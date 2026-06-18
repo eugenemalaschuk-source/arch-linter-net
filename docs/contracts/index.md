@@ -25,8 +25,8 @@ strict_layers:
   - name: clean-architecture-layers
     layers:
       - infrastructure
-      - domain
       - app
+      - domain
     reason: Dependencies must point inward toward the domain.
 ```
 

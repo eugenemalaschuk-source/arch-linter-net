@@ -23,7 +23,7 @@ make docs-serve  # start local preview at http://127.0.0.1:8000
 make docs-build  # build static site to site/
 ```
 
-See the [Getting Started](https://eugenemalaschuk-source.github.io/arch-linter-net/getting-started/)
+See the [Getting Started](docs/getting-started/index.md)
 guide for a quick walkthrough.
 
 ---
@@ -133,10 +133,13 @@ A .NET global/local tool for local and CI validation.
 # Run via dotnet run (development):
 dotnet run --project src/ArchLinterNet.Cli -- --policy architecture/dependencies.arch.yml --mode strict
 
-# Run via local tool (after dotnet tool restore):
+# Run via global tool:
 arch-linter-net --policy architecture/dependencies.arch.yml --mode audit --format json
 
-# Shortcut flags:
+# Run via local tool (after dotnet tool restore):
+dotnet arch-linter-net --policy architecture/dependencies.arch.yml --mode audit --format json
+
+# Shortcut flags (global tool form):
 arch-linter-net --policy architecture/dependencies.arch.yml --strict --json
 ```
 

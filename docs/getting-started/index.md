@@ -35,8 +35,8 @@ contracts:
     - name: clean-architecture-layering
       layers:
         - infrastructure
-        - domain
         - app
+        - domain
       reason: Dependencies must point inward toward the domain.
 ```
 
