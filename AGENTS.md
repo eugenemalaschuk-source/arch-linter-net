@@ -57,5 +57,13 @@ tests/
 - No BDD/Gherkin — library project.
 - File size thresholds: ≥500 lines warning, >800 lines error.
 
+## OpenSpec workflow
+- Specs live in `openspec/specs/<capability>/spec.md` — this is the source of truth.
+- During proposal, new specs are created under the change directory.
+- **Before archiving a change**, sync all new specs to `openspec/specs/<capability>/spec.md`.
+  The archive workflow does NOT auto-promote new specs — only delta specs on existing ones.
+- Active changes live in `openspec/changes/<name>/`. Archived changes live in
+  `openspec/changes/archive/YYYY-MM-DD-<name>/`.
+
 ## State of the repo
-- Early extraction / preview. `docs/` is empty. No `.github/` CI config exists yet.
+- Early extraction / preview. Some docs exist under `docs/`. No `.github/` CI config.
