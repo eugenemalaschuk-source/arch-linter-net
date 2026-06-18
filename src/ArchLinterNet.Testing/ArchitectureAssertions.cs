@@ -44,10 +44,11 @@ public sealed class ArchitectureValidationBuilder
     {
         ArchitectureContractDocument document = ArchitectureContractLoader.LoadFromPath(_policyPath);
 
-        IReadOnlyCollection<System.Reflection.Assembly> assemblies =
-            ArchitectureAssemblyResolver.ResolveFromDocument(document);
+        string repositoryRoot = ResolveRepositoryRoot(_policyPath);
 
-        string repositoryRoot = Path.GetDirectoryName(_policyPath) ?? Directory.GetCurrentDirectory();
+        IReadOnlyCollection<System.Reflection.Assembly> assemblies =
+            ArchitectureAssemblyResolver.ResolveFromDocument(document, repositoryRoot);
+
         ArchitectureAnalysisContext context = new(repositoryRoot, assemblies);
         ArchitectureContractRunner runner = new(context, document);
 
@@ -102,6 +103,15 @@ public sealed class ArchitectureValidationBuilder
             allViolations.AddRange(runner.CheckMethodBodyContract(contract));
         }
 
+        IEnumerable<ArchitectureAsmdefContract> asmdefContracts = isStrict
+            ? runner.StrictAsmdefContracts()
+            : runner.AuditAsmdefContracts();
+
+        foreach (ArchitectureAsmdefContract contract in asmdefContracts)
+        {
+            allViolations.AddRange(runner.CheckAsmdefContract(contract));
+        }
+
         IEnumerable<ArchitectureIndependenceContract> independenceContracts = isStrict
             ? runner.StrictIndependenceContracts()
             : runner.AuditIndependenceContracts();
@@ -115,6 +125,22 @@ public sealed class ArchitectureValidationBuilder
             allViolations.Count == 0 && allCycles.Count == 0,
             allViolations,
             allCycles);
+    }
+
+    private static string ResolveRepositoryRoot(string policyPath)
+    {
+        string? policyDir = Path.GetDirectoryName(policyPath);
+        if (string.IsNullOrEmpty(policyDir))
+        {
+            return Directory.GetCurrentDirectory();
+        }
+
+        if (string.Equals(Path.GetFileName(policyDir), "architecture", StringComparison.OrdinalIgnoreCase))
+        {
+            return Path.GetDirectoryName(policyDir) ?? policyDir;
+        }
+
+        return policyDir;
     }
 }
 

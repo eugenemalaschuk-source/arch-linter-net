@@ -14,7 +14,7 @@ public sealed class AsmdefValidator
     {
         ArchitectureContractDocument document = ArchitectureContractLoader.LoadFromPath(contractPath);
 
-        string repositoryRoot = Path.GetDirectoryName(contractPath) ?? Directory.GetCurrentDirectory();
+        string repositoryRoot = ResolveRepositoryRoot(contractPath);
 
         List<Core.Model.ArchitectureViolation> allViolations = new();
 
@@ -28,5 +28,21 @@ public sealed class AsmdefValidator
 
         violations = allViolations;
         return allViolations.Count == 0;
+    }
+
+    private static string ResolveRepositoryRoot(string contractPath)
+    {
+        string? contractDir = Path.GetDirectoryName(contractPath);
+        if (string.IsNullOrEmpty(contractDir))
+        {
+            return Directory.GetCurrentDirectory();
+        }
+
+        if (string.Equals(Path.GetFileName(contractDir), "architecture", StringComparison.OrdinalIgnoreCase))
+        {
+            return Path.GetDirectoryName(contractDir) ?? contractDir;
+        }
+
+        return contractDir;
     }
 }
