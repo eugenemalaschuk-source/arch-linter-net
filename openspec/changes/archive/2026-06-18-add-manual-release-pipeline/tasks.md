@@ -13,7 +13,7 @@
 - [x] 2.3 Configure release workflow with minimal repository permissions.
 - [x] 2.4 Add an early version validation step that rejects empty or obviously invalid package versions.
 - [x] 2.5 Add .NET setup for `10.0.x`.
-- [x] 2.6 Add restore, Release build, and Release test steps using the explicit version input where appropriate.
+- [x] 2.6 Add restore, explicit Release build, and `make acceptance` steps before packing.
 - [x] 2.7 Pack `ArchLinterNet.Core`, `ArchLinterNet.Cli`, `ArchLinterNet.Testing`, and `ArchLinterNet.Unity` with `PackageVersion` set from the workflow input.
 - [x] 2.8 Upload generated `.nupkg` files as workflow artifacts.
 - [x] 2.9 Add a publish step guarded by `publish == true` that uses NuGet.org Trusted Publishing, NuGet.org source `https://api.nuget.org/v3/index.json`, and `--skip-duplicate`.

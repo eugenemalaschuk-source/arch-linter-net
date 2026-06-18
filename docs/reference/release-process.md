@@ -62,7 +62,7 @@ publish = false
 
 Expected result:
 
-- restore, build, and tests pass in Release configuration;
+- restore, explicit Release build, and `make acceptance` pass;
 - versioned `.nupkg` artifacts are created for the publishable projects;
 - package artifacts are uploaded to the workflow run;
 - nothing is published to NuGet.org.
@@ -82,7 +82,7 @@ publish = true
 
 Expected result:
 
-- restore, build, and tests pass again in Release configuration;
+- restore, explicit Release build, and `make acceptance` pass again;
 - versioned `.nupkg` artifacts are produced again;
 - package artifacts are uploaded to the workflow run;
 - packages are pushed to NuGet.org using trusted publishing;
