@@ -4,13 +4,10 @@ name: ArchLinterNet Architecture Contract
 layers:
   core:
     namespace: ArchLinterNet.Core
-
   cli:
     namespace: ArchLinterNet.Cli
-
   testing:
     namespace: ArchLinterNet.Testing
-
   unity:
     namespace: ArchLinterNet.Unity
 
@@ -20,6 +17,9 @@ analysis:
     - ArchLinterNet.Cli
     - ArchLinterNet.Testing
     - ArchLinterNet.Unity
+  assembly_search_paths:
+    - src/ArchLinterNet.Testing/bin/Debug/net10.0
+    - src/ArchLinterNet.Unity/bin/Debug/net10.0
 
 contracts:
   strict:

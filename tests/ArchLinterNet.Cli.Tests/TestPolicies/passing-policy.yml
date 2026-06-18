@@ -1,0 +1,17 @@
+version: 1
+name: Test Passing Policy
+
+layers:
+  core:
+    namespace: ArchLinterNet.Core
+
+analysis:
+  target_assemblies:
+    - ArchLinterNet.Core
+
+contracts:
+  strict:
+    - name: core-has-no-forbidden-dependencies
+      source: core
+      forbidden: []
+      reason: Core has no forbidden dependencies in this test.

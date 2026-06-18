@@ -8,6 +8,8 @@
     <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
+    <PackageId>ArchLinterNet.Testing</PackageId>
+    <Description>NUnit test adapter for ArchLinterNet architecture contracts. Enables running strict/audit validation from .NET test projects.</Description>
   </PropertyGroup>
 
 </Project>

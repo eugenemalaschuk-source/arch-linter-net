@@ -4,6 +4,8 @@
     <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
+    <PackageId>ArchLinterNet.Core</PackageId>
+    <Description>YAML-first architecture contract engine for .NET projects. Loads declarative architecture policies, resolves assemblies, and validates dependency rules.</Description>
   </PropertyGroup>
 
   <ItemGroup>
