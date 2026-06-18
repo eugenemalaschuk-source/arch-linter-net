@@ -6,10 +6,11 @@ namespace ArchLinterNet.Unity.Tests;
 public class AsmdefValidatorTests
 {
     [Test]
-    public void Validate_ShouldReturnTrue()
+    public void Validate_NonExistentFile_ThrowsFileNotFoundException()
     {
         var validator = new AsmdefValidator();
-        var result = validator.Validate("dummy.asmdef");
-        Assert.That(result, Is.True);
+
+        Assert.Throws<System.IO.FileNotFoundException>(() =>
+            validator.Validate("nonexistent.yml"));
     }
 }

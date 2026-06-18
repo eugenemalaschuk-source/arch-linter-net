@@ -1,0 +1,70 @@
+version: 1
+name: Basic Clean Architecture Contract
+
+layers:
+  web:
+    namespace: MyApp.Web
+  domain:
+    namespace: MyApp.Domain
+  infrastructure:
+    namespace: MyApp.Infrastructure
+
+legacy_runtime_layers: []
+
+analysis:
+  target_assemblies:
+    - MyApp.Web
+    - MyApp.Domain
+    - MyApp.Infrastructure
+  assembly_search_paths: []
+
+contracts:
+  strict:
+    - name: web-must-not-depend-on-infrastructure
+      source: web
+      forbidden: [infrastructure]
+      reason: Web layer should only depend on Domain, not Infrastructure.
+
+    - name: domain-must-not-depend-on-web
+      source: domain
+      forbidden: [web, infrastructure]
+      reason: Domain must be independent of application layers.
+
+  audit: []
+
+  strict_layers:
+    - name: inward-layering
+      layers:
+        - infrastructure
+        - domain
+        - web
+      reason: Dependencies must point inward: Web -> Domain, Infrastructure -> Domain.
+
+  audit_layers: []
+
+  strict_allow_only: []
+  audit_allow_only: []
+
+  strict_cycles:
+    - name: no-package-cycles
+      layers:
+        - web
+        - domain
+        - infrastructure
+      reason: Packages must not form dependency cycles.
+
+  audit_cycles: []
+
+  strict_method_body: []
+  audit_method_body: []
+  strict_asmdef: []
+  audit_asmdef: []
+
+  strict_independence:
+    - name: web-and-infrastructure-must-be-independent
+      layers:
+        - web
+        - infrastructure
+      reason: Web and Infrastructure must not reference each other.
+
+  audit_independence: []
