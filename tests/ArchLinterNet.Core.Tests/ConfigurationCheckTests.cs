@@ -134,4 +134,162 @@ public sealed class ConfigurationCheckTests
 
         Assert.That(violations, Is.Empty);
     }
+
+    [Test]
+    public void CheckConfiguration_ExternalLayerWithNoTypes_NoViolation()
+    {
+        var document = new ArchitectureContractDocument
+        {
+            Version = 1,
+            Name = "Test",
+            Layers = new Dictionary<string, ArchitectureLayer>
+            {
+                ["ext"] = new() { Namespace = "External.Namespace.With.No.Types", External = true }
+            },
+            Analysis = new ArchitectureAnalysisConfiguration
+            {
+                TargetAssemblies = new List<string> { "ArchLinterNet.Core" }
+            },
+            Contracts = new ArchitectureContractGroups
+            {
+                StrictLayers = new List<ArchitectureLayerContract>
+                {
+                    new() { Name = "test", Layers = new List<string> { "ext" } }
+                }
+            }
+        };
+
+        var context = new ArchitectureAnalysisContext(
+            _tempDir,
+            new[] { typeof(ArchitectureContractLoader).Assembly },
+            Array.Empty<string>(),
+            Array.Empty<string>());
+
+        var runner = new ArchitectureContractRunner(context, document);
+        var violations = runner.CheckConfiguration();
+
+        Assert.That(violations.Any(v => v.ForbiddenNamespace == "empty layer namespace"), Is.False);
+    }
+
+    [Test]
+    public void CheckConfiguration_NonExternalEmptyLayer_StillProducesViolation()
+    {
+        var document = new ArchitectureContractDocument
+        {
+            Version = 1,
+            Name = "Test",
+            Layers = new Dictionary<string, ArchitectureLayer>
+            {
+                ["empty"] = new() { Namespace = "Empty.Namespace.With.No.Types", External = false }
+            },
+            Analysis = new ArchitectureAnalysisConfiguration
+            {
+                TargetAssemblies = new List<string> { "ArchLinterNet.Core" }
+            },
+            Contracts = new ArchitectureContractGroups
+            {
+                StrictLayers = new List<ArchitectureLayerContract>
+                {
+                    new() { Name = "test", Layers = new List<string> { "empty" } }
+                }
+            }
+        };
+
+        var context = new ArchitectureAnalysisContext(
+            _tempDir,
+            new[] { typeof(ArchitectureContractLoader).Assembly },
+            Array.Empty<string>(),
+            Array.Empty<string>());
+
+        var runner = new ArchitectureContractRunner(context, document);
+        var violations = runner.CheckConfiguration();
+
+        Assert.That(violations.Any(v => v.ForbiddenNamespace == "empty layer namespace"), Is.True);
+    }
+
+    [Test]
+    public void CheckConfiguration_ExternalLayerWithTypes_NoViolation()
+    {
+        var document = new ArchitectureContractDocument
+        {
+            Version = 1,
+            Name = "Test",
+            Layers = new Dictionary<string, ArchitectureLayer>
+            {
+                ["core"] = new() { Namespace = "ArchLinterNet.Core", External = true }
+            },
+            Analysis = new ArchitectureAnalysisConfiguration
+            {
+                TargetAssemblies = new List<string> { "ArchLinterNet.Core" }
+            },
+            Contracts = new ArchitectureContractGroups
+            {
+                StrictLayers = new List<ArchitectureLayerContract>
+                {
+                    new() { Name = "test", Layers = new List<string> { "core" } }
+                }
+            }
+        };
+
+        var context = new ArchitectureAnalysisContext(
+            _tempDir,
+            new[] { typeof(ArchitectureContractLoader).Assembly },
+            Array.Empty<string>(),
+            Array.Empty<string>());
+
+        var runner = new ArchitectureContractRunner(context, document);
+        var violations = runner.CheckConfiguration();
+
+        Assert.That(violations.Any(v => v.ForbiddenNamespace == "empty layer namespace"), Is.False);
+    }
+
+    [Test]
+    public void CheckConfiguration_ExternalLayer_StrictAndAuditModes()
+    {
+        var document = new ArchitectureContractDocument
+        {
+            Version = 1,
+            Name = "Test",
+            Layers = new Dictionary<string, ArchitectureLayer>
+            {
+                ["ext"] = new() { Namespace = "External.Empty", External = true },
+                ["normal"] = new() { Namespace = "Another.Empty" }
+            },
+            Analysis = new ArchitectureAnalysisConfiguration
+            {
+                TargetAssemblies = new List<string> { "ArchLinterNet.Core" }
+            },
+            Contracts = new ArchitectureContractGroups
+            {
+                StrictLayers = new List<ArchitectureLayerContract>
+                {
+                    new() { Name = "strict-test", Layers = new List<string> { "ext" } }
+                },
+                AuditLayers = new List<ArchitectureLayerContract>
+                {
+                    new() { Name = "audit-test", Layers = new List<string> { "normal" } }
+                }
+            }
+        };
+
+        var context = new ArchitectureAnalysisContext(
+            _tempDir,
+            new[] { typeof(ArchitectureContractLoader).Assembly },
+            Array.Empty<string>(),
+            Array.Empty<string>());
+
+        var runner = new ArchitectureContractRunner(context, document);
+        var strictViolations = runner.CheckConfiguration(strict: true);
+        var auditViolations = runner.CheckConfiguration(strict: false);
+
+        // External layer should not produce violations in either mode
+        Assert.That(strictViolations.Any(v =>
+            v.ForbiddenNamespace == "empty layer namespace" &&
+            v.SourceType.Contains("External.Empty")), Is.False);
+
+        // Non-external audit layer should produce violations in audit mode
+        Assert.That(auditViolations.Any(v =>
+            v.ForbiddenNamespace == "empty layer namespace" &&
+            v.SourceType.Contains("Another.Empty")), Is.True);
+    }
 }

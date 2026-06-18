@@ -50,6 +50,11 @@
         "namespace_suffix": {
           "type": "string",
           "description": "Optional namespace suffix constraint, matched after the namespace prefix."
+        },
+        "external": {
+          "type": "boolean",
+          "default": false,
+          "description": "When true, suppresses the empty-layer configuration diagnostic for this layer. Use for namespaces whose assemblies may not be available in the scan environment (external SDKs, engine types, platform-conditional namespaces)."
         }
       }
     },
