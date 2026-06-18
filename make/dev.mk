@@ -1,4 +1,4 @@
-.PHONY: bundle bundle-unix bundle-windows rtk-init rtk-init-unix rtk-init-windows restore fmt
+.PHONY: bundle bundle-unix bundle-windows rtk-init rtk-init-unix rtk-init-windows restore pack fmt-csharp
 
 bundle: bundle-$(BUNDLE_OS)  ## Install development tools for the current OS
 
@@ -30,5 +30,5 @@ pack:  ## Build NuGet packages for all publishable projects
 	@dotnet pack "$(SLNX)" -c Release -o "$(PROJECT_ROOT)/nupkg" --nologo
 	@echo "Packages created in nupkg/. Run 'dotnet tool restore' to install the local tool."
 
-fmt:  ## Auto-format all first-party C# code
+fmt-csharp:  ## Auto-format all first-party C# code
 	@dotnet format "$(SLNX)" --verbosity minimal

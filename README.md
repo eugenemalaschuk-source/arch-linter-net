@@ -12,6 +12,22 @@ It is inspired by tools such as Import Linter, ArchUnit, ArchUnitNET, NetArchTes
 
 ---
 
+## Documentation
+
+The user-facing documentation is maintained as a [MkDocs](https://www.mkdocs.org/) site
+under `docs/`. To build and view locally:
+
+```bash
+make venv        # create Python virtual environment (one-time setup)
+make docs-serve  # start local preview at http://127.0.0.1:8000
+make docs-build  # build static site to site/
+```
+
+See the [Getting Started](docs/getting-started/index.md)
+guide for a quick walkthrough.
+
+---
+
 ## Why ArchLinterNet?
 
 Many .NET architecture testing tools are excellent when you want to express rules directly in C# tests:
@@ -117,11 +133,14 @@ A .NET global/local tool for local and CI validation.
 # Run via dotnet run (development):
 dotnet run --project src/ArchLinterNet.Cli -- --policy architecture/dependencies.arch.yml --mode strict
 
+# Run via global tool:
+arch-linter-net --policy architecture/dependencies.arch.yml --mode audit --format json
+
 # Run via local tool (after dotnet tool restore):
 dotnet arch-linter-net --policy architecture/dependencies.arch.yml --mode audit --format json
 
-# Shortcut flags:
-dotnet arch-linter-net --policy architecture/dependencies.arch.yml --strict --json
+# Shortcut flags (global tool form):
+arch-linter-net --policy architecture/dependencies.arch.yml --strict --json
 ```
 
 ### `ArchLinterNet.Testing`
@@ -519,9 +538,9 @@ contracts:
 ## Output formats
 
 ```bash
-dotnet arch-linter-net --mode strict --format human
-dotnet arch-linter-net --mode strict --format json
-dotnet arch-linter-net --mode audit --format json
+arch-linter-net --mode strict --format human
+arch-linter-net --mode strict --format json
+arch-linter-net --mode audit --format json
 ```
 
 ### Human output

@@ -1,6 +1,4 @@
-.PHONY: verify test clean-results
-
-verify: lint test  ## Standard local verification: lint + all tests
+.PHONY: test clean-results
 
 test:  ## Run all tests
 	@dotnet test "$(SLNX)" --no-restore

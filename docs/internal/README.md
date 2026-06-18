@@ -17,7 +17,7 @@ Primary design goals:
 - policy-driven behavior (YAML, not hardcoded tests);
 - reusable in non-Unity backends.
 
----
+______________________________________________________________________
 
 ## Public API Surface
 
@@ -51,22 +51,22 @@ Primary design goals:
 
 - `ArchitectureRepositoryRootLocator`
 
----
+______________________________________________________________________
 
 ## Execution Model
 
 1. Load YAML into `ArchitectureContractDocument`.
-2. Resolve target assemblies from `analysis.target_assemblies`.
+1. Resolve target assemblies from `analysis.target_assemblies`.
    The resolver checks already loaded assemblies, then `Assembly.Load`, then optional probing paths from YAML.
-3. Build `ArchitectureAnalysisContext` with:
+1. Build `ArchitectureAnalysisContext` with:
    - repository root;
    - target assemblies.
-4. Build `ArchitectureContractRunner`.
-5. Enumerate strict/audit contract lists.
-6. Execute each contract type and collect violations/cycles.
-7. Render output for humans or CI artifacts.
+1. Build `ArchitectureContractRunner`.
+1. Enumerate strict/audit contract lists.
+1. Execute each contract type and collect violations/cycles.
+1. Render output for humans or CI artifacts.
 
----
+______________________________________________________________________
 
 ## YAML Requirements
 
@@ -121,7 +121,7 @@ contracts:
   audit_independence: []
 ```
 
----
+______________________________________________________________________
 
 ## Minimal Usage Example
 
@@ -158,7 +158,7 @@ foreach (ArchitectureDependencyContract contract in runner.StrictContracts())
 }
 ```
 
----
+______________________________________________________________________
 
 ## Contract Types and Behavior
 
@@ -196,7 +196,7 @@ Validates assembly definition dependency boundaries (Unity-focused but YAML-driv
 
 Mutual separation across a set of layers (no cross references in either direction).
 
----
+______________________________________________________________________
 
 ## Violation and Cycle Outputs
 
@@ -222,30 +222,30 @@ Cycle checks return string paths.
 
 CI artifact payloads are JSON strings designed for machine parsing.
 
----
+______________________________________________________________________
 
 ## Integration Pattern for Test Projects
 
 Recommended pattern:
 
 1. Keep reusable logic in ArchLinterNet.Core.
-2. Keep test project as a thin runner adapter.
-3. Test layer responsibilities:
+1. Keep test project as a thin runner adapter.
+1. Test layer responsibilities:
    - load policy;
    - initialize target assemblies for that solution;
    - execute strict/audit contract sets;
    - fail test on non-empty result sets.
 
----
+______________________________________________________________________
 
 ## Using in Backend Repositories
 
 For backend repos (ASP.NET, workers, services):
 
 1. Add package reference to ArchLinterNet.Core.
-2. Add `architecture/dependencies.arch.yml` in repo root.
-3. Define `analysis.target_assemblies` with backend assembly names.
-4. Create a small test/CLI host that:
+1. Add `architecture/dependencies.arch.yml` in repo root.
+1. Define `analysis.target_assemblies` with backend assembly names.
+1. Create a small test/CLI host that:
    - loads contract;
    - resolves assemblies;
    - executes strict/audit policies.
