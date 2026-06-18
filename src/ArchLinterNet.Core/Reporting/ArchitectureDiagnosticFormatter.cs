@@ -13,7 +13,7 @@ public static class ArchitectureDiagnosticFormatter
                 .OrderBy(violation => violation.SourceType)
                 .ThenBy(violation => violation.ForbiddenNamespace)
                 .Select(violation =>
-                    $"- {violation.SourceType} -> {violation.ForbiddenNamespace}: {string.Join(", ", violation.ForbiddenReferences)}"));
+                    $"- [{violation.ContractName}] {violation.SourceType} -> {violation.ForbiddenNamespace}: {string.Join(", ", violation.ForbiddenReferences)}"));
     }
 
     public static string FormatCyclesForHumans(IReadOnlyCollection<string> cycles)
@@ -33,6 +33,7 @@ public static class ArchitectureDiagnosticFormatter
             mode,
             violations = violations.Select(v => new
             {
+                contract = v.ContractName,
                 source = v.SourceType,
                 forbidden_namespace = v.ForbiddenNamespace,
                 forbidden_references = v.ForbiddenReferences.ToArray()

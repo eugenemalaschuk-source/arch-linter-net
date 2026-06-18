@@ -1,4 +1,5 @@
 using ArchLinterNet.Core.Contracts;
+using ArchLinterNet.Core.Resolution;
 using ArchLinterNet.Core.Scanning;
 
 namespace ArchLinterNet.Unity;
@@ -14,7 +15,7 @@ public sealed class AsmdefValidator
     {
         ArchitectureContractDocument document = ArchitectureContractLoader.LoadFromPath(contractPath);
 
-        string repositoryRoot = ResolveRepositoryRoot(contractPath);
+        string repositoryRoot = ArchitectureRepositoryRootLocator.ResolveFrom(contractPath);
 
         List<Core.Model.ArchitectureViolation> allViolations = new();
 
@@ -30,19 +31,4 @@ public sealed class AsmdefValidator
         return allViolations.Count == 0;
     }
 
-    private static string ResolveRepositoryRoot(string contractPath)
-    {
-        string? contractDir = Path.GetDirectoryName(contractPath);
-        if (string.IsNullOrEmpty(contractDir))
-        {
-            return Directory.GetCurrentDirectory();
-        }
-
-        if (string.Equals(Path.GetFileName(contractDir), "architecture", StringComparison.OrdinalIgnoreCase))
-        {
-            return Path.GetDirectoryName(contractDir) ?? contractDir;
-        }
-
-        return contractDir;
-    }
 }

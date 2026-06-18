@@ -95,33 +95,108 @@ public sealed class ArchitectureContractRunner(
 
         foreach (string missingAssembly in _context.MissingAssemblyNames)
         {
+            string probeInfo = _context.AssemblyProbingPaths.Count > 0
+                ? $" Probing paths: {string.Join("; ", _context.AssemblyProbingPaths)}"
+                : string.Empty;
+
             violations.Add(new ArchitectureViolation(
                 "<configuration>",
                 missingAssembly,
                 "missing target assembly",
-                new[] { $"Assembly '{missingAssembly}' is declared in analysis.target_assemblies but could not be resolved." }));
+                new[] { $"Assembly '{missingAssembly}' is declared in analysis.target_assemblies but could not be resolved.{probeInfo}" }));
         }
 
-        IEnumerable<ArchitectureLayerContract> layerContracts = strict
-            ? _document.Contracts.StrictLayers
-            : _document.Contracts.AuditLayers;
+        HashSet<string> referencedLayers = new(StringComparer.Ordinal);
 
-        foreach (ArchitectureLayerContract contract in layerContracts)
+        void AddLayerNames(IEnumerable<string> names)
         {
-            foreach (string layerName in contract.Layers)
+            foreach (string name in names)
             {
-                ArchitectureLayer layer =
-                    ArchitectureLayerResolver.ResolveLayer(_document, contract.Name, layerName);
-                Type[] types = ArchitectureTypeScanner.FindTypesInLayer(_context.TargetAssemblies, layer);
+                referencedLayers.Add(name);
+            }
+        }
 
-                if (types.Length == 0)
-                {
-                    violations.Add(new ArchitectureViolation(
-                        contract.Name,
-                        ArchitectureLayerResolver.DescribeLayer(layer),
-                        "empty layer namespace",
-                        new[] { $"Layer '{layerName}' namespace '{layer.Namespace}' contains no types in loaded assemblies." }));
-                }
+        if (strict)
+        {
+            foreach (ArchitectureDependencyContract c in _document.Contracts.Strict)
+            {
+                AddLayerNames(new[] { c.Source });
+                AddLayerNames(c.Forbidden);
+            }
+
+            foreach (ArchitectureAllowOnlyContract c in _document.Contracts.StrictAllowOnly)
+            {
+                AddLayerNames(new[] { c.Source });
+                AddLayerNames(c.Allowed);
+            }
+
+            foreach (ArchitectureCycleContract c in _document.Contracts.StrictCycles)
+            {
+                AddLayerNames(c.Layers);
+            }
+
+            foreach (ArchitectureMethodBodyContract c in _document.Contracts.StrictMethodBody)
+            {
+                AddLayerNames(new[] { c.Source });
+            }
+
+            foreach (ArchitectureIndependenceContract c in _document.Contracts.StrictIndependence)
+            {
+                AddLayerNames(c.Layers);
+            }
+
+            foreach (ArchitectureLayerContract c in _document.Contracts.StrictLayers)
+            {
+                AddLayerNames(c.Layers);
+            }
+        }
+        else
+        {
+            foreach (ArchitectureDependencyContract c in _document.Contracts.Audit)
+            {
+                AddLayerNames(new[] { c.Source });
+                AddLayerNames(c.Forbidden);
+            }
+
+            foreach (ArchitectureAllowOnlyContract c in _document.Contracts.AuditAllowOnly)
+            {
+                AddLayerNames(new[] { c.Source });
+                AddLayerNames(c.Allowed);
+            }
+
+            foreach (ArchitectureCycleContract c in _document.Contracts.AuditCycles)
+            {
+                AddLayerNames(c.Layers);
+            }
+
+            foreach (ArchitectureMethodBodyContract c in _document.Contracts.AuditMethodBody)
+            {
+                AddLayerNames(new[] { c.Source });
+            }
+
+            foreach (ArchitectureIndependenceContract c in _document.Contracts.AuditIndependence)
+            {
+                AddLayerNames(c.Layers);
+            }
+
+            foreach (ArchitectureLayerContract c in _document.Contracts.AuditLayers)
+            {
+                AddLayerNames(c.Layers);
+            }
+        }
+
+        foreach (string layerName in referencedLayers)
+        {
+            ArchitectureLayer layer = ArchitectureLayerResolver.ResolveLayer(_document, "<configuration>", layerName);
+            Type[] types = ArchitectureTypeScanner.FindTypesInLayer(_context.TargetAssemblies, layer);
+
+            if (types.Length == 0)
+            {
+                violations.Add(new ArchitectureViolation(
+                    "<configuration>",
+                    ArchitectureLayerResolver.DescribeLayer(layer),
+                    "empty layer namespace",
+                    new[] { $"Layer '{layerName}' namespace '{layer.Namespace}' contains no types in loaded assemblies." }));
             }
         }
 

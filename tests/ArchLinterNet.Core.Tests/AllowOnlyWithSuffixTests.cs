@@ -41,6 +41,7 @@ public sealed class AllowOnlyWithSuffixTests
         var context = new ArchitectureAnalysisContext(
             "/tmp",
             new[] { typeof(ArchitectureContractLoader).Assembly },
+            Array.Empty<string>(),
             Array.Empty<string>());
 
         var runner = new ArchitectureContractRunner(context, document);

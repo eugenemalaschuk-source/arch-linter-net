@@ -9,6 +9,23 @@ public static class ArchitectureRepositoryRootLocator
         return _root.Value;
     }
 
+    public static string ResolveFrom(string policyPath)
+    {
+        string fullPath = Path.GetFullPath(policyPath);
+        string? policyDir = Path.GetDirectoryName(fullPath);
+        if (string.IsNullOrEmpty(policyDir))
+        {
+            return Directory.GetCurrentDirectory();
+        }
+
+        if (string.Equals(Path.GetFileName(policyDir), "architecture", StringComparison.OrdinalIgnoreCase))
+        {
+            return Path.GetDirectoryName(policyDir) ?? policyDir;
+        }
+
+        return policyDir;
+    }
+
     private static string ResolveInternal()
     {
         DirectoryInfo? directory = new(AppContext.BaseDirectory);

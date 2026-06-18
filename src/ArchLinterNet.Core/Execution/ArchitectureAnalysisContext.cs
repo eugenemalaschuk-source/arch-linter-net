@@ -7,7 +7,8 @@ public sealed class ArchitectureAnalysisContext
     public ArchitectureAnalysisContext(
         string repositoryRoot,
         IReadOnlyCollection<Assembly> targetAssemblies,
-        IReadOnlyCollection<string> missingAssemblyNames)
+        IReadOnlyCollection<string> missingAssemblyNames,
+        IReadOnlyCollection<string> assemblyProbingPaths)
     {
         if (string.IsNullOrWhiteSpace(repositoryRoot))
         {
@@ -18,6 +19,7 @@ public sealed class ArchitectureAnalysisContext
         TargetAssemblies = targetAssemblies?.Where(assembly => assembly != null).Distinct().ToArray()
                            ?? throw new ArgumentNullException(nameof(targetAssemblies));
         MissingAssemblyNames = missingAssemblyNames ?? Array.Empty<string>();
+        AssemblyProbingPaths = assemblyProbingPaths ?? Array.Empty<string>();
     }
 
     public string RepositoryRoot { get; }
@@ -25,4 +27,6 @@ public sealed class ArchitectureAnalysisContext
     public IReadOnlyCollection<Assembly> TargetAssemblies { get; }
 
     public IReadOnlyCollection<string> MissingAssemblyNames { get; }
+
+    public IReadOnlyCollection<string> AssemblyProbingPaths { get; }
 }

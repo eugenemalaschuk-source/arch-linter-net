@@ -40,7 +40,7 @@ public static class ArchitectureAssemblyResolver
             }
         }
 
-        return new ResolutionResult(assemblies, missing);
+        return new ResolutionResult(assemblies, missing, probingPaths.ToArray());
     }
 
     private static Assembly ResolveByName(string assemblyName, IReadOnlyList<string> probingPaths)
@@ -170,4 +170,5 @@ public static class ArchitectureAssemblyResolver
 
 public sealed record ResolutionResult(
     IReadOnlyCollection<Assembly> ResolvedAssemblies,
-    IReadOnlyCollection<string> MissingAssemblyNames);
+    IReadOnlyCollection<string> MissingAssemblyNames,
+    IReadOnlyCollection<string> AssemblyProbingPaths);

@@ -2,6 +2,7 @@ using ArchLinterNet.Core.Contracts;
 using ArchLinterNet.Core.Execution;
 using ArchLinterNet.Core.Model;
 using ArchLinterNet.Core.Reporting;
+using ArchLinterNet.Core.Resolution;
 
 namespace ArchLinterNet.Core;
 
@@ -24,12 +25,12 @@ public sealed class ArchitectureValidator
     {
         ArchitectureContractDocument document = ArchitectureContractLoader.LoadFromPath(policyPath);
 
-        string repositoryRoot = ResolveRepositoryRoot(policyPath);
+        string repositoryRoot = ArchitectureRepositoryRootLocator.ResolveFrom(policyPath);
 
         ResolutionResult resolution = ArchitectureAssemblyResolver.ResolveFromDocument(document, repositoryRoot);
 
         ArchitectureAnalysisContext context = new(repositoryRoot, resolution.ResolvedAssemblies,
-            resolution.MissingAssemblyNames);
+            resolution.MissingAssemblyNames, resolution.AssemblyProbingPaths);
         ArchitectureContractRunner runner = new(context, document);
 
         List<ArchitectureViolation> allViolations = new();
@@ -78,19 +79,4 @@ public sealed class ArchitectureValidator
         return allViolations.Count == 0 && allCycles.Count == 0;
     }
 
-    private static string ResolveRepositoryRoot(string policyPath)
-    {
-        string? policyDir = Path.GetDirectoryName(policyPath);
-        if (string.IsNullOrEmpty(policyDir))
-        {
-            return Directory.GetCurrentDirectory();
-        }
-
-        if (string.Equals(Path.GetFileName(policyDir), "architecture", StringComparison.OrdinalIgnoreCase))
-        {
-            return Path.GetDirectoryName(policyDir) ?? policyDir;
-        }
-
-        return policyDir;
-    }
 }
