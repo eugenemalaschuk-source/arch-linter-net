@@ -1,4 +1,8 @@
 <Project>
+  <ItemGroup>
+    <None Include="$(MSBuildThisFileDirectory)README.md" Pack="true" PackagePath="\" />
+  </ItemGroup>
+
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
@@ -10,6 +14,7 @@
     <Company>Eugene Malashchuk</Company>
     <Copyright>Copyright (c) 2026 Eugene Malashchuk</Copyright>
     <PackageProjectUrl>https://eugenemalaschuk-source.github.io/arch-linter-net/</PackageProjectUrl>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageTags>architecture;linting;dotnet;yaml;ci</PackageTags>
     <RepositoryUrl>https://github.com/eugenemalaschuk-source/arch-linter-net</RepositoryUrl>
