@@ -55,9 +55,9 @@ public sealed class ArchitectureValidationBuilder
         List<ArchitectureViolation> allViolations = new();
         List<string> allCycles = new();
 
-        allViolations.AddRange(runner.CheckConfiguration());
-
         bool isStrict = contracts == "strict";
+
+        allViolations.AddRange(runner.CheckConfiguration(strict: isStrict));
 
         IEnumerable<ArchitectureDependencyContract> dependencyContracts = isStrict
             ? runner.StrictContracts()

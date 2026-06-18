@@ -15,9 +15,12 @@ internal static class ArchitectureIlMethodBodyScanner
         IReadOnlyCollection<Assembly> targetAssemblies,
         string sourceNamespacePrefix,
         IReadOnlyList<string> forbiddenCallPatterns,
-        IReadOnlyList<ArchitectureIgnoredViolation> ignoredViolations)
+        IReadOnlyList<ArchitectureIgnoredViolation> ignoredViolations,
+        ArchitectureLayer? sourceLayer = null)
     {
-        Type[] sourceTypes = ArchitectureTypeScanner.FindTypesInNamespace(targetAssemblies, sourceNamespacePrefix);
+        Type[] sourceTypes = sourceLayer != null
+            ? ArchitectureTypeScanner.FindTypesInLayer(targetAssemblies, sourceLayer)
+            : ArchitectureTypeScanner.FindTypesInNamespace(targetAssemblies, sourceNamespacePrefix);
         if (sourceTypes.Length == 0)
         {
             return Array.Empty<ArchitectureViolation>();
