@@ -7,7 +7,7 @@ layers:
   game_core:
     namespace: MyCompany.Game.Core
   gameplay_runtime:
-    namespace: MyCompany.Game.Gameplay
+    namespace: MyCompany.Game.Gameplay.Runtime
   gameplay_editor:
     namespace: MyCompany.Game.Gameplay.Editor
   unity_adapters:
@@ -18,7 +18,7 @@ legacy_runtime_layers: []
 analysis:
   target_assemblies:
     - MyCompany.Game.Core
-    - MyCompany.Game.Gameplay
+    - MyCompany.Game.Gameplay.Runtime
     - MyCompany.Game.Gameplay.Editor
     - MyCompany.Game.UnityAdapters
   assembly_search_paths: []
@@ -65,7 +65,7 @@ contracts:
     - name: runtime-asmdefs-must-not-reference-editor
       source_assemblies:
         - MyCompany.Game.Core
-        - MyCompany.Game.Gameplay
+        - MyCompany.Game.Gameplay.Runtime
       forbidden_editor_refs: true
       forbidden_asmdef_prefixes:
         - MyCompany.Game.Editor

@@ -6,21 +6,18 @@ name: Modular Monolith Policy Recipe
 layers:
   shared_kernel:
     namespace: MyCompany.Product.SharedKernel
-  sales:
-    namespace: MyCompany.Product.Modules.Sales
+  sales_impl:
+    namespace: MyCompany.Product.Modules.Sales.Internal
   sales_contracts:
-    namespace: MyCompany.Product.Modules.Sales
-    namespace_suffix: Contracts
-  billing:
-    namespace: MyCompany.Product.Modules.Billing
+    namespace: MyCompany.Product.Modules.Sales.Contracts
+  billing_impl:
+    namespace: MyCompany.Product.Modules.Billing.Internal
   billing_contracts:
-    namespace: MyCompany.Product.Modules.Billing
-    namespace_suffix: Contracts
-  inventory:
-    namespace: MyCompany.Product.Modules.Inventory
+    namespace: MyCompany.Product.Modules.Billing.Contracts
+  inventory_impl:
+    namespace: MyCompany.Product.Modules.Inventory.Internal
   inventory_contracts:
-    namespace: MyCompany.Product.Modules.Inventory
-    namespace_suffix: Contracts
+    namespace: MyCompany.Product.Modules.Inventory.Contracts
 
 legacy_runtime_layers: []
 
@@ -37,16 +34,14 @@ contracts:
   strict:
     - name: shared-kernel-must-not-depend-on-modules
       source: shared_kernel
-      forbidden: [sales, billing, inventory]
+      forbidden: [sales_impl, billing_impl, inventory_impl]
       reason: Shared kernel must be reusable by modules without depending back on them.
 
   audit:
     - name: audit-sales-direct-billing-coupling
-      source: sales
-      forbidden: [billing]
-      allowed_types:
-        - MyCompany.Product.Modules.Billing.Contracts.InvoiceCreated
-      reason: Discover direct Sales to Billing coupling outside public contracts.
+      source: sales_impl
+      forbidden: [billing_impl]
+      reason: Discover direct Sales to Billing implementation coupling outside public contracts.
 
   strict_layers: []
   audit_layers: []
@@ -71,7 +66,7 @@ contracts:
 
   strict_cycles:
     - name: module-cycles
-      layers: [sales, billing, inventory]
+      layers: [sales_impl, billing_impl, inventory_impl]
       reason: Business modules must not form dependency cycles.
 
   audit_cycles: []
@@ -82,11 +77,11 @@ contracts:
 
   strict_independence:
     - name: modules-must-be-independent
-      layers: [sales, billing, inventory]
+      layers: [sales_impl, billing_impl, inventory_impl]
       ignored_violations:
-        - source_type: MyCompany.Product.Modules.Sales.Legacy.LegacyBillingAdapter
-          forbidden_reference: MyCompany.Product.Modules.Billing.LegacyBillingGateway
+        - source_type: MyCompany.Product.Modules.Sales.Internal.Legacy.LegacyBillingAdapter
+          forbidden_reference: MyCompany.Product.Modules.Billing.Internal.LegacyBillingGateway
           reason: Existing module coupling tracked for migration; remove after billing integration is replaced.
-      reason: Modules should communicate through contracts or messaging, not direct implementation references.
+      reason: Module implementations should communicate through contracts or messaging, not direct implementation references.
 
   audit_independence: []

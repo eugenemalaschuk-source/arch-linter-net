@@ -39,11 +39,13 @@ Each layer name must be a unique identifier used to reference the layer in contr
 
 ## `legacy_runtime_layers`
 
-Optional. List of layer names that are runtime-only (not in source).
+Optional. List of namespace prefixes that are runtime-only or otherwise not
+modeled as named layers. These entries are checked as namespaces when a
+dependency contract sets `forbidden_legacy_runtime: true`.
 
 ```yaml
 legacy_runtime_layers:
-  - <layer-name>
+  - Legacy.Runtime.Namespace
 ```
 
 ## `analysis`
