@@ -1,0 +1,43 @@
+site_name: ArchLinterNet
+site_description: Declarative architecture contracts and dependency linting for .NET
+repo_url: https://github.com/eugenemalaschuk-source/arch-linter-net
+edit_uri: edit/main/docs/
+
+theme:
+  name: material
+  features:
+    - navigation.tabs
+    - navigation.sections
+    - navigation.top
+    - search.highlight
+    - content.code.copy
+
+nav:
+  - Home: index.md
+  - Getting Started: getting-started/index.md
+  - Installation: installation/index.md
+  - CLI: cli/index.md
+  - Policy Format: policy-format/index.md
+  - Contracts:
+      - contracts/index.md
+  - Guides:
+      - CI Integration: guides/ci-integration.md
+      - Migration Baselines: guides/migration-baselines.md
+  - AI:
+      - ai/index.md
+  - Reference:
+      - YAML Schema: reference/yaml-schema.md
+      - Release Process: reference/release-process.md
+
+exclude_docs: |
+  internal/
+
+
+markdown_extensions:
+  - admonition
+  - pymdownx.highlight
+  - pymdownx.superfences
+  - pymdownx.tabbed:
+      alternate_style: true
+  - toc:
+      permalink: true
