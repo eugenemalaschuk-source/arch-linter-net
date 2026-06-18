@@ -54,3 +54,9 @@ graphify-out/
 
 # Local NuGet packages (built by make pack)
 nupkg/
+
+# Python virtual environment (docs tooling)
+.venv/
+
+# MkDocs build output
+site/

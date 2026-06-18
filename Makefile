@@ -19,6 +19,11 @@
 ##   make verify               — lint + all tests
 ##   make test                 — run all tests
 ##
+## Documentation:
+##   make venv                 — create local Python virtual environment via uv
+##   make docs-serve           — start local MkDocs development server
+##   make docs-build           — build static documentation site
+##
 ## Utilities:
 ##   make clean-results        — remove test-results folder
 
@@ -32,3 +37,12 @@ include make/test.mk
 
 help:
 	@awk '/^## / { sub(/^## /, "", $$0); print }' $(MAKEFILE_LIST)
+
+venv:
+	@cd "$(PROJECT_ROOT)" && UV_PROJECT_ENVIRONMENT="$(PROJECT_ROOT)/.venv" "$(UV)" sync --project tools/pyproject.toml
+
+docs-serve:
+	@cd "$(PROJECT_ROOT)" && UV_PROJECT_ENVIRONMENT="$(PROJECT_ROOT)/.venv" "$(UV)" run --project tools/pyproject.toml mkdocs serve
+
+docs-build:
+	@cd "$(PROJECT_ROOT)" && UV_PROJECT_ENVIRONMENT="$(PROJECT_ROOT)/.venv" "$(UV)" run --project tools/pyproject.toml mkdocs build
