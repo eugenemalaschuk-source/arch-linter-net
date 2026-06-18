@@ -33,9 +33,16 @@ layers:
   <layer-name>:
     namespace: <string>          # Required — namespace pattern for matching types
     namespace_suffix: <string>   # Optional — suffix appended to namespace during matching
+    external: <bool>             # Optional — suppress empty-layer config diagnostic
 ```
 
 Each layer name must be a unique identifier used to reference the layer in contracts.
+
+When `external: true`, the linter skips the `empty layer namespace` configuration
+check for that layer. Use this for namespaces whose assemblies may not be available
+in the scan environment (external SDKs, engine namespaces, platform-conditional
+assemblies). All contract checks still apply normally — dependency scanning works
+via namespace string matching on source-side types.
 
 ## `legacy_runtime_layers`
 
