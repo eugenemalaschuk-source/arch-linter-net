@@ -7,7 +7,7 @@ public static class ArchitectureAssemblyResolver
 {
     private const string AssemblySearchPathsEnvVar = "ARCHITECTURE_ASSEMBLY_SEARCH_PATHS";
 
-    public static IReadOnlyCollection<Assembly> ResolveFromDocument(ArchitectureContractDocument document,
+    public static ResolutionResult ResolveFromDocument(ArchitectureContractDocument document,
         string? repositoryRoot = null)
     {
         if (document == null)
@@ -22,17 +22,25 @@ public static class ArchitectureAssemblyResolver
         }
 
         List<Assembly> assemblies = new(names.Count);
+        List<string> missing = new();
 
         IReadOnlyList<string> probingPaths = ResolveProbingPaths(document, repositoryRoot);
 
         foreach (string name in names.Where(value => !string.IsNullOrWhiteSpace(value))
                      .Distinct(StringComparer.Ordinal))
         {
-            Assembly assembly = ResolveByName(name.Trim(), probingPaths);
-            assemblies.Add(assembly);
+            try
+            {
+                Assembly assembly = ResolveByName(name.Trim(), probingPaths);
+                assemblies.Add(assembly);
+            }
+            catch (InvalidOperationException)
+            {
+                missing.Add(name.Trim());
+            }
         }
 
-        return assemblies;
+        return new ResolutionResult(assemblies, missing);
     }
 
     private static Assembly ResolveByName(string assemblyName, IReadOnlyList<string> probingPaths)
@@ -159,3 +167,7 @@ public static class ArchitectureAssemblyResolver
         }
     }
 }
+
+public sealed record ResolutionResult(
+    IReadOnlyCollection<Assembly> ResolvedAssemblies,
+    IReadOnlyCollection<string> MissingAssemblyNames);

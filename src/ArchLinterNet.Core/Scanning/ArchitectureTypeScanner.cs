@@ -10,7 +10,17 @@ internal static class ArchitectureTypeScanner
     {
         return FindTypes(
             targetAssemblies,
-            type => ArchitectureTypeNames.SafeNamespace(type).StartsWith(namespacePrefix, StringComparison.Ordinal));
+            type => ArchitectureLayerResolver.MatchesPrefix(
+                ArchitectureTypeNames.SafeNamespace(type), namespacePrefix));
+    }
+
+    public static Type[] FindTypesInNamespaceWithSuffix(
+        IEnumerable<Assembly> targetAssemblies,
+        string namespacePrefix,
+        string namespaceSuffix)
+    {
+        var layer = new ArchitectureLayer { Namespace = namespacePrefix, NamespaceSuffix = namespaceSuffix };
+        return FindTypesInLayer(targetAssemblies, layer);
     }
 
     public static Type[] FindTypesInLayer(IEnumerable<Assembly> targetAssemblies, ArchitectureLayer layer)

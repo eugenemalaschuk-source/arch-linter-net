@@ -53,10 +53,10 @@ internal static class ArchitectureLayerResolver
             .Select(layerName => new
             {
                 LayerName = layerName,
-                Namespace = ResolveLayerNamespace(document, "cycle-resolution", layerName)
+                Layer = ResolveLayer(document, "cycle-resolution", layerName)
             })
-            .Where(layer => MatchesPrefix(typeName, layer.Namespace))
-            .OrderByDescending(layer => layer.Namespace.Length)
+            .Where(layer => MatchesNamespace(layer.Layer, typeName))
+            .OrderByDescending(layer => layer.Layer.Namespace.Length)
             .Select(layer => layer.LayerName)
             .FirstOrDefault();
     }
@@ -64,7 +64,7 @@ internal static class ArchitectureLayerResolver
     public static bool IsProjectType(ArchitectureContractDocument document, string typeName)
     {
         return document.Layers.Values.Any(layer =>
-            MatchesPrefix(typeName, layer.Namespace));
+            MatchesNamespace(layer, typeName));
     }
 
     public static bool IsInAnyNamespace(string typeName, IEnumerable<string> namespacePrefixes)
