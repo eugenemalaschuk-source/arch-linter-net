@@ -26,8 +26,8 @@ rtk-init-windows:  ## Configure RTK AI agent integrations on Windows
 restore:  ## Restore NuGet packages for all .NET projects
 	@dotnet restore "$(SLNX)"
 
-pack:  ## Build NuGet packages for local tool installation
-	@dotnet pack "$(PROJECT_ROOT)/src/ArchLinterNet.Cli/ArchLinterNet.Cli.csproj" -c Release -o "$(PROJECT_ROOT)/nupkg" --nologo
+pack:  ## Build NuGet packages for all publishable projects
+	@dotnet pack "$(SLNX)" -c Release -o "$(PROJECT_ROOT)/nupkg" --nologo
 	@echo "Packages created in nupkg/. Run 'dotnet tool restore' to install the local tool."
 
 fmt:  ## Auto-format all first-party C# code

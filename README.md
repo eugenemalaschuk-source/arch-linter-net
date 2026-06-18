@@ -467,6 +467,7 @@ jobs:
 
   audit:
     runs-on: ubuntu-latest
+    continue-on-error: true  # audit diagnostics should not block CI
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-dotnet@v4
