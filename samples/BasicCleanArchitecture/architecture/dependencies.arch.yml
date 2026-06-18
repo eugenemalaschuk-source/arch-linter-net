@@ -9,28 +9,28 @@ layers:
   infrastructure:
     namespace: MyApp.Infrastructure
 
-legacy_runtime_layers: []
+legacy_runtime_layers: [ ]
 
 analysis:
   target_assemblies:
     - MyApp.Web
     - MyApp.Domain
     - MyApp.Infrastructure
-  assembly_search_paths: []
+  assembly_search_paths: [ ]
 
 contracts:
   strict:
     - name: web-must-not-depend-on-infrastructure
       source: web
-      forbidden: [infrastructure]
+      forbidden: [ infrastructure ]
       reason: Web layer should only depend on Domain, not Infrastructure.
 
     - name: domain-must-not-depend-on-web-or-infrastructure
       source: domain
-      forbidden: [web, infrastructure]
+      forbidden: [ web, infrastructure ]
       reason: Domain must be independent of application layers.
 
-  audit: []
+  audit: [ ]
 
   strict_layers:
     - name: inward-layering
@@ -38,12 +38,13 @@ contracts:
         - web
         - domain
         - infrastructure
-      reason: Dependencies must point inward: Web -> Domain, Infrastructure -> Domain. Outer layers may reference inner layers.
+      reason:
+        Dependencies must point inward: Web -> Domain, Infrastructure -> Domain. Outer layers may reference inner layers.
 
-  audit_layers: []
+  audit_layers: [ ]
 
-  strict_allow_only: []
-  audit_allow_only: []
+  strict_allow_only: [ ]
+  audit_allow_only: [ ]
 
   strict_cycles:
     - name: no-package-cycles
@@ -53,18 +54,18 @@ contracts:
         - infrastructure
       reason: Packages must not form dependency cycles.
 
-  audit_cycles: []
+  audit_cycles: [ ]
 
-  strict_method_body: []
-  audit_method_body: []
-  strict_asmdef: []
-  audit_asmdef: []
+  strict_method_body: [ ]
+  audit_method_body: [ ]
+  strict_asmdef: [ ]
+  audit_asmdef: [ ]
 
   strict_independence:
-    name: web-and-infrastructure-must-be-independent
-    layers:
-      - web
-      - infrastructure
-    reason: Web and Infrastructure must not reference each other.
+    - name: web-and-infrastructure-must-be-independent
+      layers:
+        - web
+        - infrastructure
+      reason: Web and Infrastructure must not reference each other.
 
-  audit_independence: []
+  audit_independence: [ ]
