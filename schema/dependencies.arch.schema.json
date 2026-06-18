@@ -1,0 +1,276 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://archlinternet.dev/schema/dependencies.arch.schema.json",
+  "title": "ArchLinterNet dependency architecture policy",
+  "description": "Schema for architecture/dependencies.arch.yml policy files.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["version", "name", "layers", "analysis", "contracts"],
+  "properties": {
+    "version": {
+      "type": "integer",
+      "const": 1,
+      "description": "Policy schema version. Current supported version is 1."
+    },
+    "name": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Human-readable policy name."
+    },
+    "layers": {
+      "type": "object",
+      "description": "Named layer definitions referenced by contracts.",
+      "additionalProperties": { "$ref": "#/$defs/layer" }
+    },
+    "legacy_runtime_layers": {
+      "type": "array",
+      "description": "Namespace prefixes used by dependency contracts with forbidden_legacy_runtime enabled.",
+      "items": { "type": "string", "minLength": 1 },
+      "default": []
+    },
+    "analysis": { "$ref": "#/$defs/analysis" },
+    "contracts": { "$ref": "#/$defs/contracts" }
+  },
+  "$defs": {
+    "stringList": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 },
+      "default": []
+    },
+    "layer": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["namespace"],
+      "properties": {
+        "namespace": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Namespace prefix matched with exact or child-namespace semantics."
+        },
+        "namespace_suffix": {
+          "type": "string",
+          "description": "Optional namespace suffix constraint, matched after the namespace prefix."
+        }
+      }
+    },
+    "analysis": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["target_assemblies"],
+      "properties": {
+        "target_assemblies": {
+          "type": "array",
+          "description": "Assembly names to load and scan.",
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "assembly_search_paths": {
+          "$ref": "#/$defs/stringList",
+          "description": "Additional directories used when resolving target assemblies."
+        },
+        "source_roots": {
+          "$ref": "#/$defs/stringList",
+          "description": "Source roots used by method-body Roslyn scanning."
+        }
+      }
+    },
+    "contracts": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "strict": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/dependencyContract" },
+          "default": []
+        },
+        "audit": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/dependencyContract" },
+          "default": []
+        },
+        "strict_layers": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/layerContract" },
+          "default": []
+        },
+        "audit_layers": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/layerContract" },
+          "default": []
+        },
+        "strict_allow_only": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/allowOnlyContract" },
+          "default": []
+        },
+        "audit_allow_only": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/allowOnlyContract" },
+          "default": []
+        },
+        "strict_cycles": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/cycleContract" },
+          "default": []
+        },
+        "audit_cycles": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/cycleContract" },
+          "default": []
+        },
+        "strict_method_body": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/methodBodyContract" },
+          "default": []
+        },
+        "audit_method_body": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/methodBodyContract" },
+          "default": []
+        },
+        "strict_asmdef": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/asmdefContract" },
+          "default": []
+        },
+        "audit_asmdef": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/asmdefContract" },
+          "default": []
+        },
+        "strict_independence": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/independenceContract" },
+          "default": []
+        },
+        "audit_independence": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/independenceContract" },
+          "default": []
+        }
+      }
+    },
+    "baseContractFields": {
+      "type": "object",
+      "properties": {
+        "name": { "type": "string", "minLength": 1 },
+        "reason": { "type": "string" }
+      }
+    },
+    "ignoredViolation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["source_type", "forbidden_reference", "reason"],
+      "properties": {
+        "source_type": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Source type name or narrow glob pattern to suppress."
+        },
+        "forbidden_reference": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Forbidden reference name or narrow glob pattern to suppress."
+        },
+        "reason": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Human-readable migration reason or issue reference."
+        }
+      }
+    },
+    "ignoredViolations": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/ignoredViolation" },
+      "default": []
+    },
+    "dependencyContract": {
+      "allOf": [
+        { "$ref": "#/$defs/baseContractFields" },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["name", "source", "forbidden"],
+          "properties": {
+            "name": { "type": "string", "minLength": 1 },
+            "source": { "type": "string", "minLength": 1 },
+            "forbidden": { "$ref": "#/$defs/stringList" },
+            "allowed_types": { "$ref": "#/$defs/stringList" },
+            "ignored_violations": { "$ref": "#/$defs/ignoredViolations" },
+            "forbidden_legacy_runtime": { "type": "boolean", "default": false },
+            "reason": { "type": "string" }
+          }
+        }
+      ]
+    },
+    "layerContract": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "layers"],
+      "properties": {
+        "name": { "type": "string", "minLength": 1 },
+        "layers": { "$ref": "#/$defs/stringList" },
+        "ignored_violations": { "$ref": "#/$defs/ignoredViolations" },
+        "reason": { "type": "string" }
+      }
+    },
+    "allowOnlyContract": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "source", "allowed"],
+      "properties": {
+        "name": { "type": "string", "minLength": 1 },
+        "source": { "type": "string", "minLength": 1 },
+        "allowed": { "$ref": "#/$defs/stringList" },
+        "allowed_types": { "$ref": "#/$defs/stringList" },
+        "ignored_violations": { "$ref": "#/$defs/ignoredViolations" },
+        "reason": { "type": "string" }
+      }
+    },
+    "cycleContract": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "layers"],
+      "properties": {
+        "name": { "type": "string", "minLength": 1 },
+        "layers": { "$ref": "#/$defs/stringList" },
+        "ignored_violations": { "$ref": "#/$defs/ignoredViolations" },
+        "reason": { "type": "string" }
+      }
+    },
+    "methodBodyContract": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "source", "forbidden_calls"],
+      "properties": {
+        "name": { "type": "string", "minLength": 1 },
+        "source": { "type": "string", "minLength": 1 },
+        "forbidden_calls": { "$ref": "#/$defs/stringList" },
+        "ignored_violations": { "$ref": "#/$defs/ignoredViolations" },
+        "reason": { "type": "string" }
+      }
+    },
+    "asmdefContract": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "source_assemblies"],
+      "properties": {
+        "name": { "type": "string", "minLength": 1 },
+        "source_assemblies": { "$ref": "#/$defs/stringList" },
+        "forbidden_editor_refs": { "type": "boolean", "default": false },
+        "forbidden_asmdef_prefixes": { "$ref": "#/$defs/stringList" },
+        "reason": { "type": "string" }
+      }
+    },
+    "independenceContract": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "layers"],
+      "properties": {
+        "name": { "type": "string", "minLength": 1 },
+        "layers": { "$ref": "#/$defs/stringList" },
+        "ignored_violations": { "$ref": "#/$defs/ignoredViolations" },
+        "reason": { "type": "string" }
+      }
+    }
+  }
+}

@@ -24,7 +24,11 @@ nav:
       - CI Integration: guides/ci-integration.md
       - Migration Baselines: guides/migration-baselines.md
   - AI:
-      - ai/index.md
+      - Overview: ai/index.md
+      - Agent Guide: ai/agent-guide.md
+      - Policy Authoring Guide: ai/policy-authoring-guide.md
+      - Capabilities: ai/capabilities.md
+      - Policy Review Checklist: ai/policy-review-checklist.md
   - Reference:
       - YAML Schema: reference/yaml-schema.md
       - Release Process: reference/release-process.md

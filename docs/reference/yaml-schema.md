@@ -1,5 +1,13 @@
 # YAML Schema Reference
 
+The machine-readable JSON Schema lives at
+`schema/dependencies.arch.schema.json`. Use it when authoring policies with
+schema-aware editors or AI agents.
+
+> Note: the current runtime YAML loader ignores unmatched properties while
+> deserializing. Validate against the JSON Schema before opening policy PRs if
+> you need unsupported fields to fail fast.
+
 ## `version`
 
 **Required**. Must be `1`.
@@ -153,3 +161,7 @@ may include an `ignored_violations` block (asmdef contracts do not support this)
       forbidden_reference: <string>    # Forbidden reference pattern
       reason: <string>                 # Issue tracker reference
 ```
+
+Ignored violations support exact values and narrow glob-like patterns. Prefer
+fully qualified type names and avoid broad entries such as `source_type: "*"`
+unless they are explicitly accepted as temporary migration debt.

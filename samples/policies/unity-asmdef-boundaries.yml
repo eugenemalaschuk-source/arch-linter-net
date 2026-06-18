@@ -1,0 +1,76 @@
+# Standalone policy recipe. Replace asmdef names, assemblies, and namespaces
+# with real values from the Unity project before running ArchLinterNet.
+version: 1
+name: Unity asmdef Boundaries Policy Recipe
+
+layers:
+  game_core:
+    namespace: MyCompany.Game.Core
+  gameplay_runtime:
+    namespace: MyCompany.Game.Gameplay
+  gameplay_editor:
+    namespace: MyCompany.Game.Gameplay.Editor
+  unity_adapters:
+    namespace: MyCompany.Game.UnityAdapters
+
+legacy_runtime_layers: []
+
+analysis:
+  target_assemblies:
+    - MyCompany.Game.Core
+    - MyCompany.Game.Gameplay
+    - MyCompany.Game.Gameplay.Editor
+    - MyCompany.Game.UnityAdapters
+  assembly_search_paths: []
+  source_roots:
+    - Assets
+
+contracts:
+  strict:
+    - name: core-must-not-depend-on-unity-adapters
+      source: game_core
+      forbidden: [unity_adapters, gameplay_editor]
+      reason: Pure game core must not depend on Unity adapter or editor code.
+
+    - name: runtime-must-not-depend-on-editor-namespaces
+      source: gameplay_runtime
+      forbidden: [gameplay_editor]
+      reason: Runtime gameplay code must not reference editor-only namespaces.
+
+  audit: []
+
+  strict_layers:
+    - name: unity-runtime-layering
+      layers:
+        - gameplay_editor
+        - unity_adapters
+        - gameplay_runtime
+        - game_core
+      reason: Editor and Unity-specific adapters may depend inward, but core runtime code must stay isolated.
+
+  audit_layers: []
+  strict_allow_only: []
+  audit_allow_only: []
+
+  strict_cycles:
+    - name: unity-runtime-cycles
+      layers: [game_core, gameplay_runtime, unity_adapters]
+      reason: Runtime Unity layers must not form dependency cycles.
+
+  audit_cycles: []
+  strict_method_body: []
+  audit_method_body: []
+
+  strict_asmdef:
+    - name: runtime-asmdefs-must-not-reference-editor
+      source_assemblies:
+        - MyCompany.Game.Core
+        - MyCompany.Game.Gameplay
+      forbidden_editor_refs: true
+      forbidden_asmdef_prefixes:
+        - MyCompany.Game.Editor
+      reason: Runtime assembly definitions must not reference editor-only assemblies.
+
+  audit_asmdef: []
+  strict_independence: []
+  audit_independence: []
