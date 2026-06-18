@@ -14,10 +14,10 @@ theme:
 
 nav:
   - Home: index.md
-  - Getting Started: getting-started.md
-  - Installation: installation.md
-  - CLI: cli.md
-  - Policy Format: policy-format.md
+  - Getting Started: getting-started/index.md
+  - Installation: installation/index.md
+  - CLI: cli/index.md
+  - Policy Format: policy-format/index.md
   - Contracts:
       - contracts/index.md
   - Guides:
@@ -30,7 +30,7 @@ nav:
       - Release Process: reference/release-process.md
 
 exclude_docs: |
-  README.md
+  internal/
 
 
 markdown_extensions:

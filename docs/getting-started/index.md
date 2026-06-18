@@ -96,6 +96,6 @@ Violations show the contract name, source type, and forbidden references:
 
 ## 4. Next steps
 
-- Read the [Policy Format](policy-format.md) guide for a complete reference
-- Check [CI Integration](guides/ci-integration.md) for adding validation to your pipeline
-- Explore [Migration Baselines](guides/migration-baselines.md) for managing existing violations
+- Read the [Policy Format](../policy-format/index.md) guide for a complete reference
+- Check [CI Integration](../guides/ci-integration.md) for adding validation to your pipeline
+- Explore [Migration Baselines](../guides/migration-baselines.md) for managing existing violations

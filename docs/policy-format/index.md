@@ -72,5 +72,5 @@ contracts:
   audit_independence: []
 ```
 
-Each contract type has its own structure. See the [Contracts](contracts/index.md) page
+Each contract type has its own structure. See the [Contracts](../contracts/index.md) page
 for detailed documentation of each family.

@@ -30,7 +30,7 @@ Pre-1.0 releases use `0.x.y`:
 1. **Run full verification**
 
    ```bash
-   make verify
+   make acceptance
    ```
 
 1. **Pack NuGet packages**

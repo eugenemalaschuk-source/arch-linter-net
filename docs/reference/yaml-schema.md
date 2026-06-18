@@ -23,7 +23,8 @@ name: My Architecture Contract
 ```yaml
 layers:
   <layer-name>:
-    namespace: <string>      # Required — namespace pattern for matching types
+    namespace: <string>          # Required — namespace pattern for matching types
+    namespace_suffix: <string>   # Optional — suffix appended to namespace during matching
 ```
 
 Each layer name must be a unique identifier used to reference the layer in contracts.
@@ -46,6 +47,7 @@ analysis:
   target_assemblies:            # Required — list of assembly names to scan
     - <assembly-name>
   assembly_search_paths: []     # Optional — additional probe directories
+  source_roots: []              # Optional — source directory roots for Roslyn resolution
 ```
 
 ## `contracts`
@@ -77,6 +79,8 @@ contracts:
 - name: <string>                # Required — unique contract name
   source: <layer-name>          # Required — source layer
   forbidden: [<layer-name>]     # Required — list of forbidden target layers
+  allowed_types: []             # Optional — exceptions to the forbidden rule
+  forbidden_legacy_runtime: false  # Optional — also check legacy runtime layers
   reason: <string>              # Recommended — human-readable justification
 ```
 
@@ -94,6 +98,7 @@ contracts:
 - name: <string>
   source: <layer-name>
   allowed: [<layer-name>]       # Required — whitelist of allowed target layers
+  allowed_types: []             # Optional — type-level exceptions
   reason: <string>
 ```
 
@@ -136,7 +141,8 @@ contracts:
 
 ### Ignored violations
 
-Any contract type may include an `ignored_violations` block:
+Dependency, layer, allow-only, cycle, method-body, and independence contracts
+may include an `ignored_violations` block (asmdef contracts do not support this):
 
 ```yaml
 - name: app-boundaries
