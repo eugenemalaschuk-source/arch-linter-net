@@ -11,9 +11,9 @@ ArchLinterNet SHALL document the initial preview package release process using t
 - **WHEN** a maintainer reads the release process documentation
 - **THEN** it explains how to rerun the manual release workflow from the GitHub Actions UI with the same explicit preview version and `publish=true`
 
-#### Scenario: NuGet.org setup is documented
+#### Scenario: NuGet.org trusted publishing setup is documented
 - **WHEN** a maintainer reads the release process documentation
-- **THEN** it explains that `NUGET_API_KEY` must be configured as a repository secret before publication and must not be committed
+- **THEN** it explains the required NuGet.org trusted publishing policy fields and states that classic API keys are not used for automated publishing
 
 #### Scenario: Publication recordkeeping is documented
 - **WHEN** packages are published publicly

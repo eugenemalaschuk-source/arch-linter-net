@@ -15,13 +15,13 @@ The requirement is explicit workflow separation: PR CI validates code only; rele
 **Goals:**
 
 - PR CI workflow runs `make restore` and `make acceptance` on every pull request and push to main.
-- PR CI workflow has no access to `NUGET_API_KEY`, no `dotnet pack`, no publish, no tag/release creation.
+- PR CI workflow has no publishing identity token, no `dotnet pack`, no publish, no tag/release creation.
 - Release workflow runs only from the GitHub Actions UI via `workflow_dispatch` with `version` and `publish` inputs.
 - Release workflow validates version input format before proceeding.
 - Release workflow builds and tests in Release configuration with the explicit version.
 - Release workflow packs all four projects with `PackageVersion=${{ inputs.version }}`.
 - Release workflow uploads `.nupkg` files as workflow artifacts.
-- Release workflow publishes to NuGet.org only when `publish=true`, using `NUGET_API_KEY` in that step only.
+- Release workflow publishes to NuGet.org only when `publish=true`, using NuGet.org Trusted Publishing.
 - Release workflow deploys documentation to GitHub Pages when `publish=true`.
 - Release workflow uses `--skip-duplicate` to prevent accidental double-publish failures.
 - Release process documentation reflects the two-step dry-run/public procedure.
@@ -105,7 +105,7 @@ The GitHub UI workflow gives a single audited release path without adding extra 
 
 ## Risks / Trade-offs
 
-- [Secret exposure in PR context] → PR CI workflow has no `NUGET_API_KEY` in environment. Release workflow accesses secrets only in publish-only steps with explicit `if` conditions.
+- [Publishing identity exposure in PR context] → PR CI workflow has no `id-token: write` permission. Release workflow grants OIDC token permission only to the manual NuGet package job.
 - [Version format mistakes] → Input validation step rejects obviously invalid versions before build starts.
 - [NuGet.org downtime during publish] → `--skip-duplicate` prevents double-publish on retry. Actual NuGet.org outages are outside control; operator retries manually.
 - [Stale workflow after .csproj changes] → Workflow packs all projects from `src/`, so new projects are automatically included. Removing a project requires workflow update.
