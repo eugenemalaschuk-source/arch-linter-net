@@ -78,8 +78,13 @@ jobs:
         if: ${{ inputs.publish == true }}
         shell: bash
         run: |
+          OIDC_TOKEN=$(curl -sS -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
+            "${ACTIONS_ID_TOKEN_REQUEST_URL}&audience=nuget.org" | jq -r '.value')
+          API_KEY=$(curl -sS -X POST -H "Content-Type: application/json" \
+            -d "{\"IdentityToken\": \"${OIDC_TOKEN}\"}" \
+            "https://www.nuget.org/api/v1/oidc/authenticate" | jq -r '.apiKey')
           for package in "$PACKAGE_OUTPUT"/*.nupkg; do
-            dotnet nuget push "$package" --source https://api.nuget.org/v3/index.json --skip-duplicate
+            dotnet nuget push "$package" --source https://api.nuget.org/v3/index.json --api-key "$API_KEY" --skip-duplicate
           done
 
   deploy-docs:
