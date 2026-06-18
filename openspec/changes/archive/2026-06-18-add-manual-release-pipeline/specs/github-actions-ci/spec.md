@@ -1,15 +1,15 @@
 ## ADDED Requirements
 
 ### Requirement: Pull request validation workflow
-ArchLinterNet SHALL provide a GitHub Actions CI workflow that validates pull requests and pushes without producing official release packages.
+ArchLinterNet SHALL provide a GitHub Actions CI workflow that validates pull requests and pushes with the repository acceptance gate without producing official release packages.
 
 #### Scenario: Pull request validation runs
 - **WHEN** a pull request targets the repository
-- **THEN** the CI workflow restores packages, builds in Release configuration, and runs tests in Release configuration
+- **THEN** the CI workflow restores packages and runs `make acceptance`
 
 #### Scenario: Main branch push validation runs
 - **WHEN** code is pushed to the `main` branch
-- **THEN** the CI workflow restores packages, builds in Release configuration, and runs tests in Release configuration
+- **THEN** the CI workflow restores packages and runs `make acceptance`
 
 ### Requirement: CI release separation
 The CI workflow SHALL NOT perform official release packaging, publication, tagging, or GitHub Release creation.

@@ -1,4 +1,4 @@
-name: Release NuGet packages
+name: Release NuGet packages and docs
 
 on:
   workflow_dispatch:
@@ -13,13 +13,13 @@ on:
         default: false
         type: boolean
 
-permissions:
-  contents: read
-
 jobs:
   release:
     name: Build NuGet packages
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      packages: write
 
     env:
       PACKAGE_VERSION: ${{ inputs.version }}
@@ -86,3 +86,66 @@ jobs:
           for package in "$PACKAGE_OUTPUT"/*.nupkg; do
             dotnet nuget push "$package" --api-key "$NUGET_API_KEY" --source https://api.nuget.org/v3/index.json --skip-duplicate
           done
+
+      - name: Publish to GitHub Packages
+        if: ${{ inputs.publish == true }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: bash
+        run: |
+          for package in "$PACKAGE_OUTPUT"/*.nupkg; do
+            dotnet nuget push "$package" --api-key "$GITHUB_TOKEN" --source "https://nuget.pkg.github.com/${{ github.repository_owner }}/index.json" --skip-duplicate
+          done
+
+      - name: Create GitHub Release
+        if: ${{ inputs.publish == true }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: bash
+        run: |
+          tag="v$PACKAGE_VERSION"
+          if gh release view "$tag" >/dev/null 2>&1; then
+            gh release upload "$tag" "$PACKAGE_OUTPUT"/*.nupkg "$PACKAGE_OUTPUT"/*.snupkg --clobber
+          else
+            gh release create "$tag" \
+              "$PACKAGE_OUTPUT"/*.nupkg \
+              "$PACKAGE_OUTPUT"/*.snupkg \
+              --target "$GITHUB_SHA" \
+              --title "ArchLinterNet $PACKAGE_VERSION" \
+              --notes "Published ArchLinterNet $PACKAGE_VERSION packages to NuGet.org and GitHub Packages. Documentation is deployed by this workflow when publication is enabled."
+          fi
+
+  deploy-docs:
+    name: Deploy GitHub Pages docs
+    if: ${{ inputs.publish == true }}
+    needs: release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup uv
+        uses: astral-sh/setup-uv@v5
+
+      - name: Configure GitHub Pages
+        uses: actions/configure-pages@v5
+
+      - name: Build docs
+        run: make docs-build
+
+      - name: Upload GitHub Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+
+      - name: Deploy GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

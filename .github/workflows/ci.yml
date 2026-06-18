@@ -11,7 +11,7 @@ permissions:
 
 jobs:
   validate:
-    name: Restore, build, test
+    name: Acceptance
     runs-on: ubuntu-latest
 
     steps:
@@ -23,11 +23,11 @@ jobs:
         with:
           dotnet-version: 10.0.x
 
+      - name: Setup uv
+        uses: astral-sh/setup-uv@v5
+
       - name: Restore
-        run: dotnet restore ArchLinterNet.slnx
+        run: make restore
 
-      - name: Build
-        run: dotnet build ArchLinterNet.slnx --configuration Release --no-restore
-
-      - name: Test
-        run: dotnet test ArchLinterNet.slnx --configuration Release --no-build
+      - name: Acceptance
+        run: make acceptance

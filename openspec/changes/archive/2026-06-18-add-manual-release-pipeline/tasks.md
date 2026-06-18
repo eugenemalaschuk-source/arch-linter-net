@@ -3,7 +3,7 @@
 - [x] 1.1 Create `.github/workflows/ci.yml` with `pull_request` and `push` to `main` triggers.
 - [x] 1.2 Configure CI workflow with read-only repository permissions.
 - [x] 1.3 Add .NET setup for `10.0.x`.
-- [x] 1.4 Add restore, Release build, and Release test steps using `dotnet restore`, `dotnet build --configuration Release --no-restore`, and `dotnet test --configuration Release --no-build`.
+- [x] 1.4 Add restore and full acceptance steps using `make restore` and `make acceptance`.
 - [x] 1.5 Verify CI workflow does not call `dotnet pack`, read `NUGET_API_KEY`, publish packages, create tags, or create GitHub Releases.
 
 ## 2. Manual NuGet Release Workflow
@@ -18,14 +18,17 @@
 - [x] 2.8 Upload generated `.nupkg` files as workflow artifacts.
 - [x] 2.9 Add a publish step guarded by `publish == true` that uses `NUGET_API_KEY`, NuGet.org source `https://api.nuget.org/v3/index.json`, and `--skip-duplicate`.
 - [x] 2.10 Verify `NUGET_API_KEY` is scoped only to the publish step.
+- [x] 2.11 Add a GitHub Pages documentation deployment job guarded by `publish == true` after successful NuGet publication.
+- [x] 2.12 Add GitHub Packages mirroring guarded by `publish == true`.
+- [x] 2.13 Add GitHub Release creation/update with package artifacts guarded by `publish == true`.
 
 ## 3. Release Documentation
 
 - [x] 3.1 Update `docs/reference/release-process.md` to describe preview versioning and the manual release workflow.
-- [x] 3.2 Document the dry-run procedure with `publish=false` and artifact inspection.
-- [x] 3.3 Document the public publication procedure with `publish=true`.
+- [x] 3.2 Document the GitHub Actions UI dry-run procedure with `publish=false` and artifact inspection.
+- [x] 3.3 Document the GitHub Actions UI public publication procedure with `publish=true`.
 - [x] 3.4 Document NuGet.org API key setup using repository secret `NUGET_API_KEY`.
-- [x] 3.5 Document that published package IDs and versions must be recorded in issue or PR notes.
+- [x] 3.5 Document that published package IDs, versions, GitHub Release URL, GitHub Packages status, and GitHub Pages deployment URL must be recorded in issue or PR notes.
 - [x] 3.6 Remove or clearly mark old tag/GitHub Release automation as out of scope for the initial preview release process.
 
 ## 4. Validation
@@ -34,4 +37,4 @@
 - [x] 4.2 Run `rtk make restore` if needed for no-restore targets.
 - [x] 4.3 Run `rtk make acceptance` and resolve any lint, architecture, formatting, or test failures caused by the change.
 - [ ] 4.4 After merge, run the manual release workflow with `publish=false` and confirm versioned `.nupkg` artifacts upload successfully.
-- [ ] 4.5 After artifact inspection, run the manual release workflow with `publish=true` and confirm packages are available from NuGet.org.
+- [ ] 4.5 After artifact inspection, run the manual release workflow with `publish=true` and confirm packages are available from NuGet.org, GitHub Packages is populated, a GitHub Release exists, and documentation is deployed to GitHub Pages.
