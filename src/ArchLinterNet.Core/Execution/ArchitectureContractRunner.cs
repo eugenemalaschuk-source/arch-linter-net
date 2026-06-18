@@ -84,6 +84,41 @@ public sealed class ArchitectureContractRunner(
         return _document.Contracts.AuditIndependence;
     }
 
+    public List<ArchitectureViolation> CheckConfiguration()
+    {
+        List<ArchitectureViolation> violations = new();
+
+        foreach (string missingAssembly in _context.MissingAssemblyNames)
+        {
+            violations.Add(new ArchitectureViolation(
+                "<configuration>",
+                missingAssembly,
+                "missing target assembly",
+                new[] { $"Assembly '{missingAssembly}' is declared in analysis.target_assemblies but could not be resolved." }));
+        }
+
+        foreach (ArchitectureLayerContract contract in _document.Contracts.StrictLayers.Concat(_document.Contracts.AuditLayers))
+        {
+            foreach (string layerName in contract.Layers)
+            {
+                ArchitectureLayer layer =
+                    ArchitectureLayerResolver.ResolveLayer(_document, contract.Name, layerName);
+                Type[] types = ArchitectureTypeScanner.FindTypesInLayer(_context.TargetAssemblies, layer);
+
+                if (types.Length == 0)
+                {
+                    violations.Add(new ArchitectureViolation(
+                        contract.Name,
+                        ArchitectureLayerResolver.DescribeLayer(layer),
+                        "empty layer namespace",
+                        new[] { $"Layer '{layerName}' namespace '{layer.Namespace}' contains no types in loaded assemblies." }));
+                }
+            }
+        }
+
+        return violations;
+    }
+
     public List<ArchitectureViolation> CheckContract(ArchitectureDependencyContract contract)
     {
         ArchitectureLayer sourceLayer = ArchitectureLayerResolver.ResolveLayer(_document, contract.Name, contract.Source);
@@ -137,14 +172,14 @@ public sealed class ArchitectureContractRunner(
 
     public List<ArchitectureViolation> CheckAllowOnlyContract(ArchitectureAllowOnlyContract contract)
     {
-        string sourceNamespace =
-            ArchitectureLayerResolver.ResolveLayerNamespace(_document, contract.Name, contract.Source);
-        Type[] sourceTypes = ArchitectureTypeScanner.FindTypesInNamespace(_context.TargetAssemblies, sourceNamespace);
+        ArchitectureLayer sourceLayer =
+            ArchitectureLayerResolver.ResolveLayer(_document, contract.Name, contract.Source);
+        Type[] sourceTypes = ArchitectureTypeScanner.FindTypesInLayer(_context.TargetAssemblies, sourceLayer);
 
-        var allowedNamespacePrefixes = contract.Allowed
-            .Select(layerName => ArchitectureLayerResolver.ResolveLayerNamespace(_document, contract.Name, layerName))
-            .Append(sourceNamespace)
-            .ToHashSet(StringComparer.Ordinal);
+        var allowedLayers = contract.Allowed
+            .Select(layerName => ArchitectureLayerResolver.ResolveLayer(_document, contract.Name, layerName))
+            .Append(sourceLayer)
+            .ToList();
 
         return sourceTypes
             .Select(type => new ArchitectureViolation(
@@ -156,7 +191,7 @@ public sealed class ArchitectureContractRunner(
                     .Where(name => !string.IsNullOrEmpty(name))
                     .Where(name => !contract.AllowedTypes.Contains(name))
                     .Where(name => ArchitectureLayerResolver.IsProjectType(_document, name))
-                    .Where(name => !ArchitectureLayerResolver.IsInAnyNamespace(name, allowedNamespacePrefixes))
+                    .Where(name => !IsInAnyAllowedLayer(name, allowedLayers))
                     .Where(name => !ArchitectureIgnoreMatcher.IsIgnored(ArchitectureTypeNames.SafeFullName(type), name,
                         contract.IgnoredViolations))
                     .Distinct()
@@ -176,10 +211,10 @@ public sealed class ArchitectureContractRunner(
 
         foreach (string sourceLayerName in contract.Layers)
         {
-            string sourceNamespace =
-                ArchitectureLayerResolver.ResolveLayerNamespace(_document, contract.Name, sourceLayerName);
+            ArchitectureLayer sourceLayer =
+                ArchitectureLayerResolver.ResolveLayer(_document, contract.Name, sourceLayerName);
             Type[] sourceTypes =
-                ArchitectureTypeScanner.FindTypesInNamespace(_context.TargetAssemblies, sourceNamespace);
+                ArchitectureTypeScanner.FindTypesInLayer(_context.TargetAssemblies, sourceLayer);
 
             foreach (Type sourceType in sourceTypes)
             {
@@ -215,9 +250,13 @@ public sealed class ArchitectureContractRunner(
         string sourceNamespace =
             ArchitectureLayerResolver.ResolveLayerNamespace(_document, contract.Name, contract.Source);
 
+        string[]? sourceRoots = _document.Analysis.SourceRoots.Count > 0
+            ? _document.Analysis.SourceRoots.ToArray()
+            : null;
+
         IReadOnlyList<ArchitectureViolation> roslynViolations = ArchitectureSourceScanner
             .FindMethodBodyViolations(contract.Name, _context.RepositoryRoot, sourceNamespace, contract.ForbiddenCalls,
-                contract.IgnoredViolations)
+                contract.IgnoredViolations, sourceRoots: sourceRoots)
             .ToList();
 
         IReadOnlyList<ArchitectureViolation> ilViolations = ArchitectureIlMethodBodyScanner.FindMethodBodyViolations(
@@ -362,5 +401,10 @@ public sealed class ArchitectureContractRunner(
         }
 
         return $"{pattern} -> {target}";
+    }
+
+    private static bool IsInAnyAllowedLayer(string typeName, IReadOnlyList<ArchitectureLayer> allowedLayers)
+    {
+        return allowedLayers.Any(layer => ArchitectureLayerResolver.MatchesNamespace(layer, typeName));
     }
 }

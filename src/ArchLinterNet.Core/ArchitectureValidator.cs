@@ -26,14 +26,16 @@ public sealed class ArchitectureValidator
 
         string repositoryRoot = ResolveRepositoryRoot(policyPath);
 
-        IReadOnlyCollection<System.Reflection.Assembly> assemblies =
-            ArchitectureAssemblyResolver.ResolveFromDocument(document, repositoryRoot);
+        ResolutionResult resolution = ArchitectureAssemblyResolver.ResolveFromDocument(document, repositoryRoot);
 
-        ArchitectureAnalysisContext context = new(repositoryRoot, assemblies);
+        ArchitectureAnalysisContext context = new(repositoryRoot, resolution.ResolvedAssemblies,
+            resolution.MissingAssemblyNames);
         ArchitectureContractRunner runner = new(context, document);
 
         List<ArchitectureViolation> allViolations = new();
         List<string> allCycles = new();
+
+        allViolations.AddRange(runner.CheckConfiguration());
 
         foreach (ArchitectureDependencyContract contract in runner.StrictContracts())
         {

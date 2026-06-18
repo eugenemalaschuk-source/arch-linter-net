@@ -25,6 +25,9 @@ public sealed class ArchitectureAnalysisConfiguration
 
     [YamlMember(Alias = "assembly_search_paths")]
     public List<string> AssemblySearchPaths { get; set; } = new();
+
+    [YamlMember(Alias = "source_roots")]
+    public List<string> SourceRoots { get; set; } = new();
 }
 
 public sealed class ArchitectureLayer
