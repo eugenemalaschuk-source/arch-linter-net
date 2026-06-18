@@ -9,7 +9,7 @@ dotnet tool install --global ArchLinterNet.Cli
 Verify installation:
 
 ```bash
-dotnet arch-linter-net --help
+arch-linter-net --help
 ```
 
 ## NuGet package
@@ -35,7 +35,7 @@ Add to your GitHub Actions workflow:
   run: dotnet tool install --global ArchLinterNet.Cli
 
 - name: Validate architecture
-  run: dotnet arch-linter-net
+  run: arch-linter-net
 ```
 
 ## Requirements

@@ -13,10 +13,10 @@
 ## 3. Core documentation pages
 
 - [x] 3.1 Create `docs/index.md` — overview, positioning, and key features
-- [x] 3.2 Create `docs/getting-started.md` — quick start guide with minimal example
-- [x] 3.3 Create `docs/installation.md` — installation via dotnet tool, NuGet, and CI
-- [x] 3.4 Create `docs/cli.md` — CLI commands, options, and usage examples
-- [x] 3.5 Create `docs/policy-format.md` — YAML policy file structure, blocks, and examples
+- [x] 3.2 Create `docs/getting-started/index.md` — quick start guide with minimal example
+- [x] 3.3 Create `docs/installation/index.md` — installation via dotnet tool, NuGet, and CI
+- [x] 3.4 Create `docs/cli/index.md` — CLI commands, options, and usage examples
+- [x] 3.5 Create `docs/policy-format/index.md` — YAML policy file structure, blocks, and examples
 - [x] 3.6 Create `docs/contracts/index.md` — overview of all contract families with behavior descriptions
 
 ## 4. Guides section

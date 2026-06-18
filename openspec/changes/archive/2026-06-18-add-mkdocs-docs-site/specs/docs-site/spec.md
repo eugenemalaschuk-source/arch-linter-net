@@ -32,26 +32,29 @@ The repository SHALL contain an `mkdocs.yml` at the project root that configures
 ### Requirement: Documentation pages
 The repository SHALL contain the following documentation pages under `docs/`:
 - `docs/index.md` — overview and positioning
-- `docs/getting-started.md` — quick start guide
-- `docs/installation.md` — installation instructions
-- `docs/cli.md` — CLI usage reference
-- `docs/policy-format.md` — policy file structure
+- `docs/getting-started/index.md` — quick start guide
+- `docs/installation/index.md` — installation instructions
+- `docs/cli/index.md` — CLI usage reference
+- `docs/policy-format/index.md` — policy file structure
 - `docs/contracts/index.md` — contract family overview
 - `docs/guides/ci-integration.md` — CI integration guide
 - `docs/guides/migration-baselines.md` — frozen debt and ignored violations
 - `docs/ai/index.md` — AI section entry point (placeholder for #662)
 - `docs/reference/yaml-schema.md` — YAML schema reference
 - `docs/reference/release-process.md` — release process documentation
+- `docs/internal/README.md` — contributor documentation (excluded from site build)
 
 #### Scenario: All required pages exist
 - **WHEN** listing files under `docs/`
 - **THEN** all of the above files exist
 
 ### Requirement: Make targets for documentation workflow
-The `Makefile` SHALL define three targets:
+The project SHALL define these targets:
 - `make venv` — creates the Python virtual environment via `uv sync --project tools/pyproject.toml`
 - `make docs-serve` — starts a local MkDocs development server
 - `make docs-build` — builds the static documentation site
+- `make fmt-docs` — auto-formats markdown documentation with mdformat
+- `make lint-docs` — runs `mkdocs build --strict` to verify documentation structure
 
 #### Scenario: make venv creates virtual environment
 - **WHEN** running `make venv`
@@ -61,12 +64,12 @@ The `Makefile` SHALL define three targets:
 - **WHEN** running `make docs-build` after `make venv`
 - **THEN** a `site/` directory is generated containing the built HTML documentation
 
-### Requirement: Existing docs/README.md is preserved
-The `docs/README.md` file SHALL NOT be removed or renamed. Its content is project/contributor documentation and is distinct from the MkDocs user documentation.
+### Requirement: Contributor documentation is separated from user docs
+Project/contributor documentation SHALL live in `docs/internal/` to distinguish it from user-facing MkDocs pages. The `docs/internal/` directory SHALL be excluded from the MkDocs site build.
 
-#### Scenario: docs/README.md remains unchanged
-- **WHEN** checking the repository
-- **THEN** `docs/README.md` still exists with its original content
+#### Scenario: internal docs excluded from site
+- **WHEN** running `mkdocs build`
+- **THEN** pages under `docs/internal/` are not published to the output site
 
 ### Requirement: Documentation builds without errors
 The documentation site SHALL build successfully with zero warnings or errors.

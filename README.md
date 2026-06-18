@@ -134,10 +134,10 @@ A .NET global/local tool for local and CI validation.
 dotnet run --project src/ArchLinterNet.Cli -- --policy architecture/dependencies.arch.yml --mode strict
 
 # Run via local tool (after dotnet tool restore):
-dotnet arch-linter-net --policy architecture/dependencies.arch.yml --mode audit --format json
+arch-linter-net --policy architecture/dependencies.arch.yml --mode audit --format json
 
 # Shortcut flags:
-dotnet arch-linter-net --policy architecture/dependencies.arch.yml --strict --json
+arch-linter-net --policy architecture/dependencies.arch.yml --strict --json
 ```
 
 ### `ArchLinterNet.Testing`
@@ -535,9 +535,9 @@ contracts:
 ## Output formats
 
 ```bash
-dotnet arch-linter-net --mode strict --format human
-dotnet arch-linter-net --mode strict --format json
-dotnet arch-linter-net --mode audit --format json
+arch-linter-net --mode strict --format human
+arch-linter-net --mode strict --format json
+arch-linter-net --mode audit --format json
 ```
 
 ### Human output

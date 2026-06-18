@@ -45,7 +45,7 @@ contracts:
 Using the .NET tool:
 
 ```bash
-dotnet arch-linter-net
+arch-linter-net
 ```
 
 Or programmatically from a test:

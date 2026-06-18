@@ -3,7 +3,7 @@
 ## Usage
 
 ```bash
-dotnet arch-linter-net [options]
+arch-linter-net [options]
 ```
 
 ## Options
@@ -24,31 +24,31 @@ dotnet arch-linter-net [options]
 ### Basic validation (strict mode)
 
 ```bash
-dotnet arch-linter-net
+arch-linter-net
 ```
 
 ### Custom policy path
 
 ```bash
-dotnet arch-linter-net --policy config/architecture.yml
+arch-linter-net --policy config/architecture.yml
 ```
 
 ### Audit mode
 
 ```bash
-dotnet arch-linter-net --mode audit
+arch-linter-net --mode audit
 ```
 
 ### JSON output for CI
 
 ```bash
-dotnet arch-linter-net --json > violations.json
+arch-linter-net --json > violations.json
 ```
 
 ### Strict mode with JSON
 
 ```bash
-dotnet arch-linter-net --strict --json
+arch-linter-net --strict --json
 ```
 
 ## Exit codes
