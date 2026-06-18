@@ -4,14 +4,54 @@ name: ArchLinterNet Architecture Contract
 layers:
   core:
     namespace: ArchLinterNet.Core
+  cli:
+    namespace: ArchLinterNet.Cli
+  testing:
+    namespace: ArchLinterNet.Testing
+  unity:
+    namespace: ArchLinterNet.Unity
 
 analysis:
   target_assemblies:
     - ArchLinterNet.Core
+    - ArchLinterNet.Cli
+    - ArchLinterNet.Testing
+    - ArchLinterNet.Unity
+  assembly_search_paths:
+    - src/ArchLinterNet.Testing/bin/Debug/net10.0
+    - src/ArchLinterNet.Unity/bin/Debug/net10.0
 
 contracts:
   strict:
-    - name: core-has-no-unwanted-dependencies
-      source: core
-      forbidden: []
-      reason: Core is the foundation layer with no prohibited first-party dependencies.
+    - name: cli-must-not-depend-on-testing
+      source: cli
+      forbidden: [testing, unity]
+      reason: CLI should only depend on Core.
+
+    - name: testing-must-not-depend-on-cli
+      source: testing
+      forbidden: [cli, unity]
+      reason: Testing adapter should only depend on Core.
+
+    - name: unity-must-not-depend-on-cli-or-testing
+      source: unity
+      forbidden: [cli, testing]
+      reason: Unity package should only depend on Core.
+
+  strict_layers:
+    - name: core-layering
+      layers:
+        - cli
+        - testing
+        - unity
+        - core
+      reason: Dependencies must point toward Core.
+
+  strict_cycles:
+    - name: package-cycles
+      layers:
+        - core
+        - cli
+        - testing
+        - unity
+      reason: Packages must not form dependency cycles.

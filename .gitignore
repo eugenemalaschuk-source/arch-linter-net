@@ -51,3 +51,6 @@ opencode.json
 
 # graphify generated knowledge graph
 graphify-out/
+
+# Local NuGet packages (built by make pack)
+nupkg/

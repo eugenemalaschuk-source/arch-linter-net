@@ -126,12 +126,13 @@ dotnet arch-linter-net --policy architecture/dependencies.arch.yml --strict --js
 
 ### `ArchLinterNet.Testing`
 
-Thin helpers for using ArchLinterNet from test frameworks.
-
-Target usage shape:
+Thin helpers for using ArchLinterNet from NUnit tests.
 
 ```csharp
-[Fact]
+using NUnit.Framework;
+using ArchLinterNet.Testing;
+
+[Test]
 public void ArchitectureStrictContractsMustPass()
 {
     ArchitectureAssertions
