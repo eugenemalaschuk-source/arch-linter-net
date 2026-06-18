@@ -19,24 +19,27 @@ Pull request CI and package publication are intentionally separate:
   official versioned package artifacts, can publish to NuGet.org, and deploys
   documentation to GitHub Pages when publication is enabled.
 
-The CI workflow must not call `dotnet pack`, read `NUGET_API_KEY`, publish
-packages, create tags, or create GitHub Releases.
+The CI workflow must not call `dotnet pack`, request publishing identity tokens,
+publish packages, create tags, or create GitHub Releases.
 
 Local `make pack` is only for developer inspection. Official preview package
 publication and GitHub Pages deployment are performed by the manual GitHub
 Actions workflow.
 
-## NuGet.org Setup
+## NuGet.org Trusted Publishing Setup
 
 Before the first public publication:
 
-1. Create or obtain a NuGet.org API key that can publish these package IDs:
-   `ArchLinterNet.Core`, `ArchLinterNet.Cli`, `ArchLinterNet.Testing`, and
-   `ArchLinterNet.Unity`.
-2. Store the key as the repository secret `NUGET_API_KEY`.
-3. Enable GitHub Pages for the repository and use GitHub Actions as the Pages
+1. Configure a NuGet.org trusted publishing policy with these fields:
+   - package owner: `eugene.malaschuk`
+   - repository owner: `eugenemalaschuk-source`
+   - repository: `arch-linter-net`
+   - workflow file: `release-nuget.yml`
+   - environment: empty
+2. Enable GitHub Pages for the repository and use GitHub Actions as the Pages
    source.
-4. Do not commit the key or expose it to pull request CI.
+
+Classic NuGet API keys are not used for automated publishing in this workflow.
 
 NuGet.org is the only package publication target for preview consumption.
 GitHub Packages is not used as package storage or as a mirror in the initial
@@ -82,7 +85,7 @@ Expected result:
 - restore, build, and tests pass again in Release configuration;
 - versioned `.nupkg` artifacts are produced again;
 - package artifacts are uploaded to the workflow run;
-- packages are pushed to NuGet.org using `NUGET_API_KEY`;
+- packages are pushed to NuGet.org using trusted publishing;
 - duplicate pushes are skipped to make accidental reruns non-destructive;
 - documentation is built and deployed to GitHub Pages through GitHub Actions.
 

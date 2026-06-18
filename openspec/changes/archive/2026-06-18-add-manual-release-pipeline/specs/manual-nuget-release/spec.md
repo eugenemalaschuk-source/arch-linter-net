@@ -37,9 +37,9 @@ The release workflow SHALL publish packages to NuGet.org only when the manual ru
 - **WHEN** the release workflow runs with `publish=true`
 - **THEN** it publishes package artifacts to `https://api.nuget.org/v3/index.json`
 
-#### Scenario: Publication secret is scoped to publish step
+#### Scenario: Publication uses trusted publishing
 - **WHEN** the release workflow publishes packages
-- **THEN** only the publish step uses the repository secret `NUGET_API_KEY`
+- **THEN** it publishes through NuGet.org Trusted Publishing without a classic NuGet API key
 
 #### Scenario: Publication is rerun-safe
 - **WHEN** the release workflow publishes packages

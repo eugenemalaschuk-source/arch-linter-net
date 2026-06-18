@@ -4,7 +4,7 @@
 - [x] 1.2 Configure CI workflow with read-only repository permissions.
 - [x] 1.3 Add .NET setup for `10.0.x`.
 - [x] 1.4 Add restore and full acceptance steps using `make restore` and `make acceptance`.
-- [x] 1.5 Verify CI workflow does not call `dotnet pack`, read `NUGET_API_KEY`, publish packages, create tags, or create GitHub Releases.
+- [x] 1.5 Verify CI workflow does not call `dotnet pack`, request publishing identity tokens, publish packages, create tags, or create GitHub Releases.
 
 ## 2. Manual NuGet Release Workflow
 
@@ -16,8 +16,8 @@
 - [x] 2.6 Add restore, Release build, and Release test steps using the explicit version input where appropriate.
 - [x] 2.7 Pack `ArchLinterNet.Core`, `ArchLinterNet.Cli`, `ArchLinterNet.Testing`, and `ArchLinterNet.Unity` with `PackageVersion` set from the workflow input.
 - [x] 2.8 Upload generated `.nupkg` files as workflow artifacts.
-- [x] 2.9 Add a publish step guarded by `publish == true` that uses `NUGET_API_KEY`, NuGet.org source `https://api.nuget.org/v3/index.json`, and `--skip-duplicate`.
-- [x] 2.10 Verify `NUGET_API_KEY` is scoped only to the publish step.
+- [x] 2.9 Add a publish step guarded by `publish == true` that uses NuGet.org Trusted Publishing, NuGet.org source `https://api.nuget.org/v3/index.json`, and `--skip-duplicate`.
+- [x] 2.10 Verify the NuGet package job has `id-token: write` and does not use a classic NuGet API key.
 - [x] 2.11 Add a GitHub Pages documentation deployment job guarded by `publish == true` after successful NuGet publication.
 
 ## 3. Release Documentation
@@ -25,7 +25,7 @@
 - [x] 3.1 Update `docs/reference/release-process.md` to describe preview versioning and the manual release workflow.
 - [x] 3.2 Document the GitHub Actions UI dry-run procedure with `publish=false` and artifact inspection.
 - [x] 3.3 Document the GitHub Actions UI public publication procedure with `publish=true`.
-- [x] 3.4 Document NuGet.org API key setup using repository secret `NUGET_API_KEY`.
+- [x] 3.4 Document NuGet.org Trusted Publishing setup and state that classic API keys are not used for automated publishing.
 - [x] 3.5 Document that published package IDs, versions, and GitHub Pages deployment URL must be recorded in issue or PR notes.
 - [x] 3.6 Remove or clearly mark old tag/GitHub Release automation as out of scope for the initial preview release process.
 

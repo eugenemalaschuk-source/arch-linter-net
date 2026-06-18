@@ -18,9 +18,9 @@ The CI workflow SHALL NOT perform official release packaging, publication, taggi
 - **WHEN** the CI workflow runs for a pull request or push
 - **THEN** it does not run `dotnet pack` for official versioned package artifacts
 
-#### Scenario: CI does not use publication secrets
+#### Scenario: CI does not use publishing identity
 - **WHEN** the CI workflow runs for a pull request or push
-- **THEN** it does not read, require, or expose `NUGET_API_KEY`
+- **THEN** it does not request publishing identity tokens or package publication credentials
 
 #### Scenario: CI does not publish or release
 - **WHEN** the CI workflow runs for a pull request or push

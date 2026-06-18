@@ -19,6 +19,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
+      id-token: write
 
     env:
       PACKAGE_VERSION: ${{ inputs.version }}
@@ -78,12 +79,10 @@ jobs:
 
       - name: Publish to NuGet.org
         if: ${{ inputs.publish == true }}
-        env:
-          NUGET_API_KEY: ${{ secrets.NUGET_API_KEY }}
         shell: bash
         run: |
           for package in "$PACKAGE_OUTPUT"/*.nupkg; do
-            dotnet nuget push "$package" --api-key "$NUGET_API_KEY" --source https://api.nuget.org/v3/index.json --skip-duplicate
+            dotnet nuget push "$package" --source https://api.nuget.org/v3/index.json --skip-duplicate
           done
 
   deploy-docs:
