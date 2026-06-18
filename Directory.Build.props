@@ -9,7 +9,7 @@
     <Authors>Eugene Malashchuk</Authors>
     <Company>Eugene Malashchuk</Company>
     <Copyright>Copyright (c) 2026 Eugene Malashchuk</Copyright>
-    <PackageProjectUrl>https://github.com/eugenemalaschuk-source/arch-linter-net</PackageProjectUrl>
+    <PackageProjectUrl>https://eugenemalaschuk-source.github.io/arch-linter-net/</PackageProjectUrl>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageTags>architecture;linting;dotnet;yaml;ci</PackageTags>
     <RepositoryUrl>https://github.com/eugenemalaschuk-source/arch-linter-net</RepositoryUrl>
