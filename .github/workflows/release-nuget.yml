@@ -74,17 +74,19 @@ jobs:
             ${{ env.PACKAGE_OUTPUT }}/*.snupkg
           if-no-files-found: error
 
+      - name: NuGet login
+        if: ${{ inputs.publish == true }}
+        uses: NuGet/login@v1
+        id: nuget-login
+        with:
+          user: ${{ secrets.NUGET_USER }}
+
       - name: Publish to NuGet.org
         if: ${{ inputs.publish == true }}
         shell: bash
         run: |
-          OIDC_TOKEN=$(curl -sS -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
-            "${ACTIONS_ID_TOKEN_REQUEST_URL}&audience=nuget.org" | jq -r '.value')
-          API_KEY=$(curl -sS -X POST -H "Content-Type: application/json" \
-            -d "{\"IdentityToken\": \"${OIDC_TOKEN}\"}" \
-            "https://www.nuget.org/api/v1/oidc/authenticate" | jq -r '.apiKey')
           for package in "$PACKAGE_OUTPUT"/*.nupkg; do
-            dotnet nuget push "$package" --source https://api.nuget.org/v3/index.json --api-key "$API_KEY" --skip-duplicate
+            dotnet nuget push "$package" --source https://api.nuget.org/v3/index.json --api-key "${{ steps.nuget-login.outputs.NUGET_API_KEY }}" --skip-duplicate
           done
 
   deploy-docs:
