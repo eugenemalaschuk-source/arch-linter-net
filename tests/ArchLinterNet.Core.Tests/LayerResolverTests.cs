@@ -133,4 +133,32 @@ public sealed class LayerResolverTests
 
         Assert.That(result, Is.False);
     }
+
+    [Test]
+    public void MatchesNamespace_SiblingNamespace_ReturnsFalse()
+    {
+        ArchitectureLayer layer = new() { Namespace = "Test.Core" };
+
+        bool result = ArchitectureLayerResolver.MatchesNamespace(layer, "Test.CoreExtra");
+
+        Assert.That(result, Is.False);
+    }
+
+    [Test]
+    public void IsProjectType_SiblingNamespace_ReturnsFalse()
+    {
+        bool result = ArchitectureLayerResolver.IsProjectType(_document, "Test.CoreExtra.Foo");
+
+        Assert.That(result, Is.False);
+    }
+
+    [Test]
+    public void IsInAnyNamespace_SiblingNamespace_ReturnsFalse()
+    {
+        bool result = ArchitectureLayerResolver.IsInAnyNamespace(
+            "Test.CoreExtra.Foo",
+            new[] { "Test.Core" });
+
+        Assert.That(result, Is.False);
+    }
 }

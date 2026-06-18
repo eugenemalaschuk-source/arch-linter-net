@@ -30,10 +30,10 @@ internal static class ArchitectureLayerResolver
     {
         if (string.IsNullOrEmpty(layer.NamespaceSuffix))
         {
-            return namespaceName.StartsWith(layer.Namespace, StringComparison.Ordinal);
+            return MatchesPrefix(namespaceName, layer.Namespace);
         }
 
-        return namespaceName.StartsWith(layer.Namespace + ".", StringComparison.Ordinal)
+        return MatchesPrefix(namespaceName, layer.Namespace)
                && namespaceName.EndsWith("." + layer.NamespaceSuffix, StringComparison.Ordinal);
     }
 
@@ -55,7 +55,7 @@ internal static class ArchitectureLayerResolver
                 LayerName = layerName,
                 Namespace = ResolveLayerNamespace(document, "cycle-resolution", layerName)
             })
-            .Where(layer => typeName.StartsWith(layer.Namespace, StringComparison.Ordinal))
+            .Where(layer => MatchesPrefix(typeName, layer.Namespace))
             .OrderByDescending(layer => layer.Namespace.Length)
             .Select(layer => layer.LayerName)
             .FirstOrDefault();
@@ -64,12 +64,17 @@ internal static class ArchitectureLayerResolver
     public static bool IsProjectType(ArchitectureContractDocument document, string typeName)
     {
         return document.Layers.Values.Any(layer =>
-            typeName.StartsWith(layer.Namespace, StringComparison.Ordinal));
+            MatchesPrefix(typeName, layer.Namespace));
     }
 
     public static bool IsInAnyNamespace(string typeName, IEnumerable<string> namespacePrefixes)
     {
-        return namespacePrefixes.Any(prefix =>
-            typeName.StartsWith(prefix, StringComparison.Ordinal));
+        return namespacePrefixes.Any(prefix => MatchesPrefix(typeName, prefix));
+    }
+
+    public static bool MatchesPrefix(string name, string prefix)
+    {
+        return string.Equals(name, prefix, StringComparison.Ordinal)
+               || name.StartsWith(prefix + ".", StringComparison.Ordinal);
     }
 }

@@ -215,19 +215,20 @@ public sealed class ArchitectureContractRunner(
         string sourceNamespace =
             ArchitectureLayerResolver.ResolveLayerNamespace(_document, contract.Name, contract.Source);
 
-        var violations = ArchitectureSourceScanner
+        IReadOnlyList<ArchitectureViolation> roslynViolations = ArchitectureSourceScanner
             .FindMethodBodyViolations(contract.Name, _context.RepositoryRoot, sourceNamespace, contract.ForbiddenCalls,
                 contract.IgnoredViolations)
             .ToList();
 
-        violations.AddRange(ArchitectureIlMethodBodyScanner.FindMethodBodyViolations(
+        IReadOnlyList<ArchitectureViolation> ilViolations = ArchitectureIlMethodBodyScanner.FindMethodBodyViolations(
             contract.Name,
             _context.TargetAssemblies,
             sourceNamespace,
             contract.ForbiddenCalls,
-            contract.IgnoredViolations));
+            contract.IgnoredViolations)
+            .ToList();
 
-        return violations;
+        return MergeMethodBodyViolations(contract.Name, roslynViolations, ilViolations);
     }
 
     public List<ArchitectureViolation> CheckAsmdefContract(ArchitectureAsmdefContract contract)
@@ -289,5 +290,77 @@ public sealed class ArchitectureContractRunner(
                     .ToArray()))
             .Where(violation => violation.ForbiddenReferences.Count > 0)
             .ToArray();
+    }
+
+    private static List<ArchitectureViolation> MergeMethodBodyViolations(
+        string contractName,
+        IReadOnlyList<ArchitectureViolation> roslynViolations,
+        IReadOnlyList<ArchitectureViolation> ilViolations)
+    {
+        Dictionary<string, ArchitectureViolation> merged = new(StringComparer.Ordinal);
+
+        foreach (ArchitectureViolation violation in roslynViolations)
+        {
+            foreach (string reference in violation.ForbiddenReferences)
+            {
+                string key = ExtractNormalizedKey(reference);
+                if (merged.TryGetValue(key, out ArchitectureViolation? existing))
+                {
+                    List<string> combined = existing.ForbiddenReferences.Append(reference).ToList();
+                    merged[key] = new ArchitectureViolation(contractName, existing.SourceType,
+                        existing.ForbiddenNamespace, combined);
+                }
+                else
+                {
+                    merged[key] = new ArchitectureViolation(contractName, violation.SourceType,
+                        violation.ForbiddenNamespace, new List<string> { reference });
+                }
+            }
+        }
+
+        foreach (ArchitectureViolation violation in ilViolations)
+        {
+            foreach (string reference in violation.ForbiddenReferences)
+            {
+                string key = ExtractNormalizedKey(reference);
+                if (merged.TryGetValue(key, out ArchitectureViolation? existing))
+                {
+                    List<string> combined = existing.ForbiddenReferences.Append(reference).ToList();
+                    merged[key] = new ArchitectureViolation(contractName, existing.SourceType,
+                        existing.ForbiddenNamespace, combined);
+                }
+                else
+                {
+                    merged[key] = new ArchitectureViolation(contractName, violation.SourceType,
+                        violation.ForbiddenNamespace, new List<string> { reference });
+                }
+            }
+        }
+
+        return merged.Values
+            .OrderBy(v => v.SourceType, StringComparer.Ordinal)
+            .ThenBy(v => v.ForbiddenNamespace, StringComparer.Ordinal)
+            .ToList();
+    }
+
+    private static string ExtractNormalizedKey(string reference)
+    {
+        const string Marker = " -> ";
+        int markerIndex = reference.IndexOf(Marker, StringComparison.Ordinal);
+        if (markerIndex < 0)
+        {
+            return reference;
+        }
+
+        string pattern = reference[..markerIndex].Trim();
+        string target = reference[(markerIndex + Marker.Length)..].Trim();
+
+        int lineEnd = target.IndexOf(' ');
+        if (lineEnd > 0)
+        {
+            target = target[..lineEnd];
+        }
+
+        return $"{pattern} -> {target}";
     }
 }

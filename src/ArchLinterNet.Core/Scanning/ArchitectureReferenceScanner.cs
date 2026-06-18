@@ -8,12 +8,18 @@ internal static class ArchitectureReferenceScanner
     {
         foreach (Type interfaceType in SafeGetInterfaces(type))
         {
-            yield return NormalizeType(interfaceType);
+            foreach (Type expanded in ExpandType(interfaceType))
+            {
+                yield return expanded;
+            }
         }
 
         foreach (Type baseType in EnumerateBaseTypes(type))
         {
-            yield return NormalizeType(baseType);
+            foreach (Type expanded in ExpandType(baseType))
+            {
+                yield return expanded;
+            }
         }
 
         foreach (FieldInfo field in SafeGetFields(type))
@@ -21,7 +27,10 @@ internal static class ArchitectureReferenceScanner
             Type? fieldType = SafeGetFieldType(field);
             if (fieldType != null)
             {
-                yield return NormalizeType(fieldType);
+                foreach (Type expanded in ExpandType(fieldType))
+                {
+                    yield return expanded;
+                }
             }
         }
 
@@ -30,7 +39,10 @@ internal static class ArchitectureReferenceScanner
             Type? propertyType = SafeGetPropertyType(property);
             if (propertyType != null)
             {
-                yield return NormalizeType(propertyType);
+                foreach (Type expanded in ExpandType(propertyType))
+                {
+                    yield return expanded;
+                }
             }
         }
 
@@ -39,7 +51,10 @@ internal static class ArchitectureReferenceScanner
             Type? returnType = SafeGetReturnType(method);
             if (returnType != null)
             {
-                yield return NormalizeType(returnType);
+                foreach (Type expanded in ExpandType(returnType))
+                {
+                    yield return expanded;
+                }
             }
 
             foreach (ParameterInfo parameter in SafeGetParameters(method))
@@ -47,7 +62,10 @@ internal static class ArchitectureReferenceScanner
                 Type? parameterType = SafeGetParameterType(parameter);
                 if (parameterType != null)
                 {
-                    yield return NormalizeType(parameterType);
+                    foreach (Type expanded in ExpandType(parameterType))
+                    {
+                        yield return expanded;
+                    }
                 }
             }
         }
@@ -59,7 +77,10 @@ internal static class ArchitectureReferenceScanner
                 Type? parameterType = SafeGetParameterType(parameter);
                 if (parameterType != null)
                 {
-                    yield return NormalizeType(parameterType);
+                    foreach (Type expanded in ExpandType(parameterType))
+                    {
+                        yield return expanded;
+                    }
                 }
             }
         }
@@ -260,6 +281,17 @@ internal static class ArchitectureReferenceScanner
         }
     }
 
+    private static IEnumerable<Type> ExpandType(Type type)
+    {
+        Type normalized = NormalizeType(type);
+        yield return normalized;
+
+        foreach (Type arg in GetGenericArgumentsRecursive(normalized))
+        {
+            yield return arg;
+        }
+    }
+
     private static Type NormalizeType(Type type)
     {
         try
@@ -277,5 +309,32 @@ internal static class ArchitectureReferenceScanner
         }
 
         return type;
+    }
+
+    private static IEnumerable<Type> GetGenericArgumentsRecursive(Type type)
+    {
+        Type[] args;
+        try
+        {
+            args = type.GetGenericArguments();
+        }
+        catch (FileNotFoundException)
+        {
+            yield break;
+        }
+        catch (TypeLoadException)
+        {
+            yield break;
+        }
+
+        foreach (Type arg in args)
+        {
+            yield return arg;
+
+            foreach (Type nested in GetGenericArgumentsRecursive(arg))
+            {
+                yield return nested;
+            }
+        }
     }
 }
