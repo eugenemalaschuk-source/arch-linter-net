@@ -1,0 +1,87 @@
+# Standalone policy recipe. Replace assemblies and namespaces with real values
+# from the repository being validated before running ArchLinterNet.
+version: 1
+name: Modular Monolith Policy Recipe
+
+layers:
+  shared_kernel:
+    namespace: MyCompany.Product.SharedKernel
+  sales_impl:
+    namespace: MyCompany.Product.Modules.Sales.Internal
+  sales_contracts:
+    namespace: MyCompany.Product.Modules.Sales.Contracts
+  billing_impl:
+    namespace: MyCompany.Product.Modules.Billing.Internal
+  billing_contracts:
+    namespace: MyCompany.Product.Modules.Billing.Contracts
+  inventory_impl:
+    namespace: MyCompany.Product.Modules.Inventory.Internal
+  inventory_contracts:
+    namespace: MyCompany.Product.Modules.Inventory.Contracts
+
+legacy_runtime_layers: []
+
+analysis:
+  target_assemblies:
+    - MyCompany.Product.Modules.Sales
+    - MyCompany.Product.Modules.Billing
+    - MyCompany.Product.Modules.Inventory
+    - MyCompany.Product.SharedKernel
+  assembly_search_paths: []
+  source_roots: []
+
+contracts:
+  strict:
+    - name: shared-kernel-must-not-depend-on-modules
+      source: shared_kernel
+      forbidden: [sales_impl, billing_impl, inventory_impl]
+      reason: Shared kernel must be reusable by modules without depending back on them.
+
+  audit:
+    - name: audit-sales-direct-billing-coupling
+      source: sales_impl
+      forbidden: [billing_impl]
+      reason: Discover direct Sales to Billing implementation coupling outside public contracts.
+
+  strict_layers: []
+  audit_layers: []
+
+  strict_allow_only:
+    - name: sales-contracts-are-public-surface
+      source: sales_contracts
+      allowed: [shared_kernel]
+      reason: Public contracts should depend only on stable shared kernel types.
+
+    - name: billing-contracts-are-public-surface
+      source: billing_contracts
+      allowed: [shared_kernel]
+      reason: Public contracts should depend only on stable shared kernel types.
+
+    - name: inventory-contracts-are-public-surface
+      source: inventory_contracts
+      allowed: [shared_kernel]
+      reason: Public contracts should depend only on stable shared kernel types.
+
+  audit_allow_only: []
+
+  strict_cycles:
+    - name: module-cycles
+      layers: [sales_impl, billing_impl, inventory_impl]
+      reason: Business modules must not form dependency cycles.
+
+  audit_cycles: []
+  strict_method_body: []
+  audit_method_body: []
+  strict_asmdef: []
+  audit_asmdef: []
+
+  strict_independence:
+    - name: modules-must-be-independent
+      layers: [sales_impl, billing_impl, inventory_impl]
+      ignored_violations:
+        - source_type: MyCompany.Product.Modules.Sales.Internal.Legacy.LegacyBillingAdapter
+          forbidden_reference: MyCompany.Product.Modules.Billing.Internal.LegacyBillingGateway
+          reason: Existing module coupling tracked for migration; remove after billing integration is replaced.
+      reason: Module implementations should communicate through contracts or messaging, not direct implementation references.
+
+  audit_independence: []
