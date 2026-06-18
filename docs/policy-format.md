@@ -28,12 +28,11 @@ layers:
     namespace: MyApp.Infrastructure
 ```
 
-You can also define legacy runtime layers (for runtime-only assemblies):
+You can also define legacy runtime layer names (for runtime-only assemblies):
 
 ```yaml
 legacy_runtime_layers:
-  third-party:
-    namespace: ThirdParty
+  - third-party
 ```
 
 ## Analysis configuration

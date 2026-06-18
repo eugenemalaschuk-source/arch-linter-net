@@ -39,7 +39,7 @@ Any reference outside the allow list is a violation.
 strict_allow_only:
   - name: web-only-allowed-dependencies
     source: web
-    allowOnly: [application, infrastructure]
+    allowed: [application, infrastructure]
     reason: Web layer may only depend on application and infrastructure.
 ```
 
@@ -67,9 +67,9 @@ from source, with IL token fallback scanning from compiled assemblies.
 strict_method_body:
   - name: domain-must-not-call-repositories
     source: domain
-    forbidden:
-      - type: Microsoft.EntityFrameworkCore.DbContext
-      - namespace: MyApp.Infrastructure
+    forbidden_calls:
+      - Microsoft.EntityFrameworkCore.DbContext
+      - MyApp.Infrastructure.IRepository
     reason: Domain layer must not use infrastructure APIs.
 ```
 
@@ -80,8 +80,8 @@ Validates Unity assembly definition (`.asmdef`) dependency boundaries.
 ```yaml
 strict_asmdef:
   - name: gameplay-asmdef-boundaries
-    source: gameplay
-    forbidden: [editor]
+    source_assemblies: [Gameplay]
+    forbidden_editor_refs: true
     reason: Gameplay assembly must not reference editor assemblies.
 ```
 

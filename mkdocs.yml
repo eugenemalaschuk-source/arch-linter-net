@@ -29,6 +29,10 @@ nav:
       - YAML Schema: reference/yaml-schema.md
       - Release Process: reference/release-process.md
 
+exclude_docs: |
+  README.md
+
+
 markdown_extensions:
   - admonition
   - pymdownx.highlight

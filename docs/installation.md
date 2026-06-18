@@ -35,10 +35,10 @@ Add to your GitHub Actions workflow:
   run: dotnet tool install --global ArchLinterNet.Cli
 
 - name: Validate architecture
-  run: dotnet arch-linter-net validate
+  run: dotnet arch-linter-net
 ```
 
 ## Requirements
 
-- .NET 8.0 or later
+- .NET 10 SDK or later
 - Windows, macOS, or Linux

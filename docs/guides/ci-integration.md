@@ -27,12 +27,12 @@ jobs:
       - name: Build
         run: dotnet build --no-restore
 
-      - name: Validate architecture
-        run: dotnet arch-linter-net validate
+      - name: Validate architecture (strict)
+        run: dotnet arch-linter-net
 
       - name: Audit report (non-blocking)
         if: always()
-        run: dotnet arch-linter-net validate --mode audit --output json > audit-report.json
+        run: dotnet arch-linter-net --mode audit --json > audit-report.json
 
       - name: Upload audit report
         if: always()
@@ -46,7 +46,7 @@ jobs:
 
 ```yaml
 - name: Validate architecture (strict)
-  run: dotnet arch-linter-net validate --output json > violations.json
+  run: dotnet arch-linter-net --json > violations.json
 
 - name: Upload violations
   if: failure()
@@ -66,7 +66,7 @@ jobs:
     custom: 'tool'
     arguments: 'install --global ArchLinterNet.Cli'
 
-- script: 'dotnet arch-linter-net validate'
+- script: 'dotnet arch-linter-net'
   displayName: 'Validate architecture'
 ```
 

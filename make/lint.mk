@@ -1,6 +1,6 @@
 .PHONY: lint lint-architecture audit-architecture lint-code-size lint-dotnet-format
 
-lint: lint-code-size lint-dotnet-format lint-architecture  ## Run all code quality checks
+lint: lint-code-size lint-dotnet-format lint-architecture lint-docs  ## Run all code quality checks
 
 lint-architecture:  ## Run strict architecture contracts on self
 	@dotnet test "$(TESTS_DIR)/ArchLinterNet.Core.Tests/ArchLinterNet.Core.Tests.csproj" --no-restore

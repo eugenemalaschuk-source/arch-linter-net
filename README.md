@@ -12,6 +12,22 @@ It is inspired by tools such as Import Linter, ArchUnit, ArchUnitNET, NetArchTes
 
 ---
 
+## Documentation
+
+The user-facing documentation is maintained as a [MkDocs](https://www.mkdocs.org/) site
+under `docs/`. To build and view locally:
+
+```bash
+make venv        # create Python virtual environment (one-time setup)
+make docs-serve  # start local preview at http://127.0.0.1:8000
+make docs-build  # build static site to site/
+```
+
+See the [Getting Started](https://eugenemalaschuk-source.github.io/arch-linter-net/getting-started/)
+guide for a quick walkthrough.
+
+---
+
 ## Why ArchLinterNet?
 
 Many .NET architecture testing tools are excellent when you want to express rules directly in C# tests:

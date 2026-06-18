@@ -1,70 +1,60 @@
 # CLI Usage
 
-## Commands
-
-### `validate`
-
-Run architecture validation against the policy file.
+## Usage
 
 ```bash
-dotnet arch-linter-net validate [options]
+dotnet arch-linter-net [options]
 ```
 
-Options:
+## Options
 
 | Option | Description | Default |
 |--------|-------------|---------|
-| `--policy` | Path to the architecture policy file | `architecture/dependencies.arch.yml` |
-| `--repository-root` | Repository root directory | Current directory |
-| `--mode` | Validation mode: `strict` or `audit` | `strict` |
-| `--output` | Output format: `human` or `json` | `human` |
-| `--search-paths` | Additional assembly probe paths (semicolon-separated) | |
-| `--project` | Path to a test project for context | |
-
-### `--help`
-
-Display help and available options.
-
-```bash
-dotnet arch-linter-net --help
-```
+| `-p`, `--policy <path>` | Path to YAML policy file | `architecture/dependencies.arch.yml` |
+| `-m`, `--mode <mode>` | Validation mode: `strict` or `audit` | `strict` |
+| `--strict` | Shortcut for `--mode strict` | |
+| `--audit` | Shortcut for `--mode audit` | |
+| `-f`, `--format <fmt>` | Output format: `human` or `json` | `human` |
+| `--json` | Shortcut for `--format json` | |
+| `-h`, `--help` | Show help message | |
+| `-v`, `--version` | Show version | |
 
 ## Examples
 
-### Basic validation
+### Basic validation (strict mode)
 
 ```bash
-dotnet arch-linter-net validate
+dotnet arch-linter-net
 ```
 
 ### Custom policy path
 
 ```bash
-dotnet arch-linter-net validate --policy config/architecture.yml
+dotnet arch-linter-net --policy config/architecture.yml
 ```
 
 ### Audit mode
 
 ```bash
-dotnet arch-linter-net validate --mode audit
+dotnet arch-linter-net --mode audit
 ```
 
 ### JSON output for CI
 
 ```bash
-dotnet arch-linter-net validate --output json > violations.json
+dotnet arch-linter-net --json > violations.json
 ```
 
-### Specify assembly search paths
+### Strict mode with JSON
 
 ```bash
-dotnet arch-linter-net validate --search-paths "./build-output;./libs"
+dotnet arch-linter-net --strict --json
 ```
 
 ## Exit codes
 
 | Code | Meaning |
 |------|---------|
-| `0` | No violations (or audit mode with only audit violations) |
-| `1` | Strict violations found |
-| `2` | Configuration or resolution error |
+| `0` | All contracts passed |
+| `1` | One or more contracts failed |
+| `2` | Runtime error (invalid arguments, file not found, etc.) |

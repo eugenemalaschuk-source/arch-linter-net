@@ -1,12 +1,16 @@
 ## ArchLinterNet — local developer targets
 ##
 ## Bootstrap & environment:
+##   make setup                — full project bootstrap: bundle + restore + venv
 ##   make bundle               — install development tools for the current OS
 ##   make rtk-init             — install/configure RTK without telemetry
 ##   make restore              — restore NuGet packages for all .NET projects
+##   make venv                 — create local Python virtual environment via uv
 ##
 ## Formatting:
-##   make fmt                  — auto-format all C# code
+##   make fmt                  — auto-format all code and documentation
+##   make fmt-csharp           — auto-format all C# code
+##   make fmt-docs             — auto-format markdown documentation
 ##
 ## Linting & quality:
 ##   make lint                 — run all code quality checks
@@ -14,21 +18,24 @@
 ##   make audit-architecture   — run diagnostic architecture audit on self
 ##   make lint-code-size       — size lint for C# and documentation files
 ##   make lint-dotnet-format   — verify C# formatting without changing files
+##   make lint-docs            — verify MkDocs documentation structure
 ##
 ## Testing:
-##   make verify               — lint + all tests
+##   make acceptance           — lint + all tests
 ##   make test                 — run all tests
 ##
-## Documentation:
-##   make venv                 — create local Python virtual environment via uv
+## Build:
+##   make build                — build documentation site + NuGet packages
 ##   make docs-serve           — start local MkDocs development server
 ##   make docs-build           — build static documentation site
+##   make pack                 — build NuGet packages
 ##
 ## Utilities:
 ##   make clean-results        — remove test-results folder
 
 include make/paths.mk
 include make/dev.mk
+include make/docs.mk
 include make/lint.mk
 include make/test.mk
 
@@ -38,11 +45,10 @@ include make/test.mk
 help:
 	@awk '/^## / { sub(/^## /, "", $$0); print }' $(MAKEFILE_LIST)
 
-venv:
-	@cd "$(PROJECT_ROOT)" && UV_PROJECT_ENVIRONMENT="$(PROJECT_ROOT)/.venv" "$(UV)" sync --project tools/pyproject.toml
+setup: bundle restore venv  ## Full project bootstrap: tools + NuGet + Python venv
 
-docs-serve:
-	@cd "$(PROJECT_ROOT)" && UV_PROJECT_ENVIRONMENT="$(PROJECT_ROOT)/.venv" "$(UV)" run --project tools/pyproject.toml mkdocs serve
+fmt: fmt-csharp fmt-docs  ## Auto-format all code and documentation
 
-docs-build:
-	@cd "$(PROJECT_ROOT)" && UV_PROJECT_ENVIRONMENT="$(PROJECT_ROOT)/.venv" "$(UV)" run --project tools/pyproject.toml mkdocs build
+build: docs-build pack  ## Build documentation site and NuGet packages
+
+acceptance: lint test  ## Full project acceptance: lint + all tests

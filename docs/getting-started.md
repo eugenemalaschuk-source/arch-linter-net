@@ -45,7 +45,7 @@ contracts:
 Using the .NET tool:
 
 ```bash
-dotnet arch-linter-net validate
+dotnet arch-linter-net
 ```
 
 Or programmatically from a test:
@@ -64,7 +64,8 @@ var resolution = ArchitectureAssemblyResolver.ResolveFromDocument(document, repo
 var context = new ArchitectureAnalysisContext(
     repositoryRoot,
     resolution.ResolvedAssemblies,
-    resolution.MissingAssemblyNames);
+    resolution.MissingAssemblyNames,
+    resolution.AssemblyProbingPaths);
 
 var runner = new ArchitectureContractRunner(context, document);
 
