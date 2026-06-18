@@ -27,4 +27,4 @@
 - [x] 4.1 Verify all new JSON files parse successfully and are formatted consistently.
 - [x] 4.2 Validate all sample policy files against `schema/dependencies.arch.schema.json` using an available JSON Schema validator.
 - [x] 4.3 Run `rtk make restore` if needed for no-restore targets.
-- [x] 4.4 Run `rtk make verify` and resolve any lint, architecture, formatting, or test failures caused by the change.
+- [x] 4.4 Run `rtk make acceptance` and resolve any lint, architecture, formatting, or test failures caused by the change.

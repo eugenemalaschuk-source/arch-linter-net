@@ -1,0 +1,88 @@
+name: Release NuGet packages
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'NuGet package version, for example 0.1.0-preview.1'
+        required: true
+        type: string
+      publish:
+        description: 'Publish packages to NuGet.org'
+        required: true
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+
+jobs:
+  release:
+    name: Build NuGet packages
+    runs-on: ubuntu-latest
+
+    env:
+      PACKAGE_VERSION: ${{ inputs.version }}
+      PACKAGE_OUTPUT: artifacts/packages
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Validate version input
+        shell: bash
+        run: |
+          if [[ -z "$PACKAGE_VERSION" ]]; then
+            echo "Package version is required." >&2
+            exit 1
+          fi
+
+          if [[ ! "$PACKAGE_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z][0-9A-Za-z.-]*)?(\+[0-9A-Za-z][0-9A-Za-z.-]*)?$ ]]; then
+            echo "Package version '$PACKAGE_VERSION' is not a valid SemVer-style NuGet version." >&2
+            exit 1
+          fi
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Restore
+        run: dotnet restore ArchLinterNet.slnx
+
+      - name: Build
+        run: dotnet build ArchLinterNet.slnx --configuration Release --no-restore -p:Version="$PACKAGE_VERSION"
+
+      - name: Test
+        run: dotnet test ArchLinterNet.slnx --configuration Release --no-build -p:Version="$PACKAGE_VERSION"
+
+      - name: Pack Core
+        run: dotnet pack src/ArchLinterNet.Core/ArchLinterNet.Core.csproj --configuration Release --no-build --output "$PACKAGE_OUTPUT" -p:PackageVersion="$PACKAGE_VERSION" -p:Version="$PACKAGE_VERSION"
+
+      - name: Pack CLI
+        run: dotnet pack src/ArchLinterNet.Cli/ArchLinterNet.Cli.csproj --configuration Release --no-build --output "$PACKAGE_OUTPUT" -p:PackageVersion="$PACKAGE_VERSION" -p:Version="$PACKAGE_VERSION"
+
+      - name: Pack Testing
+        run: dotnet pack src/ArchLinterNet.Testing/ArchLinterNet.Testing.csproj --configuration Release --no-build --output "$PACKAGE_OUTPUT" -p:PackageVersion="$PACKAGE_VERSION" -p:Version="$PACKAGE_VERSION"
+
+      - name: Pack Unity
+        run: dotnet pack src/ArchLinterNet.Unity/ArchLinterNet.Unity.csproj --configuration Release --no-build --output "$PACKAGE_OUTPUT" -p:PackageVersion="$PACKAGE_VERSION" -p:Version="$PACKAGE_VERSION"
+
+      - name: Upload package artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: nuget-packages-${{ inputs.version }}
+          path: |
+            ${{ env.PACKAGE_OUTPUT }}/*.nupkg
+            ${{ env.PACKAGE_OUTPUT }}/*.snupkg
+          if-no-files-found: error
+
+      - name: Publish to NuGet.org
+        if: ${{ inputs.publish == true }}
+        env:
+          NUGET_API_KEY: ${{ secrets.NUGET_API_KEY }}
+        shell: bash
+        run: |
+          for package in "$PACKAGE_OUTPUT"/*.nupkg; do
+            dotnet nuget push "$package" --api-key "$NUGET_API_KEY" --source https://api.nuget.org/v3/index.json --skip-duplicate
+          done

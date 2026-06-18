@@ -4,57 +4,81 @@
 
 ArchLinterNet follows [Semantic Versioning 2.0](https://semver.org/).
 
-Pre-1.0 releases use `0.x.y`:
+Pre-1.0 preview releases use explicit versions such as `0.1.0-preview.1`.
+The manual release workflow receives the package version as an input and passes
+it to MSBuild when building official package artifacts. Do not update
+`Directory.Build.props` just to run a preview release.
 
-- **Patch** (`0.x.z`): Bug fixes, documentation, internal refactoring
-- **Minor** (`0.y.0`): New features, contract format changes, behavioral changes
+## Workflow Separation
 
-## Release steps
+Pull request CI and package publication are intentionally separate:
 
-1. **Prepare the release branch**
+- `.github/workflows/ci.yml` validates pull requests and pushes to `main` with
+  restore, Release build, and Release test steps only.
+- `.github/workflows/release-nuget.yml` is the only workflow that builds
+  official versioned package artifacts and can publish to NuGet.org.
 
-   ```bash
-   git checkout -b release/v0.x.y
-   ```
+The CI workflow must not call `dotnet pack`, read `NUGET_API_KEY`, publish
+packages, create tags, or create GitHub Releases.
 
-1. **Update version**
+## NuGet.org Setup
 
-   Update `Directory.Build.props` with the new version number.
+Before the first public publication:
 
-1. **Update documentation**
+1. Create or obtain a NuGet.org API key that can publish these package IDs:
+   `ArchLinterNet.Core`, `ArchLinterNet.Cli`, `ArchLinterNet.Testing`, and
+   `ArchLinterNet.Unity`.
+2. Store the key as the repository secret `NUGET_API_KEY`.
+3. Do not commit the key or expose it to pull request CI.
 
-   - Update `docs/reference/release-process.md` if procedures changed
-   - Update `mkdocs.yml` if new pages were added
-   - Verify docs build: `make docs-build`
+NuGet.org is the primary public package storage for preview consumption.
+GitHub Packages is not part of the initial preview release path.
 
-1. **Run full verification**
+## Manual Release Steps
 
-   ```bash
-   make acceptance
-   ```
+Initial preview releases use two explicit manual workflow runs.
 
-1. **Pack NuGet packages**
+### Step 1: Dry-Run Package Build
 
-   ```bash
-   make pack
-   ```
+Run the `Release NuGet packages` workflow manually with:
 
-1. **Create a GitHub release**
+```text
+version = 0.1.0-preview.1
+publish = false
+```
 
-   - Tag the release: `git tag v0.x.y`
-   - Push tag: `git push origin v0.x.y`
-   - Create a release with release notes
+Expected result:
 
-1. **Publish NuGet packages**
+- restore, build, and tests pass in Release configuration;
+- versioned `.nupkg` artifacts are created for the publishable projects;
+- package artifacts are uploaded to the workflow run;
+- nothing is published to NuGet.org.
 
-   ```bash
-   dotnet nuget push nupkg/ArchLinterNet.Core.0.x.y.nupkg --api-key <key> --source https://api.nuget.org/v3/index.json
-   dotnet nuget push nupkg/ArchLinterNet.Cli.0.x.y.nupkg --api-key <key> --source https://api.nuget.org/v3/index.json
-   dotnet nuget push nupkg/ArchLinterNet.Testing.0.x.y.nupkg --api-key <key> --source https://api.nuget.org/v3/index.json
-   ```
+Download or inspect the uploaded artifacts before publication.
 
-## Package publication
+### Step 2: Public Publication
 
-Package release is separate from documentation deployment. See
-[issue #661](https://github.com/eugenemalaschuk-source/firstice/issues/661)
-for the official publication workflow.
+After the dry-run artifacts are checked, rerun the same workflow with the same
+version and publication enabled:
+
+```text
+version = 0.1.0-preview.1
+publish = true
+```
+
+Expected result:
+
+- restore, build, and tests pass again in Release configuration;
+- versioned `.nupkg` artifacts are produced again;
+- package artifacts are uploaded to the workflow run;
+- packages are pushed to NuGet.org using `NUGET_API_KEY`;
+- duplicate pushes are skipped to make accidental reruns non-destructive.
+
+After publication, record the published package IDs and versions in the related
+issue or pull request notes.
+
+## Future Automation
+
+Tag-triggered publication and GitHub Release automation are out of scope for the
+initial preview process. They can be introduced later after the manual NuGet.org
+flow is validated.
