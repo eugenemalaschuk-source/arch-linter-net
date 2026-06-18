@@ -113,21 +113,26 @@ Core model, YAML loading, assembly resolution, dependency scanning, contract exe
 
 A .NET global/local tool for local and CI validation.
 
-Target command shape:
-
 ```bash
-archlinternet validate --policy architecture/dependencies.arch.yml --mode strict
-archlinternet validate --policy architecture/dependencies.arch.yml --mode audit --format json
+# Run via dotnet run (development):
+dotnet run --project src/ArchLinterNet.Cli -- --policy architecture/dependencies.arch.yml --mode strict
+
+# Run via local tool (after dotnet tool restore):
+dotnet arch-linter-net --policy architecture/dependencies.arch.yml --mode audit --format json
+
+# Shortcut flags:
+dotnet arch-linter-net --policy architecture/dependencies.arch.yml --strict --json
 ```
 
 ### `ArchLinterNet.Testing`
 
-Thin helpers for using ArchLinterNet from test frameworks.
-
-Target usage shape:
+Thin helpers for using ArchLinterNet from NUnit tests.
 
 ```csharp
-[Fact]
+using NUnit.Framework;
+using ArchLinterNet.Testing;
+
+[Test]
 public void ArchitectureStrictContractsMustPass()
 {
     ArchitectureAssertions
@@ -227,23 +232,58 @@ contracts:
 
 ### 2. Run strict validation
 
-Target CLI shape:
-
 ```bash
-archlinternet validate --mode strict
+dotnet run --project src/ArchLinterNet.Cli -- --mode strict
 ```
 
-Strict validation should be used as the no-new-debt gate in CI.
+Or if installed as a local tool:
+
+```bash
+dotnet arch-linter-net --mode strict
+```
+
+Strict validation should be used as the no-new-debt gate in CI. Exit code 0 means all contracts pass. Exit code 1 means violations were found.
 
 ### 3. Run audit validation
 
-Target CLI shape:
-
 ```bash
-archlinternet validate --mode audit
+dotnet run --project src/ArchLinterNet.Cli -- --mode audit
 ```
 
 Audit validation is useful during decomposition and migration work. It can expose known debt without blocking every pull request.
+
+---
+
+## Running against samples
+
+A sample clean architecture policy is available at `samples/BasicCleanArchitecture/`:
+
+```bash
+# Strict validation (will report missing target assemblies - the sample
+# assemblies don't exist, demonstrating configuration diagnostics)
+dotnet run --project src/ArchLinterNet.Cli -- \
+    --policy samples/BasicCleanArchitecture/architecture/dependencies.arch.yml \
+    --mode strict
+
+# Audit validation
+dotnet run --project src/ArchLinterNet.Cli -- \
+    --policy samples/BasicCleanArchitecture/architecture/dependencies.arch.yml \
+    --mode audit
+```
+
+Sample NUnit usage:
+```csharp
+using ArchLinterNet.Testing;
+
+[Test]
+public void Architecture_Strict_Contracts_Must_Pass()
+{
+    ArchitectureAssertions
+        .FromPolicy("samples/BasicCleanArchitecture/architecture/dependencies.arch.yml")
+        .ValidateStrict()
+        .ShouldPass();
+}
+```
 
 ---
 
@@ -356,9 +396,55 @@ Ignored violations are not intended to hide new debt.
 
 ---
 
+## CLI usage
+
+```
+arch-linter-net [options]
+
+Options:
+  -p, --policy <path>   Path to YAML contract file
+                        (default: architecture/dependencies.arch.yml)
+  -m, --mode <mode>     Validation mode: strict or audit (default: strict)
+      --strict          Shortcut for --mode strict
+      --audit           Shortcut for --mode audit
+  -f, --format <fmt>    Output format: human or json (default: human)
+      --json            Shortcut for --format json
+  -h, --help            Show help message
+  -v, --version         Show version
+
+Exit codes:
+  0   All contracts passed
+  1   One or more contracts failed
+  2   Runtime error (invalid arguments, file not found, etc.)
+```
+
+## Test adapter API
+
+Use from NUnit tests:
+
+```csharp
+[Test]
+public void ArchitectureStrictContractsMustPass()
+{
+    ArchitectureAssertions
+        .FromPolicy("architecture/dependencies.arch.yml")
+        .ValidateStrict()
+        .ShouldPass();
+}
+
+[Test]
+public void ArchitectureAuditContractsMustPass()
+{
+    ArchitectureAssertions
+        .FromPolicy("architecture/dependencies.arch.yml")
+        .ValidateAudit()
+        .ShouldPass();
+}
+```
+
 ## CI example
 
-Example GitHub Actions shape:
+GitHub Actions:
 
 ```yaml
 name: Architecture
@@ -366,25 +452,41 @@ name: Architecture
 on:
   pull_request:
   push:
-    branches:
-      - main
+    branches: [main]
 
 jobs:
-  architecture:
+  strict:
     runs-on: ubuntu-latest
-
     steps:
       - uses: actions/checkout@v4
-
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: 10.0.x
+      - run: dotnet tool restore
+      - run: dotnet arch-linter-net --mode strict --format json
 
-      - name: Restore tools
-        run: dotnet tool restore
+  audit:
+    runs-on: ubuntu-latest
+    continue-on-error: true  # audit diagnostics should not block CI
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+      - run: dotnet tool restore
+      - run: dotnet arch-linter-net --mode audit --format json
+```
 
-      - name: Validate architecture
-        run: arch-linter-net --mode strict --format json
+Using Make:
+
+```makefile
+.PHONY: lint-architecture audit-architecture
+
+lint-architecture:
+	dotnet run --project src/ArchLinterNet.Cli -- --mode strict
+
+audit-architecture:
+	dotnet run --project src/ArchLinterNet.Cli -- --mode audit
 ```
 
 ---
@@ -416,17 +518,20 @@ contracts:
 
 ## Output formats
 
-Target output modes:
-
 ```bash
-arch-linter-net --mode strict --format human
-arch-linter-net --mode strict --format json
-arch-linter-net --mode audit --format json
+dotnet arch-linter-net --mode strict --format human
+dotnet arch-linter-net --mode strict --format json
+dotnet arch-linter-net --mode audit --format json
 ```
 
 ### Human output
 
-For local development and readable CI logs.
+For local development and readable CI logs. Example:
+
+```
+- [web-must-not-depend-on-infrastructure] MyApp.Web -> MyApp.Infrastructure: MyApp.Web.Services.LegacyService
+- [inward-layering] MyApp.Infrastructure -> MyApp.Web: MyApp.Infrastructure.Data.WebContext
+```
 
 ### JSON output
 
@@ -436,8 +541,15 @@ Single JSON object for CI artifacts, dashboards, and downstream automation:
 {
   "passed": false,
   "mode": "strict",
-  "violations": [...],
-  "cycles": [...]
+  "violations": [
+    {
+      "contract": "web-must-not-depend-on-infrastructure",
+      "source": "MyApp.Web",
+      "forbidden_namespace": "MyApp.Infrastructure",
+      "forbidden_references": ["MyApp.Web.Services.LegacyService"]
+    }
+  ],
+  "cycles": ["web -> infrastructure -> web"]
 }
 ```
 

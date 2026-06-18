@@ -4,5 +4,17 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <VersionPrefix>0.1.0</VersionPrefix>
+    <VersionSuffix>preview.658</VersionSuffix>
+    <Authors>Eugene Malashchuk</Authors>
+    <Company>Eugene Malashchuk</Company>
+    <Copyright>Copyright (c) 2026 Eugene Malashchuk</Copyright>
+    <PackageProjectUrl>https://github.com/eugenemalaschuk-source/arch-linter-net</PackageProjectUrl>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageTags>architecture;linting;dotnet;yaml;ci</PackageTags>
+    <RepositoryUrl>https://github.com/eugenemalaschuk-source/arch-linter-net</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <IncludeSymbols>true</IncludeSymbols>
+    <SymbolPackageFormat>snupkg</SymbolPackageFormat>
   </PropertyGroup>
 </Project>

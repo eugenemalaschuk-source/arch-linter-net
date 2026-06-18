@@ -1,0 +1,12 @@
+version: 1
+name: Deliberately Failing Policy
+
+layers:
+  core:
+    namespace: ArchLinterNet.Core
+
+analysis:
+  target_assemblies:
+    - NonExistentAssembly
+
+contracts: {}

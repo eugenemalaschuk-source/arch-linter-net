@@ -6,8 +6,9 @@ lint-architecture:  ## Run strict architecture contracts on self
 	@dotnet test "$(TESTS_DIR)/ArchLinterNet.Core.Tests/ArchLinterNet.Core.Tests.csproj" --no-restore
 
 audit-architecture:  ## Run diagnostic architecture audit contracts
-	@echo "Audit mode not yet implemented; running strict tests."
-	@dotnet test "$(TESTS_DIR)/ArchLinterNet.Core.Tests/ArchLinterNet.Core.Tests.csproj" --no-restore
+	@dotnet build "$(PROJECT_ROOT)/src/ArchLinterNet.Testing/ArchLinterNet.Testing.csproj" --nologo -q 2>/dev/null
+	@dotnet build "$(PROJECT_ROOT)/src/ArchLinterNet.Unity/ArchLinterNet.Unity.csproj" --nologo -q 2>/dev/null; true
+	@dotnet run --project "$(PROJECT_ROOT)/src/ArchLinterNet.Cli" -- --policy "$(PROJECT_ROOT)/architecture/dependencies.arch.yml" --mode audit
 
 lint-code-size:  ## Size lint for C# and documentation files
 	@cd "$(TOOLS_DIR)" && "$(UV)" run python scripts/lint_csharp_file_size.py \

@@ -9,6 +9,11 @@
     <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
+    <PackAsTool>true</PackAsTool>
+    <ToolCommandName>arch-linter-net</ToolCommandName>
+    <IsPackable>true</IsPackable>
+    <PackageId>ArchLinterNet.Cli</PackageId>
+    <Description>.NET tool for running ArchLinterNet architecture contracts from YAML policies. Supports strict and audit modes with human and JSON output.</Description>
   </PropertyGroup>
 
 </Project>

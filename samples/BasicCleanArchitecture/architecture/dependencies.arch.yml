@@ -30,7 +30,13 @@ contracts:
       forbidden: [web, infrastructure]
       reason: Domain must be independent of application layers.
 
-  audit: []
+  audit:
+    - name: audit-infrastructure-must-not-depend-on-web
+      source: infrastructure
+      forbidden: [web]
+      reason: >
+        Audit: Infrastructure should not reference Web in clean architecture.
+        Known violations are tracked in the ignored_violations baseline.
 
   strict_layers:
     - name: inward-layering
