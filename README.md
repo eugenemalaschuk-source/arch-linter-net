@@ -378,13 +378,13 @@ jobs:
 
       - uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: 8.0.x
+          dotnet-version: 10.0.x
 
       - name: Restore tools
         run: dotnet tool restore
 
       - name: Validate architecture
-        run: dotnet archlinternet validate --mode strict --format github
+        run: arch-linter-net --mode strict --format json
 ```
 
 ---
@@ -406,8 +406,9 @@ Example target shape:
 contracts:
   strict_asmdef:
     - name: runtime-must-not-reference-editor-assemblies
-      source: Runtime
-      forbidden: [Editor]
+      source_assemblies:
+        - Runtime
+      forbidden_editor_refs: true
       reason: Runtime assemblies must not depend on UnityEditor-only code.
 ```
 
@@ -418,22 +419,27 @@ contracts:
 Target output modes:
 
 ```bash
-archlinternet validate --mode strict --format text
-archlinternet validate --mode strict --format json
-archlinternet validate --mode strict --format github
+arch-linter-net --mode strict --format human
+arch-linter-net --mode strict --format json
+arch-linter-net --mode audit --format json
 ```
 
-### Text output
+### Human output
 
 For local development and readable CI logs.
 
 ### JSON output
 
-For CI artifacts, dashboards, and downstream automation.
+Single JSON object for CI artifacts, dashboards, and downstream automation:
 
-### GitHub output
-
-For GitHub Actions annotations.
+```json
+{
+  "passed": false,
+  "mode": "strict",
+  "violations": [...],
+  "cycles": [...]
+}
+```
 
 ---
 
