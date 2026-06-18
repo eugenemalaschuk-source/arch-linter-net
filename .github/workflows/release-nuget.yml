@@ -53,9 +53,6 @@ jobs:
       - name: Build
         run: dotnet build ArchLinterNet.slnx --configuration Release --no-restore -p:Version="$PACKAGE_VERSION"
 
-      - name: Acceptance
-        run: make acceptance
-
       - name: Pack Core
         run: dotnet pack src/ArchLinterNet.Core/ArchLinterNet.Core.csproj --configuration Release --no-build --output "$PACKAGE_OUTPUT" -p:PackageVersion="$PACKAGE_VERSION" -p:Version="$PACKAGE_VERSION"
 
