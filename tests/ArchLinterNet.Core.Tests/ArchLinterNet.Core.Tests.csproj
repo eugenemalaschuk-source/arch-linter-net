@@ -17,6 +17,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\ArchLinterNet.Core\ArchLinterNet.Core.csproj" />
+    <ProjectReference Include="..\..\src\ArchLinterNet.Testing\ArchLinterNet.Testing.csproj" />
   </ItemGroup>
 
 </Project>

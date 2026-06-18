@@ -9,23 +9,31 @@ public sealed class ArchitectureValidator
 {
     public bool Validate(string policyPath)
     {
-        return Validate(policyPath, out _);
+        return Validate(policyPath, out _, out _);
     }
 
     public bool Validate(string policyPath, out IReadOnlyCollection<ArchitectureViolation> violations)
     {
+        return Validate(policyPath, out violations, out _);
+    }
+
+    public bool Validate(
+        string policyPath,
+        out IReadOnlyCollection<ArchitectureViolation> violations,
+        out IReadOnlyCollection<string> cycles)
+    {
         ArchitectureContractDocument document = ArchitectureContractLoader.LoadFromPath(policyPath);
 
+        string repositoryRoot = ResolveRepositoryRoot(policyPath);
+
         IReadOnlyCollection<System.Reflection.Assembly> assemblies =
-            ArchitectureAssemblyResolver.ResolveFromDocument(document);
+            ArchitectureAssemblyResolver.ResolveFromDocument(document, repositoryRoot);
 
-        ArchitectureAnalysisContext context = new(
-            Path.GetDirectoryName(policyPath) ?? Directory.GetCurrentDirectory(),
-            assemblies);
-
+        ArchitectureAnalysisContext context = new(repositoryRoot, assemblies);
         ArchitectureContractRunner runner = new(context, document);
 
         List<ArchitectureViolation> allViolations = new();
+        List<string> allCycles = new();
 
         foreach (ArchitectureDependencyContract contract in runner.StrictContracts())
         {
@@ -44,16 +52,8 @@ public sealed class ArchitectureValidator
 
         foreach (ArchitectureCycleContract contract in runner.StrictCycleContracts())
         {
-            IReadOnlyCollection<string> cycles = runner.CheckCycleContract(contract);
-            if (cycles.Count > 0)
-            {
-                string details = ArchitectureDiagnosticFormatter.FormatCyclesForHumans(cycles);
-                allViolations.Add(new ArchitectureViolation(
-                    contract.Name,
-                    "(cycle-detection)",
-                    "cycles-detected",
-                    new[] { details }));
-            }
+            IReadOnlyCollection<string> contractCycles = runner.CheckCycleContract(contract);
+            allCycles.AddRange(contractCycles);
         }
 
         foreach (ArchitectureMethodBodyContract contract in runner.StrictMethodBodyContracts())
@@ -72,6 +72,23 @@ public sealed class ArchitectureValidator
         }
 
         violations = allViolations;
-        return allViolations.Count == 0;
+        cycles = allCycles;
+        return allViolations.Count == 0 && allCycles.Count == 0;
+    }
+
+    private static string ResolveRepositoryRoot(string policyPath)
+    {
+        string? policyDir = Path.GetDirectoryName(policyPath);
+        if (string.IsNullOrEmpty(policyDir))
+        {
+            return Directory.GetCurrentDirectory();
+        }
+
+        if (string.Equals(Path.GetFileName(policyDir), "architecture", StringComparison.OrdinalIgnoreCase))
+        {
+            return Path.GetDirectoryName(policyDir) ?? policyDir;
+        }
+
+        return policyDir;
     }
 }

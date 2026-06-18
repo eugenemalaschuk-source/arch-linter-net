@@ -25,7 +25,7 @@ contracts:
       forbidden: [infrastructure]
       reason: Web layer should only depend on Domain, not Infrastructure.
 
-    - name: domain-must-not-depend-on-web
+    - name: domain-must-not-depend-on-web-or-infrastructure
       source: domain
       forbidden: [web, infrastructure]
       reason: Domain must be independent of application layers.
@@ -35,10 +35,10 @@ contracts:
   strict_layers:
     - name: inward-layering
       layers:
-        - infrastructure
-        - domain
         - web
-      reason: Dependencies must point inward: Web -> Domain, Infrastructure -> Domain.
+        - domain
+        - infrastructure
+      reason: Dependencies must point inward: Web -> Domain, Infrastructure -> Domain. Outer layers may reference inner layers.
 
   audit_layers: []
 
@@ -61,10 +61,10 @@ contracts:
   audit_asmdef: []
 
   strict_independence:
-    - name: web-and-infrastructure-must-be-independent
-      layers:
-        - web
-        - infrastructure
-      reason: Web and Infrastructure must not reference each other.
+    name: web-and-infrastructure-must-be-independent
+    layers:
+      - web
+      - infrastructure
+    reason: Web and Infrastructure must not reference each other.
 
   audit_independence: []
