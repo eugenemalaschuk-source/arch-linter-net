@@ -85,7 +85,7 @@ jobs:
 
           AUTH_RESPONSE=$(curl -sS -X POST -H "Content-Type: application/json" \
             -d "{\"IdentityToken\": \"${OIDC_TOKEN}\"}" \
-            "https://api.nuget.org/api/v1/oidc/authenticate")
+            "https://www.nuget.org/api/v1/oidc/authenticate")
           echo "Auth response: $AUTH_RESPONSE"
           API_KEY=$(echo "$AUTH_RESPONSE" | jq -r '.apiKey')
 
