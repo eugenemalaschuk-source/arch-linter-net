@@ -1,0 +1,5 @@
+brew "uv"
+brew "node"
+brew "openspec"
+brew "opencode"
+brew "rtk"
