@@ -45,21 +45,6 @@ The release workflow SHALL publish packages to NuGet.org only when the manual ru
 - **WHEN** the release workflow publishes packages
 - **THEN** it uses `--skip-duplicate` for NuGet push operations
 
-### Requirement: GitHub release publication
-The release workflow SHALL create repository-visible release records when public package publication is requested.
-
-#### Scenario: GitHub Packages mirror is populated
-- **WHEN** the release workflow runs with `publish=true`
-- **THEN** it pushes package artifacts to GitHub Packages using `GITHUB_TOKEN`
-
-#### Scenario: GitHub Release is created
-- **WHEN** the release workflow runs with `publish=true`
-- **THEN** it creates or updates a GitHub Release for the explicit version and uploads package artifacts to that release
-
-#### Scenario: GitHub release records are skipped during dry-run
-- **WHEN** the release workflow runs with `publish=false`
-- **THEN** it does not push to GitHub Packages or create a GitHub Release
-
 ### Requirement: Documentation publication
 The release workflow SHALL publish the documentation site to GitHub Pages when public package publication is requested.
 

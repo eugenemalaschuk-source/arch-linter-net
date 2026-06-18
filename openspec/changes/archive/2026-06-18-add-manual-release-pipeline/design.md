@@ -8,7 +8,7 @@ ArchLinterNet is a public .NET architecture linter with four packages: Core, Cli
 - `docs/reference/release-process.md` describes a manual tag/push flow that does not match the required two-step workflow_dispatch approach.
 - All four `.csproj` files define `PackageId` already.
 
-The requirement is explicit workflow separation: PR CI validates code only; release workflow is started from the GitHub Actions UI and builds versioned packages, optionally publishes packages, creates GitHub release records, and deploys documentation.
+The requirement is explicit workflow separation: PR CI validates code only; release workflow is started from the GitHub Actions UI and builds versioned packages, optionally publishes packages to NuGet.org, and deploys documentation.
 
 ## Goals / Non-Goals
 
@@ -22,7 +22,7 @@ The requirement is explicit workflow separation: PR CI validates code only; rele
 - Release workflow packs all four projects with `PackageVersion=${{ inputs.version }}`.
 - Release workflow uploads `.nupkg` files as workflow artifacts.
 - Release workflow publishes to NuGet.org only when `publish=true`, using `NUGET_API_KEY` in that step only.
-- Release workflow mirrors packages to GitHub Packages, creates or updates a GitHub Release, and deploys documentation to GitHub Pages when `publish=true`.
+- Release workflow deploys documentation to GitHub Pages when `publish=true`.
 - Release workflow uses `--skip-duplicate` to prevent accidental double-publish failures.
 - Release process documentation reflects the two-step dry-run/public procedure.
 
@@ -32,7 +32,7 @@ The requirement is explicit workflow separation: PR CI validates code only; rele
 - Automatic publication on merge.
 - Publishing stable 1.0.0.
 - Internal/private package feeds.
-- Using GitHub Packages as primary storage; it is only a repository-visible mirror.
+- Using GitHub Packages as package storage or as a mirror.
 - Runtime code changes.
 
 ## Decisions
@@ -92,16 +92,16 @@ Alternatives considered:
 
 Early validation is cheap and improves developer experience.
 
-### Publish release records from GitHub UI workflow
+### Publish only NuGet.org packages and GitHub Pages docs
 
-Official publication is initiated from the GitHub Actions UI, not from local machines. When `publish=true`, the workflow publishes to NuGet.org, mirrors to GitHub Packages, creates or updates a GitHub Release, and deploys docs to GitHub Pages.
+Official publication is initiated from the GitHub Actions UI, not from local machines. When `publish=true`, the workflow publishes packages to NuGet.org and deploys docs to GitHub Pages. Workflow artifacts remain the dry-run inspection and audit trail.
 
 Alternatives considered:
 
 - Local `make publish`: useful for internal workflows, but weaker auditability and easier to run from an unprepared environment.
-- GitHub Release-only distribution: fills the repository UI, but does not satisfy NuGet consumption.
+- GitHub Packages mirror or GitHub Release assets: fills repository UI surfaces, but adds another package distribution path before the first NuGet.org preview release is validated.
 
-The GitHub UI workflow gives a single audited release path while still populating repository Releases and Packages.
+The GitHub UI workflow gives a single audited release path without adding extra package storage.
 
 ## Risks / Trade-offs
 

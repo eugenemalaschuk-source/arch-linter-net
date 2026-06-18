@@ -16,16 +16,15 @@ Pull request CI and package publication are intentionally separate:
 - `.github/workflows/ci.yml` validates pull requests and pushes to `main` with
   `make restore` followed by the full `make acceptance` gate.
 - `.github/workflows/release-nuget.yml` is the only workflow that builds
-  official versioned package artifacts, can publish to NuGet.org, mirrors
-  packages to GitHub Packages, creates a GitHub Release, and deploys
+  official versioned package artifacts, can publish to NuGet.org, and deploys
   documentation to GitHub Pages when publication is enabled.
 
 The CI workflow must not call `dotnet pack`, read `NUGET_API_KEY`, publish
 packages, create tags, or create GitHub Releases.
 
 Local `make pack` is only for developer inspection. Official preview package
-publication, GitHub Release creation, GitHub Packages mirroring, and GitHub
-Pages deployment are performed by the manual GitHub Actions workflow.
+publication and GitHub Pages deployment are performed by the manual GitHub
+Actions workflow.
 
 ## NuGet.org Setup
 
@@ -39,9 +38,9 @@ Before the first public publication:
    source.
 4. Do not commit the key or expose it to pull request CI.
 
-NuGet.org is the primary public package storage for preview consumption.
-GitHub Packages is also populated as a repository-visible mirror during public
-publication.
+NuGet.org is the only package publication target for preview consumption.
+GitHub Packages is not used as package storage or as a mirror in the initial
+release pipeline.
 
 ## Manual Release Steps
 
@@ -84,18 +83,14 @@ Expected result:
 - versioned `.nupkg` artifacts are produced again;
 - package artifacts are uploaded to the workflow run;
 - packages are pushed to NuGet.org using `NUGET_API_KEY`;
-- packages are mirrored to GitHub Packages using `GITHUB_TOKEN`;
-- a GitHub Release named for the version is created or updated with package
-  artifacts;
 - duplicate pushes are skipped to make accidental reruns non-destructive;
 - documentation is built and deployed to GitHub Pages through GitHub Actions.
 
-After publication, record the published package IDs, versions, GitHub Release
-URL, GitHub Packages status, and GitHub Pages deployment URL in the related
-issue or pull request notes.
+After publication, record the published package IDs, versions, and GitHub Pages
+deployment URL in the related issue or pull request notes.
 
 ## Future Automation
 
-Tag-triggered publication remains out of scope for the initial preview process.
-The manual release workflow creates the version tag and GitHub Release only when
-`publish=true`.
+Tag-triggered publication and GitHub Release automation are out of scope for the
+initial preview process. Workflow artifacts are the dry-run inspection and audit
+trail.

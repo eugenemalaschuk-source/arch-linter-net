@@ -9,7 +9,7 @@ ArchLinterNet needs a controlled way to publish preview NuGet packages for First
 - PR CI workflow never packs official versioned packages, never reads `NUGET_API_KEY`, never publishes.
 - Release workflow uses `workflow_dispatch` with explicit `version` and `publish` inputs.
 - Release workflow builds, tests, packs versioned `.nupkg` artifacts, uploads them as workflow artifacts, and only publishes when `publish=true`.
-- Public publication pushes to NuGet.org, mirrors packages to GitHub Packages, creates or updates a GitHub Release, and deploys documentation to GitHub Pages.
+- Public publication pushes packages to NuGet.org and deploys documentation to GitHub Pages.
 - Update `docs/reference/release-process.md` to document the new two-step manual release procedure.
 
 ## Capabilities

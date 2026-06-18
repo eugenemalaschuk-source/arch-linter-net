@@ -18,8 +18,7 @@ jobs:
     name: Build NuGet packages
     runs-on: ubuntu-latest
     permissions:
-      contents: write
-      packages: write
+      contents: read
 
     env:
       PACKAGE_VERSION: ${{ inputs.version }}
@@ -86,34 +85,6 @@ jobs:
           for package in "$PACKAGE_OUTPUT"/*.nupkg; do
             dotnet nuget push "$package" --api-key "$NUGET_API_KEY" --source https://api.nuget.org/v3/index.json --skip-duplicate
           done
-
-      - name: Publish to GitHub Packages
-        if: ${{ inputs.publish == true }}
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        shell: bash
-        run: |
-          for package in "$PACKAGE_OUTPUT"/*.nupkg; do
-            dotnet nuget push "$package" --api-key "$GITHUB_TOKEN" --source "https://nuget.pkg.github.com/${{ github.repository_owner }}/index.json" --skip-duplicate
-          done
-
-      - name: Create GitHub Release
-        if: ${{ inputs.publish == true }}
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        shell: bash
-        run: |
-          tag="v$PACKAGE_VERSION"
-          if gh release view "$tag" >/dev/null 2>&1; then
-            gh release upload "$tag" "$PACKAGE_OUTPUT"/*.nupkg "$PACKAGE_OUTPUT"/*.snupkg --clobber
-          else
-            gh release create "$tag" \
-              "$PACKAGE_OUTPUT"/*.nupkg \
-              "$PACKAGE_OUTPUT"/*.snupkg \
-              --target "$GITHUB_SHA" \
-              --title "ArchLinterNet $PACKAGE_VERSION" \
-              --notes "Published ArchLinterNet $PACKAGE_VERSION packages to NuGet.org and GitHub Packages. Documentation is deployed by this workflow when publication is enabled."
-          fi
 
   deploy-docs:
     name: Deploy GitHub Pages docs

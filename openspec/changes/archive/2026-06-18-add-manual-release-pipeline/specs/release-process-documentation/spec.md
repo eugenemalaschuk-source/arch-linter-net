@@ -17,4 +17,4 @@ ArchLinterNet SHALL document the initial preview package release process using t
 
 #### Scenario: Publication recordkeeping is documented
 - **WHEN** packages are published publicly
-- **THEN** the documentation instructs maintainers to record published package IDs, versions, GitHub Release URL, GitHub Packages status, and GitHub Pages deployment URL in issue or PR notes
+- **THEN** the documentation instructs maintainers to record published package IDs, versions, and GitHub Pages deployment URL in issue or PR notes
