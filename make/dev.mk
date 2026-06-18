@@ -24,6 +24,7 @@ rtk-init-windows:  ## Configure RTK AI agent integrations on Windows
 	@$(POWERSHELL) -NoProfile -ExecutionPolicy Bypass -File "$(PROJECT_ROOT)/tools/scripts/configure_rtk_windows.ps1"
 
 restore:  ## Restore NuGet packages for all .NET projects
+	@mkdir -p "$(PROJECT_ROOT)/nupkg"
 	@dotnet restore "$(SLNX)"
 
 pack:  ## Build NuGet packages for all publishable projects

@@ -31,10 +31,10 @@
 ## 5. Make Targets & Quality
 
 - [x] 5.1 Wire `make audit-architecture` to use CLI instead of stub
-- [x] 5.2 Run `rtk make verify` — all tests and lint pass
+- [x] 5.2 Run `rtk make acceptance` — all tests and lint pass
 
 ## 6. Final Verification
 
-- [x] 6.1 `rtk make verify` passes (Core.Tests: 74, Cli.Tests: 19, Unity.Tests: 1)
+- [x] 6.1 `rtk make acceptance` passes (Core.Tests: 74, Cli.Tests: 19, Unity.Tests: 1)
 - [x] 6.2 `make audit-architecture` produces clean audit output
 - [x] 6.3 `dotnet arch-linter-net --help` works from repository root

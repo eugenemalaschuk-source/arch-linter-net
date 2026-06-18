@@ -9,7 +9,7 @@
 ## RTK — mandatory CLI prefix
 Every shell command MUST be prefixed with `rtk`:
 ```
-rtk make verify
+rtk make acceptance
 rtk dotnet restore
 ```
 Bootstrap dependencies: `rtk brew bundle` (macOS) or `rtk make bundle`.
@@ -22,7 +22,7 @@ rtk make lint                 # lint-code-size + lint-dotnet-format + lint-archi
 rtk make lint-architecture    # strict self-architecture validation (via Core.Tests)
 rtk make lint-code-size       # file size lint (warn ≥500, error ≥800 lines)
 rtk make test                 # run all tests
-rtk make verify               # lint + all tests
+rtk make acceptance           # lint + all tests
 ```
 All `dotnet test`/`dotnet format` targets use `--no-restore` — run `restore` first when adding/changing dependencies.
 
