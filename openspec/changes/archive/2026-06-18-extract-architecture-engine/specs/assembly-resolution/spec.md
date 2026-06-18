@@ -9,7 +9,9 @@ The system SHALL resolve all assemblies listed in `analysis.target_assemblies` f
 
 #### Scenario: Assembly not found
 - **WHEN** `target_assemblies` lists an assembly name that cannot be loaded from any probe path
-- **THEN** the system throws `InvalidOperationException` listing the probing paths
+- **THEN** the resolver does NOT throw; instead it collects the name into `ResolutionResult.MissingAssemblyNames`
+- **AND** the probing paths searched are recorded in `ResolutionResult.AssemblyProbingPaths`
+- **AND** `CheckConfiguration` later produces an `ArchitectureViolation` with `ForbiddenNamespace = "missing target assembly"` and a message listing the missing name and probe paths
 
 ### Requirement: Multi-probe-path resolution strategy
 The system SHALL probe for assemblies in this order: (1) already-loaded assemblies in `AppDomain.CurrentDomain`, (2) `Assembly.Load`, (3) env var `ARCHITECTURE_ASSEMBLY_SEARCH_PATHS`, (4) YAML `analysis.assembly_search_paths`, (5) `AppContext.BaseDirectory`, (6) repository root, (7) `<repo>/artifacts/bin`, (8) `<repo>/bin`.
