@@ -145,20 +145,6 @@ try
 
     bool passed = allViolations.Count == 0 && allCycles.Count == 0;
 
-    if (passed)
-    {
-        if (format == "json")
-        {
-            Console.WriteLine("{\"passed\":true}");
-        }
-        else
-        {
-            Console.WriteLine("Architecture validation passed.");
-        }
-
-        return 0;
-    }
-
     if (format == "json")
     {
         Console.WriteLine(ArchitectureDiagnosticFormatter.FormatResultForCiArtifacts(
@@ -166,18 +152,25 @@ try
     }
     else
     {
-        if (allViolations.Count > 0)
+        if (passed)
         {
-            Console.WriteLine(ArchitectureDiagnosticFormatter.FormatViolationsForHumans(allViolations));
+            Console.WriteLine("Architecture validation passed.");
         }
-
-        if (allCycles.Count > 0)
+        else
         {
-            Console.WriteLine(ArchitectureDiagnosticFormatter.FormatCyclesForHumans(allCycles));
+            if (allViolations.Count > 0)
+            {
+                Console.WriteLine(ArchitectureDiagnosticFormatter.FormatViolationsForHumans(allViolations));
+            }
+
+            if (allCycles.Count > 0)
+            {
+                Console.WriteLine(ArchitectureDiagnosticFormatter.FormatCyclesForHumans(allCycles));
+            }
         }
     }
 
-    return 1;
+    return passed ? 0 : 1;
 }
 catch (Exception ex)
 {
