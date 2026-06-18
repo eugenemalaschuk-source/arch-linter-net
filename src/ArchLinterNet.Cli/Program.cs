@@ -3,6 +3,8 @@ using ArchLinterNet.Core.Execution;
 using ArchLinterNet.Core.Model;
 using ArchLinterNet.Core.Reporting;
 
+string version = typeof(ArchitectureContractLoader).Assembly.GetName().Version?.ToString(3) ?? "0.0.0";
+
 string policyPath = "architecture/dependencies.arch.yml";
 string mode = "strict";
 string format = "human";
@@ -11,16 +13,53 @@ for (int i = 0; i < args.Length; i++)
 {
     switch (args[i])
     {
-        case "--policy" when i + 1 < args.Length:
+        case "--help" or "-h":
+            PrintHelp();
+            return 0;
+        case "--version" or "-v":
+            Console.WriteLine($"arch-linter-net {version}");
+            return 0;
+        case "--policy" or "-p" when i + 1 < args.Length:
             policyPath = args[++i];
             break;
-        case "--mode" when i + 1 < args.Length:
+        case "--mode" or "-m" when i + 1 < args.Length:
             mode = args[++i];
             break;
-        case "--format" when i + 1 < args.Length:
+        case "--format" or "-f" when i + 1 < args.Length:
             format = args[++i];
             break;
+        case "--strict":
+            mode = "strict";
+            break;
+        case "--audit":
+            mode = "audit";
+            break;
+        case "--json":
+            format = "json";
+            break;
+        default:
+            Console.Error.WriteLine($"Unknown option: {args[i]}");
+            Console.Error.WriteLine("Run with --help for usage information.");
+            return 2;
     }
+}
+
+if (mode is not ("strict" or "audit"))
+{
+    Console.Error.WriteLine($"Invalid mode: {mode}. Use 'strict' or 'audit'.");
+    return 2;
+}
+
+if (format is not ("human" or "json"))
+{
+    Console.Error.WriteLine($"Invalid format: {format}. Use 'human' or 'json'.");
+    return 2;
+}
+
+if (!File.Exists(policyPath))
+{
+    Console.Error.WriteLine($"Policy file not found: {policyPath}");
+    return 2;
 }
 
 try
@@ -71,8 +110,8 @@ try
 
     foreach (ArchitectureCycleContract contract in cycleContracts)
     {
-        IReadOnlyCollection<string> cycles = runner.CheckCycleContract(contract);
-        allCycles.AddRange(cycles);
+        IReadOnlyCollection<string> contractCycles = runner.CheckCycleContract(contract);
+        allCycles.AddRange(contractCycles);
     }
 
     IEnumerable<ArchitectureMethodBodyContract> methodBodyContracts = mode == "audit"
@@ -106,7 +145,15 @@ try
 
     if (passed)
     {
-        Console.WriteLine("Architecture validation passed.");
+        if (format == "json")
+        {
+            Console.WriteLine("{\"passed\":true}");
+        }
+        else
+        {
+            Console.WriteLine("Architecture validation passed.");
+        }
+
         return 0;
     }
 
@@ -118,14 +165,10 @@ try
                 $"arch-linter-{mode}", allViolations));
         }
 
-        foreach (ArchitectureCycleContract contract in cycleContracts)
+        if (allCycles.Count > 0)
         {
-            IReadOnlyCollection<string> contractCycles = runner.CheckCycleContract(contract);
-            if (contractCycles.Count > 0)
-            {
-                Console.WriteLine(ArchitectureDiagnosticFormatter.FormatCyclesForCiArtifacts(
-                    contract.Name, contractCycles));
-            }
+            Console.WriteLine(ArchitectureDiagnosticFormatter.FormatCyclesForCiArtifacts(
+                "cycle-contract", allCycles));
         }
     }
     else
@@ -157,11 +200,36 @@ static string ResolveRepositoryRoot(string policyPath)
         return Directory.GetCurrentDirectory();
     }
 
-    // If policy is at <repo>/architecture/dependencies.arch.yml, go up one level
     if (string.Equals(Path.GetFileName(policyDir), "architecture", StringComparison.OrdinalIgnoreCase))
     {
         return Path.GetDirectoryName(policyDir) ?? policyDir;
     }
 
     return policyDir;
+}
+
+static void PrintHelp()
+{
+    Console.WriteLine("""
+        arch-linter-net — architecture contract linter for .NET
+
+        Usage:
+          arch-linter-net [options]
+
+        Options:
+          -p, --policy <path>   Path to YAML contract file
+                                (default: architecture/dependencies.arch.yml)
+          -m, --mode <mode>     Validation mode: strict or audit (default: strict)
+              --strict          Shortcut for --mode strict
+              --audit           Shortcut for --mode audit
+          -f, --format <fmt>    Output format: human or json (default: human)
+              --json            Shortcut for --format json
+          -h, --help            Show this help message
+          -v, --version         Show version
+
+        Exit codes:
+          0   All contracts passed
+          1   One or more contracts failed
+          2   Runtime error (invalid arguments, file not found, etc.)
+        """);
 }
