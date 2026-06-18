@@ -86,6 +86,11 @@ public sealed class ArchitectureContractRunner(
 
     public List<ArchitectureViolation> CheckConfiguration()
     {
+        return CheckConfiguration(strict: true);
+    }
+
+    public List<ArchitectureViolation> CheckConfiguration(bool strict)
+    {
         List<ArchitectureViolation> violations = new();
 
         foreach (string missingAssembly in _context.MissingAssemblyNames)
@@ -97,7 +102,11 @@ public sealed class ArchitectureContractRunner(
                 new[] { $"Assembly '{missingAssembly}' is declared in analysis.target_assemblies but could not be resolved." }));
         }
 
-        foreach (ArchitectureLayerContract contract in _document.Contracts.StrictLayers.Concat(_document.Contracts.AuditLayers))
+        IEnumerable<ArchitectureLayerContract> layerContracts = strict
+            ? _document.Contracts.StrictLayers
+            : _document.Contracts.AuditLayers;
+
+        foreach (ArchitectureLayerContract contract in layerContracts)
         {
             foreach (string layerName in contract.Layers)
             {
@@ -247,24 +256,26 @@ public sealed class ArchitectureContractRunner(
 
     public List<ArchitectureViolation> CheckMethodBodyContract(ArchitectureMethodBodyContract contract)
     {
-        string sourceNamespace =
-            ArchitectureLayerResolver.ResolveLayerNamespace(_document, contract.Name, contract.Source);
+        ArchitectureLayer sourceLayer =
+            ArchitectureLayerResolver.ResolveLayer(_document, contract.Name, contract.Source);
 
         string[]? sourceRoots = _document.Analysis.SourceRoots.Count > 0
             ? _document.Analysis.SourceRoots.ToArray()
             : null;
 
         IReadOnlyList<ArchitectureViolation> roslynViolations = ArchitectureSourceScanner
-            .FindMethodBodyViolations(contract.Name, _context.RepositoryRoot, sourceNamespace, contract.ForbiddenCalls,
-                contract.IgnoredViolations, sourceRoots: sourceRoots)
+            .FindMethodBodyViolations(contract.Name, _context.RepositoryRoot, sourceLayer.Namespace,
+                contract.ForbiddenCalls, contract.IgnoredViolations, sourceRoots: sourceRoots,
+                sourceLayer: sourceLayer)
             .ToList();
 
         IReadOnlyList<ArchitectureViolation> ilViolations = ArchitectureIlMethodBodyScanner.FindMethodBodyViolations(
             contract.Name,
             _context.TargetAssemblies,
-            sourceNamespace,
+            sourceLayer.Namespace,
             contract.ForbiddenCalls,
-            contract.IgnoredViolations)
+            contract.IgnoredViolations,
+            sourceLayer: sourceLayer)
             .ToList();
 
         return MergeMethodBodyViolations(contract.Name, roslynViolations, ilViolations);

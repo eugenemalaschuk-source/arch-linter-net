@@ -21,6 +21,28 @@ public static class ArchitectureDiagnosticFormatter
         return string.Join(Environment.NewLine, cycles.Select(cycle => $"- {cycle}"));
     }
 
+    public static string FormatResultForCiArtifacts(
+        string mode,
+        bool passed,
+        IReadOnlyCollection<ArchitectureViolation> violations,
+        IReadOnlyCollection<string> cycles)
+    {
+        var payload = new
+        {
+            passed,
+            mode,
+            violations = violations.Select(v => new
+            {
+                source = v.SourceType,
+                forbidden_namespace = v.ForbiddenNamespace,
+                forbidden_references = v.ForbiddenReferences.ToArray()
+            }).ToArray(),
+            cycles = cycles.ToArray()
+        };
+
+        return JsonSerializer.Serialize(payload);
+    }
+
     public static string FormatViolationsForCiArtifacts(string contractName,
         IReadOnlyCollection<ArchitectureViolation> violations)
     {

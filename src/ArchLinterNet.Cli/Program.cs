@@ -77,7 +77,7 @@ try
     List<ArchitectureViolation> allViolations = new();
     List<string> allCycles = new();
 
-    allViolations.AddRange(runner.CheckConfiguration());
+    allViolations.AddRange(runner.CheckConfiguration(strict: mode == "strict"));
 
     IEnumerable<ArchitectureDependencyContract> dependencyContracts = mode == "audit"
         ? runner.AuditContracts()
@@ -161,17 +161,8 @@ try
 
     if (format == "json")
     {
-        if (allViolations.Count > 0)
-        {
-            Console.WriteLine(ArchitectureDiagnosticFormatter.FormatViolationsForCiArtifacts(
-                $"arch-linter-{mode}", allViolations));
-        }
-
-        if (allCycles.Count > 0)
-        {
-            Console.WriteLine(ArchitectureDiagnosticFormatter.FormatCyclesForCiArtifacts(
-                "cycle-contract", allCycles));
-        }
+        Console.WriteLine(ArchitectureDiagnosticFormatter.FormatResultForCiArtifacts(
+            mode, passed, allViolations, allCycles));
     }
     else
     {

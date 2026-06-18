@@ -131,12 +131,16 @@ using ArchLinterNet.Core.Execution;
 using ArchLinterNet.Core.Reporting;
 
 string repositoryRoot = @"/path/to/repo";
-ArchitectureContractDocument document = ArchitectureContractLoader.LoadFromRepositoryRoot(repositoryRoot);
+string policyPath = Path.Combine(repositoryRoot, "architecture", "dependencies.arch.yml");
+ArchitectureContractDocument document = ArchitectureContractLoader.LoadFromPath(policyPath);
 
-IReadOnlyCollection<System.Reflection.Assembly> targetAssemblies =
+ResolutionResult resolution =
     ArchitectureAssemblyResolver.ResolveFromDocument(document, repositoryRoot);
 
-ArchitectureAnalysisContext context = new(repositoryRoot, targetAssemblies);
+ArchitectureAnalysisContext context = new(
+    repositoryRoot,
+    resolution.ResolvedAssemblies,
+    resolution.MissingAssemblyNames);
 ArchitectureContractRunner runner = new(context, document);
 
 foreach (ArchitectureDependencyContract contract in runner.StrictContracts())

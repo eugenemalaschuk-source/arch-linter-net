@@ -18,10 +18,13 @@ internal static class ArchitectureSourceScanner
         string sourceNamespacePrefix,
         IReadOnlyList<string> forbiddenCallPatterns,
         IReadOnlyList<ArchitectureIgnoredViolation> ignoredViolations,
-        string[]? sourceRoots = null)
+        string[]? sourceRoots = null,
+        ArchitectureLayer? sourceLayer = null)
     {
         string[] roots = sourceRoots ?? _defaultSourceRoots;
-        List<string> sourceFiles = FindSourceFilesForNamespace(repositoryRoot, sourceNamespacePrefix, roots);
+        ArchitectureLayer effectiveLayer = sourceLayer
+                                          ?? new ArchitectureLayer { Namespace = sourceNamespacePrefix };
+        List<string> sourceFiles = FindSourceFilesForNamespace(repositoryRoot, effectiveLayer, roots);
         if (sourceFiles.Count == 0)
         {
             return Array.Empty<ArchitectureViolation>();
@@ -38,7 +41,7 @@ internal static class ArchitectureSourceScanner
             SemanticModel semanticModel = compilation.GetSemanticModel(syntaxTree, true);
             CompilationUnitSyntax root = syntaxTree.GetCompilationUnitRoot();
 
-            if (!ContainsNamespace(root, sourceNamespacePrefix))
+            if (!ContainsNamespace(root, effectiveLayer))
             {
                 continue;
             }
@@ -251,7 +254,7 @@ internal static class ArchitectureSourceScanner
         return null;
     }
 
-    private static List<string> FindSourceFilesForNamespace(string repositoryRoot, string namespacePrefix, string[] sourceRoots)
+    private static List<string> FindSourceFilesForNamespace(string repositoryRoot, ArchitectureLayer layer, string[] sourceRoots)
     {
         List<string> result = new();
 
@@ -266,7 +269,7 @@ internal static class ArchitectureSourceScanner
 
             foreach (string filePath in Directory.EnumerateFiles(fullRoot, "*.cs", SearchOption.AllDirectories))
             {
-                if (FileContainsNamespace(filePath, namespacePrefix))
+                if (FileContainsNamespace(filePath, layer))
                 {
                     result.Add(filePath);
                 }
@@ -276,7 +279,7 @@ internal static class ArchitectureSourceScanner
         return result;
     }
 
-    private static bool FileContainsNamespace(string filePath, string namespacePrefix)
+    private static bool FileContainsNamespace(string filePath, ArchitectureLayer layer)
     {
         try
         {
@@ -290,7 +293,7 @@ internal static class ArchitectureSourceScanner
                 }
 
                 string declared = trimmed[10..].TrimEnd('{', ' ', '\t', ';');
-                if (declared.StartsWith(namespacePrefix, StringComparison.Ordinal))
+                if (ArchitectureLayerResolver.MatchesNamespace(layer, declared))
                 {
                     return true;
                 }
@@ -304,13 +307,13 @@ internal static class ArchitectureSourceScanner
         return false;
     }
 
-    private static bool ContainsNamespace(CompilationUnitSyntax root, string namespacePrefix)
+    private static bool ContainsNamespace(CompilationUnitSyntax root, ArchitectureLayer layer)
     {
         IEnumerable<string> namespaces = root.DescendantNodes()
             .OfType<BaseNamespaceDeclarationSyntax>()
             .Select(ns => ns.Name.ToString());
 
-        return namespaces.Any(ns => ns.StartsWith(namespacePrefix, StringComparison.Ordinal));
+        return namespaces.Any(ns => ArchitectureLayerResolver.MatchesNamespace(layer, ns));
     }
 
     private static string GetRelativePath(string root, string fullPath)
