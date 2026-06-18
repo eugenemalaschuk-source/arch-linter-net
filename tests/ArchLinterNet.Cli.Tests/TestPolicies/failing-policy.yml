@@ -1,0 +1,20 @@
+version: 1
+name: Deliberately Failing Policy
+
+layers:
+  core:
+    namespace: ArchLinterNet.Core
+  cli:
+    namespace: ArchLinterNet.Cli
+
+analysis:
+  target_assemblies:
+    - ArchLinterNet.Core
+    - ArchLinterNet.Cli
+
+contracts:
+  strict:
+    - name: cli-must-not-depend-on-core
+      source: cli
+      forbidden: [core]
+      reason: Deliberately false constraint to produce test violations.

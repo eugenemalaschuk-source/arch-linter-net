@@ -1,5 +1,5 @@
 version: 1
-name: ArchLinterNet Architecture Contract
+name: Test Passing Policy
 
 layers:
   core:
@@ -11,7 +11,7 @@ analysis:
 
 contracts:
   strict:
-    - name: core-has-no-unwanted-dependencies
+    - name: core-has-no-forbidden-dependencies
       source: core
       forbidden: []
-      reason: Core is the foundation layer with no prohibited first-party dependencies.
+      reason: Core has no forbidden dependencies in this test.
