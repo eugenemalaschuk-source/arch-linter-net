@@ -1,0 +1,90 @@
+{
+  "schemaVersion": 1,
+  "tool": "ArchLinterNet",
+  "policyFile": "architecture/dependencies.arch.yml",
+  "policySchema": "schema/dependencies.arch.schema.json",
+  "validationModes": {
+    "strict": "Blocking validation mode for no-new-debt gates.",
+    "audit": "Diagnostic validation mode for migration discovery and future-state rules."
+  },
+  "layerMatching": {
+    "namespace": "Exact namespace or child namespace prefix match.",
+    "namespace_suffix": "Optional suffix constraint applied after namespace prefix matching.",
+    "unsupported": ["regular expressions", "wildcards in layer namespace definitions", "assembly-only layer definitions"]
+  },
+  "contractFamilies": [
+    {
+      "kind": "dependency",
+      "strictGroup": "strict",
+      "auditGroup": "audit",
+      "fields": ["name", "source", "forbidden", "allowed_types", "ignored_violations", "forbidden_legacy_runtime", "reason"],
+      "validates": "A source layer does not reference forbidden target layers or configured legacy runtime namespace prefixes."
+    },
+    {
+      "kind": "layer-order",
+      "strictGroup": "strict_layers",
+      "auditGroup": "audit_layers",
+      "fields": ["name", "layers", "ignored_violations", "reason"],
+      "validates": "Layers are ordered outermost to innermost; dependencies may point only toward later layers."
+    },
+    {
+      "kind": "allow-only",
+      "strictGroup": "strict_allow_only",
+      "auditGroup": "audit_allow_only",
+      "fields": ["name", "source", "allowed", "allowed_types", "ignored_violations", "reason"],
+      "validates": "A source layer references only itself and explicitly allowed first-party layers."
+    },
+    {
+      "kind": "cycle",
+      "strictGroup": "strict_cycles",
+      "auditGroup": "audit_cycles",
+      "fields": ["name", "layers", "ignored_violations", "reason"],
+      "validates": "Directed dependency cycles among selected layers."
+    },
+    {
+      "kind": "method-body",
+      "strictGroup": "strict_method_body",
+      "auditGroup": "audit_method_body",
+      "fields": ["name", "source", "forbidden_calls", "ignored_violations", "reason"],
+      "validates": "Forbidden method-body calls using Roslyn source scanning and IL fallback scanning."
+    },
+    {
+      "kind": "asmdef",
+      "strictGroup": "strict_asmdef",
+      "auditGroup": "audit_asmdef",
+      "fields": ["name", "source_assemblies", "forbidden_editor_refs", "forbidden_asmdef_prefixes", "reason"],
+      "validates": "Unity .asmdef references under Assets, including editor-only references and forbidden assembly prefixes."
+    },
+    {
+      "kind": "independence",
+      "strictGroup": "strict_independence",
+      "auditGroup": "audit_independence",
+      "fields": ["name", "layers", "ignored_violations", "reason"],
+      "validates": "Mutual independence among a set of layers; no selected layer references another selected layer."
+    }
+  ],
+  "exceptionMechanisms": {
+    "allowed_types": "Exact full type-name exceptions for dependency and allow-only contracts.",
+    "ignored_violations": "Narrow source_type and forbidden_reference baselines with exact or glob-like matching; each entry should include a reason."
+  },
+  "methodBodyPatterns": {
+    "supported": ["member name", "Type.Member", "Namespace.Type.Member", "namespace prefix ending with ."],
+    "unsupported": ["argument-sensitive matching", "return-type matching", "data-flow analysis"]
+  },
+  "unsupportedCapabilities": [
+    "runtime behavior validation",
+    "security policy validation",
+    "ownership or CODEOWNERS enforcement",
+    "semantic data-flow analysis",
+    "regex-based layer definitions",
+    "custom contract families outside the documented YAML schema",
+    "automatic baseline generation"
+  ],
+  "authoringWarnings": [
+    "Start from real assemblies and namespaces, not idealized architecture names.",
+    "Use strict rules only when they pass today or represent an accepted no-new-debt gate.",
+    "Use audit rules for migration discovery and future-state architecture.",
+    "Do not add broad ignored violations such as source_type: '*' unless explicitly accepted as temporary migration debt.",
+    "The current YAML loader ignores unmatched properties; use the JSON Schema to catch unsupported fields."
+  ]
+}

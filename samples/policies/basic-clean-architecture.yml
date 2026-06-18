@@ -1,0 +1,76 @@
+# Standalone policy recipe. Replace assemblies and namespaces with real values
+# from the repository being validated before running ArchLinterNet.
+version: 1
+name: Basic Clean Architecture Policy Recipe
+
+layers:
+  ui:
+    namespace: MyCompany.Product.Web
+  application:
+    namespace: MyCompany.Product.Application
+  domain:
+    namespace: MyCompany.Product.Domain
+  infrastructure:
+    namespace: MyCompany.Product.Infrastructure
+
+legacy_runtime_layers: []
+
+analysis:
+  target_assemblies:
+    - MyCompany.Product.Web
+    - MyCompany.Product.Application
+    - MyCompany.Product.Domain
+    - MyCompany.Product.Infrastructure
+  assembly_search_paths: []
+  source_roots: []
+
+contracts:
+  strict:
+    - name: domain-must-not-depend-on-outer-layers
+      source: domain
+      forbidden: [application, infrastructure, ui]
+      reason: Domain code must stay independent of application, infrastructure, and UI concerns.
+
+    - name: application-must-not-depend-on-ui
+      source: application
+      forbidden: [ui]
+      reason: Application use cases must not depend on presentation code.
+
+  audit:
+    - name: audit-ui-bypassing-application
+      source: ui
+      forbidden: [domain]
+      reason: Discover UI code that bypasses application use cases before deciding whether to make this strict.
+
+  strict_layers:
+    - name: clean-architecture-layering
+      layers:
+        - ui
+        - infrastructure
+        - application
+        - domain
+      reason: Dependencies should point inward toward domain.
+
+  audit_layers: []
+
+  strict_allow_only:
+    - name: domain-allowed-dependencies
+      source: domain
+      allowed: []
+      reason: Domain must not depend on other first-party layers.
+
+  audit_allow_only: []
+
+  strict_cycles:
+    - name: main-layer-cycles
+      layers: [ui, application, domain, infrastructure]
+      reason: Main architecture layers must not form dependency cycles.
+
+  audit_cycles: []
+  strict_method_body: []
+  audit_method_body: []
+  strict_asmdef: []
+  audit_asmdef: []
+
+  strict_independence: []
+  audit_independence: []
