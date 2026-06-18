@@ -28,6 +28,30 @@ layers:
     namespace: MyApp.Infrastructure
 ```
 
+### External layers
+
+When a layer references namespaces whose assemblies are not available in the
+scan environment (external SDKs, engine types, platform-conditional namespaces),
+set `external: true` to suppress the `empty layer namespace` configuration
+diagnostic:
+
+```yaml
+layers:
+  unity_engine:
+    namespace: UnityEngine
+    external: true
+
+  sentry:
+    namespace: Sentry
+    external: true
+```
+
+External layers remain fully usable as `forbidden` targets, in `allowed` lists,
+in `strict_layers`, `strict_cycles`, `strict_independence`, etc. — dependency
+scanning uses namespace string matching and does not require target-side types
+to be loaded. If types are found for an external layer (e.g. SDK present in
+search paths), the linter uses them normally.
+
 You can also define legacy runtime layer names (for runtime-only assemblies):
 
 ```yaml

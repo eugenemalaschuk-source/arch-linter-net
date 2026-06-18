@@ -35,6 +35,8 @@ public sealed class ArchitectureLayer
     [YamlMember(Alias = "namespace")] public string Namespace { get; set; } = string.Empty;
 
     [YamlMember(Alias = "namespace_suffix")] public string NamespaceSuffix { get; set; } = string.Empty;
+
+    [YamlMember(Alias = "external")] public bool External { get; set; }
 }
 
 public sealed class ArchitectureContractGroups

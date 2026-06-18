@@ -188,6 +188,12 @@ public sealed class ArchitectureContractRunner(
         foreach (string layerName in referencedLayers)
         {
             ArchitectureLayer layer = ArchitectureLayerResolver.ResolveLayer(_document, "<configuration>", layerName);
+
+            if (layer.External)
+            {
+                continue;
+            }
+
             Type[] types = ArchitectureTypeScanner.FindTypesInLayer(_context.TargetAssemblies, layer);
 
             if (types.Length == 0)

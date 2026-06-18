@@ -3,18 +3,24 @@ schema: spec-driven
 # Project context (optional)
 # This is shown to AI when creating artifacts.
 # Add your tech stack, conventions, style guides, domain knowledge, etc.
-# Example:
-#   context: |
-#     Tech stack: TypeScript, React, Node.js
-#     We use conventional commits
-#     Domain: e-commerce platform
+context: |
+  Tech stack: .NET 10, C#, NUnit, YamlDotNet
+  Solution format: .slnx
+  TreatWarningsAsErrors: true
+
+  ## Spec lifecycle
+  - New capabilities (specs/) are created inside the change directory during proposal.
+  - Before archiving a change, ALL specs in the change MUST be synced to openspec/specs/<capability>/spec.md.
+  - The openspec archive workflow only checks for "delta specs" (modifications to existing specs).
+    It does NOT automatically promote new specs to the main specs directory.
+  - Therefore: during archive, always check if the change introduces new capabilities.
+    If so, copy their spec files to openspec/specs/<capability>/ before moving to archive.
 
 # Per-artifact rules (optional)
 # Add custom rules for specific artifacts.
-# Example:
-#   rules:
-#     proposal:
-#       - Keep proposals under 500 words
-#       - Always include a "Non-goals" section
-#     tasks:
-#       - Break tasks into chunks of max 2 hours
+rules:
+  archive:
+    - Before archiving, collect all spec files from openspec/changes/<name>/specs/
+    - For each capability present in the change but missing from openspec/specs/,
+      copy it to openspec/specs/<capability>/spec.md
+    - Only then move the change directory to archive/
