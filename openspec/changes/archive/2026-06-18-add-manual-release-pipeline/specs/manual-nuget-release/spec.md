@@ -16,11 +16,11 @@ ArchLinterNet SHALL provide a separate GitHub Actions workflow for official pack
 - **THEN** it rejects empty or obviously invalid package version input before building packages
 
 ### Requirement: Manual release package build
-The release workflow SHALL restore, build, test, pack, and upload versioned NuGet package artifacts using the explicit version input.
+The release workflow SHALL restore, run the repository acceptance gate, build, pack, and upload versioned NuGet package artifacts using the explicit version input.
 
 #### Scenario: Dry-run release builds artifacts
 - **WHEN** the release workflow runs with `publish=false`
-- **THEN** it restores packages, builds in Release configuration, runs tests in Release configuration, packs versioned `.nupkg` artifacts, uploads them to the workflow run, and publishes nothing
+- **THEN** it restores packages, builds in Release configuration with the explicit version, runs `make acceptance`, packs versioned `.nupkg` artifacts, uploads them to the workflow run, and publishes nothing
 
 #### Scenario: Package version comes from workflow input
 - **WHEN** the release workflow packs packages
