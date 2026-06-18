@@ -52,7 +52,8 @@ public sealed class ConfigurationCheckTests
         var context = new ArchitectureAnalysisContext(
             _tempDir,
             Array.Empty<System.Reflection.Assembly>(),
-            new[] { "Nonexistent.Assembly.That.Does.Not.Exist" });
+            new[] { "Nonexistent.Assembly.That.Does.Not.Exist" },
+            Array.Empty<string>());
 
         var runner = new ArchitectureContractRunner(context, document);
         var violations = runner.CheckConfiguration();
@@ -88,6 +89,7 @@ public sealed class ConfigurationCheckTests
         var context = new ArchitectureAnalysisContext(
             _tempDir,
             new[] { typeof(ArchitectureContractLoader).Assembly },
+            Array.Empty<string>(),
             Array.Empty<string>());
 
         var runner = new ArchitectureContractRunner(context, document);
@@ -124,6 +126,7 @@ public sealed class ConfigurationCheckTests
         var context = new ArchitectureAnalysisContext(
             _tempDir,
             new[] { typeof(ArchitectureContractLoader).Assembly },
+            Array.Empty<string>(),
             Array.Empty<string>());
 
         var runner = new ArchitectureContractRunner(context, document);

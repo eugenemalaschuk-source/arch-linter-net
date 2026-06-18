@@ -39,6 +39,7 @@ public sealed class ConfigurationCheckByModeTests
         var context = new ArchitectureAnalysisContext(
             "/tmp",
             new[] { typeof(ArchitectureContractLoader).Assembly },
+            Array.Empty<string>(),
             Array.Empty<string>());
 
         var runner = new ArchitectureContractRunner(context, document);
@@ -84,6 +85,7 @@ public sealed class ConfigurationCheckByModeTests
         var context = new ArchitectureAnalysisContext(
             "/tmp",
             new[] { typeof(ArchitectureContractLoader).Assembly },
+            Array.Empty<string>(),
             Array.Empty<string>());
 
         var runner = new ArchitectureContractRunner(context, document);
@@ -114,7 +116,8 @@ public sealed class ConfigurationCheckByModeTests
         var context = new ArchitectureAnalysisContext(
             "/tmp",
             Array.Empty<System.Reflection.Assembly>(),
-            new[] { "Missing.Assembly" });
+            new[] { "Missing.Assembly" },
+            Array.Empty<string>());
 
         var runner = new ArchitectureContractRunner(context, document);
         var strictViolations = runner.CheckConfiguration(strict: true);

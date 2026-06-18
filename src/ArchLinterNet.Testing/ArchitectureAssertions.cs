@@ -44,12 +44,12 @@ public sealed class ArchitectureValidationBuilder
     {
         ArchitectureContractDocument document = ArchitectureContractLoader.LoadFromPath(_policyPath);
 
-        string repositoryRoot = ResolveRepositoryRoot(_policyPath);
+        string repositoryRoot = ArchitectureRepositoryRootLocator.ResolveFrom(_policyPath);
 
         ResolutionResult resolution = ArchitectureAssemblyResolver.ResolveFromDocument(document, repositoryRoot);
 
         ArchitectureAnalysisContext context = new(repositoryRoot, resolution.ResolvedAssemblies,
-            resolution.MissingAssemblyNames);
+            resolution.MissingAssemblyNames, resolution.AssemblyProbingPaths);
         ArchitectureContractRunner runner = new(context, document);
 
         List<ArchitectureViolation> allViolations = new();
@@ -129,21 +129,6 @@ public sealed class ArchitectureValidationBuilder
             allCycles);
     }
 
-    private static string ResolveRepositoryRoot(string policyPath)
-    {
-        string? policyDir = Path.GetDirectoryName(policyPath);
-        if (string.IsNullOrEmpty(policyDir))
-        {
-            return Directory.GetCurrentDirectory();
-        }
-
-        if (string.Equals(Path.GetFileName(policyDir), "architecture", StringComparison.OrdinalIgnoreCase))
-        {
-            return Path.GetDirectoryName(policyDir) ?? policyDir;
-        }
-
-        return policyDir;
-    }
 }
 
 public sealed class ArchitectureValidationResult
