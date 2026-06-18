@@ -35,7 +35,15 @@ public class CliIntegrationTests
             }
         };
         build.Start();
+
+        string buildStderr = build.StandardError.ReadToEnd();
         build.WaitForExit();
+
+        if (build.ExitCode != 0)
+        {
+            throw new InvalidOperationException(
+                $"CLI project build failed (exit {build.ExitCode}):{Environment.NewLine}{buildStderr}");
+        }
     }
 
     private static string FindRepoRoot()
