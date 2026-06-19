@@ -31,6 +31,10 @@ jobs:
       contents: write
       id-token: write
 
+    outputs:
+      package_version: ${{ steps.release_metadata.outputs.package_version }}
+      target_tag: ${{ steps.release_metadata.outputs.target_tag }}
+
     env:
       PACKAGE_OUTPUT: artifacts/packages
 
@@ -55,6 +59,13 @@ jobs:
             --release-type "${{ inputs.release_type }}" \
             --version-override "${{ inputs.version_override }}" \
             --github-env "$GITHUB_ENV"
+
+      - name: Export release metadata outputs
+        id: release_metadata
+        shell: bash
+        run: |
+          echo "package_version=$PACKAGE_VERSION" >> "$GITHUB_OUTPUT"
+          echo "target_tag=$TARGET_TAG" >> "$GITHUB_OUTPUT"
 
       - name: Generate release notes
         shell: bash
@@ -148,19 +159,20 @@ jobs:
       - name: Download release notes artifact
         uses: actions/download-artifact@v4
         with:
-          name: release-notes-${{ env.PACKAGE_VERSION }}
+          name: release-notes-${{ needs.release.outputs.package_version }}
           path: artifacts/release-notes
 
       - name: Download package artifacts
         uses: actions/download-artifact@v4
         with:
-          name: nuget-packages-${{ env.PACKAGE_VERSION }}
+          name: nuget-packages-${{ needs.release.outputs.package_version }}
           path: artifacts/packages
 
       - name: Create GitHub Release
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
+          TARGET_TAG: ${{ needs.release.outputs.target_tag }}
         run: |
           gh release create "$TARGET_TAG" \
             --title "$TARGET_TAG" \
