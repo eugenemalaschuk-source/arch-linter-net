@@ -248,8 +248,8 @@ Agents must not create isolated implementation issues without placing them insid
 Before creating or updating a GitHub issue, agents must check this document and apply:
 
 1. canonical title format;
-2. controlled title verbs;
-3. explicit parent/dependency links;
-4. required issue sections;
-5. estimate rule;
-6. architecture/release task rules where relevant.
+1. controlled title verbs;
+1. explicit parent/dependency links;
+1. required issue sections;
+1. estimate rule;
+1. architecture/release task rules where relevant.

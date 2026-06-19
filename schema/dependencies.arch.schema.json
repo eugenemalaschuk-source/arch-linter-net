@@ -340,7 +340,12 @@
           "items": { "$ref": "#/$defs/templateLayer" },
           "minItems": 1
         },
-        "reason": { "type": "string" }
+        "reason": { "type": "string" },
+        "exhaustive": {
+          "type": "boolean",
+          "default": false,
+          "description": "When true, the linter checks for sibling namespaces under each container that are not mapped into any declared layer. Unmapped siblings with types produce violations."
+        }
       }
     },
     "templateLayer": {

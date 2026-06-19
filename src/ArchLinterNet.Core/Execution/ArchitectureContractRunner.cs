@@ -338,6 +338,38 @@ public sealed class ArchitectureContractRunner(
             }
         }
 
+        if (contract.Exhaustive && contract.ContainerNamespace != null)
+        {
+            HashSet<string> expectedNamespaces = new(
+                effectiveLayers.Select(l => l.layer.Namespace),
+                StringComparer.Ordinal);
+
+            foreach (string childNs in FindChildNamespaces(contract.ContainerNamespace).OrderBy(ns => ns, StringComparer.Ordinal))
+            {
+                if (expectedNamespaces.Contains(childNs))
+                {
+                    continue;
+                }
+
+                Type[] childTypes = ArchitectureTypeScanner.FindTypesInNamespace(
+                    _context.TargetAssemblies, childNs);
+
+                if (childTypes.Length > 0)
+                {
+                    violations.Add(new ArchitectureViolation(
+                        contract.Name,
+                        contract.Id,
+                        contract.ContainerNamespace,
+                        "unmapped sibling namespace",
+                        new[] { $"Namespace '{childNs}' contains types but is not mapped into any declared layer in template '{contract.TemplateName}'." })
+                    {
+                        TemplateName = contract.TemplateName,
+                        ContainerNamespace = contract.ContainerNamespace
+                    });
+                }
+            }
+        }
+
         return violations;
     }
 
@@ -351,6 +383,31 @@ public sealed class ArchitectureContractRunner(
         }
 
         return ArchitectureLayerResolver.ResolveLayer(_document, contract.Name, layerEntry);
+    }
+
+    private HashSet<string> FindChildNamespaces(string containerNamespace)
+    {
+        string prefix = containerNamespace + ".";
+        HashSet<string> children = new(StringComparer.Ordinal);
+
+        foreach (Assembly assembly in _context.TargetAssemblies.Distinct())
+        {
+            foreach (Type type in ArchitectureTypeScanner.GetLoadableTypes(assembly))
+            {
+                string ns = ArchitectureTypeNames.SafeNamespace(type);
+                if (!ns.StartsWith(prefix, StringComparison.Ordinal))
+                {
+                    continue;
+                }
+
+                string remainder = ns[prefix.Length..];
+                int dotIndex = remainder.IndexOf('.');
+                string child = dotIndex < 0 ? remainder : remainder[..dotIndex];
+                children.Add($"{prefix}{child}");
+            }
+        }
+
+        return children;
     }
 
     public List<ArchitectureViolation> CheckAllowOnlyContract(ArchitectureAllowOnlyContract contract)
