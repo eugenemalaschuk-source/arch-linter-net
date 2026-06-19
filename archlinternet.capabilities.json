@@ -73,8 +73,8 @@
       "kind": "layer-template",
       "strictGroup": "strict_layer_templates",
       "auditGroup": "audit_layer_templates",
-      "fields": ["name", "id", "containers", "layers[].name", "layers[].optional", "reason"],
-      "validates": "Reusable layer order contract applied to multiple namespace containers. Each container produces one concrete ordered-layer contract. Relative layer names are resolved by prepending the container namespace. Optional layers (layers[].optional: true) silently skip empty namespaces."
+      "fields": ["name", "id", "containers", "layers[].name", "layers[].optional", "exhaustive", "reason"],
+      "validates": "Reusable layer order contract applied to multiple namespace containers. Each container produces one concrete ordered-layer contract. Relative layer names are resolved by prepending the container namespace. Optional layers (layers[].optional: true) silently skip empty namespaces. When exhaustive is true, every immediate child namespace under the container that contains types must be mapped to a declared layer; unmapped sibling namespaces produce a violation."
     }
   ],
   "exceptionMechanisms": {
