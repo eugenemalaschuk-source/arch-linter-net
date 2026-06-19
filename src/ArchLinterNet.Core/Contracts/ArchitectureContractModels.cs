@@ -160,6 +160,8 @@ public sealed class ArchitectureLayerTemplateContract : IArchitectureContract
 
     [YamlMember(Alias = "layers")] public List<ArchitectureTemplateLayer> Layers { get; set; } = new();
 
+    [YamlMember(Alias = "exhaustive")] public bool Exhaustive { get; set; }
+
     [YamlMember(Alias = "reason")] public string Reason { get; set; } = string.Empty;
 }
 
@@ -176,6 +178,8 @@ public sealed class ArchitectureLayerContract : IArchitectureContract
     [YamlIgnore] public string? TemplateName { get; init; }
 
     [YamlIgnore] public string? ContainerNamespace { get; init; }
+
+    [YamlIgnore] public bool Exhaustive { get; init; }
 
     [YamlMember(Alias = "ignored_violations")]
     public List<ArchitectureIgnoredViolation> IgnoredViolations { get; set; } = new();

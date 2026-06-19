@@ -38,6 +38,7 @@ public static class LayerTemplateExpander
                     OptionalLayers = optionalLayers,
                     TemplateName = template.Name,
                     ContainerNamespace = container,
+                    Exhaustive = template.Exhaustive,
                     Reason = template.Reason
                 });
             }

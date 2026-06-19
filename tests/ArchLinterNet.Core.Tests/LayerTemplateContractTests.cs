@@ -369,4 +369,193 @@ contracts:
                 Directory.Delete(dir, true);
         }
     }
+
+    [Test]
+    public void CheckLayerContract_Exhaustive_AllChildrenMapped_NoViolation()
+    {
+        var document = new ArchitectureContractDocument
+        {
+            Version = 1,
+            Name = "Test",
+            Layers = new Dictionary<string, ArchitectureLayer>
+            {
+                ["core"] = new() { Namespace = "ArchLinterNet.Core" }
+            },
+            Analysis = new ArchitectureAnalysisConfiguration
+            {
+                TargetAssemblies = new List<string> { CoreAssemblyName }
+            },
+            Contracts = new ArchitectureContractGroups()
+        };
+
+        var context = new ArchitectureAnalysisContext(
+            "/tmp",
+            new[] { CoreAssembly },
+            Array.Empty<string>(),
+            Array.Empty<string>());
+
+        var runner = new ArchitectureContractRunner(context, document);
+
+        var contract = new ArchitectureLayerContract
+        {
+            Name = "exhaustive-test (ArchLinterNet.Core)",
+            Id = "exhaustive-test/archlinternet-core",
+            TemplateName = "exhaustive-test",
+            ContainerNamespace = "ArchLinterNet.Core",
+            Exhaustive = true,
+            Layers = new List<string>
+            {
+                "ArchLinterNet.Core.Contracts",
+                "ArchLinterNet.Core.Execution",
+                "ArchLinterNet.Core.Model",
+                "ArchLinterNet.Core.Reporting",
+                "ArchLinterNet.Core.Resolution",
+                "ArchLinterNet.Core.Scanning"
+            },
+            OptionalLayers = new HashSet<string>()
+        };
+
+        List<ArchitectureViolation> violations = runner.CheckLayerContract(contract);
+
+        Assert.That(violations.Where(v => v.ForbiddenNamespace == "unmapped sibling namespace"), Is.Empty);
+    }
+
+    [Test]
+    public void CheckLayerContract_Exhaustive_UnmappedSibling_ProducesViolation()
+    {
+        var document = new ArchitectureContractDocument
+        {
+            Version = 1,
+            Name = "Test",
+            Layers = new Dictionary<string, ArchitectureLayer>
+            {
+                ["core"] = new() { Namespace = "ArchLinterNet.Core" }
+            },
+            Analysis = new ArchitectureAnalysisConfiguration
+            {
+                TargetAssemblies = new List<string> { CoreAssemblyName }
+            },
+            Contracts = new ArchitectureContractGroups()
+        };
+
+        var context = new ArchitectureAnalysisContext(
+            "/tmp",
+            new[] { CoreAssembly },
+            Array.Empty<string>(),
+            Array.Empty<string>());
+
+        var runner = new ArchitectureContractRunner(context, document);
+
+        var contract = new ArchitectureLayerContract
+        {
+            Name = "exhaustive-test (ArchLinterNet.Core)",
+            Id = "exhaustive-test/archlinternet-core",
+            TemplateName = "exhaustive-test",
+            ContainerNamespace = "ArchLinterNet.Core",
+            Exhaustive = true,
+            Layers = new List<string>
+            {
+                "ArchLinterNet.Core.Contracts",
+                "ArchLinterNet.Core.Execution"
+            },
+            OptionalLayers = new HashSet<string>()
+        };
+
+        List<ArchitectureViolation> violations = runner.CheckLayerContract(contract);
+
+        var unmapped = violations.Where(v => v.ForbiddenNamespace == "unmapped sibling namespace").ToList();
+        Assert.That(unmapped, Is.Not.Empty);
+        Assert.That(unmapped.Any(v =>
+            v.ForbiddenReferences.Any(r => r.Contains("ArchLinterNet.Core.Model"))), Is.True);
+    }
+
+    [Test]
+    public void CheckLayerContract_Exhaustive_UnmappedSiblingWithoutTypes_Silent()
+    {
+        var document = new ArchitectureContractDocument
+        {
+            Version = 1,
+            Name = "Test",
+            Layers = new Dictionary<string, ArchitectureLayer>
+            {
+                ["core"] = new() { Namespace = "ArchLinterNet.Core" }
+            },
+            Analysis = new ArchitectureAnalysisConfiguration
+            {
+                TargetAssemblies = new List<string> { CoreAssemblyName }
+            },
+            Contracts = new ArchitectureContractGroups()
+        };
+
+        var context = new ArchitectureAnalysisContext(
+            "/tmp",
+            new[] { CoreAssembly },
+            Array.Empty<string>(),
+            Array.Empty<string>());
+
+        var runner = new ArchitectureContractRunner(context, document);
+
+        var contract = new ArchitectureLayerContract
+        {
+            Name = "exhaustive-test (Does.Not.Exist)",
+            Id = "exhaustive-test/does-not-exist",
+            TemplateName = "exhaustive-test",
+            ContainerNamespace = "Does.Not.Exist",
+            Exhaustive = true,
+            Layers = new List<string> { "Does.Not.Exist.Mapped" },
+            OptionalLayers = new HashSet<string>()
+        };
+
+        List<ArchitectureViolation> violations = runner.CheckLayerContract(contract);
+
+        var unmapped = violations.Where(v => v.ForbiddenNamespace == "unmapped sibling namespace").ToList();
+        Assert.That(unmapped, Is.Empty);
+    }
+
+    [Test]
+    public void CheckLayerContract_NonExhaustive_UnmappedSibling_Silent()
+    {
+        var document = new ArchitectureContractDocument
+        {
+            Version = 1,
+            Name = "Test",
+            Layers = new Dictionary<string, ArchitectureLayer>
+            {
+                ["core"] = new() { Namespace = "ArchLinterNet.Core" }
+            },
+            Analysis = new ArchitectureAnalysisConfiguration
+            {
+                TargetAssemblies = new List<string> { CoreAssemblyName }
+            },
+            Contracts = new ArchitectureContractGroups()
+        };
+
+        var context = new ArchitectureAnalysisContext(
+            "/tmp",
+            new[] { CoreAssembly },
+            Array.Empty<string>(),
+            Array.Empty<string>());
+
+        var runner = new ArchitectureContractRunner(context, document);
+
+        var contract = new ArchitectureLayerContract
+        {
+            Name = "non-exhaustive-test (ArchLinterNet.Core)",
+            Id = "non-exhaustive-test/archlinternet-core",
+            TemplateName = "non-exhaustive-test",
+            ContainerNamespace = "ArchLinterNet.Core",
+            Exhaustive = false,
+            Layers = new List<string>
+            {
+                "ArchLinterNet.Core.Contracts",
+                "ArchLinterNet.Core.Execution"
+            },
+            OptionalLayers = new HashSet<string>()
+        };
+
+        List<ArchitectureViolation> violations = runner.CheckLayerContract(contract);
+
+        var unmapped = violations.Where(v => v.ForbiddenNamespace == "unmapped sibling namespace").ToList();
+        Assert.That(unmapped, Is.Empty);
+    }
 }
