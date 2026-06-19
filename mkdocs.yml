@@ -29,6 +29,7 @@ nav:
       - Policy Authoring Guide: ai/policy-authoring-guide.md
       - Capabilities: ai/capabilities.md
       - Policy Review Checklist: ai/policy-review-checklist.md
+      - Backlog Governance: ai/backlog-governance.md
   - Reference:
       - YAML Schema: reference/yaml-schema.md
       - Release Process: reference/release-process.md
