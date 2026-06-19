@@ -93,6 +93,8 @@ public static class ArchitectureContractLoader
             document.Contracts.AuditIndependence,
             document.Contracts.StrictProtected,
             document.Contracts.AuditProtected,
+            document.Contracts.StrictExternal,
+            document.Contracts.AuditExternal,
             document.Contracts.StrictLayerTemplates,
             document.Contracts.AuditLayerTemplates,
         ];

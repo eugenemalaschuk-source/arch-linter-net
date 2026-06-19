@@ -7,6 +7,15 @@
     "strict": "Blocking validation mode for no-new-debt gates.",
     "audit": "Diagnostic validation mode for migration discovery and future-state rules."
   },
+  "externalDependencies": {
+    "namespace_prefixes": "Exact namespace or child namespace prefix match against referenced external types.",
+    "type_prefixes": "Full referenced type-name prefix match for targeted vendor/framework APIs.",
+    "limitations": [
+      "matches only referenced type metadata visible from project types",
+      "does not perform full method-body analysis",
+      "does not statically analyze third-party package internals"
+    ]
+  },
   "layerMatching": {
     "namespace": "Exact namespace or child namespace prefix match.",
     "namespace_suffix": "Optional suffix constraint applied after namespace prefix matching.",
@@ -68,6 +77,13 @@
       "auditGroup": "audit_protected",
       "fields": ["name", "protected", "allowed_importers", "allowed_types", "ignored_violations", "reason"],
       "validates": "Protected layers are referenced only by explicitly allowed importer layers. Self-references within the protected layer are implicitly allowed."
+    },
+    {
+      "kind": "external-dependency",
+      "strictGroup": "strict_external",
+      "auditGroup": "audit_external",
+      "fields": ["name", "source", "forbidden", "ignored_violations", "reason"],
+      "validates": "A source layer does not reference forbidden vendor/framework dependency groups declared in external_dependencies."
     },
     {
       "kind": "layer-template",

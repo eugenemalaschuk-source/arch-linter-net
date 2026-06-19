@@ -104,6 +104,16 @@ public sealed class ArchitectureContractRunner(
         return _document.Contracts.AuditProtected;
     }
 
+    public IEnumerable<ArchitectureExternalDependencyContract> StrictExternalContracts()
+    {
+        return _document.Contracts.StrictExternal;
+    }
+
+    public IEnumerable<ArchitectureExternalDependencyContract> AuditExternalContracts()
+    {
+        return _document.Contracts.AuditExternal;
+    }
+
     public List<ArchitectureViolation> CheckConfiguration()
     {
         return CheckConfiguration(strict: true);
@@ -128,12 +138,21 @@ public sealed class ArchitectureContractRunner(
         }
 
         HashSet<string> referencedLayers = new(StringComparer.Ordinal);
+        HashSet<string> referencedExternalGroups = new(StringComparer.Ordinal);
 
         void AddLayerNames(IEnumerable<string> names)
         {
             foreach (string name in names)
             {
                 referencedLayers.Add(name);
+            }
+        }
+
+        void AddExternalGroupNames(IEnumerable<string> names)
+        {
+            foreach (string name in names)
+            {
+                referencedExternalGroups.Add(name);
             }
         }
 
@@ -176,6 +195,12 @@ public sealed class ArchitectureContractRunner(
                 AddLayerNames(c.Protected);
                 AddLayerNames(c.AllowedImporters);
             }
+
+            foreach (ArchitectureExternalDependencyContract c in _document.Contracts.StrictExternal)
+            {
+                AddLayerNames(new[] { c.Source });
+                AddExternalGroupNames(c.Forbidden);
+            }
         }
         else
         {
@@ -216,6 +241,12 @@ public sealed class ArchitectureContractRunner(
                 AddLayerNames(c.Protected);
                 AddLayerNames(c.AllowedImporters);
             }
+
+            foreach (ArchitectureExternalDependencyContract c in _document.Contracts.AuditExternal)
+            {
+                AddLayerNames(new[] { c.Source });
+                AddExternalGroupNames(c.Forbidden);
+            }
         }
 
         foreach (string layerName in referencedLayers)
@@ -238,6 +269,27 @@ public sealed class ArchitectureContractRunner(
                     "empty layer namespace",
                     new[] { $"Layer '{layerName}' namespace '{layer.Namespace}' contains no types in loaded assemblies." }));
             }
+        }
+
+        foreach (string groupName in referencedExternalGroups)
+        {
+            if (_document.ExternalDependencies.ContainsKey(groupName))
+            {
+                continue;
+            }
+
+            violations.Add(new ArchitectureViolation(
+                "<configuration>",
+                null,
+                groupName,
+                "unknown external dependency group",
+                new[]
+                {
+                    $"External dependency group '{groupName}' is referenced by a contract but is not declared in external_dependencies."
+                })
+            {
+                ForbiddenExternalGroup = groupName
+            });
         }
 
         return violations;
@@ -692,6 +744,36 @@ public sealed class ArchitectureContractRunner(
                     });
                 }
             }
+        }
+
+        return violations;
+    }
+
+    public List<ArchitectureViolation> CheckExternalContract(ArchitectureExternalDependencyContract contract)
+    {
+        if (!IsContractSelected(contract.Id))
+        {
+            return new List<ArchitectureViolation>();
+        }
+
+        ArchitectureLayer sourceLayer = ArchitectureLayerResolver.ResolveLayer(_document, contract.Name, contract.Source);
+        Type[] sourceTypes = ArchitectureTypeScanner.FindTypesInLayer(_context.TargetAssemblies, sourceLayer);
+        List<ArchitectureViolation> violations = new();
+
+        foreach (string externalGroupName in contract.Forbidden)
+        {
+            if (!_document.ExternalDependencies.TryGetValue(externalGroupName, out ArchitectureExternalDependencyGroup? externalGroup))
+            {
+                continue;
+            }
+
+            violations.AddRange(ArchitectureExternalDependencyViolationFinder.FindViolations(
+                contract.Name,
+                contract.Id,
+                externalGroupName,
+                sourceTypes,
+                externalGroup,
+                contract.IgnoredViolations));
         }
 
         return violations;

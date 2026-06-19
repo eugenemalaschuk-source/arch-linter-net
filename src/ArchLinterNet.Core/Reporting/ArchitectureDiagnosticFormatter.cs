@@ -23,6 +23,12 @@ public static class ArchitectureDiagnosticFormatter
                         string importers = string.Join(", ", violation.AllowedImporters);
                         context = $" (source_layer: {srcLayer}, target_layer: {tgtLayer}, allowed_importers: [{importers}])";
                     }
+
+                    if (violation.ForbiddenExternalGroup != null)
+                    {
+                        context += $" (external_group: {violation.ForbiddenExternalGroup})";
+                    }
+
                     string refs = string.Join(", ", violation.ForbiddenReferences);
                     string pathSuffix = string.Empty;
                     if (violation.DependencyPaths != null && violation.DependencyPaths.Count > 0)
@@ -71,6 +77,9 @@ public static class ArchitectureDiagnosticFormatter
                 if (v.AllowedImporters != null)
                     obj["allowed_importers"] = v.AllowedImporters.ToArray();
 
+                if (v.ForbiddenExternalGroup != null)
+                    obj["forbidden_external_group"] = v.ForbiddenExternalGroup;
+
                 if (v.TemplateName != null)
                     obj["template_name"] = v.TemplateName;
 
@@ -113,6 +122,9 @@ public static class ArchitectureDiagnosticFormatter
 
                 if (v.AllowedImporters != null)
                     obj["allowed_importers"] = v.AllowedImporters.ToArray();
+
+                if (v.ForbiddenExternalGroup != null)
+                    obj["forbidden_external_group"] = v.ForbiddenExternalGroup;
 
                 if (v.TemplateName != null)
                     obj["template_name"] = v.TemplateName;
