@@ -85,6 +85,13 @@ jobs:
           cat artifacts/release-notes/release-notes.md
           echo "---"
 
+      - name: Upload release notes artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-notes-${{ env.PACKAGE_VERSION }}
+          path: artifacts/release-notes/release-notes.md
+          if-no-files-found: error
+
       - name: Restore
         run: make restore
 
@@ -95,16 +102,16 @@ jobs:
         run: make acceptance
 
       - name: Pack Core
-        run: dotnet pack src/ArchLinterNet.Core/ArchLinterNet.Core.csproj --configuration Release --no-build --output "$PACKAGE_OUTPUT" -p:PackageVersion="$PACKAGE_VERSION" -p:Version="$PACKAGE_VERSION"
+        run: dotnet pack src/ArchLinterNet.Core/ArchLinterNet.Core.csproj --configuration Release --no-build --output "$PACKAGE_OUTPUT" -p:PackageVersion="$PACKAGE_VERSION" -p:Version="$PACKAGE_VERSION" -p:PackageReleaseNotes="$(cat artifacts/release-notes/release-notes.md)"
 
       - name: Pack CLI
-        run: dotnet pack src/ArchLinterNet.Cli/ArchLinterNet.Cli.csproj --configuration Release --no-build --output "$PACKAGE_OUTPUT" -p:PackageVersion="$PACKAGE_VERSION" -p:Version="$PACKAGE_VERSION"
+        run: dotnet pack src/ArchLinterNet.Cli/ArchLinterNet.Cli.csproj --configuration Release --no-build --output "$PACKAGE_OUTPUT" -p:PackageVersion="$PACKAGE_VERSION" -p:Version="$PACKAGE_VERSION" -p:PackageReleaseNotes="$(cat artifacts/release-notes/release-notes.md)"
 
       - name: Pack Testing
-        run: dotnet pack src/ArchLinterNet.Testing/ArchLinterNet.Testing.csproj --configuration Release --no-build --output "$PACKAGE_OUTPUT" -p:PackageVersion="$PACKAGE_VERSION" -p:Version="$PACKAGE_VERSION"
+        run: dotnet pack src/ArchLinterNet.Testing/ArchLinterNet.Testing.csproj --configuration Release --no-build --output "$PACKAGE_OUTPUT" -p:PackageVersion="$PACKAGE_VERSION" -p:Version="$PACKAGE_VERSION" -p:PackageReleaseNotes="$(cat artifacts/release-notes/release-notes.md)"
 
       - name: Pack Unity
-        run: dotnet pack src/ArchLinterNet.Unity/ArchLinterNet.Unity.csproj --configuration Release --no-build --output "$PACKAGE_OUTPUT" -p:PackageVersion="$PACKAGE_VERSION" -p:Version="$PACKAGE_VERSION"
+        run: dotnet pack src/ArchLinterNet.Unity/ArchLinterNet.Unity.csproj --configuration Release --no-build --output "$PACKAGE_OUTPUT" -p:PackageVersion="$PACKAGE_VERSION" -p:Version="$PACKAGE_VERSION" -p:PackageReleaseNotes="$(cat artifacts/release-notes/release-notes.md)"
 
       - name: Upload package artifacts
         uses: actions/upload-artifact@v4
