@@ -51,6 +51,7 @@ internal static class ArchitectureNamespaceViolationFinder
         Func<Type, bool> traversePredicate = t => assemblySet.Contains(t.Assembly);
 
         return sourceTypes
+            .OrderBy(type => ArchitectureTypeNames.SafeFullName(type), StringComparer.Ordinal)
             .Select(type =>
             {
                 string sourceFullName = ArchitectureTypeNames.SafeFullName(type);

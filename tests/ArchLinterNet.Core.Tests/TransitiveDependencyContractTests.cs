@@ -325,6 +325,94 @@ public sealed class TransitiveDependencyContractTests
     }
 
     [Test]
+    public void CheckContract_TransitiveMode_AuditContract_ProducesDependencyPaths()
+    {
+        var document = new ArchitectureContractDocument
+        {
+            Version = 1,
+            Name = "Test",
+            Layers = new Dictionary<string, ArchitectureLayer>
+            {
+                ["execution"] = new() { Namespace = "ArchLinterNet.Core.Execution" },
+                ["contracts"] = new() { Namespace = "ArchLinterNet.Core.Contracts" }
+            },
+            Analysis = new ArchitectureAnalysisConfiguration
+            {
+                TargetAssemblies = new List<string> { "ArchLinterNet.Core" }
+            },
+            Contracts = new ArchitectureContractGroups
+            {
+                Audit = new List<ArchitectureDependencyContract>
+                {
+                    new()
+                    {
+                        Name = "audit-execution-not-depend-on-contracts",
+                        Source = "execution",
+                        Forbidden = new List<string> { "contracts" },
+                        DependencyDepth = DependencyDepthMode.Transitive
+                    }
+                }
+            }
+        };
+
+        var context = CreateContext();
+        var runner = new ArchitectureContractRunner(context, document);
+        var violations = runner.AuditContracts().First();
+        var results = runner.CheckContract(violations).ToList();
+
+        Assert.That(results.Count, Is.GreaterThan(0));
+        Assert.That(results.All(v => v.DependencyPaths != null), Is.True);
+    }
+
+    [Test]
+    public void CheckContract_TransitiveMode_IgnoredViolations_SuppressesViolation()
+    {
+        var document = new ArchitectureContractDocument
+        {
+            Version = 1,
+            Name = "Test",
+            Layers = new Dictionary<string, ArchitectureLayer>
+            {
+                ["execution"] = new() { Namespace = "ArchLinterNet.Core.Execution" },
+                ["contracts"] = new() { Namespace = "ArchLinterNet.Core.Contracts" }
+            },
+            Analysis = new ArchitectureAnalysisConfiguration
+            {
+                TargetAssemblies = new List<string> { "ArchLinterNet.Core" }
+            },
+            Contracts = new ArchitectureContractGroups
+            {
+                Strict = new List<ArchitectureDependencyContract>
+                {
+                    new()
+                    {
+                        Name = "execution-must-not-depend-on-contracts",
+                        Source = "execution",
+                        Forbidden = new List<string> { "contracts" },
+                        DependencyDepth = DependencyDepthMode.Transitive,
+                        IgnoredViolations = new List<ArchitectureIgnoredViolation>
+                        {
+                            new()
+                            {
+                                SourceType = "ArchLinterNet.Core.Execution.ArchitectureContractRunner",
+                                ForbiddenReference = "*",
+                                Reason = "baseline"
+                            }
+                        }
+                    }
+                }
+            }
+        };
+
+        var context = CreateContext();
+        var runner = new ArchitectureContractRunner(context, document);
+        var violations = runner.CheckContract(document.Contracts.Strict[0]).ToList();
+
+        Assert.That(violations.All(v => v.SourceType != typeof(ArchitectureContractRunner).FullName), Is.True,
+            "Ignored violation should suppress the source+terminal pair");
+    }
+
+    [Test]
     public void CheckContract_TransitiveMode_ProducesDeterministicResults()
     {
         var document = new ArchitectureContractDocument
@@ -365,6 +453,51 @@ public sealed class TransitiveDependencyContractTests
         {
             Assert.That(run1[i].SourceType, Is.EqualTo(run2[i].SourceType));
             Assert.That(run1[i].ForbiddenReferences, Is.EqualTo(run2[i].ForbiddenReferences));
+        }
+    }
+
+    [Test]
+    public void CheckContract_TransitiveMode_SourceTypesAreSortedGlobally()
+    {
+        var document = new ArchitectureContractDocument
+        {
+            Version = 1,
+            Name = "Test",
+            Layers = new Dictionary<string, ArchitectureLayer>
+            {
+                ["execution"] = new() { Namespace = "ArchLinterNet.Core.Execution" },
+                ["contracts"] = new() { Namespace = "ArchLinterNet.Core.Contracts" }
+            },
+            Analysis = new ArchitectureAnalysisConfiguration
+            {
+                TargetAssemblies = new List<string> { "ArchLinterNet.Core" }
+            },
+            Contracts = new ArchitectureContractGroups
+            {
+                Strict = new List<ArchitectureDependencyContract>
+                {
+                    new()
+                    {
+                        Name = "execution-must-not-depend-on-contracts",
+                        Source = "execution",
+                        Forbidden = new List<string> { "contracts" },
+                        DependencyDepth = DependencyDepthMode.Transitive
+                    }
+                }
+            }
+        };
+
+        var context = CreateContext();
+        var runner = new ArchitectureContractRunner(context, document);
+        var violations = runner.CheckContract(document.Contracts.Strict[0]).ToList();
+
+        Assert.That(violations.Count, Is.GreaterThan(1));
+        for (int i = 1; i < violations.Count; i++)
+        {
+            Assert.That(
+                string.Compare(violations[i - 1].SourceType, violations[i].SourceType, StringComparison.Ordinal),
+                Is.LessThanOrEqualTo(0),
+                $"Violations should be sorted by SourceType: '{violations[i - 1].SourceType}' should come before '{violations[i].SourceType}'");
         }
     }
 }
