@@ -173,7 +173,7 @@ def main() -> None:
         "--github-env",
         default=None,
         help="Path to GitHub env file for key=value export "
-             "(disables stdout output; exports PACKAGE_VERSION, TARGET_TAG, PREVIOUS_TAG)",
+             "(exports env file and prints summary; PACKAGE_VERSION, TARGET_TAG, PREVIOUS_TAG)",
     )
 
     args = parser.parse_args()

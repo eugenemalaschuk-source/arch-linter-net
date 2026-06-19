@@ -317,6 +317,20 @@ class TestDetectLatestTag(unittest.TestCase):
         self.assertIsNotNone(result)
         self.assertEqual("0.1.0-preview.10", str(result))
 
+    @patch(
+        "tools.release.calculate_version.subprocess.run",
+    )
+    def test_detected_tag_preserves_raw_name(self, mock_run):
+        mock_run.return_value.stdout = (
+            "0.1.0\nv0.2.0-preview.2\n"
+        )
+        mock_run.return_value.returncode = 0
+
+        result = detect_latest_detected_tag()
+        self.assertIsNotNone(result)
+        self.assertEqual(result.name, "v0.2.0-preview.2")
+        self.assertEqual(result.version, SemVerVersion(0, 2, 0, 2))
+
 
 class TestGithubEnv(unittest.TestCase):
 
