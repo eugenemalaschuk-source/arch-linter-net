@@ -7,4 +7,4 @@
 ## 2. Verify
 
 - [x] 2.1 Run `make acceptance` locally to confirm gate still passes
-- [ ] 2.2 Trigger manual release workflow with `publish=false` and confirm acceptance runs before pack
+- [x] 2.2 Trigger manual release workflow with `publish=false` and confirm acceptance runs before pack
