@@ -75,6 +75,7 @@ Container for all contract definitions. Two groups at the top level:
 contracts:
   strict: []                    # Blocking contracts
   strict_layers: []
+  strict_layer_templates: []    # Blocking layer templates
   strict_allow_only: []
   strict_cycles: []
   strict_method_body: []
@@ -84,6 +85,7 @@ contracts:
 
   audit: []                     # Non-blocking contracts (same types)
   audit_layers: []
+  audit_layer_templates: []     # Audit layer templates
   audit_allow_only: []
   audit_cycles: []
   audit_method_body: []
@@ -115,6 +117,40 @@ references.
   name: <string>
   layers: [<layer-name>]        # Required — ordered outermost to innermost
   reason: <string>
+```
+
+### Layer template contract
+
+Reusable layer order contracts that apply the same layering to multiple namespace
+containers. Each template expands into one concrete layer order contract per
+container. Relative layer names are resolved by prepending the container namespace.
+
+```yaml
+- id: <string>                  # Optional
+  name: <string>                # Required — template name
+  containers: [<string>]        # Required — namespace prefixes for each container
+  layers:                       # Required — ordered template layer definitions
+    - name: <string>            # Required — relative layer name
+      optional: <bool>          # Optional — if absent, no empty-namespace diagnostic
+  reason: <string>
+```
+
+When a layer has `optional: true`, the expander silently skips it if no types are
+found. If present, the layer must still obey dependency direction. Required layers
+with zero types produce a configuration violation.
+
+```yaml
+strict_layer_templates:
+  - name: feature-clean-architecture
+    containers:
+      - FirstIce.Features.Fishing
+      - FirstIce.Features.Inventory
+    layers:
+      - name: Presentation
+      - name: Application
+        optional: true
+      - name: Domain
+    reason: Every feature follows the same internal dependency direction.
 ```
 
 ### Allow-only contract

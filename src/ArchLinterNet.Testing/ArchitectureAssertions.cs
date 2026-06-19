@@ -5,6 +5,8 @@ using ArchLinterNet.Core.Model;
 using ArchLinterNet.Core.Reporting;
 using ArchLinterNet.Core.Resolution;
 
+using static ArchLinterNet.Core.Execution.LayerTemplateExpander;
+
 namespace ArchLinterNet.Testing;
 
 public static class ArchitectureAssertions
@@ -68,9 +70,18 @@ public sealed class ArchitectureValidationBuilder
             allViolations.AddRange(runner.CheckContract(contract));
         }
 
-        IEnumerable<ArchitectureLayerContract> layerContracts = isStrict
-            ? runner.StrictLayerContracts()
-            : runner.AuditLayerContracts();
+        List<ArchitectureLayerContract> expandedLayerContracts = Expand(
+            isStrict
+                ? document.Contracts.StrictLayerTemplates
+                : document.Contracts.AuditLayerTemplates,
+            isStrict
+                ? document.Contracts.StrictLayers
+                : document.Contracts.AuditLayers);
+
+        IEnumerable<ArchitectureLayerContract> layerContracts = (isStrict
+                ? runner.StrictLayerContracts()
+                : runner.AuditLayerContracts())
+            .Concat(expandedLayerContracts);
 
         foreach (ArchitectureLayerContract contract in layerContracts)
         {

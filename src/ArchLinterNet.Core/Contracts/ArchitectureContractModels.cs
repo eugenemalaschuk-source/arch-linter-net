@@ -87,6 +87,12 @@ public sealed class ArchitectureContractGroups
     [YamlMember(Alias = "audit_protected")]
     public List<ArchitectureProtectedContract> AuditProtected { get; set; } = new();
 
+    [YamlMember(Alias = "strict_layer_templates")]
+    public List<ArchitectureLayerTemplateContract> StrictLayerTemplates { get; set; } = new();
+
+    [YamlMember(Alias = "audit_layer_templates")]
+    public List<ArchitectureLayerTemplateContract> AuditLayerTemplates { get; set; } = new();
+
     public IEnumerable<IArchitectureContract> AllStrict => EnumerateStrict();
 
     public IEnumerable<IArchitectureContract> AllAudit => EnumerateAudit();
@@ -137,6 +143,26 @@ public sealed class ArchitectureDependencyContract : IArchitectureContract
     [YamlMember(Alias = "reason")] public string Reason { get; set; } = string.Empty;
 }
 
+public sealed class ArchitectureTemplateLayer
+{
+    [YamlMember(Alias = "name")] public string Name { get; set; } = string.Empty;
+
+    [YamlMember(Alias = "optional")] public bool Optional { get; set; }
+}
+
+public sealed class ArchitectureLayerTemplateContract : IArchitectureContract
+{
+    [YamlMember(Alias = "name")] public string Name { get; set; } = string.Empty;
+
+    [YamlMember(Alias = "id")] public string? Id { get; set; }
+
+    [YamlMember(Alias = "containers")] public List<string> Containers { get; set; } = new();
+
+    [YamlMember(Alias = "layers")] public List<ArchitectureTemplateLayer> Layers { get; set; } = new();
+
+    [YamlMember(Alias = "reason")] public string Reason { get; set; } = string.Empty;
+}
+
 public sealed class ArchitectureLayerContract : IArchitectureContract
 {
     [YamlMember(Alias = "name")] public string Name { get; set; } = string.Empty;
@@ -144,6 +170,12 @@ public sealed class ArchitectureLayerContract : IArchitectureContract
     [YamlMember(Alias = "id")] public string? Id { get; set; }
 
     [YamlMember(Alias = "layers")] public List<string> Layers { get; set; } = new();
+
+    [YamlIgnore] public HashSet<string> OptionalLayers { get; set; } = new(StringComparer.Ordinal);
+
+    [YamlIgnore] public string? TemplateName { get; init; }
+
+    [YamlIgnore] public string? ContainerNamespace { get; init; }
 
     [YamlMember(Alias = "ignored_violations")]
     public List<ArchitectureIgnoredViolation> IgnoredViolations { get; set; } = new();

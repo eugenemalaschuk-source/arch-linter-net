@@ -93,6 +93,8 @@ public static class ArchitectureContractLoader
             document.Contracts.AuditIndependence,
             document.Contracts.StrictProtected,
             document.Contracts.AuditProtected,
+            document.Contracts.StrictLayerTemplates,
+            document.Contracts.AuditLayerTemplates,
         ];
 
         foreach (var group in groups)
@@ -113,6 +115,9 @@ public static class ArchitectureContractLoader
 
     private static IEnumerable<IArchitectureContract> GetAllContracts(ArchitectureContractDocument document)
     {
-        return document.Contracts.AllStrict.Concat(document.Contracts.AllAudit);
+        return document.Contracts.AllStrict
+            .Concat(document.Contracts.AllAudit)
+            .Concat(document.Contracts.StrictLayerTemplates)
+            .Concat(document.Contracts.AuditLayerTemplates);
     }
 }

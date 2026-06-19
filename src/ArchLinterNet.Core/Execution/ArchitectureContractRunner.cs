@@ -285,23 +285,72 @@ public sealed class ArchitectureContractRunner(
 
         List<ArchitectureViolation> violations = new();
 
-        for (int sourceIndex = 0; sourceIndex < contract.Layers.Count; sourceIndex++)
+        // Build effective layers: resolve each, skip optional absent ones
+        var effectiveLayers = new List<(string name, ArchitectureLayer layer, Type[] types)>();
+
+        foreach (string layerEntry in contract.Layers)
         {
-            ArchitectureLayer sourceLayer =
-                ArchitectureLayerResolver.ResolveLayer(_document, contract.Name, contract.Layers[sourceIndex]);
-            Type[] sourceTypes = ArchitectureTypeScanner.FindTypesInLayer(_context.TargetAssemblies, sourceLayer);
+            ArchitectureLayer layer = ResolveLayerEntry(contract, layerEntry);
+            Type[] types = ArchitectureTypeScanner.FindTypesInLayer(_context.TargetAssemblies, layer);
+
+            if (types.Length == 0)
+            {
+                if (contract.OptionalLayers.Contains(layerEntry))
+                {
+                    continue;
+                }
+
+                if (contract.TemplateName != null)
+                {
+                    violations.Add(new ArchitectureViolation(
+                        contract.Name,
+                        contract.Id,
+                        ArchitectureLayerResolver.DescribeLayer(layer),
+                        "empty layer namespace",
+                        new[] { $"Required layer '{layerEntry}' namespace '{layer.Namespace}' contains no types in loaded assemblies." })
+                    {
+                        TemplateName = contract.TemplateName,
+                        ContainerNamespace = contract.ContainerNamespace
+                    });
+                }
+            }
+
+            effectiveLayers.Add((layerEntry, layer, types));
+        }
+
+        for (int sourceIndex = 0; sourceIndex < effectiveLayers.Count; sourceIndex++)
+        {
+            var (_, _, sourceTypes) = effectiveLayers[sourceIndex];
 
             for (int forbiddenIndex = 0; forbiddenIndex < sourceIndex; forbiddenIndex++)
             {
-                ArchitectureLayer forbiddenLayer =
-                    ArchitectureLayerResolver.ResolveLayer(_document, contract.Name,
-                        contract.Layers[forbiddenIndex]);
-                violations.AddRange(FindNamespaceViolations(contract.Name, contract.Id, sourceTypes, forbiddenLayer,
-                    Array.Empty<string>(), contract.IgnoredViolations));
+                var (_, forbiddenLayer, _) = effectiveLayers[forbiddenIndex];
+                foreach (ArchitectureViolation v in FindNamespaceViolations(
+                    contract.Name, contract.Id, sourceTypes, forbiddenLayer,
+                    Array.Empty<string>(), contract.IgnoredViolations))
+                {
+                    violations.Add(v with
+                    {
+                        TemplateName = contract.TemplateName,
+                        ContainerNamespace = contract.ContainerNamespace
+                    });
+                }
             }
         }
 
         return violations;
+    }
+
+    private ArchitectureLayer ResolveLayerEntry(
+        ArchitectureLayerContract contract,
+        string layerEntry)
+    {
+        if (contract.TemplateName != null)
+        {
+            return new ArchitectureLayer { Namespace = layerEntry };
+        }
+
+        return ArchitectureLayerResolver.ResolveLayer(_document, contract.Name, layerEntry);
     }
 
     public List<ArchitectureViolation> CheckAllowOnlyContract(ArchitectureAllowOnlyContract contract)
