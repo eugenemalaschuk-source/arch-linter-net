@@ -1,4 +1,5 @@
 using System.Reflection;
+using System.Reflection.Emit;
 using ArchLinterNet.Core.Contracts;
 using ArchLinterNet.Core.Execution;
 using ArchLinterNet.Core.Model;
@@ -595,6 +596,65 @@ public sealed class ProtectedContractTests
             Assert.That(violation.TargetLayer, Is.EqualTo("core_execution"),
                 "TargetLayer must be the protected layer name, not a nested child layer");
         }
+    }
+
+    [Test]
+    public void CheckProtectedContract_GlobalNamespaceSourceType_ProducesViolation()
+    {
+        AssemblyName assemblyName = new("GlobalNsTestAssembly");
+        AssemblyBuilder assemblyBuilder = AssemblyBuilder.DefineDynamicAssembly(assemblyName, AssemblyBuilderAccess.Run);
+        ModuleBuilder moduleBuilder = assemblyBuilder.DefineDynamicModule("MainModule");
+        TypeBuilder typeBuilder = moduleBuilder.DefineType("GlobalNsRunnerUser", TypeAttributes.Public);
+        typeBuilder.DefineField("_runner", typeof(ArchitectureContractRunner), FieldAttributes.Private);
+        Type globalType = typeBuilder.CreateType();
+
+        var document = new ArchitectureContractDocument
+        {
+            Version = 1,
+            Name = "Test",
+            Layers = new Dictionary<string, ArchitectureLayer>
+            {
+                ["execution"] = new() { Namespace = "ArchLinterNet.Core.Execution" }
+            },
+            Analysis = new ArchitectureAnalysisConfiguration
+            {
+                TargetAssemblies = new List<string>
+                {
+                    "ArchLinterNet.Core",
+                    "ArchLinterNet.Core.Tests"
+                }
+            },
+            Contracts = new ArchitectureContractGroups
+            {
+                StrictProtected = new List<ArchitectureProtectedContract>
+                {
+                    new()
+                    {
+                        Name = "execution-is-protected",
+                        Protected = new List<string> { "execution" },
+                        AllowedImporters = new List<string>()
+                    }
+                }
+            }
+        };
+
+        var context = new ArchitectureAnalysisContext(
+            "/tmp",
+            new[] { CoreAssembly, TestAssembly, assemblyBuilder },
+            Array.Empty<string>(),
+            Array.Empty<string>());
+
+        var runner = new ArchitectureContractRunner(context, document);
+        var violations = runner.CheckProtectedContract(document.Contracts.StrictProtected[0]);
+
+        var globalViolations = violations
+            .Where(v => v.SourceType == "GlobalNsRunnerUser")
+            .ToList();
+
+        Assert.That(globalViolations, Is.Not.Empty,
+            "Global-namespace types referencing protected layers must produce violations");
+        Assert.That(globalViolations[0].SourceLayer, Is.Null,
+            "Global-namespace types should have null SourceLayer");
     }
 
     public sealed class ExecutionUser

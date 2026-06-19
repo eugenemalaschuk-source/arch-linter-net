@@ -498,19 +498,17 @@ public sealed class ArchitectureContractRunner(
                     }
 
                     string sourceNs = ArchitectureTypeNames.SafeNamespace(sourceType);
-                    if (string.IsNullOrEmpty(sourceNs))
-                    {
-                        continue;
-                    }
 
                     // Self-reference: source inside protected layer is always allowed
-                    if (ArchitectureLayerResolver.MatchesNamespace(protectedLayer, sourceNs))
+                    if (!string.IsNullOrEmpty(sourceNs) &&
+                        ArchitectureLayerResolver.MatchesNamespace(protectedLayer, sourceNs))
                     {
                         continue;
                     }
 
                     // Allowed importer: source namespace matches any allowed importer layer
-                    if (allowedImporterLayers.Any(l => ArchitectureLayerResolver.MatchesNamespace(l, sourceNs)))
+                    if (!string.IsNullOrEmpty(sourceNs) &&
+                        allowedImporterLayers.Any(l => ArchitectureLayerResolver.MatchesNamespace(l, sourceNs)))
                     {
                         continue;
                     }
