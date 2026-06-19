@@ -3,9 +3,14 @@ import sys
 from io import StringIO
 from unittest.mock import patch
 
+import tempfile
+from pathlib import Path
+
 from tools.release.calculate_version import (
+    DetectedTag,
     SemVerVersion,
     detect_latest_tag,
+    detect_latest_detected_tag,
     calculate_next_version,
     validate_package_version,
     main,
@@ -311,6 +316,112 @@ class TestDetectLatestTag(unittest.TestCase):
         result = detect_latest_tag()
         self.assertIsNotNone(result)
         self.assertEqual("0.1.0-preview.10", str(result))
+
+    @patch(
+        "tools.release.calculate_version.subprocess.run",
+    )
+    def test_detected_tag_preserves_raw_name(self, mock_run):
+        mock_run.return_value.stdout = (
+            "0.1.0\nv0.2.0-preview.2\n"
+        )
+        mock_run.return_value.returncode = 0
+
+        result = detect_latest_detected_tag()
+        self.assertIsNotNone(result)
+        self.assertEqual(result.name, "v0.2.0-preview.2")
+        self.assertEqual(result.version, SemVerVersion(0, 2, 0, 2))
+
+
+class TestGithubEnv(unittest.TestCase):
+
+    def _run_with_env(self, args: list[str], detected: DetectedTag | None):
+        env_file = tempfile.NamedTemporaryFile(mode="w", delete=False, suffix=".env")
+        env_path = env_file.name
+        env_file.close()
+
+        try:
+            test_args = ["prog"] + args + ["--github-env", env_path]
+            with patch.object(sys, "argv", test_args):
+                with (
+                    patch(
+                        "tools.release.calculate_version.detect_latest_detected_tag",
+                        return_value=detected,
+                    ),
+                    patch("sys.stdout", new_callable=StringIO) as out,
+                ):
+                    main()
+                    stdout = out.getvalue()
+
+            with open(env_path) as f:
+                content = f.read()
+        finally:
+            Path(env_path).unlink(missing_ok=True)
+
+        return stdout, content
+
+    def _parse_env(self, content: str) -> dict[str, str]:
+        result: dict[str, str] = {}
+        for line in content.strip().splitlines():
+            if "=" in line:
+                k, v = line.split("=", 1)
+                result[k] = v
+        return result
+
+    def test_github_env_preview_exports_context(self):
+        detected = DetectedTag("v0.2.0-preview.2", SemVerVersion(0, 2, 0, 2))
+        stdout, content = self._run_with_env(
+            ["--release-type", "preview"], detected
+        )
+        env = self._parse_env(content)
+        self.assertEqual(env["PACKAGE_VERSION"], "0.2.0-preview.3")
+        self.assertEqual(env["TARGET_TAG"], "v0.2.0-preview.3")
+        self.assertEqual(env["PREVIOUS_TAG"], "v0.2.0-preview.2")
+        self.assertIn("Calculated PACKAGE_VERSION=0.2.0-preview.3", stdout)
+        self.assertIn("Target tag: v0.2.0-preview.3", stdout)
+        self.assertIn("Previous tag: v0.2.0-preview.2", stdout)
+
+    def test_github_env_stable_exports_previous_tag(self):
+        detected = DetectedTag("v0.1.0", SemVerVersion(0, 1, 0))
+        stdout, content = self._run_with_env(
+            ["--release-type", "patch"], detected
+        )
+        env = self._parse_env(content)
+        self.assertEqual(env["PACKAGE_VERSION"], "0.1.1")
+        self.assertEqual(env["TARGET_TAG"], "v0.1.1")
+        self.assertEqual(env["PREVIOUS_TAG"], "v0.1.0")
+        self.assertIn("Target tag: v0.1.1", stdout)
+
+    def test_github_env_override_detects_previous_tag(self):
+        detected = DetectedTag("v0.2.0", SemVerVersion(0, 2, 0))
+        stdout, content = self._run_with_env(
+            ["--version-override", "0.3.0"], detected
+        )
+        env = self._parse_env(content)
+        self.assertEqual(env["PACKAGE_VERSION"], "0.3.0")
+        self.assertEqual(env["TARGET_TAG"], "v0.3.0")
+        self.assertEqual(env["PREVIOUS_TAG"], "v0.2.0")
+        self.assertIn("Target tag: v0.3.0", stdout)
+
+    def test_github_env_override_no_tags_previous_empty(self):
+        stdout, content = self._run_with_env(
+            ["--version-override", "0.1.0"], None
+        )
+        env = self._parse_env(content)
+        self.assertEqual(env["PACKAGE_VERSION"], "0.1.0")
+        self.assertEqual(env["TARGET_TAG"], "v0.1.0")
+        self.assertEqual(env["PREVIOUS_TAG"], "")
+        self.assertIn("Previous tag: <none>", stdout)
+
+    def test_github_env_writes_to_file(self):
+        detected = DetectedTag("v0.1.0", SemVerVersion(0, 1, 0))
+        stdout, content = self._run_with_env(
+            ["--release-type", "minor"], detected
+        )
+        env = self._parse_env(content)
+        self.assertIn("PACKAGE_VERSION", env)
+        self.assertIn("TARGET_TAG", env)
+        self.assertIn("PREVIOUS_TAG", env)
+        self.assertNotEqual(stdout, "")
 
 
 if __name__ == "__main__":

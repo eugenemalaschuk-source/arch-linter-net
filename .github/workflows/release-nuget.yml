@@ -28,7 +28,7 @@ jobs:
     name: Build NuGet packages
     runs-on: ubuntu-latest
     permissions:
-      contents: read
+      contents: write
       id-token: write
 
     env:
@@ -51,11 +51,39 @@ jobs:
       - name: Calculate package version
         shell: bash
         run: |
-          PACKAGE_VERSION="$(uv run python tools/release/calculate_version.py \
+          uv run python tools/release/calculate_version.py \
             --release-type "${{ inputs.release_type }}" \
-            --version-override "${{ inputs.version_override }}")"
-          echo "PACKAGE_VERSION=$PACKAGE_VERSION" >> "$GITHUB_ENV"
-          echo "Calculated PACKAGE_VERSION=$PACKAGE_VERSION"
+            --version-override "${{ inputs.version_override }}" \
+            --github-env "$GITHUB_ENV"
+
+      - name: Generate release notes
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p artifacts/release-notes
+
+          payload="$(jq -n \
+            --arg tag_name "$TARGET_TAG" \
+            --arg target_commitish "$GITHUB_SHA" \
+            --arg configuration_file_path ".github/release.yml" \
+            '{ tag_name: $tag_name, target_commitish: $target_commitish, configuration_file_path: $configuration_file_path }')"
+
+          if [ -n "$PREVIOUS_TAG" ]; then
+            payload="$(echo "$payload" | jq --arg previous_tag_name "$PREVIOUS_TAG" '. + { previous_tag_name: $previous_tag_name }')"
+          fi
+
+          gh api \
+            --method POST \
+            repos/${{ github.repository }}/releases/generate-notes \
+            --input - <<< "$payload" \
+            --jq '.body' \
+            | tee artifacts/release-notes/release-notes.md
+
+          echo "Generated release notes for $TARGET_TAG"
+          echo "---"
+          cat artifacts/release-notes/release-notes.md
+          echo "---"
 
       - name: Restore
         run: make restore

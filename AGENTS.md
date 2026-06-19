@@ -16,6 +16,7 @@ Bootstrap dependencies: `rtk brew bundle` (macOS) or `rtk make bundle`.
 
 ## Key commands
 ```
+rtk make setup                # full bootstrap: bundle + restore + venv (run once)
 rtk make restore              # NuGet restore (required before any --no-restore target)
 rtk make fmt                  # dotnet format — auto-format all C# code
 rtk make lint                 # lint-code-size + lint-dotnet-format + lint-architecture
@@ -29,6 +30,20 @@ All `dotnet test`/`dotnet format` targets use `--no-restore` — run `restore` f
 Run a single test project:
 ```
 rtk dotnet test tests/ArchLinterNet.Core.Tests --no-restore
+```
+
+Run the CLI directly:
+```
+rtk dotnet run --project src/ArchLinterNet.Cli -- --policy architecture/dependencies.arch.yml --mode strict
+```
+
+## Docs workflow
+```
+rtk make venv                 # create Python virtual environment (one-time)
+rtk make docs-serve           # start local preview at http://127.0.0.1:8000
+rtk make docs-build           # build static site to site/
+rtk make fmt-docs             # auto-format markdown documentation
+rtk make lint-docs            # verify MkDocs documentation structure
 ```
 
 ## Backlog governance
@@ -50,7 +65,7 @@ File: `architecture/dependencies.arch.yml`. Enforced via `lint-architecture`.
 Direction rules:
 - CLI, Testing, and Unity depend **only** on Core.
 - No circular dependencies between packages.
-- `audit-architecture` is a stub (not yet implemented; falls back to strict).
+- `Core.Scanning` internals are protected — only Core itself may import them.
 
 ## Package layout
 ```
@@ -79,4 +94,4 @@ tests/
   `openspec/changes/archive/YYYY-MM-DD-<name>/`.
 
 ## State of the repo
-- Early extraction / preview. Some docs exist under `docs/`. No `.github/` CI config.
+- Early extraction / preview. Docs under `docs/` built with MkDocs. CI in `.github/workflows/`.
