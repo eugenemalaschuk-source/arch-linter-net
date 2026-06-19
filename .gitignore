@@ -3,6 +3,8 @@
 [Oo]bj/
 [Dd]ebug/
 [Rr]elease/
+!tools/release/
+!tests/release/
 artifacts/
 TestResults/
 test-results/
