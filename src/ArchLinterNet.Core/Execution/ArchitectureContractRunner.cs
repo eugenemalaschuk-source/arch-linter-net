@@ -558,9 +558,6 @@ public sealed class ArchitectureContractRunner(
                         .OrderBy(name => name, StringComparer.Ordinal)
                         .ToArray();
 
-                    string? refLayerName = ArchitectureLayerResolver.ResolveContainingLayer(
-                        _document, normalizedRefs[0], allLayerNames);
-
                     violations.Add(new ArchitectureViolation(
                         contract.Name, contract.Id,
                         sourceTypeFullName,
@@ -568,7 +565,7 @@ public sealed class ArchitectureContractRunner(
                         normalizedRefs)
                     {
                         SourceLayer = sourceLayerName,
-                        TargetLayer = refLayerName,
+                        TargetLayer = protectedLayerName,
                         AllowedImporters = contract.AllowedImporters
                     });
                 }

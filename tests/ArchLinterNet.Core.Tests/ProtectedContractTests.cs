@@ -546,6 +546,57 @@ public sealed class ProtectedContractTests
             "Types in child namespaces of allowed importer parent layer should be permitted");
     }
 
+    [Test]
+    public void CheckProtectedContract_ViolationTargetLayerIsProtectedLayerName()
+    {
+        var document = new ArchitectureContractDocument
+        {
+            Version = 1,
+            Name = "Test",
+            Layers = new Dictionary<string, ArchitectureLayer>
+            {
+                ["core_execution"] = new() { Namespace = "ArchLinterNet.Core.Execution" },
+                ["execution_internal"] = new() { Namespace = "ArchLinterNet.Core.Execution.Internal" }
+            },
+            Analysis = new ArchitectureAnalysisConfiguration
+            {
+                TargetAssemblies = new List<string>
+                {
+                    "ArchLinterNet.Core",
+                    "ArchLinterNet.Core.Tests"
+                }
+            },
+            Contracts = new ArchitectureContractGroups
+            {
+                StrictProtected = new List<ArchitectureProtectedContract>
+                {
+                    new()
+                    {
+                        Name = "execution-is-protected",
+                        Protected = new List<string> { "core_execution" },
+                        AllowedImporters = new List<string>()
+                    }
+                }
+            }
+        };
+
+        var context = new ArchitectureAnalysisContext(
+            "/tmp",
+            new[] { CoreAssembly, TestAssembly },
+            Array.Empty<string>(),
+            Array.Empty<string>());
+
+        var runner = new ArchitectureContractRunner(context, document);
+        var violations = runner.CheckProtectedContract(document.Contracts.StrictProtected[0]);
+
+        Assert.That(violations, Is.Not.Empty);
+        foreach (var violation in violations)
+        {
+            Assert.That(violation.TargetLayer, Is.EqualTo("core_execution"),
+                "TargetLayer must be the protected layer name, not a nested child layer");
+        }
+    }
+
     public sealed class ExecutionUser
     {
         private readonly ArchitectureContractRunner _runner;
