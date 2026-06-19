@@ -124,6 +124,15 @@ public sealed class ArchitectureValidationBuilder
             allViolations.AddRange(runner.CheckIndependenceContract(contract));
         }
 
+        IEnumerable<ArchitectureProtectedContract> protectedContracts = isStrict
+            ? runner.StrictProtectedContracts()
+            : runner.AuditProtectedContracts();
+
+        foreach (ArchitectureProtectedContract contract in protectedContracts)
+        {
+            allViolations.AddRange(runner.CheckProtectedContract(contract));
+        }
+
         return new ArchitectureValidationResult(
             allViolations.Count == 0 && allCycles.Count == 0,
             allViolations,

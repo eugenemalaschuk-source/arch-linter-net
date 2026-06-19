@@ -81,6 +81,12 @@ public sealed class ArchitectureContractGroups
     [YamlMember(Alias = "audit_independence")]
     public List<ArchitectureIndependenceContract> AuditIndependence { get; set; } = new();
 
+    [YamlMember(Alias = "strict_protected")]
+    public List<ArchitectureProtectedContract> StrictProtected { get; set; } = new();
+
+    [YamlMember(Alias = "audit_protected")]
+    public List<ArchitectureProtectedContract> AuditProtected { get; set; } = new();
+
     public IEnumerable<IArchitectureContract> AllStrict => EnumerateStrict();
 
     public IEnumerable<IArchitectureContract> AllAudit => EnumerateAudit();
@@ -94,6 +100,7 @@ public sealed class ArchitectureContractGroups
         foreach (var c in StrictMethodBody) yield return c;
         foreach (var c in StrictAsmdef) yield return c;
         foreach (var c in StrictIndependence) yield return c;
+        foreach (var c in StrictProtected) yield return c;
     }
 
     private IEnumerable<IArchitectureContract> EnumerateAudit()
@@ -105,6 +112,7 @@ public sealed class ArchitectureContractGroups
         foreach (var c in AuditMethodBody) yield return c;
         foreach (var c in AuditAsmdef) yield return c;
         foreach (var c in AuditIndependence) yield return c;
+        foreach (var c in AuditProtected) yield return c;
     }
 }
 
@@ -217,6 +225,25 @@ public sealed class ArchitectureIndependenceContract : IArchitectureContract
     [YamlMember(Alias = "id")] public string? Id { get; set; }
 
     [YamlMember(Alias = "layers")] public List<string> Layers { get; set; } = new();
+
+    [YamlMember(Alias = "ignored_violations")]
+    public List<ArchitectureIgnoredViolation> IgnoredViolations { get; set; } = new();
+
+    [YamlMember(Alias = "reason")] public string Reason { get; set; } = string.Empty;
+}
+
+public sealed class ArchitectureProtectedContract : IArchitectureContract
+{
+    [YamlMember(Alias = "name")] public string Name { get; set; } = string.Empty;
+
+    [YamlMember(Alias = "id")] public string? Id { get; set; }
+
+    [YamlMember(Alias = "protected")] public List<string> Protected { get; set; } = new();
+
+    [YamlMember(Alias = "allowed_importers")]
+    public List<string> AllowedImporters { get; set; } = new();
+
+    [YamlMember(Alias = "allowed_types")] public List<string> AllowedTypes { get; set; } = new();
 
     [YamlMember(Alias = "ignored_violations")]
     public List<ArchitectureIgnoredViolation> IgnoredViolations { get; set; } = new();

@@ -39,7 +39,7 @@ internal static class ArchitectureTypeScanner
             .ToArray();
     }
 
-    private static IEnumerable<Type> GetLoadableTypes(Assembly assembly)
+    internal static IEnumerable<Type> GetLoadableTypes(Assembly assembly)
     {
         try
         {

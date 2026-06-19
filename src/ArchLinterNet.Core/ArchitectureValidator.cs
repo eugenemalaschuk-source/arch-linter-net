@@ -75,6 +75,11 @@ public sealed class ArchitectureValidator
             allViolations.AddRange(runner.CheckIndependenceContract(contract));
         }
 
+        foreach (ArchitectureProtectedContract contract in runner.StrictProtectedContracts())
+        {
+            allViolations.AddRange(runner.CheckProtectedContract(contract));
+        }
+
         violations = allViolations;
         cycles = allCycles;
         return allViolations.Count == 0 && allCycles.Count == 0;

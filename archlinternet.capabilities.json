@@ -61,6 +61,13 @@
       "auditGroup": "audit_independence",
       "fields": ["name", "layers", "ignored_violations", "reason"],
       "validates": "Mutual independence among a set of layers; no selected layer references another selected layer."
+    },
+    {
+      "kind": "protected-surface",
+      "strictGroup": "strict_protected",
+      "auditGroup": "audit_protected",
+      "fields": ["name", "protected", "allowed_importers", "allowed_types", "ignored_violations", "reason"],
+      "validates": "Protected layers are referenced only by explicitly allowed importer layers. Self-references within the protected layer are implicitly allowed."
     }
   ],
   "exceptionMechanisms": {
