@@ -126,6 +126,43 @@ they must still obey the dependency direction.
 Use `audit_layer_templates` for audit-mode templates. Templates coexist with
 direct `strict_layers` / `audit_layers` contracts.
 
+### Exhaustive container coverage
+
+When a template declares `exhaustive: true`, the runner verifies that every
+immediate child namespace under each container that contains loaded types is
+mapped to a declared layer. Any unmapped sibling namespace produces a violation.
+
+This catches new modules added under an existing container root without
+corresponding layer declarations — a common governance gap in growing codebases.
+
+```yaml
+contracts:
+  strict_layer_templates:
+    - name: feature-clean-architecture
+      containers:
+        - MyApp.Features.Fishing
+        - MyApp.Features.Inventory
+        - MyApp.Features.Map
+      layers:
+        - name: Presentation
+        - name: Application
+        - name: Domain
+      exhaustive: true
+      reason: Every feature must declare all internal layers; new modules must not silently bypass the architecture.
+```
+
+When `exhaustive: true`, template layer names must be single namespace segments
+(e.g. `Domain`, not `Domain.Models`). The layer name is prepended to the
+container to form the full namespace, so dotted names would produce a namespace
+deeper than an immediate child and cannot be validated correctly.
+
+Only namespaces that contain at least one loadable type are checked. Empty
+child namespaces are silently ignored.
+
+Exhaustive works in both strict and audit modes. Use strict for blocking gates
+and audit for discovery. The check only runs on expanded template contracts
+(with a `ContainerNamespace`), not on direct layer contracts.
+
 ## Model Modules With Independence Or Cycles
 
 Use `strict_independence` when modules must not reference each other at all. Use

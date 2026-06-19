@@ -111,6 +111,31 @@ Optional layers (`optional: true`) are silently skipped when absent. If present,
 they must still obey the dependency direction. Required layers with zero types
 produce a configuration violation.
 
+### Exhaustive container coverage
+
+Add `exhaustive: true` to require all child namespaces under each container to be
+mapped into declared layers. Unmapped sibling namespaces that contain types produce
+a violation, preventing silent architecture gaps when new namespaces are created.
+
+```yaml
+strict_layer_templates:
+  - name: feature-clean-architecture
+    containers:
+      - MyApp.Features.Fishing
+    layers:
+      - name: Presentation
+      - name: Application
+        optional: true
+      - name: Domain
+    exhaustive: true
+    reason: Every feature namespace must be mapped into the layer structure.
+```
+
+With `exhaustive: true`, if a developer creates `MyApp.Features.Fishing.Payments`
+and it is not listed in the template layers, the linter reports an
+`unmapped sibling namespace` violation. Unmapped namespaces without types are
+silent. The default is `false` (no coverage check).
+
 ## Independence (`strict_independence` / `audit_independence`)
 
 Mutual separation across a set of layers: no cross-references in either direction.

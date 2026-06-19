@@ -261,4 +261,41 @@ public sealed class LayerTemplateExpanderTests
 
         Assert.That(result[0].Reason, Is.EqualTo("Because architecture matters"));
     }
+
+    [Test]
+    public void Expand_ExhaustiveTemplate_SetsExhaustiveFlag()
+    {
+        var templates = new List<ArchitectureLayerTemplateContract>
+        {
+            new()
+            {
+                Name = "t",
+                Containers = new List<string> { "App" },
+                Layers = new List<ArchitectureTemplateLayer> { new() { Name = "Layer" } },
+                Exhaustive = true
+            }
+        };
+
+        List<ArchitectureLayerContract> result = LayerTemplateExpander.Expand(templates);
+
+        Assert.That(result[0].Exhaustive, Is.True);
+    }
+
+    [Test]
+    public void Expand_NonExhaustiveTemplate_ExhaustiveFlagFalse()
+    {
+        var templates = new List<ArchitectureLayerTemplateContract>
+        {
+            new()
+            {
+                Name = "t",
+                Containers = new List<string> { "App" },
+                Layers = new List<ArchitectureTemplateLayer> { new() { Name = "Layer" } }
+            }
+        };
+
+        List<ArchitectureLayerContract> result = LayerTemplateExpander.Expand(templates);
+
+        Assert.That(result[0].Exhaustive, Is.False);
+    }
 }
