@@ -263,7 +263,7 @@ public sealed class ArchitectureContractRunner(
             if (transitive)
             {
                 violations.AddRange(ArchitectureNamespaceViolationFinder.FindTransitiveNamespaceViolations(contract.Name, contract.Id, sourceTypes,
-                    forbiddenLayer, contract.AllowedTypes, contract.IgnoredViolations));
+                    forbiddenLayer, contract.AllowedTypes, contract.IgnoredViolations, _context.TargetAssemblies));
             }
             else
             {
@@ -280,7 +280,7 @@ public sealed class ArchitectureContractRunner(
                 {
                     violations.AddRange(ArchitectureNamespaceViolationFinder.FindTransitiveNamespaceViolations(contract.Name, contract.Id, sourceTypes,
                         new ArchitectureLayer { Namespace = forbiddenNamespace },
-                        contract.AllowedTypes, contract.IgnoredViolations));
+                        contract.AllowedTypes, contract.IgnoredViolations, _context.TargetAssemblies));
                 }
                 else
                 {

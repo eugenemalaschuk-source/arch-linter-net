@@ -1,3 +1,4 @@
+using System.Reflection;
 using ArchLinterNet.Core.Contracts;
 using ArchLinterNet.Core.Model;
 using ArchLinterNet.Core.Resolution;
@@ -43,8 +44,12 @@ internal static class ArchitectureNamespaceViolationFinder
         Type[] sourceTypes,
         ArchitectureLayer forbiddenLayer,
         IReadOnlyCollection<string> allowedTypeFullNames,
-        IReadOnlyCollection<ArchitectureIgnoredViolation> ignoredViolations)
+        IReadOnlyCollection<ArchitectureIgnoredViolation> ignoredViolations,
+        IReadOnlyCollection<Assembly> targetAssemblies)
     {
+        HashSet<Assembly> assemblySet = targetAssemblies.ToHashSet();
+        Func<Type, bool> traversePredicate = t => assemblySet.Contains(t.Assembly);
+
         return sourceTypes
             .Select(type =>
             {
@@ -52,7 +57,7 @@ internal static class ArchitectureNamespaceViolationFinder
                 List<string> forbiddenRefs = new();
                 List<IReadOnlyCollection<string>> paths = new();
 
-                foreach (var (referenced, path) in ArchitectureReferenceScanner.GetTransitiveReferencedTypes(type))
+                foreach (var (referenced, path) in ArchitectureReferenceScanner.GetTransitiveReferencedTypes(type, traversePredicate))
                 {
                     string refFullName = ArchitectureTypeNames.SafeFullName(referenced);
                     if (string.IsNullOrEmpty(refFullName))

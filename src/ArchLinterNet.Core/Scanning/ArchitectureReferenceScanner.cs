@@ -86,7 +86,9 @@ internal static class ArchitectureReferenceScanner
         }
     }
 
-    public static IEnumerable<(Type referenced, List<Type> path)> GetTransitiveReferencedTypes(Type type)
+    public static IEnumerable<(Type referenced, List<Type> path)> GetTransitiveReferencedTypes(
+        Type type,
+        Func<Type, bool>? traversePredicate = null)
     {
         HashSet<Type> visited = new();
         Queue<(Type current, List<Type> path)> queue = new();
@@ -108,8 +110,12 @@ internal static class ArchitectureReferenceScanner
 
                 visited.Add(directRef);
                 List<Type> refPath = new(path) { directRef };
-                queue.Enqueue((directRef, refPath));
                 yield return (directRef, refPath);
+
+                if (traversePredicate == null || traversePredicate(directRef))
+                {
+                    queue.Enqueue((directRef, refPath));
+                }
             }
         }
     }
