@@ -47,14 +47,12 @@ contracts:
         - testing
         - unity
         - core
-        - core_scanning
       reason: Dependencies must point toward Core.
 
   strict_cycles:
     - name: package-cycles
       layers:
         - core
-        - core_scanning
         - cli
         - testing
         - unity

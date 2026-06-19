@@ -177,6 +177,7 @@ references.
   protected: [<layer-name>]     # Required — layers to protect
   allowed_importers: [<layer-name>]  # Required — layers allowed to reference protected layers
   allowed_types: []             # Optional — source-type-level exceptions
+  ignored_violations: []        # Optional — baseline known violations
   reason: <string>
 ```
 
@@ -186,7 +187,7 @@ need not be listed in `allowed_importers`.
 
 ### Ignored violations
 
-Dependency, layer, allow-only, cycle, method-body, and independence contracts
+Dependency, layer, allow-only, cycle, method-body, independence, and protected contracts
 may include an `ignored_violations` block (asmdef contracts do not support this):
 
 ```yaml

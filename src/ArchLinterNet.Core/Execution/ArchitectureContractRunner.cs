@@ -478,6 +478,11 @@ public sealed class ArchitectureContractRunner(
 
         HashSet<string> allLayerNames = new(_document.Layers.Keys, StringComparer.Ordinal);
 
+        foreach (string allowedImporter in contract.AllowedImporters)
+        {
+            ArchitectureLayerResolver.ResolveLayer(_document, contract.Name, allowedImporter);
+        }
+
         foreach (string protectedLayerName in contract.Protected)
         {
             ArchitectureLayer protectedLayer =
@@ -539,14 +544,19 @@ public sealed class ArchitectureContractRunner(
                         continue;
                     }
 
+                    string[] normalizedRefs = matchingRefs
+                        .Distinct(StringComparer.Ordinal)
+                        .OrderBy(name => name, StringComparer.Ordinal)
+                        .ToArray();
+
                     string? refLayerName = ArchitectureLayerResolver.ResolveContainingLayer(
-                        _document, matchingRefs[0], allLayerNames);
+                        _document, normalizedRefs[0], allLayerNames);
 
                     violations.Add(new ArchitectureViolation(
                         contract.Name, contract.Id,
                         sourceTypeFullName,
                         $"protected layer '{protectedLayerName}' (allowed importers: [{string.Join(", ", contract.AllowedImporters)}])",
-                        matchingRefs)
+                        normalizedRefs)
                     {
                         SourceLayer = sourceLayerName,
                         TargetLayer = refLayerName,

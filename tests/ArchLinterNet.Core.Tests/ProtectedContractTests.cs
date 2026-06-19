@@ -456,6 +456,48 @@ public sealed class ProtectedContractTests
         Assert.That(json, Does.Not.Contain("allowed_importers"));
     }
 
+    [Test]
+    public void CheckProtectedContract_UnknownAllowedImporter_ThrowsInvalidOperation()
+    {
+        var document = new ArchitectureContractDocument
+        {
+            Version = 1,
+            Name = "Test",
+            Layers = new Dictionary<string, ArchitectureLayer>
+            {
+                ["execution"] = new() { Namespace = "ArchLinterNet.Core.Execution" }
+            },
+            Analysis = new ArchitectureAnalysisConfiguration
+            {
+                TargetAssemblies = new List<string> { "ArchLinterNet.Core" }
+            },
+            Contracts = new ArchitectureContractGroups
+            {
+                StrictProtected = new List<ArchitectureProtectedContract>
+                {
+                    new()
+                    {
+                        Name = "bad-allowed-importer",
+                        Protected = new List<string> { "execution" },
+                        AllowedImporters = new List<string> { "nonexistent_importer" }
+                    }
+                }
+            }
+        };
+
+        var context = new ArchitectureAnalysisContext(
+            "/tmp",
+            new[] { CoreAssembly },
+            Array.Empty<string>(),
+            Array.Empty<string>());
+
+        var runner = new ArchitectureContractRunner(context, document);
+
+        Assert.That(
+            () => runner.CheckProtectedContract(document.Contracts.StrictProtected[0]),
+            Throws.InvalidOperationException);
+    }
+
     public sealed class ExecutionUser
     {
         private readonly ArchitectureContractRunner _runner;
