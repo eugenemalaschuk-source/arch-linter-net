@@ -5,7 +5,7 @@ ArchLinterNet SHALL provide a separate GitHub Actions workflow for official pack
 
 #### Scenario: Manual release inputs are required
 - **WHEN** a maintainer starts the release workflow manually
-- **THEN** the workflow requires a `version` input and exposes a `publish` boolean input that defaults to `false`
+- **THEN** the workflow requires a `release_type` choice input (`preview`, `patch`, `minor`, or `major`), exposes an optional `version_override` text input for emergency recovery, and exposes a `publish` boolean input that defaults to `false`
 
 #### Scenario: Manual release starts from GitHub UI
 - **WHEN** a maintainer releases preview packages
