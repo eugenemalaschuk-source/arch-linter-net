@@ -31,6 +31,10 @@ jobs:
       contents: write
       id-token: write
 
+    outputs:
+      package_version: ${{ steps.release_metadata.outputs.package_version }}
+      target_tag: ${{ steps.release_metadata.outputs.target_tag }}
+
     env:
       PACKAGE_OUTPUT: artifacts/packages
 
@@ -55,6 +59,13 @@ jobs:
             --release-type "${{ inputs.release_type }}" \
             --version-override "${{ inputs.version_override }}" \
             --github-env "$GITHUB_ENV"
+
+      - name: Export release metadata outputs
+        id: release_metadata
+        shell: bash
+        run: |
+          echo "package_version=$PACKAGE_VERSION" >> "$GITHUB_OUTPUT"
+          echo "target_tag=$TARGET_TAG" >> "$GITHUB_OUTPUT"
 
       - name: Generate release notes
         shell: bash
@@ -136,6 +147,40 @@ jobs:
           for package in "$PACKAGE_OUTPUT"/*.nupkg; do
             dotnet nuget push "$package" --source https://api.nuget.org/v3/index.json --api-key "${{ steps.nuget-login.outputs.NUGET_API_KEY }}" --skip-duplicate
           done
+
+  create-release:
+    name: Create GitHub Release
+    if: ${{ inputs.publish == true }}
+    needs: release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Download release notes artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: release-notes-${{ needs.release.outputs.package_version }}
+          path: artifacts/release-notes
+
+      - name: Download package artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: nuget-packages-${{ needs.release.outputs.package_version }}
+          path: artifacts/packages
+
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          TARGET_TAG: ${{ needs.release.outputs.target_tag }}
+          RELEASE_COMMIT: ${{ github.sha }}
+        run: |
+          gh release create "$TARGET_TAG" \
+            --target "$RELEASE_COMMIT" \
+            --title "$TARGET_TAG" \
+            --notes-file artifacts/release-notes/release-notes.md \
+            artifacts/packages/*.nupkg \
+            artifacts/packages/*.snupkg
 
   deploy-docs:
     name: Deploy GitHub Pages docs
