@@ -4,6 +4,8 @@ using ArchLinterNet.Core.Model;
 using ArchLinterNet.Core.Reporting;
 using ArchLinterNet.Core.Resolution;
 
+using static ArchLinterNet.Core.Execution.LayerTemplateExpander;
+
 namespace ArchLinterNet.Core;
 
 public sealed class ArchitectureValidator
@@ -43,7 +45,11 @@ public sealed class ArchitectureValidator
             allViolations.AddRange(runner.CheckContract(contract));
         }
 
-        foreach (ArchitectureLayerContract contract in runner.StrictLayerContracts())
+        List<ArchitectureLayerContract> strictExpandedLayerContracts = Expand(
+            document.Contracts.StrictLayerTemplates);
+
+        foreach (ArchitectureLayerContract contract in runner.StrictLayerContracts()
+                     .Concat(strictExpandedLayerContracts))
         {
             allViolations.AddRange(runner.CheckLayerContract(contract));
         }

@@ -4,6 +4,8 @@ using ArchLinterNet.Core.Model;
 using ArchLinterNet.Core.Reporting;
 using ArchLinterNet.Core.Resolution;
 
+using static ArchLinterNet.Core.Execution.LayerTemplateExpander;
+
 namespace ArchLinterNet.Cli;
 
 public static class Program
@@ -114,9 +116,15 @@ public static class Program
                 allViolations.AddRange(runner.CheckContract(contract));
             }
 
-            IEnumerable<ArchitectureLayerContract> layerContracts = mode == "audit"
-                ? runner.AuditLayerContracts()
-                : runner.StrictLayerContracts();
+            List<ArchitectureLayerContract> expandedLayerContracts = Expand(
+                mode == "audit"
+                    ? document.Contracts.AuditLayerTemplates
+                    : document.Contracts.StrictLayerTemplates);
+
+            IEnumerable<ArchitectureLayerContract> layerContracts = (mode == "audit"
+                    ? runner.AuditLayerContracts()
+                    : runner.StrictLayerContracts())
+                .Concat(expandedLayerContracts);
 
             foreach (ArchitectureLayerContract contract in layerContracts)
             {
@@ -227,6 +235,18 @@ public static class Program
             if (c.Id != null)
             {
                 ids.Add(c.Id);
+            }
+        }
+
+        List<ArchitectureLayerTemplateContract> templates = mode == "strict"
+            ? document.Contracts.StrictLayerTemplates
+            : document.Contracts.AuditLayerTemplates;
+
+        foreach (ArchitectureLayerContract expanded in Expand(templates))
+        {
+            if (expanded.Id != null)
+            {
+                ids.Add(expanded.Id);
             }
         }
 
