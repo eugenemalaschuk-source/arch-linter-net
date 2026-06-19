@@ -15,6 +15,7 @@ Start here:
 - [Policy Authoring Guide](policy-authoring-guide.md) for YAML authoring rules.
 - [Capabilities](capabilities.md) for supported contract families and limits.
 - [Policy Review Checklist](policy-review-checklist.md) before opening a PR.
+- [Pull Request Governance](pull-request-governance.md) before creating a PR for a GitHub issue.
 
 Machine-readable references:
 
