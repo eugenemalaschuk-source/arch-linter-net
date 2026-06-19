@@ -344,7 +344,7 @@ public sealed class ArchitectureContractRunner(
                 effectiveLayers.Select(l => l.layer.Namespace),
                 StringComparer.Ordinal);
 
-            foreach (string childNs in FindChildNamespaces(contract.ContainerNamespace))
+            foreach (string childNs in FindChildNamespaces(contract.ContainerNamespace).OrderBy(ns => ns, StringComparer.Ordinal))
             {
                 if (expectedNamespaces.Contains(childNs))
                 {

@@ -22,6 +22,14 @@ public static class LayerTemplateExpander
 
                 foreach (ArchitectureTemplateLayer templateLayer in template.Layers)
                 {
+                    if (template.Exhaustive && templateLayer.Name.Contains('.', StringComparison.Ordinal))
+                    {
+                        throw new ArgumentException(
+                            $"Dotted template layer name '{templateLayer.Name}' is not supported when exhaustive is true " +
+                            $"in template '{template.Name}'. Template layer names must be single namespace segments " +
+                            $"(e.g. 'Contracts', not 'Core.Execution').");
+                    }
+
                     string ns = $"{container}.{templateLayer.Name}";
                     layers.Add(ns);
                     if (templateLayer.Optional)
