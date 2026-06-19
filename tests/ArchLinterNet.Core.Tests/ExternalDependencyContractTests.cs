@@ -250,6 +250,55 @@ contracts:
     }
 
     [Test]
+    public void CheckExternalContract_AllowedAdapterReferenceOutsideSourceLayer_DoesNotViolate()
+    {
+        var document = new ArchitectureContractDocument
+        {
+            Version = 1,
+            Name = "Test",
+            Layers = new Dictionary<string, ArchitectureLayer>
+            {
+                ["core"] = new() { Namespace = "ExternalDependencyContractTestsFixtures.Core" },
+                ["adapters"] = new() { Namespace = "ExternalDependencyContractTestsFixtures.Adapters" }
+            },
+            ExternalDependencies = new Dictionary<string, ArchitectureExternalDependencyGroup>
+            {
+                ["vendor_sdk"] = new()
+                {
+                    NamespacePrefixes = new List<string> { "ExternalDependencyContractTestsFixtures.VendorSdk" }
+                }
+            },
+            Analysis = new ArchitectureAnalysisConfiguration
+            {
+                TargetAssemblies = new List<string> { typeof(ExternalDependencyContractTests).Assembly.GetName().Name! }
+            },
+            Contracts = new ArchitectureContractGroups
+            {
+                StrictExternal = new List<ArchitectureExternalDependencyContract>
+                {
+                    new()
+                    {
+                        Name = "core-no-vendor-sdk",
+                        Source = "core",
+                        Forbidden = new List<string> { "vendor_sdk" }
+                    }
+                }
+            }
+        };
+
+        var context = new ArchitectureAnalysisContext(
+            "/tmp",
+            new[] { typeof(ExternalDependencyContractTests).Assembly },
+            Array.Empty<string>(),
+            Array.Empty<string>());
+
+        var runner = new ArchitectureContractRunner(context, document);
+        var violations = runner.CheckExternalContract(document.Contracts.StrictExternal[0]);
+
+        Assert.That(violations, Is.Empty);
+    }
+
+    [Test]
     public void CheckExternalContract_IgnoredViolation_SuppressesViolation()
     {
         var document = new ArchitectureContractDocument
