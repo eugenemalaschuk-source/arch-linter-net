@@ -4,10 +4,36 @@
 
 ArchLinterNet follows [Semantic Versioning 2.0](https://semver.org/).
 
-Pre-1.0 preview releases use explicit versions such as `0.1.0-preview.1`.
-The manual release workflow receives the package version as an input and passes
-it to MSBuild when building official package artifacts. Do not update
-`Directory.Build.props` just to run a preview release.
+Pre-1.0 preview releases use versions such as `0.1.0-preview.1`.
+The manual release workflow calculates the package version automatically from
+git tags based on the selected release scenario (`preview`, `patch`, `minor`,
+or `major`). Do not update `Directory.Build.props` just to run a release.
+
+### Version Calculation Rules
+
+The workflow detects the latest SemVer-compatible git tag (format
+`vX.Y.Z` or `vX.Y.Z-preview.N`) and calculates the next version:
+
+| Latest tag | Release type | Calculated version |
+|---|---|---|
+| `v0.1.1-preview.2` | `preview` | `0.1.1-preview.3` |
+| `v0.1.0` | `preview` | `0.1.1-preview.1` |
+| `v0.1.1-preview.2` | `patch` | `0.1.1` |
+| `v0.1.0` | `patch` | `0.1.1` |
+| `v0.1.0` | `minor` | `0.2.0` |
+| `v0.1.0` | `major` | `1.0.0` |
+
+- `preview` increments the preview number within the current preview train,
+  or starts a new preview train from the next patch when the latest tag is
+  stable.
+- `patch` finalizes a preview train (drops the prerelease suffix) or
+  increments the patch version from the latest stable tag.
+- `minor` and `major` always produce stable versions from the base version,
+  ignoring any prerelease suffix.
+- Tags use `v` prefix; package versions are always output without `v`.
+
+An explicit `version_override` input bypasses tag detection and can be used
+for the first release (when no tags exist yet) or for emergency recovery.
 
 ## Workflow Separation
 
@@ -53,12 +79,14 @@ Actions UI. Do not publish packages from a local machine.
 ### Step 1: Dry-Run Package Build
 
 In GitHub, open **Actions**, select `Release NuGet packages and docs`, choose
-**Run workflow**, and enter:
+**Run workflow**, and select:
 
-```text
-version = 0.1.0-preview.1
-publish = false
-```
+- **release_type**: preview (or the appropriate scenario for your release)
+- **publish**: false
+- **version_override**: leave empty for normal releases
+
+The workflow automatically detects the latest git tag and calculates the
+package version. The calculated version is printed in the workflow log.
 
 Expected result:
 
@@ -72,13 +100,12 @@ Download or inspect the uploaded artifacts before publication.
 ### Step 2: Public Publication
 
 After the dry-run artifacts are checked in the GitHub workflow run, rerun the
-same workflow from the GitHub Actions UI with the same version and publication
+same workflow from the GitHub Actions UI with the same settings and publication
 enabled:
 
-```text
-version = 0.1.0-preview.1
-publish = true
-```
+- **release_type**: same scenario as dry-run
+- **publish**: true
+- **version_override**: leave empty
 
 Expected result:
 
@@ -91,6 +118,14 @@ Expected result:
 
 After publication, record the published package IDs, versions, and GitHub Pages
 deployment URL in the related issue or pull request notes.
+
+### Emergency Version Override
+
+If the automatic version calculation cannot find a valid base tag (e.g.,
+first release with no tags), use `version_override` to specify the exact
+package version (e.g., `0.1.0-preview.1`). The override bypasses tag
+detection and version calculation entirely. Override values are still
+validated against the NuGet version format before proceeding.
 
 ## Future Automation
 

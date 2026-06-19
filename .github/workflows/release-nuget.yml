@@ -3,15 +3,25 @@ name: Release NuGet packages and docs
 on:
   workflow_dispatch:
     inputs:
-      version:
-        description: 'NuGet package version, for example 0.1.0-preview.1'
+      release_type:
+        description: 'Release scenario'
         required: true
-        type: string
+        type: choice
+        default: preview
+        options:
+          - preview
+          - patch
+          - minor
+          - major
       publish:
         description: 'Publish packages to NuGet.org'
         required: true
         default: false
         type: boolean
+      version_override:
+        description: 'Emergency/manual package version override. Leave empty for normal releases.'
+        required: false
+        type: string
 
 jobs:
   release:
@@ -22,25 +32,13 @@ jobs:
       id-token: write
 
     env:
-      PACKAGE_VERSION: ${{ inputs.version }}
       PACKAGE_OUTPUT: artifacts/packages
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-
-      - name: Validate version input
-        shell: bash
-        run: |
-          if [[ -z "$PACKAGE_VERSION" ]]; then
-            echo "Package version is required." >&2
-            exit 1
-          fi
-
-          if [[ ! "$PACKAGE_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z][0-9A-Za-z.-]*)?(\+[0-9A-Za-z][0-9A-Za-z.-]*)?$ ]]; then
-            echo "Package version '$PACKAGE_VERSION' is not a valid SemVer-style NuGet version." >&2
-            exit 1
-          fi
+        with:
+          fetch-depth: 0
 
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
@@ -49,6 +47,15 @@ jobs:
 
       - name: Setup uv
         uses: astral-sh/setup-uv@v5
+
+      - name: Calculate package version
+        shell: bash
+        run: |
+          PACKAGE_VERSION="$(uv run python tools/release/calculate_version.py \
+            --release-type "${{ inputs.release_type }}" \
+            --version-override "${{ inputs.version_override }}")"
+          echo "PACKAGE_VERSION=$PACKAGE_VERSION" >> "$GITHUB_ENV"
+          echo "Calculated PACKAGE_VERSION=$PACKAGE_VERSION"
 
       - name: Restore
         run: make restore
@@ -74,7 +81,7 @@ jobs:
       - name: Upload package artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: nuget-packages-${{ inputs.version }}
+          name: nuget-packages-${{ env.PACKAGE_VERSION }}
           path: |
             ${{ env.PACKAGE_OUTPUT }}/*.nupkg
             ${{ env.PACKAGE_OUTPUT }}/*.snupkg
