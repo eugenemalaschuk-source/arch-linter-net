@@ -15,7 +15,15 @@ public static class ArchitectureDiagnosticFormatter
                 .Select(violation =>
                 {
                     string idPrefix = violation.ContractId != null ? $"[{violation.ContractId}] " : string.Empty;
-                    return $"- {idPrefix}[{violation.ContractName}] {violation.SourceType} -> {violation.ForbiddenNamespace}: {string.Join(", ", violation.ForbiddenReferences)}";
+                    string context = string.Empty;
+                    if (violation.AllowedImporters != null)
+                    {
+                        string srcLayer = violation.SourceLayer ?? "?";
+                        string tgtLayer = violation.TargetLayer ?? "?";
+                        string importers = string.Join(", ", violation.AllowedImporters);
+                        context = $" (source_layer: {srcLayer}, target_layer: {tgtLayer}, allowed_importers: [{importers}])";
+                    }
+                    return $"- {idPrefix}[{violation.ContractName}] {violation.SourceType} -> {violation.ForbiddenNamespace}{context}: {string.Join(", ", violation.ForbiddenReferences)}";
                 }));
     }
 

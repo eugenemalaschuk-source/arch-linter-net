@@ -478,18 +478,14 @@ public sealed class ArchitectureContractRunner(
 
         HashSet<string> allLayerNames = new(_document.Layers.Keys, StringComparer.Ordinal);
 
-        foreach (string allowedImporter in contract.AllowedImporters)
-        {
-            ArchitectureLayerResolver.ResolveLayer(_document, contract.Name, allowedImporter);
-        }
+        List<ArchitectureLayer> allowedImporterLayers = contract.AllowedImporters
+            .Select(name => ArchitectureLayerResolver.ResolveLayer(_document, contract.Name, name))
+            .ToList();
 
         foreach (string protectedLayerName in contract.Protected)
         {
             ArchitectureLayer protectedLayer =
                 ArchitectureLayerResolver.ResolveLayer(_document, contract.Name, protectedLayerName);
-
-            HashSet<string> allowedImporterNames = new(contract.AllowedImporters, StringComparer.Ordinal);
-            allowedImporterNames.Add(protectedLayerName);
 
             foreach (Assembly assembly in _context.TargetAssemblies)
             {
@@ -501,13 +497,26 @@ public sealed class ArchitectureContractRunner(
                         continue;
                     }
 
-                    string? sourceLayerName = ArchitectureLayerResolver.ResolveContainingLayer(
-                        _document, sourceTypeFullName, allLayerNames);
-
-                    if (sourceLayerName != null && allowedImporterNames.Contains(sourceLayerName))
+                    string sourceNs = ArchitectureTypeNames.SafeNamespace(sourceType);
+                    if (string.IsNullOrEmpty(sourceNs))
                     {
                         continue;
                     }
+
+                    // Self-reference: source inside protected layer is always allowed
+                    if (ArchitectureLayerResolver.MatchesNamespace(protectedLayer, sourceNs))
+                    {
+                        continue;
+                    }
+
+                    // Allowed importer: source namespace matches any allowed importer layer
+                    if (allowedImporterLayers.Any(l => ArchitectureLayerResolver.MatchesNamespace(l, sourceNs)))
+                    {
+                        continue;
+                    }
+
+                    string? sourceLayerName = ArchitectureLayerResolver.ResolveContainingLayer(
+                        _document, sourceTypeFullName, allLayerNames);
 
                     List<string> matchingRefs = new();
 

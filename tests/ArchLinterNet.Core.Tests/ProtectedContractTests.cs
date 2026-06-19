@@ -498,6 +498,54 @@ public sealed class ProtectedContractTests
             Throws.InvalidOperationException);
     }
 
+    [Test]
+    public void CheckProtectedContract_AllowedImporterParentLayer_CoversChildNamespaces()
+    {
+        var document = new ArchitectureContractDocument
+        {
+            Version = 1,
+            Name = "Test",
+            Layers = new Dictionary<string, ArchitectureLayer>
+            {
+                ["core"] = new() { Namespace = "ArchLinterNet.Core" },
+                ["core_tests"] = new() { Namespace = "ArchLinterNet.Core.Tests" },
+                ["execution"] = new() { Namespace = "ArchLinterNet.Core.Execution" }
+            },
+            Analysis = new ArchitectureAnalysisConfiguration
+            {
+                TargetAssemblies = new List<string>
+                {
+                    "ArchLinterNet.Core",
+                    "ArchLinterNet.Core.Tests"
+                }
+            },
+            Contracts = new ArchitectureContractGroups
+            {
+                StrictProtected = new List<ArchitectureProtectedContract>
+                {
+                    new()
+                    {
+                        Name = "execution-is-protected",
+                        Protected = new List<string> { "execution" },
+                        AllowedImporters = new List<string> { "core" }
+                    }
+                }
+            }
+        };
+
+        var context = new ArchitectureAnalysisContext(
+            "/tmp",
+            new[] { CoreAssembly, TestAssembly },
+            Array.Empty<string>(),
+            Array.Empty<string>());
+
+        var runner = new ArchitectureContractRunner(context, document);
+        var violations = runner.CheckProtectedContract(document.Contracts.StrictProtected[0]);
+
+        Assert.That(violations, Is.Empty,
+            "Types in child namespaces of allowed importer parent layer should be permitted");
+    }
+
     public sealed class ExecutionUser
     {
         private readonly ArchitectureContractRunner _runner;
