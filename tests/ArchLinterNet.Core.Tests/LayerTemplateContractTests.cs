@@ -597,17 +597,15 @@ contracts:
             .Where(v => v.ForbiddenNamespace == "unmapped sibling namespace")
             .ToList();
 
-        var ordered = unmapped
+        var actual = unmapped
             .SelectMany(v => v.ForbiddenReferences)
+            .ToList();
+
+        var expected = actual
             .OrderBy(r => r, StringComparer.Ordinal)
             .ToList();
 
-        var orderedAgain = unmapped
-            .SelectMany(v => v.ForbiddenReferences)
-            .OrderBy(r => r, StringComparer.Ordinal)
-            .ToList();
-
-        Assert.That(ordered, Is.EqualTo(orderedAgain));
+        Assert.That(actual, Is.EqualTo(expected));
     }
 
     [Test]
