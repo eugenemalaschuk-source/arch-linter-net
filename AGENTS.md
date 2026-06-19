@@ -31,6 +31,19 @@ Run a single test project:
 rtk dotnet test tests/ArchLinterNet.Core.Tests --no-restore
 ```
 
+## Backlog governance
+File: `docs/ai/backlog-governance.md`.
+
+Before creating or updating GitHub issues, agents MUST apply the backlog governance rules:
+- use typed titles such as `[STORY][AI] Tooling: ...` and `[TASK][AI] Tooling: ...`;
+- use the controlled title verbs from the governance document;
+- link issues explicitly with `Parent story: #...`, `Depends on: #...`, and `Related: #...` where applicable;
+- include the required sections: `Goal`, `Work type`, `Context`, `What to do`, `Manual tasks`, `AI-friendly tasks`, `Estimate`, `Acceptance criteria`, `Validation`, and `Non-goals`;
+- estimate the developer's real hands-on time with AI assistance;
+- keep architecture-governance and release-pipeline task rules aligned with the governance document.
+
+Do not create isolated implementation tasks without an existing story or a newly proposed story.
+
 ## Architecture governance
 File: `architecture/dependencies.arch.yml`. Enforced via `lint-architecture`.
 
