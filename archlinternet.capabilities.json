@@ -68,6 +68,13 @@
       "auditGroup": "audit_protected",
       "fields": ["name", "protected", "allowed_importers", "allowed_types", "ignored_violations", "reason"],
       "validates": "Protected layers are referenced only by explicitly allowed importer layers. Self-references within the protected layer are implicitly allowed."
+    },
+    {
+      "kind": "layer-template",
+      "strictGroup": "strict_layer_templates",
+      "auditGroup": "audit_layer_templates",
+      "fields": ["name", "id", "containers", "layers[].name", "layers[].optional", "reason"],
+      "validates": "Reusable layer order contract applied to multiple namespace containers. Each container produces one concrete ordered-layer contract. Relative layer names are resolved by prepending the container namespace. Optional layers (layers[].optional: true) silently skip empty namespaces."
     }
   ],
   "exceptionMechanisms": {
