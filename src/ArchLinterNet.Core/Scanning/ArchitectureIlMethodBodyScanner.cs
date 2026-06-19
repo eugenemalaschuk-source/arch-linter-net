@@ -12,6 +12,7 @@ internal static class ArchitectureIlMethodBodyScanner
 
     public static IEnumerable<ArchitectureViolation> FindMethodBodyViolations(
         string contractName,
+        string? contractId,
         IReadOnlyCollection<Assembly> targetAssemblies,
         string sourceNamespacePrefix,
         IReadOnlyList<string> forbiddenCallPatterns,
@@ -47,6 +48,7 @@ internal static class ArchitectureIlMethodBodyScanner
 
             violations.Add(new ArchitectureViolation(
                 contractName,
+                contractId,
                 sourceTypeName,
                 "method-body-il",
                 matches));

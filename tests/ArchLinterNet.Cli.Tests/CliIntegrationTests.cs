@@ -296,6 +296,62 @@ public class CliIntegrationTests
         });
     }
 
+    /* --contract flag */
+
+    [Test]
+    public void SingleContract_SelectsMatchingContract()
+    {
+        string policyWithIds = Path.Combine(
+            _repoRoot, "tests", "ArchLinterNet.Cli.Tests", "TestPolicies", "passing-with-ids.yml");
+        var (exitCode, stdout, stderr) = RunCli("--policy", policyWithIds, "--strict", "--contract", "core-no-forbidden");
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(exitCode, Is.EqualTo(0),
+                $"Policy should pass with --contract, stderr: {stderr}");
+        });
+    }
+
+    [Test]
+    public void MultipleContracts_SelectsAll()
+    {
+        string policyWithIds = Path.Combine(
+            _repoRoot, "tests", "ArchLinterNet.Cli.Tests", "TestPolicies", "passing-with-ids.yml");
+        var (exitCode, _, stderr) = RunCli("--policy", policyWithIds, "--strict",
+            "--contract", "core-no-forbidden", "--contract", "no-non-existent");
+
+        Assert.That(exitCode, Is.EqualTo(0),
+            $"Policy should pass with two --contract flags, stderr: {stderr}");
+    }
+
+    [Test]
+    public void SingleContract_WithAuditMode_SelectsAuditContract()
+    {
+        string policyWithIds = Path.Combine(
+            _repoRoot, "tests", "ArchLinterNet.Cli.Tests", "TestPolicies", "passing-with-ids.yml");
+        var (exitCode, _, stderr) = RunCli("--policy", policyWithIds, "--mode", "audit", "--contract", "audit-core-check");
+
+        Assert.That(exitCode, Is.EqualTo(0),
+            $"Should pass in audit mode with valid contract ID, stderr: {stderr}");
+    }
+
+    [Test]
+    public void UnknownContractId_ExitsTwoWithDiagnostic()
+    {
+        string policyWithIds = Path.Combine(
+            _repoRoot, "tests", "ArchLinterNet.Cli.Tests", "TestPolicies", "passing-with-ids.yml");
+        var (exitCode, _, stderr) = RunCli("--policy", policyWithIds, "--strict", "--contract", "nonexistent");
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(exitCode, Is.EqualTo(2));
+            Assert.That(stderr, Does.Contain("Unknown contract ID"));
+            Assert.That(stderr, Does.Contain("nonexistent"));
+            Assert.That(stderr, Does.Contain("core-no-forbidden"));
+            Assert.That(stderr, Does.Contain("no-non-existent"));
+        });
+    }
+
     /* Sample policy */
 
     [Test]

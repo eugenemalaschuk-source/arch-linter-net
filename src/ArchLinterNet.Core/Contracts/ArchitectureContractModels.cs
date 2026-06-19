@@ -2,6 +2,12 @@ using YamlDotNet.Serialization;
 
 namespace ArchLinterNet.Core.Contracts;
 
+public interface IArchitectureContract
+{
+    string Name { get; }
+    string? Id { get; set; }
+}
+
 public sealed class ArchitectureContractDocument
 {
     [YamlMember(Alias = "version")] public int Version { get; set; }
@@ -74,11 +80,39 @@ public sealed class ArchitectureContractGroups
 
     [YamlMember(Alias = "audit_independence")]
     public List<ArchitectureIndependenceContract> AuditIndependence { get; set; } = new();
+
+    public IEnumerable<IArchitectureContract> AllStrict => EnumerateStrict();
+
+    public IEnumerable<IArchitectureContract> AllAudit => EnumerateAudit();
+
+    private IEnumerable<IArchitectureContract> EnumerateStrict()
+    {
+        foreach (var c in Strict) yield return c;
+        foreach (var c in StrictLayers) yield return c;
+        foreach (var c in StrictAllowOnly) yield return c;
+        foreach (var c in StrictCycles) yield return c;
+        foreach (var c in StrictMethodBody) yield return c;
+        foreach (var c in StrictAsmdef) yield return c;
+        foreach (var c in StrictIndependence) yield return c;
+    }
+
+    private IEnumerable<IArchitectureContract> EnumerateAudit()
+    {
+        foreach (var c in Audit) yield return c;
+        foreach (var c in AuditLayers) yield return c;
+        foreach (var c in AuditAllowOnly) yield return c;
+        foreach (var c in AuditCycles) yield return c;
+        foreach (var c in AuditMethodBody) yield return c;
+        foreach (var c in AuditAsmdef) yield return c;
+        foreach (var c in AuditIndependence) yield return c;
+    }
 }
 
-public sealed class ArchitectureDependencyContract
+public sealed class ArchitectureDependencyContract : IArchitectureContract
 {
     [YamlMember(Alias = "name")] public string Name { get; set; } = string.Empty;
+
+    [YamlMember(Alias = "id")] public string? Id { get; set; }
 
     [YamlMember(Alias = "source")] public string Source { get; set; } = string.Empty;
 
@@ -95,9 +129,11 @@ public sealed class ArchitectureDependencyContract
     [YamlMember(Alias = "reason")] public string Reason { get; set; } = string.Empty;
 }
 
-public sealed class ArchitectureLayerContract
+public sealed class ArchitectureLayerContract : IArchitectureContract
 {
     [YamlMember(Alias = "name")] public string Name { get; set; } = string.Empty;
+
+    [YamlMember(Alias = "id")] public string? Id { get; set; }
 
     [YamlMember(Alias = "layers")] public List<string> Layers { get; set; } = new();
 
@@ -107,9 +143,11 @@ public sealed class ArchitectureLayerContract
     [YamlMember(Alias = "reason")] public string Reason { get; set; } = string.Empty;
 }
 
-public sealed class ArchitectureAllowOnlyContract
+public sealed class ArchitectureAllowOnlyContract : IArchitectureContract
 {
     [YamlMember(Alias = "name")] public string Name { get; set; } = string.Empty;
+
+    [YamlMember(Alias = "id")] public string? Id { get; set; }
 
     [YamlMember(Alias = "source")] public string Source { get; set; } = string.Empty;
 
@@ -123,9 +161,11 @@ public sealed class ArchitectureAllowOnlyContract
     [YamlMember(Alias = "reason")] public string Reason { get; set; } = string.Empty;
 }
 
-public sealed class ArchitectureCycleContract
+public sealed class ArchitectureCycleContract : IArchitectureContract
 {
     [YamlMember(Alias = "name")] public string Name { get; set; } = string.Empty;
+
+    [YamlMember(Alias = "id")] public string? Id { get; set; }
 
     [YamlMember(Alias = "layers")] public List<string> Layers { get; set; } = new();
 
@@ -135,9 +175,11 @@ public sealed class ArchitectureCycleContract
     [YamlMember(Alias = "reason")] public string Reason { get; set; } = string.Empty;
 }
 
-public sealed class ArchitectureMethodBodyContract
+public sealed class ArchitectureMethodBodyContract : IArchitectureContract
 {
     [YamlMember(Alias = "name")] public string Name { get; set; } = string.Empty;
+
+    [YamlMember(Alias = "id")] public string? Id { get; set; }
 
     [YamlMember(Alias = "source")] public string Source { get; set; } = string.Empty;
 
@@ -150,9 +192,11 @@ public sealed class ArchitectureMethodBodyContract
     [YamlMember(Alias = "reason")] public string Reason { get; set; } = string.Empty;
 }
 
-public sealed class ArchitectureAsmdefContract
+public sealed class ArchitectureAsmdefContract : IArchitectureContract
 {
     [YamlMember(Alias = "name")] public string Name { get; set; } = string.Empty;
+
+    [YamlMember(Alias = "id")] public string? Id { get; set; }
 
     [YamlMember(Alias = "source_assemblies")]
     public List<string> SourceAssemblies { get; set; } = new();
@@ -166,9 +210,11 @@ public sealed class ArchitectureAsmdefContract
     [YamlMember(Alias = "reason")] public string Reason { get; set; } = string.Empty;
 }
 
-public sealed class ArchitectureIndependenceContract
+public sealed class ArchitectureIndependenceContract : IArchitectureContract
 {
     [YamlMember(Alias = "name")] public string Name { get; set; } = string.Empty;
+
+    [YamlMember(Alias = "id")] public string? Id { get; set; }
 
     [YamlMember(Alias = "layers")] public List<string> Layers { get; set; } = new();
 

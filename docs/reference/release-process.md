@@ -36,7 +36,7 @@ Before the first public publication:
    - repository: `arch-linter-net`
    - workflow file: `release-nuget.yml`
    - environment: empty
-2. Enable GitHub Pages for the repository and use GitHub Actions as the Pages
+1. Enable GitHub Pages for the repository and use GitHub Actions as the Pages
    source.
 
 Classic NuGet API keys are not used for automated publishing in this workflow.
