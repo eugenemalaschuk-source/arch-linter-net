@@ -45,3 +45,53 @@ A dependency contract SHALL accept an optional `id` field. When provided, violat
 #### Scenario: Violation without explicit ID
 - **WHEN** a dependency contract without explicit `id` produces a violation
 - **THEN** the violation SHALL have `ContractId` set to the fallback ID derived from `name`
+
+## ADDED Requirements
+
+### Requirement: Dependency depth mode
+A dependency contract SHALL accept an optional `dependency_depth` field with values `"direct"` (default) or `"transitive"`.
+
+#### Scenario: Default direct mode
+- **WHEN** a dependency contract has no `dependency_depth` field
+- **THEN** only direct type references (1 level) are checked
+
+#### Scenario: Explicit direct mode
+- **WHEN** a dependency contract has `dependency_depth: direct`
+- **THEN** only direct type references are checked
+
+#### Scenario: Transitive mode
+- **WHEN** a dependency contract has `dependency_depth: transitive`
+- **THEN** the system follows the type dependency graph via BFS and reports violations at any depth
+
+### Requirement: Transitive dependency path diagnostics
+When `dependency_depth: transitive`, each violation SHALL include a `DependencyPaths` collection parallel to `ForbiddenReferences`.
+
+#### Scenario: Transitive violation with path
+- **WHEN** source type A references intermediate type B which references forbidden type C
+- **THEN** the violation has `ForbiddenReferences` containing `"C"` and `DependencyPaths` containing `[["A", "B", "C"]]`
+
+#### Scenario: Path starts with source type
+- **WHEN** a transitive violation is produced
+- **THEN** each path's first element is the `SourceType`
+
+#### Scenario: Path ends with forbidden reference
+- **WHEN** a transitive violation is produced
+- **THEN** each path's last element equals the corresponding entry in `ForbiddenReferences`
+
+### Requirement: Transitive mode respects allowed types and ignored violations
+Transitive mode SHALL apply the same `allowed_types` and `ignored_violations` filters as direct mode.
+
+#### Scenario: Allowed types in transitive mode
+- **WHEN** `dependency_depth: transitive` and a forbidden terminal type is in `allowed_types`
+- **THEN** that terminal type is excluded from violations
+
+#### Scenario: Ignored violations in transitive mode
+- **WHEN** `dependency_depth: transitive` and a source+terminal pair matches `ignored_violations`
+- **THEN** that violation is excluded from results
+
+### Requirement: Transitive mode determinism
+Transitive violation results SHALL be deterministic and sorted.
+
+#### Scenario: Deterministic output
+- **WHEN** the same contract is evaluated twice
+- **THEN** identical violations with identical paths are returned in the same order

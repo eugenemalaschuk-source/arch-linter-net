@@ -15,6 +15,19 @@ strict:
     reason: Application should not depend on infrastructure directly.
 ```
 
+By default, only direct type references (1 level) are checked. Set
+`dependency_depth: transitive` to follow the type dependency graph via BFS and
+report violations at any depth, with full dependency path diagnostics:
+
+```yaml
+strict:
+  - name: app-must-not-transitively-depend-on-infrastructure
+    source: app
+    forbidden: [infrastructure]
+    dependency_depth: transitive
+    reason: Application must not have any transitive dependency path into Infrastructure.
+```
+
 ## Layer Order (`strict_layers` / `audit_layers`)
 
 Import-linter-style inward-only layering constraints. Layers are ordered from outermost

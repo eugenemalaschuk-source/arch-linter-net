@@ -254,22 +254,40 @@ public sealed class ArchitectureContractRunner(
         Type[] sourceTypes = ArchitectureTypeScanner.FindTypesInLayer(_context.TargetAssemblies, sourceLayer);
 
         List<ArchitectureViolation> violations = new();
+        bool transitive = contract.DependencyDepth == DependencyDepthMode.Transitive;
 
         foreach (string forbiddenLayerName in contract.Forbidden)
         {
             ArchitectureLayer forbiddenLayer =
                 ArchitectureLayerResolver.ResolveLayer(_document, contract.Name, forbiddenLayerName);
-            violations.AddRange(FindNamespaceViolations(contract.Name, contract.Id, sourceTypes, forbiddenLayer,
-                contract.AllowedTypes, contract.IgnoredViolations));
+            if (transitive)
+            {
+                violations.AddRange(ArchitectureNamespaceViolationFinder.FindTransitiveNamespaceViolations(contract.Name, contract.Id, sourceTypes,
+                    forbiddenLayer, contract.AllowedTypes, contract.IgnoredViolations));
+            }
+            else
+            {
+                violations.AddRange(ArchitectureNamespaceViolationFinder.FindNamespaceViolations(contract.Name, contract.Id, sourceTypes, forbiddenLayer,
+                    contract.AllowedTypes, contract.IgnoredViolations));
+            }
         }
 
         if (contract.ForbiddenLegacyRuntime)
         {
             foreach (string forbiddenNamespace in _document.LegacyRuntimeLayers)
             {
-                violations.AddRange(FindNamespaceViolations(contract.Name, contract.Id, sourceTypes,
-                    new ArchitectureLayer { Namespace = forbiddenNamespace },
-                    contract.AllowedTypes, contract.IgnoredViolations));
+                if (transitive)
+                {
+                    violations.AddRange(ArchitectureNamespaceViolationFinder.FindTransitiveNamespaceViolations(contract.Name, contract.Id, sourceTypes,
+                        new ArchitectureLayer { Namespace = forbiddenNamespace },
+                        contract.AllowedTypes, contract.IgnoredViolations));
+                }
+                else
+                {
+                    violations.AddRange(ArchitectureNamespaceViolationFinder.FindNamespaceViolations(contract.Name, contract.Id, sourceTypes,
+                        new ArchitectureLayer { Namespace = forbiddenNamespace },
+                        contract.AllowedTypes, contract.IgnoredViolations));
+                }
             }
         }
 
@@ -325,7 +343,7 @@ public sealed class ArchitectureContractRunner(
             for (int forbiddenIndex = 0; forbiddenIndex < sourceIndex; forbiddenIndex++)
             {
                 var (_, forbiddenLayer, _) = effectiveLayers[forbiddenIndex];
-                foreach (ArchitectureViolation v in FindNamespaceViolations(
+                foreach (ArchitectureViolation v in ArchitectureNamespaceViolationFinder.FindNamespaceViolations(
                     contract.Name, contract.Id, sourceTypes, forbiddenLayer,
                     Array.Empty<string>(), contract.IgnoredViolations))
                 {
@@ -437,7 +455,7 @@ public sealed class ArchitectureContractRunner(
                     .Where(name => !string.IsNullOrEmpty(name))
                     .Where(name => !contract.AllowedTypes.Contains(name))
                     .Where(name => ArchitectureLayerResolver.IsProjectType(_document, name))
-                    .Where(name => !IsInAnyAllowedLayer(name, allowedLayers))
+                    .Where(name => !ArchitectureNamespaceViolationFinder.IsInAnyAllowedLayer(name, allowedLayers))
                     .Where(name => !ArchitectureIgnoreMatcher.IsIgnored(ArchitectureTypeNames.SafeFullName(type), name,
                         contract.IgnoredViolations))
                     .Distinct()
@@ -526,7 +544,7 @@ public sealed class ArchitectureContractRunner(
             sourceLayer: sourceLayer)
             .ToList();
 
-        return MergeMethodBodyViolations(contract.Name, contract.Id, roslynViolations, ilViolations);
+        return ArchitectureNamespaceViolationFinder.MergeMethodBodyViolations(contract.Name, contract.Id, roslynViolations, ilViolations);
     }
 
     public List<ArchitectureViolation> CheckAsmdefContract(ArchitectureAsmdefContract contract)
@@ -564,7 +582,7 @@ public sealed class ArchitectureContractRunner(
 
                 ArchitectureLayer forbiddenLayer =
                     ArchitectureLayerResolver.ResolveLayer(_document, contract.Name, forbiddenLayerName);
-                violations.AddRange(FindNamespaceViolations(contract.Name, contract.Id, sourceTypes, forbiddenLayer,
+                violations.AddRange(ArchitectureNamespaceViolationFinder.FindNamespaceViolations(contract.Name, contract.Id, sourceTypes, forbiddenLayer,
                     Array.Empty<string>(), contract.IgnoredViolations));
             }
         }
@@ -677,113 +695,5 @@ public sealed class ArchitectureContractRunner(
         }
 
         return violations;
-    }
-
-    private static IEnumerable<ArchitectureViolation> FindNamespaceViolations(
-        string contractName,
-        string? contractId,
-        Type[] sourceTypes,
-        ArchitectureLayer forbiddenLayer,
-        IReadOnlyCollection<string> allowedTypeFullNames,
-        IReadOnlyCollection<ArchitectureIgnoredViolation> ignoredViolations)
-    {
-        return sourceTypes
-            .Select(type => new ArchitectureViolation(
-                contractName,
-                contractId,
-                ArchitectureTypeNames.SafeFullName(type),
-                ArchitectureLayerResolver.DescribeLayer(forbiddenLayer),
-                ArchitectureReferenceScanner.GetReferencedTypes(type)
-                    .Where(reference => ArchitectureLayerResolver.MatchesNamespace(forbiddenLayer,
-                        ArchitectureTypeNames.SafeNamespace(reference)))
-                    .Select(ArchitectureTypeNames.SafeFullName)
-                    .Where(name => !string.IsNullOrEmpty(name))
-                    .Where(name => !allowedTypeFullNames.Contains(name))
-                    .Where(name =>
-                        !ArchitectureIgnoreMatcher.IsIgnored(ArchitectureTypeNames.SafeFullName(type), name,
-                            ignoredViolations))
-                    .Distinct()
-                    .OrderBy(name => name)
-                    .ToArray()))
-            .Where(violation => violation.ForbiddenReferences.Count > 0)
-            .ToArray();
-    }
-
-    private static List<ArchitectureViolation> MergeMethodBodyViolations(
-        string contractName,
-        string? contractId,
-        IReadOnlyList<ArchitectureViolation> roslynViolations,
-        IReadOnlyList<ArchitectureViolation> ilViolations)
-    {
-        Dictionary<string, ArchitectureViolation> merged = new(StringComparer.Ordinal);
-
-        foreach (ArchitectureViolation violation in roslynViolations)
-        {
-            foreach (string reference in violation.ForbiddenReferences)
-            {
-                string key = ExtractNormalizedKey(reference);
-                if (merged.TryGetValue(key, out ArchitectureViolation? existing))
-                {
-                    List<string> combined = existing.ForbiddenReferences.Append(reference).ToList();
-                    merged[key] = new ArchitectureViolation(contractName, contractId, existing.SourceType,
-                        existing.ForbiddenNamespace, combined);
-                }
-                else
-                {
-                    merged[key] = new ArchitectureViolation(contractName, contractId, violation.SourceType,
-                        violation.ForbiddenNamespace, new List<string> { reference });
-                }
-            }
-        }
-
-        foreach (ArchitectureViolation violation in ilViolations)
-        {
-            foreach (string reference in violation.ForbiddenReferences)
-            {
-                string key = ExtractNormalizedKey(reference);
-                if (merged.TryGetValue(key, out ArchitectureViolation? existing))
-                {
-                    List<string> combined = existing.ForbiddenReferences.Append(reference).ToList();
-                    merged[key] = new ArchitectureViolation(contractName, contractId, existing.SourceType,
-                        existing.ForbiddenNamespace, combined);
-                }
-                else
-                {
-                    merged[key] = new ArchitectureViolation(contractName, contractId, violation.SourceType,
-                        violation.ForbiddenNamespace, new List<string> { reference });
-                }
-            }
-        }
-
-        return merged.Values
-            .OrderBy(v => v.SourceType, StringComparer.Ordinal)
-            .ThenBy(v => v.ForbiddenNamespace, StringComparer.Ordinal)
-            .ToList();
-    }
-
-    private static string ExtractNormalizedKey(string reference)
-    {
-        const string Marker = " -> ";
-        int markerIndex = reference.IndexOf(Marker, StringComparison.Ordinal);
-        if (markerIndex < 0)
-        {
-            return reference;
-        }
-
-        string pattern = reference[..markerIndex].Trim();
-        string target = reference[(markerIndex + Marker.Length)..].Trim();
-
-        int lineEnd = target.IndexOf(' ');
-        if (lineEnd > 0)
-        {
-            target = target[..lineEnd];
-        }
-
-        return $"{pattern} -> {target}";
-    }
-
-    private static bool IsInAnyAllowedLayer(string typeName, IReadOnlyList<ArchitectureLayer> allowedLayers)
-    {
-        return allowedLayers.Any(layer => ArchitectureLayerResolver.MatchesNamespace(layer, typeName));
     }
 }

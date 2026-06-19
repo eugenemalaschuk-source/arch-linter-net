@@ -103,12 +103,19 @@ contracts:
   forbidden: [<layer-name>]     # Required — list of forbidden target layers
   allowed_types: []             # Optional — exceptions to the forbidden rule
   forbidden_legacy_runtime: false  # Optional — also check legacy runtime layers
+  dependency_depth: direct      # Optional — "direct" (default) or "transitive"
   reason: <string>              # Recommended — human-readable justification
 ```
 
 When `id` is omitted it is derived automatically from `name` (lowercased with
 hyphens replacing spaces). Explicit IDs are recommended for stable CLI
 references.
+
+When `dependency_depth` is `"transitive"`, the linter follows the type dependency
+graph via BFS and reports violations at any depth. Each violation includes a
+`DependencyPaths` collection showing the full dependency chain from source to
+forbidden type. The default is `"direct"`, which checks only immediate type
+references (1 level).
 
 ### Layer order contract
 

@@ -223,6 +223,12 @@
             "allowed_types": { "$ref": "#/$defs/stringList" },
             "ignored_violations": { "$ref": "#/$defs/ignoredViolations" },
             "forbidden_legacy_runtime": { "type": "boolean", "default": false },
+            "dependency_depth": {
+              "type": "string",
+              "enum": ["direct", "transitive"],
+              "default": "direct",
+              "description": "Evaluation depth for dependency checking. 'direct' checks only immediate references (1 level). 'transitive' follows the dependency graph via BFS and reports violations at any depth."
+            },
             "reason": { "type": "string" }
           }
         }
