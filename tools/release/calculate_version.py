@@ -6,6 +6,12 @@ from dataclasses import dataclass
 from typing import Optional
 
 
+@dataclass
+class DetectedTag:
+    name: str
+    version: "SemVerVersion"
+
+
 _SEMVER_TAG_RE = re.compile(
     r"^v?(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)"
     r"(?:-preview\.(0|[1-9]\d*))?$"
@@ -77,7 +83,7 @@ def _latest_by_semver(versions: list[SemVerVersion]) -> Optional[SemVerVersion]:
     return sorted_versions[0]
 
 
-def detect_latest_tag() -> Optional[SemVerVersion]:
+def detect_latest_detected_tag() -> Optional[DetectedTag]:
     try:
         result = subprocess.run(
             ["git", "tag"],
@@ -88,14 +94,27 @@ def detect_latest_tag() -> Optional[SemVerVersion]:
     except (subprocess.CalledProcessError, FileNotFoundError):
         return None
 
-    versions: list[SemVerVersion] = []
+    detected_tags: list[DetectedTag] = []
     for line in result.stdout.splitlines():
         tag = line.strip()
         v = SemVerVersion.try_parse(tag)
         if v is not None:
-            versions.append(v)
+            detected_tags.append(DetectedTag(tag, v))
 
-    return _latest_by_semver(versions)
+    if not detected_tags:
+        return None
+
+    sorted_tags = sorted(
+        detected_tags,
+        key=lambda dt: _semver_sort_key(dt.version),
+        reverse=True,
+    )
+    return sorted_tags[0]
+
+
+def detect_latest_tag() -> Optional[SemVerVersion]:
+    detected = detect_latest_detected_tag()
+    return detected.version if detected is not None else None
 
 
 def calculate_next_version(
@@ -150,6 +169,12 @@ def main() -> None:
         default=None,
         help="Explicit version override (bypasses tag detection)",
     )
+    parser.add_argument(
+        "--github-env",
+        default=None,
+        help="Path to GitHub env file for key=value export "
+             "(disables stdout output; exports PACKAGE_VERSION, TARGET_TAG, PREVIOUS_TAG)",
+    )
 
     args = parser.parse_args()
 
@@ -160,26 +185,39 @@ def main() -> None:
         except ValueError as e:
             print(f"Error: {e}", file=sys.stderr)
             sys.exit(1)
-        print(version)
-        return
+        result = version
+    else:
+        if not args.release_type:
+            print(
+                "Error: --release-type is required when --version-override is not provided.",
+                file=sys.stderr,
+            )
+            sys.exit(1)
 
-    if not args.release_type:
-        print(
-            "Error: --release-type is required when --version-override is not provided.",
-            file=sys.stderr,
-        )
-        sys.exit(1)
+        latest = detect_latest_tag()
+        try:
+            next_version = calculate_next_version(latest, args.release_type)
+        except ValueError as e:
+            print(f"Error: {e}", file=sys.stderr)
+            sys.exit(1)
 
-    latest = detect_latest_tag()
-    try:
-        next_version = calculate_next_version(latest, args.release_type)
-    except ValueError as e:
-        print(f"Error: {e}", file=sys.stderr)
-        sys.exit(1)
+        result = str(next_version)
+        validate_package_version(result)
 
-    result = str(next_version)
-    validate_package_version(result)
-    print(result)
+    if args.github_env:
+        detected = detect_latest_detected_tag()
+        target_tag = f"v{result}"
+        previous_tag = detected.name if detected is not None else ""
+        with open(args.github_env, "a") as f:
+            f.write(f"PACKAGE_VERSION={result}\n")
+            f.write(f"TARGET_TAG={target_tag}\n")
+            f.write(f"PREVIOUS_TAG={previous_tag}\n")
+        previous_display = previous_tag if previous_tag else "<none>"
+        print(f"Calculated PACKAGE_VERSION={result}")
+        print(f"Target tag: {target_tag}")
+        print(f"Previous tag: {previous_display}")
+    else:
+        print(result)
 
 
 if __name__ == "__main__":
