@@ -34,10 +34,7 @@ internal static class ArchitectureExternalDependencyResolver
 
     private static bool MatchesTypePrefix(string typeFullName, string typePrefix)
     {
-        return string.Equals(typeFullName, typePrefix, StringComparison.Ordinal)
-               || typeFullName.StartsWith(typePrefix + ".", StringComparison.Ordinal)
-               || typeFullName.StartsWith(typePrefix + "+", StringComparison.Ordinal)
-               || typeFullName.StartsWith(typePrefix + "`", StringComparison.Ordinal);
+        return typeFullName.StartsWith(typePrefix, StringComparison.Ordinal);
     }
 
     private static IEnumerable<string> EnumerateUsablePrefixes(IEnumerable<string> prefixes)

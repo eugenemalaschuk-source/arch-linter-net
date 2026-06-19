@@ -163,6 +163,22 @@ contracts:
     }
 
     [Test]
+    public void MatchesGroup_TypeRawPrefixMatch_ReturnsTrue()
+    {
+        ArchitectureExternalDependencyGroup group = new()
+        {
+            TypePrefixes = new List<string> { "Amazon.S3.AmazonS3" }
+        };
+
+        bool matches = ArchitectureExternalDependencyResolver.MatchesGroup(
+            group,
+            "Amazon.S3.AmazonS3Client",
+            "Amazon.S3");
+
+        Assert.That(matches, Is.True);
+    }
+
+    [Test]
     public void CheckExternalContract_StrictViolationFound_ReturnsViolation()
     {
         var document = new ArchitectureContractDocument
