@@ -1,0 +1,36 @@
+# Only one catch-all ("*") is allowed. GitHub rejects duplicate catch-alls.
+changelog:
+  exclude:
+    labels:
+      - ignore-for-release
+
+  categories:
+    - title: Breaking Changes
+      labels:
+        - breaking-change
+
+    - title: Features
+      labels:
+        - enhancement
+        - feature
+
+    - title: Fixes
+      labels:
+        - bug
+        - fix
+
+    - title: Documentation
+      labels:
+        - documentation
+
+    - title: CI/CD
+      labels:
+        - ci
+
+    - title: Dependencies
+      labels:
+        - dependencies
+
+    - title: Other Changes
+      labels:
+        - "*"
