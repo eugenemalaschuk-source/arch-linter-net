@@ -23,7 +23,16 @@ public static class ArchitectureDiagnosticFormatter
                         string importers = string.Join(", ", violation.AllowedImporters);
                         context = $" (source_layer: {srcLayer}, target_layer: {tgtLayer}, allowed_importers: [{importers}])";
                     }
-                    return $"- {idPrefix}[{violation.ContractName}] {violation.SourceType} -> {violation.ForbiddenNamespace}{context}: {string.Join(", ", violation.ForbiddenReferences)}";
+                    string refs = string.Join(", ", violation.ForbiddenReferences);
+                    string pathSuffix = string.Empty;
+                    if (violation.DependencyPaths != null && violation.DependencyPaths.Count > 0)
+                    {
+                        var pathLines = violation.DependencyPaths
+                            .Zip(violation.ForbiddenReferences, (path, reference) => (path, reference))
+                            .Select(x => $"  via: {string.Join(" -> ", x.path)}");
+                        pathSuffix = Environment.NewLine + string.Join(Environment.NewLine, pathLines);
+                    }
+                    return $"- {idPrefix}[{violation.ContractName}] {violation.SourceType} -> {violation.ForbiddenNamespace}{context}: {refs}{pathSuffix}";
                 }));
     }
 
@@ -68,6 +77,9 @@ public static class ArchitectureDiagnosticFormatter
                 if (v.ContainerNamespace != null)
                     obj["container_namespace"] = v.ContainerNamespace;
 
+                if (v.DependencyPaths != null)
+                    obj["dependency_paths"] = v.DependencyPaths.Select(p => p.ToArray()).ToArray();
+
                 return obj;
             }).ToArray(),
             cycles = cycles.ToArray()
@@ -107,6 +119,9 @@ public static class ArchitectureDiagnosticFormatter
 
                 if (v.ContainerNamespace != null)
                     obj["container_namespace"] = v.ContainerNamespace;
+
+                if (v.DependencyPaths != null)
+                    obj["dependency_paths"] = v.DependencyPaths.Select(p => p.ToArray()).ToArray();
 
                 return obj;
             })

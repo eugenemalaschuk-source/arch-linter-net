@@ -55,6 +55,27 @@ AI-agent workflows.
 Do not put known-failing future-state rules in strict unless the team explicitly
 wants a blocking gate.
 
+## Use Transitive Depth For Indirect Coupling
+
+When a dependency should be blocked at any depth (direct or indirect), use
+`dependency_depth: transitive`. This follows the type dependency graph via BFS
+and reports violations with full path diagnostics:
+
+```yaml
+contracts:
+  strict:
+    - id: cli-not-transitively-testing
+      name: cli-must-not-transitively-depend-on-testing
+      source: cli
+      forbidden: [testing]
+      dependency_depth: transitive
+      reason: CLI must not have any transitive dependency path into Testing.
+```
+
+Transitive mode is more expensive than direct mode. Use it when auditing
+indirect coupling across module boundaries. The default is `direct`, which
+checks only immediate type references.
+
 ## Prefer Allow-Only For Pure Layers
 
 Use `strict_allow_only` for pure layers where every first-party dependency

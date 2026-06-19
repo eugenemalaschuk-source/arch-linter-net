@@ -86,6 +86,40 @@ internal static class ArchitectureReferenceScanner
         }
     }
 
+    public static IEnumerable<(Type referenced, List<Type> path)> GetTransitiveReferencedTypes(
+        Type type,
+        Func<Type, bool>? traversePredicate = null)
+    {
+        HashSet<Type> visited = new();
+        Queue<(Type current, List<Type> path)> queue = new();
+
+        List<Type> initialPath = new() { type };
+        queue.Enqueue((type, initialPath));
+        visited.Add(type);
+
+        while (queue.Count > 0)
+        {
+            var (current, path) = queue.Dequeue();
+
+            foreach (Type directRef in GetReferencedTypes(current))
+            {
+                if (visited.Contains(directRef))
+                {
+                    continue;
+                }
+
+                visited.Add(directRef);
+                List<Type> refPath = new(path) { directRef };
+                yield return (directRef, refPath);
+
+                if (traversePredicate == null || traversePredicate(directRef))
+                {
+                    queue.Enqueue((directRef, refPath));
+                }
+            }
+        }
+    }
+
     private static IEnumerable<Type> EnumerateBaseTypes(Type type)
     {
         foreach (Type interfaceType in SafeGetInterfaces(type))
