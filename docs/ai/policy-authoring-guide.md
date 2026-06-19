@@ -24,12 +24,13 @@ adding a broad `application` layer that hides cross-module coupling.
 
 ## Choose Strict Or Audit
 
-Use strict rules for current gates:
+Use strict rules for current gates. Add an `id` for stable CLI and CI references:
 
 ```yaml
 contracts:
   strict:
-    - name: domain-must-not-depend-on-infrastructure
+    - id: domain-not-infrastructure
+      name: domain-must-not-depend-on-infrastructure
       source: domain
       forbidden: [infrastructure]
       reason: Domain code must remain independent of infrastructure.
@@ -40,11 +41,16 @@ Use audit rules for migration discovery and future-state boundaries:
 ```yaml
 contracts:
   audit:
-    - name: audit-ui-bypassing-application
+    - id: audit-ui-to-domain
+      name: audit-ui-bypassing-application
       source: ui
       forbidden: [domain]
       reason: Discover UI code that bypasses application use cases before making this strict.
 ```
+
+When `id` is omitted it is derived automatically from `name` (lowercased with
+hyphens). Explicit `id` values are recommended for stable references in CI and
+AI-agent workflows.
 
 Do not put known-failing future-state rules in strict unless the team explicitly
 wants a blocking gate.
@@ -57,7 +63,8 @@ should be known:
 ```yaml
 contracts:
   strict_allow_only:
-    - name: domain-allowed-dependencies
+    - id: domain-pure
+      name: domain-allowed-dependencies
       source: domain
       allowed: []
       reason: Domain must not depend on other first-party layers.
@@ -74,7 +81,8 @@ Layer order contracts list layers from outermost to innermost:
 ```yaml
 contracts:
   strict_layers:
-    - name: clean-architecture-layering
+    - id: clean-layering
+      name: clean-architecture-layering
       layers:
         - ui
         - infrastructure
@@ -96,7 +104,8 @@ allowed.
 ```yaml
 contracts:
   strict_independence:
-    - name: modules-must-be-independent
+    - id: modules-independent
+      name: modules-must-be-independent
       layers: [sales, billing, inventory]
       reason: Bounded contexts communicate through explicit public contracts.
 ```

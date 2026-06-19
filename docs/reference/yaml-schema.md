@@ -93,7 +93,8 @@ contracts:
 ### Dependency contract
 
 ```yaml
-- name: <string>                # Required — unique contract name
+- id: <string>                  # Optional — stable identifier for CLI selection
+  name: <string>                # Required — unique contract name
   source: <layer-name>          # Required — source layer
   forbidden: [<layer-name>]     # Required — list of forbidden target layers
   allowed_types: []             # Optional — exceptions to the forbidden rule
@@ -101,10 +102,15 @@ contracts:
   reason: <string>              # Recommended — human-readable justification
 ```
 
+When `id` is omitted it is derived automatically from `name` (lowercased with
+hyphens replacing spaces). Explicit IDs are recommended for stable CLI
+references.
+
 ### Layer order contract
 
 ```yaml
-- name: <string>
+- id: <string>                  # Optional
+  name: <string>
   layers: [<layer-name>]        # Required — ordered outermost to innermost
   reason: <string>
 ```
@@ -112,7 +118,8 @@ contracts:
 ### Allow-only contract
 
 ```yaml
-- name: <string>
+- id: <string>                  # Optional
+  name: <string>
   source: <layer-name>
   allowed: [<layer-name>]       # Required — whitelist of allowed target layers
   allowed_types: []             # Optional — type-level exceptions
@@ -122,7 +129,8 @@ contracts:
 ### Cycle contract
 
 ```yaml
-- name: <string>
+- id: <string>                  # Optional
+  name: <string>
   layers: [<layer-name>]        # Required — set of layers to check for cycles
   reason: <string>
 ```
@@ -130,7 +138,8 @@ contracts:
 ### Method-body contract
 
 ```yaml
-- name: <string>
+- id: <string>                  # Optional
+  name: <string>
   source: <layer-name>
   forbidden_calls:              # Required — list of fully qualified type/namespace names
     - <fully-qualified-type-name>
@@ -140,7 +149,8 @@ contracts:
 ### asmdef contract
 
 ```yaml
-- name: <string>
+- id: <string>                  # Optional
+  name: <string>
   source_assemblies: [<string>]   # Required — assemblies to scan
   forbidden_editor_refs: <bool>   # Block references to Unity editor assemblies
   forbidden_asmdef_prefixes:      # Block references matching these prefixes
@@ -151,7 +161,8 @@ contracts:
 ### Independence contract
 
 ```yaml
-- name: <string>
+- id: <string>                  # Optional
+  name: <string>
   layers: [<layer-name>]        # Required — layers that must not cross-reference
   reason: <string>
 ```

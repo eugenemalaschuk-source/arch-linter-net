@@ -14,6 +14,7 @@ arch-linter-net [options]
 | `-m`, `--mode <mode>` | Validation mode: `strict` or `audit` | `strict` |
 | `--strict` | Shortcut for `--mode strict` | |
 | `--audit` | Shortcut for `--mode audit` | |
+| `--contract <id>` | Run only the contract with the given ID (may be repeated) | |
 | `-f`, `--format <fmt>` | Output format: `human` or `json` | `human` |
 | `--json` | Shortcut for `--format json` | |
 | `-h`, `--help` | Show help message | |
@@ -50,6 +51,22 @@ arch-linter-net --json > violations.json
 ```bash
 arch-linter-net --strict --json
 ```
+
+### Run a single contract by ID
+
+```bash
+arch-linter-net --contract map-core-boundary
+```
+
+### Run multiple contracts
+
+```bash
+arch-linter-net --contract map-core-boundary --contract feature-no-cycles
+```
+
+Contract IDs are defined in the YAML policy file. If a contract has no explicit
+`id`, it is derived automatically from its `name`. Unknown contract IDs produce
+exit code 2 with a diagnostic listing available IDs.
 
 ## Exit codes
 

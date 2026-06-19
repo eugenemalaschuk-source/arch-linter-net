@@ -23,6 +23,7 @@ public sealed class AsmdefValidator
         {
             allViolations.AddRange(ArchitectureAsmdefScanner.FindAsmdefViolations(
                 contract.Name,
+                contract.Id,
                 repositoryRoot,
                 contract));
         }

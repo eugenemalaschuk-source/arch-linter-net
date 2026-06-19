@@ -93,7 +93,8 @@ public sealed class ArchitectureValidationBuilder
         foreach (ArchitectureCycleContract contract in cycleContracts)
         {
             IReadOnlyCollection<string> cycles = runner.CheckCycleContract(contract);
-            allCycles.AddRange(cycles);
+            string idPrefix = contract.Id != null ? $"[{contract.Id}] " : string.Empty;
+            allCycles.AddRange(cycles.Select(c => $"{idPrefix}{c}"));
         }
 
         IEnumerable<ArchitectureMethodBodyContract> methodBodyContracts = isStrict

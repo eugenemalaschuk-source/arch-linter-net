@@ -15,6 +15,7 @@ public static class Program
         string policyPath = "architecture/dependencies.arch.yml";
         string mode = "strict";
         string format = "human";
+        List<string> contractIds = new();
 
         for (int i = 0; i < args.Length; i++)
         {
@@ -34,6 +35,9 @@ public static class Program
                     break;
                 case "--format" or "-f" when i + 1 < args.Length:
                     format = args[++i];
+                    break;
+                case "--contract" when i + 1 < args.Length:
+                    contractIds.Add(args[++i]);
                     break;
                 case "--strict":
                     mode = "strict";
@@ -75,11 +79,26 @@ public static class Program
 
             string repositoryRoot = ArchitectureRepositoryRootLocator.ResolveFrom(policyPath);
 
+            HashSet<string>? selectedIds = contractIds.Count > 0 ? new HashSet<string>(contractIds, StringComparer.OrdinalIgnoreCase) : null;
+
+            if (selectedIds != null)
+            {
+                HashSet<string> availableIds = CollectAvailableContractIds(document, mode);
+                List<string> unknownIds = selectedIds.Where(id => !availableIds.Contains(id)).ToList();
+
+                if (unknownIds.Count > 0)
+                {
+                    Console.Error.WriteLine($"Unknown contract IDs: {string.Join(", ", unknownIds)}");
+                    Console.Error.WriteLine($"Available IDs in {mode} mode: {string.Join(", ", availableIds.OrderBy(id => id))}");
+                    return 2;
+                }
+            }
+
             ResolutionResult resolution = ArchitectureAssemblyResolver.ResolveFromDocument(document, repositoryRoot);
 
             ArchitectureAnalysisContext context = new(repositoryRoot, resolution.ResolvedAssemblies,
                 resolution.MissingAssemblyNames, resolution.AssemblyProbingPaths);
-            ArchitectureContractRunner runner = new(context, document);
+            ArchitectureContractRunner runner = new(context, document, selectedIds);
 
             List<ArchitectureViolation> allViolations = new();
             List<string> allCycles = new();
@@ -120,7 +139,8 @@ public static class Program
             foreach (ArchitectureCycleContract contract in cycleContracts)
             {
                 IReadOnlyCollection<string> contractCycles = runner.CheckCycleContract(contract);
-                allCycles.AddRange(contractCycles);
+                string idPrefix = contract.Id != null ? $"[{contract.Id}] " : string.Empty;
+                allCycles.AddRange(contractCycles.Select(c => $"{idPrefix}{c}"));
             }
 
             IEnumerable<ArchitectureMethodBodyContract> methodBodyContracts = mode == "audit"
@@ -186,6 +206,24 @@ public static class Program
         }
     }
 
+    private static HashSet<string> CollectAvailableContractIds(ArchitectureContractDocument document, string mode)
+    {
+        HashSet<string> ids = new(StringComparer.OrdinalIgnoreCase);
+        IEnumerable<IArchitectureContract> contracts = mode == "strict"
+            ? document.Contracts.AllStrict
+            : document.Contracts.AllAudit;
+
+        foreach (var c in contracts)
+        {
+            if (c.Id != null)
+            {
+                ids.Add(c.Id);
+            }
+        }
+
+        return ids;
+    }
+
     private static void PrintHelp()
     {
         Console.WriteLine("""
@@ -200,6 +238,7 @@ public static class Program
               -m, --mode <mode>     Validation mode: strict or audit (default: strict)
                   --strict          Shortcut for --mode strict
                   --audit           Shortcut for --mode audit
+                  --contract <id>   Run only the contract with the given ID (may be repeated)
               -f, --format <fmt>    Output format: human or json (default: human)
                   --json            Shortcut for --format json
               -h, --help            Show this help message

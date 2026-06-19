@@ -1,0 +1,37 @@
+version: 1
+name: Test Policy With Contract IDs
+
+layers:
+  core:
+    namespace: ArchLinterNet.Core
+  contracts:
+    namespace: ArchLinterNet.Core.Contracts
+
+analysis:
+  target_assemblies:
+    - ArchLinterNet.Core
+
+contracts:
+  strict:
+    - id: core-no-forbidden
+      name: Core has no forbidden dependencies
+      source: core
+      forbidden: []
+      reason: Core has no forbidden dependencies in this test.
+    - id: no-non-existent
+      name: Core doesn't reference non-existent layer
+      source: core
+      forbidden: []
+      reason: No forbidden references in this test.
+
+  audit:
+    - id: audit-core-check
+      name: Audit — Core must not reference non-existent
+      source: core
+      forbidden: []
+      reason: Audit mode check.
+    - id: audit-second-rule
+      name: Audit — second rule
+      source: core
+      forbidden: []
+      reason: Second audit rule for multi-select test.

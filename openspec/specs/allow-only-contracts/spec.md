@@ -21,3 +21,16 @@ The system SHALL exclude references to types that are not in any defined layer n
 #### Scenario: External type reference
 - **WHEN** source type references `System.String` (not in any layer)
 - **THEN** no violation is reported for that reference
+
+## ADDED Requirements
+
+### Requirement: Allow-only contract accepts optional id
+An allow-only contract SHALL accept an optional `id` field. When provided, violations from this contract SHALL include the contract ID.
+
+#### Scenario: Violation includes contract ID
+- **WHEN** an allow-only contract with `id: allowed-refs` produces a violation
+- **THEN** the violation SHALL have `ContractId == "allowed-refs"`
+
+#### Scenario: Violation without explicit ID
+- **WHEN** an allow-only contract without explicit `id` produces a violation
+- **THEN** the violation SHALL have `ContractId` set to the fallback ID derived from `name`

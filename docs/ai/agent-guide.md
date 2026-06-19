@@ -9,12 +9,12 @@ smallest enforceable rules.
 ## Investigation Flow
 
 1. Find the existing policy file, usually `architecture/dependencies.arch.yml`.
-2. List real projects and assemblies from the solution and project files.
-3. Inspect namespaces in source files and compiled target assemblies.
-4. Identify existing architectural seams: packages, modules, bounded contexts, UI, application, domain, infrastructure, testing, Unity runtime, and Unity editor code.
-5. Check current references before deciding whether a rule belongs in `strict` or `audit`.
-6. Read `schema/dependencies.arch.schema.json` before adding fields.
-7. Read `archlinternet.capabilities.json` before proposing a contract family.
+1. List real projects and assemblies from the solution and project files.
+1. Inspect namespaces in source files and compiled target assemblies.
+1. Identify existing architectural seams: packages, modules, bounded contexts, UI, application, domain, infrastructure, testing, Unity runtime, and Unity editor code.
+1. Check current references before deciding whether a rule belongs in `strict` or `audit`.
+1. Read `schema/dependencies.arch.schema.json` before adding fields.
+1. Read `archlinternet.capabilities.json` before proposing a contract family.
 
 ## Mental Model
 
