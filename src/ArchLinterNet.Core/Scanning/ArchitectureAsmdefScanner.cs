@@ -10,6 +10,7 @@ internal static class ArchitectureAsmdefScanner
 
     public static IEnumerable<ArchitectureViolation> FindAsmdefViolations(
         string contractName,
+        string? contractId,
         string repositoryRoot,
         ArchitectureAsmdefContract contract,
         string? asmdefRoot = null)
@@ -49,6 +50,7 @@ internal static class ArchitectureAsmdefScanner
             {
                 yield return new ArchitectureViolation(
                     contractName,
+                    contractId,
                     sourceAssemblyName,
                     "asmdef-references",
                     distinct);

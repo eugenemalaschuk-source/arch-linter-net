@@ -29,7 +29,7 @@ public sealed class UnifiedJsonOutputTests
     {
         var violations = new List<ArchitectureViolation>
         {
-            new("test-contract", "MyApp.Web.Foo", "MyApp.Core", new[] { "ref1", "ref2" })
+            new("test-contract", null, "MyApp.Web.Foo", "MyApp.Core", new[] { "ref1", "ref2" })
         };
         var cycles = new[] { "A -> B -> A" };
 
@@ -48,7 +48,7 @@ public sealed class UnifiedJsonOutputTests
     {
         var violations = new List<ArchitectureViolation>
         {
-            new("c1", "src", "ns", new[] { "ref" })
+            new("c1", null, "src", "ns", new[] { "ref" })
         };
         var cycles = new[] { "X -> Y -> X" };
 
@@ -61,5 +61,77 @@ public sealed class UnifiedJsonOutputTests
         int openBraces = json.Count(c => c == '{');
         int closeBraces = json.Count(c => c == '}');
         Assert.That(openBraces, Is.EqualTo(closeBraces));
+    }
+
+    [Test]
+    public void FormatResultForCiArtifacts_IncludesContractId()
+    {
+        var violations = new List<ArchitectureViolation>
+        {
+            new("test-contract", "my-rule", "MyApp.Web.Foo", "MyApp.Core", new[] { "ref1" })
+        };
+
+        string json = ArchitectureDiagnosticFormatter.FormatResultForCiArtifacts(
+            "strict", false, violations, Array.Empty<string>());
+
+        using var doc = JsonDocument.Parse(json);
+        JsonElement violation = doc.RootElement.GetProperty("violations")[0];
+        Assert.That(violation.GetProperty("contract_id").GetString(), Is.EqualTo("my-rule"));
+        Assert.That(violation.GetProperty("contract").GetString(), Is.EqualTo("test-contract"));
+    }
+
+    [Test]
+    public void FormatResultForCiArtifacts_NullContractId_Excluded()
+    {
+        var violations = new List<ArchitectureViolation>
+        {
+            new("test-contract", null, "src", "ns", new[] { "ref" })
+        };
+
+        string json = ArchitectureDiagnosticFormatter.FormatResultForCiArtifacts(
+            "audit", true, violations, Array.Empty<string>());
+
+        using var doc = JsonDocument.Parse(json);
+        JsonElement violation = doc.RootElement.GetProperty("violations")[0];
+        Assert.That(violation.GetProperty("contract_id").ValueKind, Is.EqualTo(JsonValueKind.Null));
+    }
+
+    [Test]
+    public void FormatViolationsForHumans_IncludesContractId()
+    {
+        var violations = new List<ArchitectureViolation>
+        {
+            new("My Contract", "my-rule", "MyApp.Web.Foo", "MyApp.Core", new[] { "ref1" })
+        };
+
+        string output = ArchitectureDiagnosticFormatter.FormatViolationsForHumans(violations);
+
+        Assert.That(output, Does.Contain("[my-rule]"));
+        Assert.That(output, Does.Contain("[My Contract]"));
+    }
+
+    [Test]
+    public void FormatCyclesWithContractId_HumanOutputIncludesId()
+    {
+        var cycles = new[] { "[cycle-check] A -> B -> A", "[no-cycles] X -> Y -> X" };
+
+        string output = ArchitectureDiagnosticFormatter.FormatCyclesForHumans(cycles);
+
+        Assert.That(output, Does.Contain("[cycle-check]"));
+        Assert.That(output, Does.Contain("[no-cycles]"));
+        Assert.That(output, Does.Contain("A -> B -> A"));
+    }
+
+    [Test]
+    public void FormatViolationsForHumans_FallbackId_ShowsNormalizedId()
+    {
+        var violations = new List<ArchitectureViolation>
+        {
+            new("My Contract", "my-contract", "src", "ns", new[] { "ref" })
+        };
+
+        string output = ArchitectureDiagnosticFormatter.FormatViolationsForHumans(violations);
+
+        Assert.That(output, Does.Contain("[my-contract]"));
     }
 }

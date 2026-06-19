@@ -56,7 +56,8 @@ public sealed class ArchitectureValidator
         foreach (ArchitectureCycleContract contract in runner.StrictCycleContracts())
         {
             IReadOnlyCollection<string> contractCycles = runner.CheckCycleContract(contract);
-            allCycles.AddRange(contractCycles);
+            string idPrefix = contract.Id != null ? $"[{contract.Id}] " : string.Empty;
+            allCycles.AddRange(contractCycles.Select(c => $"{idPrefix}{c}"));
         }
 
         foreach (ArchitectureMethodBodyContract contract in runner.StrictMethodBodyContracts())
