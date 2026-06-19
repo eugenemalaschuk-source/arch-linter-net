@@ -20,8 +20,16 @@ internal static class ArchitectureExternalDependencyResolver
 
     public static bool MatchesGroup(ArchitectureExternalDependencyGroup group, string typeFullName, string namespaceName)
     {
-        return group.NamespacePrefixes.Any(prefix => ArchitectureLayerResolver.MatchesPrefix(namespaceName, prefix))
-               || group.TypePrefixes.Any(prefix => MatchesTypePrefix(typeFullName, prefix));
+        return EnumerateUsablePrefixes(group.NamespacePrefixes)
+                   .Any(prefix => ArchitectureLayerResolver.MatchesPrefix(namespaceName, prefix))
+               || EnumerateUsablePrefixes(group.TypePrefixes)
+                   .Any(prefix => MatchesTypePrefix(typeFullName, prefix));
+    }
+
+    public static bool HasUsableMatchers(ArchitectureExternalDependencyGroup group)
+    {
+        return EnumerateUsablePrefixes(group.NamespacePrefixes).Any()
+               || EnumerateUsablePrefixes(group.TypePrefixes).Any();
     }
 
     private static bool MatchesTypePrefix(string typeFullName, string typePrefix)
@@ -30,5 +38,10 @@ internal static class ArchitectureExternalDependencyResolver
                || typeFullName.StartsWith(typePrefix + ".", StringComparison.Ordinal)
                || typeFullName.StartsWith(typePrefix + "+", StringComparison.Ordinal)
                || typeFullName.StartsWith(typePrefix + "`", StringComparison.Ordinal);
+    }
+
+    private static IEnumerable<string> EnumerateUsablePrefixes(IEnumerable<string> prefixes)
+    {
+        return prefixes.Where(prefix => !string.IsNullOrWhiteSpace(prefix)).Select(prefix => prefix.Trim());
     }
 }

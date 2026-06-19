@@ -273,7 +273,25 @@ public sealed class ArchitectureContractRunner(
 
         foreach (string groupName in referencedExternalGroups)
         {
-            if (_document.ExternalDependencies.ContainsKey(groupName))
+            if (!_document.ExternalDependencies.TryGetValue(groupName, out ArchitectureExternalDependencyGroup? group))
+            {
+                violations.Add(new ArchitectureViolation(
+                    "<configuration>",
+                    null,
+                    groupName,
+                    "unknown external dependency group",
+                    new[]
+                    {
+                        $"External dependency group '{groupName}' is referenced by a contract but is not declared in external_dependencies."
+                    })
+                {
+                    ForbiddenExternalGroup = groupName
+                });
+
+                continue;
+            }
+
+            if (ArchitectureExternalDependencyResolver.HasUsableMatchers(group))
             {
                 continue;
             }
@@ -282,10 +300,10 @@ public sealed class ArchitectureContractRunner(
                 "<configuration>",
                 null,
                 groupName,
-                "unknown external dependency group",
+                "invalid external dependency group",
                 new[]
                 {
-                    $"External dependency group '{groupName}' is referenced by a contract but is not declared in external_dependencies."
+                    $"External dependency group '{groupName}' must declare at least one non-empty namespace_prefixes or type_prefixes matcher."
                 })
             {
                 ForbiddenExternalGroup = groupName

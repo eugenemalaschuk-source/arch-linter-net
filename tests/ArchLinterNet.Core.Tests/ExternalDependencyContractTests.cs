@@ -390,6 +390,88 @@ contracts:
     }
 
     [Test]
+    public void CheckConfiguration_ExternalGroupWithoutMatchers_ReturnsViolation()
+    {
+        var document = new ArchitectureContractDocument
+        {
+            Version = 1,
+            Name = "Test",
+            Layers = new Dictionary<string, ArchitectureLayer>
+            {
+                ["core"] = new() { Namespace = "ArchLinterNet.Core" }
+            },
+            ExternalDependencies = new Dictionary<string, ArchitectureExternalDependencyGroup>
+            {
+                ["empty_group"] = new()
+            },
+            Analysis = new ArchitectureAnalysisConfiguration
+            {
+                TargetAssemblies = new List<string> { "ArchLinterNet.Core" }
+            },
+            Contracts = new ArchitectureContractGroups
+            {
+                StrictExternal = new List<ArchitectureExternalDependencyContract>
+                {
+                    new()
+                    {
+                        Name = "core-no-empty-group",
+                        Source = "core",
+                        Forbidden = new List<string> { "empty_group" }
+                    }
+                }
+            }
+        };
+
+        var runner = new ArchitectureContractRunner(CreateContext(), document);
+        var violations = runner.CheckConfiguration();
+
+        Assert.That(violations.Any(v => v.ForbiddenNamespace == "invalid external dependency group"), Is.True);
+    }
+
+    [Test]
+    public void CheckConfiguration_ExternalGroupWithWhitespaceMatchers_ReturnsViolation()
+    {
+        var document = new ArchitectureContractDocument
+        {
+            Version = 1,
+            Name = "Test",
+            Layers = new Dictionary<string, ArchitectureLayer>
+            {
+                ["core"] = new() { Namespace = "ArchLinterNet.Core" }
+            },
+            ExternalDependencies = new Dictionary<string, ArchitectureExternalDependencyGroup>
+            {
+                ["blank_group"] = new()
+                {
+                    NamespacePrefixes = new List<string> { "   " },
+                    TypePrefixes = new List<string> { "\t" }
+                }
+            },
+            Analysis = new ArchitectureAnalysisConfiguration
+            {
+                TargetAssemblies = new List<string> { "ArchLinterNet.Core" }
+            },
+            Contracts = new ArchitectureContractGroups
+            {
+                StrictExternal = new List<ArchitectureExternalDependencyContract>
+                {
+                    new()
+                    {
+                        Name = "core-no-blank-group",
+                        Source = "core",
+                        Forbidden = new List<string> { "blank_group" }
+                    }
+                }
+            }
+        };
+
+        var runner = new ArchitectureContractRunner(CreateContext(), document);
+        var violations = runner.CheckConfiguration();
+
+        Assert.That(violations.Any(v => v.ForbiddenNamespace == "invalid external dependency group"), Is.True);
+    }
+
+    [Test]
     public void ValidateStrict_UnknownExternalGroup_ReturnsConfigurationViolationInsteadOfThrowing()
     {
         string contractDir = Path.Combine(_tempDir, "architecture");
@@ -425,6 +507,48 @@ contracts:
 
         Assert.That(result.Passed, Is.False);
         Assert.That(result.Violations.Any(v => v.ForbiddenNamespace == "unknown external dependency group"), Is.True);
+    }
+
+    [Test]
+    public void ValidateStrict_MalformedExternalGroupField_ReturnsConfigurationViolationInsteadOfSilentlyPassing()
+    {
+        string contractDir = Path.Combine(_tempDir, "architecture");
+        Directory.CreateDirectory(contractDir);
+        string contractPath = Path.Combine(contractDir, "dependencies.arch.yml");
+
+        File.WriteAllText(contractPath, @"
+version: 1
+name: Malformed External Group Test
+layers:
+  core:
+    namespace: ArchLinterNet.Core
+external_dependencies:
+  broken_group:
+    namespace_prefix:
+      - System
+analysis:
+  target_assemblies:
+    - ArchLinterNet.Core
+contracts:
+  strict: []
+  strict_layers: []
+  strict_allow_only: []
+  strict_cycles: []
+  strict_method_body: []
+  strict_asmdef: []
+  strict_independence: []
+  strict_protected: []
+  strict_external:
+    - name: core-no-broken-group
+      source: core
+      forbidden: [broken_group]
+  audit_external: []
+");
+
+        var result = ArchitectureAssertions.FromPolicy(contractPath).ValidateStrict();
+
+        Assert.That(result.Passed, Is.False);
+        Assert.That(result.Violations.Any(v => v.ForbiddenNamespace == "invalid external dependency group"), Is.True);
     }
 
     [Test]

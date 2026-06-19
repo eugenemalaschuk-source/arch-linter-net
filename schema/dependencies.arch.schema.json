@@ -43,6 +43,11 @@
       "items": { "type": "string", "minLength": 1 },
       "default": []
     },
+    "nonBlankStringList": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1, "pattern": ".*\\S.*" },
+      "default": []
+    },
     "layer": {
       "type": "object",
       "additionalProperties": false,
@@ -67,13 +72,31 @@
     "externalDependencyGroup": {
       "type": "object",
       "additionalProperties": false,
+      "anyOf": [
+        {
+          "required": ["namespace_prefixes"],
+          "properties": {
+            "namespace_prefixes": {
+              "minItems": 1
+            }
+          }
+        },
+        {
+          "required": ["type_prefixes"],
+          "properties": {
+            "type_prefixes": {
+              "minItems": 1
+            }
+          }
+        }
+      ],
       "properties": {
         "namespace_prefixes": {
-          "$ref": "#/$defs/stringList",
+          "$ref": "#/$defs/nonBlankStringList",
           "description": "Namespace prefixes matched with exact or child-namespace semantics against referenced external types."
         },
         "type_prefixes": {
-          "$ref": "#/$defs/stringList",
+          "$ref": "#/$defs/nonBlankStringList",
           "description": "Full type-name prefixes matched against referenced external types."
         }
       }
