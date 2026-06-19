@@ -119,7 +119,10 @@ public static class Program
             List<ArchitectureLayerContract> expandedLayerContracts = Expand(
                 mode == "audit"
                     ? document.Contracts.AuditLayerTemplates
-                    : document.Contracts.StrictLayerTemplates);
+                    : document.Contracts.StrictLayerTemplates,
+                mode == "audit"
+                    ? document.Contracts.AuditLayers
+                    : document.Contracts.StrictLayers);
 
             IEnumerable<ArchitectureLayerContract> layerContracts = (mode == "audit"
                     ? runner.AuditLayerContracts()

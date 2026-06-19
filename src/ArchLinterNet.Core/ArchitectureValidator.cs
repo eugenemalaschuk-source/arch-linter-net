@@ -46,7 +46,8 @@ public sealed class ArchitectureValidator
         }
 
         List<ArchitectureLayerContract> strictExpandedLayerContracts = Expand(
-            document.Contracts.StrictLayerTemplates);
+            document.Contracts.StrictLayerTemplates,
+            document.Contracts.StrictLayers);
 
         foreach (ArchitectureLayerContract contract in runner.StrictLayerContracts()
                      .Concat(strictExpandedLayerContracts))

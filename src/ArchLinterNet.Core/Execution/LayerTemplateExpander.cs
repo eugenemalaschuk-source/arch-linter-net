@@ -5,7 +5,8 @@ namespace ArchLinterNet.Core.Execution;
 public static class LayerTemplateExpander
 {
     public static List<ArchitectureLayerContract> Expand(
-        IEnumerable<ArchitectureLayerTemplateContract> templates)
+        IEnumerable<ArchitectureLayerTemplateContract> templates,
+        IEnumerable<IArchitectureContract>? existingContracts = null)
     {
         List<ArchitectureLayerContract> contracts = new();
 
@@ -42,6 +43,36 @@ public static class LayerTemplateExpander
             }
         }
 
+        if (existingContracts != null)
+        {
+            ValidateNoIdConflicts(contracts, existingContracts);
+        }
+
         return contracts;
+    }
+
+    private static void ValidateNoIdConflicts(
+        List<ArchitectureLayerContract> expanded,
+        IEnumerable<IArchitectureContract> existing)
+    {
+        HashSet<string> ids = new(StringComparer.OrdinalIgnoreCase);
+
+        foreach (IArchitectureContract c in existing)
+        {
+            if (c.Id != null && !ids.Add(c.Id))
+            {
+                throw new InvalidOperationException(
+                    $"Duplicate contract ID '{c.Id}' in existing contracts.");
+            }
+        }
+
+        foreach (ArchitectureLayerContract c in expanded)
+        {
+            if (c.Id != null && !ids.Add(c.Id))
+            {
+                throw new InvalidOperationException(
+                    $"Generated expanded template contract ID '{c.Id}' conflicts with an existing contract ID. Consider using an explicit 'id' on the template to differentiate.");
+            }
+        }
     }
 }

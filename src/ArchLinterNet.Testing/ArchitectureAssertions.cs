@@ -73,7 +73,10 @@ public sealed class ArchitectureValidationBuilder
         List<ArchitectureLayerContract> expandedLayerContracts = Expand(
             isStrict
                 ? document.Contracts.StrictLayerTemplates
-                : document.Contracts.AuditLayerTemplates);
+                : document.Contracts.AuditLayerTemplates,
+            isStrict
+                ? document.Contracts.StrictLayers
+                : document.Contracts.AuditLayers);
 
         IEnumerable<ArchitectureLayerContract> layerContracts = (isStrict
                 ? runner.StrictLayerContracts()
