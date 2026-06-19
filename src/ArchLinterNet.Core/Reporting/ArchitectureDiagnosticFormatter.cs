@@ -62,6 +62,12 @@ public static class ArchitectureDiagnosticFormatter
                 if (v.AllowedImporters != null)
                     obj["allowed_importers"] = v.AllowedImporters.ToArray();
 
+                if (v.TemplateName != null)
+                    obj["template_name"] = v.TemplateName;
+
+                if (v.ContainerNamespace != null)
+                    obj["container_namespace"] = v.ContainerNamespace;
+
                 return obj;
             }).ToArray(),
             cycles = cycles.ToArray()
@@ -95,6 +101,12 @@ public static class ArchitectureDiagnosticFormatter
 
                 if (v.AllowedImporters != null)
                     obj["allowed_importers"] = v.AllowedImporters.ToArray();
+
+                if (v.TemplateName != null)
+                    obj["template_name"] = v.TemplateName;
+
+                if (v.ContainerNamespace != null)
+                    obj["container_namespace"] = v.ContainerNamespace;
 
                 return obj;
             })

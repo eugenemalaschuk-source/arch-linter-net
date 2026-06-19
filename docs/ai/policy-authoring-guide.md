@@ -95,6 +95,37 @@ Do not mix parent aggregate layers and child layers in one ordered contract
 unless each entry maps to a distinct namespace slice. Overlapping layers can make
 diagnostics confusing.
 
+## Use Layer Templates For Repeated Shapes
+
+When multiple modules or features share the same internal architecture, use
+`strict_layer_templates` instead of duplicating ordered-layer contracts:
+
+```yaml
+contracts:
+  strict_layer_templates:
+    - name: feature-clean-architecture
+      containers:
+        - MyApp.Features.Fishing
+        - MyApp.Features.Inventory
+        - MyApp.Features.Map
+      layers:
+        - name: Presentation
+        - name: Application
+          optional: true
+        - name: Domain
+      reason: Every feature follows the same internal dependency direction.
+```
+
+Each `containers` entry is a raw namespace prefix — layer names are resolved by
+prepending the container. For container `MyApp.Features.Fishing`, the template
+above produces layers `[MyApp.Features.Fishing.Presentation, ...]`.
+
+Optional layers (`optional: true`) produce no diagnostic when absent. If present,
+they must still obey the dependency direction.
+
+Use `audit_layer_templates` for audit-mode templates. Templates coexist with
+direct `strict_layers` / `audit_layers` contracts.
+
 ## Model Modules With Independence Or Cycles
 
 Use `strict_independence` when modules must not reference each other at all. Use

@@ -85,6 +85,32 @@ strict_asmdef:
     reason: Gameplay assembly must not reference editor assemblies.
 ```
 
+## Layer Template (`strict_layer_templates` / `audit_layer_templates`)
+
+Reusable layer order templates that apply the same layered architecture to
+multiple namespace containers. Each template expands into one concrete layer
+order contract per container, with relative layer names resolved by prepending
+the container namespace.
+
+```yaml
+strict_layer_templates:
+  - name: feature-clean-architecture
+    containers:
+      - MyApp.Features.Fishing
+      - MyApp.Features.Inventory
+      - MyApp.Features.Map
+    layers:
+      - name: Presentation
+      - name: Application
+        optional: true
+      - name: Domain
+    reason: Every feature follows the same internal dependency direction.
+```
+
+Optional layers (`optional: true`) are silently skipped when absent. If present,
+they must still obey the dependency direction. Required layers with zero types
+produce a configuration violation.
+
 ## Independence (`strict_independence` / `audit_independence`)
 
 Mutual separation across a set of layers: no cross-references in either direction.
