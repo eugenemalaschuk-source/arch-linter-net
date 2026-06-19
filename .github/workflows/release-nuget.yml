@@ -173,8 +173,10 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
           TARGET_TAG: ${{ needs.release.outputs.target_tag }}
+          RELEASE_COMMIT: ${{ github.sha }}
         run: |
           gh release create "$TARGET_TAG" \
+            --target "$RELEASE_COMMIT" \
             --title "$TARGET_TAG" \
             --notes-file artifacts/release-notes/release-notes.md \
             artifacts/packages/*.nupkg \
