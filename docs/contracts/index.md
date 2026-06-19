@@ -98,3 +98,23 @@ strict_independence:
       - notifications
     reason: Bounded contexts must remain independent of each other.
 ```
+
+## Protected Surface (`strict_protected` / `audit_protected`)
+
+Target-side protection: a protected layer may only be referenced by explicitly
+allowed importer layers. Any reference from outside the allow list is a violation.
+This is the inverse of the dependency contract — instead of "source A must not
+reference target B", it answers "target B is internal; who may reference it?"
+
+```yaml
+strict_protected:
+  - name: core-internals-are-protected
+    protected: [core_internal]
+    allowed_importers: [core]
+    reason: External layers must use the public Core surface only.
+```
+
+Self-references within the protected layer are implicitly allowed. Type-level
+exceptions are supported via `allowed_types` and violation baselining via
+`ignored_violations`. Protected contracts work with both `strict` and `audit`
+modes, enabling gradual adoption in existing codebases.

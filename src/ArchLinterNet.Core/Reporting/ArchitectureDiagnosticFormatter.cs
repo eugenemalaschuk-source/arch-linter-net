@@ -34,13 +34,27 @@ public static class ArchitectureDiagnosticFormatter
         {
             passed,
             mode,
-            violations = violations.Select(v => new
+            violations = violations.Select(v =>
             {
-                contract = v.ContractName,
-                contract_id = v.ContractId,
-                source = v.SourceType,
-                forbidden_namespace = v.ForbiddenNamespace,
-                forbidden_references = v.ForbiddenReferences.ToArray()
+                var obj = new Dictionary<string, object?>
+                {
+                    ["contract"] = v.ContractName,
+                    ["contract_id"] = v.ContractId,
+                    ["source"] = v.SourceType,
+                    ["forbidden_namespace"] = v.ForbiddenNamespace,
+                    ["forbidden_references"] = v.ForbiddenReferences.ToArray()
+                };
+
+                if (v.SourceLayer != null)
+                    obj["source_layer"] = v.SourceLayer;
+
+                if (v.TargetLayer != null)
+                    obj["target_layer"] = v.TargetLayer;
+
+                if (v.AllowedImporters != null)
+                    obj["allowed_importers"] = v.AllowedImporters.ToArray();
+
+                return obj;
             }).ToArray(),
             cycles = cycles.ToArray()
         };
@@ -56,11 +70,25 @@ public static class ArchitectureDiagnosticFormatter
             kind = "architecture_violations",
             contract = contractName,
             contract_id = contractId,
-            violations = violations.Select(v => new
+            violations = violations.Select(v =>
             {
-                source = v.SourceType,
-                forbidden_namespace = v.ForbiddenNamespace,
-                forbidden_references = v.ForbiddenReferences.ToArray()
+                var obj = new Dictionary<string, object?>
+                {
+                    ["source"] = v.SourceType,
+                    ["forbidden_namespace"] = v.ForbiddenNamespace,
+                    ["forbidden_references"] = v.ForbiddenReferences.ToArray()
+                };
+
+                if (v.SourceLayer != null)
+                    obj["source_layer"] = v.SourceLayer;
+
+                if (v.TargetLayer != null)
+                    obj["target_layer"] = v.TargetLayer;
+
+                if (v.AllowedImporters != null)
+                    obj["allowed_importers"] = v.AllowedImporters.ToArray();
+
+                return obj;
             })
         };
 

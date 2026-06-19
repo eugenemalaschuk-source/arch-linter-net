@@ -91,6 +91,8 @@ public static class ArchitectureContractLoader
             document.Contracts.AuditAsmdef,
             document.Contracts.StrictIndependence,
             document.Contracts.AuditIndependence,
+            document.Contracts.StrictProtected,
+            document.Contracts.AuditProtected,
         ];
 
         foreach (var group in groups)

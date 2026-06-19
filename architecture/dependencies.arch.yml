@@ -4,6 +4,8 @@ name: ArchLinterNet Architecture Contract
 layers:
   core:
     namespace: ArchLinterNet.Core
+  core_scanning:
+    namespace: ArchLinterNet.Core.Scanning
   cli:
     namespace: ArchLinterNet.Cli
   testing:
@@ -45,13 +47,21 @@ contracts:
         - testing
         - unity
         - core
+        - core_scanning
       reason: Dependencies must point toward Core.
 
   strict_cycles:
     - name: package-cycles
       layers:
         - core
+        - core_scanning
         - cli
         - testing
         - unity
       reason: Packages must not form dependency cycles.
+
+  strict_protected:
+    - name: core-scanning-internals-are-protected
+      protected: [core_scanning]
+      allowed_importers: [core]
+      reason: Scanning internals must not be referenced outside Core.

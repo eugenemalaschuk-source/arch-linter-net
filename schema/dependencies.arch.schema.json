@@ -151,6 +151,16 @@
           "type": "array",
           "items": { "$ref": "#/$defs/independenceContract" },
           "default": []
+        },
+        "strict_protected": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/protectedContract" },
+          "default": []
+        },
+        "audit_protected": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/protectedContract" },
+          "default": []
         }
       }
     },
@@ -283,6 +293,25 @@
         "ignored_violations": { "$ref": "#/$defs/ignoredViolations" },
         "reason": { "type": "string" }
       }
+    },
+    "protectedContract": {
+      "allOf": [
+        { "$ref": "#/$defs/baseContractFields" },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["name", "protected", "allowed_importers"],
+          "properties": {
+            "name": { "type": "string", "minLength": 1 },
+            "id": { "type": "string", "minLength": 1 },
+            "protected": { "$ref": "#/$defs/stringList" },
+            "allowed_importers": { "$ref": "#/$defs/stringList" },
+            "allowed_types": { "$ref": "#/$defs/stringList" },
+            "ignored_violations": { "$ref": "#/$defs/ignoredViolations" },
+            "reason": { "type": "string" }
+          }
+        }
+      ]
     }
   }
 }
