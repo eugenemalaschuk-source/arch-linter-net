@@ -140,6 +140,9 @@ public sealed class ArchitectureDependencyContract : IArchitectureContract
     [YamlMember(Alias = "forbidden_legacy_runtime")]
     public bool ForbiddenLegacyRuntime { get; set; }
 
+    [YamlMember(Alias = "dependency_depth")]
+    public DependencyDepthMode DependencyDepth { get; set; } = DependencyDepthMode.Direct;
+
     [YamlMember(Alias = "reason")] public string Reason { get; set; } = string.Empty;
 }
 

@@ -12,4 +12,5 @@ public sealed record ArchitectureViolation(
     public IReadOnlyCollection<string>? AllowedImporters { get; init; }
     public string? TemplateName { get; init; }
     public string? ContainerNamespace { get; init; }
+    public IReadOnlyCollection<IReadOnlyCollection<string>>? DependencyPaths { get; init; }
 }
