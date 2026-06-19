@@ -1,3 +1,4 @@
+using System.Reflection;
 using ArchLinterNet.Core.Contracts;
 using ArchLinterNet.Core.Model;
 using ArchLinterNet.Core.Resolution;
@@ -93,6 +94,16 @@ public sealed class ArchitectureContractRunner(
         return _document.Contracts.AuditIndependence;
     }
 
+    public IEnumerable<ArchitectureProtectedContract> StrictProtectedContracts()
+    {
+        return _document.Contracts.StrictProtected;
+    }
+
+    public IEnumerable<ArchitectureProtectedContract> AuditProtectedContracts()
+    {
+        return _document.Contracts.AuditProtected;
+    }
+
     public List<ArchitectureViolation> CheckConfiguration()
     {
         return CheckConfiguration(strict: true);
@@ -159,6 +170,12 @@ public sealed class ArchitectureContractRunner(
             {
                 AddLayerNames(c.Layers);
             }
+
+            foreach (ArchitectureProtectedContract c in _document.Contracts.StrictProtected)
+            {
+                AddLayerNames(c.Protected);
+                AddLayerNames(c.AllowedImporters);
+            }
         }
         else
         {
@@ -192,6 +209,12 @@ public sealed class ArchitectureContractRunner(
             foreach (ArchitectureLayerContract c in _document.Contracts.AuditLayers)
             {
                 AddLayerNames(c.Layers);
+            }
+
+            foreach (ArchitectureProtectedContract c in _document.Contracts.AuditProtected)
+            {
+                AddLayerNames(c.Protected);
+                AddLayerNames(c.AllowedImporters);
             }
         }
 
@@ -437,6 +460,113 @@ public sealed class ArchitectureContractRunner(
                     ArchitectureLayerResolver.ResolveLayer(_document, contract.Name, forbiddenLayerName);
                 violations.AddRange(FindNamespaceViolations(contract.Name, contract.Id, sourceTypes, forbiddenLayer,
                     Array.Empty<string>(), contract.IgnoredViolations));
+            }
+        }
+
+        return violations;
+    }
+
+    public List<ArchitectureViolation> CheckProtectedContract(ArchitectureProtectedContract contract)
+    {
+        if (!IsContractSelected(contract.Id))
+        {
+            return new List<ArchitectureViolation>();
+        }
+
+        List<ArchitectureViolation> violations = new();
+        HashSet<string> allowedTypes = new(contract.AllowedTypes, StringComparer.Ordinal);
+
+        HashSet<string> allLayerNames = new(_document.Layers.Keys, StringComparer.Ordinal);
+
+        List<ArchitectureLayer> allowedImporterLayers = contract.AllowedImporters
+            .Select(name => ArchitectureLayerResolver.ResolveLayer(_document, contract.Name, name))
+            .ToList();
+
+        foreach (string protectedLayerName in contract.Protected)
+        {
+            ArchitectureLayer protectedLayer =
+                ArchitectureLayerResolver.ResolveLayer(_document, contract.Name, protectedLayerName);
+
+            foreach (Assembly assembly in _context.TargetAssemblies)
+            {
+                foreach (Type sourceType in ArchitectureTypeScanner.GetLoadableTypes(assembly))
+                {
+                    string sourceTypeFullName = ArchitectureTypeNames.SafeFullName(sourceType);
+                    if (string.IsNullOrEmpty(sourceTypeFullName))
+                    {
+                        continue;
+                    }
+
+                    string sourceNs = ArchitectureTypeNames.SafeNamespace(sourceType);
+
+                    // Self-reference: source inside protected layer is always allowed
+                    if (!string.IsNullOrEmpty(sourceNs) &&
+                        ArchitectureLayerResolver.MatchesNamespace(protectedLayer, sourceNs))
+                    {
+                        continue;
+                    }
+
+                    // Allowed importer: source namespace matches any allowed importer layer
+                    if (!string.IsNullOrEmpty(sourceNs) &&
+                        allowedImporterLayers.Any(l => ArchitectureLayerResolver.MatchesNamespace(l, sourceNs)))
+                    {
+                        continue;
+                    }
+
+                    string? sourceLayerName = ArchitectureLayerResolver.ResolveContainingLayer(
+                        _document, sourceTypeFullName, allLayerNames);
+
+                    List<string> matchingRefs = new();
+
+                    foreach (Type refType in ArchitectureReferenceScanner.GetReferencedTypes(sourceType))
+                    {
+                        string refFullName = ArchitectureTypeNames.SafeFullName(refType);
+                        if (string.IsNullOrEmpty(refFullName))
+                        {
+                            continue;
+                        }
+
+                        if (!ArchitectureLayerResolver.MatchesNamespace(
+                                protectedLayer, ArchitectureTypeNames.SafeNamespace(refType)))
+                        {
+                            continue;
+                        }
+
+                        if (allowedTypes.Contains(sourceTypeFullName))
+                        {
+                            continue;
+                        }
+
+                        if (ArchitectureIgnoreMatcher.IsIgnored(
+                                sourceTypeFullName, refFullName, contract.IgnoredViolations))
+                        {
+                            continue;
+                        }
+
+                        matchingRefs.Add(refFullName);
+                    }
+
+                    if (matchingRefs.Count == 0)
+                    {
+                        continue;
+                    }
+
+                    string[] normalizedRefs = matchingRefs
+                        .Distinct(StringComparer.Ordinal)
+                        .OrderBy(name => name, StringComparer.Ordinal)
+                        .ToArray();
+
+                    violations.Add(new ArchitectureViolation(
+                        contract.Name, contract.Id,
+                        sourceTypeFullName,
+                        $"protected layer '{protectedLayerName}' (allowed importers: [{string.Join(", ", contract.AllowedImporters)}])",
+                        normalizedRefs)
+                    {
+                        SourceLayer = sourceLayerName,
+                        TargetLayer = protectedLayerName,
+                        AllowedImporters = contract.AllowedImporters
+                    });
+                }
             }
         }
 

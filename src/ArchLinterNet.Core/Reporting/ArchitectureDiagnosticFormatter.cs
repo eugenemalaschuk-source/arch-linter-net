@@ -15,7 +15,15 @@ public static class ArchitectureDiagnosticFormatter
                 .Select(violation =>
                 {
                     string idPrefix = violation.ContractId != null ? $"[{violation.ContractId}] " : string.Empty;
-                    return $"- {idPrefix}[{violation.ContractName}] {violation.SourceType} -> {violation.ForbiddenNamespace}: {string.Join(", ", violation.ForbiddenReferences)}";
+                    string context = string.Empty;
+                    if (violation.AllowedImporters != null)
+                    {
+                        string srcLayer = violation.SourceLayer ?? "?";
+                        string tgtLayer = violation.TargetLayer ?? "?";
+                        string importers = string.Join(", ", violation.AllowedImporters);
+                        context = $" (source_layer: {srcLayer}, target_layer: {tgtLayer}, allowed_importers: [{importers}])";
+                    }
+                    return $"- {idPrefix}[{violation.ContractName}] {violation.SourceType} -> {violation.ForbiddenNamespace}{context}: {string.Join(", ", violation.ForbiddenReferences)}";
                 }));
     }
 
@@ -34,13 +42,27 @@ public static class ArchitectureDiagnosticFormatter
         {
             passed,
             mode,
-            violations = violations.Select(v => new
+            violations = violations.Select(v =>
             {
-                contract = v.ContractName,
-                contract_id = v.ContractId,
-                source = v.SourceType,
-                forbidden_namespace = v.ForbiddenNamespace,
-                forbidden_references = v.ForbiddenReferences.ToArray()
+                var obj = new Dictionary<string, object?>
+                {
+                    ["contract"] = v.ContractName,
+                    ["contract_id"] = v.ContractId,
+                    ["source"] = v.SourceType,
+                    ["forbidden_namespace"] = v.ForbiddenNamespace,
+                    ["forbidden_references"] = v.ForbiddenReferences.ToArray()
+                };
+
+                if (v.SourceLayer != null)
+                    obj["source_layer"] = v.SourceLayer;
+
+                if (v.TargetLayer != null)
+                    obj["target_layer"] = v.TargetLayer;
+
+                if (v.AllowedImporters != null)
+                    obj["allowed_importers"] = v.AllowedImporters.ToArray();
+
+                return obj;
             }).ToArray(),
             cycles = cycles.ToArray()
         };
@@ -56,11 +78,25 @@ public static class ArchitectureDiagnosticFormatter
             kind = "architecture_violations",
             contract = contractName,
             contract_id = contractId,
-            violations = violations.Select(v => new
+            violations = violations.Select(v =>
             {
-                source = v.SourceType,
-                forbidden_namespace = v.ForbiddenNamespace,
-                forbidden_references = v.ForbiddenReferences.ToArray()
+                var obj = new Dictionary<string, object?>
+                {
+                    ["source"] = v.SourceType,
+                    ["forbidden_namespace"] = v.ForbiddenNamespace,
+                    ["forbidden_references"] = v.ForbiddenReferences.ToArray()
+                };
+
+                if (v.SourceLayer != null)
+                    obj["source_layer"] = v.SourceLayer;
+
+                if (v.TargetLayer != null)
+                    obj["target_layer"] = v.TargetLayer;
+
+                if (v.AllowedImporters != null)
+                    obj["allowed_importers"] = v.AllowedImporters.ToArray();
+
+                return obj;
             })
         };
 

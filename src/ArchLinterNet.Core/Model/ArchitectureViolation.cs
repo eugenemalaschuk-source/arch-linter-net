@@ -5,4 +5,9 @@ public sealed record ArchitectureViolation(
     string? ContractId,
     string SourceType,
     string ForbiddenNamespace,
-    IReadOnlyCollection<string> ForbiddenReferences);
+    IReadOnlyCollection<string> ForbiddenReferences)
+{
+    public string? SourceLayer { get; init; }
+    public string? TargetLayer { get; init; }
+    public IReadOnlyCollection<string>? AllowedImporters { get; init; }
+}

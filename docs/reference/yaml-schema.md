@@ -80,6 +80,7 @@ contracts:
   strict_method_body: []
   strict_asmdef: []
   strict_independence: []
+  strict_protected: []
 
   audit: []                     # Non-blocking contracts (same types)
   audit_layers: []
@@ -88,6 +89,7 @@ contracts:
   audit_method_body: []
   audit_asmdef: []
   audit_independence: []
+  audit_protected: []
 ```
 
 ### Dependency contract
@@ -167,9 +169,25 @@ references.
   reason: <string>
 ```
 
+### Protected surface contract
+
+```yaml
+- id: <string>                  # Optional
+  name: <string>
+  protected: [<layer-name>]     # Required — layers to protect
+  allowed_importers: [<layer-name>]  # Required — layers allowed to reference protected layers
+  allowed_types: []             # Optional — source-type-level exceptions
+  ignored_violations: []        # Optional — baseline known violations
+  reason: <string>
+```
+
+Protected contracts enforce that only explicitly allowed importer layers may reference
+protected layers. Self-references within a protected layer are implicitly allowed and
+need not be listed in `allowed_importers`.
+
 ### Ignored violations
 
-Dependency, layer, allow-only, cycle, method-body, and independence contracts
+Dependency, layer, allow-only, cycle, method-body, independence, and protected contracts
 may include an `ignored_violations` block (asmdef contracts do not support this):
 
 ```yaml
