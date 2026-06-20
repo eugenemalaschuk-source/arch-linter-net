@@ -134,4 +134,42 @@ public sealed class UnifiedJsonOutputTests
 
         Assert.That(output, Does.Contain("[my-contract]"));
     }
+
+    [Test]
+    public void FormatResultForCiArtifacts_ExternalViolation_IncludesExternalGroup()
+    {
+        var violations = new List<ArchitectureViolation>
+        {
+            new("core-no-unity", "core-no-unity", "MyApp.Core.PlayerModel", "external dependency group 'unity_runtime'",
+                new[] { "UnityEngine.Vector3" })
+            {
+                ForbiddenExternalGroup = "unity_runtime"
+            }
+        };
+
+        string json = ArchitectureDiagnosticFormatter.FormatResultForCiArtifacts(
+            "strict", false, violations, Array.Empty<string>());
+
+        using var doc = JsonDocument.Parse(json);
+        JsonElement violation = doc.RootElement.GetProperty("violations")[0];
+        Assert.That(violation.GetProperty("forbidden_external_group").GetString(), Is.EqualTo("unity_runtime"));
+    }
+
+    [Test]
+    public void FormatViolationsForHumans_ExternalViolation_IncludesExternalGroup()
+    {
+        var violations = new List<ArchitectureViolation>
+        {
+            new("core-no-unity", "core-no-unity", "MyApp.Core.PlayerModel", "external dependency group 'unity_runtime'",
+                new[] { "UnityEngine.Vector3" })
+            {
+                ForbiddenExternalGroup = "unity_runtime"
+            }
+        };
+
+        string output = ArchitectureDiagnosticFormatter.FormatViolationsForHumans(violations);
+
+        Assert.That(output, Does.Contain("external_group: unity_runtime"));
+        Assert.That(output, Does.Contain("UnityEngine.Vector3"));
+    }
 }

@@ -352,6 +352,21 @@ public class CliIntegrationTests
         });
     }
 
+    [Test]
+    public void UnknownExternalGroup_ReturnsValidationFailureInsteadOfRuntimeError()
+    {
+        string policy = Path.Combine(
+            _repoRoot, "tests", "ArchLinterNet.Cli.Tests", "TestPolicies", "unknown-external-group.yml");
+        var (exitCode, stdout, stderr) = RunCli("--policy", policy, "--strict");
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(exitCode, Is.EqualTo(1));
+            Assert.That(stdout, Does.Contain("unknown external dependency group"));
+            Assert.That(stderr, Is.Empty);
+        });
+    }
+
     /* Sample policy */
 
     [Test]

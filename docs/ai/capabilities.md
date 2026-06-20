@@ -10,6 +10,7 @@ The policy file is usually `architecture/dependencies.arch.yml` and contains:
 - `version`: current value is `1`.
 - `name`: human-readable policy name.
 - `layers`: named namespace-prefix layer definitions.
+- `external_dependencies`: named vendor/framework dependency groups.
 - `legacy_runtime_layers`: optional namespace prefixes used by dependency contracts.
 - `analysis`: target assemblies, assembly search paths, and optional source roots.
 - `contracts`: strict and audit contract groups.
@@ -26,6 +27,7 @@ The policy file is usually `architecture/dependencies.arch.yml` and contains:
 | asmdef | `strict_asmdef` | `audit_asmdef` | Unity `.asmdef` references avoid editor refs or forbidden prefixes |
 | Independence | `strict_independence` | `audit_independence` | Selected layers do not reference each other |
 | Protected surface | `strict_protected` | `audit_protected` | Protected layers are referenced only by explicitly allowed importers |
+| External dependency | `strict_external` | `audit_external` | Source layer does not reference forbidden vendor/framework dependency groups |
 | Layer template | `strict_layer_templates` | `audit_layer_templates` | Reusable layer order applied to multiple containers; optional layers skip empty namespaces; `exhaustive: true` detects unmapped sibling namespaces |
 
 ## Matching Semantics
@@ -38,6 +40,10 @@ example, `MyCompany.Product.Domain` matches `MyCompany.Product.Domain` and
 as matching `*.Contracts` inside a broader namespace root.
 
 `allowed_types` entries are exact full type names.
+
+`external_dependencies.namespace_prefixes` match exact namespaces and child
+namespaces. `external_dependencies.type_prefixes` match full referenced type
+names by prefix.
 
 `ignored_violations` supports exact values and glob-like patterns for
 `source_type` and `forbidden_reference`, but broad patterns should be treated as
@@ -66,6 +72,7 @@ ArchLinterNet does not currently validate:
 - Security policy, authorization, or data access permissions.
 - Code ownership or review ownership.
 - Semantic data-flow analysis.
+- Full method-body detection for external dependency contracts.
 - Regex or wildcard layer namespace definitions.
 - Custom contract families outside the documented YAML schema.
 - Automatic baseline generation.

@@ -10,6 +10,7 @@ public sealed record ArchitectureViolation(
     public string? SourceLayer { get; init; }
     public string? TargetLayer { get; init; }
     public IReadOnlyCollection<string>? AllowedImporters { get; init; }
+    public string? ForbiddenExternalGroup { get; init; }
     public string? TemplateName { get; init; }
     public string? ContainerNamespace { get; init; }
     public IReadOnlyCollection<IReadOnlyCollection<string>>? DependencyPaths { get; init; }

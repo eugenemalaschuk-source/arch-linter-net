@@ -44,6 +44,25 @@ in the scan environment (external SDKs, engine namespaces, platform-conditional
 assemblies). All contract checks still apply normally — dependency scanning works
 via namespace string matching on source-side types.
 
+For new vendor/framework leakage controls, prefer `external_dependencies` over
+modeling framework namespaces as pseudo-layers.
+
+## `external_dependencies`
+
+Optional. Map of named vendor/framework dependency groups.
+
+```yaml
+external_dependencies:
+  <group-name>:
+    namespace_prefixes: [<string>]   # Optional — exact or child namespace match
+    type_prefixes: [<string>]        # Optional — full type-name prefix match
+```
+
+External dependency matching uses only referenced type metadata visible from
+project types. It does not statically analyze third-party internals and does
+not guarantee detection when external assemblies are unresolved enough that the
+current scanner cannot observe referenced type names.
+
 ## `legacy_runtime_layers`
 
 Optional. List of namespace prefixes that are runtime-only or otherwise not
@@ -82,6 +101,7 @@ contracts:
   strict_asmdef: []
   strict_independence: []
   strict_protected: []
+  strict_external: []
 
   audit: []                     # Non-blocking contracts (same types)
   audit_layers: []
@@ -92,6 +112,7 @@ contracts:
   audit_asmdef: []
   audit_independence: []
   audit_protected: []
+  audit_external: []
 ```
 
 ### Dependency contract
@@ -228,9 +249,23 @@ Protected contracts enforce that only explicitly allowed importer layers may ref
 protected layers. Self-references within a protected layer are implicitly allowed and
 need not be listed in `allowed_importers`.
 
+### External dependency contract
+
+```yaml
+- id: <string>                  # Optional
+  name: <string>
+  source: <layer-name>          # Required — first-party source layer
+  forbidden: [<group-name>]     # Required — external dependency groups
+  ignored_violations: []        # Optional — baseline known violations
+  reason: <string>
+```
+
+External dependency contracts use named groups from `external_dependencies` and
+report references from source types into those vendor/framework surfaces.
+
 ### Ignored violations
 
-Dependency, layer, allow-only, cycle, method-body, independence, and protected contracts
+Dependency, layer, allow-only, cycle, method-body, independence, protected, and external contracts
 may include an `ignored_violations` block (asmdef contracts do not support this):
 
 ```yaml
