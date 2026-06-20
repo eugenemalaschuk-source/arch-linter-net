@@ -5,6 +5,7 @@ Use this checklist before opening or approving an AI-generated policy change.
 ## Repository Facts
 
 - [ ] Every layer maps to an existing namespace prefix or documented runtime namespace.
+- [ ] Every `external_dependencies` group maps to a real vendor/framework namespace or type prefix.
 - [ ] Every target assembly name is real for the repository being validated.
 - [ ] `assembly_search_paths` point to real build output directories when needed.
 - [ ] `source_roots` are included when method-body source scanning needs non-default roots.
@@ -14,6 +15,7 @@ Use this checklist before opening or approving an AI-generated policy change.
 - [ ] Strict contracts pass today or intentionally enforce an accepted no-new-debt gate.
 - [ ] Future-state or discovery rules are in audit groups, not strict groups.
 - [ ] Allow-only rules are used for pure layers where every first-party dependency should be explicit.
+- [ ] Vendor/framework leakage rules use `strict_external` / `audit_external` instead of pseudo-layers unless there is a deliberate compatibility reason.
 - [ ] Ordered layer contracts do not mix broad aggregate layers with overlapping child layers.
 - [ ] Module independence rules reflect real module boundaries, not idealized names.
 

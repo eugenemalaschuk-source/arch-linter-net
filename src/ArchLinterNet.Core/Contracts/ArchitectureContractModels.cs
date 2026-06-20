@@ -16,6 +16,9 @@ public sealed class ArchitectureContractDocument
 
     [YamlMember(Alias = "layers")] public Dictionary<string, ArchitectureLayer> Layers { get; set; } = new();
 
+    [YamlMember(Alias = "external_dependencies")]
+    public Dictionary<string, ArchitectureExternalDependencyGroup> ExternalDependencies { get; set; } = new();
+
     [YamlMember(Alias = "legacy_runtime_layers")]
     public List<string> LegacyRuntimeLayers { get; set; } = new();
 
@@ -43,6 +46,15 @@ public sealed class ArchitectureLayer
     [YamlMember(Alias = "namespace_suffix")] public string NamespaceSuffix { get; set; } = string.Empty;
 
     [YamlMember(Alias = "external")] public bool External { get; set; }
+}
+
+public sealed class ArchitectureExternalDependencyGroup
+{
+    [YamlMember(Alias = "namespace_prefixes")]
+    public List<string> NamespacePrefixes { get; set; } = new();
+
+    [YamlMember(Alias = "type_prefixes")]
+    public List<string> TypePrefixes { get; set; } = new();
 }
 
 public sealed class ArchitectureContractGroups
@@ -87,6 +99,12 @@ public sealed class ArchitectureContractGroups
     [YamlMember(Alias = "audit_protected")]
     public List<ArchitectureProtectedContract> AuditProtected { get; set; } = new();
 
+    [YamlMember(Alias = "strict_external")]
+    public List<ArchitectureExternalDependencyContract> StrictExternal { get; set; } = new();
+
+    [YamlMember(Alias = "audit_external")]
+    public List<ArchitectureExternalDependencyContract> AuditExternal { get; set; } = new();
+
     [YamlMember(Alias = "strict_layer_templates")]
     public List<ArchitectureLayerTemplateContract> StrictLayerTemplates { get; set; } = new();
 
@@ -107,6 +125,7 @@ public sealed class ArchitectureContractGroups
         foreach (var c in StrictAsmdef) yield return c;
         foreach (var c in StrictIndependence) yield return c;
         foreach (var c in StrictProtected) yield return c;
+        foreach (var c in StrictExternal) yield return c;
     }
 
     private IEnumerable<IArchitectureContract> EnumerateAudit()
@@ -119,7 +138,24 @@ public sealed class ArchitectureContractGroups
         foreach (var c in AuditAsmdef) yield return c;
         foreach (var c in AuditIndependence) yield return c;
         foreach (var c in AuditProtected) yield return c;
+        foreach (var c in AuditExternal) yield return c;
     }
+}
+
+public sealed class ArchitectureExternalDependencyContract : IArchitectureContract
+{
+    [YamlMember(Alias = "name")] public string Name { get; set; } = string.Empty;
+
+    [YamlMember(Alias = "id")] public string? Id { get; set; }
+
+    [YamlMember(Alias = "source")] public string Source { get; set; } = string.Empty;
+
+    [YamlMember(Alias = "forbidden")] public List<string> Forbidden { get; set; } = new();
+
+    [YamlMember(Alias = "ignored_violations")]
+    public List<ArchitectureIgnoredViolation> IgnoredViolations { get; set; } = new();
+
+    [YamlMember(Alias = "reason")] public string Reason { get; set; } = string.Empty;
 }
 
 public sealed class ArchitectureDependencyContract : IArchitectureContract

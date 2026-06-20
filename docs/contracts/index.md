@@ -28,6 +28,38 @@ strict:
     reason: Application must not have any transitive dependency path into Infrastructure.
 ```
 
+## External Dependency (`strict_external` / `audit_external`)
+
+Checks that a source layer does not reference forbidden vendor/framework
+dependency groups declared in `external_dependencies`.
+
+```yaml
+external_dependencies:
+  unity_runtime:
+    namespace_prefixes:
+      - UnityEngine
+    type_prefixes: []
+
+  unity_editor:
+    namespace_prefixes:
+      - UnityEditor
+    type_prefixes: []
+
+contracts:
+  strict_external:
+    - id: core-no-unity
+      name: core-must-not-reference-unity
+      source: game_core
+      forbidden: [unity_runtime, unity_editor]
+      reason: Pure game core must not expose Unity runtime or editor types.
+```
+
+External dependency contracts are direct-only in the current MVP. They match
+referenced type metadata already visible from project types, such as base
+types, interfaces, fields, properties, method signatures, and generic
+arguments. They do not promise full method-body call detection and do not
+traverse third-party package internals.
+
 ## Layer Order (`strict_layers` / `audit_layers`)
 
 Import-linter-style inward-only layering constraints. Layers are ordered from outermost

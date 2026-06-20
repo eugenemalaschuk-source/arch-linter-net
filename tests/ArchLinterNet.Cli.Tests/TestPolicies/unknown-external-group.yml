@@ -1,0 +1,25 @@
+version: 1
+name: Unknown External Group Policy
+
+layers:
+  core:
+    namespace: ArchLinterNet.Core
+
+analysis:
+  target_assemblies:
+    - ArchLinterNet.Core
+
+contracts:
+  strict: []
+  strict_layers: []
+  strict_allow_only: []
+  strict_cycles: []
+  strict_method_body: []
+  strict_asmdef: []
+  strict_independence: []
+  strict_protected: []
+  strict_external:
+    - name: core-no-missing-group
+      source: core
+      forbidden: [missing_group]
+  audit_external: []

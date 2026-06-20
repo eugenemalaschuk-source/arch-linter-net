@@ -190,6 +190,15 @@ public static class Program
                 allViolations.AddRange(runner.CheckProtectedContract(contract));
             }
 
+            IEnumerable<ArchitectureExternalDependencyContract> externalContracts = mode == "audit"
+                ? runner.AuditExternalContracts()
+                : runner.StrictExternalContracts();
+
+            foreach (ArchitectureExternalDependencyContract contract in externalContracts)
+            {
+                allViolations.AddRange(runner.CheckExternalContract(contract));
+            }
+
             bool passed = allViolations.Count == 0 && allCycles.Count == 0;
 
             if (format == "json")

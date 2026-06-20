@@ -55,6 +55,38 @@ AI-agent workflows.
 Do not put known-failing future-state rules in strict unless the team explicitly
 wants a blocking gate.
 
+## Use External Dependencies For Vendor Or Framework Leakage
+
+When the target is not a first-party layer but a vendor/framework surface such
+as Unity, EF Core, or a cloud SDK, model it with `external_dependencies` and
+`strict_external` / `audit_external` instead of inventing pseudo-layers:
+
+```yaml
+external_dependencies:
+  unity_runtime:
+    namespace_prefixes:
+      - UnityEngine
+    type_prefixes: []
+
+contracts:
+  strict_external:
+    - id: core-no-unity
+      name: core-must-not-reference-unity
+      source: core
+      forbidden: [unity_runtime]
+      reason: Pure core must not expose Unity runtime types.
+```
+
+Use `external: true` on a layer only when you intentionally want layer-style
+semantics with missing-type suppression. For new vendor/framework controls,
+prefer `external_dependencies`.
+
+External dependency contracts currently match only referenced type metadata that
+the scanner already sees from project types, such as base types, interfaces,
+fields, properties, method signatures, and generic arguments. They do not
+promise full method-body call detection and do not analyze third-party package
+internals.
+
 ## Use Transitive Depth For Indirect Coupling
 
 When a dependency should be blocked at any depth (direct or indirect), use

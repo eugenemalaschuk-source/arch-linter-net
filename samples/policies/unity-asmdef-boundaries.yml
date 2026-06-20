@@ -13,6 +13,16 @@ layers:
   unity_adapters:
     namespace: MyCompany.Game.UnityAdapters
 
+external_dependencies:
+  unity_runtime:
+    namespace_prefixes:
+      - UnityEngine
+    type_prefixes: []
+  unity_editor_api:
+    namespace_prefixes:
+      - UnityEditor
+    type_prefixes: []
+
 legacy_runtime_layers: []
 
 analysis:
@@ -38,6 +48,21 @@ contracts:
       reason: Runtime gameplay code must not reference editor-only namespaces.
 
   audit: []
+
+  strict_external:
+    - id: core-no-unity-runtime
+      name: core-must-not-reference-unity-runtime-types
+      source: game_core
+      forbidden: [unity_runtime]
+      reason: Pure game core must not expose or depend on Unity runtime types directly.
+
+    - id: runtime-no-unity-editor-api
+      name: runtime-must-not-reference-unity-editor-api
+      source: gameplay_runtime
+      forbidden: [unity_editor_api]
+      reason: Runtime gameplay code must not reference UnityEditor APIs.
+
+  audit_external: []
 
   strict_layers:
     - name: unity-runtime-layering
