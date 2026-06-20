@@ -296,6 +296,22 @@ public class CliIntegrationTests
         });
     }
 
+    /* Invalid analysis config */
+
+    [Test]
+    public void InvalidUnmatchedIgnoredViolationsValue_ExitsWithError()
+    {
+        string invalidPolicy = Path.Combine(
+            _repoRoot, "tests", "ArchLinterNet.Cli.Tests", "TestPolicies", "invalid-unmatched-config.yml");
+        var (exitCode, _, stderr) = RunCli("--policy", invalidPolicy, "--strict");
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(exitCode, Is.EqualTo(2));
+            Assert.That(stderr, Does.Contain("unmatched_ignored_violations"));
+        });
+    }
+
     /* --contract flag */
 
     [Test]

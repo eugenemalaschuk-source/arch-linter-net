@@ -9,7 +9,8 @@ namespace ArchLinterNet.Core.Execution;
 public sealed partial class ArchitectureContractRunner(
     ArchitectureAnalysisContext context,
     ArchitectureContractDocument document,
-    HashSet<string>? selectedContractIds = null)
+    HashSet<string>? selectedContractIds = null,
+    bool enableUnmatchedIgnoreTracking = true)
 {
     private readonly ArchitectureAnalysisContext _context = context ?? throw new ArgumentNullException(nameof(context));
 
@@ -17,6 +18,8 @@ public sealed partial class ArchitectureContractRunner(
         document ?? throw new ArgumentNullException(nameof(document));
 
     private readonly HashSet<string>? _selectedContractIds = selectedContractIds;
+
+    private readonly bool _enableUnmatchedIgnoreTracking = enableUnmatchedIgnoreTracking;
 
     private readonly List<ArchitectureUnmatchedIgnoredViolation> _unmatchedIgnoredViolations = new();
 

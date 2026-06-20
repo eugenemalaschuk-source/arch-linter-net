@@ -20,7 +20,7 @@ public sealed partial class ArchitectureContractRunner
 
         List<ArchitectureViolation> violations = new();
         bool transitive = contract.DependencyDepth == DependencyDepthMode.Transitive;
-        ArchitectureIgnoreUsageTracker? tracker = contract.IgnoredViolations.Count > 0 ? new() : null;
+        ArchitectureIgnoreUsageTracker? tracker = _enableUnmatchedIgnoreTracking && contract.IgnoredViolations.Count > 0 ? new() : null;
 
         foreach (string forbiddenLayerName in contract.Forbidden)
         {
@@ -102,7 +102,7 @@ public sealed partial class ArchitectureContractRunner
             effectiveLayers.Add((layerEntry, layer, types));
         }
 
-        ArchitectureIgnoreUsageTracker? tracker = contract.IgnoredViolations.Count > 0 ? new() : null;
+        ArchitectureIgnoreUsageTracker? tracker = _enableUnmatchedIgnoreTracking && contract.IgnoredViolations.Count > 0 ? new() : null;
 
         for (int sourceIndex = 0; sourceIndex < effectiveLayers.Count; sourceIndex++)
         {
@@ -214,7 +214,7 @@ public sealed partial class ArchitectureContractRunner
             .Append(sourceLayer)
             .ToList();
 
-        ArchitectureIgnoreUsageTracker? tracker = contract.IgnoredViolations.Count > 0 ? new() : null;
+        ArchitectureIgnoreUsageTracker? tracker = _enableUnmatchedIgnoreTracking && contract.IgnoredViolations.Count > 0 ? new() : null;
 
         List<ArchitectureViolation> violations = sourceTypes
             .Select(type => new ArchitectureViolation(
@@ -253,7 +253,7 @@ public sealed partial class ArchitectureContractRunner
             _ => new HashSet<string>(StringComparer.Ordinal),
             StringComparer.Ordinal);
 
-        ArchitectureIgnoreUsageTracker? tracker = contract.IgnoredViolations.Count > 0 ? new() : null;
+        ArchitectureIgnoreUsageTracker? tracker = _enableUnmatchedIgnoreTracking && contract.IgnoredViolations.Count > 0 ? new() : null;
 
         foreach (string sourceLayerName in contract.Layers)
         {
@@ -306,7 +306,7 @@ public sealed partial class ArchitectureContractRunner
             ? _document.Analysis.SourceRoots.ToArray()
             : null;
 
-        ArchitectureIgnoreUsageTracker? tracker = contract.IgnoredViolations.Count > 0 ? new() : null;
+        ArchitectureIgnoreUsageTracker? tracker = _enableUnmatchedIgnoreTracking && contract.IgnoredViolations.Count > 0 ? new() : null;
 
         IReadOnlyList<ArchitectureViolation> roslynViolations = ArchitectureSourceScanner
             .FindMethodBodyViolations(contract.Name, contract.Id, _context.RepositoryRoot, sourceLayer.Namespace,
@@ -349,7 +349,7 @@ public sealed partial class ArchitectureContractRunner
         }
 
         List<ArchitectureViolation> violations = new();
-        ArchitectureIgnoreUsageTracker? tracker = contract.IgnoredViolations.Count > 0 ? new() : null;
+        ArchitectureIgnoreUsageTracker? tracker = _enableUnmatchedIgnoreTracking && contract.IgnoredViolations.Count > 0 ? new() : null;
 
         foreach (string sourceLayerName in contract.Layers)
         {
@@ -391,7 +391,7 @@ public sealed partial class ArchitectureContractRunner
             .Select(name => ArchitectureLayerResolver.ResolveLayer(_document, contract.Name, name))
             .ToList();
 
-        ArchitectureIgnoreUsageTracker? tracker = contract.IgnoredViolations.Count > 0 ? new() : null;
+        ArchitectureIgnoreUsageTracker? tracker = _enableUnmatchedIgnoreTracking && contract.IgnoredViolations.Count > 0 ? new() : null;
 
         foreach (string protectedLayerName in contract.Protected)
         {
@@ -494,7 +494,7 @@ public sealed partial class ArchitectureContractRunner
         Type[] sourceTypes = ArchitectureTypeScanner.FindTypesInLayer(_context.TargetAssemblies, sourceLayer);
         List<ArchitectureViolation> violations = new();
 
-        ArchitectureIgnoreUsageTracker? tracker = contract.IgnoredViolations.Count > 0 ? new() : null;
+        ArchitectureIgnoreUsageTracker? tracker = _enableUnmatchedIgnoreTracking && contract.IgnoredViolations.Count > 0 ? new() : null;
 
         foreach (string externalGroupName in contract.Forbidden)
         {
