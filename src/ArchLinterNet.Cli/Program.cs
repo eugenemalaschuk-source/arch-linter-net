@@ -199,12 +199,18 @@ public static class Program
                 allViolations.AddRange(runner.CheckExternalContract(contract));
             }
 
-            bool passed = allViolations.Count == 0 && allCycles.Count == 0;
+            string unmatchedConfig = document.Analysis.UnmatchedIgnoredViolations;
+            IReadOnlyList<ArchitectureUnmatchedIgnoredViolation> allUnmatched = unmatchedConfig != "off"
+                ? runner.UnmatchedIgnoredViolations
+                : Array.Empty<ArchitectureUnmatchedIgnoredViolation>();
+            bool hasBlockingUnmatched = unmatchedConfig == "error" && allUnmatched.Count > 0;
+
+            bool passed = allViolations.Count == 0 && allCycles.Count == 0 && !hasBlockingUnmatched;
 
             if (format == "json")
             {
                 Console.WriteLine(ArchitectureDiagnosticFormatter.FormatResultForCiArtifacts(
-                    mode, passed, allViolations, allCycles));
+                    mode, passed, allViolations, allCycles, allUnmatched));
             }
             else
             {
@@ -222,6 +228,16 @@ public static class Program
                     if (allCycles.Count > 0)
                     {
                         Console.WriteLine(ArchitectureDiagnosticFormatter.FormatCyclesForHumans(allCycles));
+                    }
+                }
+
+                if (allUnmatched.Count > 0 && unmatchedConfig != "off")
+                {
+                    string unmatchedSection = ArchitectureDiagnosticFormatter.FormatUnmatchedForHumans(allUnmatched);
+                    if (!string.IsNullOrEmpty(unmatchedSection))
+                    {
+                        Console.WriteLine();
+                        Console.WriteLine(unmatchedSection);
                     }
                 }
             }

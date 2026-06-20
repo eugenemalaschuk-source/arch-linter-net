@@ -20,7 +20,8 @@ internal static class ArchitectureSourceScanner
         IReadOnlyList<string> forbiddenCallPatterns,
         IReadOnlyList<ArchitectureIgnoredViolation> ignoredViolations,
         string[]? sourceRoots = null,
-        ArchitectureLayer? sourceLayer = null)
+        ArchitectureLayer? sourceLayer = null,
+        ArchitectureIgnoreUsageTracker? usageTracker = null)
     {
         string[] roots = sourceRoots ?? _defaultSourceRoots;
         ArchitectureLayer effectiveLayer = sourceLayer
@@ -56,7 +57,7 @@ internal static class ArchitectureSourceScanner
             string relativePath = GetRelativePath(repositoryRoot, syntaxTree.FilePath);
 
             IReadOnlyList<string> unignored = matches
-                .Where(match => !ArchitectureIgnoreMatcher.IsIgnored(relativePath, match, ignoredViolations))
+                .Where(match => !ArchitectureIgnoreMatcher.IsIgnored(relativePath, match, ignoredViolations, usageTracker))
                 .Distinct(StringComparer.Ordinal)
                 .OrderBy(match => match, StringComparer.Ordinal)
                 .ToArray();

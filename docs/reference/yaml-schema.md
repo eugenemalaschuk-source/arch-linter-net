@@ -76,7 +76,7 @@ legacy_runtime_layers:
 
 ## `analysis`
 
-Assembly resolution configuration.
+Assembly resolution and linter behavior configuration.
 
 ```yaml
 analysis:
@@ -84,7 +84,20 @@ analysis:
     - <assembly-name>
   assembly_search_paths: []     # Optional — additional probe directories
   source_roots: []              # Optional — source directory roots for Roslyn resolution
+  unmatched_ignored_violations: error  # Optional — error | warn | off (default: error)
 ```
+
+### `unmatched_ignored_violations`
+
+Controls behavior when an `ignored_violations` entry no longer matches any current
+dependency violation. A stale ignore entry suggests the original debt has been
+resolved but the baseline was not cleaned up.
+
+| Value | Behavior |
+|-------|----------|
+| `error` (default) | Unmatched ignores fail validation (exit code 1) |
+| `warn` | Unmatched ignores are reported but do not affect the exit code |
+| `off` | Unmatched detection is skipped entirely |
 
 ## `contracts`
 
@@ -281,3 +294,34 @@ may include an `ignored_violations` block (asmdef contracts do not support this)
 Ignored violations support exact values and narrow glob-like patterns. Prefer
 fully qualified type names and avoid broad entries such as `source_type: "*"`
 unless they are explicitly accepted as temporary migration debt.
+
+### Unmatched ignored violation detection
+
+When `analysis.unmatched_ignored_violations` is `error` or `warn`, the linter
+detects `ignored_violations` entries whose patterns match no current dependency
+violation. Each stale entry is reported as a separate diagnostic with its
+contract name, ignore index, source type pattern, forbidden reference pattern,
+and stored reason.
+
+In human output, unmatched ignores appear in a separate `Unmatched ignored violations:`
+section. In JSON output, they appear in the `unmatched_ignored_violations` array
+at the top level alongside `violations` and `cycles`:
+
+```json
+{
+  "passed": false,
+  "mode": "strict",
+  "violations": [],
+  "cycles": [],
+  "unmatched_ignored_violations": [
+    {
+      "contract": "domain-no-infra",
+      "contract_id": "domain",
+      "ignore_index": 0,
+      "source_type": "MyApp.Legacy.Service",
+      "forbidden_reference": "MyApp.Infrastructure.*",
+      "reason": "Tracked in #1234"
+    }
+  ]
+}
+```
