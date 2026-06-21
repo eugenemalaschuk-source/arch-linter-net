@@ -230,6 +230,16 @@
           "type": "array",
           "items": { "$ref": "#/$defs/layerTemplateContract" },
           "default": []
+        },
+        "strict_acyclic_siblings": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/acyclicSiblingContract" },
+          "default": []
+        },
+        "audit_acyclic_siblings": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/acyclicSiblingContract" },
+          "default": []
         }
       }
     },
@@ -327,6 +337,22 @@
         "name": { "type": "string", "minLength": 1 },
         "id": { "type": "string", "minLength": 1 },
         "layers": { "$ref": "#/$defs/stringList" },
+        "ignored_violations": { "$ref": "#/$defs/ignoredViolations" },
+        "reason": { "type": "string" }
+      }
+    },
+    "acyclicSiblingContract": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "ancestors"],
+      "properties": {
+        "name": { "type": "string", "minLength": 1 },
+        "id": { "type": "string", "minLength": 1, "description": "Stable contract identifier for CLI selection and cross-referencing." },
+        "ancestors": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 },
+          "minItems": 1
+        },
         "ignored_violations": { "$ref": "#/$defs/ignoredViolations" },
         "reason": { "type": "string" }
       }

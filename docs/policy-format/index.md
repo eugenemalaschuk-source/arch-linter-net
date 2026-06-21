@@ -125,6 +125,7 @@ contracts:
   strict_asmdef: []
   strict_independence: []
   strict_external: []
+  strict_acyclic_siblings: []
 
   audit: []
   audit_layers: []
@@ -134,6 +135,7 @@ contracts:
   audit_asmdef: []
   audit_independence: []
   audit_external: []
+  audit_acyclic_siblings: []
 ```
 
 Each contract type has its own structure. See the [Contracts](../contracts/index.md) page

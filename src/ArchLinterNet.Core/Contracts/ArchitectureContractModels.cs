@@ -114,6 +114,12 @@ public sealed class ArchitectureContractGroups
     [YamlMember(Alias = "audit_layer_templates")]
     public List<ArchitectureLayerTemplateContract> AuditLayerTemplates { get; set; } = new();
 
+    [YamlMember(Alias = "strict_acyclic_siblings")]
+    public List<ArchitectureAcyclicSiblingContract> StrictAcyclicSiblings { get; set; } = new();
+
+    [YamlMember(Alias = "audit_acyclic_siblings")]
+    public List<ArchitectureAcyclicSiblingContract> AuditAcyclicSiblings { get; set; } = new();
+
     public IEnumerable<IArchitectureContract> AllStrict => EnumerateStrict();
 
     public IEnumerable<IArchitectureContract> AllAudit => EnumerateAudit();
@@ -129,6 +135,7 @@ public sealed class ArchitectureContractGroups
         foreach (var c in StrictIndependence) yield return c;
         foreach (var c in StrictProtected) yield return c;
         foreach (var c in StrictExternal) yield return c;
+        foreach (var c in StrictAcyclicSiblings) yield return c;
     }
 
     private IEnumerable<IArchitectureContract> EnumerateAudit()
@@ -142,6 +149,7 @@ public sealed class ArchitectureContractGroups
         foreach (var c in AuditIndependence) yield return c;
         foreach (var c in AuditProtected) yield return c;
         foreach (var c in AuditExternal) yield return c;
+        foreach (var c in AuditAcyclicSiblings) yield return c;
     }
 }
 
@@ -254,6 +262,20 @@ public sealed class ArchitectureCycleContract : IArchitectureContract
     [YamlMember(Alias = "id")] public string? Id { get; set; }
 
     [YamlMember(Alias = "layers")] public List<string> Layers { get; set; } = new();
+
+    [YamlMember(Alias = "ignored_violations")]
+    public List<ArchitectureIgnoredViolation> IgnoredViolations { get; set; } = new();
+
+    [YamlMember(Alias = "reason")] public string Reason { get; set; } = string.Empty;
+}
+
+public sealed class ArchitectureAcyclicSiblingContract : IArchitectureContract
+{
+    [YamlMember(Alias = "name")] public string Name { get; set; } = string.Empty;
+
+    [YamlMember(Alias = "id")] public string? Id { get; set; }
+
+    [YamlMember(Alias = "ancestors")] public List<string> Ancestors { get; set; } = new();
 
     [YamlMember(Alias = "ignored_violations")]
     public List<ArchitectureIgnoredViolation> IgnoredViolations { get; set; } = new();

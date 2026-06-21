@@ -103,6 +103,28 @@ strict_cycles:
     reason: Core layers must not form dependency cycles.
 ```
 
+## Acyclic Sibling (`strict_acyclic_siblings` / `audit_acyclic_siblings`)
+
+Auto-discovers dependency cycles between direct sibling namespaces under one or more
+configured ancestor namespaces. Instead of listing layers explicitly, the contract
+scans loaded types and groups them by their immediate child namespace segment under
+each ancestor. Descendant dependencies (e.g., `Ancestor.A.Sub.X` → `Ancestor.B.Sub.Y`)
+are attributed to the direct sibling groups (`A` → `B`).
+
+```yaml
+strict_acyclic_siblings:
+  - name: feature-siblings-acyclic
+    ancestors:
+      - MyApp.Features
+      - MyApp.Modules
+    reason: Sibling feature namespaces must not form dependency cycles.
+```
+
+Each ancestor is evaluated independently. Diagnostics include the ancestor prefix:
+`MyApp.Features: Auth -> Payments -> Reporting -> Auth`. Empty or single-child
+ancestors produce no output. Supports `ignored_violations` and `id` consistently
+with existing cycle contracts.
+
 ## Method-Body (`strict_method_body` / `audit_method_body`)
 
 Detects forbidden calls inside method bodies using Roslyn semantic symbol resolution
