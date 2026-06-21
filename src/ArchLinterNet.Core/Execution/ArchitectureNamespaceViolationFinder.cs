@@ -14,7 +14,8 @@ internal static class ArchitectureNamespaceViolationFinder
         Type[] sourceTypes,
         ArchitectureLayer forbiddenLayer,
         IReadOnlyCollection<string> allowedTypeFullNames,
-        IReadOnlyCollection<ArchitectureIgnoredViolation> ignoredViolations)
+        IReadOnlyList<ArchitectureIgnoredViolation> ignoredViolations,
+        ArchitectureIgnoreUsageTracker? usageTracker = null)
     {
         return sourceTypes
             .Select(type => new ArchitectureViolation(
@@ -30,7 +31,7 @@ internal static class ArchitectureNamespaceViolationFinder
                     .Where(name => !allowedTypeFullNames.Contains(name))
                     .Where(name =>
                         !ArchitectureIgnoreMatcher.IsIgnored(ArchitectureTypeNames.SafeFullName(type), name,
-                            ignoredViolations))
+                            ignoredViolations, usageTracker))
                     .Distinct()
                     .OrderBy(name => name)
                     .ToArray()))
@@ -44,8 +45,9 @@ internal static class ArchitectureNamespaceViolationFinder
         Type[] sourceTypes,
         ArchitectureLayer forbiddenLayer,
         IReadOnlyCollection<string> allowedTypeFullNames,
-        IReadOnlyCollection<ArchitectureIgnoredViolation> ignoredViolations,
-        IReadOnlyCollection<Assembly> targetAssemblies)
+        IReadOnlyList<ArchitectureIgnoredViolation> ignoredViolations,
+        IReadOnlyCollection<Assembly> targetAssemblies,
+        ArchitectureIgnoreUsageTracker? usageTracker = null)
     {
         HashSet<Assembly> assemblySet = targetAssemblies.ToHashSet();
         Func<Type, bool> traversePredicate = t => assemblySet.Contains(t.Assembly);
@@ -77,7 +79,7 @@ internal static class ArchitectureNamespaceViolationFinder
                         continue;
                     }
 
-                    if (ArchitectureIgnoreMatcher.IsIgnored(sourceFullName, refFullName, ignoredViolations))
+                    if (ArchitectureIgnoreMatcher.IsIgnored(sourceFullName, refFullName, ignoredViolations, usageTracker))
                     {
                         continue;
                     }

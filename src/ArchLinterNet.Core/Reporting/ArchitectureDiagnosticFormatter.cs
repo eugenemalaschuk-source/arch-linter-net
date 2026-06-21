@@ -47,12 +47,48 @@ public static class ArchitectureDiagnosticFormatter
         return string.Join(Environment.NewLine, cycles.OrderBy(c => c).Select(cycle => $"- {cycle}"));
     }
 
+    public static string FormatUnmatchedForHumans(IReadOnlyCollection<ArchitectureUnmatchedIgnoredViolation> unmatched)
+    {
+        if (unmatched.Count == 0)
+        {
+            return string.Empty;
+        }
+
+        return "Unmatched ignored violations:" + Environment.NewLine
+            + string.Join(
+                Environment.NewLine,
+                unmatched
+                    .OrderBy(u => u.ContractName)
+                    .ThenBy(u => u.IgnoreIndex)
+                    .Select(u =>
+                    {
+                        string idPrefix = u.ContractId != null ? $"[{u.ContractId}] " : string.Empty;
+                        return $"  {idPrefix}[{u.ContractName}] ignored_violations[{u.IgnoreIndex}] no longer matches any current violation:{Environment.NewLine}" +
+                               $"    source_type: {u.SourceType}{Environment.NewLine}" +
+                               $"    forbidden_reference: {u.ForbiddenReference}{Environment.NewLine}" +
+                               $"    reason: {u.Reason}";
+                    }));
+    }
+
     public static string FormatResultForCiArtifacts(
         string mode,
         bool passed,
         IReadOnlyCollection<ArchitectureViolation> violations,
-        IReadOnlyCollection<string> cycles)
+        IReadOnlyCollection<string> cycles,
+        IReadOnlyCollection<ArchitectureUnmatchedIgnoredViolation>? unmatched = null)
     {
+        var unmatchedSerialized = (unmatched ?? Array.Empty<ArchitectureUnmatchedIgnoredViolation>())
+            .Select(u => new
+            {
+                contract = u.ContractName,
+                contract_id = u.ContractId,
+                ignore_index = u.IgnoreIndex,
+                source_type = u.SourceType,
+                forbidden_reference = u.ForbiddenReference,
+                reason = u.Reason
+            })
+            .ToArray();
+
         var payload = new
         {
             passed,
@@ -91,7 +127,8 @@ public static class ArchitectureDiagnosticFormatter
 
                 return obj;
             }).ToArray(),
-            cycles = cycles.ToArray()
+            cycles = cycles.ToArray(),
+            unmatched_ignored_violations = unmatchedSerialized
         };
 
         return JsonSerializer.Serialize(payload);
@@ -154,4 +191,5 @@ public static class ArchitectureDiagnosticFormatter
 
         return JsonSerializer.Serialize(payload);
     }
+
 }
