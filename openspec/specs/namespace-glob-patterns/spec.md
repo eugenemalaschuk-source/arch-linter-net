@@ -71,7 +71,7 @@ When `namespace` contains a glob pattern AND `namespace_suffix` is set, the suff
 
 #### Scenario: Literal namespace + suffix retains old behavior
 - **WHEN** a layer defines `namespace: FirstIce.Game.Features` and `namespace_suffix: Models` (no glob)
-- **AND** the namespace to match is `FirstIce.Game.Features.Audio.Internal.Models.Dto`
+- **AND** the namespace to match is `FirstIce.Game.Features.Audio.Internal.Models`
 - **THEN** match succeeds (existing `EndsWith(".Models")` behavior — no breaking change)
 
 ### Requirement: Deterministic layer resolution ranking

@@ -237,7 +237,7 @@ public sealed class LayerResolverGlobTests
     }
 
     [Test]
-    public void ResolveContainingLayer_SpecificGlobBeatsBroadLiteral()
+    public void ResolveContainingLayer_BroadLiteralBeatsSpecificGlob()
     {
         _document.Layers["broad_literal"] = new() { Namespace = "Test" };
         _document.Layers["specific_glob"] = new() { Namespace = "Test.Features.*" };
@@ -247,7 +247,7 @@ public sealed class LayerResolverGlobTests
             "Test.Features.Audio.Player",
             new HashSet<string> { "broad_literal", "specific_glob" });
 
-        Assert.That(result, Is.EqualTo("specific_glob"));
+        Assert.That(result, Is.EqualTo("broad_literal"));
     }
 
     [Test]

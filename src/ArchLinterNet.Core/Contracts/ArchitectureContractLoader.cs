@@ -145,10 +145,9 @@ public static class ArchitectureContractLoader
     {
         foreach (KeyValuePair<string, ArchitectureLayer> pair in document.Layers)
         {
-            string layerName = pair.Key;
             ArchitectureLayer layer = pair.Value;
 
-            if (!string.IsNullOrEmpty(layer.Namespace) && layer.Namespace.Contains('*'))
+            if (!string.IsNullOrWhiteSpace(layer.Namespace))
             {
                 _ = layer.GlobPattern;
             }

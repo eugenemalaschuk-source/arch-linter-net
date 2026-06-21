@@ -78,11 +78,14 @@ internal static class ArchitectureLayerResolver
             {
                 layer.LayerName,
                 layer.Layer,
-                Match = MatchNamespace(layer.Layer, typeName)
+                Match = MatchNamespace(layer.Layer, typeName),
+                Pattern = layer.Layer.GlobPattern
             })
             .Where(layer => layer.Match.Matched)
-            .OrderByDescending(layer => GetMatchedPrefixLength(layer.Layer, layer.Match))
-            .ThenByDescending(layer => ComputeSpecificity(layer.Layer))
+            .OrderByDescending(layer => !layer.Pattern.IsGlob)
+            .ThenByDescending(layer => layer.Pattern.LiteralCount)
+            .ThenByDescending(layer => !string.IsNullOrEmpty(layer.Layer.NamespaceSuffix))
+            .ThenBy(layer => layer.Pattern.WildcardCount)
             .ThenBy(layer => layer.LayerName, StringComparer.Ordinal)
             .Select(layer => layer.LayerName)
             .FirstOrDefault();
@@ -184,20 +187,5 @@ internal static class ArchitectureLayerResolver
         }
 
         return score;
-    }
-
-    private static int GetMatchedPrefixLength(ArchitectureLayer layer, ArchitectureNamespaceMatch match)
-    {
-        if (!string.IsNullOrEmpty(match.MatchedNamespacePrefix))
-        {
-            return match.MatchedNamespacePrefix.Length;
-        }
-
-        if (!string.IsNullOrEmpty(layer.NamespaceSuffix))
-        {
-            return layer.Namespace.Length + layer.NamespaceSuffix.Length + 1;
-        }
-
-        return layer.Namespace.Length;
     }
 }
