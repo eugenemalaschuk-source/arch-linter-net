@@ -51,7 +51,18 @@ public sealed class ArchitectureAnalysisConfiguration
 
 public sealed class ArchitectureLayer
 {
-    [YamlMember(Alias = "namespace")] public string Namespace { get; set; } = string.Empty;
+    private string _namespace = string.Empty;
+
+    [YamlMember(Alias = "namespace")]
+    public string Namespace
+    {
+        get => _namespace;
+        set
+        {
+            _namespace = value;
+            _cachedGlobPattern = null;
+        }
+    }
 
     [YamlMember(Alias = "namespace_suffix")] public string NamespaceSuffix { get; set; } = string.Empty;
 

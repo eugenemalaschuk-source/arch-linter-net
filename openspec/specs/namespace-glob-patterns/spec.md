@@ -64,6 +64,11 @@ When `namespace` contains a glob pattern AND `namespace_suffix` is set, the suff
 - **AND** the namespace to match is `FirstIce.Game.Features.Audio.Models.Dto`
 - **THEN** match succeeds (suffix matched, `Dto` is descendant)
 
+#### Scenario: Glob + multi-segment suffix match
+- **WHEN** a layer defines `namespace: FirstIce.Game.Features.*` and `namespace_suffix: Api.Contracts`
+- **AND** the namespace to match is `FirstIce.Game.Features.Audio.Api.Contracts.Dto`
+- **THEN** match succeeds and the resolved concrete prefix is `FirstIce.Game.Features.Audio.Api.Contracts`
+
 #### Scenario: Glob + suffix wrong position fails
 - **WHEN** a layer defines `namespace: FirstIce.Game.Features.*` and `namespace_suffix: Models`
 - **AND** the namespace to match is `FirstIce.Game.Features.Audio.Internal.Models`

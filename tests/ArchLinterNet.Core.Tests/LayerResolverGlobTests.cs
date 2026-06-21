@@ -23,6 +23,7 @@ public sealed class LayerResolverGlobTests
                 ["domain"] = new() { Namespace = "Test.Domain", NamespaceSuffix = "Models" },
                 ["features"] = new() { Namespace = "Test.Features.*" },
                 ["feature_models"] = new() { Namespace = "Test.Features.*", NamespaceSuffix = "Models" },
+                ["feature_api_contracts"] = new() { Namespace = "Test.Features.*", NamespaceSuffix = "Api.Contracts" },
                 ["audio"] = new() { Namespace = "Test.Features.Audio" }
             }
         };
@@ -109,11 +110,41 @@ public sealed class LayerResolverGlobTests
     }
 
     [Test]
+    public void MatchesNamespace_GlobWithMultiSegmentSuffix_ReturnsTrue()
+    {
+        var layer = new ArchitectureLayer { Namespace = "Test.Features.*", NamespaceSuffix = "Api.Contracts" };
+
+        bool result = ArchitectureLayerResolver.MatchesNamespace(layer, "Test.Features.Audio.Api.Contracts");
+
+        Assert.That(result, Is.True);
+    }
+
+    [Test]
+    public void MatchesNamespace_GlobWithMultiSegmentSuffixDescendant_ReturnsTrue()
+    {
+        var layer = new ArchitectureLayer { Namespace = "Test.Features.*", NamespaceSuffix = "Api.Contracts" };
+
+        bool result = ArchitectureLayerResolver.MatchesNamespace(layer, "Test.Features.Audio.Api.Contracts.Dto");
+
+        Assert.That(result, Is.True);
+    }
+
+    [Test]
     public void MatchesNamespace_GlobWithSuffixWrongPosition_ReturnsFalse()
     {
         var layer = new ArchitectureLayer { Namespace = "Test.Features.*", NamespaceSuffix = "Models" };
 
         bool result = ArchitectureLayerResolver.MatchesNamespace(layer, "Test.Features.Audio.Internal.Models");
+
+        Assert.That(result, Is.False);
+    }
+
+    [Test]
+    public void MatchesNamespace_GlobWithMultiSegmentSuffixWrongPosition_ReturnsFalse()
+    {
+        var layer = new ArchitectureLayer { Namespace = "Test.Features.*", NamespaceSuffix = "Api.Contracts" };
+
+        bool result = ArchitectureLayerResolver.MatchesNamespace(layer, "Test.Features.Audio.Internal.Api.Contracts");
 
         Assert.That(result, Is.False);
     }
@@ -148,6 +179,30 @@ public sealed class LayerResolverGlobTests
 
         Assert.That(result.Matched, Is.True);
         Assert.That(result.MatchedNamespacePrefix, Is.EqualTo("Test.Features.Audio.Models"));
+    }
+
+    [Test]
+    public void MatchNamespace_GlobWithMultiSegmentSuffix_ReturnsMatchedNamespacePrefixIncludingSuffix()
+    {
+        var layer = new ArchitectureLayer { Namespace = "Test.Features.*", NamespaceSuffix = "Api.Contracts" };
+
+        ArchitectureNamespaceMatch result = ArchitectureLayerResolver.MatchNamespace(layer, "Test.Features.Audio.Api.Contracts.Dto");
+
+        Assert.That(result.Matched, Is.True);
+        Assert.That(result.MatchedNamespacePrefix, Is.EqualTo("Test.Features.Audio.Api.Contracts"));
+    }
+
+    [Test]
+    public void ArchitectureLayer_NamespaceMutation_InvalidatesGlobCache()
+    {
+        var layer = new ArchitectureLayer { Namespace = "Test.Features.*" };
+
+        Assert.That(ArchitectureLayerResolver.MatchesNamespace(layer, "Test.Features.Audio"), Is.True);
+
+        layer.Namespace = "Test.Modules.*";
+
+        Assert.That(ArchitectureLayerResolver.MatchesNamespace(layer, "Test.Features.Audio"), Is.False);
+        Assert.That(ArchitectureLayerResolver.MatchesNamespace(layer, "Test.Modules.Audio"), Is.True);
     }
 
     [Test]

@@ -148,16 +148,20 @@ internal static class ArchitectureLayerResolver
 
         string[] nsSegments = namespaceName.Split('.');
         string[] patternSegments = layer.Namespace.Split('.');
+        string[] suffixSegments = layer.NamespaceSuffix.Split('.');
 
         int suffixIndex = patternSegments.Length;
-        if (nsSegments.Length <= suffixIndex)
+        if (nsSegments.Length < suffixIndex + suffixSegments.Length)
         {
             return new ArchitectureNamespaceMatch(false, layer.Namespace, null);
         }
 
-        if (nsSegments[suffixIndex] != layer.NamespaceSuffix)
+        for (int i = 0; i < suffixSegments.Length; i++)
         {
-            return new ArchitectureNamespaceMatch(false, layer.Namespace, null);
+            if (nsSegments[suffixIndex + i] != suffixSegments[i])
+            {
+                return new ArchitectureNamespaceMatch(false, layer.Namespace, null);
+            }
         }
 
         if (string.IsNullOrEmpty(baseMatch.MatchedNamespacePrefix))
