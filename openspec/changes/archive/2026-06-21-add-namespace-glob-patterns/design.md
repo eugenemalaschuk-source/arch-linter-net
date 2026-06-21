@@ -41,9 +41,9 @@ The implementation is constrained to a single `*` segment wildcard — no `**`, 
 
 ### D3: `namespace_suffix` position-fixed only when glob is present
 
-**Choice**: When `namespace` contains `*`, suffix is checked at a fixed position (the segment immediately after the wildcard). When `namespace` is literal, suffix retains current `EndsWith(".Suffix")` behavior.
+**Choice**: When `namespace` contains `*`, suffix is checked at a fixed position immediately after the full namespace pattern. When `namespace` is literal, suffix retains current `EndsWith(".Suffix")` behavior.
 
-**Rationale**: With glob patterns, the suffix position is unambiguous — it follows the wildcard. Changing `EndsWith` for literals would break existing policy files. The divergence is easy to document: "position-fixed under glob, free-form under literal."
+**Rationale**: With glob patterns, the suffix position is unambiguous once the full namespace pattern is resolved. Changing `EndsWith` for literals would break existing policy files. The divergence is easy to document: "position-fixed under glob, free-form under literal."
 
 ### D4: Literal beats glob in `ResolveContainingLayer` tiebreaker
 

@@ -46,7 +46,7 @@ namespace segment. For example, `MyCompany.Product.Features.*` matches
 `namespace_suffix` further requires the namespace to end with the suffix, such
 as matching `*.Contracts` inside a broader namespace root. When `namespace`
 contains a glob, `namespace_suffix` is position-fixed immediately after the
-wildcard-resolved segment.
+full resolved namespace pattern.
 
 `allowed_types` entries are exact full type names.
 

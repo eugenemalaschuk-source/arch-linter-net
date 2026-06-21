@@ -49,7 +49,7 @@ Glob semantics:
 - `*` matches exactly one namespace segment.
 - Descendants of the resolved prefix still match.
 - `namespace_suffix` composes with glob patterns, but the suffix becomes
-  position-fixed immediately after the wildcard-resolved segment.
+  position-fixed immediately after the full resolved namespace pattern.
 - `**`, `?`, character classes, partial-segment wildcards, bare `*`, and
   leading wildcard patterns such as `*.Features` are invalid.
 

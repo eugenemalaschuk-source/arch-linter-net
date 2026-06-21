@@ -193,6 +193,47 @@ public sealed class LayerResolverGlobTests
     }
 
     [Test]
+    public void MatchesNamespace_GlobWithMiddleWildcardAndSuffix_ReturnsTrue()
+    {
+        var layer = new ArchitectureLayer { Namespace = "Test.*.Features", NamespaceSuffix = "Contracts" };
+
+        bool result = ArchitectureLayerResolver.MatchesNamespace(layer, "Test.Game.Features.Contracts.Dto");
+
+        Assert.That(result, Is.True);
+    }
+
+    [Test]
+    public void MatchNamespace_GlobWithMiddleWildcardAndSuffix_ReturnsResolvedPrefixIncludingSuffix()
+    {
+        var layer = new ArchitectureLayer { Namespace = "Test.*.Features", NamespaceSuffix = "Contracts" };
+
+        ArchitectureNamespaceMatch result = ArchitectureLayerResolver.MatchNamespace(layer, "Test.Game.Features.Contracts.Dto");
+
+        Assert.That(result.Matched, Is.True);
+        Assert.That(result.MatchedNamespacePrefix, Is.EqualTo("Test.Game.Features.Contracts"));
+    }
+
+    [Test]
+    public void MatchesNamespace_GlobWithMultipleWildcardsAndSuffix_ReturnsTrue()
+    {
+        var layer = new ArchitectureLayer { Namespace = "A.*.B.*", NamespaceSuffix = "C" };
+
+        bool result = ArchitectureLayerResolver.MatchesNamespace(layer, "A.Foo.B.Bar.C.D");
+
+        Assert.That(result, Is.True);
+    }
+
+    [Test]
+    public void MatchesNamespace_GlobWithMultipleWildcardsAndSuffixWrongPosition_ReturnsFalse()
+    {
+        var layer = new ArchitectureLayer { Namespace = "A.*.B.*", NamespaceSuffix = "C" };
+
+        bool result = ArchitectureLayerResolver.MatchesNamespace(layer, "A.Foo.B.Bar.Internal.C");
+
+        Assert.That(result, Is.False);
+    }
+
+    [Test]
     public void ArchitectureLayer_NamespaceMutation_InvalidatesGlobCache()
     {
         var layer = new ArchitectureLayer { Namespace = "Test.Features.*" };

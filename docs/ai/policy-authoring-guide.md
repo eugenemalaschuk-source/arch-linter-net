@@ -37,7 +37,7 @@ Rules:
 - `*` matches exactly one namespace segment.
 - Descendants under the resolved prefix still match.
 - With `namespace_suffix`, the suffix is position-fixed immediately after the
-  wildcard-resolved segment.
+  full resolved namespace pattern.
 - `*` must be a full segment. Do not author `Feature*`, `*Feature`, or `F*eature`.
 - Do not author `**`, `?`, character classes, or regex.
 

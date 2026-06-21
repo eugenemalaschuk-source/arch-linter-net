@@ -52,12 +52,12 @@ Glob matching SHALL operate on namespace segments (split by `.`), not on raw reg
 
 ### Requirement: `namespace_suffix` composes with glob patterns
 
-When `namespace` contains a glob pattern AND `namespace_suffix` is set, the suffix position is fixed to the segment immediately after the wildcard.
+When `namespace` contains a glob pattern AND `namespace_suffix` is set, the suffix position is fixed immediately after the full namespace pattern.
 
 #### Scenario: Glob + suffix fixed-position match
 - **WHEN** a layer defines `namespace: FirstIce.Game.Features.*` and `namespace_suffix: Models`
 - **AND** the namespace to match is `FirstIce.Game.Features.Audio.Models`
-- **THEN** `*` consumes `Audio`, suffix matches `Models` on the next segment — match succeeds
+- **THEN** `*` consumes `Audio`, the full pattern resolves to `FirstIce.Game.Features.Audio`, and suffix matches `Models` on the next segment — match succeeds
 
 #### Scenario: Glob + suffix descendant allowed
 - **WHEN** a layer defines `namespace: FirstIce.Game.Features.*` and `namespace_suffix: Models`
@@ -69,10 +69,15 @@ When `namespace` contains a glob pattern AND `namespace_suffix` is set, the suff
 - **AND** the namespace to match is `FirstIce.Game.Features.Audio.Api.Contracts.Dto`
 - **THEN** match succeeds and the resolved concrete prefix is `FirstIce.Game.Features.Audio.Api.Contracts`
 
+#### Scenario: Glob with middle wildcard and suffix match
+- **WHEN** a layer defines `namespace: FirstIce.Game.*.Features` and `namespace_suffix: Contracts`
+- **AND** the namespace to match is `FirstIce.Game.Audio.Features.Contracts.Dto`
+- **THEN** match succeeds and the resolved concrete prefix is `FirstIce.Game.Audio.Features.Contracts`
+
 #### Scenario: Glob + suffix wrong position fails
 - **WHEN** a layer defines `namespace: FirstIce.Game.Features.*` and `namespace_suffix: Models`
 - **AND** the namespace to match is `FirstIce.Game.Features.Audio.Internal.Models`
-- **THEN** match fails (suffix must be immediately after the wildcard-consumed segment, but `Internal` occupies that position)
+- **THEN** match fails (suffix must be immediately after the full resolved namespace pattern, but `Internal` occupies that position)
 
 #### Scenario: Literal namespace + suffix retains old behavior
 - **WHEN** a layer defines `namespace: FirstIce.Game.Features` and `namespace_suffix: Models` (no glob)

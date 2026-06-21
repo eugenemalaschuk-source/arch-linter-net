@@ -6,7 +6,7 @@ Layer namespace definitions currently support only literal prefix matching. Poli
 
 - `ArchitectureLayer.Namespace` field accepts constrained glob patterns (`*` as a complete namespace segment) in addition to literal prefixes
 - `*` matches exactly one namespace segment; descendants of the resolved concrete prefix are included (matching existing child-prefix semantics)
-- `namespace_suffix` composes with glob patterns: when glob is present, suffix position is fixed to the segment immediately after `*` (vs. current `EndsWith` behavior for literal-only patterns)
+- `namespace_suffix` composes with glob patterns: when glob is present, suffix position is fixed immediately after the full namespace pattern (vs. current `EndsWith` behavior for literal-only patterns)
 - Literal prefixes outrank glob patterns in `ResolveContainingLayer` tiebreaking
 - Invalid patterns (`**`, `?`, partial-segment `*`, bare `*`, character classes, empty segments) are rejected at config load time with clear diagnostics
 - Violation diagnostics include both the configured pattern and the resolved concrete namespace prefix

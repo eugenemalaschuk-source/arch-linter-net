@@ -174,22 +174,4 @@ internal static class ArchitectureLayerResolver
         return new ArchitectureNamespaceMatch(true, baseMatch.Pattern, resolvedPrefix);
     }
 
-    private static int ComputeSpecificity(ArchitectureLayer layer)
-    {
-        NamespaceGlobPattern pattern = layer.GlobPattern;
-
-        int score = pattern.SpecificityScore;
-
-        if (!string.IsNullOrEmpty(layer.NamespaceSuffix))
-        {
-            score += 5;
-        }
-
-        if (!pattern.IsGlob)
-        {
-            score += 100;
-        }
-
-        return score;
-    }
 }
