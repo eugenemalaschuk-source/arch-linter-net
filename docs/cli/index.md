@@ -18,6 +18,7 @@ arch-linter-net [options]
 | `--condition-set <name>` | Use a named condition set from `analysis.condition_sets` to control conditional compilation symbols during Roslyn source analysis | policy `default_condition_set`, otherwise empty |
 | `-f`, `--format <fmt>` | Output format: `human` or `json` | `human` |
 | `--json` | Shortcut for `--format json` | |
+| `--timings` | Print phase-level timing report to stderr | |
 | `-h`, `--help` | Show help message | |
 | `-v`, `--version` | Show version | |
 
@@ -86,3 +87,55 @@ exit code 2 with a diagnostic listing available IDs.
 | `0` | All contracts passed |
 | `1` | One or more contracts failed |
 | `2` | Runtime error (invalid arguments, file not found, etc.) |
+
+## Timing baseline
+
+Use `--timings` to capture local validation baseline timings before performance work. Timing data is printed to stderr and is intended for human comparison between branches. Durations are machine-dependent; the output shape is stable, but numeric values are not part of tests.
+
+This is a measurement tool, not a performance optimization feature. See [#19](https://github.com/eugenemalaschuk-source/arch-linter-net/issues/19) for the performance planning story.
+
+### Examples
+
+```bash
+# Basic timing report
+arch-linter-net --strict --timings
+
+# Audit mode with timings
+arch-linter-net --audit --timings
+
+# JSON output with timings (JSON on stdout, timings on stderr)
+arch-linter-net --strict --json --timings 2>timings.txt
+```
+
+### Sample output
+
+The timing report is printed to stderr in a stable columnar format:
+
+```
+Validation timings:
+  total                                      452 ms
+
+  load_and_setup                              51 ms
+    yaml_loading                              12 ms
+    root_resolution                            3 ms
+    condition_set_resolution                   2 ms
+    assembly_resolution                       34 ms
+
+  configuration_check                          8 ms
+
+  contract_checks                            389 ms
+    dependency                 count=1         9 ms
+    layer                      count=1        12 ms
+    allow_only                 count=0         0 ms
+    cycle                      count=1        20 ms
+    method_body                count=2       345 ms
+    asmdef                     count=0         0 ms
+    independence               count=0         0 ms
+    protected                  count=1         3 ms
+    external                   count=0         0 ms
+    acyclic_sibling            count=0         0 ms
+
+  post_processing                              2 ms
+```
+
+`contract_checks` shows per-family breakdown with contract counts. The shape is deterministic — same policy always produces the same phase names and ordering.

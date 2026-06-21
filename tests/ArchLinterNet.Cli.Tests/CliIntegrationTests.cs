@@ -27,7 +27,7 @@ public class CliIntegrationTests
             StartInfo = new ProcessStartInfo
             {
                 FileName = "dotnet",
-                Arguments = $"build \"{_cliProjectPath}\" --nologo -q",
+                Arguments = $"build \"{_cliProjectPath}\" --nologo --verbosity quiet",
                 RedirectStandardOutput = true,
                 RedirectStandardError = true,
                 UseShellExecute = false,
@@ -412,5 +412,83 @@ public class CliIntegrationTests
             Assert.That(exitCode, Is.EqualTo(1));
             Assert.That(stdout, Does.Contain("missing target assembly"));
         });
+    }
+
+    /* --timings flag */
+
+    [Test]
+    public void Timings_PrintsPhaseNamesToStderr()
+    {
+        var (exitCode, _, stderr) = RunCli("--policy", _passingPolicy, "--strict", "--timings");
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(exitCode, Is.EqualTo(0));
+            Assert.That(stderr, Does.Contain("Validation timings:"));
+            Assert.That(stderr, Does.Contain("total"));
+            Assert.That(stderr, Does.Contain("load_and_setup"));
+            Assert.That(stderr, Does.Contain("configuration_check"));
+            Assert.That(stderr, Does.Contain("contract_checks"));
+            Assert.That(stderr, Does.Contain("ms"));
+        });
+    }
+
+    [Test]
+    public void Timings_ExitCodeMatchesNonTimings()
+    {
+        var (normalExit, _, _) = RunCli("--policy", _passingPolicy, "--strict");
+        var (timingExit, _, _) = RunCli("--policy", _passingPolicy, "--strict", "--timings");
+
+        Assert.That(timingExit, Is.EqualTo(normalExit));
+    }
+
+    [Test]
+    public void Timings_WithJson_StdoutRemainsValidJson()
+    {
+        var (exitCode, stdout, stderr) = RunCli("--policy", _passingPolicy, "--json", "--timings");
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(exitCode, Is.EqualTo(0));
+            Assert.That(stderr, Does.Contain("Validation timings:"));
+            Assert.DoesNotThrow(() => JsonDocument.Parse(stdout));
+        });
+    }
+
+    [Test]
+    public void Timings_StdoutUnchanged()
+    {
+        var (normalExit, normalOut, normalErr) = RunCli("--policy", _passingPolicy, "--strict");
+        var (timingExit, timingOut, timingErr) = RunCli("--policy", _passingPolicy, "--strict", "--timings");
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(timingExit, Is.EqualTo(normalExit));
+            Assert.That(timingOut, Is.EqualTo(normalOut));
+            Assert.That(timingErr, Is.Not.Empty);
+            Assert.That(normalErr, Is.Empty);
+        });
+    }
+
+    [Test]
+    public void Timings_WithAudit_PrintsPhaseNames()
+    {
+        var (exitCode, _, stderr) = RunCli("--policy", _passingPolicy, "--audit", "--timings");
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(exitCode, Is.EqualTo(0));
+            Assert.That(stderr, Does.Contain("Validation timings:"));
+            Assert.That(stderr, Does.Contain("contract_checks"));
+            Assert.That(stderr, Does.Contain("ms"));
+        });
+    }
+
+    [Test]
+    public void Timings_WithoutFlag_NoStderrOutput()
+    {
+        var (_, _, stderr) = RunCli("--policy", _passingPolicy, "--strict");
+
+        Assert.That(stderr, Is.Empty);
     }
 }
