@@ -117,11 +117,12 @@ Use `external: true` on a layer only when you intentionally want layer-style
 semantics with missing-type suppression. For new vendor/framework controls,
 prefer `external_dependencies`.
 
-External dependency contracts currently match only referenced type metadata that
-the scanner already sees from project types, such as base types, interfaces,
-fields, properties, method signatures, and generic arguments. They do not
-promise full method-body call detection and do not analyze third-party package
-internals.
+External dependency contracts detect forbidden references through type-level
+metadata (base types, interfaces, fields, properties, method signatures,
+generic arguments) and method-body IL scanning (method calls, constructor
+calls, field/property access, type references inside method bodies). They do
+not analyze third-party package internals. This is static reference analysis,
+not semantic data-flow or runtime validation.
 
 ## Use Transitive Depth For Indirect Coupling
 
