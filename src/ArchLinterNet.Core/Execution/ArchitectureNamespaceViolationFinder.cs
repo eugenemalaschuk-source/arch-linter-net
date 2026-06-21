@@ -221,9 +221,9 @@ internal static class ArchitectureNamespaceViolationFinder
             .ToList();
     }
 
-    public static bool IsInAnyAllowedLayer(string typeName, IReadOnlyList<ArchitectureLayer> allowedLayers)
+    public static bool IsInAnyAllowedLayer(string namespaceName, IReadOnlyList<ArchitectureLayer> allowedLayers)
     {
-        return allowedLayers.Any(layer => ArchitectureLayerResolver.MatchesNamespace(layer, typeName));
+        return allowedLayers.Any(layer => ArchitectureLayerResolver.MatchesNamespace(layer, namespaceName));
     }
 
     private static string ExtractNormalizedKey(string reference)

@@ -65,7 +65,7 @@ internal static class ArchitectureLayerResolver
 
     public static string? ResolveContainingLayer(
         ArchitectureContractDocument document,
-        string typeName,
+        string namespaceName,
         IReadOnlySet<string> candidateLayerNames)
     {
         return candidateLayerNames
@@ -78,7 +78,7 @@ internal static class ArchitectureLayerResolver
             {
                 layer.LayerName,
                 layer.Layer,
-                Match = MatchNamespace(layer.Layer, typeName),
+                Match = MatchNamespace(layer.Layer, namespaceName),
                 Pattern = layer.Layer.GlobPattern
             })
             .Where(layer => layer.Match.Matched)
@@ -91,10 +91,10 @@ internal static class ArchitectureLayerResolver
             .FirstOrDefault();
     }
 
-    public static bool IsProjectType(ArchitectureContractDocument document, string typeName)
+    public static bool IsProjectType(ArchitectureContractDocument document, string namespaceName)
     {
         return document.Layers.Values.Any(layer =>
-            MatchesNamespace(layer, typeName));
+            MatchesNamespace(layer, namespaceName));
     }
 
     public static bool IsInAnyNamespace(string typeName, IEnumerable<string> namespacePrefixes)

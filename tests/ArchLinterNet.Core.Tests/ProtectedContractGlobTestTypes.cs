@@ -10,3 +10,11 @@ namespace ProtectedGlob.Source
         public ProtectedGlob.Target.Execution.ProtectedExecutionService Service { get; } = new();
     }
 }
+
+namespace ProtectedGlob.Importers
+{
+    public sealed class DirectImporter
+    {
+        public ProtectedGlob.Target.Execution.ProtectedExecutionService Service { get; } = new();
+    }
+}
