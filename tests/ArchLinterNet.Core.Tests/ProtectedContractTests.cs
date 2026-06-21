@@ -438,6 +438,53 @@ public sealed class ProtectedContractTests
     }
 
     [Test]
+    public void CheckProtectedContract_GlobProtectedLayer_IncludesMatchedNamespacePrefixes()
+    {
+        var document = new ArchitectureContractDocument
+        {
+            Version = 1,
+            Name = "Test",
+            Layers = new Dictionary<string, ArchitectureLayer>
+            {
+                ["glob_target"] = new() { Namespace = "ProtectedGlob.Target.*" }
+            },
+            Analysis = new ArchitectureAnalysisConfiguration
+            {
+                TargetAssemblies = new List<string>
+                {
+                    "ArchLinterNet.Core.Tests"
+                }
+            },
+            Contracts = new ArchitectureContractGroups
+            {
+                StrictProtected = new List<ArchitectureProtectedContract>
+                {
+                    new()
+                    {
+                        Name = "glob-target-is-protected",
+                        Protected = new List<string> { "glob_target" },
+                        AllowedImporters = new List<string>()
+                    }
+                }
+            }
+        };
+
+        var context = new ArchitectureAnalysisContext(
+            "/tmp",
+            new[] { TestAssembly },
+            Array.Empty<string>(),
+            Array.Empty<string>());
+
+        var runner = new ArchitectureContractRunner(context, document);
+        var violations = runner.CheckProtectedContract(document.Contracts.StrictProtected[0]);
+
+        Assert.That(violations, Is.Not.Empty);
+        Assert.That(violations.Any(v =>
+            v.MatchedNamespacePrefixes != null
+            && v.MatchedNamespacePrefixes.Contains("ProtectedGlob.Target.Execution")), Is.True);
+    }
+
+    [Test]
     public void CheckProtectedContract_StandardViolation_NoProtectedContextInJson()
     {
         var violation = new ArchitectureViolation(

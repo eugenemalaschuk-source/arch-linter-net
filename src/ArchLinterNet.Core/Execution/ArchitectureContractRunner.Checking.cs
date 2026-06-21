@@ -561,6 +561,7 @@ public sealed partial class ArchitectureContractRunner
                         _document, sourceTypeFullName, allLayerNames);
 
                     List<string> matchingRefs = new();
+                    HashSet<string> matchedNamespacePrefixes = new(StringComparer.Ordinal);
 
                     foreach (Type refType in ArchitectureReferenceScanner.GetReferencedTypes(sourceType))
                     {
@@ -570,8 +571,9 @@ public sealed partial class ArchitectureContractRunner
                             continue;
                         }
 
-                        if (!ArchitectureLayerResolver.MatchesNamespace(
-                                protectedLayer, ArchitectureTypeNames.SafeNamespace(refType)))
+                        ArchitectureNamespaceMatch protectedMatch = ArchitectureLayerResolver.MatchNamespace(
+                            protectedLayer, ArchitectureTypeNames.SafeNamespace(refType));
+                        if (!protectedMatch.Matched)
                         {
                             continue;
                         }
@@ -597,6 +599,10 @@ public sealed partial class ArchitectureContractRunner
                         }
 
                         matchingRefs.Add(refFullName);
+                        if (!string.IsNullOrEmpty(protectedMatch.MatchedNamespacePrefix))
+                        {
+                            matchedNamespacePrefixes.Add(protectedMatch.MatchedNamespacePrefix);
+                        }
                     }
 
                     if (matchingRefs.Count == 0)
@@ -615,6 +621,9 @@ public sealed partial class ArchitectureContractRunner
                         $"protected layer '{protectedLayerName}' (allowed importers: [{string.Join(", ", contract.AllowedImporters)}])",
                         normalizedRefs)
                     {
+                        MatchedNamespacePrefixes = matchedNamespacePrefixes.Count > 0
+                            ? matchedNamespacePrefixes.OrderBy(prefix => prefix, StringComparer.Ordinal).ToArray()
+                            : null,
                         SourceLayer = sourceLayerName,
                         TargetLayer = protectedLayerName,
                         AllowedImporters = contract.AllowedImporters
