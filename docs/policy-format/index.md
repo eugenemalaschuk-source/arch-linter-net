@@ -1,183 +1,100 @@
 # Policy Format
 
-The architecture policy file lives at `architecture/dependencies.arch.yml` (configurable)
-and defines the complete validation configuration.
+The architecture policy file usually lives at:
+
+```text
+architecture/dependencies.arch.yml
+```
+
+The CLI path is configurable with `--policy <path>`.
 
 ## Top-level structure
 
 ```yaml
-version: 1                    # Schema version (required)
-name: My Architecture Contract # Human-readable name (required)
+version: 1
+name: My Architecture Contract
 
-layers:                        # Named layers with namespace patterns
-external_dependencies:         # Named vendor/framework dependency groups
-analysis:                      # Assembly resolution configuration
-contracts:                     # Validation contracts
+layers: {}
+external_dependencies: {}
+legacy_runtime_layers: []
+analysis: {}
+contracts: {}
 ```
 
-## Layers
+| Section | Purpose |
+|---------|---------|
+| `version` | Policy schema version. Current value is `1`. |
+| `name` | Human-readable policy name. |
+| `layers` | Named first-party or external namespace surfaces used by contracts. |
+| `external_dependencies` | Named vendor/framework dependency groups. |
+| `legacy_runtime_layers` | Optional compatibility namespace groups for runtime-only assemblies. |
+| `analysis` | Assembly resolution, source roots, condition sets, and validation behavior. |
+| `contracts` | Strict and audit contract families. |
 
-Each layer defines a namespace pattern for matching types:
+## Minimal policy
 
 ```yaml
+version: 1
+name: Minimal Architecture Contract
+
 layers:
-  app:
+  application:
     namespace: MyApp.Application
   domain:
     namespace: MyApp.Domain
   infrastructure:
     namespace: MyApp.Infrastructure
+
+analysis:
+  target_assemblies:
+    - MyApp.Application
+    - MyApp.Domain
+    - MyApp.Infrastructure
+
+contracts:
+  strict:
+    - id: application-not-infrastructure
+      name: application-must-not-depend-on-infrastructure
+      source: application
+      forbidden: [infrastructure]
+      reason: Application must not depend on Infrastructure directly.
 ```
 
-Literal `namespace` values match the exact namespace and any child namespace.
-For example, `MyApp.Domain` matches both `MyApp.Domain` and
-`MyApp.Domain.Models`.
+See [First policy](../getting-started/first-policy.md) for a walkthrough.
 
-### Namespace glob patterns
+## Layers
 
-Layer namespaces also support a constrained glob syntax using `*` as a complete
-namespace segment:
+Layers map short policy names to namespace patterns. They can represent application layers, modules, slices, or external namespace surfaces.
 
-```yaml
-layers:
-  feature_modules:
-    namespace: MyApp.Features.*
+Read [Layers and namespace patterns](layers-and-namespaces.md) for literal prefix matching, constrained `*` globs, `namespace_suffix`, and `external: true`.
 
-  feature_models:
-    namespace: MyApp.Features.*
-    namespace_suffix: Models
-```
+## External dependencies
 
-Rules:
+Use `external_dependencies` for vendor/framework leakage checks such as Unity, Entity Framework Core, cloud SDKs, database clients, or payment SDKs.
 
-- `*` matches exactly one namespace segment.
-- After `*` resolves to a concrete segment, descendants of that resolved prefix
-  are allowed, just like literal prefix matching.
-- `*` must occupy a whole segment. Patterns such as `Feature*`, `*Feature`, and
-  `F*eature` are invalid.
-- `**`, `?`, character classes, and raw regex are not supported.
-- A leading wildcard such as `*.Features` is invalid.
-
-Examples:
-
-- `MyApp.Features.*` matches `MyApp.Features.Audio` and
-  `MyApp.Features.Audio.Player`.
-- `MyApp.Features.*` does not match `MyApp.Features`.
-- `namespace: MyApp.Features.*` with `namespace_suffix: Models` matches
-  `MyApp.Features.Audio.Models` and `MyApp.Features.Audio.Models.Dto`.
-- That same pattern does not match `MyApp.Features.Audio.Internal.Models`
-  because the suffix is position-fixed when glob matching is used.
-
-### External layers
-
-When a layer references namespaces whose assemblies are not available in the
-scan environment (external SDKs, engine types, platform-conditional namespaces),
-set `external: true` to suppress the `empty layer namespace` configuration
-diagnostic:
-
-```yaml
-layers:
-  unity_engine:
-    namespace: UnityEngine
-    external: true
-
-  sentry:
-    namespace: Sentry
-    external: true
-```
-
-External layers remain fully usable as `forbidden` targets, in `allowed` lists,
-in `strict_layers`, `strict_cycles`, `strict_independence`, etc. Dependency
-scanning uses namespace string matching and does not require target-side types
-to be loaded. If types are found for an external layer (e.g. SDK present in
-search paths), the linter uses them normally.
-
-For new vendor/framework leakage rules, prefer `external_dependencies` over
-`external: true` layers. `external: true` remains supported as a backward-
-compatible escape hatch for layer-based policies and namespaces that may be
-missing from the scan environment.
-
-## External Dependencies
-
-Use `external_dependencies` to model vendor/framework dependency surfaces that
-are not first-party layers:
-
-```yaml
-external_dependencies:
-  unity_runtime:
-    namespace_prefixes:
-      - UnityEngine
-    type_prefixes: []
-
-  unity_editor:
-    namespace_prefixes:
-      - UnityEditor
-    type_prefixes: []
-
-  infrastructure_sdks:
-    namespace_prefixes:
-      - Amazon
-      - Azure
-      - Microsoft.EntityFrameworkCore
-    type_prefixes:
-      - Stripe.StripeClient
-```
-
-`namespace_prefixes` use exact-or-child namespace matching. `type_prefixes`
-match full referenced type names by prefix. External dependency matching uses
-only referenced type metadata visible from project types. It does not perform
-full method-body analysis and does not statically analyze third-party package
-internals.
-
-You can also define legacy runtime layer names (for runtime-only assemblies):
-
-```yaml
-legacy_runtime_layers:
-  - third-party
-```
+Read [External dependencies](external-dependencies.md) for the YAML shape and matching rules.
 
 ## Analysis configuration
 
 ```yaml
 analysis:
-  target_assemblies:          # Required — assemblies to scan
+  target_assemblies:
     - MyApp.Application
     - MyApp.Domain
-  assembly_search_paths: []   # Optional — additional probe directories
-  condition_sets: {}          # Optional — named preprocessor symbol sets
-  default_condition_set: ''   # Optional — default condition set name
+  assembly_search_paths: []
+  source_roots: []
+  condition_sets: {}
+  default_condition_set: ''
+  unmatched_ignored_violations: error
 ```
 
-`assembly_search_paths` is recommended for standalone CLI hosts.
-You can also provide probe paths through the `ARCHITECTURE_ASSEMBLY_SEARCH_PATHS`
-environment variable (path-separator delimited).
+`target_assemblies` tells the runner which assemblies to inspect. `assembly_search_paths` and `source_roots` make standalone CLI and method-body scanning reliable in real repositories.
 
-### Condition sets
-
-Condition sets control which preprocessor symbols (`#if`, `#if !`) are active
-during Roslyn source/method-body analysis. Each named set is a list of preprocessor
-symbols. When no condition set is selected (or the default resolves to empty), no
-symbols are defined and all `#if SYMBOL` blocks are excluded from analysis.
-
-```yaml
-analysis:
-  condition_sets:
-    runtime: []
-    editor: [UNITY_EDITOR]
-    debug: [DEBUG, UNITY_EDITOR]
-  default_condition_set: runtime
-```
-
-Condition sets affect Roslyn source/method-body scanning only. Reflection and IL
-scanners analyze the assemblies provided to the run and are not reinterpreted under
-different symbols.
-
-Select a condition set with `--condition-set <name>` on the CLI, or let the default
-apply. Unknown condition set names produce exit code 2.
+Read [Condition sets](condition-sets.md) for conditional compilation behavior.
 
 ## Contracts
 
-Contracts are divided into **strict** and **audit** groups at the top level:
+Contracts are split into strict and audit groups. Strict contracts block the run when they fail. Audit contracts are diagnostic and should be used for migration discovery or future-state rules.
 
 ```yaml
 contracts:
@@ -190,6 +107,8 @@ contracts:
   strict_independence: []
   strict_external: []
   strict_acyclic_siblings: []
+  strict_protected: []
+  strict_layer_templates: []
 
   audit: []
   audit_layers: []
@@ -200,7 +119,18 @@ contracts:
   audit_independence: []
   audit_external: []
   audit_acyclic_siblings: []
+  audit_protected: []
+  audit_layer_templates: []
 ```
 
-Each contract type has its own structure. See the [Contracts](../contracts/index.md) page
-for detailed documentation of each family.
+Read [Contracts](../contracts/index.md) for the supported contract families.
+
+## Baselines and ignored violations
+
+Use `ignored_violations` or a generated baseline only to freeze known existing debt. New violations should still be detected.
+
+Read [Migration baselines](../guides/migration-baselines.md) for the full lifecycle.
+
+## Supported capabilities and non-goals
+
+Before adding fields, check [Supported capabilities and non-goals](supported-capabilities.md). ArchLinterNet intentionally does not validate runtime dependency injection behavior, security/authorization correctness, code ownership, or semantic data flow.

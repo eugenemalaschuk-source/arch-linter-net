@@ -2,7 +2,7 @@
 
 Use this checklist before opening or approving an AI-generated policy change.
 
-## Repository Facts
+## Repository facts
 
 - [ ] Every layer maps to an existing namespace prefix or documented runtime namespace.
 - [ ] Every `external_dependencies` group maps to a real vendor/framework namespace or type prefix.
@@ -10,7 +10,7 @@ Use this checklist before opening or approving an AI-generated policy change.
 - [ ] `assembly_search_paths` point to real build output directories when needed.
 - [ ] `source_roots` are included when method-body source scanning needs non-default roots.
 
-## Contract Safety
+## Contract safety
 
 - [ ] Strict contracts pass today or intentionally enforce an accepted no-new-debt gate.
 - [ ] Future-state or discovery rules are in audit groups, not strict groups.
@@ -19,22 +19,29 @@ Use this checklist before opening or approving an AI-generated policy change.
 - [ ] Ordered layer contracts do not mix broad aggregate layers with overlapping child layers.
 - [ ] Module independence rules reflect real module boundaries, not idealized names.
 
-## Ignores And Debt
+## Ignores and debt
 
 - [ ] Every `ignored_violations` entry is narrow enough to freeze known debt only.
 - [ ] Every ignore has a reason with a migration note or issue reference.
-- [ ] No ignore uses broad `*` patterns unless a human explicitly accepted that baseline.
+- [ ] No ignore uses broad patterns unless a human explicitly accepted that baseline.
 - [ ] New violations are not hidden by expanding an unrelated ignore.
+- [ ] Generated baselines are reviewed before being committed.
 
-## Schema And Capability Fit
+## Schema and capability fit
 
 - [ ] The policy uses only fields supported by `schema/dependencies.arch.schema.json`.
-- [ ] The policy uses only contract families listed in `archlinternet.capabilities.json`.
-- [ ] No unsupported fields such as `regex`, `severity`, `from`, `to`, custom groups, or unsupported glob syntax (`**`, `?`, `Feature*`) were invented.
+- [ ] The policy uses only contract families listed in `archlinternet.capabilities.json` and public docs.
+- [ ] No unsupported fields such as `regex`, `severity`, `from`, `to`, `owner`, custom groups, or unsupported namespace pattern syntax were invented.
 - [ ] Any layer `namespace` using `*` uses it as a full segment and still maps to real repeated namespaces in the repository.
 - [ ] Documentation and sample policy snippets match executable YAML.
 
-## Local Validation
+## Public documentation boundary
+
+- [ ] Product usage docs are in the MkDocs public documentation tree.
+- [ ] Internal backlog governance, OpenSpec archives, and repository-agent instructions are not linked as product docs.
+- [ ] NuGet-facing links point to the public product docs and GitHub repository, not internal Markdown files.
+
+## Local validation
 
 - [ ] The policy validates against the JSON Schema when a schema validator is available.
 - [ ] Strict validation was run locally.

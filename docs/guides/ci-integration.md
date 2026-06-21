@@ -1,13 +1,16 @@
 # CI Integration
 
-## GitHub Actions
+A good CI setup separates blocking strict validation from non-blocking audit visibility.
 
-### Basic validation
+## Recommended GitHub Actions workflow
 
 ```yaml
 name: Architecture validation
 
-on: [push, pull_request]
+on:
+  pull_request:
+  push:
+    branches: [main]
 
 jobs:
   architecture:
@@ -17,9 +20,11 @@ jobs:
 
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
 
-      - name: Install ArchLinterNet
-        run: dotnet tool install --global ArchLinterNet.Cli
+      - name: Restore tools
+        run: dotnet tool restore
 
       - name: Restore dependencies
         run: dotnet restore
@@ -28,52 +33,74 @@ jobs:
         run: dotnet build --no-restore
 
       - name: Validate architecture (strict)
-        run: arch-linter-net
+        run: dotnet arch-linter-net --mode strict --json > architecture-strict.json
 
-      - name: Audit report (non-blocking)
+      - name: Upload strict diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: architecture-strict
+          path: architecture-strict.json
+
+      - name: Architecture audit report
         if: always()
-        run: arch-linter-net --mode audit --json > audit-report.json
+        continue-on-error: true
+        run: dotnet arch-linter-net --mode audit --json > architecture-audit.json
 
-      - name: Upload audit report
+      - name: Upload audit diagnostics
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: architecture-audit
-          path: audit-report.json
+          path: architecture-audit.json
 ```
 
-### Strict validation with artifact
+Use `dotnet tool restore` with a local tool manifest when the repository should pin the ArchLinterNet version. Use `dotnet tool install --global ArchLinterNet.Cli` only when global installation is acceptable for your pipeline.
+
+## Exit code behavior
+
+| Code | Meaning | CI action |
+|------|---------|-----------|
+| `0` | No selected contract violations | Pass |
+| `1` | Validation completed and violations were found | Fail strict jobs; expected when manually inspecting failing audit rules |
+| `2` | Invalid arguments, invalid configuration, missing files, or other runtime error | Fail closed |
+
+See [Exit codes](../usage/exit-codes.md) for details.
+
+## Strict vs audit jobs
+
+Strict validation is the no-new-debt gate. It should fail a pull request when an enforced architecture boundary is violated.
+
+Audit validation is visibility for migration work. It can be uploaded as an artifact, posted to a dashboard, or inspected periodically, but it should not accidentally become the strict gate unless the team intentionally promotes the audit rule.
+
+## Baseline in CI
+
+For existing repositories with known debt:
 
 ```yaml
-- name: Validate architecture (strict)
-  run: arch-linter-net --json > violations.json
-
-- name: Upload violations
-  if: failure()
-  uses: actions/upload-artifact@v4
-  with:
-    name: architecture-violations
-    path: violations.json
+- name: Validate architecture with baseline
+  run: dotnet arch-linter-net \
+    --policy architecture/dependencies.arch.yml \
+    --baseline architecture/baseline.arch.yml \
+    --mode strict
 ```
 
-## Azure Pipelines
+The baseline should be reviewed like code and cleaned up as violations are fixed.
+
+## Azure Pipelines example
 
 ```yaml
 - task: DotNetCoreCLI@2
-  displayName: 'Install ArchLinterNet'
+  displayName: Restore local tools
   inputs:
-    command: 'custom'
-    custom: 'tool'
-    arguments: 'install --global ArchLinterNet.Cli'
+    command: custom
+    custom: tool
+    arguments: restore
 
-- script: 'arch-linter-net'
-  displayName: 'Validate architecture'
+- script: dotnet arch-linter-net --mode strict
+  displayName: Validate architecture
 ```
 
-## Exit codes for CI
+## Documentation publication note
 
-| Code | Meaning | CI Action |
-|------|---------|-----------|
-| `0` | No violations | Pass |
-| `1` | Strict violations found | Fail |
-| `2` | Configuration error | Fail |
+Repository release automation may publish MkDocs to GitHub Pages, but PR CI should only validate docs and code. It must not publish packages, create releases, or deploy documentation.
