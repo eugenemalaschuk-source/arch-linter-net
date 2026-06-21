@@ -163,6 +163,9 @@ public sealed class ExternalDependencyIlScannerTests
         Assert.That(violations, Is.Not.Empty);
         Assert.That(violations[0].SourceType,
             Does.Contain("CoreTypeWithGenericOnlyInBody"));
+        Assert.That(violations[0].ForbiddenReferences.Any(r =>
+            r.Contains("ExternalDependencyContractTestsFixtures.VendorSdk.Client")),
+            Is.True);
     }
 
     [Test]
@@ -338,9 +341,15 @@ contracts:
       forbidden: [vendor_sdk]
 ");
 
-            var result = ArchitectureAssertions.FromPolicy(contractPath).ValidateStrict();
+            var strictResult = ArchitectureAssertions.FromPolicy(contractPath).ValidateStrict();
+            Assert.That(strictResult.Passed, Is.True);
 
-            Assert.That(result.Passed, Is.True);
+            var auditResult = ArchitectureAssertions.FromPolicy(contractPath).ValidateAudit();
+            Assert.That(auditResult.Passed, Is.False);
+            Assert.That(auditResult.Violations.Any(v =>
+                v.ForbiddenExternalGroup == "vendor_sdk" &&
+                v.ForbiddenReferences.Any(r => r.Contains("VendorSdk.Client"))),
+                Is.True);
         }
         finally
         {

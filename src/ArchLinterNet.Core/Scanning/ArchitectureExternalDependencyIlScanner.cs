@@ -136,7 +136,7 @@ internal static class ArchitectureExternalDependencyIlScanner
                 continue;
             }
 
-            string? matchedType = MatchReferencedTypes(referencedMember, externalGroup);
+            string? matchedType = FindMatchedExternalType(referencedMember, externalGroup);
             if (matchedType == null)
             {
                 continue;
@@ -146,7 +146,7 @@ internal static class ArchitectureExternalDependencyIlScanner
         }
     }
 
-    private static string? MatchReferencedTypes(
+    private static string? FindMatchedExternalType(
         MemberInfo member,
         ArchitectureExternalDependencyGroup externalGroup)
     {
@@ -161,9 +161,10 @@ internal static class ArchitectureExternalDependencyIlScanner
             return null;
         }
 
-        if (MatchesGroupOrGenericArgs(primaryType, externalGroup))
+        string? result = FindMatchedTypeInHierarchy(primaryType, externalGroup);
+        if (result != null)
         {
-            return FormatMemberName(member);
+            return result;
         }
 
         if (member is MethodInfo mi && mi.IsGenericMethod)
@@ -180,9 +181,10 @@ internal static class ArchitectureExternalDependencyIlScanner
 
             foreach (Type arg in methodArgs)
             {
-                if (MatchesGroupOrGenericArgs(arg, externalGroup))
+                result = FindMatchedTypeInHierarchy(arg, externalGroup);
+                if (result != null)
                 {
-                    return FormatMemberName(member);
+                    return result;
                 }
             }
         }
@@ -190,31 +192,7 @@ internal static class ArchitectureExternalDependencyIlScanner
         return null;
     }
 
-    private static string FormatMemberName(MemberInfo member)
-    {
-        Type? declaringType = member switch
-        {
-            Type t => t,
-            _ => member.DeclaringType
-        };
-
-        string fullName = declaringType != null
-            ? ArchitectureTypeNames.SafeFullName(declaringType)
-            : string.Empty;
-
-        return member switch
-        {
-            MethodInfo m => $"{fullName}.{m.Name}",
-            ConstructorInfo c => $"{fullName}..ctor",
-            PropertyInfo p => $"{fullName}.{p.Name}",
-            FieldInfo f => $"{fullName}.{f.Name}",
-            EventInfo e => $"{fullName}.{e.Name}",
-            Type t => ArchitectureTypeNames.SafeFullName(t),
-            _ => fullName
-        };
-    }
-
-    private static bool MatchesGroupOrGenericArgs(
+    private static string? FindMatchedTypeInHierarchy(
         Type type,
         ArchitectureExternalDependencyGroup externalGroup)
     {
@@ -223,18 +201,19 @@ internal static class ArchitectureExternalDependencyIlScanner
 
         if (ArchitectureExternalDependencyResolver.MatchesGroup(externalGroup, fullName, ns))
         {
-            return true;
+            return fullName;
         }
 
         foreach (Type arg in SafeGetGenericArguments(type))
         {
-            if (MatchesGroupOrGenericArgs(arg, externalGroup))
+            string? result = FindMatchedTypeInHierarchy(arg, externalGroup);
+            if (result != null)
             {
-                return true;
+                return result;
             }
         }
 
-        return false;
+        return null;
     }
 
     private static Type[] SafeGetGenericArguments(Type type)
