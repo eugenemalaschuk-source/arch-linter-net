@@ -1,43 +1,30 @@
 # Release Process
 
-This page documents the maintainer workflow for publishing ArchLinterNet
-preview/stable releases. The release pipeline is intentionally manual: a
-maintainer chooses the release scenario, reviews a dry-run, and only then
-publishes packages and creates the public release record.
+This page documents the maintainer workflow for publishing ArchLinterNet preview/stable releases. The release pipeline is intentionally manual: a maintainer chooses the release scenario, reviews a dry-run, and only then publishes packages and creates the public release record.
 
-## Release Records
+## Release records
 
 A completed public release is recorded in three places:
 
-- **NuGet.org packages** — each generated `.nupkg` includes the generated
-  release notes in NuGet `PackageReleaseNotes` metadata.
-- **GitHub Release** — the GitHub Release body uses the same generated
-  `release-notes.md`, and the generated `.nupkg` / `.snupkg` files are attached
-  as release assets.
-- **Workflow artifacts** — every manual workflow run uploads the generated
-  release notes and package artifacts for review/audit of that run.
+- **NuGet.org packages** — each generated `.nupkg` includes release notes and public package metadata.
+- **GitHub Release** — the GitHub Release body uses the generated release notes, and generated `.nupkg` / `.snupkg` files are attached as release assets.
+- **GitHub Pages documentation** — the MkDocs public product site is deployed when publication is enabled.
+- **Workflow artifacts** — every manual workflow run uploads generated release notes and package artifacts for review/audit of that run.
 
-The GitHub Release is the durable human-facing release record. The workflow does
-not commit generated changelog files to the repository. If a committed changelog
-or custom release-history site is needed later, add a separate backlog task for
-that behavior.
+The GitHub Release is the durable human-facing release record. The workflow does not commit generated changelog files to the repository.
 
 ## Versioning
 
-ArchLinterNet follows [Semantic Versioning 2.0](https://semver.org/).
+ArchLinterNet follows Semantic Versioning 2.0.
 
-Pre-1.0 preview releases use versions such as `0.1.0-preview.1`.
-The manual release workflow calculates the package version automatically from
-git tags based on the selected release scenario (`preview`, `patch`, `minor`,
-or `major`). Do not update `Directory.Build.props` just to run a release.
+Pre-1.0 preview releases use versions such as `0.1.0-preview.1`. The manual release workflow calculates package versions from git tags based on the selected release scenario (`preview`, `patch`, `minor`, or `major`). Do not update `Directory.Build.props` just to run a release.
 
-### Version Calculation Rules
+### Version calculation rules
 
-The workflow detects the latest SemVer-compatible git tag (format
-`vX.Y.Z` or `vX.Y.Z-preview.N`) and calculates the next version:
+The workflow detects the latest SemVer-compatible git tag and calculates the next version:
 
 | Latest tag | Release type | Calculated version |
-|---|---|---|
+|------------|--------------|--------------------|
 | `v0.1.1-preview.2` | `preview` | `0.1.1-preview.3` |
 | `v0.1.0` | `preview` | `0.1.1-preview.1` |
 | `v0.1.1-preview.2` | `patch` | `0.1.1` |
@@ -45,180 +32,136 @@ The workflow detects the latest SemVer-compatible git tag (format
 | `v0.1.0` | `minor` | `0.2.0` |
 | `v0.1.0` | `major` | `1.0.0` |
 
-- `preview` increments the preview number within the current preview train,
-  or starts a new preview train from the next patch when the latest tag is
-  stable.
-- `patch` finalizes a preview train (drops the prerelease suffix) or increments
-  the patch version from the latest stable tag.
-- `minor` and `major` always produce stable versions from the base version,
-  ignoring any prerelease suffix.
-- Tags use the `v` prefix; package versions are always output without `v`.
+Tags use the `v` prefix. Package versions are emitted without `v`.
 
-The workflow prints the calculated values in the run log:
-
-```text
-Calculated PACKAGE_VERSION=0.1.0-preview.4
-Target tag: v0.1.0-preview.4
-Previous tag: v0.1.0-preview.3
-```
-
-### Version Override
+### Version override
 
 Use `version_override` only when automatic tag-based calculation cannot be used:
 
 - first release with no SemVer-compatible tags;
 - emergency recovery from a broken/manual versioning situation.
 
-The override value bypasses tag detection and version calculation entirely.
-Use the NuGet package version form without `v`, for example
-`0.1.0-preview.1`. The workflow still creates the target git tag as
-`v{version_override}` during public release creation.
+For normal preview continuation, leave `version_override` empty.
 
-For normal preview continuation, leave `version_override` empty. For example, if
-`v0.1.0-preview.3` already exists as a git tag, select `release_type: preview`
-and the workflow calculates `0.1.0-preview.4` automatically.
+## Public documentation boundary
 
-## Release Notes
+GitHub Pages publishes only the public product documentation generated by MkDocs.
 
-Release notes are generated by GitHub from merged pull request history and the
-category rules in `.github/release.yml`.
+Internal project documentation remains in repository Markdown files and must not appear in the MkDocs navigation or generated site:
 
-The generated note range is based on:
+- `docs/internal/`;
+- OpenSpec/change archives;
+- backlog governance;
+- issue-writing rules;
+- repository-agent instructions;
+- implementation planning notes.
 
-- the detected previous SemVer tag, when one exists;
-- the calculated target tag for the current release;
-- the workflow commit being released.
+The release workflow should deploy the generated MkDocs site only. It should not publish internal documentation as product docs.
 
-Maintainers should treat the generated notes as a reviewable artifact, not as an
-unreviewed black box. Before publishing, inspect the dry-run `release-notes-*`
-artifact and confirm the notes are user-facing enough for NuGet.org and the
-GitHub Release page.
+## NuGet metadata and links
 
-## Workflow Separation
+Before publication, inspect package metadata and confirm:
+
+- `PackageProjectUrl` points to the public GitHub Pages documentation site;
+- `RepositoryUrl` points to the GitHub repository;
+- `PackageReadmeFile` is a concise user-facing README;
+- `PackageLicenseExpression` matches the repository license;
+- release notes are user-facing enough for NuGet.org;
+- no NuGet-facing link points to internal project documentation.
+
+See [NuGet package metadata](nuget-metadata.md) for the canonical link model.
+
+## Workflow separation
 
 Pull request CI and package publication are intentionally separate:
 
-- `.github/workflows/ci.yml` validates pull requests and pushes to `main` with
-  `make restore` followed by the full `make acceptance` gate.
-- `.github/workflows/release-nuget.yml` is the only workflow that builds
-  official versioned package artifacts, can publish to NuGet.org, creates the
-  GitHub Release, and deploys documentation to GitHub Pages when publication is
-  enabled.
+- PR CI validates code and documentation.
+- The manual release workflow owns official package build, optional NuGet publication, GitHub Release creation, and GitHub Pages deployment.
 
-The CI workflow must not call `dotnet pack`, request publishing identity tokens,
-publish packages, create tags, create GitHub Releases, or deploy docs.
+PR CI must not call official release publication steps, request publishing identity tokens, push packages, create tags, create GitHub Releases, or deploy docs.
 
-Local `make pack` is only for developer inspection. Official preview package
-publication, GitHub Release creation, and GitHub Pages deployment are performed
-by the manual GitHub Actions workflow.
+Local `make pack` is only for developer inspection. Official publication is performed by the manual GitHub Actions workflow.
 
-## NuGet.org Trusted Publishing Setup
+## NuGet.org trusted publishing setup
 
 Before the first public publication:
 
 1. Configure a NuGet.org trusted publishing policy with these fields:
-   - package owner: `eugene.malaschuk`
-   - repository owner: `eugenemalaschuk-source`
-   - repository: `arch-linter-net`
-   - workflow file: `release-nuget.yml`
-   - environment: empty
-1. Enable GitHub Pages for the repository and use GitHub Actions as the Pages
-   source.
+   - package owner: `eugene.malaschuk`;
+   - repository owner: `eugenemalaschuk-source`;
+   - repository: `arch-linter-net`;
+   - workflow file: `release-nuget.yml`;
+   - environment: empty.
+1. Enable GitHub Pages for the repository and use GitHub Actions as the Pages source.
 
-Classic long-lived NuGet API keys are not stored as repository secrets for this
-workflow. The release job uses GitHub's publishing identity flow to obtain the
-NuGet publish credential during the run.
+Classic long-lived NuGet API keys are not stored as repository secrets for this workflow. The release job uses GitHub's publishing identity flow to obtain the NuGet publish credential during the run.
 
-NuGet.org is the only package publication target for preview consumption.
-GitHub Packages is not used as package storage or as a mirror in the initial
-release pipeline.
+NuGet.org is the package publication target for preview consumption. GitHub Packages is not used as package storage or as a mirror in the initial release pipeline.
 
-## Manual Release Procedure
+## Manual release procedure
 
-Always run releases from the GitHub Actions UI. Do not publish official packages
-from a local machine.
+Always run releases from the GitHub Actions UI. Do not publish official packages from a local machine.
 
-### Step 1: Dry-Run Review
+### Step 1: dry-run review
 
-In GitHub, open **Actions**, select **Release NuGet packages and docs**, choose
-**Run workflow**, select the target branch (`main` for normal releases), and set:
-
-- **release_type**: `preview`, `patch`, `minor`, or `major`;
-- **publish**: `false`;
-- **version_override**: empty for normal releases; exact package version only for
-  first-release/emergency cases.
+Run the release workflow with `publish: false`.
 
 Expected dry-run result:
 
-- restore, Release build, and `make acceptance` pass;
-- generated release notes are written to
-  `artifacts/release-notes/release-notes.md`;
-- package artifacts are built with the calculated `PackageVersion` / `Version`;
-- all packages receive the same `PackageReleaseNotes` metadata;
-- `release-notes-{PACKAGE_VERSION}` is uploaded as a workflow artifact;
-- `nuget-packages-{PACKAGE_VERSION}` is uploaded as a workflow artifact;
+- restore, Release build, and acceptance validation pass;
+- release notes are generated as workflow artifacts;
+- package artifacts are built with one calculated package version;
+- packages contain public metadata and package README;
 - nothing is pushed to NuGet.org;
 - no GitHub tag or GitHub Release is created;
 - docs are not deployed.
 
-Before continuing, download or inspect:
+Before continuing, inspect:
 
-- `release-notes-{PACKAGE_VERSION}` — review the exact notes that will be used
-  for NuGet and GitHub Release;
-- `nuget-packages-{PACKAGE_VERSION}` — inspect at least one `.nupkg` and confirm
-  package metadata, including release notes, is present.
+- release notes artifact;
+- package artifacts;
+- generated package metadata;
+- package README;
+- project/repository/license links.
 
-### Step 2: Public Publication
+### Step 2: public publication
 
-After dry-run artifacts are checked, rerun the same workflow from the GitHub
-Actions UI with the same release scenario and version override choice, but set:
-
-- **publish**: `true`.
+After dry-run artifacts are checked, rerun the workflow with the same release scenario and `publish: true`.
 
 Expected public result:
 
-- restore, Release build, and `make acceptance` pass again;
-- package artifacts are rebuilt for the same calculated version;
-- package and release-note artifacts are uploaded to the workflow run;
-- `.nupkg` packages are pushed to NuGet.org;
-- duplicate pushes are skipped to make accidental reruns safer;
-- after NuGet publication succeeds, the workflow creates GitHub tag/release
-  `v{PACKAGE_VERSION}` from the exact workflow commit;
-- the GitHub Release body uses the generated `release-notes.md`;
-- the GitHub Release assets include all generated `.nupkg` and `.snupkg` files;
-- documentation is built and deployed to GitHub Pages.
+- packages are pushed to NuGet.org;
+- duplicate pushes are skipped for safer reruns;
+- GitHub tag and release are created from the workflow commit;
+- generated package assets are attached to the GitHub Release;
+- MkDocs product documentation is built and deployed to GitHub Pages.
 
 After publication, verify:
 
-- NuGet.org shows the expected package versions;
-- NuGet package release notes are visible in package metadata;
-- GitHub Release `v{PACKAGE_VERSION}` exists and contains the expected body;
-- GitHub Release assets include all package and symbol package files;
-- GitHub Pages deployment completed successfully.
+- NuGet.org shows expected package versions;
+- NuGet package project links open the public product docs;
+- NuGet repository links open the GitHub repository;
+- NuGet package README is product-facing;
+- GitHub Release exists and contains expected assets;
+- GitHub Pages deployment completed successfully;
+- internal docs are not visible in the published site navigation.
 
-Record the published package IDs, version, GitHub Release URL, and GitHub Pages
-URL in the related issue or pull request notes.
+Record the published package IDs, version, GitHub Release URL, NuGet package URL, and GitHub Pages URL in the related issue or pull request notes.
 
-## Failure and Rerun Notes
+## Failure and rerun notes
 
-- If the dry-run fails, fix the underlying problem and rerun with
-  `publish: false`.
-- If public publication fails before NuGet push completes, no GitHub Release
-  should be created because release creation runs only after the release job
-  succeeds.
-- If NuGet publication partially succeeds, inspect NuGet.org and the workflow
-  logs before rerunning. The workflow uses `--skip-duplicate`, but maintainers
-  must still verify that all expected packages are available.
-- If a GitHub Release already exists for the target tag, do not overwrite it
-  blindly. Inspect the existing release and decide whether to fix the release
-  manually or publish a new version.
+- If the dry-run fails, fix the underlying problem and rerun with `publish: false`.
+- If public publication fails before NuGet push completes, no GitHub Release should be created.
+- If NuGet publication partially succeeds, inspect NuGet.org and workflow logs before rerunning. The workflow should use duplicate-safe push behavior where possible.
+- If a GitHub Release already exists for the target tag, do not overwrite it blindly. Inspect the existing release and decide whether to fix the release manually or publish a new version.
 
-## Non-Goals
+## Non-goals
 
 The release workflow does not:
 
 - publish from pushed tags automatically;
 - publish docs independently from package publication;
+- publish internal project documentation as product docs;
 - commit generated changelog files;
 - maintain a custom changelog website;
 - publish packages to GitHub Packages.

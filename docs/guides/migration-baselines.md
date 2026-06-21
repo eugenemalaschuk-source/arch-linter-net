@@ -90,9 +90,9 @@ baseline:
 ### Baseline lifecycle
 
 1. **Generate** — create the baseline from current violations
-2. **Merge** — run `arch-linter-net --policy ... --baseline baseline.yml --mode strict` to enforce boundaries going forward
-3. **Clean up** — as violations are fixed, remove individual entries from the baseline file
-4. **Regenerate** — when the codebase changes significantly, regenerate to capture the new state
+1. **Merge** — run `arch-linter-net --policy ... --baseline baseline.yml --mode strict` to enforce boundaries going forward
+1. **Clean up** — as violations are fixed, remove individual entries from the baseline file
+1. **Regenerate** — when the codebase changes significantly, regenerate to capture the new state
 
 ### Merge semantics
 

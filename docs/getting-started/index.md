@@ -1,17 +1,33 @@
 # Getting Started
 
-This guide walks through adding ArchLinterNet to a .NET repository.
+This guide shows the shortest path from a .NET repository to an executable architecture policy.
 
-## 1. Create a policy file
+## 1. Install or run the tool
 
-Create `architecture/dependencies.arch.yml` at your repository root:
+During ArchLinterNet development, run the CLI from source:
+
+```bash
+dotnet run --project src/ArchLinterNet.Cli -- --policy architecture/dependencies.arch.yml --mode strict
+```
+
+After the .NET tool is installed from NuGet.org, run:
+
+```bash
+arch-linter-net --policy architecture/dependencies.arch.yml --mode strict
+```
+
+See [Installation](../installation/index.md) for global tool, local tool, and package usage.
+
+## 2. Create a policy
+
+Create `architecture/dependencies.arch.yml` at the repository root. Start with a small rule that maps to real namespaces and passes or fails for a known reason.
 
 ```yaml
 version: 1
 name: My Architecture Contract
 
 layers:
-  app:
+  application:
     namespace: MyApp.Application
   domain:
     namespace: MyApp.Domain
@@ -26,76 +42,73 @@ analysis:
 
 contracts:
   strict:
-    - name: app-must-not-depend-on-infrastructure
-      source: app
+    - id: application-not-infrastructure
+      name: application-must-not-depend-on-infrastructure
+      source: application
       forbidden: [infrastructure]
-      reason: Application layer should not depend on infrastructure directly.
+      reason: Application code must depend on abstractions, not concrete infrastructure.
 
   strict_layers:
-    - name: clean-architecture-layering
+    - id: clean-architecture-layering
+      name: clean-architecture-layering
       layers:
         - infrastructure
-        - app
+        - application
         - domain
       reason: Dependencies must point inward toward the domain.
 ```
 
-## 2. Run validation
+See [First policy](first-policy.md) for a walkthrough.
 
-Using the .NET tool:
+## 3. Choose strict or audit
+
+Use **strict** contracts for boundaries that should block CI today.
+
+Use **audit** contracts for migration discovery, future-state architecture, and known debt that should be visible before it becomes a gate.
 
 ```bash
-arch-linter-net
+arch-linter-net --mode strict
+arch-linter-net --mode audit
 ```
 
-Or programmatically from a test:
+## 4. Add CI
 
-```csharp
-using ArchLinterNet.Core.Contracts;
-using ArchLinterNet.Core.Execution;
-using ArchLinterNet.Core.Reporting;
+A common CI setup runs strict validation as a blocking step and audit validation as a non-blocking artifact:
 
-string repositoryRoot = @"/path/to/repo";
-string policyPath = Path.Combine(repositoryRoot, "architecture", "dependencies.arch.yml");
+```yaml
+- name: Validate architecture (strict)
+  run: arch-linter-net --mode strict
 
-var document = ArchitectureContractLoader.LoadFromPath(policyPath);
-var resolution = ArchitectureAssemblyResolver.ResolveFromDocument(document, repositoryRoot);
-
-var context = new ArchitectureAnalysisContext(
-    repositoryRoot,
-    resolution.ResolvedAssemblies,
-    resolution.MissingAssemblyNames,
-    resolution.AssemblyProbingPaths);
-
-var runner = new ArchitectureContractRunner(context, document);
-
-foreach (var contract in runner.StrictContracts())
-{
-    var violations = runner.CheckContract(contract);
-    if (violations.Count == 0) continue;
-
-    string output = ArchitectureDiagnosticFormatter.FormatViolationsForHumans(violations);
-    Console.WriteLine(output);
-}
+- name: Architecture audit report
+  if: always()
+  continue-on-error: true
+  run: arch-linter-net --mode audit --json > architecture-audit.json
 ```
 
-## 3. Interpret results
+See [CI integration](../guides/ci-integration.md) for full workflows.
 
-Violations show the contract name, source type, and forbidden references:
+## 5. Handle existing debt
 
-```
-[VIOLATION] app-must-not-depend-on-infrastructure
-  MyApp.Application.Services.MyService
-    → MyApp.Infrastructure.Repositories.UserRepository
-    → MyApp.Infrastructure.Data.DbContext
+When adopting ArchLinterNet in an existing repository, generate a baseline for current violations instead of weakening the rule:
 
-[VIOLATION] clean-architecture-layering
-  MyApp.Infrastructure.Importer
-    → MyApp.Domain.Abstractions.IUnitOfWork
+```bash
+arch-linter-net baseline generate \
+  --config architecture/dependencies.arch.yml \
+  --output architecture/baseline.arch.yml \
+  --reason "Initial migration baseline"
 ```
 
-## 4. Next steps
+Then validate with:
 
-- Read the [Policy Format](../policy-format/index.md) guide for a complete reference
-- Check [CI Integration](../guides/ci-integration.md) for adding validation to your pipeline
-- Explore [Migration Baselines](../guides/migration-baselines.md) for managing existing violations
+```bash
+arch-linter-net --policy architecture/dependencies.arch.yml --baseline architecture/baseline.arch.yml --mode strict
+```
+
+See [Migration baselines](../guides/migration-baselines.md) for the lifecycle.
+
+## Next steps
+
+- [Policy format](../policy-format/index.md)
+- [Contract families](../contracts/index.md)
+- [Supported capabilities and non-goals](../policy-format/supported-capabilities.md)
+- [AI policy authoring](../ai/index.md)
