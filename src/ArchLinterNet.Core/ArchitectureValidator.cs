@@ -28,9 +28,10 @@ public sealed class ArchitectureValidator
     {
         ArchitectureContractDocument document = ArchitectureContractLoader.LoadFromPath(policyPath);
 
-        if (preprocessorSymbols == null)
+        if (preprocessorSymbols == null &&
+            !ConditionSetResolver.TryResolve(document, null, out preprocessorSymbols, out string? resolveError))
         {
-            ConditionSetResolver.TryResolve(document, null, out preprocessorSymbols, out _);
+            throw new InvalidOperationException(resolveError);
         }
 
         string repositoryRoot = ArchitectureRepositoryRootLocator.ResolveFrom(policyPath);

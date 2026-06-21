@@ -147,6 +147,29 @@ public class NonDebugClass
     }
 
     [Test]
+    public void Validator_UnknownDefaultConditionSet_ThrowsInvalidOperation()
+    {
+        string yaml = """
+                      version: 1
+                      name: InvalidDefaultTest
+                      layers:
+                        core:
+                          namespace: TestNamespace
+                      analysis:
+                        target_assemblies:
+                          - TestAssembly
+                        default_condition_set: non_existent_set
+                      contracts: {}
+                      """;
+        string policyPath = Path.Combine(_tempDir, "invalid-default.arch.yml");
+        File.WriteAllText(policyPath, yaml);
+
+        var validator = new ArchitectureValidator();
+        var ex = Assert.Throws<InvalidOperationException>(() => validator.Validate(policyPath));
+        Assert.That(ex!.Message, Does.Contain("non_existent_set"));
+    }
+
+    [Test]
     public void ValidatorDefaultConditionSet_ResolvesFromPolicyDefault()
     {
         var document = new ArchitectureContractDocument
