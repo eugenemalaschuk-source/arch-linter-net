@@ -9,7 +9,7 @@ The policy file is usually `architecture/dependencies.arch.yml` and contains:
 
 - `version`: current value is `1`.
 - `name`: human-readable policy name.
-- `layers`: named namespace-prefix layer definitions.
+- `layers`: named namespace-prefix or constrained glob layer definitions.
 - `external_dependencies`: named vendor/framework dependency groups.
 - `legacy_runtime_layers`: optional namespace prefixes used by dependency contracts.
 - `analysis`: target assemblies, assembly search paths, optional source roots, condition sets, and default condition set.
@@ -38,8 +38,15 @@ Layer `namespace` values match exact namespaces and child namespaces. For
 example, `MyCompany.Product.Domain` matches `MyCompany.Product.Domain` and
 `MyCompany.Product.Domain.Models`.
 
+Layer `namespace` also supports constrained glob patterns using `*` as a full
+namespace segment. For example, `MyCompany.Product.Features.*` matches
+`MyCompany.Product.Features.Audio` and descendants such as
+`MyCompany.Product.Features.Audio.Player`.
+
 `namespace_suffix` further requires the namespace to end with the suffix, such
-as matching `*.Contracts` inside a broader namespace root.
+as matching `*.Contracts` inside a broader namespace root. When `namespace`
+contains a glob, `namespace_suffix` is position-fixed immediately after the
+wildcard-resolved segment.
 
 `allowed_types` entries are exact full type names.
 
@@ -75,7 +82,8 @@ ArchLinterNet does not currently validate:
 - Code ownership or review ownership.
 - Semantic data-flow analysis.
 - Full method-body detection for external dependency contracts.
-- Regex or wildcard layer namespace definitions.
+- Recursive `**`, `?`, character classes, raw regex, or partial-segment
+  wildcard layer namespace definitions.
 - Custom contract families outside the documented YAML schema.
 - Automatic baseline generation.
 

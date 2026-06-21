@@ -15,12 +15,48 @@ layers:
 ```
 
 Layer namespaces are prefix matches. `namespace_suffix` is available for
-conventions such as `*.Contracts`, but layer definitions do not support regular
-expressions or wildcards.
+conventions such as `*.Contracts`.
+
+Layer definitions also support a constrained `*` wildcard when it occupies a
+whole namespace segment:
+
+```yaml
+layers:
+  feature_modules:
+    namespace: MyCompany.Product.Features.*
+
+  feature_contracts:
+    namespace: MyCompany.Product.Features.*
+    namespace_suffix: Contracts
+```
+
+Use this only when you need one layer to cover repeated sibling namespaces.
+
+Rules:
+
+- `*` matches exactly one namespace segment.
+- Descendants under the resolved prefix still match.
+- With `namespace_suffix`, the suffix is position-fixed immediately after the
+  wildcard-resolved segment.
+- `*` must be a full segment. Do not author `Feature*`, `*Feature`, or `F*eature`.
+- Do not author `**`, `?`, character classes, or regex.
+
+Examples:
+
+- `MyCompany.Product.Features.*` matches `MyCompany.Product.Features.Audio` and
+  `MyCompany.Product.Features.Audio.Player`.
+- `namespace: MyCompany.Product.Features.*` with
+  `namespace_suffix: Contracts` matches
+  `MyCompany.Product.Features.Audio.Contracts` and
+  `MyCompany.Product.Features.Audio.Contracts.Dto`.
+- That same pattern does not match
+  `MyCompany.Product.Features.Audio.Internal.Contracts`.
 
 Prefer narrow layers before broad aggregate layers. If a repository has modules
 such as `Sales`, `Billing`, and `Inventory`, model those modules directly before
-adding a broad `application` layer that hides cross-module coupling.
+adding a broad `application` layer that hides cross-module coupling. Use glob
+layers as aggregate views, not as a replacement for the concrete layers you need
+for specific contracts and diagnostics.
 
 ## Choose Strict Or Audit
 

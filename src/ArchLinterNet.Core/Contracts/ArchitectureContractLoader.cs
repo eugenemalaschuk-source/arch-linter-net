@@ -49,6 +49,7 @@ public static class ArchitectureContractLoader
         AssignFallbackIds(document);
         ValidateDuplicateIds(document);
         ValidateAcyclicSiblingContracts(document);
+        ValidateLayerNamespaces(document);
 
         return document;
     }
@@ -136,6 +137,20 @@ public static class ArchitectureContractLoader
                     throw new InvalidOperationException(
                         $"Acyclic sibling contract '{contract.Name}' has a blank or empty ancestor at index {i}. Each ancestor must be a non-empty namespace prefix.");
                 }
+            }
+        }
+    }
+
+    private static void ValidateLayerNamespaces(ArchitectureContractDocument document)
+    {
+        foreach (KeyValuePair<string, ArchitectureLayer> pair in document.Layers)
+        {
+            string layerName = pair.Key;
+            ArchitectureLayer layer = pair.Value;
+
+            if (!string.IsNullOrEmpty(layer.Namespace) && layer.Namespace.Contains('*'))
+            {
+                _ = layer.GlobPattern;
             }
         }
     }

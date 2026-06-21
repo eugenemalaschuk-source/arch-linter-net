@@ -23,28 +23,56 @@ internal static class ArchitectureNamespaceViolationFinder
             .Select(type =>
             {
                 string sourceFullName = ArchitectureTypeNames.SafeFullName(type);
-                string[] forbiddenRefs = ArchitectureReferenceScanner.GetReferencedTypes(type)
-                    .Where(reference => ArchitectureLayerResolver.MatchesNamespace(forbiddenLayer,
-                        ArchitectureTypeNames.SafeNamespace(reference)))
-                    .Select(ArchitectureTypeNames.SafeFullName)
-                    .Where(name => !string.IsNullOrEmpty(name))
-                    .Where(name => !allowedTypeFullNames.Contains(name))
-                    .Where(name =>
+                var forbiddenMatches = ArchitectureReferenceScanner.GetReferencedTypes(type)
+                    .Select(reference => new
                     {
-                        bool ignored = ArchitectureIgnoreMatcher.IsIgnored(sourceFullName, name,
+                        Reference = reference,
+                        Match = ArchitectureLayerResolver.MatchNamespace(forbiddenLayer,
+                            ArchitectureTypeNames.SafeNamespace(reference))
+                    })
+                    .Where(x => x.Match.Matched)
+                    .Select(x => new
+                    {
+                        FullName = ArchitectureTypeNames.SafeFullName(x.Reference),
+                        x.Match.MatchedNamespacePrefix
+                    })
+                    .Where(x => !string.IsNullOrEmpty(x.FullName))
+                    .Where(x => !allowedTypeFullNames.Contains(x.FullName))
+                    .Where(x =>
+                    {
+                        bool ignored = ArchitectureIgnoreMatcher.IsIgnored(sourceFullName, x.FullName,
                             ignoredViolations, usageTracker);
                         if (!ignored && contractGroup != null && baselineCandidates != null)
                         {
-                            baselineCandidates.Add(new ArchitectureBaselineCandidate(contractGroup, contractId, sourceFullName, name));
+                            baselineCandidates.Add(new ArchitectureBaselineCandidate(contractGroup, contractId, sourceFullName, x.FullName));
                         }
+
                         return !ignored;
                     })
-                    .Distinct()
-                    .OrderBy(name => name)
+                    .GroupBy(x => x.FullName, StringComparer.Ordinal)
+                    .Select(group => new
+                    {
+                        FullName = group.Key,
+                        MatchedNamespacePrefix = group.Select(x => x.MatchedNamespacePrefix)
+                            .FirstOrDefault(prefix => !string.IsNullOrEmpty(prefix))
+                    })
+                    .OrderBy(x => x.FullName, StringComparer.Ordinal)
                     .ToArray();
+
+                string[] forbiddenRefs = forbiddenMatches.Select(x => x.FullName).ToArray();
+                string[] matchedPrefixes = forbiddenMatches
+                    .Select(x => x.MatchedNamespacePrefix)
+                    .Where(prefix => !string.IsNullOrEmpty(prefix))
+                    .Distinct(StringComparer.Ordinal)
+                    .OrderBy(prefix => prefix, StringComparer.Ordinal)
+                    .ToArray()!;
+
                 return new ArchitectureViolation(
                     contractName, contractId, sourceFullName,
-                    ArchitectureLayerResolver.DescribeLayer(forbiddenLayer), forbiddenRefs);
+                    ArchitectureLayerResolver.DescribeLayer(forbiddenLayer), forbiddenRefs)
+                {
+                    MatchedNamespacePrefixes = matchedPrefixes.Length > 0 ? matchedPrefixes : null
+                };
             })
             .Where(violation => violation.ForbiddenReferences.Count > 0)
             .ToArray();
@@ -71,6 +99,7 @@ internal static class ArchitectureNamespaceViolationFinder
             {
                 string sourceFullName = ArchitectureTypeNames.SafeFullName(type);
                 List<string> forbiddenRefs = new();
+                HashSet<string> matchedPrefixes = new(StringComparer.Ordinal);
                 List<IReadOnlyCollection<string>> paths = new();
 
                 foreach (var (referenced, path) in ArchitectureReferenceScanner.GetTransitiveReferencedTypes(type, traversePredicate))
@@ -81,8 +110,9 @@ internal static class ArchitectureNamespaceViolationFinder
                         continue;
                     }
 
-                    if (!ArchitectureLayerResolver.MatchesNamespace(forbiddenLayer,
-                            ArchitectureTypeNames.SafeNamespace(referenced)))
+                    ArchitectureNamespaceMatch match = ArchitectureLayerResolver.MatchNamespace(forbiddenLayer,
+                        ArchitectureTypeNames.SafeNamespace(referenced));
+                    if (!match.Matched)
                     {
                         continue;
                     }
@@ -103,6 +133,11 @@ internal static class ArchitectureNamespaceViolationFinder
                     }
 
                     forbiddenRefs.Add(refFullName);
+                    if (!string.IsNullOrEmpty(match.MatchedNamespacePrefix))
+                    {
+                        matchedPrefixes.Add(match.MatchedNamespacePrefix);
+                    }
+
                     paths.Add(path.Select(ArchitectureTypeNames.SafeFullName)
                         .Where(n => !string.IsNullOrEmpty(n))
                         .ToArray());
@@ -125,7 +160,10 @@ internal static class ArchitectureNamespaceViolationFinder
                     ArchitectureLayerResolver.DescribeLayer(forbiddenLayer),
                     paired.Select(x => x.refName).ToArray())
                 {
-                    DependencyPaths = paired.Select(x => x.path).ToArray()
+                    DependencyPaths = paired.Select(x => x.path).ToArray(),
+                    MatchedNamespacePrefixes = matchedPrefixes.Count > 0
+                        ? matchedPrefixes.OrderBy(prefix => prefix, StringComparer.Ordinal).ToArray()
+                        : null
                 };
             })
             .Where(violation => violation != null)!;
