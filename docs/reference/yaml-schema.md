@@ -115,6 +115,7 @@ contracts:
   strict_independence: []
   strict_protected: []
   strict_external: []
+  strict_acyclic_siblings: []
 
   audit: []                     # Non-blocking contracts (same types)
   audit_layers: []
@@ -126,6 +127,7 @@ contracts:
   audit_independence: []
   audit_protected: []
   audit_external: []
+  audit_acyclic_siblings: []
 ```
 
 ### Dependency contract
@@ -214,6 +216,21 @@ strict_layer_templates:
   reason: <string>
 ```
 
+### Acyclic sibling contract
+
+```yaml
+- id: <string>                  # Optional — stable identifier for CLI selection
+  name: <string>                # Required
+  ancestors: [<string>]         # Required — one or more namespace prefixes
+  ignored_violations: []        # Optional — baseline known violations
+  reason: <string>              # Recommended — human-readable justification
+```
+
+Scans loaded types under each ancestor namespace and groups them by immediate
+child namespace segment. Detects dependency cycles between sibling groups.
+Descendant dependencies are attributed to the direct sibling group. Each ancestor
+is evaluated independently.
+
 ### Method-body contract
 
 ```yaml
@@ -278,7 +295,7 @@ report references from source types into those vendor/framework surfaces.
 
 ### Ignored violations
 
-Dependency, layer, allow-only, cycle, method-body, independence, protected, and external contracts
+Dependency, layer, allow-only, cycle, acyclic sibling, method-body, independence, protected, and external contracts
 may include an `ignored_violations` block (asmdef contracts do not support this):
 
 ```yaml

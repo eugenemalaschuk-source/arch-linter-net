@@ -208,6 +208,17 @@ public static class Program
                 allViolations.AddRange(runner.CheckExternalContract(contract));
             }
 
+            IEnumerable<ArchitectureAcyclicSiblingContract> acyclicSiblingContracts = mode == "audit"
+                ? runner.AuditAcyclicSiblingContracts()
+                : runner.StrictAcyclicSiblingContracts();
+
+            foreach (ArchitectureAcyclicSiblingContract contract in acyclicSiblingContracts)
+            {
+                IReadOnlyCollection<string> contractCycles = runner.CheckAcyclicSiblingContract(contract);
+                string idPrefix = contract.Id != null ? $"[{contract.Id}] " : string.Empty;
+                allCycles.AddRange(contractCycles.Select(c => $"{idPrefix}{c}"));
+            }
+
             IReadOnlyList<ArchitectureUnmatchedIgnoredViolation> allUnmatched = unmatchedConfig != "off"
                 ? runner.UnmatchedIgnoredViolations
                 : Array.Empty<ArchitectureUnmatchedIgnoredViolation>();

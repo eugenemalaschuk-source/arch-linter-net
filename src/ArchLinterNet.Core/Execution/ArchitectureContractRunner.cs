@@ -147,6 +147,16 @@ public sealed partial class ArchitectureContractRunner(
         return _document.Contracts.AuditExternal;
     }
 
+    public IEnumerable<ArchitectureAcyclicSiblingContract> StrictAcyclicSiblingContracts()
+    {
+        return _document.Contracts.StrictAcyclicSiblings;
+    }
+
+    public IEnumerable<ArchitectureAcyclicSiblingContract> AuditAcyclicSiblingContracts()
+    {
+        return _document.Contracts.AuditAcyclicSiblings;
+    }
+
     public List<ArchitectureViolation> CheckConfiguration()
     {
         return CheckConfiguration(strict: true);

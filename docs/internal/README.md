@@ -111,6 +111,7 @@ contracts:
   strict_method_body: []
   strict_asmdef: []
   strict_independence: []
+  strict_acyclic_siblings: []
 
   audit: []
   audit_layers: []
@@ -119,6 +120,7 @@ contracts:
   audit_method_body: []
   audit_asmdef: []
   audit_independence: []
+  audit_acyclic_siblings: []
 ```
 
 ______________________________________________________________________
@@ -178,7 +180,13 @@ Whitelist model: source may reference only explicitly allowed layers.
 
 Detects directed cycles among selected layers.
 
-### 5. Method-Body (`strict_method_body` / `audit_method_body`)
+### 5. Acyclic Sibling (`strict_acyclic_siblings` / `audit_acyclic_siblings`)
+
+Auto-discovers direct sibling namespaces under configured ancestor namespaces
+and detects dependency cycles between them. Uses `ArchitectureSiblingGraphBuilder`
+for namespace discovery and `ArchitectureCycleDetector` for cycle detection.
+
+### 6. Method-Body (`strict_method_body` / `audit_method_body`)
 
 Detects forbidden calls in executable bodies using:
 

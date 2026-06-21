@@ -292,6 +292,99 @@ public sealed partial class ArchitectureContractRunner
         return ArchitectureCycleDetector.FindCycles(graph);
     }
 
+    public IReadOnlyCollection<string> CheckAcyclicSiblingContract(ArchitectureAcyclicSiblingContract contract)
+    {
+        if (!IsContractSelected(contract.Id))
+        {
+            return Array.Empty<string>();
+        }
+
+        List<string> allCycles = new();
+        ArchitectureIgnoreUsageTracker? tracker = _enableUnmatchedIgnoreTracking && contract.IgnoredViolations.Count > 0 ? new() : null;
+
+        foreach (string ancestor in contract.Ancestors)
+        {
+            Dictionary<string, List<Type>> siblingGroups =
+                ArchitectureSiblingGraphBuilder.BuildSiblingGroups(_context.TargetAssemblies, ancestor);
+
+            if (siblingGroups.Count <= 1)
+            {
+                continue;
+            }
+
+            Dictionary<string, HashSet<string>> graph = new(StringComparer.Ordinal);
+
+            foreach (string siblingName in siblingGroups.Keys)
+            {
+                graph[siblingName] = new HashSet<string>(StringComparer.Ordinal);
+            }
+
+            foreach (KeyValuePair<string, List<Type>> sourceEntry in siblingGroups)
+            {
+                string sourceSibling = sourceEntry.Key;
+
+                foreach (Type sourceType in sourceEntry.Value)
+                {
+                    string sourceTypeName = ArchitectureTypeNames.SafeFullName(sourceType);
+
+                    foreach (Type referencedType in ArchitectureReferenceScanner.GetReferencedTypes(sourceType))
+                    {
+                        string referencedTypeName = ArchitectureTypeNames.SafeFullName(referencedType);
+                        string? referencedSibling = ResolveSiblingGroup(siblingGroups, referencedTypeName, ancestor);
+
+                        if (referencedSibling == null || referencedSibling == sourceSibling)
+                        {
+                            continue;
+                        }
+
+                        if (ArchitectureIgnoreMatcher.IsIgnored(sourceTypeName, referencedTypeName,
+                                contract.IgnoredViolations, tracker))
+                        {
+                            continue;
+                        }
+
+                        graph[sourceSibling].Add(referencedSibling);
+                    }
+                }
+            }
+
+            IReadOnlyCollection<string> ancestorCycles = ArchitectureCycleDetector.FindCycles(graph);
+
+            allCycles.AddRange(
+                ancestorCycles.Select(c => $"{ancestor}: {c}"));
+        }
+
+        RecordUnmatchedIgnores(contract.Name, contract.Id, contract.IgnoredViolations, tracker, _unmatchedIgnoredViolations);
+        return allCycles;
+    }
+
+    private static string? ResolveSiblingGroup(
+        Dictionary<string, List<Type>> siblingGroups,
+        string typeName,
+        string ancestorNamespace)
+    {
+        string prefix = ancestorNamespace + ".";
+
+        int dotIndex = typeName.LastIndexOf('.');
+        if (dotIndex < 0)
+        {
+            return null;
+        }
+
+        string ns = typeName[..dotIndex];
+
+        if (!ns.StartsWith(prefix, StringComparison.Ordinal))
+        {
+            return null;
+        }
+
+        string remainder = ns[prefix.Length..];
+        int childDotIndex = remainder.IndexOf('.');
+        string child = childDotIndex < 0 ? remainder : remainder[..childDotIndex];
+
+        return siblingGroups.ContainsKey(child) ? child : null;
+    }
+
     public List<ArchitectureViolation> CheckMethodBodyContract(ArchitectureMethodBodyContract contract)
     {
         if (!IsContractSelected(contract.Id))

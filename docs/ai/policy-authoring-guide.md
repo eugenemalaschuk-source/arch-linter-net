@@ -231,6 +231,22 @@ contracts:
       reason: Bounded contexts communicate through explicit public contracts.
 ```
 
+Use `strict_acyclic_siblings` when you want to automatically discover sibling
+namespaces under one or more ancestor namespaces and ensure they don't form
+dependency cycles. This is useful for feature-group architectures where siblings
+are added over time without updating policy definitions.
+
+```yaml
+contracts:
+  strict_acyclic_siblings:
+    - id: features-acyclic
+      name: feature-siblings-must-be-acyclic
+      ancestors:
+        - MyApp.Features
+        - MyApp.Modules
+      reason: New feature siblings should not introduce cycles.
+```
+
 ## Keep Ignores Narrow
 
 `ignored_violations` is a frozen-debt baseline. Each entry should identify a

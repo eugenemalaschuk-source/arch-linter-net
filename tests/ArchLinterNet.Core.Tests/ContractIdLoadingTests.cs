@@ -105,6 +105,7 @@ contracts:
         Assert.That(typeof(ArchitectureMethodBodyContract).GetInterfaces(), Does.Contain(typeof(IArchitectureContract)));
         Assert.That(typeof(ArchitectureAsmdefContract).GetInterfaces(), Does.Contain(typeof(IArchitectureContract)));
         Assert.That(typeof(ArchitectureIndependenceContract).GetInterfaces(), Does.Contain(typeof(IArchitectureContract)));
+        Assert.That(typeof(ArchitectureAcyclicSiblingContract).GetInterfaces(), Does.Contain(typeof(IArchitectureContract)));
     }
 
     [Test]

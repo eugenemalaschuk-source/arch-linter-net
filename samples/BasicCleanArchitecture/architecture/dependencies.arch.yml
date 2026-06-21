@@ -77,3 +77,9 @@ contracts:
       reason: Web and Infrastructure must not reference each other.
 
   audit_independence: []
+
+  strict_acyclic_siblings:
+    - name: main-modules-acyclic
+      ancestors:
+        - MyApp
+      reason: Direct sibling namespaces under MyApp must not form cycles.
