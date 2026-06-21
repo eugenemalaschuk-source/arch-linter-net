@@ -17,6 +17,12 @@ analysis:
     - MyApp.Domain
     - MyApp.Infrastructure
   assembly_search_paths: []
+  # Condition sets control which preprocessor symbols (#if) are active
+  # during Roslyn source analysis. Only affects method-body contracts.
+  # condition_sets:
+  #   runtime: []
+  #   editor: [UNITY_EDITOR]
+  # default_condition_set: runtime
 
 contracts:
   strict:

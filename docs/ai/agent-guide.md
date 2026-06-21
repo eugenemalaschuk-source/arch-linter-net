@@ -15,6 +15,7 @@ smallest enforceable rules.
 1. Check current references before deciding whether a rule belongs in `strict` or `audit`.
 1. Read `schema/dependencies.arch.schema.json` before adding fields.
 1. Read `archlinternet.capabilities.json` before proposing a contract family.
+1. If the project uses conditional compilation (`#if UNITY_EDITOR`, `#if DEBUG`), check whether method-body contracts need a condition set to avoid false positives or missed violations. Define `analysis.condition_sets` when the same source should be validated under different symbol configurations.
 
 ## Mental Model
 

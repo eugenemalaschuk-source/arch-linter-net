@@ -15,12 +15,16 @@ ArchLinterNet SHALL provide AI-facing documentation that explains how agents cre
 - **WHEN** an agent writes policy YAML
 - **THEN** the guide explicitly warns the agent not to invent unsupported fields, contract families, matching modes, or broad ignored violations
 
+#### Scenario: Agent considers conditional compilation
+- **WHEN** an agent inspects a repository with `#if UNITY_EDITOR` or `#if DEBUG` blocks
+- **THEN** the guide instructs the agent to consider whether method-body contracts need `analysis.condition_sets` to avoid false positives or missed violations under different symbol configurations
+
 ### Requirement: Capability and limit documentation
 ArchLinterNet SHALL document the linter capabilities and limits that matter to AI policy authors.
 
 #### Scenario: Agent reviews supported contract families
 - **WHEN** an agent checks the AI capability documentation
-- **THEN** the documentation lists supported dependency, layer order, allow-only, cycle, method-body, asmdef, and independence contracts with their strict and audit variants
+- **THEN** the documentation lists supported dependency, layer order, allow-only, cycle, method-body, asmdef, independence contracts with their strict and audit variants, and condition sets under the `analysis` section
 
 #### Scenario: Agent reviews unsupported capabilities
 - **WHEN** an agent checks the AI capability documentation

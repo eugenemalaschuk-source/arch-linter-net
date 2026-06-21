@@ -40,6 +40,12 @@ public sealed class ArchitectureAnalysisConfiguration
 
     [YamlMember(Alias = "unmatched_ignored_violations")]
     public string UnmatchedIgnoredViolations { get; set; } = "error";
+
+    [YamlMember(Alias = "condition_sets")]
+    public Dictionary<string, List<string>> ConditionSets { get; set; } = new();
+
+    [YamlMember(Alias = "default_condition_set")]
+    public string DefaultConditionSet { get; set; } = string.Empty;
 }
 
 public sealed class ArchitectureLayer

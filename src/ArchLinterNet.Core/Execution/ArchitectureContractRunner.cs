@@ -10,7 +10,8 @@ public sealed partial class ArchitectureContractRunner(
     ArchitectureAnalysisContext context,
     ArchitectureContractDocument document,
     HashSet<string>? selectedContractIds = null,
-    bool enableUnmatchedIgnoreTracking = true)
+    bool enableUnmatchedIgnoreTracking = true,
+    IReadOnlyList<string>? preprocessorSymbols = null)
 {
     private readonly ArchitectureAnalysisContext _context = context ?? throw new ArgumentNullException(nameof(context));
 
@@ -20,6 +21,8 @@ public sealed partial class ArchitectureContractRunner(
     private readonly HashSet<string>? _selectedContractIds = selectedContractIds;
 
     private readonly bool _enableUnmatchedIgnoreTracking = enableUnmatchedIgnoreTracking;
+
+    private readonly IReadOnlyList<string>? _preprocessorSymbols = preprocessorSymbols;
 
     private readonly List<ArchitectureUnmatchedIgnoredViolation> _unmatchedIgnoredViolations = new();
 

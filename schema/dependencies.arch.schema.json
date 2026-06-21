@@ -124,6 +124,20 @@
           "enum": ["error", "warn", "off"],
           "default": "error",
           "description": "Behavior when an ignored_violations entry matches no current violation. 'error' (default) fails validation, 'warn' reports but does not fail, 'off' skips detection."
+        },
+        "condition_sets": {
+          "type": "object",
+          "description": "Named preprocessor symbol sets for conditional compilation analysis. Each key is a condition set name (e.g. 'runtime', 'editor'), each value is an array of preprocessor symbols (e.g. ['UNITY_EDITOR']). Only affects Roslyn source/method-body scanning.",
+          "default": {},
+          "additionalProperties": {
+            "type": "array",
+            "items": { "type": "string", "minLength": 1 }
+          }
+        },
+        "default_condition_set": {
+          "type": "string",
+          "description": "Name of the default condition set used when --condition-set is not provided on the CLI. Must match a key in condition_sets. When empty or unset, no preprocessor symbols are defined.",
+          "default": ""
         }
       }
     },

@@ -18,6 +18,7 @@ public static class Program
         string mode = "strict";
         string format = "human";
         List<string> contractIds = new();
+        string? conditionSetName = null;
 
         for (int i = 0; i < args.Length; i++)
         {
@@ -40,6 +41,9 @@ public static class Program
                     break;
                 case "--contract" when i + 1 < args.Length:
                     contractIds.Add(args[++i]);
+                    break;
+                case "--condition-set" when i + 1 < args.Length:
+                    conditionSetName = args[++i];
                     break;
                 case "--strict":
                     mode = "strict";
@@ -105,11 +109,19 @@ public static class Program
                 }
             }
 
+            if (!ConditionSetResolver.TryResolve(
+                    document, conditionSetName, out IReadOnlyList<string> preprocessorSymbols, out string? resolveError))
+            {
+                Console.Error.WriteLine(resolveError);
+                return 2;
+            }
+
             ResolutionResult resolution = ArchitectureAssemblyResolver.ResolveFromDocument(document, repositoryRoot);
 
             ArchitectureAnalysisContext context = new(repositoryRoot, resolution.ResolvedAssemblies,
                 resolution.MissingAssemblyNames, resolution.AssemblyProbingPaths);
-            ArchitectureContractRunner runner = new(context, document, selectedIds, unmatchedConfig != "off");
+            ArchitectureContractRunner runner = new(context, document, selectedIds, unmatchedConfig != "off",
+                preprocessorSymbols: preprocessorSymbols);
 
             List<ArchitectureViolation> allViolations = new();
             List<string> allCycles = new();
@@ -315,6 +327,11 @@ public static class Program
                   --strict          Shortcut for --mode strict
                   --audit           Shortcut for --mode audit
                   --contract <id>   Run only the contract with the given ID (may be repeated)
+                  --condition-set <name>
+                                    Use a named condition set from analysis.condition_sets
+                                    to control conditional compilation symbols during
+                                    Roslyn source analysis (default: policy default_condition_set,
+                                    otherwise empty symbol set)
               -f, --format <fmt>    Output format: human or json (default: human)
                   --json            Shortcut for --format json
               -h, --help            Show this help message

@@ -404,7 +404,7 @@ public sealed partial class ArchitectureContractRunner
         IReadOnlyList<ArchitectureViolation> roslynViolations = ArchitectureSourceScanner
             .FindMethodBodyViolations(contract.Name, contract.Id, _context.RepositoryRoot, sourceLayer.Namespace,
                 contract.ForbiddenCalls, contract.IgnoredViolations, sourceRoots: sourceRoots,
-                sourceLayer: sourceLayer, usageTracker: tracker)
+                sourceLayer: sourceLayer, usageTracker: tracker, preprocessorSymbols: _preprocessorSymbols)
             .ToList();
 
         IReadOnlyList<ArchitectureViolation> ilViolations = ArchitectureIlMethodBodyScanner.FindMethodBodyViolations(

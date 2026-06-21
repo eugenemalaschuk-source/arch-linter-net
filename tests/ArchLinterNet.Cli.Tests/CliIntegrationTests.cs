@@ -312,6 +312,21 @@ public class CliIntegrationTests
         });
     }
 
+    /* --condition-set */
+
+    [Test]
+    public void UnknownConditionSet_ExitsTwoWithDiagnostic()
+    {
+        var (exitCode, _, stderr) = RunCli("--policy", _passingPolicy, "--strict", "--condition-set", "nonexistent");
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(exitCode, Is.EqualTo(2));
+            Assert.That(stderr, Does.Contain("Unknown condition set"));
+            Assert.That(stderr, Does.Contain("nonexistent"));
+        });
+    }
+
     /* --contract flag */
 
     [Test]
