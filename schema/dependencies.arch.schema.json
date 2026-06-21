@@ -348,7 +348,11 @@
       "properties": {
         "name": { "type": "string", "minLength": 1 },
         "id": { "type": "string", "minLength": 1, "description": "Stable contract identifier for CLI selection and cross-referencing." },
-        "ancestors": { "$ref": "#/$defs/stringList" },
+        "ancestors": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 },
+          "minItems": 1
+        },
         "ignored_violations": { "$ref": "#/$defs/ignoredViolations" },
         "reason": { "type": "string" }
       }

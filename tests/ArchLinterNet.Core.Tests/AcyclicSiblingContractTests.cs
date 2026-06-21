@@ -377,4 +377,174 @@ contracts:
         Assert.Throws<InvalidOperationException>(() =>
             ArchitectureContractLoader.LoadFromPath(path));
     }
+
+    [Test]
+    public void ContractLoader_EmptyAncestors_Throws()
+    {
+        string path = WriteContract(MinimalContractsYaml(@"
+  strict_acyclic_siblings:
+    - name: empty-ancestors
+      ancestors: []
+"));
+
+        var ex = Assert.Throws<InvalidOperationException>(() =>
+            ArchitectureContractLoader.LoadFromPath(path));
+        Assert.That(ex!.Message, Does.Contain("empty ancestors list"));
+    }
+
+    [Test]
+    public void ContractLoader_BlankAncestor_Throws()
+    {
+        string contractDir = Path.Combine(_tempDir, "architecture");
+        Directory.CreateDirectory(contractDir);
+        string path = Path.Combine(contractDir, "dependencies.arch.yml");
+        File.WriteAllText(path, @"
+version: 1
+name: Test
+layers:
+  core:
+    namespace: Test.Core
+analysis:
+  target_assemblies: []
+contracts:
+  strict_acyclic_siblings:
+    - name: blank-ancestor
+      ancestors:
+        - ''
+
+        - Some.Valid.Namespace
+");
+
+        var ex = Assert.Throws<InvalidOperationException>(() =>
+            ArchitectureContractLoader.LoadFromPath(path));
+        Assert.That(ex!.Message, Does.Contain("blank or empty ancestor"));
+    }
+
+    [Test]
+    public void Validate_WithStrictAcyclicSibling_ProcessesWithoutError()
+    {
+        string contractDir = Path.Combine(_tempDir, "architecture");
+        Directory.CreateDirectory(contractDir);
+        string contractPath = Path.Combine(contractDir, "dependencies.arch.yml");
+
+        File.WriteAllText(contractPath, @"
+version: 1
+name: Acyclic Sibling Test
+layers:
+  core:
+    namespace: ArchLinterNet.Core
+analysis:
+  target_assemblies:
+    - ArchLinterNet.Core
+contracts:
+  strict_acyclic_siblings:
+    - name: core-siblings-acyclic
+      ancestors:
+        - ArchLinterNet.Core
+      reason: Core sub-namespaces must be acyclic
+");
+
+        var validator = new ArchitectureValidator();
+        bool result = validator.Validate(contractPath, out var violations, out var cycles);
+
+        Assert.That(violations, Is.Empty);
+        Assert.That(result || cycles.Count > 0, Is.True);
+    }
+
+    [Test]
+    public void Validate_DeterministicOutput_SamePolicySameResult()
+    {
+        string contractDir = Path.Combine(_tempDir, "architecture");
+        Directory.CreateDirectory(contractDir);
+        string contractPath = Path.Combine(contractDir, "dependencies.arch.yml");
+
+        string yaml = @"
+version: 1
+name: Acyclic Sibling Test
+layers:
+  core:
+    namespace: ArchLinterNet.Core
+analysis:
+  target_assemblies:
+    - ArchLinterNet.Core
+contracts:
+  strict_acyclic_siblings:
+    - name: core-siblings-acyclic
+      ancestors:
+        - ArchLinterNet.Core
+      reason: Core sub-namespaces must be acyclic
+";
+        File.WriteAllText(contractPath, yaml);
+
+        var validator = new ArchitectureValidator();
+        validator.Validate(contractPath, out var violations1, out var cycles1);
+        validator.Validate(contractPath, out var violations2, out var cycles2);
+
+        Assert.That(cycles1.OrderBy(c => c), Is.EqualTo(cycles2.OrderBy(c => c)));
+    }
+
+    [Test]
+    public void Validate_WithAuditAcyclicSibling_DoesNotFailOnCycles()
+    {
+        string contractDir = Path.Combine(_tempDir, "architecture");
+        Directory.CreateDirectory(contractDir);
+        string contractPath = Path.Combine(contractDir, "dependencies.arch.yml");
+
+        File.WriteAllText(contractPath, @"
+version: 1
+name: Acyclic Sibling Audit Test
+layers:
+  core:
+    namespace: ArchLinterNet.Core
+analysis:
+  target_assemblies:
+    - ArchLinterNet.Core
+contracts:
+  audit_acyclic_siblings:
+    - name: core-siblings-audit
+      ancestors:
+        - ArchLinterNet.Core
+      reason: Audit mode
+");
+
+        var validator = new ArchitectureValidator();
+        bool result = validator.Validate(contractPath, out var violations, out var cycles);
+
+        Assert.That(violations, Is.Empty);
+        Assert.That(cycles, Is.Not.Null);
+    }
+
+    [Test]
+    public void Validate_RunnerProducesSiblingGroupsForRealAssembly()
+    {
+        var context = CreateContext();
+        var document = new ArchitectureContractDocument
+        {
+            Version = 1,
+            Name = "Test",
+            Layers = new Dictionary<string, ArchitectureLayer>(),
+            Analysis = new ArchitectureAnalysisConfiguration
+            {
+                TargetAssemblies = new List<string> { typeof(ArchitectureContractDocument).Assembly.GetName().Name! }
+            },
+            Contracts = new ArchitectureContractGroups
+            {
+                StrictAcyclicSiblings = new List<ArchitectureAcyclicSiblingContract>
+                {
+                    new()
+                    {
+                        Name = "Core sibling check",
+                        Id = "core-siblings",
+                        Ancestors = new List<string> { "ArchLinterNet.Core" }
+                    }
+                }
+            }
+        };
+
+        var runner = new ArchitectureContractRunner(context, document);
+        var result = runner.CheckAcyclicSiblingContract(
+            document.Contracts.StrictAcyclicSiblings[0]);
+
+        Assert.That(result, Is.Not.Null);
+    }
 }
