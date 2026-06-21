@@ -32,6 +32,8 @@ public static class Program
         string policyPath = "architecture/dependencies.arch.yml";
         string? outputPath = null;
         string reason = "generated baseline";
+        string mode = "all";
+        string? conditionSetName = null;
 
         for (int i = argIndex; i < args.Length; i++)
         {
@@ -49,11 +51,23 @@ public static class Program
                 case "--reason" when i + 1 < args.Length:
                     reason = args[++i];
                     break;
+                case "--mode" or "-m" when i + 1 < args.Length:
+                    mode = args[++i];
+                    break;
+                case "--condition-set" when i + 1 < args.Length:
+                    conditionSetName = args[++i];
+                    break;
                 default:
                     Console.Error.WriteLine($"Unknown option: {args[i]}");
                     Console.Error.WriteLine("Run 'arch-linter-net baseline --help' for usage information.");
                     return 2;
             }
+        }
+
+        if (mode is not ("strict" or "audit" or "all"))
+        {
+            Console.Error.WriteLine($"Invalid mode: {mode}. Use 'strict', 'audit', or 'all'.");
+            return 2;
         }
 
         if (outputPath == null)
@@ -71,68 +85,109 @@ public static class Program
         try
         {
             ArchitectureContractDocument document = ArchitectureContractLoader.LoadFromPath(policyPath);
+
+            if (!ConditionSetResolver.TryResolve(
+                    document, conditionSetName, out IReadOnlyList<string> preprocessorSymbols, out string? resolveError))
+            {
+                Console.Error.WriteLine(resolveError);
+                return 2;
+            }
+
             string repositoryRoot = ArchitectureRepositoryRootLocator.ResolveFrom(policyPath);
             ResolutionResult resolution = ArchitectureAssemblyResolver.ResolveFromDocument(document, repositoryRoot);
             var context = new ArchitectureAnalysisContext(repositoryRoot, resolution.ResolvedAssemblies,
                 resolution.MissingAssemblyNames, resolution.AssemblyProbingPaths);
 
             var runner = new ArchitectureContractRunner(context, document,
-                enableUnmatchedIgnoreTracking: true);
+                enableUnmatchedIgnoreTracking: true,
+                preprocessorSymbols: preprocessorSymbols);
 
-            runner.CheckConfiguration(strict: true);
-
-            foreach (ArchitectureDependencyContract contract in runner.StrictContracts())
+            List<ArchitectureViolation> configViolations = runner.CheckConfiguration(strict: true);
+            if (configViolations.Count > 0)
             {
-                runner.CheckContract(contract);
+                Console.Error.WriteLine("Configuration violations detected — baseline cannot be generated:");
+                foreach (ArchitectureViolation v in configViolations)
+                {
+                    Console.Error.WriteLine($"  {v.SourceType}: {v.ForbiddenNamespace}");
+                }
+                return 2;
             }
 
-            foreach (ArchitectureLayerContract contract in runner.StrictLayerContracts())
+            bool includeStrict = mode is "strict" or "all";
+            bool includeAudit = mode is "audit" or "all";
+
+            if (includeStrict)
             {
-                runner.CheckLayerContract(contract);
+                foreach (ArchitectureDependencyContract contract in runner.StrictContracts())
+                    runner.CheckContract(contract);
+
+                foreach (ArchitectureLayerContract contract in runner.StrictLayerContracts())
+                    runner.CheckLayerContract(contract);
+
+                foreach (ArchitectureAllowOnlyContract contract in runner.StrictAllowOnlyContracts())
+                    runner.CheckAllowOnlyContract(contract);
+
+                foreach (ArchitectureCycleContract contract in runner.StrictCycleContracts())
+                    runner.CheckCycleContract(contract);
+
+                foreach (ArchitectureMethodBodyContract contract in runner.StrictMethodBodyContracts())
+                    runner.CheckMethodBodyContract(contract);
+
+                foreach (ArchitectureIndependenceContract contract in runner.StrictIndependenceContracts())
+                    runner.CheckIndependenceContract(contract);
+
+                foreach (ArchitectureProtectedContract contract in runner.StrictProtectedContracts())
+                    runner.CheckProtectedContract(contract);
+
+                foreach (ArchitectureExternalDependencyContract contract in runner.StrictExternalContracts())
+                    runner.CheckExternalContract(contract);
+
+                foreach (ArchitectureAcyclicSiblingContract contract in runner.StrictAcyclicSiblingContracts())
+                    runner.CheckAcyclicSiblingContract(contract);
+
+                List<ArchitectureLayerContract> strictExpanded = Expand(
+                    document.Contracts.StrictLayerTemplates,
+                    document.Contracts.StrictLayers);
+
+                foreach (ArchitectureLayerContract contract in strictExpanded)
+                    runner.CheckLayerContract(contract);
             }
 
-            foreach (ArchitectureAllowOnlyContract contract in runner.StrictAllowOnlyContracts())
+            if (includeAudit)
             {
-                runner.CheckAllowOnlyContract(contract);
-            }
+                foreach (ArchitectureDependencyContract contract in runner.AuditContracts())
+                    runner.CheckContract(contract);
 
-            foreach (ArchitectureCycleContract contract in runner.StrictCycleContracts())
-            {
-                runner.CheckCycleContract(contract);
-            }
+                foreach (ArchitectureLayerContract contract in runner.AuditLayerContracts())
+                    runner.CheckLayerContract(contract);
 
-            foreach (ArchitectureMethodBodyContract contract in runner.StrictMethodBodyContracts())
-            {
-                runner.CheckMethodBodyContract(contract);
-            }
+                foreach (ArchitectureAllowOnlyContract contract in runner.AuditAllowOnlyContracts())
+                    runner.CheckAllowOnlyContract(contract);
 
-            foreach (ArchitectureIndependenceContract contract in runner.StrictIndependenceContracts())
-            {
-                runner.CheckIndependenceContract(contract);
-            }
+                foreach (ArchitectureCycleContract contract in runner.AuditCycleContracts())
+                    runner.CheckCycleContract(contract);
 
-            foreach (ArchitectureProtectedContract contract in runner.StrictProtectedContracts())
-            {
-                runner.CheckProtectedContract(contract);
-            }
+                foreach (ArchitectureMethodBodyContract contract in runner.AuditMethodBodyContracts())
+                    runner.CheckMethodBodyContract(contract);
 
-            foreach (ArchitectureExternalDependencyContract contract in runner.StrictExternalContracts())
-            {
-                runner.CheckExternalContract(contract);
-            }
+                foreach (ArchitectureIndependenceContract contract in runner.AuditIndependenceContracts())
+                    runner.CheckIndependenceContract(contract);
 
-            foreach (ArchitectureAcyclicSiblingContract contract in runner.StrictAcyclicSiblingContracts())
-            {
-                runner.CheckAcyclicSiblingContract(contract);
-            }
+                foreach (ArchitectureProtectedContract contract in runner.AuditProtectedContracts())
+                    runner.CheckProtectedContract(contract);
 
-            List<ArchitectureLayerContract> expandedLayerContracts = Expand(
-                document.Contracts.StrictLayerTemplates,
-                document.Contracts.StrictLayers);
+                foreach (ArchitectureExternalDependencyContract contract in runner.AuditExternalContracts())
+                    runner.CheckExternalContract(contract);
 
-            foreach (ArchitectureLayerContract contract in expandedLayerContracts)
-            {
-                runner.CheckLayerContract(contract);
+                foreach (ArchitectureAcyclicSiblingContract contract in runner.AuditAcyclicSiblingContracts())
+                    runner.CheckAcyclicSiblingContract(contract);
+
+                List<ArchitectureLayerContract> auditExpanded = Expand(
+                    document.Contracts.AuditLayerTemplates,
+                    document.Contracts.AuditLayers);
+
+                foreach (ArchitectureLayerContract contract in auditExpanded)
+                    runner.CheckLayerContract(contract);
             }
 
             ArchitectureBaselineDocument baseline = ArchitectureBaselineGenerator.Generate(
@@ -567,7 +622,7 @@ public static class Program
 
             Usage:
               arch-linter-net [options]
-              arch-linter-net baseline generate --config <path> --output <path> [--reason <text>]
+              arch-linter-net baseline generate --config <path> --output <path> [options]
 
             Validate Options:
               -p, --policy <path>   Path to YAML contract file
@@ -604,16 +659,22 @@ public static class Program
               arch-linter-net baseline generate --config <path> --output <path> [options]
 
             Options:
-              --config <path>   Path to YAML contract file
-                                (default: architecture/dependencies.arch.yml)
-              --output <path>   Path to write the generated baseline file (required)
-              --reason <text>   Reason text for baseline entries
-                                (default: "generated baseline")
-              -h, --help        Show this help message
+              --config <path>     Path to YAML contract file
+                                  (default: architecture/dependencies.arch.yml)
+              --output <path>     Path to write the generated baseline file (required)
+              --mode <mode>       Contract mode: strict, audit, or all (default: all)
+              --reason <text>     Reason text for baseline entries
+                                  (default: "generated baseline")
+              --condition-set <name>
+                                  Use a named condition set from analysis.condition_sets
+                                  to control conditional compilation symbols during
+                                  Roslyn source analysis (default: policy
+                                  default_condition_set, otherwise empty symbol set)
+              -h, --help          Show this help message
 
             Exit codes:
               0   Baseline generated successfully
-              2   Runtime error (invalid arguments, file not found, etc.)
+              2   Runtime error (invalid arguments, file not found, config violations, etc.)
             """);
     }
 }

@@ -36,7 +36,9 @@ arch-linter-net baseline generate --config <path> --output <path> [--reason <tex
 |--------|-------------|---------|
 | `--config <path>` | Path to YAML policy file | `architecture/dependencies.arch.yml` |
 | `--output <path>` | Path to write the generated baseline file (required) | |
+| `--mode <mode>` | Contract mode: `strict`, `audit`, or `all` | `all` |
 | `--reason <text>` | Reason text for baseline entries | `generated baseline` |
+| `--condition-set <name>` | Use a named condition set from `analysis.condition_sets` | policy `default_condition_set`, otherwise empty |
 | `-h`, `--help` | Show help message | |
 
 ## Examples
