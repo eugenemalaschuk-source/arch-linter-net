@@ -13,7 +13,8 @@ internal static class ArchitectureExternalDependencyViolationFinder
         string externalGroupName,
         Type[] sourceTypes,
         ArchitectureExternalDependencyGroup externalGroup,
-        IReadOnlyCollection<ArchitectureIgnoredViolation> ignoredViolations)
+        IReadOnlyList<ArchitectureIgnoredViolation> ignoredViolations,
+        ArchitectureIgnoreUsageTracker? usageTracker = null)
     {
         return sourceTypes
             .Select(type =>
@@ -30,7 +31,7 @@ internal static class ArchitectureExternalDependencyViolationFinder
                         ArchitectureExternalDependencyResolver.MatchesGroup(externalGroup, reference.FullName,
                             reference.Namespace))
                     .Where(reference =>
-                        !ArchitectureIgnoreMatcher.IsIgnored(sourceType, reference.FullName, ignoredViolations))
+                        !ArchitectureIgnoreMatcher.IsIgnored(sourceType, reference.FullName, ignoredViolations, usageTracker))
                     .Select(reference => reference.FullName)
                     .Distinct(StringComparer.Ordinal)
                     .OrderBy(name => name, StringComparer.Ordinal)

@@ -118,6 +118,12 @@
         "source_roots": {
           "$ref": "#/$defs/stringList",
           "description": "Source roots used by method-body Roslyn scanning."
+        },
+        "unmatched_ignored_violations": {
+          "type": "string",
+          "enum": ["error", "warn", "off"],
+          "default": "error",
+          "description": "Behavior when an ignored_violations entry matches no current violation. 'error' (default) fails validation, 'warn' reports but does not fail, 'off' skips detection."
         }
       }
     },

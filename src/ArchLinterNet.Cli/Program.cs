@@ -79,6 +79,15 @@ public static class Program
         {
             ArchitectureContractDocument document = ArchitectureContractLoader.LoadFromPath(policyPath);
 
+            string unmatchedConfig = document.Analysis.UnmatchedIgnoredViolations;
+
+            if (unmatchedConfig is not ("error" or "warn" or "off"))
+            {
+                Console.Error.WriteLine(
+                    $"Invalid analysis.unmatched_ignored_violations: {unmatchedConfig}. Use 'error', 'warn', or 'off'.");
+                return 2;
+            }
+
             string repositoryRoot = ArchitectureRepositoryRootLocator.ResolveFrom(policyPath);
 
             HashSet<string>? selectedIds = contractIds.Count > 0 ? new HashSet<string>(contractIds, StringComparer.OrdinalIgnoreCase) : null;
@@ -100,7 +109,7 @@ public static class Program
 
             ArchitectureAnalysisContext context = new(repositoryRoot, resolution.ResolvedAssemblies,
                 resolution.MissingAssemblyNames, resolution.AssemblyProbingPaths);
-            ArchitectureContractRunner runner = new(context, document, selectedIds);
+            ArchitectureContractRunner runner = new(context, document, selectedIds, unmatchedConfig != "off");
 
             List<ArchitectureViolation> allViolations = new();
             List<string> allCycles = new();
@@ -199,12 +208,17 @@ public static class Program
                 allViolations.AddRange(runner.CheckExternalContract(contract));
             }
 
-            bool passed = allViolations.Count == 0 && allCycles.Count == 0;
+            IReadOnlyList<ArchitectureUnmatchedIgnoredViolation> allUnmatched = unmatchedConfig != "off"
+                ? runner.UnmatchedIgnoredViolations
+                : Array.Empty<ArchitectureUnmatchedIgnoredViolation>();
+            bool hasBlockingUnmatched = unmatchedConfig == "error" && allUnmatched.Count > 0;
+
+            bool passed = allViolations.Count == 0 && allCycles.Count == 0 && !hasBlockingUnmatched;
 
             if (format == "json")
             {
                 Console.WriteLine(ArchitectureDiagnosticFormatter.FormatResultForCiArtifacts(
-                    mode, passed, allViolations, allCycles));
+                    mode, passed, allViolations, allCycles, allUnmatched));
             }
             else
             {
@@ -222,6 +236,16 @@ public static class Program
                     if (allCycles.Count > 0)
                     {
                         Console.WriteLine(ArchitectureDiagnosticFormatter.FormatCyclesForHumans(allCycles));
+                    }
+                }
+
+                if (allUnmatched.Count > 0 && unmatchedConfig != "off")
+                {
+                    string unmatchedSection = ArchitectureDiagnosticFormatter.FormatUnmatchedForHumans(allUnmatched);
+                    if (!string.IsNullOrEmpty(unmatchedSection))
+                    {
+                        Console.WriteLine();
+                        Console.WriteLine(unmatchedSection);
                     }
                 }
             }

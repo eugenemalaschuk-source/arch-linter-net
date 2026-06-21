@@ -247,6 +247,11 @@ Avoid broad patterns such as `source_type: "*"` or
 `forbidden_reference: "MyCompany.Product.Infrastructure.*"` unless a human has
 explicitly accepted the debt baseline.
 
+When `analysis.unmatched_ignored_violations` is enabled (default `error`), the
+linter warns about `ignored_violations` entries that match no current violation.
+Remove stale entries proactively to keep the baseline trustworthy and avoid CI
+failures. Use `warn` during migration cleanup, then switch to `error`.
+
 ## Validate Before PR
 
 Run strict validation for current gates and audit validation for migration

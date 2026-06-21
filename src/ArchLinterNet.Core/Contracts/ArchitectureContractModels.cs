@@ -37,6 +37,9 @@ public sealed class ArchitectureAnalysisConfiguration
 
     [YamlMember(Alias = "source_roots")]
     public List<string> SourceRoots { get; set; } = new();
+
+    [YamlMember(Alias = "unmatched_ignored_violations")]
+    public string UnmatchedIgnoredViolations { get; set; } = "error";
 }
 
 public sealed class ArchitectureLayer

@@ -1,0 +1,19 @@
+version: 1
+name: Test Invalid Unmatched Config
+
+layers:
+  core:
+    namespace: ArchLinterNet.Core
+
+analysis:
+  target_assemblies:
+    - ArchLinterNet.Core
+  unmatched_ignored_violations: erorr
+
+contracts:
+  strict:
+    - id: core-no-forbidden
+      name: core-has-no-forbidden-dependencies
+      source: core
+      forbidden: []
+      reason: Core has no forbidden dependencies in this test.

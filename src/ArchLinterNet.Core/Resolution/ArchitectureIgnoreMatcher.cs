@@ -8,10 +8,38 @@ internal static class ArchitectureIgnoreMatcher
     public static bool IsIgnored(
         string sourceType,
         string forbiddenReference,
-        IEnumerable<ArchitectureIgnoredViolation> ignoredViolations)
+        IReadOnlyList<ArchitectureIgnoredViolation> ignoredViolations,
+        ArchitectureIgnoreUsageTracker? usageTracker = null)
     {
-        return ignoredViolations.Any(ignore => MatchesPattern(sourceType, ignore.SourceType)
-                                               && MatchesPattern(forbiddenReference, ignore.ForbiddenReference));
+        if (usageTracker == null)
+        {
+            for (int i = 0; i < ignoredViolations.Count; i++)
+            {
+                var ignore = ignoredViolations[i];
+                if (MatchesPattern(sourceType, ignore.SourceType)
+                    && MatchesPattern(forbiddenReference, ignore.ForbiddenReference))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        bool anyMatched = false;
+
+        for (int i = 0; i < ignoredViolations.Count; i++)
+        {
+            var ignore = ignoredViolations[i];
+            if (MatchesPattern(sourceType, ignore.SourceType)
+                && MatchesPattern(forbiddenReference, ignore.ForbiddenReference))
+            {
+                usageTracker.MarkMatched(i);
+                anyMatched = true;
+            }
+        }
+
+        return anyMatched;
     }
 
     private static bool MatchesPattern(string value, string pattern)
