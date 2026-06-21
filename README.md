@@ -95,21 +95,15 @@ ArchLinterNet does **not** validate runtime dependency injection behavior, autho
 
 Public product documentation is published through MkDocs and GitHub Pages:
 
-- [Documentation home](docs/index.md)
-- [Getting started](docs/getting-started/index.md)
-- [Installation](docs/installation/index.md)
-- [CLI usage](docs/cli/index.md)
-- [Policy format](docs/policy-format/index.md)
-- [Contract families](docs/contracts/index.md)
-- [CI integration](docs/guides/ci-integration.md)
-- [AI policy authoring](docs/ai/index.md)
-- [Supported capabilities and non-goals](docs/policy-format/supported-capabilities.md)
-
-When GitHub Pages is enabled, the canonical product documentation URL is:
-
-```text
-https://eugenemalaschuk-source.github.io/arch-linter-net/
-```
+- [Documentation home](https://eugenemalaschuk-source.github.io/arch-linter-net/)
+- [Getting started](https://eugenemalaschuk-source.github.io/arch-linter-net/getting-started/)
+- [Installation](https://eugenemalaschuk-source.github.io/arch-linter-net/installation/)
+- [CLI usage](https://eugenemalaschuk-source.github.io/arch-linter-net/cli/)
+- [Policy format](https://eugenemalaschuk-source.github.io/arch-linter-net/policy-format/)
+- [Contract families](https://eugenemalaschuk-source.github.io/arch-linter-net/contracts/)
+- [CI integration](https://eugenemalaschuk-source.github.io/arch-linter-net/guides/ci-integration/)
+- [AI policy authoring](https://eugenemalaschuk-source.github.io/arch-linter-net/ai/)
+- [Supported capabilities and non-goals](https://eugenemalaschuk-source.github.io/arch-linter-net/policy-format/supported-capabilities/)
 
 Internal project documentation remains in repository Markdown files such as `docs/internal/`, `openspec/`, `.github/`, and root governance files. It is not part of the published product site.
 
