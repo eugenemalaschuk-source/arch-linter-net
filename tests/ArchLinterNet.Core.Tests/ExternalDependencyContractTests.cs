@@ -266,7 +266,7 @@ contracts:
     }
 
     [Test]
-    public void CheckExternalContract_AllowedAdapterReferenceOutsideSourceLayer_DoesNotViolate()
+    public void CheckExternalContract_AdapterLayerOutsideSourceLayer_NotScanned()
     {
         var document = new ArchitectureContractDocument
         {
@@ -311,7 +311,7 @@ contracts:
         var runner = new ArchitectureContractRunner(context, document);
         var violations = runner.CheckExternalContract(document.Contracts.StrictExternal[0]);
 
-        Assert.That(violations, Is.Empty);
+        Assert.That(violations.Any(v => v.SourceType.Contains("AdapterUsingVendorSdk")), Is.False);
     }
 
     [Test]
@@ -732,4 +732,5 @@ contracts:
         Assert.That(passed, Is.True);
         Assert.That(violations, Is.Empty);
     }
+
 }

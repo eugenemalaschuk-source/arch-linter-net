@@ -39,7 +39,7 @@ external_dependencies:
 
 `type_prefixes` match referenced full type names by prefix.
 
-External dependency matching uses referenced type metadata visible from project types. It does not analyze third-party package internals and should not be described as semantic data-flow analysis.
+External dependency matching detects forbidden references through type-level metadata (base types, interfaces, fields, properties, method signatures, generic arguments) and method-body IL scanning (method calls, constructor calls, field/property access, type references inside method bodies). It does not analyze third-party package internals and should not be described as semantic data-flow analysis.
 
 ## Use with contracts
 
@@ -71,8 +71,8 @@ Prefer `external_dependencies` for vendor/framework leakage checks.
 
 Use layer `external: true` only when you intentionally need layer-style semantics and want to suppress empty-layer diagnostics for namespaces that may not be present in the scan environment.
 
-## Method-body limitation
+## Method-body detection
 
-External dependency contracts currently operate on referenced type metadata visible to the scanner. They must not claim full method-body detection for all vendor/framework calls unless that capability is explicitly implemented and documented.
+External dependency contracts now detect forbidden references inside method bodies via IL bytecode scanning. This covers method calls, constructor calls, field/property access, and type references. Violations include the source type, containing method name, forbidden group, and referenced external member.
 
-For implementation-body calls, use [method-body contracts](../contracts/method-body.md) when the forbidden API surface can be expressed as a method-body rule.
+For more granular call-pattern matching (e.g., specific method signatures), use [method-body contracts](../contracts/method-body.md).

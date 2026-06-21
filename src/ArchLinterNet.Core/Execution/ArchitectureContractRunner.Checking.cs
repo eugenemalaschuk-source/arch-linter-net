@@ -674,6 +674,17 @@ public sealed partial class ArchitectureContractRunner
                 tracker,
                 contractGroup,
                 candidates));
+
+            violations.AddRange(ArchitectureExternalDependencyIlScanner.FindMethodBodyViolations(
+                contract.Name,
+                contract.Id,
+                sourceTypes,
+                externalGroupName,
+                externalGroup,
+                contract.IgnoredViolations,
+                tracker,
+                contractGroup,
+                candidates));
         }
 
         RecordUnmatchedIgnores(contract.Name, contract.Id, contract.IgnoredViolations, tracker, _unmatchedIgnoredViolations);
