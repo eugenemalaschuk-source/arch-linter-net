@@ -147,6 +147,75 @@ public class NonDebugClass
     }
 
     [Test]
+    public void ValidatorDefaultConditionSet_ResolvesFromPolicyDefault()
+    {
+        var document = new ArchitectureContractDocument
+        {
+            Version = 1,
+            Name = "Test",
+            Layers = new Dictionary<string, ArchitectureLayer>
+            {
+                ["core"] = new() { Namespace = "TestNamespace" }
+            },
+            Analysis = new ArchitectureAnalysisConfiguration
+            {
+                TargetAssemblies = new List<string> { "TestAssembly" },
+                ConditionSets = new Dictionary<string, List<string>>
+                {
+                    ["editor"] = new() { "UNITY_EDITOR" }
+                },
+                DefaultConditionSet = "editor"
+            },
+            Contracts = new ArchitectureContractGroups()
+        };
+
+        bool resolved = ConditionSetResolver.TryResolve(
+            document, null, out IReadOnlyList<string> symbols, out string? error);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(resolved, Is.True);
+            Assert.That(error, Is.Null);
+            Assert.That(symbols, Is.EquivalentTo(new[] { "UNITY_EDITOR" }));
+        });
+    }
+
+    [Test]
+    public void ValidatorExplicitSymbols_OverrideDefault()
+    {
+        var document = new ArchitectureContractDocument
+        {
+            Version = 1,
+            Name = "Test",
+            Layers = new Dictionary<string, ArchitectureLayer>
+            {
+                ["core"] = new() { Namespace = "TestNamespace" }
+            },
+            Analysis = new ArchitectureAnalysisConfiguration
+            {
+                TargetAssemblies = new List<string> { "TestAssembly" },
+                ConditionSets = new Dictionary<string, List<string>>
+                {
+                    ["editor"] = new() { "UNITY_EDITOR" },
+                    ["debug"] = new() { "DEBUG" }
+                },
+                DefaultConditionSet = "editor"
+            },
+            Contracts = new ArchitectureContractGroups()
+        };
+
+        bool resolved = ConditionSetResolver.TryResolve(
+            document, "debug", out IReadOnlyList<string> symbols, out string? error);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(resolved, Is.True);
+            Assert.That(error, Is.Null);
+            Assert.That(symbols, Is.EquivalentTo(new[] { "DEBUG" }));
+        });
+    }
+
+    [Test]
     public void MultipleSymbols_MatchCorrectBranches()
     {
         string sourceFile = Path.Combine(_tempDir, "DebugClass.cs");

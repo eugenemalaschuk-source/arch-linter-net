@@ -109,25 +109,11 @@ public static class Program
                 }
             }
 
-            string selectedConditionSet = conditionSetName ?? string.Empty;
-            if (string.IsNullOrWhiteSpace(selectedConditionSet))
+            if (!ConditionSetResolver.TryResolve(
+                    document, conditionSetName, out IReadOnlyList<string> preprocessorSymbols, out string? resolveError))
             {
-                selectedConditionSet = document.Analysis.DefaultConditionSet;
-            }
-
-            IReadOnlyList<string> preprocessorSymbols = Array.Empty<string>();
-
-            if (!string.IsNullOrWhiteSpace(selectedConditionSet))
-            {
-                if (!document.Analysis.ConditionSets.TryGetValue(
-                        selectedConditionSet, out List<string>? symbols))
-                {
-                    Console.Error.WriteLine(
-                        $"Unknown condition set: '{selectedConditionSet}'. Available condition sets: {string.Join(", ", document.Analysis.ConditionSets.Keys.OrderBy(x => x))}");
-                    return 2;
-                }
-
-                preprocessorSymbols = symbols;
+                Console.Error.WriteLine(resolveError);
+                return 2;
             }
 
             ResolutionResult resolution = ArchitectureAssemblyResolver.ResolveFromDocument(document, repositoryRoot);
@@ -344,7 +330,8 @@ public static class Program
                   --condition-set <name>
                                     Use a named condition set from analysis.condition_sets
                                     to control conditional compilation symbols during
-                                    Roslyn source analysis (default: empty symbol set)
+                                    Roslyn source analysis (default: policy default_condition_set,
+                                    otherwise empty symbol set)
               -f, --format <fmt>    Output format: human or json (default: human)
                   --json            Shortcut for --format json
               -h, --help            Show this help message

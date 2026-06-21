@@ -15,7 +15,7 @@ arch-linter-net [options]
 | `--strict` | Shortcut for `--mode strict` | |
 | `--audit` | Shortcut for `--mode audit` | |
 | `--contract <id>` | Run only the contract with the given ID (may be repeated) | |
-| `--condition-set <name>` | Use a named condition set from `analysis.condition_sets` to control conditional compilation symbols during Roslyn source analysis | empty symbol set |
+| `--condition-set <name>` | Use a named condition set from `analysis.condition_sets` to control conditional compilation symbols during Roslyn source analysis | policy `default_condition_set`, otherwise empty |
 | `-f`, `--format <fmt>` | Output format: `human` or `json` | `human` |
 | `--json` | Shortcut for `--format json` | |
 | `-h`, `--help` | Show help message | |

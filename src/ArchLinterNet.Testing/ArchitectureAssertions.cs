@@ -55,27 +55,10 @@ public sealed class ArchitectureValidationBuilder
 
         string repositoryRoot = ArchitectureRepositoryRootLocator.ResolveFrom(_policyPath);
 
-        string selectedConditionSet = _conditionSetName ?? string.Empty;
-        if (string.IsNullOrWhiteSpace(selectedConditionSet))
+        if (!ConditionSetResolver.TryResolve(
+                document, _conditionSetName, out IReadOnlyList<string> preprocessorSymbols, out string? resolveError))
         {
-            selectedConditionSet = document.Analysis.DefaultConditionSet;
-        }
-
-        IReadOnlyList<string> preprocessorSymbols = Array.Empty<string>();
-
-        if (!string.IsNullOrWhiteSpace(selectedConditionSet))
-        {
-            if (!document.Analysis.ConditionSets.TryGetValue(
-                    selectedConditionSet, out List<string>? symbols))
-            {
-                string available = document.Analysis.ConditionSets.Keys.Count > 0
-                    ? $" Available condition sets: {string.Join(", ", document.Analysis.ConditionSets.Keys.OrderBy(x => x))}."
-                    : string.Empty;
-                throw new InvalidOperationException(
-                    $"Unknown condition set: '{selectedConditionSet}'.{available}");
-            }
-
-            preprocessorSymbols = symbols;
+            throw new InvalidOperationException(resolveError);
         }
 
         ResolutionResult resolution = ArchitectureAssemblyResolver.ResolveFromDocument(document, repositoryRoot);

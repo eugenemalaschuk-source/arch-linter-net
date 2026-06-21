@@ -28,6 +28,11 @@ public sealed class ArchitectureValidator
     {
         ArchitectureContractDocument document = ArchitectureContractLoader.LoadFromPath(policyPath);
 
+        if (preprocessorSymbols == null)
+        {
+            ConditionSetResolver.TryResolve(document, null, out preprocessorSymbols, out _);
+        }
+
         string repositoryRoot = ArchitectureRepositoryRootLocator.ResolveFrom(policyPath);
 
         ResolutionResult resolution = ArchitectureAssemblyResolver.ResolveFromDocument(document, repositoryRoot);
