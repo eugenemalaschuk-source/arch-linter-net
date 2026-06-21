@@ -14,29 +14,55 @@ theme:
 
 nav:
   - Home: index.md
-  - Getting Started: getting-started/index.md
-  - Installation: installation/index.md
-  - CLI: cli/index.md
-  - Policy Format: policy-format/index.md
+  - Getting Started:
+      - Overview: getting-started/index.md
+      - Installation: installation/index.md
+      - First policy: getting-started/first-policy.md
+      - Run in CI: guides/ci-integration.md
+  - Usage:
+      - CLI: cli/index.md
+      - Test adapter: usage/test-adapter.md
+      - Output formats: usage/output-formats.md
+      - Exit codes: usage/exit-codes.md
+      - Timings: usage/timings.md
+  - Policy Authoring:
+      - Policy format: policy-format/index.md
+      - Layers and namespace patterns: policy-format/layers-and-namespaces.md
+      - External dependencies: policy-format/external-dependencies.md
+      - Condition sets: policy-format/condition-sets.md
+      - Ignored violations and baselines: guides/migration-baselines.md
+      - Supported capabilities and non-goals: policy-format/supported-capabilities.md
   - Contracts:
-      - contracts/index.md
+      - Overview: contracts/index.md
+      - Dependency contracts: contracts/dependency.md
+      - Layer contracts: contracts/layers.md
+      - Allow-only contracts: contracts/allow-only.md
+      - Cycle contracts: contracts/cycles.md
+      - Acyclic sibling contracts: contracts/acyclic-siblings.md
+      - Independence contracts: contracts/independence.md
+      - Protected surface contracts: contracts/protected-surface.md
+      - External dependency contracts: contracts/external-dependencies.md
+      - Method-body contracts: contracts/method-body.md
+      - Unity asmdef contracts: contracts/asmdef.md
+      - Layer templates: contracts/layer-templates.md
   - Guides:
-      - CI Integration: guides/ci-integration.md
-      - Migration Baselines: guides/migration-baselines.md
+      - Adopt in an existing repository: guides/adoption.md
+      - Clean architecture policy: guides/clean-architecture.md
+      - Unity boundaries: guides/unity-boundaries.md
+      - Troubleshooting: guides/troubleshooting.md
   - AI:
       - Overview: ai/index.md
-      - Agent Guide: ai/agent-guide.md
-      - Policy Authoring Guide: ai/policy-authoring-guide.md
+      - Agent guide: ai/agent-guide.md
+      - Policy authoring guide: ai/policy-authoring-guide.md
       - Capabilities: ai/capabilities.md
-      - Policy Review Checklist: ai/policy-review-checklist.md
-      - Backlog Governance: ai/backlog-governance.md
+      - Policy review checklist: ai/policy-review-checklist.md
   - Reference:
-      - YAML Schema: reference/yaml-schema.md
-      - Release Process: reference/release-process.md
+      - YAML schema: reference/yaml-schema.md
+      - NuGet package metadata: reference/nuget-metadata.md
+      - Release process: reference/release-process.md
 
 exclude_docs: |
   internal/
-
 
 markdown_extensions:
   - admonition
