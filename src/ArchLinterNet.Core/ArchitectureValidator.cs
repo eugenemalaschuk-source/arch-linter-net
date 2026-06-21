@@ -92,6 +92,13 @@ public sealed class ArchitectureValidator
             allViolations.AddRange(runner.CheckExternalContract(contract));
         }
 
+        foreach (ArchitectureAcyclicSiblingContract contract in runner.StrictAcyclicSiblingContracts())
+        {
+            IReadOnlyCollection<string> contractCycles = runner.CheckAcyclicSiblingContract(contract);
+            string idPrefix = contract.Id != null ? $"[{contract.Id}] " : string.Empty;
+            allCycles.AddRange(contractCycles.Select(c => $"{idPrefix}{c}"));
+        }
+
         violations = allViolations;
         cycles = allCycles;
         return allViolations.Count == 0 && allCycles.Count == 0;

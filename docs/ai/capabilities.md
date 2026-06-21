@@ -23,6 +23,7 @@ The policy file is usually `architecture/dependencies.arch.yml` and contains:
 | Layer order | `strict_layers` | `audit_layers` | Dependencies point from outer layers toward inner layers |
 | Allow-only | `strict_allow_only` | `audit_allow_only` | Source layer references only itself and allowed first-party layers |
 | Cycle | `strict_cycles` | `audit_cycles` | Selected layers do not form directed cycles |
+| Acyclic sibling | `strict_acyclic_siblings` | `audit_acyclic_siblings` | Direct sibling namespaces under ancestor namespaces do not form dependency cycles |
 | Method body | `strict_method_body` | `audit_method_body` | Source layer does not call forbidden APIs |
 | asmdef | `strict_asmdef` | `audit_asmdef` | Unity `.asmdef` references avoid editor refs or forbidden prefixes |
 | Independence | `strict_independence` | `audit_independence` | Selected layers do not reference each other |

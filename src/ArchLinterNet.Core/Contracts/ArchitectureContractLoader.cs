@@ -97,6 +97,8 @@ public static class ArchitectureContractLoader
             document.Contracts.AuditExternal,
             document.Contracts.StrictLayerTemplates,
             document.Contracts.AuditLayerTemplates,
+            document.Contracts.StrictAcyclicSiblings,
+            document.Contracts.AuditAcyclicSiblings,
         ];
 
         foreach (var group in groups)

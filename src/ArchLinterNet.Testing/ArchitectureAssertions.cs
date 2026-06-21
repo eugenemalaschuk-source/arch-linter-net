@@ -153,6 +153,17 @@ public sealed class ArchitectureValidationBuilder
             allViolations.AddRange(runner.CheckExternalContract(contract));
         }
 
+        IEnumerable<ArchitectureAcyclicSiblingContract> acyclicSiblingContracts = isStrict
+            ? runner.StrictAcyclicSiblingContracts()
+            : runner.AuditAcyclicSiblingContracts();
+
+        foreach (ArchitectureAcyclicSiblingContract contract in acyclicSiblingContracts)
+        {
+            IReadOnlyCollection<string> cycles = runner.CheckAcyclicSiblingContract(contract);
+            string idPrefix = contract.Id != null ? $"[{contract.Id}] " : string.Empty;
+            allCycles.AddRange(cycles.Select(c => $"{idPrefix}{c}"));
+        }
+
         return new ArchitectureValidationResult(
             allViolations.Count == 0 && allCycles.Count == 0,
             allViolations,
