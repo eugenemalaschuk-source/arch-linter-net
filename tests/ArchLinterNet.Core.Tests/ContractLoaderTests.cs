@@ -1,4 +1,5 @@
 using ArchLinterNet.Core.Contracts;
+using ArchLinterNet.Core.Resolution;
 using NUnit.Framework;
 
 namespace ArchLinterNet.Core.Tests;
@@ -113,5 +114,45 @@ contracts:
         Assert.That(document.Version, Is.EqualTo(1));
         Assert.That(document.Layers, Is.Empty);
         Assert.That(document.Contracts.Strict, Is.Empty);
+    }
+
+    [TestCase("Test.Domain.?.Models")]
+    [TestCase("Test..Domain")]
+    [TestCase(".Test.Domain")]
+    [TestCase("Test.Domain.")]
+    [TestCase("Test.Domain.[x]")]
+    public void LoadFromPath_InvalidLayerNamespace_ThrowsInvalidNamespacePatternException(string layerNamespace)
+    {
+        string contractDir = Path.Combine(_tempDir, "architecture");
+        Directory.CreateDirectory(contractDir);
+        string contractPath = Path.Combine(contractDir, "dependencies.arch.yml");
+
+        File.WriteAllText(contractPath, $@"
+version: 1
+name: Invalid Namespace Contract
+layers:
+  core:
+    namespace: {layerNamespace}
+analysis:
+  target_assemblies: []
+contracts:
+  strict: []
+  audit: []
+  strict_layers: []
+  audit_layers: []
+  strict_allow_only: []
+  audit_allow_only: []
+  strict_cycles: []
+  audit_cycles: []
+  strict_method_body: []
+  audit_method_body: []
+  strict_asmdef: []
+  audit_asmdef: []
+  strict_independence: []
+  audit_independence: []
+");
+
+        Assert.Throws<InvalidNamespacePatternException>(() =>
+            ArchitectureContractLoader.LoadFromPath(contractPath));
     }
 }

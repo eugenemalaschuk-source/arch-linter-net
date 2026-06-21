@@ -6,6 +6,8 @@ name: Modular Monolith Policy Recipe
 layers:
   shared_kernel:
     namespace: MyCompany.Product.SharedKernel
+  module_impls:
+    namespace: MyCompany.Product.Modules.*.Internal
   sales_impl:
     namespace: MyCompany.Product.Modules.Sales.Internal
   sales_contracts:
@@ -42,6 +44,11 @@ contracts:
       source: sales_impl
       forbidden: [billing_impl]
       reason: Discover direct Sales to Billing implementation coupling outside public contracts.
+
+    - name: audit-shared-kernel-reaching-module-implementation
+      source: shared_kernel
+      forbidden: [module_impls]
+      reason: Example aggregate rule using a constrained glob layer to cover all module implementation namespaces.
 
   strict_layers: []
   audit_layers: []

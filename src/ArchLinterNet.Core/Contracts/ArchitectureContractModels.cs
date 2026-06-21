@@ -1,3 +1,4 @@
+using ArchLinterNet.Core.Resolution;
 using YamlDotNet.Serialization;
 
 namespace ArchLinterNet.Core.Contracts;
@@ -50,11 +51,28 @@ public sealed class ArchitectureAnalysisConfiguration
 
 public sealed class ArchitectureLayer
 {
-    [YamlMember(Alias = "namespace")] public string Namespace { get; set; } = string.Empty;
+    private string _namespace = string.Empty;
+
+    [YamlMember(Alias = "namespace")]
+    public string Namespace
+    {
+        get => _namespace;
+        set
+        {
+            _namespace = value;
+            _cachedGlobPattern = null;
+        }
+    }
 
     [YamlMember(Alias = "namespace_suffix")] public string NamespaceSuffix { get; set; } = string.Empty;
 
     [YamlMember(Alias = "external")] public bool External { get; set; }
+
+    [YamlIgnore] private NamespaceGlobPattern? _cachedGlobPattern;
+
+    [YamlIgnore]
+    internal NamespaceGlobPattern GlobPattern =>
+        _cachedGlobPattern ??= NamespaceGlobPattern.Parse(Namespace);
 }
 
 public sealed class ArchitectureExternalDependencyGroup

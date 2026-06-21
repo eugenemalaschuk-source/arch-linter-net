@@ -38,6 +38,21 @@ layers:
 
 Each layer name must be a unique identifier used to reference the layer in contracts.
 
+`namespace` supports either:
+
+- a literal namespace prefix such as `MyApp.Domain`, or
+- a constrained glob pattern using `*` as a complete namespace segment, such as
+  `MyApp.Features.*`.
+
+Glob semantics:
+
+- `*` matches exactly one namespace segment.
+- Descendants of the resolved prefix still match.
+- `namespace_suffix` composes with glob patterns, but the suffix becomes
+  position-fixed immediately after the full resolved namespace pattern.
+- `**`, `?`, character classes, partial-segment wildcards, bare `*`, and
+  leading wildcard patterns such as `*.Features` are invalid.
+
 When `external: true`, the linter skips the `empty layer namespace` configuration
 check for that layer. Use this for namespaces whose assemblies may not be available
 in the scan environment (external SDKs, engine namespaces, platform-conditional
