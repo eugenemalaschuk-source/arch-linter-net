@@ -38,17 +38,9 @@ contracts:
 
 ## What is checked
 
-External dependency contracts match referenced type metadata visible from project types, such as:
+External dependency contracts detect forbidden references through:
 
-- base types;
-- interfaces;
-- fields;
-- properties;
-- method signatures;
-- generic arguments.
+- **Type-level metadata**: base types, interfaces, fields, properties, method signatures, generic arguments.
+- **Method-body IL scanning**: method calls, constructor calls, field/property access, and type references inside method bodies.
 
-They do not analyze third-party package internals and should not be presented as semantic data-flow analysis.
-
-## Current limitation
-
-External dependency contracts are not a blanket guarantee for all implementation-body calls. For known forbidden API calls inside method bodies, use [method-body contracts](method-body.md) where appropriate.
+They do not analyze third-party package internals and should not be presented as semantic data-flow analysis. This is static reference analysis, not runtime behavior validation.
