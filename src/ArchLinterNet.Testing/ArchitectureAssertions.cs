@@ -26,10 +26,17 @@ public static class ArchitectureAssertions
 public sealed class ArchitectureValidationBuilder
 {
     private readonly string _policyPath;
+    private string? _conditionSetName;
 
     public ArchitectureValidationBuilder(string policyPath)
     {
         _policyPath = policyPath;
+    }
+
+    public ArchitectureValidationBuilder WithConditionSet(string name)
+    {
+        _conditionSetName = name;
+        return this;
     }
 
     public ArchitectureValidationResult ValidateStrict()
@@ -48,11 +55,35 @@ public sealed class ArchitectureValidationBuilder
 
         string repositoryRoot = ArchitectureRepositoryRootLocator.ResolveFrom(_policyPath);
 
+        string selectedConditionSet = _conditionSetName ?? string.Empty;
+        if (string.IsNullOrWhiteSpace(selectedConditionSet))
+        {
+            selectedConditionSet = document.Analysis.DefaultConditionSet;
+        }
+
+        IReadOnlyList<string> preprocessorSymbols = Array.Empty<string>();
+
+        if (!string.IsNullOrWhiteSpace(selectedConditionSet))
+        {
+            if (!document.Analysis.ConditionSets.TryGetValue(
+                    selectedConditionSet, out List<string>? symbols))
+            {
+                string available = document.Analysis.ConditionSets.Keys.Count > 0
+                    ? $" Available condition sets: {string.Join(", ", document.Analysis.ConditionSets.Keys.OrderBy(x => x))}."
+                    : string.Empty;
+                throw new InvalidOperationException(
+                    $"Unknown condition set: '{selectedConditionSet}'.{available}");
+            }
+
+            preprocessorSymbols = symbols;
+        }
+
         ResolutionResult resolution = ArchitectureAssemblyResolver.ResolveFromDocument(document, repositoryRoot);
 
         ArchitectureAnalysisContext context = new(repositoryRoot, resolution.ResolvedAssemblies,
             resolution.MissingAssemblyNames, resolution.AssemblyProbingPaths);
-        ArchitectureContractRunner runner = new(context, document);
+        ArchitectureContractRunner runner = new(context, document,
+            preprocessorSymbols: preprocessorSymbols);
 
         List<ArchitectureViolation> allViolations = new();
         List<string> allCycles = new();

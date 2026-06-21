@@ -21,7 +21,8 @@ internal static class ArchitectureSourceScanner
         IReadOnlyList<ArchitectureIgnoredViolation> ignoredViolations,
         string[]? sourceRoots = null,
         ArchitectureLayer? sourceLayer = null,
-        ArchitectureIgnoreUsageTracker? usageTracker = null)
+        ArchitectureIgnoreUsageTracker? usageTracker = null,
+        IReadOnlyList<string>? preprocessorSymbols = null)
     {
         string[] roots = sourceRoots ?? _defaultSourceRoots;
         ArchitectureLayer effectiveLayer = sourceLayer
@@ -32,7 +33,7 @@ internal static class ArchitectureSourceScanner
             return Array.Empty<ArchitectureViolation>();
         }
 
-        CSharpCompilation compilation = BuildCompilation(sourceFiles);
+        CSharpCompilation compilation = BuildCompilation(sourceFiles, preprocessorSymbols);
         IReadOnlyList<ForbiddenCallPattern> patterns =
             ArchitectureForbiddenCallMatcher.NormalizePatterns(forbiddenCallPatterns);
         Dictionary<string, bool> matchCache = new(StringComparer.Ordinal);
@@ -78,11 +79,18 @@ internal static class ArchitectureSourceScanner
         return violations;
     }
 
-    private static CSharpCompilation BuildCompilation(IReadOnlyList<string> sourceFiles)
+    private static CSharpCompilation BuildCompilation(
+        IReadOnlyList<string> sourceFiles,
+        IReadOnlyList<string>? preprocessorSymbols = null)
     {
+        CSharpParseOptions? parseOptions = preprocessorSymbols is { Count: > 0 }
+            ? CSharpParseOptions.Default.WithPreprocessorSymbols(preprocessorSymbols)
+            : null;
+
         var syntaxTrees = sourceFiles
             .Select(filePath => CSharpSyntaxTree.ParseText(
                 File.ReadAllText(filePath),
+                options: parseOptions,
                 path: filePath))
             .ToList();
 

@@ -15,6 +15,7 @@ arch-linter-net [options]
 | `--strict` | Shortcut for `--mode strict` | |
 | `--audit` | Shortcut for `--mode audit` | |
 | `--contract <id>` | Run only the contract with the given ID (may be repeated) | |
+| `--condition-set <name>` | Use a named condition set from `analysis.condition_sets` to control conditional compilation symbols during Roslyn source analysis | empty symbol set |
 | `-f`, `--format <fmt>` | Output format: `human` or `json` | `human` |
 | `--json` | Shortcut for `--format json` | |
 | `-h`, `--help` | Show help message | |
@@ -63,6 +64,16 @@ arch-linter-net --contract map-core-boundary
 ```bash
 arch-linter-net --contract map-core-boundary --contract feature-no-cycles
 ```
+
+### Use a condition set
+
+```bash
+arch-linter-net --condition-set editor
+```
+
+Condition sets control which `#if` preprocessor branches are active during
+Roslyn source analysis. The named set must be defined in `analysis.condition_sets`
+in the policy file. Only affects method-body contracts (Roslyn scanning).
 
 Contract IDs are defined in the YAML policy file. If a contract has no explicit
 `id`, it is derived automatically from its `name`. Unknown contract IDs produce
