@@ -15,26 +15,37 @@ internal static class ArchitectureNamespaceViolationFinder
         ArchitectureLayer forbiddenLayer,
         IReadOnlyCollection<string> allowedTypeFullNames,
         IReadOnlyList<ArchitectureIgnoredViolation> ignoredViolations,
-        ArchitectureIgnoreUsageTracker? usageTracker = null)
+        ArchitectureIgnoreUsageTracker? usageTracker = null,
+        string? contractGroup = null,
+        List<ArchitectureBaselineCandidate>? baselineCandidates = null)
     {
         return sourceTypes
-            .Select(type => new ArchitectureViolation(
-                contractName,
-                contractId,
-                ArchitectureTypeNames.SafeFullName(type),
-                ArchitectureLayerResolver.DescribeLayer(forbiddenLayer),
-                ArchitectureReferenceScanner.GetReferencedTypes(type)
+            .Select(type =>
+            {
+                string sourceFullName = ArchitectureTypeNames.SafeFullName(type);
+                string[] forbiddenRefs = ArchitectureReferenceScanner.GetReferencedTypes(type)
                     .Where(reference => ArchitectureLayerResolver.MatchesNamespace(forbiddenLayer,
                         ArchitectureTypeNames.SafeNamespace(reference)))
                     .Select(ArchitectureTypeNames.SafeFullName)
                     .Where(name => !string.IsNullOrEmpty(name))
                     .Where(name => !allowedTypeFullNames.Contains(name))
                     .Where(name =>
-                        !ArchitectureIgnoreMatcher.IsIgnored(ArchitectureTypeNames.SafeFullName(type), name,
-                            ignoredViolations, usageTracker))
+                    {
+                        bool ignored = ArchitectureIgnoreMatcher.IsIgnored(sourceFullName, name,
+                            ignoredViolations, usageTracker);
+                        if (!ignored && contractGroup != null && baselineCandidates != null)
+                        {
+                            baselineCandidates.Add(new ArchitectureBaselineCandidate(contractGroup, contractId, sourceFullName, name));
+                        }
+                        return !ignored;
+                    })
                     .Distinct()
                     .OrderBy(name => name)
-                    .ToArray()))
+                    .ToArray();
+                return new ArchitectureViolation(
+                    contractName, contractId, sourceFullName,
+                    ArchitectureLayerResolver.DescribeLayer(forbiddenLayer), forbiddenRefs);
+            })
             .Where(violation => violation.ForbiddenReferences.Count > 0)
             .ToArray();
     }
@@ -47,7 +58,9 @@ internal static class ArchitectureNamespaceViolationFinder
         IReadOnlyCollection<string> allowedTypeFullNames,
         IReadOnlyList<ArchitectureIgnoredViolation> ignoredViolations,
         IReadOnlyCollection<Assembly> targetAssemblies,
-        ArchitectureIgnoreUsageTracker? usageTracker = null)
+        ArchitectureIgnoreUsageTracker? usageTracker = null,
+        string? contractGroup = null,
+        List<ArchitectureBaselineCandidate>? baselineCandidates = null)
     {
         HashSet<Assembly> assemblySet = targetAssemblies.ToHashSet();
         Func<Type, bool> traversePredicate = t => assemblySet.Contains(t.Assembly);
@@ -82,6 +95,11 @@ internal static class ArchitectureNamespaceViolationFinder
                     if (ArchitectureIgnoreMatcher.IsIgnored(sourceFullName, refFullName, ignoredViolations, usageTracker))
                     {
                         continue;
+                    }
+
+                    if (contractGroup != null && baselineCandidates != null)
+                    {
+                        baselineCandidates.Add(new ArchitectureBaselineCandidate(contractGroup, contractId, sourceFullName, refFullName));
                     }
 
                     forbiddenRefs.Add(refFullName);

@@ -268,6 +268,32 @@ linter warns about `ignored_violations` entries that match no current violation.
 Remove stale entries proactively to keep the baseline trustworthy and avoid CI
 failures. Use `warn` during migration cleanup, then switch to `error`.
 
+## Use Automated Baselines For Existing Codebases
+
+When adding architecture rules to an existing codebase with existing violations,
+use the automated baseline generation workflow instead of hand-writing
+`ignored_violations` entries:
+
+```bash
+arch-linter-net baseline generate \
+  --config architecture/dependencies.arch.yml \
+  --output baseline.yml \
+  --reason "Initial baseline"
+```
+
+Then validate with the baseline:
+
+```bash
+arch-linter-net --policy architecture/dependencies.arch.yml \
+  --baseline baseline.yml --mode strict
+```
+
+The baseline file is a separate YAML file that is merged into the policy's
+ignores at runtime. This keeps the policy file clean and makes the baseline
+lifecycle explicit — entries are added by the generator and removed as
+violations are fixed. See [Migration Baselines](../guides/migration-baselines.md)
+for the full lifecycle.
+
 ## Validate Before PR
 
 Run strict validation for current gates and audit validation for migration
