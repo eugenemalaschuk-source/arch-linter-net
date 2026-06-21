@@ -1,69 +1,52 @@
 # ArchLinterNet
 
-Declarative architecture contracts and dependency linting for .NET repositories.
+ArchLinterNet is a YAML-first architecture linter for .NET repositories.
 
-ArchLinterNet is a small, CI-friendly architecture governance tool for teams that want
-their architecture boundaries to live in a repository policy file instead of being
-scattered across hardcoded test rules.
+It lets teams define architecture boundaries once in a repository policy file and run those rules from the CLI, tests, or CI. The goal is practical architecture governance: strict gates for rules that must pass today, audit diagnostics for migration work, and readable output for both humans and automation.
 
-## Why ArchLinterNet?
+## Product documentation only
 
-Architecture testing tools often express rules directly in C#:
+This site is the public product documentation for ArchLinterNet. It is the only documentation intended for GitHub Pages publication and NuGet.org documentation links.
 
-```csharp
-Types().That().ResideInNamespace("MyApp.Application")
-    .Should().NotDependOnAny("MyApp.Infrastructure");
-```
+Internal project documentation such as backlog governance, OpenSpec archives, implementation planning, and repository-agent instructions remains in GitHub Markdown files outside this published site.
 
-That works, but has drawbacks:
-
-- Architecture policy becomes code, not a simple repository contract
-- Rules are harder for humans and AI agents to inspect quickly
-- Multiple repositories duplicate slightly different test helpers
-- Strict rules, audit rules, migration baselines, and CI output need extra infrastructure
-
-ArchLinterNet focuses on a different workflow:
+## Core workflow
 
 ```text
 architecture/dependencies.arch.yml
         ↓
-ArchLinterNet CLI / test adapter
+ArchLinterNet validation
         ↓
-strict or audit architecture validation
+strict gate or audit report
         ↓
-human-readable diagnostics + CI artifacts
+CI result, JSON artifact, or test failure
 ```
 
-The YAML policy file is the source of truth. Test projects, CLI wrappers, and CI steps
-are execution adapters.
+## Start here
 
-## Features
+- [Getting Started](getting-started/index.md) — first run and mental model.
+- [Installation](installation/index.md) — .NET tool, local tool, and package usage.
+- [First policy](getting-started/first-policy.md) — a minimal working YAML policy.
+- [CI integration](guides/ci-integration.md) — strict blocking + audit non-blocking workflow.
 
-- YAML policy loading and validation
-- Target assembly resolution (loaded assemblies, `Assembly.Load`, probe paths)
-- Namespace and assembly dependency checks
-- Ordered layer contracts
-- Allow-only whitelist contracts
-- Dependency cycle detection
-- Independence contracts between layers/modules
-- Strict and audit rule groups
-- Frozen-debt `ignored_violations` baseline
-- Method-body forbidden API checks
-- Optional Unity `.asmdef` validation
-- Human-readable diagnostics
-- JSON output for CI artifacts
-- CLI and test-runner integration
+## Author policies
 
-## Package layout
+- [Policy format](policy-format/index.md) — top-level YAML structure.
+- [Layers and namespace patterns](policy-format/layers-and-namespaces.md) — literal prefixes, constrained globs, suffixes, and external layers.
+- [External dependencies](policy-format/external-dependencies.md) — vendor/framework leakage modeling.
+- [Condition sets](policy-format/condition-sets.md) — conditional compilation for source/method-body analysis.
+- [Supported capabilities and non-goals](policy-format/supported-capabilities.md) — what the tool can and cannot validate.
 
-```
-src/
-  ArchLinterNet.Core/     — model, YAML loading, assembly resolution
-  ArchLinterNet.Cli/      — .NET global/local tool CLI
-  ArchLinterNet.Testing/  — test framework adapters
-  ArchLinterNet.Unity/    — Unity .asmdef validation (optional)
-tests/
-  ArchLinterNet.Core.Tests/
-  ArchLinterNet.Cli.Tests/
-  ArchLinterNet.Unity.Tests/
-```
+## Contract families
+
+ArchLinterNet supports strict and audit variants for dependency, ordered layer, allow-only, cycle, acyclic sibling, independence, protected surface, external dependency, method-body, Unity `.asmdef`, and layer-template contracts.
+
+See the [Contracts](contracts/index.md) section for the full reference.
+
+## AI-assisted policy authoring
+
+The [AI section](ai/index.md) documents how AI coding agents and human reviewers should inspect repositories, author safe YAML, avoid unsupported fields, and review generated policies before opening a PR.
+
+## What ArchLinterNet is not
+
+ArchLinterNet is not a runtime analyzer, security analyzer, semantic data-flow engine, ownership system, or enterprise architecture dashboard. It is intentionally focused on executable static architecture contracts that can run locally and in CI.
