@@ -1,0 +1,155 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://archlinternet.dev/schema/baseline.schema.json",
+  "title": "ArchLinterNet baseline file",
+  "description": "Schema for baseline YAML files that suppress known violations for architecture policy migration.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["version", "baseline"],
+  "properties": {
+    "version": {
+      "type": "integer",
+      "const": 1,
+      "description": "Baseline schema version. Current supported version is 1."
+    },
+    "baseline": {
+      "type": "object",
+      "description": "Contract group entries indexed by contract group name.",
+      "properties": {
+        "strict": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/baselineContractEntry" },
+          "default": []
+        },
+        "audit": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/baselineContractEntry" },
+          "default": []
+        },
+        "strict_layers": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/baselineContractEntry" },
+          "default": []
+        },
+        "audit_layers": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/baselineContractEntry" },
+          "default": []
+        },
+        "strict_allow_only": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/baselineContractEntry" },
+          "default": []
+        },
+        "audit_allow_only": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/baselineContractEntry" },
+          "default": []
+        },
+        "strict_cycles": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/baselineContractEntry" },
+          "default": []
+        },
+        "audit_cycles": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/baselineContractEntry" },
+          "default": []
+        },
+        "strict_acyclic_siblings": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/baselineContractEntry" },
+          "default": []
+        },
+        "audit_acyclic_siblings": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/baselineContractEntry" },
+          "default": []
+        },
+        "strict_method_body": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/baselineContractEntry" },
+          "default": []
+        },
+        "audit_method_body": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/baselineContractEntry" },
+          "default": []
+        },
+        "strict_independence": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/baselineContractEntry" },
+          "default": []
+        },
+        "audit_independence": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/baselineContractEntry" },
+          "default": []
+        },
+        "strict_protected": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/baselineContractEntry" },
+          "default": []
+        },
+        "audit_protected": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/baselineContractEntry" },
+          "default": []
+        },
+        "strict_external": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/baselineContractEntry" },
+          "default": []
+        },
+        "audit_external": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/baselineContractEntry" },
+          "default": []
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "$defs": {
+    "baselineContractEntry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "ignored_violations"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Contract ID matching the id field in an architecture contract."
+        },
+        "ignored_violations": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/baselineViolation" },
+          "minItems": 1,
+          "description": "Violation entries to suppress for this contract."
+        }
+      }
+    },
+    "baselineViolation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["source_type", "forbidden_reference"],
+      "properties": {
+        "source_type": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Source type name or narrow glob pattern to suppress."
+        },
+        "forbidden_reference": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Forbidden reference name or narrow glob pattern to suppress."
+        },
+        "reason": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Human-readable migration reason or issue reference."
+        }
+      }
+    }
+  }
+}

@@ -4,9 +4,10 @@
 
 ```bash
 arch-linter-net [options]
+arch-linter-net baseline generate --config <path> --output <path> [--reason <text>]
 ```
 
-## Options
+## Validate Options
 
 | Option | Description | Default |
 |--------|-------------|---------|
@@ -16,11 +17,29 @@ arch-linter-net [options]
 | `--audit` | Shortcut for `--mode audit` | |
 | `--contract <id>` | Run only the contract with the given ID (may be repeated) | |
 | `--condition-set <name>` | Use a named condition set from `analysis.condition_sets` to control conditional compilation symbols during Roslyn source analysis | policy `default_condition_set`, otherwise empty |
+| `--baseline <path>` | Path to baseline YAML file to merge with policy ignores | |
 | `-f`, `--format <fmt>` | Output format: `human` or `json` | `human` |
 | `--json` | Shortcut for `--format json` | |
 | `--timings` | Print phase-level timing report to stderr | |
 | `-h`, `--help` | Show help message | |
 | `-v`, `--version` | Show version | |
+
+## Baseline Subcommand
+
+| Subcommand | Description |
+|------------|-------------|
+| `baseline generate` | Generate a baseline of current violations |
+
+**Options for `baseline generate`:**
+
+| Option | Description | Default |
+|--------|-------------|---------|
+| `--config <path>` | Path to YAML policy file | `architecture/dependencies.arch.yml` |
+| `--output <path>` | Path to write the generated baseline file (required) | |
+| `--mode <mode>` | Contract mode: `strict`, `audit`, or `all` | `all` |
+| `--reason <text>` | Reason text for baseline entries | `generated baseline` |
+| `--condition-set <name>` | Use a named condition set from `analysis.condition_sets` | policy `default_condition_set`, otherwise empty |
+| `-h`, `--help` | Show help message | |
 
 ## Examples
 
@@ -76,9 +95,22 @@ Condition sets control which `#if` preprocessor branches are active during
 Roslyn source analysis. The named set must be defined in `analysis.condition_sets`
 in the policy file. Only affects method-body contracts (Roslyn scanning).
 
+### Generate a violation baseline
+
+```bash
+arch-linter-net baseline generate --config architecture/dependencies.arch.yml --output baseline.yml
+```
+
+### Validate with a baseline
+
+```bash
+arch-linter-net --policy architecture/dependencies.arch.yml --baseline baseline.yml --mode strict
+```
+
 Contract IDs are defined in the YAML policy file. If a contract has no explicit
 `id`, it is derived automatically from its `name`. Unknown contract IDs produce
-exit code 2 with a diagnostic listing available IDs.
+exit code 2 with a diagnostic listing available IDs. Unknown contract IDs in
+baseline files also produce exit code 2.
 
 ## Exit codes
 

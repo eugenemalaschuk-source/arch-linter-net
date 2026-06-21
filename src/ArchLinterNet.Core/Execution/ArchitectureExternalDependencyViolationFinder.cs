@@ -14,7 +14,9 @@ internal static class ArchitectureExternalDependencyViolationFinder
         Type[] sourceTypes,
         ArchitectureExternalDependencyGroup externalGroup,
         IReadOnlyList<ArchitectureIgnoredViolation> ignoredViolations,
-        ArchitectureIgnoreUsageTracker? usageTracker = null)
+        ArchitectureIgnoreUsageTracker? usageTracker = null,
+        string? contractGroup = null,
+        List<ArchitectureBaselineCandidate>? baselineCandidates = null)
     {
         return sourceTypes
             .Select(type =>
@@ -31,7 +33,14 @@ internal static class ArchitectureExternalDependencyViolationFinder
                         ArchitectureExternalDependencyResolver.MatchesGroup(externalGroup, reference.FullName,
                             reference.Namespace))
                     .Where(reference =>
-                        !ArchitectureIgnoreMatcher.IsIgnored(sourceType, reference.FullName, ignoredViolations, usageTracker))
+                    {
+                        bool ignored = ArchitectureIgnoreMatcher.IsIgnored(sourceType, reference.FullName, ignoredViolations, usageTracker);
+                        if (!ignored && contractGroup != null && baselineCandidates != null)
+                        {
+                            baselineCandidates.Add(new ArchitectureBaselineCandidate(contractGroup, contractId, sourceType, reference.FullName));
+                        }
+                        return !ignored;
+                    })
                     .Select(reference => reference.FullName)
                     .Distinct(StringComparer.Ordinal)
                     .OrderBy(name => name, StringComparer.Ordinal)

@@ -22,7 +22,9 @@ internal static class ArchitectureSourceScanner
         string[]? sourceRoots = null,
         ArchitectureLayer? sourceLayer = null,
         ArchitectureIgnoreUsageTracker? usageTracker = null,
-        IReadOnlyList<string>? preprocessorSymbols = null)
+        IReadOnlyList<string>? preprocessorSymbols = null,
+        string? contractGroup = null,
+        List<ArchitectureBaselineCandidate>? baselineCandidates = null)
     {
         string[] roots = sourceRoots ?? _defaultSourceRoots;
         ArchitectureLayer effectiveLayer = sourceLayer
@@ -58,7 +60,15 @@ internal static class ArchitectureSourceScanner
             string relativePath = GetRelativePath(repositoryRoot, syntaxTree.FilePath);
 
             IReadOnlyList<string> unignored = matches
-                .Where(match => !ArchitectureIgnoreMatcher.IsIgnored(relativePath, match, ignoredViolations, usageTracker))
+                .Where(match =>
+                {
+                    bool ignored = ArchitectureIgnoreMatcher.IsIgnored(relativePath, match, ignoredViolations, usageTracker);
+                    if (!ignored && contractGroup != null && baselineCandidates != null)
+                    {
+                        baselineCandidates.Add(new ArchitectureBaselineCandidate(contractGroup, contractId, relativePath, match));
+                    }
+                    return !ignored;
+                })
                 .Distinct(StringComparer.Ordinal)
                 .OrderBy(match => match, StringComparer.Ordinal)
                 .ToArray();

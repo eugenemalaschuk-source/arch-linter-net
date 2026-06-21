@@ -26,8 +26,13 @@ public sealed partial class ArchitectureContractRunner(
 
     private readonly List<ArchitectureUnmatchedIgnoredViolation> _unmatchedIgnoredViolations = new();
 
+    private readonly List<ArchitectureBaselineCandidate> _baselineCandidates = new();
+
     public IReadOnlyList<ArchitectureUnmatchedIgnoredViolation> UnmatchedIgnoredViolations
         => _unmatchedIgnoredViolations;
+
+    public IReadOnlyList<ArchitectureBaselineCandidate> BaselineCandidates
+        => _baselineCandidates;
 
     private static void RecordUnmatchedIgnores(
         string contractName,
@@ -52,6 +57,63 @@ public sealed partial class ArchitectureContractRunner(
             result.Add(new ArchitectureUnmatchedIgnoredViolation(
                 contractName, contractId, i, ignore.SourceType, ignore.ForbiddenReference, ignore.Reason));
         }
+    }
+
+    private void AddBaselineCandidate(string contractGroup, string? contractId, string sourceType, string forbiddenReference)
+    {
+        if (contractId != null)
+        {
+            _baselineCandidates.Add(new ArchitectureBaselineCandidate(contractGroup, contractId, sourceType, forbiddenReference));
+        }
+    }
+
+    private string? ResolveContractGroup(IArchitectureContract contract)
+    {
+        if (_document.Contracts.Strict.Contains(contract)) return "strict";
+        if (_document.Contracts.Audit.Contains(contract)) return "audit";
+        if (_document.Contracts.StrictLayers.Contains(contract)) return "strict_layers";
+        if (_document.Contracts.AuditLayers.Contains(contract)) return "audit_layers";
+        if (_document.Contracts.StrictAllowOnly.Contains(contract)) return "strict_allow_only";
+        if (_document.Contracts.AuditAllowOnly.Contains(contract)) return "audit_allow_only";
+        if (_document.Contracts.StrictCycles.Contains(contract)) return "strict_cycles";
+        if (_document.Contracts.AuditCycles.Contains(contract)) return "audit_cycles";
+        if (_document.Contracts.StrictAcyclicSiblings.Contains(contract)) return "strict_acyclic_siblings";
+        if (_document.Contracts.AuditAcyclicSiblings.Contains(contract)) return "audit_acyclic_siblings";
+        if (_document.Contracts.StrictMethodBody.Contains(contract)) return "strict_method_body";
+        if (_document.Contracts.AuditMethodBody.Contains(contract)) return "audit_method_body";
+        if (_document.Contracts.StrictIndependence.Contains(contract)) return "strict_independence";
+        if (_document.Contracts.AuditIndependence.Contains(contract)) return "audit_independence";
+        if (_document.Contracts.StrictProtected.Contains(contract)) return "strict_protected";
+        if (_document.Contracts.AuditProtected.Contains(contract)) return "audit_protected";
+        if (_document.Contracts.StrictExternal.Contains(contract)) return "strict_external";
+        if (_document.Contracts.AuditExternal.Contains(contract)) return "audit_external";
+
+        if (contract.Id == null) return null;
+
+        if (AnyWithId(_document.Contracts.Strict, contract.Id)) return "strict";
+        if (AnyWithId(_document.Contracts.Audit, contract.Id)) return "audit";
+        if (AnyWithId(_document.Contracts.StrictLayers, contract.Id)) return "strict_layers";
+        if (AnyWithId(_document.Contracts.AuditLayers, contract.Id)) return "audit_layers";
+        if (AnyWithId(_document.Contracts.StrictAllowOnly, contract.Id)) return "strict_allow_only";
+        if (AnyWithId(_document.Contracts.AuditAllowOnly, contract.Id)) return "audit_allow_only";
+        if (AnyWithId(_document.Contracts.StrictCycles, contract.Id)) return "strict_cycles";
+        if (AnyWithId(_document.Contracts.AuditCycles, contract.Id)) return "audit_cycles";
+        if (AnyWithId(_document.Contracts.StrictAcyclicSiblings, contract.Id)) return "strict_acyclic_siblings";
+        if (AnyWithId(_document.Contracts.AuditAcyclicSiblings, contract.Id)) return "audit_acyclic_siblings";
+        if (AnyWithId(_document.Contracts.StrictMethodBody, contract.Id)) return "strict_method_body";
+        if (AnyWithId(_document.Contracts.AuditMethodBody, contract.Id)) return "audit_method_body";
+        if (AnyWithId(_document.Contracts.StrictIndependence, contract.Id)) return "strict_independence";
+        if (AnyWithId(_document.Contracts.AuditIndependence, contract.Id)) return "audit_independence";
+        if (AnyWithId(_document.Contracts.StrictProtected, contract.Id)) return "strict_protected";
+        if (AnyWithId(_document.Contracts.AuditProtected, contract.Id)) return "audit_protected";
+        if (AnyWithId(_document.Contracts.StrictExternal, contract.Id)) return "strict_external";
+        if (AnyWithId(_document.Contracts.AuditExternal, contract.Id)) return "audit_external";
+        return null;
+    }
+
+    private static bool AnyWithId<T>(List<T> contracts, string id) where T : IArchitectureContract
+    {
+        return contracts.Any(c => string.Equals(c.Id, id, StringComparison.OrdinalIgnoreCase));
     }
 
     private bool IsContractSelected(string? contractId)

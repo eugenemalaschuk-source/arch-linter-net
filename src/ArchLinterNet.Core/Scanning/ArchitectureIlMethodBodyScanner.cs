@@ -18,7 +18,9 @@ internal static class ArchitectureIlMethodBodyScanner
         IReadOnlyList<string> forbiddenCallPatterns,
         IReadOnlyList<ArchitectureIgnoredViolation> ignoredViolations,
         ArchitectureLayer? sourceLayer = null,
-        ArchitectureIgnoreUsageTracker? usageTracker = null)
+        ArchitectureIgnoreUsageTracker? usageTracker = null,
+        string? contractGroup = null,
+        List<ArchitectureBaselineCandidate>? baselineCandidates = null)
     {
         Type[] sourceTypes = sourceLayer != null
             ? ArchitectureTypeScanner.FindTypesInLayer(targetAssemblies, sourceLayer)
@@ -37,7 +39,15 @@ internal static class ArchitectureIlMethodBodyScanner
         {
             string sourceTypeName = ArchitectureTypeNames.SafeFullName(sourceType);
             var matches = FindTypeMatches(sourceType, patterns, matchCache)
-                .Where(match => !ArchitectureIgnoreMatcher.IsIgnored(sourceTypeName, match, ignoredViolations, usageTracker))
+                .Where(match =>
+                {
+                    bool ignored = ArchitectureIgnoreMatcher.IsIgnored(sourceTypeName, match, ignoredViolations, usageTracker);
+                    if (!ignored && contractGroup != null && baselineCandidates != null)
+                    {
+                        baselineCandidates.Add(new ArchitectureBaselineCandidate(contractGroup, contractId, sourceTypeName, match));
+                    }
+                    return !ignored;
+                })
                 .Distinct(StringComparer.Ordinal)
                 .OrderBy(match => match, StringComparer.Ordinal)
                 .ToList();
