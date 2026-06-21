@@ -26,7 +26,6 @@ public sealed class ArchitectureValidator
             PolicyPath = policyPath,
             Mode = "strict",
             PreprocessorSymbols = preprocessorSymbols,
-            IncludeAsmdefContracts = false,
         };
 
         ValidationOutcome outcome = ArchitectureValidationService.Validate(request);
