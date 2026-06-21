@@ -1,10 +1,5 @@
-using ArchLinterNet.Core.Contracts;
-using ArchLinterNet.Core.Execution;
 using ArchLinterNet.Core.Model;
-using ArchLinterNet.Core.Reporting;
-using ArchLinterNet.Core.Resolution;
-
-using static ArchLinterNet.Core.Execution.LayerTemplateExpander;
+using ArchLinterNet.Core.Validation;
 
 namespace ArchLinterNet.Core;
 
@@ -26,90 +21,18 @@ public sealed class ArchitectureValidator
         out IReadOnlyCollection<string> cycles,
         IReadOnlyList<string>? preprocessorSymbols = null)
     {
-        ArchitectureContractDocument document = ArchitectureContractLoader.LoadFromPath(policyPath);
-
-        if (preprocessorSymbols == null &&
-            !ConditionSetResolver.TryResolve(document, null, out preprocessorSymbols, out string? resolveError))
+        ValidationRequest request = new()
         {
-            throw new InvalidOperationException(resolveError);
-        }
+            PolicyPath = policyPath,
+            Mode = "strict",
+            PreprocessorSymbols = preprocessorSymbols,
+            IncludeAsmdefContracts = false,
+        };
 
-        string repositoryRoot = ArchitectureRepositoryRootLocator.ResolveFrom(policyPath);
+        ValidationOutcome outcome = ArchitectureValidationService.Validate(request);
 
-        ResolutionResult resolution = ArchitectureAssemblyResolver.ResolveFromDocument(document, repositoryRoot);
-
-        ArchitectureAnalysisContext context = new(repositoryRoot, resolution.ResolvedAssemblies,
-            resolution.MissingAssemblyNames, resolution.AssemblyProbingPaths);
-        ArchitectureContractRunner runner = new(context, document,
-            preprocessorSymbols: preprocessorSymbols);
-
-        List<ArchitectureViolation> allViolations = new();
-        List<string> allCycles = new();
-
-        allViolations.AddRange(runner.CheckConfiguration());
-
-        foreach (ArchitectureDependencyContract contract in runner.StrictContracts())
-        {
-            allViolations.AddRange(runner.CheckContract(contract));
-        }
-
-        List<ArchitectureLayerContract> strictExpandedLayerContracts = Expand(
-            document.Contracts.StrictLayerTemplates,
-            document.Contracts.StrictLayers);
-
-        foreach (ArchitectureLayerContract contract in runner.StrictLayerContracts()
-                     .Concat(strictExpandedLayerContracts))
-        {
-            allViolations.AddRange(runner.CheckLayerContract(contract));
-        }
-
-        foreach (ArchitectureAllowOnlyContract contract in runner.StrictAllowOnlyContracts())
-        {
-            allViolations.AddRange(runner.CheckAllowOnlyContract(contract));
-        }
-
-        foreach (ArchitectureCycleContract contract in runner.StrictCycleContracts())
-        {
-            IReadOnlyCollection<string> contractCycles = runner.CheckCycleContract(contract);
-            string idPrefix = contract.Id != null ? $"[{contract.Id}] " : string.Empty;
-            allCycles.AddRange(contractCycles.Select(c => $"{idPrefix}{c}"));
-        }
-
-        foreach (ArchitectureMethodBodyContract contract in runner.StrictMethodBodyContracts())
-        {
-            allViolations.AddRange(runner.CheckMethodBodyContract(contract));
-        }
-
-        foreach (ArchitectureAsmdefContract contract in runner.StrictAsmdefContracts())
-        {
-            allViolations.AddRange(runner.CheckAsmdefContract(contract));
-        }
-
-        foreach (ArchitectureIndependenceContract contract in runner.StrictIndependenceContracts())
-        {
-            allViolations.AddRange(runner.CheckIndependenceContract(contract));
-        }
-
-        foreach (ArchitectureProtectedContract contract in runner.StrictProtectedContracts())
-        {
-            allViolations.AddRange(runner.CheckProtectedContract(contract));
-        }
-
-        foreach (ArchitectureExternalDependencyContract contract in runner.StrictExternalContracts())
-        {
-            allViolations.AddRange(runner.CheckExternalContract(contract));
-        }
-
-        foreach (ArchitectureAcyclicSiblingContract contract in runner.StrictAcyclicSiblingContracts())
-        {
-            IReadOnlyCollection<string> contractCycles = runner.CheckAcyclicSiblingContract(contract);
-            string idPrefix = contract.Id != null ? $"[{contract.Id}] " : string.Empty;
-            allCycles.AddRange(contractCycles.Select(c => $"{idPrefix}{c}"));
-        }
-
-        violations = allViolations;
-        cycles = allCycles;
-        return allViolations.Count == 0 && allCycles.Count == 0;
+        violations = outcome.Violations;
+        cycles = outcome.Cycles;
+        return outcome.Passed;
     }
-
 }

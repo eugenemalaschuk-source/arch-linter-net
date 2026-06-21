@@ -1,8 +1,8 @@
 using System.Diagnostics;
 
-namespace ArchLinterNet.Cli;
+namespace ArchLinterNet.Core.Validation;
 
-internal sealed class ValidationTiming
+public sealed class ValidationTiming
 {
     private readonly List<Entry> _entries = new();
     private int _nextOrdinal;

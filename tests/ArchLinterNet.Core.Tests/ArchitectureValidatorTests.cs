@@ -89,4 +89,35 @@ contracts:
 
         Assert.That(result, Is.True);
     }
+
+    [Test]
+    public void Validate_FailsPolicyWithViolatedContract()
+    {
+        string contractDir = Path.Combine(_tempDir, "architecture");
+        Directory.CreateDirectory(contractDir);
+        string contractPath = Path.Combine(contractDir, "dependencies.arch.yml");
+
+        File.WriteAllText(contractPath, @"
+version: 1
+name: Failing Test
+layers:
+  core:
+    namespace: ArchLinterNet.Core
+analysis:
+  target_assemblies:
+    - ArchLinterNet.Core
+contracts:
+  strict:
+    - name: core-must-not-depend-on-itself
+      source: core
+      forbidden: [core]
+");
+
+        var validator = new ArchitectureValidator();
+        bool result = validator.Validate(contractPath, out var violations, out var cycles);
+
+        Assert.That(result, Is.False);
+        Assert.That(violations, Is.Not.Empty);
+        Assert.That(cycles, Is.Empty);
+    }
 }

@@ -1,0 +1,179 @@
+using ArchLinterNet.Core.Contracts;
+using ArchLinterNet.Core.Model;
+using ArchLinterNet.Core.Validation;
+
+namespace ArchLinterNet.Core.Execution;
+
+public static class ArchitectureContractExecutor
+{
+    public sealed record ExecutionResult(
+        IReadOnlyCollection<ArchitectureViolation> Violations,
+        IReadOnlyCollection<string> Cycles);
+
+    public static ExecutionResult Execute(
+        ArchitectureContractRunner runner,
+        ArchitectureContractDocument document,
+        string mode,
+        bool includeAsmdefContracts = true,
+        ValidationTiming? timing = null)
+    {
+        bool isStrict = mode == "strict";
+
+        List<ArchitectureViolation> violations = new();
+        List<string> cycles = new();
+
+        int depCount = 0;
+        using (timing?.MeasureContractFamily("dependency", () => depCount))
+        {
+            IEnumerable<ArchitectureDependencyContract> dependencyContracts = isStrict
+                ? runner.StrictContracts()
+                : runner.AuditContracts();
+
+            foreach (ArchitectureDependencyContract contract in dependencyContracts)
+            {
+                depCount++;
+                violations.AddRange(runner.CheckContract(contract));
+            }
+        }
+
+        int layerCount = 0;
+        using (timing?.MeasureContractFamily("layer", () => layerCount))
+        {
+            List<ArchitectureLayerContract> expandedLayerContracts = LayerTemplateExpander.Expand(
+                isStrict ? document.Contracts.StrictLayerTemplates : document.Contracts.AuditLayerTemplates,
+                isStrict ? document.Contracts.StrictLayers : document.Contracts.AuditLayers);
+
+            IEnumerable<ArchitectureLayerContract> layerContracts = (isStrict
+                    ? runner.StrictLayerContracts()
+                    : runner.AuditLayerContracts())
+                .Concat(expandedLayerContracts);
+
+            foreach (ArchitectureLayerContract contract in layerContracts)
+            {
+                layerCount++;
+                violations.AddRange(runner.CheckLayerContract(contract));
+            }
+        }
+
+        int allowOnlyCount = 0;
+        using (timing?.MeasureContractFamily("allow_only", () => allowOnlyCount))
+        {
+            IEnumerable<ArchitectureAllowOnlyContract> allowOnlyContracts = isStrict
+                ? runner.StrictAllowOnlyContracts()
+                : runner.AuditAllowOnlyContracts();
+
+            foreach (ArchitectureAllowOnlyContract contract in allowOnlyContracts)
+            {
+                allowOnlyCount++;
+                violations.AddRange(runner.CheckAllowOnlyContract(contract));
+            }
+        }
+
+        int cycleCount = 0;
+        using (timing?.MeasureContractFamily("cycle", () => cycleCount))
+        {
+            IEnumerable<ArchitectureCycleContract> cycleContracts = isStrict
+                ? runner.StrictCycleContracts()
+                : runner.AuditCycleContracts();
+
+            foreach (ArchitectureCycleContract contract in cycleContracts)
+            {
+                cycleCount++;
+                IReadOnlyCollection<string> contractCycles = runner.CheckCycleContract(contract);
+                string idPrefix = contract.Id != null ? $"[{contract.Id}] " : string.Empty;
+                cycles.AddRange(contractCycles.Select(c => $"{idPrefix}{c}"));
+            }
+        }
+
+        int methodBodyCount = 0;
+        using (timing?.MeasureContractFamily("method_body", () => methodBodyCount))
+        {
+            IEnumerable<ArchitectureMethodBodyContract> methodBodyContracts = isStrict
+                ? runner.StrictMethodBodyContracts()
+                : runner.AuditMethodBodyContracts();
+
+            foreach (ArchitectureMethodBodyContract contract in methodBodyContracts)
+            {
+                methodBodyCount++;
+                violations.AddRange(runner.CheckMethodBodyContract(contract));
+            }
+        }
+
+        if (includeAsmdefContracts)
+        {
+            int asmdefCount = 0;
+            using (timing?.MeasureContractFamily("asmdef", () => asmdefCount))
+            {
+                IEnumerable<ArchitectureAsmdefContract> asmdefContracts = isStrict
+                    ? runner.StrictAsmdefContracts()
+                    : runner.AuditAsmdefContracts();
+
+                foreach (ArchitectureAsmdefContract contract in asmdefContracts)
+                {
+                    asmdefCount++;
+                    violations.AddRange(runner.CheckAsmdefContract(contract));
+                }
+            }
+        }
+
+        int independenceCount = 0;
+        using (timing?.MeasureContractFamily("independence", () => independenceCount))
+        {
+            IEnumerable<ArchitectureIndependenceContract> independenceContracts = isStrict
+                ? runner.StrictIndependenceContracts()
+                : runner.AuditIndependenceContracts();
+
+            foreach (ArchitectureIndependenceContract contract in independenceContracts)
+            {
+                independenceCount++;
+                violations.AddRange(runner.CheckIndependenceContract(contract));
+            }
+        }
+
+        int protectedCount = 0;
+        using (timing?.MeasureContractFamily("protected", () => protectedCount))
+        {
+            IEnumerable<ArchitectureProtectedContract> protectedContracts = isStrict
+                ? runner.StrictProtectedContracts()
+                : runner.AuditProtectedContracts();
+
+            foreach (ArchitectureProtectedContract contract in protectedContracts)
+            {
+                protectedCount++;
+                violations.AddRange(runner.CheckProtectedContract(contract));
+            }
+        }
+
+        int externalCount = 0;
+        using (timing?.MeasureContractFamily("external", () => externalCount))
+        {
+            IEnumerable<ArchitectureExternalDependencyContract> externalContracts = isStrict
+                ? runner.StrictExternalContracts()
+                : runner.AuditExternalContracts();
+
+            foreach (ArchitectureExternalDependencyContract contract in externalContracts)
+            {
+                externalCount++;
+                violations.AddRange(runner.CheckExternalContract(contract));
+            }
+        }
+
+        int acyclicSiblingCount = 0;
+        using (timing?.MeasureContractFamily("acyclic_sibling", () => acyclicSiblingCount))
+        {
+            IEnumerable<ArchitectureAcyclicSiblingContract> acyclicSiblingContracts = isStrict
+                ? runner.StrictAcyclicSiblingContracts()
+                : runner.AuditAcyclicSiblingContracts();
+
+            foreach (ArchitectureAcyclicSiblingContract contract in acyclicSiblingContracts)
+            {
+                acyclicSiblingCount++;
+                IReadOnlyCollection<string> contractCycles = runner.CheckAcyclicSiblingContract(contract);
+                string idPrefix = contract.Id != null ? $"[{contract.Id}] " : string.Empty;
+                cycles.AddRange(contractCycles.Select(c => $"{idPrefix}{c}"));
+            }
+        }
+
+        return new ExecutionResult(violations, cycles);
+    }
+}
