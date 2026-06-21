@@ -74,6 +74,14 @@ The system SHALL detect external dependency leakage through referenced type meta
 - **WHEN** a forbidden external dependency is found inside a method body
 - **THEN** the violation SHALL identify the source type, the containing method or constructor name, the forbidden external group, and the referenced external member or type
 
+#### Scenario: Method-body strict violation fails validation
+- **WHEN** a strict external dependency contract contains a method-body-only violation
+- **THEN** strict validation SHALL fail
+
+#### Scenario: Method-body audit violation reports without failing strict
+- **WHEN** an audit external dependency contract contains a method-body-only violation
+- **THEN** audit validation SHALL report the violation and strict validation SHALL NOT fail
+
 #### Scenario: Unresolved external metadata is not guaranteed
 - **WHEN** an external assembly is unavailable or unresolved enough that referenced type metadata cannot be observed by the scanner
 - **THEN** the external dependency contract SHALL NOT be required to report references from that unavailable metadata
