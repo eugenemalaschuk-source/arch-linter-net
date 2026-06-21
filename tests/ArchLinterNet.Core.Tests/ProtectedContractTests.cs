@@ -1,3 +1,4 @@
+using System.Linq;
 using System.Reflection;
 using System.Reflection.Emit;
 using ArchLinterNet.Core.Contracts;
@@ -435,6 +436,105 @@ public sealed class ProtectedContractTests
         Assert.That(json, Does.Contain("\"source_layer\":\"test_area\""));
         Assert.That(json, Does.Contain("\"target_layer\":\"execution\""));
         Assert.That(json, Does.Contain("\"allowed_importers\":[\"core\"]"));
+    }
+
+    [Test]
+    public void CheckProtectedContract_GlobProtectedLayer_IncludesMatchedNamespacePrefixes()
+    {
+        var document = new ArchitectureContractDocument
+        {
+            Version = 1,
+            Name = "Test",
+            Layers = new Dictionary<string, ArchitectureLayer>
+            {
+                ["glob_target"] = new() { Namespace = "ProtectedGlob.Target.*" }
+            },
+            Analysis = new ArchitectureAnalysisConfiguration
+            {
+                TargetAssemblies = new List<string>
+                {
+                    "ArchLinterNet.Core.Tests"
+                }
+            },
+            Contracts = new ArchitectureContractGroups
+            {
+                StrictProtected = new List<ArchitectureProtectedContract>
+                {
+                    new()
+                    {
+                        Name = "glob-target-is-protected",
+                        Protected = new List<string> { "glob_target" },
+                        AllowedImporters = new List<string>()
+                    }
+                }
+            }
+        };
+
+        var context = new ArchitectureAnalysisContext(
+            "/tmp",
+            new[] { TestAssembly },
+            Array.Empty<string>(),
+            Array.Empty<string>());
+
+        var runner = new ArchitectureContractRunner(context, document);
+        var violations = runner.CheckProtectedContract(document.Contracts.StrictProtected[0]);
+
+        Assert.That(violations, Is.Not.Empty);
+        Assert.That(violations.Any(v =>
+            v.MatchedNamespacePrefixes != null
+            && v.MatchedNamespacePrefixes.Contains("ProtectedGlob.Target.Execution")), Is.True);
+    }
+
+    [Test]
+    public void CheckProtectedContract_SourceTypeDirectlyInGlobParentNamespace_DoesNotResolveToGlobLayer()
+    {
+        var document = new ArchitectureContractDocument
+        {
+            Version = 1,
+            Name = "Test",
+            Layers = new Dictionary<string, ArchitectureLayer>
+            {
+                ["glob_target"] = new() { Namespace = "ProtectedGlob.Target.*" },
+                ["glob_importers"] = new() { Namespace = "ProtectedGlob.Importers.*" }
+            },
+            Analysis = new ArchitectureAnalysisConfiguration
+            {
+                TargetAssemblies = new List<string>
+                {
+                    "ArchLinterNet.Core.Tests"
+                }
+            },
+            Contracts = new ArchitectureContractGroups
+            {
+                StrictProtected = new List<ArchitectureProtectedContract>
+                {
+                    new()
+                    {
+                        Name = "glob-target-is-protected",
+                        Protected = new List<string> { "glob_target" },
+                        AllowedImporters = new List<string>()
+                    }
+                }
+            }
+        };
+
+        var context = new ArchitectureAnalysisContext(
+            "/tmp",
+            new[] { TestAssembly },
+            Array.Empty<string>(),
+            Array.Empty<string>());
+
+        var runner = new ArchitectureContractRunner(context, document);
+        var violations = runner.CheckProtectedContract(document.Contracts.StrictProtected[0]);
+
+        ArchitectureViolation? violation = violations.SingleOrDefault(
+            v => v.SourceType == "ProtectedGlob.Importers.DirectImporter");
+
+        Assert.That(violation, Is.Not.Null);
+        Assert.That(violation!.SourceLayer, Is.Null,
+            "A type declared directly in 'ProtectedGlob.Importers' (no descendant segment) must not be " +
+            "classified as belonging to the glob layer 'ProtectedGlob.Importers.*', which requires one " +
+            "additional namespace segment.");
     }
 
     [Test]

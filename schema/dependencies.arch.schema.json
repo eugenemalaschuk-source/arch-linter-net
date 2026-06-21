@@ -56,7 +56,7 @@
         "namespace": {
           "type": "string",
           "minLength": 1,
-          "description": "Namespace prefix matched with exact or child-namespace semantics."
+          "description": "Namespace prefix or constrained glob pattern. Supports '*' as a single-segment wildcard (e.g. 'App.Features.*'). Literal prefixes use exact or child-namespace semantics. See documentation for full glob syntax."
         },
         "namespace_suffix": {
           "type": "string",

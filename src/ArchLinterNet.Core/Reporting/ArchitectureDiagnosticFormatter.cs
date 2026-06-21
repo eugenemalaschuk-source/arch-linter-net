@@ -29,6 +29,14 @@ public static class ArchitectureDiagnosticFormatter
                         context += $" (external_group: {violation.ForbiddenExternalGroup})";
                     }
 
+                    string nsDisplay = violation.MatchedNamespacePrefixes switch
+                    {
+                        { Count: 1 } prefixes => $"{violation.ForbiddenNamespace} (matched {prefixes.First()})",
+                        { Count: > 1 } prefixes =>
+                            $"{violation.ForbiddenNamespace} (matched {string.Join(", ", prefixes.OrderBy(p => p, StringComparer.Ordinal))})",
+                        _ => violation.ForbiddenNamespace
+                    };
+
                     string refs = string.Join(", ", violation.ForbiddenReferences);
                     string pathSuffix = string.Empty;
                     if (violation.DependencyPaths != null && violation.DependencyPaths.Count > 0)
@@ -38,7 +46,7 @@ public static class ArchitectureDiagnosticFormatter
                             .Select(x => $"  via: {string.Join(" -> ", x.path)}");
                         pathSuffix = Environment.NewLine + string.Join(Environment.NewLine, pathLines);
                     }
-                    return $"- {idPrefix}[{violation.ContractName}] {violation.SourceType} -> {violation.ForbiddenNamespace}{context}: {refs}{pathSuffix}";
+                    return $"- {idPrefix}[{violation.ContractName}] {violation.SourceType} -> {nsDisplay}{context}: {refs}{pathSuffix}";
                 }));
     }
 
@@ -125,6 +133,13 @@ public static class ArchitectureDiagnosticFormatter
                 if (v.DependencyPaths != null)
                     obj["dependency_paths"] = v.DependencyPaths.Select(p => p.ToArray()).ToArray();
 
+                if (v.MatchedNamespacePrefixes != null)
+                {
+                    obj["matched_namespace_prefixes"] = v.MatchedNamespacePrefixes.ToArray();
+                    if (v.MatchedNamespacePrefixes.Count == 1)
+                        obj["matched_namespace_prefix"] = v.MatchedNamespacePrefixes.First();
+                }
+
                 return obj;
             }).ToArray(),
             cycles = cycles.ToArray(),
@@ -171,6 +186,13 @@ public static class ArchitectureDiagnosticFormatter
 
                 if (v.DependencyPaths != null)
                     obj["dependency_paths"] = v.DependencyPaths.Select(p => p.ToArray()).ToArray();
+
+                if (v.MatchedNamespacePrefixes != null)
+                {
+                    obj["matched_namespace_prefixes"] = v.MatchedNamespacePrefixes.ToArray();
+                    if (v.MatchedNamespacePrefixes.Count == 1)
+                        obj["matched_namespace_prefix"] = v.MatchedNamespacePrefixes.First();
+                }
 
                 return obj;
             })

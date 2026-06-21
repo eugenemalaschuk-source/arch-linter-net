@@ -29,6 +29,45 @@ layers:
     namespace: MyApp.Infrastructure
 ```
 
+Literal `namespace` values match the exact namespace and any child namespace.
+For example, `MyApp.Domain` matches both `MyApp.Domain` and
+`MyApp.Domain.Models`.
+
+### Namespace glob patterns
+
+Layer namespaces also support a constrained glob syntax using `*` as a complete
+namespace segment:
+
+```yaml
+layers:
+  feature_modules:
+    namespace: MyApp.Features.*
+
+  feature_models:
+    namespace: MyApp.Features.*
+    namespace_suffix: Models
+```
+
+Rules:
+
+- `*` matches exactly one namespace segment.
+- After `*` resolves to a concrete segment, descendants of that resolved prefix
+  are allowed, just like literal prefix matching.
+- `*` must occupy a whole segment. Patterns such as `Feature*`, `*Feature`, and
+  `F*eature` are invalid.
+- `**`, `?`, character classes, and raw regex are not supported.
+- A leading wildcard such as `*.Features` is invalid.
+
+Examples:
+
+- `MyApp.Features.*` matches `MyApp.Features.Audio` and
+  `MyApp.Features.Audio.Player`.
+- `MyApp.Features.*` does not match `MyApp.Features`.
+- `namespace: MyApp.Features.*` with `namespace_suffix: Models` matches
+  `MyApp.Features.Audio.Models` and `MyApp.Features.Audio.Models.Dto`.
+- That same pattern does not match `MyApp.Features.Audio.Internal.Models`
+  because the suffix is position-fixed when glob matching is used.
+
 ### External layers
 
 When a layer references namespaces whose assemblies are not available in the
@@ -48,7 +87,7 @@ layers:
 ```
 
 External layers remain fully usable as `forbidden` targets, in `allowed` lists,
-in `strict_layers`, `strict_cycles`, `strict_independence`, etc. — dependency
+in `strict_layers`, `strict_cycles`, `strict_independence`, etc. Dependency
 scanning uses namespace string matching and does not require target-side types
 to be loaded. If types are found for an external layer (e.g. SDK present in
 search paths), the linter uses them normally.

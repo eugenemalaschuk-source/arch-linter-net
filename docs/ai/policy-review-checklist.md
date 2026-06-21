@@ -30,7 +30,8 @@ Use this checklist before opening or approving an AI-generated policy change.
 
 - [ ] The policy uses only fields supported by `schema/dependencies.arch.schema.json`.
 - [ ] The policy uses only contract families listed in `archlinternet.capabilities.json`.
-- [ ] No unsupported fields such as `regex`, `severity`, `from`, `to`, or custom groups were invented.
+- [ ] No unsupported fields such as `regex`, `severity`, `from`, `to`, custom groups, or unsupported glob syntax (`**`, `?`, `Feature*`) were invented.
+- [ ] Any layer `namespace` using `*` uses it as a full segment and still maps to real repeated namespaces in the repository.
 - [ ] Documentation and sample policy snippets match executable YAML.
 
 ## Local Validation

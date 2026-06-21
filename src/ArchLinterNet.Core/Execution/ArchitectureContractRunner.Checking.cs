@@ -229,21 +229,26 @@ public sealed partial class ArchitectureContractRunner
             {
                 string sourceFullName = ArchitectureTypeNames.SafeFullName(type);
                 string[] forbiddenRefs = ArchitectureReferenceScanner.GetReferencedTypes(type)
-                    .Select(ArchitectureTypeNames.SafeFullName)
-                    .Where(name => !string.IsNullOrEmpty(name))
-                    .Where(name => !contract.AllowedTypes.Contains(name))
-                    .Where(name => ArchitectureLayerResolver.IsProjectType(_document, name))
-                    .Where(name => !ArchitectureNamespaceViolationFinder.IsInAnyAllowedLayer(name, allowedLayers))
-                    .Where(name =>
+                    .Select(refType => new
                     {
-                        bool ignored = ArchitectureIgnoreMatcher.IsIgnored(sourceFullName, name,
+                        FullName = ArchitectureTypeNames.SafeFullName(refType),
+                        Namespace = ArchitectureTypeNames.SafeNamespace(refType)
+                    })
+                    .Where(r => !string.IsNullOrEmpty(r.FullName))
+                    .Where(r => !contract.AllowedTypes.Contains(r.FullName))
+                    .Where(r => ArchitectureLayerResolver.IsProjectType(_document, r.Namespace))
+                    .Where(r => !ArchitectureNamespaceViolationFinder.IsInAnyAllowedLayer(r.Namespace, allowedLayers))
+                    .Where(r =>
+                    {
+                        bool ignored = ArchitectureIgnoreMatcher.IsIgnored(sourceFullName, r.FullName,
                             contract.IgnoredViolations, tracker);
                         if (!ignored && contractGroup != null && candidates != null)
                         {
-                            candidates.Add(new ArchitectureBaselineCandidate(contractGroup, contract.Id, sourceFullName, name));
+                            candidates.Add(new ArchitectureBaselineCandidate(contractGroup, contract.Id, sourceFullName, r.FullName));
                         }
                         return !ignored;
                     })
+                    .Select(r => r.FullName)
                     .Distinct()
                     .OrderBy(name => name)
                     .ToArray();
@@ -286,8 +291,9 @@ public sealed partial class ArchitectureContractRunner
                 foreach (Type referencedType in ArchitectureReferenceScanner.GetReferencedTypes(sourceType))
                 {
                     string referencedTypeName = ArchitectureTypeNames.SafeFullName(referencedType);
+                    string referencedNamespace = ArchitectureTypeNames.SafeNamespace(referencedType);
                     string? referencedLayerName =
-                        ArchitectureLayerResolver.ResolveContainingLayer(_document, referencedTypeName, contractLayers);
+                        ArchitectureLayerResolver.ResolveContainingLayer(_document, referencedNamespace, contractLayers);
 
                     if (referencedLayerName == null || referencedLayerName == sourceLayerName)
                     {
@@ -558,9 +564,10 @@ public sealed partial class ArchitectureContractRunner
                     }
 
                     string? sourceLayerName = ArchitectureLayerResolver.ResolveContainingLayer(
-                        _document, sourceTypeFullName, allLayerNames);
+                        _document, sourceNs, allLayerNames);
 
                     List<string> matchingRefs = new();
+                    HashSet<string> matchedNamespacePrefixes = new(StringComparer.Ordinal);
 
                     foreach (Type refType in ArchitectureReferenceScanner.GetReferencedTypes(sourceType))
                     {
@@ -570,8 +577,9 @@ public sealed partial class ArchitectureContractRunner
                             continue;
                         }
 
-                        if (!ArchitectureLayerResolver.MatchesNamespace(
-                                protectedLayer, ArchitectureTypeNames.SafeNamespace(refType)))
+                        ArchitectureNamespaceMatch protectedMatch = ArchitectureLayerResolver.MatchNamespace(
+                            protectedLayer, ArchitectureTypeNames.SafeNamespace(refType));
+                        if (!protectedMatch.Matched)
                         {
                             continue;
                         }
@@ -597,6 +605,10 @@ public sealed partial class ArchitectureContractRunner
                         }
 
                         matchingRefs.Add(refFullName);
+                        if (!string.IsNullOrEmpty(protectedMatch.MatchedNamespacePrefix))
+                        {
+                            matchedNamespacePrefixes.Add(protectedMatch.MatchedNamespacePrefix);
+                        }
                     }
 
                     if (matchingRefs.Count == 0)
@@ -615,6 +627,9 @@ public sealed partial class ArchitectureContractRunner
                         $"protected layer '{protectedLayerName}' (allowed importers: [{string.Join(", ", contract.AllowedImporters)}])",
                         normalizedRefs)
                     {
+                        MatchedNamespacePrefixes = matchedNamespacePrefixes.Count > 0
+                            ? matchedNamespacePrefixes.OrderBy(prefix => prefix, StringComparer.Ordinal).ToArray()
+                            : null,
                         SourceLayer = sourceLayerName,
                         TargetLayer = protectedLayerName,
                         AllowedImporters = contract.AllowedImporters

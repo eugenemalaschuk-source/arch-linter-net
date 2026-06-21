@@ -14,4 +14,5 @@ public sealed record ArchitectureViolation(
     public string? TemplateName { get; init; }
     public string? ContainerNamespace { get; init; }
     public IReadOnlyCollection<IReadOnlyCollection<string>>? DependencyPaths { get; init; }
+    public IReadOnlyCollection<string>? MatchedNamespacePrefixes { get; init; }
 }
