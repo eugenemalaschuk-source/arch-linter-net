@@ -136,41 +136,116 @@ internal static class ArchitectureExternalDependencyIlScanner
                 continue;
             }
 
-            Type? declaringType = referencedMember switch
-            {
-                MethodInfo m => m.DeclaringType,
-                ConstructorInfo c => c.DeclaringType,
-                PropertyInfo p => p.DeclaringType,
-                FieldInfo f => f.DeclaringType,
-                EventInfo e => e.DeclaringType,
-                Type t => t,
-                _ => null
-            };
-
-            if (declaringType == null)
+            string? matchedType = MatchReferencedTypes(referencedMember, externalGroup);
+            if (matchedType == null)
             {
                 continue;
             }
 
-            string fullName = ArchitectureTypeNames.SafeFullName(declaringType);
-            string ns = ArchitectureTypeNames.SafeNamespace(declaringType);
+            yield return $"{methodName}: {matchedType}";
+        }
+    }
 
-            if (!ArchitectureExternalDependencyResolver.MatchesGroup(externalGroup, fullName, ns))
+    private static string? MatchReferencedTypes(
+        MemberInfo member,
+        ArchitectureExternalDependencyGroup externalGroup)
+    {
+        Type? primaryType = member switch
+        {
+            Type t => t,
+            _ => member.DeclaringType
+        };
+
+        if (primaryType == null)
+        {
+            return null;
+        }
+
+        if (MatchesGroupOrGenericArgs(primaryType, externalGroup))
+        {
+            return FormatMemberName(member);
+        }
+
+        if (member is MethodInfo mi && mi.IsGenericMethod)
+        {
+            Type[] methodArgs;
+            try
             {
-                continue;
+                methodArgs = mi.GetGenericArguments();
+            }
+            catch
+            {
+                methodArgs = Type.EmptyTypes;
             }
 
-            string memberName = referencedMember switch
+            foreach (Type arg in methodArgs)
             {
-                MethodInfo m => $"{fullName}.{m.Name}",
-                ConstructorInfo c => $"{fullName}..ctor",
-                PropertyInfo p => $"{fullName}.{p.Name}",
-                FieldInfo f => $"{fullName}.{f.Name}",
-                EventInfo e => $"{fullName}.{e.Name}",
-                Type t => ArchitectureTypeNames.SafeFullName(t),
-                _ => fullName
-            };
-            yield return $"{methodName}: {memberName}";
+                if (MatchesGroupOrGenericArgs(arg, externalGroup))
+                {
+                    return FormatMemberName(member);
+                }
+            }
+        }
+
+        return null;
+    }
+
+    private static string FormatMemberName(MemberInfo member)
+    {
+        Type? declaringType = member switch
+        {
+            Type t => t,
+            _ => member.DeclaringType
+        };
+
+        string fullName = declaringType != null
+            ? ArchitectureTypeNames.SafeFullName(declaringType)
+            : string.Empty;
+
+        return member switch
+        {
+            MethodInfo m => $"{fullName}.{m.Name}",
+            ConstructorInfo c => $"{fullName}..ctor",
+            PropertyInfo p => $"{fullName}.{p.Name}",
+            FieldInfo f => $"{fullName}.{f.Name}",
+            EventInfo e => $"{fullName}.{e.Name}",
+            Type t => ArchitectureTypeNames.SafeFullName(t),
+            _ => fullName
+        };
+    }
+
+    private static bool MatchesGroupOrGenericArgs(
+        Type type,
+        ArchitectureExternalDependencyGroup externalGroup)
+    {
+        string fullName = ArchitectureTypeNames.SafeFullName(type);
+        string ns = ArchitectureTypeNames.SafeNamespace(type);
+
+        if (ArchitectureExternalDependencyResolver.MatchesGroup(externalGroup, fullName, ns))
+        {
+            return true;
+        }
+
+        foreach (Type arg in SafeGetGenericArguments(type))
+        {
+            if (MatchesGroupOrGenericArgs(arg, externalGroup))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static Type[] SafeGetGenericArguments(Type type)
+    {
+        try
+        {
+            return type.GetGenericArguments();
+        }
+        catch
+        {
+            return Type.EmptyTypes;
         }
     }
 

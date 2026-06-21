@@ -140,6 +140,32 @@ public sealed class ExternalDependencyIlScannerTests
     }
 
     [Test]
+    public void FindMethodBodyViolations_GenericOnlyInsideBody_DetectsViolation()
+    {
+        var group = new ArchitectureExternalDependencyGroup
+        {
+            NamespacePrefixes = new List<string> { "ExternalDependencyContractTestsFixtures.VendorSdk" }
+        };
+
+        Type[] sourceTypes = new[]
+        {
+            typeof(ExternalDependencyContractTestsFixtures.Core.CoreTypeWithGenericOnlyInBody)
+        };
+
+        var violations = ArchitectureExternalDependencyIlScanner.FindMethodBodyViolations(
+            "test-contract",
+            null,
+            sourceTypes,
+            "vendor_sdk",
+            group,
+            Array.Empty<ArchitectureIgnoredViolation>()).ToList();
+
+        Assert.That(violations, Is.Not.Empty);
+        Assert.That(violations[0].SourceType,
+            Does.Contain("CoreTypeWithGenericOnlyInBody"));
+    }
+
+    [Test]
     public void FindMethodBodyViolations_UnityStyleViolation_DetectsViolation()
     {
         var group = new ArchitectureExternalDependencyGroup
@@ -265,7 +291,8 @@ public sealed class ExternalDependencyIlScannerTests
             v.SourceType.Contains("CoreTypeWithMethodCall") ||
             v.SourceType.Contains("CoreTypeWithConstructorCall") ||
             v.SourceType.Contains("CoreTypeWithPropertyAccess") ||
-            v.SourceType.Contains("CoreTypeWithGenericReference")),
+            v.SourceType.Contains("CoreTypeWithGenericReference") ||
+            v.SourceType.Contains("CoreTypeWithGenericOnlyInBody")),
             Is.True);
     }
 

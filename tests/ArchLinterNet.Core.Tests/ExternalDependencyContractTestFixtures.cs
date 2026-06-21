@@ -36,6 +36,15 @@ namespace ExternalDependencyContractTestsFixtures.Core
             return new List<ExternalDependencyContractTestsFixtures.VendorSdk.Client>();
         }
     }
+
+    public sealed class CoreTypeWithGenericOnlyInBody
+    {
+        public void DoWork()
+        {
+            var clients = new List<ExternalDependencyContractTestsFixtures.VendorSdk.Client>();
+            _ = clients.Count;
+        }
+    }
 }
 
 namespace ExternalDependencyContractTestsFixtures.VendorSdk
