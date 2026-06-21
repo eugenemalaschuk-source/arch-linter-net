@@ -18,6 +18,7 @@ arch-linter-net [options]
 | `--condition-set <name>` | Use a named condition set from `analysis.condition_sets` to control conditional compilation symbols during Roslyn source analysis | policy `default_condition_set`, otherwise empty |
 | `-f`, `--format <fmt>` | Output format: `human` or `json` | `human` |
 | `--json` | Shortcut for `--format json` | |
+| `--timings` | Print phase-level timing report to stderr | |
 | `-h`, `--help` | Show help message | |
 | `-v`, `--version` | Show version | |
 
@@ -116,8 +117,8 @@ Validation timings:
 
   load_and_setup                              51 ms
     yaml_loading                              12 ms
-    condition_set_resolution                   2 ms
     root_resolution                            3 ms
+    condition_set_resolution                   2 ms
     assembly_resolution                       34 ms
 
   configuration_check                          8 ms
