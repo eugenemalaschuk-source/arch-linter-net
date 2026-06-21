@@ -26,10 +26,17 @@ public static class ArchitectureAssertions
 public sealed class ArchitectureValidationBuilder
 {
     private readonly string _policyPath;
+    private string? _conditionSetName;
 
     public ArchitectureValidationBuilder(string policyPath)
     {
         _policyPath = policyPath;
+    }
+
+    public ArchitectureValidationBuilder WithConditionSet(string name)
+    {
+        _conditionSetName = name;
+        return this;
     }
 
     public ArchitectureValidationResult ValidateStrict()
@@ -48,11 +55,18 @@ public sealed class ArchitectureValidationBuilder
 
         string repositoryRoot = ArchitectureRepositoryRootLocator.ResolveFrom(_policyPath);
 
+        if (!ConditionSetResolver.TryResolve(
+                document, _conditionSetName, out IReadOnlyList<string> preprocessorSymbols, out string? resolveError))
+        {
+            throw new InvalidOperationException(resolveError);
+        }
+
         ResolutionResult resolution = ArchitectureAssemblyResolver.ResolveFromDocument(document, repositoryRoot);
 
         ArchitectureAnalysisContext context = new(repositoryRoot, resolution.ResolvedAssemblies,
             resolution.MissingAssemblyNames, resolution.AssemblyProbingPaths);
-        ArchitectureContractRunner runner = new(context, document);
+        ArchitectureContractRunner runner = new(context, document,
+            preprocessorSymbols: preprocessorSymbols);
 
         List<ArchitectureViolation> allViolations = new();
         List<string> allCycles = new();

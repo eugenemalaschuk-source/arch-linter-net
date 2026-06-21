@@ -117,4 +117,43 @@ contracts:
 
         Assert.That(result.Passed, Is.True);
     }
+
+    [Test]
+    public void UnknownConditionSet_ThrowsInvalidOperation()
+    {
+        string contractDir = Path.Combine(_tempDir, "architecture");
+        Directory.CreateDirectory(contractDir);
+        string contractPath = Path.Combine(contractDir, "dependencies.arch.yml");
+
+        File.WriteAllText(contractPath, @"
+version: 1
+name: Test
+layers:
+  core:
+    namespace: ArchLinterNet.Core
+analysis:
+  target_assemblies:
+    - ArchLinterNet.Core
+  condition_sets:
+    runtime: []
+contracts:
+  strict: []
+  strict_layers: []
+  strict_allow_only: []
+  strict_cycles: []
+  strict_method_body: []
+  strict_asmdef: []
+  strict_independence: []
+");
+
+        var ex = Assert.Throws<InvalidOperationException>(() =>
+            ArchitectureAssertions
+                .FromPolicy(contractPath)
+                .WithConditionSet("nonexistent")
+                .ValidateStrict());
+
+        Assert.That(ex!.Message, Does.Contain("Unknown condition set"));
+        Assert.That(ex.Message, Does.Contain("nonexistent"));
+        Assert.That(ex.Message, Does.Contain("runtime"));
+    }
 }

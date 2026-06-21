@@ -12,7 +12,7 @@ The policy file is usually `architecture/dependencies.arch.yml` and contains:
 - `layers`: named namespace-prefix layer definitions.
 - `external_dependencies`: named vendor/framework dependency groups.
 - `legacy_runtime_layers`: optional namespace prefixes used by dependency contracts.
-- `analysis`: target assemblies, assembly search paths, and optional source roots.
+- `analysis`: target assemblies, assembly search paths, optional source roots, condition sets, and default condition set.
 - `contracts`: strict and audit contract groups.
 
 ## Supported Contract Families
@@ -30,6 +30,7 @@ The policy file is usually `architecture/dependencies.arch.yml` and contains:
 | Protected surface | `strict_protected` | `audit_protected` | Protected layers are referenced only by explicitly allowed importers |
 | External dependency | `strict_external` | `audit_external` | Source layer does not reference forbidden vendor/framework dependency groups |
 | Layer template | `strict_layer_templates` | `audit_layer_templates` | Reusable layer order applied to multiple containers; optional layers skip empty namespaces; `exhaustive: true` detects unmapped sibling namespaces |
+| Condition set | `analysis.condition_sets` | — | Named preprocessor symbol sets controlling which `#if` branches are active during Roslyn source/method-body scanning |
 
 ## Matching Semantics
 

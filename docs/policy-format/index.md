@@ -105,11 +105,36 @@ analysis:
     - MyApp.Application
     - MyApp.Domain
   assembly_search_paths: []   # Optional — additional probe directories
+  condition_sets: {}          # Optional — named preprocessor symbol sets
+  default_condition_set: ''   # Optional — default condition set name
 ```
 
 `assembly_search_paths` is recommended for standalone CLI hosts.
 You can also provide probe paths through the `ARCHITECTURE_ASSEMBLY_SEARCH_PATHS`
 environment variable (path-separator delimited).
+
+### Condition sets
+
+Condition sets control which preprocessor symbols (`#if`, `#if !`) are active
+during Roslyn source/method-body analysis. Each named set is a list of preprocessor
+symbols. When no condition set is selected (or the default resolves to empty), no
+symbols are defined and all `#if SYMBOL` blocks are excluded from analysis.
+
+```yaml
+analysis:
+  condition_sets:
+    runtime: []
+    editor: [UNITY_EDITOR]
+    debug: [DEBUG, UNITY_EDITOR]
+  default_condition_set: runtime
+```
+
+Condition sets affect Roslyn source/method-body scanning only. Reflection and IL
+scanners analyze the assemblies provided to the run and are not reinterpreted under
+different symbols.
+
+Select a condition set with `--condition-set <name>` on the CLI, or let the default
+apply. Unknown condition set names produce exit code 2.
 
 ## Contracts
 

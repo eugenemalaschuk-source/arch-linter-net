@@ -23,9 +23,16 @@ public sealed class ArchitectureValidator
     public bool Validate(
         string policyPath,
         out IReadOnlyCollection<ArchitectureViolation> violations,
-        out IReadOnlyCollection<string> cycles)
+        out IReadOnlyCollection<string> cycles,
+        IReadOnlyList<string>? preprocessorSymbols = null)
     {
         ArchitectureContractDocument document = ArchitectureContractLoader.LoadFromPath(policyPath);
+
+        if (preprocessorSymbols == null &&
+            !ConditionSetResolver.TryResolve(document, null, out preprocessorSymbols, out string? resolveError))
+        {
+            throw new InvalidOperationException(resolveError);
+        }
 
         string repositoryRoot = ArchitectureRepositoryRootLocator.ResolveFrom(policyPath);
 
@@ -33,7 +40,8 @@ public sealed class ArchitectureValidator
 
         ArchitectureAnalysisContext context = new(repositoryRoot, resolution.ResolvedAssemblies,
             resolution.MissingAssemblyNames, resolution.AssemblyProbingPaths);
-        ArchitectureContractRunner runner = new(context, document);
+        ArchitectureContractRunner runner = new(context, document,
+            preprocessorSymbols: preprocessorSymbols);
 
         List<ArchitectureViolation> allViolations = new();
         List<string> allCycles = new();

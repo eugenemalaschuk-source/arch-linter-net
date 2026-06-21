@@ -85,6 +85,21 @@ analysis:
   assembly_search_paths: []     # Optional — additional probe directories
   source_roots: []              # Optional — source directory roots for Roslyn resolution
   unmatched_ignored_violations: error  # Optional — error | warn | off (default: error)
+  condition_sets: {}            # Optional — named preprocessor symbol sets
+  default_condition_set: ''     # Optional — default condition set name
+```
+
+Condition sets control which preprocessor symbols (`#if`) are active during
+Roslyn source/method-body scanning. Reflection and IL scanners analyze the
+assemblies provided to the run and are not affected by condition sets.
+
+```yaml
+analysis:
+  condition_sets:
+    runtime: []
+    editor: [UNITY_EDITOR]
+    debug: [DEBUG, UNITY_EDITOR]
+  default_condition_set: runtime
 ```
 
 ### `unmatched_ignored_violations`
