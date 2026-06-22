@@ -11,29 +11,16 @@ internal static class ArchitectureExternalDependencyIlScanner
     private static readonly Dictionary<ushort, OpCode> _opCodes = BuildOpCodeMap();
 
     public static IEnumerable<ArchitectureViolation> FindMethodBodyViolations(
-        string contractName,
-        string? contractId,
         Type[] sourceTypes,
         string externalGroupName,
         ArchitectureExternalDependencyGroup externalGroup,
-        IReadOnlyList<ArchitectureIgnoredViolation> ignoredViolations,
-        ArchitectureIgnoreUsageTracker? usageTracker = null,
-        string? contractGroup = null,
-        List<ArchitectureBaselineCandidate>? baselineCandidates = null)
+        ArchitectureContractExecutionContext executionContext)
     {
         foreach (Type sourceType in sourceTypes)
         {
             string sourceTypeName = ArchitectureTypeNames.SafeFullName(sourceType);
             string[] forbiddenReferences = FindTypeMatches(sourceType, externalGroup)
-                .Where(match =>
-                {
-                    bool ignored = ArchitectureIgnoreMatcher.IsIgnored(sourceTypeName, match, ignoredViolations, usageTracker);
-                    if (!ignored && contractGroup != null && baselineCandidates != null)
-                    {
-                        baselineCandidates.Add(new ArchitectureBaselineCandidate(contractGroup, contractId, sourceTypeName, match));
-                    }
-                    return !ignored;
-                })
+                .Where(match => !executionContext.IsIgnored(sourceTypeName, match))
                 .Distinct(StringComparer.Ordinal)
                 .OrderBy(name => name, StringComparer.Ordinal)
                 .ToArray();
@@ -44,8 +31,8 @@ internal static class ArchitectureExternalDependencyIlScanner
             }
 
             yield return new ArchitectureViolation(
-                contractName,
-                contractId,
+                executionContext.ContractName,
+                executionContext.ContractId,
                 sourceTypeName,
                 $"external dependency group '{externalGroupName}'",
                 forbiddenReferences)

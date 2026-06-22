@@ -1,5 +1,6 @@
 using ArchLinterNet.Core.Contracts;
 using ArchLinterNet.Core.Model;
+using ArchLinterNet.Core.Resolution;
 using ArchLinterNet.Core.Scanning;
 using NUnit.Framework;
 
@@ -73,11 +74,13 @@ public class RuntimeClass
 }
 ");
 
+        var executionContext = new ArchitectureContractExecutionContext(
+            "test-runtime", null, Array.Empty<ArchitectureIgnoredViolation>(), false, null, null);
         IReadOnlyList<ArchitectureViolation> violations = ArchitectureSourceScanner
             .FindMethodBodyViolations(
-                "test-runtime", null, _tempDir, "TestNamespace",
+                _tempDir, "TestNamespace",
                 new[] { "System.Console.WriteLine" },
-                Array.Empty<ArchitectureIgnoredViolation>(),
+                executionContext,
                 sourceRoots: new[] { "." },
                 preprocessorSymbols: Array.Empty<string>())
             .ToList();
@@ -103,11 +106,13 @@ public class DebugClass
 }
 ");
 
+        var executionContext = new ArchitectureContractExecutionContext(
+            "test-debug", null, Array.Empty<ArchitectureIgnoredViolation>(), false, null, null);
         IReadOnlyList<ArchitectureViolation> violations = ArchitectureSourceScanner
             .FindMethodBodyViolations(
-                "test-debug", null, _tempDir, "TestNamespace",
+                _tempDir, "TestNamespace",
                 new[] { "System.Console.WriteLine" },
-                Array.Empty<ArchitectureIgnoredViolation>(),
+                executionContext,
                 sourceRoots: new[] { "." },
                 preprocessorSymbols: new[] { "DEBUG" })
             .ToList();
@@ -133,11 +138,13 @@ public class NonDebugClass
 }
 ");
 
+        var executionContext = new ArchitectureContractExecutionContext(
+            "test-no-debug", null, Array.Empty<ArchitectureIgnoredViolation>(), false, null, null);
         IReadOnlyList<ArchitectureViolation> violations = ArchitectureSourceScanner
             .FindMethodBodyViolations(
-                "test-no-debug", null, _tempDir, "TestNamespace",
+                _tempDir, "TestNamespace",
                 new[] { "System.Console.WriteLine" },
-                Array.Empty<ArchitectureIgnoredViolation>(),
+                executionContext,
                 sourceRoots: new[] { "." },
                 preprocessorSymbols: new[] { "DEBUG" })
             .ToList();
@@ -257,9 +264,10 @@ public class DebugClass
 
         IReadOnlyList<ArchitectureViolation> violationsWithDebug = ArchitectureSourceScanner
             .FindMethodBodyViolations(
-                "test-debug", null, _tempDir, "TestNamespace",
+                _tempDir, "TestNamespace",
                 new[] { "System.Diagnostics.Debug.WriteLine" },
-                Array.Empty<ArchitectureIgnoredViolation>(),
+                new ArchitectureContractExecutionContext(
+                    "test-debug", null, Array.Empty<ArchitectureIgnoredViolation>(), false, null, null),
                 sourceRoots: new[] { "." },
                 preprocessorSymbols: new[] { "UNITY_EDITOR", "DEBUG" })
             .ToList();
@@ -269,9 +277,10 @@ public class DebugClass
 
         IReadOnlyList<ArchitectureViolation> violationsWithoutDebug = ArchitectureSourceScanner
             .FindMethodBodyViolations(
-                "test-no-debug", null, _tempDir, "TestNamespace",
+                _tempDir, "TestNamespace",
                 new[] { "System.Diagnostics.Debug.WriteLine" },
-                Array.Empty<ArchitectureIgnoredViolation>(),
+                new ArchitectureContractExecutionContext(
+                    "test-no-debug", null, Array.Empty<ArchitectureIgnoredViolation>(), false, null, null),
                 sourceRoots: new[] { "." },
                 preprocessorSymbols: new[] { "UNITY_EDITOR" })
             .ToList();

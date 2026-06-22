@@ -1,6 +1,7 @@
 using ArchLinterNet.Core.Contracts;
 using ArchLinterNet.Core.Execution;
 using ArchLinterNet.Core.Reporting;
+using ArchLinterNet.Core.Resolution;
 using NUnit.Framework;
 
 namespace ArchLinterNet.Core.Tests;
@@ -13,13 +14,13 @@ public sealed class NamespaceViolationFinderGlobTests
     {
         ArchitectureLayer forbiddenLayer = new() { Namespace = "ReviewTest.Modules.*.Internal" };
 
+        var executionContext = new ArchitectureContractExecutionContext(
+            "glob-rule", "glob-rule", Array.Empty<ArchitectureIgnoredViolation>(), false, null, null);
         var violations = ArchitectureNamespaceViolationFinder.FindNamespaceViolations(
-                "glob-rule",
-                "glob-rule",
                 new[] { typeof(ReviewTest.SharedKernel.SharedKernelType) },
                 forbiddenLayer,
                 Array.Empty<string>(),
-                Array.Empty<ArchitectureIgnoredViolation>())
+                executionContext)
             .ToArray();
 
         Assert.That(violations, Has.Length.EqualTo(1));
