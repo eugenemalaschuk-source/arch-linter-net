@@ -20,9 +20,7 @@ public sealed partial class ArchitectureContractRunner
 
         List<ArchitectureViolation> violations = new();
         bool transitive = contract.DependencyDepth == DependencyDepthMode.Transitive;
-        ArchitectureIgnoreUsageTracker? tracker = _enableUnmatchedIgnoreTracking && contract.IgnoredViolations.Count > 0 ? new() : null;
-        List<ArchitectureBaselineCandidate>? candidates = _enableUnmatchedIgnoreTracking ? _baselineCandidates : null;
-        string? contractGroup = _enableUnmatchedIgnoreTracking ? ResolveContractGroup(contract) : null;
+        ArchitectureContractExecutionContext executionContext = CreateExecutionContext(contract, contract.IgnoredViolations);
 
         foreach (string forbiddenLayerName in contract.Forbidden)
         {
@@ -30,14 +28,13 @@ public sealed partial class ArchitectureContractRunner
                 ArchitectureLayerResolver.ResolveLayer(_document, contract.Name, forbiddenLayerName);
             if (transitive)
             {
-                violations.AddRange(ArchitectureNamespaceViolationFinder.FindTransitiveNamespaceViolations(contract.Name, contract.Id, sourceTypes,
-                    forbiddenLayer, contract.AllowedTypes, contract.IgnoredViolations, _context.TargetAssemblies, tracker,
-                    contractGroup, candidates));
+                violations.AddRange(ArchitectureNamespaceViolationFinder.FindTransitiveNamespaceViolations(sourceTypes,
+                    forbiddenLayer, contract.AllowedTypes, _context.TargetAssemblies, executionContext));
             }
             else
             {
-                violations.AddRange(ArchitectureNamespaceViolationFinder.FindNamespaceViolations(contract.Name, contract.Id, sourceTypes, forbiddenLayer,
-                    contract.AllowedTypes, contract.IgnoredViolations, tracker, contractGroup, candidates));
+                violations.AddRange(ArchitectureNamespaceViolationFinder.FindNamespaceViolations(sourceTypes, forbiddenLayer,
+                    contract.AllowedTypes, executionContext));
             }
         }
 
@@ -47,21 +44,20 @@ public sealed partial class ArchitectureContractRunner
             {
                 if (transitive)
                 {
-                    violations.AddRange(ArchitectureNamespaceViolationFinder.FindTransitiveNamespaceViolations(contract.Name, contract.Id, sourceTypes,
+                    violations.AddRange(ArchitectureNamespaceViolationFinder.FindTransitiveNamespaceViolations(sourceTypes,
                         new ArchitectureLayer { Namespace = forbiddenNamespace },
-                        contract.AllowedTypes, contract.IgnoredViolations, _context.TargetAssemblies, tracker,
-                        contractGroup, candidates));
+                        contract.AllowedTypes, _context.TargetAssemblies, executionContext));
                 }
                 else
                 {
-                    violations.AddRange(ArchitectureNamespaceViolationFinder.FindNamespaceViolations(contract.Name, contract.Id, sourceTypes,
+                    violations.AddRange(ArchitectureNamespaceViolationFinder.FindNamespaceViolations(sourceTypes,
                         new ArchitectureLayer { Namespace = forbiddenNamespace },
-                        contract.AllowedTypes, contract.IgnoredViolations, tracker, contractGroup, candidates));
+                        contract.AllowedTypes, executionContext));
                 }
             }
         }
 
-        RecordUnmatchedIgnores(contract.Name, contract.Id, contract.IgnoredViolations, tracker, _unmatchedIgnoredViolations);
+        executionContext.CollectUnmatchedIgnores(_unmatchedIgnoredViolations);
         return violations;
     }
 
@@ -106,9 +102,7 @@ public sealed partial class ArchitectureContractRunner
             effectiveLayers.Add((layerEntry, layer, types));
         }
 
-        ArchitectureIgnoreUsageTracker? tracker = _enableUnmatchedIgnoreTracking && contract.IgnoredViolations.Count > 0 ? new() : null;
-        List<ArchitectureBaselineCandidate>? candidates = _enableUnmatchedIgnoreTracking ? _baselineCandidates : null;
-        string? contractGroup = _enableUnmatchedIgnoreTracking ? ResolveContractGroup(contract) : null;
+        ArchitectureContractExecutionContext executionContext = CreateExecutionContext(contract, contract.IgnoredViolations);
 
         for (int sourceIndex = 0; sourceIndex < effectiveLayers.Count; sourceIndex++)
         {
@@ -118,8 +112,7 @@ public sealed partial class ArchitectureContractRunner
             {
                 var (_, forbiddenLayer, _) = effectiveLayers[forbiddenIndex];
                 foreach (ArchitectureViolation v in ArchitectureNamespaceViolationFinder.FindNamespaceViolations(
-                    contract.Name, contract.Id, sourceTypes, forbiddenLayer,
-                    Array.Empty<string>(), contract.IgnoredViolations, tracker, contractGroup, candidates))
+                    sourceTypes, forbiddenLayer, Array.Empty<string>(), executionContext))
                 {
                     violations.Add(v with
                     {
@@ -130,7 +123,7 @@ public sealed partial class ArchitectureContractRunner
             }
         }
 
-        RecordUnmatchedIgnores(contract.Name, contract.Id, contract.IgnoredViolations, tracker, _unmatchedIgnoredViolations);
+        executionContext.CollectUnmatchedIgnores(_unmatchedIgnoredViolations);
 
         if (contract.Exhaustive && contract.ContainerNamespace != null)
         {
@@ -220,9 +213,7 @@ public sealed partial class ArchitectureContractRunner
             .Append(sourceLayer)
             .ToList();
 
-        ArchitectureIgnoreUsageTracker? tracker = _enableUnmatchedIgnoreTracking && contract.IgnoredViolations.Count > 0 ? new() : null;
-        List<ArchitectureBaselineCandidate>? candidates = _enableUnmatchedIgnoreTracking ? _baselineCandidates : null;
-        string? contractGroup = _enableUnmatchedIgnoreTracking ? ResolveContractGroup(contract) : null;
+        ArchitectureContractExecutionContext executionContext = CreateExecutionContext(contract, contract.IgnoredViolations);
 
         List<ArchitectureViolation> violations = sourceTypes
             .Select(type =>
@@ -238,16 +229,7 @@ public sealed partial class ArchitectureContractRunner
                     .Where(r => !contract.AllowedTypes.Contains(r.FullName))
                     .Where(r => ArchitectureLayerResolver.IsProjectType(_document, r.Namespace))
                     .Where(r => !ArchitectureNamespaceViolationFinder.IsInAnyAllowedLayer(r.Namespace, allowedLayers))
-                    .Where(r =>
-                    {
-                        bool ignored = ArchitectureIgnoreMatcher.IsIgnored(sourceFullName, r.FullName,
-                            contract.IgnoredViolations, tracker);
-                        if (!ignored && contractGroup != null && candidates != null)
-                        {
-                            candidates.Add(new ArchitectureBaselineCandidate(contractGroup, contract.Id, sourceFullName, r.FullName));
-                        }
-                        return !ignored;
-                    })
+                    .Where(r => !executionContext.IsIgnored(sourceFullName, r.FullName))
                     .Select(r => r.FullName)
                     .Distinct()
                     .OrderBy(name => name)
@@ -258,7 +240,7 @@ public sealed partial class ArchitectureContractRunner
             .Where(violation => violation.ForbiddenReferences.Count > 0)
             .ToList();
 
-        RecordUnmatchedIgnores(contract.Name, contract.Id, contract.IgnoredViolations, tracker, _unmatchedIgnoredViolations);
+        executionContext.CollectUnmatchedIgnores(_unmatchedIgnoredViolations);
         return violations;
     }
 
@@ -275,7 +257,7 @@ public sealed partial class ArchitectureContractRunner
             _ => new HashSet<string>(StringComparer.Ordinal),
             StringComparer.Ordinal);
 
-        ArchitectureIgnoreUsageTracker? tracker = _enableUnmatchedIgnoreTracking && contract.IgnoredViolations.Count > 0 ? new() : null;
+        ArchitectureContractExecutionContext executionContext = CreateExecutionContext(contract, contract.IgnoredViolations);
 
         foreach (string sourceLayerName in contract.Layers)
         {
@@ -300,19 +282,9 @@ public sealed partial class ArchitectureContractRunner
                         continue;
                     }
 
-                    if (ArchitectureIgnoreMatcher.IsIgnored(sourceTypeName, referencedTypeName,
-                            contract.IgnoredViolations, tracker))
+                    if (executionContext.IsIgnored(sourceTypeName, referencedTypeName))
                     {
                         continue;
-                    }
-
-                    if (_enableUnmatchedIgnoreTracking)
-                    {
-                        string? group = ResolveContractGroup(contract);
-                        if (group != null)
-                        {
-                            AddBaselineCandidate(group, contract.Id, sourceTypeName, referencedTypeName);
-                        }
                     }
 
                     graph[sourceLayerName].Add(referencedLayerName);
@@ -320,7 +292,7 @@ public sealed partial class ArchitectureContractRunner
             }
         }
 
-        RecordUnmatchedIgnores(contract.Name, contract.Id, contract.IgnoredViolations, tracker, _unmatchedIgnoredViolations);
+        executionContext.CollectUnmatchedIgnores(_unmatchedIgnoredViolations);
         return ArchitectureCycleDetector.FindCycles(graph);
     }
 
@@ -332,7 +304,7 @@ public sealed partial class ArchitectureContractRunner
         }
 
         List<string> allCycles = new();
-        ArchitectureIgnoreUsageTracker? tracker = _enableUnmatchedIgnoreTracking && contract.IgnoredViolations.Count > 0 ? new() : null;
+        ArchitectureContractExecutionContext executionContext = CreateExecutionContext(contract, contract.IgnoredViolations);
 
         foreach (string ancestor in contract.Ancestors)
         {
@@ -369,19 +341,9 @@ public sealed partial class ArchitectureContractRunner
                             continue;
                         }
 
-                        if (ArchitectureIgnoreMatcher.IsIgnored(sourceTypeName, referencedTypeName,
-                                contract.IgnoredViolations, tracker))
+                        if (executionContext.IsIgnored(sourceTypeName, referencedTypeName))
                         {
                             continue;
-                        }
-
-                        if (_enableUnmatchedIgnoreTracking)
-                        {
-                            string? group = ResolveContractGroup(contract);
-                            if (group != null)
-                            {
-                                AddBaselineCandidate(group, contract.Id, sourceTypeName, referencedTypeName);
-                            }
                         }
 
                         graph[sourceSibling].Add(referencedSibling);
@@ -395,7 +357,7 @@ public sealed partial class ArchitectureContractRunner
                 ancestorCycles.Select(c => $"{ancestor}: {c}"));
         }
 
-        RecordUnmatchedIgnores(contract.Name, contract.Id, contract.IgnoredViolations, tracker, _unmatchedIgnoredViolations);
+        executionContext.CollectUnmatchedIgnores(_unmatchedIgnoredViolations);
         return allCycles;
     }
 
@@ -440,32 +402,24 @@ public sealed partial class ArchitectureContractRunner
             ? _document.Analysis.SourceRoots.ToArray()
             : null;
 
-        ArchitectureIgnoreUsageTracker? tracker = _enableUnmatchedIgnoreTracking && contract.IgnoredViolations.Count > 0 ? new() : null;
-        List<ArchitectureBaselineCandidate>? candidates = _enableUnmatchedIgnoreTracking ? _baselineCandidates : null;
-        string? contractGroup = _enableUnmatchedIgnoreTracking ? ResolveContractGroup(contract) : null;
+        ArchitectureContractExecutionContext executionContext = CreateExecutionContext(contract, contract.IgnoredViolations);
 
         IReadOnlyList<ArchitectureViolation> roslynViolations = ArchitectureSourceScanner
-            .FindMethodBodyViolations(contract.Name, contract.Id, _context.RepositoryRoot, sourceLayer.Namespace,
-                contract.ForbiddenCalls, contract.IgnoredViolations, sourceRoots: sourceRoots,
-                sourceLayer: sourceLayer, usageTracker: tracker, preprocessorSymbols: _preprocessorSymbols,
-                contractGroup: contractGroup, baselineCandidates: candidates)
+            .FindMethodBodyViolations(_context.RepositoryRoot, sourceLayer.Namespace,
+                contract.ForbiddenCalls, executionContext, sourceRoots: sourceRoots,
+                sourceLayer: sourceLayer, preprocessorSymbols: _preprocessorSymbols)
             .ToList();
 
         IReadOnlyList<ArchitectureViolation> ilViolations = ArchitectureIlMethodBodyScanner.FindMethodBodyViolations(
-            contract.Name,
-            contract.Id,
             _context.TargetAssemblies,
             sourceLayer.Namespace,
             contract.ForbiddenCalls,
-            contract.IgnoredViolations,
-            sourceLayer: sourceLayer,
-            usageTracker: tracker,
-            contractGroup: contractGroup,
-            baselineCandidates: candidates)
+            executionContext,
+            sourceLayer: sourceLayer)
             .ToList();
 
         List<ArchitectureViolation> violations = ArchitectureNamespaceViolationFinder.MergeMethodBodyViolations(contract.Name, contract.Id, roslynViolations, ilViolations);
-        RecordUnmatchedIgnores(contract.Name, contract.Id, contract.IgnoredViolations, tracker, _unmatchedIgnoredViolations);
+        executionContext.CollectUnmatchedIgnores(_unmatchedIgnoredViolations);
         return violations;
     }
 
@@ -488,9 +442,7 @@ public sealed partial class ArchitectureContractRunner
         }
 
         List<ArchitectureViolation> violations = new();
-        ArchitectureIgnoreUsageTracker? tracker = _enableUnmatchedIgnoreTracking && contract.IgnoredViolations.Count > 0 ? new() : null;
-        List<ArchitectureBaselineCandidate>? candidates = _enableUnmatchedIgnoreTracking ? _baselineCandidates : null;
-        string? contractGroup = _enableUnmatchedIgnoreTracking ? ResolveContractGroup(contract) : null;
+        ArchitectureContractExecutionContext executionContext = CreateExecutionContext(contract, contract.IgnoredViolations);
 
         foreach (string sourceLayerName in contract.Layers)
         {
@@ -507,12 +459,12 @@ public sealed partial class ArchitectureContractRunner
 
                 ArchitectureLayer forbiddenLayer =
                     ArchitectureLayerResolver.ResolveLayer(_document, contract.Name, forbiddenLayerName);
-                violations.AddRange(ArchitectureNamespaceViolationFinder.FindNamespaceViolations(contract.Name, contract.Id, sourceTypes, forbiddenLayer,
-                    Array.Empty<string>(), contract.IgnoredViolations, tracker, contractGroup, candidates));
+                violations.AddRange(ArchitectureNamespaceViolationFinder.FindNamespaceViolations(sourceTypes, forbiddenLayer,
+                    Array.Empty<string>(), executionContext));
             }
         }
 
-        RecordUnmatchedIgnores(contract.Name, contract.Id, contract.IgnoredViolations, tracker, _unmatchedIgnoredViolations);
+        executionContext.CollectUnmatchedIgnores(_unmatchedIgnoredViolations);
         return violations;
     }
 
@@ -532,7 +484,7 @@ public sealed partial class ArchitectureContractRunner
             .Select(name => ArchitectureLayerResolver.ResolveLayer(_document, contract.Name, name))
             .ToList();
 
-        ArchitectureIgnoreUsageTracker? tracker = _enableUnmatchedIgnoreTracking && contract.IgnoredViolations.Count > 0 ? new() : null;
+        ArchitectureContractExecutionContext executionContext = CreateExecutionContext(contract, contract.IgnoredViolations);
 
         foreach (string protectedLayerName in contract.Protected)
         {
@@ -589,19 +541,9 @@ public sealed partial class ArchitectureContractRunner
                             continue;
                         }
 
-                        if (ArchitectureIgnoreMatcher.IsIgnored(
-                                sourceTypeFullName, refFullName, contract.IgnoredViolations, tracker))
+                        if (executionContext.IsIgnored(sourceTypeFullName, refFullName))
                         {
                             continue;
-                        }
-
-                        if (_enableUnmatchedIgnoreTracking)
-                        {
-                            string? group = ResolveContractGroup(contract);
-                            if (group != null)
-                            {
-                                AddBaselineCandidate(group, contract.Id, sourceTypeFullName, refFullName);
-                            }
                         }
 
                         matchingRefs.Add(refFullName);
@@ -638,7 +580,7 @@ public sealed partial class ArchitectureContractRunner
             }
         }
 
-        RecordUnmatchedIgnores(contract.Name, contract.Id, contract.IgnoredViolations, tracker, _unmatchedIgnoredViolations);
+        executionContext.CollectUnmatchedIgnores(_unmatchedIgnoredViolations);
         return violations;
     }
 
@@ -653,9 +595,7 @@ public sealed partial class ArchitectureContractRunner
         Type[] sourceTypes = ArchitectureTypeScanner.FindTypesInLayer(_context.TargetAssemblies, sourceLayer);
         List<ArchitectureViolation> violations = new();
 
-        ArchitectureIgnoreUsageTracker? tracker = _enableUnmatchedIgnoreTracking && contract.IgnoredViolations.Count > 0 ? new() : null;
-        List<ArchitectureBaselineCandidate>? candidates = _enableUnmatchedIgnoreTracking ? _baselineCandidates : null;
-        string? contractGroup = _enableUnmatchedIgnoreTracking ? ResolveContractGroup(contract) : null;
+        ArchitectureContractExecutionContext executionContext = CreateExecutionContext(contract, contract.IgnoredViolations);
 
         foreach (string externalGroupName in contract.Forbidden)
         {
@@ -665,29 +605,19 @@ public sealed partial class ArchitectureContractRunner
             }
 
             violations.AddRange(ArchitectureExternalDependencyViolationFinder.FindViolations(
-                contract.Name,
-                contract.Id,
                 externalGroupName,
                 sourceTypes,
                 externalGroup,
-                contract.IgnoredViolations,
-                tracker,
-                contractGroup,
-                candidates));
+                executionContext));
 
             violations.AddRange(ArchitectureExternalDependencyIlScanner.FindMethodBodyViolations(
-                contract.Name,
-                contract.Id,
                 sourceTypes,
                 externalGroupName,
                 externalGroup,
-                contract.IgnoredViolations,
-                tracker,
-                contractGroup,
-                candidates));
+                executionContext));
         }
 
-        RecordUnmatchedIgnores(contract.Name, contract.Id, contract.IgnoredViolations, tracker, _unmatchedIgnoredViolations);
+        executionContext.CollectUnmatchedIgnores(_unmatchedIgnoredViolations);
         return violations;
     }
 }

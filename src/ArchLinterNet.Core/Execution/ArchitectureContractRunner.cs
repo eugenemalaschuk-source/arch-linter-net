@@ -38,37 +38,13 @@ public sealed partial class ArchitectureContractRunner(
 
     public ArchitectureContractCatalog Catalog => _catalog;
 
-    private static void RecordUnmatchedIgnores(
-        string contractName,
-        string? contractId,
-        IReadOnlyList<ArchitectureIgnoredViolation> ignoredViolations,
-        ArchitectureIgnoreUsageTracker? tracker,
-        List<ArchitectureUnmatchedIgnoredViolation> result)
+    private ArchitectureContractExecutionContext CreateExecutionContext(
+        IArchitectureContract contract,
+        IReadOnlyList<ArchitectureIgnoredViolation> ignoredViolations)
     {
-        if (tracker == null)
-        {
-            return;
-        }
-
-        for (int i = 0; i < ignoredViolations.Count; i++)
-        {
-            if (tracker.IsMatched(i))
-            {
-                continue;
-            }
-
-            var ignore = ignoredViolations[i];
-            result.Add(new ArchitectureUnmatchedIgnoredViolation(
-                contractName, contractId, i, ignore.SourceType, ignore.ForbiddenReference, ignore.Reason));
-        }
-    }
-
-    private void AddBaselineCandidate(string contractGroup, string? contractId, string sourceType, string forbiddenReference)
-    {
-        if (contractId != null)
-        {
-            _baselineCandidates.Add(new ArchitectureBaselineCandidate(contractGroup, contractId, sourceType, forbiddenReference));
-        }
+        string? contractGroup = _enableUnmatchedIgnoreTracking ? ResolveContractGroup(contract) : null;
+        return new ArchitectureContractExecutionContext(
+            contract.Name, contract.Id, ignoredViolations, _enableUnmatchedIgnoreTracking, contractGroup, _baselineCandidates);
     }
 
     private string? ResolveContractGroup(IArchitectureContract contract)

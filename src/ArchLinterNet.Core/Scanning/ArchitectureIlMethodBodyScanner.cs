@@ -11,16 +11,11 @@ internal static class ArchitectureIlMethodBodyScanner
     private static readonly Dictionary<ushort, OpCode> _opCodes = BuildOpCodeMap();
 
     public static IEnumerable<ArchitectureViolation> FindMethodBodyViolations(
-        string contractName,
-        string? contractId,
         IReadOnlyCollection<Assembly> targetAssemblies,
         string sourceNamespacePrefix,
         IReadOnlyList<string> forbiddenCallPatterns,
-        IReadOnlyList<ArchitectureIgnoredViolation> ignoredViolations,
-        ArchitectureLayer? sourceLayer = null,
-        ArchitectureIgnoreUsageTracker? usageTracker = null,
-        string? contractGroup = null,
-        List<ArchitectureBaselineCandidate>? baselineCandidates = null)
+        ArchitectureContractExecutionContext executionContext,
+        ArchitectureLayer? sourceLayer = null)
     {
         Type[] sourceTypes = sourceLayer != null
             ? ArchitectureTypeScanner.FindTypesInLayer(targetAssemblies, sourceLayer)
@@ -39,15 +34,7 @@ internal static class ArchitectureIlMethodBodyScanner
         {
             string sourceTypeName = ArchitectureTypeNames.SafeFullName(sourceType);
             var matches = FindTypeMatches(sourceType, patterns, matchCache)
-                .Where(match =>
-                {
-                    bool ignored = ArchitectureIgnoreMatcher.IsIgnored(sourceTypeName, match, ignoredViolations, usageTracker);
-                    if (!ignored && contractGroup != null && baselineCandidates != null)
-                    {
-                        baselineCandidates.Add(new ArchitectureBaselineCandidate(contractGroup, contractId, sourceTypeName, match));
-                    }
-                    return !ignored;
-                })
+                .Where(match => !executionContext.IsIgnored(sourceTypeName, match))
                 .Distinct(StringComparer.Ordinal)
                 .OrderBy(match => match, StringComparer.Ordinal)
                 .ToList();
@@ -58,8 +45,8 @@ internal static class ArchitectureIlMethodBodyScanner
             }
 
             violations.Add(new ArchitectureViolation(
-                contractName,
-                contractId,
+                executionContext.ContractName,
+                executionContext.ContractId,
                 sourceTypeName,
                 "method-body-il",
                 matches));

@@ -1,6 +1,7 @@
 using ArchLinterNet.Core;
 using ArchLinterNet.Core.Contracts;
 using ArchLinterNet.Core.Execution;
+using ArchLinterNet.Core.Resolution;
 using ArchLinterNet.Core.Scanning;
 using ArchLinterNet.Testing;
 using NUnit.Framework;
@@ -23,13 +24,13 @@ public sealed class ExternalDependencyIlScannerTests
             typeof(ExternalDependencyContractTestsFixtures.Core.CoreTypeWithMethodCall)
         };
 
+        var executionContext = new ArchitectureContractExecutionContext(
+            "test-contract", "test-id", Array.Empty<ArchitectureIgnoredViolation>(), false, null, null);
         var violations = ArchitectureExternalDependencyIlScanner.FindMethodBodyViolations(
-            "test-contract",
-            "test-id",
             sourceTypes,
             "vendor_sdk",
             group,
-            Array.Empty<ArchitectureIgnoredViolation>()).ToList();
+            executionContext).ToList();
 
         Assert.That(violations, Is.Not.Empty);
         Assert.That(violations[0].SourceType,
@@ -51,13 +52,13 @@ public sealed class ExternalDependencyIlScannerTests
             typeof(ExternalDependencyContractTestsFixtures.Core.CoreTypeWithConstructorCall)
         };
 
+        var executionContext = new ArchitectureContractExecutionContext(
+            "test-contract", null, Array.Empty<ArchitectureIgnoredViolation>(), false, null, null);
         var violations = ArchitectureExternalDependencyIlScanner.FindMethodBodyViolations(
-            "test-contract",
-            null,
             sourceTypes,
             "vendor_sdk",
             group,
-            Array.Empty<ArchitectureIgnoredViolation>()).ToList();
+            executionContext).ToList();
 
         Assert.That(violations, Is.Not.Empty);
         Assert.That(violations[0].SourceType,
@@ -77,13 +78,13 @@ public sealed class ExternalDependencyIlScannerTests
             typeof(ExternalDependencyContractTestsFixtures.Core.CoreTypeWithPropertyAccess)
         };
 
+        var executionContext = new ArchitectureContractExecutionContext(
+            "test-contract", null, Array.Empty<ArchitectureIgnoredViolation>(), false, null, null);
         var violations = ArchitectureExternalDependencyIlScanner.FindMethodBodyViolations(
-            "test-contract",
-            null,
             sourceTypes,
             "vendor_sdk",
             group,
-            Array.Empty<ArchitectureIgnoredViolation>()).ToList();
+            executionContext).ToList();
 
         Assert.That(violations, Is.Not.Empty);
         Assert.That(violations[0].SourceType,
@@ -103,13 +104,13 @@ public sealed class ExternalDependencyIlScannerTests
             typeof(ExternalDependencyContractTestsFixtures.Adapters.AdapterUsingVendorSdk)
         };
 
+        var executionContext = new ArchitectureContractExecutionContext(
+            "test-contract", null, Array.Empty<ArchitectureIgnoredViolation>(), false, null, null);
         var violations = ArchitectureExternalDependencyIlScanner.FindMethodBodyViolations(
-            "test-contract",
-            null,
             sourceTypes,
             "vendor_sdk",
             group,
-            Array.Empty<ArchitectureIgnoredViolation>()).ToList();
+            executionContext).ToList();
 
         Assert.That(violations, Is.Not.Empty);
         Assert.That(violations[0].SourceType, Does.Contain("AdapterUsingVendorSdk"));
@@ -128,13 +129,13 @@ public sealed class ExternalDependencyIlScannerTests
             typeof(ExternalDependencyContractTestsFixtures.Core.PureCoreType)
         };
 
+        var executionContext = new ArchitectureContractExecutionContext(
+            "test-contract", null, Array.Empty<ArchitectureIgnoredViolation>(), false, null, null);
         var violations = ArchitectureExternalDependencyIlScanner.FindMethodBodyViolations(
-            "test-contract",
-            null,
             sourceTypes,
             "vendor_sdk",
             group,
-            Array.Empty<ArchitectureIgnoredViolation>()).ToList();
+            executionContext).ToList();
 
         Assert.That(violations, Is.Empty);
     }
@@ -152,13 +153,13 @@ public sealed class ExternalDependencyIlScannerTests
             typeof(ExternalDependencyContractTestsFixtures.Core.CoreTypeWithGenericOnlyInBody)
         };
 
+        var executionContext = new ArchitectureContractExecutionContext(
+            "test-contract", null, Array.Empty<ArchitectureIgnoredViolation>(), false, null, null);
         var violations = ArchitectureExternalDependencyIlScanner.FindMethodBodyViolations(
-            "test-contract",
-            null,
             sourceTypes,
             "vendor_sdk",
             group,
-            Array.Empty<ArchitectureIgnoredViolation>()).ToList();
+            executionContext).ToList();
 
         Assert.That(violations, Is.Not.Empty);
         Assert.That(violations[0].SourceType,
@@ -181,13 +182,13 @@ public sealed class ExternalDependencyIlScannerTests
             typeof(ExternalDependencyContractTestsFixtures.UnityStyle.CoreTypeWithUnityMethodBody)
         };
 
+        var executionContext = new ArchitectureContractExecutionContext(
+            "test-contract", null, Array.Empty<ArchitectureIgnoredViolation>(), false, null, null);
         var violations = ArchitectureExternalDependencyIlScanner.FindMethodBodyViolations(
-            "test-contract",
-            null,
             sourceTypes,
             "unity_runtime",
             group,
-            Array.Empty<ArchitectureIgnoredViolation>()).ToList();
+            executionContext).ToList();
 
         Assert.That(violations, Is.Not.Empty);
         Assert.That(violations[0].ForbiddenReferences.Any(r => r.Contains("UnityEngine")),
@@ -207,13 +208,13 @@ public sealed class ExternalDependencyIlScannerTests
             typeof(ExternalDependencyContractTestsFixtures.Core.CoreTypeWithMethodCall)
         };
 
+        var withoutIgnoreContext = new ArchitectureContractExecutionContext(
+            "test-contract", null, Array.Empty<ArchitectureIgnoredViolation>(), false, null, null);
         var violationsWithoutIgnore = ArchitectureExternalDependencyIlScanner.FindMethodBodyViolations(
-            "test-contract",
-            null,
             sourceTypes,
             "vendor_sdk",
             group,
-            Array.Empty<ArchitectureIgnoredViolation>()).ToList();
+            withoutIgnoreContext).ToList();
 
         Assert.That(violationsWithoutIgnore, Is.Not.Empty);
 
@@ -230,13 +231,13 @@ public sealed class ExternalDependencyIlScannerTests
             }
         };
 
+        var withIgnoreContext = new ArchitectureContractExecutionContext(
+            "test-contract", null, ignoredViolations, false, null, null);
         var violationsWithIgnore = ArchitectureExternalDependencyIlScanner.FindMethodBodyViolations(
-            "test-contract",
-            null,
             sourceTypes,
             "vendor_sdk",
             group,
-            ignoredViolations).ToList();
+            withIgnoreContext).ToList();
 
         Assert.That(violationsWithIgnore.Any(v =>
             v.SourceType == sourceType &&

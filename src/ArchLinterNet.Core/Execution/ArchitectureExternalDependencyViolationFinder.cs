@@ -8,15 +8,10 @@ namespace ArchLinterNet.Core.Execution;
 internal static class ArchitectureExternalDependencyViolationFinder
 {
     public static IEnumerable<ArchitectureViolation> FindViolations(
-        string contractName,
-        string? contractId,
         string externalGroupName,
         Type[] sourceTypes,
         ArchitectureExternalDependencyGroup externalGroup,
-        IReadOnlyList<ArchitectureIgnoredViolation> ignoredViolations,
-        ArchitectureIgnoreUsageTracker? usageTracker = null,
-        string? contractGroup = null,
-        List<ArchitectureBaselineCandidate>? baselineCandidates = null)
+        ArchitectureContractExecutionContext executionContext)
     {
         return sourceTypes
             .Select(type =>
@@ -32,15 +27,7 @@ internal static class ArchitectureExternalDependencyViolationFinder
                     .Where(reference =>
                         ArchitectureExternalDependencyResolver.MatchesGroup(externalGroup, reference.FullName,
                             reference.Namespace))
-                    .Where(reference =>
-                    {
-                        bool ignored = ArchitectureIgnoreMatcher.IsIgnored(sourceType, reference.FullName, ignoredViolations, usageTracker);
-                        if (!ignored && contractGroup != null && baselineCandidates != null)
-                        {
-                            baselineCandidates.Add(new ArchitectureBaselineCandidate(contractGroup, contractId, sourceType, reference.FullName));
-                        }
-                        return !ignored;
-                    })
+                    .Where(reference => !executionContext.IsIgnored(sourceType, reference.FullName))
                     .Select(reference => reference.FullName)
                     .Distinct(StringComparer.Ordinal)
                     .OrderBy(name => name, StringComparer.Ordinal)
@@ -52,8 +39,8 @@ internal static class ArchitectureExternalDependencyViolationFinder
                 }
 
                 return new ArchitectureViolation(
-                    contractName,
-                    contractId,
+                    executionContext.ContractName,
+                    executionContext.ContractId,
                     sourceType,
                     $"external dependency group '{externalGroupName}'",
                     forbiddenReferences)
