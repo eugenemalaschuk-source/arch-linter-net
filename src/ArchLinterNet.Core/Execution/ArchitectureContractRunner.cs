@@ -36,6 +36,8 @@ public sealed partial class ArchitectureContractRunner(
     public IReadOnlyList<ArchitectureBaselineCandidate> BaselineCandidates
         => _baselineCandidates;
 
+    public ArchitectureContractCatalog Catalog => _catalog;
+
     private static void RecordUnmatchedIgnores(
         string contractName,
         string? contractId,

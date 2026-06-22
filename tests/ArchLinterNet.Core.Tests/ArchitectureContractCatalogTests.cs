@@ -106,6 +106,40 @@ public sealed class ArchitectureContractCatalogTests
     }
 
     [Test]
+    public void ContractsFor_FiltersByModeAndFamily()
+    {
+        ArchitectureContractDocument document = BuildDocument();
+        ArchitectureContractCatalog catalog = ArchitectureContractCatalog.Build(document);
+
+        List<IArchitectureContract> strictDependency = catalog.ContractsFor("strict", "dependency").ToList();
+        List<IArchitectureContract> auditDependency = catalog.ContractsFor("audit", "dependency").ToList();
+        List<IArchitectureContract> strictCycle = catalog.ContractsFor("strict", "cycle").ToList();
+
+        Assert.That(strictDependency, Is.EquivalentTo(document.Contracts.Strict));
+        Assert.That(auditDependency, Is.EquivalentTo(document.Contracts.Audit));
+        Assert.That(strictCycle, Is.EquivalentTo(document.Contracts.StrictCycles));
+    }
+
+    [Test]
+    public void ContractsFor_IncludesExpandedLayerTemplateContracts()
+    {
+        ArchitectureContractCatalog catalog = ArchitectureContractCatalog.Build(BuildDocument());
+
+        List<IArchitectureContract> templateContracts = catalog.ContractsFor("strict", "layer_template").ToList();
+
+        Assert.That(templateContracts, Has.Count.EqualTo(1));
+        Assert.That(templateContracts[0].Id, Is.EqualTo("tmpl/archlinternet-core"));
+    }
+
+    [Test]
+    public void ContractsFor_UnknownFamily_ReturnsEmpty()
+    {
+        ArchitectureContractCatalog catalog = ArchitectureContractCatalog.Build(BuildDocument());
+
+        Assert.That(catalog.ContractsFor("strict", "does_not_exist"), Is.Empty);
+    }
+
+    [Test]
     public void ResolveGroup_ReturnsGroupForKnownContractByReference()
     {
         ArchitectureContractDocument document = BuildDocument();

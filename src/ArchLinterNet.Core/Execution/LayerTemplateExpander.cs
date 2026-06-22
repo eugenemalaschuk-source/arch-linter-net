@@ -60,8 +60,8 @@ public static class LayerTemplateExpander
         return contracts;
     }
 
-    private static void ValidateNoIdConflicts(
-        List<ArchitectureLayerContract> expanded,
+    internal static void ValidateNoIdConflicts(
+        IReadOnlyCollection<ArchitectureLayerContract> expanded,
         IEnumerable<IArchitectureContract> existing)
     {
         HashSet<string> ids = new(StringComparer.OrdinalIgnoreCase);

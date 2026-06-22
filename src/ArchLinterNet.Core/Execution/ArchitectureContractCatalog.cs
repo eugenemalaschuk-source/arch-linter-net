@@ -62,6 +62,17 @@ public sealed class ArchitectureContractCatalog
         return new ArchitectureContractCatalog(descriptors);
     }
 
+    public IEnumerable<IArchitectureContract> ContractsFor(string mode, string family)
+    {
+        foreach (ArchitectureContractDescriptor descriptor in _descriptors)
+        {
+            if (descriptor.Mode == mode && descriptor.Family == family)
+            {
+                yield return descriptor.Contract;
+            }
+        }
+    }
+
     public HashSet<string> AvailableContractIds(string mode)
     {
         HashSet<string> ids = new(StringComparer.OrdinalIgnoreCase);
