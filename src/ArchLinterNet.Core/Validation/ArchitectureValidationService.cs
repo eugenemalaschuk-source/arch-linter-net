@@ -2,8 +2,6 @@ using ArchLinterNet.Core.Contracts;
 using ArchLinterNet.Core.Execution;
 using ArchLinterNet.Core.Model;
 
-using static ArchLinterNet.Core.Execution.LayerTemplateExpander;
-
 namespace ArchLinterNet.Core.Validation;
 
 public static class ArchitectureValidationService
@@ -100,31 +98,6 @@ public static class ArchitectureValidationService
 
     private static HashSet<string> CollectAvailableContractIds(ArchitectureContractDocument document, string mode)
     {
-        HashSet<string> ids = new(StringComparer.OrdinalIgnoreCase);
-        IEnumerable<IArchitectureContract> contracts = mode == "strict"
-            ? document.Contracts.AllStrict
-            : document.Contracts.AllAudit;
-
-        foreach (IArchitectureContract c in contracts)
-        {
-            if (c.Id != null)
-            {
-                ids.Add(c.Id);
-            }
-        }
-
-        List<ArchitectureLayerTemplateContract> templates = mode == "strict"
-            ? document.Contracts.StrictLayerTemplates
-            : document.Contracts.AuditLayerTemplates;
-
-        foreach (ArchitectureLayerContract expanded in Expand(templates))
-        {
-            if (expanded.Id != null)
-            {
-                ids.Add(expanded.Id);
-            }
-        }
-
-        return ids;
+        return ArchitectureContractCatalog.Build(document).AvailableContractIds(mode);
     }
 }
