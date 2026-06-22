@@ -3,7 +3,7 @@ using ArchLinterNet.Core.Model;
 
 namespace ArchLinterNet.Core.Resolution;
 
-public sealed class ArchitectureContractExecutionContext
+internal sealed class ArchitectureContractExecutionContext
 {
     private readonly IReadOnlyList<ArchitectureIgnoredViolation> _ignoredViolations;
     private readonly ArchitectureIgnoreUsageTracker? _tracker;
