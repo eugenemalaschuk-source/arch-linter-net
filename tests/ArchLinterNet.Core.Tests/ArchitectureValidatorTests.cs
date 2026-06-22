@@ -1,4 +1,5 @@
 using ArchLinterNet.Core;
+using ArchLinterNet.Core.Model;
 using NUnit.Framework;
 
 namespace ArchLinterNet.Core.Tests;
@@ -88,5 +89,76 @@ contracts:
         bool result = validator.Validate(contractPath);
 
         Assert.That(result, Is.True);
+    }
+
+    [Test]
+    public void Validate_FailsPolicyWithViolatedContract()
+    {
+        string contractDir = Path.Combine(_tempDir, "architecture");
+        Directory.CreateDirectory(contractDir);
+        string contractPath = Path.Combine(contractDir, "dependencies.arch.yml");
+
+        File.WriteAllText(contractPath, @"
+version: 1
+name: Failing Test
+layers:
+  core:
+    namespace: ArchLinterNet.Core
+analysis:
+  target_assemblies:
+    - ArchLinterNet.Core
+contracts:
+  strict:
+    - name: core-must-not-depend-on-itself
+      source: core
+      forbidden: [core]
+");
+
+        var validator = new ArchitectureValidator();
+        bool result = validator.Validate(contractPath, out var violations, out var cycles);
+
+        Assert.That(result, Is.False);
+        Assert.That(violations, Is.Not.Empty);
+        Assert.That(cycles, Is.Empty);
+    }
+
+    [Test]
+    public void Validate_FailsPolicyWithViolatedAsmdefContract()
+    {
+        string contractDir = Path.Combine(_tempDir, "architecture");
+        Directory.CreateDirectory(contractDir);
+        string contractPath = Path.Combine(contractDir, "dependencies.arch.yml");
+
+        string assetsDir = Path.Combine(_tempDir, "Assets");
+        Directory.CreateDirectory(assetsDir);
+        File.WriteAllText(Path.Combine(assetsDir, "MyAssembly.asmdef"), @"
+{
+  ""name"": ""MyAssembly"",
+  ""references"": [ ""Forbidden.Editor"" ]
+}
+");
+
+        File.WriteAllText(contractPath, @"
+version: 1
+name: Asmdef Failing Test
+layers:
+  core:
+    namespace: ArchLinterNet.Core
+analysis:
+  target_assemblies:
+    - ArchLinterNet.Core
+contracts:
+  strict_asmdef:
+    - name: my-assembly-must-not-reference-forbidden
+      source_assemblies: [MyAssembly]
+      forbidden_asmdef_prefixes: [Forbidden]
+");
+
+        var validator = new ArchitectureValidator();
+        bool result = validator.Validate(contractPath, out var violations, out var cycles);
+
+        Assert.That(result, Is.False);
+        Assert.That(violations, Has.Some.Matches<ArchitectureViolation>(v => v.SourceType == "MyAssembly"));
+        Assert.That(cycles, Is.Empty);
     }
 }

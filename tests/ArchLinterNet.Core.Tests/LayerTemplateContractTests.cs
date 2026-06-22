@@ -410,7 +410,8 @@ contracts:
                 "ArchLinterNet.Core.Model",
                 "ArchLinterNet.Core.Reporting",
                 "ArchLinterNet.Core.Resolution",
-                "ArchLinterNet.Core.Scanning"
+                "ArchLinterNet.Core.Scanning",
+                "ArchLinterNet.Core.Validation"
             },
             OptionalLayers = new HashSet<string>()
         };
