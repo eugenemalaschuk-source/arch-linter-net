@@ -55,11 +55,22 @@ public sealed class ArchitectureContractCatalog
         AddGroup("audit_asmdef", "audit", "asmdef", groups.AuditAsmdef);
 
         AddGroup("strict_layer_templates", "strict", "layer_template",
-            LayerTemplateExpander.Expand(groups.StrictLayerTemplates));
+            LayerTemplateExpander.Expand(groups.StrictLayerTemplates, groups.StrictLayers));
         AddGroup("audit_layer_templates", "audit", "layer_template",
-            LayerTemplateExpander.Expand(groups.AuditLayerTemplates));
+            LayerTemplateExpander.Expand(groups.AuditLayerTemplates, groups.AuditLayers));
 
         return new ArchitectureContractCatalog(descriptors);
+    }
+
+    public IEnumerable<IArchitectureContract> ContractsFor(string mode, string family)
+    {
+        foreach (ArchitectureContractDescriptor descriptor in _descriptors)
+        {
+            if (descriptor.Mode == mode && descriptor.Family == family)
+            {
+                yield return descriptor.Contract;
+            }
+        }
     }
 
     public HashSet<string> AvailableContractIds(string mode)
