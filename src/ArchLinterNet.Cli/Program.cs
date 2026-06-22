@@ -1,11 +1,8 @@
-using System.Diagnostics;
 using ArchLinterNet.Core.Contracts;
 using ArchLinterNet.Core.Execution;
 using ArchLinterNet.Core.Model;
 using ArchLinterNet.Core.Reporting;
-using ArchLinterNet.Core.Resolution;
-
-using static ArchLinterNet.Core.Execution.LayerTemplateExpander;
+using ArchLinterNet.Core.Validation;
 
 namespace ArchLinterNet.Cli;
 
@@ -84,23 +81,12 @@ public static class Program
 
         try
         {
-            ArchitectureContractDocument document = ArchitectureContractLoader.LoadFromPath(policyPath);
+            ArchitectureContractDocument document = ArchitectureRunnerFactory.LoadDocument(policyPath);
 
-            if (!ConditionSetResolver.TryResolve(
-                    document, conditionSetName, out IReadOnlyList<string> preprocessorSymbols, out string? resolveError))
-            {
-                Console.Error.WriteLine(resolveError);
-                return 2;
-            }
+            ArchitectureRunnerSetup setup = ArchitectureRunnerFactory.BuildRunner(
+                document, policyPath, conditionSetName, enableUnmatchedIgnoreTracking: true);
 
-            string repositoryRoot = ArchitectureRepositoryRootLocator.ResolveFrom(policyPath);
-            ResolutionResult resolution = ArchitectureAssemblyResolver.ResolveFromDocument(document, repositoryRoot);
-            var context = new ArchitectureAnalysisContext(repositoryRoot, resolution.ResolvedAssemblies,
-                resolution.MissingAssemblyNames, resolution.AssemblyProbingPaths);
-
-            var runner = new ArchitectureContractRunner(context, document,
-                enableUnmatchedIgnoreTracking: true,
-                preprocessorSymbols: preprocessorSymbols);
+            ArchitectureContractRunner runner = setup.Runner;
 
             List<ArchitectureViolation> configViolations = runner.CheckConfiguration(strict: true);
             if (configViolations.Count > 0)
@@ -118,76 +104,12 @@ public static class Program
 
             if (includeStrict)
             {
-                foreach (ArchitectureDependencyContract contract in runner.StrictContracts())
-                    runner.CheckContract(contract);
-
-                foreach (ArchitectureLayerContract contract in runner.StrictLayerContracts())
-                    runner.CheckLayerContract(contract);
-
-                foreach (ArchitectureAllowOnlyContract contract in runner.StrictAllowOnlyContracts())
-                    runner.CheckAllowOnlyContract(contract);
-
-                foreach (ArchitectureCycleContract contract in runner.StrictCycleContracts())
-                    runner.CheckCycleContract(contract);
-
-                foreach (ArchitectureMethodBodyContract contract in runner.StrictMethodBodyContracts())
-                    runner.CheckMethodBodyContract(contract);
-
-                foreach (ArchitectureIndependenceContract contract in runner.StrictIndependenceContracts())
-                    runner.CheckIndependenceContract(contract);
-
-                foreach (ArchitectureProtectedContract contract in runner.StrictProtectedContracts())
-                    runner.CheckProtectedContract(contract);
-
-                foreach (ArchitectureExternalDependencyContract contract in runner.StrictExternalContracts())
-                    runner.CheckExternalContract(contract);
-
-                foreach (ArchitectureAcyclicSiblingContract contract in runner.StrictAcyclicSiblingContracts())
-                    runner.CheckAcyclicSiblingContract(contract);
-
-                List<ArchitectureLayerContract> strictExpanded = Expand(
-                    document.Contracts.StrictLayerTemplates,
-                    document.Contracts.StrictLayers);
-
-                foreach (ArchitectureLayerContract contract in strictExpanded)
-                    runner.CheckLayerContract(contract);
+                ArchitectureContractExecutor.Execute(runner, document, "strict", includeAsmdefContracts: false);
             }
 
             if (includeAudit)
             {
-                foreach (ArchitectureDependencyContract contract in runner.AuditContracts())
-                    runner.CheckContract(contract);
-
-                foreach (ArchitectureLayerContract contract in runner.AuditLayerContracts())
-                    runner.CheckLayerContract(contract);
-
-                foreach (ArchitectureAllowOnlyContract contract in runner.AuditAllowOnlyContracts())
-                    runner.CheckAllowOnlyContract(contract);
-
-                foreach (ArchitectureCycleContract contract in runner.AuditCycleContracts())
-                    runner.CheckCycleContract(contract);
-
-                foreach (ArchitectureMethodBodyContract contract in runner.AuditMethodBodyContracts())
-                    runner.CheckMethodBodyContract(contract);
-
-                foreach (ArchitectureIndependenceContract contract in runner.AuditIndependenceContracts())
-                    runner.CheckIndependenceContract(contract);
-
-                foreach (ArchitectureProtectedContract contract in runner.AuditProtectedContracts())
-                    runner.CheckProtectedContract(contract);
-
-                foreach (ArchitectureExternalDependencyContract contract in runner.AuditExternalContracts())
-                    runner.CheckExternalContract(contract);
-
-                foreach (ArchitectureAcyclicSiblingContract contract in runner.AuditAcyclicSiblingContracts())
-                    runner.CheckAcyclicSiblingContract(contract);
-
-                List<ArchitectureLayerContract> auditExpanded = Expand(
-                    document.Contracts.AuditLayerTemplates,
-                    document.Contracts.AuditLayers);
-
-                foreach (ArchitectureLayerContract contract in auditExpanded)
-                    runner.CheckLayerContract(contract);
+                ArchitectureContractExecutor.Execute(runner, document, "audit", includeAsmdefContracts: false);
             }
 
             ArchitectureBaselineDocument baseline = ArchitectureBaselineGenerator.Generate(
@@ -290,282 +212,46 @@ public static class Program
         {
             ValidationTiming? timing = timingsEnabled ? new ValidationTiming() : null;
 
-            bool passed;
-            List<ArchitectureViolation> allViolations = new();
-            List<string> allCycles = new();
-            IReadOnlyList<ArchitectureUnmatchedIgnoredViolation> allUnmatched =
-                Array.Empty<ArchitectureUnmatchedIgnoredViolation>();
-            string unmatchedConfig = "error";
-
-            using (timing?.Measure("total"))
+            ValidationRequest request = new()
             {
-                ArchitectureContractDocument document = null!;
-                string repositoryRoot = null!;
-                ResolutionResult resolution = null!;
-                ArchitectureContractRunner runner = null!;
+                PolicyPath = policyPath,
+                Mode = mode,
+                ConditionSetName = conditionSetName,
+                ContractIds = contractIds,
+                BaselinePath = baselinePath,
+                EnforceUnmatchedIgnoredViolationsPolicy = true,
+            };
 
-                using (timing?.Measure("load_and_setup"))
-                {
-                    using (timing?.Measure("yaml_loading", indent: 1))
-                        document = ArchitectureContractLoader.LoadFromPath(policyPath);
-
-                    if (baselinePath != null)
-                    {
-                        using (timing?.Measure("baseline_loading", indent: 1))
-                        {
-                            ArchitectureBaselineDocument baseline = ArchitectureBaselineLoader.LoadFromPath(baselinePath);
-                            ArchitectureBaselineMerger.MergeAndValidate(document, baseline);
-                        }
-                    }
-
-                    unmatchedConfig = document.Analysis.UnmatchedIgnoredViolations;
-
-                    if (unmatchedConfig is not ("error" or "warn" or "off"))
-                    {
-                        Console.Error.WriteLine(
-                            $"Invalid analysis.unmatched_ignored_violations: {unmatchedConfig}. Use 'error', 'warn', or 'off'.");
-                        return 2;
-                    }
-
-                    using (timing?.Measure("root_resolution", indent: 1))
-                        repositoryRoot = ArchitectureRepositoryRootLocator.ResolveFrom(policyPath);
-
-                    HashSet<string>? selectedIds = contractIds.Count > 0
-                        ? new HashSet<string>(contractIds, StringComparer.OrdinalIgnoreCase)
-                        : null;
-
-                    if (selectedIds != null)
-                    {
-                        HashSet<string> availableIds = CollectAvailableContractIds(document, mode);
-                        List<string> unknownIds = selectedIds.Where(id => !availableIds.Contains(id)).ToList();
-
-                        if (unknownIds.Count > 0)
-                        {
-                            Console.Error.WriteLine($"Unknown contract IDs: {string.Join(", ", unknownIds)}");
-                            Console.Error.WriteLine($"Available IDs in {mode} mode: {string.Join(", ", availableIds.OrderBy(id => id))}");
-                            return 2;
-                        }
-                    }
-
-                    IReadOnlyList<string> preprocessorSymbols = null!;
-
-                    using (timing?.Measure("condition_set_resolution", indent: 1))
-                    {
-                        if (!ConditionSetResolver.TryResolve(
-                                document, conditionSetName, out preprocessorSymbols, out string? resolveError))
-                        {
-                            Console.Error.WriteLine(resolveError);
-                            return 2;
-                        }
-                    }
-
-                    using (timing?.Measure("assembly_resolution", indent: 1))
-                    {
-                        resolution = ArchitectureAssemblyResolver.ResolveFromDocument(document, repositoryRoot);
-                        var context = new ArchitectureAnalysisContext(repositoryRoot, resolution.ResolvedAssemblies,
-                            resolution.MissingAssemblyNames, resolution.AssemblyProbingPaths);
-                        runner = new ArchitectureContractRunner(context, document, selectedIds, unmatchedConfig != "off",
-                            preprocessorSymbols: preprocessorSymbols);
-                    }
-                }
-
-                using (timing?.Measure("configuration_check"))
-                    allViolations.AddRange(runner.CheckConfiguration(strict: mode == "strict"));
-
-                using (timing?.Measure("contract_checks"))
-                {
-                    int depCount = 0;
-                    using (timing?.MeasureContractFamily("dependency", () => depCount))
-                    {
-                        IEnumerable<ArchitectureDependencyContract> dependencyContracts = mode == "audit"
-                            ? runner.AuditContracts()
-                            : runner.StrictContracts();
-
-                        foreach (ArchitectureDependencyContract contract in dependencyContracts)
-                        {
-                            depCount++;
-                            allViolations.AddRange(runner.CheckContract(contract));
-                        }
-                    }
-
-                    int layerCount = 0;
-                    using (timing?.MeasureContractFamily("layer", () => layerCount))
-                    {
-                        List<ArchitectureLayerContract> expandedLayerContracts = Expand(
-                            mode == "audit"
-                                ? document.Contracts.AuditLayerTemplates
-                                : document.Contracts.StrictLayerTemplates,
-                            mode == "audit"
-                                ? document.Contracts.AuditLayers
-                                : document.Contracts.StrictLayers);
-
-                        IEnumerable<ArchitectureLayerContract> layerContracts = (mode == "audit"
-                                ? runner.AuditLayerContracts()
-                                : runner.StrictLayerContracts())
-                            .Concat(expandedLayerContracts);
-
-                        foreach (ArchitectureLayerContract contract in layerContracts)
-                        {
-                            layerCount++;
-                            allViolations.AddRange(runner.CheckLayerContract(contract));
-                        }
-                    }
-
-                    int allowOnlyCount = 0;
-                    using (timing?.MeasureContractFamily("allow_only", () => allowOnlyCount))
-                    {
-                        IEnumerable<ArchitectureAllowOnlyContract> allowOnlyContracts = mode == "audit"
-                            ? runner.AuditAllowOnlyContracts()
-                            : runner.StrictAllowOnlyContracts();
-
-                        foreach (ArchitectureAllowOnlyContract contract in allowOnlyContracts)
-                        {
-                            allowOnlyCount++;
-                            allViolations.AddRange(runner.CheckAllowOnlyContract(contract));
-                        }
-                    }
-
-                    int cycleCount = 0;
-                    using (timing?.MeasureContractFamily("cycle", () => cycleCount))
-                    {
-                        IEnumerable<ArchitectureCycleContract> cycleContracts = mode == "audit"
-                            ? runner.AuditCycleContracts()
-                            : runner.StrictCycleContracts();
-
-                        foreach (ArchitectureCycleContract contract in cycleContracts)
-                        {
-                            cycleCount++;
-                            IReadOnlyCollection<string> contractCycles = runner.CheckCycleContract(contract);
-                            string idPrefix = contract.Id != null ? $"[{contract.Id}] " : string.Empty;
-                            allCycles.AddRange(contractCycles.Select(c => $"{idPrefix}{c}"));
-                        }
-                    }
-
-                    int methodBodyCount = 0;
-                    using (timing?.MeasureContractFamily("method_body", () => methodBodyCount))
-                    {
-                        IEnumerable<ArchitectureMethodBodyContract> methodBodyContracts = mode == "audit"
-                            ? runner.AuditMethodBodyContracts()
-                            : runner.StrictMethodBodyContracts();
-
-                        foreach (ArchitectureMethodBodyContract contract in methodBodyContracts)
-                        {
-                            methodBodyCount++;
-                            allViolations.AddRange(runner.CheckMethodBodyContract(contract));
-                        }
-                    }
-
-                    int asmdefCount = 0;
-                    using (timing?.MeasureContractFamily("asmdef", () => asmdefCount))
-                    {
-                        IEnumerable<ArchitectureAsmdefContract> asmdefContracts = mode == "audit"
-                            ? runner.AuditAsmdefContracts()
-                            : runner.StrictAsmdefContracts();
-
-                        foreach (ArchitectureAsmdefContract contract in asmdefContracts)
-                        {
-                            asmdefCount++;
-                            allViolations.AddRange(runner.CheckAsmdefContract(contract));
-                        }
-                    }
-
-                    int independenceCount = 0;
-                    using (timing?.MeasureContractFamily("independence", () => independenceCount))
-                    {
-                        IEnumerable<ArchitectureIndependenceContract> independenceContracts = mode == "audit"
-                            ? runner.AuditIndependenceContracts()
-                            : runner.StrictIndependenceContracts();
-
-                        foreach (ArchitectureIndependenceContract contract in independenceContracts)
-                        {
-                            independenceCount++;
-                            allViolations.AddRange(runner.CheckIndependenceContract(contract));
-                        }
-                    }
-
-                    int protectedCount = 0;
-                    using (timing?.MeasureContractFamily("protected", () => protectedCount))
-                    {
-                        IEnumerable<ArchitectureProtectedContract> protectedContracts = mode == "audit"
-                            ? runner.AuditProtectedContracts()
-                            : runner.StrictProtectedContracts();
-
-                        foreach (ArchitectureProtectedContract contract in protectedContracts)
-                        {
-                            protectedCount++;
-                            allViolations.AddRange(runner.CheckProtectedContract(contract));
-                        }
-                    }
-
-                    int externalCount = 0;
-                    using (timing?.MeasureContractFamily("external", () => externalCount))
-                    {
-                        IEnumerable<ArchitectureExternalDependencyContract> externalContracts = mode == "audit"
-                            ? runner.AuditExternalContracts()
-                            : runner.StrictExternalContracts();
-
-                        foreach (ArchitectureExternalDependencyContract contract in externalContracts)
-                        {
-                            externalCount++;
-                            allViolations.AddRange(runner.CheckExternalContract(contract));
-                        }
-                    }
-
-                    int acyclicSiblingCount = 0;
-                    using (timing?.MeasureContractFamily("acyclic_sibling", () => acyclicSiblingCount))
-                    {
-                        IEnumerable<ArchitectureAcyclicSiblingContract> acyclicSiblingContracts = mode == "audit"
-                            ? runner.AuditAcyclicSiblingContracts()
-                            : runner.StrictAcyclicSiblingContracts();
-
-                        foreach (ArchitectureAcyclicSiblingContract contract in acyclicSiblingContracts)
-                        {
-                            acyclicSiblingCount++;
-                            IReadOnlyCollection<string> contractCycles = runner.CheckAcyclicSiblingContract(contract);
-                            string idPrefix = contract.Id != null ? $"[{contract.Id}] " : string.Empty;
-                            allCycles.AddRange(contractCycles.Select(c => $"{idPrefix}{c}"));
-                        }
-                    }
-                }
-
-                using (timing?.Measure("post_processing"))
-                {
-                    allUnmatched = unmatchedConfig != "off"
-                        ? runner.UnmatchedIgnoredViolations
-                        : Array.Empty<ArchitectureUnmatchedIgnoredViolation>();
-                }
-
-                bool hasBlockingUnmatched = unmatchedConfig == "error" && allUnmatched.Count > 0;
-                passed = allViolations.Count == 0 && allCycles.Count == 0 && !hasBlockingUnmatched;
-            }
+            ValidationOutcome outcome = ArchitectureValidationService.Validate(request, timing);
 
             if (format == "json")
             {
                 Console.WriteLine(ArchitectureDiagnosticFormatter.FormatResultForCiArtifacts(
-                    mode, passed, allViolations, allCycles, allUnmatched));
+                    mode, outcome.Passed, outcome.Violations, outcome.Cycles, outcome.UnmatchedIgnoredViolations));
             }
             else
             {
-                if (passed)
+                if (outcome.Passed)
                 {
                     Console.WriteLine("Architecture validation passed.");
                 }
                 else
                 {
-                    if (allViolations.Count > 0)
+                    if (outcome.Violations.Count > 0)
                     {
-                        Console.WriteLine(ArchitectureDiagnosticFormatter.FormatViolationsForHumans(allViolations));
+                        Console.WriteLine(ArchitectureDiagnosticFormatter.FormatViolationsForHumans(outcome.Violations));
                     }
 
-                    if (allCycles.Count > 0)
+                    if (outcome.Cycles.Count > 0)
                     {
-                        Console.WriteLine(ArchitectureDiagnosticFormatter.FormatCyclesForHumans(allCycles));
+                        Console.WriteLine(ArchitectureDiagnosticFormatter.FormatCyclesForHumans(outcome.Cycles));
                     }
                 }
 
-                if (allUnmatched.Count > 0 && unmatchedConfig != "off")
+                if (outcome.UnmatchedIgnoredViolations.Count > 0 && outcome.UnmatchedIgnoredViolationsConfig != "off")
                 {
-                    string unmatchedSection = ArchitectureDiagnosticFormatter.FormatUnmatchedForHumans(allUnmatched);
+                    string unmatchedSection =
+                        ArchitectureDiagnosticFormatter.FormatUnmatchedForHumans(outcome.UnmatchedIgnoredViolations);
                     if (!string.IsNullOrEmpty(unmatchedSection))
                     {
                         Console.WriteLine();
@@ -576,43 +262,13 @@ public static class Program
 
             timing?.WriteReport(Console.Error);
 
-            return passed ? 0 : 1;
+            return outcome.Passed ? 0 : 1;
         }
         catch (Exception ex)
         {
             Console.Error.WriteLine($"Architecture validation error: {ex.Message}");
             return 2;
         }
-    }
-
-    private static HashSet<string> CollectAvailableContractIds(ArchitectureContractDocument document, string mode)
-    {
-        HashSet<string> ids = new(StringComparer.OrdinalIgnoreCase);
-        IEnumerable<IArchitectureContract> contracts = mode == "strict"
-            ? document.Contracts.AllStrict
-            : document.Contracts.AllAudit;
-
-        foreach (var c in contracts)
-        {
-            if (c.Id != null)
-            {
-                ids.Add(c.Id);
-            }
-        }
-
-        List<ArchitectureLayerTemplateContract> templates = mode == "strict"
-            ? document.Contracts.StrictLayerTemplates
-            : document.Contracts.AuditLayerTemplates;
-
-        foreach (ArchitectureLayerContract expanded in Expand(templates))
-        {
-            if (expanded.Id != null)
-            {
-                ids.Add(expanded.Id);
-            }
-        }
-
-        return ids;
     }
 
     private static void PrintHelp()
