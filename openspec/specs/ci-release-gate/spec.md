@@ -1,4 +1,9 @@
-## ADDED Requirements
+# CI Release Gate Specification
+
+## Purpose
+Ensures the release workflow runs the full acceptance gate before packing and publishing packages, without altering the existing CI workflow.
+
+## Requirements
 
 ### Requirement: Release workflow runs acceptance gate before packing packages
 The manual release workflow SHALL run the repository acceptance gate before building NuGet packages.
@@ -14,3 +19,7 @@ The manual release workflow SHALL run the repository acceptance gate before buil
 
 ### Requirement: CI workflow remains unchanged
 The pull request CI workflow SHALL NOT be modified by this change.
+
+#### Scenario: Pull request CI workflow is untouched
+- **WHEN** this change is applied
+- **THEN** the pull request CI workflow file SHALL have no diff

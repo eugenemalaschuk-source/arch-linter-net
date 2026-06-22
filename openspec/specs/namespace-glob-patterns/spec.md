@@ -1,4 +1,9 @@
-## ADDED Requirements
+# Namespace Glob Patterns Specification
+
+## Purpose
+Lets a layer's namespace be declared with constrained, segment-based glob patterns instead of an exact namespace string.
+
+## Requirements
 
 ### Requirement: Layer namespace accepts constrained glob patterns
 
@@ -52,7 +57,7 @@ Glob matching SHALL operate on namespace segments (split by `.`), not on raw reg
 
 ### Requirement: `namespace_suffix` composes with glob patterns
 
-When `namespace` contains a glob pattern AND `namespace_suffix` is set, the suffix position is fixed immediately after the full namespace pattern.
+When `namespace` contains a glob pattern AND `namespace_suffix` is set, the suffix position SHALL be fixed immediately after the full namespace pattern.
 
 #### Scenario: Glob + suffix fixed-position match
 - **WHEN** a layer defines `namespace: FirstIce.Game.Features.*` and `namespace_suffix: Models`

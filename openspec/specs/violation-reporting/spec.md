@@ -1,4 +1,9 @@
-## ADDED Requirements
+# Violation Reporting Specification
+
+## Purpose
+Formats violations for human-readable terminal output and for machine-readable CI JSON artifacts.
+
+## Requirements
 
 ### Requirement: Format violations for human-readable output
 The system SHALL format violation lists as sorted bullet lines with format `- {SourceType} -> {ForbiddenNamespace}: {refs}`.
@@ -32,7 +37,6 @@ The system SHALL format cycles as a JSON object with `kind = "architecture_cycle
 - **WHEN** a contract produces 1 cycle
 - **THEN** the JSON contains `{"kind":"architecture_cycles","contract":"...","cycles":["A -> B -> A"]}`
 
-## ADDED Requirements
 
 ### Requirement: Human output includes contract ID
 The human-readable violation formatter SHALL prefix each violation line with the contract ID in square brackets when available.

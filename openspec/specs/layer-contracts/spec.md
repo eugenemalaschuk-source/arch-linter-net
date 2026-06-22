@@ -1,4 +1,9 @@
-## ADDED Requirements
+# Layer Contracts Specification
+
+## Purpose
+Evaluates inward-only layer ordering contracts, where each layer may only reference layers below it, with optional stable IDs.
+
+## Requirements
 
 ### Requirement: Evaluate inward-only layer ordering
 The system SHALL verify that for each layer in the contract's layer list, types in that layer do not reference types in any layer listed earlier (inward direction).
@@ -15,7 +20,6 @@ The system SHALL verify that for each layer in the contract's layer list, types 
 - **WHEN** a type in layer B references another type in layer B
 - **THEN** no violation is reported for that reference
 
-## ADDED Requirements
 
 ### Requirement: Layer contract accepts optional id
 A layer contract SHALL accept an optional `id` field. When provided, violations from this contract SHALL include the contract ID.

@@ -1,4 +1,9 @@
-## ADDED Requirements
+# Assembly Resolution Specification
+
+## Purpose
+Resolves the assemblies named in a policy's target_assemblies list to loaded .NET Assembly instances via a multi-probe-path strategy.
+
+## Requirements
 
 ### Requirement: Resolve target assemblies from YAML document
 The system SHALL resolve all assemblies listed in `analysis.target_assemblies` from the YAML document into `System.Reflection.Assembly` instances.

@@ -1,4 +1,9 @@
-## ADDED Requirements
+# Dependency Contracts Specification
+
+## Purpose
+Evaluates strict and audit dependency contracts that forbid one layer from referencing another, including forbidden legacy runtime layers.
+
+## Requirements
 
 ### Requirement: Evaluate strict dependency contracts
 The system SHALL evaluate each strict dependency contract by finding all types in the source layer's namespace and checking that none reference types in any forbidden layer's namespace.
@@ -33,7 +38,6 @@ The system SHALL evaluate each forbidden layer independently and return all viol
 - **WHEN** source type references types in both forbidden layer A and forbidden layer B
 - **THEN** violations are returned for both forbidden namespaces
 
-## ADDED Requirements
 
 ### Requirement: Dependency contract accepts optional id
 A dependency contract SHALL accept an optional `id` field. When provided, violations from this contract SHALL include the contract ID.
@@ -46,7 +50,6 @@ A dependency contract SHALL accept an optional `id` field. When provided, violat
 - **WHEN** a dependency contract without explicit `id` produces a violation
 - **THEN** the violation SHALL have `ContractId` set to the fallback ID derived from `name`
 
-## ADDED Requirements
 
 ### Requirement: Dependency depth mode
 A dependency contract SHALL accept an optional `dependency_depth` field with values `"direct"` (default) or `"transitive"`.

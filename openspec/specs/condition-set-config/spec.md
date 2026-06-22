@@ -1,4 +1,9 @@
-## ADDED Requirements
+# Condition Set Config Specification
+
+## Purpose
+Lets a policy define named sets of preprocessor symbols and select one by name to control conditional compilation during analysis.
+
+## Requirements
 
 ### Requirement: Policy defines named preprocessor symbol sets
 

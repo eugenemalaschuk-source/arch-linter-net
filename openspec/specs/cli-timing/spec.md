@@ -1,4 +1,9 @@
-## ADDED Requirements
+# CLI Timing Specification
+
+## Purpose
+Adds an opt-in CLI flag that reports phase-level timing for a validation run to stderr.
+
+## Requirements
 
 ### Requirement: CLI timing flag
 

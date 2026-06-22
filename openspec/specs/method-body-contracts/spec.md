@@ -1,4 +1,9 @@
-## ADDED Requirements
+# Method Body Contracts Specification
+
+## Purpose
+Detects forbidden method calls inside method bodies via Roslyn semantic analysis, falling back to IL token inspection when needed.
+
+## Requirements
 
 ### Requirement: Detect forbidden calls via Roslyn semantic analysis
 The system SHALL parse C# source files, build a Roslyn compilation, walk executable bodies (methods, constructors, accessors, local functions), resolve symbols via `SemanticModel`, and match against forbidden call patterns.
@@ -33,7 +38,6 @@ The system SHALL merge violations from Roslyn and IL scanning by normalized desc
 - **WHEN** both Roslyn and IL scanning find the same forbidden call
 - **THEN** only one violation entry is produced for that call
 
-## ADDED Requirements
 
 ### Requirement: Method body contract accepts optional id
 A method body contract SHALL accept an optional `id` field. When provided, violations from this contract SHALL include the contract ID.

@@ -1,4 +1,9 @@
-## ADDED Requirements
+# Release Version Bump Specification
+
+## Purpose
+Detects the current version from git tags and calculates the next version from the selected release type.
+
+## Requirements
 
 ### Requirement: Version detection from git tags
 The system SHALL detect the latest SemVer-compatible release tag from repository tags to determine the base version for increment calculations.

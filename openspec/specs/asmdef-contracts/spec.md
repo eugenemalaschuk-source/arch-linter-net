@@ -1,4 +1,9 @@
-## ADDED Requirements
+# Asmdef Contracts Specification
+
+## Purpose
+Validates Unity assembly definition (.asmdef) files against editor-only reference and forbidden-prefix restrictions.
+
+## Requirements
 
 ### Requirement: Validate asmdef editor-only reference restrictions
 The system SHALL detect when a source assembly references an editor-only assembly (where `includePlatforms == ["Editor"]`) and `forbidden_editor_refs` is true.
@@ -33,7 +38,6 @@ The system SHALL recursively scan a configurable root directory for `*.asmdef` f
 - **WHEN** a `.asmdef` file contains invalid JSON
 - **THEN** that file is skipped without error
 
-## ADDED Requirements
 
 ### Requirement: Asmdef contract accepts optional id
 An asmdef contract SHALL accept an optional `id` field. When provided, violations from this contract SHALL include the contract ID.

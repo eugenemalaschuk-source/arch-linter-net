@@ -1,4 +1,9 @@
-## ADDED Requirements
+# Cycle Contracts Specification
+
+## Purpose
+Detects directed dependency cycles among declared layers, respecting ignored violations.
+
+## Requirements
 
 ### Requirement: Detect directed cycles among layers
 The system SHALL build a directed graph of inter-layer references and detect all cycles using DFS.
@@ -26,7 +31,6 @@ The system SHALL exclude references matching `ignored_violations` before buildin
 - **WHEN** a cycle exists but all edges in the cycle match `ignored_violations`
 - **THEN** no cycle is reported
 
-## ADDED Requirements
 
 ### Requirement: Cycle contract accepts optional id
 A cycle contract SHALL accept an optional `id` field. When provided, cycle results from this contract SHALL include the contract ID.

@@ -1,4 +1,9 @@
-## ADDED Requirements
+# AI Policy Authoring Specification
+
+## Purpose
+Documents how AI agents author and validate architecture policies, including capability and limit guidance.
+
+## Requirements
 
 ### Requirement: AI authoring guide
 ArchLinterNet SHALL provide AI-facing documentation that explains how agents create and revise architecture policies from real repository facts rather than idealized architecture names.
