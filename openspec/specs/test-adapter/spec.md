@@ -1,4 +1,9 @@
-## ADDED Requirements
+# Test Adapter Specification
+
+## Purpose
+Provides a fluent NUnit-friendly test adapter that loads a policy by path or repository root and asserts strict/audit validation results.
+
+## Requirements
 
 ### Requirement: Test adapter loads policy from path
 `ArchitectureAssertions.FromPolicy(path)` SHALL return an `ArchitectureValidationBuilder` configured to load the YAML policy from the given file path.

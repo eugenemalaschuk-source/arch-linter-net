@@ -1,4 +1,9 @@
-## ADDED Requirements
+# GitHub Actions CI Specification
+
+## Purpose
+Defines the GitHub Actions workflows for pull request validation and the separated CI/release pipeline.
+
+## Requirements
 
 ### Requirement: Pull request validation workflow
 ArchLinterNet SHALL provide a GitHub Actions CI workflow that validates pull requests and pushes with the repository acceptance gate without producing official release packages.

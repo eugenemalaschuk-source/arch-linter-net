@@ -1,4 +1,9 @@
-## ADDED Requirements
+# Allow Only Contracts Specification
+
+## Purpose
+Restricts a source layer to only reference an explicitly allowed set of layers, flagging any other namespace reference as a violation.
+
+## Requirements
 
 ### Requirement: Evaluate allow-only contracts
 The system SHALL verify that source layer types reference only types in explicitly allowed layers (plus their own layer).
@@ -22,7 +27,6 @@ The system SHALL exclude references to types that are not in any defined layer n
 - **WHEN** source type references `System.String` (not in any layer)
 - **THEN** no violation is reported for that reference
 
-## ADDED Requirements
 
 ### Requirement: Allow-only contract accepts optional id
 An allow-only contract SHALL accept an optional `id` field. When provided, violations from this contract SHALL include the contract ID.

@@ -1,4 +1,9 @@
-## ADDED Requirements
+# Baseline Generation Specification
+
+## Purpose
+Generates and consumes baseline files that record pre-existing violations so policies can be enforced incrementally going forward.
+
+## Requirements
 
 ### Requirement: User can generate a baseline file from current violations
 

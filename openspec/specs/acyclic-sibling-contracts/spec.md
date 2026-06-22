@@ -1,4 +1,9 @@
-## ADDED Requirements
+# Acyclic Sibling Contracts Specification
+
+## Purpose
+Detects circular reference cycles among sibling namespaces beneath a shared ancestor, independent of any explicit layer ordering.
+
+## Requirements
 
 ### Requirement: Detect cycles between sibling namespaces under an ancestor namespace
 The system SHALL discover direct child namespaces under one or more configured ancestor namespaces and detect dependency cycles among those sibling groups.
