@@ -6,6 +6,9 @@ namespace ArchLinterNet.Core.Execution;
 
 public static class ArchitectureContractExecutor
 {
+    private static readonly ArchitectureContractHandlerRegistry _handlerRegistry =
+        ArchitectureContractHandlerRegistry.CreateDefault();
+
     public sealed record ExecutionResult(
         IReadOnlyCollection<ArchitectureViolation> Violations,
         IReadOnlyCollection<string> Cycles);
@@ -30,33 +33,32 @@ public static class ArchitectureContractExecutor
         int depCount = 0;
         using (timing?.MeasureContractFamily("dependency", () => depCount))
         {
-            IEnumerable<ArchitectureDependencyContract> dependencyContracts = isStrict
-                ? runner.StrictContracts()
-                : runner.AuditContracts();
-
-            foreach (ArchitectureDependencyContract contract in dependencyContracts)
+            foreach (IArchitectureContract contract in runner.Catalog.ContractsFor(mode, "dependency"))
             {
                 depCount++;
-                violations.AddRange(runner.CheckContract(contract));
+                violations.AddRange(_handlerRegistry.Execute("dependency", runner, contract).Violations);
             }
         }
 
         int layerCount = 0;
         using (timing?.MeasureContractFamily("layer", () => layerCount))
         {
-            List<ArchitectureLayerContract> expandedLayerContracts = LayerTemplateExpander.Expand(
-                isStrict ? document.Contracts.StrictLayerTemplates : document.Contracts.AuditLayerTemplates,
+            List<ArchitectureLayerContract> layerTemplateContracts = runner.Catalog
+                .ContractsFor(mode, "layer_template")
+                .Cast<ArchitectureLayerContract>()
+                .ToList();
+
+            LayerTemplateExpander.ValidateNoIdConflicts(
+                layerTemplateContracts,
                 isStrict ? document.Contracts.StrictLayers : document.Contracts.AuditLayers);
 
-            IEnumerable<ArchitectureLayerContract> layerContracts = (isStrict
-                    ? runner.StrictLayerContracts()
-                    : runner.AuditLayerContracts())
-                .Concat(expandedLayerContracts);
+            IEnumerable<IArchitectureContract> layerContracts = runner.Catalog.ContractsFor(mode, "layer")
+                .Concat(layerTemplateContracts);
 
-            foreach (ArchitectureLayerContract contract in layerContracts)
+            foreach (IArchitectureContract contract in layerContracts)
             {
                 layerCount++;
-                violations.AddRange(runner.CheckLayerContract(contract));
+                violations.AddRange(_handlerRegistry.Execute("layer", runner, contract).Violations);
             }
         }
 
@@ -77,16 +79,10 @@ public static class ArchitectureContractExecutor
         int cycleCount = 0;
         using (timing?.MeasureContractFamily("cycle", () => cycleCount))
         {
-            IEnumerable<ArchitectureCycleContract> cycleContracts = isStrict
-                ? runner.StrictCycleContracts()
-                : runner.AuditCycleContracts();
-
-            foreach (ArchitectureCycleContract contract in cycleContracts)
+            foreach (IArchitectureContract contract in runner.Catalog.ContractsFor(mode, "cycle"))
             {
                 cycleCount++;
-                IReadOnlyCollection<string> contractCycles = runner.CheckCycleContract(contract);
-                string idPrefix = contract.Id != null ? $"[{contract.Id}] " : string.Empty;
-                cycles.AddRange(contractCycles.Select(c => $"{idPrefix}{c}"));
+                cycles.AddRange(_handlerRegistry.Execute("cycle", runner, contract).Cycles);
             }
         }
 
