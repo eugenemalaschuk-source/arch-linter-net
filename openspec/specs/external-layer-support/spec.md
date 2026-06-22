@@ -1,4 +1,9 @@
-## ADDED Requirements
+# External Layer Support Specification
+
+## Purpose
+Lets a layer be declared external, suppressing the configuration empty-layer diagnostic for layers backed by third-party code.
+
+## Requirements
 
 ### Requirement: Layer can be declared external
 

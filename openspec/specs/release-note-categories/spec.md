@@ -1,4 +1,9 @@
-## ADDED Requirements
+# Release Note Categories Specification
+
+## Purpose
+Configures release-note categories, including a dedicated Breaking Changes section.
+
+## Requirements
 
 ### Requirement: Release-note category configuration
 

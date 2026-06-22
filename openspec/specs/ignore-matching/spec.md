@@ -1,4 +1,9 @@
-## ADDED Requirements
+# Ignore Matching Specification
+
+## Purpose
+Matches ignored-violation entries against actual violations by exact source/forbidden-reference pairs and wildcard patterns.
+
+## Requirements
 
 ### Requirement: Match exact source type and forbidden reference
 The system SHALL match violations where both `source_type` and `forbidden_reference` exactly equal the ignore pattern values.

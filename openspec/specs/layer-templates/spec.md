@@ -1,4 +1,9 @@
-## ADDED Requirements
+# Layer Templates Specification
+
+## Purpose
+Defines reusable layer-contract templates that expand into concrete layer contracts from a declarative YAML structure.
+
+## Requirements
 
 ### Requirement: Template contract YAML structure
 

@@ -1,4 +1,9 @@
-## ADDED Requirements
+# Unmatched Ignore Alerting Specification
+
+## Purpose
+Detects ignore entries that no longer match any actual violation and surfaces them as a diagnostic with contract and ignore-entry context.
+
+## Requirements
 
 ### Requirement: Detect unmatched ignored violations
 

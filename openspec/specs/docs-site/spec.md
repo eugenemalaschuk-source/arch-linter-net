@@ -1,4 +1,9 @@
-## ADDED Requirements
+# Docs Site Specification
+
+## Purpose
+Sets up the MkDocs-based documentation site tooling, including a gitignored Python virtual environment.
+
+## Requirements
 
 ### Requirement: Documentation tooling setup
 The repository SHALL contain a Python tooling project at `tools/pyproject.toml` that defines MkDocs and mkdocs-material as dependencies, managed via `uv` with a committed `tools/uv.lock` file.

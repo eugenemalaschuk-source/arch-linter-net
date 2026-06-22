@@ -1,4 +1,9 @@
-## ADDED Requirements
+# Contract ID Selection Specification
+
+## Purpose
+Lets contracts declare a stable optional ID and lets the CLI select a subset of contracts to run by ID.
+
+## Requirements
 
 ### Requirement: Contract model accepts optional stable ID
 All 7 contract types SHALL accept an optional `id` field in YAML. When `id` is omitted, the system SHALL derive one from `name` by lowercasing and replacing space runs with hyphens.

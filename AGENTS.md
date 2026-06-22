@@ -87,11 +87,17 @@ tests/
 
 ## OpenSpec workflow
 - Specs live in `openspec/specs/<capability>/spec.md` — this is the source of truth.
-- During proposal, new specs are created under the change directory.
-- **Before archiving a change**, sync all new specs to `openspec/specs/<capability>/spec.md`.
-  The archive workflow does NOT auto-promote new specs — only delta specs on existing ones.
+  Each spec file MUST have a `## Purpose` section and a `## Requirements` section;
+  it must NOT contain a delta header (`## ADDED/MODIFIED/REMOVED/RENAMED Requirements`).
+- During proposal, new capabilities are written as delta specs (`## ADDED Requirements`)
+  under the change directory.
+- **To finish a change**, run `openspec archive <change-name>`. It rebuilds
+  `openspec/specs/<capability>/spec.md` from the change's delta specs for both new
+  and existing capabilities — do not copy a delta spec file into `openspec/specs/`
+  directly, since that leaves an invalid delta header in the main spec.
 - Active changes live in `openspec/changes/<name>/`. Archived changes live in
   `openspec/changes/archive/YYYY-MM-DD-<name>/`.
+- Run `openspec validate --all` after archiving or any manual spec edit.
 
 ## State of the repo
 - Early extraction / preview. Docs under `docs/` built with MkDocs. CI in `.github/workflows/`.

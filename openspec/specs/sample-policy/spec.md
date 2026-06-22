@@ -1,4 +1,9 @@
-## ADDED Requirements
+# Sample Policy Specification
+
+## Purpose
+Provides a sample YAML policy and documents sample CLI usage for new adopters.
+
+## Requirements
 
 ### Requirement: Sample YAML policy exists
 The repository SHALL contain a sample YAML architecture contract file in `samples/BasicCleanArchitecture/architecture/dependencies.arch.yml` that demonstrates a realistic clean-architecture policy with strict contracts, layer contracts, cycle contracts, independence contracts, and audit-mode contracts.

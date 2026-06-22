@@ -9,18 +9,19 @@ context: |
   TreatWarningsAsErrors: true
 
   ## Spec lifecycle
-  - New capabilities (specs/) are created inside the change directory during proposal.
-  - Before archiving a change, ALL specs in the change MUST be synced to openspec/specs/<capability>/spec.md.
-  - The openspec archive workflow only checks for "delta specs" (modifications to existing specs).
-    It does NOT automatically promote new specs to the main specs directory.
-  - Therefore: during archive, always check if the change introduces new capabilities.
-    If so, copy their spec files to openspec/specs/<capability>/ before moving to archive.
-
-# Per-artifact rules (optional)
-# Add custom rules for specific artifacts.
-rules:
-  archive:
-    - Before archiving, collect all spec files from openspec/changes/<name>/specs/
-    - For each capability present in the change but missing from openspec/specs/,
-      copy it to openspec/specs/<capability>/spec.md
-    - Only then move the change directory to archive/
+  - New capabilities (specs/) are created as delta specs (## ADDED Requirements)
+    inside the change directory during proposal.
+  - Run `openspec archive <change-name>` to finish a change. It automatically
+    rebuilds openspec/specs/<capability>/spec.md from the change's delta specs —
+    for new capabilities it generates the `# <Title> Specification` / `## Purpose`
+    / `## Requirements` skeleton and inserts the ADDED requirements; for existing
+    capabilities it applies ADDED/MODIFIED/REMOVED/RENAMED onto the current spec.
+  - Do NOT copy a change's delta spec file (the one starting with
+    `## ADDED Requirements`) directly into openspec/specs/<capability>/spec.md.
+    Delta headers are only valid under openspec/changes/<name>/specs/ — a main
+    spec must have `## Purpose` and a `## Requirements` section, or
+    `openspec validate` will reject it. If `openspec archive` isn't available,
+    rebuild the target spec by hand into that format instead of copying the delta
+    file verbatim.
+  - After archiving (or any manual spec edit), run `openspec validate --all` to
+    confirm every spec under openspec/specs/ still passes.

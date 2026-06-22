@@ -1,4 +1,9 @@
-## ADDED Requirements
+# Manual NuGet Release Specification
+
+## Purpose
+Documents and supports the manual NuGet release workflow, including the release package build.
+
+## Requirements
 
 ### Requirement: Manual NuGet release workflow
 ArchLinterNet SHALL provide a separate GitHub Actions workflow for official package builds and optional NuGet.org publication that maintainers run through the GitHub Actions UI using `workflow_dispatch`.

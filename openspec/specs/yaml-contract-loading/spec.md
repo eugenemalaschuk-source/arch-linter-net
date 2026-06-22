@@ -1,4 +1,9 @@
-## ADDED Requirements
+# YAML Contract Loading Specification
+
+## Purpose
+Loads an architecture contract document from a YAML file path or repository root.
+
+## Requirements
 
 ### Requirement: Load architecture contract from YAML file path
 The system SHALL load and deserialize an `architecture/dependencies.arch.yml` file from a given file path into an `ArchitectureContractDocument` instance.
@@ -44,7 +49,6 @@ The deserialized document SHALL contain all 14 contract groups: `strict`, `audit
 - **WHEN** a YAML file defines only `version`, `name`, `layers`, `analysis`, and empty contract lists
 - **THEN** the deserialized document has empty lists for all contract groups
 
-## ADDED Requirements
 
 ### Requirement: YAML deserialization accepts optional id field
 The deserializer SHALL accept an optional `id` field on all contract types without throwing for unmatched properties.

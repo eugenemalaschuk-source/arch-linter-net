@@ -1,4 +1,9 @@
-## ADDED Requirements
+# Release Process Documentation Specification
+
+## Purpose
+Documents the manual release procedure for maintainers.
+
+## Requirements
 
 ### Requirement: Manual release procedure documentation
 ArchLinterNet SHALL document the initial preview package release process using the manual NuGet release workflow.

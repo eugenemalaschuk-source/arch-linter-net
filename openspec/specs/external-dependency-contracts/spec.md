@@ -1,4 +1,9 @@
-## ADDED Requirements
+# External Dependency Contracts Specification
+
+## Purpose
+Lets policies declare named external dependency groups and evaluate contracts that forbid referencing them.
+
+## Requirements
 
 ### Requirement: Declare external dependency groups
 The system SHALL allow policies to declare named external dependency groups in a top-level `external_dependencies` section. Each group SHALL support `namespace_prefixes` and `type_prefixes` lists.

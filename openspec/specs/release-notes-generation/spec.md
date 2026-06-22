@@ -1,4 +1,9 @@
-## ADDED Requirements
+# Release Notes Generation Specification
+
+## Purpose
+Generates release notes from the calculated version to a stable output file path.
+
+## Requirements
 
 ### Requirement: Release notes generation from calculated version
 The manual release workflow SHALL generate a release-notes markdown file for the calculated package version using the GitHub `releases/generate-notes` API and the repository `.github/release.yml` category configuration.

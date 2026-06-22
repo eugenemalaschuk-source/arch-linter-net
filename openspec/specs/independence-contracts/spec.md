@@ -1,4 +1,9 @@
-## ADDED Requirements
+# Independence Contracts Specification
+
+## Purpose
+Evaluates mutual independence across a set of layers, ignoring self-references, so no layer in the set may reference any other.
+
+## Requirements
 
 ### Requirement: Evaluate mutual independence across layers
 The system SHALL verify that for each pair of layers in the contract, types in layer A do not reference types in layer B AND types in layer B do not reference types in layer A.
@@ -22,7 +27,6 @@ The system SHALL not report violations for references within the same layer.
 - **WHEN** a type in layer A references another type in layer A
 - **THEN** no violation is reported
 
-## ADDED Requirements
 
 ### Requirement: Independence contract accepts optional id
 An independence contract SHALL accept an optional `id` field. When provided, violations from this contract SHALL include the contract ID.

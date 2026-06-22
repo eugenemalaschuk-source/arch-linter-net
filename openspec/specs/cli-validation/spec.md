@@ -1,4 +1,9 @@
-## ADDED Requirements
+# CLI Validation Specification
+
+## Purpose
+Defines the CLI's validation command: policy/mode/format flags, exit codes, help/version output, and packaging as a .NET tool.
+
+## Requirements
 
 ### Requirement: CLI accepts --policy flag
 The CLI SHALL accept a `--policy` (or `-p`) flag specifying the path to a YAML architecture contract file. If omitted, the default SHALL be `architecture/dependencies.arch.yml`.
@@ -94,7 +99,6 @@ The CLI project SHALL be configured with `<PackAsTool>true</PackAsTool>` and `<T
 - **WHEN** a consumer runs `dotnet arch-linter-net --help`
 - **THEN** the tool SHALL respond identically to the `dotnet run` invocation
 
-## ADDED Requirements
 
 ### Requirement: CLI accepts --contract flag for selective contract execution
 The CLI SHALL accept a `--contract` flag that specifies one or more contract IDs to execute. The flag MAY be specified multiple times. When specified, only contracts with matching IDs SHALL be validated.

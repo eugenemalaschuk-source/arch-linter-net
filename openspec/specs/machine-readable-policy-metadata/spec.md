@@ -1,4 +1,9 @@
-## ADDED Requirements
+# Machine Readable Policy Metadata Specification
+
+## Purpose
+Publishes a JSON Schema for the policy format and a capability manifest describing supported contract types.
+
+## Requirements
 
 ### Requirement: Policy JSON Schema
 ArchLinterNet SHALL provide a machine-readable JSON Schema for `dependencies.arch.yml` policy files that describes the supported policy shape for schema-aware tools and AI agents.
