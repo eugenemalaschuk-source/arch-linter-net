@@ -9,15 +9,10 @@ namespace ArchLinterNet.Core.Execution;
 internal static class ArchitectureNamespaceViolationFinder
 {
     public static IEnumerable<ArchitectureViolation> FindNamespaceViolations(
-        string contractName,
-        string? contractId,
         Type[] sourceTypes,
         ArchitectureLayer forbiddenLayer,
         IReadOnlyCollection<string> allowedTypeFullNames,
-        IReadOnlyList<ArchitectureIgnoredViolation> ignoredViolations,
-        ArchitectureIgnoreUsageTracker? usageTracker = null,
-        string? contractGroup = null,
-        List<ArchitectureBaselineCandidate>? baselineCandidates = null)
+        ArchitectureContractExecutionContext executionContext)
     {
         return sourceTypes
             .Select(type =>
@@ -38,17 +33,7 @@ internal static class ArchitectureNamespaceViolationFinder
                     })
                     .Where(x => !string.IsNullOrEmpty(x.FullName))
                     .Where(x => !allowedTypeFullNames.Contains(x.FullName))
-                    .Where(x =>
-                    {
-                        bool ignored = ArchitectureIgnoreMatcher.IsIgnored(sourceFullName, x.FullName,
-                            ignoredViolations, usageTracker);
-                        if (!ignored && contractGroup != null && baselineCandidates != null)
-                        {
-                            baselineCandidates.Add(new ArchitectureBaselineCandidate(contractGroup, contractId, sourceFullName, x.FullName));
-                        }
-
-                        return !ignored;
-                    })
+                    .Where(x => !executionContext.IsIgnored(sourceFullName, x.FullName))
                     .GroupBy(x => x.FullName, StringComparer.Ordinal)
                     .Select(group => new
                     {
@@ -68,7 +53,7 @@ internal static class ArchitectureNamespaceViolationFinder
                     .ToArray()!;
 
                 return new ArchitectureViolation(
-                    contractName, contractId, sourceFullName,
+                    executionContext.ContractName, executionContext.ContractId, sourceFullName,
                     ArchitectureLayerResolver.DescribeLayer(forbiddenLayer), forbiddenRefs)
                 {
                     MatchedNamespacePrefixes = matchedPrefixes.Length > 0 ? matchedPrefixes : null
@@ -79,16 +64,11 @@ internal static class ArchitectureNamespaceViolationFinder
     }
 
     public static IEnumerable<ArchitectureViolation> FindTransitiveNamespaceViolations(
-        string contractName,
-        string? contractId,
         Type[] sourceTypes,
         ArchitectureLayer forbiddenLayer,
         IReadOnlyCollection<string> allowedTypeFullNames,
-        IReadOnlyList<ArchitectureIgnoredViolation> ignoredViolations,
         IReadOnlyCollection<Assembly> targetAssemblies,
-        ArchitectureIgnoreUsageTracker? usageTracker = null,
-        string? contractGroup = null,
-        List<ArchitectureBaselineCandidate>? baselineCandidates = null)
+        ArchitectureContractExecutionContext executionContext)
     {
         HashSet<Assembly> assemblySet = targetAssemblies.ToHashSet();
         Func<Type, bool> traversePredicate = t => assemblySet.Contains(t.Assembly);
@@ -122,14 +102,9 @@ internal static class ArchitectureNamespaceViolationFinder
                         continue;
                     }
 
-                    if (ArchitectureIgnoreMatcher.IsIgnored(sourceFullName, refFullName, ignoredViolations, usageTracker))
+                    if (executionContext.IsIgnored(sourceFullName, refFullName))
                     {
                         continue;
-                    }
-
-                    if (contractGroup != null && baselineCandidates != null)
-                    {
-                        baselineCandidates.Add(new ArchitectureBaselineCandidate(contractGroup, contractId, sourceFullName, refFullName));
                     }
 
                     forbiddenRefs.Add(refFullName);
@@ -154,8 +129,8 @@ internal static class ArchitectureNamespaceViolationFinder
                     .ToList();
 
                 return new ArchitectureViolation(
-                    contractName,
-                    contractId,
+                    executionContext.ContractName,
+                    executionContext.ContractId,
                     sourceFullName,
                     ArchitectureLayerResolver.DescribeLayer(forbiddenLayer),
                     paired.Select(x => x.refName).ToArray())

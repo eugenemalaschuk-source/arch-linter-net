@@ -13,18 +13,13 @@ internal static class ArchitectureSourceScanner
     private static readonly string[] _defaultSourceRoots = ["src", "tests"];
 
     public static IEnumerable<ArchitectureViolation> FindMethodBodyViolations(
-        string contractName,
-        string? contractId,
         string repositoryRoot,
         string sourceNamespacePrefix,
         IReadOnlyList<string> forbiddenCallPatterns,
-        IReadOnlyList<ArchitectureIgnoredViolation> ignoredViolations,
+        ArchitectureContractExecutionContext executionContext,
         string[]? sourceRoots = null,
         ArchitectureLayer? sourceLayer = null,
-        ArchitectureIgnoreUsageTracker? usageTracker = null,
-        IReadOnlyList<string>? preprocessorSymbols = null,
-        string? contractGroup = null,
-        List<ArchitectureBaselineCandidate>? baselineCandidates = null)
+        IReadOnlyList<string>? preprocessorSymbols = null)
     {
         string[] roots = sourceRoots ?? _defaultSourceRoots;
         ArchitectureLayer effectiveLayer = sourceLayer
@@ -60,15 +55,7 @@ internal static class ArchitectureSourceScanner
             string relativePath = GetRelativePath(repositoryRoot, syntaxTree.FilePath);
 
             IReadOnlyList<string> unignored = matches
-                .Where(match =>
-                {
-                    bool ignored = ArchitectureIgnoreMatcher.IsIgnored(relativePath, match, ignoredViolations, usageTracker);
-                    if (!ignored && contractGroup != null && baselineCandidates != null)
-                    {
-                        baselineCandidates.Add(new ArchitectureBaselineCandidate(contractGroup, contractId, relativePath, match));
-                    }
-                    return !ignored;
-                })
+                .Where(match => !executionContext.IsIgnored(relativePath, match))
                 .Distinct(StringComparer.Ordinal)
                 .OrderBy(match => match, StringComparer.Ordinal)
                 .ToArray();
@@ -79,8 +66,8 @@ internal static class ArchitectureSourceScanner
             }
 
             violations.Add(new ArchitectureViolation(
-                contractName,
-                contractId,
+                executionContext.ContractName,
+                executionContext.ContractId,
                 relativePath,
                 "method-body",
                 unignored));
