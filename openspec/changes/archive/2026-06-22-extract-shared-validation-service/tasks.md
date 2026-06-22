@@ -16,8 +16,9 @@
 ## 3. Preserve existing asymmetries
 
 - [x] 3.1 Verify against the base branch which call sites skip `asmdef` contracts and which enforce the unmatched-ignored-violations policy (`git show <base-sha>:<path>`)
-- [x] 3.2 Encode those asymmetries as `ValidationRequest.IncludeAsmdefContracts` / `EnforceUnmatchedIgnoredViolationsPolicy`, defaulting to the CLI `validate` command's fuller behavior
+- [x] 3.2 Encode those asymmetries as `ValidationRequest.IncludeAsmdefContracts` (defaults `true`) and `EnforceUnmatchedIgnoredViolationsPolicy` (defaults `false`, CLI `validate` opts in explicitly)
 - [x] 3.3 Fix incorrect `IncludeAsmdefContracts = false` on `ArchitectureValidator` found during PR review (base branch did run asmdef checks there) and add a regression test
+- [x] 3.4 Add explicit mode validation to `ArchitectureContractExecutor.Execute` found during PR review, matching the guard already in `ArchitectureValidationService.Validate`
 
 ## 4. Characterization tests
 
