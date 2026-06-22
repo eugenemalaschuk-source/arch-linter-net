@@ -17,6 +17,11 @@ public static class ArchitectureContractExecutor
         bool includeAsmdefContracts = true,
         ValidationTiming? timing = null)
     {
+        if (mode is not ("strict" or "audit"))
+        {
+            throw new ArgumentException($"Invalid mode: {mode}. Use 'strict' or 'audit'.", nameof(mode));
+        }
+
         bool isStrict = mode == "strict";
 
         List<ArchitectureViolation> violations = new();
