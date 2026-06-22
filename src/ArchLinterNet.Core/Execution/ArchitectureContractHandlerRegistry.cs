@@ -2,7 +2,7 @@ using ArchLinterNet.Core.Contracts;
 
 namespace ArchLinterNet.Core.Execution;
 
-public sealed class ArchitectureContractHandlerRegistry
+internal sealed class ArchitectureContractHandlerRegistry
 {
     private readonly Dictionary<string, IArchitectureContractHandler> _handlersByFamily;
 

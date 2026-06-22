@@ -43,8 +43,17 @@ public static class ArchitectureContractExecutor
         int layerCount = 0;
         using (timing?.MeasureContractFamily("layer", () => layerCount))
         {
+            List<ArchitectureLayerContract> layerTemplateContracts = runner.Catalog
+                .ContractsFor(mode, "layer_template")
+                .Cast<ArchitectureLayerContract>()
+                .ToList();
+
+            LayerTemplateExpander.ValidateNoIdConflicts(
+                layerTemplateContracts,
+                isStrict ? document.Contracts.StrictLayers : document.Contracts.AuditLayers);
+
             IEnumerable<IArchitectureContract> layerContracts = runner.Catalog.ContractsFor(mode, "layer")
-                .Concat(runner.Catalog.ContractsFor(mode, "layer_template"));
+                .Concat(layerTemplateContracts);
 
             foreach (IArchitectureContract contract in layerContracts)
             {

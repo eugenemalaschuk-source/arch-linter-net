@@ -55,9 +55,9 @@ public sealed class ArchitectureContractCatalog
         AddGroup("audit_asmdef", "audit", "asmdef", groups.AuditAsmdef);
 
         AddGroup("strict_layer_templates", "strict", "layer_template",
-            LayerTemplateExpander.Expand(groups.StrictLayerTemplates, groups.StrictLayers));
+            LayerTemplateExpander.Expand(groups.StrictLayerTemplates));
         AddGroup("audit_layer_templates", "audit", "layer_template",
-            LayerTemplateExpander.Expand(groups.AuditLayerTemplates, groups.AuditLayers));
+            LayerTemplateExpander.Expand(groups.AuditLayerTemplates));
 
         return new ArchitectureContractCatalog(descriptors);
     }
