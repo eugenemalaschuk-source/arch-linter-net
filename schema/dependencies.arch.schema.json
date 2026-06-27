@@ -134,8 +134,8 @@
         "coverage": {
           "type": "string",
           "enum": ["error", "warn", "off"],
-          "default": "off",
-          "description": "Behavior when a declared coverage contract finds uncovered, stale, or empty-input first-party units. 'error' fails validation, 'warn' reports but does not fail, 'off' (default) suppresses findings. A policy with no strict_coverage/audit_coverage contracts is unaffected regardless of this setting."
+          "default": "error",
+          "description": "Behavior when a declared coverage contract finds uncovered, stale, or empty-input first-party units. 'error' (default) fails validation, 'warn' reports but does not fail, 'off' suppresses findings even for an explicitly declared coverage contract. Backward compatibility does not depend on this default: a policy with no strict_coverage/audit_coverage contracts is unaffected regardless of this setting, because no coverage contract exists to produce a finding."
         },
         "condition_sets": {
           "type": "object",
@@ -502,34 +502,51 @@
         "optional": { "type": "boolean", "default": false }
       }
     },
-    "coverageRoot": {
+    "coverageNamespaceRoot": {
       "type": "object",
       "additionalProperties": false,
-      "minProperties": 1,
-      "anyOf": [
-        { "required": ["namespace"] },
-        { "required": ["include"] }
-      ],
+      "required": ["namespace"],
       "properties": {
-        "namespace": { "type": "string", "minLength": 1, "description": "Namespace prefix or glob pattern, same syntax as layers.<name>.namespace. Used for scope: namespace." },
-        "namespace_suffix": { "type": "string", "description": "Optional namespace suffix constraint, same syntax as layers.<name>.namespace_suffix." },
-        "include": { "$ref": "#/$defs/stringList", "description": "Glob patterns for project/assembly discovery roots. Used for scope: project or assembly." },
+        "namespace": { "type": "string", "minLength": 1, "description": "Namespace prefix or glob pattern, same syntax as layers.<name>.namespace." },
+        "namespace_suffix": { "type": "string", "description": "Optional namespace suffix constraint, same syntax as layers.<name>.namespace_suffix." }
+      }
+    },
+    "coverageDiscoveryRoot": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["include"],
+      "properties": {
+        "include": { "$ref": "#/$defs/stringList", "description": "Glob patterns for project/assembly discovery roots." },
         "exclude": { "$ref": "#/$defs/stringList", "description": "Glob patterns excluded from include, before coverage exclusion reasons apply." }
       }
     },
-    "coverageExclusion": {
+    "coverageNamespaceExclusion": {
       "type": "object",
       "additionalProperties": false,
       "required": ["reason"],
       "anyOf": [
         { "required": ["namespace"] },
-        { "required": ["namespace_suffix"] },
-        { "required": ["project"] },
-        { "required": ["assembly"] }
+        { "required": ["namespace_suffix"] }
       ],
       "properties": {
         "namespace": { "type": "string", "minLength": 1 },
         "namespace_suffix": { "type": "string", "minLength": 1 },
+        "reason": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Required justification for excluding this unit from coverage."
+        }
+      }
+    },
+    "coverageDiscoveryExclusion": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["reason"],
+      "anyOf": [
+        { "required": ["project"] },
+        { "required": ["assembly"] }
+      ],
+      "properties": {
         "project": { "type": "string", "minLength": 1 },
         "assembly": { "type": "string", "minLength": 1 },
         "reason": {
@@ -555,9 +572,8 @@
             },
             "roots": {
               "type": "array",
-              "items": { "$ref": "#/$defs/coverageRoot" },
               "minItems": 1,
-              "description": "Units to classify. Required for, and only valid with, scope: namespace, project, or assembly."
+              "description": "Units to classify. Required for, and only valid with, scope: namespace, project, or assembly. Item shape depends on scope: namespace uses coverageNamespaceRoot, project/assembly use coverageDiscoveryRoot (see scope-specific allOf constraints below)."
             },
             "between": {
               "type": "array",
@@ -576,8 +592,7 @@
             },
             "exclude": {
               "type": "array",
-              "items": { "$ref": "#/$defs/coverageExclusion" },
-              "default": []
+              "description": "Excluded units, each carrying a required reason. Item shape depends on scope: namespace uses coverageNamespaceExclusion, project/assembly use coverageDiscoveryExclusion. Not valid for scope: dependency_edge or rule_input (no exclusion shape defined for those scopes yet)."
             },
             "reason": {
               "type": "string",
@@ -590,6 +605,10 @@
           "if": { "properties": { "scope": { "const": "namespace" } }, "required": ["scope"] },
           "then": {
             "required": ["roots"],
+            "properties": {
+              "roots": { "items": { "$ref": "#/$defs/coverageNamespaceRoot" } },
+              "exclude": { "items": { "$ref": "#/$defs/coverageNamespaceExclusion" }, "default": [] }
+            },
             "not": { "anyOf": [{ "required": ["between"] }, { "required": ["contract_ids"] }] }
           }
         },
@@ -597,7 +616,17 @@
           "if": { "properties": { "scope": { "enum": ["project", "assembly"] } }, "required": ["scope"] },
           "then": {
             "required": ["roots"],
+            "properties": {
+              "roots": { "items": { "$ref": "#/$defs/coverageDiscoveryRoot" } },
+              "exclude": { "items": { "$ref": "#/$defs/coverageDiscoveryExclusion" }, "default": [] }
+            },
             "not": { "anyOf": [{ "required": ["between"] }, { "required": ["contract_ids"] }] }
+          }
+        },
+        {
+          "if": { "properties": { "scope": { "enum": ["dependency_edge", "rule_input"] } }, "required": ["scope"] },
+          "then": {
+            "not": { "required": ["exclude"] }
           }
         },
         {

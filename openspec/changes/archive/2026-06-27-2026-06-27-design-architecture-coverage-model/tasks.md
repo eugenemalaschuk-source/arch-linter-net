@@ -21,7 +21,7 @@
 ## 4. Diagnostic identity and severity
 
 - [x] 4.1 Define the `Coverage` diagnostic kind and diagnostic field shape (`Scope`, `Status`, `RepresentativeUnit`, `Reason?`), following the `PolicyConsistencyDiagnostic` one-kind/one-record precedent.
-- [x] 4.2 Define `analysis.coverage: error|warn|off`, decide and justify the default (`off`), and document backward-compatibility guarantees for policies with no coverage contracts.
+- [x] 4.2 Define `analysis.coverage: error|warn|off`, decide and justify the default (`error`), and document backward-compatibility guarantees for policies with no coverage contracts.
 
 ## 5. Schema update
 

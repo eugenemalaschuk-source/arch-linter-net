@@ -60,11 +60,15 @@ Every `exclude` entry under a coverage contract SHALL require a non-empty `reaso
 - **THEN** the reviewed schema SHALL reject the document as invalid
 
 ### Requirement: Coverage severity is configurable and defaults to off
-The reviewed schema SHALL define `analysis.coverage` with values `error`, `warn`, or `off`, defaulting to `off` when unset, following the same configuration pattern as `analysis.unmatched_ignored_violations` and `analysis.policy_consistency`.
+The reviewed schema SHALL define `analysis.coverage` with values `error`, `warn`, or `off`, defaulting to `error` when unset, following the same configuration pattern and default rationale as `analysis.policy_consistency`. The default is `error` (not `off`) so that a policy author who explicitly declares a `strict_coverage`/`audit_coverage` contract gets a failing/visible signal by default; backward compatibility for policies that declare no coverage contracts is guaranteed structurally (see "Existing policies remain unaffected" below), not by defaulting severity to `off`.
 
-#### Scenario: Coverage is opt-in by default
+#### Scenario: Coverage is opt-in by the absence of coverage contracts, not by default severity
 - **WHEN** a policy declares no `strict_coverage` or `audit_coverage` entries and does not set `analysis.coverage`
-- **THEN** the policy's validation behavior is unaffected by the existence of the coverage model
+- **THEN** the policy's validation behavior is unaffected by the existence of the coverage model, because no coverage contract exists to produce a finding
+
+#### Scenario: An explicitly declared strict coverage contract fails by default
+- **WHEN** a policy declares a `strict_coverage` contract that finds an `uncovered` unit and does not set `analysis.coverage`
+- **THEN** validation SHALL fail, exactly as an explicitly declared `strict` dependency contract would
 
 #### Scenario: Coverage severity values mirror existing severity settings
 - **WHEN** `analysis.coverage` is set to a value other than `error`, `warn`, or `off`
