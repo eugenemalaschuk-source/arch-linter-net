@@ -12,13 +12,16 @@ internal static class ArchitectureNamespaceViolationFinder
         Type[] sourceTypes,
         ArchitectureLayer forbiddenLayer,
         IReadOnlyCollection<string> allowedTypeFullNames,
-        ArchitectureContractExecutionContext executionContext)
+        ArchitectureContractExecutionContext executionContext,
+        ArchitectureReferenceGraph? referenceGraph = null)
     {
         return sourceTypes
             .Select(type =>
             {
                 string sourceFullName = ArchitectureTypeNames.SafeFullName(type);
-                var forbiddenMatches = ArchitectureReferenceScanner.GetReferencedTypes(type)
+                var forbiddenMatches = (referenceGraph != null
+                        ? referenceGraph.GetReferencedTypes(type)
+                        : ArchitectureReferenceScanner.GetReferencedTypes(type))
                     .Select(reference => new
                     {
                         Reference = reference,
