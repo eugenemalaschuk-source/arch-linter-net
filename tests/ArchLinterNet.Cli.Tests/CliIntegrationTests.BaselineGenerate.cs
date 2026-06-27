@@ -225,6 +225,35 @@ public partial class CliIntegrationTests
         }
     }
 
+    /* baseline generate (coverage contracts) */
+
+    [Test]
+    public void BaselineGenerate_WithCoveragePolicy_CapturesCoverageEntries()
+    {
+        string outputPath = Path.Combine(Path.GetTempPath(), $"baseline-{Guid.NewGuid():N}.yml");
+        try
+        {
+            var (exitCode, stdout, stderr) = RunCli("baseline", "generate",
+                "--config", _coveragePolicy,
+                "--output", outputPath);
+
+            Assert.Multiple(() =>
+            {
+                Assert.That(exitCode, Is.EqualTo(0), $"Baseline generate failed, stderr: {stderr}");
+                Assert.That(stdout, Does.Contain("Generated baseline"));
+            });
+
+            string content = File.ReadAllText(outputPath);
+            Assert.That(content, Does.Contain("strict_coverage:"));
+            Assert.That(content, Does.Contain("validation-namespace-coverage"));
+        }
+        finally
+        {
+            if (File.Exists(outputPath))
+                File.Delete(outputPath);
+        }
+    }
+
     /* baseline --help */
 
     [Test]

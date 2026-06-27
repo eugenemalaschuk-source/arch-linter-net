@@ -6,4 +6,7 @@ public sealed record ArchitectureUnmatchedIgnoredViolation(
     int IgnoreIndex,
     string SourceType,
     string ForbiddenReference,
-    string Reason);
+    string Reason)
+{
+    public string? ContractGroup { get; init; }
+}

@@ -25,6 +25,8 @@ public static class ArchitectureBaselineMerger
         groupMerger.MergeGroup(baseline.AuditProtected, "audit_protected");
         groupMerger.MergeGroup(baseline.StrictExternal, "strict_external");
         groupMerger.MergeGroup(baseline.AuditExternal, "audit_external");
+        groupMerger.MergeGroup(baseline.StrictCoverage, "strict_coverage");
+        groupMerger.MergeGroup(baseline.AuditCoverage, "audit_coverage");
     }
 
     public static void MergeAndValidate(
@@ -53,6 +55,8 @@ public static class ArchitectureBaselineMerger
         unknownIds.AddRange(groupMerger.MergeGroup(baseline.AuditProtected, "audit_protected"));
         unknownIds.AddRange(groupMerger.MergeGroup(baseline.StrictExternal, "strict_external"));
         unknownIds.AddRange(groupMerger.MergeGroup(baseline.AuditExternal, "audit_external"));
+        unknownIds.AddRange(groupMerger.MergeGroup(baseline.StrictCoverage, "strict_coverage"));
+        unknownIds.AddRange(groupMerger.MergeGroup(baseline.AuditCoverage, "audit_coverage"));
 
         if (unknownIds.Count > 0)
         {
@@ -134,6 +138,8 @@ public static class ArchitectureBaselineMerger
                 "audit_protected" => _groups.AuditProtected.Select(c => (IArchitectureContract)c).ToList(),
                 "strict_external" => _groups.StrictExternal.Select(c => (IArchitectureContract)c).ToList(),
                 "audit_external" => _groups.AuditExternal.Select(c => (IArchitectureContract)c).ToList(),
+                "strict_coverage" => _groups.StrictCoverage.Select(c => (IArchitectureContract)c).ToList(),
+                "audit_coverage" => _groups.AuditCoverage.Select(c => (IArchitectureContract)c).ToList(),
                 _ => new List<IArchitectureContract>()
             };
         }
@@ -151,6 +157,7 @@ public static class ArchitectureBaselineMerger
                 ArchitectureIndependenceContract c => c.IgnoredViolations,
                 ArchitectureProtectedContract c => c.IgnoredViolations,
                 ArchitectureExternalDependencyContract c => c.IgnoredViolations,
+                ArchitectureCoverageContract c => c.IgnoredViolations,
                 _ => null!
             };
         }

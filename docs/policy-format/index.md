@@ -136,12 +136,15 @@ contracts:
 
 Read [Contracts](../contracts/index.md) for the supported contract families.
 
-## Namespace coverage
+## Namespace and rule-input coverage
 
-ArchLinterNet currently supports coverage contracts for namespace scope only.
-Use them to detect first-party namespaces under a configured root that are not
-represented by any declared layer, namespace glob, expanded layer template, or
-explicit exclusion.
+ArchLinterNet supports coverage contracts for namespace scope and rule-input
+scope. Namespace coverage (`scope: namespace`) detects first-party namespaces
+under a configured root that are not represented by any declared layer,
+namespace glob, expanded layer template, or explicit exclusion. Rule-input
+coverage (`scope: rule_input`) detects referenced contracts whose
+source/target layer references are dangling or currently match no first-party
+code.
 
 ```yaml
 analysis:
@@ -161,11 +164,15 @@ contracts:
       reason: Every feature namespace must be declared as a layer or explicitly excluded.
 ```
 
+Coverage contracts also support `ignored_violations`, allowing existing
+coverage debt to be baselined the same way ordinary dependency violations are.
+See [migration baselines](../guides/migration-baselines.md#coverage-baselines).
+
 Current limits:
 
-- Only `scope: namespace` is implemented.
-- `project`, `assembly`, `dependency_edge`, and `rule_input` coverage scopes
-  remain unsupported and fail validation.
+- `scope: namespace` and `scope: rule_input` are implemented.
+- `project`, `assembly`, and `dependency_edge` coverage scopes remain
+  unsupported and fail validation.
 - Every `exclude` entry must include a non-empty `reason`.
 
 For user-facing examples and behavior, see [Coverage contracts](../contracts/coverage.md).

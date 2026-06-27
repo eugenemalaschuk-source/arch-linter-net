@@ -141,6 +141,34 @@ In JSON output, the summary appears as a top-level `coverage_summary` array, add
 
 A coverage contract only appears in the summary when it is actually selected to run. If `validate --contract <id>` is used to run only specific contracts and a coverage contract's ID isn't among them, that coverage contract is omitted from `coverage_summary` entirely — it never appears as a zero-count row.
 
+## Baselining coverage debt
+
+Coverage contracts support `ignored_violations`, the same baseline mechanism described in
+[migration baselines](../guides/migration-baselines.md#coverage-baselines). This lets you adopt a
+coverage gate incrementally on a codebase that already has uncovered namespaces or stale
+rule-input references, by accepting the current findings as baseline debt and failing only on new
+ones:
+
+```yaml
+contracts:
+  strict_coverage:
+    - id: feature-namespace-coverage
+      name: feature-namespace-coverage
+      scope: namespace
+      roots:
+        - namespace: MyApp.Features
+      ignored_violations:
+        - source_type: MyApp.Features.Legacy
+          forbidden_reference: "uncovered namespace"
+          reason: "Accepted — tracked in #103"
+```
+
+`arch-linter-net baseline generate` and `validate --baseline` work the same way for
+`strict_coverage`/`audit_coverage` contracts as they do for ordinary dependency contracts.
+Coverage baseline entries only suppress coverage findings — they never affect `strict`/`audit`
+dependency violations. A baselined coverage finding that has since been resolved is reported as a
+stale baseline entry via `unmatched_ignored_violations`.
+
 ## Exclusion rules
 
 Use `exclude` only for units you intentionally do not want to model yet. For `scope: namespace`, exclude by namespace:

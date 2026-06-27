@@ -122,6 +122,20 @@ public static class ArchitectureValidationService
                 }
             }
 
+            if (coverageConfig == "off" && unmatched.Count > 0)
+            {
+                // When coverage gating is disabled, a stale entry in a strict_coverage/audit_coverage
+                // baseline must not surface or block — otherwise turning coverage off would not fully
+                // disable the coverage family, only its non-stale findings. Filtered by contract
+                // group rather than contract ID: IDs are not guaranteed unique across families (the
+                // policy-consistency duplicate-id check does not span coverage contracts), so an
+                // id-only filter could mistakenly suppress a stale ignore on an unrelated strict/audit
+                // contract that happens to share an ID with a coverage contract.
+                unmatched = unmatched
+                    .Where(u => u.ContractGroup is not ("strict_coverage" or "audit_coverage"))
+                    .ToList();
+            }
+
             bool hasBlockingUnmatched = request.EnforceUnmatchedIgnoredViolationsPolicy
                 && unmatchedConfig == "error" && unmatched.Count > 0;
 

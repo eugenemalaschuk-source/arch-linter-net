@@ -4,6 +4,34 @@ namespace ArchLinterNet.Cli.Tests;
 
 public partial class CliIntegrationTests
 {
+    /* validate --baseline (coverage contracts) */
+
+    [Test]
+    public void ValidateWithBaseline_CoveragePolicy_SuppressesBaselinedUncoveredNamespace()
+    {
+        string baselinePath = Path.Combine(Path.GetTempPath(), $"baseline-{Guid.NewGuid():N}.yml");
+        try
+        {
+            var (genExit, genStdout, genStderr) = RunCli("baseline", "generate",
+                "--config", _coveragePolicy,
+                "--output", baselinePath);
+            Assert.That(genExit, Is.EqualTo(0), $"Baseline generation should succeed, stderr: {genStderr}");
+            Assert.That(File.ReadAllText(baselinePath), Does.Contain("strict_coverage:"),
+                $"Expected coverage entries in generated baseline, stdout: {genStdout}");
+
+            var (exitCode, _, stderr) = RunCli("--policy", _coveragePolicy, "--strict",
+                "--baseline", baselinePath);
+
+            Assert.That(exitCode, Is.EqualTo(0),
+                $"Validate with coverage baseline should pass, stderr: {stderr}");
+        }
+        finally
+        {
+            if (File.Exists(baselinePath))
+                File.Delete(baselinePath);
+        }
+    }
+
     /* validate --baseline */
 
     [Test]

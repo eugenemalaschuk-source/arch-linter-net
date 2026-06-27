@@ -153,12 +153,15 @@ public sealed partial class ArchitectureContractRunner
 
         ArchitectureCoverageInventory inventory = _session.BuildCoverageInventory(_document);
 
-        return inventory.Namespaces
+        ArchitectureContractExecutionContext executionContext = CreateExecutionContext(contract, contract.IgnoredViolations);
+
+        List<ArchitectureViolation> findings = inventory.Namespaces
             .Where(entry => contract.Roots.Any(root => MatchesNamespaceRoot(root, entry.Namespace)))
             .Where(entry => !contract.Exclude.Any(exclusion => MatchesNamespaceExclusion(exclusion, entry.Namespace)))
             .Where(entry => !IsCoveredByDeclaredLayers(inventory, entry.Namespace))
             .Where(entry => !IsCoveredByExpandedTemplates(inventory, entry.Namespace))
             .OrderBy(entry => entry.Namespace, StringComparer.Ordinal)
+            .Where(entry => !executionContext.IsIgnored(entry.Namespace, "uncovered namespace"))
             .Select(entry => new ArchitectureViolation(
                 contract.Name,
                 contract.Id,
@@ -166,6 +169,10 @@ public sealed partial class ArchitectureContractRunner
                 "uncovered namespace",
                 new[] { entry.RepresentativeType }))
             .ToList();
+
+        executionContext.CollectUnmatchedIgnores(_unmatchedIgnoredViolations);
+
+        return findings;
     }
 
     private List<ArchitectureViolation> CheckRuleInputCoverageContract(ArchitectureCoverageContract contract)
@@ -182,6 +189,8 @@ public sealed partial class ArchitectureContractRunner
             .Where(descriptor => !string.IsNullOrEmpty(descriptor.Id))
             .GroupBy(descriptor => descriptor.Id!, StringComparer.OrdinalIgnoreCase)
             .ToDictionary(group => group.Key, group => group.First(), StringComparer.OrdinalIgnoreCase);
+
+        ArchitectureContractExecutionContext executionContext = CreateExecutionContext(contract, contract.IgnoredViolations);
 
         List<ArchitectureViolation> findings = new();
 
@@ -205,19 +214,23 @@ public sealed partial class ArchitectureContractRunner
             {
                 if (!_document.Layers.TryGetValue(layerName, out ArchitectureLayer? layer))
                 {
-                    findings.Add(new ArchitectureViolation(
-                        contract.Name,
-                        contract.Id,
-                        referencedContractId,
-                        "unresolved",
-                        new[] { layerName }));
+                    if (!executionContext.IsIgnored(referencedContractId, layerName))
+                    {
+                        findings.Add(new ArchitectureViolation(
+                            contract.Name,
+                            contract.Id,
+                            referencedContractId,
+                            "unresolved",
+                            new[] { layerName }));
+                    }
+
                     continue;
                 }
 
                 bool matchesAnyCode = inventory.Namespaces.Any(entry =>
                     ArchitectureLayerResolver.MatchesNamespace(layer, entry.Namespace));
 
-                if (!matchesAnyCode)
+                if (!matchesAnyCode && !executionContext.IsIgnored(referencedContractId, layerName))
                 {
                     findings.Add(new ArchitectureViolation(
                         contract.Name,
@@ -228,6 +241,8 @@ public sealed partial class ArchitectureContractRunner
                 }
             }
         }
+
+        executionContext.CollectUnmatchedIgnores(_unmatchedIgnoredViolations);
 
         return findings
             .OrderBy(f => f.SourceType, StringComparer.Ordinal)
