@@ -59,7 +59,7 @@ Every `exclude` entry under a coverage contract SHALL require a non-empty `reaso
 - **WHEN** a coverage contract's `exclude` entry omits `reason`
 - **THEN** the reviewed schema SHALL reject the document as invalid
 
-### Requirement: Coverage severity is configurable and defaults to off
+### Requirement: Coverage severity is configurable and defaults to error
 The reviewed schema SHALL define `analysis.coverage` with values `error`, `warn`, or `off`, defaulting to `error` when unset, following the same configuration pattern and default rationale as `analysis.policy_consistency`. The default is `error` (not `off`) so that a policy author who explicitly declares a `strict_coverage`/`audit_coverage` contract gets a failing/visible signal by default; backward compatibility for policies that declare no coverage contracts is guaranteed structurally (see "Existing policies remain unaffected" below), not by defaulting severity to `off`.
 
 #### Scenario: Coverage is opt-in by the absence of coverage contracts, not by default severity
@@ -87,4 +87,11 @@ A policy with no `strict_coverage`/`audit_coverage` entries SHALL behave identic
 #### Scenario: Policy without coverage contracts is unaffected
 - **WHEN** a policy declares no coverage contracts
 - **THEN** no coverage diagnostic of any status can be produced for that policy
+
+### Requirement: A declared coverage contract cannot be silently ignored before the engine exists
+Until the coverage engine (#97-#103) is implemented, the system SHALL reject — rather than silently accept and drop — any policy that declares a `strict_coverage` or `audit_coverage` contract, so a schema-valid policy can never diverge from what is actually enforced.
+
+#### Scenario: A declared coverage contract fails validation with an actionable message
+- **WHEN** a policy declares at least one `strict_coverage` or `audit_coverage` contract and the coverage engine has not yet been implemented
+- **THEN** the system SHALL throw an error identifying that coverage contracts are reserved by the schema and not yet enforceable, rather than passing validation with the contract silently unenforced
 

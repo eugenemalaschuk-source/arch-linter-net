@@ -35,3 +35,9 @@
 - [x] 6.2 Write the `architecture-coverage-model` spec capturing the reviewed shape as ADDED requirements.
 - [x] 6.3 State explicit non-goals: no engine, no checker, no diagnostic implementation, no runtime behavior change (owned by #97–#103).
 - [x] 6.4 Run `openspec validate --all` and confirm the change validates cleanly before archiving.
+
+## 7. Reject-not-silently-drop guard
+
+- [x] 7.1 Add minimal `ArchitectureCoverageContract` binding (`name`/`id`/`scope`/`reason`) and `StrictCoverage`/`AuditCoverage`/`Coverage` properties so the loader's `IgnoreUnmatchedProperties` cannot silently drop a schema-valid coverage contract.
+- [x] 7.2 Add a guard in `ArchitectureRunnerFactory.LoadDocument` that throws `InvalidOperationException` when any coverage contract is declared, with a message identifying the contracts are reserved and not yet enforceable.
+- [x] 7.3 Add tests covering: strict_coverage throws, audit_coverage throws, a policy without coverage contracts is unaffected.

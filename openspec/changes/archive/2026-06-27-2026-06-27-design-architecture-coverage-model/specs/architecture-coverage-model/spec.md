@@ -84,3 +84,10 @@ A policy with no `strict_coverage`/`audit_coverage` entries SHALL behave identic
 #### Scenario: Policy without coverage contracts is unaffected
 - **WHEN** a policy declares no coverage contracts
 - **THEN** no coverage diagnostic of any status can be produced for that policy
+
+### Requirement: A declared coverage contract cannot be silently ignored before the engine exists
+Until the coverage engine (#97-#103) is implemented, the system SHALL reject — rather than silently accept and drop — any policy that declares a `strict_coverage` or `audit_coverage` contract, so a schema-valid policy can never diverge from what is actually enforced.
+
+#### Scenario: A declared coverage contract fails validation with an actionable message
+- **WHEN** a policy declares at least one `strict_coverage` or `audit_coverage` contract and the coverage engine has not yet been implemented
+- **THEN** the system SHALL throw an error identifying that coverage contracts are reserved by the schema and not yet enforceable, rather than passing validation with the contract silently unenforced

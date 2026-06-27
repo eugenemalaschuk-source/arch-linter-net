@@ -20,6 +20,8 @@ A normal ArchLinterNet contract answers "is this dependency allowed?" — but a 
 ## Impact
 
 - `schema/dependencies.arch.schema.json`: new `$defs` for coverage contract shapes and `analysis.coverage` severity setting; additive only.
+- `src/ArchLinterNet.Core/Contracts/ArchitectureContractModels.cs`: minimal `ArchitectureCoverageContract` binding (`name`/`id`/`scope`/`reason` only) plus `StrictCoverage`/`AuditCoverage` lists on `ArchitectureContractGroups` and `Coverage` on `ArchitectureAnalysisConfiguration` — bound but never executed by any contract family, so a schema-valid coverage contract is detected rather than silently dropped by the loader's `IgnoreUnmatchedProperties` deserialization.
+- `src/ArchLinterNet.Core/Execution/ArchitectureRunnerFactory.cs`: `LoadDocument` throws `InvalidOperationException` when any `strict_coverage`/`audit_coverage` contract is declared, since the coverage engine does not exist yet to enforce it. This is the only runtime behavior change in this PR — it exists to prevent a trust-boundary gap (schema accepts a contract the engine cannot run), not to implement coverage.
+- No diagnostic kind, checker, or pipeline step is implemented by this change — those land in #97–#103 against this design.
 - `docs/architecture/`: new design reference for the coverage model (vocabulary, YAML shape, scope/exclusion rules).
-- No changes to `src/` — no diagnostic kind, no contract group, no checker, no pipeline step is implemented by this change. Those land in #97–#103 against this design.
-- No changes to runtime validation behavior; existing policies are unaffected because no coverage contracts exist yet to declare.
+- No changes to runtime validation behavior for policies that declare no coverage contracts — they are unaffected.
