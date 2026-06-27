@@ -1,5 +1,6 @@
 using System.Reflection;
 using ArchLinterNet.Core.Contracts;
+using ArchLinterNet.Core.Discovery;
 using ArchLinterNet.Core.Model;
 using ArchLinterNet.Core.Resolution;
 using ArchLinterNet.Core.Scanning;
@@ -181,6 +182,16 @@ public sealed partial class ArchitectureContractRunner(
                 missingAssembly,
                 "missing target assembly",
                 new[] { $"Assembly '{missingAssembly}' is declared in analysis.target_assemblies but could not be resolved.{probeInfo}" }));
+        }
+
+        foreach (ArchitectureProjectDiscoveryDiagnostic discoveryDiagnostic in _context.DiscoveryDiagnostics)
+        {
+            violations.Add(new ArchitectureViolation(
+                "<configuration>",
+                null,
+                discoveryDiagnostic.Subject,
+                discoveryDiagnostic.Kind,
+                new[] { discoveryDiagnostic.Message }));
         }
 
         HashSet<string> referencedLayers = new(StringComparer.Ordinal);
