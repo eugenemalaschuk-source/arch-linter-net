@@ -22,6 +22,7 @@ Most contract families have two variants:
 | [Method body](method-body.md) | `strict_method_body` | `audit_method_body` | Source code must not call forbidden APIs inside executable bodies. |
 | [Unity asmdef](asmdef.md) | `strict_asmdef` | `audit_asmdef` | Unity assembly definition references must follow architecture rules. |
 | [Layer template](layer-templates.md) | `strict_layer_templates` | `audit_layer_templates` | The same ordered layer shape applies to multiple namespace containers. |
+| [Namespace coverage](coverage.md) | `strict_coverage` | `audit_coverage` | First-party namespaces under configured roots must be modeled by layers, templates, or explicit exclusions. |
 
 ## Strict or audit?
 
