@@ -1,0 +1,10 @@
+namespace ArchLinterNet.Core.Model;
+
+public enum ArchitectureDiagnosticKind
+{
+    Dependency,
+    Cycle,
+    UnmatchedIgnore,
+    Configuration,
+    ExternalDependency
+}
