@@ -1,4 +1,5 @@
 using ArchLinterNet.Core.Contracts;
+using ArchLinterNet.Core.Discovery;
 using ArchLinterNet.Core.Model;
 using ArchLinterNet.Core.Reporting;
 using ArchLinterNet.Core.Resolution;
@@ -56,13 +57,44 @@ public static class ArchitectureRunnerFactory
         ArchitectureContractRunner runner;
         using (timing?.Measure("assembly_resolution", indent: 1))
         {
+            bool resolveAssemblyOutputs = document.Analysis.TargetAssemblies.Count == 0;
+            ProjectDiscoveryResult discovery = ArchitectureProjectDiscovery.ResolveFromDocument(
+                document, repositoryRoot, resolveAssemblyOutputs);
+            ApplyDiscoveryResult(document.Analysis, discovery);
+
+            if (resolveAssemblyOutputs && document.Analysis.TargetAssemblies.Count == 0 && discovery.Diagnostics.Count > 0)
+            {
+                string details = string.Join("; ", discovery.Diagnostics.Select(d => d.Message));
+                throw new InvalidOperationException(
+                    $"Architecture YAML must define analysis.target_assemblies. Project discovery did not resolve any assemblies: {details}");
+            }
+
             ResolutionResult resolution = ArchitectureAssemblyResolver.ResolveFromDocument(document, repositoryRoot);
             ArchitectureAnalysisContext context = new(repositoryRoot, resolution.ResolvedAssemblies,
-                resolution.MissingAssemblyNames, resolution.AssemblyProbingPaths);
+                resolution.MissingAssemblyNames, resolution.AssemblyProbingPaths, discovery.Diagnostics);
             runner = new ArchitectureContractRunner(context, document, selectedContractIds,
                 enableUnmatchedIgnoreTracking, preprocessorSymbols: symbols);
         }
 
         return new ArchitectureRunnerSetup(repositoryRoot, runner);
+    }
+
+    private static void ApplyDiscoveryResult(ArchitectureAnalysisConfiguration analysis, ProjectDiscoveryResult discovery)
+    {
+        bool seedAssemblies = analysis.TargetAssemblies.Count == 0 && discovery.TargetAssemblyNames.Count > 0;
+
+        if (seedAssemblies)
+        {
+            analysis.TargetAssemblies = discovery.TargetAssemblyNames.ToList();
+            analysis.AssemblySearchPaths = analysis.AssemblySearchPaths
+                .Concat(discovery.AssemblySearchPaths)
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
+        }
+
+        if (analysis.SourceRoots.Count == 0 && discovery.SourceRoots.Count > 0)
+        {
+            analysis.SourceRoots = discovery.SourceRoots.ToList();
+        }
     }
 }

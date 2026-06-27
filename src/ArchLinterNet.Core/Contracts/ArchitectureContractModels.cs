@@ -39,6 +39,24 @@ public sealed class ArchitectureAnalysisConfiguration
     [YamlMember(Alias = "source_roots")]
     public List<string> SourceRoots { get; set; } = new();
 
+    [YamlMember(Alias = "solution")]
+    public string Solution { get; set; } = string.Empty;
+
+    [YamlMember(Alias = "projects")]
+    public List<string> Projects { get; set; } = new();
+
+    [YamlMember(Alias = "project_include")]
+    public List<string> ProjectInclude { get; set; } = new();
+
+    [YamlMember(Alias = "project_exclude")]
+    public List<string> ProjectExclude { get; set; } = new();
+
+    [YamlMember(Alias = "configuration")]
+    public string Configuration { get; set; } = "Debug";
+
+    [YamlMember(Alias = "target_framework")]
+    public string TargetFramework { get; set; } = string.Empty;
+
     [YamlMember(Alias = "unmatched_ignored_violations")]
     public string UnmatchedIgnoredViolations { get; set; } = "error";
 
