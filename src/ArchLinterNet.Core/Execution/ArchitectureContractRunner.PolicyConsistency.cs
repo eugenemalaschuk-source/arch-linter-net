@@ -183,22 +183,51 @@ public sealed partial class ArchitectureContractRunner
             }
         }
 
-        IEnumerable<ArchitectureLayerContract> orderedLayerContracts = _document.Contracts.StrictLayers
-            .Concat(_document.Contracts.AuditLayers)
-            .Concat(LayerTemplateExpander.Expand(_document.Contracts.StrictLayerTemplates))
-            .Concat(LayerTemplateExpander.Expand(_document.Contracts.AuditLayerTemplates));
-
-        foreach (ArchitectureLayerContract c in orderedLayerContracts)
+        foreach (ArchitectureLayerContract c in _document.Contracts.StrictLayers.Concat(_document.Contracts.AuditLayers))
         {
             // Ordered layer contracts express an explicit allowed/ordered dependency between
-            // consecutive layers (later layers may depend on earlier ones). Expanded layer
-            // templates produce the same kind of ordered contract and must be included here too,
-            // so an independence contract conflicting with a template-generated order is caught.
+            // consecutive layers (later layers may depend on earlier ones). Their `Layers`
+            // entries are already named top-level layer keys, same as independence.Layers.
             for (int i = 0; i < c.Layers.Count; i++)
             {
                 for (int j = 0; j < i; j++)
                 {
                     explicitDependencyPairs.Add((c.Layers[i], c.Layers[j], c.Name, c.Id));
+                }
+            }
+        }
+
+        // Expanded layer templates produce the same kind of ordered contract, but their `Layers`
+        // entries are concrete container namespaces (e.g. "MyApp.Feature.Domain"), not named
+        // layer keys. Resolve each one back to the named top-level layer it belongs to before
+        // comparing against independence.Layers, which always lists named layers.
+        IReadOnlySet<string> allLayerNames = new HashSet<string>(_document.Layers.Keys, StringComparer.Ordinal);
+
+        IEnumerable<ArchitectureLayerContract> expandedTemplateContracts =
+            LayerTemplateExpander.Expand(_document.Contracts.StrictLayerTemplates)
+                .Concat(LayerTemplateExpander.Expand(_document.Contracts.AuditLayerTemplates));
+
+        foreach (ArchitectureLayerContract c in expandedTemplateContracts)
+        {
+            List<string?> resolvedLayers = c.Layers
+                .Select(ns => ArchitectureLayerResolver.ResolveContainingLayer(_document, ns, allLayerNames))
+                .ToList();
+
+            for (int i = 0; i < resolvedLayers.Count; i++)
+            {
+                if (resolvedLayers[i] == null)
+                {
+                    continue;
+                }
+
+                for (int j = 0; j < i; j++)
+                {
+                    if (resolvedLayers[j] == null)
+                    {
+                        continue;
+                    }
+
+                    explicitDependencyPairs.Add((resolvedLayers[i]!, resolvedLayers[j]!, c.Name, c.Id));
                 }
             }
         }

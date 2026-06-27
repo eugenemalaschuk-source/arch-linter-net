@@ -155,27 +155,29 @@ public sealed class PolicyConsistencyCheckTests
     }
 
     [Test]
-    public void IndependenceVsExpandedLayerTemplateOrder_Conflict_Detected()
+    public void IndependenceVsExpandedLayerTemplateOrder_NamedLayers_Conflict_Detected()
     {
         var document = BaseDocument();
+        document.Layers["feature_domain"] = new ArchitectureLayer { Namespace = "MyApp.Feature.Domain" };
+        document.Layers["feature_application"] = new ArchitectureLayer { Namespace = "MyApp.Feature.Application" };
         document.Contracts.StrictIndependence = new List<ArchitectureIndependenceContract>
         {
             new()
             {
-                Name = "container-upper-lower-independent",
-                Layers = new List<string> { "Test.Container.Upper", "Test.Container.Lower" }
+                Name = "feature-domain-app-independent",
+                Layers = new List<string> { "feature_domain", "feature_application" }
             }
         };
         document.Contracts.StrictLayerTemplates = new List<ArchitectureLayerTemplateContract>
         {
             new()
             {
-                Name = "test-template",
-                Containers = new List<string> { "Test.Container" },
+                Name = "feature-stack",
+                Containers = new List<string> { "MyApp.Feature" },
                 Layers = new List<ArchitectureTemplateLayer>
                 {
-                    new() { Name = "Upper" },
-                    new() { Name = "Lower" }
+                    new() { Name = "Domain" },
+                    new() { Name = "Application" }
                 }
             }
         };
@@ -185,8 +187,8 @@ public sealed class PolicyConsistencyCheckTests
 
         var finding = findings.FirstOrDefault(f => f.CheckKind == "independence-conflict");
         Assert.That(finding, Is.Not.Null);
-        Assert.That(finding!.ConflictingContractNames, Contains.Item("container-upper-lower-independent"));
-        Assert.That(finding.Layers, Is.EquivalentTo(new[] { "Test.Container.Lower", "Test.Container.Upper" }));
+        Assert.That(finding!.ConflictingContractNames, Contains.Item("feature-domain-app-independent"));
+        Assert.That(finding.Layers, Is.EquivalentTo(new[] { "feature_domain", "feature_application" }));
     }
 
     [Test]
