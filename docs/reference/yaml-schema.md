@@ -132,9 +132,15 @@ For each discovered project, the linter looks for an existing build output at
 project's directory — it never invokes `dotnet build`. If a project targets
 multiple frameworks and more than one has a build output on disk, set
 `analysis.target_framework` to pick one; otherwise the linter reports the
-ambiguity as a configuration error rather than guessing. Discovered project
-directories are also used as `source_roots` when `source_roots` is not set
-explicitly. Explicit `target_assemblies`, `assembly_search_paths`, and
+ambiguity as a configuration error rather than guessing. If the selected
+build output is older than the project's `.csproj` or any of its `*.cs`
+source files, the linter reports it as a stale configuration error instead
+of silently validating an outdated assembly — rebuild the project to clear
+it. Build-output and staleness checks only run when `analysis.target_assemblies`
+is empty; an explicit `target_assemblies` policy is never affected by
+discovered projects' build state. Discovered project directories are also
+used as `source_roots` when `source_roots` is not set explicitly, independent
+of whether their build output resolves. Explicit `target_assemblies`, `assembly_search_paths`, and
 `source_roots` always take precedence over discovery results.
 
 ```yaml

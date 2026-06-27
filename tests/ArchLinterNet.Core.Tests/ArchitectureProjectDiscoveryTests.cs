@@ -216,6 +216,87 @@ public sealed class ArchitectureProjectDiscoveryTests
     }
 
     [Test]
+    public void ResolveFromDocument_StaleBuildOutput_ProducesDiagnostic()
+    {
+        string projectDir = CreateProject("Stale", "net9.0", buildOutputFrameworks: ["net9.0"]);
+
+        string dllPath = Path.Combine(projectDir, "bin", "Debug", "net9.0", "Stale.dll");
+        File.SetLastWriteTimeUtc(dllPath, new DateTime(2020, 1, 1, 0, 0, 0, DateTimeKind.Utc));
+
+        string sourceFile = Path.Combine(projectDir, "Program.cs");
+        File.WriteAllText(sourceFile, "// changed after the build");
+        File.SetLastWriteTimeUtc(sourceFile, new DateTime(2024, 1, 1, 0, 0, 0, DateTimeKind.Utc));
+
+        var document = new ArchitectureContractDocument
+        {
+            Analysis = new ArchitectureAnalysisConfiguration
+            {
+                Projects = new List<string> { Path.Combine(projectDir, "Stale.csproj") }
+            }
+        };
+
+        ProjectDiscoveryResult result = ArchitectureProjectDiscovery.ResolveFromDocument(document, _repoRoot);
+
+        Assert.That(result.TargetAssemblyNames, Is.Empty);
+        Assert.That(result.Diagnostics.Single().Kind, Is.EqualTo("stale project build output"));
+    }
+
+    [Test]
+    public void ResolveFromDocument_FreshBuildOutput_NoStaleDiagnostic()
+    {
+        // CreateProject writes the .csproj first, then the build output a moment later,
+        // mirroring a real build — so the output is naturally newer than its sources.
+        string projectDir = CreateProject("Fresh", "net9.0", buildOutputFrameworks: ["net9.0"]);
+
+        var document = new ArchitectureContractDocument
+        {
+            Analysis = new ArchitectureAnalysisConfiguration
+            {
+                Projects = new List<string> { Path.Combine(projectDir, "Fresh.csproj") }
+            }
+        };
+
+        ProjectDiscoveryResult result = ArchitectureProjectDiscovery.ResolveFromDocument(document, _repoRoot);
+
+        Assert.That(result.Diagnostics, Is.Empty);
+        Assert.That(result.TargetAssemblyNames, Is.EquivalentTo(new[] { "Fresh" }));
+    }
+
+    [Test]
+    public void ResolveFromDocument_MalformedClassicSln_ProducesUnparsableDiagnostic()
+    {
+        string slnPath = Path.Combine(_repoRoot, "Garbage.sln");
+        File.WriteAllText(slnPath, "this is not a solution file\njust garbage text\n");
+
+        var document = new ArchitectureContractDocument
+        {
+            Analysis = new ArchitectureAnalysisConfiguration { Solution = "Garbage.sln" }
+        };
+
+        ProjectDiscoveryResult result = ArchitectureProjectDiscovery.ResolveFromDocument(document, _repoRoot);
+
+        Assert.That(result.TargetAssemblyNames, Is.Empty);
+        Assert.That(result.Diagnostics.Single().Kind, Is.EqualTo("unparsable solution file"));
+    }
+
+    [Test]
+    public void ResolveFromDocument_ValidSlnWithNoProjectEntries_ProducesNoProjectsDiagnostic()
+    {
+        string slnPath = Path.Combine(_repoRoot, "Empty.sln");
+        File.WriteAllText(slnPath, "Microsoft Visual Studio Solution File, Format Version 12.00\n");
+
+        var document = new ArchitectureContractDocument
+        {
+            Analysis = new ArchitectureAnalysisConfiguration { Solution = "Empty.sln" }
+        };
+
+        ProjectDiscoveryResult result = ArchitectureProjectDiscovery.ResolveFromDocument(document, _repoRoot);
+
+        Assert.That(result.TargetAssemblyNames, Is.Empty);
+        Assert.That(result.Diagnostics.Single().Kind, Is.EqualTo("no C# projects discovered"));
+    }
+
+    [Test]
     public void ResolveFromDocument_ProjectIncludeExclude_FiltersDiscoveredProjects()
     {
         string includedDir = CreateProject("Included", "net9.0", buildOutputFrameworks: ["net9.0"], subdirectory: "src/Included");

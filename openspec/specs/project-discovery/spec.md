@@ -19,8 +19,12 @@ The system SHALL parse a `.sln` (classic) or `.slnx` (XML) file referenced by `a
 - **THEN** discovery does not throw; it produces a Configuration diagnostic naming the missing path
 
 #### Scenario: Solution file unparsable
-- **WHEN** `analysis.solution` points to a file that exists but cannot be parsed as `.sln` or `.slnx`
+- **WHEN** `analysis.solution` points to a file that exists but cannot be parsed as `.sln` or `.slnx` (for classic `.sln`, this includes a file missing the `Microsoft Visual Studio Solution File` header)
 - **THEN** discovery does not throw; it produces a Configuration diagnostic naming the file and the parse failure
+
+#### Scenario: Solution parses but discovers no projects
+- **WHEN** `analysis.solution` points to a file that parses successfully (has a valid `.sln`/`.slnx` structure) but contains no `.csproj` entries, or all entries are filtered out by `project_include`/`project_exclude`
+- **THEN** discovery produces a Configuration diagnostic naming the solution file, distinct from the unparsable-file diagnostic
 
 ### Requirement: Parse project files for assembly metadata
 The system SHALL parse each discovered or explicitly listed `.csproj` file (via XML, without MSBuild SDK evaluation) to determine its `AssemblyName` and target framework(s).
@@ -74,6 +78,21 @@ The system SHALL select exactly one build output per discovered project at `bin/
 #### Scenario: No build output found
 - **WHEN** a project's only target framework has no build output at the expected path
 - **THEN** discovery produces a Configuration diagnostic naming the project and the path checked
+
+### Requirement: Detect stale build outputs
+The system SHALL compare a selected build output's last-write time against the project's `.csproj` file and all `*.cs` files under the project directory (excluding `bin`/`obj`), and SHALL treat an output older than its sources as unresolved rather than silently using it.
+
+#### Scenario: Build output older than a changed source file
+- **WHEN** a project's selected build output's DLL was last written before a `.cs` file under the project directory (outside `bin`/`obj`)
+- **THEN** discovery does not select that output; it produces a Configuration diagnostic naming the project, the output path, and the build/source timestamps, distinct from "missing project build output"
+
+#### Scenario: Build output older than the project file itself
+- **WHEN** a project's selected build output's DLL was last written before the `.csproj` file
+- **THEN** discovery treats the output as stale using the same diagnostic as a stale source file
+
+#### Scenario: Build output newer than all sources
+- **WHEN** a project's selected build output's DLL was last written after the `.csproj` file and every `.cs` file under the project directory
+- **THEN** discovery selects that output normally and produces no staleness diagnostic
 
 ### Requirement: Discovery results feed assembly resolution and source roots
 The system SHALL use discovery-derived assembly names and search paths only when `analysis.target_assemblies` is empty, and discovery-derived source roots only when `analysis.source_roots` is empty.

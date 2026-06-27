@@ -38,14 +38,27 @@ internal static class ArchitectureSolutionParser
     private static IEnumerable<string> ParseClassicSln(string solutionPath)
     {
         List<string> paths = new();
+        bool hasHeader = false;
 
         foreach (string line in File.ReadLines(solutionPath))
         {
+            if (!hasHeader && line.TrimStart()
+                    .StartsWith("Microsoft Visual Studio Solution File", StringComparison.OrdinalIgnoreCase))
+            {
+                hasHeader = true;
+            }
+
             Match match = _classicSlnProjectLine.Match(line);
             if (match.Success)
             {
                 paths.Add(match.Groups[1].Value);
             }
+        }
+
+        if (!hasHeader)
+        {
+            throw new FormatException(
+                "File does not contain the expected 'Microsoft Visual Studio Solution File' header.");
         }
 
         return paths;
