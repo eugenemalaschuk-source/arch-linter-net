@@ -1,6 +1,6 @@
 using System.Diagnostics;
 
-namespace ArchLinterNet.Core.Validation;
+namespace ArchLinterNet.Core.Reporting;
 
 public sealed class ValidationTiming
 {

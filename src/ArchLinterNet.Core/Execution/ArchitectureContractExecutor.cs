@@ -1,6 +1,6 @@
 using ArchLinterNet.Core.Contracts;
 using ArchLinterNet.Core.Model;
-using ArchLinterNet.Core.Validation;
+using ArchLinterNet.Core.Reporting;
 
 namespace ArchLinterNet.Core.Execution;
 

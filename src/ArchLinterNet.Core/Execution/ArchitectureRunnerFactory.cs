@@ -1,7 +1,7 @@
 using ArchLinterNet.Core.Contracts;
 using ArchLinterNet.Core.Model;
+using ArchLinterNet.Core.Reporting;
 using ArchLinterNet.Core.Resolution;
-using ArchLinterNet.Core.Validation;
 
 namespace ArchLinterNet.Core.Execution;
 

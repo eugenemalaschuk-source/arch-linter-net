@@ -4,8 +4,20 @@ name: ArchLinterNet Architecture Contract
 layers:
   core:
     namespace: ArchLinterNet.Core
+  core_model:
+    namespace: ArchLinterNet.Core.Model
+  core_reporting:
+    namespace: ArchLinterNet.Core.Reporting
+  core_resolution:
+    namespace: ArchLinterNet.Core.Resolution
   core_scanning:
     namespace: ArchLinterNet.Core.Scanning
+  core_contracts:
+    namespace: ArchLinterNet.Core.Contracts
+  core_execution:
+    namespace: ArchLinterNet.Core.Execution
+  core_validation:
+    namespace: ArchLinterNet.Core.Validation
   cli:
     namespace: ArchLinterNet.Cli
   testing:
@@ -20,6 +32,7 @@ analysis:
     - ArchLinterNet.Testing
     - ArchLinterNet.Unity
   assembly_search_paths:
+    - src/ArchLinterNet.Cli/bin/Debug/net10.0
     - src/ArchLinterNet.Testing/bin/Debug/net10.0
     - src/ArchLinterNet.Unity/bin/Debug/net10.0
 
@@ -40,6 +53,36 @@ contracts:
       forbidden: [cli, testing]
       reason: Unity package should only depend on Core.
 
+    - name: cli-must-use-validation-application-seam
+      source: cli
+      forbidden: [core_execution, core_contracts, core_resolution, core_scanning]
+      reason: CLI must call the Core.Validation application seam instead of constructing contract runners or loading policies directly.
+
+    - name: core-execution-must-not-depend-on-cli-or-testing
+      source: core_execution
+      forbidden: [cli, testing, unity]
+      reason: Contract execution and handler internals must stay usable from any host and must not couple back to a specific CLI or test adapter.
+
+    - name: core-reporting-stays-a-diagnostics-leaf
+      source: core_reporting
+      forbidden: [cli, testing, unity, core_execution, core_validation, core_resolution, core_scanning, core_contracts]
+      reason: Diagnostics formatting is a leaf consumed by higher layers and must not depend back on business logic.
+
+    - name: core-model-stays-independent
+      source: core_model
+      forbidden: [cli, testing, unity, core_execution, core_validation, core_resolution, core_scanning, core_contracts, core_reporting]
+      reason: Model types are the most fundamental layer and must not depend on anything else.
+
+    - name: core-resolution-must-not-depend-on-execution-or-validation
+      source: core_resolution
+      forbidden: [core_execution, core_validation, cli, testing, unity]
+      reason: Repository and assembly resolution must not depend upward on contract execution or the application seam.
+
+    - name: core-scanning-must-not-depend-on-execution-or-validation
+      source: core_scanning
+      forbidden: [core_execution, core_validation, cli, testing, unity]
+      reason: Scanning internals must not depend upward on contract execution or the application seam.
+
   strict_layers:
     - name: core-layering
       layers:
@@ -48,6 +91,14 @@ contracts:
         - unity
         - core
       reason: Dependencies must point toward Core.
+
+    - name: core-application-seam-layering
+      layers:
+        - cli
+        - core_validation
+        - core_execution
+        - core_model
+      reason: CLI calls the Core.Validation application seam, which orchestrates Core.Execution, which ultimately rests on Core.Model.
 
   strict_cycles:
     - name: package-cycles

@@ -1,5 +1,3 @@
-using ArchLinterNet.Core.Contracts;
-using ArchLinterNet.Core.Execution;
 using ArchLinterNet.Core.Model;
 using ArchLinterNet.Core.Reporting;
 using ArchLinterNet.Core.Validation;
@@ -81,45 +79,29 @@ public static class Program
 
         try
         {
-            ArchitectureContractDocument document = ArchitectureRunnerFactory.LoadDocument(policyPath);
+            BaselineGenerationRequest request = new()
+            {
+                PolicyPath = policyPath,
+                Mode = mode,
+                ConditionSetName = conditionSetName,
+                Reason = reason,
+            };
 
-            ArchitectureRunnerSetup setup = ArchitectureRunnerFactory.BuildRunner(
-                document, policyPath, conditionSetName, enableUnmatchedIgnoreTracking: true);
+            BaselineGenerationOutcome outcome = ArchitectureBaselineService.Generate(request);
 
-            ArchitectureContractRunner runner = setup.Runner;
-
-            List<ArchitectureViolation> configViolations = runner.CheckConfiguration(strict: true);
-            if (configViolations.Count > 0)
+            if (!outcome.Succeeded)
             {
                 Console.Error.WriteLine("Configuration violations detected — baseline cannot be generated:");
-                foreach (ArchitectureViolation v in configViolations)
+                foreach (ArchitectureViolation v in outcome.ConfigurationViolations)
                 {
                     Console.Error.WriteLine($"  {v.SourceType}: {v.ForbiddenNamespace}");
                 }
                 return 2;
             }
 
-            bool includeStrict = mode is "strict" or "all";
-            bool includeAudit = mode is "audit" or "all";
+            File.WriteAllText(outputPath, outcome.Yaml);
 
-            if (includeStrict)
-            {
-                ArchitectureContractExecutor.Execute(runner, document, "strict", includeAsmdefContracts: false);
-            }
-
-            if (includeAudit)
-            {
-                ArchitectureContractExecutor.Execute(runner, document, "audit", includeAsmdefContracts: false);
-            }
-
-            ArchitectureBaselineDocument baseline = ArchitectureBaselineGenerator.Generate(
-                document, runner.BaselineCandidates, reason);
-
-            string yaml = ArchitectureBaselineGenerator.Serialize(baseline);
-            File.WriteAllText(outputPath, yaml);
-
-            int candidateCount = runner.BaselineCandidates.Count;
-            Console.WriteLine($"Generated baseline with {candidateCount} violation entries.");
+            Console.WriteLine($"Generated baseline with {outcome.CandidateCount} violation entries.");
             Console.WriteLine($"Output: {outputPath}");
 
             return 0;
@@ -133,7 +115,7 @@ public static class Program
 
     private static int RunValidateCommand(string[] args)
     {
-        string version = typeof(ArchitectureContractLoader).Assembly.GetName().Version?.ToString(3) ?? "0.0.0";
+        string version = typeof(ArchitectureValidationService).Assembly.GetName().Version?.ToString(3) ?? "0.0.0";
 
         string policyPath = "architecture/dependencies.arch.yml";
         string mode = "strict";
