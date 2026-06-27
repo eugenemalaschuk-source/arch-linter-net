@@ -1,4 +1,5 @@
 using System.Reflection;
+using ArchLinterNet.Core.Discovery;
 
 namespace ArchLinterNet.Core.Execution;
 
@@ -8,7 +9,8 @@ public sealed class ArchitectureAnalysisContext
         string repositoryRoot,
         IReadOnlyCollection<Assembly> targetAssemblies,
         IReadOnlyCollection<string> missingAssemblyNames,
-        IReadOnlyCollection<string> assemblyProbingPaths)
+        IReadOnlyCollection<string> assemblyProbingPaths,
+        IReadOnlyCollection<ArchitectureProjectDiscoveryDiagnostic>? discoveryDiagnostics = null)
     {
         if (string.IsNullOrWhiteSpace(repositoryRoot))
         {
@@ -20,6 +22,7 @@ public sealed class ArchitectureAnalysisContext
                            ?? throw new ArgumentNullException(nameof(targetAssemblies));
         MissingAssemblyNames = missingAssemblyNames ?? Array.Empty<string>();
         AssemblyProbingPaths = assemblyProbingPaths ?? Array.Empty<string>();
+        DiscoveryDiagnostics = discoveryDiagnostics ?? Array.Empty<ArchitectureProjectDiscoveryDiagnostic>();
     }
 
     public string RepositoryRoot { get; }
@@ -29,4 +32,6 @@ public sealed class ArchitectureAnalysisContext
     public IReadOnlyCollection<string> MissingAssemblyNames { get; }
 
     public IReadOnlyCollection<string> AssemblyProbingPaths { get; }
+
+    public IReadOnlyCollection<ArchitectureProjectDiscoveryDiagnostic> DiscoveryDiagnostics { get; }
 }

@@ -1,8 +1,5 @@
-# Assembly Resolution Specification
+## MODIFIED Requirements
 
-## Purpose
-Resolves the assemblies named in a policy's target_assemblies list to loaded .NET Assembly instances via a multi-probe-path strategy.
-## Requirements
 ### Requirement: Resolve target assemblies from YAML document
 The system SHALL resolve all assemblies listed in `analysis.target_assemblies` from the YAML document into `System.Reflection.Assembly` instances. When `analysis.target_assemblies` is empty, the system SHALL instead resolve assemblies from names contributed by project discovery (see `project-discovery` capability), if any were discovered.
 
@@ -49,4 +46,3 @@ The system SHALL throw `InvalidOperationException` when `analysis.target_assembl
 #### Scenario: No target assemblies defined but discovery configured with no resolvable projects
 - **WHEN** `target_assemblies` list is empty, `analysis.solution` is set, but no projects could be discovered or none had a resolvable build output
 - **THEN** the system throws `InvalidOperationException` indicating assemblies must be defined, in addition to any Configuration diagnostics describing why discovery found nothing
-

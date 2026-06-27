@@ -95,10 +95,16 @@ Assembly resolution and linter behavior configuration.
 
 ```yaml
 analysis:
-  target_assemblies:            # Required — list of assembly names to scan
+  target_assemblies:            # Required, unless solution/projects discovery resolves assemblies — list of assembly names to scan
     - <assembly-name>
   assembly_search_paths: []     # Optional — additional probe directories
   source_roots: []              # Optional — source directory roots for Roslyn resolution
+  solution: ''                  # Optional — path to a .sln or .slnx file for project discovery
+  projects: []                  # Optional — explicit list of .csproj paths for project discovery
+  project_include: []           # Optional — glob patterns to narrow solution-discovered projects
+  project_exclude: []           # Optional — glob patterns to remove solution-discovered projects
+  configuration: Debug          # Optional — build configuration used to locate project outputs
+  target_framework: ''          # Optional — disambiguates multi-targeted project output selection
   unmatched_ignored_violations: error  # Optional — error | warn | off (default: error)
   condition_sets: {}            # Optional — named preprocessor symbol sets
   default_condition_set: ''     # Optional — default condition set name
@@ -107,6 +113,29 @@ analysis:
 Condition sets control which preprocessor symbols (`#if`) are active during
 Roslyn source/method-body scanning. Reflection and IL scanners analyze the
 assemblies provided to the run and are not affected by condition sets.
+
+### Solution and project discovery
+
+When `target_assemblies` is empty, the linter can discover assemblies from a
+`.sln`/`.slnx` file or an explicit list of `.csproj` files instead of requiring
+every assembly name to be hand-listed:
+
+```yaml
+analysis:
+  solution: MyApp.slnx
+  project_exclude:
+    - "**/*.Tests/**"
+```
+
+For each discovered project, the linter looks for an existing build output at
+`bin/{configuration}/{target_framework}/{AssemblyName}.dll` relative to the
+project's directory — it never invokes `dotnet build`. If a project targets
+multiple frameworks and more than one has a build output on disk, set
+`analysis.target_framework` to pick one; otherwise the linter reports the
+ambiguity as a configuration error rather than guessing. Discovered project
+directories are also used as `source_roots` when `source_roots` is not set
+explicitly. Explicit `target_assemblies`, `assembly_search_paths`, and
+`source_roots` always take precedence over discovery results.
 
 ```yaml
 analysis:

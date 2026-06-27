@@ -406,6 +406,7 @@ contracts:
             Layers = new List<string>
             {
                 "ArchLinterNet.Core.Contracts",
+                "ArchLinterNet.Core.Discovery",
                 "ArchLinterNet.Core.Execution",
                 "ArchLinterNet.Core.Model",
                 "ArchLinterNet.Core.Reporting",
