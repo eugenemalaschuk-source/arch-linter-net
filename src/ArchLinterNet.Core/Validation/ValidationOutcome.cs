@@ -7,4 +7,6 @@ public sealed record ValidationOutcome(
     IReadOnlyCollection<ArchitectureViolation> Violations,
     IReadOnlyCollection<string> Cycles,
     IReadOnlyList<ArchitectureUnmatchedIgnoredViolation> UnmatchedIgnoredViolations,
-    string UnmatchedIgnoredViolationsConfig);
+    string UnmatchedIgnoredViolationsConfig,
+    IReadOnlyCollection<PolicyConsistencyDiagnostic> PolicyConsistencyFindings,
+    string PolicyConsistencyConfig);

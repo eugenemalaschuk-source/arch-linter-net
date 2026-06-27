@@ -209,7 +209,10 @@ public static class Program
             if (format == "json")
             {
                 Console.WriteLine(ArchitectureDiagnosticFormatter.FormatResultForCiArtifacts(
-                    mode, outcome.Passed, outcome.Violations, outcome.Cycles, outcome.UnmatchedIgnoredViolations));
+                    mode, outcome.Passed, outcome.Violations, outcome.Cycles, outcome.UnmatchedIgnoredViolations,
+                    outcome.PolicyConsistencyConfig == "off"
+                        ? Array.Empty<PolicyConsistencyDiagnostic>()
+                        : outcome.PolicyConsistencyFindings));
             }
             else
             {
@@ -227,6 +230,17 @@ public static class Program
                     if (outcome.Cycles.Count > 0)
                     {
                         Console.WriteLine(ArchitectureDiagnosticFormatter.FormatCyclesForHumans(outcome.Cycles));
+                    }
+                }
+
+                if (outcome.PolicyConsistencyConfig != "off" && outcome.PolicyConsistencyFindings.Count > 0)
+                {
+                    string policyConsistencySection =
+                        ArchitectureDiagnosticFormatter.FormatPolicyConsistencyForHumans(outcome.PolicyConsistencyFindings);
+                    if (!string.IsNullOrEmpty(policyConsistencySection))
+                    {
+                        Console.WriteLine();
+                        Console.WriteLine(policyConsistencySection);
                     }
                 }
 

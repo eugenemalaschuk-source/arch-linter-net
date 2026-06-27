@@ -106,6 +106,7 @@ analysis:
   configuration: Debug          # Optional — build configuration used to locate project outputs
   target_framework: ''          # Optional — disambiguates multi-targeted project output selection
   unmatched_ignored_violations: error  # Optional — error | warn | off (default: error)
+  policy_consistency: error     # Optional — error | warn | off (default: error)
   condition_sets: {}            # Optional — named preprocessor symbol sets
   default_condition_set: ''     # Optional — default condition set name
 ```
@@ -163,6 +164,43 @@ resolved but the baseline was not cleaned up.
 | `error` (default) | Unmatched ignores fail validation (exit code 1) |
 | `warn` | Unmatched ignores are reported but do not affect the exit code |
 | `off` | Unmatched detection is skipped entirely |
+
+### `policy_consistency`
+
+Controls behavior when the policy-consistency check finds internal
+contradictions within the policy document itself — independent of any code
+being scanned. This pass runs after `configuration_check` and before contract
+execution, on the fully expanded contract set (including layer-template
+expansion), and detects:
+
+- Duplicate contract IDs across strict/audit families and expanded layer templates.
+- Allow-only contracts that permit a dependency another contract forbids for
+  the same source/target layer pair.
+- Independence contracts contradicted by an explicit allowed or ordered
+  dependency between the same two layers.
+- Protected-surface `allowed_importers` that conflict with a strict
+  forbidden/protected rule over the same surface and importer.
+- Overlapping internal layer definitions where the same concrete type is
+  matched by more than one layer without a parent/child namespace
+  containment relationship reconciling the overlap (an external layer
+  overlapping an internal one is never flagged).
+- Contracts referencing a layer whose namespace pattern can never match any
+  type (structurally impossible, not just empty today).
+
+| Value | Behavior |
+|-------|----------|
+| `error` (default) | Policy-consistency findings fail validation (exit code 1) |
+| `warn` | Findings are reported but do not affect the exit code |
+| `off` | The check still runs internally but produces no diagnostics and never affects the result |
+
+The check always runs regardless of this setting — `policy_consistency` only
+controls whether findings affect `Passed`/the exit code and whether they are
+emitted as diagnostics. In human output, findings appear in a separate
+`Policy consistency findings:` section. In JSON output, they appear in the
+`policy_consistency_findings` array at the top level, each entry carrying
+`kind`, `check_kind`, `contract`, `contract_id`, `reason`,
+`conflicting_contract_ids`, `conflicting_contract_names`, `layers`, and
+(for layer-overlap findings) `representative_type`.
 
 ## `contracts`
 

@@ -156,4 +156,38 @@ contracts:
         Assert.That(ex.Message, Does.Contain("nonexistent"));
         Assert.That(ex.Message, Does.Contain("runtime"));
     }
+
+    [Test]
+    public void ValidateStrict_IndependenceConflict_Fails()
+    {
+        string contractDir = Path.Combine(_tempDir, "architecture");
+        Directory.CreateDirectory(contractDir);
+        string contractPath = Path.Combine(contractDir, "dependencies.arch.yml");
+
+        File.WriteAllText(contractPath, @"
+version: 1
+name: Independence Conflict Test
+layers:
+  core:
+    namespace: ArchLinterNet.Core
+  contracts:
+    namespace: ArchLinterNet.Core.Contracts
+analysis:
+  target_assemblies:
+    - ArchLinterNet.Core
+  policy_consistency: error
+contracts:
+  strict_independence:
+    - name: core-contracts-independent
+      layers: [core, contracts]
+  strict_allow_only:
+    - name: core-allows-contracts
+      source: core
+      allowed: [contracts]
+");
+
+        var result = ArchitectureAssertions.FromPolicy(contractPath).ValidateStrict();
+
+        Assert.That(result.Passed, Is.False);
+    }
 }

@@ -125,6 +125,12 @@
           "default": "error",
           "description": "Behavior when an ignored_violations entry matches no current violation. 'error' (default) fails validation, 'warn' reports but does not fail, 'off' skips detection."
         },
+        "policy_consistency": {
+          "type": "string",
+          "enum": ["error", "warn", "off"],
+          "default": "error",
+          "description": "Behavior when the policy-consistency check finds internal contradictions in the policy itself (duplicate IDs, allow/forbid conflicts, independence conflicts, protected-importer conflicts, layer overlaps, unreachable contracts). 'error' (default) fails validation, 'warn' reports but does not fail, 'off' suppresses findings. The check itself always runs."
+        },
         "condition_sets": {
           "type": "object",
           "description": "Named preprocessor symbol sets for conditional compilation analysis. Each key is a condition set name (e.g. 'runtime', 'editor'), each value is an array of preprocessor symbols (e.g. ['UNITY_EDITOR']). Only affects Roslyn source/method-body scanning.",

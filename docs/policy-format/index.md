@@ -86,9 +86,12 @@ analysis:
   condition_sets: {}
   default_condition_set: ''
   unmatched_ignored_violations: error
+  policy_consistency: error
 ```
 
 `target_assemblies` tells the runner which assemblies to inspect. `assembly_search_paths` and `source_roots` make standalone CLI and method-body scanning reliable in real repositories.
+
+`policy_consistency` controls a separate pass that checks the policy document itself for internal contradictions (duplicate contract IDs, allow/forbid conflicts, independence conflicts, protected-importer conflicts, layer overlaps, unreachable contracts) — independent of code scanning. See [YAML schema reference](../reference/yaml-schema.md#policy_consistency) for details.
 
 Read [Condition sets](condition-sets.md) for conditional compilation behavior.
 

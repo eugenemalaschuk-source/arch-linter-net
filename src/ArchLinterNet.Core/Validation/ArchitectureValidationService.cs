@@ -18,6 +18,7 @@ public static class ArchitectureValidationService
         {
             ArchitectureContractDocument document;
             string unmatchedConfig;
+            string policyConsistencyConfig;
             ArchitectureRunnerSetup setup;
 
             using (timing?.Measure("load_and_setup"))
@@ -30,6 +31,14 @@ public static class ArchitectureValidationService
                 {
                     throw new InvalidOperationException(
                         $"Invalid analysis.unmatched_ignored_violations: {unmatchedConfig}. Use 'error', 'warn', or 'off'.");
+                }
+
+                policyConsistencyConfig = document.Analysis.PolicyConsistency;
+
+                if (policyConsistencyConfig is not ("error" or "warn" or "off"))
+                {
+                    throw new InvalidOperationException(
+                        $"Invalid analysis.policy_consistency: {policyConsistencyConfig}. Use 'error', 'warn', or 'off'.");
                 }
 
                 HashSet<string>? selectedIds = request.ContractIds is { Count: > 0 }
@@ -68,6 +77,14 @@ public static class ArchitectureValidationService
             using (timing?.Measure("configuration_check"))
                 allViolations.AddRange(runner.CheckConfiguration(strict: request.Mode == "strict"));
 
+            List<PolicyConsistencyDiagnostic> policyConsistencyFindings;
+            using (timing?.Measure("policy_consistency_check"))
+            {
+                policyConsistencyFindings = policyConsistencyConfig == "off"
+                    ? new List<PolicyConsistencyDiagnostic>()
+                    : runner.CheckPolicyConsistency();
+            }
+
             ArchitectureContractExecutor.ExecutionResult execution;
             using (timing?.Measure("contract_checks"))
             {
@@ -91,9 +108,15 @@ public static class ArchitectureValidationService
             bool hasBlockingUnmatched = request.EnforceUnmatchedIgnoredViolationsPolicy
                 && unmatchedConfig == "error" && unmatched.Count > 0;
 
-            bool passed = allViolations.Count == 0 && execution.Cycles.Count == 0 && !hasBlockingUnmatched;
+            bool hasBlockingPolicyConsistency =
+                policyConsistencyConfig == "error" && policyConsistencyFindings.Count > 0;
 
-            return new ValidationOutcome(passed, allViolations, execution.Cycles, unmatched, unmatchedConfig);
+            bool passed = allViolations.Count == 0 && execution.Cycles.Count == 0
+                && !hasBlockingUnmatched && !hasBlockingPolicyConsistency;
+
+            return new ValidationOutcome(
+                passed, allViolations, execution.Cycles, unmatched, unmatchedConfig,
+                policyConsistencyFindings, policyConsistencyConfig);
         }
     }
 
