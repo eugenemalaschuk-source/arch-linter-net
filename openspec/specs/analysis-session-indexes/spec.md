@@ -5,7 +5,7 @@ Provide a per-validation-run analysis session with lazy type, reference, and lay
 
 ## Requirements
 ### Requirement: Session created once per validation run
-The system SHALL construct exactly one `ArchitectureAnalysisSession` per validation run, created alongside `ArchitectureAnalysisContext` in `ArchitectureRunnerFactory.BuildRunner` and reused by every contract check executed within that run.
+The system SHALL construct exactly one `ArchitectureAnalysisSession` per validation run, created during `ArchitectureContractRunner` construction from the per-run `ArchitectureAnalysisContext` (itself built once in `ArchitectureRunnerFactory.BuildRunner`), and reused by every contract check executed within that run.
 
 #### Scenario: Single session for a multi-contract run
 - **WHEN** a validation run executes multiple contracts across the dependency, layer, and cycle families
