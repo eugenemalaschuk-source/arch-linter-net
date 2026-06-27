@@ -16,6 +16,11 @@ internal sealed class ArchitectureTypeIndex
         _allTypes = new Lazy<Type[]>(LoadAllTypes);
     }
 
+    public Type[] AllTypes()
+    {
+        return _allTypes.Value;
+    }
+
     public Type[] FindTypesInLayer(ArchitectureLayer layer)
     {
         return _allTypes.Value
