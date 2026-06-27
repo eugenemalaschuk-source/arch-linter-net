@@ -10,7 +10,8 @@ public sealed class ArchitectureAnalysisContext
         IReadOnlyCollection<Assembly> targetAssemblies,
         IReadOnlyCollection<string> missingAssemblyNames,
         IReadOnlyCollection<string> assemblyProbingPaths,
-        IReadOnlyCollection<ArchitectureProjectDiscoveryDiagnostic>? discoveryDiagnostics = null)
+        IReadOnlyCollection<ArchitectureProjectDiscoveryDiagnostic>? discoveryDiagnostics = null,
+        ProjectDiscoveryResult? projectDiscovery = null)
     {
         if (string.IsNullOrWhiteSpace(repositoryRoot))
         {
@@ -23,6 +24,7 @@ public sealed class ArchitectureAnalysisContext
         MissingAssemblyNames = missingAssemblyNames ?? Array.Empty<string>();
         AssemblyProbingPaths = assemblyProbingPaths ?? Array.Empty<string>();
         DiscoveryDiagnostics = discoveryDiagnostics ?? Array.Empty<ArchitectureProjectDiscoveryDiagnostic>();
+        ProjectDiscovery = projectDiscovery;
     }
 
     public string RepositoryRoot { get; }
@@ -34,4 +36,6 @@ public sealed class ArchitectureAnalysisContext
     public IReadOnlyCollection<string> AssemblyProbingPaths { get; }
 
     public IReadOnlyCollection<ArchitectureProjectDiscoveryDiagnostic> DiscoveryDiagnostics { get; }
+
+    public ProjectDiscoveryResult? ProjectDiscovery { get; }
 }

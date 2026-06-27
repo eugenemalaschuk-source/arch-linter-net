@@ -41,6 +41,8 @@ public sealed partial class ArchitectureContractRunner(
 
     public ArchitectureContractCatalog Catalog => _catalog;
 
+    internal ArchitectureAnalysisSession Session => _session;
+
     private ArchitectureContractExecutionContext CreateExecutionContext(
         IArchitectureContract contract,
         IReadOnlyList<ArchitectureIgnoredViolation> ignoredViolations)
