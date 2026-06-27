@@ -16,7 +16,7 @@ public sealed partial class ArchitectureContractRunner
         }
 
         ArchitectureLayer sourceLayer = ArchitectureLayerResolver.ResolveLayer(_document, contract.Name, contract.Source);
-        Type[] sourceTypes = ArchitectureTypeScanner.FindTypesInLayer(_context.TargetAssemblies, sourceLayer);
+        Type[] sourceTypes = _session.TypeIndex.FindTypesInLayer(sourceLayer);
 
         List<ArchitectureViolation> violations = new();
         bool transitive = contract.DependencyDepth == DependencyDepthMode.Transitive;
@@ -29,12 +29,12 @@ public sealed partial class ArchitectureContractRunner
             if (transitive)
             {
                 violations.AddRange(ArchitectureNamespaceViolationFinder.FindTransitiveNamespaceViolations(sourceTypes,
-                    forbiddenLayer, contract.AllowedTypes, _context.TargetAssemblies, executionContext));
+                    forbiddenLayer, contract.AllowedTypes, _context.TargetAssemblies, executionContext, _session.ReferenceGraph));
             }
             else
             {
                 violations.AddRange(ArchitectureNamespaceViolationFinder.FindNamespaceViolations(sourceTypes, forbiddenLayer,
-                    contract.AllowedTypes, executionContext));
+                    contract.AllowedTypes, executionContext, _session.ReferenceGraph));
             }
         }
 
@@ -46,13 +46,13 @@ public sealed partial class ArchitectureContractRunner
                 {
                     violations.AddRange(ArchitectureNamespaceViolationFinder.FindTransitiveNamespaceViolations(sourceTypes,
                         new ArchitectureLayer { Namespace = forbiddenNamespace },
-                        contract.AllowedTypes, _context.TargetAssemblies, executionContext));
+                        contract.AllowedTypes, _context.TargetAssemblies, executionContext, _session.ReferenceGraph));
                 }
                 else
                 {
                     violations.AddRange(ArchitectureNamespaceViolationFinder.FindNamespaceViolations(sourceTypes,
                         new ArchitectureLayer { Namespace = forbiddenNamespace },
-                        contract.AllowedTypes, executionContext));
+                        contract.AllowedTypes, executionContext, _session.ReferenceGraph));
                 }
             }
         }
@@ -75,7 +75,7 @@ public sealed partial class ArchitectureContractRunner
         foreach (string layerEntry in contract.Layers)
         {
             ArchitectureLayer layer = ResolveLayerEntry(contract, layerEntry);
-            Type[] types = ArchitectureTypeScanner.FindTypesInLayer(_context.TargetAssemblies, layer);
+            Type[] types = _session.TypeIndex.FindTypesInLayer(layer);
 
             if (types.Length == 0)
             {
@@ -112,7 +112,7 @@ public sealed partial class ArchitectureContractRunner
             {
                 var (_, forbiddenLayer, _) = effectiveLayers[forbiddenIndex];
                 foreach (ArchitectureViolation v in ArchitectureNamespaceViolationFinder.FindNamespaceViolations(
-                    sourceTypes, forbiddenLayer, Array.Empty<string>(), executionContext))
+                    sourceTypes, forbiddenLayer, Array.Empty<string>(), executionContext, _session.ReferenceGraph))
                 {
                     violations.Add(v with
                     {
@@ -131,15 +131,14 @@ public sealed partial class ArchitectureContractRunner
                 effectiveLayers.Select(l => l.layer.Namespace),
                 StringComparer.Ordinal);
 
-            foreach (string childNs in FindChildNamespaces(contract.ContainerNamespace).OrderBy(ns => ns, StringComparer.Ordinal))
+            foreach (string childNs in _session.TypeIndex.FindDirectChildNamespaces(contract.ContainerNamespace).OrderBy(ns => ns, StringComparer.Ordinal))
             {
                 if (expectedNamespaces.Contains(childNs))
                 {
                     continue;
                 }
 
-                Type[] childTypes = ArchitectureTypeScanner.FindTypesInNamespace(
-                    _context.TargetAssemblies, childNs);
+                Type[] childTypes = _session.TypeIndex.FindTypesInNamespace(childNs);
 
                 if (childTypes.Length > 0)
                 {
@@ -170,31 +169,6 @@ public sealed partial class ArchitectureContractRunner
         }
 
         return ArchitectureLayerResolver.ResolveLayer(_document, contract.Name, layerEntry);
-    }
-
-    private HashSet<string> FindChildNamespaces(string containerNamespace)
-    {
-        string prefix = containerNamespace + ".";
-        HashSet<string> children = new(StringComparer.Ordinal);
-
-        foreach (Assembly assembly in _context.TargetAssemblies.Distinct())
-        {
-            foreach (Type type in ArchitectureTypeScanner.GetLoadableTypes(assembly))
-            {
-                string ns = ArchitectureTypeNames.SafeNamespace(type);
-                if (!ns.StartsWith(prefix, StringComparison.Ordinal))
-                {
-                    continue;
-                }
-
-                string remainder = ns[prefix.Length..];
-                int dotIndex = remainder.IndexOf('.');
-                string child = dotIndex < 0 ? remainder : remainder[..dotIndex];
-                children.Add($"{prefix}{child}");
-            }
-        }
-
-        return children;
     }
 
     public List<ArchitectureViolation> CheckAllowOnlyContract(ArchitectureAllowOnlyContract contract)
@@ -263,14 +237,13 @@ public sealed partial class ArchitectureContractRunner
         {
             ArchitectureLayer sourceLayer =
                 ArchitectureLayerResolver.ResolveLayer(_document, contract.Name, sourceLayerName);
-            Type[] sourceTypes =
-                ArchitectureTypeScanner.FindTypesInLayer(_context.TargetAssemblies, sourceLayer);
+            Type[] sourceTypes = _session.TypeIndex.FindTypesInLayer(sourceLayer);
 
             foreach (Type sourceType in sourceTypes)
             {
                 string sourceTypeName = ArchitectureTypeNames.SafeFullName(sourceType);
 
-                foreach (Type referencedType in ArchitectureReferenceScanner.GetReferencedTypes(sourceType))
+                foreach (Type referencedType in _session.ReferenceGraph.GetReferencedTypes(sourceType))
                 {
                     string referencedTypeName = ArchitectureTypeNames.SafeFullName(referencedType);
                     string referencedNamespace = ArchitectureTypeNames.SafeNamespace(referencedType);
