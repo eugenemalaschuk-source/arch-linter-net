@@ -4,7 +4,10 @@ namespace ArchLinterNet.Core.Discovery;
 
 public static class ArchitectureProjectDiscovery
 {
-    public static ProjectDiscoveryResult ResolveFromDocument(ArchitectureContractDocument document, string repositoryRoot)
+    public static ProjectDiscoveryResult ResolveFromDocument(
+        ArchitectureContractDocument document,
+        string repositoryRoot,
+        bool resolveAssemblyOutputs = true)
     {
         ArchitectureAnalysisConfiguration analysis = document.Analysis;
         bool hasSolution = !string.IsNullOrWhiteSpace(analysis.Solution);
@@ -74,6 +77,15 @@ public static class ArchitectureProjectDiscovery
                 continue;
             }
 
+            // A project is a valid source root as soon as it parses, regardless of whether its
+            // build output can be (or needs to be) resolved for assembly seeding.
+            sourceRoots.Add(GetRelativeDirectory(repositoryRoot, projectPath));
+
+            if (!resolveAssemblyOutputs)
+            {
+                continue;
+            }
+
             if (projectFile.TargetFrameworks.Count == 0)
             {
                 diagnostics.Add(new ArchitectureProjectDiscoveryDiagnostic(
@@ -90,7 +102,6 @@ public static class ArchitectureProjectDiscovery
 
             targetAssemblyNames.Add(projectFile.AssemblyName);
             assemblySearchPaths.Add(outputDirectory);
-            sourceRoots.Add(GetRelativeDirectory(repositoryRoot, projectPath));
         }
 
         return new ProjectDiscoveryResult(

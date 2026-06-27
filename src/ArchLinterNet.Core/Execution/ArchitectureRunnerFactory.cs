@@ -57,10 +57,12 @@ public static class ArchitectureRunnerFactory
         ArchitectureContractRunner runner;
         using (timing?.Measure("assembly_resolution", indent: 1))
         {
-            ProjectDiscoveryResult discovery = ArchitectureProjectDiscovery.ResolveFromDocument(document, repositoryRoot);
+            bool resolveAssemblyOutputs = document.Analysis.TargetAssemblies.Count == 0;
+            ProjectDiscoveryResult discovery = ArchitectureProjectDiscovery.ResolveFromDocument(
+                document, repositoryRoot, resolveAssemblyOutputs);
             ApplyDiscoveryResult(document.Analysis, discovery);
 
-            if (document.Analysis.TargetAssemblies.Count == 0 && discovery.Diagnostics.Count > 0)
+            if (resolveAssemblyOutputs && document.Analysis.TargetAssemblies.Count == 0 && discovery.Diagnostics.Count > 0)
             {
                 string details = string.Join("; ", discovery.Diagnostics.Select(d => d.Message));
                 throw new InvalidOperationException(

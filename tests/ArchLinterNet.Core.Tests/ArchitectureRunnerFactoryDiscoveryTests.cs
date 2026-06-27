@@ -77,6 +77,37 @@ public sealed class ArchitectureRunnerFactoryDiscoveryTests
     }
 
     [Test]
+    public void BuildRunner_ExplicitTargetAssemblies_ProjectWithNoBuildOutput_DoesNotProduceDiagnosticButStillSeedsSourceRoot()
+    {
+        string projectDir = Path.Combine(_repoRoot, "NoOutput");
+        Directory.CreateDirectory(projectDir);
+        File.WriteAllText(Path.Combine(projectDir, "NoOutput.csproj"), """
+            <Project Sdk="Microsoft.NET.Sdk">
+              <PropertyGroup>
+                <TargetFramework>net9.0</TargetFramework>
+              </PropertyGroup>
+            </Project>
+            """);
+
+        var document = new ArchitectureContractDocument
+        {
+            Version = 1,
+            Name = "Test",
+            Analysis = new ArchitectureAnalysisConfiguration
+            {
+                TargetAssemblies = new List<string> { "ArchLinterNet.Core" },
+                Projects = new List<string> { Path.Combine(projectDir, "NoOutput.csproj") }
+            }
+        };
+
+        ArchitectureRunnerSetup setup = ArchitectureRunnerFactory.BuildRunner(document, _policyPath);
+
+        Assert.That(document.Analysis.TargetAssemblies, Is.EquivalentTo(new[] { "ArchLinterNet.Core" }));
+        Assert.That(setup.Runner.CheckConfiguration().Any(v => v.ForbiddenNamespace == "missing project build output"), Is.False);
+        Assert.That(document.Analysis.SourceRoots, Is.EquivalentTo(new[] { "NoOutput" }));
+    }
+
+    [Test]
     public void BuildRunner_NoTargetAssembliesAndDiscoveryYieldsNothing_ThrowsWithDiagnosticDetails()
     {
         string projectDir = Path.Combine(_repoRoot, "NoOutput");
