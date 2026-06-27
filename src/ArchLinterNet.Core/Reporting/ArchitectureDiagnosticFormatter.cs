@@ -113,7 +113,17 @@ public static class ArchitectureDiagnosticFormatter
             .OrderBy(item => item.Item, StringComparer.Ordinal)
             .Select(item => $"    uncovered: {item.Item} ({item.Evidence})");
 
-        return string.Join(Environment.NewLine, new[] { header }.Concat(excludedLines).Concat(uncoveredLines));
+        var staleLines = summary.StaleItems
+            .OrderBy(item => item.Item, StringComparer.Ordinal)
+            .Select(item => $"    stale: {item.Item} ({item.Evidence})");
+
+        var unknownLines = summary.UnknownItems
+            .OrderBy(item => item.Item, StringComparer.Ordinal)
+            .Select(item => $"    unknown: {item.Item} ({item.Evidence})");
+
+        return string.Join(
+            Environment.NewLine,
+            new[] { header }.Concat(excludedLines).Concat(uncoveredLines).Concat(staleLines).Concat(unknownLines));
     }
 
     public static string FormatResultForCiArtifacts(
@@ -306,11 +316,19 @@ public static class ArchitectureDiagnosticFormatter
                 .OrderBy(item => item.Item, StringComparer.Ordinal)
                 .Select(item => new Dictionary<string, object?> { ["item"] = item.Item, ["reason"] = item.Reason })
                 .ToArray(),
-            ["uncovered_items"] = summary.UncoveredItems
-                .OrderBy(item => item.Item, StringComparer.Ordinal)
-                .Select(item => new Dictionary<string, object?> { ["item"] = item.Item, ["evidence"] = item.Evidence })
-                .ToArray()
+            ["uncovered_items"] = ToEvidenceItemsJson(summary.UncoveredItems),
+            ["stale_items"] = ToEvidenceItemsJson(summary.StaleItems),
+            ["unknown_items"] = ToEvidenceItemsJson(summary.UnknownItems)
         };
+    }
+
+    private static Dictionary<string, object?>[] ToEvidenceItemsJson(
+        IReadOnlyCollection<ArchitectureCoverageSummaryEvidenceItem> items)
+    {
+        return items
+            .OrderBy(item => item.Item, StringComparer.Ordinal)
+            .Select(item => new Dictionary<string, object?> { ["item"] = item.Item, ["evidence"] = item.Evidence })
+            .ToArray();
     }
 
     private static Dictionary<string, object?> ToCiJsonObject(ArchitectureDiagnostic diagnostic, bool includeContract)

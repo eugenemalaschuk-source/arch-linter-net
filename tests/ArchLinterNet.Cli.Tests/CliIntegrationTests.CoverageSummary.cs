@@ -8,6 +8,23 @@ public partial class CliIntegrationTests
     private string CoveragePolicy => Path.Combine(
         _repoRoot, "tests", "ArchLinterNet.Cli.Tests", "TestPolicies", "coverage-policy.yml");
 
+    private string RuleInputCoveragePolicy => Path.Combine(
+        _repoRoot, "tests", "ArchLinterNet.Cli.Tests", "TestPolicies", "rule-input-coverage-policy.yml");
+
+    private static JsonElement FindSummaryEntry(JsonElement summaries, string contractId)
+    {
+        foreach (JsonElement entry in summaries.EnumerateArray())
+        {
+            if (entry.GetProperty("contract_id").GetString() == contractId)
+            {
+                return entry;
+            }
+        }
+
+        Assert.Fail($"No coverage_summary entry found for contract_id '{contractId}'.");
+        throw new InvalidOperationException("Unreachable.");
+    }
+
     [Test]
     public void CoverageSummary_JsonOutput_IncludesSummarySiblingToCoverageFindings()
     {
@@ -22,11 +39,10 @@ public partial class CliIntegrationTests
         Assert.That(root.TryGetProperty("coverage_summary", out JsonElement summaries), Is.True);
         Assert.That(summaries.GetArrayLength(), Is.EqualTo(1));
 
-        JsonElement entry = summaries[0];
+        JsonElement entry = FindSummaryEntry(summaries, "validation-namespace-coverage");
         Assert.Multiple(() =>
         {
             Assert.That(entry.GetProperty("contract").GetString(), Is.EqualTo("validation-namespace-coverage"));
-            Assert.That(entry.GetProperty("contract_id").GetString(), Is.EqualTo("validation-namespace-coverage"));
             Assert.That(entry.GetProperty("scope").GetString(), Is.EqualTo("namespace"));
 
             JsonElement counts = entry.GetProperty("counts");
@@ -40,7 +56,57 @@ public partial class CliIntegrationTests
             Assert.That(uncoveredItems.GetArrayLength(), Is.EqualTo(1));
             Assert.That(uncoveredItems[0].GetProperty("item").GetString(), Is.EqualTo("ArchLinterNet.Core.Validation"));
             Assert.That(entry.GetProperty("excluded_items").GetArrayLength(), Is.EqualTo(0));
+            Assert.That(entry.GetProperty("stale_items").GetArrayLength(), Is.EqualTo(0));
+            Assert.That(entry.GetProperty("unknown_items").GetArrayLength(), Is.EqualTo(0));
         });
+    }
+
+    [Test]
+    public void CoverageSummary_JsonOutput_BucketsRuleInputStaleAndUnknownSeparately()
+    {
+        // ghost-rule's forbidden layer ("ghost") matches no code -> stale.
+        // typo-rule's source layer ("does_not_exist_layer") isn't declared at all -> unknown.
+        // Both must be locatable by which bucket they're in, not lumped into a single
+        // ambiguous "uncovered" list.
+        var (exitCode, stdout, _) = RunCli("--policy", RuleInputCoveragePolicy, "--format", "json");
+
+        Assert.That(exitCode, Is.EqualTo(0));
+
+        using var doc = JsonDocument.Parse(stdout);
+        JsonElement entry = FindSummaryEntry(doc.RootElement.GetProperty("coverage_summary"), "rule-input-coverage");
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(entry.GetProperty("scope").GetString(), Is.EqualTo("rule_input"));
+
+            JsonElement counts = entry.GetProperty("counts");
+            Assert.That(counts.GetProperty("stale").GetInt32(), Is.EqualTo(1));
+            Assert.That(counts.GetProperty("unknown").GetInt32(), Is.EqualTo(1));
+
+            Assert.That(entry.GetProperty("uncovered_items").GetArrayLength(), Is.EqualTo(0));
+
+            JsonElement staleItems = entry.GetProperty("stale_items");
+            Assert.That(staleItems.GetArrayLength(), Is.EqualTo(1));
+            Assert.That(staleItems[0].GetProperty("item").GetString(), Is.EqualTo("ghost-rule"));
+            Assert.That(staleItems[0].GetProperty("evidence").GetString(), Is.EqualTo("ghost"));
+
+            JsonElement unknownItems = entry.GetProperty("unknown_items");
+            Assert.That(unknownItems.GetArrayLength(), Is.EqualTo(1));
+            Assert.That(unknownItems[0].GetProperty("item").GetString(), Is.EqualTo("typo-rule"));
+            Assert.That(unknownItems[0].GetProperty("evidence").GetString(), Is.EqualTo("does_not_exist_layer"));
+        });
+    }
+
+    [Test]
+    public void CoverageSummary_HumanOutput_LabelsRuleInputStaleAndUnknownDistinctly()
+    {
+        var (exitCode, stdout, _) = RunCli("--policy", RuleInputCoveragePolicy, "--format", "human");
+
+        Assert.That(exitCode, Is.EqualTo(0));
+        Assert.That(stdout, Does.Contain("stale: ghost-rule (ghost)"));
+        Assert.That(stdout, Does.Contain("unknown: typo-rule (does_not_exist_layer)"));
+        Assert.That(stdout, Does.Not.Contain("uncovered: ghost-rule"));
+        Assert.That(stdout, Does.Not.Contain("uncovered: typo-rule"));
     }
 
     [Test]

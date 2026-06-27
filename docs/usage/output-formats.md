@@ -102,11 +102,15 @@ Example shape:
       ],
       "uncovered_items": [
         { "item": "MyApp.Features.Payments", "evidence": "MyApp.Features.Payments.PaymentsRepresentative" }
-      ]
+      ],
+      "stale_items": [],
+      "unknown_items": []
     }
   ]
 }
 ```
+
+Every `coverage_summary` entry always includes `uncovered_items`, `stale_items`, and `unknown_items`; only the array(s) matching the contract's `scope` are ever non-empty (`uncovered_items` for `scope: namespace`; `stale_items`/`unknown_items` for `scope: rule_input`) — they are kept distinct so a `stale` finding can't be mistaken for an `unknown` one or vice versa.
 
 `coverage_summary` is always present as an array (empty when no coverage contracts ran) and is reported independent of `analysis.coverage` severity, since it summarizes state rather than gating the run. See [Coverage contracts — Coverage summary](../contracts/coverage.md#coverage-summary) for the count semantics, including how `scope: rule_input` maps to `stale`/`unknown`.
 

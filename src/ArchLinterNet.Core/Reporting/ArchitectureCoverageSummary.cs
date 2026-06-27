@@ -9,7 +9,7 @@ public sealed record ArchitectureCoverageSummaryCounts(
 
 public sealed record ArchitectureCoverageSummaryExcludedItem(string Item, string Reason);
 
-public sealed record ArchitectureCoverageSummaryUncoveredItem(string Item, string Evidence);
+public sealed record ArchitectureCoverageSummaryEvidenceItem(string Item, string Evidence);
 
 public sealed record ArchitectureCoverageSummary(
     string ContractName,
@@ -17,4 +17,6 @@ public sealed record ArchitectureCoverageSummary(
     string Scope,
     ArchitectureCoverageSummaryCounts Counts,
     IReadOnlyCollection<ArchitectureCoverageSummaryExcludedItem> ExcludedItems,
-    IReadOnlyCollection<ArchitectureCoverageSummaryUncoveredItem> UncoveredItems);
+    IReadOnlyCollection<ArchitectureCoverageSummaryEvidenceItem> UncoveredItems,
+    IReadOnlyCollection<ArchitectureCoverageSummaryEvidenceItem> StaleItems,
+    IReadOnlyCollection<ArchitectureCoverageSummaryEvidenceItem> UnknownItems);

@@ -28,7 +28,7 @@ public sealed partial class ArchitectureContractRunner
 
         int covered = 0;
         List<ArchitectureCoverageSummaryExcludedItem> excludedItems = new();
-        List<ArchitectureCoverageSummaryUncoveredItem> uncoveredItems = new();
+        List<ArchitectureCoverageSummaryEvidenceItem> uncoveredItems = new();
 
         foreach (ArchitectureCoverageNamespaceEntry entry in inventory.Namespaces
                      .Where(entry => contract.Roots.Any(root => MatchesNamespaceRoot(root, entry.Namespace)))
@@ -49,7 +49,7 @@ public sealed partial class ArchitectureContractRunner
                 continue;
             }
 
-            uncoveredItems.Add(new ArchitectureCoverageSummaryUncoveredItem(entry.Namespace, entry.RepresentativeType));
+            uncoveredItems.Add(new ArchitectureCoverageSummaryEvidenceItem(entry.Namespace, entry.RepresentativeType));
         }
 
         return new ArchitectureCoverageSummary(
@@ -58,7 +58,9 @@ public sealed partial class ArchitectureContractRunner
             contract.Scope,
             new ArchitectureCoverageSummaryCounts(covered, excludedItems.Count, uncoveredItems.Count, 0, 0),
             excludedItems,
-            uncoveredItems);
+            uncoveredItems,
+            Array.Empty<ArchitectureCoverageSummaryEvidenceItem>(),
+            Array.Empty<ArchitectureCoverageSummaryEvidenceItem>());
     }
 
     private ArchitectureCoverageSummary BuildRuleInputCoverageSummary(ArchitectureCoverageContract contract)
@@ -71,10 +73,9 @@ public sealed partial class ArchitectureContractRunner
             .ToDictionary(group => group.Key, group => group.First(), StringComparer.OrdinalIgnoreCase);
 
         int covered = 0;
-        int stale = 0;
-        int unknown = 0;
         List<ArchitectureCoverageSummaryExcludedItem> excludedItems = new();
-        List<ArchitectureCoverageSummaryUncoveredItem> uncoveredItems = new();
+        List<ArchitectureCoverageSummaryEvidenceItem> staleItems = new();
+        List<ArchitectureCoverageSummaryEvidenceItem> unknownItems = new();
 
         foreach (string referencedContractId in contract.ContractIds.OrderBy(id => id, StringComparer.Ordinal))
         {
@@ -103,8 +104,7 @@ public sealed partial class ArchitectureContractRunner
             {
                 if (!_document.Layers.TryGetValue(layerName, out ArchitectureLayer? layer))
                 {
-                    unknown++;
-                    uncoveredItems.Add(new ArchitectureCoverageSummaryUncoveredItem(referencedContractId, layerName));
+                    unknownItems.Add(new ArchitectureCoverageSummaryEvidenceItem(referencedContractId, layerName));
                     continue;
                 }
 
@@ -113,8 +113,7 @@ public sealed partial class ArchitectureContractRunner
 
                 if (!matchesAnyCode)
                 {
-                    stale++;
-                    uncoveredItems.Add(new ArchitectureCoverageSummaryUncoveredItem(referencedContractId, layerName));
+                    staleItems.Add(new ArchitectureCoverageSummaryEvidenceItem(referencedContractId, layerName));
                     continue;
                 }
 
@@ -126,9 +125,11 @@ public sealed partial class ArchitectureContractRunner
             contract.Name,
             contract.Id,
             contract.Scope,
-            new ArchitectureCoverageSummaryCounts(covered, excludedItems.Count, 0, stale, unknown),
+            new ArchitectureCoverageSummaryCounts(covered, excludedItems.Count, 0, staleItems.Count, unknownItems.Count),
             excludedItems,
-            uncoveredItems);
+            Array.Empty<ArchitectureCoverageSummaryEvidenceItem>(),
+            staleItems,
+            unknownItems);
     }
 
     public List<ArchitectureViolation> CheckCoverageContract(ArchitectureCoverageContract contract)

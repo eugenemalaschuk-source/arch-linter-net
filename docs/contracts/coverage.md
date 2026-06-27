@@ -93,17 +93,20 @@ Alongside the raw findings, `validate` reports a deterministic coverage summary 
 | `stale` | always `0` — this scope reports `uncovered` instead | referenced layer exists but currently matches zero namespaces (`"empty-input"` finding) |
 | `unknown` | always `0` | referenced field names a layer that isn't declared at all (`"unresolved"` finding) |
 
-Each excluded item is reported with its `reason` text from the contract's `exclude` entry. Each uncovered/stale/unknown item is reported with evidence: a representative type for namespace coverage, or the dangling/empty layer name for rule-input coverage.
+Each excluded item is reported with its `reason` text from the contract's `exclude` entry. Each uncovered/stale/unknown item is reported with evidence — a representative type for namespace coverage, or the dangling/empty layer name for rule-input coverage — and is kept in a bucket-specific list (`uncovered_items` for namespace coverage, `stale_items`/`unknown_items` for rule-input coverage) rather than a single combined list, since `stale` and `unknown` mean different things and must stay distinguishable by a reviewer or downstream tooling.
 
-In human output, the summary appears in a `Coverage summary:` section, one line per contract, after `Coverage findings:`:
+In human output, the summary appears in a `Coverage summary:` section, one line per contract, after `Coverage findings:`, with each evidence sub-line explicitly labeled `uncovered:`, `stale:`, or `unknown:`:
 
 ```
 Coverage summary:
 - [validation-namespace-coverage] [validation-namespace-coverage] scope: namespace covered=0 excluded=0 uncovered=1 stale=0 unknown=0
     uncovered: ArchLinterNet.Core.Validation (ArchLinterNet.Core.Validation.ArchitectureBaselineService)
+- [rule-input-coverage] [rule-input-coverage] scope: rule_input covered=2 excluded=0 uncovered=0 stale=1 unknown=1
+    stale: ghost-rule (ghost)
+    unknown: typo-rule (does_not_exist_layer)
 ```
 
-In JSON output, the summary appears as a top-level `coverage_summary` array, additive to (not nested inside) `coverage_findings`:
+In JSON output, the summary appears as a top-level `coverage_summary` array, additive to (not nested inside) `coverage_findings`. Every entry always includes all three evidence arrays (`uncovered_items`, `stale_items`, `unknown_items`); only the ones relevant to the contract's scope are ever non-empty — namespace coverage only populates `uncovered_items`, rule-input coverage only populates `stale_items`/`unknown_items`:
 
 ```json
 {
@@ -116,7 +119,19 @@ In JSON output, the summary appears as a top-level `coverage_summary` array, add
       "excluded_items": [],
       "uncovered_items": [
         { "item": "ArchLinterNet.Core.Validation", "evidence": "ArchLinterNet.Core.Validation.ArchitectureBaselineService" }
-      ]
+      ],
+      "stale_items": [],
+      "unknown_items": []
+    },
+    {
+      "contract": "rule-input-coverage",
+      "contract_id": "rule-input-coverage",
+      "scope": "rule_input",
+      "counts": { "covered": 2, "excluded": 0, "uncovered": 0, "stale": 1, "unknown": 1 },
+      "excluded_items": [],
+      "uncovered_items": [],
+      "stale_items": [{ "item": "ghost-rule", "evidence": "ghost" }],
+      "unknown_items": [{ "item": "typo-rule", "evidence": "does_not_exist_layer" }]
     }
   ]
 }

@@ -226,9 +226,13 @@ public sealed class ArchitectureCoverageSummaryTests
         Assert.That(summary.Counts, Is.EqualTo(new ArchitectureCoverageSummaryCounts(
             Covered: 4, Excluded: 0, Uncovered: 0, Stale: 1, Unknown: 1)));
 
-        Assert.That(summary.UncoveredItems.Select(i => (i.Item, i.Evidence)), Is.EquivalentTo(new[]
+        Assert.That(summary.UncoveredItems, Is.Empty);
+        Assert.That(summary.StaleItems.Select(i => (i.Item, i.Evidence)), Is.EquivalentTo(new[]
         {
-            ("video-to-ghost-rule", "ghost"),
+            ("video-to-ghost-rule", "ghost")
+        }));
+        Assert.That(summary.UnknownItems.Select(i => (i.Item, i.Evidence)), Is.EquivalentTo(new[]
+        {
             ("typo-rule", "does_not_exist_layer")
         }));
     }
