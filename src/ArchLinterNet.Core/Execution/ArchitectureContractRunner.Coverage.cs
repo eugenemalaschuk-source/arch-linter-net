@@ -1,11 +1,142 @@
 using ArchLinterNet.Core.Contracts;
 using ArchLinterNet.Core.Model;
+using ArchLinterNet.Core.Reporting;
 using ArchLinterNet.Core.Resolution;
 
 namespace ArchLinterNet.Core.Execution;
 
 public sealed partial class ArchitectureContractRunner
 {
+    public ArchitectureCoverageSummary BuildCoverageSummary(ArchitectureCoverageContract contract)
+    {
+        if (!IsContractSelected(contract.Id))
+        {
+            return new ArchitectureCoverageSummary(
+                contract.Name,
+                contract.Id,
+                contract.Scope,
+                new ArchitectureCoverageSummaryCounts(0, 0, 0, 0, 0),
+                Array.Empty<ArchitectureCoverageSummaryExcludedItem>(),
+                Array.Empty<ArchitectureCoverageSummaryUncoveredItem>());
+        }
+
+        if (string.Equals(contract.Scope, "rule_input", StringComparison.Ordinal))
+        {
+            return BuildRuleInputCoverageSummary(contract);
+        }
+
+        return BuildNamespaceCoverageSummary(contract);
+    }
+
+    private ArchitectureCoverageSummary BuildNamespaceCoverageSummary(ArchitectureCoverageContract contract)
+    {
+        ArchitectureCoverageInventory inventory = _session.BuildCoverageInventory(_document);
+
+        int covered = 0;
+        List<ArchitectureCoverageSummaryExcludedItem> excludedItems = new();
+        List<ArchitectureCoverageSummaryUncoveredItem> uncoveredItems = new();
+
+        foreach (ArchitectureCoverageNamespaceEntry entry in inventory.Namespaces
+                     .Where(entry => contract.Roots.Any(root => MatchesNamespaceRoot(root, entry.Namespace)))
+                     .OrderBy(entry => entry.Namespace, StringComparer.Ordinal))
+        {
+            ArchitectureCoverageExclusion? matchedExclusion = contract.Exclude
+                .FirstOrDefault(exclusion => MatchesNamespaceExclusion(exclusion, entry.Namespace));
+
+            if (matchedExclusion != null)
+            {
+                excludedItems.Add(new ArchitectureCoverageSummaryExcludedItem(entry.Namespace, matchedExclusion.Reason));
+                continue;
+            }
+
+            if (IsCoveredByDeclaredLayers(inventory, entry.Namespace) || IsCoveredByExpandedTemplates(inventory, entry.Namespace))
+            {
+                covered++;
+                continue;
+            }
+
+            uncoveredItems.Add(new ArchitectureCoverageSummaryUncoveredItem(entry.Namespace, entry.RepresentativeType));
+        }
+
+        return new ArchitectureCoverageSummary(
+            contract.Name,
+            contract.Id,
+            contract.Scope,
+            new ArchitectureCoverageSummaryCounts(covered, excludedItems.Count, uncoveredItems.Count, 0, 0),
+            excludedItems,
+            uncoveredItems);
+    }
+
+    private ArchitectureCoverageSummary BuildRuleInputCoverageSummary(ArchitectureCoverageContract contract)
+    {
+        ArchitectureCoverageInventory inventory = _session.BuildCoverageInventory(_document);
+
+        Dictionary<string, ArchitectureContractDescriptor> descriptorsById = BuildAllDescriptors()
+            .Where(descriptor => !string.IsNullOrEmpty(descriptor.Id))
+            .GroupBy(descriptor => descriptor.Id!, StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(group => group.Key, group => group.First(), StringComparer.OrdinalIgnoreCase);
+
+        int covered = 0;
+        int stale = 0;
+        int unknown = 0;
+        List<ArchitectureCoverageSummaryExcludedItem> excludedItems = new();
+        List<ArchitectureCoverageSummaryUncoveredItem> uncoveredItems = new();
+
+        foreach (string referencedContractId in contract.ContractIds.OrderBy(id => id, StringComparer.Ordinal))
+        {
+            ArchitectureCoverageExclusion? matchedExclusion = contract.Exclude
+                .FirstOrDefault(exclusion =>
+                    !string.IsNullOrWhiteSpace(exclusion.ContractId)
+                    && string.Equals(exclusion.ContractId, referencedContractId, StringComparison.OrdinalIgnoreCase));
+
+            if (matchedExclusion != null)
+            {
+                excludedItems.Add(new ArchitectureCoverageSummaryExcludedItem(referencedContractId, matchedExclusion.Reason));
+                continue;
+            }
+
+            if (!descriptorsById.TryGetValue(referencedContractId, out ArchitectureContractDescriptor? descriptor))
+            {
+                continue;
+            }
+
+            IReadOnlyList<string> referencedLayerNames = GetReferencedLayerNames(descriptor.Contract)
+                .Distinct(StringComparer.Ordinal)
+                .OrderBy(name => name, StringComparer.Ordinal)
+                .ToList();
+
+            foreach (string layerName in referencedLayerNames)
+            {
+                if (!_document.Layers.TryGetValue(layerName, out ArchitectureLayer? layer))
+                {
+                    unknown++;
+                    uncoveredItems.Add(new ArchitectureCoverageSummaryUncoveredItem(referencedContractId, layerName));
+                    continue;
+                }
+
+                bool matchesAnyCode = inventory.Namespaces.Any(entry =>
+                    ArchitectureLayerResolver.MatchesNamespace(layer, entry.Namespace));
+
+                if (!matchesAnyCode)
+                {
+                    stale++;
+                    uncoveredItems.Add(new ArchitectureCoverageSummaryUncoveredItem(referencedContractId, layerName));
+                    continue;
+                }
+
+                covered++;
+            }
+        }
+
+        return new ArchitectureCoverageSummary(
+            contract.Name,
+            contract.Id,
+            contract.Scope,
+            new ArchitectureCoverageSummaryCounts(covered, excludedItems.Count, 0, stale, unknown),
+            excludedItems,
+            uncoveredItems);
+    }
+
     public List<ArchitectureViolation> CheckCoverageContract(ArchitectureCoverageContract contract)
     {
         if (!IsContractSelected(contract.Id))

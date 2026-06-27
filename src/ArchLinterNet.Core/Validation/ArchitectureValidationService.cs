@@ -135,7 +135,7 @@ public static class ArchitectureValidationService
 
             return new ValidationOutcome(
                 passed, allViolations, execution.Cycles, coverageFindings, coverageConfig, unmatched, unmatchedConfig,
-                policyConsistencyFindings, policyConsistencyConfig);
+                policyConsistencyFindings, policyConsistencyConfig, execution.CoverageSummaries);
         }
     }
 

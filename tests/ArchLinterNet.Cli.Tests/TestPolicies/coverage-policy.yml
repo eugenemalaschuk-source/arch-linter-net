@@ -1,0 +1,27 @@
+version: 1
+name: Test Coverage Policy
+
+layers:
+  core:
+    namespace: ArchLinterNet.Core.Reporting
+
+analysis:
+  target_assemblies:
+    - ArchLinterNet.Core
+  coverage: warn
+
+contracts:
+  strict:
+    - id: core-no-forbidden
+      name: core-has-no-forbidden-dependencies
+      source: core
+      forbidden: []
+      reason: Core has no forbidden dependencies in this test.
+
+  strict_coverage:
+    - id: validation-namespace-coverage
+      name: validation-namespace-coverage
+      scope: namespace
+      roots:
+        - namespace: ArchLinterNet.Core.Validation
+      reason: Validation namespace must be mapped or explicitly excluded.

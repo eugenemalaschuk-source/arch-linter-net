@@ -20,7 +20,8 @@ Human output is optimized for readability, not machine parsing.
 
 When enabled and non-empty, supplemental diagnostics are emitted in dedicated sections:
 
-- `Coverage findings:` for namespace coverage contracts;
+- `Coverage findings:` for namespace and rule-input coverage contracts;
+- `Coverage summary:` for the per-contract coverage counts described in [Coverage contracts](../contracts/coverage.md#coverage-summary) — printed whenever any coverage contract ran, regardless of `analysis.coverage` severity;
 - `Unmatched ignored violations:` for stale baseline/ignore entries;
 - `Policy consistency findings:` for internal contradictions in the policy document.
 
@@ -29,6 +30,10 @@ Example supplemental section:
 ```text
 Coverage findings:
 - [feature-namespace-coverage] [feature-namespace-coverage] MyApp.Features.Payments -> uncovered namespace: MyApp.Features.Payments.PaymentsRepresentative
+
+Coverage summary:
+- [feature-namespace-coverage] [feature-namespace-coverage] scope: namespace covered=4 excluded=1 uncovered=1 stale=0 unknown=0
+    uncovered: MyApp.Features.Payments (MyApp.Features.Payments.PaymentsRepresentative)
 ```
 
 ## JSON output
@@ -54,6 +59,7 @@ Current JSON output is a single top-level object with these arrays:
 - `coverage_findings`
 - `unmatched_ignored_violations`
 - `policy_consistency_findings`
+- `coverage_summary`
 
 Example shape:
 
@@ -84,9 +90,25 @@ Example shape:
       "conflicting_contract_names": ["domain-boundaries", "domain-boundaries-copy"],
       "layers": []
     }
+  ],
+  "coverage_summary": [
+    {
+      "contract": "feature-namespace-coverage",
+      "contract_id": "feature-namespace-coverage",
+      "scope": "namespace",
+      "counts": { "covered": 4, "excluded": 1, "uncovered": 1, "stale": 0, "unknown": 0 },
+      "excluded_items": [
+        { "item": "MyApp.Features.Video.Generated", "reason": "Generated code is excluded from manual architecture coverage." }
+      ],
+      "uncovered_items": [
+        { "item": "MyApp.Features.Payments", "evidence": "MyApp.Features.Payments.PaymentsRepresentative" }
+      ]
+    }
   ]
 }
 ```
+
+`coverage_summary` is always present as an array (empty when no coverage contracts ran) and is reported independent of `analysis.coverage` severity, since it summarizes state rather than gating the run. See [Coverage contracts — Coverage summary](../contracts/coverage.md#coverage-summary) for the count semantics, including how `scope: rule_input` maps to `stale`/`unknown`.
 
 Behavior for non-violation finding families is controlled separately:
 

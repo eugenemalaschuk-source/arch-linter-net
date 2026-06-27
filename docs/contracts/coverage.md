@@ -81,6 +81,49 @@ Coverage is evaluated against discovered first-party namespaces that contain loa
 
 In human output, findings appear in a separate `Coverage findings:` section. In JSON output, they appear in the top-level `coverage_findings` array alongside `violations`, `cycles`, `unmatched_ignored_violations`, and `policy_consistency_findings`.
 
+## Coverage summary
+
+Alongside the raw findings, `validate` reports a deterministic coverage summary for every coverage contract that ran, independent of `analysis.coverage` severity (it is reported even when `coverage: warn` or `coverage: off`). The summary buckets each in-scope item into exactly one of five counts:
+
+| Count | `scope: namespace` meaning | `scope: rule_input` meaning |
+|-------|------------------------------|------------------------------|
+| `covered` | namespace matched a declared layer, namespace-glob layer, or expanded layer template | referenced layer exists and currently matches code |
+| `excluded` | namespace matched an `exclude` rule | referenced contract ID matched an `exclude` rule |
+| `uncovered` | namespace matched none of the above (`"uncovered namespace"` finding) | always `0` — this scope reports `stale`/`unknown` instead |
+| `stale` | always `0` — this scope reports `uncovered` instead | referenced layer exists but currently matches zero namespaces (`"empty-input"` finding) |
+| `unknown` | always `0` | referenced field names a layer that isn't declared at all (`"unresolved"` finding) |
+
+Each excluded item is reported with its `reason` text from the contract's `exclude` entry. Each uncovered/stale/unknown item is reported with evidence: a representative type for namespace coverage, or the dangling/empty layer name for rule-input coverage.
+
+In human output, the summary appears in a `Coverage summary:` section, one line per contract, after `Coverage findings:`:
+
+```
+Coverage summary:
+- [validation-namespace-coverage] [validation-namespace-coverage] scope: namespace covered=0 excluded=0 uncovered=1 stale=0 unknown=0
+    uncovered: ArchLinterNet.Core.Validation (ArchLinterNet.Core.Validation.ArchitectureBaselineService)
+```
+
+In JSON output, the summary appears as a top-level `coverage_summary` array, additive to (not nested inside) `coverage_findings`:
+
+```json
+{
+  "coverage_summary": [
+    {
+      "contract": "validation-namespace-coverage",
+      "contract_id": "validation-namespace-coverage",
+      "scope": "namespace",
+      "counts": { "covered": 0, "excluded": 0, "uncovered": 1, "stale": 0, "unknown": 0 },
+      "excluded_items": [],
+      "uncovered_items": [
+        { "item": "ArchLinterNet.Core.Validation", "evidence": "ArchLinterNet.Core.Validation.ArchitectureBaselineService" }
+      ]
+    }
+  ]
+}
+```
+
+`scope: project`, `scope: assembly`, and `scope: dependency_edge` never appear in the summary, since `ArchitectureContractLoader` rejects those scopes at load time (see [Current limits](#current-limits)) — there is no contract instance to summarize for them.
+
 ## Exclusion rules
 
 Use `exclude` only for units you intentionally do not want to model yet. For `scope: namespace`, exclude by namespace:

@@ -81,6 +81,41 @@ public static class ArchitectureDiagnosticFormatter
             + FormatViolationsForHumans(findings);
     }
 
+    public static string FormatCoverageSummaryForHumans(IReadOnlyCollection<ArchitectureCoverageSummary> summaries)
+    {
+        if (summaries.Count == 0)
+        {
+            return string.Empty;
+        }
+
+        var lines = summaries
+            .OrderBy(s => s.ContractId ?? s.ContractName, StringComparer.Ordinal)
+            .Select(FormatCoverageSummaryEntryForHumans);
+
+        return "Coverage summary:" + Environment.NewLine
+            + string.Join(Environment.NewLine, lines);
+    }
+
+    private static string FormatCoverageSummaryEntryForHumans(ArchitectureCoverageSummary summary)
+    {
+        string idPrefix = summary.ContractId != null ? $"[{summary.ContractId}] " : string.Empty;
+        ArchitectureCoverageSummaryCounts counts = summary.Counts;
+
+        string header = $"- {idPrefix}[{summary.ContractName}] scope: {summary.Scope} " +
+            $"covered={counts.Covered} excluded={counts.Excluded} uncovered={counts.Uncovered} " +
+            $"stale={counts.Stale} unknown={counts.Unknown}";
+
+        var excludedLines = summary.ExcludedItems
+            .OrderBy(item => item.Item, StringComparer.Ordinal)
+            .Select(item => $"    excluded: {item.Item} ({item.Reason})");
+
+        var uncoveredLines = summary.UncoveredItems
+            .OrderBy(item => item.Item, StringComparer.Ordinal)
+            .Select(item => $"    uncovered: {item.Item} ({item.Evidence})");
+
+        return string.Join(Environment.NewLine, new[] { header }.Concat(excludedLines).Concat(uncoveredLines));
+    }
+
     public static string FormatResultForCiArtifacts(
         string mode,
         bool passed,
@@ -88,7 +123,8 @@ public static class ArchitectureDiagnosticFormatter
         IReadOnlyCollection<string> cycles,
         IReadOnlyCollection<ArchitectureViolation>? coverageFindings = null,
         IReadOnlyCollection<ArchitectureUnmatchedIgnoredViolation>? unmatched = null,
-        IReadOnlyCollection<PolicyConsistencyDiagnostic>? policyConsistencyFindings = null)
+        IReadOnlyCollection<PolicyConsistencyDiagnostic>? policyConsistencyFindings = null,
+        IReadOnlyCollection<ArchitectureCoverageSummary>? coverageSummaries = null)
     {
         var unmatchedSerialized = (unmatched ?? Array.Empty<ArchitectureUnmatchedIgnoredViolation>())
             .Select(ArchitectureDiagnosticMapper.FromUnmatchedIgnore)
@@ -124,7 +160,11 @@ public static class ArchitectureDiagnosticFormatter
                 .Select(d => ToCiJsonObject(d, includeContract: true))
                 .ToArray(),
             unmatched_ignored_violations = unmatchedSerialized,
-            policy_consistency_findings = policyConsistencySerialized
+            policy_consistency_findings = policyConsistencySerialized,
+            coverage_summary = (coverageSummaries ?? Array.Empty<ArchitectureCoverageSummary>())
+                .OrderBy(s => s.ContractId ?? s.ContractName, StringComparer.Ordinal)
+                .Select(ToCoverageSummaryJsonObject)
+                .ToArray()
         };
 
         return JsonSerializer.Serialize(payload);
@@ -245,6 +285,32 @@ public static class ArchitectureDiagnosticFormatter
         }
 
         return obj;
+    }
+
+    private static Dictionary<string, object?> ToCoverageSummaryJsonObject(ArchitectureCoverageSummary summary)
+    {
+        return new Dictionary<string, object?>
+        {
+            ["contract"] = summary.ContractName,
+            ["contract_id"] = summary.ContractId,
+            ["scope"] = summary.Scope,
+            ["counts"] = new Dictionary<string, object?>
+            {
+                ["covered"] = summary.Counts.Covered,
+                ["excluded"] = summary.Counts.Excluded,
+                ["uncovered"] = summary.Counts.Uncovered,
+                ["stale"] = summary.Counts.Stale,
+                ["unknown"] = summary.Counts.Unknown
+            },
+            ["excluded_items"] = summary.ExcludedItems
+                .OrderBy(item => item.Item, StringComparer.Ordinal)
+                .Select(item => new Dictionary<string, object?> { ["item"] = item.Item, ["reason"] = item.Reason })
+                .ToArray(),
+            ["uncovered_items"] = summary.UncoveredItems
+                .OrderBy(item => item.Item, StringComparer.Ordinal)
+                .Select(item => new Dictionary<string, object?> { ["item"] = item.Item, ["evidence"] = item.Evidence })
+                .ToArray()
+        };
     }
 
     private static Dictionary<string, object?> ToCiJsonObject(ArchitectureDiagnostic diagnostic, bool includeContract)

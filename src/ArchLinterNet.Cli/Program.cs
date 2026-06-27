@@ -213,7 +213,8 @@ public static class Program
                     outcome.UnmatchedIgnoredViolations,
                     outcome.PolicyConsistencyConfig == "off"
                         ? Array.Empty<PolicyConsistencyDiagnostic>()
-                        : outcome.PolicyConsistencyFindings));
+                        : outcome.PolicyConsistencyFindings,
+                    outcome.CoverageSummaries));
             }
             else
             {
@@ -264,6 +265,17 @@ public static class Program
                     {
                         Console.WriteLine();
                         Console.WriteLine(coverageSection);
+                    }
+                }
+
+                if (outcome.CoverageSummaries.Count > 0)
+                {
+                    string coverageSummarySection =
+                        ArchitectureDiagnosticFormatter.FormatCoverageSummaryForHumans(outcome.CoverageSummaries);
+                    if (!string.IsNullOrEmpty(coverageSummarySection))
+                    {
+                        Console.WriteLine();
+                        Console.WriteLine(coverageSummarySection);
                     }
                 }
             }
