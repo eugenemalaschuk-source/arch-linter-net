@@ -19,6 +19,16 @@ public static class ArchitectureRunnerFactory
         using (timing?.Measure("yaml_loading", indent: 1))
             document = ArchitectureContractLoader.LoadFromPath(policyPath);
 
+        int declaredCoverageContracts = document.Contracts.StrictCoverage.Count + document.Contracts.AuditCoverage.Count;
+        if (declaredCoverageContracts > 0)
+        {
+            throw new InvalidOperationException(
+                $"Policy declares {declaredCoverageContracts} coverage contract(s) (strict_coverage/audit_coverage), " +
+                "but the architecture coverage engine is not implemented yet. The schema accepts the reviewed shape " +
+                "for #97-#103 to implement against; remove these contracts until that work lands, or this policy " +
+                "cannot be enforced as authored.");
+        }
+
         if (baselinePath != null)
         {
             using (timing?.Measure("baseline_loading", indent: 1))
