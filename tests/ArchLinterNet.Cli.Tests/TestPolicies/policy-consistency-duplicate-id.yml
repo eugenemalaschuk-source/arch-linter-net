@@ -1,0 +1,27 @@
+version: 1
+name: Test Policy Consistency Duplicate ID
+
+layers:
+  core:
+    namespace: ArchLinterNet.Core
+  contracts:
+    namespace: ArchLinterNet.Core.Contracts
+
+analysis:
+  target_assemblies:
+    - ArchLinterNet.Core
+
+contracts:
+  strict:
+    - id: dup-id
+      name: core-no-forbidden
+      source: core
+      forbidden: []
+      reason: First contract using the shared ID.
+
+  audit:
+    - id: dup-id
+      name: contracts-no-forbidden
+      source: contracts
+      forbidden: []
+      reason: Second contract reusing the same ID as the strict contract above.

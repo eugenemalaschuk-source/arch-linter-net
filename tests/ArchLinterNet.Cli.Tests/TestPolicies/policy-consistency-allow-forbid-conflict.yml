@@ -1,0 +1,28 @@
+version: 1
+name: Test Policy Consistency Allow Forbid Conflict
+
+layers:
+  ghost_source:
+    namespace: ArchLinterNet.Core.Ghost.Source.Namespace.That.Has.No.Types
+    external: true
+  ghost_target:
+    namespace: ArchLinterNet.Core.Ghost.Target.Namespace.That.Has.No.Types
+    external: true
+
+analysis:
+  target_assemblies:
+    - ArchLinterNet.Core
+  policy_consistency: warn
+
+contracts:
+  strict:
+    - name: ghost-source-forbids-ghost-target
+      source: ghost_source
+      forbidden: [ghost_target]
+      reason: Strict contract forbidding ghost_source -> ghost_target.
+
+  strict_allow_only:
+    - name: ghost-source-allows-ghost-target
+      source: ghost_source
+      allowed: [ghost_target]
+      reason: Allow-only contract that contradicts the strict forbid above.
