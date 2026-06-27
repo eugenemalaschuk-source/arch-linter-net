@@ -182,6 +182,49 @@ public sealed class RuleInputCoverageValidationTests
     }
 
     [Test]
+    public void RuleInputCoverage_StrictRuleCoveredOnlyByAuditCoverage_StillFailsViaConfigurationCheck()
+    {
+        // The referenced rule lives in 'strict' but the rule_input coverage contract that tracks
+        // it lives in 'audit_coverage'. ArchitectureContractExecutor only runs the coverage group
+        // matching the current mode, so when validating in strict mode this audit_coverage
+        // contract never executes and produces no finding. CheckConfiguration must NOT defer to
+        // a coverage contract that won't run this request — otherwise the empty layer goes
+        // unreported by both mechanisms (false green).
+        string policyPath = WritePolicy(BuildPolicy("audit_coverage", referencedRuleGroup: "strict"));
+
+        ValidationOutcome outcome = ArchitectureValidationService.Validate(new ValidationRequest
+        {
+            PolicyPath = policyPath,
+            Mode = "strict"
+        });
+
+        Assert.That(outcome.Passed, Is.False);
+        Assert.That(outcome.Violations.Select(v => v.ForbiddenNamespace), Has.Member("empty layer namespace"));
+        Assert.That(outcome.CoverageFindings, Is.Empty);
+    }
+
+    [Test]
+    public void RuleInputCoverage_CoverageContractNotSelected_StillFailsViaConfigurationCheck()
+    {
+        // When --contract-id selection excludes the rule_input coverage contract itself, that
+        // coverage contract's own IsContractSelected guard makes it produce no finding for this
+        // request. CheckConfiguration must not defer to an unselected coverage contract either,
+        // for the same false-green reason as the mode-mismatch case above.
+        string policyPath = WritePolicy(BuildPolicy("strict_coverage", referencedRuleGroup: "strict"));
+
+        ValidationOutcome outcome = ArchitectureValidationService.Validate(new ValidationRequest
+        {
+            PolicyPath = policyPath,
+            Mode = "strict",
+            ContractIds = new[] { "video-to-ghost-rule" }
+        });
+
+        Assert.That(outcome.Passed, Is.False);
+        Assert.That(outcome.Violations.Select(v => v.ForbiddenNamespace), Has.Member("empty layer namespace"));
+        Assert.That(outcome.CoverageFindings, Is.Empty);
+    }
+
+    [Test]
     public void RuleInputCoverage_EmptyContractIds_ThrowsActionableError()
     {
         string policyPath = WritePolicy("""

@@ -278,7 +278,8 @@ public static class ArchitectureContractLoader
                 throw new InvalidOperationException(
                     $"Rule-input coverage contract '{contract.Name}' references unknown contract ID '{referencedContractId}' " +
                     "in 'contract_ids'. The ID must match a declared dependency, layer, allow_only, cycle, method_body, " +
-                    "independence, protected, external, asmdef, acyclic_sibling, or layer_template contract.");
+                    "independence, protected, or external contract. asmdef, acyclic_sibling, and layer_template contracts " +
+                    "are not valid for scope 'rule_input'.");
             }
         }
 

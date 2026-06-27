@@ -317,7 +317,7 @@ public sealed partial class ArchitectureContractRunner(
             }
         }
 
-        HashSet<string> ruleInputCoveredContractIds = CollectRuleInputCoveredContractIds();
+        HashSet<string> ruleInputCoveredContractIds = CollectRuleInputCoveredContractIds(strict);
 
         foreach ((string layerName, HashSet<string> referencingContractIds) in layerReferencingContractIds)
         {
@@ -396,12 +396,23 @@ public sealed partial class ArchitectureContractRunner(
         return violations;
     }
 
-    private HashSet<string> CollectRuleInputCoveredContractIds()
+    // Only contracts that ArchitectureContractExecutor will actually run for this request can
+    // defer CheckConfiguration's hard failure: ContractsFor(mode, "coverage") only executes the
+    // group matching the current mode (strict_coverage for strict, audit_coverage for audit), and
+    // CheckCoverageContract itself no-ops when the coverage contract isn't selected. Deferring
+    // for a coverage contract that won't run this request would silently drop the finding
+    // entirely instead of handing it off — the same false-green risk this deferral exists to
+    // avoid in the first place.
+    private HashSet<string> CollectRuleInputCoveredContractIds(bool strict)
     {
+        IEnumerable<ArchitectureCoverageContract> coverageContractsForMode = strict
+            ? _document.Contracts.StrictCoverage
+            : _document.Contracts.AuditCoverage;
+
         return new HashSet<string>(
-            _document.Contracts.StrictCoverage
-                .Concat(_document.Contracts.AuditCoverage)
+            coverageContractsForMode
                 .Where(c => string.Equals(c.Scope, "rule_input", StringComparison.Ordinal))
+                .Where(c => IsContractSelected(c.Id))
                 .SelectMany(c => c.ContractIds),
             StringComparer.OrdinalIgnoreCase);
     }
