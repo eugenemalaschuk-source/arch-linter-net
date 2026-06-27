@@ -126,10 +126,13 @@ public static class ArchitectureValidationService
             {
                 // When coverage gating is disabled, a stale entry in a strict_coverage/audit_coverage
                 // baseline must not surface or block — otherwise turning coverage off would not fully
-                // disable the coverage family, only its non-stale findings.
-                HashSet<string> coverageContractIds = CollectCoverageContractIds(document);
+                // disable the coverage family, only its non-stale findings. Filtered by contract
+                // group rather than contract ID: IDs are not guaranteed unique across families (the
+                // policy-consistency duplicate-id check does not span coverage contracts), so an
+                // id-only filter could mistakenly suppress a stale ignore on an unrelated strict/audit
+                // contract that happens to share an ID with a coverage contract.
                 unmatched = unmatched
-                    .Where(u => u.ContractId == null || !coverageContractIds.Contains(u.ContractId))
+                    .Where(u => u.ContractGroup is not ("strict_coverage" or "audit_coverage"))
                     .ToList();
             }
 
@@ -153,15 +156,5 @@ public static class ArchitectureValidationService
     private static HashSet<string> CollectAvailableContractIds(ArchitectureContractDocument document, string mode)
     {
         return ArchitectureContractCatalog.Build(document).AvailableContractIds(mode);
-    }
-
-    private static HashSet<string> CollectCoverageContractIds(ArchitectureContractDocument document)
-    {
-        return new HashSet<string>(
-            document.Contracts.StrictCoverage
-                .Concat(document.Contracts.AuditCoverage)
-                .Where(c => !string.IsNullOrEmpty(c.Id))
-                .Select(c => c.Id!),
-            StringComparer.OrdinalIgnoreCase);
     }
 }

@@ -60,7 +60,10 @@ internal sealed class ArchitectureContractExecutionContext
 
             ArchitectureIgnoredViolation ignore = _ignoredViolations[i];
             result.Add(new ArchitectureUnmatchedIgnoredViolation(
-                ContractName, ContractId, i, ignore.SourceType, ignore.ForbiddenReference, ignore.Reason));
+                ContractName, ContractId, i, ignore.SourceType, ignore.ForbiddenReference, ignore.Reason)
+            {
+                ContractGroup = _contractGroup
+            });
         }
     }
 }

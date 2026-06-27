@@ -30,7 +30,7 @@
 
 - [x] 5.1 Update `docs/guides/migration-baselines.md` to describe coverage baseline adoption.
 - [x] 5.2 Update `docs/contracts/coverage.md` to describe `ignored_violations`/baseline support for coverage contracts.
-- [ ] 5.3 Run `openspec validate --all` after archiving to confirm specs are consistent.
+- [x] 5.3 Run `openspec validate --all` after archiving to confirm specs are consistent.
 
 ## 6. Validation
 
