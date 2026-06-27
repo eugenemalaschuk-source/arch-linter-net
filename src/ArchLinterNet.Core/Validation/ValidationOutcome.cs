@@ -1,4 +1,5 @@
 using ArchLinterNet.Core.Model;
+using ArchLinterNet.Core.Reporting;
 
 namespace ArchLinterNet.Core.Validation;
 
@@ -11,4 +12,5 @@ public sealed record ValidationOutcome(
     IReadOnlyList<ArchitectureUnmatchedIgnoredViolation> UnmatchedIgnoredViolations,
     string UnmatchedIgnoredViolationsConfig,
     IReadOnlyCollection<PolicyConsistencyDiagnostic> PolicyConsistencyFindings,
-    string PolicyConsistencyConfig);
+    string PolicyConsistencyConfig,
+    IReadOnlyCollection<ArchitectureCoverageSummary> CoverageSummaries);

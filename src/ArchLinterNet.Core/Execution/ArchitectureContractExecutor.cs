@@ -12,7 +12,8 @@ public static class ArchitectureContractExecutor
     public sealed record ExecutionResult(
         IReadOnlyCollection<ArchitectureViolation> Violations,
         IReadOnlyCollection<string> Cycles,
-        IReadOnlyCollection<ArchitectureViolation> CoverageViolations);
+        IReadOnlyCollection<ArchitectureViolation> CoverageViolations,
+        IReadOnlyCollection<ArchitectureCoverageSummary> CoverageSummaries);
 
     public static ExecutionResult Execute(
         ArchitectureContractRunner runner,
@@ -178,15 +179,22 @@ public static class ArchitectureContractExecutor
         }
 
         int coverageCount = 0;
+        List<ArchitectureCoverageSummary> coverageSummaries = new();
         using (timing?.MeasureContractFamily("coverage", () => coverageCount))
         {
             foreach (IArchitectureContract contract in runner.Catalog.ContractsFor(mode, "coverage"))
             {
                 coverageCount++;
                 coverageViolations.AddRange(_handlerRegistry.Execute("coverage", runner, contract).Violations);
+
+                ArchitectureCoverageSummary? summary = runner.BuildCoverageSummary((ArchitectureCoverageContract)contract);
+                if (summary != null)
+                {
+                    coverageSummaries.Add(summary);
+                }
             }
         }
 
-        return new ExecutionResult(violations, cycles, coverageViolations);
+        return new ExecutionResult(violations, cycles, coverageViolations, coverageSummaries);
     }
 }

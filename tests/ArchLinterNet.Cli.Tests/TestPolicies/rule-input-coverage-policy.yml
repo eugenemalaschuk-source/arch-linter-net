@@ -1,0 +1,34 @@
+version: 1
+name: Test Rule-Input Coverage Policy
+
+layers:
+  core:
+    namespace: ArchLinterNet.Core.Reporting
+  ghost:
+    namespace: ArchLinterNet.Core.NonexistentGhostNamespace
+
+analysis:
+  target_assemblies:
+    - ArchLinterNet.Core
+  coverage: warn
+
+contracts:
+  strict:
+    - id: ghost-rule
+      name: ghost-rule
+      source: core
+      forbidden: [ghost]
+      reason: Placeholder rule whose target layer matches no code (stale).
+
+    - id: typo-rule
+      name: typo-rule
+      source: does_not_exist_layer
+      forbidden: [core]
+      reason: Placeholder rule with a dangling source layer (unknown).
+
+  strict_coverage:
+    - id: rule-input-coverage
+      name: rule-input-coverage
+      scope: rule_input
+      contract_ids: [ghost-rule, typo-rule]
+      reason: Flag rules whose source/target layers stop matching any code.
