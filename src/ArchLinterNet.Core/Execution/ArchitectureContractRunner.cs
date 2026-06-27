@@ -33,6 +33,8 @@ public sealed partial class ArchitectureContractRunner(
 
     private readonly ArchitectureContractCatalog _catalog = ArchitectureContractCatalog.Build(document);
 
+    private HashSet<string>? _ruleInputCoveredContractIdsForMode;
+
     public IReadOnlyList<ArchitectureUnmatchedIgnoredViolation> UnmatchedIgnoredViolations
         => _unmatchedIgnoredViolations;
 
@@ -61,6 +63,33 @@ public sealed partial class ArchitectureContractRunner(
     {
         return _selectedContractIds == null || _selectedContractIds.Count == 0
             || (contractId != null && _selectedContractIds.Contains(contractId));
+    }
+
+    // Called once by ArchitectureContractExecutor.Execute before any family loop runs, so every
+    // Check*Contract call below can defer a dangling layer reference to rule-input coverage using
+    // the exact mode/selection-aware set CheckConfiguration already computes — without each method
+    // needing to know "mode" itself.
+    internal void PrepareRuleInputCoverageDeferral(string mode)
+    {
+        _ruleInputCoveredContractIdsForMode = CollectRuleInputCoveredContractIds(mode == "strict");
+    }
+
+    // A contract whose layer-bearing field names a layer absent from `layers` would otherwise
+    // throw via ArchitectureLayerResolver.ResolveLayer the moment its check runs. When a
+    // rule_input coverage contract that will actually execute this request already tracks this
+    // contract's ID, defer entirely to that coverage contract's "unresolved" finding instead of
+    // crashing — mirroring CheckConfiguration's "empty layer namespace" deferral for the same
+    // contract_ids-tracked relationship.
+    private bool IsDanglingButCoveredByRuleInputCoverage(IArchitectureContract contract)
+    {
+        if (contract.Id == null
+            || _ruleInputCoveredContractIdsForMode == null
+            || !_ruleInputCoveredContractIdsForMode.Contains(contract.Id))
+        {
+            return false;
+        }
+
+        return GetReferencedLayerNames(contract).Any(layerName => !_document.Layers.ContainsKey(layerName));
     }
 
     public IEnumerable<ArchitectureDependencyContract> StrictContracts()
@@ -321,6 +350,22 @@ public sealed partial class ArchitectureContractRunner(
 
         foreach ((string layerName, HashSet<string> referencingContractIds) in layerReferencingContractIds)
         {
+            bool isFullyOwnedByRuleInputCoverage = referencingContractIds.Count > 0
+                && referencingContractIds.All(ruleInputCoveredContractIds.Contains);
+
+            if (!_document.Layers.ContainsKey(layerName))
+            {
+                // A dangling layer name referenced exclusively by contracts a rule_input coverage
+                // contract tracks defers to that coverage contract's own "unresolved" finding
+                // instead of throwing here — otherwise scope: rule_input's unresolved diagnostic
+                // would be unreachable through the real validation pipeline, since this resolution
+                // happens before any contract or coverage check runs.
+                if (isFullyOwnedByRuleInputCoverage)
+                {
+                    continue;
+                }
+            }
+
             ArchitectureLayer layer = ArchitectureLayerResolver.ResolveLayer(_document, "<configuration>", layerName);
 
             if (layer.External)
@@ -337,9 +382,6 @@ public sealed partial class ArchitectureContractRunner(
                 // empty-input classification and severity instead of also failing here as a hard,
                 // unconditional configuration error — otherwise analysis.coverage and exclude
                 // entries could never actually govern the outcome for these contracts.
-                bool isFullyOwnedByRuleInputCoverage = referencingContractIds.Count > 0
-                    && referencingContractIds.All(ruleInputCoveredContractIds.Contains);
-
                 if (isFullyOwnedByRuleInputCoverage)
                 {
                     continue;

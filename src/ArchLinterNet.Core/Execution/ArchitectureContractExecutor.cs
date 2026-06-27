@@ -26,6 +26,8 @@ public static class ArchitectureContractExecutor
             throw new ArgumentException($"Invalid mode: {mode}. Use 'strict' or 'audit'.", nameof(mode));
         }
 
+        runner.PrepareRuleInputCoverageDeferral(mode);
+
         bool isStrict = mode == "strict";
 
         List<ArchitectureViolation> violations = new();

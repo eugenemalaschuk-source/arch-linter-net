@@ -181,6 +181,100 @@ public sealed class RuleInputCoverageValidationTests
         Assert.That(outcome.CoverageFindings, Has.Count.EqualTo(1));
     }
 
+    private string BuildDanglingLayerPolicy(string coverageGroup, string referencedRuleGroup)
+    {
+        return $"version: 1{Environment.NewLine}" +
+               $"name: Test{Environment.NewLine}{Environment.NewLine}" +
+               $"layers:{Environment.NewLine}" +
+               $"  audio:{Environment.NewLine}" +
+               $"    namespace: {FixtureRoot}.Audio{Environment.NewLine}{Environment.NewLine}" +
+               $"analysis:{Environment.NewLine}" +
+               $"  target_assemblies: [{AssemblyName}]{Environment.NewLine}" +
+               $"contracts:{Environment.NewLine}" +
+               $"  {referencedRuleGroup}:{Environment.NewLine}" +
+               $"    - id: audio-to-typo-rule{Environment.NewLine}" +
+               $"      name: audio-to-typo-rule{Environment.NewLine}" +
+               $"      source: audio{Environment.NewLine}" +
+               $"      forbidden: [does_not_exist_layer]{Environment.NewLine}" +
+               $"      reason: Audio must not depend on a typo'd layer.{Environment.NewLine}" +
+               $"  {coverageGroup}:{Environment.NewLine}" +
+               $"    - id: rule-input-coverage{Environment.NewLine}" +
+               $"      name: rule-input-coverage{Environment.NewLine}" +
+               $"      scope: rule_input{Environment.NewLine}" +
+               $"      contract_ids: [audio-to-typo-rule]{Environment.NewLine}" +
+               $"      reason: Flag dangling layer references.{Environment.NewLine}";
+    }
+
+    [Test]
+    public void StrictRuleInputCoverage_SameModeDanglingLayer_ReportsUnresolvedWithoutThrowing()
+    {
+        // Before the fix, CheckConfiguration and CheckContract both resolved every referenced
+        // layer name unconditionally — a dangling layer name threw before any coverage contract
+        // ever ran, making scope: rule_input's 'unresolved' finding unreachable through the real
+        // Validate() pipeline (only reachable by calling CheckCoverageContract directly in a unit
+        // test). Asserting this does not throw, and reports 'unresolved' instead, proves the
+        // deferral now also covers dangling layer references, not just empty ones.
+        string policyPath = WritePolicy(BuildDanglingLayerPolicy("strict_coverage", referencedRuleGroup: "strict"));
+
+        ValidationOutcome outcome = ArchitectureValidationService.Validate(new ValidationRequest
+        {
+            PolicyPath = policyPath,
+            Mode = "strict"
+        });
+
+        Assert.That(outcome.Passed, Is.False);
+        Assert.That(outcome.Violations, Is.Empty);
+        Assert.That(outcome.CoverageFindings, Has.Count.EqualTo(1));
+        Assert.That(outcome.CoverageFindings.Single().ForbiddenNamespace, Is.EqualTo("unresolved"));
+        Assert.That(outcome.CoverageFindings.Single().ForbiddenReferences, Is.EqualTo(new[] { "does_not_exist_layer" }));
+    }
+
+    [Test]
+    public void RuleInputCoverage_DanglingLayerCoveredOnlyByAuditCoverage_StillThrows()
+    {
+        // Mirrors the mode-mismatch regression for empty-input: an audit_coverage contract
+        // tracking a strict-group rule never executes when validating in strict mode, so the
+        // dangling layer reference must still surface as the original hard failure rather than
+        // silently passing.
+        string policyPath = WritePolicy(BuildDanglingLayerPolicy("audit_coverage", referencedRuleGroup: "strict"));
+
+        Assert.Throws<InvalidOperationException>(() =>
+            ArchitectureValidationService.Validate(new ValidationRequest
+            {
+                PolicyPath = policyPath,
+                Mode = "strict"
+            }));
+    }
+
+    [Test]
+    public void RuleInputCoverage_UnreferencedDanglingLayer_StillThrows()
+    {
+        // A dangling layer reference on a contract that no rule_input coverage contract tracks at
+        // all must keep the pre-existing hard-failure behavior.
+        string policyPath = WritePolicy("""
+            version: 1
+            name: Test
+
+            analysis:
+              target_assemblies: [ArchLinterNet.Core]
+
+            contracts:
+              strict:
+                - id: untracked-typo-rule
+                  name: untracked-typo-rule
+                  source: ArchLinterNet.Core
+                  forbidden: [does_not_exist_layer]
+                  reason: Placeholder with a dangling forbidden layer.
+            """);
+
+        Assert.Throws<InvalidOperationException>(() =>
+            ArchitectureValidationService.Validate(new ValidationRequest
+            {
+                PolicyPath = policyPath,
+                Mode = "strict"
+            }));
+    }
+
     [Test]
     public void RuleInputCoverage_StrictRuleCoveredOnlyByAuditCoverage_StillFailsViaConfigurationCheck()
     {
