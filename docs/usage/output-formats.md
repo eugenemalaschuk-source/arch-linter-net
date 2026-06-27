@@ -62,7 +62,7 @@ Example shape:
     {
       "contract": "feature-namespace-coverage",
       "contract_id": "feature-namespace-coverage",
-      "source_type": "MyApp.Features.Payments",
+      "source": "MyApp.Features.Payments",
       "forbidden_namespace": "uncovered namespace",
       "forbidden_references": ["MyApp.Features.Payments.PaymentsRepresentative"]
     }
@@ -74,7 +74,10 @@ Example shape:
       "check_kind": "duplicate-id",
       "contract": "domain-boundaries",
       "contract_id": "domain-boundaries",
-      "reason": "Contract ID is used more than once."
+      "reason": "Contract ID is used more than once.",
+      "conflicting_contract_ids": ["domain-boundaries", "domain-boundaries"],
+      "conflicting_contract_names": ["domain-boundaries", "domain-boundaries-copy"],
+      "layers": []
     }
   ]
 }
