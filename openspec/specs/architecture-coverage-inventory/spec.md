@@ -1,7 +1,7 @@
 # architecture-coverage-inventory Specification
 
 ## Purpose
-TBD - created by archiving change add-architecture-coverage-inventory. Update Purpose after archive.
+Provide a shared, deterministic inventory of first-party namespaces, representative types, declared layers, expanded layer templates, project/assembly facts, and dependency edges, built by reusing existing discovery/resolution/execution components, so future coverage contract families can consume one source of truth instead of duplicating scans.
 ## Requirements
 ### Requirement: A shared coverage inventory is built from existing discovery and resolution facts
 The system SHALL provide an `ArchitectureCoverageInventory` that aggregates first-party namespaces, representative types, declared layers, expanded layer templates, project/assembly facts, and dependency edges by reusing `ArchitectureTypeIndex`, `ArchitectureLayerResolver`, `NamespaceGlobPattern`, `LayerTemplateExpander`, `ArchitectureProjectDiscovery`, and `ArchitectureReferenceGraph`, without re-implementing namespace matching, layer resolution, template expansion, or type/reference scanning.

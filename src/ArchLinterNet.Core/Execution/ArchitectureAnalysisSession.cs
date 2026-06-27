@@ -15,6 +15,6 @@ internal sealed class ArchitectureAnalysisSession(ArchitectureAnalysisContext co
         ArchitectureContractDocument document,
         ProjectDiscoveryResult? projectDiscovery = null)
     {
-        return ArchitectureCoverageInventory.Build(document, this, projectDiscovery);
+        return ArchitectureCoverageInventory.Build(document, this, projectDiscovery ?? Context.ProjectDiscovery);
     }
 }

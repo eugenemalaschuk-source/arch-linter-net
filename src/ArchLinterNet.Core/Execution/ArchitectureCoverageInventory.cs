@@ -8,6 +8,8 @@ internal sealed record ArchitectureCoverageNamespaceEntry(string Namespace, stri
 
 internal sealed record ArchitectureCoverageDependencyEdge(string SourceNamespace, string TargetNamespace);
 
+internal sealed record ArchitectureCoverageLayerEntry(string Name, ArchitectureLayer Layer);
+
 internal sealed class ArchitectureCoverageInventory
 {
     private readonly Dictionary<string, Type[]> _typesByNamespace;
@@ -18,7 +20,7 @@ internal sealed class ArchitectureCoverageInventory
         IReadOnlyList<ArchitectureCoverageNamespaceEntry> namespaces,
         Dictionary<string, Type[]> typesByNamespace,
         ArchitectureReferenceGraph referenceGraph,
-        IReadOnlyList<ArchitectureLayerContract> declaredLayers,
+        IReadOnlyList<ArchitectureCoverageLayerEntry> declaredLayers,
         IReadOnlyList<ArchitectureLayerContract> expandedLayerTemplates,
         ProjectDiscoveryResult? projectDiscovery)
     {
@@ -33,7 +35,7 @@ internal sealed class ArchitectureCoverageInventory
 
     public IReadOnlyList<ArchitectureCoverageNamespaceEntry> Namespaces { get; }
 
-    public IReadOnlyList<ArchitectureLayerContract> DeclaredLayers { get; }
+    public IReadOnlyList<ArchitectureCoverageLayerEntry> DeclaredLayers { get; }
 
     public IReadOnlyList<ArchitectureLayerContract> ExpandedLayerTemplates { get; }
 
@@ -61,12 +63,8 @@ internal sealed class ArchitectureCoverageInventory
             .Select(pair => new ArchitectureCoverageNamespaceEntry(pair.Key, pair.Value[0].FullName ?? pair.Value[0].Name))
             .ToList();
 
-        List<ArchitectureLayerContract> declaredLayers = document.Layers
-            .Select(pair => new ArchitectureLayerContract
-            {
-                Name = pair.Key,
-                Layers = new List<string> { pair.Value.Namespace }
-            })
+        List<ArchitectureCoverageLayerEntry> declaredLayers = document.Layers
+            .Select(pair => new ArchitectureCoverageLayerEntry(pair.Key, pair.Value))
             .ToList();
 
         List<ArchitectureLayerContract> expandedTemplates = LayerTemplateExpander.Expand(

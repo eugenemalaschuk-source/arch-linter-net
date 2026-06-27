@@ -81,7 +81,7 @@ public static class ArchitectureRunnerFactory
 
             ResolutionResult resolution = ArchitectureAssemblyResolver.ResolveFromDocument(document, repositoryRoot);
             ArchitectureAnalysisContext context = new(repositoryRoot, resolution.ResolvedAssemblies,
-                resolution.MissingAssemblyNames, resolution.AssemblyProbingPaths, discovery.Diagnostics);
+                resolution.MissingAssemblyNames, resolution.AssemblyProbingPaths, discovery.Diagnostics, discovery);
             runner = new ArchitectureContractRunner(context, document, selectedContractIds,
                 enableUnmatchedIgnoreTracking, preprocessorSymbols: symbols);
         }
