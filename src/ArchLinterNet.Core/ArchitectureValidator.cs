@@ -32,7 +32,10 @@ public sealed class ArchitectureValidator
 
         violations = outcome.PolicyConsistencyConfig == "off"
             ? outcome.Violations
+                .Concat(outcome.CoverageConfig == "off" ? Array.Empty<ArchitectureViolation>() : outcome.CoverageFindings)
+                .ToArray()
             : outcome.Violations
+                .Concat(outcome.CoverageConfig == "off" ? Array.Empty<ArchitectureViolation>() : outcome.CoverageFindings)
                 .Concat(outcome.PolicyConsistencyFindings.Select(ToViolation))
                 .ToArray();
         cycles = outcome.Cycles;

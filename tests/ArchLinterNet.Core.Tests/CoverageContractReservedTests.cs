@@ -31,30 +31,117 @@ public sealed class CoverageContractReservedTests
         return path;
     }
 
-    private const string CoveragePolicyTemplate = """
-        version: 1
-        name: Test
+    private const string FeatureRoot = "ArchLinterNet.Core.Tests.NamespaceCoverageFixtures.Features";
 
-        layers:
-          core:
-            namespace: ArchLinterNet.Core
+    private string WriteNamespaceCoveragePolicy(string coverageGroup, string? analysisCoverage = null)
+    {
+        string assemblyName = typeof(CoverageContractReservedTests).Assembly.GetName().Name!;
+        string coverageSetting = analysisCoverage is null
+            ? string.Empty
+            : $"  coverage: {analysisCoverage}{Environment.NewLine}";
 
-        analysis:
-          target_assemblies: [ArchLinterNet.Core]
-
-        contracts:
-          {0}:
-            - name: domain-namespace-coverage
-              scope: namespace
-              roots:
-                - namespace: ArchLinterNet.Core
-              reason: coverage test
-        """;
+        return WritePolicy(
+            $"version: 1{Environment.NewLine}" +
+            $"name: Test{Environment.NewLine}{Environment.NewLine}" +
+            $"layers:{Environment.NewLine}" +
+            $"  audio:{Environment.NewLine}" +
+            $"    namespace: {FeatureRoot}.Audio{Environment.NewLine}" +
+            $"  feature_api:{Environment.NewLine}" +
+            $"    namespace: {FeatureRoot}.*{Environment.NewLine}" +
+            $"    namespace_suffix: Api{Environment.NewLine}{Environment.NewLine}" +
+            $"analysis:{Environment.NewLine}" +
+            $"  target_assemblies: [{assemblyName}]{Environment.NewLine}" +
+            coverageSetting +
+            $"contracts:{Environment.NewLine}" +
+            $"  strict_layer_templates:{Environment.NewLine}" +
+            $"    - name: billing-template{Environment.NewLine}" +
+            $"      containers: [{FeatureRoot}.Billing]{Environment.NewLine}" +
+            $"      layers:{Environment.NewLine}" +
+            $"        - name: Contracts{Environment.NewLine}" +
+            $"      reason: Template coverage.{Environment.NewLine}" +
+            $"  {coverageGroup}:{Environment.NewLine}" +
+            $"    - id: namespace-feature-coverage{Environment.NewLine}" +
+            $"      name: namespace-feature-coverage{Environment.NewLine}" +
+            $"      scope: namespace{Environment.NewLine}" +
+            $"      roots:{Environment.NewLine}" +
+            $"        - namespace: {FeatureRoot}{Environment.NewLine}" +
+            $"      exclude:{Environment.NewLine}" +
+            $"        - namespace_suffix: Generated{Environment.NewLine}" +
+            $"          reason: Generated namespaces are excluded from manual architecture coverage.{Environment.NewLine}" +
+            $"      reason: Feature namespaces must be mapped or explicitly excluded.{Environment.NewLine}");
+    }
 
     [Test]
-    public void StrictCoverageContract_ThrowsInsteadOfBeingSilentlyDropped()
+    public void StrictNamespaceCoverage_DefaultSeverity_FailsAndReportsFindings()
     {
-        string policyPath = WritePolicy(string.Format(CoveragePolicyTemplate, "strict_coverage"));
+        string policyPath = WriteNamespaceCoveragePolicy("strict_coverage");
+
+        ValidationOutcome outcome = ArchitectureValidationService.Validate(new ValidationRequest
+        {
+            PolicyPath = policyPath,
+            Mode = "strict"
+        });
+
+        Assert.That(outcome.Passed, Is.False);
+        Assert.That(outcome.CoverageConfig, Is.EqualTo("error"));
+        Assert.That(outcome.CoverageFindings.Select(f => f.SourceType), Is.EqualTo(new[]
+        {
+            $"{FeatureRoot}.AlphaGap",
+            $"{FeatureRoot}.ZetaGap"
+        }));
+        Assert.That(outcome.CoverageFindings.All(f => f.ContractId == "namespace-feature-coverage"), Is.True);
+    }
+
+    [Test]
+    public void AuditNamespaceCoverage_WarnSeverity_ReportsWithoutFailing()
+    {
+        string policyPath = WriteNamespaceCoveragePolicy("audit_coverage", analysisCoverage: "warn");
+
+        ValidationOutcome outcome = ArchitectureValidationService.Validate(new ValidationRequest
+        {
+            PolicyPath = policyPath,
+            Mode = "audit"
+        });
+
+        Assert.That(outcome.Passed, Is.True);
+        Assert.That(outcome.CoverageConfig, Is.EqualTo("warn"));
+        Assert.That(outcome.CoverageFindings, Has.Count.EqualTo(2));
+    }
+
+    [Test]
+    public void NamespaceCoverage_OffSeverity_SuppressesFindings()
+    {
+        string policyPath = WriteNamespaceCoveragePolicy("strict_coverage", analysisCoverage: "off");
+
+        ValidationOutcome outcome = ArchitectureValidationService.Validate(new ValidationRequest
+        {
+            PolicyPath = policyPath,
+            Mode = "strict"
+        });
+
+        Assert.That(outcome.Passed, Is.True);
+        Assert.That(outcome.CoverageConfig, Is.EqualTo("off"));
+        Assert.That(outcome.CoverageFindings, Is.Empty);
+    }
+
+    [Test]
+    public void UnsupportedCoverageScope_ThrowsActionableError()
+    {
+        string policyPath = WritePolicy("""
+            version: 1
+            name: Test
+
+            analysis:
+              target_assemblies: [ArchLinterNet.Core]
+
+            contracts:
+              strict_coverage:
+                - name: project-coverage
+                  scope: project
+                  roots:
+                    - include: ["src/**/*.csproj"]
+                  reason: Reserved for a later issue.
+            """);
 
         InvalidOperationException ex = Assert.Throws<InvalidOperationException>(() =>
             ArchitectureValidationService.Validate(new ValidationRequest
@@ -63,19 +150,7 @@ public sealed class CoverageContractReservedTests
                 Mode = "strict"
             }))!;
 
-        Assert.That(ex.Message, Does.Contain("coverage contract"));
-    }
-
-    [Test]
-    public void AuditCoverageContract_ThrowsInsteadOfBeingSilentlyDropped()
-    {
-        string policyPath = WritePolicy(string.Format(CoveragePolicyTemplate, "audit_coverage"));
-
-        Assert.Throws<InvalidOperationException>(() => ArchitectureValidationService.Validate(new ValidationRequest
-        {
-            PolicyPath = policyPath,
-            Mode = "audit"
-        }));
+        Assert.That(ex.Message, Does.Contain("Only coverage contracts with scope 'namespace' are implemented"));
     }
 
     [Test]

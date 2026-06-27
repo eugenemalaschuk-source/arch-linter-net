@@ -36,3 +36,14 @@ internal sealed class CycleContractHandler : IArchitectureContractHandler
         return ArchitectureHandlerResult.FromCycles(cycles.Select(c => $"{idPrefix}{c}").ToList());
     }
 }
+
+internal sealed class CoverageContractHandler : IArchitectureContractHandler
+{
+    public string Family => "coverage";
+
+    public ArchitectureHandlerResult Execute(ArchitectureContractRunner runner, IArchitectureContract contract)
+    {
+        return ArchitectureHandlerResult.FromViolations(
+            runner.CheckCoverageContract((ArchitectureCoverageContract)contract));
+    }
+}

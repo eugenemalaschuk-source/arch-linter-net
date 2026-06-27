@@ -50,6 +50,7 @@ public static class ArchitectureContractLoader
         ValidateDuplicateIds(document);
         ValidateAcyclicSiblingContracts(document);
         ValidateLayerNamespaces(document);
+        ValidateCoverageNamespaces(document);
 
         return document;
     }
@@ -101,6 +102,8 @@ public static class ArchitectureContractLoader
             document.Contracts.AuditLayerTemplates,
             document.Contracts.StrictAcyclicSiblings,
             document.Contracts.AuditAcyclicSiblings,
+            document.Contracts.StrictCoverage,
+            document.Contracts.AuditCoverage,
         ];
 
         foreach (var group in groups)
@@ -150,6 +153,42 @@ public static class ArchitectureContractLoader
             if (!string.IsNullOrWhiteSpace(layer.Namespace))
             {
                 _ = layer.GlobPattern;
+            }
+        }
+    }
+
+    private static void ValidateCoverageNamespaces(ArchitectureContractDocument document)
+    {
+        foreach (ArchitectureCoverageContract contract in document.Contracts.StrictCoverage
+                     .Concat(document.Contracts.AuditCoverage))
+        {
+            if (!string.Equals(contract.Scope, "namespace", StringComparison.Ordinal))
+            {
+                continue;
+            }
+
+            foreach (ArchitectureCoverageRoot root in contract.Roots)
+            {
+                if (!string.IsNullOrWhiteSpace(root.Namespace))
+                {
+                    _ = new ArchitectureLayer
+                    {
+                        Namespace = root.Namespace,
+                        NamespaceSuffix = root.NamespaceSuffix
+                    }.GlobPattern;
+                }
+            }
+
+            foreach (ArchitectureCoverageExclusion exclusion in contract.Exclude)
+            {
+                if (!string.IsNullOrWhiteSpace(exclusion.Namespace))
+                {
+                    _ = new ArchitectureLayer
+                    {
+                        Namespace = exclusion.Namespace,
+                        NamespaceSuffix = exclusion.NamespaceSuffix
+                    }.GlobPattern;
+                }
             }
         }
     }

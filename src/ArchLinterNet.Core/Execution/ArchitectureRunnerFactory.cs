@@ -19,15 +19,7 @@ public static class ArchitectureRunnerFactory
         using (timing?.Measure("yaml_loading", indent: 1))
             document = ArchitectureContractLoader.LoadFromPath(policyPath);
 
-        int declaredCoverageContracts = document.Contracts.StrictCoverage.Count + document.Contracts.AuditCoverage.Count;
-        if (declaredCoverageContracts > 0)
-        {
-            throw new InvalidOperationException(
-                $"Policy declares {declaredCoverageContracts} coverage contract(s) (strict_coverage/audit_coverage), " +
-                "but the architecture coverage engine is not implemented yet. The schema accepts the reviewed shape " +
-                "for #97-#103 to implement against; remove these contracts until that work lands, or this policy " +
-                "cannot be enforced as authored.");
-        }
+        ValidateImplementedCoverageScopes(document);
 
         if (baselinePath != null)
         {
@@ -109,5 +101,24 @@ public static class ArchitectureRunnerFactory
         {
             analysis.SourceRoots = discovery.SourceRoots.ToList();
         }
+    }
+
+    private static void ValidateImplementedCoverageScopes(ArchitectureContractDocument document)
+    {
+        List<ArchitectureCoverageContract> unsupported = document.Contracts.StrictCoverage
+            .Concat(document.Contracts.AuditCoverage)
+            .Where(contract => !string.Equals(contract.Scope, "namespace", StringComparison.Ordinal))
+            .ToList();
+
+        if (unsupported.Count == 0)
+        {
+            return;
+        }
+
+        string details = string.Join(", ", unsupported.Select(contract => $"{contract.Name} ({contract.Scope})"));
+        throw new InvalidOperationException(
+            "Only coverage contracts with scope 'namespace' are implemented right now. " +
+            $"Unsupported coverage contract scopes: {details}. Project, assembly, dependency_edge, " +
+            "and rule_input coverage remain reserved for follow-up issues.");
     }
 }
