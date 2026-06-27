@@ -48,10 +48,8 @@ public static class ArchitectureContractExecutor
                 .Cast<ArchitectureLayerContract>()
                 .ToList();
 
-            LayerTemplateExpander.ValidateNoIdConflicts(
-                layerTemplateContracts,
-                isStrict ? document.Contracts.StrictLayers : document.Contracts.AuditLayers);
-
+            // Expanded-template ID conflicts are detected (with configurable severity) by the
+            // policy-consistency pass (analysis.policy_consistency), not by a hard throw here.
             IEnumerable<IArchitectureContract> layerContracts = runner.Catalog.ContractsFor(mode, "layer")
                 .Concat(layerTemplateContracts);
 

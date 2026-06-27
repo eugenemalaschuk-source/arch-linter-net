@@ -181,6 +181,63 @@ public sealed class PolicyConsistencyCheckTests
     }
 
     [Test]
+    public void ProtectedImporter_ConflictsWithAnotherProtectedContract_Detected()
+    {
+        var document = BaseDocument();
+        document.Contracts.StrictProtected = new List<ArchitectureProtectedContract>
+        {
+            new()
+            {
+                Name = "domain-protected-allows-application",
+                Protected = new List<string> { "domain" },
+                AllowedImporters = new List<string> { "application" }
+            },
+            new()
+            {
+                Name = "domain-protected-no-application",
+                Protected = new List<string> { "domain" },
+                AllowedImporters = new List<string>()
+            }
+        };
+
+        var runner = new ArchitectureContractRunner(CreateContext(), document);
+        var findings = runner.CheckPolicyConsistency();
+
+        var finding = findings.FirstOrDefault(f => f.CheckKind == "protected-importer-conflict"
+            && f.ConflictingContractNames.Contains("domain-protected-no-application"));
+        Assert.That(finding, Is.Not.Null);
+        Assert.That(finding!.Layers, Is.EquivalentTo(new[] { "domain", "application" }));
+        Assert.That(finding.ConflictingContractNames,
+            Is.EquivalentTo(new[] { "domain-protected-allows-application", "domain-protected-no-application" }));
+    }
+
+    [Test]
+    public void ProtectedImporter_SameAllowedImportersOnBothSurfaces_NotFlagged()
+    {
+        var document = BaseDocument();
+        document.Contracts.StrictProtected = new List<ArchitectureProtectedContract>
+        {
+            new()
+            {
+                Name = "domain-protected-a",
+                Protected = new List<string> { "domain" },
+                AllowedImporters = new List<string> { "application" }
+            },
+            new()
+            {
+                Name = "domain-protected-b",
+                Protected = new List<string> { "domain" },
+                AllowedImporters = new List<string> { "application" }
+            }
+        };
+
+        var runner = new ArchitectureContractRunner(CreateContext(), document);
+        var findings = runner.CheckPolicyConsistency();
+
+        Assert.That(findings.Any(f => f.CheckKind == "protected-importer-conflict"), Is.False);
+    }
+
+    [Test]
     public void LayerOverlap_TwoInternalLayersMatchSameType_Detected()
     {
         var document = BaseDocument();
