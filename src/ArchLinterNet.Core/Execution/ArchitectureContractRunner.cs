@@ -15,6 +15,8 @@ public sealed partial class ArchitectureContractRunner(
 {
     private readonly ArchitectureAnalysisContext _context = context ?? throw new ArgumentNullException(nameof(context));
 
+    private readonly ArchitectureAnalysisSession _session = new(context);
+
     private readonly ArchitectureContractDocument _document =
         document ?? throw new ArgumentNullException(nameof(document));
 
