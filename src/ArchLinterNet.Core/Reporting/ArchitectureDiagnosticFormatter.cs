@@ -7,52 +7,19 @@ public static class ArchitectureDiagnosticFormatter
 {
     public static string FormatViolationsForHumans(IReadOnlyCollection<ArchitectureViolation> violations)
     {
+        var diagnostics = violations.Select(ArchitectureDiagnosticMapper.FromViolation).ToArray();
         return string.Join(
             Environment.NewLine,
-            violations
-                .OrderBy(violation => violation.SourceType)
-                .ThenBy(violation => violation.ForbiddenNamespace)
-                .Select(violation =>
-                {
-                    string idPrefix = violation.ContractId != null ? $"[{violation.ContractId}] " : string.Empty;
-                    string context = string.Empty;
-                    if (violation.AllowedImporters != null)
-                    {
-                        string srcLayer = violation.SourceLayer ?? "?";
-                        string tgtLayer = violation.TargetLayer ?? "?";
-                        string importers = string.Join(", ", violation.AllowedImporters);
-                        context = $" (source_layer: {srcLayer}, target_layer: {tgtLayer}, allowed_importers: [{importers}])";
-                    }
-
-                    if (violation.ForbiddenExternalGroup != null)
-                    {
-                        context += $" (external_group: {violation.ForbiddenExternalGroup})";
-                    }
-
-                    string nsDisplay = violation.MatchedNamespacePrefixes switch
-                    {
-                        { Count: 1 } prefixes => $"{violation.ForbiddenNamespace} (matched {prefixes.First()})",
-                        { Count: > 1 } prefixes =>
-                            $"{violation.ForbiddenNamespace} (matched {string.Join(", ", prefixes.OrderBy(p => p, StringComparer.Ordinal))})",
-                        _ => violation.ForbiddenNamespace
-                    };
-
-                    string refs = string.Join(", ", violation.ForbiddenReferences);
-                    string pathSuffix = string.Empty;
-                    if (violation.DependencyPaths != null && violation.DependencyPaths.Count > 0)
-                    {
-                        var pathLines = violation.DependencyPaths
-                            .Zip(violation.ForbiddenReferences, (path, reference) => (path, reference))
-                            .Select(x => $"  via: {string.Join(" -> ", x.path)}");
-                        pathSuffix = Environment.NewLine + string.Join(Environment.NewLine, pathLines);
-                    }
-                    return $"- {idPrefix}[{violation.ContractName}] {violation.SourceType} -> {nsDisplay}{context}: {refs}{pathSuffix}";
-                }));
+            diagnostics
+                .OrderBy(d => SourceTypeOf(d))
+                .ThenBy(d => ForbiddenNamespaceOf(d))
+                .Select(FormatForHumans));
     }
 
     public static string FormatCyclesForHumans(IReadOnlyCollection<string> cycles)
     {
-        return string.Join(Environment.NewLine, cycles.OrderBy(c => c).Select(cycle => $"- {cycle}"));
+        var diagnostics = cycles.Select(cycle => ArchitectureDiagnosticMapper.FromCycle(cycle, contractName: string.Empty, contractId: null));
+        return string.Join(Environment.NewLine, diagnostics.OrderBy(d => d.Path).Select(d => $"- {d.Path}"));
     }
 
     public static string FormatUnmatchedForHumans(IReadOnlyCollection<ArchitectureUnmatchedIgnoredViolation> unmatched)
@@ -62,10 +29,12 @@ public static class ArchitectureDiagnosticFormatter
             return string.Empty;
         }
 
+        var diagnostics = unmatched.Select(ArchitectureDiagnosticMapper.FromUnmatchedIgnore).ToArray();
+
         return "Unmatched ignored violations:" + Environment.NewLine
             + string.Join(
                 Environment.NewLine,
-                unmatched
+                diagnostics
                     .OrderBy(u => u.ContractName)
                     .ThenBy(u => u.IgnoreIndex)
                     .Select(u =>
@@ -86,6 +55,7 @@ public static class ArchitectureDiagnosticFormatter
         IReadOnlyCollection<ArchitectureUnmatchedIgnoredViolation>? unmatched = null)
     {
         var unmatchedSerialized = (unmatched ?? Array.Empty<ArchitectureUnmatchedIgnoredViolation>())
+            .Select(ArchitectureDiagnosticMapper.FromUnmatchedIgnore)
             .Select(u => new
             {
                 contract = u.ContractName,
@@ -101,48 +71,14 @@ public static class ArchitectureDiagnosticFormatter
         {
             passed,
             mode,
-            violations = violations.Select(v =>
-            {
-                var obj = new Dictionary<string, object?>
-                {
-                    ["contract"] = v.ContractName,
-                    ["contract_id"] = v.ContractId,
-                    ["source"] = v.SourceType,
-                    ["forbidden_namespace"] = v.ForbiddenNamespace,
-                    ["forbidden_references"] = v.ForbiddenReferences.ToArray()
-                };
-
-                if (v.SourceLayer != null)
-                    obj["source_layer"] = v.SourceLayer;
-
-                if (v.TargetLayer != null)
-                    obj["target_layer"] = v.TargetLayer;
-
-                if (v.AllowedImporters != null)
-                    obj["allowed_importers"] = v.AllowedImporters.ToArray();
-
-                if (v.ForbiddenExternalGroup != null)
-                    obj["forbidden_external_group"] = v.ForbiddenExternalGroup;
-
-                if (v.TemplateName != null)
-                    obj["template_name"] = v.TemplateName;
-
-                if (v.ContainerNamespace != null)
-                    obj["container_namespace"] = v.ContainerNamespace;
-
-                if (v.DependencyPaths != null)
-                    obj["dependency_paths"] = v.DependencyPaths.Select(p => p.ToArray()).ToArray();
-
-                if (v.MatchedNamespacePrefixes != null)
-                {
-                    obj["matched_namespace_prefixes"] = v.MatchedNamespacePrefixes.ToArray();
-                    if (v.MatchedNamespacePrefixes.Count == 1)
-                        obj["matched_namespace_prefix"] = v.MatchedNamespacePrefixes.First();
-                }
-
-                return obj;
-            }).ToArray(),
-            cycles = cycles.ToArray(),
+            violations = violations
+                .Select(ArchitectureDiagnosticMapper.FromViolation)
+                .Select(d => ToCiJsonObject(d, includeContract: true))
+                .ToArray(),
+            cycles = cycles
+                .Select(cycle => ArchitectureDiagnosticMapper.FromCycle(cycle, contractName: string.Empty, contractId: null))
+                .Select(d => d.Path)
+                .ToArray(),
             unmatched_ignored_violations = unmatchedSerialized
         };
 
@@ -157,45 +93,9 @@ public static class ArchitectureDiagnosticFormatter
             kind = "architecture_violations",
             contract = contractName,
             contract_id = contractId,
-            violations = violations.Select(v =>
-            {
-                var obj = new Dictionary<string, object?>
-                {
-                    ["source"] = v.SourceType,
-                    ["forbidden_namespace"] = v.ForbiddenNamespace,
-                    ["forbidden_references"] = v.ForbiddenReferences.ToArray()
-                };
-
-                if (v.SourceLayer != null)
-                    obj["source_layer"] = v.SourceLayer;
-
-                if (v.TargetLayer != null)
-                    obj["target_layer"] = v.TargetLayer;
-
-                if (v.AllowedImporters != null)
-                    obj["allowed_importers"] = v.AllowedImporters.ToArray();
-
-                if (v.ForbiddenExternalGroup != null)
-                    obj["forbidden_external_group"] = v.ForbiddenExternalGroup;
-
-                if (v.TemplateName != null)
-                    obj["template_name"] = v.TemplateName;
-
-                if (v.ContainerNamespace != null)
-                    obj["container_namespace"] = v.ContainerNamespace;
-
-                if (v.DependencyPaths != null)
-                    obj["dependency_paths"] = v.DependencyPaths.Select(p => p.ToArray()).ToArray();
-
-                if (v.MatchedNamespacePrefixes != null)
-                {
-                    obj["matched_namespace_prefixes"] = v.MatchedNamespacePrefixes.ToArray();
-                    if (v.MatchedNamespacePrefixes.Count == 1)
-                        obj["matched_namespace_prefix"] = v.MatchedNamespacePrefixes.First();
-                }
-
-                return obj;
-            })
+            violations = violations
+                .Select(ArchitectureDiagnosticMapper.FromViolation)
+                .Select(d => ToCiJsonObject(d, includeContract: false))
         };
 
         return JsonSerializer.Serialize(payload);
@@ -203,15 +103,133 @@ public static class ArchitectureDiagnosticFormatter
 
     public static string FormatCyclesForCiArtifacts(string contractName, string? contractId, IReadOnlyCollection<string> cycles)
     {
+        var diagnostics = cycles.Select(cycle => ArchitectureDiagnosticMapper.FromCycle(cycle, contractName, contractId));
+
         var payload = new
         {
             kind = "architecture_cycles",
             contract = contractName,
             contract_id = contractId,
-            cycles = cycles.ToArray()
+            cycles = diagnostics.Select(d => d.Path).ToArray()
         };
 
         return JsonSerializer.Serialize(payload);
     }
 
+    private static string SourceTypeOf(ArchitectureDiagnostic diagnostic) => diagnostic switch
+    {
+        DependencyDiagnostic d => d.SourceType,
+        ConfigurationDiagnostic d => d.SourceType,
+        ExternalDependencyDiagnostic d => d.SourceType,
+        _ => string.Empty
+    };
+
+    private static string ForbiddenNamespaceOf(ArchitectureDiagnostic diagnostic) => diagnostic switch
+    {
+        DependencyDiagnostic d => d.ForbiddenNamespace,
+        ConfigurationDiagnostic d => d.ForbiddenNamespace,
+        ExternalDependencyDiagnostic d => d.ForbiddenNamespace,
+        _ => string.Empty
+    };
+
+    private static IReadOnlyCollection<string> ForbiddenReferencesOf(ArchitectureDiagnostic diagnostic) => diagnostic switch
+    {
+        DependencyDiagnostic d => d.ForbiddenReferences,
+        ConfigurationDiagnostic d => d.ForbiddenReferences,
+        ExternalDependencyDiagnostic d => d.ForbiddenReferences,
+        _ => Array.Empty<string>()
+    };
+
+    private static string FormatForHumans(ArchitectureDiagnostic diagnostic)
+    {
+        string idPrefix = diagnostic.ContractId != null ? $"[{diagnostic.ContractId}] " : string.Empty;
+        string context = string.Empty;
+
+        if (diagnostic is DependencyDiagnostic { AllowedImporters: not null } dependency)
+        {
+            string srcLayer = dependency.SourceLayer ?? "?";
+            string tgtLayer = dependency.TargetLayer ?? "?";
+            string importers = string.Join(", ", dependency.AllowedImporters);
+            context = $" (source_layer: {srcLayer}, target_layer: {tgtLayer}, allowed_importers: [{importers}])";
+        }
+
+        if (diagnostic is ExternalDependencyDiagnostic external)
+        {
+            context += $" (external_group: {external.ForbiddenExternalGroup})";
+        }
+
+        string forbiddenNamespace = ForbiddenNamespaceOf(diagnostic);
+        string nsDisplay = diagnostic.MatchedNamespacePrefixes switch
+        {
+            { Count: 1 } prefixes => $"{forbiddenNamespace} (matched {prefixes.First()})",
+            { Count: > 1 } prefixes =>
+                $"{forbiddenNamespace} (matched {string.Join(", ", prefixes.OrderBy(p => p, StringComparer.Ordinal))})",
+            _ => forbiddenNamespace
+        };
+
+        string refs = string.Join(", ", ForbiddenReferencesOf(diagnostic));
+        string pathSuffix = string.Empty;
+        if (diagnostic is ConfigurationDiagnostic { DependencyPaths: { Count: > 0 } dependencyPaths } configuration)
+        {
+            var pathLines = dependencyPaths
+                .Zip(configuration.ForbiddenReferences, (path, reference) => (path, reference))
+                .Select(x => $"  via: {string.Join(" -> ", x.path)}");
+            pathSuffix = Environment.NewLine + string.Join(Environment.NewLine, pathLines);
+        }
+
+        return $"- {idPrefix}[{diagnostic.ContractName}] {SourceTypeOf(diagnostic)} -> {nsDisplay}{context}: {refs}{pathSuffix}";
+    }
+
+    private static Dictionary<string, object?> ToCiJsonObject(ArchitectureDiagnostic diagnostic, bool includeContract)
+    {
+        var obj = new Dictionary<string, object?>();
+
+        if (includeContract)
+        {
+            obj["contract"] = diagnostic.ContractName;
+            obj["contract_id"] = diagnostic.ContractId;
+        }
+
+        obj["source"] = SourceTypeOf(diagnostic);
+        obj["forbidden_namespace"] = ForbiddenNamespaceOf(diagnostic);
+        obj["forbidden_references"] = ForbiddenReferencesOf(diagnostic).ToArray();
+
+        if (diagnostic is DependencyDiagnostic dependency)
+        {
+            if (dependency.SourceLayer != null)
+                obj["source_layer"] = dependency.SourceLayer;
+
+            if (dependency.TargetLayer != null)
+                obj["target_layer"] = dependency.TargetLayer;
+
+            if (dependency.AllowedImporters != null)
+                obj["allowed_importers"] = dependency.AllowedImporters.ToArray();
+        }
+
+        if (diagnostic is ExternalDependencyDiagnostic external)
+        {
+            obj["forbidden_external_group"] = external.ForbiddenExternalGroup;
+        }
+
+        if (diagnostic is ConfigurationDiagnostic configuration)
+        {
+            if (configuration.TemplateName != null)
+                obj["template_name"] = configuration.TemplateName;
+
+            if (configuration.ContainerNamespace != null)
+                obj["container_namespace"] = configuration.ContainerNamespace;
+
+            if (configuration.DependencyPaths != null)
+                obj["dependency_paths"] = configuration.DependencyPaths.Select(p => p.ToArray()).ToArray();
+        }
+
+        if (diagnostic.MatchedNamespacePrefixes != null)
+        {
+            obj["matched_namespace_prefixes"] = diagnostic.MatchedNamespacePrefixes.ToArray();
+            if (diagnostic.MatchedNamespacePrefixes.Count == 1)
+                obj["matched_namespace_prefix"] = diagnostic.MatchedNamespacePrefixes.First();
+        }
+
+        return obj;
+    }
 }
