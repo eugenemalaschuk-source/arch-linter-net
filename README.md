@@ -78,16 +78,16 @@ arch-linter-net --policy architecture/dependencies.arch.yml --mode strict
 ArchLinterNet focuses on static architecture guardrails:
 
 - YAML policy loading and schema-backed contract authoring.
-- Namespace/layer dependency contracts.
-- Ordered layer contracts.
-- Allow-only contracts.
-- Dependency cycle and acyclic sibling checks.
-- Independence contracts between layers/modules.
-- Protected surface contracts.
-- External dependency groups for vendor/framework leakage.
+- Namespace/layer dependency contracts and allow-only contracts.
+- Ordered layer contracts and reusable layer templates.
+- Dependency cycle, acyclic sibling, and independence checks.
+- Protected surface contracts for importer restrictions.
+- External dependency leakage checks for vendor/framework namespaces.
 - Method-body forbidden API checks.
-- Unity `.asmdef` dependency validation.
-- Strict gates, audit diagnostics, JSON output, and migration baselines.
+- Namespace coverage contracts for unmapped first-party namespaces.
+- Project/solution discovery when assemblies are not hand-listed.
+- Policy-consistency diagnostics for contradictory or unreachable policy definitions.
+- Strict gates, audit diagnostics, JSON output, timings, and migration baselines.
 
 ArchLinterNet does **not** validate runtime dependency injection behavior, authorization/security correctness, code ownership, semantic data flow, or arbitrary custom YAML fields outside the documented schema.
 
@@ -101,6 +101,7 @@ Public product documentation is published through MkDocs and GitHub Pages:
 - [CLI usage](https://eugenemalaschuk-source.github.io/arch-linter-net/cli/)
 - [Policy format](https://eugenemalaschuk-source.github.io/arch-linter-net/policy-format/)
 - [Contract families](https://eugenemalaschuk-source.github.io/arch-linter-net/contracts/)
+- [Namespace coverage contracts](https://eugenemalaschuk-source.github.io/arch-linter-net/contracts/coverage/)
 - [CI integration](https://eugenemalaschuk-source.github.io/arch-linter-net/guides/ci-integration/)
 - [AI policy authoring](https://eugenemalaschuk-source.github.io/arch-linter-net/ai/)
 - [Supported capabilities and non-goals](https://eugenemalaschuk-source.github.io/arch-linter-net/policy-format/supported-capabilities/)
@@ -113,6 +114,7 @@ Internal project documentation remains in repository Markdown files such as `doc
 make venv        # create Python virtual environment
 make docs-serve  # preview MkDocs locally
 make docs-build  # build the static documentation site
+make fmt-docs    # auto-format markdown documentation
 make lint-docs   # strict documentation validation
 ```
 
