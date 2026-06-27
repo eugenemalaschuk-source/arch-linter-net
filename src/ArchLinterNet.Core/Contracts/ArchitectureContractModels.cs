@@ -194,6 +194,7 @@ public sealed class ArchitectureContractGroups
         foreach (var c in StrictProtected) yield return c;
         foreach (var c in StrictExternal) yield return c;
         foreach (var c in StrictAcyclicSiblings) yield return c;
+        foreach (var c in StrictCoverage) yield return c;
     }
 
     private IEnumerable<IArchitectureContract> EnumerateAudit()
@@ -208,6 +209,7 @@ public sealed class ArchitectureContractGroups
         foreach (var c in AuditProtected) yield return c;
         foreach (var c in AuditExternal) yield return c;
         foreach (var c in AuditAcyclicSiblings) yield return c;
+        foreach (var c in AuditCoverage) yield return c;
     }
 }
 
@@ -341,10 +343,30 @@ public sealed class ArchitectureAcyclicSiblingContract : IArchitectureContract
     [YamlMember(Alias = "reason")] public string Reason { get; set; } = string.Empty;
 }
 
-// Minimal binding for the reviewed coverage shape (see openspec/specs/architecture-coverage-model).
-// Deliberately not executed by any contract family yet; ArchitectureRunnerFactory.LoadDocument
-// rejects any declared coverage contract so the schema cannot accept a policy the runtime
-// silently ignores. The full shape (roots/between/contract_ids/exclude) is implemented by #97-#103.
+public sealed class ArchitectureCoverageRoot
+{
+    [YamlMember(Alias = "namespace")] public string Namespace { get; set; } = string.Empty;
+
+    [YamlMember(Alias = "namespace_suffix")] public string NamespaceSuffix { get; set; } = string.Empty;
+
+    [YamlMember(Alias = "include")] public List<string> Include { get; set; } = new();
+
+    [YamlMember(Alias = "exclude")] public List<string> Exclude { get; set; } = new();
+}
+
+public sealed class ArchitectureCoverageExclusion
+{
+    [YamlMember(Alias = "namespace")] public string Namespace { get; set; } = string.Empty;
+
+    [YamlMember(Alias = "namespace_suffix")] public string NamespaceSuffix { get; set; } = string.Empty;
+
+    [YamlMember(Alias = "project")] public string Project { get; set; } = string.Empty;
+
+    [YamlMember(Alias = "assembly")] public string Assembly { get; set; } = string.Empty;
+
+    [YamlMember(Alias = "reason")] public string Reason { get; set; } = string.Empty;
+}
+
 public sealed class ArchitectureCoverageContract : IArchitectureContract
 {
     [YamlMember(Alias = "name")] public string Name { get; set; } = string.Empty;
@@ -352,6 +374,14 @@ public sealed class ArchitectureCoverageContract : IArchitectureContract
     [YamlMember(Alias = "id")] public string? Id { get; set; }
 
     [YamlMember(Alias = "scope")] public string Scope { get; set; } = string.Empty;
+
+    [YamlMember(Alias = "roots")] public List<ArchitectureCoverageRoot> Roots { get; set; } = new();
+
+    [YamlMember(Alias = "between")] public List<List<string>> Between { get; set; } = new();
+
+    [YamlMember(Alias = "contract_ids")] public List<string> ContractIds { get; set; } = new();
+
+    [YamlMember(Alias = "exclude")] public List<ArchitectureCoverageExclusion> Exclude { get; set; } = new();
 
     [YamlMember(Alias = "reason")] public string Reason { get; set; } = string.Empty;
 }
