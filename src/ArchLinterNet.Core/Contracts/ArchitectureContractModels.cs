@@ -63,6 +63,9 @@ public sealed class ArchitectureAnalysisConfiguration
     [YamlMember(Alias = "policy_consistency")]
     public string PolicyConsistency { get; set; } = "error";
 
+    [YamlMember(Alias = "coverage")]
+    public string Coverage { get; set; } = "error";
+
     [YamlMember(Alias = "condition_sets")]
     public Dictionary<string, List<string>> ConditionSets { get; set; } = new();
 
@@ -164,6 +167,16 @@ public sealed class ArchitectureContractGroups
 
     [YamlMember(Alias = "audit_acyclic_siblings")]
     public List<ArchitectureAcyclicSiblingContract> AuditAcyclicSiblings { get; set; } = new();
+
+    // Bound (not executed) so a schema-valid coverage contract is detected and rejected with a
+    // clear "reserved, not implemented" diagnostic instead of being silently dropped by
+    // IgnoreUnmatchedProperties deserialization. See ArchitectureRunnerFactory.LoadDocument.
+    // The coverage engine itself is implemented by #97-#103.
+    [YamlMember(Alias = "strict_coverage")]
+    public List<ArchitectureCoverageContract> StrictCoverage { get; set; } = new();
+
+    [YamlMember(Alias = "audit_coverage")]
+    public List<ArchitectureCoverageContract> AuditCoverage { get; set; } = new();
 
     public IEnumerable<IArchitectureContract> AllStrict => EnumerateStrict();
 
@@ -324,6 +337,21 @@ public sealed class ArchitectureAcyclicSiblingContract : IArchitectureContract
 
     [YamlMember(Alias = "ignored_violations")]
     public List<ArchitectureIgnoredViolation> IgnoredViolations { get; set; } = new();
+
+    [YamlMember(Alias = "reason")] public string Reason { get; set; } = string.Empty;
+}
+
+// Minimal binding for the reviewed coverage shape (see openspec/specs/architecture-coverage-model).
+// Deliberately not executed by any contract family yet; ArchitectureRunnerFactory.LoadDocument
+// rejects any declared coverage contract so the schema cannot accept a policy the runtime
+// silently ignores. The full shape (roots/between/contract_ids/exclude) is implemented by #97-#103.
+public sealed class ArchitectureCoverageContract : IArchitectureContract
+{
+    [YamlMember(Alias = "name")] public string Name { get; set; } = string.Empty;
+
+    [YamlMember(Alias = "id")] public string? Id { get; set; }
+
+    [YamlMember(Alias = "scope")] public string Scope { get; set; } = string.Empty;
 
     [YamlMember(Alias = "reason")] public string Reason { get; set; } = string.Empty;
 }
