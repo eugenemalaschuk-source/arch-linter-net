@@ -231,4 +231,50 @@ public sealed class ArchitectureCoverageInventoryTests
             Directory.Delete(repoRoot, true);
         }
     }
+
+    [Test]
+    public void BuildRunner_NoSolutionOrProjectsConfigured_ProjectDiscoveryIsAbsentNotEmpty()
+    {
+        string repoRoot = Path.Combine(Path.GetTempPath(), $"arch-linter-coverage-inventory-no-discovery-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(repoRoot);
+        try
+        {
+            string policyPath = Path.Combine(repoRoot, "policy.arch.yml");
+            File.WriteAllText(policyPath, "version: 1\nname: test\n");
+
+            var document = new ArchitectureContractDocument
+            {
+                Version = 1,
+                Name = "Test",
+                Analysis = new ArchitectureAnalysisConfiguration
+                {
+                    TargetAssemblies = new List<string> { "ArchLinterNet.Core" }
+                }
+            };
+
+            ArchitectureRunnerSetup setup = ArchitectureRunnerFactory.BuildRunner(document, policyPath);
+
+            ArchitectureCoverageInventory inventory = setup.Runner.Session.BuildCoverageInventory(document);
+
+            Assert.That(inventory.ProjectDiscovery, Is.Null,
+                "no analysis.solution/analysis.projects means discovery was never attempted, " +
+                "which must be distinguishable from discovery running and finding nothing");
+        }
+        finally
+        {
+            Directory.Delete(repoRoot, true);
+        }
+    }
+
+    [Test]
+    public void Session_BuildCoverageInventory_RepeatedCalls_ReturnSameCachedInstance()
+    {
+        ArchitectureAnalysisSession session = CreateSession();
+        ArchitectureContractDocument document = CreateDocument();
+
+        ArchitectureCoverageInventory first = session.BuildCoverageInventory(document);
+        ArchitectureCoverageInventory second = session.BuildCoverageInventory(document);
+
+        Assert.That(second, Is.SameAs(first));
+    }
 }

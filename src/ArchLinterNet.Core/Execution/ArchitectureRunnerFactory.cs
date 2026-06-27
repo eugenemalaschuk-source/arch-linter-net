@@ -80,8 +80,11 @@ public static class ArchitectureRunnerFactory
             }
 
             ResolutionResult resolution = ArchitectureAssemblyResolver.ResolveFromDocument(document, repositoryRoot);
+            ProjectDiscoveryResult? attemptedDiscovery = ReferenceEquals(discovery, ProjectDiscoveryResult.Empty)
+                ? null
+                : discovery;
             ArchitectureAnalysisContext context = new(repositoryRoot, resolution.ResolvedAssemblies,
-                resolution.MissingAssemblyNames, resolution.AssemblyProbingPaths, discovery.Diagnostics, discovery);
+                resolution.MissingAssemblyNames, resolution.AssemblyProbingPaths, discovery.Diagnostics, attemptedDiscovery);
             runner = new ArchitectureContractRunner(context, document, selectedContractIds,
                 enableUnmatchedIgnoreTracking, preprocessorSymbols: symbols);
         }

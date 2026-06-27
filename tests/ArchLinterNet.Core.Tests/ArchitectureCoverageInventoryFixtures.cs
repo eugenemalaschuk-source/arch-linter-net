@@ -10,6 +10,7 @@ namespace ArchLinterNet.Core.Tests.CoverageInventoryFixtures.Alpha
     internal sealed class AlphaOtherType
     {
         public AlphaType? SameNamespaceReference;
+        public ArchLinterNet.Core.Tests.CoverageInventoryFixtures.Beta.BetaOtherType? AnotherReference;
     }
 }
 
