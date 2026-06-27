@@ -1,7 +1,7 @@
 # architecture-coverage-model Specification
 
 ## Purpose
-TBD - created by archiving change 2026-06-27-design-architecture-coverage-model. Update Purpose after archive.
+Define the architecture coverage vocabulary, strict/audit YAML contract shape, scope rules, exclusion/severity behavior, and diagnostic identity that future coverage contract families (#97-#103) implement against. This capability is design-only: no coverage engine, checker, or diagnostic kind is implemented by it.
 ## Requirements
 ### Requirement: Coverage vocabulary is defined
 The architecture coverage model SHALL define exactly six classification terms for first-party units (namespace, project, assembly, or dependency edge): `covered`, `excluded`, `uncovered`, `unknown`, `stale`, and `empty-input`, each with a distinct meaning that does not overlap another term.

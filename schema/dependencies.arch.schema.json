@@ -505,6 +505,11 @@
     "coverageRoot": {
       "type": "object",
       "additionalProperties": false,
+      "minProperties": 1,
+      "anyOf": [
+        { "required": ["namespace"] },
+        { "required": ["include"] }
+      ],
       "properties": {
         "namespace": { "type": "string", "minLength": 1, "description": "Namespace prefix or glob pattern, same syntax as layers.<name>.namespace. Used for scope: namespace." },
         "namespace_suffix": { "type": "string", "description": "Optional namespace suffix constraint, same syntax as layers.<name>.namespace_suffix." },
@@ -516,6 +521,12 @@
       "type": "object",
       "additionalProperties": false,
       "required": ["reason"],
+      "anyOf": [
+        { "required": ["namespace"] },
+        { "required": ["namespace_suffix"] },
+        { "required": ["project"] },
+        { "required": ["assembly"] }
+      ],
       "properties": {
         "namespace": { "type": "string", "minLength": 1 },
         "namespace_suffix": { "type": "string", "minLength": 1 },
@@ -529,47 +540,81 @@
       }
     },
     "coverageContract": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": ["name", "scope", "reason"],
-      "properties": {
-        "name": { "type": "string", "minLength": 1 },
-        "id": { "type": "string", "minLength": 1, "description": "Stable contract identifier for CLI selection and cross-referencing." },
-        "scope": {
-          "type": "string",
-          "enum": ["namespace", "project", "assembly", "dependency_edge", "rule_input"],
-          "description": "Which kind of first-party unit this coverage contract classifies."
+      "allOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["name", "scope", "reason"],
+          "properties": {
+            "name": { "type": "string", "minLength": 1 },
+            "id": { "type": "string", "minLength": 1, "description": "Stable contract identifier for CLI selection and cross-referencing." },
+            "scope": {
+              "type": "string",
+              "enum": ["namespace", "project", "assembly", "dependency_edge", "rule_input"],
+              "description": "Which kind of first-party unit this coverage contract classifies."
+            },
+            "roots": {
+              "type": "array",
+              "items": { "$ref": "#/$defs/coverageRoot" },
+              "minItems": 1,
+              "description": "Units to classify. Required for, and only valid with, scope: namespace, project, or assembly."
+            },
+            "between": {
+              "type": "array",
+              "items": {
+                "type": "array",
+                "items": { "type": "string", "minLength": 1 },
+                "minItems": 2,
+                "maxItems": 2
+              },
+              "minItems": 1,
+              "description": "Declared-layer-name pairs to classify. Required for, and only valid with, scope: dependency_edge."
+            },
+            "contract_ids": {
+              "$ref": "#/$defs/stringList",
+              "description": "Contract IDs whose rule inputs are checked for stale/empty-input status. Required for, and only valid with, scope: rule_input."
+            },
+            "exclude": {
+              "type": "array",
+              "items": { "$ref": "#/$defs/coverageExclusion" },
+              "default": []
+            },
+            "reason": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Why this coverage contract exists."
+            }
+          }
         },
-        "roots": {
-          "type": "array",
-          "items": { "$ref": "#/$defs/coverageRoot" },
-          "description": "Units to classify. Used for scope: namespace, project, assembly."
+        {
+          "if": { "properties": { "scope": { "const": "namespace" } }, "required": ["scope"] },
+          "then": {
+            "required": ["roots"],
+            "not": { "anyOf": [{ "required": ["between"] }, { "required": ["contract_ids"] }] }
+          }
         },
-        "between": {
-          "type": "array",
-          "items": {
-            "type": "array",
-            "items": { "type": "string", "minLength": 1 },
-            "minItems": 2,
-            "maxItems": 2
-          },
-          "description": "Declared-layer-name pairs to classify. Used for scope: dependency_edge."
+        {
+          "if": { "properties": { "scope": { "enum": ["project", "assembly"] } }, "required": ["scope"] },
+          "then": {
+            "required": ["roots"],
+            "not": { "anyOf": [{ "required": ["between"] }, { "required": ["contract_ids"] }] }
+          }
         },
-        "contract_ids": {
-          "$ref": "#/$defs/stringList",
-          "description": "Contract IDs whose rule inputs are checked for stale/empty-input status. Used for scope: rule_input."
+        {
+          "if": { "properties": { "scope": { "const": "dependency_edge" } }, "required": ["scope"] },
+          "then": {
+            "required": ["between"],
+            "not": { "anyOf": [{ "required": ["roots"] }, { "required": ["contract_ids"] }] }
+          }
         },
-        "exclude": {
-          "type": "array",
-          "items": { "$ref": "#/$defs/coverageExclusion" },
-          "default": []
-        },
-        "reason": {
-          "type": "string",
-          "minLength": 1,
-          "description": "Why this coverage contract exists."
+        {
+          "if": { "properties": { "scope": { "const": "rule_input" } }, "required": ["scope"] },
+          "then": {
+            "required": ["contract_ids"],
+            "not": { "anyOf": [{ "required": ["roots"] }, { "required": ["between"] }] }
+          }
         }
-      }
+      ]
     }
   }
 }
