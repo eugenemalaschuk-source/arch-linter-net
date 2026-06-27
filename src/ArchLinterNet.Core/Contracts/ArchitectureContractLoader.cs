@@ -301,6 +301,15 @@ public static class ArchitectureContractLoader
         }
     }
 
+    // Limited to the contract families ArchitectureContractRunner's GetReferencedLayerNames
+    // actually maps to document.Layers keys. Asmdef (source_assemblies, not a layer namespace),
+    // acyclic_sibling (ancestors are namespace prefixes, not layer keys), and layer_template are
+    // intentionally excluded: layer_template's expanded ArchitectureLayerContract instances carry
+    // synthetic IDs ("<template>/<container>") distinct from the authored template ID, and their
+    // Layers entries are concrete namespaces rather than document.Layers keys, so neither the ID
+    // nor the field values resolve the way rule-input coverage expects. Referencing one of these
+    // families is therefore rejected below as an unknown contract ID rather than silently
+    // producing zero findings.
     private static HashSet<string> CollectLayerBearingContractIds(ArchitectureContractDocument document)
     {
         IEnumerable<IArchitectureContract>[] groups =
@@ -315,18 +324,12 @@ public static class ArchitectureContractLoader
             document.Contracts.AuditCycles,
             document.Contracts.StrictMethodBody,
             document.Contracts.AuditMethodBody,
-            document.Contracts.StrictAsmdef,
-            document.Contracts.AuditAsmdef,
             document.Contracts.StrictIndependence,
             document.Contracts.AuditIndependence,
             document.Contracts.StrictProtected,
             document.Contracts.AuditProtected,
             document.Contracts.StrictExternal,
             document.Contracts.AuditExternal,
-            document.Contracts.StrictLayerTemplates,
-            document.Contracts.AuditLayerTemplates,
-            document.Contracts.StrictAcyclicSiblings,
-            document.Contracts.AuditAcyclicSiblings,
         ];
 
         return new HashSet<string>(

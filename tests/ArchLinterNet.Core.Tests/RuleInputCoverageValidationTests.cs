@@ -36,7 +36,11 @@ public sealed class RuleInputCoverageValidationTests
     private string AssemblyName => typeof(RuleInputCoverageValidationTests).Assembly.GetName().Name!;
 
     private string BuildPolicy(
-        string coverageGroup, string referencedRuleGroup, string? analysisCoverage = null, string extraExclude = "")
+        string coverageGroup,
+        string referencedRuleGroup,
+        string? analysisCoverage = null,
+        string extraExclude = "",
+        string extraContracts = "")
     {
         string coverageSetting = analysisCoverage is null
             ? string.Empty
@@ -61,6 +65,7 @@ public sealed class RuleInputCoverageValidationTests
                $"      source: video{Environment.NewLine}" +
                $"      forbidden: [ghost]{Environment.NewLine}" +
                $"      reason: Video must not depend on ghost.{Environment.NewLine}" +
+               extraContracts +
                $"  {coverageGroup}:{Environment.NewLine}" +
                $"    - id: rule-input-coverage{Environment.NewLine}" +
                $"      name: rule-input-coverage{Environment.NewLine}" +
@@ -71,13 +76,14 @@ public sealed class RuleInputCoverageValidationTests
     }
 
     [Test]
-    public void StrictRuleInputCoverage_DefaultSeverity_FailsAndReportsEmptyInput()
+    public void StrictRuleInputCoverage_SameModeDefaultSeverity_FailsViaCoverageOnly()
     {
-        // The referenced rule is declared in the 'audit' group so the pre-existing, unconditional
-        // CheckConfiguration "empty layer namespace" check (which only scans the strict-mode
-        // group's layers when validating in strict mode) does not also fire on the same gap and
-        // confound the assertion below with an unrelated violation.
-        string policyPath = WritePolicy(BuildPolicy("strict_coverage", referencedRuleGroup: "audit"));
+        // Referenced rule is in the SAME group ('strict') as the validated mode. Before the fix,
+        // the pre-existing, unconditional CheckConfiguration "empty layer namespace" check would
+        // also fire on this exact gap regardless of analysis.coverage, making rule_input
+        // severity/exclusion meaningless for the dominant same-mode case. Asserting Violations is
+        // empty proves CheckConfiguration now defers to the coverage contract that tracks this ID.
+        string policyPath = WritePolicy(BuildPolicy("strict_coverage", referencedRuleGroup: "strict"));
 
         ValidationOutcome outcome = ArchitectureValidationService.Validate(new ValidationRequest
         {
@@ -86,15 +92,16 @@ public sealed class RuleInputCoverageValidationTests
         });
 
         Assert.That(outcome.Passed, Is.False);
+        Assert.That(outcome.Violations, Is.Empty);
         Assert.That(outcome.CoverageFindings, Has.Count.EqualTo(1));
         Assert.That(outcome.CoverageFindings.Single().ForbiddenNamespace, Is.EqualTo("empty-input"));
     }
 
     [Test]
-    public void AuditRuleInputCoverage_WarnSeverity_ReportsWithoutFailing()
+    public void AuditRuleInputCoverage_SameModeWarnSeverity_ReportsWithoutFailing()
     {
         string policyPath = WritePolicy(
-            BuildPolicy("audit_coverage", referencedRuleGroup: "strict", analysisCoverage: "warn"));
+            BuildPolicy("audit_coverage", referencedRuleGroup: "audit", analysisCoverage: "warn"));
 
         ValidationOutcome outcome = ArchitectureValidationService.Validate(new ValidationRequest
         {
@@ -103,20 +110,16 @@ public sealed class RuleInputCoverageValidationTests
         });
 
         Assert.That(outcome.Passed, Is.True);
+        Assert.That(outcome.Violations, Is.Empty);
         Assert.That(outcome.CoverageConfig, Is.EqualTo("warn"));
         Assert.That(outcome.CoverageFindings, Has.Count.EqualTo(1));
     }
 
     [Test]
-    public void RuleInputCoverage_IntentionallyEmptyExclusion_SuppressesFinding()
+    public void StrictRuleInputCoverage_SameModeOffSeverity_SuppressesFindingAndPasses()
     {
-        string extraExclude =
-            $"      exclude:{Environment.NewLine}" +
-            $"        - contract_id: video-to-ghost-rule{Environment.NewLine}" +
-            $"          reason: Ghost layer is intentionally unused for now.{Environment.NewLine}";
-
         string policyPath = WritePolicy(
-            BuildPolicy("strict_coverage", referencedRuleGroup: "audit", extraExclude: extraExclude));
+            BuildPolicy("strict_coverage", referencedRuleGroup: "strict", analysisCoverage: "off"));
 
         ValidationOutcome outcome = ArchitectureValidationService.Validate(new ValidationRequest
         {
@@ -125,7 +128,57 @@ public sealed class RuleInputCoverageValidationTests
         });
 
         Assert.That(outcome.Passed, Is.True);
+        Assert.That(outcome.Violations, Is.Empty);
         Assert.That(outcome.CoverageFindings, Is.Empty);
+    }
+
+    [Test]
+    public void RuleInputCoverage_SameModeIntentionallyEmptyExclusion_SuppressesFindingAndPasses()
+    {
+        string extraExclude =
+            $"      exclude:{Environment.NewLine}" +
+            $"        - contract_id: video-to-ghost-rule{Environment.NewLine}" +
+            $"          reason: Ghost layer is intentionally unused for now.{Environment.NewLine}";
+
+        string policyPath = WritePolicy(
+            BuildPolicy("strict_coverage", referencedRuleGroup: "strict", extraExclude: extraExclude));
+
+        ValidationOutcome outcome = ArchitectureValidationService.Validate(new ValidationRequest
+        {
+            PolicyPath = policyPath,
+            Mode = "strict"
+        });
+
+        Assert.That(outcome.Passed, Is.True);
+        Assert.That(outcome.Violations, Is.Empty);
+        Assert.That(outcome.CoverageFindings, Is.Empty);
+    }
+
+    [Test]
+    public void RuleInputCoverage_UnreferencedRuleWithEmptyLayer_StillFailsViaConfigurationCheck()
+    {
+        // A second strict rule that targets the same empty 'ghost' layer but is NOT listed in
+        // contract_ids must still be caught by the pre-existing, unconditional CheckConfiguration
+        // check — only contracts a rule_input coverage contract explicitly tracks defer to it.
+        string extraContracts =
+            $"    - id: audio-to-ghost-rule{Environment.NewLine}" +
+            $"      name: audio-to-ghost-rule{Environment.NewLine}" +
+            $"      source: audio{Environment.NewLine}" +
+            $"      forbidden: [ghost]{Environment.NewLine}" +
+            $"      reason: Audio must not depend on ghost.{Environment.NewLine}";
+
+        string policyPath = WritePolicy(
+            BuildPolicy("strict_coverage", referencedRuleGroup: "strict", extraContracts: extraContracts));
+
+        ValidationOutcome outcome = ArchitectureValidationService.Validate(new ValidationRequest
+        {
+            PolicyPath = policyPath,
+            Mode = "strict"
+        });
+
+        Assert.That(outcome.Passed, Is.False);
+        Assert.That(outcome.Violations.Select(v => v.ForbiddenNamespace), Has.Member("empty layer namespace"));
+        Assert.That(outcome.CoverageFindings, Has.Count.EqualTo(1));
     }
 
     [Test]
@@ -221,6 +274,108 @@ public sealed class RuleInputCoverageValidationTests
     }
 
     [Test]
+    public void RuleInputCoverage_AsmdefContractId_ThrowsActionableError()
+    {
+        string policyPath = WritePolicy("""
+            version: 1
+            name: Test
+
+            analysis:
+              target_assemblies: [ArchLinterNet.Core]
+
+            contracts:
+              strict_asmdef:
+                - id: editor-asmdef-rule
+                  name: editor-asmdef-rule
+                  source_assemblies: [MyApp.Editor]
+                  forbidden_editor_refs: true
+                  reason: Placeholder.
+              strict_coverage:
+                - name: rule-input-coverage
+                  scope: rule_input
+                  contract_ids: [editor-asmdef-rule]
+                  reason: Invalid rule-input coverage contract.
+            """);
+
+        InvalidOperationException ex = Assert.Throws<InvalidOperationException>(() =>
+            ArchitectureValidationService.Validate(new ValidationRequest
+            {
+                PolicyPath = policyPath,
+                Mode = "strict"
+            }))!;
+
+        Assert.That(ex.Message, Does.Contain("unknown contract ID 'editor-asmdef-rule'"));
+    }
+
+    [Test]
+    public void RuleInputCoverage_AcyclicSiblingContractId_ThrowsActionableError()
+    {
+        string policyPath = WritePolicy("""
+            version: 1
+            name: Test
+
+            analysis:
+              target_assemblies: [ArchLinterNet.Core]
+
+            contracts:
+              strict_acyclic_siblings:
+                - id: feature-siblings-rule
+                  name: feature-siblings-rule
+                  ancestors: [MyApp.Features]
+                  reason: Placeholder.
+              strict_coverage:
+                - name: rule-input-coverage
+                  scope: rule_input
+                  contract_ids: [feature-siblings-rule]
+                  reason: Invalid rule-input coverage contract.
+            """);
+
+        InvalidOperationException ex = Assert.Throws<InvalidOperationException>(() =>
+            ArchitectureValidationService.Validate(new ValidationRequest
+            {
+                PolicyPath = policyPath,
+                Mode = "strict"
+            }))!;
+
+        Assert.That(ex.Message, Does.Contain("unknown contract ID 'feature-siblings-rule'"));
+    }
+
+    [Test]
+    public void RuleInputCoverage_LayerTemplateContractId_ThrowsActionableError()
+    {
+        string policyPath = WritePolicy("""
+            version: 1
+            name: Test
+
+            analysis:
+              target_assemblies: [ArchLinterNet.Core]
+
+            contracts:
+              strict_layer_templates:
+                - id: feature-template
+                  name: feature-template
+                  containers: [MyApp.Features.Billing]
+                  layers:
+                    - name: Contracts
+                  reason: Placeholder.
+              strict_coverage:
+                - name: rule-input-coverage
+                  scope: rule_input
+                  contract_ids: [feature-template]
+                  reason: Invalid rule-input coverage contract.
+            """);
+
+        InvalidOperationException ex = Assert.Throws<InvalidOperationException>(() =>
+            ArchitectureValidationService.Validate(new ValidationRequest
+            {
+                PolicyPath = policyPath,
+                Mode = "strict"
+            }))!;
+
+        Assert.That(ex.Message, Does.Contain("unknown contract ID 'feature-template'"));
+    }
+
+    [Test]
     public void RuleInputCoverage_ExclusionWithoutReason_ThrowsActionableError()
     {
         string extraExclude =
@@ -228,7 +383,7 @@ public sealed class RuleInputCoverageValidationTests
             $"        - contract_id: video-to-ghost-rule{Environment.NewLine}";
 
         string policyPath = WritePolicy(
-            BuildPolicy("strict_coverage", referencedRuleGroup: "audit", extraExclude: extraExclude));
+            BuildPolicy("strict_coverage", referencedRuleGroup: "strict", extraExclude: extraExclude));
 
         InvalidOperationException ex = Assert.Throws<InvalidOperationException>(() =>
             ArchitectureValidationService.Validate(new ValidationRequest
@@ -248,7 +403,7 @@ public sealed class RuleInputCoverageValidationTests
             $"        - reason: Missing contract_id matcher.{Environment.NewLine}";
 
         string policyPath = WritePolicy(
-            BuildPolicy("strict_coverage", referencedRuleGroup: "audit", extraExclude: extraExclude));
+            BuildPolicy("strict_coverage", referencedRuleGroup: "strict", extraExclude: extraExclude));
 
         InvalidOperationException ex = Assert.Throws<InvalidOperationException>(() =>
             ArchitectureValidationService.Validate(new ValidationRequest

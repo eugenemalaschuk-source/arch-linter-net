@@ -453,11 +453,13 @@ Rule-input coverage (`scope: rule_input`) resolves each entry in
   pattern currently matches zero namespaces in the analysis inventory.
 
 `contract_ids` may reference dependency, layer, allow_only, cycle,
-method_body, independence, protected, external, asmdef, acyclic_sibling, or
-layer_template contracts. An unknown ID, or an ID belonging to a coverage
-contract, is rejected at load time. `exclude` entries for `scope: rule_input`
-must use `contract_id` and suppress both `unresolved` and `empty-input`
-findings for that referenced contract.
+method_body, independence, protected, or external contracts — the families
+whose layer-bearing fields are plain `layers` keys. An unknown ID, an
+asmdef/acyclic_sibling/layer_template contract ID (their fields are not plain
+layer-name references), or an ID belonging to a coverage contract, is
+rejected at load time. `exclude` entries for `scope: rule_input` must use
+`contract_id` and suppress both `unresolved` and `empty-input` findings for
+that referenced contract.
 
 Example:
 

@@ -56,7 +56,7 @@ A `scope: rule_input` contract resolves each entry in `contract_ids` to its refe
 - `unresolved` — the referenced field names a layer that is not declared under `layers` at all (a typo or a deleted layer);
 - `empty-input` — the referenced field names a declared layer whose namespace pattern currently matches zero namespaces in the analyzed codebase, whether it never matched any code or stopped matching after a rename/deletion.
 
-`contract_ids` may reference dependency, layer, allow_only, cycle, method_body, independence, protected, external, asmdef, acyclic_sibling, or layer_template contracts. Referencing an unknown contract ID, or a coverage contract, is rejected at load time.
+`contract_ids` may reference dependency, layer, allow_only, cycle, method_body, independence, protected, or external contracts — the families whose layer-bearing fields are plain `layers` keys. Referencing an unknown contract ID, an asmdef/acyclic_sibling/layer_template contract (whose fields are not plain layer-name references), or a coverage contract, is rejected at load time.
 
 ## What counts as covered
 
