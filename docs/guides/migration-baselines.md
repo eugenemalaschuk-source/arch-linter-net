@@ -110,3 +110,58 @@ Baseline entries that no longer match any current violation are detected by the
 runner's unmatched ignored violation tracking (same as manual ignores). When
 `analysis.unmatched_ignored_violations` is set to `error` (default), stale
 baseline entries produce a blocking failure, encouraging proactive cleanup.
+
+## Coverage baselines
+
+`strict_coverage` and `audit_coverage` contracts (see
+[architecture coverage](../contracts/coverage.md)) support the same
+`ignored_violations` and baseline mechanism as ordinary dependency contracts.
+This lets teams adopt coverage gates incrementally on a repository that
+already has uncovered namespaces or stale rule-input references, rather than
+having to resolve every coverage gap before turning the gate on.
+
+```bash
+arch-linter-net baseline generate \
+  --config architecture/dependencies.arch.yml \
+  --output baseline.yml \
+  --reason "Coverage baseline — tracked in #103"
+```
+
+For a `namespace`-scoped coverage contract, each currently uncovered namespace
+is captured as `source_type: <namespace>` /
+`forbidden_reference: "uncovered namespace"`:
+
+```yaml
+version: 1
+baseline:
+  strict_coverage:
+    - id: feature-namespace-coverage
+      ignored_violations:
+        - source_type: MyApp.Features.Legacy
+          forbidden_reference: "uncovered namespace"
+          reason: "Coverage baseline — tracked in #103"
+```
+
+For a `rule_input`-scoped coverage contract, each unresolved or empty-input
+rule reference is captured as `source_type: <referenced-contract-id>` /
+`forbidden_reference: <layer-name>`:
+
+```yaml
+version: 1
+baseline:
+  strict_coverage:
+    - id: rule-input-coverage
+      ignored_violations:
+        - source_type: video-to-ghost-rule
+          forbidden_reference: ghost
+          reason: "Coverage baseline — tracked in #103"
+```
+
+`validate --baseline` suppresses these baselined coverage findings while still
+reporting newly uncovered areas, exactly like ordinary dependency violations.
+Coverage baseline entries only affect coverage contract findings — they never
+suppress or otherwise interact with `strict`/`audit` dependency violations.
+A coverage baseline entry whose underlying gap has since been resolved (the
+namespace became covered, or the rule reference became resolved again) is
+reported as a stale baseline entry through the same
+`unmatched_ignored_violations` mechanism described above.

@@ -55,6 +55,8 @@ public static class ArchitectureBaselineLoader
         ValidateGroupEntries(document.Baseline.AuditProtected, "audit_protected");
         ValidateGroupEntries(document.Baseline.StrictExternal, "strict_external");
         ValidateGroupEntries(document.Baseline.AuditExternal, "audit_external");
+        ValidateGroupEntries(document.Baseline.StrictCoverage, "strict_coverage");
+        ValidateGroupEntries(document.Baseline.AuditCoverage, "audit_coverage");
     }
 
     private static void ValidateGroupEntries(List<ArchitectureBaselineContractEntry> entries, string groupName)

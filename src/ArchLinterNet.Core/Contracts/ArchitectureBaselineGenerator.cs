@@ -108,6 +108,8 @@ public static class ArchitectureBaselineGenerator
             case "audit_protected": groups.AuditProtected = entries; break;
             case "strict_external": groups.StrictExternal = entries; break;
             case "audit_external": groups.AuditExternal = entries; break;
+            case "strict_coverage": groups.StrictCoverage = entries; break;
+            case "audit_coverage": groups.AuditCoverage = entries; break;
         }
     }
 }
