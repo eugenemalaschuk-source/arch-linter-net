@@ -13,11 +13,16 @@ public sealed partial class ArchitectureContractRunner
             return new List<ArchitectureViolation>();
         }
 
+        if (string.Equals(contract.Scope, "rule_input", StringComparison.Ordinal))
+        {
+            return CheckRuleInputCoverageContract(contract);
+        }
+
         if (!string.Equals(contract.Scope, "namespace", StringComparison.Ordinal))
         {
             throw new InvalidOperationException(
                 $"Coverage contract '{contract.Name}' declares unsupported scope '{contract.Scope}'. " +
-                "Only scope 'namespace' is implemented right now.");
+                "Only scopes 'namespace' and 'rule_input' are implemented right now.");
         }
 
         ArchitectureCoverageInventory inventory = _session.BuildCoverageInventory(_document);
@@ -34,6 +39,73 @@ public sealed partial class ArchitectureContractRunner
                 entry.Namespace,
                 "uncovered namespace",
                 new[] { entry.RepresentativeType }))
+            .ToList();
+    }
+
+    private List<ArchitectureViolation> CheckRuleInputCoverageContract(ArchitectureCoverageContract contract)
+    {
+        ArchitectureCoverageInventory inventory = _session.BuildCoverageInventory(_document);
+
+        HashSet<string> excludedContractIds = new(
+            contract.Exclude
+                .Where(exclusion => !string.IsNullOrWhiteSpace(exclusion.ContractId))
+                .Select(exclusion => exclusion.ContractId),
+            StringComparer.OrdinalIgnoreCase);
+
+        Dictionary<string, ArchitectureContractDescriptor> descriptorsById = BuildAllDescriptors()
+            .Where(descriptor => !string.IsNullOrEmpty(descriptor.Id))
+            .GroupBy(descriptor => descriptor.Id!, StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(group => group.Key, group => group.First(), StringComparer.OrdinalIgnoreCase);
+
+        List<ArchitectureViolation> findings = new();
+
+        foreach (string referencedContractId in contract.ContractIds)
+        {
+            if (excludedContractIds.Contains(referencedContractId))
+            {
+                continue;
+            }
+
+            if (!descriptorsById.TryGetValue(referencedContractId, out ArchitectureContractDescriptor? descriptor))
+            {
+                continue;
+            }
+
+            IReadOnlyList<string> referencedLayerNames = GetReferencedLayerNames(descriptor.Contract)
+                .Distinct(StringComparer.Ordinal)
+                .ToList();
+
+            foreach (string layerName in referencedLayerNames)
+            {
+                if (!_document.Layers.TryGetValue(layerName, out ArchitectureLayer? layer))
+                {
+                    findings.Add(new ArchitectureViolation(
+                        contract.Name,
+                        contract.Id,
+                        referencedContractId,
+                        "unresolved",
+                        new[] { layerName }));
+                    continue;
+                }
+
+                bool matchesAnyCode = inventory.Namespaces.Any(entry =>
+                    ArchitectureLayerResolver.MatchesNamespace(layer, entry.Namespace));
+
+                if (!matchesAnyCode)
+                {
+                    findings.Add(new ArchitectureViolation(
+                        contract.Name,
+                        contract.Id,
+                        referencedContractId,
+                        "empty-input",
+                        new[] { layerName }));
+                }
+            }
+        }
+
+        return findings
+            .OrderBy(f => f.SourceType, StringComparer.Ordinal)
+            .ThenBy(f => f.ForbiddenReferences.First(), StringComparer.Ordinal)
             .ToList();
     }
 

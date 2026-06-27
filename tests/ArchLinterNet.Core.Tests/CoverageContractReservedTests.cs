@@ -150,7 +150,7 @@ public sealed class CoverageContractReservedTests
                 Mode = "strict"
             }))!;
 
-        Assert.That(ex.Message, Does.Contain("Only coverage contracts with scope 'namespace' are implemented"));
+        Assert.That(ex.Message, Does.Contain("Only coverage contracts with scope 'namespace' or 'rule_input' are implemented"));
     }
 
     [Test]

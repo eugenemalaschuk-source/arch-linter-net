@@ -162,6 +162,12 @@ public static class ArchitectureContractLoader
         foreach (ArchitectureCoverageContract contract in document.Contracts.StrictCoverage
                      .Concat(document.Contracts.AuditCoverage))
         {
+            if (string.Equals(contract.Scope, "rule_input", StringComparison.Ordinal))
+            {
+                ValidateRuleInputCoverageContract(document, contract);
+                continue;
+            }
+
             if (!string.Equals(contract.Scope, "namespace", StringComparison.Ordinal))
             {
                 continue;
@@ -240,6 +246,96 @@ public static class ArchitectureContractLoader
                 }
             }
         }
+    }
+
+    private static void ValidateRuleInputCoverageContract(
+        ArchitectureContractDocument document, ArchitectureCoverageContract contract)
+    {
+        if (contract.ContractIds.Count == 0)
+        {
+            throw new InvalidOperationException(
+                $"Rule-input coverage contract '{contract.Name}' must declare at least one entry in 'contract_ids'.");
+        }
+
+        if (contract.Roots.Count > 0)
+        {
+            throw new InvalidOperationException(
+                $"Rule-input coverage contract '{contract.Name}' cannot declare 'roots'. That field is only valid for scope 'namespace'.");
+        }
+
+        if (contract.Between.Count > 0)
+        {
+            throw new InvalidOperationException(
+                $"Rule-input coverage contract '{contract.Name}' cannot declare 'between'. That field is only valid for scope 'dependency_edge'.");
+        }
+
+        HashSet<string> knownContractIds = CollectLayerBearingContractIds(document);
+
+        foreach (string referencedContractId in contract.ContractIds)
+        {
+            if (!knownContractIds.Contains(referencedContractId))
+            {
+                throw new InvalidOperationException(
+                    $"Rule-input coverage contract '{contract.Name}' references unknown contract ID '{referencedContractId}' " +
+                    "in 'contract_ids'. The ID must match a declared dependency, layer, allow_only, cycle, method_body, " +
+                    "independence, protected, or external contract. asmdef, acyclic_sibling, and layer_template contracts " +
+                    "are not valid for scope 'rule_input'.");
+            }
+        }
+
+        for (int i = 0; i < contract.Exclude.Count; i++)
+        {
+            ArchitectureCoverageExclusion exclusion = contract.Exclude[i];
+
+            if (string.IsNullOrWhiteSpace(exclusion.ContractId))
+            {
+                throw new InvalidOperationException(
+                    $"Rule-input coverage contract '{contract.Name}' has an exclusion at index {i} without a " +
+                    "'contract_id' matcher. Rule-input coverage exclusions must declare 'contract_id'.");
+            }
+
+            if (string.IsNullOrWhiteSpace(exclusion.Reason))
+            {
+                throw new InvalidOperationException(
+                    $"Rule-input coverage contract '{contract.Name}' has an exclusion at index {i} without a non-empty reason.");
+            }
+        }
+    }
+
+    // Limited to the contract families ArchitectureContractRunner's GetReferencedLayerNames
+    // actually maps to document.Layers keys. Asmdef (source_assemblies, not a layer namespace),
+    // acyclic_sibling (ancestors are namespace prefixes, not layer keys), and layer_template are
+    // intentionally excluded: layer_template's expanded ArchitectureLayerContract instances carry
+    // synthetic IDs ("<template>/<container>") distinct from the authored template ID, and their
+    // Layers entries are concrete namespaces rather than document.Layers keys, so neither the ID
+    // nor the field values resolve the way rule-input coverage expects. Referencing one of these
+    // families is therefore rejected below as an unknown contract ID rather than silently
+    // producing zero findings.
+    private static HashSet<string> CollectLayerBearingContractIds(ArchitectureContractDocument document)
+    {
+        IEnumerable<IArchitectureContract>[] groups =
+        [
+            document.Contracts.Strict,
+            document.Contracts.Audit,
+            document.Contracts.StrictLayers,
+            document.Contracts.AuditLayers,
+            document.Contracts.StrictAllowOnly,
+            document.Contracts.AuditAllowOnly,
+            document.Contracts.StrictCycles,
+            document.Contracts.AuditCycles,
+            document.Contracts.StrictMethodBody,
+            document.Contracts.AuditMethodBody,
+            document.Contracts.StrictIndependence,
+            document.Contracts.AuditIndependence,
+            document.Contracts.StrictProtected,
+            document.Contracts.AuditProtected,
+            document.Contracts.StrictExternal,
+            document.Contracts.AuditExternal,
+        ];
+
+        return new HashSet<string>(
+            groups.SelectMany(group => group).Select(c => c.Id).Where(id => !string.IsNullOrEmpty(id))!,
+            StringComparer.OrdinalIgnoreCase);
     }
 
     private static IEnumerable<IArchitectureContract> GetAllContracts(ArchitectureContractDocument document)

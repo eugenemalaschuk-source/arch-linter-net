@@ -33,6 +33,8 @@ public sealed partial class ArchitectureContractRunner(
 
     private readonly ArchitectureContractCatalog _catalog = ArchitectureContractCatalog.Build(document);
 
+    private HashSet<string>? _ruleInputCoveredContractIdsForMode;
+
     public IReadOnlyList<ArchitectureUnmatchedIgnoredViolation> UnmatchedIgnoredViolations
         => _unmatchedIgnoredViolations;
 
@@ -61,6 +63,33 @@ public sealed partial class ArchitectureContractRunner(
     {
         return _selectedContractIds == null || _selectedContractIds.Count == 0
             || (contractId != null && _selectedContractIds.Contains(contractId));
+    }
+
+    // Called once by ArchitectureContractExecutor.Execute before any family loop runs, so every
+    // Check*Contract call below can defer a dangling layer reference to rule-input coverage using
+    // the exact mode/selection-aware set CheckConfiguration already computes — without each method
+    // needing to know "mode" itself.
+    internal void PrepareRuleInputCoverageDeferral(string mode)
+    {
+        _ruleInputCoveredContractIdsForMode = CollectRuleInputCoveredContractIds(mode == "strict");
+    }
+
+    // A contract whose layer-bearing field names a layer absent from `layers` would otherwise
+    // throw via ArchitectureLayerResolver.ResolveLayer the moment its check runs. When a
+    // rule_input coverage contract that will actually execute this request already tracks this
+    // contract's ID, defer entirely to that coverage contract's "unresolved" finding instead of
+    // crashing — mirroring CheckConfiguration's "empty layer namespace" deferral for the same
+    // contract_ids-tracked relationship.
+    private bool IsDanglingButCoveredByRuleInputCoverage(IArchitectureContract contract)
+    {
+        if (contract.Id == null
+            || _ruleInputCoveredContractIdsForMode == null
+            || !_ruleInputCoveredContractIdsForMode.Contains(contract.Id))
+        {
+            return false;
+        }
+
+        return GetReferencedLayerNames(contract).Any(layerName => !_document.Layers.ContainsKey(layerName));
     }
 
     public IEnumerable<ArchitectureDependencyContract> StrictContracts()
@@ -196,14 +225,23 @@ public sealed partial class ArchitectureContractRunner(
                 new[] { discoveryDiagnostic.Message }));
         }
 
-        HashSet<string> referencedLayers = new(StringComparer.Ordinal);
+        Dictionary<string, HashSet<string>> layerReferencingContractIds = new(StringComparer.Ordinal);
         HashSet<string> referencedExternalGroups = new(StringComparer.Ordinal);
 
-        void AddLayerNames(IEnumerable<string> names)
+        void AddLayerNames(string? contractId, IEnumerable<string> names)
         {
             foreach (string name in names)
             {
-                referencedLayers.Add(name);
+                if (!layerReferencingContractIds.TryGetValue(name, out HashSet<string>? contractIds))
+                {
+                    contractIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                    layerReferencingContractIds[name] = contractIds;
+                }
+
+                if (contractId != null)
+                {
+                    contractIds.Add(contractId);
+                }
             }
         }
 
@@ -219,45 +257,45 @@ public sealed partial class ArchitectureContractRunner(
         {
             foreach (ArchitectureDependencyContract c in _document.Contracts.Strict)
             {
-                AddLayerNames(new[] { c.Source });
-                AddLayerNames(c.Forbidden);
+                AddLayerNames(c.Id, new[] { c.Source });
+                AddLayerNames(c.Id, c.Forbidden);
             }
 
             foreach (ArchitectureAllowOnlyContract c in _document.Contracts.StrictAllowOnly)
             {
-                AddLayerNames(new[] { c.Source });
-                AddLayerNames(c.Allowed);
+                AddLayerNames(c.Id, new[] { c.Source });
+                AddLayerNames(c.Id, c.Allowed);
             }
 
             foreach (ArchitectureCycleContract c in _document.Contracts.StrictCycles)
             {
-                AddLayerNames(c.Layers);
+                AddLayerNames(c.Id, c.Layers);
             }
 
             foreach (ArchitectureMethodBodyContract c in _document.Contracts.StrictMethodBody)
             {
-                AddLayerNames(new[] { c.Source });
+                AddLayerNames(c.Id, new[] { c.Source });
             }
 
             foreach (ArchitectureIndependenceContract c in _document.Contracts.StrictIndependence)
             {
-                AddLayerNames(c.Layers);
+                AddLayerNames(c.Id, c.Layers);
             }
 
             foreach (ArchitectureLayerContract c in _document.Contracts.StrictLayers)
             {
-                AddLayerNames(c.Layers);
+                AddLayerNames(c.Id, c.Layers);
             }
 
             foreach (ArchitectureProtectedContract c in _document.Contracts.StrictProtected)
             {
-                AddLayerNames(c.Protected);
-                AddLayerNames(c.AllowedImporters);
+                AddLayerNames(c.Id, c.Protected);
+                AddLayerNames(c.Id, c.AllowedImporters);
             }
 
             foreach (ArchitectureExternalDependencyContract c in _document.Contracts.StrictExternal)
             {
-                AddLayerNames(new[] { c.Source });
+                AddLayerNames(c.Id, new[] { c.Source });
                 AddExternalGroupNames(c.Forbidden);
             }
         }
@@ -265,51 +303,69 @@ public sealed partial class ArchitectureContractRunner(
         {
             foreach (ArchitectureDependencyContract c in _document.Contracts.Audit)
             {
-                AddLayerNames(new[] { c.Source });
-                AddLayerNames(c.Forbidden);
+                AddLayerNames(c.Id, new[] { c.Source });
+                AddLayerNames(c.Id, c.Forbidden);
             }
 
             foreach (ArchitectureAllowOnlyContract c in _document.Contracts.AuditAllowOnly)
             {
-                AddLayerNames(new[] { c.Source });
-                AddLayerNames(c.Allowed);
+                AddLayerNames(c.Id, new[] { c.Source });
+                AddLayerNames(c.Id, c.Allowed);
             }
 
             foreach (ArchitectureCycleContract c in _document.Contracts.AuditCycles)
             {
-                AddLayerNames(c.Layers);
+                AddLayerNames(c.Id, c.Layers);
             }
 
             foreach (ArchitectureMethodBodyContract c in _document.Contracts.AuditMethodBody)
             {
-                AddLayerNames(new[] { c.Source });
+                AddLayerNames(c.Id, new[] { c.Source });
             }
 
             foreach (ArchitectureIndependenceContract c in _document.Contracts.AuditIndependence)
             {
-                AddLayerNames(c.Layers);
+                AddLayerNames(c.Id, c.Layers);
             }
 
             foreach (ArchitectureLayerContract c in _document.Contracts.AuditLayers)
             {
-                AddLayerNames(c.Layers);
+                AddLayerNames(c.Id, c.Layers);
             }
 
             foreach (ArchitectureProtectedContract c in _document.Contracts.AuditProtected)
             {
-                AddLayerNames(c.Protected);
-                AddLayerNames(c.AllowedImporters);
+                AddLayerNames(c.Id, c.Protected);
+                AddLayerNames(c.Id, c.AllowedImporters);
             }
 
             foreach (ArchitectureExternalDependencyContract c in _document.Contracts.AuditExternal)
             {
-                AddLayerNames(new[] { c.Source });
+                AddLayerNames(c.Id, new[] { c.Source });
                 AddExternalGroupNames(c.Forbidden);
             }
         }
 
-        foreach (string layerName in referencedLayers)
+        HashSet<string> ruleInputCoveredContractIds = CollectRuleInputCoveredContractIds(strict);
+
+        foreach ((string layerName, HashSet<string> referencingContractIds) in layerReferencingContractIds)
         {
+            bool isFullyOwnedByRuleInputCoverage = referencingContractIds.Count > 0
+                && referencingContractIds.All(ruleInputCoveredContractIds.Contains);
+
+            if (!_document.Layers.ContainsKey(layerName))
+            {
+                // A dangling layer name referenced exclusively by contracts a rule_input coverage
+                // contract tracks defers to that coverage contract's own "unresolved" finding
+                // instead of throwing here — otherwise scope: rule_input's unresolved diagnostic
+                // would be unreachable through the real validation pipeline, since this resolution
+                // happens before any contract or coverage check runs.
+                if (isFullyOwnedByRuleInputCoverage)
+                {
+                    continue;
+                }
+            }
+
             ArchitectureLayer layer = ArchitectureLayerResolver.ResolveLayer(_document, "<configuration>", layerName);
 
             if (layer.External)
@@ -321,6 +377,16 @@ public sealed partial class ArchitectureContractRunner(
 
             if (types.Length == 0)
             {
+                // A layer referenced exclusively by contracts that a rule_input coverage contract
+                // explicitly tracks (via contract_ids) defers to that coverage contract's own
+                // empty-input classification and severity instead of also failing here as a hard,
+                // unconditional configuration error — otherwise analysis.coverage and exclude
+                // entries could never actually govern the outcome for these contracts.
+                if (isFullyOwnedByRuleInputCoverage)
+                {
+                    continue;
+                }
+
                 violations.Add(new ArchitectureViolation(
                     "<configuration>",
                     null,
@@ -372,4 +438,24 @@ public sealed partial class ArchitectureContractRunner(
         return violations;
     }
 
+    // Only contracts that ArchitectureContractExecutor will actually run for this request can
+    // defer CheckConfiguration's hard failure: ContractsFor(mode, "coverage") only executes the
+    // group matching the current mode (strict_coverage for strict, audit_coverage for audit), and
+    // CheckCoverageContract itself no-ops when the coverage contract isn't selected. Deferring
+    // for a coverage contract that won't run this request would silently drop the finding
+    // entirely instead of handing it off — the same false-green risk this deferral exists to
+    // avoid in the first place.
+    private HashSet<string> CollectRuleInputCoveredContractIds(bool strict)
+    {
+        IEnumerable<ArchitectureCoverageContract> coverageContractsForMode = strict
+            ? _document.Contracts.StrictCoverage
+            : _document.Contracts.AuditCoverage;
+
+        return new HashSet<string>(
+            coverageContractsForMode
+                .Where(c => string.Equals(c.Scope, "rule_input", StringComparison.Ordinal))
+                .Where(c => IsContractSelected(c.Id))
+                .SelectMany(c => c.ContractIds),
+            StringComparer.OrdinalIgnoreCase);
+    }
 }

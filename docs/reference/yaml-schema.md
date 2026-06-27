@@ -216,7 +216,7 @@ Controls behavior when declared coverage contracts find uncovered namespaces.
 Coverage is opt-in through `strict_coverage` / `audit_coverage`. Policies that
 declare no coverage contracts behave unchanged regardless of this setting.
 
-See [Namespace coverage contracts](../contracts/coverage.md) for public authoring examples and severity behavior.
+See [Coverage contracts](../contracts/coverage.md) for public authoring examples and severity behavior.
 
 ## `contracts`
 
@@ -416,29 +416,50 @@ report references from source types into those vendor/framework surfaces.
 
 ### Coverage contract
 
-Current runtime support is limited to `scope: namespace`.
+Current runtime support covers `scope: namespace` and `scope: rule_input`.
 
 ```yaml
 - id: <string>                  # Optional — stable identifier
   name: <string>                # Required — human-readable contract name
-  scope: namespace              # Required — only supported scope today
-  roots:                        # Required — one or more namespace matchers
+  scope: namespace              # Required — namespace | rule_input
+  roots:                        # Required for scope: namespace — one or more namespace matchers
     - namespace: <string>       # Required — literal prefix or constrained glob
       namespace_suffix: <string>  # Optional — same semantics as layers.<name>.namespace_suffix
-  exclude:                      # Optional — explicit namespace exclusions
-    - namespace: <string>       # Optional — namespace matcher
-      namespace_suffix: <string>  # Optional — suffix-only matcher or refinement
+  contract_ids:                 # Required for scope: rule_input — referenced contract IDs
+    - <string>
+  exclude:                      # Optional — explicit exclusions
+    - namespace: <string>       # Optional — namespace matcher (scope: namespace only)
+      namespace_suffix: <string>  # Optional — suffix-only matcher or refinement (scope: namespace only)
+      contract_id: <string>     # Optional — referenced contract ID (scope: rule_input only)
       reason: <string>          # Required when exclude entry exists
   reason: <string>              # Recommended — why this coverage gate exists
 ```
 
-Namespace coverage checks first-party namespaces discovered in the analysis
-inventory and reports any namespace under `roots` that is not covered by:
+Namespace coverage (`scope: namespace`) checks first-party namespaces
+discovered in the analysis inventory and reports any namespace under `roots`
+that is not covered by:
 
 - a declared layer;
 - a declared namespace glob layer;
 - an expanded layer-template layer; or
 - an explicit exclusion.
+
+Rule-input coverage (`scope: rule_input`) resolves each entry in
+`contract_ids` to its referenced contract's layer-bearing fields and reports:
+
+- `unresolved` — the referenced field names a layer that is not declared
+  under `layers` at all;
+- `empty-input` — the referenced field names a declared layer whose namespace
+  pattern currently matches zero namespaces in the analysis inventory.
+
+`contract_ids` may reference dependency, layer, allow_only, cycle,
+method_body, independence, protected, or external contracts — the families
+whose layer-bearing fields are plain `layers` keys. An unknown ID, an
+asmdef/acyclic_sibling/layer_template contract ID (their fields are not plain
+layer-name references), or an ID belonging to a coverage contract, is
+rejected at load time. `exclude` entries for `scope: rule_input` must use
+`contract_id` and suppress both `unresolved` and `empty-input` findings for
+that referenced contract.
 
 Example:
 
@@ -458,18 +479,23 @@ contracts:
           namespace_suffix: Generated
           reason: Generated code is excluded from manual architecture coverage.
       reason: Every feature namespace must be declared as a layer or explicitly excluded.
+
+    - id: rule-input-coverage
+      name: rule-input-coverage
+      scope: rule_input
+      contract_ids: [cli-must-not-depend-on-testing]
+      reason: Flag rules whose source/target layers stop matching any code.
 ```
 
 Current limits:
 
-- Only `scope: namespace` is implemented.
-- `scope: project`, `scope: assembly`, `scope: dependency_edge`, and
-  `scope: rule_input` are reserved and fail validation with an actionable
-  error.
+- `scope: namespace` and `scope: rule_input` are implemented.
+- `scope: project`, `scope: assembly`, and `scope: dependency_edge` are
+  reserved and fail validation with an actionable error.
 - Coverage findings are emitted as a separate coverage section in human output
   and `coverage_findings` array in JSON output.
 
-For a user-oriented guide, see [Namespace coverage contracts](../contracts/coverage.md).
+For a user-oriented guide, see [Coverage contracts](../contracts/coverage.md).
 
 ### Ignored violations
 
