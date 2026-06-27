@@ -26,7 +26,7 @@ dotnet run --project src/ArchLinterNet.Cli --
 | `--contract <id>` | Run only the contract with the given ID. May be repeated. | |
 | `--condition-set <name>` | Use a named condition set from `analysis.condition_sets` for Roslyn source analysis. | policy `default_condition_set`, otherwise empty |
 | `--baseline <path>` | Path to baseline YAML file to merge with policy ignores. | |
-| `-f`, `--format <fmt>` | Output format: `human` or `json` | `human` |
+| `-f`, `--format <fmt>` | Output format: `human` or `json`. Both formats include a coverage summary (counts + exclusions) for any coverage contracts that ran — see [Output Formats](../usage/output-formats.md). | `human` |
 | `--json` | Shortcut for `--format json` | |
 | `--timings` | Print phase-level timing report to stderr. | |
 | `-h`, `--help` | Show help message. | |
