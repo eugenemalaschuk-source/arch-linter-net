@@ -29,7 +29,7 @@ public sealed partial class ArchitectureContractRunner
             if (transitive)
             {
                 violations.AddRange(ArchitectureNamespaceViolationFinder.FindTransitiveNamespaceViolations(sourceTypes,
-                    forbiddenLayer, contract.AllowedTypes, _context.TargetAssemblies, executionContext));
+                    forbiddenLayer, contract.AllowedTypes, _context.TargetAssemblies, executionContext, _session.ReferenceGraph));
             }
             else
             {
@@ -46,7 +46,7 @@ public sealed partial class ArchitectureContractRunner
                 {
                     violations.AddRange(ArchitectureNamespaceViolationFinder.FindTransitiveNamespaceViolations(sourceTypes,
                         new ArchitectureLayer { Namespace = forbiddenNamespace },
-                        contract.AllowedTypes, _context.TargetAssemblies, executionContext));
+                        contract.AllowedTypes, _context.TargetAssemblies, executionContext, _session.ReferenceGraph));
                 }
                 else
                 {
@@ -131,7 +131,7 @@ public sealed partial class ArchitectureContractRunner
                 effectiveLayers.Select(l => l.layer.Namespace),
                 StringComparer.Ordinal);
 
-            foreach (string childNs in FindChildNamespaces(contract.ContainerNamespace).OrderBy(ns => ns, StringComparer.Ordinal))
+            foreach (string childNs in _session.TypeIndex.FindDirectChildNamespaces(contract.ContainerNamespace).OrderBy(ns => ns, StringComparer.Ordinal))
             {
                 if (expectedNamespaces.Contains(childNs))
                 {
@@ -169,31 +169,6 @@ public sealed partial class ArchitectureContractRunner
         }
 
         return ArchitectureLayerResolver.ResolveLayer(_document, contract.Name, layerEntry);
-    }
-
-    private HashSet<string> FindChildNamespaces(string containerNamespace)
-    {
-        string prefix = containerNamespace + ".";
-        HashSet<string> children = new(StringComparer.Ordinal);
-
-        foreach (Assembly assembly in _context.TargetAssemblies.Distinct())
-        {
-            foreach (Type type in ArchitectureTypeScanner.GetLoadableTypes(assembly))
-            {
-                string ns = ArchitectureTypeNames.SafeNamespace(type);
-                if (!ns.StartsWith(prefix, StringComparison.Ordinal))
-                {
-                    continue;
-                }
-
-                string remainder = ns[prefix.Length..];
-                int dotIndex = remainder.IndexOf('.');
-                string child = dotIndex < 0 ? remainder : remainder[..dotIndex];
-                children.Add($"{prefix}{child}");
-            }
-        }
-
-        return children;
     }
 
     public List<ArchitectureViolation> CheckAllowOnlyContract(ArchitectureAllowOnlyContract contract)

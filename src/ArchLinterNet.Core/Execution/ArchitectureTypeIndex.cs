@@ -31,6 +31,28 @@ internal sealed class ArchitectureTypeIndex
             .ToArray();
     }
 
+    public HashSet<string> FindDirectChildNamespaces(string containerNamespace)
+    {
+        string prefix = containerNamespace + ".";
+        HashSet<string> children = new(StringComparer.Ordinal);
+
+        foreach (Type type in _allTypes.Value)
+        {
+            string ns = ArchitectureTypeNames.SafeNamespace(type);
+            if (!ns.StartsWith(prefix, StringComparison.Ordinal))
+            {
+                continue;
+            }
+
+            string remainder = ns[prefix.Length..];
+            int dotIndex = remainder.IndexOf('.');
+            string child = dotIndex < 0 ? remainder : remainder[..dotIndex];
+            children.Add($"{prefix}{child}");
+        }
+
+        return children;
+    }
+
     private Type[] LoadAllTypes()
     {
         return _targetAssemblies

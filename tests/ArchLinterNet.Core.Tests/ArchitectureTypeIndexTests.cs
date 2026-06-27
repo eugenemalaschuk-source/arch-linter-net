@@ -45,4 +45,40 @@ public sealed class ArchitectureTypeIndexTests
 
         Assert.That(first, Is.EqualTo(second));
     }
+
+    [Test]
+    public void FindTypesInLayer_RepeatedCalls_EnumeratesTargetAssembliesOnlyOnce()
+    {
+        var countingAssemblies = new EnumerationCountingCollection(_targetAssemblies);
+        var layer = new ArchitectureLayer { Namespace = "ArchLinterNet.Core.Tests" };
+        var index = new ArchitectureTypeIndex(countingAssemblies);
+
+        index.FindTypesInLayer(layer);
+        index.FindTypesInNamespace("ArchLinterNet.Core.Tests");
+        index.FindTypesInLayer(new ArchitectureLayer { Namespace = "ArchLinterNet.Core" });
+
+        Assert.That(countingAssemblies.EnumerationCount, Is.EqualTo(1));
+    }
+
+    private sealed class EnumerationCountingCollection : IReadOnlyCollection<System.Reflection.Assembly>
+    {
+        private readonly System.Reflection.Assembly[] _items;
+
+        public EnumerationCountingCollection(System.Reflection.Assembly[] items)
+        {
+            _items = items;
+        }
+
+        public int EnumerationCount { get; private set; }
+
+        public int Count => _items.Length;
+
+        public IEnumerator<System.Reflection.Assembly> GetEnumerator()
+        {
+            EnumerationCount++;
+            return _items.AsEnumerable().GetEnumerator();
+        }
+
+        System.Collections.IEnumerator System.Collections.IEnumerable.GetEnumerator() => GetEnumerator();
+    }
 }

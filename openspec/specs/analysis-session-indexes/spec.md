@@ -1,7 +1,8 @@
 # analysis-session-indexes Specification
 
 ## Purpose
-TBD - created by archiving change add-analysis-session-indexes. Update Purpose after archive.
+Provide a per-validation-run analysis session with lazy type, reference, and layer indexes so contract handlers can reuse resolved assemblies and reflection-derived type/reference lookups instead of repeatedly invoking static scanners on every contract check.
+
 ## Requirements
 ### Requirement: Session created once per validation run
 The system SHALL construct exactly one `ArchitectureAnalysisSession` per validation run, created alongside `ArchitectureAnalysisContext` in `ArchitectureRunnerFactory.BuildRunner` and reused by every contract check executed within that run.

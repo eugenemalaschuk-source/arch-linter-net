@@ -71,7 +71,8 @@ internal static class ArchitectureNamespaceViolationFinder
         ArchitectureLayer forbiddenLayer,
         IReadOnlyCollection<string> allowedTypeFullNames,
         IReadOnlyCollection<Assembly> targetAssemblies,
-        ArchitectureContractExecutionContext executionContext)
+        ArchitectureContractExecutionContext executionContext,
+        ArchitectureReferenceGraph? referenceGraph = null)
     {
         HashSet<Assembly> assemblySet = targetAssemblies.ToHashSet();
         Func<Type, bool> traversePredicate = t => assemblySet.Contains(t.Assembly);
@@ -85,7 +86,11 @@ internal static class ArchitectureNamespaceViolationFinder
                 HashSet<string> matchedPrefixes = new(StringComparer.Ordinal);
                 List<IReadOnlyCollection<string>> paths = new();
 
-                foreach (var (referenced, path) in ArchitectureReferenceScanner.GetTransitiveReferencedTypes(type, traversePredicate))
+                IEnumerable<(Type referenced, List<Type> path)> transitiveReferences = referenceGraph != null
+                    ? referenceGraph.GetTransitiveReferencedTypes(type, traversePredicate)
+                    : ArchitectureReferenceScanner.GetTransitiveReferencedTypes(type, traversePredicate);
+
+                foreach (var (referenced, path) in transitiveReferences)
                 {
                     string refFullName = ArchitectureTypeNames.SafeFullName(referenced);
                     if (string.IsNullOrEmpty(refFullName))
