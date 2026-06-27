@@ -155,6 +155,41 @@ public sealed class PolicyConsistencyCheckTests
     }
 
     [Test]
+    public void IndependenceVsExpandedLayerTemplateOrder_Conflict_Detected()
+    {
+        var document = BaseDocument();
+        document.Contracts.StrictIndependence = new List<ArchitectureIndependenceContract>
+        {
+            new()
+            {
+                Name = "container-upper-lower-independent",
+                Layers = new List<string> { "Test.Container.Upper", "Test.Container.Lower" }
+            }
+        };
+        document.Contracts.StrictLayerTemplates = new List<ArchitectureLayerTemplateContract>
+        {
+            new()
+            {
+                Name = "test-template",
+                Containers = new List<string> { "Test.Container" },
+                Layers = new List<ArchitectureTemplateLayer>
+                {
+                    new() { Name = "Upper" },
+                    new() { Name = "Lower" }
+                }
+            }
+        };
+
+        var runner = new ArchitectureContractRunner(CreateContext(), document);
+        var findings = runner.CheckPolicyConsistency();
+
+        var finding = findings.FirstOrDefault(f => f.CheckKind == "independence-conflict");
+        Assert.That(finding, Is.Not.Null);
+        Assert.That(finding!.ConflictingContractNames, Contains.Item("container-upper-lower-independent"));
+        Assert.That(finding.Layers, Is.EquivalentTo(new[] { "Test.Container.Lower", "Test.Container.Upper" }));
+    }
+
+    [Test]
     public void ProtectedImporter_ConflictsWithStrictForbid_Detected()
     {
         var document = BaseDocument();

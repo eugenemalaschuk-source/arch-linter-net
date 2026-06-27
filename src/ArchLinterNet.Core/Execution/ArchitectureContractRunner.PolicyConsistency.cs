@@ -183,10 +183,17 @@ public sealed partial class ArchitectureContractRunner
             }
         }
 
-        foreach (ArchitectureLayerContract c in _document.Contracts.StrictLayers.Concat(_document.Contracts.AuditLayers))
+        IEnumerable<ArchitectureLayerContract> orderedLayerContracts = _document.Contracts.StrictLayers
+            .Concat(_document.Contracts.AuditLayers)
+            .Concat(LayerTemplateExpander.Expand(_document.Contracts.StrictLayerTemplates))
+            .Concat(LayerTemplateExpander.Expand(_document.Contracts.AuditLayerTemplates));
+
+        foreach (ArchitectureLayerContract c in orderedLayerContracts)
         {
             // Ordered layer contracts express an explicit allowed/ordered dependency between
-            // consecutive layers (later layers may depend on earlier ones).
+            // consecutive layers (later layers may depend on earlier ones). Expanded layer
+            // templates produce the same kind of ordered contract and must be included here too,
+            // so an independence contract conflicting with a template-generated order is caught.
             for (int i = 0; i < c.Layers.Count; i++)
             {
                 for (int j = 0; j < i; j++)
