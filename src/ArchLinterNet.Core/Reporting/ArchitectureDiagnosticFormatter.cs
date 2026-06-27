@@ -47,12 +47,36 @@ public static class ArchitectureDiagnosticFormatter
                     }));
     }
 
+    public static string FormatPolicyConsistencyForHumans(
+        IReadOnlyCollection<PolicyConsistencyDiagnostic> findings)
+    {
+        if (findings.Count == 0)
+        {
+            return string.Empty;
+        }
+
+        return "Policy consistency findings:" + Environment.NewLine
+            + string.Join(
+                Environment.NewLine,
+                findings
+                    .OrderBy(f => f.CheckKind, StringComparer.Ordinal)
+                    .ThenBy(f => f.ContractName, StringComparer.Ordinal)
+                    .Select(f =>
+                    {
+                        string idPrefix = f.ContractId != null ? $"[{f.ContractId}] " : string.Empty;
+                        string names = string.Join(", ", f.ConflictingContractNames);
+                        return $"  {idPrefix}[{f.CheckKind}] {f.Reason}" +
+                               (names.Length > 0 ? $" (contracts: {names})" : string.Empty);
+                    }));
+    }
+
     public static string FormatResultForCiArtifacts(
         string mode,
         bool passed,
         IReadOnlyCollection<ArchitectureViolation> violations,
         IReadOnlyCollection<string> cycles,
-        IReadOnlyCollection<ArchitectureUnmatchedIgnoredViolation>? unmatched = null)
+        IReadOnlyCollection<ArchitectureUnmatchedIgnoredViolation>? unmatched = null,
+        IReadOnlyCollection<PolicyConsistencyDiagnostic>? policyConsistencyFindings = null)
     {
         var unmatchedSerialized = (unmatched ?? Array.Empty<ArchitectureUnmatchedIgnoredViolation>())
             .Select(ArchitectureDiagnosticMapper.FromUnmatchedIgnore)
@@ -67,6 +91,10 @@ public static class ArchitectureDiagnosticFormatter
             })
             .ToArray();
 
+        var policyConsistencySerialized = (policyConsistencyFindings ?? Array.Empty<PolicyConsistencyDiagnostic>())
+            .Select(ToPolicyConsistencyJsonObject)
+            .ToArray();
+
         var payload = new
         {
             passed,
@@ -79,7 +107,8 @@ public static class ArchitectureDiagnosticFormatter
                 .Select(cycle => ArchitectureDiagnosticMapper.FromCycle(cycle, contractName: string.Empty, contractId: null))
                 .Select(d => d.Path)
                 .ToArray(),
-            unmatched_ignored_violations = unmatchedSerialized
+            unmatched_ignored_violations = unmatchedSerialized,
+            policy_consistency_findings = policyConsistencySerialized
         };
 
         return JsonSerializer.Serialize(payload);
@@ -178,6 +207,28 @@ public static class ArchitectureDiagnosticFormatter
         }
 
         return $"- {idPrefix}[{diagnostic.ContractName}] {SourceTypeOf(diagnostic)} -> {nsDisplay}{context}: {refs}{pathSuffix}";
+    }
+
+    private static Dictionary<string, object?> ToPolicyConsistencyJsonObject(PolicyConsistencyDiagnostic finding)
+    {
+        var obj = new Dictionary<string, object?>
+        {
+            ["kind"] = "policy_consistency",
+            ["check_kind"] = finding.CheckKind,
+            ["contract"] = finding.ContractName,
+            ["contract_id"] = finding.ContractId,
+            ["reason"] = finding.Reason,
+            ["conflicting_contract_ids"] = finding.ConflictingContractIds.ToArray(),
+            ["conflicting_contract_names"] = finding.ConflictingContractNames.ToArray(),
+            ["layers"] = finding.Layers.ToArray()
+        };
+
+        if (finding.RepresentativeType != null)
+        {
+            obj["representative_type"] = finding.RepresentativeType;
+        }
+
+        return obj;
     }
 
     private static Dictionary<string, object?> ToCiJsonObject(ArchitectureDiagnostic diagnostic, bool includeContract)

@@ -60,6 +60,9 @@ public sealed class ArchitectureAnalysisConfiguration
     [YamlMember(Alias = "unmatched_ignored_violations")]
     public string UnmatchedIgnoredViolations { get; set; } = "error";
 
+    [YamlMember(Alias = "policy_consistency")]
+    public string PolicyConsistency { get; set; } = "error";
+
     [YamlMember(Alias = "condition_sets")]
     public Dictionary<string, List<string>> ConditionSets { get; set; } = new();
 

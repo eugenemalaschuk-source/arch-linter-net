@@ -305,6 +305,19 @@ linter warns about `ignored_violations` entries that match no current violation.
 Remove stale entries proactively to keep the baseline trustworthy and avoid CI
 failures. Use `warn` during migration cleanup, then switch to `error`.
 
+## Policy Consistency Checks
+
+Separately from scanning code, the linter always runs a policy-consistency
+pass over the policy document itself, looking for internal contradictions:
+duplicate contract IDs (including those produced by layer-template
+expansion), allow-only contracts that conflict with a forbidding contract for
+the same layer pair, independence contracts contradicted by an explicit
+allowed dependency, protected-surface `allowed_importers` that conflict with
+a strict forbidding rule, overlapping internal layer definitions, and
+contracts that reference a structurally unreachable layer. `analysis.policy_consistency`
+(default `error`) controls whether these findings fail validation (`error`),
+are reported without failing (`warn`), or are suppressed entirely (`off`).
+
 ## Use Automated Baselines For Existing Codebases
 
 When adding architecture rules to an existing codebase with existing violations,

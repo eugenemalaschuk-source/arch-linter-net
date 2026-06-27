@@ -30,8 +30,22 @@ public sealed class ArchitectureValidator
 
         ValidationOutcome outcome = ArchitectureValidationService.Validate(request);
 
-        violations = outcome.Violations;
+        violations = outcome.PolicyConsistencyConfig == "off"
+            ? outcome.Violations
+            : outcome.Violations
+                .Concat(outcome.PolicyConsistencyFindings.Select(ToViolation))
+                .ToArray();
         cycles = outcome.Cycles;
         return outcome.Passed;
+    }
+
+    private static ArchitectureViolation ToViolation(PolicyConsistencyDiagnostic finding)
+    {
+        return new ArchitectureViolation(
+            finding.ContractName,
+            finding.ContractId,
+            finding.CheckKind,
+            finding.Reason,
+            finding.ConflictingContractNames);
     }
 }

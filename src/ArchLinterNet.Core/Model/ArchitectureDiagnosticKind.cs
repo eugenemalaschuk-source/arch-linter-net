@@ -6,5 +6,6 @@ public enum ArchitectureDiagnosticKind
     Cycle,
     UnmatchedIgnore,
     Configuration,
-    ExternalDependency
+    ExternalDependency,
+    PolicyConsistency
 }

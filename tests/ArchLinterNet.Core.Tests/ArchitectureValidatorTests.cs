@@ -161,4 +161,41 @@ contracts:
         Assert.That(violations, Has.Some.Matches<ArchitectureViolation>(v => v.SourceType == "MyAssembly"));
         Assert.That(cycles, Is.Empty);
     }
+
+    [Test]
+    public void Validate_AllowForbidConflict_FailsAndSurfacesInViolations()
+    {
+        string contractDir = Path.Combine(_tempDir, "architecture");
+        Directory.CreateDirectory(contractDir);
+        string contractPath = Path.Combine(contractDir, "dependencies.arch.yml");
+
+        File.WriteAllText(contractPath, @"
+version: 1
+name: Policy Consistency Test
+layers:
+  core:
+    namespace: ArchLinterNet.Core
+  contracts:
+    namespace: ArchLinterNet.Core.Contracts
+analysis:
+  target_assemblies:
+    - ArchLinterNet.Core
+  policy_consistency: error
+contracts:
+  strict:
+    - name: core-forbids-contracts
+      source: core
+      forbidden: [contracts]
+  strict_allow_only:
+    - name: core-allows-contracts
+      source: core
+      allowed: [contracts]
+");
+
+        var validator = new ArchitectureValidator();
+        bool result = validator.Validate(contractPath, out var violations, out _);
+
+        Assert.That(result, Is.False);
+        Assert.That(violations, Has.Some.Matches<ArchitectureViolation>(v => v.SourceType == "allow-forbid-conflict"));
+    }
 }
