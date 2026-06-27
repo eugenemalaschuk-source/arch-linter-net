@@ -10,6 +10,10 @@ The architecture coverage model SHALL define exactly six classification terms fo
 - **WHEN** a namespace matches no declared layer, glob layer, layer-template container, or explicit coverage exclusion
 - **THEN** the model classifies it as `uncovered`, a status distinct from any `ArchitectureDiagnosticKind.Dependency` violation, which requires a matched layer to exist
 
+#### Scenario: Being listed under a coverage contract's roots does not by itself make a unit covered
+- **WHEN** a unit matches a coverage contract's `roots` (the scan boundary the contract classifies) but matches no declared layer and no explicit `exclude` entry
+- **THEN** the model classifies it as `uncovered`, not `covered` — `roots` membership determines what is classified, not the classification result
+
 #### Scenario: Unknown is distinguished from uncovered
 - **WHEN** a project or assembly coverage unit cannot be classified because required discovery input is unavailable or ambiguous
 - **THEN** the model classifies it as `unknown`, not `uncovered`

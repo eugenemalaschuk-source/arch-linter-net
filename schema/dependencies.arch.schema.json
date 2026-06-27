@@ -135,7 +135,7 @@
           "type": "string",
           "enum": ["error", "warn", "off"],
           "default": "error",
-          "description": "Behavior when a declared coverage contract finds uncovered, stale, or empty-input first-party units. 'error' (default) fails validation, 'warn' reports but does not fail, 'off' suppresses findings even for an explicitly declared coverage contract. Backward compatibility does not depend on this default: a policy with no strict_coverage/audit_coverage contracts is unaffected regardless of this setting, because no coverage contract exists to produce a finding."
+          "description": "Behavior when a declared coverage contract finds uncovered, unknown, stale, or empty-input first-party units. 'error' (default) fails validation, 'warn' reports but does not fail, 'off' suppresses findings even for an explicitly declared coverage contract. Backward compatibility does not depend on this default: a policy with no strict_coverage/audit_coverage contracts is unaffected regardless of this setting, because no coverage contract exists to produce a finding."
         },
         "condition_sets": {
           "type": "object",
@@ -538,16 +538,24 @@
         }
       }
     },
-    "coverageDiscoveryExclusion": {
+    "coverageProjectExclusion": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["reason"],
-      "anyOf": [
-        { "required": ["project"] },
-        { "required": ["assembly"] }
-      ],
+      "required": ["project", "reason"],
       "properties": {
         "project": { "type": "string", "minLength": 1 },
+        "reason": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Required justification for excluding this unit from coverage."
+        }
+      }
+    },
+    "coverageAssemblyExclusion": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["assembly", "reason"],
+      "properties": {
         "assembly": { "type": "string", "minLength": 1 },
         "reason": {
           "type": "string",
@@ -573,7 +581,7 @@
             "roots": {
               "type": "array",
               "minItems": 1,
-              "description": "Units to classify. Required for, and only valid with, scope: namespace, project, or assembly. Item shape depends on scope: namespace uses coverageNamespaceRoot, project/assembly use coverageDiscoveryRoot (see scope-specific allOf constraints below)."
+              "description": "Units to classify (the scan boundary the contract classifies, not coverage evidence by itself). Required for, and only valid with, scope: namespace, project, or assembly. Item shape depends on scope: namespace uses coverageNamespaceRoot, project/assembly use coverageDiscoveryRoot (see scope-specific allOf constraints below)."
             },
             "between": {
               "type": "array",
@@ -592,7 +600,7 @@
             },
             "exclude": {
               "type": "array",
-              "description": "Excluded units, each carrying a required reason. Item shape depends on scope: namespace uses coverageNamespaceExclusion, project/assembly use coverageDiscoveryExclusion. Not valid for scope: dependency_edge or rule_input (no exclusion shape defined for those scopes yet)."
+              "description": "Excluded units, each carrying a required reason. Item shape depends on scope: namespace uses coverageNamespaceExclusion, project uses coverageProjectExclusion, assembly uses coverageAssemblyExclusion. Not valid for scope: dependency_edge or rule_input (no exclusion shape defined for those scopes yet)."
             },
             "reason": {
               "type": "string",
@@ -613,12 +621,23 @@
           }
         },
         {
-          "if": { "properties": { "scope": { "enum": ["project", "assembly"] } }, "required": ["scope"] },
+          "if": { "properties": { "scope": { "const": "project" } }, "required": ["scope"] },
           "then": {
             "required": ["roots"],
             "properties": {
               "roots": { "items": { "$ref": "#/$defs/coverageDiscoveryRoot" } },
-              "exclude": { "items": { "$ref": "#/$defs/coverageDiscoveryExclusion" }, "default": [] }
+              "exclude": { "items": { "$ref": "#/$defs/coverageProjectExclusion" }, "default": [] }
+            },
+            "not": { "anyOf": [{ "required": ["between"] }, { "required": ["contract_ids"] }] }
+          }
+        },
+        {
+          "if": { "properties": { "scope": { "const": "assembly" } }, "required": ["scope"] },
+          "then": {
+            "required": ["roots"],
+            "properties": {
+              "roots": { "items": { "$ref": "#/$defs/coverageDiscoveryRoot" } },
+              "exclude": { "items": { "$ref": "#/$defs/coverageAssemblyExclusion" }, "default": [] }
             },
             "not": { "anyOf": [{ "required": ["between"] }, { "required": ["contract_ids"] }] }
           }
