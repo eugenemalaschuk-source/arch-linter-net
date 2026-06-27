@@ -564,6 +564,19 @@
         }
       }
     },
+    "coverageContractIdExclusion": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["contract_id", "reason"],
+      "properties": {
+        "contract_id": { "type": "string", "minLength": 1 },
+        "reason": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Required justification for excluding this referenced contract from rule-input coverage."
+        }
+      }
+    },
     "coverageContract": {
       "allOf": [
         {
@@ -600,7 +613,7 @@
             },
             "exclude": {
               "type": "array",
-              "description": "Excluded units, each carrying a required reason. Item shape depends on scope: namespace uses coverageNamespaceExclusion, project uses coverageProjectExclusion, assembly uses coverageAssemblyExclusion. Not valid for scope: dependency_edge or rule_input (no exclusion shape defined for those scopes yet)."
+              "description": "Excluded units, each carrying a required reason. Item shape depends on scope: namespace uses coverageNamespaceExclusion, project uses coverageProjectExclusion, assembly uses coverageAssemblyExclusion, rule_input uses coverageContractIdExclusion. Not valid for scope: dependency_edge (no exclusion shape defined for that scope yet)."
             },
             "reason": {
               "type": "string",
@@ -643,22 +656,19 @@
           }
         },
         {
-          "if": { "properties": { "scope": { "enum": ["dependency_edge", "rule_input"] } }, "required": ["scope"] },
-          "then": {
-            "not": { "required": ["exclude"] }
-          }
-        },
-        {
           "if": { "properties": { "scope": { "const": "dependency_edge" } }, "required": ["scope"] },
           "then": {
             "required": ["between"],
-            "not": { "anyOf": [{ "required": ["roots"] }, { "required": ["contract_ids"] }] }
+            "not": { "anyOf": [{ "required": ["roots"] }, { "required": ["contract_ids"] }, { "required": ["exclude"] }] }
           }
         },
         {
           "if": { "properties": { "scope": { "const": "rule_input" } }, "required": ["scope"] },
           "then": {
             "required": ["contract_ids"],
+            "properties": {
+              "exclude": { "items": { "$ref": "#/$defs/coverageContractIdExclusion" }, "default": [] }
+            },
             "not": { "anyOf": [{ "required": ["roots"] }, { "required": ["between"] }] }
           }
         }

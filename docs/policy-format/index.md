@@ -97,7 +97,7 @@ analysis:
 `coverage` controls whether declared namespace coverage findings fail validation
 (`error`), are reported without failing (`warn`), or are suppressed (`off`).
 
-See [Namespace coverage contracts](../contracts/coverage.md) for authoring guidance, exclusion rules, and current limits.
+See [Coverage contracts](../contracts/coverage.md) for authoring guidance, exclusion rules, and current limits.
 
 Read [Condition sets](condition-sets.md) for conditional compilation behavior.
 
@@ -168,7 +168,7 @@ Current limits:
   remain unsupported and fail validation.
 - Every `exclude` entry must include a non-empty `reason`.
 
-For user-facing examples and behavior, see [Namespace coverage contracts](../contracts/coverage.md).
+For user-facing examples and behavior, see [Coverage contracts](../contracts/coverage.md).
 
 ## Baselines and ignored violations
 

@@ -107,7 +107,8 @@ public static class ArchitectureRunnerFactory
     {
         List<ArchitectureCoverageContract> unsupported = document.Contracts.StrictCoverage
             .Concat(document.Contracts.AuditCoverage)
-            .Where(contract => !string.Equals(contract.Scope, "namespace", StringComparison.Ordinal))
+            .Where(contract => !string.Equals(contract.Scope, "namespace", StringComparison.Ordinal)
+                                && !string.Equals(contract.Scope, "rule_input", StringComparison.Ordinal))
             .ToList();
 
         if (unsupported.Count == 0)
@@ -117,8 +118,8 @@ public static class ArchitectureRunnerFactory
 
         string details = string.Join(", ", unsupported.Select(contract => $"{contract.Name} ({contract.Scope})"));
         throw new InvalidOperationException(
-            "Only coverage contracts with scope 'namespace' are implemented right now. " +
-            $"Unsupported coverage contract scopes: {details}. Project, assembly, dependency_edge, " +
-            "and rule_input coverage remain reserved for follow-up issues.");
+            "Only coverage contracts with scope 'namespace' or 'rule_input' are implemented right now. " +
+            $"Unsupported coverage contract scopes: {details}. Project, assembly, and dependency_edge " +
+            "coverage remain reserved for follow-up issues.");
     }
 }

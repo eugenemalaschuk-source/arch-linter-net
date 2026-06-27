@@ -10,7 +10,7 @@ public sealed partial class ArchitectureContractRunner
 {
     public List<ArchitectureViolation> CheckContract(ArchitectureDependencyContract contract)
     {
-        if (!IsContractSelected(contract.Id))
+        if (!IsContractSelected(contract.Id) || IsDanglingButCoveredByRuleInputCoverage(contract))
         {
             return new List<ArchitectureViolation>();
         }
@@ -63,7 +63,7 @@ public sealed partial class ArchitectureContractRunner
 
     public List<ArchitectureViolation> CheckLayerContract(ArchitectureLayerContract contract)
     {
-        if (!IsContractSelected(contract.Id))
+        if (!IsContractSelected(contract.Id) || IsDanglingButCoveredByRuleInputCoverage(contract))
         {
             return new List<ArchitectureViolation>();
         }
@@ -173,7 +173,7 @@ public sealed partial class ArchitectureContractRunner
 
     public List<ArchitectureViolation> CheckAllowOnlyContract(ArchitectureAllowOnlyContract contract)
     {
-        if (!IsContractSelected(contract.Id))
+        if (!IsContractSelected(contract.Id) || IsDanglingButCoveredByRuleInputCoverage(contract))
         {
             return new List<ArchitectureViolation>();
         }
@@ -220,7 +220,7 @@ public sealed partial class ArchitectureContractRunner
 
     public IReadOnlyCollection<string> CheckCycleContract(ArchitectureCycleContract contract)
     {
-        if (!IsContractSelected(contract.Id))
+        if (!IsContractSelected(contract.Id) || IsDanglingButCoveredByRuleInputCoverage(contract))
         {
             return Array.Empty<string>();
         }
@@ -363,7 +363,7 @@ public sealed partial class ArchitectureContractRunner
 
     public List<ArchitectureViolation> CheckMethodBodyContract(ArchitectureMethodBodyContract contract)
     {
-        if (!IsContractSelected(contract.Id))
+        if (!IsContractSelected(contract.Id) || IsDanglingButCoveredByRuleInputCoverage(contract))
         {
             return new List<ArchitectureViolation>();
         }
@@ -409,7 +409,7 @@ public sealed partial class ArchitectureContractRunner
 
     public List<ArchitectureViolation> CheckIndependenceContract(ArchitectureIndependenceContract contract)
     {
-        if (!IsContractSelected(contract.Id))
+        if (!IsContractSelected(contract.Id) || IsDanglingButCoveredByRuleInputCoverage(contract))
         {
             return new List<ArchitectureViolation>();
         }
@@ -443,7 +443,7 @@ public sealed partial class ArchitectureContractRunner
 
     public List<ArchitectureViolation> CheckProtectedContract(ArchitectureProtectedContract contract)
     {
-        if (!IsContractSelected(contract.Id))
+        if (!IsContractSelected(contract.Id) || IsDanglingButCoveredByRuleInputCoverage(contract))
         {
             return new List<ArchitectureViolation>();
         }
@@ -559,7 +559,7 @@ public sealed partial class ArchitectureContractRunner
 
     public List<ArchitectureViolation> CheckExternalContract(ArchitectureExternalDependencyContract contract)
     {
-        if (!IsContractSelected(contract.Id))
+        if (!IsContractSelected(contract.Id) || IsDanglingButCoveredByRuleInputCoverage(contract))
         {
             return new List<ArchitectureViolation>();
         }
