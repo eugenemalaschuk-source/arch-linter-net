@@ -131,6 +131,12 @@
           "default": "error",
           "description": "Behavior when the policy-consistency check finds internal contradictions in the policy itself (duplicate IDs, allow/forbid conflicts, independence conflicts, protected-importer conflicts, layer overlaps, unreachable contracts). 'error' (default) fails validation, 'warn' reports but does not fail, 'off' suppresses findings. The check itself always runs."
         },
+        "coverage": {
+          "type": "string",
+          "enum": ["error", "warn", "off"],
+          "default": "off",
+          "description": "Behavior when a declared coverage contract finds uncovered, stale, or empty-input first-party units. 'error' fails validation, 'warn' reports but does not fail, 'off' (default) suppresses findings. A policy with no strict_coverage/audit_coverage contracts is unaffected regardless of this setting."
+        },
         "condition_sets": {
           "type": "object",
           "description": "Named preprocessor symbol sets for conditional compilation analysis. Each key is a condition set name (e.g. 'runtime', 'editor'), each value is an array of preprocessor symbols (e.g. ['UNITY_EDITOR']). Only affects Roslyn source/method-body scanning.",
@@ -259,6 +265,16 @@
         "audit_acyclic_siblings": {
           "type": "array",
           "items": { "$ref": "#/$defs/acyclicSiblingContract" },
+          "default": []
+        },
+        "strict_coverage": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/coverageContract" },
+          "default": []
+        },
+        "audit_coverage": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/coverageContract" },
           "default": []
         }
       }
@@ -484,6 +500,75 @@
       "properties": {
         "name": { "type": "string", "minLength": 1 },
         "optional": { "type": "boolean", "default": false }
+      }
+    },
+    "coverageRoot": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "namespace": { "type": "string", "minLength": 1, "description": "Namespace prefix or glob pattern, same syntax as layers.<name>.namespace. Used for scope: namespace." },
+        "namespace_suffix": { "type": "string", "description": "Optional namespace suffix constraint, same syntax as layers.<name>.namespace_suffix." },
+        "include": { "$ref": "#/$defs/stringList", "description": "Glob patterns for project/assembly discovery roots. Used for scope: project or assembly." },
+        "exclude": { "$ref": "#/$defs/stringList", "description": "Glob patterns excluded from include, before coverage exclusion reasons apply." }
+      }
+    },
+    "coverageExclusion": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["reason"],
+      "properties": {
+        "namespace": { "type": "string", "minLength": 1 },
+        "namespace_suffix": { "type": "string", "minLength": 1 },
+        "project": { "type": "string", "minLength": 1 },
+        "assembly": { "type": "string", "minLength": 1 },
+        "reason": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Required justification for excluding this unit from coverage."
+        }
+      }
+    },
+    "coverageContract": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "scope", "reason"],
+      "properties": {
+        "name": { "type": "string", "minLength": 1 },
+        "id": { "type": "string", "minLength": 1, "description": "Stable contract identifier for CLI selection and cross-referencing." },
+        "scope": {
+          "type": "string",
+          "enum": ["namespace", "project", "assembly", "dependency_edge", "rule_input"],
+          "description": "Which kind of first-party unit this coverage contract classifies."
+        },
+        "roots": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/coverageRoot" },
+          "description": "Units to classify. Used for scope: namespace, project, assembly."
+        },
+        "between": {
+          "type": "array",
+          "items": {
+            "type": "array",
+            "items": { "type": "string", "minLength": 1 },
+            "minItems": 2,
+            "maxItems": 2
+          },
+          "description": "Declared-layer-name pairs to classify. Used for scope: dependency_edge."
+        },
+        "contract_ids": {
+          "$ref": "#/$defs/stringList",
+          "description": "Contract IDs whose rule inputs are checked for stale/empty-input status. Used for scope: rule_input."
+        },
+        "exclude": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/coverageExclusion" },
+          "default": []
+        },
+        "reason": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Why this coverage contract exists."
+        }
       }
     }
   }
