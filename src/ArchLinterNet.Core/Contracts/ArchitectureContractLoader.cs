@@ -167,20 +167,69 @@ public static class ArchitectureContractLoader
                 continue;
             }
 
-            foreach (ArchitectureCoverageRoot root in contract.Roots)
+            if (contract.Roots.Count == 0)
             {
-                if (!string.IsNullOrWhiteSpace(root.Namespace))
-                {
-                    _ = new ArchitectureLayer
-                    {
-                        Namespace = root.Namespace,
-                        NamespaceSuffix = root.NamespaceSuffix
-                    }.GlobPattern;
-                }
+                throw new InvalidOperationException(
+                    $"Namespace coverage contract '{contract.Name}' must declare at least one root with a non-empty namespace.");
             }
 
-            foreach (ArchitectureCoverageExclusion exclusion in contract.Exclude)
+            if (contract.Between.Count > 0)
             {
+                throw new InvalidOperationException(
+                    $"Namespace coverage contract '{contract.Name}' cannot declare 'between'. That field is only valid for scope 'dependency_edge'.");
+            }
+
+            if (contract.ContractIds.Count > 0)
+            {
+                throw new InvalidOperationException(
+                    $"Namespace coverage contract '{contract.Name}' cannot declare 'contract_ids'. That field is only valid for scope 'rule_input'.");
+            }
+
+            for (int i = 0; i < contract.Roots.Count; i++)
+            {
+                ArchitectureCoverageRoot root = contract.Roots[i];
+
+                if (string.IsNullOrWhiteSpace(root.Namespace))
+                {
+                    throw new InvalidOperationException(
+                        $"Namespace coverage contract '{contract.Name}' has a root at index {i} without a non-empty namespace. Namespace coverage roots must use the layer namespace matcher shape.");
+                }
+
+                if (root.Include.Count > 0 || root.Exclude.Count > 0)
+                {
+                    throw new InvalidOperationException(
+                        $"Namespace coverage contract '{contract.Name}' has a root at index {i} using include/exclude discovery fields. Namespace coverage roots must use only namespace and optional namespace_suffix.");
+                }
+
+                _ = new ArchitectureLayer
+                {
+                    Namespace = root.Namespace,
+                    NamespaceSuffix = root.NamespaceSuffix
+                }.GlobPattern;
+            }
+
+            for (int i = 0; i < contract.Exclude.Count; i++)
+            {
+                ArchitectureCoverageExclusion exclusion = contract.Exclude[i];
+
+                if (string.IsNullOrWhiteSpace(exclusion.Reason))
+                {
+                    throw new InvalidOperationException(
+                        $"Namespace coverage contract '{contract.Name}' has an exclusion at index {i} without a non-empty reason.");
+                }
+
+                if (!string.IsNullOrWhiteSpace(exclusion.Project) || !string.IsNullOrWhiteSpace(exclusion.Assembly))
+                {
+                    throw new InvalidOperationException(
+                        $"Namespace coverage contract '{contract.Name}' has an exclusion at index {i} using project/assembly fields. Namespace coverage exclusions must use namespace and/or namespace_suffix only.");
+                }
+
+                if (string.IsNullOrWhiteSpace(exclusion.Namespace) && string.IsNullOrWhiteSpace(exclusion.NamespaceSuffix))
+                {
+                    throw new InvalidOperationException(
+                        $"Namespace coverage contract '{contract.Name}' has an exclusion at index {i} without a namespace or namespace_suffix matcher.");
+                }
+
                 if (!string.IsNullOrWhiteSpace(exclusion.Namespace))
                 {
                     _ = new ArchitectureLayer

@@ -154,6 +154,94 @@ public sealed class CoverageContractReservedTests
     }
 
     [Test]
+    public void NamespaceCoverageRoot_WithoutNamespace_ThrowsActionableError()
+    {
+        string policyPath = WritePolicy("""
+            version: 1
+            name: Test
+
+            analysis:
+              target_assemblies: [ArchLinterNet.Core]
+
+            contracts:
+              strict_coverage:
+                - name: namespace-coverage
+                  scope: namespace
+                  roots:
+                    - include: ["src/**/*.cs"]
+                  reason: Invalid namespace coverage root.
+            """);
+
+        InvalidOperationException ex = Assert.Throws<InvalidOperationException>(() =>
+            ArchitectureValidationService.Validate(new ValidationRequest
+            {
+                PolicyPath = policyPath,
+                Mode = "strict"
+            }))!;
+
+        Assert.That(ex.Message, Does.Contain("without a non-empty namespace"));
+    }
+
+    [Test]
+    public void NamespaceCoverageRoot_WithIncludeExcludeFields_ThrowsActionableError()
+    {
+        string policyPath = WritePolicy("""
+            version: 1
+            name: Test
+
+            analysis:
+              target_assemblies: [ArchLinterNet.Core]
+
+            contracts:
+              strict_coverage:
+                - name: namespace-coverage
+                  scope: namespace
+                  roots:
+                    - namespace: ArchLinterNet.Core
+                      include: ["src/**/*.cs"]
+                  reason: Invalid namespace coverage root.
+            """);
+
+        InvalidOperationException ex = Assert.Throws<InvalidOperationException>(() =>
+            ArchitectureValidationService.Validate(new ValidationRequest
+            {
+                PolicyPath = policyPath,
+                Mode = "strict"
+            }))!;
+
+        Assert.That(ex.Message, Does.Contain("include/exclude discovery fields"));
+    }
+
+    [Test]
+    public void NamespaceCoverageExclusion_WithoutReason_ThrowsActionableError()
+    {
+        string assemblyName = typeof(CoverageContractReservedTests).Assembly.GetName().Name!;
+        string policyPath = WritePolicy(
+            $"version: 1{Environment.NewLine}" +
+            $"name: Test{Environment.NewLine}{Environment.NewLine}" +
+            $"analysis:{Environment.NewLine}" +
+            $"  target_assemblies: [{assemblyName}]{Environment.NewLine}" +
+            $"contracts:{Environment.NewLine}" +
+            $"  strict_coverage:{Environment.NewLine}" +
+            $"    - name: namespace-coverage{Environment.NewLine}" +
+            $"      scope: namespace{Environment.NewLine}" +
+            $"      roots:{Environment.NewLine}" +
+            $"        - namespace: {FeatureRoot}{Environment.NewLine}" +
+            $"      exclude:{Environment.NewLine}" +
+            $"        - namespace_suffix: Generated{Environment.NewLine}" +
+            $"      reason: Invalid exclusion.{Environment.NewLine}");
+
+        InvalidOperationException ex = Assert.Throws<InvalidOperationException>(() =>
+            ArchitectureValidationService.Validate(new ValidationRequest
+            {
+                PolicyPath = policyPath,
+                Mode = "strict"
+            }))!;
+
+        Assert.That(ex.Message, Does.Contain("without a non-empty reason"));
+    }
+
+    [Test]
     public void PolicyWithoutCoverageContracts_IsUnaffected()
     {
         const string Yaml = """
