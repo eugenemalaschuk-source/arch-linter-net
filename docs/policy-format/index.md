@@ -87,11 +87,15 @@ analysis:
   default_condition_set: ''
   unmatched_ignored_violations: error
   policy_consistency: error
+  coverage: error
 ```
 
 `target_assemblies` tells the runner which assemblies to inspect. `assembly_search_paths` and `source_roots` make standalone CLI and method-body scanning reliable in real repositories.
 
 `policy_consistency` controls a separate pass that checks the policy document itself for internal contradictions (duplicate contract IDs, allow/forbid conflicts, independence conflicts, protected-importer conflicts, layer overlaps, unreachable contracts) — independent of code scanning. See [YAML schema reference](../reference/yaml-schema.md#policy_consistency) for details.
+
+`coverage` controls whether declared namespace coverage findings fail validation
+(`error`), are reported without failing (`warn`), or are suppressed (`off`).
 
 Read [Condition sets](condition-sets.md) for conditional compilation behavior.
 
@@ -112,6 +116,7 @@ contracts:
   strict_acyclic_siblings: []
   strict_protected: []
   strict_layer_templates: []
+  strict_coverage: []
 
   audit: []
   audit_layers: []
@@ -124,9 +129,42 @@ contracts:
   audit_acyclic_siblings: []
   audit_protected: []
   audit_layer_templates: []
+  audit_coverage: []
 ```
 
 Read [Contracts](../contracts/index.md) for the supported contract families.
+
+## Namespace coverage
+
+ArchLinterNet currently supports coverage contracts for namespace scope only.
+Use them to detect first-party namespaces under a configured root that are not
+represented by any declared layer, namespace glob, expanded layer template, or
+explicit exclusion.
+
+```yaml
+analysis:
+  coverage: error
+
+contracts:
+  strict_coverage:
+    - id: feature-namespace-coverage
+      name: feature-namespace-coverage
+      scope: namespace
+      roots:
+        - namespace: MyApp.Features
+      exclude:
+        - namespace: MyApp.Features.*
+          namespace_suffix: Generated
+          reason: Generated code is excluded from manual architecture coverage.
+      reason: Every feature namespace must be declared as a layer or explicitly excluded.
+```
+
+Current limits:
+
+- Only `scope: namespace` is implemented.
+- `project`, `assembly`, `dependency_edge`, and `rule_input` coverage scopes
+  remain unsupported and fail validation.
+- Every `exclude` entry must include a non-empty `reason`.
 
 ## Baselines and ignored violations
 
