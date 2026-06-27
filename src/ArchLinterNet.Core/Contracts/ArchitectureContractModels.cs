@@ -364,6 +364,8 @@ public sealed class ArchitectureCoverageExclusion
 
     [YamlMember(Alias = "assembly")] public string Assembly { get; set; } = string.Empty;
 
+    [YamlMember(Alias = "contract_id")] public string ContractId { get; set; } = string.Empty;
+
     [YamlMember(Alias = "reason")] public string Reason { get; set; } = string.Empty;
 }
 
