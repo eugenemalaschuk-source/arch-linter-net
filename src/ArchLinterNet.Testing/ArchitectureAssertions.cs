@@ -55,7 +55,12 @@ public sealed class ArchitectureValidationBuilder
 
         ValidationOutcome outcome = ArchitectureValidationService.Validate(request);
 
-        return new ArchitectureValidationResult(outcome.Passed, outcome.Violations, outcome.Cycles);
+        return new ArchitectureValidationResult(
+            outcome.Passed,
+            outcome.Violations,
+            outcome.Cycles,
+            outcome.PolicyConsistencyFindings,
+            outcome.PolicyConsistencyConfig);
     }
 }
 
@@ -64,15 +69,21 @@ public sealed class ArchitectureValidationResult
     public bool Passed { get; }
     public IReadOnlyCollection<ArchitectureViolation> Violations { get; }
     public IReadOnlyCollection<string> Cycles { get; }
+    public IReadOnlyCollection<PolicyConsistencyDiagnostic> PolicyConsistencyFindings { get; }
+    public string PolicyConsistencyConfig { get; }
 
     public ArchitectureValidationResult(
         bool passed,
         IReadOnlyCollection<ArchitectureViolation> violations,
-        IReadOnlyCollection<string> cycles)
+        IReadOnlyCollection<string> cycles,
+        IReadOnlyCollection<PolicyConsistencyDiagnostic>? policyConsistencyFindings = null,
+        string policyConsistencyConfig = "error")
     {
         Passed = passed;
         Violations = violations;
         Cycles = cycles;
+        PolicyConsistencyFindings = policyConsistencyFindings ?? Array.Empty<PolicyConsistencyDiagnostic>();
+        PolicyConsistencyConfig = policyConsistencyConfig;
     }
 
     public void ShouldPass()
@@ -87,6 +98,10 @@ public sealed class ArchitectureValidationResult
                 ? ArchitectureDiagnosticFormatter.FormatCyclesForHumans(Cycles)
                 : string.Empty;
 
+            string policyConsistencyDetails = PolicyConsistencyFindings.Count > 0
+                ? ArchitectureDiagnosticFormatter.FormatPolicyConsistencyForHumans(PolicyConsistencyFindings)
+                : string.Empty;
+
             string message = $"Architecture validation failed.{Environment.NewLine}";
             if (!string.IsNullOrEmpty(violationDetails))
             {
@@ -96,6 +111,11 @@ public sealed class ArchitectureValidationResult
             if (!string.IsNullOrEmpty(cycleDetails))
             {
                 message += $"Cycles:{Environment.NewLine}{cycleDetails}{Environment.NewLine}";
+            }
+
+            if (!string.IsNullOrEmpty(policyConsistencyDetails))
+            {
+                message += $"{policyConsistencyDetails}{Environment.NewLine}";
             }
 
             throw new InvalidOperationException(message);

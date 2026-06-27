@@ -190,4 +190,48 @@ contracts:
 
         Assert.That(result.Passed, Is.False);
     }
+
+    [Test]
+    public void ShouldPass_PolicyConsistencyOnlyFailure_ThrowsWithCheckKindAndReason()
+    {
+        string contractDir = Path.Combine(_tempDir, "architecture");
+        Directory.CreateDirectory(contractDir);
+        string contractPath = Path.Combine(contractDir, "dependencies.arch.yml");
+
+        File.WriteAllText(contractPath, @"
+version: 1
+name: Duplicate Id Test
+layers:
+  core:
+    namespace: ArchLinterNet.Core
+analysis:
+  target_assemblies:
+    - ArchLinterNet.Core
+  policy_consistency: error
+contracts:
+  strict:
+    - id: dup-id
+      name: core-no-forbidden
+      source: core
+      forbidden: []
+  audit:
+    - id: dup-id
+      name: contracts-no-forbidden
+      source: core
+      forbidden: []
+");
+
+        var result = ArchitectureAssertions.FromPolicy(contractPath).ValidateStrict();
+
+        Assert.That(result.Passed, Is.False);
+        Assert.That(result.Violations, Is.Empty);
+        Assert.That(result.Cycles, Is.Empty);
+        Assert.That(result.PolicyConsistencyFindings, Is.Not.Empty);
+
+        var ex = Assert.Throws<InvalidOperationException>(() => result.ShouldPass());
+
+        Assert.That(ex!.Message, Does.Contain("duplicate-id"));
+        Assert.That(ex.Message, Does.Contain("core-no-forbidden"));
+        Assert.That(ex.Message, Does.Contain("contracts-no-forbidden"));
+    }
 }
