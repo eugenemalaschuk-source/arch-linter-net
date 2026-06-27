@@ -13,9 +13,7 @@ arch-linter-net --mode strict --format human
 Example shape:
 
 ```text
-[VIOLATION] application-must-not-depend-on-infrastructure
-  MyApp.Application.Services.LegacyService
-    -> MyApp.Infrastructure.Repositories.UserRepository
+- [application-not-infrastructure] [application-must-not-depend-on-infrastructure] MyApp.Application.Services.LegacyService -> MyApp.Infrastructure: MyApp.Infrastructure.Repositories.UserRepository
 ```
 
 Human output is optimized for readability, not machine parsing.
@@ -25,6 +23,13 @@ When enabled and non-empty, supplemental diagnostics are emitted in dedicated se
 - `Coverage findings:` for namespace coverage contracts;
 - `Unmatched ignored violations:` for stale baseline/ignore entries;
 - `Policy consistency findings:` for internal contradictions in the policy document.
+
+Example supplemental section:
+
+```text
+Coverage findings:
+- [feature-namespace-coverage] [feature-namespace-coverage] MyApp.Features.Payments -> uncovered namespace: MyApp.Features.Payments.PaymentsRepresentative
+```
 
 ## JSON output
 
