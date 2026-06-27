@@ -41,6 +41,18 @@ public static class ArchitectureValidationService
                         $"Invalid analysis.policy_consistency: {policyConsistencyConfig}. Use 'error', 'warn', or 'off'.");
                 }
 
+                // Coverage contracts themselves are rejected earlier, in ArchitectureRunnerFactory.LoadDocument
+                // (the engine isn't implemented yet; see #97-#103). Validating the severity value here keeps
+                // analysis.coverage held to the same "fail fast on malformed config" standard as the other
+                // severity settings even though no coverage check currently reads it.
+                string coverageConfig = document.Analysis.Coverage;
+
+                if (coverageConfig is not ("error" or "warn" or "off"))
+                {
+                    throw new InvalidOperationException(
+                        $"Invalid analysis.coverage: {coverageConfig}. Use 'error', 'warn', or 'off'.");
+                }
+
                 HashSet<string>? selectedIds = request.ContractIds is { Count: > 0 }
                     ? new HashSet<string>(request.ContractIds, StringComparer.OrdinalIgnoreCase)
                     : null;

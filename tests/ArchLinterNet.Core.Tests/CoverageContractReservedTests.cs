@@ -104,4 +104,33 @@ public sealed class CoverageContractReservedTests
 
         Assert.That(outcome.Passed, Is.True);
     }
+
+    [Test]
+    public void InvalidCoverageSeverityValue_ThrowsEvenWithoutCoverageContracts()
+    {
+        const string Yaml = """
+            version: 1
+            name: Test
+
+            layers:
+              core:
+                namespace: ArchLinterNet.Core
+
+            analysis:
+              target_assemblies: [ArchLinterNet.Core]
+              coverage: nonsense
+
+            contracts: {}
+            """;
+        string policyPath = WritePolicy(Yaml);
+
+        InvalidOperationException ex = Assert.Throws<InvalidOperationException>(() =>
+            ArchitectureValidationService.Validate(new ValidationRequest
+            {
+                PolicyPath = policyPath,
+                Mode = "strict"
+            }))!;
+
+        Assert.That(ex.Message, Does.Contain("analysis.coverage"));
+    }
 }
