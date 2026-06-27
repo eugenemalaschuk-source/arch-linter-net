@@ -79,13 +79,11 @@ public static class ArchitectureRunnerFactory
 
     private static void ApplyDiscoveryResult(ArchitectureAnalysisConfiguration analysis, ProjectDiscoveryResult discovery)
     {
-        if (analysis.TargetAssemblies.Count == 0 && discovery.TargetAssemblyNames.Count > 0)
+        bool seedAssemblies = analysis.TargetAssemblies.Count == 0 && discovery.TargetAssemblyNames.Count > 0;
+
+        if (seedAssemblies)
         {
             analysis.TargetAssemblies = discovery.TargetAssemblyNames.ToList();
-        }
-
-        if (discovery.AssemblySearchPaths.Count > 0)
-        {
             analysis.AssemblySearchPaths = analysis.AssemblySearchPaths
                 .Concat(discovery.AssemblySearchPaths)
                 .Distinct(StringComparer.OrdinalIgnoreCase)

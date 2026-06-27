@@ -48,6 +48,10 @@ public sealed class ArchitectureRunnerFactoryDiscoveryTests
 
         Assert.That(document.Analysis.TargetAssemblies, Is.EquivalentTo(new[] { "ArchLinterNet.Core" }));
         Assert.That(setup.Runner.CheckConfiguration().Any(v => v.ForbiddenNamespace == "missing project build output"), Is.False);
+
+        string discoveredOutputDir = Path.Combine(_repoRoot, "Unresolvable", "bin", "Debug", "net9.0");
+        Assert.That(document.Analysis.AssemblySearchPaths, Has.None.Matches<string>(
+            path => string.Equals(path, discoveredOutputDir, StringComparison.OrdinalIgnoreCase)));
     }
 
     [Test]
