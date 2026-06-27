@@ -13,12 +13,23 @@ arch-linter-net --mode strict --format human
 Example shape:
 
 ```text
-[VIOLATION] application-must-not-depend-on-infrastructure
-  MyApp.Application.Services.LegacyService
-    -> MyApp.Infrastructure.Repositories.UserRepository
+- [application-not-infrastructure] [application-must-not-depend-on-infrastructure] MyApp.Application.Services.LegacyService -> MyApp.Infrastructure: MyApp.Infrastructure.Repositories.UserRepository
 ```
 
 Human output is optimized for readability, not machine parsing.
+
+When enabled and non-empty, supplemental diagnostics are emitted in dedicated sections:
+
+- `Coverage findings:` for namespace coverage contracts;
+- `Unmatched ignored violations:` for stale baseline/ignore entries;
+- `Policy consistency findings:` for internal contradictions in the policy document.
+
+Example supplemental section:
+
+```text
+Coverage findings:
+- [feature-namespace-coverage] [feature-namespace-coverage] MyApp.Features.Payments -> uncovered namespace: MyApp.Features.Payments.PaymentsRepresentative
+```
 
 ## JSON output
 
@@ -35,6 +46,53 @@ arch-linter-net --strict --json > architecture-violations.json
 ```
 
 JSON output is written to stdout. When `--timings` is also enabled, timings are written to stderr so stdout remains parseable.
+
+Current JSON output is a single top-level object with these arrays:
+
+- `violations`
+- `cycles`
+- `coverage_findings`
+- `unmatched_ignored_violations`
+- `policy_consistency_findings`
+
+Example shape:
+
+```json
+{
+  "passed": false,
+  "mode": "strict",
+  "violations": [],
+  "cycles": [],
+  "coverage_findings": [
+    {
+      "contract": "feature-namespace-coverage",
+      "contract_id": "feature-namespace-coverage",
+      "source": "MyApp.Features.Payments",
+      "forbidden_namespace": "uncovered namespace",
+      "forbidden_references": ["MyApp.Features.Payments.PaymentsRepresentative"]
+    }
+  ],
+  "unmatched_ignored_violations": [],
+  "policy_consistency_findings": [
+    {
+      "kind": "policy_consistency",
+      "check_kind": "duplicate-id",
+      "contract": "domain-boundaries",
+      "contract_id": "domain-boundaries",
+      "reason": "Contract ID is used more than once.",
+      "conflicting_contract_ids": ["domain-boundaries", "domain-boundaries"],
+      "conflicting_contract_names": ["domain-boundaries", "domain-boundaries-copy"],
+      "layers": []
+    }
+  ]
+}
+```
+
+Behavior for non-violation finding families is controlled separately:
+
+- `analysis.coverage: error|warn|off` controls whether `coverage_findings` fail the run, report without failing, or are suppressed.
+- `analysis.policy_consistency: error|warn|off` controls whether `policy_consistency_findings` fail the run, report without failing, or are suppressed.
+- `analysis.unmatched_ignored_violations: error|warn|off` controls whether stale ignore entries fail the run, report without failing, or are suppressed.
 
 ## CI artifact pattern
 

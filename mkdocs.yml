@@ -45,6 +45,7 @@ nav:
       - Method-body contracts: contracts/method-body.md
       - Unity asmdef contracts: contracts/asmdef.md
       - Layer templates: contracts/layer-templates.md
+      - Namespace coverage: contracts/coverage.md
   - Guides:
       - Adopt in an existing repository: guides/adoption.md
       - Clean architecture policy: guides/clean-architecture.md

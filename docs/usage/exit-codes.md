@@ -15,6 +15,8 @@ Exit code `1` means the tool worked and found architecture violations. Examples:
 - a strict dependency contract found a forbidden reference;
 - a cycle contract found a cycle;
 - an allow-only contract found an unapproved layer reference;
+- a namespace coverage contract reported `coverage_findings` while `analysis.coverage` is `error`;
+- the policy-consistency pass reported `policy_consistency_findings` while `analysis.policy_consistency` is `error`;
 - a stale ignored violation is treated as a blocking policy error by current configuration.
 
 ## Exit code 2
@@ -26,6 +28,8 @@ Exit code `2` means the run could not be trusted as normal validation. Examples:
 - invalid YAML shape;
 - unknown contract ID passed to `--contract`;
 - unknown condition set passed to `--condition-set`;
+- invalid `analysis.coverage`, `analysis.policy_consistency`, or `analysis.unmatched_ignored_violations` value;
+- unsupported coverage scope such as `project` or `assembly`;
 - baseline references a contract ID that does not exist in the policy;
 - required target assemblies cannot be resolved when configuration treats that as fatal.
 

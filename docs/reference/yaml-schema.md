@@ -216,6 +216,8 @@ Controls behavior when declared coverage contracts find uncovered namespaces.
 Coverage is opt-in through `strict_coverage` / `audit_coverage`. Policies that
 declare no coverage contracts behave unchanged regardless of this setting.
 
+See [Namespace coverage contracts](../contracts/coverage.md) for public authoring examples and severity behavior.
+
 ## `contracts`
 
 Container for all contract definitions. Two groups at the top level:
@@ -466,6 +468,8 @@ Current limits:
   error.
 - Coverage findings are emitted as a separate coverage section in human output
   and `coverage_findings` array in JSON output.
+
+For a user-oriented guide, see [Namespace coverage contracts](../contracts/coverage.md).
 
 ### Ignored violations
 
