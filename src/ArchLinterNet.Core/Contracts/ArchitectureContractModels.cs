@@ -386,6 +386,9 @@ public sealed class ArchitectureCoverageContract : IArchitectureContract
     [YamlMember(Alias = "exclude")] public List<ArchitectureCoverageExclusion> Exclude { get; set; } = new();
 
     [YamlMember(Alias = "reason")] public string Reason { get; set; } = string.Empty;
+
+    [YamlMember(Alias = "ignored_violations")]
+    public List<ArchitectureIgnoredViolation> IgnoredViolations { get; set; } = new();
 }
 
 public sealed class ArchitectureMethodBodyContract : IArchitectureContract

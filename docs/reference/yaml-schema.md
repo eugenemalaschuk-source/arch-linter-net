@@ -432,6 +432,7 @@ Current runtime support covers `scope: namespace` and `scope: rule_input`.
       namespace_suffix: <string>  # Optional — suffix-only matcher or refinement (scope: namespace only)
       contract_id: <string>     # Optional — referenced contract ID (scope: rule_input only)
       reason: <string>          # Required when exclude entry exists
+  ignored_violations: []        # Optional — baseline accepted coverage debt
   reason: <string>              # Recommended — why this coverage gate exists
 ```
 

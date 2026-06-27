@@ -133,6 +133,93 @@ public sealed class RuleInputCoverageValidationTests
     }
 
     [Test]
+    public void StrictRuleInputCoverage_OffSeverityWithStaleBaselineEntry_StillPasses()
+    {
+        // The coverage gate is off, but a strict_coverage contract still carries an
+        // ignored_violations entry that no longer matches any current finding (resolved coverage
+        // debt). Stale-entry reporting must follow analysis.coverage, not just
+        // analysis.unmatched_ignored_violations — otherwise turning coverage off would not fully
+        // disable the coverage family.
+        // Keyed on a layer name that the current "video-to-ghost-rule" finding never reports
+        // (the real finding's forbidden_reference is "ghost"), so this entry never matches and is
+        // genuinely stale rather than coincidentally suppressing the live finding.
+        string staleIgnore =
+            $"      ignored_violations:{Environment.NewLine}" +
+            $"        - source_type: video-to-ghost-rule{Environment.NewLine}" +
+            $"          forbidden_reference: already-resolved-layer{Environment.NewLine}" +
+            $"          reason: previously accepted{Environment.NewLine}";
+
+        string policyPath = WritePolicy(BuildPolicy(
+            "strict_coverage",
+            referencedRuleGroup: "strict",
+            analysisCoverage: "off",
+            extraExclude: staleIgnore));
+
+        ValidationOutcome outcome = ArchitectureValidationService.Validate(new ValidationRequest
+        {
+            PolicyPath = policyPath,
+            Mode = "strict",
+            EnforceUnmatchedIgnoredViolationsPolicy = true
+        });
+
+        Assert.That(outcome.Passed, Is.True);
+        Assert.That(outcome.CoverageFindings, Is.Empty);
+        Assert.That(outcome.UnmatchedIgnoredViolations, Is.Empty);
+    }
+
+    [Test]
+    public void StrictDependencyContract_SharesIdWithCoverageContract_StaleIgnoreStillBlocksWhenCoverageOff()
+    {
+        // A non-coverage "strict" contract and a "strict_coverage" contract declare the SAME id —
+        // a collision the policy-consistency duplicate-id check does not catch, since its
+        // descriptor list does not span coverage groups. With analysis.coverage: off, the stale
+        // ignore on the *non-coverage* "strict" contract must still be reported/blocking: the
+        // off-filter must key off contract GROUP, not contract ID, or it would wrongly suppress
+        // this unrelated stale entry just because the id also belongs to a coverage contract.
+        string policyPath = WritePolicy(
+            $"version: 1{Environment.NewLine}" +
+            $"name: Test{Environment.NewLine}{Environment.NewLine}" +
+            $"layers:{Environment.NewLine}" +
+            $"  audio:{Environment.NewLine}" +
+            $"    namespace: {FixtureRoot}.Audio{Environment.NewLine}" +
+            $"  video:{Environment.NewLine}" +
+            $"    namespace: {FixtureRoot}.Video{Environment.NewLine}{Environment.NewLine}" +
+            $"analysis:{Environment.NewLine}" +
+            $"  target_assemblies: [{AssemblyName}]{Environment.NewLine}" +
+            $"  coverage: off{Environment.NewLine}{Environment.NewLine}" +
+            $"contracts:{Environment.NewLine}" +
+            $"  strict:{Environment.NewLine}" +
+            $"    - id: shared-id{Environment.NewLine}" +
+            $"      name: shared-id{Environment.NewLine}" +
+            $"      source: video{Environment.NewLine}" +
+            $"      forbidden: []{Environment.NewLine}" +
+            $"      ignored_violations:{Environment.NewLine}" +
+            $"        - source_type: Stale.Type{Environment.NewLine}" +
+            $"          forbidden_reference: Stale.Ref{Environment.NewLine}" +
+            $"          reason: previously accepted{Environment.NewLine}{Environment.NewLine}" +
+            $"  strict_coverage:{Environment.NewLine}" +
+            $"    - id: shared-id{Environment.NewLine}" +
+            $"      name: shared-id{Environment.NewLine}" +
+            $"      scope: namespace{Environment.NewLine}" +
+            $"      roots:{Environment.NewLine}" +
+            $"        - namespace: {FixtureRoot}{Environment.NewLine}" +
+            $"      reason: shared id coverage contract{Environment.NewLine}");
+
+        ValidationOutcome outcome = ArchitectureValidationService.Validate(new ValidationRequest
+        {
+            PolicyPath = policyPath,
+            Mode = "strict",
+            EnforceUnmatchedIgnoredViolationsPolicy = true
+        });
+
+        Assert.That(outcome.Passed, Is.False,
+            "Stale ignore on the unrelated 'strict' contract must still block, even though a " +
+            "'strict_coverage' contract shares its id and coverage gating is off");
+        Assert.That(outcome.UnmatchedIgnoredViolations, Has.Some.Matches<ArchLinterNet.Core.Model.ArchitectureUnmatchedIgnoredViolation>(u =>
+            u.SourceType == "Stale.Type" && u.ForbiddenReference == "Stale.Ref"));
+    }
+
+    [Test]
     public void RuleInputCoverage_SameModeIntentionallyEmptyExclusion_SuppressesFindingAndPasses()
     {
         string extraExclude =
