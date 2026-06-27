@@ -105,6 +105,28 @@ public sealed class ArchitectureDiagnosticFormatterTests
     }
 
     [Test]
+    public void FormatCyclesForHumans_MultipleCycles_SortedAlphabetically()
+    {
+        var cycles = new[] { "Z -> Y -> Z", "A -> B -> A" };
+
+        string output = ArchitectureDiagnosticFormatter.FormatCyclesForHumans(cycles);
+
+        Assert.That(output, Is.EqualTo("- A -> B -> A" + Environment.NewLine + "- Z -> Y -> Z"));
+    }
+
+    [Test]
+    public void FormatCyclesForCiArtifacts_IncludesCyclePaths()
+    {
+        var cycles = new[] { "A -> B -> A" };
+
+        string json = ArchitectureDiagnosticFormatter.FormatCyclesForCiArtifacts("cycle-contract", "cycle-check", cycles);
+
+        using var doc = JsonDocument.Parse(json);
+        Assert.That(doc.RootElement.GetProperty("cycles")[0].GetString(), Is.EqualTo("A -> B -> A"));
+        Assert.That(doc.RootElement.GetProperty("contract_id").GetString(), Is.EqualTo("cycle-check"));
+    }
+
+    [Test]
     public void FormatUnmatchedForHumans_NoEntries_ReturnsEmptyString()
     {
         string output = ArchitectureDiagnosticFormatter.FormatUnmatchedForHumans(

@@ -18,7 +18,8 @@ public static class ArchitectureDiagnosticFormatter
 
     public static string FormatCyclesForHumans(IReadOnlyCollection<string> cycles)
     {
-        return string.Join(Environment.NewLine, cycles.OrderBy(c => c).Select(cycle => $"- {cycle}"));
+        var diagnostics = cycles.Select(cycle => ArchitectureDiagnosticMapper.FromCycle(cycle, contractName: string.Empty, contractId: null));
+        return string.Join(Environment.NewLine, diagnostics.OrderBy(d => d.Path).Select(d => $"- {d.Path}"));
     }
 
     public static string FormatUnmatchedForHumans(IReadOnlyCollection<ArchitectureUnmatchedIgnoredViolation> unmatched)
@@ -74,7 +75,10 @@ public static class ArchitectureDiagnosticFormatter
                 .Select(ArchitectureDiagnosticMapper.FromViolation)
                 .Select(d => ToCiJsonObject(d, includeContract: true))
                 .ToArray(),
-            cycles = cycles.ToArray(),
+            cycles = cycles
+                .Select(cycle => ArchitectureDiagnosticMapper.FromCycle(cycle, contractName: string.Empty, contractId: null))
+                .Select(d => d.Path)
+                .ToArray(),
             unmatched_ignored_violations = unmatchedSerialized
         };
 
@@ -99,12 +103,14 @@ public static class ArchitectureDiagnosticFormatter
 
     public static string FormatCyclesForCiArtifacts(string contractName, string? contractId, IReadOnlyCollection<string> cycles)
     {
+        var diagnostics = cycles.Select(cycle => ArchitectureDiagnosticMapper.FromCycle(cycle, contractName, contractId));
+
         var payload = new
         {
             kind = "architecture_cycles",
             contract = contractName,
             contract_id = contractId,
-            cycles = cycles.ToArray()
+            cycles = diagnostics.Select(d => d.Path).ToArray()
         };
 
         return JsonSerializer.Serialize(payload);

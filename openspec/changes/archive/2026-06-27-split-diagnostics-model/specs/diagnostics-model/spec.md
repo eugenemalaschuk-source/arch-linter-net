@@ -50,8 +50,8 @@ The system SHALL provide a mapper that converts existing legacy checker result t
 - **THEN** it returns an `ExternalDependencyDiagnostic` preserving the forbidden external group
 
 #### Scenario: Mapping a legacy violation with configuration fields set
-- **WHEN** the mapper receives an `ArchitectureViolation` with `TemplateName`, `ContainerNamespace`, `DependencyPaths`, or `MatchedNamespacePrefixes` populated
-- **THEN** it returns a `ConfigurationDiagnostic` preserving those fields
+- **WHEN** the mapper receives an `ArchitectureViolation` with `TemplateName`, `ContainerNamespace`, or `DependencyPaths` populated
+- **THEN** it returns a `ConfigurationDiagnostic` preserving those fields; `MatchedNamespacePrefixes`, if also set, is preserved on the shared base and does not affect kind classification
 
 #### Scenario: Mapping a cycle path
 - **WHEN** the mapper receives a cycle path collection, contract name, and contract id
