@@ -19,6 +19,7 @@ public static class ArchitectureValidationService
             ArchitectureContractDocument document;
             string unmatchedConfig;
             string policyConsistencyConfig;
+            string coverageConfig;
             ArchitectureRunnerSetup setup;
 
             using (timing?.Measure("load_and_setup"))
@@ -45,7 +46,7 @@ public static class ArchitectureValidationService
                 // (the engine isn't implemented yet; see #97-#103). Validating the severity value here keeps
                 // analysis.coverage held to the same "fail fast on malformed config" standard as the other
                 // severity settings even though no coverage check currently reads it.
-                string coverageConfig = document.Analysis.Coverage;
+                coverageConfig = document.Analysis.Coverage;
 
                 if (coverageConfig is not ("error" or "warn" or "off"))
                 {
@@ -106,6 +107,10 @@ public static class ArchitectureValidationService
 
             allViolations.AddRange(execution.Violations);
 
+            IReadOnlyCollection<ArchitectureViolation> coverageFindings = coverageConfig == "off"
+                ? Array.Empty<ArchitectureViolation>()
+                : execution.CoverageViolations;
+
             IReadOnlyList<ArchitectureUnmatchedIgnoredViolation> unmatched =
                 Array.Empty<ArchitectureUnmatchedIgnoredViolation>();
 
@@ -123,11 +128,13 @@ public static class ArchitectureValidationService
             bool hasBlockingPolicyConsistency =
                 policyConsistencyConfig == "error" && policyConsistencyFindings.Count > 0;
 
+            bool hasBlockingCoverage = coverageConfig == "error" && coverageFindings.Count > 0;
+
             bool passed = allViolations.Count == 0 && execution.Cycles.Count == 0
-                && !hasBlockingUnmatched && !hasBlockingPolicyConsistency;
+                && !hasBlockingUnmatched && !hasBlockingPolicyConsistency && !hasBlockingCoverage;
 
             return new ValidationOutcome(
-                passed, allViolations, execution.Cycles, unmatched, unmatchedConfig,
+                passed, allViolations, execution.Cycles, coverageFindings, coverageConfig, unmatched, unmatchedConfig,
                 policyConsistencyFindings, policyConsistencyConfig);
         }
     }

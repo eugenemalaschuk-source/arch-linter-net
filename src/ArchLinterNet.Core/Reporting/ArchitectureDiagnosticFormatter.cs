@@ -70,11 +70,23 @@ public static class ArchitectureDiagnosticFormatter
                     }));
     }
 
+    public static string FormatCoverageForHumans(IReadOnlyCollection<ArchitectureViolation> findings)
+    {
+        if (findings.Count == 0)
+        {
+            return string.Empty;
+        }
+
+        return "Coverage findings:" + Environment.NewLine
+            + FormatViolationsForHumans(findings);
+    }
+
     public static string FormatResultForCiArtifacts(
         string mode,
         bool passed,
         IReadOnlyCollection<ArchitectureViolation> violations,
         IReadOnlyCollection<string> cycles,
+        IReadOnlyCollection<ArchitectureViolation>? coverageFindings = null,
         IReadOnlyCollection<ArchitectureUnmatchedIgnoredViolation>? unmatched = null,
         IReadOnlyCollection<PolicyConsistencyDiagnostic>? policyConsistencyFindings = null)
     {
@@ -106,6 +118,10 @@ public static class ArchitectureDiagnosticFormatter
             cycles = cycles
                 .Select(cycle => ArchitectureDiagnosticMapper.FromCycle(cycle, contractName: string.Empty, contractId: null))
                 .Select(d => d.Path)
+                .ToArray(),
+            coverage_findings = (coverageFindings ?? Array.Empty<ArchitectureViolation>())
+                .Select(ArchitectureDiagnosticMapper.FromViolation)
+                .Select(d => ToCiJsonObject(d, includeContract: true))
                 .ToArray(),
             unmatched_ignored_violations = unmatchedSerialized,
             policy_consistency_findings = policyConsistencySerialized

@@ -107,6 +107,7 @@ analysis:
   target_framework: ''          # Optional — disambiguates multi-targeted project output selection
   unmatched_ignored_violations: error  # Optional — error | warn | off (default: error)
   policy_consistency: error     # Optional — error | warn | off (default: error)
+  coverage: error               # Optional — error | warn | off (default: error)
   condition_sets: {}            # Optional — named preprocessor symbol sets
   default_condition_set: ''     # Optional — default condition set name
 ```
@@ -202,6 +203,19 @@ emitted as diagnostics. In human output, findings appear in a separate
 `conflicting_contract_ids`, `conflicting_contract_names`, `layers`, and
 (for layer-overlap findings) `representative_type`.
 
+### `coverage`
+
+Controls behavior when declared coverage contracts find uncovered namespaces.
+
+| Value | Behavior |
+|-------|----------|
+| `error` (default) | Coverage findings fail validation (exit code 1) |
+| `warn` | Findings are reported but do not affect the exit code |
+| `off` | Coverage findings are suppressed |
+
+Coverage is opt-in through `strict_coverage` / `audit_coverage`. Policies that
+declare no coverage contracts behave unchanged regardless of this setting.
+
 ## `contracts`
 
 Container for all contract definitions. Two groups at the top level:
@@ -219,6 +233,7 @@ contracts:
   strict_protected: []
   strict_external: []
   strict_acyclic_siblings: []
+  strict_coverage: []
 
   audit: []                     # Non-blocking contracts (same types)
   audit_layers: []
@@ -231,6 +246,7 @@ contracts:
   audit_protected: []
   audit_external: []
   audit_acyclic_siblings: []
+  audit_coverage: []
 ```
 
 ### Dependency contract
@@ -395,6 +411,61 @@ need not be listed in `allowed_importers`.
 
 External dependency contracts use named groups from `external_dependencies` and
 report references from source types into those vendor/framework surfaces.
+
+### Coverage contract
+
+Current runtime support is limited to `scope: namespace`.
+
+```yaml
+- id: <string>                  # Optional — stable identifier
+  name: <string>                # Required — human-readable contract name
+  scope: namespace              # Required — only supported scope today
+  roots:                        # Required — one or more namespace matchers
+    - namespace: <string>       # Required — literal prefix or constrained glob
+      namespace_suffix: <string>  # Optional — same semantics as layers.<name>.namespace_suffix
+  exclude:                      # Optional — explicit namespace exclusions
+    - namespace: <string>       # Optional — namespace matcher
+      namespace_suffix: <string>  # Optional — suffix-only matcher or refinement
+      reason: <string>          # Required when exclude entry exists
+  reason: <string>              # Recommended — why this coverage gate exists
+```
+
+Namespace coverage checks first-party namespaces discovered in the analysis
+inventory and reports any namespace under `roots` that is not covered by:
+
+- a declared layer;
+- a declared namespace glob layer;
+- an expanded layer-template layer; or
+- an explicit exclusion.
+
+Example:
+
+```yaml
+analysis:
+  coverage: error
+
+contracts:
+  strict_coverage:
+    - id: feature-namespace-coverage
+      name: feature-namespace-coverage
+      scope: namespace
+      roots:
+        - namespace: MyApp.Features
+      exclude:
+        - namespace: MyApp.Features.*
+          namespace_suffix: Generated
+          reason: Generated code is excluded from manual architecture coverage.
+      reason: Every feature namespace must be declared as a layer or explicitly excluded.
+```
+
+Current limits:
+
+- Only `scope: namespace` is implemented.
+- `scope: project`, `scope: assembly`, `scope: dependency_edge`, and
+  `scope: rule_input` are reserved and fail validation with an actionable
+  error.
+- Coverage findings are emitted as a separate coverage section in human output
+  and `coverage_findings` array in JSON output.
 
 ### Ignored violations
 

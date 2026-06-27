@@ -19,6 +19,7 @@ ArchLinterNet supports static architecture validation through documented YAML po
 - method-body forbidden API contracts;
 - Unity `.asmdef` contracts;
 - reusable layer templates;
+- namespace coverage contracts (`scope: namespace`);
 - strict and audit contract groups;
 - constrained namespace glob patterns;
 - external dependency groups;
@@ -39,6 +40,9 @@ ArchLinterNet does not currently validate:
 - unrestricted custom contract families outside the documented YAML schema;
 - unrestricted namespace pattern systems;
 - arbitrary YAML fields such as `severity`, `from`, `to`, `regex`, `owner`, or custom rule groups unless the schema documents them.
+
+Coverage support currently excludes `scope: project`, `scope: assembly`,
+`scope: dependency_edge`, and `scope: rule_input`.
 
 ## Important distinctions
 

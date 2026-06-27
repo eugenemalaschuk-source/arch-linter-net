@@ -53,6 +53,8 @@ public sealed class ArchitectureContractCatalog
         AddGroup("audit_external", "audit", "external", groups.AuditExternal);
         AddGroup("strict_asmdef", "strict", "asmdef", groups.StrictAsmdef);
         AddGroup("audit_asmdef", "audit", "asmdef", groups.AuditAsmdef);
+        AddGroup("strict_coverage", "strict", "coverage", groups.StrictCoverage);
+        AddGroup("audit_coverage", "audit", "coverage", groups.AuditCoverage);
 
         AddGroup("strict_layer_templates", "strict", "layer_template",
             LayerTemplateExpander.Expand(groups.StrictLayerTemplates));

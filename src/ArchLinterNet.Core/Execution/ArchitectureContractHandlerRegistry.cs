@@ -16,6 +16,7 @@ internal sealed class ArchitectureContractHandlerRegistry
         IArchitectureContractHandler dependencyHandler = new DependencyContractHandler();
         IArchitectureContractHandler layerHandler = new LayerContractHandler();
         IArchitectureContractHandler cycleHandler = new CycleContractHandler();
+        IArchitectureContractHandler coverageHandler = new CoverageContractHandler();
 
         return new ArchitectureContractHandlerRegistry(new Dictionary<string, IArchitectureContractHandler>(StringComparer.Ordinal)
         {
@@ -23,6 +24,7 @@ internal sealed class ArchitectureContractHandlerRegistry
             ["layer"] = layerHandler,
             ["layer_template"] = layerHandler,
             ["cycle"] = cycleHandler,
+            ["coverage"] = coverageHandler,
         });
     }
 
