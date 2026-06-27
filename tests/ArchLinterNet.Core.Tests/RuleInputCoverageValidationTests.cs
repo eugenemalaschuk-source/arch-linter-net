@@ -133,6 +133,41 @@ public sealed class RuleInputCoverageValidationTests
     }
 
     [Test]
+    public void StrictRuleInputCoverage_OffSeverityWithStaleBaselineEntry_StillPasses()
+    {
+        // The coverage gate is off, but a strict_coverage contract still carries an
+        // ignored_violations entry that no longer matches any current finding (resolved coverage
+        // debt). Stale-entry reporting must follow analysis.coverage, not just
+        // analysis.unmatched_ignored_violations — otherwise turning coverage off would not fully
+        // disable the coverage family.
+        // Keyed on a layer name that the current "video-to-ghost-rule" finding never reports
+        // (the real finding's forbidden_reference is "ghost"), so this entry never matches and is
+        // genuinely stale rather than coincidentally suppressing the live finding.
+        string staleIgnore =
+            $"      ignored_violations:{Environment.NewLine}" +
+            $"        - source_type: video-to-ghost-rule{Environment.NewLine}" +
+            $"          forbidden_reference: already-resolved-layer{Environment.NewLine}" +
+            $"          reason: previously accepted{Environment.NewLine}";
+
+        string policyPath = WritePolicy(BuildPolicy(
+            "strict_coverage",
+            referencedRuleGroup: "strict",
+            analysisCoverage: "off",
+            extraExclude: staleIgnore));
+
+        ValidationOutcome outcome = ArchitectureValidationService.Validate(new ValidationRequest
+        {
+            PolicyPath = policyPath,
+            Mode = "strict",
+            EnforceUnmatchedIgnoredViolationsPolicy = true
+        });
+
+        Assert.That(outcome.Passed, Is.True);
+        Assert.That(outcome.CoverageFindings, Is.Empty);
+        Assert.That(outcome.UnmatchedIgnoredViolations, Is.Empty);
+    }
+
+    [Test]
     public void RuleInputCoverage_SameModeIntentionallyEmptyExclusion_SuppressesFindingAndPasses()
     {
         string extraExclude =

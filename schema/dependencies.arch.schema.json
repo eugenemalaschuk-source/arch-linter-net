@@ -619,7 +619,8 @@
               "type": "string",
               "minLength": 1,
               "description": "Why this coverage contract exists."
-            }
+            },
+            "ignored_violations": { "$ref": "#/$defs/ignoredViolations" }
           }
         },
         {

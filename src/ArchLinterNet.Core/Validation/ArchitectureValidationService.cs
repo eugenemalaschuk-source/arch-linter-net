@@ -122,6 +122,17 @@ public static class ArchitectureValidationService
                 }
             }
 
+            if (coverageConfig == "off" && unmatched.Count > 0)
+            {
+                // When coverage gating is disabled, a stale entry in a strict_coverage/audit_coverage
+                // baseline must not surface or block — otherwise turning coverage off would not fully
+                // disable the coverage family, only its non-stale findings.
+                HashSet<string> coverageContractIds = CollectCoverageContractIds(document);
+                unmatched = unmatched
+                    .Where(u => u.ContractId == null || !coverageContractIds.Contains(u.ContractId))
+                    .ToList();
+            }
+
             bool hasBlockingUnmatched = request.EnforceUnmatchedIgnoredViolationsPolicy
                 && unmatchedConfig == "error" && unmatched.Count > 0;
 
@@ -142,5 +153,15 @@ public static class ArchitectureValidationService
     private static HashSet<string> CollectAvailableContractIds(ArchitectureContractDocument document, string mode)
     {
         return ArchitectureContractCatalog.Build(document).AvailableContractIds(mode);
+    }
+
+    private static HashSet<string> CollectCoverageContractIds(ArchitectureContractDocument document)
+    {
+        return new HashSet<string>(
+            document.Contracts.StrictCoverage
+                .Concat(document.Contracts.AuditCoverage)
+                .Where(c => !string.IsNullOrEmpty(c.Id))
+                .Select(c => c.Id!),
+            StringComparer.OrdinalIgnoreCase);
     }
 }
