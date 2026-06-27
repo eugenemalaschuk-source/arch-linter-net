@@ -1,4 +1,3 @@
-using System.Reflection;
 using ArchLinterNet.Core.Contracts;
 using ArchLinterNet.Core.Execution;
 using ArchLinterNet.Core.Reporting;
@@ -19,6 +18,12 @@ public sealed class ArchitectureCoverageSummaryTests
             targetAssemblies: new[] { fixtureType.Assembly },
             missingAssemblyNames: Array.Empty<string>(),
             assemblyProbingPaths: Array.Empty<string>());
+    }
+
+    private static ArchitectureCoverageSummary RequireSummary(ArchitectureCoverageSummary? summary)
+    {
+        Assert.That(summary, Is.Not.Null);
+        return summary!;
     }
 
     private static ArchitectureCoverageContract CreateNamespaceContract(
@@ -76,7 +81,7 @@ public sealed class ArchitectureCoverageSummaryTests
 
         ArchitectureContractRunner runner = new(CreateContext(typeof(ArchitectureCoverageSummaryTests)), document);
 
-        ArchitectureCoverageSummary summary = runner.BuildCoverageSummary(contract);
+        ArchitectureCoverageSummary summary = RequireSummary(runner.BuildCoverageSummary(contract));
 
         Assert.That(summary.Scope, Is.EqualTo("namespace"));
         Assert.That(summary.Counts, Is.EqualTo(new ArchitectureCoverageSummaryCounts(
@@ -108,7 +113,7 @@ public sealed class ArchitectureCoverageSummaryTests
 
         ArchitectureContractRunner runner = new(CreateContext(typeof(ArchitectureCoverageSummaryTests)), document);
 
-        ArchitectureCoverageSummary summary = runner.BuildCoverageSummary(contract);
+        ArchitectureCoverageSummary summary = RequireSummary(runner.BuildCoverageSummary(contract));
 
         Assert.That(summary.Counts, Is.EqualTo(new ArchitectureCoverageSummaryCounts(
             Covered: 1, Excluded: 0, Uncovered: 0, Stale: 0, Unknown: 0)));
@@ -124,11 +129,27 @@ public sealed class ArchitectureCoverageSummaryTests
 
         ArchitectureContractRunner runner = new(CreateContext(typeof(ArchitectureCoverageSummaryTests)), document);
 
-        ArchitectureCoverageSummary summary = runner.BuildCoverageSummary(contract);
+        ArchitectureCoverageSummary summary = RequireSummary(runner.BuildCoverageSummary(contract));
 
         Assert.That(summary.Counts, Is.EqualTo(new ArchitectureCoverageSummaryCounts(0, 0, 0, 0, 0)));
         Assert.That(summary.ExcludedItems, Is.Empty);
         Assert.That(summary.UncoveredItems, Is.Empty);
+    }
+
+    [Test]
+    public void BuildCoverageSummary_ContractNotSelected_ReturnsNull()
+    {
+        ArchitectureContractDocument document = CreateNamespaceDocument();
+        ArchitectureCoverageContract contract = CreateNamespaceContract();
+
+        ArchitectureContractRunner runner = new(
+            CreateContext(typeof(ArchitectureCoverageSummaryTests)),
+            document,
+            selectedContractIds: new HashSet<string>(new[] { "some-other-contract-id" }, StringComparer.OrdinalIgnoreCase));
+
+        ArchitectureCoverageSummary? summary = runner.BuildCoverageSummary(contract);
+
+        Assert.That(summary, Is.Null);
     }
 
     private static ArchitectureContractDocument CreateRuleInputDocument()
@@ -199,7 +220,7 @@ public sealed class ArchitectureCoverageSummaryTests
 
         ArchitectureContractRunner runner = new(CreateContext(typeof(ArchitectureCoverageSummaryTests)), document);
 
-        ArchitectureCoverageSummary summary = runner.BuildCoverageSummary(contract);
+        ArchitectureCoverageSummary summary = RequireSummary(runner.BuildCoverageSummary(contract));
 
         Assert.That(summary.Scope, Is.EqualTo("rule_input"));
         Assert.That(summary.Counts, Is.EqualTo(new ArchitectureCoverageSummaryCounts(
@@ -234,7 +255,7 @@ public sealed class ArchitectureCoverageSummaryTests
 
         ArchitectureContractRunner runner = new(CreateContext(typeof(ArchitectureCoverageSummaryTests)), document);
 
-        ArchitectureCoverageSummary summary = runner.BuildCoverageSummary(contract);
+        ArchitectureCoverageSummary summary = RequireSummary(runner.BuildCoverageSummary(contract));
 
         Assert.That(summary.Counts, Is.EqualTo(new ArchitectureCoverageSummaryCounts(
             Covered: 0, Excluded: 2, Uncovered: 0, Stale: 0, Unknown: 0)));
@@ -254,7 +275,7 @@ public sealed class ArchitectureCoverageSummaryTests
 
         ArchitectureContractRunner runner = new(CreateContext(typeof(ArchitectureCoverageSummaryTests)), document);
 
-        ArchitectureCoverageSummary summary = runner.BuildCoverageSummary(contract);
+        ArchitectureCoverageSummary summary = RequireSummary(runner.BuildCoverageSummary(contract));
 
         Assert.That(summary.Counts, Is.EqualTo(new ArchitectureCoverageSummaryCounts(0, 0, 0, 0, 0)));
     }
@@ -275,8 +296,8 @@ public sealed class ArchitectureCoverageSummaryTests
         ArchitectureContractRunner firstRunner = new(CreateContext(typeof(ArchitectureCoverageSummaryTests)), document);
         ArchitectureContractRunner secondRunner = new(CreateContext(typeof(ArchitectureCoverageSummaryTests)), document);
 
-        ArchitectureCoverageSummary first = firstRunner.BuildCoverageSummary(contract);
-        ArchitectureCoverageSummary second = secondRunner.BuildCoverageSummary(contract);
+        ArchitectureCoverageSummary first = RequireSummary(firstRunner.BuildCoverageSummary(contract));
+        ArchitectureCoverageSummary second = RequireSummary(secondRunner.BuildCoverageSummary(contract));
 
         Assert.That(first.Counts, Is.EqualTo(second.Counts));
         Assert.That(first.ExcludedItems, Is.EqualTo(second.ExcludedItems));

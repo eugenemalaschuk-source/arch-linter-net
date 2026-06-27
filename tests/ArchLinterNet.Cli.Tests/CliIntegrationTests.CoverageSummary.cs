@@ -99,4 +99,44 @@ public partial class CliIntegrationTests
         using var doc = JsonDocument.Parse(stdout);
         Assert.That(doc.RootElement.GetProperty("coverage_summary").GetArrayLength(), Is.EqualTo(0));
     }
+
+    [Test]
+    public void CoverageSummary_ContractFilterExcludesUnselectedCoverageContract_JsonOmitsSummaryEntry()
+    {
+        // coverage-policy.yml declares both a non-coverage contract (core-no-forbidden) and a
+        // coverage contract (validation-namespace-coverage). Selecting only the non-coverage
+        // contract must not produce a phantom zero-count summary row for the unselected
+        // coverage contract — it should be entirely absent, not present with zeroed counts.
+        var (exitCode, stdout, _) = RunCli(
+            "--policy", CoveragePolicy, "--contract", "core-no-forbidden", "--format", "json");
+
+        Assert.That(exitCode, Is.EqualTo(0));
+
+        using var doc = JsonDocument.Parse(stdout);
+        Assert.That(doc.RootElement.GetProperty("coverage_summary").GetArrayLength(), Is.EqualTo(0));
+        Assert.That(doc.RootElement.GetProperty("coverage_findings").GetArrayLength(), Is.EqualTo(0));
+    }
+
+    [Test]
+    public void CoverageSummary_ContractFilterExcludesUnselectedCoverageContract_HumanOmitsSummarySection()
+    {
+        var (exitCode, stdout, _) = RunCli(
+            "--policy", CoveragePolicy, "--contract", "core-no-forbidden", "--format", "human");
+
+        Assert.That(exitCode, Is.EqualTo(0));
+        Assert.That(stdout, Does.Not.Contain("Coverage summary:"));
+        Assert.That(stdout, Does.Not.Contain("Coverage findings:"));
+    }
+
+    [Test]
+    public void CoverageSummary_ContractFilterIncludesSelectedCoverageContract_StillReportsSummary()
+    {
+        var (exitCode, stdout, _) = RunCli(
+            "--policy", CoveragePolicy, "--contract", "validation-namespace-coverage", "--format", "json");
+
+        Assert.That(exitCode, Is.EqualTo(0));
+
+        using var doc = JsonDocument.Parse(stdout);
+        Assert.That(doc.RootElement.GetProperty("coverage_summary").GetArrayLength(), Is.EqualTo(1));
+    }
 }

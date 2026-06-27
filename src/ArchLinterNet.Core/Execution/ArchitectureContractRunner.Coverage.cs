@@ -7,17 +7,11 @@ namespace ArchLinterNet.Core.Execution;
 
 public sealed partial class ArchitectureContractRunner
 {
-    public ArchitectureCoverageSummary BuildCoverageSummary(ArchitectureCoverageContract contract)
+    public ArchitectureCoverageSummary? BuildCoverageSummary(ArchitectureCoverageContract contract)
     {
         if (!IsContractSelected(contract.Id))
         {
-            return new ArchitectureCoverageSummary(
-                contract.Name,
-                contract.Id,
-                contract.Scope,
-                new ArchitectureCoverageSummaryCounts(0, 0, 0, 0, 0),
-                Array.Empty<ArchitectureCoverageSummaryExcludedItem>(),
-                Array.Empty<ArchitectureCoverageSummaryUncoveredItem>());
+            return null;
         }
 
         if (string.Equals(contract.Scope, "rule_input", StringComparison.Ordinal))

@@ -124,6 +124,8 @@ In JSON output, the summary appears as a top-level `coverage_summary` array, add
 
 `scope: project`, `scope: assembly`, and `scope: dependency_edge` never appear in the summary, since `ArchitectureContractLoader` rejects those scopes at load time (see [Current limits](#current-limits)) — there is no contract instance to summarize for them.
 
+A coverage contract only appears in the summary when it is actually selected to run. If `validate --contract <id>` is used to run only specific contracts and a coverage contract's ID isn't among them, that coverage contract is omitted from `coverage_summary` entirely — it never appears as a zero-count row.
+
 ## Exclusion rules
 
 Use `exclude` only for units you intentionally do not want to model yet. For `scope: namespace`, exclude by namespace:

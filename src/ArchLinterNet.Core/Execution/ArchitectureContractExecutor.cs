@@ -186,7 +186,12 @@ public static class ArchitectureContractExecutor
             {
                 coverageCount++;
                 coverageViolations.AddRange(_handlerRegistry.Execute("coverage", runner, contract).Violations);
-                coverageSummaries.Add(runner.BuildCoverageSummary((ArchitectureCoverageContract)contract));
+
+                ArchitectureCoverageSummary? summary = runner.BuildCoverageSummary((ArchitectureCoverageContract)contract);
+                if (summary != null)
+                {
+                    coverageSummaries.Add(summary);
+                }
             }
         }
 
