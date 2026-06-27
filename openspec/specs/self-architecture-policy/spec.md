@@ -1,7 +1,8 @@
 # self-architecture-policy Specification
 
 ## Purpose
-TBD - created by archiving change add-self-architecture-policy. Update Purpose after archive.
+Define and enforce ArchLinterNet's own internal validation-pipeline boundaries (application seam, contract execution, diagnostics, resolution, scanning) through the repository's architecture policy and acceptance gate, so the post-#69 split does not regress into central orchestration coupling.
+
 ## Requirements
 ### Requirement: Repository governs its own internal validation-pipeline boundaries
 The repository's architecture contract (`architecture/dependencies.arch.yml`) SHALL declare namespace layers for `ArchLinterNet.Core.Model`, `ArchLinterNet.Core.Reporting`, `ArchLinterNet.Core.Resolution`, `ArchLinterNet.Core.Contracts`, `ArchLinterNet.Core.Execution`, and `ArchLinterNet.Core.Validation`, in addition to the existing package-level layers (`core`, `core_scanning`, `cli`, `testing`, `unity`).
