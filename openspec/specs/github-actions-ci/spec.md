@@ -37,11 +37,19 @@ The repository README SHALL display a CI status badge and document that it cover
 - **THEN** it shows a CI status badge sourced from `ci.yml`
 - **AND** it links to documentation explaining that the same badge reflects the architecture coverage gate
 
-### Requirement: Architecture coverage runs in the existing CI workflow
-The architecture coverage steps (strict/audit JSON artifacts, report generation, sticky PR comment) SHALL run inside the existing `ci.yml` acceptance job, after `make acceptance`, reusing its already-built solution instead of restoring and building a second time in a separate workflow.
+### Requirement: Architecture coverage analysis runs in the existing CI workflow
+The architecture coverage analysis steps (strict/audit JSON artifacts, report generation) SHALL run inside the existing `ci.yml` `validate` job, after `make acceptance`, reusing its already-built solution instead of restoring and building a second time in a separate workflow.
 
 #### Scenario: Coverage steps run after acceptance in the same job
 - **WHEN** the `ci.yml` `validate` job runs
-- **THEN** the architecture coverage steps execute after the `Acceptance` step in the same job
+- **THEN** the architecture coverage analysis steps execute after the `Acceptance` step in the same job
 - **AND** no additional `dotnet restore`/`dotnet build` of the already-built assemblies is performed before invoking the CLI
+
+### Requirement: PR comment posting is isolated from build/test code
+Posting the architecture coverage PR comment SHALL run in a separate `comment` job in `ci.yml` that depends on `validate` and downloads its report artifact, rather than running inside the `validate` job that builds and tests repository code.
+
+#### Scenario: Only the comment job can write to pull requests
+- **WHEN** `ci.yml` is inspected
+- **THEN** the top-level workflow `permissions` are `contents: read`
+- **AND** only the `comment` job declares `pull-requests: write`
 

@@ -19,4 +19,5 @@ public sealed record ArchitectureCoverageSummary(
     IReadOnlyCollection<ArchitectureCoverageSummaryExcludedItem> ExcludedItems,
     IReadOnlyCollection<ArchitectureCoverageSummaryEvidenceItem> UncoveredItems,
     IReadOnlyCollection<ArchitectureCoverageSummaryEvidenceItem> StaleItems,
-    IReadOnlyCollection<ArchitectureCoverageSummaryEvidenceItem> UnknownItems);
+    IReadOnlyCollection<ArchitectureCoverageSummaryEvidenceItem> UnknownItems,
+    IReadOnlyCollection<ArchitectureCoverageSummaryEvidenceItem> CoveredItems);

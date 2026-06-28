@@ -36,11 +36,12 @@ def test_render_summary_markdown_zero_findings() -> None:
 
     markdown = render_summary_markdown(report)
 
-    assert "Status: pass" in markdown
-    assert "Covered: 0" in markdown
-    assert "Uncovered: 0" in markdown
-    assert "Stale: 0" in markdown
-    assert "Unknown: 0" in markdown
+    assert "## Architecture coverage" in markdown
+    assert "✅ pass" in markdown
+    assert "| Covered | 0 |" in markdown
+    assert "| Uncovered | 0 |" in markdown
+    assert "| Stale | 0 |" in markdown
+    assert "| Unknown | 0 |" in markdown
 
 
 def test_render_summary_markdown_notes_when_coverage_unconfigured() -> None:
@@ -68,7 +69,7 @@ def test_render_summary_markdown_omits_note_when_coverage_contracts_exist_and_cl
 
     markdown = render_summary_markdown(report)
 
-    assert "Covered: 3" in markdown
+    assert "| Covered | 3 |" in markdown
     assert "coverage is unconfigured" not in markdown
 
 
@@ -90,8 +91,8 @@ def test_render_summary_markdown_failed_gate() -> None:
 
     markdown = render_summary_markdown(report)
 
-    assert "Status: fail" in markdown
-    assert "Uncovered: 2" in markdown
+    assert "❌ fail" in markdown
+    assert "| Uncovered | 2 |" in markdown
 
 
 def test_total_counts_sums_across_contracts() -> None:
@@ -156,8 +157,8 @@ def test_render_new_code_section_reports_unknown_and_uncovered(tmp_path: Path) -
 
     markdown = render_report(report, [file_rel], tmp_path)
 
-    assert "New-code coverage" in markdown
-    assert "Changed items requiring policy update: 1" in markdown
+    assert "### New-code coverage" in markdown
+    assert "| Requiring policy update | 1 |" in markdown
 
 
 def test_render_new_code_section_skips_covered_units() -> None:
@@ -165,8 +166,8 @@ def test_render_new_code_section_skips_covered_units() -> None:
 
     section = render_new_code_section([ChangedUnit(file="a.cs", scope="namespace", unit="A.B", state="covered")])
 
-    assert "Changed namespaces/projects/assemblies covered: 1" in section
-    assert "A.B" not in section.split("\n", 4)[-1]
+    assert "| Covered | 1 |" in section
+    assert "A.B" not in section
 
 
 def test_classify_changed_file_does_not_assume_covered_without_evidence(tmp_path: Path) -> None:
@@ -184,13 +185,97 @@ def test_classify_changed_file_does_not_assume_covered_without_evidence(tmp_path
     assert unit.unit == "Foo.Bar"
 
 
+def test_classify_changed_file_derives_covered_from_real_coverage_summary_shape(tmp_path: Path) -> None:
+    file_rel = "src/Foo/Bar.cs"
+    file_path = tmp_path / file_rel
+    file_path.parent.mkdir(parents=True)
+    file_path.write_text("namespace Foo.Bar;\n\nclass C {}\n", encoding="utf-8")
+
+    report = make_report(
+        True,
+        [
+            {
+                "scope": "namespace",
+                "counts": {"covered": 1, "excluded": 0, "uncovered": 0, "stale": 0, "unknown": 0},
+                "excluded_items": [],
+                "uncovered_items": [],
+                "stale_items": [],
+                "unknown_items": [],
+                "covered_items": [{"item": "Foo.Bar", "evidence": "Foo.Bar.SomeType"}],
+            }
+        ],
+    )
+    coverage_index = build_coverage_index(report)
+
+    unit = classify_changed_file(file_rel, tmp_path, coverage_index)
+
+    assert unit.state == "covered"
+    assert unit.unit == "Foo.Bar"
+
+
+def test_classify_changed_file_unknown_when_namespace_outside_configured_scope(tmp_path: Path) -> None:
+    file_rel = "src/Foo/Bar.cs"
+    file_path = tmp_path / file_rel
+    file_path.parent.mkdir(parents=True)
+    file_path.write_text("namespace Foo.Bar;\n\nclass C {}\n", encoding="utf-8")
+
+    report = make_report(
+        True,
+        [
+            {
+                "scope": "namespace",
+                "counts": {"covered": 1, "excluded": 0, "uncovered": 0, "stale": 0, "unknown": 0},
+                "excluded_items": [],
+                "uncovered_items": [],
+                "stale_items": [],
+                "unknown_items": [],
+                "covered_items": [{"item": "Some.Other.Namespace", "evidence": "Some.Other.Namespace.Type"}],
+            }
+        ],
+    )
+    coverage_index = build_coverage_index(report)
+
+    unit = classify_changed_file(file_rel, tmp_path, coverage_index)
+
+    assert unit.state == "unknown"
+    assert unit.unit == "Foo.Bar"
+
+
+def test_render_new_code_section_does_not_flag_real_covered_unit(tmp_path: Path) -> None:
+    file_rel = "src/Foo/Bar.cs"
+    file_path = tmp_path / file_rel
+    file_path.parent.mkdir(parents=True)
+    file_path.write_text("namespace Foo.Bar;\n\nclass C {}\n", encoding="utf-8")
+
+    report = make_report(
+        True,
+        [
+            {
+                "scope": "namespace",
+                "counts": {"covered": 1, "excluded": 0, "uncovered": 0, "stale": 0, "unknown": 0},
+                "excluded_items": [],
+                "uncovered_items": [],
+                "stale_items": [],
+                "unknown_items": [],
+                "covered_items": [{"item": "Foo.Bar", "evidence": "Foo.Bar.SomeType"}],
+            }
+        ],
+    )
+
+    markdown = render_report(report, [file_rel], tmp_path)
+
+    assert "| Covered | 1 |" in markdown
+    assert "| Requiring policy update | none |" in markdown
+    assert "Foo.Bar" not in markdown.split("### New-code coverage", 1)[1].split("Items needing attention", 1)[0]
+
+
 def test_render_report_includes_new_code_section_when_changed_files_list_is_empty() -> None:
     report = make_report(True, [])
 
     markdown = render_report(report, [], Path("."))
 
-    assert "New-code coverage" in markdown
-    assert "Changed first-party files: 0" in markdown
+    assert "### New-code coverage" in markdown
+    assert "| Changed first-party files | 0 |" in markdown
 
 
 def test_render_report_omits_new_code_section_when_changed_files_not_requested() -> None:
@@ -198,4 +283,4 @@ def test_render_report_omits_new_code_section_when_changed_files_not_requested()
 
     markdown = render_report(report, None, Path("."))
 
-    assert "New-code coverage" not in markdown
+    assert "### New-code coverage" not in markdown

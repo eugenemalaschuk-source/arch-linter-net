@@ -43,21 +43,27 @@ def total_counts(report: dict) -> dict[str, int]:
 def render_summary_markdown(report: dict) -> str:
     totals = total_counts(report)
     coverage_contracts_configured = bool(report.get("coverage_summary"))
+    status = overall_status(report)
+    status_badge = "✅ pass" if status == "pass" else "❌ fail"
 
     lines = [
-        "Architecture coverage",
-        f"Status: {overall_status(report)}",
-        f"Covered: {totals['covered']}",
-        f"Excluded: {totals['excluded']}",
-        f"Uncovered: {totals['uncovered']}",
-        f"Stale: {totals['stale']}",
-        f"Unknown: {totals['unknown']}",
+        "## Architecture coverage",
+        "",
+        f"**Status:** {status_badge}",
+        "",
+        "| Metric | Count |",
+        "| --- | --- |",
+        f"| Covered | {totals['covered']} |",
+        f"| Excluded | {totals['excluded']} |",
+        f"| Uncovered | {totals['uncovered']} |",
+        f"| Stale | {totals['stale']} |",
+        f"| Unknown | {totals['unknown']} |",
     ]
 
     if not coverage_contracts_configured:
         lines.append("")
         lines.append(
-            "Note: the policy defines no coverage contracts (strict_coverage/audit_coverage). "
+            "> **Note:** the policy defines no coverage contracts (`strict_coverage`/`audit_coverage`). "
             "These zeros mean coverage is unconfigured, not that everything is covered."
         )
 
@@ -98,6 +104,7 @@ def build_coverage_index(report: dict) -> dict[tuple[str, str], dict]:
         if scope not in KNOWN_SCOPES:
             continue
         for bucket, state in (
+            ("covered_items", "covered"),
             ("excluded_items", "excluded"),
             ("uncovered_items", "uncovered"),
             ("stale_items", "stale"),
@@ -121,9 +128,10 @@ def classify_changed_file(file_path: str, repo_root: Path, coverage_index: dict[
         if match is not None:
             return ChangedUnit(file=file_path, scope=scope, unit=unit, state=match["state"], evidence=match.get("evidence"))
 
-    # A namespace/project was detected but coverage_summary has no entry proving it is
-    # covered by an active contract. Absence of a problem entry is not proof of coverage,
-    # so report unknown rather than assuming covered.
+    # A namespace/project was detected, but it doesn't appear in any contract's
+    # covered_items/excluded_items/uncovered_items/stale_items/unknown_items —
+    # meaning no configured coverage contract's roots/scope actually covers this
+    # unit. Absence of evidence is not proof of coverage, so report unknown.
     if namespace is not None:
         return ChangedUnit(file=file_path, scope="namespace", unit=namespace, state="unknown")
     if project is not None:
@@ -141,18 +149,23 @@ def render_new_code_section(changed_units: list[ChangedUnit]) -> str:
 
     lines = [
         "",
-        "New-code coverage",
-        f"Changed first-party files: {len(changed_units)}",
-        f"Changed namespaces/projects/assemblies covered: {covered_count}",
-        f"Changed namespaces/projects/assemblies uncovered: {uncovered_count}",
-        f"Changed items requiring policy update: {unknown_count if unknown_count else 'none'}",
+        "### New-code coverage",
+        "",
+        "| Metric | Count |",
+        "| --- | --- |",
+        f"| Changed first-party files | {len(changed_units)} |",
+        f"| Covered | {covered_count} |",
+        f"| Uncovered | {uncovered_count} |",
+        f"| Requiring policy update | {unknown_count if unknown_count else 'none'} |",
     ]
 
     if problems:
         lines.append("")
+        lines.append("Items needing attention:")
+        lines.append("")
         for unit in problems:
             label = unit.unit or unit.file
-            lines.append(f"  - {label} ({unit.scope}): {unit.state}")
+            lines.append(f"- `{label}` ({unit.scope}): **{unit.state}**")
 
     return "\n".join(lines)
 
