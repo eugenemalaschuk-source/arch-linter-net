@@ -32,8 +32,11 @@ jobs:
       - name: Restore
         run: make restore
 
-      - name: Build CLI
-        run: dotnet build src/ArchLinterNet.Cli/ArchLinterNet.Cli.csproj --no-restore --nologo -v minimal
+      - name: Build self-policy target assemblies
+        run: |
+          dotnet build src/ArchLinterNet.Cli/ArchLinterNet.Cli.csproj --no-restore --nologo -v minimal
+          dotnet build src/ArchLinterNet.Testing/ArchLinterNet.Testing.csproj --no-restore --nologo -v minimal
+          dotnet build src/ArchLinterNet.Unity/ArchLinterNet.Unity.csproj --no-restore --nologo -v minimal
 
       - name: Run strict architecture coverage
         id: strict
@@ -70,6 +73,10 @@ jobs:
         run: |
           git diff --name-only --diff-filter=ACMR "origin/${{ github.event.pull_request.base.ref }}"...HEAD \
             -- '*.cs' ':!*.g.cs' ':!*Designer.cs' > changed-files.txt || true
+
+      - name: Test coverage report generator
+        if: always()
+        run: make test-architecture-coverage-report
 
       - name: Generate coverage report
         if: always()

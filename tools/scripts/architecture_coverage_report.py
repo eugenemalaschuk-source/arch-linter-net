@@ -111,8 +111,13 @@ def classify_changed_file(file_path: str, repo_root: Path, coverage_index: dict[
         if match is not None:
             return ChangedUnit(file=file_path, scope=scope, unit=unit, state=match["state"], evidence=match.get("evidence"))
 
-    if namespace is not None or project is not None:
-        return ChangedUnit(file=file_path, scope="namespace" if namespace else "project", unit=namespace or project, state="covered")
+    # A namespace/project was detected but coverage_summary has no entry proving it is
+    # covered by an active contract. Absence of a problem entry is not proof of coverage,
+    # so report unknown rather than assuming covered.
+    if namespace is not None:
+        return ChangedUnit(file=file_path, scope="namespace", unit=namespace, state="unknown")
+    if project is not None:
+        return ChangedUnit(file=file_path, scope="project", unit=project, state="unknown")
 
     return ChangedUnit(file=file_path, scope="unknown", unit=None, state="unknown")
 
@@ -127,6 +132,7 @@ def render_new_code_section(changed_units: list[ChangedUnit]) -> str:
     lines = [
         "",
         "New-code coverage",
+        f"Changed first-party files: {len(changed_units)}",
         f"Changed namespaces/projects/assemblies covered: {covered_count}",
         f"Changed namespaces/projects/assemblies uncovered: {uncovered_count}",
         f"Changed items requiring policy update: {unknown_count if unknown_count else 'none'}",
@@ -141,10 +147,10 @@ def render_new_code_section(changed_units: list[ChangedUnit]) -> str:
     return "\n".join(lines)
 
 
-def render_report(report: dict, changed_files: list[str], repo_root: Path) -> str:
+def render_report(report: dict, changed_files: list[str] | None, repo_root: Path) -> str:
     sections = [render_summary_markdown(report)]
 
-    if changed_files:
+    if changed_files is not None:
         coverage_index = build_coverage_index(report)
         changed_units = [classify_changed_file(file, repo_root, coverage_index) for file in changed_files]
         sections.append(render_new_code_section(changed_units))
@@ -163,7 +169,7 @@ def main() -> int:
 
     report = load_coverage(args.json_path)
 
-    changed_files: list[str] = []
+    changed_files: list[str] | None = None
     if args.changed_files is not None and args.changed_files.exists():
         changed_files = [line.strip() for line in args.changed_files.read_text(encoding="utf-8").splitlines() if line.strip()]
 

@@ -138,3 +138,35 @@ def test_render_new_code_section_skips_covered_units() -> None:
 
     assert "Changed namespaces/projects/assemblies covered: 1" in section
     assert "A.B" not in section.split("\n", 4)[-1]
+
+
+def test_classify_changed_file_does_not_assume_covered_without_evidence(tmp_path: Path) -> None:
+    file_rel = "src/Foo/Bar.cs"
+    file_path = tmp_path / file_rel
+    file_path.parent.mkdir(parents=True)
+    file_path.write_text("namespace Foo.Bar;\n\nclass C {}\n", encoding="utf-8")
+
+    report = make_report(True, [])
+    coverage_index = build_coverage_index(report)
+
+    unit = classify_changed_file(file_rel, tmp_path, coverage_index)
+
+    assert unit.state == "unknown"
+    assert unit.unit == "Foo.Bar"
+
+
+def test_render_report_includes_new_code_section_when_changed_files_list_is_empty() -> None:
+    report = make_report(True, [])
+
+    markdown = render_report(report, [], Path("."))
+
+    assert "New-code coverage" in markdown
+    assert "Changed first-party files: 0" in markdown
+
+
+def test_render_report_omits_new_code_section_when_changed_files_not_requested() -> None:
+    report = make_report(True, [])
+
+    markdown = render_report(report, None, Path("."))
+
+    assert "New-code coverage" not in markdown
