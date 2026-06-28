@@ -25,6 +25,8 @@
 ## Testing:
 ##   make acceptance           — lint + all tests
 ##   make test                 — run all tests
+##   make test-coverage        — run all tests with coverage collection (cobertura XML)
+##   make test-coverage-badge  — run tests with coverage and print a test-coverage badge line
 ##
 ## Build:
 ##   make build                — build documentation site + NuGet packages

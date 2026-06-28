@@ -15,7 +15,6 @@ KNOWN_SCOPES = ("namespace", "project", "assembly")
 
 @dataclass(frozen=True)
 class ChangedUnit:
-    file: str
     scope: str
     unit: str | None
     state: str
@@ -83,7 +82,7 @@ def detect_namespace(file_path: Path) -> str | None:
     return match.group(1) if match else None
 
 
-def detect_project(file_path: Path, repo_root: Path) -> str | None:
+def find_enclosing_csproj(file_path: Path, repo_root: Path) -> Path | None:
     root_resolved = repo_root.resolve()
     absolute = file_path if file_path.is_absolute() else (root_resolved / file_path)
     current = absolute.parent
@@ -91,10 +90,24 @@ def detect_project(file_path: Path, repo_root: Path) -> str | None:
     while True:
         csproj_matches = list(current.glob("*.csproj"))
         if csproj_matches:
-            return csproj_matches[0].stem
+            return csproj_matches[0]
         if current == root_resolved or current == current.parent:
             return None
         current = current.parent
+
+
+def detect_project_path(csproj_path: Path, repo_root: Path) -> str:
+    return csproj_path.resolve().relative_to(repo_root.resolve()).as_posix()
+
+
+def detect_assembly_name(csproj_path: Path) -> str:
+    try:
+        text = csproj_path.read_text(encoding="utf-8", errors="ignore")
+    except OSError:
+        return csproj_path.stem
+
+    match = re.search(r"<AssemblyName>\s*([^<\s]+)\s*</AssemblyName>", text)
+    return match.group(1) if match else csproj_path.stem
 
 
 def build_coverage_index(report: dict) -> dict[tuple[str, str], dict]:
@@ -116,36 +129,58 @@ def build_coverage_index(report: dict) -> dict[tuple[str, str], dict]:
     return index
 
 
-def classify_changed_file(file_path: str, repo_root: Path, coverage_index: dict[tuple[str, str], dict]) -> ChangedUnit:
-    path_obj = Path(file_path)
-    namespace = detect_namespace(repo_root / path_obj)
-    project = detect_project(path_obj, repo_root)
+def _classify_unit(scope: str, unit: str | None, coverage_index: dict[tuple[str, str], dict]) -> ChangedUnit | None:
+    if unit is None:
+        return None
 
-    for scope, unit in (("namespace", namespace), ("project", project), ("assembly", project)):
-        if unit is None:
-            continue
-        match = coverage_index.get((scope, unit))
-        if match is not None:
-            return ChangedUnit(file=file_path, scope=scope, unit=unit, state=match["state"], evidence=match.get("evidence"))
+    match = coverage_index.get((scope, unit))
+    if match is not None:
+        return ChangedUnit(scope=scope, unit=unit, state=match["state"], evidence=match.get("evidence"))
 
-    # A namespace/project was detected, but it doesn't appear in any contract's
+    # The unit was detected, but it doesn't appear in any contract's
     # covered_items/excluded_items/uncovered_items/stale_items/unknown_items —
     # meaning no configured coverage contract's roots/scope actually covers this
     # unit. Absence of evidence is not proof of coverage, so report unknown.
-    if namespace is not None:
-        return ChangedUnit(file=file_path, scope="namespace", unit=namespace, state="unknown")
-    if project is not None:
-        return ChangedUnit(file=file_path, scope="project", unit=project, state="unknown")
-
-    return ChangedUnit(file=file_path, scope="unknown", unit=None, state="unknown")
+    return ChangedUnit(scope=scope, unit=unit, state="unknown")
 
 
-def render_new_code_section(changed_units: list[ChangedUnit]) -> str:
-    problems = [unit for unit in changed_units if unit.state != "covered"]
+def classify_changed_file(file_path: str, repo_root: Path, coverage_index: dict[tuple[str, str], dict]) -> list[ChangedUnit]:
+    """Classify every applicable coverage scope (namespace, project, assembly) for a
+    changed file independently. A file can be covered in one scope and uncovered/unknown
+    in another (e.g. a covered namespace inside an uncovered project) — reporting only
+    the first match would hide that gap, so every applicable unit is returned."""
+    path_obj = Path(file_path)
+    namespace = detect_namespace(repo_root / path_obj)
+    csproj_path = find_enclosing_csproj(path_obj, repo_root)
 
-    covered_count = sum(1 for unit in changed_units if unit.state == "covered")
-    uncovered_count = sum(1 for unit in changed_units if unit.state in ("uncovered", "stale", "excluded"))
-    unknown_count = sum(1 for unit in changed_units if unit.state == "unknown")
+    project_path = detect_project_path(csproj_path, repo_root) if csproj_path is not None else None
+    assembly_name = detect_assembly_name(csproj_path) if csproj_path is not None else None
+
+    units = [
+        _classify_unit("namespace", namespace, coverage_index),
+        _classify_unit("project", project_path, coverage_index),
+        _classify_unit("assembly", assembly_name, coverage_index),
+    ]
+    applicable = [unit for unit in units if unit is not None]
+
+    if not applicable:
+        return [ChangedUnit(scope="unknown", unit=None, state="unknown")]
+
+    return applicable
+
+
+def render_new_code_section(file_units: dict[str, list[ChangedUnit]]) -> str:
+    all_units = [unit for units in file_units.values() for unit in units]
+
+    # Dedupe by (scope, unit): the same project/assembly/namespace can be the
+    # classification target for multiple changed files.
+    unique_units: dict[tuple[str, str | None], ChangedUnit] = {}
+    for unit in all_units:
+        unique_units[(unit.scope, unit.unit)] = unit
+
+    covered_count = sum(1 for unit in unique_units.values() if unit.state == "covered")
+    uncovered_count = sum(1 for unit in unique_units.values() if unit.state in ("uncovered", "stale", "excluded"))
+    unknown_count = sum(1 for unit in unique_units.values() if unit.state == "unknown")
 
     lines = [
         "",
@@ -153,19 +188,26 @@ def render_new_code_section(changed_units: list[ChangedUnit]) -> str:
         "",
         "| Metric | Count |",
         "| --- | --- |",
-        f"| Changed first-party files | {len(changed_units)} |",
-        f"| Covered | {covered_count} |",
-        f"| Uncovered | {uncovered_count} |",
+        f"| Changed first-party files | {len(file_units)} |",
+        f"| Changed namespaces/projects/assemblies covered | {covered_count} |",
+        f"| Changed namespaces/projects/assemblies uncovered | {uncovered_count} |",
         f"| Requiring policy update | {unknown_count if unknown_count else 'none'} |",
     ]
 
-    if problems:
+    files_with_problems = {
+        file: [unit for unit in units if unit.state != "covered"]
+        for file, units in file_units.items()
+        if any(unit.state != "covered" for unit in units)
+    }
+
+    if files_with_problems:
         lines.append("")
         lines.append("Items needing attention:")
         lines.append("")
-        for unit in problems:
-            label = unit.unit or unit.file
-            lines.append(f"- `{label}` ({unit.scope}): **{unit.state}**")
+        for file, problem_units in files_with_problems.items():
+            for unit in problem_units:
+                label = unit.unit or file
+                lines.append(f"- `{file}` — `{label}` ({unit.scope}): **{unit.state}**")
 
     return "\n".join(lines)
 
@@ -175,8 +217,8 @@ def render_report(report: dict, changed_files: list[str] | None, repo_root: Path
 
     if changed_files is not None:
         coverage_index = build_coverage_index(report)
-        changed_units = [classify_changed_file(file, repo_root, coverage_index) for file in changed_files]
-        sections.append(render_new_code_section(changed_units))
+        file_units = {file: classify_changed_file(file, repo_root, coverage_index) for file in changed_files}
+        sections.append(render_new_code_section(file_units))
 
     return "\n".join(sections) + "\n"
 

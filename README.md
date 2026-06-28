@@ -1,8 +1,20 @@
-# ArchLinterNet
+<p align="center">
+  <img src="docs/assets/logo.png" alt="ArchLinterNet" width="420">
+</p>
 
 [![CI](https://github.com/eugenemalaschuk-source/arch-linter-net/actions/workflows/ci.yml/badge.svg)](https://github.com/eugenemalaschuk-source/arch-linter-net/actions/workflows/ci.yml)
+[![Test coverage](https://img.shields.io/badge/test%20coverage-79%25-yellow)](https://github.com/eugenemalaschuk-source/arch-linter-net/actions/workflows/ci.yml)
 
-The CI badge covers build, test, and the architecture coverage quality gate — see [CI integration](docs/guides/ci-integration.md#baseline-debt-semantics-in-the-coverage-gate) for how the coverage gate and PR comment work.
+The CI badge tracks one workflow that runs all quality signals in the same `validate` job, so a green badge means all of them passed:
+
+| Quality signal | Source |
+|---|---|
+| Build/test | `make acceptance` (lint + all tests) |
+| Test coverage (line %) | `make test-coverage-badge` — merged cobertura line coverage across all test projects; regenerate and update the badge above when it changes meaningfully |
+| Architecture validation | strict ArchLinterNet self-policy check (`architecture/dependencies.arch.yml`) |
+| Architecture coverage | strict/audit coverage JSON artifacts + Markdown report + sticky PR comment |
+
+See [CI integration](docs/guides/ci-integration.md#baseline-debt-semantics-in-the-coverage-gate) for how the coverage gate and PR comment work.
 
 Declarative architecture contracts and dependency linting for .NET repositories.
 

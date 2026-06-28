@@ -93,7 +93,7 @@ Alongside the raw findings, `validate` reports a deterministic coverage summary 
 | `stale` | always `0` — this scope reports `uncovered` instead | always `0` | always `0` | referenced layer exists but currently matches zero namespaces (`"empty-input"` finding) |
 | `unknown` | always `0` | `scope: project` only — discovered project could not be resolved to a target assembly (`"unresolved project"` finding); always `0` for `scope: assembly` | always `0` | referenced field names a layer that isn't declared at all (`"unresolved"` finding) |
 
-Each excluded item is reported with its `reason` text from the contract's `exclude` entry. Each uncovered/stale/unknown item is reported with evidence — a representative type for namespace/project/assembly coverage, the source/target namespace pair plus a representative source type for dependency-edge coverage, or the dangling/empty layer name for rule-input coverage — and is kept in a bucket-specific list (`uncovered_items` for namespace/project/assembly/dependency-edge coverage, `unknown_items` additionally for project coverage, `stale_items`/`unknown_items` for rule-input coverage) rather than a single combined list, since `stale` and `unknown` mean different things and must stay distinguishable by a reviewer or downstream tooling.
+Each excluded item is reported with its `reason` text from the contract's `exclude` entry. Each covered/uncovered/stale/unknown item is reported with evidence — a representative type for namespace/project/assembly coverage, the source/target namespace pair plus a representative source type for dependency-edge coverage, or the dangling/empty layer name for rule-input coverage — and is kept in a bucket-specific list (`covered_items` for every scope; `uncovered_items` for namespace/project/assembly/dependency-edge coverage, `unknown_items` additionally for project coverage, `stale_items`/`unknown_items` for rule-input coverage) rather than a single combined list, since `stale` and `unknown` mean different things and must stay distinguishable by a reviewer or downstream tooling. `covered_items` is the only list naming units found covered by positive evidence — downstream tooling (such as a CI new-code coverage report) should never infer "covered" from a unit's mere absence from the other lists.
 
 In human output, the summary appears in a `Coverage summary:` section, one line per contract, after `Coverage findings:`, with each evidence sub-line explicitly labeled `uncovered:`, `stale:`, or `unknown:`:
 
@@ -106,7 +106,7 @@ Coverage summary:
     unknown: typo-rule (does_not_exist_layer)
 ```
 
-In JSON output, the summary appears as a top-level `coverage_summary` array, additive to (not nested inside) `coverage_findings`. Every entry always includes all three evidence arrays (`uncovered_items`, `stale_items`, `unknown_items`); only the ones relevant to the contract's scope are ever non-empty — namespace, project, assembly, and dependency-edge coverage populate `uncovered_items` (project coverage additionally populates `unknown_items` for unresolved projects), rule-input coverage only populates `stale_items`/`unknown_items`:
+In JSON output, the summary appears as a top-level `coverage_summary` array, additive to (not nested inside) `coverage_findings`. Every entry always includes all four evidence arrays (`covered_items`, `uncovered_items`, `stale_items`, `unknown_items`); only the ones relevant to the contract's scope are ever non-empty (besides `covered_items`, which is populated whenever a unit is found covered, for every scope) — namespace, project, assembly, and dependency-edge coverage populate `uncovered_items` (project coverage additionally populates `unknown_items` for unresolved projects), rule-input coverage only populates `stale_items`/`unknown_items`:
 
 ```json
 {
@@ -121,7 +121,8 @@ In JSON output, the summary appears as a top-level `coverage_summary` array, add
         { "item": "ArchLinterNet.Core.Validation", "evidence": "ArchLinterNet.Core.Validation.ArchitectureBaselineService" }
       ],
       "stale_items": [],
-      "unknown_items": []
+      "unknown_items": [],
+      "covered_items": []
     },
     {
       "contract": "rule-input-coverage",
@@ -131,7 +132,11 @@ In JSON output, the summary appears as a top-level `coverage_summary` array, add
       "excluded_items": [],
       "uncovered_items": [],
       "stale_items": [{ "item": "ghost-rule", "evidence": "ghost" }],
-      "unknown_items": [{ "item": "typo-rule", "evidence": "does_not_exist_layer" }]
+      "unknown_items": [{ "item": "typo-rule", "evidence": "does_not_exist_layer" }],
+      "covered_items": [
+        { "item": "core-validation:core_validation", "evidence": "core_validation" },
+        { "item": "core-validation:core_execution", "evidence": "core_execution" }
+      ]
     }
   ]
 }

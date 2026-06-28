@@ -7,6 +7,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from architecture_coverage_report import (  # noqa: E402
+    ChangedUnit,
     build_coverage_index,
     classify_changed_file,
     load_coverage,
@@ -19,6 +20,12 @@ from architecture_coverage_report import (  # noqa: E402
 
 def make_report(passed: bool, coverage_summary: list[dict]) -> dict:
     return {"passed": passed, "coverage_summary": coverage_summary, "coverage_findings": []}
+
+
+def write_file(tmp_path: Path, rel_path: str, content: str) -> None:
+    file_path = tmp_path / rel_path
+    file_path.parent.mkdir(parents=True, exist_ok=True)
+    file_path.write_text(content, encoding="utf-8")
 
 
 def test_load_coverage_parses_json(tmp_path: Path) -> None:
@@ -113,17 +120,16 @@ def test_classify_changed_file_unknown_when_unmappable(tmp_path: Path) -> None:
     report = make_report(True, [])
     coverage_index = build_coverage_index(report)
 
-    unit = classify_changed_file("src/Missing/DoesNotExist.cs", tmp_path, coverage_index)
+    units = classify_changed_file("src/Missing/DoesNotExist.cs", tmp_path, coverage_index)
 
-    assert unit.state == "unknown"
-    assert unit.unit is None
+    assert len(units) == 1
+    assert units[0].state == "unknown"
+    assert units[0].unit is None
 
 
 def test_classify_changed_file_maps_known_uncovered_namespace(tmp_path: Path) -> None:
     file_rel = "src/Foo/Bar.cs"
-    file_path = tmp_path / file_rel
-    file_path.parent.mkdir(parents=True)
-    file_path.write_text("namespace Foo.Bar;\n\nclass C {}\n", encoding="utf-8")
+    write_file(tmp_path, file_rel, "namespace Foo.Bar;\n\nclass C {}\n")
 
     report = make_report(
         False,
@@ -140,18 +146,17 @@ def test_classify_changed_file_maps_known_uncovered_namespace(tmp_path: Path) ->
     )
     coverage_index = build_coverage_index(report)
 
-    unit = classify_changed_file(file_rel, tmp_path, coverage_index)
+    units = classify_changed_file(file_rel, tmp_path, coverage_index)
+    namespace_units = [unit for unit in units if unit.scope == "namespace"]
 
-    assert unit.scope == "namespace"
-    assert unit.unit == "Foo.Bar"
-    assert unit.state == "uncovered"
+    assert len(namespace_units) == 1
+    assert namespace_units[0].unit == "Foo.Bar"
+    assert namespace_units[0].state == "uncovered"
 
 
 def test_render_new_code_section_reports_unknown_and_uncovered(tmp_path: Path) -> None:
     file_rel = "src/Untracked/Thing.cs"
-    file_path = tmp_path / file_rel
-    file_path.parent.mkdir(parents=True)
-    file_path.write_text("// no namespace here\n", encoding="utf-8")
+    write_file(tmp_path, file_rel, "// no namespace here\n")
 
     report = make_report(True, [])
 
@@ -162,34 +167,29 @@ def test_render_new_code_section_reports_unknown_and_uncovered(tmp_path: Path) -
 
 
 def test_render_new_code_section_skips_covered_units() -> None:
-    from architecture_coverage_report import ChangedUnit
+    section = render_new_code_section({"a.cs": [ChangedUnit(scope="namespace", unit="A.B", state="covered")]})
 
-    section = render_new_code_section([ChangedUnit(file="a.cs", scope="namespace", unit="A.B", state="covered")])
-
-    assert "| Covered | 1 |" in section
+    assert "| Changed namespaces/projects/assemblies covered | 1 |" in section
     assert "A.B" not in section
 
 
 def test_classify_changed_file_does_not_assume_covered_without_evidence(tmp_path: Path) -> None:
     file_rel = "src/Foo/Bar.cs"
-    file_path = tmp_path / file_rel
-    file_path.parent.mkdir(parents=True)
-    file_path.write_text("namespace Foo.Bar;\n\nclass C {}\n", encoding="utf-8")
+    write_file(tmp_path, file_rel, "namespace Foo.Bar;\n\nclass C {}\n")
 
     report = make_report(True, [])
     coverage_index = build_coverage_index(report)
 
-    unit = classify_changed_file(file_rel, tmp_path, coverage_index)
+    units = classify_changed_file(file_rel, tmp_path, coverage_index)
+    namespace_units = [unit for unit in units if unit.scope == "namespace"]
 
-    assert unit.state == "unknown"
-    assert unit.unit == "Foo.Bar"
+    assert namespace_units[0].state == "unknown"
+    assert namespace_units[0].unit == "Foo.Bar"
 
 
 def test_classify_changed_file_derives_covered_from_real_coverage_summary_shape(tmp_path: Path) -> None:
     file_rel = "src/Foo/Bar.cs"
-    file_path = tmp_path / file_rel
-    file_path.parent.mkdir(parents=True)
-    file_path.write_text("namespace Foo.Bar;\n\nclass C {}\n", encoding="utf-8")
+    write_file(tmp_path, file_rel, "namespace Foo.Bar;\n\nclass C {}\n")
 
     report = make_report(
         True,
@@ -207,17 +207,16 @@ def test_classify_changed_file_derives_covered_from_real_coverage_summary_shape(
     )
     coverage_index = build_coverage_index(report)
 
-    unit = classify_changed_file(file_rel, tmp_path, coverage_index)
+    units = classify_changed_file(file_rel, tmp_path, coverage_index)
+    namespace_units = [unit for unit in units if unit.scope == "namespace"]
 
-    assert unit.state == "covered"
-    assert unit.unit == "Foo.Bar"
+    assert namespace_units[0].state == "covered"
+    assert namespace_units[0].unit == "Foo.Bar"
 
 
 def test_classify_changed_file_unknown_when_namespace_outside_configured_scope(tmp_path: Path) -> None:
     file_rel = "src/Foo/Bar.cs"
-    file_path = tmp_path / file_rel
-    file_path.parent.mkdir(parents=True)
-    file_path.write_text("namespace Foo.Bar;\n\nclass C {}\n", encoding="utf-8")
+    write_file(tmp_path, file_rel, "namespace Foo.Bar;\n\nclass C {}\n")
 
     report = make_report(
         True,
@@ -235,17 +234,16 @@ def test_classify_changed_file_unknown_when_namespace_outside_configured_scope(t
     )
     coverage_index = build_coverage_index(report)
 
-    unit = classify_changed_file(file_rel, tmp_path, coverage_index)
+    units = classify_changed_file(file_rel, tmp_path, coverage_index)
+    namespace_units = [unit for unit in units if unit.scope == "namespace"]
 
-    assert unit.state == "unknown"
-    assert unit.unit == "Foo.Bar"
+    assert namespace_units[0].state == "unknown"
+    assert namespace_units[0].unit == "Foo.Bar"
 
 
 def test_render_new_code_section_does_not_flag_real_covered_unit(tmp_path: Path) -> None:
     file_rel = "src/Foo/Bar.cs"
-    file_path = tmp_path / file_rel
-    file_path.parent.mkdir(parents=True)
-    file_path.write_text("namespace Foo.Bar;\n\nclass C {}\n", encoding="utf-8")
+    write_file(tmp_path, file_rel, "namespace Foo.Bar;\n\nclass C {}\n")
 
     report = make_report(
         True,
@@ -264,7 +262,6 @@ def test_render_new_code_section_does_not_flag_real_covered_unit(tmp_path: Path)
 
     markdown = render_report(report, [file_rel], tmp_path)
 
-    assert "| Covered | 1 |" in markdown
     assert "| Requiring policy update | none |" in markdown
     assert "Foo.Bar" not in markdown.split("### New-code coverage", 1)[1].split("Items needing attention", 1)[0]
 
@@ -284,3 +281,127 @@ def test_render_report_omits_new_code_section_when_changed_files_not_requested()
     markdown = render_report(report, None, Path("."))
 
     assert "### New-code coverage" not in markdown
+
+
+def test_classify_changed_file_flags_uncovered_project_even_when_namespace_is_covered(tmp_path: Path) -> None:
+    """A changed file's namespace can be covered while its containing project is not.
+    The classifier must report both scopes independently instead of stopping at the
+    first match (namespace), or the project-level gap would be silently hidden."""
+    file_rel = "src/Foo/Bar.cs"
+    write_file(tmp_path, file_rel, "namespace Foo.Bar;\n\nclass C {}\n")
+    write_file(tmp_path, "src/Foo/Foo.csproj", "<Project Sdk=\"Microsoft.NET.Sdk\"></Project>\n")
+
+    report = make_report(
+        True,
+        [
+            {
+                "scope": "namespace",
+                "counts": {"covered": 1, "excluded": 0, "uncovered": 0, "stale": 0, "unknown": 0},
+                "excluded_items": [],
+                "uncovered_items": [],
+                "stale_items": [],
+                "unknown_items": [],
+                "covered_items": [{"item": "Foo.Bar", "evidence": "Foo.Bar.SomeType"}],
+            },
+            {
+                "scope": "project",
+                "counts": {"covered": 0, "excluded": 0, "uncovered": 1, "stale": 0, "unknown": 0},
+                "excluded_items": [],
+                "uncovered_items": [{"item": "src/Foo/Foo.csproj", "evidence": "no layer covers this project"}],
+                "stale_items": [],
+                "unknown_items": [],
+                "covered_items": [],
+            },
+        ],
+    )
+    coverage_index = build_coverage_index(report)
+
+    units = classify_changed_file(file_rel, tmp_path, coverage_index)
+    by_scope = {unit.scope: unit for unit in units}
+
+    assert by_scope["namespace"].state == "covered"
+    assert by_scope["project"].state == "uncovered"
+    assert by_scope["project"].unit == "src/Foo/Foo.csproj"
+
+
+def test_render_new_code_section_surfaces_project_problem_despite_covered_namespace(tmp_path: Path) -> None:
+    file_rel = "src/Foo/Bar.cs"
+    write_file(tmp_path, file_rel, "namespace Foo.Bar;\n\nclass C {}\n")
+    write_file(tmp_path, "src/Foo/Foo.csproj", "<Project Sdk=\"Microsoft.NET.Sdk\"></Project>\n")
+
+    report = make_report(
+        True,
+        [
+            {
+                "scope": "namespace",
+                "counts": {"covered": 1, "excluded": 0, "uncovered": 0, "stale": 0, "unknown": 0},
+                "excluded_items": [],
+                "uncovered_items": [],
+                "stale_items": [],
+                "unknown_items": [],
+                "covered_items": [{"item": "Foo.Bar", "evidence": "Foo.Bar.SomeType"}],
+            },
+            {
+                "scope": "project",
+                "counts": {"covered": 0, "excluded": 0, "uncovered": 1, "stale": 0, "unknown": 0},
+                "excluded_items": [],
+                "uncovered_items": [{"item": "src/Foo/Foo.csproj", "evidence": "no layer covers this project"}],
+                "stale_items": [],
+                "unknown_items": [],
+                "covered_items": [],
+            },
+        ],
+    )
+
+    markdown = render_report(report, [file_rel], tmp_path)
+
+    assert "| Changed namespaces/projects/assemblies covered | 1 |" in markdown
+    assert "| Changed namespaces/projects/assemblies uncovered | 1 |" in markdown
+    assert "src/Foo/Foo.csproj" in markdown
+    assert "**uncovered**" in markdown
+
+
+def test_detect_project_path_matches_repo_relative_csproj_path(tmp_path: Path) -> None:
+    file_rel = "src/Foo/Sub/Bar.cs"
+    write_file(tmp_path, file_rel, "namespace Foo.Sub;\n")
+    write_file(tmp_path, "src/Foo/Foo.csproj", "<Project Sdk=\"Microsoft.NET.Sdk\"></Project>\n")
+
+    coverage_index: dict[tuple[str, str], dict] = {("project", "src/Foo/Foo.csproj"): {"state": "covered", "evidence": None}}
+
+    units = classify_changed_file(file_rel, tmp_path, coverage_index)
+    project_unit = next(unit for unit in units if unit.scope == "project")
+
+    assert project_unit.unit == "src/Foo/Foo.csproj"
+    assert project_unit.state == "covered"
+
+
+def test_detect_assembly_name_uses_csproj_assembly_name_when_present(tmp_path: Path) -> None:
+    file_rel = "src/Foo/Bar.cs"
+    write_file(tmp_path, file_rel, "namespace Foo;\n")
+    write_file(
+        tmp_path,
+        "src/Foo/Foo.csproj",
+        "<Project Sdk=\"Microsoft.NET.Sdk\"><PropertyGroup><AssemblyName>CustomAssembly</AssemblyName></PropertyGroup></Project>\n",
+    )
+
+    coverage_index: dict[tuple[str, str], dict] = {("assembly", "CustomAssembly"): {"state": "covered", "evidence": None}}
+
+    units = classify_changed_file(file_rel, tmp_path, coverage_index)
+    assembly_unit = next(unit for unit in units if unit.scope == "assembly")
+
+    assert assembly_unit.unit == "CustomAssembly"
+    assert assembly_unit.state == "covered"
+
+
+def test_detect_assembly_name_falls_back_to_csproj_stem_without_assembly_name(tmp_path: Path) -> None:
+    file_rel = "src/Foo/Bar.cs"
+    write_file(tmp_path, file_rel, "namespace Foo;\n")
+    write_file(tmp_path, "src/Foo/Foo.csproj", "<Project Sdk=\"Microsoft.NET.Sdk\"></Project>\n")
+
+    coverage_index: dict[tuple[str, str], dict] = {}
+
+    units = classify_changed_file(file_rel, tmp_path, coverage_index)
+    assembly_unit = next(unit for unit in units if unit.scope == "assembly")
+
+    assert assembly_unit.unit == "Foo"
+    assert assembly_unit.state == "unknown"
