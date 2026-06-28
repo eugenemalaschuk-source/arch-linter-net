@@ -120,8 +120,10 @@ public static class ArchitectureProjectDiscovery
             targetAssemblyNames.Distinct(StringComparer.Ordinal).ToArray(),
             assemblySearchPaths.Distinct(StringComparer.OrdinalIgnoreCase).ToArray(),
             sourceRoots.Distinct(StringComparer.OrdinalIgnoreCase).ToArray(),
-            diagnostics,
-            discoveredProjects);
+            diagnostics)
+        {
+            DiscoveredProjects = discoveredProjects
+        };
     }
 
     private static bool TryResolveOutput(

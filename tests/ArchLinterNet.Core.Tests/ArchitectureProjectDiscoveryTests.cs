@@ -26,6 +26,31 @@ public sealed class ArchitectureProjectDiscoveryTests
     }
 
     [Test]
+    public void ProjectDiscoveryResult_FourArgPositionalConstructorAndDeconstruct_StillCompile()
+    {
+        // ProjectDiscoveryResult.DiscoveredProjects is an init-only property, not a fifth
+        // positional parameter, specifically so the pre-existing 4-arg positional constructor
+        // and 4-value Deconstruct (both part of the public API before project/assembly
+        // coverage existed) remain source- and binary-compatible.
+        ProjectDiscoveryResult result = new(
+            new[] { "Fixture.Assembly" },
+            new[] { "bin/Debug/net10.0" },
+            new[] { "src/Fixture" },
+            Array.Empty<ArchitectureProjectDiscoveryDiagnostic>());
+
+        (IReadOnlyCollection<string> targetAssemblyNames,
+            IReadOnlyCollection<string> assemblySearchPaths,
+            IReadOnlyCollection<string> sourceRoots,
+            IReadOnlyCollection<ArchitectureProjectDiscoveryDiagnostic> diagnostics) = result;
+
+        Assert.That(targetAssemblyNames, Is.EquivalentTo(new[] { "Fixture.Assembly" }));
+        Assert.That(assemblySearchPaths, Is.EquivalentTo(new[] { "bin/Debug/net10.0" }));
+        Assert.That(sourceRoots, Is.EquivalentTo(new[] { "src/Fixture" }));
+        Assert.That(diagnostics, Is.Empty);
+        Assert.That(result.DiscoveredProjects, Is.Empty);
+    }
+
+    [Test]
     public void ResolveFromDocument_NoDiscoveryConfigured_ReturnsEmptyResult()
     {
         var document = new ArchitectureContractDocument { Analysis = new ArchitectureAnalysisConfiguration() };

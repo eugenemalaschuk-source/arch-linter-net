@@ -149,7 +149,10 @@ public sealed class ProjectAssemblyCoverageContractTests
     {
         return new ProjectDiscoveryResult(
             Array.Empty<string>(), Array.Empty<string>(), Array.Empty<string>(),
-            Array.Empty<ArchitectureProjectDiscoveryDiagnostic>(), projects);
+            Array.Empty<ArchitectureProjectDiscoveryDiagnostic>())
+        {
+            DiscoveredProjects = projects
+        };
     }
 
     [Test]

@@ -102,8 +102,7 @@ public sealed class ArchitectureCoverageInventoryTests
             new[] { "Fixture.Assembly" },
             new[] { "bin/Debug/net10.0" },
             new[] { "src/Fixture" },
-            Array.Empty<ArchitectureProjectDiscoveryDiagnostic>(),
-            Array.Empty<ArchitectureDiscoveredProject>());
+            Array.Empty<ArchitectureProjectDiscoveryDiagnostic>());
 
         ArchitectureCoverageInventory inventory = ArchitectureCoverageInventory.Build(
             CreateDocument(), CreateSession(), discoveryResult);

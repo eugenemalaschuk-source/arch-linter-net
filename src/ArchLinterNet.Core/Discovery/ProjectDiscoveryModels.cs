@@ -10,10 +10,12 @@ public sealed record ProjectDiscoveryResult(
     IReadOnlyCollection<string> TargetAssemblyNames,
     IReadOnlyCollection<string> AssemblySearchPaths,
     IReadOnlyCollection<string> SourceRoots,
-    IReadOnlyCollection<ArchitectureProjectDiscoveryDiagnostic> Diagnostics,
-    IReadOnlyCollection<ArchitectureDiscoveredProject> DiscoveredProjects)
+    IReadOnlyCollection<ArchitectureProjectDiscoveryDiagnostic> Diagnostics)
 {
+    public IReadOnlyCollection<ArchitectureDiscoveredProject> DiscoveredProjects { get; init; } =
+        Array.Empty<ArchitectureDiscoveredProject>();
+
     public static readonly ProjectDiscoveryResult Empty = new(
         Array.Empty<string>(), Array.Empty<string>(), Array.Empty<string>(),
-        Array.Empty<ArchitectureProjectDiscoveryDiagnostic>(), Array.Empty<ArchitectureDiscoveredProject>());
+        Array.Empty<ArchitectureProjectDiscoveryDiagnostic>());
 }
