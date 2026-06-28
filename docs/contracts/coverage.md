@@ -1,6 +1,6 @@
 # Coverage Contracts
 
-Coverage contracts detect parts of the policy that are not actually exercised against the analyzed codebase: namespaces with no representing layer (`scope: namespace`), or rules whose source/target layer references are dangling or currently match no first-party code (`scope: rule_input`).
+Coverage contracts detect parts of the policy that are not actually exercised against the analyzed codebase: namespaces with no representing layer (`scope: namespace`), rules whose source/target layer references are dangling or currently match no first-party code (`scope: rule_input`), projects or assemblies with no code mapped to any layer (`scope: project`/`scope: assembly`), or observed dependency edges between declared layers that no rule actually governs (`scope: dependency_edge`).
 
 Groups:
 
@@ -137,8 +137,6 @@ In JSON output, the summary appears as a top-level `coverage_summary` array, add
 }
 ```
 
-`scope: project`, `scope: assembly`, and `scope: dependency_edge` never appear in the summary, since `ArchitectureContractLoader` rejects those scopes at load time (see [Current limits](#current-limits)) — there is no contract instance to summarize for them.
-
 A coverage contract only appears in the summary when it is actually selected to run. If `validate --contract <id>` is used to run only specific contracts and a coverage contract's ID isn't among them, that coverage contract is omitted from `coverage_summary` entirely — it never appears as a zero-count row.
 
 ## Baselining coverage debt
@@ -254,15 +252,74 @@ exclusions do not support glob matching.
 [asmdef contracts](asmdef.md)) are a separate mechanism with their own identity model and are not
 affected by, or folded into, `scope: project`/`scope: assembly` coverage.
 
+## Dependency-edge coverage
+
+`scope: dependency_edge` answers a narrower question than namespace/project/assembly coverage:
+for code that *is* inside a declared layer, is the specific dependency edge between two layers
+actually governed by a layer, independence, or dependency contract — or does it bypass policy
+because no contract happens to mention that layer pair?
+
+Each contract declares `between` as a list of declared-layer-name pairs. For every pair, the
+system looks at every observed first-party namespace-to-namespace edge whose source namespace
+resolves to the pair's first layer and target namespace resolves to the pair's second layer, and
+classifies it:
+
+```yaml
+analysis:
+  coverage: error
+
+contracts:
+  strict:
+    - id: cli-must-not-depend-on-testing
+      name: cli-must-not-depend-on-testing
+      source: cli
+      forbidden: [testing]
+      reason: CLI must stay independent from test-only helpers.
+
+  strict_coverage:
+    - id: layer-edge-coverage
+      name: layer-edge-coverage
+      scope: dependency_edge
+      between:
+        - [cli, testing]
+        - [cli, core]
+      exclude:
+        - between: [cli, core]
+          reason: Already enforced structurally; CLI is allowed to depend on core.
+      reason: Every edge between cli and other layers must be governed by a declared rule.
+```
+
+A pair is **covered** when any of these already governs it:
+
+- a dependency contract whose `source` equals the pair's first layer and whose `forbidden` list
+  contains the second layer;
+- a layer contract (`scope: layer`/`strict_layers`/`audit_layers`) whose `layers` chain contains
+  both layer names, in either order — the chain's ordering check governs every pair within it;
+- an independence contract whose `layers` list contains both layer names — independence is
+  bidirectional by definition;
+- an expanded [layer template](layer-templates.md) whose container layers match both declared
+  layers' namespace patterns.
+
+A pair that matches none of the above, and matches no `exclude` entry, is **uncovered**: every
+observed edge for that pair produces an `"uncovered dependency edge"` finding naming the source
+namespace, target namespace, and a representative source type. Layer pairs that are not declared
+in any `between` list are simply not evaluated — they are out of scope, not a fourth status.
+
+Exclusions match by declared pair, not by individual namespace: `exclude[].between` names the same
+`[sourceLayer, targetLayer]` pair as the contract's own `between` entry, plus a required `reason`.
+Every observed edge for an excluded pair is suppressed.
+
 ## Current limits
 
 Coverage support is intentionally narrow in the current product surface:
 
-- `scope: namespace`, `scope: rule_input`, `scope: project`, and `scope: assembly` are implemented;
-- `scope: dependency_edge` is reserved and currently fails validation;
+- `scope: namespace`, `scope: rule_input`, `scope: project`, `scope: assembly`, and
+  `scope: dependency_edge` are implemented;
 - namespace coverage roots must use `roots[].namespace`;
 - discovery-style fields such as `include` and `exclude` are not valid on namespace coverage roots;
 - rule-input coverage contracts must use `contract_ids` and must not declare `roots` or `between`;
-- `scope: project`/`scope: assembly` contracts must not declare `roots`, `between`, or `contract_ids`.
+- `scope: project`/`scope: assembly` contracts must not declare `roots`, `between`, or `contract_ids`;
+- `scope: dependency_edge` contracts must declare `between` and must not declare `roots` or
+  `contract_ids`; both layer names in every `between` pair must be declared under `layers`.
 
 For the YAML contract shape, see [YAML schema reference](../reference/yaml-schema.md#coverage-contract).

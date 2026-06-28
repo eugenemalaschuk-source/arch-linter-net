@@ -266,7 +266,7 @@ public sealed partial class ArchitectureContractRunner
 
             bool isGoverned = IsLayerPairGoverned(sourceLayer, targetLayer);
 
-            foreach (ArchitectureCoverageDependencyEdge edge in GetEdgesForLayerPair(inventory, sourceLayer, targetLayer))
+            foreach (ArchitectureCoverageDependencyEdge edge in GetEdgesForLayerPair(sourceLayer, targetLayer))
             {
                 if (matchedExclusion != null)
                 {
@@ -532,7 +532,7 @@ public sealed partial class ArchitectureContractRunner
                 continue;
             }
 
-            foreach (ArchitectureCoverageDependencyEdge edge in GetEdgesForLayerPair(inventory, sourceLayer, targetLayer))
+            foreach (ArchitectureCoverageDependencyEdge edge in GetEdgesForLayerPair(sourceLayer, targetLayer))
             {
                 string edgeKey = $"{edge.SourceNamespace} -> {edge.TargetNamespace}";
 
@@ -557,19 +557,19 @@ public sealed partial class ArchitectureContractRunner
             .ToList();
     }
 
-    private static IEnumerable<ArchitectureCoverageDependencyEdge> GetEdgesForLayerPair(
-        ArchitectureCoverageInventory inventory, string sourceLayer, string targetLayer)
+    private IEnumerable<ArchitectureCoverageDependencyEdge> GetEdgesForLayerPair(string sourceLayer, string targetLayer)
     {
+        ArchitectureCoverageInventory inventory = _session.BuildCoverageInventory(_document);
+
         return inventory.DependencyEdges.Where(edge =>
-            ResolveLayerName(inventory, edge.SourceNamespace) == sourceLayer
-            && ResolveLayerName(inventory, edge.TargetNamespace) == targetLayer);
+            NamespaceMatchesLayer(edge.SourceNamespace, sourceLayer)
+            && NamespaceMatchesLayer(edge.TargetNamespace, targetLayer));
     }
 
-    private static string? ResolveLayerName(ArchitectureCoverageInventory inventory, string namespaceName)
+    private bool NamespaceMatchesLayer(string namespaceName, string layerName)
     {
-        return inventory.DeclaredLayers
-            .FirstOrDefault(layerEntry => ArchitectureLayerResolver.MatchesNamespace(layerEntry.Layer, namespaceName))
-            ?.Name;
+        return _document.Layers.TryGetValue(layerName, out ArchitectureLayer? layer)
+               && ArchitectureLayerResolver.MatchesNamespace(layer, namespaceName);
     }
 
     private static string GetRepresentativeNamespaceType(ArchitectureCoverageInventory inventory, string namespaceName)
@@ -603,10 +603,21 @@ public sealed partial class ArchitectureContractRunner
             return true;
         }
 
-        return _document.Contracts.StrictIndependence
+        bool governedByIndependenceContract = _document.Contracts.StrictIndependence
             .Concat(_document.Contracts.AuditIndependence)
             .Any(independence => independence.Layers.Contains(sourceLayer, StringComparer.Ordinal)
                                   && independence.Layers.Contains(targetLayer, StringComparer.Ordinal));
+
+        if (governedByIndependenceContract)
+        {
+            return true;
+        }
+
+        ArchitectureCoverageInventory inventory = _session.BuildCoverageInventory(_document);
+
+        return inventory.ExpandedLayerTemplates.Any(template =>
+            template.Layers.Any(ns => NamespaceMatchesLayer(ns, sourceLayer))
+            && template.Layers.Any(ns => NamespaceMatchesLayer(ns, targetLayer)));
     }
 
     private static bool MatchesDependencyEdgeExclusion(

@@ -20,6 +20,7 @@ public sealed class DependencyEdgeCoverageContractTests
         List<ArchitectureDependencyContract>? dependencyContracts = null,
         List<ArchitectureLayerContract>? layerContracts = null,
         List<ArchitectureIndependenceContract>? independenceContracts = null,
+        List<ArchitectureLayerTemplateContract>? layerTemplateContracts = null,
         List<ArchitectureCoverageContract>? extraCoverageContracts = null)
     {
         ArchitectureContractDocument document = new()
@@ -36,6 +37,7 @@ public sealed class DependencyEdgeCoverageContractTests
                 Strict = dependencyContracts ?? new List<ArchitectureDependencyContract>(),
                 StrictLayers = layerContracts ?? new List<ArchitectureLayerContract>(),
                 StrictIndependence = independenceContracts ?? new List<ArchitectureIndependenceContract>(),
+                StrictLayerTemplates = layerTemplateContracts ?? new List<ArchitectureLayerTemplateContract>(),
                 StrictCoverage = new List<ArchitectureCoverageContract> { coverageContract }
                     .Concat(extraCoverageContracts ?? new List<ArchitectureCoverageContract>())
                     .ToList(),
@@ -157,6 +159,87 @@ public sealed class DependencyEdgeCoverageContractTests
 
         Assert.That(findings, Is.Empty);
         Assert.That(summary!.Counts.Covered, Is.EqualTo(1));
+    }
+
+    [Test]
+    public void DependencyEdgeCoverage_PairGovernedByExpandedLayerTemplate_IsCovered()
+    {
+        string source = $"{NsPrefix}.LayerGoverned";
+        string target = $"{NsPrefix}.LayerGovernedTarget";
+
+        Dictionary<string, ArchitectureLayer> layers = new()
+        {
+            ["source"] = new ArchitectureLayer { Namespace = source },
+            ["target"] = new ArchitectureLayer { Namespace = target },
+        };
+
+        ArchitectureCoverageContract contract = new()
+        {
+            Id = "dependency-edge-coverage",
+            Name = "dependency-edge-coverage",
+            Scope = "dependency_edge",
+            Between = new List<List<string>> { new() { "source", "target" } },
+            Reason = "Observed edges must be governed by a declared contract.",
+        };
+
+        ArchitectureContractRunner runner = CreateRunner(
+            contract,
+            layers,
+            layerTemplateContracts: new List<ArchitectureLayerTemplateContract>
+            {
+                new()
+                {
+                    Name = "fixture-template",
+                    Containers = new List<string> { NsPrefix },
+                    Layers = new List<ArchitectureTemplateLayer>
+                    {
+                        new() { Name = "LayerGoverned" },
+                        new() { Name = "LayerGovernedTarget" },
+                    },
+                    Reason = "fixture",
+                },
+            });
+
+        List<ArchitectureViolation> findings = runner.CheckCoverageContract(contract);
+        ArchitectureCoverageSummary? summary = runner.BuildCoverageSummary(contract);
+
+        Assert.That(findings, Is.Empty);
+        Assert.That(summary!.Counts.Covered, Is.EqualTo(1));
+    }
+
+    [Test]
+    public void DependencyEdgeCoverage_OverlappingDeclaredLayers_MatchesSpecificPairLayerNotFirstOverallMatch()
+    {
+        // "narrow" matches the source namespace exactly; "broad" matches it too via a wildcard.
+        // Declaring "narrow" first in document.Layers exercises the bug where edge-to-layer
+        // resolution collapsed to whichever declared layer happened to match first overall,
+        // instead of checking the edge against the SPECIFIC layer named in `between`.
+        string source = $"{NsPrefix}.Uncovered";
+        string target = $"{NsPrefix}.UncoveredTarget";
+
+        Dictionary<string, ArchitectureLayer> layers = new()
+        {
+            ["narrow"] = new ArchitectureLayer { Namespace = source },
+            ["broad"] = new ArchitectureLayer { Namespace = NsPrefix },
+            ["target"] = new ArchitectureLayer { Namespace = target },
+        };
+
+        ArchitectureCoverageContract contract = new()
+        {
+            Id = "dependency-edge-coverage",
+            Name = "dependency-edge-coverage",
+            Scope = "dependency_edge",
+            Between = new List<List<string>> { new() { "broad", "target" } },
+            Reason = "Observed edges must be governed by a declared contract.",
+        };
+
+        ArchitectureContractRunner runner = CreateRunner(contract, layers);
+
+        List<ArchitectureViolation> findings = runner.CheckCoverageContract(contract);
+        ArchitectureCoverageSummary? summary = runner.BuildCoverageSummary(contract);
+
+        Assert.That(findings.Single().SourceType, Is.EqualTo($"{source} -> {target}"));
+        Assert.That(summary!.Counts.Uncovered, Is.EqualTo(1));
     }
 
     [Test]
