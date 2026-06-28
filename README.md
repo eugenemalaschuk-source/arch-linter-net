@@ -85,7 +85,7 @@ ArchLinterNet focuses on static architecture guardrails:
 - External dependency leakage checks for vendor/framework namespaces.
 - Method-body forbidden API checks.
 - Unity `.asmdef` dependency validation.
-- Namespace coverage contracts for unmapped first-party namespaces.
+- Coverage contracts for unmapped first-party namespaces, projects, and assemblies.
 - Project/solution discovery when assemblies are not hand-listed.
 - Policy-consistency diagnostics for contradictory or unreachable policy definitions.
 - Strict gates, audit diagnostics, JSON output, timings, and migration baselines.
@@ -102,7 +102,7 @@ Public product documentation is published through MkDocs and GitHub Pages:
 - [CLI usage](https://eugenemalaschuk-source.github.io/arch-linter-net/cli/)
 - [Policy format](https://eugenemalaschuk-source.github.io/arch-linter-net/policy-format/)
 - [Contract families](https://eugenemalaschuk-source.github.io/arch-linter-net/contracts/)
-- [Namespace coverage contracts](https://eugenemalaschuk-source.github.io/arch-linter-net/contracts/coverage/)
+- [Coverage contracts](https://eugenemalaschuk-source.github.io/arch-linter-net/contracts/coverage/)
 - [CI integration](https://eugenemalaschuk-source.github.io/arch-linter-net/guides/ci-integration/)
 - [AI policy authoring](https://eugenemalaschuk-source.github.io/arch-linter-net/ai/)
 - [Supported capabilities and non-goals](https://eugenemalaschuk-source.github.io/arch-linter-net/policy-format/supported-capabilities/)

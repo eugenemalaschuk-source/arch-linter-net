@@ -175,7 +175,7 @@ public sealed partial class ArchitectureContractRunner
                 continue;
             }
 
-            uncoveredItems.Add(new ArchitectureCoverageSummaryEvidenceItem(assemblyName, GetRepresentativeType(assembly)));
+            uncoveredItems.Add(new ArchitectureCoverageSummaryEvidenceItem(assemblyName, GetAssemblyEvidence(assembly)));
         }
 
         return new ArchitectureCoverageSummary(
@@ -228,7 +228,8 @@ public sealed partial class ArchitectureContractRunner
                 continue;
             }
 
-            uncoveredItems.Add(new ArchitectureCoverageSummaryEvidenceItem(project.Path, GetRepresentativeType(resolvedAssembly)));
+            uncoveredItems.Add(new ArchitectureCoverageSummaryEvidenceItem(
+                project.Path, GetProjectEvidence(project, resolvedAssembly)));
         }
 
         return new ArchitectureCoverageSummary(
@@ -387,7 +388,7 @@ public sealed partial class ArchitectureContractRunner
                 contract.Id,
                 entry.Name,
                 "uncovered assembly",
-                new[] { GetRepresentativeType(entry.Assembly) }))
+                GetAssemblyForbiddenReferences(entry.Assembly)))
             .ToList();
 
         executionContext.CollectUnmatchedIgnores(_unmatchedIgnoredViolations);
@@ -439,7 +440,7 @@ public sealed partial class ArchitectureContractRunner
                     contract.Id,
                     project.Path,
                     "uncovered project",
-                    new[] { GetRepresentativeType(resolvedAssembly) }));
+                    new[] { project.AssemblyName, GetRepresentativeType(resolvedAssembly) }));
             }
         }
 
@@ -476,6 +477,29 @@ public sealed partial class ArchitectureContractRunner
             .FirstOrDefault();
 
         return representative?.FullName ?? representative?.Name ?? GetAssemblyName(assembly);
+    }
+
+    private static string[] GetAssemblyForbiddenReferences(Assembly assembly)
+    {
+        string representativeType = GetRepresentativeType(assembly);
+
+        return string.IsNullOrEmpty(assembly.Location)
+            ? new[] { representativeType }
+            : new[] { assembly.Location, representativeType };
+    }
+
+    private static string GetAssemblyEvidence(Assembly assembly)
+    {
+        string representativeType = GetRepresentativeType(assembly);
+
+        return string.IsNullOrEmpty(assembly.Location)
+            ? representativeType
+            : $"{assembly.Location} ({representativeType})";
+    }
+
+    private static string GetProjectEvidence(ArchitectureDiscoveredProject project, Assembly resolvedAssembly)
+    {
+        return $"{project.AssemblyName}: {GetRepresentativeType(resolvedAssembly)}";
     }
 
     private static bool MatchesAssemblyExclusion(ArchitectureCoverageExclusion exclusion, string assemblyName)

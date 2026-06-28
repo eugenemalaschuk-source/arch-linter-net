@@ -67,7 +67,7 @@ public sealed class ProjectAssemblyCoverageContractTests
     }
 
     [Test]
-    public void AssemblyCoverage__coreAssemblyMatchesLayer_IsCovered()
+    public void AssemblyCoverage_CoreAssemblyMatchesLayer_IsCovered()
     {
         ArchitectureCoverageContract contract = new()
         {
@@ -88,7 +88,7 @@ public sealed class ProjectAssemblyCoverageContractTests
     }
 
     [Test]
-    public void AssemblyCoverage__testingAssemblyMatchesNoLayer_IsUncovered()
+    public void AssemblyCoverage_TestingAssemblyMatchesNoLayer_IsUncoveredWithPathAndRepresentativeTypeEvidence()
     {
         ArchitectureCoverageContract contract = new()
         {
@@ -103,10 +103,20 @@ public sealed class ProjectAssemblyCoverageContractTests
         List<ArchitectureViolation> findings = runner.CheckCoverageContract(contract);
         ArchitectureCoverageSummary? summary = runner.BuildCoverageSummary(contract);
 
-        Assert.That(findings.Select(f => f.SourceType), Contains.Item(_testingAssembly.GetName().Name));
-        Assert.That(findings.Single(f => f.SourceType == _testingAssembly.GetName().Name).ForbiddenNamespace,
-            Is.EqualTo("uncovered assembly"));
+        ArchitectureViolation finding = findings.Single(f => f.SourceType == _testingAssembly.GetName().Name);
+        Assert.That(finding.ForbiddenNamespace, Is.EqualTo("uncovered assembly"));
         Assert.That(summary!.Counts.Uncovered, Is.EqualTo(1));
+
+        // The assembly's identity (name) is the finding's SourceType; the finding's
+        // ForbiddenReferences and the summary evidence must additionally carry the
+        // assembly's file path (when available) and a representative type, per
+        // architecture-coverage-reporting's "Uncovered evidence in summary" requirement.
+        Assert.That(_testingAssembly.Location, Is.Not.Empty);
+        Assert.That(finding.ForbiddenReferences, Contains.Item(_testingAssembly.Location));
+        Assert.That(finding.ForbiddenReferences, Contains.Item("ArchLinterNet.Testing.ArchitectureAssertions"));
+
+        string evidence = summary.UncoveredItems.Single().Evidence;
+        Assert.That(evidence, Does.Contain(_testingAssembly.Location));
     }
 
     [Test]
@@ -166,10 +176,11 @@ public sealed class ProjectAssemblyCoverageContractTests
     }
 
     [Test]
-    public void ProjectCoverage_DiscoveredProjectResolvesToUncoveredAssembly_IsUncovered()
+    public void ProjectCoverage_DiscoveredProjectResolvesToUncoveredAssembly_IsUncoveredWithAssemblyNameAndRepresentativeTypeEvidence()
     {
+        string assemblyName = _testingAssembly.GetName().Name!;
         ProjectDiscoveryResult discovery = CreateDiscovery(
-            new ArchitectureDiscoveredProject("src/Testing/Testing.csproj", _testingAssembly.GetName().Name!, new[] { "net10.0" }));
+            new ArchitectureDiscoveredProject("src/Testing/Testing.csproj", assemblyName, new[] { "net10.0" }));
 
         ArchitectureCoverageContract contract = new()
         {
@@ -184,9 +195,18 @@ public sealed class ProjectAssemblyCoverageContractTests
         List<ArchitectureViolation> findings = runner.CheckCoverageContract(contract);
         ArchitectureCoverageSummary? summary = runner.BuildCoverageSummary(contract);
 
-        Assert.That(findings.Single().SourceType, Is.EqualTo("src/Testing/Testing.csproj"));
-        Assert.That(findings.Single().ForbiddenNamespace, Is.EqualTo("uncovered project"));
+        ArchitectureViolation finding = findings.Single();
+        Assert.That(finding.SourceType, Is.EqualTo("src/Testing/Testing.csproj"));
+        Assert.That(finding.ForbiddenNamespace, Is.EqualTo("uncovered project"));
         Assert.That(summary!.Counts.Uncovered, Is.EqualTo(1));
+
+        // Project path is the finding's SourceType; the discovered assembly name must
+        // additionally appear in the finding/summary evidence alongside a representative
+        // type, per project-coverage-contracts' "uncovered project" evidence requirement.
+        Assert.That(finding.ForbiddenReferences, Contains.Item(assemblyName));
+
+        string evidence = summary.UncoveredItems.Single().Evidence;
+        Assert.That(evidence, Does.Contain(assemblyName));
     }
 
     [Test]
