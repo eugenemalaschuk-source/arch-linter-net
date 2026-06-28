@@ -129,6 +129,20 @@ def build_coverage_index(report: dict) -> dict[tuple[str, str], dict]:
     return index
 
 
+def configured_scopes(report: dict) -> set[str]:
+    """Coverage scopes (namespace/project/assembly) that have at least one configured
+    coverage contract in this run. A scope with no configured contract carries no
+    evidence either way, so the new-code classifier must not synthesize a finding for
+    it — that would report an "unknown"/"requires policy update" item purely because
+    the repository's policy doesn't define that scope, not because of anything in the
+    pull request."""
+    return {
+        entry.get("scope")
+        for entry in report.get("coverage_summary", []) or []
+        if entry.get("scope") in KNOWN_SCOPES
+    }
+
+
 def _classify_unit(scope: str, unit: str | None, coverage_index: dict[tuple[str, str], dict]) -> ChangedUnit | None:
     if unit is None:
         return None
@@ -144,17 +158,25 @@ def _classify_unit(scope: str, unit: str | None, coverage_index: dict[tuple[str,
     return ChangedUnit(scope=scope, unit=unit, state="unknown")
 
 
-def classify_changed_file(file_path: str, repo_root: Path, coverage_index: dict[tuple[str, str], dict]) -> list[ChangedUnit]:
-    """Classify every applicable coverage scope (namespace, project, assembly) for a
-    changed file independently. A file can be covered in one scope and uncovered/unknown
-    in another (e.g. a covered namespace inside an uncovered project) — reporting only
-    the first match would hide that gap, so every applicable unit is returned."""
+def classify_changed_file(
+    file_path: str,
+    repo_root: Path,
+    coverage_index: dict[tuple[str, str], dict],
+    scopes: set[str],
+) -> list[ChangedUnit]:
+    """Classify a changed file against every coverage scope (namespace, project,
+    assembly) that the policy actually configures, independently. A file can be covered
+    in one scope and uncovered/unknown in another (e.g. a covered namespace inside an
+    uncovered project) — reporting only the first match would hide that gap, so every
+    applicable unit is returned. A scope the policy doesn't configure at all is skipped
+    entirely rather than synthesized as "unknown", since that would just restate "this
+    repository has no project-coverage contract" on every changed file."""
     path_obj = Path(file_path)
-    namespace = detect_namespace(repo_root / path_obj)
-    csproj_path = find_enclosing_csproj(path_obj, repo_root)
+    namespace = detect_namespace(repo_root / path_obj) if "namespace" in scopes else None
+    csproj_path = find_enclosing_csproj(path_obj, repo_root) if ("project" in scopes or "assembly" in scopes) else None
 
-    project_path = detect_project_path(csproj_path, repo_root) if csproj_path is not None else None
-    assembly_name = detect_assembly_name(csproj_path) if csproj_path is not None else None
+    project_path = detect_project_path(csproj_path, repo_root) if csproj_path is not None and "project" in scopes else None
+    assembly_name = detect_assembly_name(csproj_path) if csproj_path is not None and "assembly" in scopes else None
 
     units = [
         _classify_unit("namespace", namespace, coverage_index),
@@ -212,12 +234,24 @@ def render_new_code_section(file_units: dict[str, list[ChangedUnit]]) -> str:
     return "\n".join(lines)
 
 
-def render_report(report: dict, changed_files: list[str] | None, repo_root: Path) -> str:
+def render_diff_unavailable_section() -> str:
+    return (
+        "\n### New-code coverage\n\n"
+        "> **Unavailable:** the changed-files diff could not be computed for this run "
+        "(e.g. a `git diff`/fetch failure). This is reported explicitly rather than as "
+        "zero changed files, since a diff failure is not the same as an empty diff."
+    )
+
+
+def render_report(report: dict, changed_files: list[str] | None, repo_root: Path, diff_failed: bool = False) -> str:
     sections = [render_summary_markdown(report)]
 
-    if changed_files is not None:
+    if diff_failed:
+        sections.append(render_diff_unavailable_section())
+    elif changed_files is not None:
         coverage_index = build_coverage_index(report)
-        file_units = {file: classify_changed_file(file, repo_root, coverage_index) for file in changed_files}
+        scopes = configured_scopes(report)
+        file_units = {file: classify_changed_file(file, repo_root, coverage_index, scopes) for file in changed_files}
         sections.append(render_new_code_section(file_units))
 
     return "\n".join(sections) + "\n"
@@ -229,16 +263,24 @@ def main() -> int:
     parser.add_argument("--changed-files", type=Path, default=None, help="Path to a file listing changed first-party files, one per line.")
     parser.add_argument("--repo-root", type=Path, default=Path("."), help="Repository root used to resolve changed file paths.")
     parser.add_argument("--output", type=Path, default=None, help="Path to write the Markdown report. Defaults to stdout.")
+    parser.add_argument(
+        "--diff-status",
+        choices=("ok", "failed"),
+        default="ok",
+        help="Pass 'failed' when the changed-files diff computation itself failed (e.g. git diff/fetch error), "
+        "so the report says diff-unavailable instead of silently reporting zero changed files.",
+    )
 
     args = parser.parse_args()
 
     report = load_coverage(args.json_path)
+    diff_failed = args.diff_status == "failed"
 
     changed_files: list[str] | None = None
-    if args.changed_files is not None and args.changed_files.exists():
+    if not diff_failed and args.changed_files is not None and args.changed_files.exists():
         changed_files = [line.strip() for line in args.changed_files.read_text(encoding="utf-8").splitlines() if line.strip()]
 
-    markdown = render_report(report, changed_files, args.repo_root)
+    markdown = render_report(report, changed_files, args.repo_root, diff_failed=diff_failed)
 
     if args.output is not None:
         args.output.write_text(markdown, encoding="utf-8")

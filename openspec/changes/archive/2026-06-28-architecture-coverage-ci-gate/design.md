@@ -1,3 +1,13 @@
+## Amendment (post-archive)
+
+This design's original decision to use a separate `architecture-coverage.yml` workflow, and the non-goal of not adding coverage contracts to the self-policy, were both revised during implementation review on the same PR (#149), before merge:
+
+- **Workflow shape**: the architecture coverage steps were folded into the existing `ci.yml` `validate` job (after `make acceptance`, reusing its already-built solution) instead of a separate workflow file, with the sticky PR comment split into its own `comment` job (`needs: validate`) so only that job carries `pull-requests: write` — `validate` stays `contents: read`. The badge precedent below ("a dedicated workflow gives a badge that means exactly...") was superseded by this decision; see the current `openspec/specs/github-actions-ci/spec.md` and `openspec/specs/architecture-coverage-ci-reporting/spec.md` for the authoritative requirements.
+- **Self-policy coverage contracts**: `architecture/dependencies.arch.yml` now defines `strict_coverage` contracts (`assembly` and `namespace` scope) so the coverage gate reflects real data instead of an always-empty, trivially-passing `coverage_summary`.
+- **New-code coverage correctness**: the report generator was revised twice more after this design was written — `covered_items` was added to the JSON shape so "covered" can be derived from positive evidence (not absence of a problem entry); the classifier was changed from "first matching scope wins" to classifying every *configured* scope (namespace/project/assembly) independently, restricted to scopes the policy actually defines (an unconfigured scope is skipped, not reported as `unknown`); and a failed changed-files diff is now reported as an explicit "diff unavailable" state rather than silently treated as zero changed files.
+
+The "Decisions" and "Non-Goals" sections below are kept as the historical record of what was decided when this change was first archived — they no longer describe the final shipped behavior. See the live specs for current requirements.
+
 ## Context
 
 `ArchLinterNet.Cli` already supports `--policy`, `--mode strict|audit`, `--format human|json`, `--baseline`, and emits `coverage_summary`/`coverage_findings` in its JSON output (`ArchitectureDiagnosticFormatter.FormatResultForCiArtifacts`). The repository's own CI (`ci.yml`) runs `make acceptance` (lint + test) but never invokes the CLI against `architecture/dependencies.arch.yml` directly, never uploads JSON artifacts, and has no PR-facing reporting. The repository's own policy currently defines no `strict_coverage`/`audit_coverage` contracts, so the coverage gate will pass trivially on this repo today — the gate must still work for repos (or future contracts) that do define them.

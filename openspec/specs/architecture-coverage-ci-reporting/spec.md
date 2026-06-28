@@ -63,6 +63,32 @@ The report generator SHALL include a "New-code coverage" section that maps PR-ch
 - **WHEN** a changed file maps to a coverage unit present in a contract's `covered_items`
 - **THEN** the New-code coverage section does not list that unit as a problem
 
+### Requirement: New-code coverage is restricted to configured scopes
+The report generator SHALL only classify a changed file against a coverage scope (namespace, project, or assembly) that has at least one coverage contract configured in `coverage_summary`. A scope with no configured contract SHALL NOT be reported as `unknown` for that file.
+
+#### Scenario: Unconfigured scope produces no finding
+- **WHEN** the policy defines a namespace-scope coverage contract but no project-scope coverage contract
+- **AND** a changed `.cs` file resolves to a `.csproj`
+- **THEN** the New-code coverage section reports the file's namespace classification but does not report a project-scope finding for that file
+
+#### Scenario: Multiple configured scopes are each evaluated independently
+- **WHEN** the policy configures both namespace-scope and project-scope coverage contracts
+- **AND** a changed file's namespace is covered while its containing project is uncovered
+- **THEN** the New-code coverage section reports both the covered namespace and the uncovered project, rather than stopping at the first matching scope
+
+### Requirement: Diff failures are reported explicitly, not as zero changed files
+When the CI step that computes the changed-files diff fails (e.g. a `git diff`/fetch error), the report generator SHALL render an explicit "diff unavailable" message in the New-code coverage section instead of silently treating the failure as zero changed files.
+
+#### Scenario: Failed diff renders as unavailable
+- **WHEN** the changed-files diff step fails
+- **THEN** the generated Markdown's New-code coverage section states the diff is unavailable
+- **AND** it does not state `Changed first-party files: 0`
+
+#### Scenario: Diff step failure does not silently pass
+- **WHEN** the `Collect changed first-party files` step in `ci.yml` fails
+- **THEN** the step's own outcome reflects failure (it is not suppressed with `|| true`)
+- **AND** that failed outcome is passed to the report generator as `--diff-status failed`
+
 ### Requirement: Sticky PR comment with minimal write permission
 A dedicated `comment` job in `.github/workflows/ci.yml`, separate from the `validate` job that runs build/test/lint code, SHALL post the generated Markdown report as a pull request comment on `pull_request` events, identifying its own prior comment via a hidden marker and updating it in place instead of creating a new comment on subsequent pushes. Only the `comment` job SHALL be granted `pull-requests: write`; the `validate` job SHALL remain `contents: read`.
 

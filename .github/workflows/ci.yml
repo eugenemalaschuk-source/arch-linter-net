@@ -70,17 +70,24 @@ jobs:
           path: architecture-audit.json
 
       - name: Collect changed first-party files
+        id: changed_files
         if: always() && github.event_name == 'pull_request'
+        continue-on-error: true
         run: |
           git diff --name-only --diff-filter=ACMR "origin/${{ github.event.pull_request.base.ref }}"...HEAD \
-            -- '*.cs' ':!*.g.cs' ':!*Designer.cs' > changed-files.txt || true
+            -- '*.cs' ':!*.g.cs' ':!*Designer.cs' > changed-files.txt
 
       - name: Generate architecture coverage report
         if: always()
         run: |
+          DIFF_STATUS="ok"
+          if [ "${{ github.event_name }}" = "pull_request" ] && [ "${{ steps.changed_files.outcome }}" = "failure" ]; then
+            DIFF_STATUS="failed"
+          fi
           UV_PROJECT_ENVIRONMENT="$GITHUB_WORKSPACE/.venv" uv run --project tools/pyproject.toml \
             python tools/scripts/architecture_coverage_report.py architecture-strict.json \
             --changed-files changed-files.txt \
+            --diff-status "$DIFF_STATUS" \
             --repo-root "$GITHUB_WORKSPACE" \
             --output architecture-coverage.md
 
