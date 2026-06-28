@@ -58,8 +58,8 @@ Current limit: `scope: namespace`, `scope: rule_input`, `scope: project`,
 contracts. `scope: dependency_edge` declares `between` (declared-layer-name
 pairs) and classifies observed first-party namespace-to-namespace edges per
 pair as `covered` (governed by an existing dependency, layer, independence,
-or expanded layer-template contract), `excluded`, or `uncovered`. Layer pairs
-absent from every `between` list are not evaluated.
+allow-only, protected, or expanded layer-template contract), `excluded`, or
+`uncovered`. Layer pairs absent from every `between` list are not evaluated.
 
 ## Supported adoption helpers
 

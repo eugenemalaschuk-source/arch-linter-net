@@ -256,8 +256,8 @@ affected by, or folded into, `scope: project`/`scope: assembly` coverage.
 
 `scope: dependency_edge` answers a narrower question than namespace/project/assembly coverage:
 for code that *is* inside a declared layer, is the specific dependency edge between two layers
-actually governed by a layer, independence, or dependency contract — or does it bypass policy
-because no contract happens to mention that layer pair?
+actually governed by a dependency, layer, independence, allow-only, protected, or layer-template
+contract — or does it bypass policy because no contract happens to mention that layer pair?
 
 Each contract declares `between` as a list of declared-layer-name pairs. For every pair, the
 system looks at every observed first-party namespace-to-namespace edge whose source namespace
@@ -297,6 +297,13 @@ A pair is **covered** when any of these already governs it:
   both layer names, in either order — the chain's ordering check governs every pair within it;
 - an independence contract whose `layers` list contains both layer names — independence is
   bidirectional by definition;
+- an allow-only contract whose `source` equals the pair's first layer — an allow-only contract
+  governs the *entire* outbound surface of its source layer, so the pair is covered even if the
+  second layer is not itself in that contract's `allowed` list;
+- a protected contract whose `protected` list contains the pair's second layer — a protected
+  contract governs *every* reference into its protected layer, allowed and disallowed alike, so
+  the pair is covered even if the first layer is not itself in that contract's
+  `allowed_importers` list;
 - an expanded [layer template](layer-templates.md) whose container layers match both declared
   layers' namespace patterns.
 

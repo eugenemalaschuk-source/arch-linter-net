@@ -511,11 +511,14 @@ Dependency-edge coverage (`scope: dependency_edge`) classifies, for each declare
 `between`, observed first-party namespace-to-namespace edges whose source/target namespaces
 resolve to that pair's layers. A pair is `covered` when an existing dependency contract
 (`source`/`forbidden` naming the pair), layer contract (chain containing both layers), independence
-contract (pair listed together), or expanded layer template (container layers matching both names)
-already governs it; otherwise edges in that pair are `uncovered`, unless excluded. Layer pairs not
-declared in any `between` list are simply not evaluated. See
-[Coverage contracts](../contracts/coverage.md#dependency-edge-coverage) for examples and the exact
-governance rule.
+contract (pair listed together), allow-only contract (`source` equals the pair's first layer —
+governs that layer's entire outbound surface regardless of whether the second layer is itself
+`allowed`), protected contract (`protected` contains the pair's second layer — governs every
+reference into that layer regardless of whether the first layer is an `allowed_importer`), or
+expanded layer template (container layers matching both names) already governs it; otherwise edges
+in that pair are `uncovered`, unless excluded. Layer pairs not declared in any `between` list are
+simply not evaluated. See [Coverage contracts](../contracts/coverage.md#dependency-edge-coverage)
+for examples and the exact governance rule.
 
 Current limits:
 
