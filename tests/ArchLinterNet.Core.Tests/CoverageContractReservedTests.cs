@@ -138,10 +138,8 @@ public sealed class CoverageContractReservedTests
 
             contracts:
               strict_coverage:
-                - name: dependency-edge-coverage
-                  scope: dependency_edge
-                  between:
-                    - [a, b]
+                - name: not-yet-implemented-scope-coverage
+                  scope: not_yet_implemented
                   reason: Reserved for a later issue.
             """);
 
@@ -153,7 +151,7 @@ public sealed class CoverageContractReservedTests
             }))!;
 
         Assert.That(ex.Message, Does.Contain(
-            "Only coverage contracts with scope 'namespace', 'rule_input', 'project', or 'assembly' are implemented"));
+            "Only coverage contracts with scope 'namespace', 'rule_input', 'project', 'assembly', or 'dependency_edge' are implemented"));
     }
 
     [Test]

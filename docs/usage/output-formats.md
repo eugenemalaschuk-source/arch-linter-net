@@ -20,7 +20,7 @@ Human output is optimized for readability, not machine parsing.
 
 When enabled and non-empty, supplemental diagnostics are emitted in dedicated sections:
 
-- `Coverage findings:` for namespace and rule-input coverage contracts;
+- `Coverage findings:` for namespace, rule-input, project, assembly, and dependency-edge coverage contracts;
 - `Coverage summary:` for the per-contract coverage counts described in [Coverage contracts](../contracts/coverage.md#coverage-summary) — printed whenever any coverage contract ran, regardless of `analysis.coverage` severity;
 - `Unmatched ignored violations:` for stale baseline/ignore entries;
 - `Policy consistency findings:` for internal contradictions in the policy document.
@@ -30,10 +30,13 @@ Example supplemental section:
 ```text
 Coverage findings:
 - [feature-namespace-coverage] [feature-namespace-coverage] MyApp.Features.Payments -> uncovered namespace: MyApp.Features.Payments.PaymentsRepresentative
+- [layer-edge-coverage] [layer-edge-coverage] MyApp.Cli.Commands -> MyApp.Testing.Fixtures -> uncovered dependency edge: MyApp.Cli.Commands.DeployCommand
 
 Coverage summary:
 - [feature-namespace-coverage] [feature-namespace-coverage] scope: namespace covered=4 excluded=1 uncovered=1 stale=0 unknown=0
     uncovered: MyApp.Features.Payments (MyApp.Features.Payments.PaymentsRepresentative)
+- [layer-edge-coverage] [layer-edge-coverage] scope: dependency_edge covered=1 excluded=0 uncovered=1 stale=0 unknown=0
+    uncovered: MyApp.Cli.Commands -> MyApp.Testing.Fixtures (MyApp.Cli.Commands.DeployCommand)
 ```
 
 ## JSON output
@@ -76,6 +79,13 @@ Example shape:
       "source": "MyApp.Features.Payments",
       "forbidden_namespace": "uncovered namespace",
       "forbidden_references": ["MyApp.Features.Payments.PaymentsRepresentative"]
+    },
+    {
+      "contract": "layer-edge-coverage",
+      "contract_id": "layer-edge-coverage",
+      "source": "MyApp.Cli.Commands -> MyApp.Testing.Fixtures",
+      "forbidden_namespace": "uncovered dependency edge",
+      "forbidden_references": ["MyApp.Cli.Commands.DeployCommand"]
     }
   ],
   "unmatched_ignored_violations": [],
@@ -105,18 +115,30 @@ Example shape:
       ],
       "stale_items": [],
       "unknown_items": []
+    },
+    {
+      "contract": "layer-edge-coverage",
+      "contract_id": "layer-edge-coverage",
+      "scope": "dependency_edge",
+      "counts": { "covered": 1, "excluded": 0, "uncovered": 1, "stale": 0, "unknown": 0 },
+      "excluded_items": [],
+      "uncovered_items": [
+        { "item": "MyApp.Cli.Commands -> MyApp.Testing.Fixtures", "evidence": "MyApp.Cli.Commands.DeployCommand" }
+      ],
+      "stale_items": [],
+      "unknown_items": []
     }
   ]
 }
 ```
 
-Every `coverage_summary` entry always includes `uncovered_items`, `stale_items`, and `unknown_items`; only the array(s) matching the contract's `scope` are ever non-empty (`uncovered_items` for `scope: namespace`; `stale_items`/`unknown_items` for `scope: rule_input`) — they are kept distinct so a `stale` finding can't be mistaken for an `unknown` one or vice versa.
+Every `coverage_summary` entry always includes `uncovered_items`, `stale_items`, and `unknown_items`; only the array(s) matching the contract's `scope` are ever non-empty (`uncovered_items` for `scope: namespace`/`scope: project`/`scope: assembly`/`scope: dependency_edge`; `unknown_items` additionally for `scope: project`; `stale_items`/`unknown_items` for `scope: rule_input`) — they are kept distinct so a `stale` finding can't be mistaken for an `unknown` one or vice versa.
 
 `coverage_summary` is always present as an array (empty when no coverage contracts ran) and is reported independent of `analysis.coverage` severity, since it summarizes state rather than gating the run. See [Coverage contracts — Coverage summary](../contracts/coverage.md#coverage-summary) for the count semantics, including how `scope: rule_input` maps to `stale`/`unknown`.
 
 Behavior for non-violation finding families is controlled separately:
 
-- `analysis.coverage: error|warn|off` controls whether `coverage_findings` fail the run, report without failing, or are suppressed.
+- `analysis.coverage: error|warn|off` controls whether `coverage_findings` fail the run, report without failing, or are suppressed — this applies uniformly across every implemented coverage scope (`namespace`, `rule_input`, `project`, `assembly`, `dependency_edge`), not just namespace/rule-input coverage.
 - `analysis.policy_consistency: error|warn|off` controls whether `policy_consistency_findings` fail the run, report without failing, or are suppressed.
 - `analysis.unmatched_ignored_violations: error|warn|off` controls whether stale ignore entries fail the run, report without failing, or are suppressed.
 

@@ -142,7 +142,8 @@ public static class ArchitectureRunnerFactory
         }
     }
 
-    private static readonly string[] _implementedCoverageScopes = { "namespace", "rule_input", "project", "assembly" };
+    private static readonly string[] _implementedCoverageScopes =
+        { "namespace", "rule_input", "project", "assembly", "dependency_edge" };
 
     private static void ValidateImplementedCoverageScopes(ArchitectureContractDocument document)
     {
@@ -158,8 +159,7 @@ public static class ArchitectureRunnerFactory
 
         string details = string.Join(", ", unsupported.Select(contract => $"{contract.Name} ({contract.Scope})"));
         throw new InvalidOperationException(
-            "Only coverage contracts with scope 'namespace', 'rule_input', 'project', or 'assembly' are " +
-            $"implemented right now. Unsupported coverage contract scopes: {details}. Dependency_edge " +
-            "coverage remains reserved for a follow-up issue.");
+            "Only coverage contracts with scope 'namespace', 'rule_input', 'project', 'assembly', or " +
+            $"'dependency_edge' are implemented right now. Unsupported coverage contract scopes: {details}.");
     }
 }
