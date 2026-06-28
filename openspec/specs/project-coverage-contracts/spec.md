@@ -1,7 +1,7 @@
 # project-coverage-contracts Specification
 
 ## Purpose
-TBD - created by archiving change add-project-assembly-coverage. Update Purpose after archive.
+Detect first-party `.csproj` projects discovered via `analysis.solution`/`analysis.projects` that are not represented by any declared layer, namespace glob, expanded layer template, or explicit exclusion, including projects whose build output could not be resolved to a target assembly, so newly added or renamed projects cannot silently fall outside architecture policy.
 ## Requirements
 ### Requirement: Project coverage contracts classify discovered first-party projects
 The system SHALL execute `strict_coverage` and `audit_coverage` contracts with `scope: project` by classifying every project in `ProjectDiscoveryResult.DiscoveredProjects` as `covered`, `excluded`, `uncovered`, or `unknown`.

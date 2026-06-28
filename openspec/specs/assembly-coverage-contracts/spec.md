@@ -1,7 +1,7 @@
 # assembly-coverage-contracts Specification
 
 ## Purpose
-TBD - created by archiving change add-project-assembly-coverage. Update Purpose after archive.
+Detect resolved first-party assemblies that are not represented by any declared layer, namespace glob, expanded layer template, or explicit exclusion, working from `ArchitectureAnalysisContext.TargetAssemblies` regardless of whether they were resolved explicitly or via project discovery, so a renamed or newly added assembly cannot silently fall outside architecture policy.
 ## Requirements
 ### Requirement: Assembly coverage contracts classify resolved first-party assemblies
 The system SHALL execute `strict_coverage` and `audit_coverage` contracts with `scope: assembly` by classifying every assembly in `ArchitectureAnalysisContext.TargetAssemblies` as `covered`, `excluded`, or `uncovered`.
