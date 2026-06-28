@@ -26,16 +26,19 @@ test-architecture-coverage-report:  ## Run tests for the architecture coverage r
 	@cd "$(PROJECT_ROOT)" && UV_PROJECT_ENVIRONMENT="$(PROJECT_ROOT)/.venv" "$(UV)" run --project tools/pyproject.toml \
 		pytest tools/scripts/tests/test_architecture_coverage_report.py
 
-architecture-coverage-report:  ## Show full-solution architecture coverage report locally (human-readable + JSON)
+architecture-coverage-report:  ## Show full-solution architecture coverage report locally (Markdown + JSON)
 	@dotnet build "$(PROJECT_ROOT)/src/ArchLinterNet.Cli/ArchLinterNet.Cli.csproj" --nologo -v minimal
 	@dotnet build "$(PROJECT_ROOT)/src/ArchLinterNet.Testing/ArchLinterNet.Testing.csproj" --nologo -v minimal
 	@dotnet build "$(PROJECT_ROOT)/src/ArchLinterNet.Unity/ArchLinterNet.Unity.csproj" --nologo -v minimal
-	@echo ""
-	@echo "===== Architecture coverage report (human-readable) ====="
-	@dotnet run --no-build --project "$(PROJECT_ROOT)/src/ArchLinterNet.Cli" -- \
-		--policy "$(PROJECT_ROOT)/architecture/dependencies.arch.yml" --mode strict || true
-	@echo ""
-	@echo "===== Architecture coverage report (JSON) ====="
 	@dotnet run --no-build --project "$(PROJECT_ROOT)/src/ArchLinterNet.Cli" -- \
 		--policy "$(PROJECT_ROOT)/architecture/dependencies.arch.yml" --mode strict --format json \
-		| python3 -m json.tool || true
+		> "$(PROJECT_ROOT)/architecture-coverage.local.json" || true
+	@echo ""
+	@echo "===== Architecture coverage report (Markdown) ====="
+	@cd "$(PROJECT_ROOT)" && UV_PROJECT_ENVIRONMENT="$(PROJECT_ROOT)/.venv" "$(UV)" run --project tools/pyproject.toml \
+		python tools/scripts/architecture_coverage_report.py architecture-coverage.local.json \
+		--output architecture-coverage.local.md
+	@cat "$(PROJECT_ROOT)/architecture-coverage.local.md"
+	@echo ""
+	@echo "===== Architecture coverage report (JSON) ====="
+	@python3 -m json.tool < "$(PROJECT_ROOT)/architecture-coverage.local.json"
