@@ -613,6 +613,30 @@ public sealed partial class ArchitectureContractRunner
             return true;
         }
 
+        // An allow-only contract governs the entire outbound surface of its source layer —
+        // every reference out of that layer is either explicitly allowed or a violation —
+        // so it governs (A, B) regardless of whether B is itself in the allowed list.
+        bool governedByAllowOnlyContract = _document.Contracts.StrictAllowOnly
+            .Concat(_document.Contracts.AuditAllowOnly)
+            .Any(allowOnly => string.Equals(allowOnly.Source, sourceLayer, StringComparison.Ordinal));
+
+        if (governedByAllowOnlyContract)
+        {
+            return true;
+        }
+
+        // A protected contract governs every reference into its protected layer — allowed
+        // importers are exempted by the contract itself, non-allowed importers are violations —
+        // so it governs (A, B) whenever B is protected, regardless of A's importer status.
+        bool governedByProtectedContract = _document.Contracts.StrictProtected
+            .Concat(_document.Contracts.AuditProtected)
+            .Any(protectedContract => protectedContract.Protected.Contains(targetLayer, StringComparer.Ordinal));
+
+        if (governedByProtectedContract)
+        {
+            return true;
+        }
+
         ArchitectureCoverageInventory inventory = _session.BuildCoverageInventory(_document);
 
         return inventory.ExpandedLayerTemplates.Any(template =>

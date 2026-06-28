@@ -45,6 +45,36 @@ namespace ArchLinterNet.Core.Tests.DependencyEdgeCoverageFixtures.DependencyGove
     }
 }
 
+namespace ArchLinterNet.Core.Tests.DependencyEdgeCoverageFixtures.AllowOnlyGoverned
+{
+    internal sealed class AllowOnlyGovernedSourceType
+    {
+        public ArchLinterNet.Core.Tests.DependencyEdgeCoverageFixtures.AllowOnlyGovernedTarget.AllowOnlyGovernedTargetType? Reference;
+    }
+}
+
+namespace ArchLinterNet.Core.Tests.DependencyEdgeCoverageFixtures.AllowOnlyGovernedTarget
+{
+    internal sealed class AllowOnlyGovernedTargetType
+    {
+    }
+}
+
+namespace ArchLinterNet.Core.Tests.DependencyEdgeCoverageFixtures.ProtectedGoverned
+{
+    internal sealed class ProtectedGovernedSourceType
+    {
+        public ArchLinterNet.Core.Tests.DependencyEdgeCoverageFixtures.ProtectedGovernedTarget.ProtectedGovernedTargetType? Reference;
+    }
+}
+
+namespace ArchLinterNet.Core.Tests.DependencyEdgeCoverageFixtures.ProtectedGovernedTarget
+{
+    internal sealed class ProtectedGovernedTargetType
+    {
+    }
+}
+
 namespace ArchLinterNet.Core.Tests.DependencyEdgeCoverageFixtures.Uncovered
 {
     internal sealed class UncoveredSourceType

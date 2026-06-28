@@ -361,6 +361,10 @@ public static class ArchitectureContractLoader
             }
         }
 
+        HashSet<string> declaredPairs = new(
+            contract.Between.Select(pair => $"{pair[0]}→{pair[1]}"),
+            StringComparer.Ordinal);
+
         for (int i = 0; i < contract.Exclude.Count; i++)
         {
             ArchitectureCoverageExclusion exclusion = contract.Exclude[i];
@@ -377,6 +381,17 @@ public static class ArchitectureContractLoader
                     $"Dependency-edge coverage contract '{contract.Name}' has an exclusion at index {i} without a 'between' pair of two non-empty declared layer names. Dependency-edge coverage exclusions must declare 'between'.");
             }
 
+            if (!string.IsNullOrWhiteSpace(exclusion.Namespace)
+                || !string.IsNullOrWhiteSpace(exclusion.NamespaceSuffix)
+                || !string.IsNullOrWhiteSpace(exclusion.Project)
+                || !string.IsNullOrWhiteSpace(exclusion.Assembly)
+                || !string.IsNullOrWhiteSpace(exclusion.ContractId))
+            {
+                throw new InvalidOperationException(
+                    $"Dependency-edge coverage contract '{contract.Name}' has an exclusion at index {i} using namespace/namespace_suffix/project/assembly/contract_id fields. " +
+                    "Dependency-edge coverage exclusions must use 'between' only — those other matchers belong to other coverage scopes and an exclusion always suppresses the whole declared pair regardless of any other field.");
+            }
+
             foreach (string layerName in exclusion.Between)
             {
                 if (!document.Layers.ContainsKey(layerName))
@@ -384,6 +399,15 @@ public static class ArchitectureContractLoader
                     throw new InvalidOperationException(
                         $"Dependency-edge coverage contract '{contract.Name}' has an exclusion at index {i} referencing undeclared layer '{layerName}'.");
                 }
+            }
+
+            string excludedPairKey = $"{exclusion.Between[0]}→{exclusion.Between[1]}";
+            if (!declaredPairs.Contains(excludedPairKey))
+            {
+                throw new InvalidOperationException(
+                    $"Dependency-edge coverage contract '{contract.Name}' has an exclusion at index {i} for pair " +
+                    $"[{exclusion.Between[0]}, {exclusion.Between[1]}] that is not declared in this contract's own 'between' list. " +
+                    "An exclusion can only narrow a pair this contract already classifies.");
             }
         }
     }

@@ -85,15 +85,15 @@ In human output, findings appear in a separate `Coverage findings:` section. In 
 
 Alongside the raw findings, `validate` reports a deterministic coverage summary for every coverage contract that ran, independent of `analysis.coverage` severity (it is reported even when `coverage: warn` or `coverage: off`). The summary buckets each in-scope item into exactly one of five counts:
 
-| Count | `scope: namespace` meaning | `scope: rule_input` meaning |
-|-------|------------------------------|------------------------------|
-| `covered` | namespace matched a declared layer, namespace-glob layer, or expanded layer template | referenced layer exists and currently matches code |
-| `excluded` | namespace matched an `exclude` rule | referenced contract ID matched an `exclude` rule |
-| `uncovered` | namespace matched none of the above (`"uncovered namespace"` finding) | always `0` — this scope reports `stale`/`unknown` instead |
-| `stale` | always `0` — this scope reports `uncovered` instead | referenced layer exists but currently matches zero namespaces (`"empty-input"` finding) |
-| `unknown` | always `0` | referenced field names a layer that isn't declared at all (`"unresolved"` finding) |
+| Count | `scope: namespace` | `scope: project`/`scope: assembly` | `scope: dependency_edge` | `scope: rule_input` |
+|-------|---------------------|-------------------------------------|---------------------------|------------------------|
+| `covered` | namespace matched a declared layer, namespace-glob layer, or expanded layer template | project/assembly has at least one matching type | observed edge's pair is governed by an existing dependency, layer, independence, or expanded-template contract | referenced layer exists and currently matches code |
+| `excluded` | namespace matched an `exclude` rule | project/assembly matched an `exclude` rule | observed edge's pair matched an `exclude` rule | referenced contract ID matched an `exclude` rule |
+| `uncovered` | namespace matched none of the above (`"uncovered namespace"` finding) | no matching type found (`"uncovered project"`/`"uncovered assembly"` finding) | pair is not governed and not excluded (`"uncovered dependency edge"` finding) | always `0` — this scope reports `stale`/`unknown` instead |
+| `stale` | always `0` — this scope reports `uncovered` instead | always `0` | always `0` | referenced layer exists but currently matches zero namespaces (`"empty-input"` finding) |
+| `unknown` | always `0` | `scope: project` only — discovered project could not be resolved to a target assembly (`"unresolved project"` finding); always `0` for `scope: assembly` | always `0` | referenced field names a layer that isn't declared at all (`"unresolved"` finding) |
 
-Each excluded item is reported with its `reason` text from the contract's `exclude` entry. Each uncovered/stale/unknown item is reported with evidence — a representative type for namespace coverage, or the dangling/empty layer name for rule-input coverage — and is kept in a bucket-specific list (`uncovered_items` for namespace coverage, `stale_items`/`unknown_items` for rule-input coverage) rather than a single combined list, since `stale` and `unknown` mean different things and must stay distinguishable by a reviewer or downstream tooling.
+Each excluded item is reported with its `reason` text from the contract's `exclude` entry. Each uncovered/stale/unknown item is reported with evidence — a representative type for namespace/project/assembly coverage, the source/target namespace pair plus a representative source type for dependency-edge coverage, or the dangling/empty layer name for rule-input coverage — and is kept in a bucket-specific list (`uncovered_items` for namespace/project/assembly/dependency-edge coverage, `unknown_items` additionally for project coverage, `stale_items`/`unknown_items` for rule-input coverage) rather than a single combined list, since `stale` and `unknown` mean different things and must stay distinguishable by a reviewer or downstream tooling.
 
 In human output, the summary appears in a `Coverage summary:` section, one line per contract, after `Coverage findings:`, with each evidence sub-line explicitly labeled `uncovered:`, `stale:`, or `unknown:`:
 
@@ -106,7 +106,7 @@ Coverage summary:
     unknown: typo-rule (does_not_exist_layer)
 ```
 
-In JSON output, the summary appears as a top-level `coverage_summary` array, additive to (not nested inside) `coverage_findings`. Every entry always includes all three evidence arrays (`uncovered_items`, `stale_items`, `unknown_items`); only the ones relevant to the contract's scope are ever non-empty — namespace coverage only populates `uncovered_items`, rule-input coverage only populates `stale_items`/`unknown_items`:
+In JSON output, the summary appears as a top-level `coverage_summary` array, additive to (not nested inside) `coverage_findings`. Every entry always includes all three evidence arrays (`uncovered_items`, `stale_items`, `unknown_items`); only the ones relevant to the contract's scope are ever non-empty — namespace, project, assembly, and dependency-edge coverage populate `uncovered_items` (project coverage additionally populates `unknown_items` for unresolved projects), rule-input coverage only populates `stale_items`/`unknown_items`:
 
 ```json
 {

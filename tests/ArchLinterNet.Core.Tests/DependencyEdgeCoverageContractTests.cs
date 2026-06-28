@@ -21,6 +21,8 @@ public sealed class DependencyEdgeCoverageContractTests
         List<ArchitectureLayerContract>? layerContracts = null,
         List<ArchitectureIndependenceContract>? independenceContracts = null,
         List<ArchitectureLayerTemplateContract>? layerTemplateContracts = null,
+        List<ArchitectureAllowOnlyContract>? allowOnlyContracts = null,
+        List<ArchitectureProtectedContract>? protectedContracts = null,
         List<ArchitectureCoverageContract>? extraCoverageContracts = null)
     {
         ArchitectureContractDocument document = new()
@@ -38,6 +40,8 @@ public sealed class DependencyEdgeCoverageContractTests
                 StrictLayers = layerContracts ?? new List<ArchitectureLayerContract>(),
                 StrictIndependence = independenceContracts ?? new List<ArchitectureIndependenceContract>(),
                 StrictLayerTemplates = layerTemplateContracts ?? new List<ArchitectureLayerTemplateContract>(),
+                StrictAllowOnly = allowOnlyContracts ?? new List<ArchitectureAllowOnlyContract>(),
+                StrictProtected = protectedContracts ?? new List<ArchitectureProtectedContract>(),
                 StrictCoverage = new List<ArchitectureCoverageContract> { coverageContract }
                     .Concat(extraCoverageContracts ?? new List<ArchitectureCoverageContract>())
                     .ToList(),
@@ -198,6 +202,86 @@ public sealed class DependencyEdgeCoverageContractTests
                     },
                     Reason = "fixture",
                 },
+            });
+
+        List<ArchitectureViolation> findings = runner.CheckCoverageContract(contract);
+        ArchitectureCoverageSummary? summary = runner.BuildCoverageSummary(contract);
+
+        Assert.That(findings, Is.Empty);
+        Assert.That(summary!.Counts.Covered, Is.EqualTo(1));
+    }
+
+    [Test]
+    public void DependencyEdgeCoverage_PairGovernedByAllowOnlyContract_IsCovered()
+    {
+        // An allow-only contract governs the ENTIRE outbound surface of its source layer —
+        // every reference out of "source" is either explicitly allowed or a violation — so the
+        // pair is covered even though "target" is not itself listed in `allowed`.
+        string source = $"{NsPrefix}.AllowOnlyGoverned";
+        string target = $"{NsPrefix}.AllowOnlyGovernedTarget";
+
+        Dictionary<string, ArchitectureLayer> layers = new()
+        {
+            ["source"] = new ArchitectureLayer { Namespace = source },
+            ["target"] = new ArchitectureLayer { Namespace = target },
+            ["other"] = new ArchitectureLayer { Namespace = $"{NsPrefix}.LayerGoverned" },
+        };
+
+        ArchitectureCoverageContract contract = new()
+        {
+            Id = "dependency-edge-coverage",
+            Name = "dependency-edge-coverage",
+            Scope = "dependency_edge",
+            Between = new List<List<string>> { new() { "source", "target" } },
+            Reason = "Observed edges must be governed by a declared contract.",
+        };
+
+        ArchitectureContractRunner runner = CreateRunner(
+            contract,
+            layers,
+            allowOnlyContracts: new List<ArchitectureAllowOnlyContract>
+            {
+                new() { Name = "allow-only", Source = "source", Allowed = new List<string> { "other" }, Reason = "fixture" },
+            });
+
+        List<ArchitectureViolation> findings = runner.CheckCoverageContract(contract);
+        ArchitectureCoverageSummary? summary = runner.BuildCoverageSummary(contract);
+
+        Assert.That(findings, Is.Empty);
+        Assert.That(summary!.Counts.Covered, Is.EqualTo(1));
+    }
+
+    [Test]
+    public void DependencyEdgeCoverage_PairGovernedByProtectedContract_IsCovered()
+    {
+        // A protected contract governs every reference INTO its protected layer — allowed
+        // importers are exempted by the contract itself, non-allowed importers are violations —
+        // so the pair is covered even though "source" is not itself an allowed importer.
+        string source = $"{NsPrefix}.ProtectedGoverned";
+        string target = $"{NsPrefix}.ProtectedGovernedTarget";
+
+        Dictionary<string, ArchitectureLayer> layers = new()
+        {
+            ["source"] = new ArchitectureLayer { Namespace = source },
+            ["target"] = new ArchitectureLayer { Namespace = target },
+            ["importer"] = new ArchitectureLayer { Namespace = $"{NsPrefix}.LayerGoverned" },
+        };
+
+        ArchitectureCoverageContract contract = new()
+        {
+            Id = "dependency-edge-coverage",
+            Name = "dependency-edge-coverage",
+            Scope = "dependency_edge",
+            Between = new List<List<string>> { new() { "source", "target" } },
+            Reason = "Observed edges must be governed by a declared contract.",
+        };
+
+        ArchitectureContractRunner runner = CreateRunner(
+            contract,
+            layers,
+            protectedContracts: new List<ArchitectureProtectedContract>
+            {
+                new() { Name = "protected", Protected = new List<string> { "target" }, AllowedImporters = new List<string> { "importer" }, Reason = "fixture" },
             });
 
         List<ArchitectureViolation> findings = runner.CheckCoverageContract(contract);

@@ -155,6 +155,77 @@ public sealed class DependencyEdgeCoverageValidationTests
         Assert.That(ex.Message, Does.Contain("Dependency-edge coverage exclusions must declare 'between'"));
     }
 
+    [Test]
+    public void DependencyEdgeCoverage_ExclusionWithNamespaceField_ThrowsActionableError()
+    {
+        string policyPath = WritePolicy($"""
+            version: 1
+            name: Test
+
+            layers:
+              source:
+                namespace: {FixtureRoot}.Uncovered
+              target:
+                namespace: {FixtureRoot}.UncoveredTarget
+
+            analysis:
+              target_assemblies: [{AssemblyName}]
+
+            contracts:
+              strict_coverage:
+                - name: dependency-edge-coverage
+                  scope: dependency_edge
+                  between:
+                    - [source, target]
+                  exclude:
+                    - between: [source, target]
+                      namespace: {FixtureRoot}.Uncovered.Generated
+                      reason: Attempting a narrower exclusion than the scope supports.
+                  reason: Invalid dependency-edge coverage contract.
+            """);
+
+        InvalidOperationException ex = Assert.Throws<InvalidOperationException>(() =>
+            ArchitectureContractLoader.LoadFromPath(policyPath))!;
+
+        Assert.That(ex.Message, Does.Contain("Dependency-edge coverage exclusions must use 'between' only"));
+    }
+
+    [Test]
+    public void DependencyEdgeCoverage_ExclusionPairNotDeclaredInBetween_ThrowsActionableError()
+    {
+        string policyPath = WritePolicy($"""
+            version: 1
+            name: Test
+
+            layers:
+              source:
+                namespace: {FixtureRoot}.Uncovered
+              target:
+                namespace: {FixtureRoot}.UncoveredTarget
+              other:
+                namespace: {FixtureRoot}.LayerGoverned
+
+            analysis:
+              target_assemblies: [{AssemblyName}]
+
+            contracts:
+              strict_coverage:
+                - name: dependency-edge-coverage
+                  scope: dependency_edge
+                  between:
+                    - [source, target]
+                  exclude:
+                    - between: [source, other]
+                      reason: This pair is not declared in this contract's own between list.
+                  reason: Invalid dependency-edge coverage contract.
+            """);
+
+        InvalidOperationException ex = Assert.Throws<InvalidOperationException>(() =>
+            ArchitectureContractLoader.LoadFromPath(policyPath))!;
+
+        Assert.That(ex.Message, Does.Contain("not declared in this contract's own 'between' list"));
+    }
+
     private string BuildPolicy(string coverageGroup, string? analysisCoverage = null)
     {
         string coverageSetting = analysisCoverage is null
