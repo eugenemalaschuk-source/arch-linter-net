@@ -53,9 +53,13 @@ Coverage findings also honor `analysis.coverage`:
 - `warn`: findings are reported but do not fail validation;
 - `off`: findings are suppressed.
 
-Current limit: `scope: namespace`, `scope: rule_input`, `scope: project`, and
-`scope: assembly` are implemented for coverage contracts. `scope: dependency_edge`
-remains reserved and must fail validation if authored today.
+Current limit: `scope: namespace`, `scope: rule_input`, `scope: project`,
+`scope: assembly`, and `scope: dependency_edge` are implemented for coverage
+contracts. `scope: dependency_edge` declares `between` (declared-layer-name
+pairs) and classifies observed first-party namespace-to-namespace edges per
+pair as `covered` (governed by an existing dependency, layer, independence,
+or expanded layer-template contract), `excluded`, or `uncovered`. Layer pairs
+absent from every `between` list are not evaluated.
 
 ## Supported adoption helpers
 
