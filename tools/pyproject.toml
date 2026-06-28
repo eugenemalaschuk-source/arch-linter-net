@@ -9,5 +9,10 @@ dependencies = [
     "mdformat>=0.7",
 ]
 
+[dependency-groups]
+dev = [
+    "pytest>=8.0",
+]
+
 [tool.uv]
 package = false

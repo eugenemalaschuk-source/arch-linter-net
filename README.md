@@ -1,5 +1,8 @@
 # ArchLinterNet
 
+[![CI](https://github.com/eugenemalaschuk-source/arch-linter-net/actions/workflows/ci.yml/badge.svg)](https://github.com/eugenemalaschuk-source/arch-linter-net/actions/workflows/ci.yml)
+[![Architecture coverage](https://github.com/eugenemalaschuk-source/arch-linter-net/actions/workflows/architecture-coverage.yml/badge.svg)](https://github.com/eugenemalaschuk-source/arch-linter-net/actions/workflows/architecture-coverage.yml)
+
 Declarative architecture contracts and dependency linting for .NET repositories.
 
 ArchLinterNet helps teams keep architecture boundaries executable: define a YAML policy, run it locally or in CI, and catch dependency drift before it becomes hidden design debt.

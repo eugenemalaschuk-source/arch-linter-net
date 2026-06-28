@@ -87,6 +87,15 @@ For existing repositories with known debt:
 
 The baseline should be reviewed like code and cleaned up as violations are fixed.
 
+## Baseline debt semantics in the coverage gate
+
+When architecture coverage is wired into CI as a quality gate (see this repository's `.github/workflows/architecture-coverage.yml`), baseline entries change how findings are reported, not whether they exist:
+
+- **Existing accepted debt** lives in the baseline file and does not fail the pull request. The strict run still reports it in `coverage_findings`/`coverage_summary`, but a finding matched by a baseline entry is treated as known debt rather than a regression.
+- **New coverage findings** — anything not matched by an existing baseline entry — fail the pull request. This is what keeps the gate "no new debt" instead of "no debt."
+- **Resolved baseline entries** become stale: once the underlying violation no longer exists, the baseline entry has nothing left to match. Stale baseline entries should be removed during normal maintenance so the baseline file reflects only real outstanding debt.
+- **Exclusions require a `reason`.** An exclusion is a deliberate, reviewed decision to leave a unit out of coverage scope — it is not a way to silently bypass the gate. Treat the `reason` field as required documentation, not boilerplate, and review exclusions the same way you'd review a baseline entry.
+
 ## Azure Pipelines example
 
 ```yaml

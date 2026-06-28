@@ -1,4 +1,4 @@
-.PHONY: lint lint-architecture audit-architecture lint-code-size lint-dotnet-format
+.PHONY: lint lint-architecture audit-architecture lint-code-size lint-dotnet-format test-architecture-coverage-report
 
 lint: lint-code-size lint-dotnet-format lint-architecture lint-docs  ## Run all code quality checks
 
@@ -21,3 +21,7 @@ lint-code-size:  ## Size lint for C# and documentation files
 
 lint-dotnet-format:  ## Verify C# formatting without changing files
 	@dotnet format "$(SLNX)" --verify-no-changes --verbosity minimal
+
+test-architecture-coverage-report:  ## Run tests for the architecture coverage report generator
+	@cd "$(PROJECT_ROOT)" && UV_PROJECT_ENVIRONMENT="$(PROJECT_ROOT)/.venv" "$(UV)" run --project tools/pyproject.toml \
+		pytest tools/scripts/tests/test_architecture_coverage_report.py

@@ -1,0 +1,125 @@
+name: Architecture coverage
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  coverage:
+    name: Architecture coverage
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Setup uv
+        uses: astral-sh/setup-uv@v5
+
+      - name: Restore
+        run: make restore
+
+      - name: Build CLI
+        run: dotnet build src/ArchLinterNet.Cli/ArchLinterNet.Cli.csproj --no-restore --nologo -v minimal
+
+      - name: Run strict architecture coverage
+        id: strict
+        continue-on-error: true
+        run: |
+          dotnet run --no-build --project src/ArchLinterNet.Cli -- \
+            --policy architecture/dependencies.arch.yml --mode strict --format json \
+            > architecture-strict.json
+
+      - name: Run audit architecture coverage
+        if: always()
+        continue-on-error: true
+        run: |
+          dotnet run --no-build --project src/ArchLinterNet.Cli -- \
+            --policy architecture/dependencies.arch.yml --mode audit --format json \
+            > architecture-audit.json
+
+      - name: Upload strict diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: architecture-strict
+          path: architecture-strict.json
+
+      - name: Upload audit diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: architecture-audit
+          path: architecture-audit.json
+
+      - name: Collect changed first-party files
+        if: always() && github.event_name == 'pull_request'
+        run: |
+          git diff --name-only --diff-filter=ACMR "origin/${{ github.event.pull_request.base.ref }}"...HEAD \
+            -- '*.cs' ':!*.g.cs' ':!*Designer.cs' > changed-files.txt || true
+
+      - name: Generate coverage report
+        if: always()
+        run: |
+          UV_PROJECT_ENVIRONMENT="$GITHUB_WORKSPACE/.venv" uv run --project tools/pyproject.toml \
+            python tools/scripts/architecture_coverage_report.py architecture-strict.json \
+            --changed-files changed-files.txt \
+            --repo-root "$GITHUB_WORKSPACE" \
+            --output architecture-coverage.md
+
+      - name: Upload coverage report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: architecture-coverage-report
+          path: architecture-coverage.md
+
+      - name: Comment on pull request
+        if: always() && github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const marker = '<!-- architecture-coverage-report -->';
+            const body = `${marker}\n${fs.readFileSync('architecture-coverage.md', 'utf8')}`;
+
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+            });
+
+            const existing = comments.find((comment) => comment.body && comment.body.includes(marker));
+
+            if (existing) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: existing.id,
+                body,
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                body,
+              });
+            }
+
+      - name: Fail if strict architecture coverage failed
+        if: steps.strict.outcome == 'failure'
+        run: exit 1
