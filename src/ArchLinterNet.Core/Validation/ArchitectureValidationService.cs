@@ -81,7 +81,8 @@ public static class ArchitectureValidationService
                     request.PreprocessorSymbols,
                     selectedIds,
                     enableUnmatchedIgnoreTracking,
-                    timing);
+                    timing,
+                    request.Mode);
             }
 
             ArchitectureContractRunner runner = setup.Runner;

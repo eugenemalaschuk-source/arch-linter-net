@@ -416,12 +416,13 @@ report references from source types into those vendor/framework surfaces.
 
 ### Coverage contract
 
-Current runtime support covers `scope: namespace` and `scope: rule_input`.
+Current runtime support covers `scope: namespace`, `scope: rule_input`, `scope: project`, and
+`scope: assembly`.
 
 ```yaml
 - id: <string>                  # Optional — stable identifier
   name: <string>                # Required — human-readable contract name
-  scope: namespace              # Required — namespace | rule_input
+  scope: namespace              # Required — namespace | rule_input | project | assembly
   roots:                        # Required for scope: namespace — one or more namespace matchers
     - namespace: <string>       # Required — literal prefix or constrained glob
       namespace_suffix: <string>  # Optional — same semantics as layers.<name>.namespace_suffix
@@ -431,10 +432,16 @@ Current runtime support covers `scope: namespace` and `scope: rule_input`.
     - namespace: <string>       # Optional — namespace matcher (scope: namespace only)
       namespace_suffix: <string>  # Optional — suffix-only matcher or refinement (scope: namespace only)
       contract_id: <string>     # Optional — referenced contract ID (scope: rule_input only)
+      project: <string>         # Optional — discovered project path or file name (scope: project only)
+      assembly: <string>        # Optional — assembly simple name (scope: assembly only)
       reason: <string>          # Required when exclude entry exists
   ignored_violations: []        # Optional — baseline accepted coverage debt
   reason: <string>              # Recommended — why this coverage gate exists
 ```
+
+`scope: project` and `scope: assembly` declare neither `roots` nor `between`/`contract_ids`; they
+classify every project/assembly discovered or resolved for the run. `scope: project` additionally
+requires `analysis.solution` or `analysis.projects` to be set.
 
 Namespace coverage (`scope: namespace`) checks first-party namespaces
 discovered in the analysis inventory and reports any namespace under `roots`
@@ -488,11 +495,17 @@ contracts:
       reason: Flag rules whose source/target layers stop matching any code.
 ```
 
+Project coverage (`scope: project`) and assembly coverage (`scope: assembly`) classify discovered
+projects or resolved first-party assemblies using the same coverage-provider rule (layer,
+namespace-glob layer, or expanded layer-template layer match) as namespace coverage, but at the
+project/assembly granularity instead of the namespace granularity. See
+[Coverage contracts](../contracts/coverage.md#project-and-assembly-coverage) for examples and
+exclusion semantics.
+
 Current limits:
 
-- `scope: namespace` and `scope: rule_input` are implemented.
-- `scope: project`, `scope: assembly`, and `scope: dependency_edge` are
-  reserved and fail validation with an actionable error.
+- `scope: namespace`, `scope: rule_input`, `scope: project`, and `scope: assembly` are implemented.
+- `scope: dependency_edge` is reserved and fails validation with an actionable error.
 - Coverage findings are emitted as a separate coverage section in human output
   and `coverage_findings` array in JSON output.
 

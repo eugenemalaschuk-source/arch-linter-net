@@ -29,7 +29,7 @@ The policy file is usually `architecture/dependencies.arch.yml` and contains:
 | Protected surface | `strict_protected` | `audit_protected` | Protected layers are referenced only by explicitly allowed importers. |
 | External dependency | `strict_external` | `audit_external` | Source layer does not reference forbidden vendor/framework dependency groups. |
 | Layer template | `strict_layer_templates` | `audit_layer_templates` | Reusable layer order applied to multiple containers. |
-| Namespace coverage | `strict_coverage` | `audit_coverage` | First-party namespaces under configured roots are covered by a layer, template expansion, or explicit exclusion. |
+| Coverage | `strict_coverage` | `audit_coverage` | First-party namespaces, discovered projects, and resolved assemblies are covered by a layer, template expansion, or explicit exclusion. |
 
 ## Matching semantics
 
@@ -47,15 +47,15 @@ Layer `namespace` also supports constrained glob patterns using `*` as a full na
 
 Strict contracts are blocking rules for current no-new-debt gates. Audit contracts are diagnostic rules for discovery, future-state architecture, and migration planning.
 
-Namespace coverage findings also honor `analysis.coverage`:
+Coverage findings also honor `analysis.coverage`:
 
 - `error`: findings fail validation;
 - `warn`: findings are reported but do not fail validation;
 - `off`: findings are suppressed.
 
-Current limit: only `scope: namespace` is implemented for coverage contracts.
-`project`, `assembly`, `dependency_edge`, and `rule_input` remain reserved and
-must fail validation if authored today.
+Current limit: `scope: namespace`, `scope: rule_input`, `scope: project`, and
+`scope: assembly` are implemented for coverage contracts. `scope: dependency_edge`
+remains reserved and must fail validation if authored today.
 
 ## Supported adoption helpers
 

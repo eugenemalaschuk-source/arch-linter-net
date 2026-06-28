@@ -197,14 +197,72 @@ Rules:
 - rule-input coverage exclusions must use `contract_id` and suppress both `unresolved` and `empty-input` findings for that referenced contract;
 - exclusions are the right place for generated code, temporary migration debt, intentionally unused rules, or known framework-produced namespaces that should not become layers.
 
+## Project and assembly coverage
+
+`scope: project` and `scope: assembly` detect first-party `.csproj` projects or resolved
+assemblies that have no code matching any declared layer, namespace-glob layer, or expanded
+layer-template layer — the same coverage-provider rule namespace coverage uses, just applied to a
+whole project/assembly instead of a namespace. Use these scopes when you want to catch a project
+or assembly that was added to the solution (or renamed) but never wired into any layer at all,
+something namespace coverage cannot see if nobody rooted it.
+
+Neither scope declares `roots`; they classify every unit discovered/resolved for the run.
+
+```yaml
+analysis:
+  solution: MyApp.slnx
+  coverage: error
+
+contracts:
+  strict_coverage:
+    - id: project-coverage
+      name: project-coverage
+      scope: project
+      exclude:
+        - project: samples/Demo/Demo.csproj
+          reason: Sample project is intentionally out of architecture scope.
+      reason: Every discovered project must be mapped to a layer or explicitly excluded.
+
+    - id: assembly-coverage
+      name: assembly-coverage
+      scope: assembly
+      exclude:
+        - assembly: MyApp.TestUtilities
+          reason: Test-only helper assembly.
+      reason: Every resolved assembly must be mapped to a layer or explicitly excluded.
+```
+
+`scope: project` requires `analysis.solution` or `analysis.projects` to be set, since discovered
+projects (path, assembly name, target frameworks) are the units it classifies — see
+`analysis.solution`/`analysis.projects` in the
+[YAML schema reference](../reference/yaml-schema.md) for how those are resolved. `scope: assembly`
+has no such requirement: it classifies `ArchitectureAnalysisContext`'s resolved first-party
+assemblies, which exist whether they came from explicit `analysis.target_assemblies` or from
+discovery.
+
+A discovered project that cannot be resolved to one of the run's target assemblies (filtered out,
+missing/stale build output, ambiguous multi-target selection) is classified `unknown`, not
+`uncovered` — it produces an `"unresolved project"` finding naming the project path and the
+assembly name discovery expected, rather than asserting the project's code is unmapped.
+
+Exclusions use `exclude[].project` (matched against the discovered project's repository-relative
+path or its file name, exact match) or `exclude[].assembly` (matched against the assembly's simple
+name, ordinal), each with a required `reason`. Unlike namespace coverage, `project`/`assembly`
+exclusions do not support glob matching.
+
+`.asmdef` contracts (the Unity assembly-definition checks documented in
+[asmdef contracts](asmdef.md)) are a separate mechanism with their own identity model and are not
+affected by, or folded into, `scope: project`/`scope: assembly` coverage.
+
 ## Current limits
 
 Coverage support is intentionally narrow in the current product surface:
 
-- `scope: namespace` and `scope: rule_input` are implemented;
-- `scope: project`, `scope: assembly`, and `scope: dependency_edge` are reserved and currently fail validation;
+- `scope: namespace`, `scope: rule_input`, `scope: project`, and `scope: assembly` are implemented;
+- `scope: dependency_edge` is reserved and currently fails validation;
 - namespace coverage roots must use `roots[].namespace`;
 - discovery-style fields such as `include` and `exclude` are not valid on namespace coverage roots;
-- rule-input coverage contracts must use `contract_ids` and must not declare `roots` or `between`.
+- rule-input coverage contracts must use `contract_ids` and must not declare `roots` or `between`;
+- `scope: project`/`scope: assembly` contracts must not declare `roots`, `between`, or `contract_ids`.
 
 For the YAML contract shape, see [YAML schema reference](../reference/yaml-schema.md#coverage-contract).
