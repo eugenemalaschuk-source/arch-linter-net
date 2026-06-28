@@ -409,4 +409,67 @@ public sealed class CoverageContractReservedTests
 
         Assert.That(ex.Message, Does.Contain("analysis.coverage"));
     }
+
+    [Test]
+    public void AuditAssemblyCoverage_WarnSeverity_ReportsWithoutFailing()
+    {
+        string policyPath = WritePolicy("""
+            version: 1
+            name: Test
+
+            analysis:
+              target_assemblies: [ArchLinterNet.Core]
+              coverage: warn
+
+            contracts:
+              audit_coverage:
+                - name: assembly-coverage
+                  scope: assembly
+                  reason: Every first-party assembly must be mapped or excluded.
+            """);
+
+        ValidationOutcome outcome = ArchitectureValidationService.Validate(new ValidationRequest
+        {
+            PolicyPath = policyPath,
+            Mode = "audit"
+        });
+
+        Assert.That(outcome.Passed, Is.True);
+        Assert.That(outcome.CoverageConfig, Is.EqualTo("warn"));
+        Assert.That(outcome.CoverageFindings.Single().ForbiddenNamespace, Is.EqualTo("uncovered assembly"));
+    }
+
+    [Test]
+    public void StrictMode_WithOnlyAuditProjectCoverageDeclared_DoesNotFailStrictGate()
+    {
+        string projectDir = Path.Combine(_tempDir, "src", "Fixture");
+        Directory.CreateDirectory(projectDir);
+        File.WriteAllText(
+            Path.Combine(projectDir, "Fixture.csproj"),
+            "<Project Sdk=\"Microsoft.NET.Sdk\"><PropertyGroup><TargetFramework>net10.0</TargetFramework></PropertyGroup></Project>");
+
+        string policyPath = WritePolicy("""
+            version: 1
+            name: Test
+
+            analysis:
+              target_assemblies: [ArchLinterNet.Core]
+              projects: ["src/Fixture/Fixture.csproj"]
+
+            contracts:
+              audit_coverage:
+                - name: project-coverage
+                  scope: project
+                  reason: Every discovered project must be mapped or excluded.
+            """);
+
+        ValidationOutcome outcome = ArchitectureValidationService.Validate(new ValidationRequest
+        {
+            PolicyPath = policyPath,
+            Mode = "strict"
+        });
+
+        Assert.That(outcome.Passed, Is.True);
+        Assert.That(outcome.CoverageFindings, Is.Empty);
+    }
 }

@@ -19,7 +19,7 @@ public static class ArchitectureRunnerFactory
         using (timing?.Measure("yaml_loading", indent: 1))
             document = ArchitectureContractLoader.LoadFromPath(policyPath);
 
-        Validate_implementedCoverageScopes(document);
+        ValidateImplementedCoverageScopes(document);
 
         if (baselinePath != null)
         {
@@ -105,7 +105,7 @@ public static class ArchitectureRunnerFactory
 
     private static readonly string[] _implementedCoverageScopes = { "namespace", "rule_input", "project", "assembly" };
 
-    private static void Validate_implementedCoverageScopes(ArchitectureContractDocument document)
+    private static void ValidateImplementedCoverageScopes(ArchitectureContractDocument document)
     {
         List<ArchitectureCoverageContract> unsupported = document.Contracts.StrictCoverage
             .Concat(document.Contracts.AuditCoverage)
