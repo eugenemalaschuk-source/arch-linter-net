@@ -558,4 +558,80 @@ public sealed class CoverageContractReservedTests
         Assert.That(outcome.CoverageFindings.Single().ForbiddenNamespace, Is.EqualTo("unresolved project"));
         Assert.That(outcome.CoverageSummaries.Single().Counts.Unknown, Is.EqualTo(1));
     }
+
+    [Test]
+    public void StrictMode_WithOnlyAuditProjectCoverageDeclaredAndUnresolvedProjects_StillThrows()
+    {
+        // The unresolved-project bypass in ArchitectureRunnerFactory.BuildRunner is mode/selection
+        // aware: an audit_coverage-only scope: project contract can never run in strict mode (the
+        // executor only runs contracts ContractsFor("strict", ...) selects), so it must not relax
+        // the no-resolved-assemblies hard-fail for a strict-mode run.
+        string relativeProjectPath = WriteUnresolvableProjectFixture();
+        string policyPath = WritePolicy($"""
+            version: 1
+            name: Test
+
+            analysis:
+              projects: ["{relativeProjectPath}"]
+
+            contracts:
+              audit_coverage:
+                - name: project-coverage
+                  scope: project
+                  reason: Every discovered project must be mapped or excluded.
+            """);
+
+        InvalidOperationException ex = Assert.Throws<InvalidOperationException>(() =>
+            ArchitectureValidationService.Validate(new ValidationRequest
+            {
+                PolicyPath = policyPath,
+                Mode = "strict"
+            }))!;
+
+        Assert.That(ex.Message, Does.Contain("Architecture YAML must define analysis.target_assemblies"));
+    }
+
+    [Test]
+    public void StrictMode_WithUnselectedProjectCoverageContractAndUnresolvedProjects_StillThrows()
+    {
+        // Same mode-awareness guarantee, but exercised through --contract selection instead of
+        // mode: when a project-scope coverage contract exists but isn't among the selected
+        // contract IDs for this run, it can't run either, so the bypass must not apply.
+        string relativeProjectPath = WriteUnresolvableProjectFixture();
+        string assemblyName = typeof(CoverageContractReservedTests).Assembly.GetName().Name!;
+        string policyPath = WritePolicy($"""
+            version: 1
+            name: Test
+
+            layers:
+              core:
+                namespace: {assemblyName}
+
+            analysis:
+              projects: ["{relativeProjectPath}"]
+
+            contracts:
+              strict:
+                - id: unrelated-rule
+                  name: unrelated-rule
+                  source: core
+                  forbidden: []
+                  reason: Placeholder selected contract.
+              strict_coverage:
+                - id: project-coverage
+                  name: project-coverage
+                  scope: project
+                  reason: Every discovered project must be mapped or excluded.
+            """);
+
+        InvalidOperationException ex = Assert.Throws<InvalidOperationException>(() =>
+            ArchitectureValidationService.Validate(new ValidationRequest
+            {
+                PolicyPath = policyPath,
+                Mode = "strict",
+                ContractIds = new List<string> { "unrelated-rule" }
+            }))!;
+
+        Assert.That(ex.Message, Does.Contain("Architecture YAML must define analysis.target_assemblies"));
+    }
 }

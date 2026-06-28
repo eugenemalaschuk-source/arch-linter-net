@@ -41,7 +41,8 @@ public static class ArchitectureRunnerFactory
         IReadOnlyList<string>? preprocessorSymbols = null,
         HashSet<string>? selectedContractIds = null,
         bool enableUnmatchedIgnoreTracking = true,
-        ValidationTiming? timing = null)
+        ValidationTiming? timing = null,
+        string? mode = null)
     {
         string repositoryRoot;
         using (timing?.Measure("root_resolution", indent: 1))
@@ -72,7 +73,8 @@ public static class ArchitectureRunnerFactory
             // no-assemblies-resolved hard-fail in that case rather than erroring out before the
             // coverage engine ever runs.
             bool projectCoverageCanReportUnresolvedProjects =
-                discovery.DiscoveredProjects.Count > 0 && HasProjectScopeCoverageContract(document);
+                discovery.DiscoveredProjects.Count > 0
+                && HasProjectScopeCoverageContract(document, mode, selectedContractIds);
 
             if (resolveAssemblyOutputs && document.Analysis.TargetAssemblies.Count == 0
                 && discovery.Diagnostics.Count > 0 && !projectCoverageCanReportUnresolvedProjects)
@@ -97,10 +99,28 @@ public static class ArchitectureRunnerFactory
         return new ArchitectureRunnerSetup(repositoryRoot, runner);
     }
 
-    private static bool HasProjectScopeCoverageContract(ArchitectureContractDocument document)
+    // mode is null for callers (e.g. ArchitectureBaselineService with request.Mode "all") that
+    // don't pin a single mode up front; in that case both strict and audit project-scope coverage
+    // contracts are considered, mirroring how such callers later execute both modes themselves.
+    private static bool HasProjectScopeCoverageContract(
+        ArchitectureContractDocument document, string? mode, HashSet<string>? selectedContractIds)
     {
-        return document.Contracts.StrictCoverage.Concat(document.Contracts.AuditCoverage)
-            .Any(contract => string.Equals(contract.Scope, "project", StringComparison.Ordinal));
+        ArchitectureContractCatalog catalog = ArchitectureContractCatalog.Build(document);
+
+        IEnumerable<IArchitectureContract> coverageContracts = mode != null
+            ? catalog.ContractsFor(mode, "coverage")
+            : catalog.ContractsFor("strict", "coverage").Concat(catalog.ContractsFor("audit", "coverage"));
+
+        return coverageContracts
+            .OfType<ArchitectureCoverageContract>()
+            .Any(contract => string.Equals(contract.Scope, "project", StringComparison.Ordinal)
+                && IsContractIdSelected(contract.Id, selectedContractIds));
+    }
+
+    private static bool IsContractIdSelected(string? contractId, HashSet<string>? selectedContractIds)
+    {
+        return selectedContractIds == null || selectedContractIds.Count == 0
+            || (contractId != null && selectedContractIds.Contains(contractId));
     }
 
     private static void ApplyDiscoveryResult(ArchitectureAnalysisConfiguration analysis, ProjectDiscoveryResult discovery)
