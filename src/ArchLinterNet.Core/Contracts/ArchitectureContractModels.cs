@@ -366,6 +366,8 @@ public sealed class ArchitectureCoverageExclusion
 
     [YamlMember(Alias = "contract_id")] public string ContractId { get; set; } = string.Empty;
 
+    [YamlMember(Alias = "between")] public List<string> Between { get; set; } = new();
+
     [YamlMember(Alias = "reason")] public string Reason { get; set; } = string.Empty;
 }
 

@@ -180,6 +180,12 @@ public static class ArchitectureContractLoader
                 continue;
             }
 
+            if (string.Equals(contract.Scope, "dependency_edge", StringComparison.Ordinal))
+            {
+                ValidateDependencyEdgeCoverageContract(document, contract);
+                continue;
+            }
+
             if (!string.Equals(contract.Scope, "namespace", StringComparison.Ordinal))
             {
                 continue;
@@ -310,6 +316,74 @@ public static class ArchitectureContractLoader
             {
                 throw new InvalidOperationException(
                     $"Rule-input coverage contract '{contract.Name}' has an exclusion at index {i} without a non-empty reason.");
+            }
+        }
+    }
+
+    private static void ValidateDependencyEdgeCoverageContract(
+        ArchitectureContractDocument document, ArchitectureCoverageContract contract)
+    {
+        if (contract.Between.Count == 0)
+        {
+            throw new InvalidOperationException(
+                $"Dependency-edge coverage contract '{contract.Name}' must declare at least one pair in 'between'.");
+        }
+
+        if (contract.Roots.Count > 0)
+        {
+            throw new InvalidOperationException(
+                $"Dependency-edge coverage contract '{contract.Name}' cannot declare 'roots'. That field is only valid for scope 'namespace', 'project', or 'assembly'.");
+        }
+
+        if (contract.ContractIds.Count > 0)
+        {
+            throw new InvalidOperationException(
+                $"Dependency-edge coverage contract '{contract.Name}' cannot declare 'contract_ids'. That field is only valid for scope 'rule_input'.");
+        }
+
+        for (int i = 0; i < contract.Between.Count; i++)
+        {
+            List<string> pair = contract.Between[i];
+
+            if (pair.Count != 2 || pair.Any(string.IsNullOrWhiteSpace))
+            {
+                throw new InvalidOperationException(
+                    $"Dependency-edge coverage contract '{contract.Name}' has a 'between' entry at index {i} that is not a pair of two non-empty declared layer names.");
+            }
+
+            foreach (string layerName in pair)
+            {
+                if (!document.Layers.ContainsKey(layerName))
+                {
+                    throw new InvalidOperationException(
+                        $"Dependency-edge coverage contract '{contract.Name}' has a 'between' entry at index {i} referencing undeclared layer '{layerName}'.");
+                }
+            }
+        }
+
+        for (int i = 0; i < contract.Exclude.Count; i++)
+        {
+            ArchitectureCoverageExclusion exclusion = contract.Exclude[i];
+
+            if (string.IsNullOrWhiteSpace(exclusion.Reason))
+            {
+                throw new InvalidOperationException(
+                    $"Dependency-edge coverage contract '{contract.Name}' has an exclusion at index {i} without a non-empty reason.");
+            }
+
+            if (exclusion.Between.Count != 2 || exclusion.Between.Any(string.IsNullOrWhiteSpace))
+            {
+                throw new InvalidOperationException(
+                    $"Dependency-edge coverage contract '{contract.Name}' has an exclusion at index {i} without a 'between' pair of two non-empty declared layer names. Dependency-edge coverage exclusions must declare 'between'.");
+            }
+
+            foreach (string layerName in exclusion.Between)
+            {
+                if (!document.Layers.ContainsKey(layerName))
+                {
+                    throw new InvalidOperationException(
+                        $"Dependency-edge coverage contract '{contract.Name}' has an exclusion at index {i} referencing undeclared layer '{layerName}'.");
+                }
             }
         }
     }

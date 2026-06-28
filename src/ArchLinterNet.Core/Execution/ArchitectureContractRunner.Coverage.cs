@@ -32,6 +32,11 @@ public sealed partial class ArchitectureContractRunner
             return BuildProjectCoverageSummary(contract);
         }
 
+        if (string.Equals(contract.Scope, "dependency_edge", StringComparison.Ordinal))
+        {
+            return BuildDependencyEdgeCoverageSummary(contract);
+        }
+
         return BuildNamespaceCoverageSummary(contract);
     }
 
@@ -243,6 +248,55 @@ public sealed partial class ArchitectureContractRunner
             unknownItems);
     }
 
+    private ArchitectureCoverageSummary BuildDependencyEdgeCoverageSummary(ArchitectureCoverageContract contract)
+    {
+        ArchitectureCoverageInventory inventory = _session.BuildCoverageInventory(_document);
+
+        int covered = 0;
+        List<ArchitectureCoverageSummaryExcludedItem> excludedItems = new();
+        List<ArchitectureCoverageSummaryEvidenceItem> uncoveredItems = new();
+
+        foreach (List<string> pair in contract.Between)
+        {
+            string sourceLayer = pair[0];
+            string targetLayer = pair[1];
+
+            ArchitectureCoverageExclusion? matchedExclusion = contract.Exclude
+                .FirstOrDefault(exclusion => MatchesDependencyEdgeExclusion(exclusion, sourceLayer, targetLayer));
+
+            bool isGoverned = IsLayerPairGoverned(sourceLayer, targetLayer);
+
+            foreach (ArchitectureCoverageDependencyEdge edge in GetEdgesForLayerPair(inventory, sourceLayer, targetLayer))
+            {
+                if (matchedExclusion != null)
+                {
+                    excludedItems.Add(new ArchitectureCoverageSummaryExcludedItem(
+                        $"{edge.SourceNamespace} -> {edge.TargetNamespace}", matchedExclusion.Reason));
+                    continue;
+                }
+
+                if (isGoverned)
+                {
+                    covered++;
+                    continue;
+                }
+
+                uncoveredItems.Add(new ArchitectureCoverageSummaryEvidenceItem(
+                    $"{edge.SourceNamespace} -> {edge.TargetNamespace}", GetRepresentativeNamespaceType(inventory, edge.SourceNamespace)));
+            }
+        }
+
+        return new ArchitectureCoverageSummary(
+            contract.Name,
+            contract.Id,
+            contract.Scope,
+            new ArchitectureCoverageSummaryCounts(covered, excludedItems.Count, uncoveredItems.Count, 0, 0),
+            excludedItems,
+            uncoveredItems,
+            Array.Empty<ArchitectureCoverageSummaryEvidenceItem>(),
+            Array.Empty<ArchitectureCoverageSummaryEvidenceItem>());
+    }
+
     public List<ArchitectureViolation> CheckCoverageContract(ArchitectureCoverageContract contract)
     {
         if (!IsContractSelected(contract.Id))
@@ -265,11 +319,16 @@ public sealed partial class ArchitectureContractRunner
             return CheckProjectCoverageContract(contract);
         }
 
+        if (string.Equals(contract.Scope, "dependency_edge", StringComparison.Ordinal))
+        {
+            return CheckDependencyEdgeCoverageContract(contract);
+        }
+
         if (!string.Equals(contract.Scope, "namespace", StringComparison.Ordinal))
         {
             throw new InvalidOperationException(
                 $"Coverage contract '{contract.Name}' declares unsupported scope '{contract.Scope}'. " +
-                "Only scopes 'namespace', 'rule_input', 'project', and 'assembly' are implemented right now.");
+                "Only scopes 'namespace', 'rule_input', 'project', 'assembly', and 'dependency_edge' are implemented right now.");
         }
 
         ArchitectureCoverageInventory inventory = _session.BuildCoverageInventory(_document);
@@ -449,6 +508,113 @@ public sealed partial class ArchitectureContractRunner
         return findings
             .OrderBy(f => f.SourceType, StringComparer.Ordinal)
             .ToList();
+    }
+
+    private List<ArchitectureViolation> CheckDependencyEdgeCoverageContract(ArchitectureCoverageContract contract)
+    {
+        ArchitectureCoverageInventory inventory = _session.BuildCoverageInventory(_document);
+        ArchitectureContractExecutionContext executionContext = CreateExecutionContext(contract, contract.IgnoredViolations);
+
+        List<ArchitectureViolation> findings = new();
+
+        foreach (List<string> pair in contract.Between)
+        {
+            string sourceLayer = pair[0];
+            string targetLayer = pair[1];
+
+            if (contract.Exclude.Any(exclusion => MatchesDependencyEdgeExclusion(exclusion, sourceLayer, targetLayer)))
+            {
+                continue;
+            }
+
+            if (IsLayerPairGoverned(sourceLayer, targetLayer))
+            {
+                continue;
+            }
+
+            foreach (ArchitectureCoverageDependencyEdge edge in GetEdgesForLayerPair(inventory, sourceLayer, targetLayer))
+            {
+                string edgeKey = $"{edge.SourceNamespace} -> {edge.TargetNamespace}";
+
+                if (executionContext.IsIgnored(edgeKey, "uncovered dependency edge"))
+                {
+                    continue;
+                }
+
+                findings.Add(new ArchitectureViolation(
+                    contract.Name,
+                    contract.Id,
+                    edgeKey,
+                    "uncovered dependency edge",
+                    new[] { GetRepresentativeNamespaceType(inventory, edge.SourceNamespace) }));
+            }
+        }
+
+        executionContext.CollectUnmatchedIgnores(_unmatchedIgnoredViolations);
+
+        return findings
+            .OrderBy(f => f.SourceType, StringComparer.Ordinal)
+            .ToList();
+    }
+
+    private static IEnumerable<ArchitectureCoverageDependencyEdge> GetEdgesForLayerPair(
+        ArchitectureCoverageInventory inventory, string sourceLayer, string targetLayer)
+    {
+        return inventory.DependencyEdges.Where(edge =>
+            ResolveLayerName(inventory, edge.SourceNamespace) == sourceLayer
+            && ResolveLayerName(inventory, edge.TargetNamespace) == targetLayer);
+    }
+
+    private static string? ResolveLayerName(ArchitectureCoverageInventory inventory, string namespaceName)
+    {
+        return inventory.DeclaredLayers
+            .FirstOrDefault(layerEntry => ArchitectureLayerResolver.MatchesNamespace(layerEntry.Layer, namespaceName))
+            ?.Name;
+    }
+
+    private static string GetRepresentativeNamespaceType(ArchitectureCoverageInventory inventory, string namespaceName)
+    {
+        ArchitectureCoverageNamespaceEntry? entry = inventory.Namespaces
+            .FirstOrDefault(n => string.Equals(n.Namespace, namespaceName, StringComparison.Ordinal));
+
+        return entry?.RepresentativeType ?? namespaceName;
+    }
+
+    private bool IsLayerPairGoverned(string sourceLayer, string targetLayer)
+    {
+        bool governedByDependencyContract = _document.Contracts.Strict
+            .Concat(_document.Contracts.Audit)
+            .Any(dependency =>
+                string.Equals(dependency.Source, sourceLayer, StringComparison.Ordinal)
+                && dependency.Forbidden.Contains(targetLayer, StringComparer.Ordinal));
+
+        if (governedByDependencyContract)
+        {
+            return true;
+        }
+
+        bool governedByLayerContract = _document.Contracts.StrictLayers
+            .Concat(_document.Contracts.AuditLayers)
+            .Any(layer => layer.Layers.Contains(sourceLayer, StringComparer.Ordinal)
+                          && layer.Layers.Contains(targetLayer, StringComparer.Ordinal));
+
+        if (governedByLayerContract)
+        {
+            return true;
+        }
+
+        return _document.Contracts.StrictIndependence
+            .Concat(_document.Contracts.AuditIndependence)
+            .Any(independence => independence.Layers.Contains(sourceLayer, StringComparer.Ordinal)
+                                  && independence.Layers.Contains(targetLayer, StringComparer.Ordinal));
+    }
+
+    private static bool MatchesDependencyEdgeExclusion(
+        ArchitectureCoverageExclusion exclusion, string sourceLayer, string targetLayer)
+    {
+        return exclusion.Between.Count == 2
+               && string.Equals(exclusion.Between[0], sourceLayer, StringComparison.Ordinal)
+               && string.Equals(exclusion.Between[1], targetLayer, StringComparison.Ordinal);
     }
 
     private Assembly? ResolveProjectAssembly(ArchitectureDiscoveredProject project)
