@@ -136,10 +136,10 @@ public sealed class CoverageContractReservedTests
 
             contracts:
               strict_coverage:
-                - name: project-coverage
-                  scope: project
-                  roots:
-                    - include: ["src/**/*.csproj"]
+                - name: dependency-edge-coverage
+                  scope: dependency_edge
+                  between:
+                    - [a, b]
                   reason: Reserved for a later issue.
             """);
 
@@ -150,7 +150,8 @@ public sealed class CoverageContractReservedTests
                 Mode = "strict"
             }))!;
 
-        Assert.That(ex.Message, Does.Contain("Only coverage contracts with scope 'namespace' or 'rule_input' are implemented"));
+        Assert.That(ex.Message, Does.Contain(
+            "Only coverage contracts with scope 'namespace', 'rule_input', 'project', or 'assembly' are implemented"));
     }
 
     [Test]
@@ -266,6 +267,118 @@ public sealed class CoverageContractReservedTests
         });
 
         Assert.That(outcome.Passed, Is.True);
+    }
+
+    [Test]
+    public void ProjectCoverage_WithoutSolutionOrProjectsConfigured_ThrowsActionableError()
+    {
+        string policyPath = WritePolicy("""
+            version: 1
+            name: Test
+
+            analysis:
+              target_assemblies: [ArchLinterNet.Core]
+
+            contracts:
+              strict_coverage:
+                - name: project-coverage
+                  scope: project
+                  reason: Every discovered project must be mapped or excluded.
+            """);
+
+        InvalidOperationException ex = Assert.Throws<InvalidOperationException>(() =>
+            ArchitectureValidationService.Validate(new ValidationRequest
+            {
+                PolicyPath = policyPath,
+                Mode = "strict"
+            }))!;
+
+        Assert.That(ex.Message, Does.Contain("requires 'analysis.solution' or 'analysis.projects'"));
+    }
+
+    [Test]
+    public void AssemblyCoverage_WithoutSolutionConfigured_DoesNotThrow()
+    {
+        string policyPath = WritePolicy("""
+            version: 1
+            name: Test
+
+            analysis:
+              target_assemblies: [ArchLinterNet.Core]
+
+            contracts:
+              strict_coverage:
+                - name: assembly-coverage
+                  scope: assembly
+                  reason: Every first-party assembly must be mapped or excluded.
+            """);
+
+        ValidationOutcome outcome = ArchitectureValidationService.Validate(new ValidationRequest
+        {
+            PolicyPath = policyPath,
+            Mode = "strict"
+        });
+
+        Assert.That(outcome.CoverageFindings.All(f => f.ForbiddenNamespace == "uncovered assembly"), Is.True);
+    }
+
+    [Test]
+    public void ProjectCoverageExclusion_WithoutProjectMatcher_ThrowsActionableError()
+    {
+        string policyPath = WritePolicy("""
+            version: 1
+            name: Test
+
+            analysis:
+              target_assemblies: [ArchLinterNet.Core]
+              projects: ["src/ArchLinterNet.Core/ArchLinterNet.Core.csproj"]
+
+            contracts:
+              strict_coverage:
+                - name: project-coverage
+                  scope: project
+                  exclude:
+                    - reason: Missing matcher.
+                  reason: Every discovered project must be mapped or excluded.
+            """);
+
+        InvalidOperationException ex = Assert.Throws<InvalidOperationException>(() =>
+            ArchitectureValidationService.Validate(new ValidationRequest
+            {
+                PolicyPath = policyPath,
+                Mode = "strict"
+            }))!;
+
+        Assert.That(ex.Message, Does.Contain("'project' matcher"));
+    }
+
+    [Test]
+    public void AssemblyCoverageExclusion_WithoutReason_ThrowsActionableError()
+    {
+        string policyPath = WritePolicy("""
+            version: 1
+            name: Test
+
+            analysis:
+              target_assemblies: [ArchLinterNet.Core]
+
+            contracts:
+              strict_coverage:
+                - name: assembly-coverage
+                  scope: assembly
+                  exclude:
+                    - assembly: SomeAssembly
+                  reason: Every first-party assembly must be mapped or excluded.
+            """);
+
+        InvalidOperationException ex = Assert.Throws<InvalidOperationException>(() =>
+            ArchitectureValidationService.Validate(new ValidationRequest
+            {
+                PolicyPath = policyPath,
+                Mode = "strict"
+            }))!;
+
+        Assert.That(ex.Message, Does.Contain("without a non-empty reason"));
     }
 
     [Test]

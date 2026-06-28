@@ -59,6 +59,46 @@ public sealed class ArchitectureProjectDiscoveryTests
     }
 
     [Test]
+    public void ResolveFromDocument_ExplicitProject_PopulatesDiscoveredProjectsWithPathAndAssemblyName()
+    {
+        string projectDir = CreateProject("Sample", "net9.0", buildOutputFrameworks: ["net9.0"]);
+
+        var document = new ArchitectureContractDocument
+        {
+            Analysis = new ArchitectureAnalysisConfiguration
+            {
+                Projects = new List<string> { Path.Combine(projectDir, "Sample.csproj") }
+            }
+        };
+
+        ProjectDiscoveryResult result = ArchitectureProjectDiscovery.ResolveFromDocument(document, _repoRoot);
+
+        ArchitectureDiscoveredProject discoveredProject = result.DiscoveredProjects.Single();
+        Assert.That(discoveredProject.AssemblyName, Is.EqualTo("Sample"));
+        Assert.That(discoveredProject.Path, Does.EndWith("Sample.csproj"));
+        Assert.That(discoveredProject.TargetFrameworks, Is.EquivalentTo(new[] { "net9.0" }));
+    }
+
+    [Test]
+    public void ResolveFromDocument_MultiTargetedProject_DiscoveredProjectListsAllTargetFrameworks()
+    {
+        string projectDir = CreateProject("MultiTarget", "net8.0;net9.0", buildOutputFrameworks: ["net8.0", "net9.0"]);
+
+        var document = new ArchitectureContractDocument
+        {
+            Analysis = new ArchitectureAnalysisConfiguration
+            {
+                Projects = new List<string> { Path.Combine(projectDir, "MultiTarget.csproj") }
+            }
+        };
+
+        ProjectDiscoveryResult result = ArchitectureProjectDiscovery.ResolveFromDocument(document, _repoRoot);
+
+        ArchitectureDiscoveredProject discoveredProject = result.DiscoveredProjects.Single();
+        Assert.That(discoveredProject.TargetFrameworks, Is.EquivalentTo(new[] { "net8.0", "net9.0" }));
+    }
+
+    [Test]
     public void ResolveFromDocument_SlnxSolution_DiscoversProjectAndOutput()
     {
         string projectDir = CreateProject("Foo", "net9.0", buildOutputFrameworks: ["net9.0"]);

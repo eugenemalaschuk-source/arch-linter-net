@@ -1,0 +1,273 @@
+using ArchLinterNet.Core.Contracts;
+using ArchLinterNet.Core.Discovery;
+using ArchLinterNet.Core.Execution;
+using ArchLinterNet.Core.Model;
+using ArchLinterNet.Core.Reporting;
+using NUnit.Framework;
+
+namespace ArchLinterNet.Core.Tests;
+
+[TestFixture]
+public sealed class ProjectAssemblyCoverageContractTests
+{
+    private string _tempDir = null!;
+
+    [SetUp]
+    public void SetUp()
+    {
+        _tempDir = Path.Combine(Path.GetTempPath(), $"arch-linter-project-assembly-coverage-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(_tempDir);
+    }
+
+    [TearDown]
+    public void TearDown()
+    {
+        if (Directory.Exists(_tempDir))
+        {
+            Directory.Delete(_tempDir, true);
+        }
+    }
+
+    private static readonly System.Reflection.Assembly _coreAssembly = typeof(ArchitectureContractDocument).Assembly;
+    private static readonly System.Reflection.Assembly _testingAssembly = typeof(ArchLinterNet.Testing.ArchitectureAssertions).Assembly;
+
+    private static ArchitectureContractDocument CreateDocument(ArchitectureCoverageContract contract, ProjectDiscoveryResult? discovery = null)
+    {
+        return new ArchitectureContractDocument
+        {
+            Version = 1,
+            Name = "Test",
+            Layers = new Dictionary<string, ArchitectureLayer>
+            {
+                ["core"] = new() { Namespace = "ArchLinterNet.Core" },
+            },
+            Analysis = new ArchitectureAnalysisConfiguration
+            {
+                TargetAssemblies = new List<string> { _coreAssembly.GetName().Name!, _testingAssembly.GetName().Name! },
+                Solution = discovery != null ? "fixture.slnx" : string.Empty,
+            },
+            Contracts = new ArchitectureContractGroups
+            {
+                StrictCoverage = new List<ArchitectureCoverageContract> { contract },
+            },
+        };
+    }
+
+    private ArchitectureContractRunner CreateRunner(ArchitectureCoverageContract contract, ProjectDiscoveryResult? discovery = null)
+    {
+        ArchitectureContractDocument document = CreateDocument(contract, discovery);
+        ArchitectureAnalysisContext context = new(
+            _tempDir,
+            new[] { _coreAssembly, _testingAssembly },
+            Array.Empty<string>(),
+            Array.Empty<string>(),
+            projectDiscovery: discovery);
+
+        return new ArchitectureContractRunner(context, document);
+    }
+
+    [Test]
+    public void AssemblyCoverage__coreAssemblyMatchesLayer_IsCovered()
+    {
+        ArchitectureCoverageContract contract = new()
+        {
+            Id = "assembly-coverage",
+            Name = "assembly-coverage",
+            Scope = "assembly",
+            Reason = "Every first-party assembly must be mapped or excluded.",
+        };
+
+        ArchitectureContractRunner runner = CreateRunner(contract);
+
+        List<ArchitectureViolation> findings = runner.CheckCoverageContract(contract);
+        ArchitectureCoverageSummary? summary = runner.BuildCoverageSummary(contract);
+
+        Assert.That(findings.Select(f => f.SourceType), Does.Not.Contain(_coreAssembly.GetName().Name));
+        Assert.That(summary, Is.Not.Null);
+        Assert.That(summary!.Counts.Covered, Is.EqualTo(1));
+    }
+
+    [Test]
+    public void AssemblyCoverage__testingAssemblyMatchesNoLayer_IsUncovered()
+    {
+        ArchitectureCoverageContract contract = new()
+        {
+            Id = "assembly-coverage",
+            Name = "assembly-coverage",
+            Scope = "assembly",
+            Reason = "Every first-party assembly must be mapped or excluded.",
+        };
+
+        ArchitectureContractRunner runner = CreateRunner(contract);
+
+        List<ArchitectureViolation> findings = runner.CheckCoverageContract(contract);
+        ArchitectureCoverageSummary? summary = runner.BuildCoverageSummary(contract);
+
+        Assert.That(findings.Select(f => f.SourceType), Contains.Item(_testingAssembly.GetName().Name));
+        Assert.That(findings.Single(f => f.SourceType == _testingAssembly.GetName().Name).ForbiddenNamespace,
+            Is.EqualTo("uncovered assembly"));
+        Assert.That(summary!.Counts.Uncovered, Is.EqualTo(1));
+    }
+
+    [Test]
+    public void AssemblyCoverage_ExcludedAssembly_ProducesNoFindingAndIsCountedExcluded()
+    {
+        ArchitectureCoverageContract contract = new()
+        {
+            Id = "assembly-coverage",
+            Name = "assembly-coverage",
+            Scope = "assembly",
+            Reason = "Every first-party assembly must be mapped or excluded.",
+            Exclude = new List<ArchitectureCoverageExclusion>
+            {
+                new() { Assembly = _testingAssembly.GetName().Name!, Reason = "Test-only helper assembly." },
+            },
+        };
+
+        ArchitectureContractRunner runner = CreateRunner(contract);
+
+        List<ArchitectureViolation> findings = runner.CheckCoverageContract(contract);
+        ArchitectureCoverageSummary? summary = runner.BuildCoverageSummary(contract);
+
+        Assert.That(findings, Is.Empty);
+        Assert.That(summary!.Counts.Excluded, Is.EqualTo(1));
+        Assert.That(summary.Counts.Covered, Is.EqualTo(1));
+        Assert.That(summary.ExcludedItems.Single().Reason, Is.EqualTo("Test-only helper assembly."));
+    }
+
+    private static ProjectDiscoveryResult CreateDiscovery(params ArchitectureDiscoveredProject[] projects)
+    {
+        return new ProjectDiscoveryResult(
+            Array.Empty<string>(), Array.Empty<string>(), Array.Empty<string>(),
+            Array.Empty<ArchitectureProjectDiscoveryDiagnostic>(), projects);
+    }
+
+    [Test]
+    public void ProjectCoverage_DiscoveredProjectResolvesToCoveredAssembly_IsCovered()
+    {
+        ProjectDiscoveryResult discovery = CreateDiscovery(
+            new ArchitectureDiscoveredProject("src/Core/Core.csproj", _coreAssembly.GetName().Name!, new[] { "net10.0" }));
+
+        ArchitectureCoverageContract contract = new()
+        {
+            Id = "project-coverage",
+            Name = "project-coverage",
+            Scope = "project",
+            Reason = "Every discovered project must be mapped or excluded.",
+        };
+
+        ArchitectureContractRunner runner = CreateRunner(contract, discovery);
+
+        List<ArchitectureViolation> findings = runner.CheckCoverageContract(contract);
+        ArchitectureCoverageSummary? summary = runner.BuildCoverageSummary(contract);
+
+        Assert.That(findings, Is.Empty);
+        Assert.That(summary!.Counts.Covered, Is.EqualTo(1));
+    }
+
+    [Test]
+    public void ProjectCoverage_DiscoveredProjectResolvesToUncoveredAssembly_IsUncovered()
+    {
+        ProjectDiscoveryResult discovery = CreateDiscovery(
+            new ArchitectureDiscoveredProject("src/Testing/Testing.csproj", _testingAssembly.GetName().Name!, new[] { "net10.0" }));
+
+        ArchitectureCoverageContract contract = new()
+        {
+            Id = "project-coverage",
+            Name = "project-coverage",
+            Scope = "project",
+            Reason = "Every discovered project must be mapped or excluded.",
+        };
+
+        ArchitectureContractRunner runner = CreateRunner(contract, discovery);
+
+        List<ArchitectureViolation> findings = runner.CheckCoverageContract(contract);
+        ArchitectureCoverageSummary? summary = runner.BuildCoverageSummary(contract);
+
+        Assert.That(findings.Single().SourceType, Is.EqualTo("src/Testing/Testing.csproj"));
+        Assert.That(findings.Single().ForbiddenNamespace, Is.EqualTo("uncovered project"));
+        Assert.That(summary!.Counts.Uncovered, Is.EqualTo(1));
+    }
+
+    [Test]
+    public void ProjectCoverage_ExcludedProject_ProducesNoFindingAndIsCountedExcluded()
+    {
+        ProjectDiscoveryResult discovery = CreateDiscovery(
+            new ArchitectureDiscoveredProject("samples/Demo/Demo.csproj", _testingAssembly.GetName().Name!, new[] { "net10.0" }));
+
+        ArchitectureCoverageContract contract = new()
+        {
+            Id = "project-coverage",
+            Name = "project-coverage",
+            Scope = "project",
+            Reason = "Every discovered project must be mapped or excluded.",
+            Exclude = new List<ArchitectureCoverageExclusion>
+            {
+                new() { Project = "samples/Demo/Demo.csproj", Reason = "Sample project excluded from coverage." },
+            },
+        };
+
+        ArchitectureContractRunner runner = CreateRunner(contract, discovery);
+
+        List<ArchitectureViolation> findings = runner.CheckCoverageContract(contract);
+        ArchitectureCoverageSummary? summary = runner.BuildCoverageSummary(contract);
+
+        Assert.That(findings, Is.Empty);
+        Assert.That(summary!.Counts.Excluded, Is.EqualTo(1));
+        Assert.That(summary.ExcludedItems.Single().Reason, Is.EqualTo("Sample project excluded from coverage."));
+    }
+
+    [Test]
+    public void ProjectCoverage_DiscoveredProjectWithNoResolvedAssembly_IsUnknown()
+    {
+        ProjectDiscoveryResult discovery = CreateDiscovery(
+            new ArchitectureDiscoveredProject("src/Ghost/Ghost.csproj", "Ghost.Assembly.Not.Resolved", new[] { "net10.0" }));
+
+        ArchitectureCoverageContract contract = new()
+        {
+            Id = "project-coverage",
+            Name = "project-coverage",
+            Scope = "project",
+            Reason = "Every discovered project must be mapped or excluded.",
+        };
+
+        ArchitectureContractRunner runner = CreateRunner(contract, discovery);
+
+        List<ArchitectureViolation> findings = runner.CheckCoverageContract(contract);
+        ArchitectureCoverageSummary? summary = runner.BuildCoverageSummary(contract);
+
+        Assert.That(findings.Single().SourceType, Is.EqualTo("src/Ghost/Ghost.csproj"));
+        Assert.That(findings.Single().ForbiddenNamespace, Is.EqualTo("unresolved project"));
+        Assert.That(summary!.Counts.Unknown, Is.EqualTo(1));
+        Assert.That(summary.Counts.Uncovered, Is.EqualTo(0));
+        Assert.That(summary.UnknownItems.Single().Item, Is.EqualTo("src/Ghost/Ghost.csproj"));
+    }
+
+    [Test]
+    public void AssemblyCoverage_BaselinedFinding_IsSuppressedAsIgnoredViolation()
+    {
+        ArchitectureCoverageContract contract = new()
+        {
+            Id = "assembly-coverage",
+            Name = "assembly-coverage",
+            Scope = "assembly",
+            Reason = "Every first-party assembly must be mapped or excluded.",
+            IgnoredViolations = new List<ArchitectureIgnoredViolation>
+            {
+                new()
+                {
+                    SourceType = _testingAssembly.GetName().Name!,
+                    ForbiddenReference = "uncovered assembly",
+                    Reason = "Accepted as baseline debt."
+                },
+            },
+        };
+
+        ArchitectureContractRunner runner = CreateRunner(contract);
+
+        List<ArchitectureViolation> findings = runner.CheckCoverageContract(contract);
+
+        Assert.That(findings, Is.Empty);
+        Assert.That(runner.UnmatchedIgnoredViolations, Is.Empty);
+    }
+}

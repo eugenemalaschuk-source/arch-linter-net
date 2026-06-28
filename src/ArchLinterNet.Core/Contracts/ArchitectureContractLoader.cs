@@ -168,6 +168,18 @@ public static class ArchitectureContractLoader
                 continue;
             }
 
+            if (string.Equals(contract.Scope, "project", StringComparison.Ordinal))
+            {
+                ValidateProjectOrAssemblyCoverageContract(document, contract, "Project");
+                continue;
+            }
+
+            if (string.Equals(contract.Scope, "assembly", StringComparison.Ordinal))
+            {
+                ValidateProjectOrAssemblyCoverageContract(document, contract, "Assembly");
+                continue;
+            }
+
             if (!string.Equals(contract.Scope, "namespace", StringComparison.Ordinal))
             {
                 continue;
@@ -298,6 +310,61 @@ public static class ArchitectureContractLoader
             {
                 throw new InvalidOperationException(
                     $"Rule-input coverage contract '{contract.Name}' has an exclusion at index {i} without a non-empty reason.");
+            }
+        }
+    }
+
+    private static void ValidateProjectOrAssemblyCoverageContract(
+        ArchitectureContractDocument document, ArchitectureCoverageContract contract, string scopeLabel)
+    {
+        bool isProjectScope = string.Equals(scopeLabel, "Project", StringComparison.Ordinal);
+
+        if (isProjectScope &&
+            string.IsNullOrWhiteSpace(document.Analysis.Solution) &&
+            document.Analysis.Projects.Count == 0)
+        {
+            throw new InvalidOperationException(
+                $"Project coverage contract '{contract.Name}' requires 'analysis.solution' or 'analysis.projects' " +
+                "to be set, since discovered projects are the units this scope classifies.");
+        }
+
+        if (contract.Roots.Count > 0)
+        {
+            throw new InvalidOperationException(
+                $"{scopeLabel} coverage contract '{contract.Name}' cannot declare 'roots'. That field is only valid for scope 'namespace'.");
+        }
+
+        if (contract.Between.Count > 0)
+        {
+            throw new InvalidOperationException(
+                $"{scopeLabel} coverage contract '{contract.Name}' cannot declare 'between'. That field is only valid for scope 'dependency_edge'.");
+        }
+
+        if (contract.ContractIds.Count > 0)
+        {
+            throw new InvalidOperationException(
+                $"{scopeLabel} coverage contract '{contract.Name}' cannot declare 'contract_ids'. That field is only valid for scope 'rule_input'.");
+        }
+
+        string matcherField = isProjectScope ? "project" : "assembly";
+
+        for (int i = 0; i < contract.Exclude.Count; i++)
+        {
+            ArchitectureCoverageExclusion exclusion = contract.Exclude[i];
+
+            if (string.IsNullOrWhiteSpace(exclusion.Reason))
+            {
+                throw new InvalidOperationException(
+                    $"{scopeLabel} coverage contract '{contract.Name}' has an exclusion at index {i} without a non-empty reason.");
+            }
+
+            string matcherValue = isProjectScope ? exclusion.Project : exclusion.Assembly;
+
+            if (string.IsNullOrWhiteSpace(matcherValue))
+            {
+                throw new InvalidOperationException(
+                    $"{scopeLabel} coverage contract '{contract.Name}' has an exclusion at index {i} without a non-empty " +
+                    $"'{matcherField}' matcher. {scopeLabel} coverage exclusions must declare '{matcherField}'.");
             }
         }
     }

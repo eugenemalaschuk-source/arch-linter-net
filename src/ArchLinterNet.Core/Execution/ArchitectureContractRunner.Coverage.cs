@@ -1,7 +1,10 @@
+using System.Reflection;
 using ArchLinterNet.Core.Contracts;
+using ArchLinterNet.Core.Discovery;
 using ArchLinterNet.Core.Model;
 using ArchLinterNet.Core.Reporting;
 using ArchLinterNet.Core.Resolution;
+using ArchLinterNet.Core.Scanning;
 
 namespace ArchLinterNet.Core.Execution;
 
@@ -17,6 +20,16 @@ public sealed partial class ArchitectureContractRunner
         if (string.Equals(contract.Scope, "rule_input", StringComparison.Ordinal))
         {
             return BuildRuleInputCoverageSummary(contract);
+        }
+
+        if (string.Equals(contract.Scope, "assembly", StringComparison.Ordinal))
+        {
+            return BuildAssemblyCoverageSummary(contract);
+        }
+
+        if (string.Equals(contract.Scope, "project", StringComparison.Ordinal))
+        {
+            return BuildProjectCoverageSummary(contract);
         }
 
         return BuildNamespaceCoverageSummary(contract);
@@ -132,6 +145,103 @@ public sealed partial class ArchitectureContractRunner
             unknownItems);
     }
 
+    private ArchitectureCoverageSummary BuildAssemblyCoverageSummary(ArchitectureCoverageContract contract)
+    {
+        ArchitectureCoverageInventory inventory = _session.BuildCoverageInventory(_document);
+
+        int covered = 0;
+        List<ArchitectureCoverageSummaryExcludedItem> excludedItems = new();
+        List<ArchitectureCoverageSummaryEvidenceItem> uncoveredItems = new();
+
+        foreach (Assembly assembly in _context.TargetAssemblies
+                     .OrderBy(GetAssemblyName, StringComparer.Ordinal))
+        {
+            string assemblyName = GetAssemblyName(assembly);
+
+            ArchitectureCoverageExclusion? matchedExclusion = contract.Exclude
+                .FirstOrDefault(exclusion => MatchesAssemblyExclusion(exclusion, assemblyName));
+
+            if (matchedExclusion != null)
+            {
+                excludedItems.Add(new ArchitectureCoverageSummaryExcludedItem(assemblyName, matchedExclusion.Reason));
+                continue;
+            }
+
+            string[] assemblyNamespaces = GetAssemblyNamespaces(assembly);
+
+            if (assemblyNamespaces.Any(ns => IsCoveredByDeclaredLayers(inventory, ns) || IsCoveredByExpandedTemplates(inventory, ns)))
+            {
+                covered++;
+                continue;
+            }
+
+            uncoveredItems.Add(new ArchitectureCoverageSummaryEvidenceItem(assemblyName, GetRepresentativeType(assembly)));
+        }
+
+        return new ArchitectureCoverageSummary(
+            contract.Name,
+            contract.Id,
+            contract.Scope,
+            new ArchitectureCoverageSummaryCounts(covered, excludedItems.Count, uncoveredItems.Count, 0, 0),
+            excludedItems,
+            uncoveredItems,
+            Array.Empty<ArchitectureCoverageSummaryEvidenceItem>(),
+            Array.Empty<ArchitectureCoverageSummaryEvidenceItem>());
+    }
+
+    private ArchitectureCoverageSummary BuildProjectCoverageSummary(ArchitectureCoverageContract contract)
+    {
+        ArchitectureCoverageInventory inventory = _session.BuildCoverageInventory(_document);
+        IReadOnlyCollection<ArchitectureDiscoveredProject> discoveredProjects =
+            _context.ProjectDiscovery?.DiscoveredProjects ?? Array.Empty<ArchitectureDiscoveredProject>();
+
+        int covered = 0;
+        List<ArchitectureCoverageSummaryExcludedItem> excludedItems = new();
+        List<ArchitectureCoverageSummaryEvidenceItem> uncoveredItems = new();
+        List<ArchitectureCoverageSummaryEvidenceItem> unknownItems = new();
+
+        foreach (ArchitectureDiscoveredProject project in discoveredProjects
+                     .OrderBy(project => project.Path, StringComparer.Ordinal))
+        {
+            ArchitectureCoverageExclusion? matchedExclusion = contract.Exclude
+                .FirstOrDefault(exclusion => MatchesProjectExclusion(exclusion, project));
+
+            if (matchedExclusion != null)
+            {
+                excludedItems.Add(new ArchitectureCoverageSummaryExcludedItem(project.Path, matchedExclusion.Reason));
+                continue;
+            }
+
+            Assembly? resolvedAssembly = ResolveProjectAssembly(project);
+
+            if (resolvedAssembly == null)
+            {
+                unknownItems.Add(new ArchitectureCoverageSummaryEvidenceItem(project.Path, project.AssemblyName));
+                continue;
+            }
+
+            string[] assemblyNamespaces = GetAssemblyNamespaces(resolvedAssembly);
+
+            if (assemblyNamespaces.Any(ns => IsCoveredByDeclaredLayers(inventory, ns) || IsCoveredByExpandedTemplates(inventory, ns)))
+            {
+                covered++;
+                continue;
+            }
+
+            uncoveredItems.Add(new ArchitectureCoverageSummaryEvidenceItem(project.Path, GetRepresentativeType(resolvedAssembly)));
+        }
+
+        return new ArchitectureCoverageSummary(
+            contract.Name,
+            contract.Id,
+            contract.Scope,
+            new ArchitectureCoverageSummaryCounts(covered, excludedItems.Count, uncoveredItems.Count, 0, unknownItems.Count),
+            excludedItems,
+            uncoveredItems,
+            Array.Empty<ArchitectureCoverageSummaryEvidenceItem>(),
+            unknownItems);
+    }
+
     public List<ArchitectureViolation> CheckCoverageContract(ArchitectureCoverageContract contract)
     {
         if (!IsContractSelected(contract.Id))
@@ -144,11 +254,21 @@ public sealed partial class ArchitectureContractRunner
             return CheckRuleInputCoverageContract(contract);
         }
 
+        if (string.Equals(contract.Scope, "assembly", StringComparison.Ordinal))
+        {
+            return CheckAssemblyCoverageContract(contract);
+        }
+
+        if (string.Equals(contract.Scope, "project", StringComparison.Ordinal))
+        {
+            return CheckProjectCoverageContract(contract);
+        }
+
         if (!string.Equals(contract.Scope, "namespace", StringComparison.Ordinal))
         {
             throw new InvalidOperationException(
                 $"Coverage contract '{contract.Name}' declares unsupported scope '{contract.Scope}'. " +
-                "Only scopes 'namespace' and 'rule_input' are implemented right now.");
+                "Only scopes 'namespace', 'rule_input', 'project', and 'assembly' are implemented right now.");
         }
 
         ArchitectureCoverageInventory inventory = _session.BuildCoverageInventory(_document);
@@ -248,6 +368,131 @@ public sealed partial class ArchitectureContractRunner
             .OrderBy(f => f.SourceType, StringComparer.Ordinal)
             .ThenBy(f => f.ForbiddenReferences.First(), StringComparer.Ordinal)
             .ToList();
+    }
+
+    private List<ArchitectureViolation> CheckAssemblyCoverageContract(ArchitectureCoverageContract contract)
+    {
+        ArchitectureCoverageInventory inventory = _session.BuildCoverageInventory(_document);
+        ArchitectureContractExecutionContext executionContext = CreateExecutionContext(contract, contract.IgnoredViolations);
+
+        List<ArchitectureViolation> findings = _context.TargetAssemblies
+            .Select(assembly => (Assembly: assembly, Name: GetAssemblyName(assembly)))
+            .Where(entry => !contract.Exclude.Any(exclusion => MatchesAssemblyExclusion(exclusion, entry.Name)))
+            .Where(entry => !GetAssemblyNamespaces(entry.Assembly)
+                .Any(ns => IsCoveredByDeclaredLayers(inventory, ns) || IsCoveredByExpandedTemplates(inventory, ns)))
+            .OrderBy(entry => entry.Name, StringComparer.Ordinal)
+            .Where(entry => !executionContext.IsIgnored(entry.Name, "uncovered assembly"))
+            .Select(entry => new ArchitectureViolation(
+                contract.Name,
+                contract.Id,
+                entry.Name,
+                "uncovered assembly",
+                new[] { GetRepresentativeType(entry.Assembly) }))
+            .ToList();
+
+        executionContext.CollectUnmatchedIgnores(_unmatchedIgnoredViolations);
+
+        return findings;
+    }
+
+    private List<ArchitectureViolation> CheckProjectCoverageContract(ArchitectureCoverageContract contract)
+    {
+        ArchitectureCoverageInventory inventory = _session.BuildCoverageInventory(_document);
+        ArchitectureContractExecutionContext executionContext = CreateExecutionContext(contract, contract.IgnoredViolations);
+        IReadOnlyCollection<ArchitectureDiscoveredProject> discoveredProjects =
+            _context.ProjectDiscovery?.DiscoveredProjects ?? Array.Empty<ArchitectureDiscoveredProject>();
+
+        List<ArchitectureViolation> findings = new();
+
+        foreach (ArchitectureDiscoveredProject project in discoveredProjects
+                     .OrderBy(project => project.Path, StringComparer.Ordinal))
+        {
+            if (contract.Exclude.Any(exclusion => MatchesProjectExclusion(exclusion, project)))
+            {
+                continue;
+            }
+
+            Assembly? resolvedAssembly = ResolveProjectAssembly(project);
+
+            if (resolvedAssembly == null)
+            {
+                if (!executionContext.IsIgnored(project.Path, "unresolved project"))
+                {
+                    findings.Add(new ArchitectureViolation(
+                        contract.Name,
+                        contract.Id,
+                        project.Path,
+                        "unresolved project",
+                        new[] { project.AssemblyName }));
+                }
+
+                continue;
+            }
+
+            bool covered = GetAssemblyNamespaces(resolvedAssembly)
+                .Any(ns => IsCoveredByDeclaredLayers(inventory, ns) || IsCoveredByExpandedTemplates(inventory, ns));
+
+            if (!covered && !executionContext.IsIgnored(project.Path, "uncovered project"))
+            {
+                findings.Add(new ArchitectureViolation(
+                    contract.Name,
+                    contract.Id,
+                    project.Path,
+                    "uncovered project",
+                    new[] { GetRepresentativeType(resolvedAssembly) }));
+            }
+        }
+
+        executionContext.CollectUnmatchedIgnores(_unmatchedIgnoredViolations);
+
+        return findings
+            .OrderBy(f => f.SourceType, StringComparer.Ordinal)
+            .ToList();
+    }
+
+    private Assembly? ResolveProjectAssembly(ArchitectureDiscoveredProject project)
+    {
+        return _context.TargetAssemblies.FirstOrDefault(assembly =>
+            string.Equals(GetAssemblyName(assembly), project.AssemblyName, StringComparison.Ordinal));
+    }
+
+    private static string GetAssemblyName(Assembly assembly)
+    {
+        return assembly.GetName().Name ?? assembly.FullName ?? assembly.ToString();
+    }
+
+    private static string[] GetAssemblyNamespaces(Assembly assembly)
+    {
+        return ArchitectureTypeScanner.GetLoadableTypes(assembly)
+            .Select(ArchitectureTypeNames.SafeNamespace)
+            .Distinct(StringComparer.Ordinal)
+            .ToArray();
+    }
+
+    private static string GetRepresentativeType(Assembly assembly)
+    {
+        Type? representative = ArchitectureTypeScanner.GetLoadableTypes(assembly)
+            .OrderBy(type => type.FullName, StringComparer.Ordinal)
+            .FirstOrDefault();
+
+        return representative?.FullName ?? representative?.Name ?? GetAssemblyName(assembly);
+    }
+
+    private static bool MatchesAssemblyExclusion(ArchitectureCoverageExclusion exclusion, string assemblyName)
+    {
+        return !string.IsNullOrWhiteSpace(exclusion.Assembly)
+               && string.Equals(exclusion.Assembly, assemblyName, StringComparison.Ordinal);
+    }
+
+    private static bool MatchesProjectExclusion(ArchitectureCoverageExclusion exclusion, ArchitectureDiscoveredProject project)
+    {
+        if (string.IsNullOrWhiteSpace(exclusion.Project))
+        {
+            return false;
+        }
+
+        return string.Equals(exclusion.Project, project.Path, StringComparison.OrdinalIgnoreCase)
+               || string.Equals(exclusion.Project, Path.GetFileName(project.Path), StringComparison.OrdinalIgnoreCase);
     }
 
     private static bool IsCoveredByDeclaredLayers(ArchitectureCoverageInventory inventory, string namespaceName)
