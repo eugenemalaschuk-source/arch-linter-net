@@ -42,6 +42,8 @@ def total_counts(report: dict) -> dict[str, int]:
 
 def render_summary_markdown(report: dict) -> str:
     totals = total_counts(report)
+    coverage_contracts_configured = bool(report.get("coverage_summary"))
+
     lines = [
         "Architecture coverage",
         f"Status: {overall_status(report)}",
@@ -51,6 +53,14 @@ def render_summary_markdown(report: dict) -> str:
         f"Stale: {totals['stale']}",
         f"Unknown: {totals['unknown']}",
     ]
+
+    if not coverage_contracts_configured:
+        lines.append("")
+        lines.append(
+            "Note: the policy defines no coverage contracts (strict_coverage/audit_coverage). "
+            "These zeros mean coverage is unconfigured, not that everything is covered."
+        )
+
     return "\n".join(lines)
 
 

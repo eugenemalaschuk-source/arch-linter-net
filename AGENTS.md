@@ -24,6 +24,7 @@ rtk make lint-architecture    # strict self-architecture validation (via Core.Te
 rtk make lint-code-size       # file size lint (warn ≥500, error ≥800 lines)
 rtk make test                 # run all tests
 rtk make acceptance           # lint + all tests
+rtk make architecture-coverage-report  # full-solution coverage report (human + JSON) on demand
 ```
 All `dotnet test`/`dotnet format` targets use `--no-restore` — run `restore` first when adding/changing dependencies.
 

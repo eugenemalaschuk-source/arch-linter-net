@@ -1,4 +1,4 @@
-.PHONY: lint lint-architecture audit-architecture lint-code-size lint-dotnet-format test-architecture-coverage-report
+.PHONY: lint lint-architecture audit-architecture lint-code-size lint-dotnet-format test-architecture-coverage-report architecture-coverage-report
 
 lint: lint-code-size lint-dotnet-format lint-architecture lint-docs  ## Run all code quality checks
 
@@ -25,3 +25,17 @@ lint-dotnet-format:  ## Verify C# formatting without changing files
 test-architecture-coverage-report:  ## Run tests for the architecture coverage report generator
 	@cd "$(PROJECT_ROOT)" && UV_PROJECT_ENVIRONMENT="$(PROJECT_ROOT)/.venv" "$(UV)" run --project tools/pyproject.toml \
 		pytest tools/scripts/tests/test_architecture_coverage_report.py
+
+architecture-coverage-report:  ## Show full-solution architecture coverage report locally (human-readable + JSON)
+	@dotnet build "$(PROJECT_ROOT)/src/ArchLinterNet.Cli/ArchLinterNet.Cli.csproj" --nologo -v minimal
+	@dotnet build "$(PROJECT_ROOT)/src/ArchLinterNet.Testing/ArchLinterNet.Testing.csproj" --nologo -v minimal
+	@dotnet build "$(PROJECT_ROOT)/src/ArchLinterNet.Unity/ArchLinterNet.Unity.csproj" --nologo -v minimal
+	@echo ""
+	@echo "===== Architecture coverage report (human-readable) ====="
+	@dotnet run --no-build --project "$(PROJECT_ROOT)/src/ArchLinterNet.Cli" -- \
+		--policy "$(PROJECT_ROOT)/architecture/dependencies.arch.yml" --mode strict || true
+	@echo ""
+	@echo "===== Architecture coverage report (JSON) ====="
+	@dotnet run --no-build --project "$(PROJECT_ROOT)/src/ArchLinterNet.Cli" -- \
+		--policy "$(PROJECT_ROOT)/architecture/dependencies.arch.yml" --mode strict --format json \
+		| python3 -m json.tool || true

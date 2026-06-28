@@ -43,6 +43,35 @@ def test_render_summary_markdown_zero_findings() -> None:
     assert "Unknown: 0" in markdown
 
 
+def test_render_summary_markdown_notes_when_coverage_unconfigured() -> None:
+    report = make_report(True, [])
+
+    markdown = render_summary_markdown(report)
+
+    assert "coverage is unconfigured" in markdown
+
+
+def test_render_summary_markdown_omits_note_when_coverage_contracts_exist_and_clean() -> None:
+    report = make_report(
+        True,
+        [
+            {
+                "scope": "namespace",
+                "counts": {"covered": 3, "excluded": 0, "uncovered": 0, "stale": 0, "unknown": 0},
+                "excluded_items": [],
+                "uncovered_items": [],
+                "stale_items": [],
+                "unknown_items": [],
+            }
+        ],
+    )
+
+    markdown = render_summary_markdown(report)
+
+    assert "Covered: 3" in markdown
+    assert "coverage is unconfigured" not in markdown
+
+
 def test_render_summary_markdown_failed_gate() -> None:
     report = make_report(
         False,
