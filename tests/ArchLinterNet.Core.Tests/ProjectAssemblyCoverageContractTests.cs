@@ -241,6 +241,37 @@ public sealed class ProjectAssemblyCoverageContractTests
     }
 
     [Test]
+    public void ProjectCoverage_ExclusionWithDifferentCase_DoesNotMatch()
+    {
+        ProjectDiscoveryResult discovery = CreateDiscovery(
+            new ArchitectureDiscoveredProject("samples/Demo/Demo.csproj", _testingAssembly.GetName().Name!, new[] { "net10.0" }));
+
+        ArchitectureCoverageContract contract = new()
+        {
+            Id = "project-coverage",
+            Name = "project-coverage",
+            Scope = "project",
+            Reason = "Every discovered project must be mapped or excluded.",
+            Exclude = new List<ArchitectureCoverageExclusion>
+            {
+                // Differs only by case from the discovered project's path/file name. Project
+                // exclusions match by exact (ordinal) string equality, like assembly exclusions,
+                // not case-insensitively, so this exclusion must NOT suppress the finding.
+                new() { Project = "SAMPLES/DEMO/DEMO.CSPROJ", Reason = "Wrong case." },
+            },
+        };
+
+        ArchitectureContractRunner runner = CreateRunner(contract, discovery);
+
+        List<ArchitectureViolation> findings = runner.CheckCoverageContract(contract);
+        ArchitectureCoverageSummary? summary = runner.BuildCoverageSummary(contract);
+
+        Assert.That(findings.Single().SourceType, Is.EqualTo("samples/Demo/Demo.csproj"));
+        Assert.That(summary!.Counts.Excluded, Is.EqualTo(0));
+        Assert.That(summary.Counts.Uncovered, Is.EqualTo(1));
+    }
+
+    [Test]
     public void ProjectCoverage_DiscoveredProjectWithNoResolvedAssembly_IsUnknown()
     {
         ProjectDiscoveryResult discovery = CreateDiscovery(

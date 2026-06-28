@@ -1,3 +1,4 @@
+using System.Reflection;
 using ArchLinterNet.Core.Contracts;
 using ArchLinterNet.Core.Discovery;
 using ArchLinterNet.Core.Model;
@@ -64,14 +65,26 @@ public static class ArchitectureRunnerFactory
                 document, repositoryRoot, resolveAssemblyOutputs);
             ApplyDiscoveryResult(document.Analysis, discovery);
 
-            if (resolveAssemblyOutputs && document.Analysis.TargetAssemblies.Count == 0 && discovery.Diagnostics.Count > 0)
+            // A scope: project coverage contract needs every discovered project to reach
+            // CheckProjectCoverageContract — including ones whose build output is missing, stale,
+            // or ambiguous and therefore never resolved to a target assembly — so it can classify
+            // them as "unknown"/"unresolved project" instead of nothing at all. Skip the
+            // no-assemblies-resolved hard-fail in that case rather than erroring out before the
+            // coverage engine ever runs.
+            bool projectCoverageCanReportUnresolvedProjects =
+                discovery.DiscoveredProjects.Count > 0 && HasProjectScopeCoverageContract(document);
+
+            if (resolveAssemblyOutputs && document.Analysis.TargetAssemblies.Count == 0
+                && discovery.Diagnostics.Count > 0 && !projectCoverageCanReportUnresolvedProjects)
             {
                 string details = string.Join("; ", discovery.Diagnostics.Select(d => d.Message));
                 throw new InvalidOperationException(
                     $"Architecture YAML must define analysis.target_assemblies. Project discovery did not resolve any assemblies: {details}");
             }
 
-            ResolutionResult resolution = ArchitectureAssemblyResolver.ResolveFromDocument(document, repositoryRoot);
+            ResolutionResult resolution = document.Analysis.TargetAssemblies.Count == 0 && projectCoverageCanReportUnresolvedProjects
+                ? new ResolutionResult(Array.Empty<Assembly>(), Array.Empty<string>(), Array.Empty<string>())
+                : ArchitectureAssemblyResolver.ResolveFromDocument(document, repositoryRoot);
             ProjectDiscoveryResult? attemptedDiscovery = ReferenceEquals(discovery, ProjectDiscoveryResult.Empty)
                 ? null
                 : discovery;
@@ -82,6 +95,12 @@ public static class ArchitectureRunnerFactory
         }
 
         return new ArchitectureRunnerSetup(repositoryRoot, runner);
+    }
+
+    private static bool HasProjectScopeCoverageContract(ArchitectureContractDocument document)
+    {
+        return document.Contracts.StrictCoverage.Concat(document.Contracts.AuditCoverage)
+            .Any(contract => string.Equals(contract.Scope, "project", StringComparison.Ordinal));
     }
 
     private static void ApplyDiscoveryResult(ArchitectureAnalysisConfiguration analysis, ProjectDiscoveryResult discovery)

@@ -1,3 +1,5 @@
+using ArchLinterNet.Core.Model;
+using ArchLinterNet.Core.Reporting;
 using ArchLinterNet.Core.Validation;
 using NUnit.Framework;
 
@@ -471,5 +473,89 @@ public sealed class CoverageContractReservedTests
 
         Assert.That(outcome.Passed, Is.True);
         Assert.That(outcome.CoverageFindings, Is.Empty);
+    }
+
+    private string WriteUnresolvableProjectFixture()
+    {
+        // A project with a declared target framework but no build output anywhere under bin/ —
+        // project discovery will diagnose "missing project build output" and never resolve this
+        // project to a target assembly. With no analysis.target_assemblies set, this previously
+        // made ArchitectureRunnerFactory.BuildRunner throw before any coverage contract ran.
+        string projectDir = Path.Combine(_tempDir, "src", "Unresolvable");
+        Directory.CreateDirectory(projectDir);
+        File.WriteAllText(
+            Path.Combine(projectDir, "Unresolvable.csproj"),
+            "<Project Sdk=\"Microsoft.NET.Sdk\"><PropertyGroup><TargetFramework>net10.0</TargetFramework></PropertyGroup></Project>");
+        return "src/Unresolvable/Unresolvable.csproj";
+    }
+
+    [Test]
+    public void StrictProjectCoverage_AllProjectsUnresolved_ReportsUnresolvedProjectInsteadOfThrowing()
+    {
+        string relativeProjectPath = WriteUnresolvableProjectFixture();
+        string policyPath = WritePolicy($"""
+            version: 1
+            name: Test
+
+            analysis:
+              projects: ["{relativeProjectPath}"]
+
+            contracts:
+              strict_coverage:
+                - name: project-coverage
+                  scope: project
+                  reason: Every discovered project must be mapped or excluded.
+            """);
+
+        ValidationOutcome outcome = ArchitectureValidationService.Validate(new ValidationRequest
+        {
+            PolicyPath = policyPath,
+            Mode = "strict"
+        });
+
+        Assert.That(outcome.Passed, Is.False);
+        ArchitectureViolation finding = outcome.CoverageFindings.Single();
+        Assert.That(finding.ForbiddenNamespace, Is.EqualTo("unresolved project"));
+        Assert.That(finding.SourceType, Is.EqualTo(relativeProjectPath));
+
+        ArchitectureCoverageSummary summary = outcome.CoverageSummaries.Single();
+        Assert.That(summary.Counts.Unknown, Is.EqualTo(1));
+        Assert.That(summary.Counts.Uncovered, Is.EqualTo(0));
+    }
+
+    [Test]
+    public void AuditProjectCoverage_AllProjectsUnresolved_CoverageEngineStillRunsAndReportsUnknown()
+    {
+        string relativeProjectPath = WriteUnresolvableProjectFixture();
+        string policyPath = WritePolicy($"""
+            version: 1
+            name: Test
+
+            analysis:
+              projects: ["{relativeProjectPath}"]
+              coverage: warn
+
+            contracts:
+              audit_coverage:
+                - name: project-coverage
+                  scope: project
+                  reason: Every discovered project must be mapped or excluded.
+            """);
+
+        ValidationOutcome outcome = ArchitectureValidationService.Validate(new ValidationRequest
+        {
+            PolicyPath = policyPath,
+            Mode = "audit"
+        });
+
+        // The missing-build-output discovery diagnostic is itself a "<configuration>" violation
+        // (ArchitectureContractRunner.CheckConfiguration), surfaced regardless of mode or
+        // analysis.coverage — that's pre-existing, orthogonal behavior, not asserted here. What
+        // this test proves is the actual regression: ArchitectureRunnerFactory.BuildRunner no
+        // longer throws before the coverage engine runs, so the contract still reaches
+        // CheckProjectCoverageContract and classifies the unresolved project as unknown.
+        Assert.That(outcome.CoverageConfig, Is.EqualTo("warn"));
+        Assert.That(outcome.CoverageFindings.Single().ForbiddenNamespace, Is.EqualTo("unresolved project"));
+        Assert.That(outcome.CoverageSummaries.Single().Counts.Unknown, Is.EqualTo(1));
     }
 }

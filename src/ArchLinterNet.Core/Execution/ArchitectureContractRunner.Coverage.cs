@@ -515,8 +515,8 @@ public sealed partial class ArchitectureContractRunner
             return false;
         }
 
-        return string.Equals(exclusion.Project, project.Path, StringComparison.OrdinalIgnoreCase)
-               || string.Equals(exclusion.Project, Path.GetFileName(project.Path), StringComparison.OrdinalIgnoreCase);
+        return string.Equals(exclusion.Project, project.Path, StringComparison.Ordinal)
+               || string.Equals(exclusion.Project, Path.GetFileName(project.Path), StringComparison.Ordinal);
     }
 
     private static bool IsCoveredByDeclaredLayers(ArchitectureCoverageInventory inventory, string namespaceName)
