@@ -89,7 +89,7 @@ The baseline should be reviewed like code and cleaned up as violations are fixed
 
 ## Baseline debt semantics in the coverage gate
 
-When architecture coverage is wired into CI as a quality gate (see this repository's `.github/workflows/architecture-coverage.yml`), baseline entries change how findings are reported, not whether they exist:
+When architecture coverage is wired into CI as a quality gate (see the `architecture-coverage` steps in this repository's `.github/workflows/ci.yml`, which run after the existing acceptance gate against the same already-built solution), baseline entries change how findings are reported, not whether they exist:
 
 - **Existing accepted debt** lives in the baseline file and does not fail the pull request. The strict run still reports it in `coverage_findings`/`coverage_summary`, but a finding matched by a baseline entry is treated as known debt rather than a regression.
 - **New coverage findings** — anything not matched by an existing baseline entry — fail the pull request. This is what keeps the gate "no new debt" instead of "no debt."

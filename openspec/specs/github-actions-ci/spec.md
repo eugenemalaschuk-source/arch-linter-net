@@ -29,18 +29,19 @@ The CI workflow SHALL NOT perform official release packaging, publication, taggi
 - **WHEN** the CI workflow runs for a pull request or push
 - **THEN** it does not publish packages, create tags, or create GitHub Releases
 
-### Requirement: README quality signal badges
-The repository README SHALL display a badges section distinguishing build status from architecture coverage status.
+### Requirement: README quality signal badge
+The repository README SHALL display a CI status badge and document that it covers the architecture coverage quality gate.
 
-#### Scenario: Badges section is present
+#### Scenario: Badge and explanation are present
 - **WHEN** a reader views the README
-- **THEN** it shows a build status badge sourced from `ci.yml`
-- **AND** it shows a separate architecture coverage badge sourced from the `architecture-coverage` workflow
+- **THEN** it shows a CI status badge sourced from `ci.yml`
+- **AND** it links to documentation explaining that the same badge reflects the architecture coverage gate
 
-### Requirement: Architecture coverage workflow is independent of the existing CI workflow
-The `architecture-coverage` workflow SHALL NOT modify or replace the existing `ci.yml` pull request validation workflow.
+### Requirement: Architecture coverage runs in the existing CI workflow
+The architecture coverage steps (strict/audit JSON artifacts, report generation, sticky PR comment) SHALL run inside the existing `ci.yml` acceptance job, after `make acceptance`, reusing its already-built solution instead of restoring and building a second time in a separate workflow.
 
-#### Scenario: ci.yml is untouched
-- **WHEN** the architecture-coverage-ci-reporting capability is added
-- **THEN** `.github/workflows/ci.yml` has no diff
+#### Scenario: Coverage steps run after acceptance in the same job
+- **WHEN** the `ci.yml` `validate` job runs
+- **THEN** the architecture coverage steps execute after the `Acceptance` step in the same job
+- **AND** no additional `dotnet restore`/`dotnet build` of the already-built assemblies is performed before invoking the CLI
 

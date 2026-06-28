@@ -1,7 +1,8 @@
 # ArchLinterNet
 
 [![CI](https://github.com/eugenemalaschuk-source/arch-linter-net/actions/workflows/ci.yml/badge.svg)](https://github.com/eugenemalaschuk-source/arch-linter-net/actions/workflows/ci.yml)
-[![Architecture coverage](https://github.com/eugenemalaschuk-source/arch-linter-net/actions/workflows/architecture-coverage.yml/badge.svg)](https://github.com/eugenemalaschuk-source/arch-linter-net/actions/workflows/architecture-coverage.yml)
+
+The CI badge covers build, test, and the architecture coverage quality gate — see [CI integration](docs/guides/ci-integration.md#baseline-debt-semantics-in-the-coverage-gate) for how the coverage gate and PR comment work.
 
 Declarative architecture contracts and dependency linting for .NET repositories.
 
