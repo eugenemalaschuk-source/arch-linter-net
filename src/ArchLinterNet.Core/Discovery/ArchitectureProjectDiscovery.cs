@@ -64,6 +64,7 @@ public static class ArchitectureProjectDiscovery
         List<string> targetAssemblyNames = new();
         List<string> assemblySearchPaths = new();
         List<string> sourceRoots = new();
+        List<ArchitectureDiscoveredProject> discoveredProjects = new();
 
         foreach (string projectPath in projectPaths.Distinct(StringComparer.OrdinalIgnoreCase))
         {
@@ -89,6 +90,8 @@ public static class ArchitectureProjectDiscovery
             // A project is a valid source root as soon as it parses, regardless of whether its
             // build output can be (or needs to be) resolved for assembly seeding.
             sourceRoots.Add(GetRelativeDirectory(repositoryRoot, projectPath));
+            discoveredProjects.Add(new ArchitectureDiscoveredProject(
+                GetRelativePath(repositoryRoot, projectPath), projectFile.AssemblyName, projectFile.TargetFrameworks));
 
             if (!resolveAssemblyOutputs)
             {
@@ -117,7 +120,10 @@ public static class ArchitectureProjectDiscovery
             targetAssemblyNames.Distinct(StringComparer.Ordinal).ToArray(),
             assemblySearchPaths.Distinct(StringComparer.OrdinalIgnoreCase).ToArray(),
             sourceRoots.Distinct(StringComparer.OrdinalIgnoreCase).ToArray(),
-            diagnostics);
+            diagnostics)
+        {
+            DiscoveredProjects = discoveredProjects
+        };
     }
 
     private static bool TryResolveOutput(
