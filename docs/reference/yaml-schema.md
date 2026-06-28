@@ -416,24 +416,27 @@ report references from source types into those vendor/framework surfaces.
 
 ### Coverage contract
 
-Current runtime support covers `scope: namespace`, `scope: rule_input`, `scope: project`, and
-`scope: assembly`.
+Current runtime support covers `scope: namespace`, `scope: rule_input`, `scope: project`,
+`scope: assembly`, and `scope: dependency_edge`.
 
 ```yaml
 - id: <string>                  # Optional — stable identifier
   name: <string>                # Required — human-readable contract name
-  scope: namespace              # Required — namespace | rule_input | project | assembly
+  scope: namespace              # Required — namespace | rule_input | project | assembly | dependency_edge
   roots:                        # Required for scope: namespace — one or more namespace matchers
     - namespace: <string>       # Required — literal prefix or constrained glob
       namespace_suffix: <string>  # Optional — same semantics as layers.<name>.namespace_suffix
   contract_ids:                 # Required for scope: rule_input — referenced contract IDs
     - <string>
+  between:                      # Required for scope: dependency_edge — declared-layer-name pairs
+    - [<string>, <string>]      # [source layer name, target layer name], both must be declared layers
   exclude:                      # Optional — explicit exclusions
     - namespace: <string>       # Optional — namespace matcher (scope: namespace only)
       namespace_suffix: <string>  # Optional — suffix-only matcher or refinement (scope: namespace only)
       contract_id: <string>     # Optional — referenced contract ID (scope: rule_input only)
       project: <string>         # Optional — discovered project path or file name (scope: project only)
       assembly: <string>        # Optional — assembly simple name (scope: assembly only)
+      between: [<string>, <string>]  # Optional — declared-layer-name pair (scope: dependency_edge only)
       reason: <string>          # Required when exclude entry exists
   ignored_violations: []        # Optional — baseline accepted coverage debt
   reason: <string>              # Recommended — why this coverage gate exists
@@ -441,7 +444,9 @@ Current runtime support covers `scope: namespace`, `scope: rule_input`, `scope: 
 
 `scope: project` and `scope: assembly` declare neither `roots` nor `between`/`contract_ids`; they
 classify every project/assembly discovered or resolved for the run. `scope: project` additionally
-requires `analysis.solution` or `analysis.projects` to be set.
+requires `analysis.solution` or `analysis.projects` to be set. `scope: dependency_edge` declares
+only `between` (and not `roots`/`contract_ids`); each pair must name two layers declared under
+`layers`.
 
 Namespace coverage (`scope: namespace`) checks first-party namespaces
 discovered in the analysis inventory and reports any namespace under `roots`
@@ -502,10 +507,23 @@ project/assembly granularity instead of the namespace granularity. See
 [Coverage contracts](../contracts/coverage.md#project-and-assembly-coverage) for examples and
 exclusion semantics.
 
+Dependency-edge coverage (`scope: dependency_edge`) classifies, for each declared layer pair in
+`between`, observed first-party namespace-to-namespace edges whose source/target namespaces
+resolve to that pair's layers. A pair is `covered` when an existing dependency contract
+(`source`/`forbidden` naming the pair), layer contract (chain containing both layers), independence
+contract (pair listed together), allow-only contract (`source` equals the pair's first layer —
+governs that layer's entire outbound surface regardless of whether the second layer is itself
+`allowed`), protected contract (`protected` contains the pair's second layer — governs every
+reference into that layer regardless of whether the first layer is an `allowed_importer`), or
+expanded layer template (container layers matching both names) already governs it; otherwise edges
+in that pair are `uncovered`, unless excluded. Layer pairs not declared in any `between` list are
+simply not evaluated. See [Coverage contracts](../contracts/coverage.md#dependency-edge-coverage)
+for examples and the exact governance rule.
+
 Current limits:
 
-- `scope: namespace`, `scope: rule_input`, `scope: project`, and `scope: assembly` are implemented.
-- `scope: dependency_edge` is reserved and fails validation with an actionable error.
+- `scope: namespace`, `scope: rule_input`, `scope: project`, `scope: assembly`, and
+  `scope: dependency_edge` are implemented.
 - Coverage findings are emitted as a separate coverage section in human output
   and `coverage_findings` array in JSON output.
 
