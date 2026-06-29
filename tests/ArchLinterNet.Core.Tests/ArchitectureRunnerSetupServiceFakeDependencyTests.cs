@@ -25,8 +25,8 @@ public sealed class ArchitectureRunnerSetupServiceFakeDependencyTests
             WasCalled = true;
             return new ResolutionResult(
                 new[] { typeof(FakeAssemblyResolutionService).Assembly },
-                Array.Empty<string>(),
-                Array.Empty<string>());
+                new[] { "fake-missing-assembly-marker" },
+                new[] { "fake-probing-path-marker" });
         }
     }
 
@@ -59,7 +59,13 @@ public sealed class ArchitectureRunnerSetupServiceFakeDependencyTests
             ArchitectureRunnerSetup setup = runnerSetupService.BuildRunner(document, policyPath);
 
             Assert.That(fakeAssemblyResolution.WasCalled, Is.True);
-            Assert.That(setup.Runner, Is.Not.Null);
+
+            // Prove the fake's ResolutionResult actually reached the runner's analysis context,
+            // not just that the fake was invoked — the context is what every contract check reads.
+            ArchitectureAnalysisContext context = setup.Runner.Session.Context;
+            Assert.That(context.TargetAssemblies, Has.Member(typeof(FakeAssemblyResolutionService).Assembly));
+            Assert.That(context.MissingAssemblyNames, Has.Member("fake-missing-assembly-marker"));
+            Assert.That(context.AssemblyProbingPaths, Has.Member("fake-probing-path-marker"));
         }
         finally
         {
