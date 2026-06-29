@@ -8,6 +8,7 @@ It is intentionally excluded from the public MkDocs/GitHub Pages product site.
 
 - [Documentation boundary](documentation-boundary.md) — public product docs vs internal project docs.
 - [Backlog governance and issue authoring](backlog-governance.md) — internal issue and backlog rules.
+- [Core architecture blueprint](core-architecture-blueprint.md) — target Core module graph, application/composition seams, and state-ownership rules for the architecture-health refactor (#132/#133).
 
 ## Publishing rule
 
