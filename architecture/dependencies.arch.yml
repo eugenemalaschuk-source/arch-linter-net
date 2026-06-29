@@ -18,12 +18,19 @@ layers:
     namespace: ArchLinterNet.Core.Execution
   core_validation:
     namespace: ArchLinterNet.Core.Validation
+  core_composition:
+    namespace: ArchLinterNet.Core.Composition
   cli:
     namespace: ArchLinterNet.Cli
   testing:
     namespace: ArchLinterNet.Testing
   unity:
     namespace: ArchLinterNet.Unity
+
+external_dependencies:
+  dependency_injection_container:
+    namespace_prefixes:
+      - Microsoft.Extensions.DependencyInjection
 
 analysis:
   target_assemblies:
@@ -83,6 +90,57 @@ contracts:
       source: core_scanning
       forbidden: [core_execution, core_validation, cli, testing, unity]
       reason: Scanning internals must not depend upward on contract execution or the application seam.
+
+  strict_external:
+    - name: core-model-must-not-depend-on-di-container
+      source: core_model
+      forbidden: [dependency_injection_container]
+      reason: Container APIs must stay confined to the composition boundary.
+
+    - name: core-reporting-must-not-depend-on-di-container
+      source: core_reporting
+      forbidden: [dependency_injection_container]
+      reason: Container APIs must stay confined to the composition boundary.
+
+    - name: core-resolution-must-not-depend-on-di-container
+      source: core_resolution
+      forbidden: [dependency_injection_container]
+      reason: Container APIs must stay confined to the composition boundary.
+
+    - name: core-scanning-must-not-depend-on-di-container
+      source: core_scanning
+      forbidden: [dependency_injection_container]
+      reason: Container APIs must stay confined to the composition boundary.
+
+    - name: core-contracts-must-not-depend-on-di-container
+      source: core_contracts
+      forbidden: [dependency_injection_container]
+      reason: Container APIs must stay confined to the composition boundary.
+
+    - name: core-execution-must-not-depend-on-di-container
+      source: core_execution
+      forbidden: [dependency_injection_container]
+      reason: Container APIs must stay confined to the composition boundary.
+
+    - name: core-validation-must-not-depend-on-di-container
+      source: core_validation
+      forbidden: [dependency_injection_container]
+      reason: Application services consume the composition root's interfaces, not container APIs directly.
+
+    - name: cli-must-not-depend-on-di-container
+      source: cli
+      forbidden: [dependency_injection_container]
+      reason: Adapters must consume the composition root's facade, not container APIs directly.
+
+    - name: testing-must-not-depend-on-di-container
+      source: testing
+      forbidden: [dependency_injection_container]
+      reason: Adapters must consume the composition root's facade, not container APIs directly.
+
+    - name: unity-must-not-depend-on-di-container
+      source: unity
+      forbidden: [dependency_injection_container]
+      reason: Adapters must consume the composition root's facade, not container APIs directly.
 
   strict_layers:
     - name: core-layering
