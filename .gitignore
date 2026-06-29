@@ -64,3 +64,9 @@ __pycache__/
 
 # MkDocs build output
 site/
+
+# Local/CI architecture coverage report output (make architecture-coverage-report, ci.yml)
+architecture-strict.json
+architecture-audit.json
+architecture-coverage.md
+changed-files.txt
