@@ -10,6 +10,29 @@ namespace ArchLinterNet.Core.Tests;
 [TestFixture]
 public sealed class ArchitectureRunnerSetupServiceFakeDependencyTests
 {
+    private sealed class FakeRepositoryRootResolver : IArchitectureRepositoryRootResolver
+    {
+        public bool WasCalled { get; private set; }
+
+        public string ResolveFrom(string policyPath)
+        {
+            WasCalled = true;
+            return "/fake/repository/root";
+        }
+    }
+
+    private sealed class FakeProjectDiscoveryService : IArchitectureProjectDiscoveryService
+    {
+        public bool WasCalled { get; private set; }
+
+        public ProjectDiscoveryResult ResolveAndApply(
+            ArchitectureContractDocument document, string repositoryRoot, bool resolveAssemblyOutputs)
+        {
+            WasCalled = true;
+            return ProjectDiscoveryResult.Empty;
+        }
+    }
+
     private sealed class FakeAssemblyResolutionService : IArchitectureAssemblyResolutionService
     {
         public bool WasCalled { get; private set; }
@@ -31,45 +54,38 @@ public sealed class ArchitectureRunnerSetupServiceFakeDependencyTests
     }
 
     [Test]
-    public void BuildRunner_FakeAssemblyResolutionService_DrivesRunnerWithoutRealResolution()
+    public void BuildRunner_FakeSetupDependencies_DriveRunnerWithoutTouchingFileSystem()
     {
-        // No analysis.target_assemblies and no analysis.solution/projects means the real
-        // ArchitectureAssemblyResolver/ArchitectureProjectDiscovery would have nothing to resolve
-        // and ArchitectureAssemblyResolutionService would throw. Substituting a fake here proves
-        // BuildRunner's setup dependencies are independently replaceable, without needing a real
-        // file system, Roslyn compilation, or assembly load to drive the runner.
-        string repoRoot = Path.Combine(Path.GetTempPath(), $"arch-linter-fake-dependency-{Guid.NewGuid():N}");
-        Directory.CreateDirectory(repoRoot);
-        try
-        {
-            string policyPath = Path.Combine(repoRoot, "policy.arch.yml");
-            File.WriteAllText(policyPath, "version: 1\nname: test\n");
+        // Faking repository-root resolution, project discovery, and assembly resolution together
+        // means BuildRunner never touches a real file system, never globs for projects, and never
+        // probes for or loads a real assembly — proving these setup dependencies are independently
+        // replaceable, not just that one of them can be swapped while the others still do real I/O.
+        var document = new ArchitectureContractDocument { Version = 1, Name = "Test" };
+        var fakeRepositoryRoot = new FakeRepositoryRootResolver();
+        var fakeProjectDiscovery = new FakeProjectDiscoveryService();
+        var fakeAssemblyResolution = new FakeAssemblyResolutionService();
 
-            var document = new ArchitectureContractDocument { Version = 1, Name = "Test" };
-            var fakeAssemblyResolution = new FakeAssemblyResolutionService();
+        var runnerSetupService = new ArchitectureRunnerSetupService(
+            new ArchitecturePolicyDocumentLoader(),
+            new ArchitectureBaselineLoadingService(),
+            fakeRepositoryRoot,
+            new ConditionSetResolutionService(),
+            fakeProjectDiscovery,
+            fakeAssemblyResolution);
 
-            var runnerSetupService = new ArchitectureRunnerSetupService(
-                new ArchitecturePolicyDocumentLoader(),
-                new ArchitectureBaselineLoadingService(),
-                new ArchitectureRepositoryRootResolver(),
-                new ConditionSetResolutionService(),
-                new ArchitectureProjectDiscoveryService(),
-                fakeAssemblyResolution);
+        ArchitectureRunnerSetup setup = runnerSetupService.BuildRunner(document, policyPath: "unused-by-fakes.arch.yml");
 
-            ArchitectureRunnerSetup setup = runnerSetupService.BuildRunner(document, policyPath);
+        Assert.That(fakeRepositoryRoot.WasCalled, Is.True);
+        Assert.That(fakeProjectDiscovery.WasCalled, Is.True);
+        Assert.That(fakeAssemblyResolution.WasCalled, Is.True);
+        Assert.That(setup.RepositoryRoot, Is.EqualTo("/fake/repository/root"));
 
-            Assert.That(fakeAssemblyResolution.WasCalled, Is.True);
-
-            // Prove the fake's ResolutionResult actually reached the runner's analysis context,
-            // not just that the fake was invoked — the context is what every contract check reads.
-            ArchitectureAnalysisContext context = setup.Runner.Session.Context;
-            Assert.That(context.TargetAssemblies, Has.Member(typeof(FakeAssemblyResolutionService).Assembly));
-            Assert.That(context.MissingAssemblyNames, Has.Member("fake-missing-assembly-marker"));
-            Assert.That(context.AssemblyProbingPaths, Has.Member("fake-probing-path-marker"));
-        }
-        finally
-        {
-            Directory.Delete(repoRoot, true);
-        }
+        // Prove the fakes' results actually reached the runner's analysis context, not just that
+        // they were invoked — the context is what every contract check reads.
+        ArchitectureAnalysisContext context = setup.Runner.Session.Context;
+        Assert.That(context.RepositoryRoot, Is.EqualTo("/fake/repository/root"));
+        Assert.That(context.TargetAssemblies, Has.Member(typeof(FakeAssemblyResolutionService).Assembly));
+        Assert.That(context.MissingAssemblyNames, Has.Member("fake-missing-assembly-marker"));
+        Assert.That(context.AssemblyProbingPaths, Has.Member("fake-probing-path-marker"));
     }
 }
