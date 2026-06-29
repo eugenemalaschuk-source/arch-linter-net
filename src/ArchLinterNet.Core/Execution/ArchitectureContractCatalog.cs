@@ -47,33 +47,39 @@ public sealed class ArchitectureContractCatalog
             }
         }
 
+        // Family order here is observable: it determines ArchitectureContractExecutor's dispatch
+        // order via FamiliesInOrder below, which in turn determines violation/cycle insertion order
+        // in ValidationOutcome (and therefore JSON output) and --timings entry order. This matches
+        // the pre-handler-registry executor's family order exactly, so migrating dispatch onto the
+        // catalog does not reorder observable output.
         AddGroup("strict", "strict", "dependency", groups.Strict);
         AddGroup("audit", "audit", "dependency", groups.Audit);
         AddGroup("strict_layers", "strict", "layer", groups.StrictLayers);
         AddGroup("audit_layers", "audit", "layer", groups.AuditLayers);
+
+        AddGroup("strict_layer_templates", "strict", "layer_template",
+            LayerTemplateExpander.Expand(groups.StrictLayerTemplates));
+        AddGroup("audit_layer_templates", "audit", "layer_template",
+            LayerTemplateExpander.Expand(groups.AuditLayerTemplates));
+
         AddGroup("strict_allow_only", "strict", "allow_only", groups.StrictAllowOnly);
         AddGroup("audit_allow_only", "audit", "allow_only", groups.AuditAllowOnly);
         AddGroup("strict_cycles", "strict", "cycle", groups.StrictCycles);
         AddGroup("audit_cycles", "audit", "cycle", groups.AuditCycles);
-        AddGroup("strict_acyclic_siblings", "strict", "acyclic_sibling", groups.StrictAcyclicSiblings);
-        AddGroup("audit_acyclic_siblings", "audit", "acyclic_sibling", groups.AuditAcyclicSiblings);
         AddGroup("strict_method_body", "strict", "method_body", groups.StrictMethodBody);
         AddGroup("audit_method_body", "audit", "method_body", groups.AuditMethodBody);
+        AddGroup("strict_asmdef", "strict", "asmdef", groups.StrictAsmdef);
+        AddGroup("audit_asmdef", "audit", "asmdef", groups.AuditAsmdef);
         AddGroup("strict_independence", "strict", "independence", groups.StrictIndependence);
         AddGroup("audit_independence", "audit", "independence", groups.AuditIndependence);
         AddGroup("strict_protected", "strict", "protected", groups.StrictProtected);
         AddGroup("audit_protected", "audit", "protected", groups.AuditProtected);
         AddGroup("strict_external", "strict", "external", groups.StrictExternal);
         AddGroup("audit_external", "audit", "external", groups.AuditExternal);
-        AddGroup("strict_asmdef", "strict", "asmdef", groups.StrictAsmdef);
-        AddGroup("audit_asmdef", "audit", "asmdef", groups.AuditAsmdef);
+        AddGroup("strict_acyclic_siblings", "strict", "acyclic_sibling", groups.StrictAcyclicSiblings);
+        AddGroup("audit_acyclic_siblings", "audit", "acyclic_sibling", groups.AuditAcyclicSiblings);
         AddGroup("strict_coverage", "strict", "coverage", groups.StrictCoverage);
         AddGroup("audit_coverage", "audit", "coverage", groups.AuditCoverage);
-
-        AddGroup("strict_layer_templates", "strict", "layer_template",
-            LayerTemplateExpander.Expand(groups.StrictLayerTemplates));
-        AddGroup("audit_layer_templates", "audit", "layer_template",
-            LayerTemplateExpander.Expand(groups.AuditLayerTemplates));
 
         return new ArchitectureContractCatalog(descriptors, familiesInOrder);
     }
