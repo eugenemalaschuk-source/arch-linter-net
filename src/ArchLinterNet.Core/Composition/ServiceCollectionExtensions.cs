@@ -18,6 +18,18 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<IArchitectureProjectDiscoveryService, ArchitectureProjectDiscoveryService>();
         services.AddSingleton<IArchitectureAssemblyResolutionService, ArchitectureAssemblyResolutionService>();
         services.AddSingleton<IArchitectureRunnerSetupService, ArchitectureRunnerSetupService>();
+        services.AddSingleton<IArchitectureContractHandler, DependencyContractHandler>();
+        services.AddSingleton<IArchitectureContractHandler, LayerContractHandler>();
+        services.AddSingleton<IArchitectureContractHandler, AllowOnlyContractHandler>();
+        services.AddSingleton<IArchitectureContractHandler, CycleContractHandler>();
+        services.AddSingleton<IArchitectureContractHandler, AcyclicSiblingContractHandler>();
+        services.AddSingleton<IArchitectureContractHandler, MethodBodyContractHandler>();
+        services.AddSingleton<IArchitectureContractHandler, AsmdefContractHandler>();
+        services.AddSingleton<IArchitectureContractHandler, IndependenceContractHandler>();
+        services.AddSingleton<IArchitectureContractHandler, ProtectedContractHandler>();
+        services.AddSingleton<IArchitectureContractHandler, ExternalContractHandler>();
+        services.AddSingleton<IArchitectureContractHandler, CoverageContractHandler>();
+        services.AddSingleton<ArchitectureContractHandlerRegistry>();
         services.AddSingleton<IArchitectureValidationApplicationService, ArchitectureValidationApplicationService>();
         services.AddSingleton<IArchitectureBaselineApplicationService, ArchitectureBaselineApplicationService>();
         return services;

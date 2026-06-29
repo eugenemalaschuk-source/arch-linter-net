@@ -1,0 +1,46 @@
+## Context
+
+`ArchitectureContractHandlerRegistry.CreateDefault()` (`src/ArchLinterNet.Core/Execution/ArchitectureContractHandlerRegistry.cs`) is a static factory that wires up 4 handlers (`DependencyContractHandler`, `LayerContractHandler` for both `layer` and `layer_template` keys, `CycleContractHandler`, `CoverageContractHandler`). `ArchitectureContractExecutor` (`src/ArchLinterNet.Core/Execution/ArchitectureContractExecutor.cs`) is a static class holding a `static readonly` registry built from `CreateDefault()`, and dispatches `dependency`/`layer`/`cycle`/`coverage` through `_handlerRegistry.Execute(...)` but calls `runner.CheckAllowOnlyContract()`, `runner.CheckMethodBodyContract()`, `runner.CheckAsmdefContract()`, `runner.CheckIndependenceContract()`, `runner.CheckProtectedContract()`, `runner.CheckExternalContract()`, and `runner.CheckAcyclicSiblingContract()` directly for the other 7 families.
+
+The composition root (`ArchLinterNet.Core.Composition`, from the prior #151 change) already confines `Microsoft.Extensions.DependencyInjection` container types to that namespace and registers application/runner-setup services as singletons in `ServiceCollectionExtensions.AddArchLinterNetCore()`. This change extends that same registration surface to contract handlers, per the core-architecture-blueprint's "Handler/checker extension model" section.
+
+## Goals / Non-Goals
+
+**Goals:**
+- Every contract family (`dependency`, `layer`, `layer_template`, `allow_only`, `cycle`, `acyclic_sibling`, `method_body`, `asmdef`, `independence`, `protected`, `external`, `coverage`) dispatches through `ArchitectureContractHandlerRegistry.Execute(family, runner, contract)`.
+- `ArchitectureContractHandlerRegistry` becomes an instance class constructed from `IEnumerable<IArchitectureContractHandler>`; remove `CreateDefault()`.
+- All 11 (12 counting `layer_template` as a second key for `LayerContractHandler`) handler registrations and the registry itself are registered in `ServiceCollectionExtensions.AddArchLinterNetCore()`.
+- Preserve exact violation/cycle output, ordering, baseline candidate collection, and timing instrumentation in `ArchitectureContractExecutor.Execute()` for every family.
+- No handler, the registry, the runner, or the executor takes a constructor/method dependency on `IServiceProvider`.
+
+**Non-Goals:**
+- Changing any `CheckXxxContract` method body or its return shape — handlers remain thin delegations, exactly like the 4 existing ones.
+- Adding new contract families or changing YAML/schema semantics.
+- Performance work — handler dispatch through a dictionary lookup is already the pattern for 4 families; extending it to 11 has no measurable cost difference.
+- Migrating `ArchitectureContractExecutor` itself off being a static class — issue #137 only asks to remove its direct `runner.CheckXxx()` calls, not to convert it to an instance service (that is implied future work, not this issue's acceptance criteria).
+
+## Decisions
+
+**1. New handlers are thin delegations added to `ArchitectureContractHandlers.cs`, matching the existing 4.**
+Each new handler (`AllowOnlyContractHandler`, `MethodBodyContractHandler`, `AsmdefContractHandler`, `IndependenceContractHandler`, `ProtectedContractHandler`, `ExternalContractHandler`, `AcyclicSiblingContractHandler`) implements `IArchitectureContractHandler` with a `Family` string and an `Execute` method that casts the contract and calls the corresponding `runner.CheckXxxContract()`, wrapping the result via `ArchitectureHandlerResult.FromViolations()` or `FromCycles()` (the latter for `acyclic_sibling`, which returns `IReadOnlyCollection<string>` like `cycle`). This is exactly the shape of `CycleContractHandler`, including its contract-ID prefixing behavior for cycle output — `AcyclicSiblingContractHandler` follows the same prefixing convention used by `CycleContractHandler` so the two cycle-shaped families stay consistent. No behavior changes inside the `CheckXxxContract` methods themselves.
+
+**2. `ArchitectureContractHandlerRegistry` takes `IEnumerable<IArchitectureContractHandler>` in its constructor and builds the family→handler dictionary once, replacing `CreateDefault()`.**
+This is the minimal change that satisfies "the registry ... is an instance service built from `IEnumerable<IArchitectureContractHandler>` at composition time, keyed by `Family`" from the blueprint. `TryGetHandler`/`Execute` keep their existing signatures and behavior (including throwing `InvalidOperationException` for an unregistered family). The `layer_template` family continues to map to the same `LayerContractHandler` instance as `layer` — DI registers `LayerContractHandler` once as `IArchitectureContractHandler` (keyed by its own `Family == "layer"`), and the registry construction step adds the explicit second `layer_template` mapping to the same instance (a handler's `Family` property can only report one string, so the second alias is registry-level, not handler-level — this preserves the existing test `Execute_LayerTemplateIdConflict_DoesNotThrow_ReportedByPolicyConsistencyInstead`).
+- Alternative considered: give `LayerContractHandler` a `Families` collection instead of a single `Family` string, so it self-declares both keys. Rejected — it changes the `IArchitectureContractHandler` interface shape for one handler's idiosyncrasy; a registry-level alias for the one pre-existing dual-key case is simpler and keeps the interface uniform for the other 10 single-family handlers.
+
+**3. `ArchitectureContractExecutor` keeps its static shape but holds an `ArchitectureContractHandlerRegistry` built once and reused, instead of a hardcoded per-family branch.**
+Since `ArchitectureContractExecutor.Execute()` is not itself converted to an instance service in this change (non-goal), the registry it uses must still be constructed somewhere reachable by both the composition root (for production wiring) and the static facade (for existing static call sites that bypass `ArchitectureEngine`). The registry is built once via the same `AddArchLinterNetCore()` registration and threaded into `ArchitectureContractExecutor.Execute()` as a parameter (alongside the existing `runner`/`document` parameters), sourced from the `ArchitectureRunnerSetupService` (or equivalent caller) that already has access to the composition root's service provider internally. `ArchitectureContractExecutor` itself does not depend on `IServiceProvider` — only whatever already-composed caller passes the registry in.
+- Alternative considered: keep a `static readonly ArchitectureContractHandlerRegistry` field on `ArchitectureContractExecutor`, but build it by manually `new`-ing all 11 handlers inline. Rejected — that reintroduces a static default-handler list, exactly what #137 says must go away ("Replace any static default-handler registry/factory with DI-populated registry construction").
+
+**4. Each new handler is registered in `ServiceCollectionExtensions.AddArchLinterNetCore()` via `services.AddSingleton<IArchitectureContractHandler, XxxHandler>()`, and the registry is registered as `services.AddSingleton<ArchitectureContractHandlerRegistry>()` resolving its constructor's `IEnumerable<IArchitectureContractHandler>` from the container.**
+This is exactly the blueprint's prescribed registration shape. All handlers are stateless (they hold no per-run state, only delegate to whatever runner/contract is passed into `Execute`), so singleton lifetime is correct, consistent with the other singleton registrations already in this file.
+
+## Risks / Trade-offs
+
+- [Risk] Threading the registry into `ArchitectureContractExecutor.Execute()` as a new parameter is a breaking signature change for any direct caller of that static method outside this codebase. → Mitigation: `ArchitectureContractExecutor.Execute()` is internal to Core's execution pipeline (called only from `ArchitectureRunnerSetupService`/the validation application service), not part of the public CLI/Testing/Unity surface — grep for all call sites before changing the signature and update them in the same change.
+- [Risk] Manually re-deriving `AcyclicSiblingContractHandler`'s cycle-prefixing behavior to match `CycleContractHandler` could subtly diverge (e.g. different prefix format) and change CLI output for that family. → Mitigation: add a handler-vs-direct-call equivalence test for `acyclic_sibling`, following the existing `CycleHandler_WithCycle_PrefixesContractIdOntoEachCycle` test pattern, before removing the executor's direct call.
+- [Risk] Moving all 7 families through the registry could change the order in which violations from different families are merged into the final outcome if the executor's per-family processing order isn't preserved. → Mitigation: keep `ArchitectureContractExecutor.Execute()`'s existing family iteration order unchanged; only swap each family's direct `runner.CheckXxx()` call for `_registry.Execute(family, runner, contract)`, with no reordering.
+
+## Open Questions
+
+- None — the issue's acceptance criteria and the blueprint's "Handler/checker extension model" section fully scope the registry/handler shape; the only implementation judgment call (the `layer_template` alias, decision 2) is resolved above by preserving the existing registry-level mapping rather than changing the handler interface.

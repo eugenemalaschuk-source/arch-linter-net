@@ -5,7 +5,9 @@ using ArchLinterNet.Core.Reporting;
 
 namespace ArchLinterNet.Core.Validation;
 
-public sealed class ArchitectureValidationApplicationService(IArchitectureRunnerSetupService runnerSetupService)
+public sealed class ArchitectureValidationApplicationService(
+    IArchitectureRunnerSetupService runnerSetupService,
+    ArchitectureContractHandlerRegistry handlerRegistry)
     : IArchitectureValidationApplicationService
 {
     public ValidationOutcome Validate(ValidationRequest request, ValidationTiming? timing = null)
@@ -104,7 +106,7 @@ public sealed class ArchitectureValidationApplicationService(IArchitectureRunner
             using (timing?.Measure("contract_checks"))
             {
                 execution = ArchitectureContractExecutor.Execute(
-                    runner, document, request.Mode, request.IncludeAsmdefContracts, timing);
+                    runner, document, request.Mode, handlerRegistry, request.IncludeAsmdefContracts, timing);
             }
 
             allViolations.AddRange(execution.Violations);

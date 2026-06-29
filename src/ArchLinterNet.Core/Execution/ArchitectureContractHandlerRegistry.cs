@@ -2,30 +2,26 @@ using ArchLinterNet.Core.Contracts;
 
 namespace ArchLinterNet.Core.Execution;
 
-internal sealed class ArchitectureContractHandlerRegistry
+public sealed class ArchitectureContractHandlerRegistry
 {
     private readonly Dictionary<string, IArchitectureContractHandler> _handlersByFamily;
 
-    private ArchitectureContractHandlerRegistry(Dictionary<string, IArchitectureContractHandler> handlersByFamily)
+    public ArchitectureContractHandlerRegistry(IEnumerable<IArchitectureContractHandler> handlers)
     {
-        _handlersByFamily = handlersByFamily;
-    }
+        _handlersByFamily = new Dictionary<string, IArchitectureContractHandler>(StringComparer.Ordinal);
 
-    public static ArchitectureContractHandlerRegistry CreateDefault()
-    {
-        IArchitectureContractHandler dependencyHandler = new DependencyContractHandler();
-        IArchitectureContractHandler layerHandler = new LayerContractHandler();
-        IArchitectureContractHandler cycleHandler = new CycleContractHandler();
-        IArchitectureContractHandler coverageHandler = new CoverageContractHandler();
-
-        return new ArchitectureContractHandlerRegistry(new Dictionary<string, IArchitectureContractHandler>(StringComparer.Ordinal)
+        foreach (IArchitectureContractHandler handler in handlers)
         {
-            ["dependency"] = dependencyHandler,
-            ["layer"] = layerHandler,
-            ["layer_template"] = layerHandler,
-            ["cycle"] = cycleHandler,
-            ["coverage"] = coverageHandler,
-        });
+            _handlersByFamily[handler.Family] = handler;
+        }
+
+        // "layer_template" contracts are expanded into ArchitectureLayerContract instances before
+        // execution, so they share the "layer" family's handler. The handler interface only reports
+        // one Family, so the alias is added here rather than duplicating the handler.
+        if (_handlersByFamily.TryGetValue("layer", out IArchitectureContractHandler? layerHandler))
+        {
+            _handlersByFamily["layer_template"] = layerHandler;
+        }
     }
 
     public bool TryGetHandler(string family, out IArchitectureContractHandler? handler)
