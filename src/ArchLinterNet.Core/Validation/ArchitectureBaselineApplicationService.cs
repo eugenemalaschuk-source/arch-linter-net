@@ -4,7 +4,9 @@ using ArchLinterNet.Core.Model;
 
 namespace ArchLinterNet.Core.Validation;
 
-public sealed class ArchitectureBaselineApplicationService(IArchitectureRunnerSetupService runnerSetupService)
+public sealed class ArchitectureBaselineApplicationService(
+    IArchitectureRunnerSetupService runnerSetupService,
+    ArchitectureContractHandlerRegistry handlerRegistry)
     : IArchitectureBaselineApplicationService
 {
     public BaselineGenerationOutcome Generate(BaselineGenerationRequest request)
@@ -33,12 +35,12 @@ public sealed class ArchitectureBaselineApplicationService(IArchitectureRunnerSe
 
         if (includeStrict)
         {
-            ArchitectureContractExecutor.Execute(runner, document, "strict", includeAsmdefContracts: false);
+            ArchitectureContractExecutor.Execute(runner, document, "strict", handlerRegistry, includeAsmdefContracts: false);
         }
 
         if (includeAudit)
         {
-            ArchitectureContractExecutor.Execute(runner, document, "audit", includeAsmdefContracts: false);
+            ArchitectureContractExecutor.Execute(runner, document, "audit", handlerRegistry, includeAsmdefContracts: false);
         }
 
         ArchitectureBaselineDocument baseline = ArchitectureBaselineGenerator.Generate(

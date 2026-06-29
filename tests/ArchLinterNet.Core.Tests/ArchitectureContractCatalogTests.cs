@@ -132,6 +132,22 @@ public sealed class ArchitectureContractCatalogTests
     }
 
     [Test]
+    public void FamiliesInOrder_MatchesHistoricalExecutorDispatchOrder()
+    {
+        // ArchitectureContractExecutor dispatches families in this exact order, which determines
+        // violation/cycle insertion order in ValidationOutcome (and JSON output) and --timings entry
+        // order. This is the order the executor used before it became catalog-driven; pinned here so
+        // a future reordering of the AddGroup calls in Build is caught as a behavior change.
+        ArchitectureContractCatalog catalog = ArchitectureContractCatalog.Build(BuildDocument());
+
+        Assert.That(catalog.FamiliesInOrder, Is.EqualTo(new[]
+        {
+            "dependency", "layer", "layer_template", "allow_only", "cycle", "method_body",
+            "asmdef", "independence", "protected", "external", "acyclic_sibling", "coverage",
+        }));
+    }
+
+    [Test]
     public void ContractsFor_UnknownFamily_ReturnsEmpty()
     {
         ArchitectureContractCatalog catalog = ArchitectureContractCatalog.Build(BuildDocument());
