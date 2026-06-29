@@ -4,7 +4,8 @@ using ArchLinterNet.Core.Model;
 
 namespace ArchLinterNet.Core.Validation;
 
-public sealed class ArchitectureBaselineApplicationService : IArchitectureBaselineApplicationService
+public sealed class ArchitectureBaselineApplicationService(IArchitectureRunnerSetupService runnerSetupService)
+    : IArchitectureBaselineApplicationService
 {
     public BaselineGenerationOutcome Generate(BaselineGenerationRequest request)
     {
@@ -13,9 +14,9 @@ public sealed class ArchitectureBaselineApplicationService : IArchitectureBaseli
             throw new ArgumentException($"Invalid mode: {request.Mode}. Use 'strict', 'audit', or 'all'.", nameof(request));
         }
 
-        ArchitectureContractDocument document = ArchitectureRunnerFactory.LoadDocument(request.PolicyPath);
+        ArchitectureContractDocument document = runnerSetupService.LoadDocument(request.PolicyPath);
 
-        ArchitectureRunnerSetup setup = ArchitectureRunnerFactory.BuildRunner(
+        ArchitectureRunnerSetup setup = runnerSetupService.BuildRunner(
             document, request.PolicyPath, request.ConditionSetName, enableUnmatchedIgnoreTracking: true);
 
         ArchitectureContractRunner runner = setup.Runner;

@@ -2,6 +2,7 @@ using System.Reflection;
 using ArchLinterNet.Core.Contracts;
 using ArchLinterNet.Core.Discovery;
 using ArchLinterNet.Core.Execution;
+using ArchLinterNet.Core.Resolution;
 using ArchLinterNet.Core.Validation;
 using NUnit.Framework;
 
@@ -11,6 +12,17 @@ namespace ArchLinterNet.Core.Tests;
 public sealed class ArchitectureCoverageInventoryTests
 {
     private static readonly Assembly[] _targetAssemblies = { typeof(ArchitectureCoverageInventoryTests).Assembly };
+
+    private static IArchitectureRunnerSetupService CreateRunnerSetupService()
+    {
+        return new ArchitectureRunnerSetupService(
+            new ArchitecturePolicyDocumentLoader(),
+            new ArchitectureBaselineLoadingService(),
+            new ArchitectureRepositoryRootResolver(),
+            new ConditionSetResolutionService(),
+            new ArchitectureProjectDiscoveryService(),
+            new ArchitectureAssemblyResolutionService());
+    }
 
     private const string AlphaNamespace = "ArchLinterNet.Core.Tests.CoverageInventoryFixtures.Alpha";
     private const string BetaNamespace = "ArchLinterNet.Core.Tests.CoverageInventoryFixtures.Beta";
@@ -219,7 +231,7 @@ public sealed class ArchitectureCoverageInventoryTests
                 }
             };
 
-            ArchitectureRunnerSetup setup = ArchitectureRunnerFactory.BuildRunner(document, policyPath);
+            ArchitectureRunnerSetup setup = CreateRunnerSetupService().BuildRunner(document, policyPath);
 
             ArchitectureCoverageInventory inventory = setup.Runner.Session.BuildCoverageInventory(document);
 
@@ -252,7 +264,7 @@ public sealed class ArchitectureCoverageInventoryTests
                 }
             };
 
-            ArchitectureRunnerSetup setup = ArchitectureRunnerFactory.BuildRunner(document, policyPath);
+            ArchitectureRunnerSetup setup = CreateRunnerSetupService().BuildRunner(document, policyPath);
 
             ArchitectureCoverageInventory inventory = setup.Runner.Session.BuildCoverageInventory(document);
 

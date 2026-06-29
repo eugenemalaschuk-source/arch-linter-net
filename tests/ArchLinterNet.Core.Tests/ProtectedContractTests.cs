@@ -25,6 +25,11 @@ public sealed class ProtectedContractTests
             Layers = new Dictionary<string, ArchitectureLayer>
             {
                 ["test_area"] = new() { Namespace = "ArchLinterNet.Core.Tests" },
+                // The Core self-policy's core-application-seam-layering rule intentionally allows
+                // Validation to depend on Execution (e.g. the validation/baseline application
+                // services are constructor-injected with execution-layer setup/runner services),
+                // so this fixture's real-assembly scan must allow that importer too.
+                ["validation"] = new() { Namespace = "ArchLinterNet.Core.Validation" },
                 ["execution"] = new() { Namespace = "ArchLinterNet.Core.Execution" }
             },
             Analysis = new ArchitectureAnalysisConfiguration
@@ -43,7 +48,7 @@ public sealed class ProtectedContractTests
                     {
                         Name = "execution-is-protected",
                         Protected = new List<string> { "execution" },
-                        AllowedImporters = new List<string> { "test_area" }
+                        AllowedImporters = new List<string> { "test_area", "validation" }
                     }
                 }
             }
@@ -271,6 +276,9 @@ public sealed class ProtectedContractTests
             Layers = new Dictionary<string, ArchitectureLayer>
             {
                 ["test_area"] = new() { Namespace = "ArchLinterNet.Core.Tests" },
+                // See CheckProtectedContract_AllowedImporter_NoViolations for why "validation"
+                // must be an allowed importer of "execution" in this real-assembly fixture.
+                ["validation"] = new() { Namespace = "ArchLinterNet.Core.Validation" },
                 ["execution"] = new() { Namespace = "ArchLinterNet.Core.Execution" }
             },
             Analysis = new ArchitectureAnalysisConfiguration
@@ -295,7 +303,7 @@ public sealed class ProtectedContractTests
                     {
                         Name = "execution-allowed-for-test",
                         Protected = new List<string> { "execution" },
-                        AllowedImporters = new List<string> { "test_area" }
+                        AllowedImporters = new List<string> { "test_area", "validation" }
                     }
                 }
             }

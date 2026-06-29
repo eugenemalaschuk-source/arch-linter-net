@@ -5,7 +5,8 @@ using ArchLinterNet.Core.Reporting;
 
 namespace ArchLinterNet.Core.Validation;
 
-public sealed class ArchitectureValidationApplicationService : IArchitectureValidationApplicationService
+public sealed class ArchitectureValidationApplicationService(IArchitectureRunnerSetupService runnerSetupService)
+    : IArchitectureValidationApplicationService
 {
     public ValidationOutcome Validate(ValidationRequest request, ValidationTiming? timing = null)
     {
@@ -24,7 +25,7 @@ public sealed class ArchitectureValidationApplicationService : IArchitectureVali
 
             using (timing?.Measure("load_and_setup"))
             {
-                document = ArchitectureRunnerFactory.LoadDocument(request.PolicyPath, request.BaselinePath, timing);
+                document = runnerSetupService.LoadDocument(request.PolicyPath, request.BaselinePath, timing);
 
                 unmatchedConfig = document.Analysis.UnmatchedIgnoredViolations;
 
@@ -42,7 +43,7 @@ public sealed class ArchitectureValidationApplicationService : IArchitectureVali
                         $"Invalid analysis.policy_consistency: {policyConsistencyConfig}. Use 'error', 'warn', or 'off'.");
                 }
 
-                // Coverage contracts themselves are rejected earlier, in ArchitectureRunnerFactory.LoadDocument
+                // Coverage contracts themselves are rejected earlier, in IArchitectureRunnerSetupService.LoadDocument
                 // (the engine isn't implemented yet; see #97-#103). Validating the severity value here keeps
                 // analysis.coverage held to the same "fail fast on malformed config" standard as the other
                 // severity settings even though no coverage check currently reads it.
@@ -74,7 +75,7 @@ public sealed class ArchitectureValidationApplicationService : IArchitectureVali
                 bool enableUnmatchedIgnoreTracking = !request.EnforceUnmatchedIgnoredViolationsPolicy
                     || unmatchedConfig != "off";
 
-                setup = ArchitectureRunnerFactory.BuildRunner(
+                setup = runnerSetupService.BuildRunner(
                     document,
                     request.PolicyPath,
                     request.ConditionSetName,

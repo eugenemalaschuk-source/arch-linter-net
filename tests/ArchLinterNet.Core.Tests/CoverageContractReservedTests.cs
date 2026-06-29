@@ -478,7 +478,7 @@ public sealed class CoverageContractReservedTests
         // A project with a declared target framework but no build output anywhere under bin/ —
         // project discovery will diagnose "missing project build output" and never resolve this
         // project to a target assembly. With no analysis.target_assemblies set, this previously
-        // made ArchitectureRunnerFactory.BuildRunner throw before any coverage contract ran.
+        // made IArchitectureRunnerSetupService.BuildRunner throw before any coverage contract ran.
         string projectDir = Path.Combine(_tempDir, "src", "Unresolvable");
         Directory.CreateDirectory(projectDir);
         File.WriteAllText(
@@ -549,7 +549,7 @@ public sealed class CoverageContractReservedTests
         // The missing-build-output discovery diagnostic is itself a "<configuration>" violation
         // (ArchitectureContractRunner.CheckConfiguration), surfaced regardless of mode or
         // analysis.coverage — that's pre-existing, orthogonal behavior, not asserted here. What
-        // this test proves is the actual regression: ArchitectureRunnerFactory.BuildRunner no
+        // this test proves is the actual regression: IArchitectureRunnerSetupService.BuildRunner no
         // longer throws before the coverage engine runs, so the contract still reaches
         // CheckProjectCoverageContract and classifies the unresolved project as unknown.
         Assert.That(outcome.CoverageConfig, Is.EqualTo("warn"));
@@ -560,7 +560,7 @@ public sealed class CoverageContractReservedTests
     [Test]
     public void StrictMode_WithOnlyAuditProjectCoverageDeclaredAndUnresolvedProjects_StillThrows()
     {
-        // The unresolved-project bypass in ArchitectureRunnerFactory.BuildRunner is mode/selection
+        // The unresolved-project bypass in IArchitectureRunnerSetupService.BuildRunner is mode/selection
         // aware: an audit_coverage-only scope: project contract can never run in strict mode (the
         // executor only runs contracts ContractsFor("strict", ...) selects), so it must not relax
         // the no-resolved-assemblies hard-fail for a strict-mode run.

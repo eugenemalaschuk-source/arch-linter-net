@@ -103,9 +103,9 @@ The handler registry is **DI-populated**, not a static `CreateDefault()` factory
 Adding a new contract family requires:
 
 1. Adding the contract schema/model under `Contracts/`.
-2. Adding an `IArchitectureContractHandler` implementation for the family.
-3. Registering it with the composition root (`services.AddSingleton<IArchitectureContractHandler, NewFamilyHandler>()`).
-4. Wiring catalog/schema lookup so the family is selectable by mode.
+1. Adding an `IArchitectureContractHandler` implementation for the family.
+1. Registering it with the composition root (`services.AddSingleton<IArchitectureContractHandler, NewFamilyHandler>()`).
+1. Wiring catalog/schema lookup so the family is selectable by mode.
 
 No step requires editing a central god executor or a static default-handler list. This is the concrete acceptance signal for #137 and the post-coverage expansion story (#104).
 

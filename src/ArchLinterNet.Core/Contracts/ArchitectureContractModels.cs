@@ -170,7 +170,7 @@ public sealed class ArchitectureContractGroups
 
     // Bound (not executed) so a schema-valid coverage contract is detected and rejected with a
     // clear "reserved, not implemented" diagnostic instead of being silently dropped by
-    // IgnoreUnmatchedProperties deserialization. See ArchitectureRunnerFactory.LoadDocument.
+    // IgnoreUnmatchedProperties deserialization. See ArchitecturePolicyDocumentLoader.Load.
     // The coverage engine itself is implemented by #97-#103.
     [YamlMember(Alias = "strict_coverage")]
     public List<ArchitectureCoverageContract> StrictCoverage { get; set; } = new();

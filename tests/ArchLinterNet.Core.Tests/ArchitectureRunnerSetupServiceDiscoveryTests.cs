@@ -1,14 +1,17 @@
 using ArchLinterNet.Core.Contracts;
+using ArchLinterNet.Core.Discovery;
 using ArchLinterNet.Core.Execution;
+using ArchLinterNet.Core.Resolution;
 using NUnit.Framework;
 
 namespace ArchLinterNet.Core.Tests;
 
 [TestFixture]
-public sealed class ArchitectureRunnerFactoryDiscoveryTests
+public sealed class ArchitectureRunnerSetupServiceDiscoveryTests
 {
     private string _repoRoot = null!;
     private string _policyPath = null!;
+    private IArchitectureRunnerSetupService _runnerSetupService = null!;
 
     [SetUp]
     public void SetUp()
@@ -17,6 +20,13 @@ public sealed class ArchitectureRunnerFactoryDiscoveryTests
         Directory.CreateDirectory(_repoRoot);
         _policyPath = Path.Combine(_repoRoot, "policy.arch.yml");
         File.WriteAllText(_policyPath, "version: 1\nname: test\n");
+        _runnerSetupService = new ArchitectureRunnerSetupService(
+            new ArchitecturePolicyDocumentLoader(),
+            new ArchitectureBaselineLoadingService(),
+            new ArchitectureRepositoryRootResolver(),
+            new ConditionSetResolutionService(),
+            new ArchitectureProjectDiscoveryService(),
+            new ArchitectureAssemblyResolutionService());
     }
 
     [TearDown]
@@ -44,7 +54,7 @@ public sealed class ArchitectureRunnerFactoryDiscoveryTests
             }
         };
 
-        ArchitectureRunnerSetup setup = ArchitectureRunnerFactory.BuildRunner(document, _policyPath);
+        ArchitectureRunnerSetup setup = _runnerSetupService.BuildRunner(document, _policyPath);
 
         Assert.That(document.Analysis.TargetAssemblies, Is.EquivalentTo(new[] { "ArchLinterNet.Core" }));
         Assert.That(setup.Runner.CheckConfiguration().Any(v => v.ForbiddenNamespace == "missing project build output"), Is.False);
@@ -69,7 +79,7 @@ public sealed class ArchitectureRunnerFactoryDiscoveryTests
             }
         };
 
-        ArchitectureRunnerSetup setup = ArchitectureRunnerFactory.BuildRunner(document, _policyPath);
+        ArchitectureRunnerSetup setup = _runnerSetupService.BuildRunner(document, _policyPath);
 
         Assert.That(document.Analysis.TargetAssemblies, Is.EquivalentTo(new[] { "ArchLinterNet.Core" }));
         Assert.That(document.Analysis.SourceRoots, Is.EquivalentTo(new[] { "ArchLinterNet.Core" }));
@@ -100,7 +110,7 @@ public sealed class ArchitectureRunnerFactoryDiscoveryTests
             }
         };
 
-        ArchitectureRunnerSetup setup = ArchitectureRunnerFactory.BuildRunner(document, _policyPath);
+        ArchitectureRunnerSetup setup = _runnerSetupService.BuildRunner(document, _policyPath);
 
         Assert.That(document.Analysis.TargetAssemblies, Is.EquivalentTo(new[] { "ArchLinterNet.Core" }));
         Assert.That(setup.Runner.CheckConfiguration().Any(v => v.ForbiddenNamespace == "missing project build output"), Is.False);
@@ -131,7 +141,7 @@ public sealed class ArchitectureRunnerFactoryDiscoveryTests
         };
 
         InvalidOperationException? exception = Assert.Throws<InvalidOperationException>(
-            () => ArchitectureRunnerFactory.BuildRunner(document, _policyPath));
+            () => _runnerSetupService.BuildRunner(document, _policyPath));
 
         Assert.That(exception!.Message, Does.Contain("analysis.target_assemblies"));
         Assert.That(exception.Message, Does.Contain("NoOutput"));
