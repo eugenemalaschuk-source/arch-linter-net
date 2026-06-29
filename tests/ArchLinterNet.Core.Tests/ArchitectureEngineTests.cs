@@ -130,6 +130,52 @@ public sealed class ArchitectureEngineTests
         Assert.That(outcome, Is.SameAs(fake.Outcome));
     }
 
+    [Test]
+    public void Dispose_DisposesProviderOwnedServices()
+    {
+        DisposableValidationApplicationService? created = null;
+
+        ArchitectureEngine engine = new ArchitectureEngineBuilder()
+            .AddArchLinterNetCore()
+            .ConfigureServices(services =>
+                services.AddSingleton<IArchitectureValidationApplicationService>(
+                    _ => created = new DisposableValidationApplicationService()))
+            .Build();
+
+        // Resolution happens lazily; force the container to construct the singleton it owns.
+        engine.Validate(new ValidationRequest { PolicyPath = _policyPath, Mode = "strict" });
+
+        engine.Dispose();
+
+        Assert.That(created, Is.Not.Null);
+        Assert.That(created!.WasDisposed, Is.True);
+    }
+
+    private sealed class DisposableValidationApplicationService : IArchitectureValidationApplicationService, IDisposable
+    {
+        public bool WasDisposed { get; private set; }
+
+        public ValidationOutcome Validate(ValidationRequest request, ValidationTiming? timing = null)
+        {
+            return new ValidationOutcome(
+                Passed: true,
+                Violations: Array.Empty<Model.ArchitectureViolation>(),
+                Cycles: Array.Empty<string>(),
+                CoverageFindings: Array.Empty<Model.ArchitectureViolation>(),
+                CoverageConfig: "off",
+                UnmatchedIgnoredViolations: Array.Empty<Model.ArchitectureUnmatchedIgnoredViolation>(),
+                UnmatchedIgnoredViolationsConfig: "off",
+                PolicyConsistencyFindings: Array.Empty<Model.PolicyConsistencyDiagnostic>(),
+                PolicyConsistencyConfig: "off",
+                CoverageSummaries: Array.Empty<ArchitectureCoverageSummary>());
+        }
+
+        public void Dispose()
+        {
+            WasDisposed = true;
+        }
+    }
+
     private sealed class FakeValidationApplicationService : IArchitectureValidationApplicationService
     {
         public bool WasCalled { get; private set; }

@@ -4,11 +4,11 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace ArchLinterNet.Core.Composition;
 
-public sealed class ArchitectureEngine
+public sealed class ArchitectureEngine : IDisposable, IAsyncDisposable
 {
-    private readonly IServiceProvider _serviceProvider;
+    private readonly ServiceProvider _serviceProvider;
 
-    internal ArchitectureEngine(IServiceProvider serviceProvider)
+    internal ArchitectureEngine(ServiceProvider serviceProvider)
     {
         _serviceProvider = serviceProvider;
     }
@@ -23,5 +23,15 @@ public sealed class ArchitectureEngine
     {
         return _serviceProvider.GetRequiredService<IArchitectureBaselineApplicationService>()
             .Generate(request);
+    }
+
+    public void Dispose()
+    {
+        _serviceProvider.Dispose();
+    }
+
+    public ValueTask DisposeAsync()
+    {
+        return _serviceProvider.DisposeAsync();
     }
 }

@@ -8,6 +8,8 @@ layers:
     namespace: ArchLinterNet.Core.Model
   core_reporting:
     namespace: ArchLinterNet.Core.Reporting
+  core_discovery:
+    namespace: ArchLinterNet.Core.Discovery
   core_resolution:
     namespace: ArchLinterNet.Core.Resolution
   core_scanning:
@@ -99,6 +101,11 @@ contracts:
 
     - name: core-reporting-must-not-depend-on-di-container
       source: core_reporting
+      forbidden: [dependency_injection_container]
+      reason: Container APIs must stay confined to the composition boundary.
+
+    - name: core-discovery-must-not-depend-on-di-container
+      source: core_discovery
       forbidden: [dependency_injection_container]
       reason: Container APIs must stay confined to the composition boundary.
 

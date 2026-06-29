@@ -1,7 +1,8 @@
 # core-composition-root Specification
 
 ## Purpose
-TBD - created by archiving change composition-root. Update Purpose after archive.
+Defines the Core composition root (`ArchitectureEngine` / `ArchitectureEngineBuilder`) that wires the validation and baseline application services through `Microsoft.Extensions.DependencyInjection`, confines container APIs to the composition boundary, and preserves the existing static entry points as compatibility facades.
+
 ## Requirements
 ### Requirement: ArchitectureEngineBuilder composes the default application services
 `ArchLinterNet.Core.Composition.ArchitectureEngineBuilder` SHALL register the default `IArchitectureValidationApplicationService` and `IArchitectureBaselineApplicationService` implementations via an `AddArchLinterNetCore()` extension method on `IServiceCollection`, and SHALL build an `ArchitectureEngine` from the resulting service provider via a `Build()` method.
