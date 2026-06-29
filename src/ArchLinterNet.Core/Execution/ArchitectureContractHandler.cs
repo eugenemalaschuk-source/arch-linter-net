@@ -3,7 +3,7 @@ using ArchLinterNet.Core.Model;
 
 namespace ArchLinterNet.Core.Execution;
 
-internal sealed record ArchitectureHandlerResult(
+public sealed record ArchitectureHandlerResult(
     IReadOnlyCollection<ArchitectureViolation> Violations,
     IReadOnlyCollection<string> Cycles)
 {
@@ -14,7 +14,7 @@ internal sealed record ArchitectureHandlerResult(
         new(Array.Empty<ArchitectureViolation>(), cycles);
 }
 
-internal interface IArchitectureContractHandler
+public interface IArchitectureContractHandler
 {
     string Family { get; }
 

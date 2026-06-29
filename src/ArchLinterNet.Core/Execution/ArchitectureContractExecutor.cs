@@ -4,11 +4,8 @@ using ArchLinterNet.Core.Reporting;
 
 namespace ArchLinterNet.Core.Execution;
 
-public static class ArchitectureContractExecutor
+internal static class ArchitectureContractExecutor
 {
-    private static readonly ArchitectureContractHandlerRegistry _handlerRegistry =
-        ArchitectureContractHandlerRegistry.CreateDefault();
-
     public sealed record ExecutionResult(
         IReadOnlyCollection<ArchitectureViolation> Violations,
         IReadOnlyCollection<string> Cycles,
@@ -19,6 +16,7 @@ public static class ArchitectureContractExecutor
         ArchitectureContractRunner runner,
         ArchitectureContractDocument document,
         string mode,
+        ArchitectureContractHandlerRegistry handlerRegistry,
         bool includeAsmdefContracts = true,
         ValidationTiming? timing = null)
     {
@@ -41,7 +39,7 @@ public static class ArchitectureContractExecutor
             foreach (IArchitectureContract contract in runner.Catalog.ContractsFor(mode, "dependency"))
             {
                 depCount++;
-                violations.AddRange(_handlerRegistry.Execute("dependency", runner, contract).Violations);
+                violations.AddRange(handlerRegistry.Execute("dependency", runner, contract).Violations);
             }
         }
 
@@ -61,7 +59,7 @@ public static class ArchitectureContractExecutor
             foreach (IArchitectureContract contract in layerContracts)
             {
                 layerCount++;
-                violations.AddRange(_handlerRegistry.Execute("layer", runner, contract).Violations);
+                violations.AddRange(handlerRegistry.Execute("layer", runner, contract).Violations);
             }
         }
 
@@ -75,7 +73,7 @@ public static class ArchitectureContractExecutor
             foreach (ArchitectureAllowOnlyContract contract in allowOnlyContracts)
             {
                 allowOnlyCount++;
-                violations.AddRange(runner.CheckAllowOnlyContract(contract));
+                violations.AddRange(handlerRegistry.Execute("allow_only", runner, contract).Violations);
             }
         }
 
@@ -85,7 +83,7 @@ public static class ArchitectureContractExecutor
             foreach (IArchitectureContract contract in runner.Catalog.ContractsFor(mode, "cycle"))
             {
                 cycleCount++;
-                cycles.AddRange(_handlerRegistry.Execute("cycle", runner, contract).Cycles);
+                cycles.AddRange(handlerRegistry.Execute("cycle", runner, contract).Cycles);
             }
         }
 
@@ -99,7 +97,7 @@ public static class ArchitectureContractExecutor
             foreach (ArchitectureMethodBodyContract contract in methodBodyContracts)
             {
                 methodBodyCount++;
-                violations.AddRange(runner.CheckMethodBodyContract(contract));
+                violations.AddRange(handlerRegistry.Execute("method_body", runner, contract).Violations);
             }
         }
 
@@ -115,7 +113,7 @@ public static class ArchitectureContractExecutor
                 foreach (ArchitectureAsmdefContract contract in asmdefContracts)
                 {
                     asmdefCount++;
-                    violations.AddRange(runner.CheckAsmdefContract(contract));
+                    violations.AddRange(handlerRegistry.Execute("asmdef", runner, contract).Violations);
                 }
             }
         }
@@ -130,7 +128,7 @@ public static class ArchitectureContractExecutor
             foreach (ArchitectureIndependenceContract contract in independenceContracts)
             {
                 independenceCount++;
-                violations.AddRange(runner.CheckIndependenceContract(contract));
+                violations.AddRange(handlerRegistry.Execute("independence", runner, contract).Violations);
             }
         }
 
@@ -144,7 +142,7 @@ public static class ArchitectureContractExecutor
             foreach (ArchitectureProtectedContract contract in protectedContracts)
             {
                 protectedCount++;
-                violations.AddRange(runner.CheckProtectedContract(contract));
+                violations.AddRange(handlerRegistry.Execute("protected", runner, contract).Violations);
             }
         }
 
@@ -158,7 +156,7 @@ public static class ArchitectureContractExecutor
             foreach (ArchitectureExternalDependencyContract contract in externalContracts)
             {
                 externalCount++;
-                violations.AddRange(runner.CheckExternalContract(contract));
+                violations.AddRange(handlerRegistry.Execute("external", runner, contract).Violations);
             }
         }
 
@@ -172,9 +170,7 @@ public static class ArchitectureContractExecutor
             foreach (ArchitectureAcyclicSiblingContract contract in acyclicSiblingContracts)
             {
                 acyclicSiblingCount++;
-                IReadOnlyCollection<string> contractCycles = runner.CheckAcyclicSiblingContract(contract);
-                string idPrefix = contract.Id != null ? $"[{contract.Id}] " : string.Empty;
-                cycles.AddRange(contractCycles.Select(c => $"{idPrefix}{c}"));
+                cycles.AddRange(handlerRegistry.Execute("acyclic_sibling", runner, contract).Cycles);
             }
         }
 
@@ -185,7 +181,7 @@ public static class ArchitectureContractExecutor
             foreach (IArchitectureContract contract in runner.Catalog.ContractsFor(mode, "coverage"))
             {
                 coverageCount++;
-                coverageViolations.AddRange(_handlerRegistry.Execute("coverage", runner, contract).Violations);
+                coverageViolations.AddRange(handlerRegistry.Execute("coverage", runner, contract).Violations);
 
                 ArchitectureCoverageSummary? summary = runner.BuildCoverageSummary((ArchitectureCoverageContract)contract);
                 if (summary != null)

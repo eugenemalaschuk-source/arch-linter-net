@@ -38,6 +38,24 @@ public sealed class ArchitectureContractHandlerRegistryTests
             Array.Empty<string>());
     }
 
+    private static ArchitectureContractHandlerRegistry CreateRegistry()
+    {
+        return new ArchitectureContractHandlerRegistry(new IArchitectureContractHandler[]
+        {
+            new DependencyContractHandler(),
+            new LayerContractHandler(),
+            new AllowOnlyContractHandler(),
+            new CycleContractHandler(),
+            new AcyclicSiblingContractHandler(),
+            new MethodBodyContractHandler(),
+            new AsmdefContractHandler(),
+            new IndependenceContractHandler(),
+            new ProtectedContractHandler(),
+            new ExternalContractHandler(),
+            new CoverageContractHandler(),
+        });
+    }
+
     private static IReadOnlyList<object> Project(IEnumerable<ArchitectureViolation> violations)
     {
         return violations
@@ -76,21 +94,29 @@ public sealed class ArchitectureContractHandlerRegistryTests
     }
 
     [Test]
-    public void CreateDefault_RegistersHandlersForMigratedFamilies()
+    public void Constructor_RegistersHandlersForEveryFamily()
     {
-        ArchitectureContractHandlerRegistry registry = ArchitectureContractHandlerRegistry.CreateDefault();
+        ArchitectureContractHandlerRegistry registry = CreateRegistry();
 
         Assert.That(registry.TryGetHandler("dependency", out _), Is.True);
         Assert.That(registry.TryGetHandler("layer", out _), Is.True);
         Assert.That(registry.TryGetHandler("layer_template", out _), Is.True);
+        Assert.That(registry.TryGetHandler("allow_only", out _), Is.True);
         Assert.That(registry.TryGetHandler("cycle", out _), Is.True);
-        Assert.That(registry.TryGetHandler("protected", out _), Is.False);
+        Assert.That(registry.TryGetHandler("acyclic_sibling", out _), Is.True);
+        Assert.That(registry.TryGetHandler("method_body", out _), Is.True);
+        Assert.That(registry.TryGetHandler("asmdef", out _), Is.True);
+        Assert.That(registry.TryGetHandler("independence", out _), Is.True);
+        Assert.That(registry.TryGetHandler("protected", out _), Is.True);
+        Assert.That(registry.TryGetHandler("external", out _), Is.True);
+        Assert.That(registry.TryGetHandler("coverage", out _), Is.True);
+        Assert.That(registry.TryGetHandler("unknown_family", out _), Is.False);
     }
 
     [Test]
     public void Execute_UnknownFamily_Throws()
     {
-        ArchitectureContractHandlerRegistry registry = ArchitectureContractHandlerRegistry.CreateDefault();
+        ArchitectureContractHandlerRegistry registry = CreateRegistry();
         var runner = new ArchitectureContractRunner(
             CreateContext(_layerFixtureAssembly),
             CreateLayerFixtureDocument("layerUpper", "layerLower", new List<string> { "layerUpper", "layerLower" }));
@@ -108,7 +134,7 @@ public sealed class ArchitectureContractHandlerRegistryTests
         ArchitectureDependencyContract contract = document.Contracts.Strict[0];
 
         List<ArchitectureViolation> direct = runner.CheckContract(contract);
-        ArchitectureHandlerResult viaHandler = ArchitectureContractHandlerRegistry.CreateDefault()
+        ArchitectureHandlerResult viaHandler = CreateRegistry()
             .Execute("dependency", runner, contract);
 
         Assert.That(direct, Has.Count.GreaterThan(0));
@@ -125,7 +151,7 @@ public sealed class ArchitectureContractHandlerRegistryTests
         ArchitectureLayerContract contract = document.Contracts.StrictLayers[0];
 
         List<ArchitectureViolation> direct = runner.CheckLayerContract(contract);
-        ArchitectureHandlerResult viaHandler = ArchitectureContractHandlerRegistry.CreateDefault()
+        ArchitectureHandlerResult viaHandler = CreateRegistry()
             .Execute("layer", runner, contract);
 
         Assert.That(direct, Has.Count.GreaterThan(0));
@@ -140,7 +166,7 @@ public sealed class ArchitectureContractHandlerRegistryTests
         var runner = new ArchitectureContractRunner(CreateContext(_layerFixtureAssembly), document);
         ArchitectureLayerContract contract = document.Contracts.StrictLayers[0];
 
-        ArchitectureHandlerResult viaHandler = ArchitectureContractHandlerRegistry.CreateDefault()
+        ArchitectureHandlerResult viaHandler = CreateRegistry()
             .Execute("layer", runner, contract);
 
         Assert.That(viaHandler.Violations, Is.Empty);
@@ -171,7 +197,7 @@ public sealed class ArchitectureContractHandlerRegistryTests
         var runner = new ArchitectureContractRunner(CreateContext(fixtureAssembly), document);
         ArchitectureCycleContract contract = document.Contracts.StrictCycles[0];
 
-        ArchitectureHandlerResult result = ArchitectureContractHandlerRegistry.CreateDefault()
+        ArchitectureHandlerResult result = CreateRegistry()
             .Execute("cycle", runner, contract);
 
         Assert.That(result.Cycles, Is.Empty);
@@ -205,7 +231,7 @@ public sealed class ArchitectureContractHandlerRegistryTests
         ArchitectureCycleContract contract = document.Contracts.StrictCycles[0];
 
         List<string> direct = runner.CheckCycleContract(contract).ToList();
-        ArchitectureHandlerResult viaHandler = ArchitectureContractHandlerRegistry.CreateDefault()
+        ArchitectureHandlerResult viaHandler = CreateRegistry()
             .Execute("cycle", runner, contract);
 
         Assert.That(direct, Has.Count.GreaterThan(0));
@@ -214,7 +240,62 @@ public sealed class ArchitectureContractHandlerRegistryTests
     }
 
     [Test]
-    public void Executor_RoutesMigratedFamiliesThroughRegistry_MatchesDirectRunnerCalls()
+    public void AllowOnlyHandler_MatchesDirectRunnerCheck()
+    {
+        var document = CreateLayerFixtureDocument("layerUpper", "layerLower", new List<string> { "layerUpper", "layerLower" });
+        document.Contracts.StrictAllowOnly = new List<ArchitectureAllowOnlyContract>
+        {
+            new() { Name = "AllowOnly", Id = "allow", Source = "layerUpper", Allowed = new List<string> { "layerUpper" } },
+        };
+        var runner = new ArchitectureContractRunner(CreateContext(_layerFixtureAssembly), document);
+        ArchitectureAllowOnlyContract contract = document.Contracts.StrictAllowOnly[0];
+
+        List<ArchitectureViolation> direct = runner.CheckAllowOnlyContract(contract);
+        ArchitectureHandlerResult viaHandler = CreateRegistry()
+            .Execute("allow_only", runner, contract);
+
+        Assert.That(direct, Has.Count.GreaterThan(0));
+        Assert.That(Project(viaHandler.Violations), Is.EqualTo(Project(direct)));
+        Assert.That(viaHandler.Cycles, Is.Empty);
+    }
+
+    [Test]
+    public void AcyclicSiblingHandler_WithCycle_PrefixesContractIdOntoEachCycle()
+    {
+        Assembly fixtureAssembly = typeof(AcyclicSiblingFixtures.TwoNode.Auth.AuthService).Assembly;
+        var document = new ArchitectureContractDocument
+        {
+            Version = 1,
+            Name = "Test",
+            Layers = new Dictionary<string, ArchitectureLayer>(),
+            Analysis = new ArchitectureAnalysisConfiguration
+            {
+                TargetAssemblies = new List<string> { fixtureAssembly.GetName().Name! }
+            },
+            Contracts = new ArchitectureContractGroups
+            {
+                StrictAcyclicSiblings = new List<ArchitectureAcyclicSiblingContract>
+                {
+                    new() { Name = "Acyclic", Id = "acyc", Ancestors = new List<string> { "AcyclicSiblingFixtures.TwoNode" } },
+                },
+            }
+        };
+        var runner = new ArchitectureContractRunner(
+            new ArchitectureAnalysisContext(_tempDir, new[] { fixtureAssembly }, Array.Empty<string>(), Array.Empty<string>()),
+            document);
+        ArchitectureAcyclicSiblingContract contract = document.Contracts.StrictAcyclicSiblings[0];
+
+        List<string> direct = runner.CheckAcyclicSiblingContract(contract).ToList();
+        ArchitectureHandlerResult viaHandler = CreateRegistry()
+            .Execute("acyclic_sibling", runner, contract);
+
+        Assert.That(direct, Has.Count.GreaterThan(0));
+        Assert.That(viaHandler.Cycles, Is.EqualTo(direct.Select(c => $"[acyc] {c}")));
+        Assert.That(viaHandler.Violations, Is.Empty);
+    }
+
+    [Test]
+    public void Executor_RoutesAllFamiliesThroughRegistry_MatchesDirectRunnerCalls()
     {
         var document = CreateLayerFixtureDocument("layerUpper", "layerLower", new List<string> { "layerLower", "layerUpper" });
 
@@ -225,7 +306,7 @@ public sealed class ArchitectureContractHandlerRegistryTests
 
         var executorRunner = new ArchitectureContractRunner(CreateContext(_layerFixtureAssembly), document);
         ArchitectureContractExecutor.ExecutionResult result =
-            ArchitectureContractExecutor.Execute(executorRunner, document, "strict");
+            ArchitectureContractExecutor.Execute(executorRunner, document, "strict", CreateRegistry());
 
         Assert.That(Project(result.Violations), Is.EqualTo(Project(expectedViolations)));
     }
@@ -270,10 +351,10 @@ public sealed class ArchitectureContractHandlerRegistryTests
         };
 
         var strictRunner = new ArchitectureContractRunner(CreateContext(typeof(ArchitectureContractDocument).Assembly), document);
-        Assert.DoesNotThrow(() => ArchitectureContractExecutor.Execute(strictRunner, document, "strict"));
+        Assert.DoesNotThrow(() => ArchitectureContractExecutor.Execute(strictRunner, document, "strict", CreateRegistry()));
 
         var auditRunner = new ArchitectureContractRunner(CreateContext(typeof(ArchitectureContractDocument).Assembly), document);
-        Assert.DoesNotThrow(() => ArchitectureContractExecutor.Execute(auditRunner, document, "audit"));
+        Assert.DoesNotThrow(() => ArchitectureContractExecutor.Execute(auditRunner, document, "audit", CreateRegistry()));
 
         var policyConsistencyRunner = new ArchitectureContractRunner(CreateContext(typeof(ArchitectureContractDocument).Assembly), document);
         var findings = policyConsistencyRunner.CheckPolicyConsistency();
