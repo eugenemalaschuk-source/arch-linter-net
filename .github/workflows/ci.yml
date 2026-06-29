@@ -8,13 +8,12 @@ on:
 
 permissions:
   contents: read
+  pull-requests: write
 
 jobs:
   validate:
     name: Acceptance
     runs-on: ubuntu-latest
-    outputs:
-      strict-outcome: ${{ steps.strict.outcome }}
 
     steps:
       - name: Checkout
@@ -98,26 +97,8 @@ jobs:
           name: architecture-coverage-report
           path: architecture-coverage.md
 
-      - name: Fail if strict architecture coverage failed
-        if: steps.strict.outcome == 'failure'
-        run: exit 1
-
-  comment:
-    name: Architecture coverage PR comment
-    needs: validate
-    if: always() && github.event_name == 'pull_request'
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      pull-requests: write
-
-    steps:
-      - name: Download architecture coverage report
-        uses: actions/download-artifact@v4
-        with:
-          name: architecture-coverage-report
-
       - name: Comment architecture coverage on pull request
+        if: always() && github.event_name == 'pull_request'
         uses: actions/github-script@v7
         with:
           script: |
@@ -148,3 +129,7 @@ jobs:
                 body,
               });
             }
+
+      - name: Fail if strict architecture coverage failed
+        if: steps.strict.outcome == 'failure'
+        run: exit 1

@@ -45,11 +45,11 @@ The architecture coverage analysis steps (strict/audit JSON artifacts, report ge
 - **THEN** the architecture coverage analysis steps execute after the `Acceptance` step in the same job
 - **AND** no additional `dotnet restore`/`dotnet build` of the already-built assemblies is performed before invoking the CLI
 
-### Requirement: PR comment posting is isolated from build/test code
-Posting the architecture coverage PR comment SHALL run in a separate `comment` job in `ci.yml` that depends on `validate` and downloads its report artifact, rather than running inside the `validate` job that builds and tests repository code.
+### Requirement: PR comment posting is a stage of the single validate job
+Posting the architecture coverage PR comment SHALL run as a step inside the same `validate` job that builds and tests repository code, rather than in a separate job — `ci.yml` stays a single job for the whole pipeline (build/test/lint, architecture coverage analysis, and the PR comment).
 
-#### Scenario: Only the comment job can write to pull requests
+#### Scenario: A single job runs the whole pipeline
 - **WHEN** `ci.yml` is inspected
-- **THEN** the top-level workflow `permissions` are `contents: read`
-- **AND** only the `comment` job declares `pull-requests: write`
+- **THEN** there is one job (`validate`) that includes the acceptance, architecture coverage, and PR comment steps
+- **AND** the top-level workflow `permissions` include `pull-requests: write` so the comment step can run without a second job
 

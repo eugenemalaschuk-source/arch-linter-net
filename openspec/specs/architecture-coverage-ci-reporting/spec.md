@@ -89,20 +89,16 @@ When the CI step that computes the changed-files diff fails (e.g. a `git diff`/f
 - **THEN** the step's own outcome reflects failure (it is not suppressed with `|| true`)
 - **AND** that failed outcome is passed to the report generator as `--diff-status failed`
 
-### Requirement: Sticky PR comment with minimal write permission
-A dedicated `comment` job in `.github/workflows/ci.yml`, separate from the `validate` job that runs build/test/lint code, SHALL post the generated Markdown report as a pull request comment on `pull_request` events, identifying its own prior comment via a hidden marker and updating it in place instead of creating a new comment on subsequent pushes. Only the `comment` job SHALL be granted `pull-requests: write`; the `validate` job SHALL remain `contents: read`.
+### Requirement: Sticky PR comment as a stage of the validate job
+A step in the `validate` job in `.github/workflows/ci.yml` SHALL post the generated Markdown report as a pull request comment on `pull_request` events, identifying its own prior comment via a hidden marker and updating it in place instead of creating a new comment on subsequent pushes. The workflow's top-level `permissions` SHALL include `pull-requests: write` so this step can run without a separate job.
 
 #### Scenario: First push creates a comment
-- **WHEN** the `comment` job runs for a pull request with no prior bot comment containing the marker
+- **WHEN** the `validate` job's comment step runs for a pull request with no prior bot comment containing the marker
 - **THEN** it creates a new comment containing the marker and the report
 
 #### Scenario: Subsequent push updates the existing comment
-- **WHEN** the `comment` job runs again for the same pull request and a comment containing the marker already exists
+- **WHEN** the `validate` job's comment step runs again for the same pull request and a comment containing the marker already exists
 - **THEN** it updates that existing comment instead of creating a new one
-
-#### Scenario: Build/test/lint steps run without pull-requests: write
-- **WHEN** the `validate` job runs
-- **THEN** it does not have `pull-requests: write` permission
 
 ### Requirement: Report generator is tested
 The report generator SHALL have script-level tests covering JSON parsing, Markdown generation, zero-findings output, failed-gate output, unknown-mapping behavior, and deriving `covered` from real `covered_items` evidence.
