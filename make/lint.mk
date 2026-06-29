@@ -1,4 +1,7 @@
-.PHONY: lint lint-architecture audit-architecture lint-code-size lint-dotnet-format test-architecture-coverage-report architecture-coverage-report
+.PHONY: lint lint-architecture audit-architecture lint-code-size lint-dotnet-format test-architecture-coverage-report architecture-coverage-report architecture-strict-json architecture-audit-json architecture-coverage-markdown architecture-coverage-ci
+
+CHANGED_FILES ?= changed-files.txt
+DIFF_STATUS   ?= ok
 
 lint: lint-code-size lint-dotnet-format lint-architecture lint-docs  ## Run all code quality checks
 
@@ -26,19 +29,40 @@ test-architecture-coverage-report:  ## Run tests for the architecture coverage r
 	@cd "$(PROJECT_ROOT)" && UV_PROJECT_ENVIRONMENT="$(PROJECT_ROOT)/.venv" "$(UV)" run --project tools/pyproject.toml \
 		pytest tools/scripts/tests/test_architecture_coverage_report.py
 
+architecture-strict-json:  ## Run strict architecture validation, writing architecture-strict.json (target assemblies must already be built)
+	@dotnet run --no-build --project "$(PROJECT_ROOT)/src/ArchLinterNet.Cli" -- \
+		--policy "$(PROJECT_ROOT)/architecture/dependencies.arch.yml" --mode strict --format json \
+		> "$(PROJECT_ROOT)/architecture-strict.json"
+
+architecture-audit-json:  ## Run audit architecture validation, writing architecture-audit.json (target assemblies must already be built)
+	@dotnet run --no-build --project "$(PROJECT_ROOT)/src/ArchLinterNet.Cli" -- \
+		--policy "$(PROJECT_ROOT)/architecture/dependencies.arch.yml" --mode audit --format json \
+		> "$(PROJECT_ROOT)/architecture-audit.json"
+
+architecture-coverage-markdown:  ## Generate architecture-coverage.md from architecture-strict.json (CHANGED_FILES/DIFF_STATUS env optional)
+	@cd "$(PROJECT_ROOT)" && UV_PROJECT_ENVIRONMENT="$(PROJECT_ROOT)/.venv" "$(UV)" run --project tools/pyproject.toml \
+		python tools/scripts/architecture_coverage_report.py architecture-strict.json \
+		--changed-files "$(CHANGED_FILES)" \
+		--diff-status "$(DIFF_STATUS)" \
+		--repo-root "$(PROJECT_ROOT)" \
+		--output architecture-coverage.md
+
+architecture-coverage-ci:  ## CI entrypoint: strict+audit JSON + Markdown report in one call (CHANGED_FILES/DIFF_STATUS env optional)
+	@$(MAKE) architecture-strict-json; STRICT_EXIT=$$?; \
+	$(MAKE) architecture-audit-json || true; \
+	$(MAKE) architecture-coverage-markdown CHANGED_FILES="$(CHANGED_FILES)" DIFF_STATUS="$(DIFF_STATUS)"; MARKDOWN_EXIT=$$?; \
+	if [ $$MARKDOWN_EXIT -ne 0 ]; then exit $$MARKDOWN_EXIT; fi; \
+	exit $$STRICT_EXIT
+
 architecture-coverage-report:  ## Show full-solution architecture coverage report locally (Markdown + JSON)
 	@dotnet build "$(PROJECT_ROOT)/src/ArchLinterNet.Cli/ArchLinterNet.Cli.csproj" --nologo -v minimal
 	@dotnet build "$(PROJECT_ROOT)/src/ArchLinterNet.Testing/ArchLinterNet.Testing.csproj" --nologo -v minimal
 	@dotnet build "$(PROJECT_ROOT)/src/ArchLinterNet.Unity/ArchLinterNet.Unity.csproj" --nologo -v minimal
-	@dotnet run --no-build --project "$(PROJECT_ROOT)/src/ArchLinterNet.Cli" -- \
-		--policy "$(PROJECT_ROOT)/architecture/dependencies.arch.yml" --mode strict --format json \
-		> "$(PROJECT_ROOT)/architecture-coverage.local.json" || true
+	@$(MAKE) architecture-strict-json
+	@$(MAKE) architecture-coverage-markdown
 	@echo ""
 	@echo "===== Architecture coverage report (Markdown) ====="
-	@cd "$(PROJECT_ROOT)" && UV_PROJECT_ENVIRONMENT="$(PROJECT_ROOT)/.venv" "$(UV)" run --project tools/pyproject.toml \
-		python tools/scripts/architecture_coverage_report.py architecture-coverage.local.json \
-		--output architecture-coverage.local.md
-	@cat "$(PROJECT_ROOT)/architecture-coverage.local.md"
+	@cat "$(PROJECT_ROOT)/architecture-coverage.md"
 	@echo ""
 	@echo "===== Architecture coverage report (JSON) ====="
-	@python3 -m json.tool < "$(PROJECT_ROOT)/architecture-coverage.local.json"
+	@python3 -m json.tool < "$(PROJECT_ROOT)/architecture-strict.json"
