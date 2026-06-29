@@ -8,6 +8,7 @@ on:
 
 permissions:
   contents: read
+  pull-requests: write
 
 jobs:
   validate:
@@ -17,6 +18,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
@@ -31,3 +34,82 @@ jobs:
 
       - name: Acceptance
         run: make acceptance
+
+      - name: Test architecture coverage report generator
+        run: make test-architecture-coverage-report
+
+      - name: Collect changed first-party files
+        id: changed_files
+        if: always() && github.event_name == 'pull_request'
+        continue-on-error: true
+        run: |
+          git diff --name-only --diff-filter=ACMR "origin/${{ github.event.pull_request.base.ref }}"...HEAD \
+            -- '*.cs' ':!*.g.cs' ':!*Designer.cs' > changed-files.txt
+
+      - name: Run architecture coverage analysis
+        id: architecture_coverage
+        continue-on-error: true
+        run: |
+          DIFF_STATUS="ok"
+          if [ "${{ github.event_name }}" = "pull_request" ] && [ "${{ steps.changed_files.outcome }}" = "failure" ]; then
+            DIFF_STATUS="failed"
+          fi
+          make architecture-coverage-ci DIFF_STATUS="$DIFF_STATUS"
+
+      - name: Upload strict diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: architecture-strict
+          path: architecture-strict.json
+
+      - name: Upload audit diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: architecture-audit
+          path: architecture-audit.json
+
+      - name: Upload architecture coverage report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: architecture-coverage-report
+          path: architecture-coverage.md
+
+      - name: Comment architecture coverage on pull request
+        if: always() && github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const marker = '<!-- architecture-coverage-report -->';
+            const body = `${marker}\n${fs.readFileSync('architecture-coverage.md', 'utf8')}`;
+
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+            });
+
+            const existing = comments.find((comment) => comment.body && comment.body.includes(marker));
+
+            if (existing) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: existing.id,
+                body,
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                body,
+              });
+            }
+
+      - name: Fail if strict architecture coverage failed
+        if: steps.architecture_coverage.outcome == 'failure'
+        run: exit 1

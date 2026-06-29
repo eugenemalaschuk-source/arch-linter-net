@@ -318,7 +318,8 @@ public static class ArchitectureDiagnosticFormatter
                 .ToArray(),
             ["uncovered_items"] = ToEvidenceItemsJson(summary.UncoveredItems),
             ["stale_items"] = ToEvidenceItemsJson(summary.StaleItems),
-            ["unknown_items"] = ToEvidenceItemsJson(summary.UnknownItems)
+            ["unknown_items"] = ToEvidenceItemsJson(summary.UnknownItems),
+            ["covered_items"] = ToEvidenceItemsJson(summary.CoveredItems)
         };
     }
 

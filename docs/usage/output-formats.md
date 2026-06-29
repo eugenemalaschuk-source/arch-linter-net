@@ -114,7 +114,10 @@ Example shape:
         { "item": "MyApp.Features.Payments", "evidence": "MyApp.Features.Payments.PaymentsRepresentative" }
       ],
       "stale_items": [],
-      "unknown_items": []
+      "unknown_items": [],
+      "covered_items": [
+        { "item": "MyApp.Features.Billing", "evidence": "MyApp.Features.Billing.BillingRepresentative" }
+      ]
     },
     {
       "contract": "layer-edge-coverage",
@@ -126,13 +129,16 @@ Example shape:
         { "item": "MyApp.Cli.Commands -> MyApp.Testing.Fixtures", "evidence": "MyApp.Cli.Commands.DeployCommand" }
       ],
       "stale_items": [],
-      "unknown_items": []
+      "unknown_items": [],
+      "covered_items": [
+        { "item": "MyApp.Cli.Commands -> MyApp.Core.Deployment", "evidence": "MyApp.Cli.Commands.DeployCommand" }
+      ]
     }
   ]
 }
 ```
 
-Every `coverage_summary` entry always includes `uncovered_items`, `stale_items`, and `unknown_items`; only the array(s) matching the contract's `scope` are ever non-empty (`uncovered_items` for `scope: namespace`/`scope: project`/`scope: assembly`/`scope: dependency_edge`; `unknown_items` additionally for `scope: project`; `stale_items`/`unknown_items` for `scope: rule_input`) — they are kept distinct so a `stale` finding can't be mistaken for an `unknown` one or vice versa.
+Every `coverage_summary` entry always includes `uncovered_items`, `stale_items`, `unknown_items`, and `covered_items`; only the array(s) matching the contract's `scope` are ever non-empty (`uncovered_items` for `scope: namespace`/`scope: project`/`scope: assembly`/`scope: dependency_edge`; `unknown_items` additionally for `scope: project`; `stale_items`/`unknown_items` for `scope: rule_input`) — they are kept distinct so a `stale` finding can't be mistaken for an `unknown` one or vice versa. `covered_items` names the specific units found covered with supporting evidence, for every scope — this is the only positive evidence of coverage in the JSON output; a unit's absence from every list (including `covered_items`) does not mean it is covered, it means no configured contract's scope/roots include that unit at all.
 
 `coverage_summary` is always present as an array (empty when no coverage contracts ran) and is reported independent of `analysis.coverage` severity, since it summarizes state rather than gating the run. See [Coverage contracts — Coverage summary](../contracts/coverage.md#coverage-summary) for the count semantics, including how `scope: rule_input` maps to `stale`/`unknown`.
 

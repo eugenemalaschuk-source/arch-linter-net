@@ -13,16 +13,20 @@
 ##   make fmt-docs             — auto-format markdown documentation
 ##
 ## Linting & quality:
-##   make lint                 — run all code quality checks
-##   make lint-architecture    — run strict architecture contracts on self
-##   make audit-architecture   — run diagnostic architecture audit on self
-##   make lint-code-size       — size lint for C# and documentation files
-##   make lint-dotnet-format   — verify C# formatting without changing files
-##   make lint-docs            — verify MkDocs documentation structure
+##   make lint                              — run all code quality checks
+##   make lint-architecture                 — run strict architecture contracts on self
+##   make audit-architecture                — run diagnostic architecture audit on self
+##   make lint-code-size                    — size lint for C# and documentation files
+##   make lint-dotnet-format                — verify C# formatting without changing files
+##   make lint-docs                         — verify MkDocs documentation structure
+##   make architecture-coverage-report      — show full-solution coverage report locally (Markdown + JSON)
+##   make test-architecture-coverage-report — run tests for the coverage report generator
 ##
 ## Testing:
 ##   make acceptance           — lint + all tests
 ##   make test                 — run all tests
+##   make test-coverage        — run all tests with coverage collection (cobertura XML)
+##   make test-coverage-badge  — run tests with coverage and print a test-coverage badge line
 ##
 ## Build:
 ##   make build                — build documentation site + NuGet packages
