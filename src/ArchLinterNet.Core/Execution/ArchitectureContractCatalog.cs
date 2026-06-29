@@ -13,20 +13,34 @@ public sealed record ArchitectureContractDescriptor(
 public sealed class ArchitectureContractCatalog
 {
     private readonly List<ArchitectureContractDescriptor> _descriptors;
+    private readonly List<string> _familiesInOrder;
 
-    private ArchitectureContractCatalog(List<ArchitectureContractDescriptor> descriptors)
+    private ArchitectureContractCatalog(List<ArchitectureContractDescriptor> descriptors, List<string> familiesInOrder)
     {
         _descriptors = descriptors;
+        _familiesInOrder = familiesInOrder;
     }
+
+    // The order new families first appear in Build below, deduplicated. ArchitectureContractExecutor
+    // iterates this list to dispatch each family through the handler registry, so a new family becomes
+    // executable as soon as it is added here (plus a handler/registration) with no executor changes.
+    public IReadOnlyList<string> FamiliesInOrder => _familiesInOrder;
 
     public static ArchitectureContractCatalog Build(ArchitectureContractDocument document)
     {
         ArchitectureContractGroups groups = document.Contracts;
         List<ArchitectureContractDescriptor> descriptors = new();
+        List<string> familiesInOrder = new();
+        HashSet<string> seenFamilies = new(StringComparer.Ordinal);
 
         void AddGroup<T>(string group, string mode, string family, IEnumerable<T> contracts)
             where T : IArchitectureContract
         {
+            if (seenFamilies.Add(family))
+            {
+                familiesInOrder.Add(family);
+            }
+
             foreach (T contract in contracts)
             {
                 descriptors.Add(new ArchitectureContractDescriptor(group, mode, family, contract.Name, contract.Id, contract));
@@ -61,7 +75,7 @@ public sealed class ArchitectureContractCatalog
         AddGroup("audit_layer_templates", "audit", "layer_template",
             LayerTemplateExpander.Expand(groups.AuditLayerTemplates));
 
-        return new ArchitectureContractCatalog(descriptors);
+        return new ArchitectureContractCatalog(descriptors, familiesInOrder);
     }
 
     public IEnumerable<IArchitectureContract> ContractsFor(string mode, string family)

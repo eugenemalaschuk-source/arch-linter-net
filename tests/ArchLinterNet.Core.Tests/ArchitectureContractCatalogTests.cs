@@ -132,6 +132,19 @@ public sealed class ArchitectureContractCatalogTests
     }
 
     [Test]
+    public void FamiliesInOrder_IncludesEveryFamilyExactlyOnce()
+    {
+        ArchitectureContractCatalog catalog = ArchitectureContractCatalog.Build(BuildDocument());
+
+        Assert.That(catalog.FamiliesInOrder, Is.Unique);
+        Assert.That(catalog.FamiliesInOrder, Is.SupersetOf(new[]
+        {
+            "dependency", "layer", "allow_only", "cycle", "acyclic_sibling", "method_body",
+            "independence", "protected", "external", "asmdef", "coverage", "layer_template",
+        }));
+    }
+
+    [Test]
     public void ContractsFor_UnknownFamily_ReturnsEmpty()
     {
         ArchitectureContractCatalog catalog = ArchitectureContractCatalog.Build(BuildDocument());

@@ -1,7 +1,9 @@
 using System.Reflection;
+using ArchLinterNet.Core.Composition;
 using ArchLinterNet.Core.Contracts;
 using ArchLinterNet.Core.Execution;
 using ArchLinterNet.Core.Model;
+using Microsoft.Extensions.DependencyInjection;
 using NUnit.Framework;
 
 namespace ArchLinterNet.Core.Tests;
@@ -111,6 +113,27 @@ public sealed class ArchitectureContractHandlerRegistryTests
         Assert.That(registry.TryGetHandler("external", out _), Is.True);
         Assert.That(registry.TryGetHandler("coverage", out _), Is.True);
         Assert.That(registry.TryGetHandler("unknown_family", out _), Is.False);
+    }
+
+    [Test]
+    public void AddArchLinterNetCore_RegistersHandlerRegistryForEveryFamily()
+    {
+        using ServiceProvider provider = new ServiceCollection().AddArchLinterNetCore().BuildServiceProvider();
+
+        ArchitectureContractHandlerRegistry registry = provider.GetRequiredService<ArchitectureContractHandlerRegistry>();
+
+        Assert.That(registry.TryGetHandler("dependency", out _), Is.True);
+        Assert.That(registry.TryGetHandler("layer", out _), Is.True);
+        Assert.That(registry.TryGetHandler("layer_template", out _), Is.True);
+        Assert.That(registry.TryGetHandler("allow_only", out _), Is.True);
+        Assert.That(registry.TryGetHandler("cycle", out _), Is.True);
+        Assert.That(registry.TryGetHandler("acyclic_sibling", out _), Is.True);
+        Assert.That(registry.TryGetHandler("method_body", out _), Is.True);
+        Assert.That(registry.TryGetHandler("asmdef", out _), Is.True);
+        Assert.That(registry.TryGetHandler("independence", out _), Is.True);
+        Assert.That(registry.TryGetHandler("protected", out _), Is.True);
+        Assert.That(registry.TryGetHandler("external", out _), Is.True);
+        Assert.That(registry.TryGetHandler("coverage", out _), Is.True);
     }
 
     [Test]
