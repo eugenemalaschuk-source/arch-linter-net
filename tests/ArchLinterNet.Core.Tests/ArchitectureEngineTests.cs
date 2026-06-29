@@ -1,4 +1,5 @@
 using ArchLinterNet.Core.Composition;
+using ArchLinterNet.Core.Reporting;
 using ArchLinterNet.Core.Validation;
 using Microsoft.Extensions.DependencyInjection;
 using NUnit.Framework;
@@ -106,5 +107,49 @@ public sealed class ArchitectureEngineTests
 
         Assert.That(provider.GetService<IArchitectureValidationApplicationService>(), Is.Not.Null);
         Assert.That(provider.GetService<IArchitectureBaselineApplicationService>(), Is.Not.Null);
+    }
+
+    [Test]
+    public void ConfigureServices_ReplacesValidationApplicationService()
+    {
+        FakeValidationApplicationService fake = new();
+
+        ArchitectureEngine engine = new ArchitectureEngineBuilder()
+            .AddArchLinterNetCore()
+            .ConfigureServices(services =>
+                services.AddSingleton<IArchitectureValidationApplicationService>(fake))
+            .Build();
+
+        ValidationOutcome outcome = engine.Validate(new ValidationRequest
+        {
+            PolicyPath = _policyPath,
+            Mode = "strict",
+        });
+
+        Assert.That(fake.WasCalled, Is.True);
+        Assert.That(outcome, Is.SameAs(fake.Outcome));
+    }
+
+    private sealed class FakeValidationApplicationService : IArchitectureValidationApplicationService
+    {
+        public bool WasCalled { get; private set; }
+
+        public ValidationOutcome Outcome { get; } = new(
+            Passed: true,
+            Violations: Array.Empty<Model.ArchitectureViolation>(),
+            Cycles: Array.Empty<string>(),
+            CoverageFindings: Array.Empty<Model.ArchitectureViolation>(),
+            CoverageConfig: "off",
+            UnmatchedIgnoredViolations: Array.Empty<Model.ArchitectureUnmatchedIgnoredViolation>(),
+            UnmatchedIgnoredViolationsConfig: "off",
+            PolicyConsistencyFindings: Array.Empty<Model.PolicyConsistencyDiagnostic>(),
+            PolicyConsistencyConfig: "off",
+            CoverageSummaries: Array.Empty<ArchitectureCoverageSummary>());
+
+        public ValidationOutcome Validate(ValidationRequest request, ValidationTiming? timing = null)
+        {
+            WasCalled = true;
+            return Outcome;
+        }
     }
 }

@@ -12,6 +12,12 @@ public sealed class ArchitectureEngineBuilder
         return this;
     }
 
+    public ArchitectureEngineBuilder ConfigureServices(Action<IServiceCollection> configure)
+    {
+        configure(_services);
+        return this;
+    }
+
     public ArchitectureEngine Build()
     {
         return new ArchitectureEngine(_services.BuildServiceProvider());
