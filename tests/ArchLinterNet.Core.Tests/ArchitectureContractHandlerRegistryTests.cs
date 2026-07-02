@@ -329,7 +329,7 @@ public sealed class ArchitectureContractHandlerRegistryTests
 
         var executorRunner = new ArchitectureContractRunner(CreateContext(_layerFixtureAssembly), document);
         ArchitectureContractExecutor.ExecutionResult result =
-            ArchitectureContractExecutor.Execute(executorRunner.Session, document, "strict", CreateRegistry());
+            ArchitectureContractExecutor.Execute(executorRunner.Session, "strict", CreateRegistry());
 
         Assert.That(Project(result.Violations), Is.EqualTo(Project(expectedViolations)));
     }
@@ -346,7 +346,7 @@ public sealed class ArchitectureContractHandlerRegistryTests
         var runner = new ArchitectureContractRunner(CreateContext(_layerFixtureAssembly), document);
 
         ArchitectureContractExecutor.ExecutionResult result =
-            ArchitectureContractExecutor.Execute(runner.Session, document, "strict", CreateRegistry());
+            ArchitectureContractExecutor.Execute(runner.Session, "strict", CreateRegistry());
 
         Assert.That(result.Violations, Has.Count.GreaterThan(0));
         Assert.That(runner.BaselineCandidates, Has.Count.GreaterThan(0),
@@ -414,10 +414,10 @@ public sealed class ArchitectureContractHandlerRegistryTests
         };
 
         var strictRunner = new ArchitectureContractRunner(CreateContext(typeof(ArchitectureContractDocument).Assembly), document);
-        Assert.DoesNotThrow(() => ArchitectureContractExecutor.Execute(strictRunner.Session, document, "strict", CreateRegistry()));
+        Assert.DoesNotThrow(() => ArchitectureContractExecutor.Execute(strictRunner.Session, "strict", CreateRegistry()));
 
         var auditRunner = new ArchitectureContractRunner(CreateContext(typeof(ArchitectureContractDocument).Assembly), document);
-        Assert.DoesNotThrow(() => ArchitectureContractExecutor.Execute(auditRunner.Session, document, "audit", CreateRegistry()));
+        Assert.DoesNotThrow(() => ArchitectureContractExecutor.Execute(auditRunner.Session, "audit", CreateRegistry()));
 
         var policyConsistencyRunner = new ArchitectureContractRunner(CreateContext(typeof(ArchitectureContractDocument).Assembly), document);
         var findings = policyConsistencyRunner.CheckPolicyConsistency();

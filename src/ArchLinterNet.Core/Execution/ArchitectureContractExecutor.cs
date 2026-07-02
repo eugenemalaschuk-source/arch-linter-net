@@ -17,7 +17,6 @@ internal static class ArchitectureContractExecutor
 
     public static ExecutionResult Execute(
         ArchitectureAnalysisSession session,
-        ArchitectureContractDocument document,
         string mode,
         ArchitectureContractHandlerRegistry handlerRegistry,
         bool includeAsmdefContracts = true,
