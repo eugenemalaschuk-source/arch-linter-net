@@ -35,12 +35,12 @@ public sealed class ArchitectureBaselineApplicationService(
 
         if (includeStrict)
         {
-            ArchitectureContractExecutor.Execute(runner, document, "strict", handlerRegistry, includeAsmdefContracts: false);
+            ArchitectureContractExecutor.Execute(runner.Session, "strict", handlerRegistry, includeAsmdefContracts: false);
         }
 
         if (includeAudit)
         {
-            ArchitectureContractExecutor.Execute(runner, document, "audit", handlerRegistry, includeAsmdefContracts: false);
+            ArchitectureContractExecutor.Execute(runner.Session, "audit", handlerRegistry, includeAsmdefContracts: false);
         }
 
         ArchitectureBaselineDocument baseline = ArchitectureBaselineGenerator.Generate(

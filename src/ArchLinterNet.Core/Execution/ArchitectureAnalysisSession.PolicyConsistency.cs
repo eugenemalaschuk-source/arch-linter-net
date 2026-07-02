@@ -5,7 +5,7 @@ using ArchLinterNet.Core.Scanning;
 
 namespace ArchLinterNet.Core.Execution;
 
-public sealed partial class ArchitectureContractRunner
+public sealed partial class ArchitectureAnalysisSession
 {
     public List<PolicyConsistencyDiagnostic> CheckPolicyConsistency()
     {
@@ -42,7 +42,7 @@ public sealed partial class ArchitectureContractRunner
             }
         }
 
-        ArchitectureContractGroups groups = _document.Contracts;
+        ArchitectureContractGroups groups = Document.Contracts;
 
         AddGroup("strict", "strict", "dependency", groups.Strict);
         AddGroup("audit", "audit", "dependency", groups.Audit);
@@ -111,7 +111,7 @@ public sealed partial class ArchitectureContractRunner
         List<PolicyConsistencyDiagnostic> findings = new();
 
         var forbidPairs = new List<(string Source, string Target, ArchitectureDependencyContract Contract)>();
-        foreach (ArchitectureDependencyContract c in _document.Contracts.Strict.Concat(_document.Contracts.Audit))
+        foreach (ArchitectureDependencyContract c in Document.Contracts.Strict.Concat(Document.Contracts.Audit))
         {
             foreach (string target in c.Forbidden)
             {
@@ -120,7 +120,7 @@ public sealed partial class ArchitectureContractRunner
         }
 
         var allowPairs = new List<(string Source, string Target, ArchitectureAllowOnlyContract Contract)>();
-        foreach (ArchitectureAllowOnlyContract c in _document.Contracts.StrictAllowOnly.Concat(_document.Contracts.AuditAllowOnly))
+        foreach (ArchitectureAllowOnlyContract c in Document.Contracts.StrictAllowOnly.Concat(Document.Contracts.AuditAllowOnly))
         {
             foreach (string target in c.Allowed)
             {
@@ -167,15 +167,15 @@ public sealed partial class ArchitectureContractRunner
     {
         List<PolicyConsistencyDiagnostic> findings = new();
 
-        var independenceContracts = _document.Contracts.StrictIndependence
-            .Concat(_document.Contracts.AuditIndependence)
+        var independenceContracts = Document.Contracts.StrictIndependence
+            .Concat(Document.Contracts.AuditIndependence)
             .ToList();
 
         // Dependency contracts only express forbidding, so they are not a source of "explicit
         // allow" pairs; allow-only and ordered layer contracts are the explicit-allow sources.
         var explicitDependencyPairs = new List<(string Source, string Target, string Name, string? Id)>();
 
-        foreach (ArchitectureAllowOnlyContract c in _document.Contracts.StrictAllowOnly.Concat(_document.Contracts.AuditAllowOnly))
+        foreach (ArchitectureAllowOnlyContract c in Document.Contracts.StrictAllowOnly.Concat(Document.Contracts.AuditAllowOnly))
         {
             foreach (string target in c.Allowed)
             {
@@ -183,7 +183,7 @@ public sealed partial class ArchitectureContractRunner
             }
         }
 
-        foreach (ArchitectureLayerContract c in _document.Contracts.StrictLayers.Concat(_document.Contracts.AuditLayers))
+        foreach (ArchitectureLayerContract c in Document.Contracts.StrictLayers.Concat(Document.Contracts.AuditLayers))
         {
             // Ordered layer contracts express an explicit allowed/ordered dependency between
             // consecutive layers (later layers may depend on earlier ones). Their `Layers`
@@ -201,16 +201,16 @@ public sealed partial class ArchitectureContractRunner
         // entries are concrete container namespaces (e.g. "MyApp.Feature.Domain"), not named
         // layer keys. Resolve each one back to the named top-level layer it belongs to before
         // comparing against independence.Layers, which always lists named layers.
-        IReadOnlySet<string> allLayerNames = new HashSet<string>(_document.Layers.Keys, StringComparer.Ordinal);
+        IReadOnlySet<string> allLayerNames = new HashSet<string>(Document.Layers.Keys, StringComparer.Ordinal);
 
         IEnumerable<ArchitectureLayerContract> expandedTemplateContracts =
-            LayerTemplateExpander.Expand(_document.Contracts.StrictLayerTemplates)
-                .Concat(LayerTemplateExpander.Expand(_document.Contracts.AuditLayerTemplates));
+            LayerTemplateExpander.Expand(Document.Contracts.StrictLayerTemplates)
+                .Concat(LayerTemplateExpander.Expand(Document.Contracts.AuditLayerTemplates));
 
         foreach (ArchitectureLayerContract c in expandedTemplateContracts)
         {
             List<string?> resolvedLayers = c.Layers
-                .Select(ns => ArchitectureLayerResolver.ResolveContainingLayer(_document, ns, allLayerNames))
+                .Select(ns => ArchitectureLayerResolver.ResolveContainingLayer(Document, ns, allLayerNames))
                 .ToList();
 
             for (int i = 0; i < resolvedLayers.Count; i++)
@@ -277,15 +277,15 @@ public sealed partial class ArchitectureContractRunner
     {
         List<PolicyConsistencyDiagnostic> findings = new();
 
-        var protectedContracts = _document.Contracts.StrictProtected
-            .Concat(_document.Contracts.AuditProtected)
+        var protectedContracts = Document.Contracts.StrictProtected
+            .Concat(Document.Contracts.AuditProtected)
             .ToList();
 
         // Strict forbidden/protected rules that forbid an importer for the same surface:
         // a dependency contract forbidding `importer -> protectedSurface`, or another
         // protected contract over the same surface that does NOT list the importer as allowed.
         var forbiddingDependencies = new List<(string Source, string Target, string Name, string? Id)>();
-        foreach (ArchitectureDependencyContract c in _document.Contracts.Strict.Concat(_document.Contracts.Audit))
+        foreach (ArchitectureDependencyContract c in Document.Contracts.Strict.Concat(Document.Contracts.Audit))
         {
             foreach (string target in c.Forbidden)
             {
@@ -391,7 +391,7 @@ public sealed partial class ArchitectureContractRunner
     {
         List<PolicyConsistencyDiagnostic> findings = new();
 
-        var internalLayers = _document.Layers
+        var internalLayers = Document.Layers
             .Where(kvp => !kvp.Value.External)
             .OrderBy(kvp => kvp.Key, StringComparer.Ordinal)
             .ToList();
@@ -403,7 +403,7 @@ public sealed partial class ArchitectureContractRunner
 
         HashSet<(string, string)> reportedPairs = new();
 
-        foreach (System.Reflection.Assembly assembly in _context.TargetAssemblies.Distinct().OrderBy(a => a.FullName, StringComparer.Ordinal))
+        foreach (System.Reflection.Assembly assembly in Context.TargetAssemblies.Distinct().OrderBy(a => a.FullName, StringComparer.Ordinal))
         {
             foreach (Type type in ArchitectureTypeScanner.GetLoadableTypes(assembly)
                 .OrderBy(t => ArchitectureTypeNames.SafeFullName(t), StringComparer.Ordinal))
@@ -502,7 +502,7 @@ public sealed partial class ArchitectureContractRunner
         List<PolicyConsistencyDiagnostic> findings = new();
 
         HashSet<string> unreachableLayerNames = new(StringComparer.Ordinal);
-        foreach (var kvp in _document.Layers)
+        foreach (var kvp in Document.Layers)
         {
             if (IsStructurallyUnreachable(kvp.Value))
             {

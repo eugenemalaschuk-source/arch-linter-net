@@ -8,7 +8,7 @@ using ArchLinterNet.Core.Scanning;
 
 namespace ArchLinterNet.Core.Execution;
 
-public sealed partial class ArchitectureContractRunner
+public sealed partial class ArchitectureAnalysisSession
 {
     public ArchitectureCoverageSummary? BuildCoverageSummary(ArchitectureCoverageContract contract)
     {
@@ -42,7 +42,7 @@ public sealed partial class ArchitectureContractRunner
 
     private ArchitectureCoverageSummary BuildNamespaceCoverageSummary(ArchitectureCoverageContract contract)
     {
-        ArchitectureCoverageInventory inventory = _session.BuildCoverageInventory(_document);
+        ArchitectureCoverageInventory inventory = BuildCoverageInventory(Document);
 
         List<ArchitectureCoverageSummaryExcludedItem> excludedItems = new();
         List<ArchitectureCoverageSummaryEvidenceItem> uncoveredItems = new();
@@ -84,7 +84,7 @@ public sealed partial class ArchitectureContractRunner
 
     private ArchitectureCoverageSummary BuildRuleInputCoverageSummary(ArchitectureCoverageContract contract)
     {
-        ArchitectureCoverageInventory inventory = _session.BuildCoverageInventory(_document);
+        ArchitectureCoverageInventory inventory = BuildCoverageInventory(Document);
 
         Dictionary<string, ArchitectureContractDescriptor> descriptorsById = BuildAllDescriptors()
             .Where(descriptor => !string.IsNullOrEmpty(descriptor.Id))
@@ -121,7 +121,7 @@ public sealed partial class ArchitectureContractRunner
 
             foreach (string layerName in referencedLayerNames)
             {
-                if (!_document.Layers.TryGetValue(layerName, out ArchitectureLayer? layer))
+                if (!Document.Layers.TryGetValue(layerName, out ArchitectureLayer? layer))
                 {
                     unknownItems.Add(new ArchitectureCoverageSummaryEvidenceItem(referencedContractId, layerName));
                     continue;
@@ -154,13 +154,13 @@ public sealed partial class ArchitectureContractRunner
 
     private ArchitectureCoverageSummary BuildAssemblyCoverageSummary(ArchitectureCoverageContract contract)
     {
-        ArchitectureCoverageInventory inventory = _session.BuildCoverageInventory(_document);
+        ArchitectureCoverageInventory inventory = BuildCoverageInventory(Document);
 
         List<ArchitectureCoverageSummaryExcludedItem> excludedItems = new();
         List<ArchitectureCoverageSummaryEvidenceItem> uncoveredItems = new();
         List<ArchitectureCoverageSummaryEvidenceItem> coveredItems = new();
 
-        foreach (Assembly assembly in _context.TargetAssemblies
+        foreach (Assembly assembly in Context.TargetAssemblies
                      .OrderBy(GetAssemblyName, StringComparer.Ordinal))
         {
             string assemblyName = GetAssemblyName(assembly);
@@ -199,9 +199,9 @@ public sealed partial class ArchitectureContractRunner
 
     private ArchitectureCoverageSummary BuildProjectCoverageSummary(ArchitectureCoverageContract contract)
     {
-        ArchitectureCoverageInventory inventory = _session.BuildCoverageInventory(_document);
+        ArchitectureCoverageInventory inventory = BuildCoverageInventory(Document);
         IReadOnlyCollection<ArchitectureDiscoveredProject> discoveredProjects =
-            _context.ProjectDiscovery?.DiscoveredProjects ?? Array.Empty<ArchitectureDiscoveredProject>();
+            Context.ProjectDiscovery?.DiscoveredProjects ?? Array.Empty<ArchitectureDiscoveredProject>();
 
         List<ArchitectureCoverageSummaryExcludedItem> excludedItems = new();
         List<ArchitectureCoverageSummaryEvidenceItem> uncoveredItems = new();
@@ -255,7 +255,7 @@ public sealed partial class ArchitectureContractRunner
 
     private ArchitectureCoverageSummary BuildDependencyEdgeCoverageSummary(ArchitectureCoverageContract contract)
     {
-        ArchitectureCoverageInventory inventory = _session.BuildCoverageInventory(_document);
+        ArchitectureCoverageInventory inventory = BuildCoverageInventory(Document);
 
         List<ArchitectureCoverageSummaryExcludedItem> excludedItems = new();
         List<ArchitectureCoverageSummaryEvidenceItem> uncoveredItems = new();
@@ -338,7 +338,7 @@ public sealed partial class ArchitectureContractRunner
                 "Only scopes 'namespace', 'rule_input', 'project', 'assembly', and 'dependency_edge' are implemented right now.");
         }
 
-        ArchitectureCoverageInventory inventory = _session.BuildCoverageInventory(_document);
+        ArchitectureCoverageInventory inventory = BuildCoverageInventory(Document);
 
         ArchitectureContractExecutionContext executionContext = CreateExecutionContext(contract, contract.IgnoredViolations);
 
@@ -364,7 +364,7 @@ public sealed partial class ArchitectureContractRunner
 
     private List<ArchitectureViolation> CheckRuleInputCoverageContract(ArchitectureCoverageContract contract)
     {
-        ArchitectureCoverageInventory inventory = _session.BuildCoverageInventory(_document);
+        ArchitectureCoverageInventory inventory = BuildCoverageInventory(Document);
 
         HashSet<string> excludedContractIds = new(
             contract.Exclude
@@ -399,7 +399,7 @@ public sealed partial class ArchitectureContractRunner
 
             foreach (string layerName in referencedLayerNames)
             {
-                if (!_document.Layers.TryGetValue(layerName, out ArchitectureLayer? layer))
+                if (!Document.Layers.TryGetValue(layerName, out ArchitectureLayer? layer))
                 {
                     if (!executionContext.IsIgnored(referencedContractId, layerName))
                     {
@@ -439,10 +439,10 @@ public sealed partial class ArchitectureContractRunner
 
     private List<ArchitectureViolation> CheckAssemblyCoverageContract(ArchitectureCoverageContract contract)
     {
-        ArchitectureCoverageInventory inventory = _session.BuildCoverageInventory(_document);
+        ArchitectureCoverageInventory inventory = BuildCoverageInventory(Document);
         ArchitectureContractExecutionContext executionContext = CreateExecutionContext(contract, contract.IgnoredViolations);
 
-        List<ArchitectureViolation> findings = _context.TargetAssemblies
+        List<ArchitectureViolation> findings = Context.TargetAssemblies
             .Select(assembly => (Assembly: assembly, Name: GetAssemblyName(assembly)))
             .Where(entry => !contract.Exclude.Any(exclusion => MatchesAssemblyExclusion(exclusion, entry.Name)))
             .Where(entry => !GetAssemblyNamespaces(entry.Assembly)
@@ -464,10 +464,10 @@ public sealed partial class ArchitectureContractRunner
 
     private List<ArchitectureViolation> CheckProjectCoverageContract(ArchitectureCoverageContract contract)
     {
-        ArchitectureCoverageInventory inventory = _session.BuildCoverageInventory(_document);
+        ArchitectureCoverageInventory inventory = BuildCoverageInventory(Document);
         ArchitectureContractExecutionContext executionContext = CreateExecutionContext(contract, contract.IgnoredViolations);
         IReadOnlyCollection<ArchitectureDiscoveredProject> discoveredProjects =
-            _context.ProjectDiscovery?.DiscoveredProjects ?? Array.Empty<ArchitectureDiscoveredProject>();
+            Context.ProjectDiscovery?.DiscoveredProjects ?? Array.Empty<ArchitectureDiscoveredProject>();
 
         List<ArchitectureViolation> findings = new();
 
@@ -519,7 +519,7 @@ public sealed partial class ArchitectureContractRunner
 
     private List<ArchitectureViolation> CheckDependencyEdgeCoverageContract(ArchitectureCoverageContract contract)
     {
-        ArchitectureCoverageInventory inventory = _session.BuildCoverageInventory(_document);
+        ArchitectureCoverageInventory inventory = BuildCoverageInventory(Document);
         ArchitectureContractExecutionContext executionContext = CreateExecutionContext(contract, contract.IgnoredViolations);
 
         List<ArchitectureViolation> findings = new();
@@ -566,7 +566,7 @@ public sealed partial class ArchitectureContractRunner
 
     private IEnumerable<ArchitectureCoverageDependencyEdge> GetEdgesForLayerPair(string sourceLayer, string targetLayer)
     {
-        ArchitectureCoverageInventory inventory = _session.BuildCoverageInventory(_document);
+        ArchitectureCoverageInventory inventory = BuildCoverageInventory(Document);
 
         return inventory.DependencyEdges.Where(edge =>
             NamespaceMatchesLayer(edge.SourceNamespace, sourceLayer)
@@ -575,7 +575,7 @@ public sealed partial class ArchitectureContractRunner
 
     private bool NamespaceMatchesLayer(string namespaceName, string layerName)
     {
-        return _document.Layers.TryGetValue(layerName, out ArchitectureLayer? layer)
+        return Document.Layers.TryGetValue(layerName, out ArchitectureLayer? layer)
                && ArchitectureLayerResolver.MatchesNamespace(layer, namespaceName);
     }
 
@@ -589,8 +589,8 @@ public sealed partial class ArchitectureContractRunner
 
     private bool IsLayerPairGoverned(string sourceLayer, string targetLayer)
     {
-        bool governedByDependencyContract = _document.Contracts.Strict
-            .Concat(_document.Contracts.Audit)
+        bool governedByDependencyContract = Document.Contracts.Strict
+            .Concat(Document.Contracts.Audit)
             .Any(dependency =>
                 string.Equals(dependency.Source, sourceLayer, StringComparison.Ordinal)
                 && dependency.Forbidden.Contains(targetLayer, StringComparer.Ordinal));
@@ -600,8 +600,8 @@ public sealed partial class ArchitectureContractRunner
             return true;
         }
 
-        bool governedByLayerContract = _document.Contracts.StrictLayers
-            .Concat(_document.Contracts.AuditLayers)
+        bool governedByLayerContract = Document.Contracts.StrictLayers
+            .Concat(Document.Contracts.AuditLayers)
             .Any(layer => layer.Layers.Contains(sourceLayer, StringComparer.Ordinal)
                           && layer.Layers.Contains(targetLayer, StringComparer.Ordinal));
 
@@ -610,8 +610,8 @@ public sealed partial class ArchitectureContractRunner
             return true;
         }
 
-        bool governedByIndependenceContract = _document.Contracts.StrictIndependence
-            .Concat(_document.Contracts.AuditIndependence)
+        bool governedByIndependenceContract = Document.Contracts.StrictIndependence
+            .Concat(Document.Contracts.AuditIndependence)
             .Any(independence => independence.Layers.Contains(sourceLayer, StringComparer.Ordinal)
                                   && independence.Layers.Contains(targetLayer, StringComparer.Ordinal));
 
@@ -623,8 +623,8 @@ public sealed partial class ArchitectureContractRunner
         // An allow-only contract governs the entire outbound surface of its source layer —
         // every reference out of that layer is either explicitly allowed or a violation —
         // so it governs (A, B) regardless of whether B is itself in the allowed list.
-        bool governedByAllowOnlyContract = _document.Contracts.StrictAllowOnly
-            .Concat(_document.Contracts.AuditAllowOnly)
+        bool governedByAllowOnlyContract = Document.Contracts.StrictAllowOnly
+            .Concat(Document.Contracts.AuditAllowOnly)
             .Any(allowOnly => string.Equals(allowOnly.Source, sourceLayer, StringComparison.Ordinal));
 
         if (governedByAllowOnlyContract)
@@ -635,8 +635,8 @@ public sealed partial class ArchitectureContractRunner
         // A protected contract governs every reference into its protected layer — allowed
         // importers are exempted by the contract itself, non-allowed importers are violations —
         // so it governs (A, B) whenever B is protected, regardless of A's importer status.
-        bool governedByProtectedContract = _document.Contracts.StrictProtected
-            .Concat(_document.Contracts.AuditProtected)
+        bool governedByProtectedContract = Document.Contracts.StrictProtected
+            .Concat(Document.Contracts.AuditProtected)
             .Any(protectedContract => protectedContract.Protected.Contains(targetLayer, StringComparer.Ordinal));
 
         if (governedByProtectedContract)
@@ -644,7 +644,7 @@ public sealed partial class ArchitectureContractRunner
             return true;
         }
 
-        ArchitectureCoverageInventory inventory = _session.BuildCoverageInventory(_document);
+        ArchitectureCoverageInventory inventory = BuildCoverageInventory(Document);
 
         return inventory.ExpandedLayerTemplates.Any(template =>
             template.Layers.Any(ns => NamespaceMatchesLayer(ns, sourceLayer))
@@ -661,7 +661,7 @@ public sealed partial class ArchitectureContractRunner
 
     private Assembly? ResolveProjectAssembly(ArchitectureDiscoveredProject project)
     {
-        return _context.TargetAssemblies.FirstOrDefault(assembly =>
+        return Context.TargetAssemblies.FirstOrDefault(assembly =>
             string.Equals(GetAssemblyName(assembly), project.AssemblyName, StringComparison.Ordinal));
     }
 
