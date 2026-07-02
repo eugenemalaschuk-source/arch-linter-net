@@ -1,6 +1,7 @@
 using System.Reflection;
 using ArchLinterNet.Core.Contracts;
 using ArchLinterNet.Core.Discovery;
+using ArchLinterNet.Core.IO;
 
 namespace ArchLinterNet.Core.Execution;
 
@@ -17,6 +18,20 @@ public interface IArchitectureAssemblyResolutionService
 
 public sealed class ArchitectureAssemblyResolutionService : IArchitectureAssemblyResolutionService
 {
+    private readonly IArchitectureFileSystem _fileSystem;
+    private readonly IArchitectureEnvironment _environment;
+    private readonly IArchitectureAssemblyLoader _assemblyLoader;
+
+    public ArchitectureAssemblyResolutionService(
+        IArchitectureFileSystem fileSystem,
+        IArchitectureEnvironment environment,
+        IArchitectureAssemblyLoader assemblyLoader)
+    {
+        _fileSystem = fileSystem;
+        _environment = environment;
+        _assemblyLoader = assemblyLoader;
+    }
+
     public ResolutionResult Resolve(
         ArchitectureContractDocument document,
         string repositoryRoot,
@@ -45,7 +60,8 @@ public sealed class ArchitectureAssemblyResolutionService : IArchitectureAssembl
 
         return document.Analysis.TargetAssemblies.Count == 0 && projectCoverageCanReportUnresolvedProjects
             ? new ResolutionResult(Array.Empty<Assembly>(), Array.Empty<string>(), Array.Empty<string>())
-            : ArchitectureAssemblyResolver.ResolveFromDocument(document, repositoryRoot);
+            : ArchitectureAssemblyResolver.ResolveFromDocument(
+                document, repositoryRoot, _fileSystem, _environment, _assemblyLoader);
     }
 
     // mode is null for callers (e.g. ArchitectureBaselineService with request.Mode "all") that

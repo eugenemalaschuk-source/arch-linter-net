@@ -1,5 +1,6 @@
 using System.Text.Json;
 using ArchLinterNet.Core.Contracts;
+using ArchLinterNet.Core.IO;
 using ArchLinterNet.Core.Model;
 
 namespace ArchLinterNet.Core.Scanning;
@@ -13,10 +14,12 @@ internal static class ArchitectureAsmdefScanner
         string? contractId,
         string repositoryRoot,
         ArchitectureAsmdefContract contract,
-        string? asmdefRoot = null)
+        string? asmdefRoot = null,
+        IArchitectureFileSystem? fileSystem = null)
     {
+        fileSystem ??= ArchitectureFileSystem.Real;
         string root = asmdefRoot ?? DefaultAsmdefRoot;
-        Dictionary<string, AsmdefEntry> asmdefMap = LoadFirstPartyAsmdefs(repositoryRoot, root);
+        Dictionary<string, AsmdefEntry> asmdefMap = LoadFirstPartyAsmdefs(repositoryRoot, root, fileSystem);
         HashSet<string> editorOnlyAssemblies = BuildEditorOnlySet(asmdefMap);
 
         foreach (string sourceAssemblyName in contract.SourceAssemblies)
@@ -58,19 +61,20 @@ internal static class ArchitectureAsmdefScanner
         }
     }
 
-    private static Dictionary<string, AsmdefEntry> LoadFirstPartyAsmdefs(string repositoryRoot, string asmdefRoot)
+    private static Dictionary<string, AsmdefEntry> LoadFirstPartyAsmdefs(
+        string repositoryRoot, string asmdefRoot, IArchitectureFileSystem fileSystem)
     {
         string fullPath = Path.Combine(repositoryRoot, asmdefRoot.Replace('/', Path.DirectorySeparatorChar));
         Dictionary<string, AsmdefEntry> result = new(StringComparer.Ordinal);
 
-        if (!Directory.Exists(fullPath))
+        if (!fileSystem.DirectoryExists(fullPath))
         {
             return result;
         }
 
-        foreach (string file in Directory.EnumerateFiles(fullPath, "*.asmdef", SearchOption.AllDirectories))
+        foreach (string file in fileSystem.EnumerateFiles(fullPath, "*.asmdef", SearchOption.AllDirectories))
         {
-            AsmdefEntry? entry = TryParseAsmdef(file);
+            AsmdefEntry? entry = TryParseAsmdef(file, fileSystem);
 
             if (entry != null)
             {
@@ -90,11 +94,11 @@ internal static class ArchitectureAsmdefScanner
             .ToHashSet(StringComparer.Ordinal);
     }
 
-    private static AsmdefEntry? TryParseAsmdef(string filePath)
+    private static AsmdefEntry? TryParseAsmdef(string filePath, IArchitectureFileSystem fileSystem)
     {
         try
         {
-            string json = File.ReadAllText(filePath);
+            string json = fileSystem.ReadAllText(filePath);
 
             using var doc = JsonDocument.Parse(json);
 

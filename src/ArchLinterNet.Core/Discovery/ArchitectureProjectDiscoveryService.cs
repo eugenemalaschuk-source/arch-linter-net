@@ -1,4 +1,5 @@
 using ArchLinterNet.Core.Contracts;
+using ArchLinterNet.Core.IO;
 
 namespace ArchLinterNet.Core.Discovery;
 
@@ -10,11 +11,18 @@ public interface IArchitectureProjectDiscoveryService
 
 public sealed class ArchitectureProjectDiscoveryService : IArchitectureProjectDiscoveryService
 {
+    private readonly IArchitectureFileSystem _fileSystem;
+
+    public ArchitectureProjectDiscoveryService(IArchitectureFileSystem fileSystem)
+    {
+        _fileSystem = fileSystem;
+    }
+
     public ProjectDiscoveryResult ResolveAndApply(
         ArchitectureContractDocument document, string repositoryRoot, bool resolveAssemblyOutputs)
     {
         ProjectDiscoveryResult discovery = ArchitectureProjectDiscovery.ResolveFromDocument(
-            document, repositoryRoot, resolveAssemblyOutputs);
+            document, repositoryRoot, resolveAssemblyOutputs, _fileSystem);
         ApplyDiscoveryResult(document.Analysis, discovery);
         return discovery;
     }

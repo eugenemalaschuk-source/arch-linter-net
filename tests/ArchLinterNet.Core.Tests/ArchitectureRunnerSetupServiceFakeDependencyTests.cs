@@ -2,6 +2,7 @@ using System.Reflection;
 using ArchLinterNet.Core.Contracts;
 using ArchLinterNet.Core.Discovery;
 using ArchLinterNet.Core.Execution;
+using ArchLinterNet.Core.IO;
 using ArchLinterNet.Core.Resolution;
 using NUnit.Framework;
 
@@ -66,8 +67,8 @@ public sealed class ArchitectureRunnerSetupServiceFakeDependencyTests
         var fakeAssemblyResolution = new FakeAssemblyResolutionService();
 
         var runnerSetupService = new ArchitectureRunnerSetupService(
-            new ArchitecturePolicyDocumentLoader(),
-            new ArchitectureBaselineLoadingService(),
+            new ArchitecturePolicyDocumentLoader(ArchitectureFileSystem.Real),
+            new ArchitectureBaselineLoadingService(ArchitectureFileSystem.Real),
             fakeRepositoryRoot,
             new ConditionSetResolutionService(),
             fakeProjectDiscovery,

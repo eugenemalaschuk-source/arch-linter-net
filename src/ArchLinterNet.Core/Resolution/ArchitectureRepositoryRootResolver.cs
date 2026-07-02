@@ -1,3 +1,5 @@
+using ArchLinterNet.Core.IO;
+
 namespace ArchLinterNet.Core.Resolution;
 
 public interface IArchitectureRepositoryRootResolver
@@ -7,8 +9,15 @@ public interface IArchitectureRepositoryRootResolver
 
 public sealed class ArchitectureRepositoryRootResolver : IArchitectureRepositoryRootResolver
 {
+    private readonly IArchitectureFileSystem _fileSystem;
+
+    public ArchitectureRepositoryRootResolver(IArchitectureFileSystem fileSystem)
+    {
+        _fileSystem = fileSystem;
+    }
+
     public string ResolveFrom(string policyPath)
     {
-        return ArchitectureRepositoryRootLocator.ResolveFrom(policyPath);
+        return ArchitectureRepositoryRootLocator.ResolveFrom(policyPath, _fileSystem);
     }
 }
