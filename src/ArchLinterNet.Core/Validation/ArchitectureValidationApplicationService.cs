@@ -106,7 +106,7 @@ public sealed class ArchitectureValidationApplicationService(
             using (timing?.Measure("contract_checks"))
             {
                 execution = ArchitectureContractExecutor.Execute(
-                    runner, document, request.Mode, handlerRegistry, request.IncludeAsmdefContracts, timing);
+                    runner.Session, document, request.Mode, handlerRegistry, request.IncludeAsmdefContracts, timing);
             }
 
             allViolations.AddRange(execution.Violations);

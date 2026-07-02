@@ -18,5 +18,5 @@ public interface IArchitectureContractHandler
 {
     string Family { get; }
 
-    ArchitectureHandlerResult Execute(ArchitectureContractRunner runner, IArchitectureContract contract);
+    ArchitectureHandlerResult Execute(ArchitectureAnalysisSession session, IArchitectureContract contract);
 }

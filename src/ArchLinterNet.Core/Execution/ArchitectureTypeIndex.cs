@@ -5,7 +5,7 @@ using ArchLinterNet.Core.Scanning;
 
 namespace ArchLinterNet.Core.Execution;
 
-internal sealed class ArchitectureTypeIndex
+public sealed class ArchitectureTypeIndex
 {
     private readonly IReadOnlyCollection<Assembly> _targetAssemblies;
     private readonly Lazy<Type[]> _allTypes;

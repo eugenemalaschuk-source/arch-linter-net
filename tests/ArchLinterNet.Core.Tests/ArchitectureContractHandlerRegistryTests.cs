@@ -145,7 +145,7 @@ public sealed class ArchitectureContractHandlerRegistryTests
             CreateLayerFixtureDocument("layerUpper", "layerLower", new List<string> { "layerUpper", "layerLower" }));
         IArchitectureContract contract = new ArchitectureDependencyContract { Name = "x", Source = "layerUpper" };
 
-        Assert.Throws<InvalidOperationException>(() => registry.Execute("unknown_family", runner, contract));
+        Assert.Throws<InvalidOperationException>(() => registry.Execute("unknown_family", runner.Session, contract));
     }
 
     [Test]
@@ -158,7 +158,7 @@ public sealed class ArchitectureContractHandlerRegistryTests
 
         List<ArchitectureViolation> direct = runner.CheckContract(contract);
         ArchitectureHandlerResult viaHandler = CreateRegistry()
-            .Execute("dependency", runner, contract);
+            .Execute("dependency", runner.Session, contract);
 
         Assert.That(direct, Has.Count.GreaterThan(0));
         Assert.That(Project(viaHandler.Violations), Is.EqualTo(Project(direct)));
@@ -175,7 +175,7 @@ public sealed class ArchitectureContractHandlerRegistryTests
 
         List<ArchitectureViolation> direct = runner.CheckLayerContract(contract);
         ArchitectureHandlerResult viaHandler = CreateRegistry()
-            .Execute("layer", runner, contract);
+            .Execute("layer", runner.Session, contract);
 
         Assert.That(direct, Has.Count.GreaterThan(0));
         Assert.That(Project(viaHandler.Violations), Is.EqualTo(Project(direct)));
@@ -190,7 +190,7 @@ public sealed class ArchitectureContractHandlerRegistryTests
         ArchitectureLayerContract contract = document.Contracts.StrictLayers[0];
 
         ArchitectureHandlerResult viaHandler = CreateRegistry()
-            .Execute("layer", runner, contract);
+            .Execute("layer", runner.Session, contract);
 
         Assert.That(viaHandler.Violations, Is.Empty);
     }
@@ -221,7 +221,7 @@ public sealed class ArchitectureContractHandlerRegistryTests
         ArchitectureCycleContract contract = document.Contracts.StrictCycles[0];
 
         ArchitectureHandlerResult result = CreateRegistry()
-            .Execute("cycle", runner, contract);
+            .Execute("cycle", runner.Session, contract);
 
         Assert.That(result.Cycles, Is.Empty);
         Assert.That(result.Violations, Is.Empty);
@@ -255,7 +255,7 @@ public sealed class ArchitectureContractHandlerRegistryTests
 
         List<string> direct = runner.CheckCycleContract(contract).ToList();
         ArchitectureHandlerResult viaHandler = CreateRegistry()
-            .Execute("cycle", runner, contract);
+            .Execute("cycle", runner.Session, contract);
 
         Assert.That(direct, Has.Count.GreaterThan(0));
         Assert.That(viaHandler.Cycles, Is.EqualTo(direct.Select(c => $"[cyc] {c}")));
@@ -275,7 +275,7 @@ public sealed class ArchitectureContractHandlerRegistryTests
 
         List<ArchitectureViolation> direct = runner.CheckAllowOnlyContract(contract);
         ArchitectureHandlerResult viaHandler = CreateRegistry()
-            .Execute("allow_only", runner, contract);
+            .Execute("allow_only", runner.Session, contract);
 
         Assert.That(direct, Has.Count.GreaterThan(0));
         Assert.That(Project(viaHandler.Violations), Is.EqualTo(Project(direct)));
@@ -310,7 +310,7 @@ public sealed class ArchitectureContractHandlerRegistryTests
 
         List<string> direct = runner.CheckAcyclicSiblingContract(contract).ToList();
         ArchitectureHandlerResult viaHandler = CreateRegistry()
-            .Execute("acyclic_sibling", runner, contract);
+            .Execute("acyclic_sibling", runner.Session, contract);
 
         Assert.That(direct, Has.Count.GreaterThan(0));
         Assert.That(viaHandler.Cycles, Is.EqualTo(direct.Select(c => $"[acyc] {c}")));
@@ -329,9 +329,49 @@ public sealed class ArchitectureContractHandlerRegistryTests
 
         var executorRunner = new ArchitectureContractRunner(CreateContext(_layerFixtureAssembly), document);
         ArchitectureContractExecutor.ExecutionResult result =
-            ArchitectureContractExecutor.Execute(executorRunner, document, "strict", CreateRegistry());
+            ArchitectureContractExecutor.Execute(executorRunner.Session, document, "strict", CreateRegistry());
 
         Assert.That(Project(result.Violations), Is.EqualTo(Project(expectedViolations)));
+    }
+
+    [Test]
+    public void Executor_BaselineCandidatesAndUnmatchedIgnores_VisibleThroughRunnerFacadeAfterHandlerDispatch()
+    {
+        var document = CreateLayerFixtureDocument("layerUpper", "layerLower", new List<string> { "layerUpper", "layerLower" });
+        document.Contracts.Strict[0].IgnoredViolations = new List<ArchitectureIgnoredViolation>
+        {
+            new() { SourceType = "does.not.exist.Type", ForbiddenReference = "also.missing.Type", Reason = "fixture" },
+        };
+
+        var runner = new ArchitectureContractRunner(CreateContext(_layerFixtureAssembly), document);
+
+        ArchitectureContractExecutor.ExecutionResult result =
+            ArchitectureContractExecutor.Execute(runner.Session, document, "strict", CreateRegistry());
+
+        Assert.That(result.Violations, Has.Count.GreaterThan(0));
+        Assert.That(runner.BaselineCandidates, Has.Count.GreaterThan(0),
+            "Baseline candidates collected while a handler ran against the session should surface through the runner facade.");
+        Assert.That(runner.UnmatchedIgnoredViolations, Has.Count.EqualTo(1),
+            "The ignore entry that never matched a real violation should surface through the runner facade.");
+    }
+
+    [Test]
+    public void Session_TypeIndexAndReferenceGraph_AreSharedAcrossMultipleHandlerDispatches()
+    {
+        var document = CreateLayerFixtureDocument("layerUpper", "layerLower", new List<string> { "layerUpper", "layerLower" });
+        var runner = new ArchitectureContractRunner(CreateContext(_layerFixtureAssembly), document);
+        ArchitectureContractHandlerRegistry registry = CreateRegistry();
+
+        registry.Execute("dependency", runner.Session, document.Contracts.Strict[0]);
+        ArchitectureTypeIndex firstTypeIndex = runner.Session.TypeIndex;
+        ArchitectureReferenceGraph firstReferenceGraph = runner.Session.ReferenceGraph;
+
+        registry.Execute("dependency", runner.Session, document.Contracts.Strict[0]);
+
+        Assert.That(runner.Session.TypeIndex, Is.SameAs(firstTypeIndex),
+            "The type index is a single per-session cache, not rebuilt per handler dispatch.");
+        Assert.That(runner.Session.ReferenceGraph, Is.SameAs(firstReferenceGraph),
+            "The reference graph is a single per-session cache, not rebuilt per handler dispatch.");
     }
 
     [Test]
@@ -374,10 +414,10 @@ public sealed class ArchitectureContractHandlerRegistryTests
         };
 
         var strictRunner = new ArchitectureContractRunner(CreateContext(typeof(ArchitectureContractDocument).Assembly), document);
-        Assert.DoesNotThrow(() => ArchitectureContractExecutor.Execute(strictRunner, document, "strict", CreateRegistry()));
+        Assert.DoesNotThrow(() => ArchitectureContractExecutor.Execute(strictRunner.Session, document, "strict", CreateRegistry()));
 
         var auditRunner = new ArchitectureContractRunner(CreateContext(typeof(ArchitectureContractDocument).Assembly), document);
-        Assert.DoesNotThrow(() => ArchitectureContractExecutor.Execute(auditRunner, document, "audit", CreateRegistry()));
+        Assert.DoesNotThrow(() => ArchitectureContractExecutor.Execute(auditRunner.Session, document, "audit", CreateRegistry()));
 
         var policyConsistencyRunner = new ArchitectureContractRunner(CreateContext(typeof(ArchitectureContractDocument).Assembly), document);
         var findings = policyConsistencyRunner.CheckPolicyConsistency();

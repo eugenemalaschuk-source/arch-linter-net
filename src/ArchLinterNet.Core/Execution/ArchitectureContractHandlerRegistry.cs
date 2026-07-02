@@ -29,13 +29,13 @@ public sealed class ArchitectureContractHandlerRegistry
         return _handlersByFamily.TryGetValue(family, out handler);
     }
 
-    public ArchitectureHandlerResult Execute(string family, ArchitectureContractRunner runner, IArchitectureContract contract)
+    public ArchitectureHandlerResult Execute(string family, ArchitectureAnalysisSession session, IArchitectureContract contract)
     {
         if (!_handlersByFamily.TryGetValue(family, out IArchitectureContractHandler? handler))
         {
             throw new InvalidOperationException($"No contract handler registered for family '{family}'.");
         }
 
-        return handler.Execute(runner, contract);
+        return handler.Execute(session, contract);
     }
 }

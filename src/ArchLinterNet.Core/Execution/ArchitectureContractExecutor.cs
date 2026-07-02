@@ -16,7 +16,7 @@ internal static class ArchitectureContractExecutor
         IReadOnlyCollection<ArchitectureCoverageSummary> CoverageSummaries);
 
     public static ExecutionResult Execute(
-        ArchitectureContractRunner runner,
+        ArchitectureAnalysisSession session,
         ArchitectureContractDocument document,
         string mode,
         ArchitectureContractHandlerRegistry handlerRegistry,
@@ -28,7 +28,7 @@ internal static class ArchitectureContractExecutor
             throw new ArgumentException($"Invalid mode: {mode}. Use 'strict' or 'audit'.", nameof(mode));
         }
 
-        runner.PrepareRuleInputCoverageDeferral(mode);
+        session.PrepareRuleInputCoverageDeferral(mode);
 
         List<ArchitectureViolation> violations = new();
         List<string> cycles = new();
@@ -40,20 +40,20 @@ internal static class ArchitectureContractExecutor
         // registered handler) is dispatched here with no executor changes. "coverage" (separate
         // output bucket + summary) and "asmdef" (CLI-controlled inclusion toggle) are genuine
         // runtime decisions, not god-executor ceremony, so they stay as small special cases.
-        foreach (string family in runner.Catalog.FamiliesInOrder)
+        foreach (string family in session.Catalog.FamiliesInOrder)
         {
             if (family == CoverageFamily)
             {
                 int coverageCount = 0;
                 using (timing?.MeasureContractFamily(CoverageFamily, () => coverageCount))
                 {
-                    foreach (IArchitectureContract contract in runner.Catalog.ContractsFor(mode, CoverageFamily))
+                    foreach (IArchitectureContract contract in session.Catalog.ContractsFor(mode, CoverageFamily))
                     {
                         coverageCount++;
-                        coverageViolations.AddRange(handlerRegistry.Execute(CoverageFamily, runner, contract).Violations);
+                        coverageViolations.AddRange(handlerRegistry.Execute(CoverageFamily, session, contract).Violations);
 
                         ArchitectureCoverageSummary? summary =
-                            runner.BuildCoverageSummary((ArchitectureCoverageContract)contract);
+                            session.BuildCoverageSummary((ArchitectureCoverageContract)contract);
                         if (summary != null)
                         {
                             coverageSummaries.Add(summary);
@@ -72,10 +72,10 @@ internal static class ArchitectureContractExecutor
             int count = 0;
             using (timing?.MeasureContractFamily(family, () => count))
             {
-                foreach (IArchitectureContract contract in runner.Catalog.ContractsFor(mode, family))
+                foreach (IArchitectureContract contract in session.Catalog.ContractsFor(mode, family))
                 {
                     count++;
-                    ArchitectureHandlerResult result = handlerRegistry.Execute(family, runner, contract);
+                    ArchitectureHandlerResult result = handlerRegistry.Execute(family, session, contract);
                     violations.AddRange(result.Violations);
                     cycles.AddRange(result.Cycles);
                 }
