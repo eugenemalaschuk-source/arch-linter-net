@@ -14,6 +14,11 @@ public sealed class ArchitecturePolicyDocumentLoader : IArchitecturePolicyDocume
 
     private readonly IArchitectureFileSystem _fileSystem;
 
+    public ArchitecturePolicyDocumentLoader()
+        : this(ArchitectureFileSystem.Real)
+    {
+    }
+
     public ArchitecturePolicyDocumentLoader(IArchitectureFileSystem fileSystem)
     {
         _fileSystem = fileSystem;

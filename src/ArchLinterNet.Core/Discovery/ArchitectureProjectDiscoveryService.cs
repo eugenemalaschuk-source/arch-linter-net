@@ -13,6 +13,11 @@ public sealed class ArchitectureProjectDiscoveryService : IArchitectureProjectDi
 {
     private readonly IArchitectureFileSystem _fileSystem;
 
+    public ArchitectureProjectDiscoveryService()
+        : this(ArchitectureFileSystem.Real)
+    {
+    }
+
     public ArchitectureProjectDiscoveryService(IArchitectureFileSystem fileSystem)
     {
         _fileSystem = fileSystem;

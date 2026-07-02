@@ -1,7 +1,6 @@
 using ArchLinterNet.Core.Contracts;
 using ArchLinterNet.Core.Discovery;
 using ArchLinterNet.Core.Execution;
-using ArchLinterNet.Core.IO;
 using ArchLinterNet.Core.Resolution;
 using NUnit.Framework;
 
@@ -22,13 +21,12 @@ public sealed class ArchitectureRunnerSetupServiceDiscoveryTests
         _policyPath = Path.Combine(_repoRoot, "policy.arch.yml");
         File.WriteAllText(_policyPath, "version: 1\nname: test\n");
         _runnerSetupService = new ArchitectureRunnerSetupService(
-            new ArchitecturePolicyDocumentLoader(ArchitectureFileSystem.Real),
-            new ArchitectureBaselineLoadingService(ArchitectureFileSystem.Real),
-            new ArchitectureRepositoryRootResolver(ArchitectureFileSystem.Real),
+            new ArchitecturePolicyDocumentLoader(),
+            new ArchitectureBaselineLoadingService(),
+            new ArchitectureRepositoryRootResolver(),
             new ConditionSetResolutionService(),
-            new ArchitectureProjectDiscoveryService(ArchitectureFileSystem.Real),
-            new ArchitectureAssemblyResolutionService(
-                ArchitectureFileSystem.Real, ArchitectureEnvironment.Real, ArchitectureAssemblyLoader.Real));
+            new ArchitectureProjectDiscoveryService(),
+            new ArchitectureAssemblyResolutionService());
     }
 
     [TearDown]

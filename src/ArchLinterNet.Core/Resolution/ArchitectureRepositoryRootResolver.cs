@@ -11,6 +11,11 @@ public sealed class ArchitectureRepositoryRootResolver : IArchitectureRepository
 {
     private readonly IArchitectureFileSystem _fileSystem;
 
+    public ArchitectureRepositoryRootResolver()
+        : this(ArchitectureFileSystem.Real)
+    {
+    }
+
     public ArchitectureRepositoryRootResolver(IArchitectureFileSystem fileSystem)
     {
         _fileSystem = fileSystem;

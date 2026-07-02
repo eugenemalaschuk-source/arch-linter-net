@@ -8,10 +8,17 @@ public static class ArchitectureProjectDiscovery
     public static ProjectDiscoveryResult ResolveFromDocument(
         ArchitectureContractDocument document,
         string repositoryRoot,
-        bool resolveAssemblyOutputs = true,
-        IArchitectureFileSystem? fileSystem = null)
+        bool resolveAssemblyOutputs = true)
     {
-        fileSystem ??= ArchitectureFileSystem.Real;
+        return ResolveFromDocument(document, repositoryRoot, resolveAssemblyOutputs, ArchitectureFileSystem.Real);
+    }
+
+    public static ProjectDiscoveryResult ResolveFromDocument(
+        ArchitectureContractDocument document,
+        string repositoryRoot,
+        bool resolveAssemblyOutputs,
+        IArchitectureFileSystem fileSystem)
+    {
         ArchitectureAnalysisConfiguration analysis = document.Analysis;
         bool hasSolution = !string.IsNullOrWhiteSpace(analysis.Solution);
         bool hasExplicitProjects = analysis.Projects.Count > 0;

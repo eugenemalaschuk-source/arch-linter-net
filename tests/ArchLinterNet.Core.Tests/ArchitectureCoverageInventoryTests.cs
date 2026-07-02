@@ -2,7 +2,6 @@ using System.Reflection;
 using ArchLinterNet.Core.Contracts;
 using ArchLinterNet.Core.Discovery;
 using ArchLinterNet.Core.Execution;
-using ArchLinterNet.Core.IO;
 using ArchLinterNet.Core.Resolution;
 using ArchLinterNet.Core.Validation;
 using NUnit.Framework;
@@ -17,13 +16,12 @@ public sealed class ArchitectureCoverageInventoryTests
     private static IArchitectureRunnerSetupService CreateRunnerSetupService()
     {
         return new ArchitectureRunnerSetupService(
-            new ArchitecturePolicyDocumentLoader(ArchitectureFileSystem.Real),
-            new ArchitectureBaselineLoadingService(ArchitectureFileSystem.Real),
-            new ArchitectureRepositoryRootResolver(ArchitectureFileSystem.Real),
+            new ArchitecturePolicyDocumentLoader(),
+            new ArchitectureBaselineLoadingService(),
+            new ArchitectureRepositoryRootResolver(),
             new ConditionSetResolutionService(),
-            new ArchitectureProjectDiscoveryService(ArchitectureFileSystem.Real),
-            new ArchitectureAssemblyResolutionService(
-                ArchitectureFileSystem.Real, ArchitectureEnvironment.Real, ArchitectureAssemblyLoader.Real));
+            new ArchitectureProjectDiscoveryService(),
+            new ArchitectureAssemblyResolutionService());
     }
 
     private const string AlphaNamespace = "ArchLinterNet.Core.Tests.CoverageInventoryFixtures.Alpha";

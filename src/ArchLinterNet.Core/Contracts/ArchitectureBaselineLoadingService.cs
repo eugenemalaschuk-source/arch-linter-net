@@ -11,6 +11,11 @@ public sealed class ArchitectureBaselineLoadingService : IArchitectureBaselineLo
 {
     private readonly IArchitectureFileSystem _fileSystem;
 
+    public ArchitectureBaselineLoadingService()
+        : this(ArchitectureFileSystem.Real)
+    {
+    }
+
     public ArchitectureBaselineLoadingService(IArchitectureFileSystem fileSystem)
     {
         _fileSystem = fileSystem;

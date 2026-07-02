@@ -22,6 +22,11 @@ public sealed class ArchitectureAssemblyResolutionService : IArchitectureAssembl
     private readonly IArchitectureEnvironment _environment;
     private readonly IArchitectureAssemblyLoader _assemblyLoader;
 
+    public ArchitectureAssemblyResolutionService()
+        : this(ArchitectureFileSystem.Real, ArchitectureEnvironment.Real, ArchitectureAssemblyLoader.Real)
+    {
+    }
+
     public ArchitectureAssemblyResolutionService(
         IArchitectureFileSystem fileSystem,
         IArchitectureEnvironment environment,

@@ -10,19 +10,23 @@ public static class ArchitectureAssemblyResolver
 
     public static ResolutionResult ResolveFromDocument(
         ArchitectureContractDocument document,
-        string? repositoryRoot = null,
-        IArchitectureFileSystem? fileSystem = null,
-        IArchitectureEnvironment? environment = null,
-        IArchitectureAssemblyLoader? assemblyLoader = null)
+        string? repositoryRoot = null)
+    {
+        return ResolveFromDocument(
+            document, repositoryRoot, ArchitectureFileSystem.Real, ArchitectureEnvironment.Real, ArchitectureAssemblyLoader.Real);
+    }
+
+    public static ResolutionResult ResolveFromDocument(
+        ArchitectureContractDocument document,
+        string? repositoryRoot,
+        IArchitectureFileSystem fileSystem,
+        IArchitectureEnvironment environment,
+        IArchitectureAssemblyLoader assemblyLoader)
     {
         if (document == null)
         {
             throw new ArgumentNullException(nameof(document));
         }
-
-        fileSystem ??= ArchitectureFileSystem.Real;
-        environment ??= ArchitectureEnvironment.Real;
-        assemblyLoader ??= ArchitectureAssemblyLoader.Real;
 
         List<string> names = document.Analysis.TargetAssemblies;
         if (names.Count == 0)

@@ -1,7 +1,8 @@
 # infrastructure-seams Specification
 
 ## Purpose
-TBD - created by archiving change infrastructure-seams. Update Purpose after archive.
+Defines the replaceable infrastructure seams (file system, environment, assembly loading/probing, Roslyn compilation) that give behavior-affecting IO/runtime access in Core a fakeable boundary, with real default implementations registered in the composition root, while every existing public call site keeps its original signature and behavior.
+
 ## Requirements
 ### Requirement: File system access is behind a replaceable seam
 `ArchLinterNet.Core` SHALL expose `IArchitectureFileSystem` (file existence, read-all-text, directory existence, file enumeration by pattern/search-option, last-write-time-UTC, current directory) with a default real implementation registered as a singleton in `ServiceCollectionExtensions.AddArchLinterNetCore()`. `ArchitectureContractLoader`, `ArchitectureBaselineLoader`, `ArchitectureProjectDiscovery`, `ArchitectureSourceScanner`, and `ArchitectureAsmdefScanner` SHALL accept an optional `IArchitectureFileSystem` parameter defaulting to the real singleton, so their file system access is replaceable without changing any existing call site.

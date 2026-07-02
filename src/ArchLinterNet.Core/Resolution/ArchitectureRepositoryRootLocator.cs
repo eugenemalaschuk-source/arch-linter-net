@@ -6,17 +6,23 @@ public static class ArchitectureRepositoryRootLocator
 {
     private static readonly Lazy<string> _root = new(() => ResolveInternal(ArchitectureFileSystem.Real, ArchitectureEnvironment.Real));
 
-    public static string Resolve(IArchitectureFileSystem? fileSystem = null, IArchitectureEnvironment? environment = null)
+    public static string Resolve()
     {
-        return fileSystem == null && environment == null
-            ? _root.Value
-            : ResolveInternal(fileSystem ?? ArchitectureFileSystem.Real, environment ?? ArchitectureEnvironment.Real);
+        return _root.Value;
     }
 
-    public static string ResolveFrom(string policyPath, IArchitectureFileSystem? fileSystem = null)
+    public static string Resolve(IArchitectureFileSystem fileSystem, IArchitectureEnvironment environment)
     {
-        fileSystem ??= ArchitectureFileSystem.Real;
+        return ResolveInternal(fileSystem, environment);
+    }
 
+    public static string ResolveFrom(string policyPath)
+    {
+        return ResolveFrom(policyPath, ArchitectureFileSystem.Real);
+    }
+
+    public static string ResolveFrom(string policyPath, IArchitectureFileSystem fileSystem)
+    {
         string fullPath = Path.GetFullPath(policyPath);
         string? policyDir = Path.GetDirectoryName(fullPath);
         if (string.IsNullOrEmpty(policyDir))

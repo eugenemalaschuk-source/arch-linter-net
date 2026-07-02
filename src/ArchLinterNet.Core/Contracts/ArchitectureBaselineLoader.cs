@@ -6,11 +6,14 @@ namespace ArchLinterNet.Core.Contracts;
 
 public static class ArchitectureBaselineLoader
 {
-    public static ArchitectureBaselineDocument LoadFromPath(
-        string baselinePath, IArchitectureFileSystem? fileSystem = null)
+    public static ArchitectureBaselineDocument LoadFromPath(string baselinePath)
     {
-        fileSystem ??= ArchitectureFileSystem.Real;
+        return LoadFromPath(baselinePath, ArchitectureFileSystem.Real);
+    }
 
+    public static ArchitectureBaselineDocument LoadFromPath(
+        string baselinePath, IArchitectureFileSystem fileSystem)
+    {
         if (!fileSystem.FileExists(baselinePath))
         {
             throw new FileNotFoundException($"Baseline file not found: {baselinePath}");

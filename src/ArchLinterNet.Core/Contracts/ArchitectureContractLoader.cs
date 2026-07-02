@@ -21,18 +21,26 @@ public static class ArchitectureContractLoader
         return LoadFromRepositoryRoot(repositoryRoot);
     }
 
+    public static ArchitectureContractDocument LoadFromRepositoryRoot(string repositoryRoot)
+    {
+        return LoadFromRepositoryRoot(repositoryRoot, ArchitectureFileSystem.Real);
+    }
+
     public static ArchitectureContractDocument LoadFromRepositoryRoot(
-        string repositoryRoot, IArchitectureFileSystem? fileSystem = null)
+        string repositoryRoot, IArchitectureFileSystem fileSystem)
     {
         string contractPath = Path.Combine(repositoryRoot, "architecture", "dependencies.arch.yml");
         return LoadFromPath(contractPath, fileSystem);
     }
 
-    public static ArchitectureContractDocument LoadFromPath(
-        string contractPath, IArchitectureFileSystem? fileSystem = null)
+    public static ArchitectureContractDocument LoadFromPath(string contractPath)
     {
-        fileSystem ??= ArchitectureFileSystem.Real;
+        return LoadFromPath(contractPath, ArchitectureFileSystem.Real);
+    }
 
+    public static ArchitectureContractDocument LoadFromPath(
+        string contractPath, IArchitectureFileSystem fileSystem)
+    {
         if (!fileSystem.FileExists(contractPath))
         {
             throw new FileNotFoundException($"Architecture contract file not found: {contractPath}");
