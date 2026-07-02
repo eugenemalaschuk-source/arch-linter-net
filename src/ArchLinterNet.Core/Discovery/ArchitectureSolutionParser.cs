@@ -1,5 +1,6 @@
 using System.Text.RegularExpressions;
 using System.Xml.Linq;
+using ArchLinterNet.Core.IO;
 
 namespace ArchLinterNet.Core.Discovery;
 
@@ -9,14 +10,15 @@ internal static class ArchitectureSolutionParser
         "^Project\\(\"\\{[^}]*}\"\\)\\s*=\\s*\"[^\"]*\",\\s*\"([^\"]*)\",\\s*\"\\{[^}]*}\"",
         RegexOptions.Compiled);
 
-    public static IReadOnlyList<string> ParseProjectPaths(string solutionPath)
+    public static IReadOnlyList<string> ParseProjectPaths(string solutionPath, IArchitectureFileSystem? fileSystem = null)
     {
+        fileSystem ??= ArchitectureFileSystem.Real;
         string solutionDirectory = Path.GetDirectoryName(solutionPath) ?? string.Empty;
         string extension = Path.GetExtension(solutionPath);
 
         IEnumerable<string> relativePaths = string.Equals(extension, ".slnx", StringComparison.OrdinalIgnoreCase)
-            ? ParseSlnx(solutionPath)
-            : ParseClassicSln(solutionPath);
+            ? ParseSlnx(solutionPath, fileSystem)
+            : ParseClassicSln(solutionPath, fileSystem);
 
         return relativePaths
             .Where(path => path.EndsWith(".csproj", StringComparison.OrdinalIgnoreCase))
@@ -25,9 +27,9 @@ internal static class ArchitectureSolutionParser
             .ToArray();
     }
 
-    private static IEnumerable<string> ParseSlnx(string solutionPath)
+    private static IEnumerable<string> ParseSlnx(string solutionPath, IArchitectureFileSystem fileSystem)
     {
-        XDocument document = XDocument.Load(solutionPath);
+        XDocument document = XDocument.Parse(fileSystem.ReadAllText(solutionPath));
 
         return document.Descendants("Project")
             .Select(element => element.Attribute("Path")?.Value)
@@ -35,12 +37,12 @@ internal static class ArchitectureSolutionParser
             .Select(path => path!);
     }
 
-    private static IEnumerable<string> ParseClassicSln(string solutionPath)
+    private static IEnumerable<string> ParseClassicSln(string solutionPath, IArchitectureFileSystem fileSystem)
     {
         List<string> paths = new();
         bool hasHeader = false;
 
-        foreach (string line in File.ReadLines(solutionPath))
+        foreach (string line in fileSystem.ReadLines(solutionPath))
         {
             if (!hasHeader && line.TrimStart()
                     .StartsWith("Microsoft Visual Studio Solution File", StringComparison.OrdinalIgnoreCase))

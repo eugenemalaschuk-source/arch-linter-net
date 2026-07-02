@@ -1,4 +1,5 @@
 using System.Text.RegularExpressions;
+using ArchLinterNet.Core.IO;
 using ArchLinterNet.Core.Resolution;
 using YamlDotNet.Serialization;
 using YamlDotNet.Serialization.NamingConventions;
@@ -22,13 +23,25 @@ public static class ArchitectureContractLoader
 
     public static ArchitectureContractDocument LoadFromRepositoryRoot(string repositoryRoot)
     {
+        return LoadFromRepositoryRoot(repositoryRoot, ArchitectureFileSystem.Real);
+    }
+
+    public static ArchitectureContractDocument LoadFromRepositoryRoot(
+        string repositoryRoot, IArchitectureFileSystem fileSystem)
+    {
         string contractPath = Path.Combine(repositoryRoot, "architecture", "dependencies.arch.yml");
-        return LoadFromPath(contractPath);
+        return LoadFromPath(contractPath, fileSystem);
     }
 
     public static ArchitectureContractDocument LoadFromPath(string contractPath)
     {
-        if (!File.Exists(contractPath))
+        return LoadFromPath(contractPath, ArchitectureFileSystem.Real);
+    }
+
+    public static ArchitectureContractDocument LoadFromPath(
+        string contractPath, IArchitectureFileSystem fileSystem)
+    {
+        if (!fileSystem.FileExists(contractPath))
         {
             throw new FileNotFoundException($"Architecture contract file not found: {contractPath}");
         }
@@ -38,7 +51,7 @@ public static class ArchitectureContractLoader
             .IgnoreUnmatchedProperties()
             .Build();
 
-        string yaml = File.ReadAllText(contractPath);
+        string yaml = fileSystem.ReadAllText(contractPath);
         ArchitectureContractDocument? document = deserializer.Deserialize<ArchitectureContractDocument>(yaml);
 
         if (document == null)

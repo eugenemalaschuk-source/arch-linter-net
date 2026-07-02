@@ -1,4 +1,5 @@
 using ArchLinterNet.Core.Contracts;
+using ArchLinterNet.Core.IO;
 
 namespace ArchLinterNet.Core.Discovery;
 
@@ -8,6 +9,15 @@ public static class ArchitectureProjectDiscovery
         ArchitectureContractDocument document,
         string repositoryRoot,
         bool resolveAssemblyOutputs = true)
+    {
+        return ResolveFromDocument(document, repositoryRoot, resolveAssemblyOutputs, ArchitectureFileSystem.Real);
+    }
+
+    public static ProjectDiscoveryResult ResolveFromDocument(
+        ArchitectureContractDocument document,
+        string repositoryRoot,
+        bool resolveAssemblyOutputs,
+        IArchitectureFileSystem fileSystem)
     {
         ArchitectureAnalysisConfiguration analysis = document.Analysis;
         bool hasSolution = !string.IsNullOrWhiteSpace(analysis.Solution);
@@ -25,7 +35,7 @@ public static class ArchitectureProjectDiscovery
         {
             string solutionPath = ResolvePath(analysis.Solution, repositoryRoot);
 
-            if (!File.Exists(solutionPath))
+            if (!fileSystem.FileExists(solutionPath))
             {
                 diagnostics.Add(new ArchitectureProjectDiscoveryDiagnostic(
                     "missing solution file", analysis.Solution,
@@ -35,7 +45,7 @@ public static class ArchitectureProjectDiscovery
             {
                 try
                 {
-                    IReadOnlyList<string> discovered = ArchitectureSolutionParser.ParseProjectPaths(solutionPath);
+                    IReadOnlyList<string> discovered = ArchitectureSolutionParser.ParseProjectPaths(solutionPath, fileSystem);
                     List<string> filtered = FilterProjects(discovered, repositoryRoot, analysis).ToList();
 
                     if (filtered.Count == 0)
@@ -68,7 +78,7 @@ public static class ArchitectureProjectDiscovery
 
         foreach (string projectPath in projectPaths.Distinct(StringComparer.OrdinalIgnoreCase))
         {
-            if (!File.Exists(projectPath))
+            if (!fileSystem.FileExists(projectPath))
             {
                 diagnostics.Add(new ArchitectureProjectDiscoveryDiagnostic(
                     "missing project file", projectPath, $"Project file '{projectPath}' does not exist."));
@@ -78,7 +88,7 @@ public static class ArchitectureProjectDiscovery
             DiscoveredProjectFile projectFile;
             try
             {
-                projectFile = ArchitectureProjectFileParser.Parse(projectPath);
+                projectFile = ArchitectureProjectFileParser.Parse(projectPath, fileSystem);
             }
             catch (Exception ex)
             {
@@ -106,7 +116,7 @@ public static class ArchitectureProjectDiscovery
                 continue;
             }
 
-            if (!TryResolveOutput(projectFile, analysis, out string outputDirectory, out ArchitectureProjectDiscoveryDiagnostic? diagnostic))
+            if (!TryResolveOutput(projectFile, analysis, fileSystem, out string outputDirectory, out ArchitectureProjectDiscoveryDiagnostic? diagnostic))
             {
                 diagnostics.Add(diagnostic!);
                 continue;
@@ -129,6 +139,7 @@ public static class ArchitectureProjectDiscovery
     private static bool TryResolveOutput(
         DiscoveredProjectFile projectFile,
         ArchitectureAnalysisConfiguration analysis,
+        IArchitectureFileSystem fileSystem,
         out string outputDirectory,
         out ArchitectureProjectDiscoveryDiagnostic? diagnostic)
     {
@@ -140,7 +151,7 @@ public static class ArchitectureProjectDiscovery
         if (!string.IsNullOrWhiteSpace(analysis.TargetFramework))
         {
             string candidatePath = BuildOutputDirectory(projectDirectory, configuration, analysis.TargetFramework);
-            if (!File.Exists(Path.Combine(candidatePath, $"{projectFile.AssemblyName}.dll")))
+            if (!fileSystem.FileExists(Path.Combine(candidatePath, $"{projectFile.AssemblyName}.dll")))
             {
                 diagnostic = new ArchitectureProjectDiscoveryDiagnostic(
                     "missing project build output", projectFile.AbsolutePath,
@@ -148,14 +159,14 @@ public static class ArchitectureProjectDiscovery
                 return false;
             }
 
-            return FinishResolve(projectFile, projectDirectory, candidatePath, out outputDirectory, out diagnostic);
+            return FinishResolve(projectFile, projectDirectory, candidatePath, fileSystem, out outputDirectory, out diagnostic);
         }
 
         List<(string Framework, string Directory, bool HasOutput)> candidates = projectFile.TargetFrameworks
             .Select(framework =>
             {
                 string directory = BuildOutputDirectory(projectDirectory, configuration, framework);
-                bool hasOutput = File.Exists(Path.Combine(directory, $"{projectFile.AssemblyName}.dll"));
+                bool hasOutput = fileSystem.FileExists(Path.Combine(directory, $"{projectFile.AssemblyName}.dll"));
                 return (framework, directory, hasOutput);
             })
             .ToList();
@@ -165,7 +176,7 @@ public static class ArchitectureProjectDiscovery
 
         if (withOutput.Count == 1)
         {
-            return FinishResolve(projectFile, projectDirectory, withOutput[0].Directory, out outputDirectory, out diagnostic);
+            return FinishResolve(projectFile, projectDirectory, withOutput[0].Directory, fileSystem, out outputDirectory, out diagnostic);
         }
 
         string checkedList = string.Join(", ", candidates.Select(candidate =>
@@ -189,14 +200,15 @@ public static class ArchitectureProjectDiscovery
         DiscoveredProjectFile projectFile,
         string projectDirectory,
         string candidateOutputDirectory,
+        IArchitectureFileSystem fileSystem,
         out string outputDirectory,
         out ArchitectureProjectDiscoveryDiagnostic? diagnostic)
     {
         outputDirectory = string.Empty;
         diagnostic = null;
         string dllPath = Path.Combine(candidateOutputDirectory, $"{projectFile.AssemblyName}.dll");
-        DateTime dllWriteTimeUtc = File.GetLastWriteTimeUtc(dllPath);
-        DateTime latestSourceWriteTimeUtc = GetLatestSourceWriteTimeUtc(projectDirectory, projectFile.AbsolutePath);
+        DateTime dllWriteTimeUtc = fileSystem.GetLastWriteTimeUtc(dllPath);
+        DateTime latestSourceWriteTimeUtc = GetLatestSourceWriteTimeUtc(projectDirectory, projectFile.AbsolutePath, fileSystem);
 
         if (dllWriteTimeUtc < latestSourceWriteTimeUtc)
         {
@@ -210,16 +222,17 @@ public static class ArchitectureProjectDiscovery
         return true;
     }
 
-    private static DateTime GetLatestSourceWriteTimeUtc(string projectDirectory, string projectFilePath)
+    private static DateTime GetLatestSourceWriteTimeUtc(
+        string projectDirectory, string projectFilePath, IArchitectureFileSystem fileSystem)
     {
-        DateTime latest = File.GetLastWriteTimeUtc(projectFilePath);
+        DateTime latest = fileSystem.GetLastWriteTimeUtc(projectFilePath);
 
-        if (!Directory.Exists(projectDirectory))
+        if (!fileSystem.DirectoryExists(projectDirectory))
         {
             return latest;
         }
 
-        foreach (string file in Directory.EnumerateFiles(projectDirectory, "*.cs", SearchOption.AllDirectories))
+        foreach (string file in fileSystem.EnumerateFiles(projectDirectory, "*.cs", SearchOption.AllDirectories))
         {
             string relativePath = Path.GetRelativePath(projectDirectory, file);
             string[] segments = relativePath.Split(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
@@ -231,7 +244,7 @@ public static class ArchitectureProjectDiscovery
                 continue;
             }
 
-            DateTime writeTime = File.GetLastWriteTimeUtc(file);
+            DateTime writeTime = fileSystem.GetLastWriteTimeUtc(file);
             if (writeTime > latest)
             {
                 latest = writeTime;

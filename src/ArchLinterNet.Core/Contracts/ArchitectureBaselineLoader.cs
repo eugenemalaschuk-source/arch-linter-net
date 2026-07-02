@@ -1,3 +1,4 @@
+using ArchLinterNet.Core.IO;
 using YamlDotNet.Serialization;
 using YamlDotNet.Serialization.NamingConventions;
 
@@ -7,7 +8,13 @@ public static class ArchitectureBaselineLoader
 {
     public static ArchitectureBaselineDocument LoadFromPath(string baselinePath)
     {
-        if (!File.Exists(baselinePath))
+        return LoadFromPath(baselinePath, ArchitectureFileSystem.Real);
+    }
+
+    public static ArchitectureBaselineDocument LoadFromPath(
+        string baselinePath, IArchitectureFileSystem fileSystem)
+    {
+        if (!fileSystem.FileExists(baselinePath))
         {
             throw new FileNotFoundException($"Baseline file not found: {baselinePath}");
         }
@@ -17,7 +24,7 @@ public static class ArchitectureBaselineLoader
             .IgnoreUnmatchedProperties()
             .Build();
 
-        string yaml = File.ReadAllText(baselinePath);
+        string yaml = fileSystem.ReadAllText(baselinePath);
         ArchitectureBaselineDocument? document = deserializer.Deserialize<ArchitectureBaselineDocument>(yaml);
 
         if (document == null)

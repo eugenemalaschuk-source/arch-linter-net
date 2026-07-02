@@ -1,6 +1,7 @@
 using ArchLinterNet.Core.Contracts;
 using ArchLinterNet.Core.Discovery;
 using ArchLinterNet.Core.Execution;
+using ArchLinterNet.Core.IO;
 using ArchLinterNet.Core.Resolution;
 using ArchLinterNet.Core.Validation;
 using Microsoft.Extensions.DependencyInjection;
@@ -11,6 +12,10 @@ public static class ServiceCollectionExtensions
 {
     public static IServiceCollection AddArchLinterNetCore(this IServiceCollection services)
     {
+        services.AddSingleton<IArchitectureFileSystem, ArchitectureFileSystem>();
+        services.AddSingleton<IArchitectureEnvironment, ArchitectureEnvironment>();
+        services.AddSingleton<IArchitectureAssemblyLoader, ArchitectureAssemblyLoader>();
+        services.AddSingleton<IRoslynCompilationFactory, RoslynCompilationFactory>();
         services.AddSingleton<IArchitecturePolicyDocumentLoader, ArchitecturePolicyDocumentLoader>();
         services.AddSingleton<IArchitectureBaselineLoadingService, ArchitectureBaselineLoadingService>();
         services.AddSingleton<IArchitectureRepositoryRootResolver, ArchitectureRepositoryRootResolver>();
