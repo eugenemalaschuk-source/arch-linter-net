@@ -4,13 +4,13 @@ using ArchLinterNet.Core.Scanning;
 
 namespace ArchLinterNet.Core.Execution;
 
-internal sealed record ArchitectureCoverageNamespaceEntry(string Namespace, string RepresentativeType);
+public sealed record ArchitectureCoverageNamespaceEntry(string Namespace, string RepresentativeType);
 
-internal sealed record ArchitectureCoverageDependencyEdge(string SourceNamespace, string TargetNamespace);
+public sealed record ArchitectureCoverageDependencyEdge(string SourceNamespace, string TargetNamespace);
 
-internal sealed record ArchitectureCoverageLayerEntry(string Name, ArchitectureLayer Layer);
+public sealed record ArchitectureCoverageLayerEntry(string Name, ArchitectureLayer Layer);
 
-internal sealed class ArchitectureCoverageInventory
+public sealed class ArchitectureCoverageInventory
 {
     private readonly Dictionary<string, Type[]> _typesByNamespace;
     private readonly ArchitectureReferenceGraph _referenceGraph;

@@ -35,7 +35,8 @@ public sealed class ArchitectureCoverageInventoryTests
             missingAssemblyNames: Array.Empty<string>(),
             assemblyProbingPaths: Array.Empty<string>());
 
-        return new ArchitectureAnalysisSession(context);
+        return new ArchitectureAnalysisSession(
+            context, CreateDocument(), selectedContractIds: null, enableUnmatchedIgnoreTracking: true, preprocessorSymbols: null);
     }
 
     private static ArchitectureContractDocument CreateDocument()

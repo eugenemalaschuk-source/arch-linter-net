@@ -2,7 +2,7 @@ using ArchLinterNet.Core.Scanning;
 
 namespace ArchLinterNet.Core.Execution;
 
-internal sealed class ArchitectureReferenceGraph
+public sealed class ArchitectureReferenceGraph
 {
     private readonly Dictionary<Type, IReadOnlyList<Type>> _referencedTypesByType = new();
 
