@@ -1,5 +1,5 @@
-using System.Reflection;
 using ArchLinterNet.Core.Contracts;
+using ArchLinterNet.Core.IO;
 using ArchLinterNet.Core.Model;
 using ArchLinterNet.Core.Resolution;
 using Microsoft.CodeAnalysis;
@@ -19,18 +19,26 @@ internal static class ArchitectureSourceScanner
         ArchitectureContractExecutionContext executionContext,
         string[]? sourceRoots = null,
         ArchitectureLayer? sourceLayer = null,
-        IReadOnlyList<string>? preprocessorSymbols = null)
+        IReadOnlyList<string>? preprocessorSymbols = null,
+        IArchitectureFileSystem? fileSystem = null,
+        IRoslynCompilationFactory? compilationFactory = null,
+        IArchitectureAssemblyLoader? assemblyLoader = null)
     {
+        fileSystem ??= ArchitectureFileSystem.Real;
+        compilationFactory ??= RoslynCompilationFactory.Real;
+        assemblyLoader ??= ArchitectureAssemblyLoader.Real;
+
         string[] roots = sourceRoots ?? _defaultSourceRoots;
         ArchitectureLayer effectiveLayer = sourceLayer
                                           ?? new ArchitectureLayer { Namespace = sourceNamespacePrefix };
-        List<string> sourceFiles = FindSourceFilesForNamespace(repositoryRoot, effectiveLayer, roots);
+        List<string> sourceFiles = FindSourceFilesForNamespace(repositoryRoot, effectiveLayer, roots, fileSystem);
         if (sourceFiles.Count == 0)
         {
             return Array.Empty<ArchitectureViolation>();
         }
 
-        CSharpCompilation compilation = BuildCompilation(sourceFiles, preprocessorSymbols);
+        CSharpCompilation compilation = compilationFactory.Create(
+            "ArchitectureSourceScanner", sourceFiles, preprocessorSymbols, fileSystem, assemblyLoader);
         IReadOnlyList<ForbiddenCallPattern> patterns =
             ArchitectureForbiddenCallMatcher.NormalizePatterns(forbiddenCallPatterns);
         Dictionary<string, bool> matchCache = new(StringComparer.Ordinal);
@@ -74,70 +82,6 @@ internal static class ArchitectureSourceScanner
         }
 
         return violations;
-    }
-
-    private static CSharpCompilation BuildCompilation(
-        IReadOnlyList<string> sourceFiles,
-        IReadOnlyList<string>? preprocessorSymbols = null)
-    {
-        CSharpParseOptions? parseOptions = preprocessorSymbols is { Count: > 0 }
-            ? CSharpParseOptions.Default.WithPreprocessorSymbols(preprocessorSymbols)
-            : null;
-
-        var syntaxTrees = sourceFiles
-            .Select(filePath => CSharpSyntaxTree.ParseText(
-                File.ReadAllText(filePath),
-                options: parseOptions,
-                path: filePath))
-            .ToList();
-
-        List<MetadataReference> references = BuildMetadataReferences();
-
-        return CSharpCompilation.Create(
-            "ArchitectureSourceScanner",
-            syntaxTrees,
-            references,
-            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
-    }
-
-    private static List<MetadataReference> BuildMetadataReferences()
-    {
-        HashSet<string> paths = new(StringComparer.OrdinalIgnoreCase);
-
-        string? trustedPlatformAssemblies = AppContext.GetData("TRUSTED_PLATFORM_ASSEMBLIES") as string;
-        if (!string.IsNullOrWhiteSpace(trustedPlatformAssemblies))
-        {
-            foreach (string path in trustedPlatformAssemblies.Split(Path.PathSeparator))
-            {
-                if (!string.IsNullOrWhiteSpace(path) && File.Exists(path))
-                {
-                    paths.Add(path);
-                }
-            }
-        }
-
-        foreach (Assembly assembly in AppDomain.CurrentDomain.GetAssemblies())
-        {
-            string location;
-
-            try
-            {
-                location = assembly.Location;
-            }
-            catch
-            {
-                continue;
-            }
-
-            if (!string.IsNullOrWhiteSpace(location) && File.Exists(location))
-            {
-                paths.Add(location);
-            }
-        }
-
-        return paths
-            .Select(path => (MetadataReference)MetadataReference.CreateFromFile(path))
-            .ToList();
     }
 
     private static List<string> FindForbiddenUsagesInBodies(
@@ -262,7 +206,8 @@ internal static class ArchitectureSourceScanner
         return null;
     }
 
-    private static List<string> FindSourceFilesForNamespace(string repositoryRoot, ArchitectureLayer layer, string[] sourceRoots)
+    private static List<string> FindSourceFilesForNamespace(
+        string repositoryRoot, ArchitectureLayer layer, string[] sourceRoots, IArchitectureFileSystem fileSystem)
     {
         List<string> result = new();
 
@@ -270,14 +215,14 @@ internal static class ArchitectureSourceScanner
         {
             string fullRoot = Path.Combine(repositoryRoot, root);
 
-            if (!Directory.Exists(fullRoot))
+            if (!fileSystem.DirectoryExists(fullRoot))
             {
                 continue;
             }
 
-            foreach (string filePath in Directory.EnumerateFiles(fullRoot, "*.cs", SearchOption.AllDirectories))
+            foreach (string filePath in fileSystem.EnumerateFiles(fullRoot, "*.cs", SearchOption.AllDirectories))
             {
-                if (FileContainsNamespace(filePath, layer))
+                if (FileContainsNamespace(filePath, layer, fileSystem))
                 {
                     result.Add(filePath);
                 }
@@ -287,11 +232,11 @@ internal static class ArchitectureSourceScanner
         return result;
     }
 
-    private static bool FileContainsNamespace(string filePath, ArchitectureLayer layer)
+    private static bool FileContainsNamespace(string filePath, ArchitectureLayer layer, IArchitectureFileSystem fileSystem)
     {
         try
         {
-            foreach (string line in File.ReadLines(filePath))
+            foreach (string line in fileSystem.ReadLines(filePath))
             {
                 string trimmed = line.Trim();
 

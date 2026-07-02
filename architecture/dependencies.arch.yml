@@ -6,6 +6,8 @@ layers:
     namespace: ArchLinterNet.Core
   core_model:
     namespace: ArchLinterNet.Core.Model
+  core_io:
+    namespace: ArchLinterNet.Core.IO
   core_reporting:
     namespace: ArchLinterNet.Core.Reporting
   core_discovery:
@@ -83,6 +85,11 @@ contracts:
       forbidden: [cli, testing, unity, core_execution, core_validation, core_resolution, core_scanning, core_contracts, core_reporting]
       reason: Model types are the most fundamental layer and must not depend on anything else.
 
+    - name: core-io-stays-independent
+      source: core_io
+      forbidden: [cli, testing, unity, core_execution, core_validation, core_resolution, core_scanning, core_contracts, core_reporting, core_discovery, core_composition]
+      reason: Infrastructure seams (file system, environment, assembly loading, Roslyn compilation) are a fundamental replaceable boundary and must not depend on the business logic layers that consume them.
+
     - name: core-resolution-must-not-depend-on-execution-or-validation
       source: core_resolution
       forbidden: [core_execution, core_validation, cli, testing, unity]
@@ -96,6 +103,11 @@ contracts:
   strict_external:
     - name: core-model-must-not-depend-on-di-container
       source: core_model
+      forbidden: [dependency_injection_container]
+      reason: Container APIs must stay confined to the composition boundary.
+
+    - name: core-io-must-not-depend-on-di-container
+      source: core_io
       forbidden: [dependency_injection_container]
       reason: Container APIs must stay confined to the composition boundary.
 

@@ -1,12 +1,14 @@
 using System.Xml.Linq;
+using ArchLinterNet.Core.IO;
 
 namespace ArchLinterNet.Core.Discovery;
 
 internal static class ArchitectureProjectFileParser
 {
-    public static DiscoveredProjectFile Parse(string projectPath)
+    public static DiscoveredProjectFile Parse(string projectPath, IArchitectureFileSystem? fileSystem = null)
     {
-        XDocument document = XDocument.Load(projectPath);
+        fileSystem ??= ArchitectureFileSystem.Real;
+        XDocument document = XDocument.Parse(fileSystem.ReadAllText(projectPath));
 
         IEnumerable<XElement> propertyGroups = document.Descendants("PropertyGroup");
 

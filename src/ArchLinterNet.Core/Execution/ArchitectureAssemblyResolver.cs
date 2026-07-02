@@ -1,5 +1,6 @@
 using System.Reflection;
 using ArchLinterNet.Core.Contracts;
+using ArchLinterNet.Core.IO;
 
 namespace ArchLinterNet.Core.Execution;
 
@@ -7,8 +8,20 @@ public static class ArchitectureAssemblyResolver
 {
     private const string AssemblySearchPathsEnvVar = "ARCHITECTURE_ASSEMBLY_SEARCH_PATHS";
 
-    public static ResolutionResult ResolveFromDocument(ArchitectureContractDocument document,
+    public static ResolutionResult ResolveFromDocument(
+        ArchitectureContractDocument document,
         string? repositoryRoot = null)
+    {
+        return ResolveFromDocument(
+            document, repositoryRoot, ArchitectureFileSystem.Real, ArchitectureEnvironment.Real, ArchitectureAssemblyLoader.Real);
+    }
+
+    public static ResolutionResult ResolveFromDocument(
+        ArchitectureContractDocument document,
+        string? repositoryRoot,
+        IArchitectureFileSystem fileSystem,
+        IArchitectureEnvironment environment,
+        IArchitectureAssemblyLoader assemblyLoader)
     {
         if (document == null)
         {
@@ -24,14 +37,14 @@ public static class ArchitectureAssemblyResolver
         List<Assembly> assemblies = new(names.Count);
         List<string> missing = new();
 
-        IReadOnlyList<string> probingPaths = ResolveProbingPaths(document, repositoryRoot);
+        IReadOnlyList<string> probingPaths = ResolveProbingPaths(document, repositoryRoot, fileSystem, environment);
 
         foreach (string name in names.Where(value => !string.IsNullOrWhiteSpace(value))
                      .Distinct(StringComparer.Ordinal))
         {
             try
             {
-                Assembly assembly = ResolveByName(name.Trim(), probingPaths);
+                Assembly assembly = ResolveByName(name.Trim(), probingPaths, fileSystem, assemblyLoader);
                 assemblies.Add(assembly);
             }
             catch (InvalidOperationException)
@@ -43,10 +56,13 @@ public static class ArchitectureAssemblyResolver
         return new ResolutionResult(assemblies, missing, probingPaths.ToArray());
     }
 
-    private static Assembly ResolveByName(string assemblyName, IReadOnlyList<string> probingPaths)
+    private static Assembly ResolveByName(
+        string assemblyName,
+        IReadOnlyList<string> probingPaths,
+        IArchitectureFileSystem fileSystem,
+        IArchitectureAssemblyLoader assemblyLoader)
     {
-        Assembly? alreadyLoaded = AppDomain.CurrentDomain
-            .GetAssemblies()
+        Assembly? alreadyLoaded = assemblyLoader.GetLoadedAssemblies()
             .FirstOrDefault(assembly => string.Equals(assembly.GetName().Name, assemblyName, StringComparison.Ordinal));
 
         if (alreadyLoaded != null)
@@ -56,21 +72,21 @@ public static class ArchitectureAssemblyResolver
 
         try
         {
-            return Assembly.Load(new AssemblyName(assemblyName));
+            return assemblyLoader.Load(new AssemblyName(assemblyName));
         }
         catch
         {
             foreach (string path in probingPaths)
             {
                 string candidate = Path.Combine(path, $"{assemblyName}.dll");
-                if (!File.Exists(candidate))
+                if (!fileSystem.FileExists(candidate))
                 {
                     continue;
                 }
 
                 try
                 {
-                    return Assembly.LoadFrom(candidate);
+                    return assemblyLoader.LoadFrom(candidate);
                 }
                 catch
                 {
@@ -83,12 +99,15 @@ public static class ArchitectureAssemblyResolver
             $"Failed to resolve target assembly '{assemblyName}' from architecture YAML. Probing paths: {probes}");
     }
 
-    private static IReadOnlyList<string> ResolveProbingPaths(ArchitectureContractDocument document,
-        string? repositoryRoot)
+    private static IReadOnlyList<string> ResolveProbingPaths(
+        ArchitectureContractDocument document,
+        string? repositoryRoot,
+        IArchitectureFileSystem fileSystem,
+        IArchitectureEnvironment environment)
     {
         List<string> result = new();
 
-        foreach (string path in ResolveEnvProbingPaths())
+        foreach (string path in ResolveEnvProbingPaths(fileSystem, environment))
         {
             result.Add(path);
         }
@@ -107,7 +126,7 @@ public static class ArchitectureAssemblyResolver
                     ? normalizedPath
                     : Path.GetFullPath(Path.Combine(repositoryRoot, normalizedPath));
 
-            if (!Directory.Exists(resolvedPath))
+            if (!fileSystem.DirectoryExists(resolvedPath))
             {
                 continue;
             }
@@ -115,13 +134,13 @@ public static class ArchitectureAssemblyResolver
             result.Add(resolvedPath);
         }
 
-        string appBaseDirectory = AppContext.BaseDirectory;
-        if (Directory.Exists(appBaseDirectory))
+        string appBaseDirectory = environment.BaseDirectory;
+        if (fileSystem.DirectoryExists(appBaseDirectory))
         {
             result.Add(appBaseDirectory);
         }
 
-        if (!string.IsNullOrWhiteSpace(repositoryRoot) && Directory.Exists(repositoryRoot))
+        if (!string.IsNullOrWhiteSpace(repositoryRoot) && fileSystem.DirectoryExists(repositoryRoot))
         {
             result.Add(repositoryRoot);
         }
@@ -129,13 +148,13 @@ public static class ArchitectureAssemblyResolver
         if (!string.IsNullOrWhiteSpace(repositoryRoot))
         {
             string artifactsBin = Path.Combine(repositoryRoot, "artifacts", "bin");
-            if (Directory.Exists(artifactsBin))
+            if (fileSystem.DirectoryExists(artifactsBin))
             {
                 result.Add(artifactsBin);
             }
 
             string repoBin = Path.Combine(repositoryRoot, "bin");
-            if (Directory.Exists(repoBin))
+            if (fileSystem.DirectoryExists(repoBin))
             {
                 result.Add(repoBin);
             }
@@ -144,9 +163,10 @@ public static class ArchitectureAssemblyResolver
         return result.Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
     }
 
-    private static IEnumerable<string> ResolveEnvProbingPaths()
+    private static IEnumerable<string> ResolveEnvProbingPaths(
+        IArchitectureFileSystem fileSystem, IArchitectureEnvironment environment)
     {
-        string? raw = Environment.GetEnvironmentVariable(AssemblySearchPathsEnvVar);
+        string? raw = environment.GetEnvironmentVariable(AssemblySearchPathsEnvVar);
         if (string.IsNullOrWhiteSpace(raw))
         {
             yield break;
@@ -160,7 +180,7 @@ public static class ArchitectureAssemblyResolver
                 continue;
             }
 
-            if (Directory.Exists(normalized))
+            if (fileSystem.DirectoryExists(normalized))
             {
                 yield return normalized;
             }

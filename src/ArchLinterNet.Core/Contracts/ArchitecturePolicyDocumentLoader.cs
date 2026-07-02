@@ -1,3 +1,5 @@
+using ArchLinterNet.Core.IO;
+
 namespace ArchLinterNet.Core.Contracts;
 
 public interface IArchitecturePolicyDocumentLoader
@@ -10,9 +12,21 @@ public sealed class ArchitecturePolicyDocumentLoader : IArchitecturePolicyDocume
     private static readonly string[] _implementedCoverageScopes =
         { "namespace", "rule_input", "project", "assembly", "dependency_edge" };
 
+    private readonly IArchitectureFileSystem _fileSystem;
+
+    public ArchitecturePolicyDocumentLoader()
+        : this(ArchitectureFileSystem.Real)
+    {
+    }
+
+    public ArchitecturePolicyDocumentLoader(IArchitectureFileSystem fileSystem)
+    {
+        _fileSystem = fileSystem;
+    }
+
     public ArchitectureContractDocument Load(string policyPath)
     {
-        ArchitectureContractDocument document = ArchitectureContractLoader.LoadFromPath(policyPath);
+        ArchitectureContractDocument document = ArchitectureContractLoader.LoadFromPath(policyPath, _fileSystem);
         ValidateImplementedCoverageScopes(document);
         return document;
     }
