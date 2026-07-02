@@ -4,7 +4,17 @@ using ArchLinterNet.Core.Reporting;
 
 namespace ArchLinterNet.Core.Execution;
 
-internal static class ArchitectureContractExecutor
+public interface IArchitectureContractExecutor
+{
+    ArchitectureContractExecutor.ExecutionResult Execute(
+        ArchitectureAnalysisSession session,
+        string mode,
+        ArchitectureContractHandlerRegistry handlerRegistry,
+        bool includeAsmdefContracts = true,
+        ValidationTiming? timing = null);
+}
+
+public sealed class ArchitectureContractExecutor : IArchitectureContractExecutor
 {
     private const string CoverageFamily = "coverage";
     private const string AsmdefFamily = "asmdef";
@@ -15,7 +25,7 @@ internal static class ArchitectureContractExecutor
         IReadOnlyCollection<ArchitectureViolation> CoverageViolations,
         IReadOnlyCollection<ArchitectureCoverageSummary> CoverageSummaries);
 
-    public static ExecutionResult Execute(
+    public ExecutionResult Execute(
         ArchitectureAnalysisSession session,
         string mode,
         ArchitectureContractHandlerRegistry handlerRegistry,

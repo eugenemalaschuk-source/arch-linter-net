@@ -318,6 +318,25 @@ public sealed class ArchitectureContractHandlerRegistryTests
     }
 
     [Test]
+    public void Executor_AsInstanceService_TwoIndependentInstancesProduceIdenticalResults()
+    {
+        var document = CreateLayerFixtureDocument("layerUpper", "layerLower", new List<string> { "layerLower", "layerUpper" });
+
+        var firstRunner = new ArchitectureContractRunner(CreateContext(_layerFixtureAssembly), document);
+        IArchitectureContractExecutor firstExecutor = new ArchitectureContractExecutor();
+        ArchitectureContractExecutor.ExecutionResult firstResult =
+            firstExecutor.Execute(firstRunner.Session, "strict", CreateRegistry());
+
+        var secondRunner = new ArchitectureContractRunner(CreateContext(_layerFixtureAssembly), document);
+        IArchitectureContractExecutor secondExecutor = new ArchitectureContractExecutor();
+        ArchitectureContractExecutor.ExecutionResult secondResult =
+            secondExecutor.Execute(secondRunner.Session, "strict", CreateRegistry());
+
+        Assert.That(Project(secondResult.Violations), Is.EqualTo(Project(firstResult.Violations)),
+            "The executor holds no mutable instance/global state, so two independently constructed instances run against equivalent sessions must produce identical results.");
+    }
+
+    [Test]
     public void Executor_RoutesAllFamiliesThroughRegistry_MatchesDirectRunnerCalls()
     {
         var document = CreateLayerFixtureDocument("layerUpper", "layerLower", new List<string> { "layerLower", "layerUpper" });
@@ -329,7 +348,7 @@ public sealed class ArchitectureContractHandlerRegistryTests
 
         var executorRunner = new ArchitectureContractRunner(CreateContext(_layerFixtureAssembly), document);
         ArchitectureContractExecutor.ExecutionResult result =
-            ArchitectureContractExecutor.Execute(executorRunner.Session, "strict", CreateRegistry());
+            new ArchitectureContractExecutor().Execute(executorRunner.Session, "strict", CreateRegistry());
 
         Assert.That(Project(result.Violations), Is.EqualTo(Project(expectedViolations)));
     }
@@ -346,7 +365,7 @@ public sealed class ArchitectureContractHandlerRegistryTests
         var runner = new ArchitectureContractRunner(CreateContext(_layerFixtureAssembly), document);
 
         ArchitectureContractExecutor.ExecutionResult result =
-            ArchitectureContractExecutor.Execute(runner.Session, "strict", CreateRegistry());
+            new ArchitectureContractExecutor().Execute(runner.Session, "strict", CreateRegistry());
 
         Assert.That(result.Violations, Has.Count.GreaterThan(0));
         Assert.That(runner.BaselineCandidates, Has.Count.GreaterThan(0),
@@ -413,11 +432,13 @@ public sealed class ArchitectureContractHandlerRegistryTests
             }
         };
 
+        var executor = new ArchitectureContractExecutor();
+
         var strictRunner = new ArchitectureContractRunner(CreateContext(typeof(ArchitectureContractDocument).Assembly), document);
-        Assert.DoesNotThrow(() => ArchitectureContractExecutor.Execute(strictRunner.Session, "strict", CreateRegistry()));
+        Assert.DoesNotThrow(() => executor.Execute(strictRunner.Session, "strict", CreateRegistry()));
 
         var auditRunner = new ArchitectureContractRunner(CreateContext(typeof(ArchitectureContractDocument).Assembly), document);
-        Assert.DoesNotThrow(() => ArchitectureContractExecutor.Execute(auditRunner.Session, "audit", CreateRegistry()));
+        Assert.DoesNotThrow(() => executor.Execute(auditRunner.Session, "audit", CreateRegistry()));
 
         var policyConsistencyRunner = new ArchitectureContractRunner(CreateContext(typeof(ArchitectureContractDocument).Assembly), document);
         var findings = policyConsistencyRunner.CheckPolicyConsistency();
