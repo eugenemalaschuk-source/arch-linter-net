@@ -1,5 +1,6 @@
 using ArchLinterNet.Core.Contracts;
 using ArchLinterNet.Core.Execution;
+using ArchLinterNet.Core.IO;
 using NUnit.Framework;
 
 namespace ArchLinterNet.Core.Tests;
@@ -7,11 +8,14 @@ namespace ArchLinterNet.Core.Tests;
 [TestFixture]
 public sealed class ArchitectureBaselineIntegrationTests
 {
+    private static readonly ArchitectureBaselineGenerator _generator = new();
+    private static readonly ArchitectureBaselineLoadingService _loadingService = new();
+
     private static ArchitectureAnalysisContext CreateContext()
     {
         return new ArchitectureAnalysisContext(
             "/tmp",
-            new[] { typeof(ArchitectureContractLoader).Assembly },
+            new[] { typeof(ArchitecturePolicyDocumentLoader).Assembly },
             Array.Empty<string>(),
             Array.Empty<string>());
     }
@@ -129,7 +133,7 @@ public sealed class ArchitectureBaselineIntegrationTests
         var runner = new ArchitectureContractRunner(CreateContext(), policy);
         runner.CheckContract(policy.Contracts.Strict[0]);
 
-        ArchitectureBaselineDocument baseline = ArchitectureBaselineGenerator.Generate(
+        ArchitectureBaselineDocument baseline = _generator.Generate(
             policy, runner.BaselineCandidates, "test baseline");
 
         Assert.That(baseline.Version, Is.EqualTo(1));
@@ -189,10 +193,10 @@ public sealed class ArchitectureBaselineIntegrationTests
         generateRunner.CheckContract(policy.Contracts.Strict[0]);
         generateRunner.CheckContract(policy.Contracts.Strict[1]);
 
-        ArchitectureBaselineDocument baseline = ArchitectureBaselineGenerator.Generate(
+        ArchitectureBaselineDocument baseline = _generator.Generate(
             policy, generateRunner.BaselineCandidates, "auto-baseline");
 
-        string mergedYaml = ArchitectureBaselineGenerator.Serialize(baseline);
+        string mergedYaml = _generator.Serialize(baseline);
 
         var tempDir = Path.Combine(Path.GetTempPath(), $"arch-linter-test-{Guid.NewGuid():N}");
         Directory.CreateDirectory(tempDir);
@@ -201,8 +205,8 @@ public sealed class ArchitectureBaselineIntegrationTests
             string baselinePath = Path.Combine(tempDir, "baseline.yml");
             File.WriteAllText(baselinePath, mergedYaml);
 
-            var loadedBaseline = ArchitectureBaselineLoader.LoadFromPath(baselinePath);
-            ArchitectureBaselineMerger.MergeAndValidate(policy, loadedBaseline);
+            var loadedBaseline = _loadingService.LoadFromPath(baselinePath);
+            _loadingService.MergeAndValidate(policy, loadedBaseline);
 
             var finalRunner = new ArchitectureContractRunner(context, policy);
             var violations1 = finalRunner.CheckContract(policy.Contracts.Strict[0]);

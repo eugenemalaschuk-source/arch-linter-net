@@ -1,18 +1,4 @@
-# static-production-service-inventory Specification
-
-## Purpose
-Keep production `static class` usage in `ArchLinterNet.Core` limited to intentional pure helpers, extension methods, constants/options holders, and compatibility facades, with every other static class either converted to a DI-registered instance service or tracked as a documented follow-up. This is the source of truth for #142's self-policy guardrails on static production services.
-## Requirements
-### Requirement: Static class inventory is maintained
-The repository SHALL maintain a document classifying every production `static class` under `src/` into one of: pure helper/deterministic mapper, extension method container, constants/options holder, compatibility facade delegating to a composed service, or production service/orchestrator/scanner/resolver/finder.
-
-#### Scenario: Reviewer checks static class classification
-- **WHEN** a reviewer or #142 guardrail author needs to know whether a given static class is an intentional exception or unaddressed debt
-- **THEN** `docs/internal/static-class-inventory.md` lists the class with its classification and rationale
-
-#### Scenario: No production-service static classes remain unclassified as debt
-- **WHEN** a reviewer checks `docs/internal/static-class-inventory.md` after this change
-- **THEN** every class previously listed in section (e) as a "follow-up candidate" is either marked "Converted" with its replacing interface/service named, or explicitly documented as a reviewed exception with a rationale
+## MODIFIED Requirements
 
 ### Requirement: Production orchestrators named by architecture-health issues are instance-based
 Every class classified in `docs/internal/static-class-inventory.md` as a production service/orchestrator/scanner/resolver/parser/loader SHALL be exposed as an interface with an instance implementation registered in the Core composition root (or, for a stateless per-run collaborator consumed only by a non-DI-composed domain object such as `ArchitectureAnalysisSession`, an instance class constructed directly at the point of use), rather than invoked via static method calls from application services.
@@ -41,3 +27,13 @@ Every class classified in `docs/internal/static-class-inventory.md` as a product
 - **WHEN** `ArchitectureAnalysisSession` checks an asmdef, method-body, or external-dependency contract
 - **THEN** it invokes an instance method on a directly-constructed `ArchitectureAsmdefScanner`, `ArchitectureSourceScanner`, `ArchitectureIlMethodBodyScanner`, or `ArchitectureExternalDependencyIlScanner` instance, none of which is declared `static class`, and produces the same violations as the prior static implementation
 
+### Requirement: Static class inventory is maintained
+The repository SHALL maintain a document classifying every production `static class` under `src/` into one of: pure helper/deterministic mapper, extension method container, constants/options holder, compatibility facade delegating to a composed service, or production service/orchestrator/scanner/resolver/finder.
+
+#### Scenario: Reviewer checks static class classification
+- **WHEN** a reviewer or #142 guardrail author needs to know whether a given static class is an intentional exception or unaddressed debt
+- **THEN** `docs/internal/static-class-inventory.md` lists the class with its classification and rationale
+
+#### Scenario: No production-service static classes remain unclassified as debt
+- **WHEN** a reviewer checks `docs/internal/static-class-inventory.md` after this change
+- **THEN** every class previously listed in section (e) as a "follow-up candidate" is either marked "Converted" with its replacing interface/service named, or explicitly documented as a reviewed exception with a rationale

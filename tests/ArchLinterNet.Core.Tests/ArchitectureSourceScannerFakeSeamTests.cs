@@ -71,7 +71,7 @@ public sealed class ArchitectureSourceScannerFakeSeamTests
             "fake-contract", "fake-contract-id", Array.Empty<ArchitectureIgnoredViolation>(),
             enableUnmatchedIgnoreTracking: false, contractGroup: null, baselineCandidates: null);
 
-        List<ArchitectureViolation> violations = ArchitectureSourceScanner.FindMethodBodyViolations(
+        List<ArchitectureViolation> violations = new ArchitectureSourceScanner().FindMethodBodyViolations(
             "/fake/repo",
             "Fake.Forbidden.Namespace",
             new[] { "System.Console.WriteLine" },

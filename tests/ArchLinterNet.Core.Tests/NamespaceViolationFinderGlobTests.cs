@@ -9,6 +9,8 @@ namespace ArchLinterNet.Core.Tests;
 [TestFixture]
 public sealed class NamespaceViolationFinderGlobTests
 {
+    private static readonly ArchitectureDiagnosticFormatter _formatter = new();
+
     [Test]
     public void FindNamespaceViolations_GlobLayer_CollectsConcreteMatchedPrefixesFromForbiddenReferences()
     {
@@ -54,7 +56,7 @@ public sealed class NamespaceViolationFinderGlobTests
             }
         };
 
-        string output = ArchitectureDiagnosticFormatter.FormatViolationsForHumans(new[] { violation });
+        string output = _formatter.FormatViolationsForHumans(new[] { violation });
 
         Assert.That(output, Does.Contain("matched ReviewTest.Modules.Billing.Internal, ReviewTest.Modules.Sales.Internal"));
     }

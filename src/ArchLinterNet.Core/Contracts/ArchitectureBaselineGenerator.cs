@@ -3,9 +3,19 @@ using YamlDotNet.Serialization.NamingConventions;
 
 namespace ArchLinterNet.Core.Contracts;
 
-public static class ArchitectureBaselineGenerator
+public interface IArchitectureBaselineGenerator
 {
-    public static ArchitectureBaselineDocument Generate(
+    ArchitectureBaselineDocument Generate(
+        ArchitectureContractDocument policyDocument,
+        IReadOnlyList<ArchitectureBaselineCandidate> candidates,
+        string reason = "generated baseline");
+
+    string Serialize(ArchitectureBaselineDocument document);
+}
+
+internal sealed class ArchitectureBaselineGenerator : IArchitectureBaselineGenerator
+{
+    public ArchitectureBaselineDocument Generate(
         ArchitectureContractDocument policyDocument,
         IReadOnlyList<ArchitectureBaselineCandidate> candidates,
         string reason = "generated baseline")
@@ -76,7 +86,7 @@ public static class ArchitectureBaselineGenerator
         return baseline;
     }
 
-    public static string Serialize(ArchitectureBaselineDocument document)
+    public string Serialize(ArchitectureBaselineDocument document)
     {
         ISerializer serializer = new SerializerBuilder()
             .WithNamingConvention(UnderscoredNamingConvention.Instance)

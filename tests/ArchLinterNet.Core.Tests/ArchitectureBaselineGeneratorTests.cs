@@ -6,6 +6,8 @@ namespace ArchLinterNet.Core.Tests;
 [TestFixture]
 public sealed class ArchitectureBaselineGeneratorTests
 {
+    private readonly ArchitectureBaselineGenerator _generator = new();
+
     [Test]
     public void Generate_EmptyCandidates_ProducesEmptyBaseline()
     {
@@ -25,7 +27,7 @@ public sealed class ArchitectureBaselineGeneratorTests
         };
 
         var candidates = Array.Empty<ArchitectureBaselineCandidate>();
-        var baseline = ArchitectureBaselineGenerator.Generate(policy, candidates);
+        var baseline = _generator.Generate(policy, candidates);
 
         Assert.That(baseline.Version, Is.EqualTo(1));
         Assert.That(baseline.Baseline.Strict, Is.Empty);
@@ -63,7 +65,7 @@ public sealed class ArchitectureBaselineGeneratorTests
             new("strict", "my-rule", "MyApp.Service", "Legacy.Provider")
         };
 
-        var baseline = ArchitectureBaselineGenerator.Generate(policy, candidates);
+        var baseline = _generator.Generate(policy, candidates);
 
         Assert.That(baseline.Baseline.Strict, Has.Count.EqualTo(1));
         Assert.That(baseline.Baseline.Strict[0].Id, Is.EqualTo("my-rule"));
@@ -99,11 +101,11 @@ public sealed class ArchitectureBaselineGeneratorTests
             new("strict", "z-rule", "AType", "ZForbidden")
         };
 
-        var baseline1 = ArchitectureBaselineGenerator.Generate(policy, candidates);
-        var baseline2 = ArchitectureBaselineGenerator.Generate(policy, candidates);
+        var baseline1 = _generator.Generate(policy, candidates);
+        var baseline2 = _generator.Generate(policy, candidates);
 
-        string yaml1 = ArchitectureBaselineGenerator.Serialize(baseline1);
-        string yaml2 = ArchitectureBaselineGenerator.Serialize(baseline2);
+        string yaml1 = _generator.Serialize(baseline1);
+        string yaml2 = _generator.Serialize(baseline2);
 
         Assert.That(yaml1, Is.EqualTo(yaml2));
     }
@@ -132,7 +134,7 @@ public sealed class ArchitectureBaselineGeneratorTests
             new("strict", "my-rule", "MyApp.Service", "Legacy.Provider")
         };
 
-        var baseline = ArchitectureBaselineGenerator.Generate(policy, candidates);
+        var baseline = _generator.Generate(policy, candidates);
 
         Assert.That(baseline.Baseline.Strict, Has.Count.EqualTo(1));
         Assert.That(baseline.Baseline.Strict[0].IgnoredViolations, Has.Count.EqualTo(1));
@@ -162,7 +164,7 @@ public sealed class ArchitectureBaselineGeneratorTests
             new("strict_cycles", "rule-b", "Src.B", "Ref.B")
         };
 
-        var baseline = ArchitectureBaselineGenerator.Generate(policy, candidates, reason: "custom reason");
+        var baseline = _generator.Generate(policy, candidates, reason: "custom reason");
 
         Assert.That(baseline.Baseline.Strict[0].IgnoredViolations[0].Reason, Is.EqualTo("custom reason"));
         Assert.That(baseline.Baseline.StrictCycles[0].IgnoredViolations[0].Reason, Is.EqualTo("custom reason"));
@@ -192,7 +194,7 @@ public sealed class ArchitectureBaselineGeneratorTests
             new("strict_acyclic_siblings", "no-sibling-cycles", "E.F", "G.H")
         };
 
-        var baseline = ArchitectureBaselineGenerator.Generate(policy, candidates);
+        var baseline = _generator.Generate(policy, candidates);
 
         Assert.That(baseline.Baseline.StrictCycles, Has.Count.EqualTo(1));
         Assert.That(baseline.Baseline.StrictCycles[0].Id, Is.EqualTo("no-cycles"));
@@ -233,7 +235,7 @@ public sealed class ArchitectureBaselineGeneratorTests
             new("strict_allow_only", "allow-rule", "Src.Allow", "Ref.Allow")
         };
 
-        var baseline = ArchitectureBaselineGenerator.Generate(policy, candidates);
+        var baseline = _generator.Generate(policy, candidates);
 
         Assert.That(baseline.Baseline.Strict, Has.Count.EqualTo(1));
         Assert.That(baseline.Baseline.StrictLayers, Has.Count.EqualTo(1));
@@ -269,7 +271,7 @@ public sealed class ArchitectureBaselineGeneratorTests
             new("strict", null, "Src.Type", "Ref.Type")
         };
 
-        var baseline = ArchitectureBaselineGenerator.Generate(policy, candidates);
+        var baseline = _generator.Generate(policy, candidates);
 
         Assert.That(baseline.Baseline.Strict, Is.Empty);
     }
@@ -283,7 +285,7 @@ public sealed class ArchitectureBaselineGeneratorTests
             Baseline = new ArchitectureBaselineContractGroups()
         };
 
-        string yaml = ArchitectureBaselineGenerator.Serialize(doc);
+        string yaml = _generator.Serialize(doc);
 
         Assert.That(yaml, Does.Contain("version: 1"));
         Assert.That(yaml, Does.Contain("baseline:"));

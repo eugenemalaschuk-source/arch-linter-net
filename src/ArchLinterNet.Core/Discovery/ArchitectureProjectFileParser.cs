@@ -3,9 +3,14 @@ using ArchLinterNet.Core.IO;
 
 namespace ArchLinterNet.Core.Discovery;
 
-internal static class ArchitectureProjectFileParser
+internal interface IArchitectureProjectFileParser
 {
-    public static DiscoveredProjectFile Parse(string projectPath, IArchitectureFileSystem? fileSystem = null)
+    DiscoveredProjectFile Parse(string projectPath, IArchitectureFileSystem? fileSystem = null);
+}
+
+internal sealed class ArchitectureProjectFileParser : IArchitectureProjectFileParser
+{
+    public DiscoveredProjectFile Parse(string projectPath, IArchitectureFileSystem? fileSystem = null)
     {
         fileSystem ??= ArchitectureFileSystem.Real;
         XDocument document = XDocument.Parse(fileSystem.ReadAllText(projectPath));

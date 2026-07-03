@@ -3,9 +3,39 @@ using ArchLinterNet.Core.Model;
 
 namespace ArchLinterNet.Core.Reporting;
 
-public static class ArchitectureDiagnosticFormatter
+public interface IArchitectureDiagnosticFormatter
 {
-    public static string FormatViolationsForHumans(IReadOnlyCollection<ArchitectureViolation> violations)
+    string FormatViolationsForHumans(IReadOnlyCollection<ArchitectureViolation> violations);
+
+    string FormatCyclesForHumans(IReadOnlyCollection<string> cycles);
+
+    string FormatUnmatchedForHumans(IReadOnlyCollection<ArchitectureUnmatchedIgnoredViolation> unmatched);
+
+    string FormatPolicyConsistencyForHumans(IReadOnlyCollection<PolicyConsistencyDiagnostic> findings);
+
+    string FormatCoverageForHumans(IReadOnlyCollection<ArchitectureViolation> findings);
+
+    string FormatCoverageSummaryForHumans(IReadOnlyCollection<ArchitectureCoverageSummary> summaries);
+
+    string FormatResultForCiArtifacts(
+        string mode,
+        bool passed,
+        IReadOnlyCollection<ArchitectureViolation> violations,
+        IReadOnlyCollection<string> cycles,
+        IReadOnlyCollection<ArchitectureViolation>? coverageFindings = null,
+        IReadOnlyCollection<ArchitectureUnmatchedIgnoredViolation>? unmatched = null,
+        IReadOnlyCollection<PolicyConsistencyDiagnostic>? policyConsistencyFindings = null,
+        IReadOnlyCollection<ArchitectureCoverageSummary>? coverageSummaries = null);
+
+    string FormatViolationsForCiArtifacts(string contractName, string? contractId,
+        IReadOnlyCollection<ArchitectureViolation> violations);
+
+    string FormatCyclesForCiArtifacts(string contractName, string? contractId, IReadOnlyCollection<string> cycles);
+}
+
+public sealed class ArchitectureDiagnosticFormatter : IArchitectureDiagnosticFormatter
+{
+    public string FormatViolationsForHumans(IReadOnlyCollection<ArchitectureViolation> violations)
     {
         var diagnostics = violations.Select(ArchitectureDiagnosticMapper.FromViolation).ToArray();
         return string.Join(
@@ -16,13 +46,13 @@ public static class ArchitectureDiagnosticFormatter
                 .Select(FormatForHumans));
     }
 
-    public static string FormatCyclesForHumans(IReadOnlyCollection<string> cycles)
+    public string FormatCyclesForHumans(IReadOnlyCollection<string> cycles)
     {
         var diagnostics = cycles.Select(cycle => ArchitectureDiagnosticMapper.FromCycle(cycle, contractName: string.Empty, contractId: null));
         return string.Join(Environment.NewLine, diagnostics.OrderBy(d => d.Path).Select(d => $"- {d.Path}"));
     }
 
-    public static string FormatUnmatchedForHumans(IReadOnlyCollection<ArchitectureUnmatchedIgnoredViolation> unmatched)
+    public string FormatUnmatchedForHumans(IReadOnlyCollection<ArchitectureUnmatchedIgnoredViolation> unmatched)
     {
         if (unmatched.Count == 0)
         {
@@ -47,7 +77,7 @@ public static class ArchitectureDiagnosticFormatter
                     }));
     }
 
-    public static string FormatPolicyConsistencyForHumans(
+    public string FormatPolicyConsistencyForHumans(
         IReadOnlyCollection<PolicyConsistencyDiagnostic> findings)
     {
         if (findings.Count == 0)
@@ -70,7 +100,7 @@ public static class ArchitectureDiagnosticFormatter
                     }));
     }
 
-    public static string FormatCoverageForHumans(IReadOnlyCollection<ArchitectureViolation> findings)
+    public string FormatCoverageForHumans(IReadOnlyCollection<ArchitectureViolation> findings)
     {
         if (findings.Count == 0)
         {
@@ -81,7 +111,7 @@ public static class ArchitectureDiagnosticFormatter
             + FormatViolationsForHumans(findings);
     }
 
-    public static string FormatCoverageSummaryForHumans(IReadOnlyCollection<ArchitectureCoverageSummary> summaries)
+    public string FormatCoverageSummaryForHumans(IReadOnlyCollection<ArchitectureCoverageSummary> summaries)
     {
         if (summaries.Count == 0)
         {
@@ -126,7 +156,7 @@ public static class ArchitectureDiagnosticFormatter
             new[] { header }.Concat(excludedLines).Concat(uncoveredLines).Concat(staleLines).Concat(unknownLines));
     }
 
-    public static string FormatResultForCiArtifacts(
+    public string FormatResultForCiArtifacts(
         string mode,
         bool passed,
         IReadOnlyCollection<ArchitectureViolation> violations,
@@ -180,7 +210,7 @@ public static class ArchitectureDiagnosticFormatter
         return JsonSerializer.Serialize(payload);
     }
 
-    public static string FormatViolationsForCiArtifacts(string contractName, string? contractId,
+    public string FormatViolationsForCiArtifacts(string contractName, string? contractId,
         IReadOnlyCollection<ArchitectureViolation> violations)
     {
         var payload = new
@@ -196,7 +226,7 @@ public static class ArchitectureDiagnosticFormatter
         return JsonSerializer.Serialize(payload);
     }
 
-    public static string FormatCyclesForCiArtifacts(string contractName, string? contractId, IReadOnlyCollection<string> cycles)
+    public string FormatCyclesForCiArtifacts(string contractName, string? contractId, IReadOnlyCollection<string> cycles)
     {
         var diagnostics = cycles.Select(cycle => ArchitectureDiagnosticMapper.FromCycle(cycle, contractName, contractId));
 

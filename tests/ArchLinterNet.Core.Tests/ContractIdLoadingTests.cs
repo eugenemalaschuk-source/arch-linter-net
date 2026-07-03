@@ -58,7 +58,7 @@ contracts:
       forbidden: [runtime]
 "));
 
-        ArchitectureContractDocument document = ArchitectureContractLoader.LoadFromPath(path);
+        ArchitectureContractDocument document = new ArchitecturePolicyDocumentLoader().Load(path);
 
         Assert.That(document.Contracts.Strict, Has.Count.EqualTo(1));
         Assert.That(document.Contracts.Strict[0].Id, Is.EqualTo("my-rule"));
@@ -74,7 +74,7 @@ contracts:
       forbidden: [runtime]
 "));
 
-        ArchitectureContractDocument document = ArchitectureContractLoader.LoadFromPath(path);
+        ArchitectureContractDocument document = new ArchitecturePolicyDocumentLoader().Load(path);
 
         Assert.That(document.Contracts.Strict[0].Id, Is.Not.Null);
         Assert.That(document.Contracts.Strict[0].Id, Is.EqualTo("my-rule"));
@@ -90,7 +90,7 @@ contracts:
       forbidden: [runtime]
 "));
 
-        ArchitectureContractDocument document = ArchitectureContractLoader.LoadFromPath(path);
+        ArchitectureContractDocument document = new ArchitecturePolicyDocumentLoader().Load(path);
 
         Assert.That(document.Contracts.Strict[0].Id, Is.EqualTo("map-core-must-not-depend-on-runtime"));
     }
@@ -124,7 +124,7 @@ contracts:
 "));
 
         Assert.Throws<InvalidOperationException>(() =>
-            ArchitectureContractLoader.LoadFromPath(path));
+            new ArchitecturePolicyDocumentLoader().Load(path));
     }
 
     [Test]
@@ -142,7 +142,7 @@ contracts:
       layers: [core, runtime]
 "));
 
-        ArchitectureContractDocument document = ArchitectureContractLoader.LoadFromPath(path);
+        ArchitectureContractDocument document = new ArchitecturePolicyDocumentLoader().Load(path);
 
         Assert.That(document.Contracts.Strict[0].Id, Is.EqualTo("boundary"));
         Assert.That(document.Contracts.StrictCycles[0].Id, Is.EqualTo("boundary"));
@@ -164,7 +164,7 @@ contracts:
       forbidden: [core]
 "));
 
-        ArchitectureContractDocument document = ArchitectureContractLoader.LoadFromPath(path);
+        ArchitectureContractDocument document = new ArchitecturePolicyDocumentLoader().Load(path);
 
         Assert.That(document.Contracts.Strict[0].Id, Is.EqualTo("common-rule"));
         Assert.That(document.Contracts.Audit[0].Id, Is.EqualTo("common-rule"));
@@ -186,14 +186,14 @@ contracts:
 "));
 
         Assert.Throws<InvalidOperationException>(() =>
-            ArchitectureContractLoader.LoadFromPath(path));
+            new ArchitecturePolicyDocumentLoader().Load(path));
     }
 
     [Test]
     public void NormalizeToContractId_HandlesSpecialCharacters()
     {
-        Assert.That(ArchitectureContractLoader.NormalizeToContractId("Assembly A -> Assembly B"), Is.EqualTo("assembly-a-to-assembly-b"));
-        Assert.That(ArchitectureContractLoader.NormalizeToContractId("  Multiple   Spaces  "), Is.EqualTo("multiple-spaces"));
-        Assert.That(ArchitectureContractLoader.NormalizeToContractId("Special!@#Characters"), Is.EqualTo("special-characters"));
+        Assert.That(ArchitecturePolicyDocumentLoader.NormalizeToContractId("Assembly A -> Assembly B"), Is.EqualTo("assembly-a-to-assembly-b"));
+        Assert.That(ArchitecturePolicyDocumentLoader.NormalizeToContractId("  Multiple   Spaces  "), Is.EqualTo("multiple-spaces"));
+        Assert.That(ArchitecturePolicyDocumentLoader.NormalizeToContractId("Special!@#Characters"), Is.EqualTo("special-characters"));
     }
 }

@@ -7,7 +7,8 @@ namespace ArchLinterNet.Core.Validation;
 public sealed class ArchitectureBaselineApplicationService(
     IArchitectureRunnerSetupService runnerSetupService,
     ArchitectureContractHandlerRegistry handlerRegistry,
-    IArchitectureContractExecutor contractExecutor)
+    IArchitectureContractExecutor contractExecutor,
+    IArchitectureBaselineGenerator baselineGenerator)
     : IArchitectureBaselineApplicationService
 {
     public BaselineGenerationOutcome Generate(BaselineGenerationRequest request)
@@ -44,10 +45,10 @@ public sealed class ArchitectureBaselineApplicationService(
             contractExecutor.Execute(runner.Session, "audit", handlerRegistry, includeAsmdefContracts: false);
         }
 
-        ArchitectureBaselineDocument baseline = ArchitectureBaselineGenerator.Generate(
+        ArchitectureBaselineDocument baseline = baselineGenerator.Generate(
             document, runner.BaselineCandidates, request.Reason);
 
-        string yaml = ArchitectureBaselineGenerator.Serialize(baseline);
+        string yaml = baselineGenerator.Serialize(baseline);
 
         return new BaselineGenerationOutcome(
             Succeeded: true,

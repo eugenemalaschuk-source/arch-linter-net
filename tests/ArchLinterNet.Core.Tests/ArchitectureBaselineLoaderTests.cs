@@ -1,4 +1,5 @@
 using ArchLinterNet.Core.Contracts;
+using ArchLinterNet.Core.IO;
 using NUnit.Framework;
 
 namespace ArchLinterNet.Core.Tests;
@@ -6,6 +7,8 @@ namespace ArchLinterNet.Core.Tests;
 [TestFixture]
 public sealed class ArchitectureBaselineLoaderTests
 {
+    private readonly ArchitectureBaselineLoadingService _service = new(ArchitectureFileSystem.Real);
+
     private string _tempDir = null!;
 
     [SetUp]
@@ -26,7 +29,8 @@ public sealed class ArchitectureBaselineLoaderTests
     public void LoadFromPath_MissingFile_ThrowsFileNotFound()
     {
         string missingPath = Path.Combine(_tempDir, "nonexistent.yml");
-        Assert.Throws<FileNotFoundException>(() => ArchitectureBaselineLoader.LoadFromPath(missingPath));
+        Assert.Throws<FileNotFoundException>(() =>
+            _service.LoadFromPath(missingPath));
     }
 
     [Test]
@@ -38,7 +42,7 @@ baseline:
   strict: []
 ");
         var ex = Assert.Throws<InvalidOperationException>(() =>
-            ArchitectureBaselineLoader.LoadFromPath(Path.Combine(_tempDir, "baseline.yml")));
+            _service.LoadFromPath(Path.Combine(_tempDir, "baseline.yml")));
         Assert.That(ex!.Message, Does.Contain("version"));
     }
 
@@ -56,7 +60,7 @@ baseline:
           reason: test
 ");
         var ex = Assert.Throws<InvalidOperationException>(() =>
-            ArchitectureBaselineLoader.LoadFromPath(Path.Combine(_tempDir, "baseline.yml")));
+            _service.LoadFromPath(Path.Combine(_tempDir, "baseline.yml")));
         Assert.That(ex!.Message, Does.Contain("id"));
     }
 
@@ -74,7 +78,7 @@ baseline:
           reason: test
 ");
         var ex = Assert.Throws<InvalidOperationException>(() =>
-            ArchitectureBaselineLoader.LoadFromPath(Path.Combine(_tempDir, "baseline.yml")));
+            _service.LoadFromPath(Path.Combine(_tempDir, "baseline.yml")));
         Assert.That(ex!.Message, Does.Contain("source_type"));
     }
 
@@ -92,7 +96,7 @@ baseline:
           reason: test
 ");
         var ex = Assert.Throws<InvalidOperationException>(() =>
-            ArchitectureBaselineLoader.LoadFromPath(Path.Combine(_tempDir, "baseline.yml")));
+            _service.LoadFromPath(Path.Combine(_tempDir, "baseline.yml")));
         Assert.That(ex!.Message, Does.Contain("forbidden_reference"));
     }
 }

@@ -1,8 +1,5 @@
-# YAML Contract Loading Specification
+## MODIFIED Requirements
 
-## Purpose
-Loads an architecture contract document from a YAML file path or repository root.
-## Requirements
 ### Requirement: Load architecture contract from YAML file path
 The system SHALL load and deserialize an `architecture/dependencies.arch.yml` file from a given file path into an `ArchitectureContractDocument` instance, via `IArchitecturePolicyDocumentLoader` (an instance service registered in `AddArchLinterNetCore()`) rather than a static `ArchitectureContractLoader` class.
 
@@ -68,4 +65,3 @@ After deserialization, the system SHALL compute fallback IDs for contracts witho
 #### Scenario: Duplicate ID detected
 - **WHEN** two contracts in the same group and type share an ID
 - **THEN** an `InvalidOperationException` is thrown with a diagnostic message
-
