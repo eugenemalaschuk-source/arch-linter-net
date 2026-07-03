@@ -4,7 +4,7 @@
 Resolves the assemblies named in a policy's target_assemblies list to loaded .NET Assembly instances via a multi-probe-path strategy.
 ## Requirements
 ### Requirement: Resolve target assemblies from YAML document
-The system SHALL resolve all assemblies listed in `analysis.target_assemblies` from the YAML document into `System.Reflection.Assembly` instances. When `analysis.target_assemblies` is empty, the system SHALL instead resolve assemblies from names contributed by project discovery (see `project-discovery` capability), if any were discovered.
+The system SHALL resolve all assemblies listed in `analysis.target_assemblies` from the YAML document into `System.Reflection.Assembly` instances. When `analysis.target_assemblies` is empty, the system SHALL instead resolve assemblies from names contributed by project discovery (see `project-discovery` capability), if any were discovered. This resolution logic SHALL be owned directly by `IArchitectureAssemblyResolutionService` (an instance service registered in `AddArchLinterNetCore()`), rather than forwarded to a static `ArchitectureAssemblyResolver` class.
 
 #### Scenario: All assemblies found
 - **WHEN** `target_assemblies` lists 3 assembly names and all are loadable
@@ -19,6 +19,10 @@ The system SHALL resolve all assemblies listed in `analysis.target_assemblies` f
 #### Scenario: Empty target_assemblies with discovered names
 - **WHEN** `target_assemblies` is empty and project discovery resolved 2 assembly names with existing build outputs
 - **THEN** the resolver treats those 2 discovered names exactly as if they had been listed in `target_assemblies`, probing for them using the existing probe-path strategy
+
+#### Scenario: Resolution service resolves without a static forwarding call
+- **WHEN** `IArchitectureAssemblyResolutionService` is resolved through `AddArchLinterNetCore()` and its resolution method is invoked
+- **THEN** the multi-probe-path resolution executes as an instance method with no reference to a static `ArchitectureAssemblyResolver` class
 
 ### Requirement: Multi-probe-path resolution strategy
 The system SHALL probe for assemblies in this order: (1) already-loaded assemblies in `AppDomain.CurrentDomain`, (2) `Assembly.Load`, (3) env var `ARCHITECTURE_ASSEMBLY_SEARCH_PATHS`, (4) YAML `analysis.assembly_search_paths`, (5) search paths contributed by project discovery, (6) `AppContext.BaseDirectory`, (7) repository root, (8) `<repo>/artifacts/bin`, (9) `<repo>/bin`.

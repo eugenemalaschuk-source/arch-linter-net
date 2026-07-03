@@ -95,7 +95,7 @@ The system SHALL compare a selected build output's last-write time against the p
 - **THEN** discovery selects that output normally and produces no staleness diagnostic
 
 ### Requirement: Discovery results feed assembly resolution and source roots
-The system SHALL use discovery-derived assembly names and search paths only when `analysis.target_assemblies` is empty, and discovery-derived source roots only when `analysis.source_roots` is empty.
+The system SHALL use discovery-derived assembly names and search paths only when `analysis.target_assemblies` is empty, and discovery-derived source roots only when `analysis.source_roots` is empty. Discovery logic SHALL be owned directly by `IArchitectureProjectDiscoveryService` (an instance service registered in `AddArchLinterNetCore()`), rather than forwarded to a static `ArchitectureProjectDiscovery` class.
 
 #### Scenario: Explicit target_assemblies takes precedence
 - **WHEN** `analysis.target_assemblies` is non-empty and `analysis.solution` is also set
@@ -112,4 +112,8 @@ The system SHALL use discovery-derived assembly names and search paths only when
 #### Scenario: No discovery configured falls back to defaults
 - **WHEN** none of `analysis.solution`, `analysis.projects`, or `analysis.target_assemblies` are set
 - **THEN** the system behaves exactly as before this change (assembly resolution still throws `InvalidOperationException` for empty `target_assemblies`, and source root scanning still defaults to `["src", "tests"]`)
+
+#### Scenario: Discovery service resolves without a static forwarding call
+- **WHEN** `IArchitectureProjectDiscoveryService` is resolved through `AddArchLinterNetCore()` and its resolution method is invoked
+- **THEN** solution parsing and project-file parsing execute via instance collaborators owned by the service, with no reference to a static `ArchitectureProjectDiscovery`, `ArchitectureSolutionParser`, or `ArchitectureProjectFileParser` class
 
