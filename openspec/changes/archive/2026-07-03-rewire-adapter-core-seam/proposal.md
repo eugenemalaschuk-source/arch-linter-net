@@ -10,8 +10,13 @@ CLI, the public `ArchitectureValidator` API, and the Testing adapter call the `A
 - `ArchitectureEngine` gains `ValidateAsmdef(AsmdefValidationRequest)`, resolving `IAsmdefValidationService`.
 - `ArchLinterNet.Unity.AsmdefValidator` becomes a thin facade over `ArchitectureEngine.ValidateAsmdef(...)`; it no longer references `ArchLinterNet.Core.Contracts`, `ArchLinterNet.Core.Resolution`, or `ArchLinterNet.Core.Scanning` directly.
 - `IArchitectureAsmdefScanner`/`ArchitectureAsmdefScanner` become `public` (from `internal`) so the new public `AsmdefValidationService` constructor can take it as a dependency.
-- Self-architecture policy (`architecture/dependencies.arch.yml`): add a `core_asmdef` layer, a `unity-must-use-asmdef-application-seam` strict contract mirroring the existing CLI seam rule, and a matching DI-container-forbidden rule for `core_asmdef`.
+- Self-architecture policy (`architecture/dependencies.arch.yml`): add a `core_asmdef` layer, a `unity-must-use-asmdef-application-seam` strict contract mirroring the existing CLI seam rule, a matching DI-container-forbidden rule for `core_asmdef`, and a `testing-must-use-validation-application-seam` strict contract mirroring the CLI seam rule for `ArchLinterNet.Testing`.
 - The pre-existing `ArchitectureValidationService`/`ArchitectureBaselineService` static facades are unchanged and keep working for any external callers; adapters simply stop being the ones who call them.
+- Added focused tests proving the new seam: `AsmdefValidationEngineTests` (Core.Tests) covers engine resolution/delegation of `ValidateAsmdef` and confirms `audit_asmdef` contracts are never evaluated; `AsmdefValidatorDelegationTests` (Unity.Tests) confirms the Unity-facing adapter still surfaces `strict_asmdef` violations end-to-end and ignores `audit_asmdef`.
+
+## Background
+
+This change supersedes PR #175 (closed as duplicate). #176 is the canonical implementation: it keeps the narrow asmdef seam under `ArchLinterNet.Core.Asmdef` (not folded back into `ArchLinterNet.Core.Validation`), rewires adapters through `ArchitectureEngine` with no adapter dependency on `IServiceProvider`/`IServiceCollection`/`Microsoft.Extensions.DependencyInjection`, and was validated locally (`make fmt`, `make acceptance`, `openspec validate --all`, self-policy strict/audit). The focused asmdef engine/delegation tests and the Testing-adapter seam guardrail were ported from #175's intent and adapted to this change's `Core.Asmdef` architecture.
 
 ## Capabilities
 
@@ -30,3 +35,4 @@ CLI, the public `ArchitectureValidator` API, and the Testing adapter call the `A
 - `src/ArchLinterNet.Cli/Program.cs`, `src/ArchLinterNet.Core/ArchitectureValidator.cs`, `src/ArchLinterNet.Testing/ArchitectureValidationBuilder.cs`, `src/ArchLinterNet.Unity/AsmdefValidator.cs`: switch call sites to the composed engine.
 - `architecture/dependencies.arch.yml`: new layer and strict/strict_external contracts.
 - `tests/ArchLinterNet.Core.Tests/LayerTemplateContractTests.cs`: exhaustive layer-template fixture updated for the new `ArchLinterNet.Core.Asmdef` sub-namespace.
+- `tests/ArchLinterNet.Core.Tests/AsmdefValidationEngineTests.cs` (new), `tests/ArchLinterNet.Unity.Tests/AsmdefValidatorDelegationTests.cs` (new): focused tests for the composed asmdef seam and Unity delegation.

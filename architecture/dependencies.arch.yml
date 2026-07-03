@@ -72,6 +72,11 @@ contracts:
       forbidden: [core_execution, core_contracts, core_resolution, core_scanning]
       reason: CLI must call the Core.Validation application seam instead of constructing contract runners or loading policies directly.
 
+    - name: testing-must-use-validation-application-seam
+      source: testing
+      forbidden: [core_execution, core_contracts, core_resolution, core_scanning]
+      reason: Testing adapter must call the composed validation seam instead of constructing contract runners, loading policies, resolving roots, or scanning directly.
+
     - name: unity-must-use-asmdef-application-seam
       source: unity
       forbidden: [core_execution, core_contracts, core_resolution, core_scanning]
