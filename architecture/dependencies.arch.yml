@@ -53,74 +53,88 @@ analysis:
 contracts:
   strict:
     - name: cli-must-not-depend-on-testing
+      id: cli-must-not-depend-on-testing
       source: cli
       forbidden: [testing, unity]
       reason: CLI should only depend on Core.
 
     - name: testing-must-not-depend-on-cli
+      id: testing-must-not-depend-on-cli
       source: testing
       forbidden: [cli, unity]
       reason: Testing adapter should only depend on Core.
 
     - name: unity-must-not-depend-on-cli-or-testing
+      id: unity-must-not-depend-on-cli-or-testing
       source: unity
       forbidden: [cli, testing]
       reason: Unity package should only depend on Core.
 
     - name: cli-must-use-validation-application-seam
+      id: cli-must-use-validation-application-seam
       source: cli
       forbidden: [core_execution, core_contracts, core_resolution, core_scanning]
       reason: CLI must call the Core.Validation application seam instead of constructing contract runners or loading policies directly.
 
     - name: testing-must-use-validation-application-seam
+      id: testing-must-use-validation-application-seam
       source: testing
       forbidden: [core_execution, core_contracts, core_resolution, core_scanning]
       reason: Testing adapter must call the composed validation seam instead of constructing contract runners, loading policies, resolving roots, or scanning directly.
 
     - name: unity-must-use-asmdef-application-seam
+      id: unity-must-use-asmdef-application-seam
       source: unity
       forbidden: [core_execution, core_contracts, core_resolution, core_scanning]
       reason: Unity must call the narrow Core.Asmdef application seam instead of loading contracts, resolving the repository root, or invoking the asmdef scanner directly.
 
-    - name: core-execution-must-not-depend-on-cli-or-testing
+    - name: core-execution-must-not-depend-on-hosts
+      id: core-execution-must-not-depend-on-hosts
       source: core_execution
       forbidden: [cli, testing, unity]
-      reason: Contract execution and handler internals must stay usable from any host and must not couple back to a specific CLI or test adapter.
+      reason: Contract execution and handler internals must stay usable from any host and must not couple back to a specific CLI, testing, or Unity adapter.
 
     - name: core-reporting-stays-a-diagnostics-leaf
+      id: core-reporting-stays-a-diagnostics-leaf
       source: core_reporting
       forbidden: [cli, testing, unity, core_execution, core_validation, core_resolution, core_scanning, core_contracts]
       reason: Diagnostics formatting is a leaf consumed by higher layers and must not depend back on business logic.
 
     - name: core-model-stays-independent
+      id: core-model-stays-independent
       source: core_model
       forbidden: [cli, testing, unity, core_execution, core_validation, core_resolution, core_scanning, core_contracts, core_reporting]
       reason: Model types are the most fundamental layer and must not depend on anything else.
 
     - name: core-io-stays-independent
+      id: core-io-stays-independent
       source: core_io
       forbidden: [cli, testing, unity, core_execution, core_validation, core_resolution, core_scanning, core_contracts, core_reporting, core_discovery, core_composition]
       reason: Infrastructure seams (file system, environment, assembly loading, Roslyn compilation) are a fundamental replaceable boundary and must not depend on the business logic layers that consume them.
 
     - name: core-resolution-must-not-depend-on-execution-or-validation
+      id: core-resolution-must-not-depend-on-execution-or-validation
       source: core_resolution
       forbidden: [core_execution, core_validation, cli, testing, unity]
       reason: Repository and assembly resolution must not depend upward on contract execution or the application seam.
 
     - name: core-scanning-must-not-depend-on-execution-or-validation
+      id: core-scanning-must-not-depend-on-execution-or-validation
       source: core_scanning
       forbidden: [core_execution, core_validation, cli, testing, unity]
       reason: Scanning internals must not depend upward on contract execution or the application seam.
 
     - name: core-discovery-must-not-depend-on-execution-or-validation
+      id: core-discovery-must-not-depend-on-execution-or-validation
       source: core_discovery
       forbidden: [core_execution, core_validation, cli, testing, unity]
       reason: Project/solution discovery internals must not depend upward on contract execution or the application seam.
 
     - name: core-validation-must-not-bypass-application-internals
+      id: core-validation-must-not-bypass-application-internals
       source: core_validation
-      forbidden: [core_scanning, core_discovery, core_resolution]
-      reason: The application seam must reach scanning, discovery, and resolution only through Core.Execution (or Core.Asmdef for Unity), not by depending on their internals directly.
+      forbidden: [core_scanning, core_discovery, core_resolution, core_io]
+      reason: The application seam must reach scanning, discovery, resolution, and infrastructure IO only through Core.Execution (or Core.Asmdef for Unity), not by depending on their internals directly.
 
   strict_external:
     - name: core-model-must-not-depend-on-di-container
@@ -190,6 +204,7 @@ contracts:
 
   strict_layers:
     - name: core-layering
+      id: core-layering
       layers:
         - cli
         - testing
@@ -198,6 +213,7 @@ contracts:
       reason: Dependencies must point toward Core.
 
     - name: core-application-seam-layering
+      id: core-application-seam-layering
       layers:
         - cli
         - core_validation
@@ -207,6 +223,7 @@ contracts:
 
   strict_cycles:
     - name: package-cycles
+      id: package-cycles
       layers:
         - core
         - cli
@@ -216,16 +233,19 @@ contracts:
 
   strict_protected:
     - name: core-scanning-internals-are-protected
+      id: core-scanning-internals-are-protected
       protected: [core_scanning]
       allowed_importers: [core]
       reason: Scanning internals must not be referenced outside Core.
 
     - name: core-discovery-internals-are-protected
+      id: core-discovery-internals-are-protected
       protected: [core_discovery]
       allowed_importers: [core]
       reason: Project/solution discovery internals must not be referenced outside Core.
 
     - name: core-resolution-internals-are-protected
+      id: core-resolution-internals-are-protected
       protected: [core_resolution]
       allowed_importers: [core]
       reason: Repository and assembly resolution internals must not be referenced outside Core.
@@ -250,10 +270,13 @@ contracts:
       id: self-policy-rule-input-coverage
       scope: rule_input
       contract_ids:
+        - cli-must-not-depend-on-testing
+        - testing-must-not-depend-on-cli
+        - unity-must-not-depend-on-cli-or-testing
         - cli-must-use-validation-application-seam
         - testing-must-use-validation-application-seam
         - unity-must-use-asmdef-application-seam
-        - core-execution-must-not-depend-on-cli-or-testing
+        - core-execution-must-not-depend-on-hosts
         - core-reporting-stays-a-diagnostics-leaf
         - core-model-stays-independent
         - core-io-stays-independent
@@ -264,4 +287,7 @@ contracts:
         - core-scanning-internals-are-protected
         - core-discovery-internals-are-protected
         - core-resolution-internals-are-protected
-      reason: The recovered Core architecture's seam, leaf-isolation, and protected-surface rules must keep matching real code so a renamed or deleted layer cannot silently stop being enforced.
+        - core-layering
+        - core-application-seam-layering
+        - package-cycles
+      reason: The recovered Core architecture's base package rules, seam, leaf-isolation, and protected-surface rules must keep matching real code so a renamed or deleted layer cannot silently stop being enforced.
