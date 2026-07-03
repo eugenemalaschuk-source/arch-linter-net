@@ -32,7 +32,7 @@ public sealed class ExternalDependencyContractTests
     {
         return new ArchitectureAnalysisContext(
             "/tmp",
-            new[] { typeof(ArchitectureContractLoader).Assembly },
+            new[] { typeof(ArchitecturePolicyDocumentLoader).Assembly },
             Array.Empty<string>(),
             Array.Empty<string>());
     }
@@ -70,7 +70,7 @@ contracts:
       forbidden: [unity_runtime]
 ");
 
-        ArchitectureContractDocument document = ArchitectureContractLoader.LoadFromPath(contractPath);
+        ArchitectureContractDocument document = new ArchitecturePolicyDocumentLoader().Load(contractPath);
 
         Assert.That(document.ExternalDependencies.ContainsKey("unity_runtime"), Is.True);
         Assert.That(document.ExternalDependencies["unity_runtime"].NamespacePrefixes,

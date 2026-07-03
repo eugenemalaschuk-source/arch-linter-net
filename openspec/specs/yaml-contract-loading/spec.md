@@ -2,11 +2,9 @@
 
 ## Purpose
 Loads an architecture contract document from a YAML file path or repository root.
-
 ## Requirements
-
 ### Requirement: Load architecture contract from YAML file path
-The system SHALL load and deserialize an `architecture/dependencies.arch.yml` file from a given file path into an `ArchitectureContractDocument` instance.
+The system SHALL load and deserialize an `architecture/dependencies.arch.yml` file from a given file path into an `ArchitectureContractDocument` instance, via `IArchitecturePolicyDocumentLoader` (an instance service registered in `AddArchLinterNetCore()`) rather than a static `ArchitectureContractLoader` class.
 
 #### Scenario: Valid YAML file
 - **WHEN** a valid `dependencies.arch.yml` file exists at the specified path
@@ -25,14 +23,14 @@ The system SHALL resolve `architecture/dependencies.arch.yml` relative to a repo
 
 #### Scenario: Repository root with contract file
 - **WHEN** a directory contains `architecture/dependencies.arch.yml`
-- **THEN** `LoadFromRepositoryRoot(repositoryRoot)` returns the deserialized document
+- **THEN** `IArchitecturePolicyDocumentLoader.LoadFromRepositoryRoot(repositoryRoot)` returns the deserialized document
 
 ### Requirement: Auto-discover repository root
-The system SHALL auto-discover the repository root by walking parent directories from `AppContext.BaseDirectory` until `architecture/dependencies.arch.yml` is found.
+The system SHALL auto-discover the repository root by walking parent directories from `AppContext.BaseDirectory` until `architecture/dependencies.arch.yml` is found, via `IArchitectureRepositoryRootResolver` (an instance service registered in `AddArchLinterNetCore()`) rather than a static `ArchitectureRepositoryRootLocator` class, and SHALL NOT cache the resolved root in a process-wide static field.
 
 #### Scenario: Contract file found in ancestor directory
 - **WHEN** `architecture/dependencies.arch.yml` exists in a parent of `AppContext.BaseDirectory`
-- **THEN** `ArchitectureRepositoryRootLocator.Resolve()` returns that ancestor directory
+- **THEN** `IArchitectureRepositoryRootResolver.Resolve()` returns that ancestor directory
 
 #### Scenario: Contract file not found
 - **WHEN** no ancestor directory contains `architecture/dependencies.arch.yml`
@@ -48,7 +46,6 @@ The deserialized document SHALL contain all 14 contract groups: `strict`, `audit
 #### Scenario: Minimal YAML with empty contract groups
 - **WHEN** a YAML file defines only `version`, `name`, `layers`, `analysis`, and empty contract lists
 - **THEN** the deserialized document has empty lists for all contract groups
-
 
 ### Requirement: YAML deserialization accepts optional id field
 The deserializer SHALL accept an optional `id` field on all contract types without throwing for unmatched properties.
@@ -71,3 +68,4 @@ After deserialization, the system SHALL compute fallback IDs for contracts witho
 #### Scenario: Duplicate ID detected
 - **WHEN** two contracts in the same group and type share an ID
 - **THEN** an `InvalidOperationException` is thrown with a diagnostic message
+

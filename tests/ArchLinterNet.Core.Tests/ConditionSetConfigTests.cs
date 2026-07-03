@@ -76,7 +76,7 @@ public class RuntimeClass
 
         var executionContext = new ArchitectureContractExecutionContext(
             "test-runtime", null, Array.Empty<ArchitectureIgnoredViolation>(), false, null, null);
-        IReadOnlyList<ArchitectureViolation> violations = ArchitectureSourceScanner
+        IReadOnlyList<ArchitectureViolation> violations = new ArchitectureSourceScanner()
             .FindMethodBodyViolations(
                 _tempDir, "TestNamespace",
                 new[] { "System.Console.WriteLine" },
@@ -108,7 +108,7 @@ public class DebugClass
 
         var executionContext = new ArchitectureContractExecutionContext(
             "test-debug", null, Array.Empty<ArchitectureIgnoredViolation>(), false, null, null);
-        IReadOnlyList<ArchitectureViolation> violations = ArchitectureSourceScanner
+        IReadOnlyList<ArchitectureViolation> violations = new ArchitectureSourceScanner()
             .FindMethodBodyViolations(
                 _tempDir, "TestNamespace",
                 new[] { "System.Console.WriteLine" },
@@ -140,7 +140,7 @@ public class NonDebugClass
 
         var executionContext = new ArchitectureContractExecutionContext(
             "test-no-debug", null, Array.Empty<ArchitectureIgnoredViolation>(), false, null, null);
-        IReadOnlyList<ArchitectureViolation> violations = ArchitectureSourceScanner
+        IReadOnlyList<ArchitectureViolation> violations = new ArchitectureSourceScanner()
             .FindMethodBodyViolations(
                 _tempDir, "TestNamespace",
                 new[] { "System.Console.WriteLine" },
@@ -262,7 +262,7 @@ public class DebugClass
 }
 ");
 
-        IReadOnlyList<ArchitectureViolation> violationsWithDebug = ArchitectureSourceScanner
+        IReadOnlyList<ArchitectureViolation> violationsWithDebug = new ArchitectureSourceScanner()
             .FindMethodBodyViolations(
                 _tempDir, "TestNamespace",
                 new[] { "System.Diagnostics.Debug.WriteLine" },
@@ -275,7 +275,7 @@ public class DebugClass
         Assert.That(violationsWithDebug, Is.Not.Empty,
             "When DEBUG is defined, #if DEBUG blocks should be visible");
 
-        IReadOnlyList<ArchitectureViolation> violationsWithoutDebug = ArchitectureSourceScanner
+        IReadOnlyList<ArchitectureViolation> violationsWithoutDebug = new ArchitectureSourceScanner()
             .FindMethodBodyViolations(
                 _tempDir, "TestNamespace",
                 new[] { "System.Diagnostics.Debug.WriteLine" },

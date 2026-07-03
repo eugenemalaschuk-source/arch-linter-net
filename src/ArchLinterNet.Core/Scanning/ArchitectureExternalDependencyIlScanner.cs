@@ -6,11 +6,20 @@ using ArchLinterNet.Core.Resolution;
 
 namespace ArchLinterNet.Core.Scanning;
 
-internal static class ArchitectureExternalDependencyIlScanner
+internal interface IArchitectureExternalDependencyIlScanner
+{
+    IEnumerable<ArchitectureViolation> FindMethodBodyViolations(
+        Type[] sourceTypes,
+        string externalGroupName,
+        ArchitectureExternalDependencyGroup externalGroup,
+        ArchitectureContractExecutionContext executionContext);
+}
+
+internal sealed class ArchitectureExternalDependencyIlScanner : IArchitectureExternalDependencyIlScanner
 {
     private static readonly Dictionary<ushort, OpCode> _opCodes = BuildOpCodeMap();
 
-    public static IEnumerable<ArchitectureViolation> FindMethodBodyViolations(
+    public IEnumerable<ArchitectureViolation> FindMethodBodyViolations(
         Type[] sourceTypes,
         string externalGroupName,
         ArchitectureExternalDependencyGroup externalGroup,

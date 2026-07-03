@@ -8,6 +8,8 @@ namespace ArchLinterNet.Core.Tests;
 [TestFixture]
 public sealed class ArchitectureDiagnosticFormatterTests
 {
+    private static readonly ArchitectureDiagnosticFormatter _formatter = new();
+
     [Test]
     public void FormatViolationsForHumans_DependencyDiagnostic_IncludesLayerContext()
     {
@@ -21,7 +23,7 @@ public sealed class ArchitectureDiagnosticFormatterTests
             }
         };
 
-        string output = ArchitectureDiagnosticFormatter.FormatViolationsForHumans(violations);
+        string output = _formatter.FormatViolationsForHumans(violations);
 
         Assert.That(output, Does.Contain("source_layer: Web"));
         Assert.That(output, Does.Contain("target_layer: Core"));
@@ -39,7 +41,7 @@ public sealed class ArchitectureDiagnosticFormatterTests
             }
         };
 
-        string output = ArchitectureDiagnosticFormatter.FormatViolationsForHumans(violations);
+        string output = _formatter.FormatViolationsForHumans(violations);
 
         Assert.That(output, Does.Contain("via: Source.Type -> Mid -> Forbidden.Namespace"));
     }
@@ -55,7 +57,7 @@ public sealed class ArchitectureDiagnosticFormatterTests
             }
         };
 
-        string output = ArchitectureDiagnosticFormatter.FormatViolationsForHumans(violations);
+        string output = _formatter.FormatViolationsForHumans(violations);
 
         Assert.That(output, Does.Contain("matched Forbidden.Namespace.Internal"));
     }
@@ -72,7 +74,7 @@ public sealed class ArchitectureDiagnosticFormatterTests
             }
         };
 
-        string json = ArchitectureDiagnosticFormatter.FormatResultForCiArtifacts(
+        string json = _formatter.FormatResultForCiArtifacts(
             "strict", false, violations, Array.Empty<string>());
 
         using var doc = JsonDocument.Parse(json);
@@ -95,7 +97,7 @@ public sealed class ArchitectureDiagnosticFormatterTests
             }
         };
 
-        string json = ArchitectureDiagnosticFormatter.FormatResultForCiArtifacts(
+        string json = _formatter.FormatResultForCiArtifacts(
             "strict", false, violations, Array.Empty<string>());
 
         using var doc = JsonDocument.Parse(json);
@@ -109,7 +111,7 @@ public sealed class ArchitectureDiagnosticFormatterTests
     {
         var cycles = new[] { "Z -> Y -> Z", "A -> B -> A" };
 
-        string output = ArchitectureDiagnosticFormatter.FormatCyclesForHumans(cycles);
+        string output = _formatter.FormatCyclesForHumans(cycles);
 
         Assert.That(output, Is.EqualTo("- A -> B -> A" + Environment.NewLine + "- Z -> Y -> Z"));
     }
@@ -119,7 +121,7 @@ public sealed class ArchitectureDiagnosticFormatterTests
     {
         var cycles = new[] { "A -> B -> A" };
 
-        string json = ArchitectureDiagnosticFormatter.FormatCyclesForCiArtifacts("cycle-contract", "cycle-check", cycles);
+        string json = _formatter.FormatCyclesForCiArtifacts("cycle-contract", "cycle-check", cycles);
 
         using var doc = JsonDocument.Parse(json);
         Assert.That(doc.RootElement.GetProperty("cycles")[0].GetString(), Is.EqualTo("A -> B -> A"));
@@ -129,7 +131,7 @@ public sealed class ArchitectureDiagnosticFormatterTests
     [Test]
     public void FormatUnmatchedForHumans_NoEntries_ReturnsEmptyString()
     {
-        string output = ArchitectureDiagnosticFormatter.FormatUnmatchedForHumans(
+        string output = _formatter.FormatUnmatchedForHumans(
             Array.Empty<ArchitectureUnmatchedIgnoredViolation>());
 
         Assert.That(output, Is.Empty);
@@ -143,7 +145,7 @@ public sealed class ArchitectureDiagnosticFormatterTests
             new("contract", "contract-id", 0, "Source.Type", "Forbidden.Ref", "stale ignore")
         };
 
-        string output = ArchitectureDiagnosticFormatter.FormatUnmatchedForHumans(unmatched);
+        string output = _formatter.FormatUnmatchedForHumans(unmatched);
 
         Assert.That(output, Does.Contain("source_type: Source.Type"));
         Assert.That(output, Does.Contain("forbidden_reference: Forbidden.Ref"));

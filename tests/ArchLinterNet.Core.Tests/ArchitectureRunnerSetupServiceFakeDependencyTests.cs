@@ -14,6 +14,12 @@ public sealed class ArchitectureRunnerSetupServiceFakeDependencyTests
     {
         public bool WasCalled { get; private set; }
 
+        public string Resolve()
+        {
+            WasCalled = true;
+            return "/fake/repository/root";
+        }
+
         public string ResolveFrom(string policyPath)
         {
             WasCalled = true;

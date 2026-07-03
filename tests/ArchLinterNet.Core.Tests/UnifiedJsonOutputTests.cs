@@ -10,10 +10,12 @@ namespace ArchLinterNet.Core.Tests;
 [TestFixture]
 public sealed class UnifiedJsonOutputTests
 {
+    private static readonly ArchitectureDiagnosticFormatter _formatter = new();
+
     [Test]
     public void FormatResultForCiArtifacts_Passed_ReturnsValidJsonWithPassedTrue()
     {
-        string json = ArchitectureDiagnosticFormatter.FormatResultForCiArtifacts(
+        string json = _formatter.FormatResultForCiArtifacts(
             "strict", passed: true,
             Array.Empty<ArchitectureViolation>(), Array.Empty<string>());
 
@@ -33,7 +35,7 @@ public sealed class UnifiedJsonOutputTests
         };
         var cycles = new[] { "A -> B -> A" };
 
-        string json = ArchitectureDiagnosticFormatter.FormatResultForCiArtifacts(
+        string json = _formatter.FormatResultForCiArtifacts(
             "audit", passed: false, violations, cycles);
 
         using var doc = JsonDocument.Parse(json);
@@ -52,7 +54,7 @@ public sealed class UnifiedJsonOutputTests
         };
         var cycles = new[] { "X -> Y -> X" };
 
-        string json = ArchitectureDiagnosticFormatter.FormatResultForCiArtifacts(
+        string json = _formatter.FormatResultForCiArtifacts(
             "strict", false, violations, cycles);
 
         Assert.That(json.StartsWith("{"), Is.True);
@@ -71,7 +73,7 @@ public sealed class UnifiedJsonOutputTests
             new("test-contract", "my-rule", "MyApp.Web.Foo", "MyApp.Core", new[] { "ref1" })
         };
 
-        string json = ArchitectureDiagnosticFormatter.FormatResultForCiArtifacts(
+        string json = _formatter.FormatResultForCiArtifacts(
             "strict", false, violations, Array.Empty<string>());
 
         using var doc = JsonDocument.Parse(json);
@@ -88,7 +90,7 @@ public sealed class UnifiedJsonOutputTests
             new("test-contract", null, "src", "ns", new[] { "ref" })
         };
 
-        string json = ArchitectureDiagnosticFormatter.FormatResultForCiArtifacts(
+        string json = _formatter.FormatResultForCiArtifacts(
             "audit", true, violations, Array.Empty<string>());
 
         using var doc = JsonDocument.Parse(json);
@@ -104,7 +106,7 @@ public sealed class UnifiedJsonOutputTests
             new("My Contract", "my-rule", "MyApp.Web.Foo", "MyApp.Core", new[] { "ref1" })
         };
 
-        string output = ArchitectureDiagnosticFormatter.FormatViolationsForHumans(violations);
+        string output = _formatter.FormatViolationsForHumans(violations);
 
         Assert.That(output, Does.Contain("[my-rule]"));
         Assert.That(output, Does.Contain("[My Contract]"));
@@ -115,7 +117,7 @@ public sealed class UnifiedJsonOutputTests
     {
         var cycles = new[] { "[cycle-check] A -> B -> A", "[no-cycles] X -> Y -> X" };
 
-        string output = ArchitectureDiagnosticFormatter.FormatCyclesForHumans(cycles);
+        string output = _formatter.FormatCyclesForHumans(cycles);
 
         Assert.That(output, Does.Contain("[cycle-check]"));
         Assert.That(output, Does.Contain("[no-cycles]"));
@@ -130,7 +132,7 @@ public sealed class UnifiedJsonOutputTests
             new("My Contract", "my-contract", "src", "ns", new[] { "ref" })
         };
 
-        string output = ArchitectureDiagnosticFormatter.FormatViolationsForHumans(violations);
+        string output = _formatter.FormatViolationsForHumans(violations);
 
         Assert.That(output, Does.Contain("[my-contract]"));
     }
@@ -147,7 +149,7 @@ public sealed class UnifiedJsonOutputTests
             }
         };
 
-        string json = ArchitectureDiagnosticFormatter.FormatResultForCiArtifacts(
+        string json = _formatter.FormatResultForCiArtifacts(
             "strict", false, violations, Array.Empty<string>());
 
         using var doc = JsonDocument.Parse(json);
@@ -167,7 +169,7 @@ public sealed class UnifiedJsonOutputTests
             }
         };
 
-        string output = ArchitectureDiagnosticFormatter.FormatViolationsForHumans(violations);
+        string output = _formatter.FormatViolationsForHumans(violations);
 
         Assert.That(output, Does.Contain("external_group: unity_runtime"));
         Assert.That(output, Does.Contain("UnityEngine.Vector3"));

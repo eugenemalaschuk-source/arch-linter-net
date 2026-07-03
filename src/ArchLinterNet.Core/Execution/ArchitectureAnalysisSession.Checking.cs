@@ -377,13 +377,13 @@ public sealed partial class ArchitectureAnalysisSession
 
         ArchitectureContractExecutionContext executionContext = CreateExecutionContext(contract, contract.IgnoredViolations);
 
-        IReadOnlyList<ArchitectureViolation> roslynViolations = ArchitectureSourceScanner
+        IReadOnlyList<ArchitectureViolation> roslynViolations = new ArchitectureSourceScanner()
             .FindMethodBodyViolations(Context.RepositoryRoot, sourceLayer.Namespace,
                 contract.ForbiddenCalls, executionContext, sourceRoots: sourceRoots,
                 sourceLayer: sourceLayer, preprocessorSymbols: PreprocessorSymbols)
             .ToList();
 
-        IReadOnlyList<ArchitectureViolation> ilViolations = ArchitectureIlMethodBodyScanner.FindMethodBodyViolations(
+        IReadOnlyList<ArchitectureViolation> ilViolations = new ArchitectureIlMethodBodyScanner().FindMethodBodyViolations(
             Context.TargetAssemblies,
             sourceLayer.Namespace,
             contract.ForbiddenCalls,
@@ -403,7 +403,7 @@ public sealed partial class ArchitectureAnalysisSession
             return new List<ArchitectureViolation>();
         }
 
-        return ArchitectureAsmdefScanner.FindAsmdefViolations(contract.Name, contract.Id, Context.RepositoryRoot, contract)
+        return new ArchitectureAsmdefScanner().FindAsmdefViolations(contract.Name, contract.Id, Context.RepositoryRoot, contract)
             .ToList();
     }
 
@@ -583,7 +583,7 @@ public sealed partial class ArchitectureAnalysisSession
                 externalGroup,
                 executionContext));
 
-            violations.AddRange(ArchitectureExternalDependencyIlScanner.FindMethodBodyViolations(
+            violations.AddRange(new ArchitectureExternalDependencyIlScanner().FindMethodBodyViolations(
                 sourceTypes,
                 externalGroupName,
                 externalGroup,

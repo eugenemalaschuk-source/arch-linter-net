@@ -23,12 +23,12 @@ public sealed class ArchitectureAssemblyResolverFakeSeamTests
 
         var fakeAssemblyLoader = new FakeArchitectureAssemblyLoader(new[] { thisAssembly });
 
-        ResolutionResult result = ArchitectureAssemblyResolver.ResolveFromDocument(
-            document,
-            repositoryRoot: null,
-            fileSystem: new FakeArchitectureFileSystem(),
-            environment: new FakeArchitectureEnvironment(),
-            assemblyLoader: fakeAssemblyLoader);
+        var service = new ArchitectureAssemblyResolutionService(
+            new FakeArchitectureFileSystem(),
+            new FakeArchitectureEnvironment(),
+            fakeAssemblyLoader);
+
+        ResolutionResult result = service.ResolveFromDocument(document, repositoryRoot: null);
 
         Assert.That(result.ResolvedAssemblies, Has.Member(thisAssembly));
         Assert.That(result.MissingAssemblyNames, Is.Empty);
@@ -56,12 +56,12 @@ public sealed class ArchitectureAssemblyResolverFakeSeamTests
         var environment = new FakeArchitectureEnvironment();
         environment.SetEnvironmentVariable("ARCHITECTURE_ASSEMBLY_SEARCH_PATHS", probingPath);
 
-        ResolutionResult result = ArchitectureAssemblyResolver.ResolveFromDocument(
-            document,
-            repositoryRoot: null,
-            fileSystem: fileSystem,
-            environment: environment,
-            assemblyLoader: new FakeArchitectureAssemblyLoader(Array.Empty<System.Reflection.Assembly>()));
+        var service = new ArchitectureAssemblyResolutionService(
+            fileSystem,
+            environment,
+            new FakeArchitectureAssemblyLoader(Array.Empty<System.Reflection.Assembly>()));
+
+        ResolutionResult result = service.ResolveFromDocument(document, repositoryRoot: null);
 
         Assert.That(result.AssemblyProbingPaths, Has.Member(probingPath));
         Assert.That(result.MissingAssemblyNames, Has.Member("MissingAssembly"));

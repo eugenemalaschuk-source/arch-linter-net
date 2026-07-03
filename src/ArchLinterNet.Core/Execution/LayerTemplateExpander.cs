@@ -11,7 +11,7 @@ public static class LayerTemplateExpander
 
         foreach (ArchitectureLayerTemplateContract template in templates)
         {
-            string templateIdBase = ArchitectureContractLoader.NormalizeToContractId(
+            string templateIdBase = ArchitecturePolicyDocumentLoader.NormalizeToContractId(
                 template.Id ?? template.Name);
 
             foreach (string container in template.Containers)
@@ -40,7 +40,7 @@ public static class LayerTemplateExpander
                 contracts.Add(new ArchitectureLayerContract
                 {
                     Name = $"{template.Name} ({container})",
-                    Id = $"{templateIdBase}/{ArchitectureContractLoader.NormalizeToContractId(container)}",
+                    Id = $"{templateIdBase}/{ArchitecturePolicyDocumentLoader.NormalizeToContractId(container)}",
                     Layers = layers,
                     OptionalLayers = optionalLayers,
                     TemplateName = template.Name,

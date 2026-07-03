@@ -13,15 +13,15 @@ public sealed class AsmdefValidator
 
     public bool Validate(string contractPath, out IReadOnlyCollection<Core.Model.ArchitectureViolation> violations)
     {
-        ArchitectureContractDocument document = ArchitectureContractLoader.LoadFromPath(contractPath);
+        ArchitectureContractDocument document = new ArchitecturePolicyDocumentLoader().Load(contractPath);
 
-        string repositoryRoot = ArchitectureRepositoryRootLocator.ResolveFrom(contractPath);
+        string repositoryRoot = new ArchitectureRepositoryRootResolver().ResolveFrom(contractPath);
 
         List<Core.Model.ArchitectureViolation> allViolations = new();
 
         foreach (ArchitectureAsmdefContract contract in document.Contracts.StrictAsmdef)
         {
-            allViolations.AddRange(ArchitectureAsmdefScanner.FindAsmdefViolations(
+            allViolations.AddRange(new ArchitectureAsmdefScanner().FindAsmdefViolations(
                 contract.Name,
                 contract.Id,
                 repositoryRoot,

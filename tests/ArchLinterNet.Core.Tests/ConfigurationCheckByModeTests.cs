@@ -38,7 +38,7 @@ public sealed class ConfigurationCheckByModeTests
 
         var context = new ArchitectureAnalysisContext(
             "/tmp",
-            new[] { typeof(ArchitectureContractLoader).Assembly },
+            new[] { typeof(ArchitecturePolicyDocumentLoader).Assembly },
             Array.Empty<string>(),
             Array.Empty<string>());
 
@@ -84,7 +84,7 @@ public sealed class ConfigurationCheckByModeTests
 
         var context = new ArchitectureAnalysisContext(
             "/tmp",
-            new[] { typeof(ArchitectureContractLoader).Assembly },
+            new[] { typeof(ArchitecturePolicyDocumentLoader).Assembly },
             Array.Empty<string>(),
             Array.Empty<string>());
 

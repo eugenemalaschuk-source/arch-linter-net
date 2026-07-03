@@ -2,7 +2,9 @@ using ArchLinterNet.Core.Contracts;
 using ArchLinterNet.Core.Discovery;
 using ArchLinterNet.Core.Execution;
 using ArchLinterNet.Core.IO;
+using ArchLinterNet.Core.Reporting;
 using ArchLinterNet.Core.Resolution;
+using ArchLinterNet.Core.Scanning;
 using ArchLinterNet.Core.Validation;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -18,10 +20,21 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<IRoslynCompilationFactory, RoslynCompilationFactory>();
         services.AddSingleton<IArchitecturePolicyDocumentLoader, ArchitecturePolicyDocumentLoader>();
         services.AddSingleton<IArchitectureBaselineLoadingService, ArchitectureBaselineLoadingService>();
+        services.AddSingleton<IArchitectureBaselineGenerator, ArchitectureBaselineGenerator>();
+        services.AddSingleton<IArchitectureDiagnosticFormatter, ArchitectureDiagnosticFormatter>();
         services.AddSingleton<IArchitectureRepositoryRootResolver, ArchitectureRepositoryRootResolver>();
         services.AddSingleton<IConditionSetResolutionService, ConditionSetResolutionService>();
-        services.AddSingleton<IArchitectureProjectDiscoveryService, ArchitectureProjectDiscoveryService>();
+        services.AddSingleton<IArchitectureSolutionParser, ArchitectureSolutionParser>();
+        services.AddSingleton<IArchitectureProjectFileParser, ArchitectureProjectFileParser>();
+        services.AddSingleton<IArchitectureProjectDiscoveryService>(sp => new ArchitectureProjectDiscoveryService(
+            sp.GetRequiredService<IArchitectureFileSystem>(),
+            sp.GetRequiredService<IArchitectureSolutionParser>(),
+            sp.GetRequiredService<IArchitectureProjectFileParser>()));
         services.AddSingleton<IArchitectureAssemblyResolutionService, ArchitectureAssemblyResolutionService>();
+        services.AddSingleton<IArchitectureAsmdefScanner, ArchitectureAsmdefScanner>();
+        services.AddSingleton<IArchitectureSourceScanner, ArchitectureSourceScanner>();
+        services.AddSingleton<IArchitectureExternalDependencyIlScanner, ArchitectureExternalDependencyIlScanner>();
+        services.AddSingleton<IArchitectureIlMethodBodyScanner, ArchitectureIlMethodBodyScanner>();
         services.AddSingleton<IArchitectureRunnerSetupService, ArchitectureRunnerSetupService>();
         services.AddSingleton<IArchitectureContractHandler, DependencyContractHandler>();
         services.AddSingleton<IArchitectureContractHandler, LayerContractHandler>();

@@ -61,7 +61,7 @@ contracts:
   audit_independence: []
 ");
 
-        ArchitectureContractDocument document = ArchitectureContractLoader.LoadFromPath(contractPath);
+        ArchitectureContractDocument document = new ArchitecturePolicyDocumentLoader().Load(contractPath);
 
         Assert.That(document.Version, Is.EqualTo(1));
         Assert.That(document.Name, Is.EqualTo("Test Contract"));
@@ -76,7 +76,7 @@ contracts:
         string missingPath = Path.Combine(_tempDir, "nonexistent.yml");
 
         Assert.Throws<FileNotFoundException>(() =>
-            ArchitectureContractLoader.LoadFromPath(missingPath));
+            new ArchitecturePolicyDocumentLoader().Load(missingPath));
     }
 
     [Test]
@@ -109,7 +109,7 @@ contracts:
   audit_independence: []
 ");
 
-        ArchitectureContractDocument document = ArchitectureContractLoader.LoadFromPath(contractPath);
+        ArchitectureContractDocument document = new ArchitecturePolicyDocumentLoader().Load(contractPath);
 
         Assert.That(document.Version, Is.EqualTo(1));
         Assert.That(document.Layers, Is.Empty);
@@ -153,6 +153,6 @@ contracts:
 ");
 
         Assert.Throws<InvalidNamespacePatternException>(() =>
-            ArchitectureContractLoader.LoadFromPath(contractPath));
+            new ArchitecturePolicyDocumentLoader().Load(contractPath));
     }
 }

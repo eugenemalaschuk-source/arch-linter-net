@@ -326,7 +326,7 @@ contracts:
       reason: Siblings must be acyclic
 "));
 
-        ArchitectureContractDocument document = ArchitectureContractLoader.LoadFromPath(path);
+        ArchitectureContractDocument document = new ArchitecturePolicyDocumentLoader().Load(path);
 
         Assert.That(document.Contracts.StrictAcyclicSiblings, Has.Count.EqualTo(1));
         Assert.That(document.Contracts.StrictAcyclicSiblings[0].Name, Is.EqualTo("sibling-check"));
@@ -344,7 +344,7 @@ contracts:
         - MyApp.Features
 "));
 
-        ArchitectureContractDocument document = ArchitectureContractLoader.LoadFromPath(path);
+        ArchitectureContractDocument document = new ArchitecturePolicyDocumentLoader().Load(path);
 
         Assert.That(document.Contracts.StrictAcyclicSiblings[0].Id, Is.EqualTo("feature-sibling-check"));
     }
@@ -360,7 +360,7 @@ contracts:
         - MyApp.Features
 "));
 
-        ArchitectureContractDocument document = ArchitectureContractLoader.LoadFromPath(path);
+        ArchitectureContractDocument document = new ArchitecturePolicyDocumentLoader().Load(path);
 
         Assert.That(document.Contracts.StrictAcyclicSiblings[0].Id, Is.EqualTo("explicit-id"));
     }
@@ -379,7 +379,7 @@ contracts:
           reason: Migration
 "));
 
-        ArchitectureContractDocument document = ArchitectureContractLoader.LoadFromPath(path);
+        ArchitectureContractDocument document = new ArchitecturePolicyDocumentLoader().Load(path);
 
         Assert.That(document.Contracts.StrictAcyclicSiblings[0].IgnoredViolations, Has.Count.EqualTo(1));
         Assert.That(document.Contracts.StrictAcyclicSiblings[0].IgnoredViolations[0].SourceType, Is.EqualTo("MyApp.Features.Legacy.*"));
@@ -396,7 +396,7 @@ contracts:
       reason: Audit mode
 "));
 
-        ArchitectureContractDocument document = ArchitectureContractLoader.LoadFromPath(path);
+        ArchitectureContractDocument document = new ArchitecturePolicyDocumentLoader().Load(path);
 
         Assert.That(document.Contracts.AuditAcyclicSiblings, Has.Count.EqualTo(1));
         Assert.That(document.Contracts.AuditAcyclicSiblings[0].Name, Is.EqualTo("audit-sibling-check"));
@@ -425,7 +425,7 @@ contracts:
 "));
 
         Assert.Throws<InvalidOperationException>(() =>
-            ArchitectureContractLoader.LoadFromPath(path));
+            new ArchitecturePolicyDocumentLoader().Load(path));
     }
 
     [Test]
@@ -438,7 +438,7 @@ contracts:
 "));
 
         var ex = Assert.Throws<InvalidOperationException>(() =>
-            ArchitectureContractLoader.LoadFromPath(path));
+            new ArchitecturePolicyDocumentLoader().Load(path));
         Assert.That(ex!.Message, Does.Contain("empty ancestors list"));
     }
 
@@ -466,7 +466,7 @@ contracts:
 ");
 
         var ex = Assert.Throws<InvalidOperationException>(() =>
-            ArchitectureContractLoader.LoadFromPath(path));
+            new ArchitecturePolicyDocumentLoader().Load(path));
         Assert.That(ex!.Message, Does.Contain("blank or empty ancestor"));
     }
 

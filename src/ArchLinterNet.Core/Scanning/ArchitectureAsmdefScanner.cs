@@ -5,11 +5,22 @@ using ArchLinterNet.Core.Model;
 
 namespace ArchLinterNet.Core.Scanning;
 
-internal static class ArchitectureAsmdefScanner
+internal interface IArchitectureAsmdefScanner
+{
+    IEnumerable<ArchitectureViolation> FindAsmdefViolations(
+        string contractName,
+        string? contractId,
+        string repositoryRoot,
+        ArchitectureAsmdefContract contract,
+        string? asmdefRoot = null,
+        IArchitectureFileSystem? fileSystem = null);
+}
+
+internal sealed class ArchitectureAsmdefScanner : IArchitectureAsmdefScanner
 {
     private const string DefaultAsmdefRoot = "Assets";
 
-    public static IEnumerable<ArchitectureViolation> FindAsmdefViolations(
+    public IEnumerable<ArchitectureViolation> FindAsmdefViolations(
         string contractName,
         string? contractId,
         string repositoryRoot,
