@@ -112,6 +112,16 @@ contracts:
       forbidden: [core_execution, core_validation, cli, testing, unity]
       reason: Scanning internals must not depend upward on contract execution or the application seam.
 
+    - name: core-discovery-must-not-depend-on-execution-or-validation
+      source: core_discovery
+      forbidden: [core_execution, core_validation, cli, testing, unity]
+      reason: Project/solution discovery internals must not depend upward on contract execution or the application seam.
+
+    - name: core-validation-must-not-bypass-application-internals
+      source: core_validation
+      forbidden: [core_scanning, core_discovery, core_resolution]
+      reason: The application seam must reach scanning, discovery, and resolution only through Core.Execution (or Core.Asmdef for Unity), not by depending on their internals directly.
+
   strict_external:
     - name: core-model-must-not-depend-on-di-container
       source: core_model
@@ -210,6 +220,16 @@ contracts:
       allowed_importers: [core]
       reason: Scanning internals must not be referenced outside Core.
 
+    - name: core-discovery-internals-are-protected
+      protected: [core_discovery]
+      allowed_importers: [core]
+      reason: Project/solution discovery internals must not be referenced outside Core.
+
+    - name: core-resolution-internals-are-protected
+      protected: [core_resolution]
+      allowed_importers: [core]
+      reason: Repository and assembly resolution internals must not be referenced outside Core.
+
   strict_coverage:
     - name: assembly-coverage
       id: assembly-coverage
@@ -225,3 +245,23 @@ contracts:
         - namespace: ArchLinterNet.Testing
         - namespace: ArchLinterNet.Unity
       reason: Every first-party root namespace must be mapped to a declared layer or explicitly excluded.
+
+    - name: self-policy-rule-input-coverage
+      id: self-policy-rule-input-coverage
+      scope: rule_input
+      contract_ids:
+        - cli-must-use-validation-application-seam
+        - testing-must-use-validation-application-seam
+        - unity-must-use-asmdef-application-seam
+        - core-execution-must-not-depend-on-cli-or-testing
+        - core-reporting-stays-a-diagnostics-leaf
+        - core-model-stays-independent
+        - core-io-stays-independent
+        - core-resolution-must-not-depend-on-execution-or-validation
+        - core-scanning-must-not-depend-on-execution-or-validation
+        - core-discovery-must-not-depend-on-execution-or-validation
+        - core-validation-must-not-bypass-application-internals
+        - core-scanning-internals-are-protected
+        - core-discovery-internals-are-protected
+        - core-resolution-internals-are-protected
+      reason: The recovered Core architecture's seam, leaf-isolation, and protected-surface rules must keep matching real code so a renamed or deleted layer cannot silently stop being enforced.
