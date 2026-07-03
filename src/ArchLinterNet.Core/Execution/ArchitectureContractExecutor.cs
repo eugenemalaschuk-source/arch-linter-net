@@ -4,18 +4,28 @@ using ArchLinterNet.Core.Reporting;
 
 namespace ArchLinterNet.Core.Execution;
 
-internal static class ArchitectureContractExecutor
+public sealed record ArchitectureContractExecutionResult(
+    IReadOnlyCollection<ArchitectureViolation> Violations,
+    IReadOnlyCollection<string> Cycles,
+    IReadOnlyCollection<ArchitectureViolation> CoverageViolations,
+    IReadOnlyCollection<ArchitectureCoverageSummary> CoverageSummaries);
+
+public interface IArchitectureContractExecutor
+{
+    ArchitectureContractExecutionResult Execute(
+        ArchitectureAnalysisSession session,
+        string mode,
+        ArchitectureContractHandlerRegistry handlerRegistry,
+        bool includeAsmdefContracts = true,
+        ValidationTiming? timing = null);
+}
+
+internal sealed class ArchitectureContractExecutor : IArchitectureContractExecutor
 {
     private const string CoverageFamily = "coverage";
     private const string AsmdefFamily = "asmdef";
 
-    public sealed record ExecutionResult(
-        IReadOnlyCollection<ArchitectureViolation> Violations,
-        IReadOnlyCollection<string> Cycles,
-        IReadOnlyCollection<ArchitectureViolation> CoverageViolations,
-        IReadOnlyCollection<ArchitectureCoverageSummary> CoverageSummaries);
-
-    public static ExecutionResult Execute(
+    public ArchitectureContractExecutionResult Execute(
         ArchitectureAnalysisSession session,
         string mode,
         ArchitectureContractHandlerRegistry handlerRegistry,
@@ -81,6 +91,6 @@ internal static class ArchitectureContractExecutor
             }
         }
 
-        return new ExecutionResult(violations, cycles, coverageViolations, coverageSummaries);
+        return new ArchitectureContractExecutionResult(violations, cycles, coverageViolations, coverageSummaries);
     }
 }

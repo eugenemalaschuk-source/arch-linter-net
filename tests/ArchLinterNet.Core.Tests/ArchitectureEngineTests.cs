@@ -1,4 +1,5 @@
 using ArchLinterNet.Core.Composition;
+using ArchLinterNet.Core.Execution;
 using ArchLinterNet.Core.Reporting;
 using ArchLinterNet.Core.Validation;
 using Microsoft.Extensions.DependencyInjection;
@@ -107,6 +108,21 @@ public sealed class ArchitectureEngineTests
 
         Assert.That(provider.GetService<IArchitectureValidationApplicationService>(), Is.Not.Null);
         Assert.That(provider.GetService<IArchitectureBaselineApplicationService>(), Is.Not.Null);
+    }
+
+    [Test]
+    public void ServiceCollectionExtensions_RegistersContractExecutorAsSingleton()
+    {
+        ServiceCollection services = new();
+        services.AddArchLinterNetCore();
+
+        using ServiceProvider provider = services.BuildServiceProvider();
+
+        IArchitectureContractExecutor? first = provider.GetService<IArchitectureContractExecutor>();
+        IArchitectureContractExecutor? second = provider.GetService<IArchitectureContractExecutor>();
+
+        Assert.That(first, Is.Not.Null);
+        Assert.That(second, Is.SameAs(first));
     }
 
     [Test]
