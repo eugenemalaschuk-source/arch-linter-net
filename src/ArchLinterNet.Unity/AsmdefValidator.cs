@@ -1,35 +1,27 @@
-using ArchLinterNet.Core.Contracts;
-using ArchLinterNet.Core.Resolution;
-using ArchLinterNet.Core.Scanning;
+using ArchLinterNet.Core.Composition;
+using ArchLinterNet.Core.Model;
+using ArchLinterNet.Core.Validation;
 
 namespace ArchLinterNet.Unity;
 
 public sealed class AsmdefValidator
 {
+    private static readonly Lazy<ArchitectureEngine> _defaultEngine =
+        new(() => new ArchitectureEngineBuilder().AddArchLinterNetCore().Build());
+
     public bool Validate(string contractPath)
     {
         return Validate(contractPath, out _);
     }
 
-    public bool Validate(string contractPath, out IReadOnlyCollection<Core.Model.ArchitectureViolation> violations)
+    public bool Validate(string contractPath, out IReadOnlyCollection<ArchitectureViolation> violations)
     {
-        ArchitectureContractDocument document = new ArchitecturePolicyDocumentLoader().Load(contractPath);
-
-        string repositoryRoot = new ArchitectureRepositoryRootResolver().ResolveFrom(contractPath);
-
-        List<Core.Model.ArchitectureViolation> allViolations = new();
-
-        foreach (ArchitectureAsmdefContract contract in document.Contracts.StrictAsmdef)
+        AsmdefValidationOutcome outcome = _defaultEngine.Value.ValidateAsmdef(new AsmdefValidationRequest
         {
-            allViolations.AddRange(new ArchitectureAsmdefScanner().FindAsmdefViolations(
-                contract.Name,
-                contract.Id,
-                repositoryRoot,
-                contract));
-        }
+            PolicyPath = contractPath,
+        });
 
-        violations = allViolations;
-        return allViolations.Count == 0;
+        violations = outcome.Violations;
+        return outcome.Passed;
     }
-
 }
