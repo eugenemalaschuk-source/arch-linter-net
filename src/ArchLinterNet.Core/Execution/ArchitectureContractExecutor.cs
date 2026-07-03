@@ -13,7 +13,7 @@ internal sealed class ArchitectureContractExecutor : IArchitectureContractExecut
     public ArchitectureContractExecutionResult Execute(
         ArchitectureAnalysisSession session,
         string mode,
-        ArchitectureContractHandlerRegistry handlerRegistry,
+        IArchitectureContractHandlerRegistry handlerRegistry,
         bool includeAsmdefContracts = true,
         ValidationTiming? timing = null)
     {

@@ -16,7 +16,7 @@ public interface IArchitectureContractExecutor
     ArchitectureContractExecutionResult Execute(
         ArchitectureAnalysisSession session,
         string mode,
-        ArchitectureContractHandlerRegistry handlerRegistry,
+        IArchitectureContractHandlerRegistry handlerRegistry,
         bool includeAsmdefContracts = true,
         ValidationTiming? timing = null);
 }

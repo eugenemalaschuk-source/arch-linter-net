@@ -1,4 +1,5 @@
 using ArchLinterNet.Core.Contracts;
+using ArchLinterNet.Core.Execution.Abstractions;
 using ArchLinterNet.Core.Model;
 using ArchLinterNet.Core.Reporting;
 
@@ -12,12 +13,12 @@ public sealed class ArchitectureContractRunner(
     ArchitectureContractDocument document,
     HashSet<string>? selectedContractIds = null,
     bool enableUnmatchedIgnoreTracking = true,
-    IReadOnlyList<string>? preprocessorSymbols = null)
+    IReadOnlyList<string>? preprocessorSymbols = null) : IArchitectureContractRunner
 {
     private readonly ArchitectureAnalysisSession _session =
         new(context, document, selectedContractIds, enableUnmatchedIgnoreTracking, preprocessorSymbols);
 
-    internal ArchitectureAnalysisSession Session => _session;
+    public ArchitectureAnalysisSession Session => _session;
 
     public IReadOnlyList<ArchitectureUnmatchedIgnoredViolation> UnmatchedIgnoredViolations
         => _session.UnmatchedIgnoredViolations;

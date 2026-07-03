@@ -121,7 +121,7 @@ public sealed class ArchitectureContractHandlerRegistryTests
     {
         using ServiceProvider provider = new ServiceCollection().AddArchLinterNetCore().BuildServiceProvider();
 
-        ArchitectureContractHandlerRegistry registry = provider.GetRequiredService<ArchitectureContractHandlerRegistry>();
+        IArchitectureContractHandlerRegistry registry = provider.GetRequiredService<IArchitectureContractHandlerRegistry>();
 
         Assert.That(registry.TryGetHandler("dependency", out _), Is.True);
         Assert.That(registry.TryGetHandler("layer", out _), Is.True);

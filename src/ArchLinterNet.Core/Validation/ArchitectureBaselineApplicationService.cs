@@ -1,6 +1,5 @@
 using ArchLinterNet.Core.Contracts;
 using ArchLinterNet.Core.Contracts.Abstractions;
-using ArchLinterNet.Core.Execution;
 using ArchLinterNet.Core.Execution.Abstractions;
 using ArchLinterNet.Core.Model;
 using ArchLinterNet.Core.Validation.Abstractions;
@@ -9,7 +8,7 @@ namespace ArchLinterNet.Core.Validation;
 
 public sealed class ArchitectureBaselineApplicationService(
     IArchitectureRunnerSetupService runnerSetupService,
-    ArchitectureContractHandlerRegistry handlerRegistry,
+    IArchitectureContractHandlerRegistry handlerRegistry,
     IArchitectureContractExecutor contractExecutor,
     IArchitectureBaselineGenerator baselineGenerator)
     : IArchitectureBaselineApplicationService
@@ -26,7 +25,7 @@ public sealed class ArchitectureBaselineApplicationService(
         ArchitectureRunnerSetup setup = runnerSetupService.BuildRunner(
             document, request.PolicyPath, request.ConditionSetName, enableUnmatchedIgnoreTracking: true);
 
-        ArchitectureContractRunner runner = setup.Runner;
+        IArchitectureContractRunner runner = setup.Runner;
 
         List<ArchitectureViolation> configViolations = runner.CheckConfiguration(strict: true);
         if (configViolations.Count > 0)
