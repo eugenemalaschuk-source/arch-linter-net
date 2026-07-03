@@ -2,6 +2,7 @@ using System.Reflection;
 using ArchLinterNet.Core.Composition;
 using ArchLinterNet.Core.Contracts;
 using ArchLinterNet.Core.Execution;
+using ArchLinterNet.Core.Execution.Abstractions;
 using ArchLinterNet.Core.Model;
 using Microsoft.Extensions.DependencyInjection;
 using NUnit.Framework;

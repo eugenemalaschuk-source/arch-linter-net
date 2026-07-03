@@ -1,7 +1,9 @@
 using ArchLinterNet.Core.Composition;
 using ArchLinterNet.Core.Execution;
+using ArchLinterNet.Core.Execution.Abstractions;
 using ArchLinterNet.Core.Reporting;
 using ArchLinterNet.Core.Validation;
+using ArchLinterNet.Core.Validation.Abstractions;
 using Microsoft.Extensions.DependencyInjection;
 using NUnit.Framework;
 

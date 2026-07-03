@@ -1,13 +1,7 @@
 using ArchLinterNet.Core.IO;
+using ArchLinterNet.Core.Resolution.Abstractions;
 
 namespace ArchLinterNet.Core.Resolution;
-
-public interface IArchitectureRepositoryRootResolver
-{
-    string Resolve();
-
-    string ResolveFrom(string policyPath);
-}
 
 public sealed class ArchitectureRepositoryRootResolver : IArchitectureRepositoryRootResolver
 {

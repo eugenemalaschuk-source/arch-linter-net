@@ -63,7 +63,7 @@ When `ValidationRequest.EnforceUnmatchedIgnoredViolationsPolicy` is `true`, the 
 - **THEN** the result SHALL be `true`
 
 ### Requirement: Shared setup and execution building blocks
-`ArchLinterNet.Core.Execution.IArchitectureRunnerSetupService` SHALL provide `LoadDocument` (policy load + optional baseline merge) and `BuildRunner` (repository-root resolution, condition-set resolution, assembly resolution, runner construction). `ArchLinterNet.Core.Execution.ArchitectureContractExecutor` SHALL provide `Execute`, which runs all contract families for a given mode (`strict`/`audit`) against a runner and returns aggregated violations and cycles, including layer-template expansion.
+`ArchLinterNet.Core.Execution.Abstractions.IArchitectureRunnerSetupService` SHALL provide `LoadDocument` (policy load + optional baseline merge) and `BuildRunner` (repository-root resolution, condition-set resolution, assembly resolution, runner construction). `ArchLinterNet.Core.Execution.ArchitectureContractExecutor` SHALL provide `Execute`, which runs all contract families for a given mode (`strict`/`audit`) against a runner and returns aggregated violations and cycles, including layer-template expansion.
 
 #### Scenario: Baseline generation reuses the shared building blocks
 - **WHEN** `ArchitectureBaselineApplicationService.Generate` runs

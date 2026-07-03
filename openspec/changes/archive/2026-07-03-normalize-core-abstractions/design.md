@@ -51,6 +51,10 @@ This was checked by grepping, for each interface, every folder under `src/ArchLi
 | `IArchitectureIlMethodBodyScanner` (internal) | `Scanning/ArchitectureIlMethodBodyScanner.cs` | only `Scanning` + `Composition` | Internal feature seam | stays in `Scanning` |
 | `IArchitectureContract` | `Contracts/ArchitectureContractModels.cs` | pure schema, consumed everywhere as a data shape, not a service | Data/model marker interface | stays in `Contracts` (with the other contract models) |
 
+### Contract-shape records move with their interface
+
+`ArchitectureContractExecutionResult` (returned by `IArchitectureContractExecutor.Execute`) and `ArchitectureRunnerSetup` (returned by `IArchitectureRunnerSetupService.BuildRunner`) are pure data shapes that exist only to describe their interface's contract, exactly like `ArchitectureHandlerResult`. Leaving them behind in `Execution` while their interface moves to `Execution.Abstractions` would make the abstraction depend back on the implementation namespace — the opposite of the dependency direction #142's guardrail candidates are meant to enforce. Both move into `Execution.Abstractions` alongside their interface.
+
 ### `IO` keeps its namespace instead of becoming `IO.Abstractions`
 
 The four `IO/*.cs` files already contain nothing but one interface and its one implementation each, and the folder contains no other concrete orchestration classes. Renaming `ArchLinterNet.Core.IO` → `ArchLinterNet.Core.IO.Abstractions` would touch every consumer's `using` directive (the most widely-referenced interfaces in Core: `IArchitectureFileSystem` alone is used from four other modules) for zero discoverability gain, since `IO` is already unambiguous. Splitting each file into an interface file and an implementation file captures the acceptance criterion ("concrete implementations do not share files with... seam interfaces") without the rename churn. This is recorded as the "documented equivalent" #155 allows.

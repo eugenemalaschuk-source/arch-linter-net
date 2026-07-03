@@ -1,13 +1,9 @@
+using ArchLinterNet.Core.Contracts.Abstractions;
 using ArchLinterNet.Core.IO;
 using YamlDotNet.Serialization;
 using YamlDotNet.Serialization.NamingConventions;
 
 namespace ArchLinterNet.Core.Contracts;
-
-public interface IArchitectureBaselineLoadingService
-{
-    void LoadAndMerge(ArchitectureContractDocument document, string baselinePath);
-}
 
 public sealed class ArchitectureBaselineLoadingService : IArchitectureBaselineLoadingService
 {

@@ -1,7 +1,9 @@
 using ArchLinterNet.Core.Contracts;
 using ArchLinterNet.Core.Execution;
+using ArchLinterNet.Core.Execution.Abstractions;
 using ArchLinterNet.Core.Model;
 using ArchLinterNet.Core.Reporting;
+using ArchLinterNet.Core.Validation.Abstractions;
 
 namespace ArchLinterNet.Core.Validation;
 
