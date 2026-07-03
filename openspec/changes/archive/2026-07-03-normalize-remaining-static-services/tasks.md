@@ -33,7 +33,7 @@
 
 - [x] 5.1 Add all new `AddSingleton` registrations to `ServiceCollectionExtensions.AddArchLinterNetCore()` in dependency order
 - [x] 5.2 Verify no type under `Execution`/`Scanning`/`Resolution`/`Discovery`/`Contracts` references `IServiceProvider` or container types (self-architecture policy should already enforce this)
-- [x] 5.3 Update `docs/internal/static-class-inventory.md`: move all 12 converted classes out of section (e) "follow-up candidate" into a "converted" status with the replacing interface named; note the `ArchitectureBaselineLoader`/`ArchitectureBaselineMerger` consolidation and the scanner direct-instantiation decision explicitly
+- [x] 5.3 Update `docs/internal/static-class-inventory.md`: move all 14 converted classes out of section (e) "follow-up candidate" into a "converted" status with the replacing interface named; note the `ArchitectureBaselineLoader`/`ArchitectureBaselineMerger` consolidation and the scanner direct-instantiation decision explicitly
 - [x] 5.4 Confirm guardrail bullets at the bottom of the inventory doc still hold (no new static production services, no new hidden `Lazy<T>`)
 
 ## 6. Validation

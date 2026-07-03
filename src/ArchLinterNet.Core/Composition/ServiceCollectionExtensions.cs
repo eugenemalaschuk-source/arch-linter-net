@@ -24,7 +24,12 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<IArchitectureDiagnosticFormatter, ArchitectureDiagnosticFormatter>();
         services.AddSingleton<IArchitectureRepositoryRootResolver, ArchitectureRepositoryRootResolver>();
         services.AddSingleton<IConditionSetResolutionService, ConditionSetResolutionService>();
-        services.AddSingleton<IArchitectureProjectDiscoveryService, ArchitectureProjectDiscoveryService>();
+        services.AddSingleton<IArchitectureSolutionParser, ArchitectureSolutionParser>();
+        services.AddSingleton<IArchitectureProjectFileParser, ArchitectureProjectFileParser>();
+        services.AddSingleton<IArchitectureProjectDiscoveryService>(sp => new ArchitectureProjectDiscoveryService(
+            sp.GetRequiredService<IArchitectureFileSystem>(),
+            sp.GetRequiredService<IArchitectureSolutionParser>(),
+            sp.GetRequiredService<IArchitectureProjectFileParser>()));
         services.AddSingleton<IArchitectureAssemblyResolutionService, ArchitectureAssemblyResolutionService>();
         services.AddSingleton<IArchitectureAsmdefScanner, ArchitectureAsmdefScanner>();
         services.AddSingleton<IArchitectureSourceScanner, ArchitectureSourceScanner>();
