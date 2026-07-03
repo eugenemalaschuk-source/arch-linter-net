@@ -103,7 +103,7 @@ public sealed class ArchitectureValidationApplicationService(
                     : runner.CheckPolicyConsistency();
             }
 
-            ArchitectureContractExecutor.ExecutionResult execution;
+            ArchitectureContractExecutionResult execution;
             using (timing?.Measure("contract_checks"))
             {
                 execution = contractExecutor.Execute(

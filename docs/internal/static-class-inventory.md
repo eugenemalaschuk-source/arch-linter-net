@@ -4,7 +4,7 @@ This is internal project documentation for maintaining the `arch-linter-net` rep
 
 Issue #154 asks for every production `static class` under `src/` to be classified so static code stays limited to intentional pure helpers, extension methods, constants, or compatibility facades, while services/orchestrators that own behavior, state, or collaborators become instance-based and composition-root managed. This document is that inventory. It also seeds guardrail candidates for #142's self-policy work.
 
-34 production `static class` declarations exist under `src/` (none in `src/ArchLinterNet.Unity/`). One (`ArchitectureContractExecutor`) has been converted to an instance-based, DI-registered service as part of this change; the rest are classified below.
+35 production `static class` declarations existed under `src/` (none in `src/ArchLinterNet.Unity/`) before this change. One (`ArchitectureContractExecutor`) has been converted to an instance-based, DI-registered service as part of this change, leaving 34 static classes classified below.
 
 ## (a) Pure helper / deterministic mapper — allowed static
 

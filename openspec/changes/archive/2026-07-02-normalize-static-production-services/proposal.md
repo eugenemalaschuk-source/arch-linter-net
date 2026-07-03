@@ -4,12 +4,12 @@ Issue #154 (part of the #132 architecture-health story) asks that Core's product
 
 ## What Changes
 
-- Add a static-class inventory document (`docs/internal/static-class-inventory.md`) classifying every production `static class` under `src/` (34 total) into: pure helper/deterministic mapper, extension method container, constants/options holder, compatibility facade, or production service/orchestrator needing DI conversion.
+- Add a static-class inventory document (`docs/internal/static-class-inventory.md`) classifying every production `static class` under `src/` (35 total) into: pure helper/deterministic mapper, extension method container, constants/options holder, compatibility facade, or production service/orchestrator needing DI conversion.
 - Convert `ArchitectureContractExecutor` (`internal static class` in `src/ArchLinterNet.Core/Execution/ArchitectureContractExecutor.cs`) — the orchestrator named directly in issue #154 — into an instance-based service behind a new `IArchitectureContractExecutor` interface, registered as a DI singleton in `ServiceCollectionExtensions.AddArchLinterNetCore()`.
 - Inject `IArchitectureContractExecutor` into `ArchitectureValidationApplicationService` and `ArchitectureBaselineApplicationService` (both already constructor-DI classes) in place of the static `ArchitectureContractExecutor.Execute(...)` call.
 - Update the 4 direct static call sites in `tests/ArchLinterNet.Core.Tests/ArchitectureContractHandlerRegistryTests.cs` to construct `new ArchitectureContractExecutor()` instead of calling the static method.
 - Add a focused unit test exercising `ArchitectureContractExecutor` as an instance service with a minimal composed session/handler-registry graph.
-- Document the remaining 13 category-(e) static classes (scanners, parsers, loaders, resolvers not yet converted) as tracked follow-up candidates with rationale, for #142 to encode as guardrails.
+- Document the remaining 14 category-(e) static classes (scanners, parsers, loaders, resolvers not yet converted) as tracked follow-up candidates with rationale, for #142 to encode as guardrails.
 
 This is the first of several follow-up PRs for #154, consistent with the issue's own guidance that the work "may be split into smaller PRs by module." Converting all 14 identified production-service statics in one PR was assessed and rejected as too large/risky for one review; this PR establishes the inventory (an issue acceptance criterion in itself) and converts the one class the issue names explicitly, proving the pattern for later follow-ups.
 

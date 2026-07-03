@@ -324,12 +324,12 @@ public sealed class ArchitectureContractHandlerRegistryTests
 
         var firstRunner = new ArchitectureContractRunner(CreateContext(_layerFixtureAssembly), document);
         IArchitectureContractExecutor firstExecutor = new ArchitectureContractExecutor();
-        ArchitectureContractExecutor.ExecutionResult firstResult =
+        ArchitectureContractExecutionResult firstResult =
             firstExecutor.Execute(firstRunner.Session, "strict", CreateRegistry());
 
         var secondRunner = new ArchitectureContractRunner(CreateContext(_layerFixtureAssembly), document);
         IArchitectureContractExecutor secondExecutor = new ArchitectureContractExecutor();
-        ArchitectureContractExecutor.ExecutionResult secondResult =
+        ArchitectureContractExecutionResult secondResult =
             secondExecutor.Execute(secondRunner.Session, "strict", CreateRegistry());
 
         Assert.That(Project(secondResult.Violations), Is.EqualTo(Project(firstResult.Violations)),
@@ -347,7 +347,7 @@ public sealed class ArchitectureContractHandlerRegistryTests
         expectedViolations.AddRange(directRunner.CheckLayerContract(document.Contracts.StrictLayers[0]));
 
         var executorRunner = new ArchitectureContractRunner(CreateContext(_layerFixtureAssembly), document);
-        ArchitectureContractExecutor.ExecutionResult result =
+        ArchitectureContractExecutionResult result =
             new ArchitectureContractExecutor().Execute(executorRunner.Session, "strict", CreateRegistry());
 
         Assert.That(Project(result.Violations), Is.EqualTo(Project(expectedViolations)));
@@ -364,7 +364,7 @@ public sealed class ArchitectureContractHandlerRegistryTests
 
         var runner = new ArchitectureContractRunner(CreateContext(_layerFixtureAssembly), document);
 
-        ArchitectureContractExecutor.ExecutionResult result =
+        ArchitectureContractExecutionResult result =
             new ArchitectureContractExecutor().Execute(runner.Session, "strict", CreateRegistry());
 
         Assert.That(result.Violations, Has.Count.GreaterThan(0));

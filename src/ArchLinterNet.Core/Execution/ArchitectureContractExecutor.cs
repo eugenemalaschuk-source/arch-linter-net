@@ -4,9 +4,15 @@ using ArchLinterNet.Core.Reporting;
 
 namespace ArchLinterNet.Core.Execution;
 
+public sealed record ArchitectureContractExecutionResult(
+    IReadOnlyCollection<ArchitectureViolation> Violations,
+    IReadOnlyCollection<string> Cycles,
+    IReadOnlyCollection<ArchitectureViolation> CoverageViolations,
+    IReadOnlyCollection<ArchitectureCoverageSummary> CoverageSummaries);
+
 public interface IArchitectureContractExecutor
 {
-    ArchitectureContractExecutor.ExecutionResult Execute(
+    ArchitectureContractExecutionResult Execute(
         ArchitectureAnalysisSession session,
         string mode,
         ArchitectureContractHandlerRegistry handlerRegistry,
@@ -14,18 +20,12 @@ public interface IArchitectureContractExecutor
         ValidationTiming? timing = null);
 }
 
-public sealed class ArchitectureContractExecutor : IArchitectureContractExecutor
+internal sealed class ArchitectureContractExecutor : IArchitectureContractExecutor
 {
     private const string CoverageFamily = "coverage";
     private const string AsmdefFamily = "asmdef";
 
-    public sealed record ExecutionResult(
-        IReadOnlyCollection<ArchitectureViolation> Violations,
-        IReadOnlyCollection<string> Cycles,
-        IReadOnlyCollection<ArchitectureViolation> CoverageViolations,
-        IReadOnlyCollection<ArchitectureCoverageSummary> CoverageSummaries);
-
-    public ExecutionResult Execute(
+    public ArchitectureContractExecutionResult Execute(
         ArchitectureAnalysisSession session,
         string mode,
         ArchitectureContractHandlerRegistry handlerRegistry,
@@ -91,6 +91,6 @@ public sealed class ArchitectureContractExecutor : IArchitectureContractExecutor
             }
         }
 
-        return new ExecutionResult(violations, cycles, coverageViolations, coverageSummaries);
+        return new ArchitectureContractExecutionResult(violations, cycles, coverageViolations, coverageSummaries);
     }
 }

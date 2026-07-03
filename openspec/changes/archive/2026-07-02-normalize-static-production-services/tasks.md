@@ -1,6 +1,6 @@
 ## 1. Inventory
 
-- [x] 1.1 Write `docs/internal/static-class-inventory.md` classifying all 34 production static classes in `src/` into: pure helper/mapper, extension container, constants holder, compatibility facade, or production service/orchestrator (with the 13 not-yet-converted category-(e) classes flagged as follow-up candidates and rationale for #142).
+- [x] 1.1 Write `docs/internal/static-class-inventory.md` classifying all 35 production static classes that existed in `src/` before this change into: pure helper/mapper, extension container, constants holder, compatibility facade, or production service/orchestrator (with the 14 not-yet-converted category-(e) classes flagged as follow-up candidates and rationale for #142).
 
 ## 2. Convert ArchitectureContractExecutor
 
@@ -10,6 +10,7 @@
 - [x] 2.4 Update `ArchitectureValidationApplicationService` to take `IArchitectureContractExecutor` as a primary-constructor parameter and call `executor.Execute(...)` instead of the static method.
 - [x] 2.5 Update `ArchitectureBaselineApplicationService` the same way.
 - [x] 2.6 Update the 4 static call sites in `tests/ArchLinterNet.Core.Tests/ArchitectureContractHandlerRegistryTests.cs` to construct `new ArchitectureContractExecutor()` and call the instance method.
+- [x] 2.7 Extract the result record as a standalone top-level `public sealed record ArchitectureContractExecutionResult` (instead of a type nested inside `ArchitectureContractExecutor`), so the public `IArchitectureContractExecutor` interface doesn't reference a member of its internal implementation type.
 
 ## 3. Tests
 
