@@ -25,13 +25,13 @@ public sealed class ArchitectureBaselineLoadingService : IArchitectureBaselineLo
 
     public void LoadAndMerge(ArchitectureContractDocument document, string baselinePath)
     {
-        ArchitectureBaselineDocument baseline = LoadFromPath(baselinePath, _fileSystem);
+        ArchitectureBaselineDocument baseline = LoadFromPath(baselinePath);
         MergeAndValidate(document, baseline);
     }
 
-    internal static ArchitectureBaselineDocument LoadFromPath(string baselinePath, IArchitectureFileSystem fileSystem)
+    internal ArchitectureBaselineDocument LoadFromPath(string baselinePath)
     {
-        if (!fileSystem.FileExists(baselinePath))
+        if (!_fileSystem.FileExists(baselinePath))
         {
             throw new FileNotFoundException($"Baseline file not found: {baselinePath}");
         }
@@ -41,7 +41,7 @@ public sealed class ArchitectureBaselineLoadingService : IArchitectureBaselineLo
             .IgnoreUnmatchedProperties()
             .Build();
 
-        string yaml = fileSystem.ReadAllText(baselinePath);
+        string yaml = _fileSystem.ReadAllText(baselinePath);
         ArchitectureBaselineDocument? document = deserializer.Deserialize<ArchitectureBaselineDocument>(yaml);
 
         if (document == null)
@@ -115,7 +115,7 @@ public sealed class ArchitectureBaselineLoadingService : IArchitectureBaselineLo
         }
     }
 
-    internal static void Merge(ArchitectureContractDocument policyDocument, ArchitectureBaselineDocument baselineDocument)
+    internal void Merge(ArchitectureContractDocument policyDocument, ArchitectureBaselineDocument baselineDocument)
     {
         var groupMerger = new ContractGroupMerger(policyDocument.Contracts);
         var baseline = baselineDocument.Baseline;
@@ -142,7 +142,7 @@ public sealed class ArchitectureBaselineLoadingService : IArchitectureBaselineLo
         groupMerger.MergeGroup(baseline.AuditCoverage, "audit_coverage");
     }
 
-    internal static void MergeAndValidate(
+    internal void MergeAndValidate(
         ArchitectureContractDocument policyDocument,
         ArchitectureBaselineDocument baselineDocument)
     {

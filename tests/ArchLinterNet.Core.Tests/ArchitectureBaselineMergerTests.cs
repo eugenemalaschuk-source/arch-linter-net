@@ -7,6 +7,8 @@ namespace ArchLinterNet.Core.Tests;
 [TestFixture]
 public sealed class ArchitectureBaselineMergerTests
 {
+    private readonly ArchitectureBaselineLoadingService _service = new();
+
     [Test]
     public void Merge_MatchingId_AppendsIgnores()
     {
@@ -50,7 +52,7 @@ public sealed class ArchitectureBaselineMergerTests
             }
         };
 
-        ArchitectureBaselineLoadingService.Merge(policy, baseline);
+        _service.Merge(policy, baseline);
 
         Assert.That(policy.Contracts.Strict[0].IgnoredViolations, Has.Count.EqualTo(1));
         Assert.That(policy.Contracts.Strict[0].IgnoredViolations[0].SourceType, Is.EqualTo("Old.Type"));
@@ -94,7 +96,7 @@ public sealed class ArchitectureBaselineMergerTests
         };
 
         var ex = Assert.Throws<InvalidOperationException>(() =>
-            ArchitectureBaselineLoadingService.MergeAndValidate(policy, baseline));
+            _service.MergeAndValidate(policy, baseline));
         Assert.That(ex!.Message, Does.Contain("nonexistent-rule"));
     }
 
@@ -151,7 +153,7 @@ public sealed class ArchitectureBaselineMergerTests
             }
         };
 
-        ArchitectureBaselineLoadingService.Merge(policy, baseline);
+        _service.Merge(policy, baseline);
 
         Assert.That(policy.Contracts.Strict[0].IgnoredViolations, Has.Count.EqualTo(1));
         Assert.That(policy.Contracts.Strict[0].IgnoredViolations[0].Reason, Is.EqualTo("manual"));
@@ -210,7 +212,7 @@ public sealed class ArchitectureBaselineMergerTests
             }
         };
 
-        ArchitectureBaselineLoadingService.Merge(policy, baseline);
+        _service.Merge(policy, baseline);
 
         Assert.That(policy.Contracts.Strict[0].IgnoredViolations, Has.Count.EqualTo(2));
         Assert.That(policy.Contracts.Strict[0].IgnoredViolations[0].SourceType, Is.EqualTo("Existing"));
@@ -284,7 +286,7 @@ public sealed class ArchitectureBaselineMergerTests
             }
         };
 
-        ArchitectureBaselineLoadingService.Merge(policy, baseline);
+        _service.Merge(policy, baseline);
 
         var postMergeRunner = new ArchitectureContractRunner(context, policy);
         var postMergeViolations = postMergeRunner.CheckContract(policy.Contracts.Strict[0]);
@@ -349,7 +351,7 @@ public sealed class ArchitectureBaselineMergerTests
             }
         };
 
-        ArchitectureBaselineLoadingService.Merge(policy, baseline);
+        _service.Merge(policy, baseline);
 
         var context = new ArchitectureAnalysisContext(
             "/tmp",
@@ -400,7 +402,7 @@ public sealed class ArchitectureBaselineMergerTests
             }
         };
 
-        ArchitectureBaselineLoadingService.Merge(policy, baseline);
+        _service.Merge(policy, baseline);
 
         Assert.That(policy.Contracts.StrictCoverage[0].IgnoredViolations, Has.Count.EqualTo(1));
         Assert.That(policy.Contracts.StrictCoverage[0].IgnoredViolations[0].SourceType, Is.EqualTo("My.Namespace"));
@@ -436,7 +438,7 @@ public sealed class ArchitectureBaselineMergerTests
         };
 
         var ex = Assert.Throws<InvalidOperationException>(() =>
-            ArchitectureBaselineLoadingService.MergeAndValidate(policy, baseline));
+            _service.MergeAndValidate(policy, baseline));
         Assert.That(ex!.Message, Does.Contain("nonexistent-coverage-rule"));
     }
 }

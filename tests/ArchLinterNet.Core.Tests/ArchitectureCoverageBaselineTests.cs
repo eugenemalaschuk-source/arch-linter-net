@@ -11,6 +11,7 @@ namespace ArchLinterNet.Core.Tests;
 public sealed class ArchitectureCoverageBaselineTests
 {
     private static readonly ArchitectureBaselineGenerator _generator = new();
+    private static readonly ArchitectureBaselineLoadingService _loadingService = new();
 
     private const string NamespaceFixtureRoot = "ArchLinterNet.Core.Tests.NamespaceCoverageFixtures.Features";
     private const string RuleInputFixtureRoot = "ArchLinterNet.Core.Tests.RuleInputCoverageFixtures";
@@ -156,8 +157,8 @@ public sealed class ArchitectureCoverageBaselineTests
         string baselinePath = Path.Combine(_tempDir, "baseline.yml");
         File.WriteAllText(baselinePath, _generator.Serialize(baseline));
 
-        ArchitectureBaselineDocument loadedBaseline = ArchitectureBaselineLoadingService.LoadFromPath(baselinePath, ArchitectureFileSystem.Real);
-        ArchitectureBaselineLoadingService.MergeAndValidate(document, loadedBaseline);
+        ArchitectureBaselineDocument loadedBaseline = _loadingService.LoadFromPath(baselinePath);
+        _loadingService.MergeAndValidate(document, loadedBaseline);
 
         ArchitectureContractRunner gateRunner = new(context, document);
         List<ArchitectureViolation> findings = gateRunner.CheckCoverageContract(document.Contracts.StrictCoverage[0]);
@@ -186,8 +187,8 @@ public sealed class ArchitectureCoverageBaselineTests
         string baselinePath = Path.Combine(_tempDir, "baseline.yml");
         File.WriteAllText(baselinePath, _generator.Serialize(baseline));
 
-        ArchitectureBaselineDocument loadedBaseline = ArchitectureBaselineLoadingService.LoadFromPath(baselinePath, ArchitectureFileSystem.Real);
-        ArchitectureBaselineLoadingService.MergeAndValidate(document, loadedBaseline);
+        ArchitectureBaselineDocument loadedBaseline = _loadingService.LoadFromPath(baselinePath);
+        _loadingService.MergeAndValidate(document, loadedBaseline);
 
         ArchitectureContractRunner gateRunner = new(context, document);
         List<ArchitectureViolation> findings = gateRunner.CheckCoverageContract(document.Contracts.StrictCoverage[0]);
@@ -292,7 +293,7 @@ public sealed class ArchitectureCoverageBaselineTests
         string baselinePath = Path.Combine(_tempDir, "legacy-baseline.yml");
         File.WriteAllText(baselinePath, LegacyYaml);
 
-        ArchitectureBaselineDocument loaded = ArchitectureBaselineLoadingService.LoadFromPath(baselinePath, ArchitectureFileSystem.Real);
+        ArchitectureBaselineDocument loaded = _loadingService.LoadFromPath(baselinePath);
 
         Assert.That(loaded.Baseline.Strict, Has.Count.EqualTo(1));
         Assert.That(loaded.Baseline.StrictCoverage, Is.Empty);

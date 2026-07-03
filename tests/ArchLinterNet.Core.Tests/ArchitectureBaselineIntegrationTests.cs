@@ -9,6 +9,7 @@ namespace ArchLinterNet.Core.Tests;
 public sealed class ArchitectureBaselineIntegrationTests
 {
     private static readonly ArchitectureBaselineGenerator _generator = new();
+    private static readonly ArchitectureBaselineLoadingService _loadingService = new();
 
     private static ArchitectureAnalysisContext CreateContext()
     {
@@ -204,8 +205,8 @@ public sealed class ArchitectureBaselineIntegrationTests
             string baselinePath = Path.Combine(tempDir, "baseline.yml");
             File.WriteAllText(baselinePath, mergedYaml);
 
-            var loadedBaseline = ArchitectureBaselineLoadingService.LoadFromPath(baselinePath, ArchitectureFileSystem.Real);
-            ArchitectureBaselineLoadingService.MergeAndValidate(policy, loadedBaseline);
+            var loadedBaseline = _loadingService.LoadFromPath(baselinePath);
+            _loadingService.MergeAndValidate(policy, loadedBaseline);
 
             var finalRunner = new ArchitectureContractRunner(context, policy);
             var violations1 = finalRunner.CheckContract(policy.Contracts.Strict[0]);

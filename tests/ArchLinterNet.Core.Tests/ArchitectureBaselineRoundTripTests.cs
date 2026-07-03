@@ -8,6 +8,7 @@ namespace ArchLinterNet.Core.Tests;
 public sealed class ArchitectureBaselineRoundTripTests
 {
     private static readonly ArchitectureBaselineGenerator _generator = new();
+    private static readonly ArchitectureBaselineLoadingService _loadingService = new();
 
     private string _tempDir = null!;
 
@@ -72,7 +73,7 @@ public sealed class ArchitectureBaselineRoundTripTests
         string baselinePath = Path.Combine(_tempDir, "baseline.yml");
         File.WriteAllText(baselinePath, yaml);
 
-        ArchitectureBaselineDocument loaded = ArchitectureBaselineLoadingService.LoadFromPath(baselinePath, ArchitectureFileSystem.Real);
+        ArchitectureBaselineDocument loaded = _loadingService.LoadFromPath(baselinePath);
 
         Assert.That(loaded.Version, Is.EqualTo(1));
         Assert.That(loaded.Baseline.Strict, Has.Count.EqualTo(1));
