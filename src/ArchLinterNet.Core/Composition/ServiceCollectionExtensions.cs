@@ -57,6 +57,7 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<IArchitectureContractExecutor, ArchitectureContractExecutor>();
         services.AddSingleton<IArchitectureValidationApplicationService, ArchitectureValidationApplicationService>();
         services.AddSingleton<IArchitectureBaselineApplicationService, ArchitectureBaselineApplicationService>();
+        services.AddSingleton<IAsmdefValidationService, AsmdefValidationService>();
         return services;
     }
 
