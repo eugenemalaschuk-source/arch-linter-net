@@ -7,7 +7,8 @@ namespace ArchLinterNet.Core.Validation;
 
 public sealed class ArchitectureValidationApplicationService(
     IArchitectureRunnerSetupService runnerSetupService,
-    ArchitectureContractHandlerRegistry handlerRegistry)
+    ArchitectureContractHandlerRegistry handlerRegistry,
+    IArchitectureContractExecutor contractExecutor)
     : IArchitectureValidationApplicationService
 {
     public ValidationOutcome Validate(ValidationRequest request, ValidationTiming? timing = null)
@@ -102,10 +103,10 @@ public sealed class ArchitectureValidationApplicationService(
                     : runner.CheckPolicyConsistency();
             }
 
-            ArchitectureContractExecutor.ExecutionResult execution;
+            ArchitectureContractExecutionResult execution;
             using (timing?.Measure("contract_checks"))
             {
-                execution = ArchitectureContractExecutor.Execute(
+                execution = contractExecutor.Execute(
                     runner.Session, request.Mode, handlerRegistry, request.IncludeAsmdefContracts, timing);
             }
 
