@@ -26,6 +26,7 @@ The policy file is usually `architecture/dependencies.arch.yml` and contains:
 | Method body | `strict_method_body` | `audit_method_body` | Source layer does not call forbidden APIs. |
 | asmdef | `strict_asmdef` | `audit_asmdef` | Unity `.asmdef` references avoid editor refs or forbidden prefixes. |
 | Independence | `strict_independence` | `audit_independence` | Selected layers do not reference each other. |
+| Assembly independence | `strict_assembly_independence` | `audit_assembly_independence` | Selected .NET assemblies do not directly reference each other. |
 | Protected surface | `strict_protected` | `audit_protected` | Protected layers are referenced only by explicitly allowed importers. |
 | External dependency | `strict_external` | `audit_external` | Source layer does not reference forbidden vendor/framework dependency groups. |
 | Layer template | `strict_layer_templates` | `audit_layer_templates` | Reusable layer order applied to multiple containers. |
