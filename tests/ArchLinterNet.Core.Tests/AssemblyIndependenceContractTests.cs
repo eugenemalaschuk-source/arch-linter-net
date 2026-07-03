@@ -103,8 +103,15 @@ public sealed class AssemblyIndependenceContractTests
 
         List<ArchitectureViolation> violations = runner.Session.CheckAssemblyIndependenceContract(contract);
 
+        // Declaration order [Tests, Testing, Core] drives iteration: Tests references both Testing
+        // and Core directly, and Testing also directly references Core.
         Assert.That(violations.Select(v => (v.SourceType, v.ForbiddenNamespace)),
-            Is.EqualTo(new[] { (testsName, testingName), (testsName, coreName) }));
+            Is.EqualTo(new[]
+            {
+                (testsName, testingName),
+                (testsName, coreName),
+                (testingName, coreName),
+            }));
     }
 
     [Test]
