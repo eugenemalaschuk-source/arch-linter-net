@@ -53,6 +53,7 @@ public sealed class ArchitectureContractHandlerRegistryTests
             new MethodBodyContractHandler(),
             new AsmdefContractHandler(),
             new IndependenceContractHandler(),
+            new AssemblyIndependenceContractHandler(),
             new ProtectedContractHandler(),
             new ExternalContractHandler(),
             new CoverageContractHandler(),
@@ -110,6 +111,7 @@ public sealed class ArchitectureContractHandlerRegistryTests
         Assert.That(registry.TryGetHandler("method_body", out _), Is.True);
         Assert.That(registry.TryGetHandler("asmdef", out _), Is.True);
         Assert.That(registry.TryGetHandler("independence", out _), Is.True);
+        Assert.That(registry.TryGetHandler("assembly_independence", out _), Is.True);
         Assert.That(registry.TryGetHandler("protected", out _), Is.True);
         Assert.That(registry.TryGetHandler("external", out _), Is.True);
         Assert.That(registry.TryGetHandler("coverage", out _), Is.True);
@@ -135,6 +137,7 @@ public sealed class ArchitectureContractHandlerRegistryTests
         Assert.That(registry.TryGetHandler("method_body", out _), Is.True);
         Assert.That(registry.TryGetHandler("asmdef", out _), Is.True);
         Assert.That(registry.TryGetHandler("independence", out _), Is.True);
+        Assert.That(registry.TryGetHandler("assembly_independence", out _), Is.True);
         Assert.That(registry.TryGetHandler("protected", out _), Is.True);
         Assert.That(registry.TryGetHandler("external", out _), Is.True);
         Assert.That(registry.TryGetHandler("coverage", out _), Is.True);
@@ -280,6 +283,50 @@ public sealed class ArchitectureContractHandlerRegistryTests
         List<ArchitectureViolation> direct = runner.CheckAllowOnlyContract(contract);
         ArchitectureHandlerResult viaHandler = CreateRegistry()
             .Execute("allow_only", runner.Session, contract);
+
+        Assert.That(direct, Has.Count.GreaterThan(0));
+        Assert.That(Project(viaHandler.Violations), Is.EqualTo(Project(direct)));
+        Assert.That(viaHandler.Cycles, Is.Empty);
+    }
+
+    [Test]
+    public void AssemblyIndependenceHandler_MatchesDirectSessionCheck()
+    {
+        // ArchLinterNet.Testing directly references ArchLinterNet.Core, so forbidding the pair is a real violation.
+        Assembly coreAssembly = typeof(ArchitectureContractDocument).Assembly;
+        Assembly testingAssembly = typeof(ArchLinterNet.Testing.ArchitectureAssertions).Assembly;
+
+        var document = new ArchitectureContractDocument
+        {
+            Version = 1,
+            Name = "Test",
+            Layers = new Dictionary<string, ArchitectureLayer>(),
+            Analysis = new ArchitectureAnalysisConfiguration
+            {
+                TargetAssemblies = new List<string> { coreAssembly.GetName().Name!, testingAssembly.GetName().Name! }
+            },
+            Contracts = new ArchitectureContractGroups
+            {
+                StrictAssemblyIndependence = new List<ArchitectureAssemblyIndependenceContract>
+                {
+                    new()
+                    {
+                        Name = "Assembly Independence",
+                        Id = "asm-indep",
+                        Assemblies = new List<string> { testingAssembly.GetName().Name!, coreAssembly.GetName().Name! }
+                    },
+                }
+            }
+        };
+
+        var runner = new ArchitectureContractRunner(
+            new ArchitectureAnalysisContext(_tempDir, new[] { coreAssembly, testingAssembly }, Array.Empty<string>(), Array.Empty<string>()),
+            document);
+        ArchitectureAssemblyIndependenceContract contract = document.Contracts.StrictAssemblyIndependence[0];
+
+        List<ArchitectureViolation> direct = runner.Session.CheckAssemblyIndependenceContract(contract);
+        ArchitectureHandlerResult viaHandler = CreateRegistry()
+            .Execute("assembly_independence", runner.Session, contract);
 
         Assert.That(direct, Has.Count.GreaterThan(0));
         Assert.That(Project(viaHandler.Violations), Is.EqualTo(Project(direct)));

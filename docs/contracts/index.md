@@ -17,6 +17,7 @@ Most contract families have two variants:
 | [Cycle](cycles.md) | `strict_cycles` | `audit_cycles` | Selected layers must not form directed dependency cycles. |
 | [Acyclic sibling](acyclic-siblings.md) | `strict_acyclic_siblings` | `audit_acyclic_siblings` | Direct sibling namespaces under an ancestor must remain acyclic. |
 | [Independence](independence.md) | `strict_independence` | `audit_independence` | A set of modules/layers must not reference each other. |
+| [Assembly independence](assembly-independence.md) | `strict_assembly_independence` | `audit_assembly_independence` | A set of compiled .NET assemblies must not directly reference each other. |
 | [Protected surface](protected-surface.md) | `strict_protected` | `audit_protected` | A target layer may only be imported by approved layers. |
 | [External dependency](external-dependencies.md) | `strict_external` | `audit_external` | Source code must not leak forbidden vendor/framework dependencies. |
 | [Method body](method-body.md) | `strict_method_body` | `audit_method_body` | Source code must not call forbidden APIs inside executable bodies. |

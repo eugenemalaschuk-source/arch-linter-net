@@ -92,3 +92,15 @@ contracts:
       reason: Module implementations should communicate through contracts or messaging, not direct implementation references.
 
   audit_independence: []
+
+  strict_assembly_independence:
+    - name: module-assemblies-must-remain-independent
+      assemblies:
+        - MyCompany.Product.Modules.Sales
+        - MyCompany.Product.Modules.Billing
+        - MyCompany.Product.Modules.Inventory
+      reason: >-
+        Module assemblies must not directly reference each other at the compiled
+        assembly level, even for code outside the declared namespace layers above.
+
+  audit_assembly_independence: []

@@ -144,6 +144,12 @@ public sealed class ArchitectureContractGroups
     [YamlMember(Alias = "audit_independence")]
     public List<ArchitectureIndependenceContract> AuditIndependence { get; set; } = new();
 
+    [YamlMember(Alias = "strict_assembly_independence")]
+    public List<ArchitectureAssemblyIndependenceContract> StrictAssemblyIndependence { get; set; } = new();
+
+    [YamlMember(Alias = "audit_assembly_independence")]
+    public List<ArchitectureAssemblyIndependenceContract> AuditAssemblyIndependence { get; set; } = new();
+
     [YamlMember(Alias = "strict_protected")]
     public List<ArchitectureProtectedContract> StrictProtected { get; set; } = new();
 
@@ -191,6 +197,7 @@ public sealed class ArchitectureContractGroups
         foreach (var c in StrictMethodBody) yield return c;
         foreach (var c in StrictAsmdef) yield return c;
         foreach (var c in StrictIndependence) yield return c;
+        foreach (var c in StrictAssemblyIndependence) yield return c;
         foreach (var c in StrictProtected) yield return c;
         foreach (var c in StrictExternal) yield return c;
         foreach (var c in StrictAcyclicSiblings) yield return c;
@@ -206,6 +213,7 @@ public sealed class ArchitectureContractGroups
         foreach (var c in AuditMethodBody) yield return c;
         foreach (var c in AuditAsmdef) yield return c;
         foreach (var c in AuditIndependence) yield return c;
+        foreach (var c in AuditAssemblyIndependence) yield return c;
         foreach (var c in AuditProtected) yield return c;
         foreach (var c in AuditExternal) yield return c;
         foreach (var c in AuditAcyclicSiblings) yield return c;
@@ -435,6 +443,20 @@ public sealed class ArchitectureIndependenceContract : IArchitectureContract
     [YamlMember(Alias = "id")] public string? Id { get; set; }
 
     [YamlMember(Alias = "layers")] public List<string> Layers { get; set; } = new();
+
+    [YamlMember(Alias = "ignored_violations")]
+    public List<ArchitectureIgnoredViolation> IgnoredViolations { get; set; } = new();
+
+    [YamlMember(Alias = "reason")] public string Reason { get; set; } = string.Empty;
+}
+
+public sealed class ArchitectureAssemblyIndependenceContract : IArchitectureContract
+{
+    [YamlMember(Alias = "name")] public string Name { get; set; } = string.Empty;
+
+    [YamlMember(Alias = "id")] public string? Id { get; set; }
+
+    [YamlMember(Alias = "assemblies")] public List<string> Assemblies { get; set; } = new();
 
     [YamlMember(Alias = "ignored_violations")]
     public List<ArchitectureIgnoredViolation> IgnoredViolations { get; set; } = new();

@@ -227,6 +227,16 @@
           "items": { "$ref": "#/$defs/independenceContract" },
           "default": []
         },
+        "strict_assembly_independence": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/assemblyIndependenceContract" },
+          "default": []
+        },
+        "audit_assembly_independence": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/assemblyIndependenceContract" },
+          "default": []
+        },
         "strict_protected": {
           "type": "array",
           "items": { "$ref": "#/$defs/protectedContract" },
@@ -427,6 +437,18 @@
         "name": { "type": "string", "minLength": 1 },
         "id": { "type": "string", "minLength": 1 },
         "layers": { "$ref": "#/$defs/stringList" },
+        "ignored_violations": { "$ref": "#/$defs/ignoredViolations" },
+        "reason": { "type": "string" }
+      }
+    },
+    "assemblyIndependenceContract": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "assemblies"],
+      "properties": {
+        "name": { "type": "string", "minLength": 1 },
+        "id": { "type": "string", "minLength": 1 },
+        "assemblies": { "$ref": "#/$defs/stringList" },
         "ignored_violations": { "$ref": "#/$defs/ignoredViolations" },
         "reason": { "type": "string" }
       }

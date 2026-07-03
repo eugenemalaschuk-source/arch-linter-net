@@ -96,7 +96,7 @@ ArchLinterNet focuses on static architecture guardrails:
 - YAML policy loading and schema-backed contract authoring.
 - Namespace/layer dependency contracts and allow-only contracts.
 - Ordered layer contracts and reusable layer templates.
-- Dependency cycle, acyclic sibling, and independence checks.
+- Dependency cycle, acyclic sibling, independence, and assembly independence checks.
 - Protected surface contracts for importer restrictions.
 - External dependency leakage checks for vendor/framework namespaces.
 - Method-body forbidden API checks.

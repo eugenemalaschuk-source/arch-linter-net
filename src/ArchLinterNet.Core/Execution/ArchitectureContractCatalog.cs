@@ -72,6 +72,8 @@ public sealed class ArchitectureContractCatalog
         AddGroup("audit_asmdef", "audit", "asmdef", groups.AuditAsmdef);
         AddGroup("strict_independence", "strict", "independence", groups.StrictIndependence);
         AddGroup("audit_independence", "audit", "independence", groups.AuditIndependence);
+        AddGroup("strict_assembly_independence", "strict", "assembly_independence", groups.StrictAssemblyIndependence);
+        AddGroup("audit_assembly_independence", "audit", "assembly_independence", groups.AuditAssemblyIndependence);
         AddGroup("strict_protected", "strict", "protected", groups.StrictProtected);
         AddGroup("audit_protected", "audit", "protected", groups.AuditProtected);
         AddGroup("strict_external", "strict", "external", groups.StrictExternal);

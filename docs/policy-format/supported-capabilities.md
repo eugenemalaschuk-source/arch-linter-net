@@ -14,6 +14,7 @@ ArchLinterNet supports static architecture validation through documented YAML po
 - dependency cycle contracts;
 - acyclic sibling namespace contracts;
 - independence contracts;
+- assembly independence contracts (direct .NET assembly reference detection);
 - protected surface contracts;
 - external dependency contracts;
 - method-body forbidden API contracts;
@@ -43,6 +44,9 @@ ArchLinterNet does not currently validate:
 
 Coverage support currently excludes `scope: dependency_edge`, which remains reserved
 and fails validation with an actionable error.
+
+Assembly independence contracts detect only **direct** assembly references; transitive
+reference paths between two listed assemblies are not resolved.
 
 ## Important distinctions
 

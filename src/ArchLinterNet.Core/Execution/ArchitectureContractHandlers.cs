@@ -93,6 +93,17 @@ internal sealed class IndependenceContractHandler : IArchitectureContractHandler
     }
 }
 
+internal sealed class AssemblyIndependenceContractHandler : IArchitectureContractHandler
+{
+    public string Family => "assembly_independence";
+
+    public ArchitectureHandlerResult Execute(ArchitectureAnalysisSession session, IArchitectureContract contract)
+    {
+        return ArchitectureHandlerResult.FromViolations(
+            session.CheckAssemblyIndependenceContract((ArchitectureAssemblyIndependenceContract)contract));
+    }
+}
+
 internal sealed class ProtectedContractHandler : IArchitectureContractHandler
 {
     public string Family => "protected";
