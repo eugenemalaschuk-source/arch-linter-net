@@ -18,6 +18,10 @@ public sealed class ArchitectureBaselineApplicationServiceFakeCompositionTests
 {
     private sealed class FakeRunnerSetupService : IArchitectureRunnerSetupService
     {
+        public bool LoadDocumentCalled { get; private set; }
+
+        public bool BuildRunnerCalled { get; private set; }
+
         public ArchitectureContractDocument DocumentToReturn { get; set; } = new() { Version = 1, Name = "Fake" };
 
         public IArchitectureContractRunner RunnerToReturn { get; set; } = null!;
@@ -25,6 +29,7 @@ public sealed class ArchitectureBaselineApplicationServiceFakeCompositionTests
         public ArchitectureContractDocument LoadDocument(
             string policyPath, string? baselinePath = null, ValidationTiming? timing = null)
         {
+            LoadDocumentCalled = true;
             return DocumentToReturn;
         }
 
@@ -38,6 +43,7 @@ public sealed class ArchitectureBaselineApplicationServiceFakeCompositionTests
             ValidationTiming? timing = null,
             string? mode = null)
         {
+            BuildRunnerCalled = true;
             return new ArchitectureRunnerSetup("/fake/repository/root", RunnerToReturn);
         }
     }
@@ -221,6 +227,8 @@ public sealed class ArchitectureBaselineApplicationServiceFakeCompositionTests
                 new BaselineGenerationRequest { PolicyPath = "unused-by-fakes.arch.yml", Mode = "not-a-real-mode" }),
             Throws.ArgumentException);
 
+        Assert.That(runnerSetupService.LoadDocumentCalled, Is.False);
+        Assert.That(runnerSetupService.BuildRunnerCalled, Is.False);
         Assert.That(contractExecutor.ModesReceived, Is.Empty);
         Assert.That(baselineGenerator.WasCalled, Is.False);
     }
