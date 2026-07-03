@@ -191,6 +191,15 @@ Current inventory:
 
 Self-policy guardrail candidate for [#142](https://github.com/eugenemalaschuk-source/arch-linter-net/issues/142): forbid any `*.Abstractions` namespace from depending on its sibling implementation namespace, with one precise, named exception — `ArchLinterNet.Core.Execution.Abstractions` referencing `ArchLinterNet.Core.Execution.ArchitectureAnalysisSession` (as a parameter or property type) is allowed; no other `Execution` type, and no reference from any other `*.Abstractions` namespace to its sibling, is exempted. Also forbid introducing any `ArchLinterNet.Core.Interfaces` namespace.
 
+## Test architecture
+
+Two fake-based test styles cover the seams this refactor introduced, and new contract-family tests should follow whichever shape fits the code under test rather than defaulting to a full end-to-end fixture:
+
+- **Fake infrastructure seam tests** — fake one `IO`/`Discovery`/`Resolution` infrastructure interface (`IArchitectureFileSystem`, `IArchitectureAssemblyLoader`, `IRoslynCompilationFactory`, `IArchitectureProjectDiscoveryService`, `IArchitectureRepositoryRootResolver`, `IArchitectureEnvironment`) and pass it directly into the scanner/resolver/service under test. See `ArchitectureSourceScannerFakeSeamTests`, `ArchitectureAssemblyResolverFakeSeamTests`, `ArchitectureProjectDiscoveryServiceFakeFileSystemTests`, and `ArchitectureRunnerSetupServiceFakeDependencyTests` (`tests/ArchLinterNet.Core.Tests/`).
+- **Fake service composition tests** — fake all of an application service's collaborators (`IArchitectureRunnerSetupService`, `IArchitectureContractHandlerRegistry`, `IArchitectureContractExecutor`, `IArchitectureBaselineGenerator`) to drive `ArchitectureValidationApplicationService`/`ArchitectureBaselineApplicationService` end to end without a real file system, assembly, or Roslyn compilation ever being touched. See `ArchitectureValidationApplicationServiceFakeCompositionTests` and `ArchitectureBaselineApplicationServiceFakeCompositionTests`. This is the pattern to reach for when testing an application-seam class: fake its interface-typed constructor parameters, not the infrastructure underneath them.
+
+`ArchitectureValidatorTests` and `ArchitectureBaselineIntegrationTests` remain as real-file, real-assembly integration coverage — both styles matter and neither replaces the other. The fake-based tests prove the seams are independently replaceable and keep new-contract-family fixtures small; the integration tests catch anything a fake's simplified contract might miss.
+
 ## Diagnostics and reporting
 
 Checkers/handlers produce structured diagnostics/violations only. Formatters and mappers under `Reporting/` (`ArchitectureDiagnosticFormatter`, `ArchitectureDiagnosticMapper`, `ArchitectureCoverageSummary`) only format already-structured results — they must not reach back into `Execution`, `Discovery`, `Resolution`, or `Scanning`. CLI output concerns stay at the `ArchLinterNet.Cli` boundary. JSON and human-readable output compatibility is preserved unless a behavior change is deliberately reviewed and documented (out of scope for this refactor per #132's non-goals).
