@@ -55,7 +55,7 @@ public sealed class ArchitectureProjectDiscoveryTests
     {
         var document = new ArchitectureContractDocument { Analysis = new ArchitectureAnalysisConfiguration() };
 
-        ProjectDiscoveryResult result = ArchitectureProjectDiscovery.ResolveFromDocument(document, _repoRoot);
+        ProjectDiscoveryResult result = new ArchitectureProjectDiscoveryService().ResolveFromDocument(document, _repoRoot);
 
         Assert.That(result.TargetAssemblyNames, Is.Empty);
         Assert.That(result.AssemblySearchPaths, Is.Empty);
@@ -77,7 +77,7 @@ public sealed class ArchitectureProjectDiscoveryTests
             }
         };
 
-        ProjectDiscoveryResult result = ArchitectureProjectDiscovery.ResolveFromDocument(document, _repoRoot);
+        ProjectDiscoveryResult result = new ArchitectureProjectDiscoveryService().ResolveFromDocument(document, _repoRoot);
 
         // Discovery itself always reports what it found; the factory layer (not this method) decides precedence.
         Assert.That(result.TargetAssemblyNames, Is.EquivalentTo(new[] { "Sample" }));
@@ -96,7 +96,7 @@ public sealed class ArchitectureProjectDiscoveryTests
             }
         };
 
-        ProjectDiscoveryResult result = ArchitectureProjectDiscovery.ResolveFromDocument(document, _repoRoot);
+        ProjectDiscoveryResult result = new ArchitectureProjectDiscoveryService().ResolveFromDocument(document, _repoRoot);
 
         ArchitectureDiscoveredProject discoveredProject = result.DiscoveredProjects.Single();
         Assert.That(discoveredProject.AssemblyName, Is.EqualTo("Sample"));
@@ -117,7 +117,7 @@ public sealed class ArchitectureProjectDiscoveryTests
             }
         };
 
-        ProjectDiscoveryResult result = ArchitectureProjectDiscovery.ResolveFromDocument(document, _repoRoot);
+        ProjectDiscoveryResult result = new ArchitectureProjectDiscoveryService().ResolveFromDocument(document, _repoRoot);
 
         ArchitectureDiscoveredProject discoveredProject = result.DiscoveredProjects.Single();
         Assert.That(discoveredProject.TargetFrameworks, Is.EquivalentTo(new[] { "net8.0", "net9.0" }));
@@ -139,7 +139,7 @@ public sealed class ArchitectureProjectDiscoveryTests
             Analysis = new ArchitectureAnalysisConfiguration { Solution = "Test.slnx" }
         };
 
-        ProjectDiscoveryResult result = ArchitectureProjectDiscovery.ResolveFromDocument(document, _repoRoot);
+        ProjectDiscoveryResult result = new ArchitectureProjectDiscoveryService().ResolveFromDocument(document, _repoRoot);
 
         Assert.That(result.Diagnostics, Is.Empty);
         Assert.That(result.TargetAssemblyNames, Is.EquivalentTo(new[] { "Foo" }));
@@ -164,7 +164,7 @@ public sealed class ArchitectureProjectDiscoveryTests
             Analysis = new ArchitectureAnalysisConfiguration { Solution = "Test.sln" }
         };
 
-        ProjectDiscoveryResult result = ArchitectureProjectDiscovery.ResolveFromDocument(document, _repoRoot);
+        ProjectDiscoveryResult result = new ArchitectureProjectDiscoveryService().ResolveFromDocument(document, _repoRoot);
 
         Assert.That(result.Diagnostics, Is.Empty);
         Assert.That(result.TargetAssemblyNames, Is.EquivalentTo(new[] { "Bar" }));
@@ -183,7 +183,7 @@ public sealed class ArchitectureProjectDiscoveryTests
             }
         };
 
-        ProjectDiscoveryResult result = ArchitectureProjectDiscovery.ResolveFromDocument(document, _repoRoot);
+        ProjectDiscoveryResult result = new ArchitectureProjectDiscoveryService().ResolveFromDocument(document, _repoRoot);
 
         Assert.That(result.TargetAssemblyNames, Is.EquivalentTo(new[] { "Baz" }));
         Assert.That(result.SourceRoots.Single(), Is.EqualTo(Path.GetRelativePath(_repoRoot, projectDir).Replace('\\', '/')));
@@ -202,7 +202,7 @@ public sealed class ArchitectureProjectDiscoveryTests
             }
         };
 
-        ProjectDiscoveryResult result = ArchitectureProjectDiscovery.ResolveFromDocument(document, _repoRoot);
+        ProjectDiscoveryResult result = new ArchitectureProjectDiscoveryService().ResolveFromDocument(document, _repoRoot);
 
         Assert.That(result.TargetAssemblyNames, Is.Empty);
         Assert.That(result.Diagnostics.Single().Kind, Is.EqualTo("missing project build output"));
@@ -221,7 +221,7 @@ public sealed class ArchitectureProjectDiscoveryTests
             }
         };
 
-        ProjectDiscoveryResult result = ArchitectureProjectDiscovery.ResolveFromDocument(document, _repoRoot);
+        ProjectDiscoveryResult result = new ArchitectureProjectDiscoveryService().ResolveFromDocument(document, _repoRoot);
 
         Assert.That(result.TargetAssemblyNames, Is.Empty);
         Assert.That(result.Diagnostics.Single().Kind, Is.EqualTo("ambiguous project build output"));
@@ -240,7 +240,7 @@ public sealed class ArchitectureProjectDiscoveryTests
             }
         };
 
-        ProjectDiscoveryResult result = ArchitectureProjectDiscovery.ResolveFromDocument(document, _repoRoot);
+        ProjectDiscoveryResult result = new ArchitectureProjectDiscoveryService().ResolveFromDocument(document, _repoRoot);
 
         Assert.That(result.Diagnostics, Is.Empty);
         Assert.That(result.TargetAssemblyNames, Is.EquivalentTo(new[] { "MultiTarget" }));
@@ -261,7 +261,7 @@ public sealed class ArchitectureProjectDiscoveryTests
             }
         };
 
-        ProjectDiscoveryResult result = ArchitectureProjectDiscovery.ResolveFromDocument(document, _repoRoot);
+        ProjectDiscoveryResult result = new ArchitectureProjectDiscoveryService().ResolveFromDocument(document, _repoRoot);
 
         Assert.That(result.Diagnostics, Is.Empty);
         Assert.That(result.AssemblySearchPaths.Single(), Does.Contain(Path.Combine("bin", "Debug", "net8.0")));
@@ -275,7 +275,7 @@ public sealed class ArchitectureProjectDiscoveryTests
             Analysis = new ArchitectureAnalysisConfiguration { Solution = "DoesNotExist.slnx" }
         };
 
-        ProjectDiscoveryResult result = ArchitectureProjectDiscovery.ResolveFromDocument(document, _repoRoot);
+        ProjectDiscoveryResult result = new ArchitectureProjectDiscoveryService().ResolveFromDocument(document, _repoRoot);
 
         Assert.That(result.Diagnostics.Single().Kind, Is.EqualTo("missing solution file"));
     }
@@ -300,7 +300,7 @@ public sealed class ArchitectureProjectDiscoveryTests
             }
         };
 
-        ProjectDiscoveryResult result = ArchitectureProjectDiscovery.ResolveFromDocument(document, _repoRoot);
+        ProjectDiscoveryResult result = new ArchitectureProjectDiscoveryService().ResolveFromDocument(document, _repoRoot);
 
         Assert.That(result.TargetAssemblyNames, Is.Empty);
         Assert.That(result.Diagnostics.Single().Kind, Is.EqualTo("stale project build output"));
@@ -321,7 +321,7 @@ public sealed class ArchitectureProjectDiscoveryTests
             }
         };
 
-        ProjectDiscoveryResult result = ArchitectureProjectDiscovery.ResolveFromDocument(document, _repoRoot);
+        ProjectDiscoveryResult result = new ArchitectureProjectDiscoveryService().ResolveFromDocument(document, _repoRoot);
 
         Assert.That(result.Diagnostics, Is.Empty);
         Assert.That(result.TargetAssemblyNames, Is.EquivalentTo(new[] { "Fresh" }));
@@ -338,7 +338,7 @@ public sealed class ArchitectureProjectDiscoveryTests
             Analysis = new ArchitectureAnalysisConfiguration { Solution = "Garbage.sln" }
         };
 
-        ProjectDiscoveryResult result = ArchitectureProjectDiscovery.ResolveFromDocument(document, _repoRoot);
+        ProjectDiscoveryResult result = new ArchitectureProjectDiscoveryService().ResolveFromDocument(document, _repoRoot);
 
         Assert.That(result.TargetAssemblyNames, Is.Empty);
         Assert.That(result.Diagnostics.Single().Kind, Is.EqualTo("unparsable solution file"));
@@ -355,7 +355,7 @@ public sealed class ArchitectureProjectDiscoveryTests
             Analysis = new ArchitectureAnalysisConfiguration { Solution = "Empty.sln" }
         };
 
-        ProjectDiscoveryResult result = ArchitectureProjectDiscovery.ResolveFromDocument(document, _repoRoot);
+        ProjectDiscoveryResult result = new ArchitectureProjectDiscoveryService().ResolveFromDocument(document, _repoRoot);
 
         Assert.That(result.TargetAssemblyNames, Is.Empty);
         Assert.That(result.Diagnostics.Single().Kind, Is.EqualTo("no C# projects discovered"));
@@ -384,7 +384,7 @@ public sealed class ArchitectureProjectDiscoveryTests
             }
         };
 
-        ProjectDiscoveryResult result = ArchitectureProjectDiscovery.ResolveFromDocument(document, _repoRoot);
+        ProjectDiscoveryResult result = new ArchitectureProjectDiscoveryService().ResolveFromDocument(document, _repoRoot);
 
         Assert.That(result.TargetAssemblyNames, Is.EquivalentTo(new[] { "Included" }));
     }

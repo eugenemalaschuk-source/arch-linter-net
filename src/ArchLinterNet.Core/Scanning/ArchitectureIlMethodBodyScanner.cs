@@ -6,11 +6,21 @@ using ArchLinterNet.Core.Resolution;
 
 namespace ArchLinterNet.Core.Scanning;
 
-internal static class ArchitectureIlMethodBodyScanner
+internal interface IArchitectureIlMethodBodyScanner
+{
+    IEnumerable<ArchitectureViolation> FindMethodBodyViolations(
+        IReadOnlyCollection<Assembly> targetAssemblies,
+        string sourceNamespacePrefix,
+        IReadOnlyList<string> forbiddenCallPatterns,
+        ArchitectureContractExecutionContext executionContext,
+        ArchitectureLayer? sourceLayer = null);
+}
+
+internal sealed class ArchitectureIlMethodBodyScanner : IArchitectureIlMethodBodyScanner
 {
     private static readonly Dictionary<ushort, OpCode> _opCodes = BuildOpCodeMap();
 
-    public static IEnumerable<ArchitectureViolation> FindMethodBodyViolations(
+    public IEnumerable<ArchitectureViolation> FindMethodBodyViolations(
         IReadOnlyCollection<Assembly> targetAssemblies,
         string sourceNamespacePrefix,
         IReadOnlyList<string> forbiddenCallPatterns,

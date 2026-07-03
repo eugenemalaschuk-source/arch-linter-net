@@ -5,6 +5,8 @@ namespace ArchLinterNet.Testing;
 
 public sealed class ArchitectureValidationResult
 {
+    private static readonly ArchitectureDiagnosticFormatter _formatter = new();
+
     public bool Passed { get; }
     public IReadOnlyCollection<ArchitectureViolation> Violations { get; }
     public IReadOnlyCollection<string> Cycles { get; }
@@ -30,15 +32,15 @@ public sealed class ArchitectureValidationResult
         if (!Passed)
         {
             string violationDetails = Violations.Count > 0
-                ? ArchitectureDiagnosticFormatter.FormatViolationsForHumans(Violations)
+                ? _formatter.FormatViolationsForHumans(Violations)
                 : string.Empty;
 
             string cycleDetails = Cycles.Count > 0
-                ? ArchitectureDiagnosticFormatter.FormatCyclesForHumans(Cycles)
+                ? _formatter.FormatCyclesForHumans(Cycles)
                 : string.Empty;
 
             string policyConsistencyDetails = PolicyConsistencyFindings.Count > 0
-                ? ArchitectureDiagnosticFormatter.FormatPolicyConsistencyForHumans(PolicyConsistencyFindings)
+                ? _formatter.FormatPolicyConsistencyForHumans(PolicyConsistencyFindings)
                 : string.Empty;
 
             string message = $"Architecture validation failed.{Environment.NewLine}";

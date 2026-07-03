@@ -6,6 +6,8 @@ namespace ArchLinterNet.Cli;
 
 public static class Program
 {
+    private static readonly ArchitectureDiagnosticFormatter _formatter = new();
+
     public static int Main(string[] args)
     {
         if (args.Length > 0 && args[0] == "baseline")
@@ -208,7 +210,7 @@ public static class Program
 
             if (format == "json")
             {
-                Console.WriteLine(ArchitectureDiagnosticFormatter.FormatResultForCiArtifacts(
+                Console.WriteLine(_formatter.FormatResultForCiArtifacts(
                     mode, outcome.Passed, outcome.Violations, outcome.Cycles, outcome.CoverageFindings,
                     outcome.UnmatchedIgnoredViolations,
                     outcome.PolicyConsistencyConfig == "off"
@@ -226,19 +228,19 @@ public static class Program
                 {
                     if (outcome.Violations.Count > 0)
                     {
-                        Console.WriteLine(ArchitectureDiagnosticFormatter.FormatViolationsForHumans(outcome.Violations));
+                        Console.WriteLine(_formatter.FormatViolationsForHumans(outcome.Violations));
                     }
 
                     if (outcome.Cycles.Count > 0)
                     {
-                        Console.WriteLine(ArchitectureDiagnosticFormatter.FormatCyclesForHumans(outcome.Cycles));
+                        Console.WriteLine(_formatter.FormatCyclesForHumans(outcome.Cycles));
                     }
                 }
 
                 if (outcome.PolicyConsistencyConfig != "off" && outcome.PolicyConsistencyFindings.Count > 0)
                 {
                     string policyConsistencySection =
-                        ArchitectureDiagnosticFormatter.FormatPolicyConsistencyForHumans(outcome.PolicyConsistencyFindings);
+                        _formatter.FormatPolicyConsistencyForHumans(outcome.PolicyConsistencyFindings);
                     if (!string.IsNullOrEmpty(policyConsistencySection))
                     {
                         Console.WriteLine();
@@ -249,7 +251,7 @@ public static class Program
                 if (outcome.UnmatchedIgnoredViolations.Count > 0 && outcome.UnmatchedIgnoredViolationsConfig != "off")
                 {
                     string unmatchedSection =
-                        ArchitectureDiagnosticFormatter.FormatUnmatchedForHumans(outcome.UnmatchedIgnoredViolations);
+                        _formatter.FormatUnmatchedForHumans(outcome.UnmatchedIgnoredViolations);
                     if (!string.IsNullOrEmpty(unmatchedSection))
                     {
                         Console.WriteLine();
@@ -260,7 +262,7 @@ public static class Program
                 if (outcome.CoverageConfig != "off" && outcome.CoverageFindings.Count > 0)
                 {
                     string coverageSection =
-                        ArchitectureDiagnosticFormatter.FormatCoverageForHumans(outcome.CoverageFindings);
+                        _formatter.FormatCoverageForHumans(outcome.CoverageFindings);
                     if (!string.IsNullOrEmpty(coverageSection))
                     {
                         Console.WriteLine();
@@ -271,7 +273,7 @@ public static class Program
                 if (outcome.CoverageSummaries.Count > 0)
                 {
                     string coverageSummarySection =
-                        ArchitectureDiagnosticFormatter.FormatCoverageSummaryForHumans(outcome.CoverageSummaries);
+                        _formatter.FormatCoverageSummaryForHumans(outcome.CoverageSummaries);
                     if (!string.IsNullOrEmpty(coverageSummarySection))
                     {
                         Console.WriteLine();

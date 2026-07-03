@@ -8,11 +8,26 @@ using Microsoft.CodeAnalysis.CSharp.Syntax;
 
 namespace ArchLinterNet.Core.Scanning;
 
-internal static class ArchitectureSourceScanner
+internal interface IArchitectureSourceScanner
+{
+    IEnumerable<ArchitectureViolation> FindMethodBodyViolations(
+        string repositoryRoot,
+        string sourceNamespacePrefix,
+        IReadOnlyList<string> forbiddenCallPatterns,
+        ArchitectureContractExecutionContext executionContext,
+        string[]? sourceRoots = null,
+        ArchitectureLayer? sourceLayer = null,
+        IReadOnlyList<string>? preprocessorSymbols = null,
+        IArchitectureFileSystem? fileSystem = null,
+        IRoslynCompilationFactory? compilationFactory = null,
+        IArchitectureAssemblyLoader? assemblyLoader = null);
+}
+
+internal sealed class ArchitectureSourceScanner : IArchitectureSourceScanner
 {
     private static readonly string[] _defaultSourceRoots = ["src", "tests"];
 
-    public static IEnumerable<ArchitectureViolation> FindMethodBodyViolations(
+    public IEnumerable<ArchitectureViolation> FindMethodBodyViolations(
         string repositoryRoot,
         string sourceNamespacePrefix,
         IReadOnlyList<string> forbiddenCallPatterns,

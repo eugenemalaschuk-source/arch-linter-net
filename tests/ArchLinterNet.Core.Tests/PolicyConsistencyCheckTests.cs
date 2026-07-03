@@ -12,7 +12,7 @@ public sealed class PolicyConsistencyCheckTests
     {
         return new ArchitectureAnalysisContext(
             "/tmp",
-            new[] { typeof(ArchitectureContractLoader).Assembly },
+            new[] { typeof(ArchitecturePolicyDocumentLoader).Assembly },
             Array.Empty<string>(),
             Array.Empty<string>());
     }

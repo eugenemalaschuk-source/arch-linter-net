@@ -55,7 +55,7 @@ public sealed class DependencyEdgeCoverageValidationTests
             """);
 
         InvalidOperationException ex = Assert.Throws<InvalidOperationException>(() =>
-            ArchitectureContractLoader.LoadFromPath(policyPath))!;
+            new ArchitecturePolicyDocumentLoader().Load(policyPath))!;
 
         Assert.That(ex.Message, Does.Contain("must declare at least one pair in 'between'"));
     }
@@ -84,7 +84,7 @@ public sealed class DependencyEdgeCoverageValidationTests
             """);
 
         InvalidOperationException ex = Assert.Throws<InvalidOperationException>(() =>
-            ArchitectureContractLoader.LoadFromPath(policyPath))!;
+            new ArchitecturePolicyDocumentLoader().Load(policyPath))!;
 
         Assert.That(ex.Message, Does.Contain("referencing undeclared layer 'does_not_exist_layer'"));
     }
@@ -117,7 +117,7 @@ public sealed class DependencyEdgeCoverageValidationTests
             """);
 
         InvalidOperationException ex = Assert.Throws<InvalidOperationException>(() =>
-            ArchitectureContractLoader.LoadFromPath(policyPath))!;
+            new ArchitecturePolicyDocumentLoader().Load(policyPath))!;
 
         Assert.That(ex.Message, Does.Contain("cannot declare 'roots'"));
     }
@@ -150,7 +150,7 @@ public sealed class DependencyEdgeCoverageValidationTests
             """);
 
         InvalidOperationException ex = Assert.Throws<InvalidOperationException>(() =>
-            ArchitectureContractLoader.LoadFromPath(policyPath))!;
+            new ArchitecturePolicyDocumentLoader().Load(policyPath))!;
 
         Assert.That(ex.Message, Does.Contain("Dependency-edge coverage exclusions must declare 'between'"));
     }
@@ -185,7 +185,7 @@ public sealed class DependencyEdgeCoverageValidationTests
             """);
 
         InvalidOperationException ex = Assert.Throws<InvalidOperationException>(() =>
-            ArchitectureContractLoader.LoadFromPath(policyPath))!;
+            new ArchitecturePolicyDocumentLoader().Load(policyPath))!;
 
         Assert.That(ex.Message, Does.Contain("Dependency-edge coverage exclusions must use 'between' only"));
     }
@@ -221,7 +221,7 @@ public sealed class DependencyEdgeCoverageValidationTests
             """);
 
         InvalidOperationException ex = Assert.Throws<InvalidOperationException>(() =>
-            ArchitectureContractLoader.LoadFromPath(policyPath))!;
+            new ArchitecturePolicyDocumentLoader().Load(policyPath))!;
 
         Assert.That(ex.Message, Does.Contain("not declared in this contract's own 'between' list"));
     }

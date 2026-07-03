@@ -12,7 +12,9 @@ namespace ArchLinterNet.Core.Tests;
 [TestFixture]
 public sealed class ProtectedContractTests
 {
-    private static Assembly CoreAssembly => typeof(ArchitectureContractLoader).Assembly;
+    private static readonly ArchitectureDiagnosticFormatter _formatter = new();
+
+    private static Assembly CoreAssembly => typeof(ArchitecturePolicyDocumentLoader).Assembly;
     private static Assembly TestAssembly => typeof(ProtectedContractTests).Assembly;
 
     [Test]
@@ -436,7 +438,7 @@ public sealed class ProtectedContractTests
             AllowedImporters = new[] { "core" }
         };
 
-        string json = ArchitectureDiagnosticFormatter.FormatResultForCiArtifacts(
+        string json = _formatter.FormatResultForCiArtifacts(
             "strict", false,
             new[] { violation },
             Array.Empty<string>());
@@ -555,7 +557,7 @@ public sealed class ProtectedContractTests
             "Infrastructure",
             new[] { "Infrastructure.DbContext" });
 
-        string json = ArchitectureDiagnosticFormatter.FormatResultForCiArtifacts(
+        string json = _formatter.FormatResultForCiArtifacts(
             "strict", false,
             new[] { violation },
             Array.Empty<string>());

@@ -1,6 +1,7 @@
 using System.Reflection;
 using ArchLinterNet.Core.Contracts;
 using ArchLinterNet.Core.Execution;
+using ArchLinterNet.Core.IO;
 using ArchLinterNet.Core.Model;
 using NUnit.Framework;
 
@@ -9,6 +10,8 @@ namespace ArchLinterNet.Core.Tests;
 [TestFixture]
 public sealed class ArchitectureCoverageBaselineTests
 {
+    private static readonly ArchitectureBaselineGenerator _generator = new();
+
     private const string NamespaceFixtureRoot = "ArchLinterNet.Core.Tests.NamespaceCoverageFixtures.Features";
     private const string RuleInputFixtureRoot = "ArchLinterNet.Core.Tests.RuleInputCoverageFixtures";
 
@@ -107,7 +110,7 @@ public sealed class ArchitectureCoverageBaselineTests
 
         runner.CheckCoverageContract(document.Contracts.StrictCoverage[0]);
 
-        ArchitectureBaselineDocument baseline = ArchitectureBaselineGenerator.Generate(
+        ArchitectureBaselineDocument baseline = _generator.Generate(
             document, runner.BaselineCandidates, "generated baseline");
 
         Assert.That(baseline.Baseline.StrictCoverage, Has.Count.EqualTo(1));
@@ -126,7 +129,7 @@ public sealed class ArchitectureCoverageBaselineTests
 
         runner.CheckCoverageContract(document.Contracts.StrictCoverage[0]);
 
-        ArchitectureBaselineDocument baseline = ArchitectureBaselineGenerator.Generate(
+        ArchitectureBaselineDocument baseline = _generator.Generate(
             document, runner.BaselineCandidates, "generated baseline");
 
         Assert.That(baseline.Baseline.StrictCoverage, Has.Count.EqualTo(1));
@@ -147,14 +150,14 @@ public sealed class ArchitectureCoverageBaselineTests
         ArchitectureContractRunner generateRunner = new(context, document);
         generateRunner.CheckCoverageContract(document.Contracts.StrictCoverage[0]);
 
-        ArchitectureBaselineDocument baseline = ArchitectureBaselineGenerator.Generate(
+        ArchitectureBaselineDocument baseline = _generator.Generate(
             document, generateRunner.BaselineCandidates, "auto-baseline");
 
         string baselinePath = Path.Combine(_tempDir, "baseline.yml");
-        File.WriteAllText(baselinePath, ArchitectureBaselineGenerator.Serialize(baseline));
+        File.WriteAllText(baselinePath, _generator.Serialize(baseline));
 
-        ArchitectureBaselineDocument loadedBaseline = ArchitectureBaselineLoader.LoadFromPath(baselinePath);
-        ArchitectureBaselineMerger.MergeAndValidate(document, loadedBaseline);
+        ArchitectureBaselineDocument loadedBaseline = ArchitectureBaselineLoadingService.LoadFromPath(baselinePath, ArchitectureFileSystem.Real);
+        ArchitectureBaselineLoadingService.MergeAndValidate(document, loadedBaseline);
 
         ArchitectureContractRunner gateRunner = new(context, document);
         List<ArchitectureViolation> findings = gateRunner.CheckCoverageContract(document.Contracts.StrictCoverage[0]);
@@ -172,7 +175,7 @@ public sealed class ArchitectureCoverageBaselineTests
         ArchitectureContractRunner generateRunner = new(context, document);
         generateRunner.CheckCoverageContract(document.Contracts.StrictCoverage[0]);
 
-        ArchitectureBaselineDocument baseline = ArchitectureBaselineGenerator.Generate(
+        ArchitectureBaselineDocument baseline = _generator.Generate(
             document, generateRunner.BaselineCandidates, "auto-baseline");
 
         // Remove one previously-uncovered namespace from the baseline to simulate a namespace
@@ -181,10 +184,10 @@ public sealed class ArchitectureCoverageBaselineTests
             v.SourceType.EndsWith("AlphaGap", StringComparison.Ordinal));
 
         string baselinePath = Path.Combine(_tempDir, "baseline.yml");
-        File.WriteAllText(baselinePath, ArchitectureBaselineGenerator.Serialize(baseline));
+        File.WriteAllText(baselinePath, _generator.Serialize(baseline));
 
-        ArchitectureBaselineDocument loadedBaseline = ArchitectureBaselineLoader.LoadFromPath(baselinePath);
-        ArchitectureBaselineMerger.MergeAndValidate(document, loadedBaseline);
+        ArchitectureBaselineDocument loadedBaseline = ArchitectureBaselineLoadingService.LoadFromPath(baselinePath, ArchitectureFileSystem.Real);
+        ArchitectureBaselineLoadingService.MergeAndValidate(document, loadedBaseline);
 
         ArchitectureContractRunner gateRunner = new(context, document);
         List<ArchitectureViolation> findings = gateRunner.CheckCoverageContract(document.Contracts.StrictCoverage[0]);
@@ -274,7 +277,7 @@ public sealed class ArchitectureCoverageBaselineTests
         ArchitectureContractRunner runner = new(CreateContext(), document);
         runner.CheckCoverageContract(auditContract);
 
-        ArchitectureBaselineDocument baseline = ArchitectureBaselineGenerator.Generate(
+        ArchitectureBaselineDocument baseline = _generator.Generate(
             document, runner.BaselineCandidates, "generated baseline");
 
         Assert.That(baseline.Baseline.AuditCoverage, Has.Count.EqualTo(1));
@@ -289,7 +292,7 @@ public sealed class ArchitectureCoverageBaselineTests
         string baselinePath = Path.Combine(_tempDir, "legacy-baseline.yml");
         File.WriteAllText(baselinePath, LegacyYaml);
 
-        ArchitectureBaselineDocument loaded = ArchitectureBaselineLoader.LoadFromPath(baselinePath);
+        ArchitectureBaselineDocument loaded = ArchitectureBaselineLoadingService.LoadFromPath(baselinePath, ArchitectureFileSystem.Real);
 
         Assert.That(loaded.Baseline.Strict, Has.Count.EqualTo(1));
         Assert.That(loaded.Baseline.StrictCoverage, Is.Empty);

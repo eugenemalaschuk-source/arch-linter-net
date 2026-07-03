@@ -26,7 +26,7 @@ public sealed class ExternalDependencyIlScannerTests
 
         var executionContext = new ArchitectureContractExecutionContext(
             "test-contract", "test-id", Array.Empty<ArchitectureIgnoredViolation>(), false, null, null);
-        var violations = ArchitectureExternalDependencyIlScanner.FindMethodBodyViolations(
+        var violations = new ArchitectureExternalDependencyIlScanner().FindMethodBodyViolations(
             sourceTypes,
             "vendor_sdk",
             group,
@@ -54,7 +54,7 @@ public sealed class ExternalDependencyIlScannerTests
 
         var executionContext = new ArchitectureContractExecutionContext(
             "test-contract", null, Array.Empty<ArchitectureIgnoredViolation>(), false, null, null);
-        var violations = ArchitectureExternalDependencyIlScanner.FindMethodBodyViolations(
+        var violations = new ArchitectureExternalDependencyIlScanner().FindMethodBodyViolations(
             sourceTypes,
             "vendor_sdk",
             group,
@@ -80,7 +80,7 @@ public sealed class ExternalDependencyIlScannerTests
 
         var executionContext = new ArchitectureContractExecutionContext(
             "test-contract", null, Array.Empty<ArchitectureIgnoredViolation>(), false, null, null);
-        var violations = ArchitectureExternalDependencyIlScanner.FindMethodBodyViolations(
+        var violations = new ArchitectureExternalDependencyIlScanner().FindMethodBodyViolations(
             sourceTypes,
             "vendor_sdk",
             group,
@@ -106,7 +106,7 @@ public sealed class ExternalDependencyIlScannerTests
 
         var executionContext = new ArchitectureContractExecutionContext(
             "test-contract", null, Array.Empty<ArchitectureIgnoredViolation>(), false, null, null);
-        var violations = ArchitectureExternalDependencyIlScanner.FindMethodBodyViolations(
+        var violations = new ArchitectureExternalDependencyIlScanner().FindMethodBodyViolations(
             sourceTypes,
             "vendor_sdk",
             group,
@@ -131,7 +131,7 @@ public sealed class ExternalDependencyIlScannerTests
 
         var executionContext = new ArchitectureContractExecutionContext(
             "test-contract", null, Array.Empty<ArchitectureIgnoredViolation>(), false, null, null);
-        var violations = ArchitectureExternalDependencyIlScanner.FindMethodBodyViolations(
+        var violations = new ArchitectureExternalDependencyIlScanner().FindMethodBodyViolations(
             sourceTypes,
             "vendor_sdk",
             group,
@@ -155,7 +155,7 @@ public sealed class ExternalDependencyIlScannerTests
 
         var executionContext = new ArchitectureContractExecutionContext(
             "test-contract", null, Array.Empty<ArchitectureIgnoredViolation>(), false, null, null);
-        var violations = ArchitectureExternalDependencyIlScanner.FindMethodBodyViolations(
+        var violations = new ArchitectureExternalDependencyIlScanner().FindMethodBodyViolations(
             sourceTypes,
             "vendor_sdk",
             group,
@@ -184,7 +184,7 @@ public sealed class ExternalDependencyIlScannerTests
 
         var executionContext = new ArchitectureContractExecutionContext(
             "test-contract", null, Array.Empty<ArchitectureIgnoredViolation>(), false, null, null);
-        var violations = ArchitectureExternalDependencyIlScanner.FindMethodBodyViolations(
+        var violations = new ArchitectureExternalDependencyIlScanner().FindMethodBodyViolations(
             sourceTypes,
             "unity_runtime",
             group,
@@ -210,7 +210,7 @@ public sealed class ExternalDependencyIlScannerTests
 
         var withoutIgnoreContext = new ArchitectureContractExecutionContext(
             "test-contract", null, Array.Empty<ArchitectureIgnoredViolation>(), false, null, null);
-        var violationsWithoutIgnore = ArchitectureExternalDependencyIlScanner.FindMethodBodyViolations(
+        var violationsWithoutIgnore = new ArchitectureExternalDependencyIlScanner().FindMethodBodyViolations(
             sourceTypes,
             "vendor_sdk",
             group,
@@ -233,7 +233,7 @@ public sealed class ExternalDependencyIlScannerTests
 
         var withIgnoreContext = new ArchitectureContractExecutionContext(
             "test-contract", null, ignoredViolations, false, null, null);
-        var violationsWithIgnore = ArchitectureExternalDependencyIlScanner.FindMethodBodyViolations(
+        var violationsWithIgnore = new ArchitectureExternalDependencyIlScanner().FindMethodBodyViolations(
             sourceTypes,
             "vendor_sdk",
             group,

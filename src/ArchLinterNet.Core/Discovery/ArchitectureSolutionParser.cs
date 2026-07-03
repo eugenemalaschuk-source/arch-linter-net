@@ -4,13 +4,18 @@ using ArchLinterNet.Core.IO;
 
 namespace ArchLinterNet.Core.Discovery;
 
-internal static class ArchitectureSolutionParser
+internal interface IArchitectureSolutionParser
+{
+    IReadOnlyList<string> ParseProjectPaths(string solutionPath, IArchitectureFileSystem? fileSystem = null);
+}
+
+internal sealed class ArchitectureSolutionParser : IArchitectureSolutionParser
 {
     private static readonly Regex _classicSlnProjectLine = new(
         "^Project\\(\"\\{[^}]*}\"\\)\\s*=\\s*\"[^\"]*\",\\s*\"([^\"]*)\",\\s*\"\\{[^}]*}\"",
         RegexOptions.Compiled);
 
-    public static IReadOnlyList<string> ParseProjectPaths(string solutionPath, IArchitectureFileSystem? fileSystem = null)
+    public IReadOnlyList<string> ParseProjectPaths(string solutionPath, IArchitectureFileSystem? fileSystem = null)
     {
         fileSystem ??= ArchitectureFileSystem.Real;
         string solutionDirectory = Path.GetDirectoryName(solutionPath) ?? string.Empty;

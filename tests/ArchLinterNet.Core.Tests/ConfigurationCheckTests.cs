@@ -88,7 +88,7 @@ public sealed class ConfigurationCheckTests
 
         var context = new ArchitectureAnalysisContext(
             _tempDir,
-            new[] { typeof(ArchitectureContractLoader).Assembly },
+            new[] { typeof(ArchitecturePolicyDocumentLoader).Assembly },
             Array.Empty<string>(),
             Array.Empty<string>());
 
@@ -125,7 +125,7 @@ public sealed class ConfigurationCheckTests
 
         var context = new ArchitectureAnalysisContext(
             _tempDir,
-            new[] { typeof(ArchitectureContractLoader).Assembly },
+            new[] { typeof(ArchitecturePolicyDocumentLoader).Assembly },
             Array.Empty<string>(),
             Array.Empty<string>());
 
@@ -161,7 +161,7 @@ public sealed class ConfigurationCheckTests
 
         var context = new ArchitectureAnalysisContext(
             _tempDir,
-            new[] { typeof(ArchitectureContractLoader).Assembly },
+            new[] { typeof(ArchitecturePolicyDocumentLoader).Assembly },
             Array.Empty<string>(),
             Array.Empty<string>());
 
@@ -197,7 +197,7 @@ public sealed class ConfigurationCheckTests
 
         var context = new ArchitectureAnalysisContext(
             _tempDir,
-            new[] { typeof(ArchitectureContractLoader).Assembly },
+            new[] { typeof(ArchitecturePolicyDocumentLoader).Assembly },
             Array.Empty<string>(),
             Array.Empty<string>());
 
@@ -233,7 +233,7 @@ public sealed class ConfigurationCheckTests
 
         var context = new ArchitectureAnalysisContext(
             _tempDir,
-            new[] { typeof(ArchitectureContractLoader).Assembly },
+            new[] { typeof(ArchitecturePolicyDocumentLoader).Assembly },
             Array.Empty<string>(),
             Array.Empty<string>());
 
@@ -274,7 +274,7 @@ public sealed class ConfigurationCheckTests
 
         var context = new ArchitectureAnalysisContext(
             _tempDir,
-            new[] { typeof(ArchitectureContractLoader).Assembly },
+            new[] { typeof(ArchitecturePolicyDocumentLoader).Assembly },
             Array.Empty<string>(),
             Array.Empty<string>());
 

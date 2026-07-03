@@ -1,4 +1,5 @@
 using ArchLinterNet.Core.Contracts;
+using ArchLinterNet.Core.IO;
 using NUnit.Framework;
 
 namespace ArchLinterNet.Core.Tests;
@@ -6,6 +7,8 @@ namespace ArchLinterNet.Core.Tests;
 [TestFixture]
 public sealed class ArchitectureBaselineRoundTripTests
 {
+    private static readonly ArchitectureBaselineGenerator _generator = new();
+
     private string _tempDir = null!;
 
     [SetUp]
@@ -65,11 +68,11 @@ public sealed class ArchitectureBaselineRoundTripTests
             }
         };
 
-        string yaml = ArchitectureBaselineGenerator.Serialize(doc);
+        string yaml = _generator.Serialize(doc);
         string baselinePath = Path.Combine(_tempDir, "baseline.yml");
         File.WriteAllText(baselinePath, yaml);
 
-        ArchitectureBaselineDocument loaded = ArchitectureBaselineLoader.LoadFromPath(baselinePath);
+        ArchitectureBaselineDocument loaded = ArchitectureBaselineLoadingService.LoadFromPath(baselinePath, ArchitectureFileSystem.Real);
 
         Assert.That(loaded.Version, Is.EqualTo(1));
         Assert.That(loaded.Baseline.Strict, Has.Count.EqualTo(1));
