@@ -32,6 +32,11 @@ public sealed class ProtectedContractTests
                 // services are constructor-injected with execution-layer setup/runner services),
                 // so this fixture's real-assembly scan must allow that importer too.
                 ["validation"] = new() { Namespace = "ArchLinterNet.Core.Validation" },
+                // ServiceCollectionExtensions.ResolveHandlerRegistry's declared return type
+                // (ArchitectureContractHandlerRegistry) is itself an execution-layer reference —
+                // Composition is the composition root, so wiring the concrete registry through a
+                // typed factory method is expected, not a layering violation.
+                ["composition"] = new() { Namespace = "ArchLinterNet.Core.Composition" },
                 ["execution"] = new() { Namespace = "ArchLinterNet.Core.Execution" }
             },
             Analysis = new ArchitectureAnalysisConfiguration
@@ -50,7 +55,7 @@ public sealed class ProtectedContractTests
                     {
                         Name = "execution-is-protected",
                         Protected = new List<string> { "execution" },
-                        AllowedImporters = new List<string> { "test_area", "validation" }
+                        AllowedImporters = new List<string> { "test_area", "validation", "composition" }
                     }
                 }
             }
@@ -278,9 +283,10 @@ public sealed class ProtectedContractTests
             Layers = new Dictionary<string, ArchitectureLayer>
             {
                 ["test_area"] = new() { Namespace = "ArchLinterNet.Core.Tests" },
-                // See CheckProtectedContract_AllowedImporter_NoViolations for why "validation"
-                // must be an allowed importer of "execution" in this real-assembly fixture.
+                // See CheckProtectedContract_AllowedImporter_NoViolations for why "validation" and
+                // "composition" must be allowed importers of "execution" in this real-assembly fixture.
                 ["validation"] = new() { Namespace = "ArchLinterNet.Core.Validation" },
+                ["composition"] = new() { Namespace = "ArchLinterNet.Core.Composition" },
                 ["execution"] = new() { Namespace = "ArchLinterNet.Core.Execution" }
             },
             Analysis = new ArchitectureAnalysisConfiguration
@@ -305,7 +311,7 @@ public sealed class ProtectedContractTests
                     {
                         Name = "execution-allowed-for-test",
                         Protected = new List<string> { "execution" },
-                        AllowedImporters = new List<string> { "test_area", "validation" }
+                        AllowedImporters = new List<string> { "test_area", "validation", "composition" }
                     }
                 }
             }

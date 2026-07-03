@@ -1,12 +1,5 @@
 namespace ArchLinterNet.Core.IO;
 
-public interface IArchitectureEnvironment
-{
-    string? GetEnvironmentVariable(string name);
-
-    string BaseDirectory { get; }
-}
-
 public sealed class ArchitectureEnvironment : IArchitectureEnvironment
 {
     public static readonly ArchitectureEnvironment Real = new();

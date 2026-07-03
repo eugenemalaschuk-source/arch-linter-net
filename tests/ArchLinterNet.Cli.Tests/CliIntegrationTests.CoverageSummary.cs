@@ -48,13 +48,16 @@ public partial class CliIntegrationTests
             JsonElement counts = entry.GetProperty("counts");
             Assert.That(counts.GetProperty("covered").GetInt32(), Is.EqualTo(0));
             Assert.That(counts.GetProperty("excluded").GetInt32(), Is.EqualTo(0));
-            Assert.That(counts.GetProperty("uncovered").GetInt32(), Is.EqualTo(1));
+            Assert.That(counts.GetProperty("uncovered").GetInt32(), Is.EqualTo(2));
             Assert.That(counts.GetProperty("stale").GetInt32(), Is.EqualTo(0));
             Assert.That(counts.GetProperty("unknown").GetInt32(), Is.EqualTo(0));
 
+            // ArchLinterNet.Core.Validation.Abstractions is a distinct namespace under the
+            // ArchLinterNet.Core.Validation root, so it surfaces as its own uncovered item.
             JsonElement uncoveredItems = entry.GetProperty("uncovered_items");
-            Assert.That(uncoveredItems.GetArrayLength(), Is.EqualTo(1));
+            Assert.That(uncoveredItems.GetArrayLength(), Is.EqualTo(2));
             Assert.That(uncoveredItems[0].GetProperty("item").GetString(), Is.EqualTo("ArchLinterNet.Core.Validation"));
+            Assert.That(uncoveredItems[1].GetProperty("item").GetString(), Is.EqualTo("ArchLinterNet.Core.Validation.Abstractions"));
             Assert.That(entry.GetProperty("excluded_items").GetArrayLength(), Is.EqualTo(0));
             Assert.That(entry.GetProperty("stale_items").GetArrayLength(), Is.EqualTo(0));
             Assert.That(entry.GetProperty("unknown_items").GetArrayLength(), Is.EqualTo(0));
@@ -117,7 +120,7 @@ public partial class CliIntegrationTests
         Assert.That(exitCode, Is.EqualTo(0));
         Assert.That(stdout, Does.Contain("Coverage findings:"));
         Assert.That(stdout, Does.Contain("Coverage summary:"));
-        Assert.That(stdout, Does.Contain("covered=0 excluded=0 uncovered=1 stale=0 unknown=0"));
+        Assert.That(stdout, Does.Contain("covered=0 excluded=0 uncovered=2 stale=0 unknown=0"));
 
         int findingsIndex = stdout.IndexOf("Coverage findings:", StringComparison.Ordinal);
         int summaryIndex = stdout.IndexOf("Coverage summary:", StringComparison.Ordinal);

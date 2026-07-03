@@ -1,29 +1,13 @@
 using ArchLinterNet.Core.Contracts;
+using ArchLinterNet.Core.Contracts.Abstractions;
 using ArchLinterNet.Core.Discovery;
+using ArchLinterNet.Core.Discovery.Abstractions;
+using ArchLinterNet.Core.Execution.Abstractions;
 using ArchLinterNet.Core.Reporting;
 using ArchLinterNet.Core.Resolution;
+using ArchLinterNet.Core.Resolution.Abstractions;
 
 namespace ArchLinterNet.Core.Execution;
-
-public sealed record ArchitectureRunnerSetup(string RepositoryRoot, ArchitectureContractRunner Runner);
-
-public interface IArchitectureRunnerSetupService
-{
-    ArchitectureContractDocument LoadDocument(
-        string policyPath,
-        string? baselinePath = null,
-        ValidationTiming? timing = null);
-
-    ArchitectureRunnerSetup BuildRunner(
-        ArchitectureContractDocument document,
-        string policyPath,
-        string? conditionSetName = null,
-        IReadOnlyList<string>? preprocessorSymbols = null,
-        HashSet<string>? selectedContractIds = null,
-        bool enableUnmatchedIgnoreTracking = true,
-        ValidationTiming? timing = null,
-        string? mode = null);
-}
 
 public sealed class ArchitectureRunnerSetupService(
     IArchitecturePolicyDocumentLoader policyDocumentLoader,

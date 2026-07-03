@@ -1,17 +1,8 @@
+using ArchLinterNet.Core.Contracts.Abstractions;
 using YamlDotNet.Serialization;
 using YamlDotNet.Serialization.NamingConventions;
 
 namespace ArchLinterNet.Core.Contracts;
-
-public interface IArchitectureBaselineGenerator
-{
-    ArchitectureBaselineDocument Generate(
-        ArchitectureContractDocument policyDocument,
-        IReadOnlyList<ArchitectureBaselineCandidate> candidates,
-        string reason = "generated baseline");
-
-    string Serialize(ArchitectureBaselineDocument document);
-}
 
 internal sealed class ArchitectureBaselineGenerator : IArchitectureBaselineGenerator
 {

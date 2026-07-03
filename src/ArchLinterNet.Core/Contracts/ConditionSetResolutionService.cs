@@ -1,13 +1,6 @@
-namespace ArchLinterNet.Core.Contracts;
+using ArchLinterNet.Core.Contracts.Abstractions;
 
-public interface IConditionSetResolutionService
-{
-    bool TryResolve(
-        ArchitectureContractDocument document,
-        string? explicitName,
-        out IReadOnlyList<string> symbols,
-        out string? error);
-}
+namespace ArchLinterNet.Core.Contracts;
 
 public sealed class ConditionSetResolutionService : IConditionSetResolutionService
 {

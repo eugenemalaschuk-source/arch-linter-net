@@ -1,8 +1,11 @@
 using System.Reflection;
 using ArchLinterNet.Core.Contracts;
 using ArchLinterNet.Core.Discovery;
+using ArchLinterNet.Core.Discovery.Abstractions;
 using ArchLinterNet.Core.Execution;
+using ArchLinterNet.Core.Execution.Abstractions;
 using ArchLinterNet.Core.Resolution;
+using ArchLinterNet.Core.Resolution.Abstractions;
 using NUnit.Framework;
 
 namespace ArchLinterNet.Core.Tests;

@@ -1,14 +1,10 @@
 using System.Text.RegularExpressions;
+using ArchLinterNet.Core.Contracts.Abstractions;
 using ArchLinterNet.Core.IO;
 using YamlDotNet.Serialization;
 using YamlDotNet.Serialization.NamingConventions;
 
 namespace ArchLinterNet.Core.Contracts;
-
-public interface IArchitecturePolicyDocumentLoader
-{
-    ArchitectureContractDocument Load(string policyPath);
-}
 
 public sealed class ArchitecturePolicyDocumentLoader : IArchitecturePolicyDocumentLoader
 {
