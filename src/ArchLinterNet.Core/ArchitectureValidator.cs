@@ -1,3 +1,4 @@
+using ArchLinterNet.Core.Composition;
 using ArchLinterNet.Core.Model;
 using ArchLinterNet.Core.Validation;
 
@@ -5,6 +6,9 @@ namespace ArchLinterNet.Core;
 
 public sealed class ArchitectureValidator
 {
+    private static readonly Lazy<ArchitectureEngine> _defaultEngine =
+        new(() => new ArchitectureEngineBuilder().AddArchLinterNetCore().Build());
+
     public bool Validate(string policyPath)
     {
         return Validate(policyPath, out _, out _);
@@ -28,7 +32,9 @@ public sealed class ArchitectureValidator
             PreprocessorSymbols = preprocessorSymbols,
         };
 
-        ValidationOutcome outcome = ArchitectureValidationService.Validate(request);
+        // Compatibility API: keep the public surface unchanged while delegating through
+        // the composed Core validation seam used by first-party adapters.
+        ValidationOutcome outcome = _defaultEngine.Value.Validate(request);
 
         violations = outcome.PolicyConsistencyConfig == "off"
             ? outcome.Violations
