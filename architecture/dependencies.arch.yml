@@ -22,6 +22,8 @@ layers:
     namespace: ArchLinterNet.Core.Execution
   core_validation:
     namespace: ArchLinterNet.Core.Validation
+  core_asmdef:
+    namespace: ArchLinterNet.Core.Asmdef
   core_composition:
     namespace: ArchLinterNet.Core.Composition
   cli:
@@ -69,6 +71,11 @@ contracts:
       source: cli
       forbidden: [core_execution, core_contracts, core_resolution, core_scanning]
       reason: CLI must call the Core.Validation application seam instead of constructing contract runners or loading policies directly.
+
+    - name: unity-must-use-asmdef-application-seam
+      source: unity
+      forbidden: [core_execution, core_contracts, core_resolution, core_scanning]
+      reason: Unity must call the narrow Core.Asmdef application seam instead of loading contracts, resolving the repository root, or invoking the asmdef scanner directly.
 
     - name: core-execution-must-not-depend-on-cli-or-testing
       source: core_execution
@@ -143,6 +150,11 @@ contracts:
 
     - name: core-validation-must-not-depend-on-di-container
       source: core_validation
+      forbidden: [dependency_injection_container]
+      reason: Application services consume the composition root's interfaces, not container APIs directly.
+
+    - name: core-asmdef-must-not-depend-on-di-container
+      source: core_asmdef
       forbidden: [dependency_injection_container]
       reason: Application services consume the composition root's interfaces, not container APIs directly.
 
