@@ -121,8 +121,11 @@ public sealed class ArchitectureContractHandlerRegistryTests
     {
         using ServiceProvider provider = new ServiceCollection().AddArchLinterNetCore().BuildServiceProvider();
 
+        ArchitectureContractHandlerRegistry concreteRegistry = provider.GetRequiredService<ArchitectureContractHandlerRegistry>();
         IArchitectureContractHandlerRegistry registry = provider.GetRequiredService<IArchitectureContractHandlerRegistry>();
 
+        Assert.That(registry, Is.SameAs(concreteRegistry),
+            "The interface registration must resolve to the same singleton as the concrete type, preserving compatibility for callers resolving ArchitectureContractHandlerRegistry directly.");
         Assert.That(registry.TryGetHandler("dependency", out _), Is.True);
         Assert.That(registry.TryGetHandler("layer", out _), Is.True);
         Assert.That(registry.TryGetHandler("layer_template", out _), Is.True);

@@ -52,10 +52,16 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<IArchitectureContractHandler, ProtectedContractHandler>();
         services.AddSingleton<IArchitectureContractHandler, ExternalContractHandler>();
         services.AddSingleton<IArchitectureContractHandler, CoverageContractHandler>();
-        services.AddSingleton<IArchitectureContractHandlerRegistry, ArchitectureContractHandlerRegistry>();
+        services.AddSingleton<ArchitectureContractHandlerRegistry>();
+        services.AddSingleton<IArchitectureContractHandlerRegistry>(ResolveHandlerRegistry);
         services.AddSingleton<IArchitectureContractExecutor, ArchitectureContractExecutor>();
         services.AddSingleton<IArchitectureValidationApplicationService, ArchitectureValidationApplicationService>();
         services.AddSingleton<IArchitectureBaselineApplicationService, ArchitectureBaselineApplicationService>();
         return services;
+    }
+
+    private static ArchitectureContractHandlerRegistry ResolveHandlerRegistry(IServiceProvider sp)
+    {
+        return sp.GetRequiredService<ArchitectureContractHandlerRegistry>();
     }
 }
