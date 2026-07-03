@@ -268,6 +268,26 @@ contracts:
       reason: Bounded contexts communicate through explicit public contracts.
 ```
 
+Use `strict_assembly_independence` when the boundary you need to enforce is a
+compiled .NET assembly rather than a namespace/layer — for example, feature
+assemblies or plugin packages whose ownership doesn't map cleanly onto
+namespace prefixes. Every assembly listed must also appear in
+`analysis.target_assemblies`. Detection is direct-reference-only.
+
+```yaml
+contracts:
+  strict_assembly_independence:
+    - id: feature-assemblies-independent
+      name: feature-assemblies-must-remain-independent
+      assemblies: [MyApp.Features.Billing, MyApp.Features.Shipping]
+      reason: Feature assemblies must not directly reference each other.
+```
+
+This is a different mechanism from `strict_independence` (namespace-based) and
+from Unity `strict_asmdef`/`audit_asmdef` (Unity `.asmdef` manifest checks) —
+see [Assembly independence contracts](../contracts/assembly-independence.md)
+for the distinction.
+
 Use `strict_acyclic_siblings` when you want to automatically discover sibling
 namespaces under one or more ancestor namespaces and ensure they don't form
 dependency cycles. This is useful for feature-group architectures where siblings

@@ -232,6 +232,7 @@ contracts:
   strict_method_body: []
   strict_asmdef: []
   strict_independence: []
+  strict_assembly_independence: []
   strict_protected: []
   strict_external: []
   strict_acyclic_siblings: []
@@ -245,6 +246,7 @@ contracts:
   audit_method_body: []
   audit_asmdef: []
   audit_independence: []
+  audit_assembly_independence: []
   audit_protected: []
   audit_external: []
   audit_acyclic_siblings: []
@@ -383,6 +385,24 @@ is evaluated independently.
   layers: [<layer-name>]        # Required — layers that must not cross-reference
   reason: <string>
 ```
+
+### Assembly independence contract
+
+```yaml
+- id: <string>                  # Optional
+  name: <string>
+  assemblies: [<string>]        # Required — assembly names that must not directly reference each other
+  ignored_violations: []        # Optional — baseline known violations
+  reason: <string>
+```
+
+Every name in `assemblies` must also appear in `analysis.target_assemblies`, or policy
+loading fails with an actionable error. Detection is direct-reference-only, via each
+assembly's own referenced-assembly metadata — transitive reference paths are not
+resolved. `ignored_violations` reuses the `source_type`/`forbidden_reference`/`reason`
+shape, with `source_type`/`forbidden_reference` holding assembly names for this family.
+See [Assembly independence contracts](../contracts/assembly-independence.md) for the
+distinction from namespace/layer independence and Unity `.asmdef` checks.
 
 ### Protected surface contract
 

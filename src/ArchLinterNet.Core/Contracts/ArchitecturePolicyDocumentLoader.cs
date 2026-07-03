@@ -49,6 +49,7 @@ public sealed class ArchitecturePolicyDocumentLoader : IArchitecturePolicyDocume
         ValidateLayerNamespaces(document);
         ValidateCoverageNamespaces(document);
         ValidateImplementedCoverageScopes(document);
+        ValidateAssemblyIndependenceContracts(document);
 
         return document;
     }
@@ -92,6 +93,8 @@ public sealed class ArchitecturePolicyDocumentLoader : IArchitecturePolicyDocume
             document.Contracts.AuditAsmdef,
             document.Contracts.StrictIndependence,
             document.Contracts.AuditIndependence,
+            document.Contracts.StrictAssemblyIndependence,
+            document.Contracts.AuditAssemblyIndependence,
             document.Contracts.StrictProtected,
             document.Contracts.AuditProtected,
             document.Contracts.StrictExternal,
@@ -461,6 +464,26 @@ public sealed class ArchitecturePolicyDocumentLoader : IArchitecturePolicyDocume
                 throw new InvalidOperationException(
                     $"{scopeLabel} coverage contract '{contract.Name}' has an exclusion at index {i} without a non-empty " +
                     $"'{matcherField}' matcher. {scopeLabel} coverage exclusions must declare '{matcherField}'.");
+            }
+        }
+    }
+
+    private static void ValidateAssemblyIndependenceContracts(ArchitectureContractDocument document)
+    {
+        HashSet<string> targetAssemblies = new(document.Analysis.TargetAssemblies, StringComparer.Ordinal);
+
+        foreach (ArchitectureAssemblyIndependenceContract contract in document.Contracts.StrictAssemblyIndependence
+                     .Concat(document.Contracts.AuditAssemblyIndependence))
+        {
+            foreach (string assemblyName in contract.Assemblies)
+            {
+                if (!targetAssemblies.Contains(assemblyName))
+                {
+                    throw new InvalidOperationException(
+                        $"Assembly independence contract '{contract.Name}' references assembly '{assemblyName}' " +
+                        "that is not declared in 'analysis.target_assemblies'. Every assembly listed in " +
+                        "'strict_assembly_independence'/'audit_assembly_independence' must be a declared target assembly.");
+                }
             }
         }
     }
