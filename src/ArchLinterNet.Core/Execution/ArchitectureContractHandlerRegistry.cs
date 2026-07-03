@@ -1,8 +1,9 @@
 using ArchLinterNet.Core.Contracts;
+using ArchLinterNet.Core.Execution.Abstractions;
 
 namespace ArchLinterNet.Core.Execution;
 
-public sealed class ArchitectureContractHandlerRegistry
+public sealed class ArchitectureContractHandlerRegistry : IArchitectureContractHandlerRegistry
 {
     private readonly Dictionary<string, IArchitectureContractHandler> _handlersByFamily;
 

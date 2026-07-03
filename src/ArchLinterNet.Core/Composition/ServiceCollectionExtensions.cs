@@ -1,11 +1,16 @@
 using ArchLinterNet.Core.Contracts;
+using ArchLinterNet.Core.Contracts.Abstractions;
 using ArchLinterNet.Core.Discovery;
+using ArchLinterNet.Core.Discovery.Abstractions;
 using ArchLinterNet.Core.Execution;
+using ArchLinterNet.Core.Execution.Abstractions;
 using ArchLinterNet.Core.IO;
 using ArchLinterNet.Core.Reporting;
 using ArchLinterNet.Core.Resolution;
+using ArchLinterNet.Core.Resolution.Abstractions;
 using ArchLinterNet.Core.Scanning;
 using ArchLinterNet.Core.Validation;
+using ArchLinterNet.Core.Validation.Abstractions;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace ArchLinterNet.Core.Composition;
@@ -48,9 +53,15 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<IArchitectureContractHandler, ExternalContractHandler>();
         services.AddSingleton<IArchitectureContractHandler, CoverageContractHandler>();
         services.AddSingleton<ArchitectureContractHandlerRegistry>();
+        services.AddSingleton<IArchitectureContractHandlerRegistry>(ResolveHandlerRegistry);
         services.AddSingleton<IArchitectureContractExecutor, ArchitectureContractExecutor>();
         services.AddSingleton<IArchitectureValidationApplicationService, ArchitectureValidationApplicationService>();
         services.AddSingleton<IArchitectureBaselineApplicationService, ArchitectureBaselineApplicationService>();
         return services;
+    }
+
+    private static ArchitectureContractHandlerRegistry ResolveHandlerRegistry(IServiceProvider sp)
+    {
+        return sp.GetRequiredService<ArchitectureContractHandlerRegistry>();
     }
 }

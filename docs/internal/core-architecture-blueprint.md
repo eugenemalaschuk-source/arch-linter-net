@@ -166,6 +166,31 @@ These seams are consumed by `Discovery`, `Resolution`, and `Scanning` services (
 - `ArchitectureSourceScanner`, `ArchitectureIlMethodBodyScanner`, `ArchitectureAsmdefScanner`, `ArchitectureReferenceScanner`.
 - The `ArchitectureContractHandlerRegistry.CreateDefault()` static factory (becomes DI-populated; see [Handler/checker extension model](#handlerchecker-extension-model)).
 
+## Core interface namespace convention
+
+Prefer bounded `*.Abstractions` namespaces over a single generic `ArchLinterNet.Core.Interfaces` namespace. An interface earns a move into `<Module>.Abstractions` when it is consumed from a Core module *other than* the one that defines it (plus `Composition`, which wires everything) — that is what makes it a public/application seam, extension/plugin contract, or replaceable infrastructure seam rather than an internal feature seam. Any data/record type that exists only to describe a moved interface's contract (e.g. a handler's result type) moves with it, so the abstraction never depends back on its own implementation namespace.
+
+Current inventory:
+
+| Interface | Category | Namespace |
+|---|---|---|
+| `IArchitectureValidationApplicationService`, `IArchitectureBaselineApplicationService` | Public/application seam | `ArchLinterNet.Core.Validation.Abstractions` |
+| `IArchitectureContractHandler` (+ `ArchitectureHandlerResult`) | Extension/plugin contract | `ArchLinterNet.Core.Execution.Abstractions` |
+| `IArchitectureContractExecutor` (+ `ArchitectureContractExecutionResult`), `IArchitectureRunnerSetupService` (+ `ArchitectureRunnerSetup`) | Public/application seam | `ArchLinterNet.Core.Execution.Abstractions` |
+| `IArchitectureContractHandlerRegistry`, `IArchitectureContractRunner` | Public/application seam (extracted from `ArchitectureContractHandlerRegistry`/`ArchitectureContractRunner` so the seam interfaces above don't take a concrete Execution type as a parameter or payload) | `ArchLinterNet.Core.Execution.Abstractions` |
+| `IArchitecturePolicyDocumentLoader`, `IArchitectureBaselineLoadingService`, `IArchitectureBaselineGenerator`, `IConditionSetResolutionService` | Replaceable infrastructure seam | `ArchLinterNet.Core.Contracts.Abstractions` |
+| `IArchitectureProjectDiscoveryService` | Replaceable infrastructure seam | `ArchLinterNet.Core.Discovery.Abstractions` |
+| `IArchitectureRepositoryRootResolver` | Replaceable infrastructure seam | `ArchLinterNet.Core.Resolution.Abstractions` |
+| `IArchitectureFileSystem`, `IArchitectureEnvironment`, `IArchitectureAssemblyLoader`, `IRoslynCompilationFactory` | Replaceable infrastructure seam | `ArchLinterNet.Core.IO` — namespace unchanged (documented equivalent to `.Abstractions`), but files live under `IO/Abstractions/` for folder-layout consistency with the other modules. This is the one place folder path and namespace intentionally diverge. |
+| `IArchitectureAssemblyResolutionService`, `IArchitectureDiagnosticFormatter`, `IArchitectureSolutionParser`, `IArchitectureProjectFileParser`, `IArchitectureAsmdefScanner`, `IArchitectureSourceScanner`, `IArchitectureExternalDependencyIlScanner`, `IArchitectureIlMethodBodyScanner` | Internal feature seam | stays with its feature (`Execution`, `Reporting`, `Discovery`, `Scanning`) — consumed only from its own module plus `Composition` |
+| `IArchitectureContract` | Data/model marker interface | stays in `Contracts` with the other contract models |
+
+### Accepted exception: `Execution.Abstractions` referencing `ArchitectureAnalysisSession`
+
+`IArchitectureContractHandler.Execute`, `IArchitectureContractExecutor.Execute`, and `IArchitectureContractHandlerRegistry.Execute` all take `ArchLinterNet.Core.Execution.ArchitectureAnalysisSession` as a parameter, and `IArchitectureContractRunner.Session` exposes it as a property getter — every one of these is a reference from `Execution.Abstractions` to that same concrete, behavior-owning class, which stays in `Execution`, not `Execution.Abstractions`. This is a deliberate, reviewed exception rather than an oversight: `ArchitectureAnalysisSession` is the per-run session/context object every contract-family handler and orchestrator is handed by design (see [Session/state ownership](#sessionstate-ownership)); it is also the active target of the god-object shrink tracked by #137/#138. Introducing a full `IArchitectureAnalysisSession` seam now — mirroring a ~2,500-line class still being decomposed elsewhere — would be a speculative abstraction this refactor's own non-goals rule out ("creating interfaces for every class", "moving all interfaces blindly"). `ArchitectureContractHandlerRegistry` and `ArchitectureContractRunner` did get extracted (above) because both were small, stable, already-thin facades where the extraction was cheap; `ArchitectureAnalysisSession` is neither. Revisit this exception if/when #137/#138 finish shrinking the session type.
+
+Self-policy guardrail candidate for [#142](https://github.com/eugenemalaschuk-source/arch-linter-net/issues/142): forbid any `*.Abstractions` namespace from depending on its sibling implementation namespace, with one precise, named exception — `ArchLinterNet.Core.Execution.Abstractions` referencing `ArchLinterNet.Core.Execution.ArchitectureAnalysisSession` (as a parameter or property type) is allowed; no other `Execution` type, and no reference from any other `*.Abstractions` namespace to its sibling, is exempted. Also forbid introducing any `ArchLinterNet.Core.Interfaces` namespace.
+
 ## Diagnostics and reporting
 
 Checkers/handlers produce structured diagnostics/violations only. Formatters and mappers under `Reporting/` (`ArchitectureDiagnosticFormatter`, `ArchitectureDiagnosticMapper`, `ArchitectureCoverageSummary`) only format already-structured results — they must not reach back into `Execution`, `Discovery`, `Resolution`, or `Scanning`. CLI output concerns stay at the `ArchLinterNet.Cli` boundary. JSON and human-readable output compatibility is preserved unless a behavior change is deliberately reviewed and documented (out of scope for this refactor per #132's non-goals).

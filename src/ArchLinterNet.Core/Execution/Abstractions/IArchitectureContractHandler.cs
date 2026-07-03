@@ -1,7 +1,8 @@
 using ArchLinterNet.Core.Contracts;
+using ArchLinterNet.Core.Execution;
 using ArchLinterNet.Core.Model;
 
-namespace ArchLinterNet.Core.Execution;
+namespace ArchLinterNet.Core.Execution.Abstractions;
 
 public sealed record ArchitectureHandlerResult(
     IReadOnlyCollection<ArchitectureViolation> Violations,

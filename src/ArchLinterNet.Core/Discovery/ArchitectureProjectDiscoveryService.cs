@@ -1,13 +1,8 @@
 using ArchLinterNet.Core.Contracts;
+using ArchLinterNet.Core.Discovery.Abstractions;
 using ArchLinterNet.Core.IO;
 
 namespace ArchLinterNet.Core.Discovery;
-
-public interface IArchitectureProjectDiscoveryService
-{
-    ProjectDiscoveryResult ResolveAndApply(
-        ArchitectureContractDocument document, string repositoryRoot, bool resolveAssemblyOutputs);
-}
 
 public sealed class ArchitectureProjectDiscoveryService : IArchitectureProjectDiscoveryService
 {

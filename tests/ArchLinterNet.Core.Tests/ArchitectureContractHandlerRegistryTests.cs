@@ -2,6 +2,7 @@ using System.Reflection;
 using ArchLinterNet.Core.Composition;
 using ArchLinterNet.Core.Contracts;
 using ArchLinterNet.Core.Execution;
+using ArchLinterNet.Core.Execution.Abstractions;
 using ArchLinterNet.Core.Model;
 using Microsoft.Extensions.DependencyInjection;
 using NUnit.Framework;
@@ -120,8 +121,11 @@ public sealed class ArchitectureContractHandlerRegistryTests
     {
         using ServiceProvider provider = new ServiceCollection().AddArchLinterNetCore().BuildServiceProvider();
 
-        ArchitectureContractHandlerRegistry registry = provider.GetRequiredService<ArchitectureContractHandlerRegistry>();
+        ArchitectureContractHandlerRegistry concreteRegistry = provider.GetRequiredService<ArchitectureContractHandlerRegistry>();
+        IArchitectureContractHandlerRegistry registry = provider.GetRequiredService<IArchitectureContractHandlerRegistry>();
 
+        Assert.That(registry, Is.SameAs(concreteRegistry),
+            "The interface registration must resolve to the same singleton as the concrete type, preserving compatibility for callers resolving ArchitectureContractHandlerRegistry directly.");
         Assert.That(registry.TryGetHandler("dependency", out _), Is.True);
         Assert.That(registry.TryGetHandler("layer", out _), Is.True);
         Assert.That(registry.TryGetHandler("layer_template", out _), Is.True);

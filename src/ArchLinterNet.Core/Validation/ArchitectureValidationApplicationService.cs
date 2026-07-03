@@ -1,13 +1,15 @@
 using ArchLinterNet.Core.Contracts;
 using ArchLinterNet.Core.Execution;
+using ArchLinterNet.Core.Execution.Abstractions;
 using ArchLinterNet.Core.Model;
 using ArchLinterNet.Core.Reporting;
+using ArchLinterNet.Core.Validation.Abstractions;
 
 namespace ArchLinterNet.Core.Validation;
 
 public sealed class ArchitectureValidationApplicationService(
     IArchitectureRunnerSetupService runnerSetupService,
-    ArchitectureContractHandlerRegistry handlerRegistry,
+    IArchitectureContractHandlerRegistry handlerRegistry,
     IArchitectureContractExecutor contractExecutor)
     : IArchitectureValidationApplicationService
 {
@@ -89,7 +91,7 @@ public sealed class ArchitectureValidationApplicationService(
                     request.Mode);
             }
 
-            ArchitectureContractRunner runner = setup.Runner;
+            IArchitectureContractRunner runner = setup.Runner;
             List<ArchitectureViolation> allViolations = new();
 
             using (timing?.Measure("configuration_check"))
