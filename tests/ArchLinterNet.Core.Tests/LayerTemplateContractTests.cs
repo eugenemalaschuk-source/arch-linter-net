@@ -405,6 +405,7 @@ contracts:
             Exhaustive = true,
             Layers = new List<string>
             {
+                "ArchLinterNet.Core.Asmdef",
                 "ArchLinterNet.Core.Composition",
                 "ArchLinterNet.Core.Contracts",
                 "ArchLinterNet.Core.Discovery",

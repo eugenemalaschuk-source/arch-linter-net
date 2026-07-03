@@ -4,19 +4,19 @@
 TBD - created by archiving change split-diagnostics-model. Update Purpose after archive.
 ## Requirements
 ### Requirement: One service drives CLI validation, the public API, and the Testing adapter
-`ArchLinterNet.Core.Validation.ArchitectureValidationService.Validate` SHALL be the single implementation of the policy-load → condition-set-resolution → repository-root-resolution → assembly-resolution → runner-creation → contract-execution → result-aggregation pipeline. The CLI `validate` command, the public `ArchitectureValidator` API, and the `ArchitectureAssertions` Testing adapter SHALL all call this service rather than re-implementing the pipeline.
+`ArchLinterNet.Core.Validation.Abstractions.IArchitectureValidationApplicationService.Validate`, reached through a composed `ArchLinterNet.Core.Composition.ArchitectureEngine`, SHALL be the single implementation of the policy-load → condition-set-resolution → repository-root-resolution → assembly-resolution → runner-creation → contract-execution → result-aggregation pipeline. The CLI `validate` command, the public `ArchitectureValidator` API, and the `ArchitectureAssertions` Testing adapter SHALL each build (and reuse) their own `ArchitectureEngine` via `new ArchitectureEngineBuilder().AddArchLinterNetCore().Build()` and call `engine.Validate(...)` rather than re-implementing the pipeline or calling the static `ArchitectureValidationService.Validate` facade directly. The static facade SHALL remain available as a compatibility entry point for other callers and SHALL continue to produce identical outcomes.
 
-#### Scenario: CLI validate delegates to the service
+#### Scenario: CLI validate delegates to the composed engine
 - **WHEN** the CLI `validate` command runs
-- **THEN** it SHALL build a `ValidationRequest` and call `ArchitectureValidationService.Validate`, performing no policy loading, condition-set resolution, assembly resolution, or contract execution itself
+- **THEN** it SHALL build a `ValidationRequest` and call `ArchitectureEngine.Validate`, performing no policy loading, condition-set resolution, assembly resolution, or contract execution itself
 
-#### Scenario: Public API delegates to the service
+#### Scenario: Public API delegates to the composed engine
 - **WHEN** `ArchitectureValidator.Validate(...)` is called
-- **THEN** it SHALL build a `ValidationRequest` with `Mode = "strict"` and call `ArchitectureValidationService.Validate`, translating the returned `ValidationOutcome` into its `out` parameters and boolean return value
+- **THEN** it SHALL build a `ValidationRequest` with `Mode = "strict"` and call `ArchitectureEngine.Validate`, translating the returned `ValidationOutcome` into its `out` parameters and boolean return value
 
-#### Scenario: Testing adapter delegates to the service
+#### Scenario: Testing adapter delegates to the composed engine
 - **WHEN** `ArchitectureValidationBuilder.ValidateStrict()` or `ValidateAudit()` is called
-- **THEN** it SHALL build a `ValidationRequest` with the corresponding `Mode` and call `ArchitectureValidationService.Validate`, wrapping the returned `ValidationOutcome` in an `ArchitectureValidationResult`
+- **THEN** it SHALL build a `ValidationRequest` with the corresponding `Mode` and call `ArchitectureEngine.Validate`, wrapping the returned `ValidationOutcome` in an `ArchitectureValidationResult`
 
 ### Requirement: ValidationRequest models a validation run
 `ValidationRequest` SHALL carry: `PolicyPath` (required), `Mode` (required, `"strict"` or `"audit"`), `ConditionSetName` (optional), `PreprocessorSymbols` (optional explicit override that bypasses condition-set resolution when set), `ContractIds` (optional contract-ID filter), `BaselinePath` (optional baseline file to merge), `IncludeAsmdefContracts` (default `true`), and `EnforceUnmatchedIgnoredViolationsPolicy` (default `false`).

@@ -1,9 +1,13 @@
+using ArchLinterNet.Core.Composition;
 using ArchLinterNet.Core.Validation;
 
 namespace ArchLinterNet.Testing;
 
 public sealed class ArchitectureValidationBuilder
 {
+    private static readonly Lazy<ArchitectureEngine> _engine =
+        new(() => new ArchitectureEngineBuilder().AddArchLinterNetCore().Build());
+
     private readonly string _policyPath;
     private string? _conditionSetName;
 
@@ -37,7 +41,7 @@ public sealed class ArchitectureValidationBuilder
             ConditionSetName = _conditionSetName,
         };
 
-        ValidationOutcome outcome = ArchitectureValidationService.Validate(request);
+        ValidationOutcome outcome = _engine.Value.Validate(request);
 
         return new ArchitectureValidationResult(
             outcome.Passed,

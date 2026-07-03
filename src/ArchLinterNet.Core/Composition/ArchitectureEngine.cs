@@ -1,3 +1,5 @@
+using ArchLinterNet.Core.Asmdef;
+using ArchLinterNet.Core.Asmdef.Abstractions;
 using ArchLinterNet.Core.Reporting;
 using ArchLinterNet.Core.Validation;
 using ArchLinterNet.Core.Validation.Abstractions;
@@ -24,6 +26,12 @@ public sealed class ArchitectureEngine : IDisposable, IAsyncDisposable
     {
         return _serviceProvider.GetRequiredService<IArchitectureBaselineApplicationService>()
             .Generate(request);
+    }
+
+    public AsmdefValidationOutcome ValidateAsmdef(AsmdefValidationRequest request)
+    {
+        return _serviceProvider.GetRequiredService<IAsmdefValidationService>()
+            .Validate(request);
     }
 
     public void Dispose()
