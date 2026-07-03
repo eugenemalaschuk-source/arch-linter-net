@@ -52,7 +52,7 @@
 
 ## 8. Spec sync and validation
 
-- [ ] 8.1 Run `rtk make fmt`
-- [ ] 8.2 Run `rtk make acceptance` and confirm it passes, including self-policy strict/audit runs
-- [ ] 8.3 Run `openspec validate --all`
+- [x] 8.1 Run `rtk make fmt`
+- [x] 8.2 Run `rtk make acceptance` and confirm it passes, including self-policy strict/audit runs
+- [x] 8.3 Run `openspec validate --all`
 - [ ] 8.4 Run `openspec archive add-assembly-independence-contracts`
