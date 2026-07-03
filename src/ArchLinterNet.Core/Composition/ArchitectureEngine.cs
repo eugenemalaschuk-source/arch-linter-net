@@ -26,6 +26,12 @@ public sealed class ArchitectureEngine : IDisposable, IAsyncDisposable
             .Generate(request);
     }
 
+    public AsmdefValidationOutcome ValidateAsmdef(AsmdefValidationRequest request)
+    {
+        return _serviceProvider.GetRequiredService<IAsmdefValidationService>()
+            .Validate(request);
+    }
+
     public void Dispose()
     {
         _serviceProvider.Dispose();
