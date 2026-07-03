@@ -7,7 +7,7 @@ using ArchLinterNet.Core.Validation.Abstractions;
 
 namespace ArchLinterNet.Core.Validation;
 
-public sealed class AsmdefValidationService(
+internal sealed class AsmdefValidationService(
     IArchitecturePolicyDocumentLoader policyDocumentLoader,
     IArchitectureRepositoryRootResolver repositoryRootResolver,
     IArchitectureAsmdefScanner asmdefScanner)
