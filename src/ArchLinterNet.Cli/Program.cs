@@ -1,3 +1,4 @@
+using ArchLinterNet.Core.Composition;
 using ArchLinterNet.Core.Model;
 using ArchLinterNet.Core.Reporting;
 using ArchLinterNet.Core.Validation;
@@ -7,6 +8,9 @@ namespace ArchLinterNet.Cli;
 public static class Program
 {
     private static readonly ArchitectureDiagnosticFormatter _formatter = new();
+
+    private static readonly Lazy<ArchitectureEngine> _engine =
+        new(() => new ArchitectureEngineBuilder().AddArchLinterNetCore().Build());
 
     public static int Main(string[] args)
     {
@@ -89,7 +93,7 @@ public static class Program
                 Reason = reason,
             };
 
-            BaselineGenerationOutcome outcome = ArchitectureBaselineService.Generate(request);
+            BaselineGenerationOutcome outcome = _engine.Value.GenerateBaseline(request);
 
             if (!outcome.Succeeded)
             {
@@ -117,7 +121,7 @@ public static class Program
 
     private static int RunValidateCommand(string[] args)
     {
-        string version = typeof(ArchitectureValidationService).Assembly.GetName().Version?.ToString(3) ?? "0.0.0";
+        string version = typeof(ArchitectureEngine).Assembly.GetName().Version?.ToString(3) ?? "0.0.0";
 
         string policyPath = "architecture/dependencies.arch.yml";
         string mode = "strict";
@@ -206,7 +210,7 @@ public static class Program
                 EnforceUnmatchedIgnoredViolationsPolicy = true,
             };
 
-            ValidationOutcome outcome = ArchitectureValidationService.Validate(request, timing);
+            ValidationOutcome outcome = _engine.Value.Validate(request, timing);
 
             if (format == "json")
             {
