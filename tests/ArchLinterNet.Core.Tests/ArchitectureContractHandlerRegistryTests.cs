@@ -56,6 +56,8 @@ public sealed class ArchitectureContractHandlerRegistryTests
             new AssemblyIndependenceContractHandler(),
             new AssemblyDependencyContractHandler(),
             new AssemblyAllowOnlyContractHandler(),
+            new PackageDependencyContractHandler(),
+            new PackageAllowOnlyContractHandler(),
             new ProtectedContractHandler(),
             new ExternalContractHandler(),
             new CoverageContractHandler(),
@@ -116,6 +118,8 @@ public sealed class ArchitectureContractHandlerRegistryTests
         Assert.That(registry.TryGetHandler("assembly_independence", out _), Is.True);
         Assert.That(registry.TryGetHandler("assembly_dependency", out _), Is.True);
         Assert.That(registry.TryGetHandler("assembly_allow_only", out _), Is.True);
+        Assert.That(registry.TryGetHandler("package_dependency", out _), Is.True);
+        Assert.That(registry.TryGetHandler("package_allow_only", out _), Is.True);
         Assert.That(registry.TryGetHandler("protected", out _), Is.True);
         Assert.That(registry.TryGetHandler("external", out _), Is.True);
         Assert.That(registry.TryGetHandler("coverage", out _), Is.True);
@@ -144,6 +148,8 @@ public sealed class ArchitectureContractHandlerRegistryTests
         Assert.That(registry.TryGetHandler("assembly_independence", out _), Is.True);
         Assert.That(registry.TryGetHandler("assembly_dependency", out _), Is.True);
         Assert.That(registry.TryGetHandler("assembly_allow_only", out _), Is.True);
+        Assert.That(registry.TryGetHandler("package_dependency", out _), Is.True);
+        Assert.That(registry.TryGetHandler("package_allow_only", out _), Is.True);
         Assert.That(registry.TryGetHandler("protected", out _), Is.True);
         Assert.That(registry.TryGetHandler("external", out _), Is.True);
         Assert.That(registry.TryGetHandler("coverage", out _), Is.True);

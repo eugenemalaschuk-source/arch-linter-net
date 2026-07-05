@@ -29,6 +29,13 @@ public static class ArchitectureDiagnosticMapper
             };
         }
 
+        if (violation.ForbiddenPackageGroup != null)
+        {
+            return new PackageDependencyDiagnostic(
+                violation.ContractName, violation.ContractId, violation.SourceType,
+                violation.ForbiddenNamespace, violation.ForbiddenReferences, violation.ForbiddenPackageGroup);
+        }
+
         return new DependencyDiagnostic(
             violation.ContractName, violation.ContractId, violation.SourceType,
             violation.ForbiddenNamespace, violation.ForbiddenReferences)

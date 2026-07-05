@@ -126,6 +126,28 @@ internal sealed class AssemblyAllowOnlyContractHandler : IArchitectureContractHa
     }
 }
 
+internal sealed class PackageDependencyContractHandler : IArchitectureContractHandler
+{
+    public string Family => "package_dependency";
+
+    public ArchitectureHandlerResult Execute(ArchitectureAnalysisSession session, IArchitectureContract contract)
+    {
+        return ArchitectureHandlerResult.FromViolations(
+            session.CheckPackageDependencyContract((ArchitecturePackageDependencyContract)contract));
+    }
+}
+
+internal sealed class PackageAllowOnlyContractHandler : IArchitectureContractHandler
+{
+    public string Family => "package_allow_only";
+
+    public ArchitectureHandlerResult Execute(ArchitectureAnalysisSession session, IArchitectureContract contract)
+    {
+        return ArchitectureHandlerResult.FromViolations(
+            session.CheckPackageAllowOnlyContract((ArchitecturePackageAllowOnlyContract)contract));
+    }
+}
+
 internal sealed class ProtectedContractHandler : IArchitectureContractHandler
 {
     public string Family => "protected";

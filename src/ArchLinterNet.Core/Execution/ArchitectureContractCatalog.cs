@@ -78,6 +78,10 @@ public sealed class ArchitectureContractCatalog
         AddGroup("audit_assembly_dependency", "audit", "assembly_dependency", groups.AuditAssemblyDependency);
         AddGroup("strict_assembly_allow_only", "strict", "assembly_allow_only", groups.StrictAssemblyAllowOnly);
         AddGroup("audit_assembly_allow_only", "audit", "assembly_allow_only", groups.AuditAssemblyAllowOnly);
+        AddGroup("strict_package_dependency", "strict", "package_dependency", groups.StrictPackageDependency);
+        AddGroup("audit_package_dependency", "audit", "package_dependency", groups.AuditPackageDependency);
+        AddGroup("strict_package_allow_only", "strict", "package_allow_only", groups.StrictPackageAllowOnly);
+        AddGroup("audit_package_allow_only", "audit", "package_allow_only", groups.AuditPackageAllowOnly);
         AddGroup("strict_protected", "strict", "protected", groups.StrictProtected);
         AddGroup("audit_protected", "audit", "protected", groups.AuditProtected);
         AddGroup("strict_external", "strict", "external", groups.StrictExternal);
