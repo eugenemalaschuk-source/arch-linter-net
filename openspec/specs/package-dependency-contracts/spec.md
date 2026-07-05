@@ -101,6 +101,36 @@ Package dependency violations SHALL be reported using a diagnostic kind distinct
 - **WHEN** a policy produces both a `package_dependency` violation and an `external_dependency` violation in the same validation run
 - **THEN** each diagnostic's `Kind` SHALL distinguish package-reference violations from external type-reference violations
 
+### Requirement: Unknown or unusable package groups are reported as configuration violations
+The system SHALL detect, during `CheckConfiguration`, any package group name referenced by a `strict_package_dependency`/`audit_package_dependency` `forbidden` list (or a `strict_package_allow_only`/`audit_package_allow_only` `allowed` list) that either is not declared in `packages` or is declared but has no non-empty `package_ids`/`package_prefixes` matcher, and SHALL report a `<configuration>` violation for each such group instead of allowing the contract to silently match nothing.
+
+#### Scenario: Undeclared package group referenced by a contract
+- **WHEN** a `package_dependency`/`package_allow_only` contract references a package group name that is not a key in `packages`
+- **THEN** `CheckConfiguration` SHALL report a violation identifying that group name as an unknown package group
+
+#### Scenario: Declared package group with no usable matchers
+- **WHEN** a `package_dependency`/`package_allow_only` contract references a package group declared in `packages` with empty (or all-blank) `package_ids` and `package_prefixes`
+- **THEN** `CheckConfiguration` SHALL report a violation identifying that group name as an invalid package group
+
+#### Scenario: Typo in a forbidden group name does not silently pass strict validation
+- **WHEN** a `strict_package_dependency` contract's `forbidden` list contains a group name that does not match any declared `packages` key (e.g. due to a typo)
+- **THEN** strict-mode validation SHALL fail via the `CheckConfiguration` unknown-package-group violation, even though the contract's own evaluation finds no matching package reference
+
+### Requirement: Package dependency/allow-only contracts require discoverable package metadata for their source
+The system SHALL detect, during `CheckConfiguration`, any `package_dependency`/`package_allow_only` contract whose `source` does not correspond to any project in `Context.ProjectDiscovery`'s discovered projects (including when project discovery did not run at all), and SHALL report a `<configuration>` violation identifying the contract and its source, rather than allowing the contract to silently evaluate as passing with no visible signal that no package metadata was available.
+
+#### Scenario: No project discovery configured
+- **WHEN** a policy declares a `package_dependency`/`package_allow_only` contract but `analysis.solution` and `analysis.projects` are both unset, so project discovery never runs
+- **THEN** `CheckConfiguration` SHALL report a violation naming the contract and its source, stating that no package metadata was discovered
+
+#### Scenario: Source assembly not among discovered projects
+- **WHEN** project discovery runs but discovers no project whose assembly name matches a `package_dependency`/`package_allow_only` contract's `source`
+- **THEN** `CheckConfiguration` SHALL report a violation naming the contract and its source, stating that no package metadata was discovered
+
+#### Scenario: Source assembly resolves to a discovered project
+- **WHEN** project discovery discovers a project whose assembly name matches a `package_dependency`/`package_allow_only` contract's `source`
+- **THEN** `CheckConfiguration` SHALL NOT report a missing-package-metadata violation for that contract
+
 ### Requirement: Package dependency contracts are independent of external dependency contracts
 Adding `packages`/`package_dependency` contracts SHALL NOT change the behavior of existing `external_dependencies`/`strict_external`/`audit_external` contracts, and vice versa.
 

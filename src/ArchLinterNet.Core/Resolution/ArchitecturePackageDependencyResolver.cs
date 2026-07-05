@@ -12,6 +12,12 @@ internal static class ArchitecturePackageDependencyResolver
                    .Any(prefix => MatchesPrefix(packageId, prefix));
     }
 
+    public static bool HasUsableMatchers(ArchitecturePackageGroup group)
+    {
+        return EnumerableUsableEntries(group.PackageIds).Any()
+               || EnumerableUsableEntries(group.PackagePrefixes).Any();
+    }
+
     private static bool MatchesPrefix(string packageId, string prefix)
     {
         return string.Equals(packageId, prefix, StringComparison.OrdinalIgnoreCase)

@@ -57,6 +57,13 @@ Violations identify the source project/assembly, the forbidden package group (fo
 
 `ignored_violations` entries use the same `source_type`/`forbidden_reference`/`reason` shape as other contract families; here `source_type` holds the source assembly name and `forbidden_reference` holds the package ID.
 
+## Configuration validation
+
+Two safety checks run as part of `CheckConfiguration` (the same pass that already validates `external_dependencies` group references), so misconfiguration surfaces as a visible failure instead of a contract silently matching nothing:
+
+- **Unknown or unusable package groups.** A package group name referenced by a `forbidden`/`allowed` list that isn't declared in `packages`, or that is declared but has no non-empty `package_ids`/`package_prefixes` matcher, is reported as an `unknown package group`/`invalid package group` configuration violation — this catches a typo in `forbidden`/`allowed` that would otherwise make a `strict_package_dependency`/`strict_package_allow_only` contract pass clean without ever matching anything.
+- **Missing package metadata for `source`.** If a contract's `source` does not correspond to any project discovered via `analysis.solution`/`analysis.projects` (including when project discovery never ran because neither is configured), a `no package metadata discovered` configuration violation names the contract and its source — this makes an otherwise-silent "this contract can never find a violation because no `.csproj` package data was ever parsed" state visible.
+
 ## Package dependency contracts vs external dependency contracts vs assembly dependency contracts
 
 These checks operate at different boundaries and are independent of one another:

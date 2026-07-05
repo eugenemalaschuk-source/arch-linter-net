@@ -64,3 +64,10 @@ Adding `package_allow_only` contracts SHALL NOT change the behavior of existing 
 - **WHEN** a policy defines both `package_dependency` and `package_allow_only` contracts for different source projects
 - **THEN** each contract family evaluates independently and neither changes the other's violations
 
+### Requirement: Package allow-only contracts share configuration validation with package dependency contracts
+Unknown/unusable package groups referenced by a `package_allow_only` contract's `allowed` list, and a `package_allow_only` contract's `source` not resolving to any discovered project's package metadata, SHALL be reported by the same `CheckConfiguration` checks described in the package-dependency-contracts specification's "Unknown or unusable package groups are reported as configuration violations" and "Package dependency/allow-only contracts require discoverable package metadata for their source" requirements.
+
+#### Scenario: Unknown allowed group reported as configuration violation
+- **WHEN** a `package_allow_only` contract's `allowed` list references a package group name not declared in `packages`
+- **THEN** `CheckConfiguration` SHALL report a violation identifying that group name as an unknown package group
+
