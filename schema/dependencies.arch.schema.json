@@ -237,6 +237,26 @@
           "items": { "$ref": "#/$defs/assemblyIndependenceContract" },
           "default": []
         },
+        "strict_assembly_dependency": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/assemblyDependencyContract" },
+          "default": []
+        },
+        "audit_assembly_dependency": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/assemblyDependencyContract" },
+          "default": []
+        },
+        "strict_assembly_allow_only": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/assemblyAllowOnlyContract" },
+          "default": []
+        },
+        "audit_assembly_allow_only": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/assemblyAllowOnlyContract" },
+          "default": []
+        },
         "strict_protected": {
           "type": "array",
           "items": { "$ref": "#/$defs/protectedContract" },
@@ -449,6 +469,32 @@
         "name": { "type": "string", "minLength": 1 },
         "id": { "type": "string", "minLength": 1 },
         "assemblies": { "$ref": "#/$defs/stringList" },
+        "ignored_violations": { "$ref": "#/$defs/ignoredViolations" },
+        "reason": { "type": "string" }
+      }
+    },
+    "assemblyDependencyContract": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "source", "forbidden"],
+      "properties": {
+        "name": { "type": "string", "minLength": 1 },
+        "id": { "type": "string", "minLength": 1 },
+        "source": { "type": "string", "minLength": 1 },
+        "forbidden": { "$ref": "#/$defs/stringList" },
+        "ignored_violations": { "$ref": "#/$defs/ignoredViolations" },
+        "reason": { "type": "string" }
+      }
+    },
+    "assemblyAllowOnlyContract": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "source", "allowed"],
+      "properties": {
+        "name": { "type": "string", "minLength": 1 },
+        "id": { "type": "string", "minLength": 1 },
+        "source": { "type": "string", "minLength": 1 },
+        "allowed": { "$ref": "#/$defs/stringList" },
         "ignored_violations": { "$ref": "#/$defs/ignoredViolations" },
         "reason": { "type": "string" }
       }

@@ -233,6 +233,8 @@ contracts:
   strict_asmdef: []
   strict_independence: []
   strict_assembly_independence: []
+  strict_assembly_dependency: []
+  strict_assembly_allow_only: []
   strict_protected: []
   strict_external: []
   strict_acyclic_siblings: []
@@ -247,6 +249,8 @@ contracts:
   audit_asmdef: []
   audit_independence: []
   audit_assembly_independence: []
+  audit_assembly_dependency: []
+  audit_assembly_allow_only: []
   audit_protected: []
   audit_external: []
   audit_acyclic_siblings: []
@@ -403,6 +407,45 @@ resolved. `ignored_violations` reuses the `source_type`/`forbidden_reference`/`r
 shape, with `source_type`/`forbidden_reference` holding assembly names for this family.
 See [Assembly independence contracts](../contracts/assembly-independence.md) for the
 distinction from namespace/layer independence and Unity `.asmdef` checks.
+
+### Assembly dependency contract
+
+```yaml
+- id: <string>                  # Optional
+  name: <string>
+  source: <string>              # Required — source assembly name
+  forbidden: [<string>]         # Required — assembly names the source must not directly reference
+  ignored_violations: []        # Optional — baseline known violations
+  reason: <string>
+```
+
+Both `source` and every entry in `forbidden` must also appear in `analysis.target_assemblies`,
+or policy loading fails with an actionable error. Detection is direct-reference-only, via
+the source assembly's own referenced-assembly metadata — transitive reference paths are not
+resolved. `ignored_violations` reuses the `source_type`/`forbidden_reference`/`reason` shape,
+with `source_type`/`forbidden_reference` holding assembly names for this family.
+
+### Assembly allow-only contract
+
+```yaml
+- id: <string>                  # Optional
+  name: <string>
+  source: <string>              # Required — source assembly name
+  allowed: [<string>]           # Required — assembly names the source may directly reference
+  ignored_violations: []        # Optional — baseline known violations
+  reason: <string>
+```
+
+Both `source` and every entry in `allowed` must also appear in `analysis.target_assemblies`,
+or policy loading fails with an actionable error. Detection is direct-reference-only. A
+violation is reported for each direct reference to a *declared* (`analysis.target_assemblies`)
+assembly that is not in `allowed` and not the source itself; references to assemblies outside
+`analysis.target_assemblies` are not flagged. `ignored_violations` reuses the
+`source_type`/`forbidden_reference`/`reason` shape, with `source_type`/`forbidden_reference`
+holding assembly names for this family.
+
+See [Assembly dependency contracts](../contracts/assembly-dependency.md) for the distinction
+from namespace/layer dependency contracts, assembly independence, and Unity `.asmdef` checks.
 
 ### Protected surface contract
 
