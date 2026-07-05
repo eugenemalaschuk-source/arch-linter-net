@@ -83,7 +83,7 @@ Adding the assembly allow-only contract family SHALL NOT change the behavior of 
 - **THEN** the namespace/layer allow-only contracts and assembly independence contracts evaluate exactly as they did before this change was introduced
 
 ### Requirement: Assembly allow-only contract accepts an optional dependency_depth field
-An assembly allow-only contract SHALL accept an optional `dependency_depth` field with the same values as namespace-level dependency contracts (`direct` or `transitive`), defaulting to `direct`.
+An assembly allow-only contract SHALL accept an optional `dependency_depth` field, using the same field name as namespace-level dependency contracts, defaulting to `direct`. Only `direct` is currently supported for this family; `transitive` is a recognized value name shared with the namespace-level field but is not yet a valid value here (see the transitive-rejection requirement below).
 
 #### Scenario: Default direct mode
 - **WHEN** an assembly allow-only contract has no `dependency_depth` field

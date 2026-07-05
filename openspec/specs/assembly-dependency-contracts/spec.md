@@ -94,7 +94,7 @@ The system SHALL report `assembly_dependency` violation evidence as a determinis
 - **THEN** the violation's evidence collection contains the string `"A -> B"`
 
 ### Requirement: Assembly dependency contract accepts an optional dependency_depth field
-An assembly dependency contract SHALL accept an optional `dependency_depth` field with the same values as namespace-level dependency contracts (`direct` or `transitive`), defaulting to `direct`.
+An assembly dependency contract SHALL accept an optional `dependency_depth` field, using the same field name as namespace-level dependency contracts, defaulting to `direct`. Only `direct` is currently supported for this family; `transitive` is a recognized value name shared with the namespace-level field but is not yet a valid value here (see the transitive-rejection requirement below).
 
 #### Scenario: Default direct mode
 - **WHEN** an assembly dependency contract has no `dependency_depth` field
