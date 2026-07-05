@@ -593,4 +593,55 @@ public sealed partial class ArchitectureAnalysisSession
         executionContext.CollectUnmatchedIgnores(_unmatchedIgnoredViolations);
         return violations;
     }
+
+    public List<ArchitectureViolation> CheckExternalAllowOnlyContract(ArchitectureExternalAllowOnlyContract contract)
+    {
+        if (!IsContractSelected(contract.Id) || IsDanglingButCoveredByRuleInputCoverage(contract))
+        {
+            return new List<ArchitectureViolation>();
+        }
+
+        ArchitectureLayer sourceLayer = ArchitectureLayerResolver.ResolveLayer(Document, contract.Name, contract.Source);
+        Type[] sourceTypes = ArchitectureTypeScanner.FindTypesInLayer(Context.TargetAssemblies, sourceLayer);
+        List<ArchitectureViolation> violations = new();
+
+        ArchitectureContractExecutionContext executionContext = CreateExecutionContext(contract, contract.IgnoredViolations);
+
+        var allowedGroups = contract.Allowed.ToHashSet(StringComparer.Ordinal);
+        IEnumerable<string> disallowedGroups = Document.ExternalDependencies.Keys
+            .Where(name => !allowedGroups.Contains(name))
+            .OrderBy(name => name, StringComparer.Ordinal);
+
+        foreach (string externalGroupName in disallowedGroups)
+        {
+            ArchitectureExternalDependencyGroup externalGroup = Document.ExternalDependencies[externalGroupName];
+
+            foreach (ArchitectureViolation violation in ArchitectureExternalDependencyViolationFinder.FindViolations(
+                         externalGroupName, sourceTypes, externalGroup, executionContext))
+            {
+                ArchitectureViolation? filtered = ExcludeAllowedTypes(violation, contract.AllowedTypes);
+                if (filtered != null)
+                {
+                    violations.Add(filtered);
+                }
+            }
+        }
+
+        executionContext.CollectUnmatchedIgnores(_unmatchedIgnoredViolations);
+        return violations;
+    }
+
+    private static ArchitectureViolation? ExcludeAllowedTypes(ArchitectureViolation violation, List<string> allowedTypes)
+    {
+        if (allowedTypes.Count == 0)
+        {
+            return violation;
+        }
+
+        string[] remaining = violation.ForbiddenReferences
+            .Where(reference => !allowedTypes.Contains(reference))
+            .ToArray();
+
+        return remaining.Length == 0 ? null : violation with { ForbiddenReferences = remaining };
+    }
 }

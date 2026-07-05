@@ -48,6 +48,7 @@ nav:
       - Package dependency contracts: contracts/package-dependencies.md
       - Protected surface contracts: contracts/protected-surface.md
       - External dependency contracts: contracts/external-dependencies.md
+      - External allow-only contracts: contracts/external-allow-only.md
       - Method-body contracts: contracts/method-body.md
       - Unity asmdef contracts: contracts/asmdef.md
       - Layer templates: contracts/layer-templates.md

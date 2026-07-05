@@ -99,7 +99,7 @@ ArchLinterNet focuses on static architecture guardrails:
 - Dependency cycle, acyclic sibling, independence, and assembly independence checks.
 - Directional assembly dependency and assembly allow-only checks.
 - Protected surface contracts for importer restrictions.
-- External dependency leakage checks for vendor/framework namespaces.
+- External dependency leakage checks and external allow-only whitelist checks for vendor/framework namespaces.
 - Method-body forbidden API checks.
 - Unity `.asmdef` dependency validation.
 - Coverage contracts for unmapped first-party namespaces, projects, and assemblies.
