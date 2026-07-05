@@ -7,5 +7,6 @@ public enum ArchitectureDiagnosticKind
     UnmatchedIgnore,
     Configuration,
     ExternalDependency,
-    PolicyConsistency
+    PolicyConsistency,
+    PackageDependency
 }
