@@ -14,6 +14,8 @@ public sealed partial class ArchitectureAnalysisSession
             return new List<ArchitectureViolation>();
         }
 
+        RequireDirectDependencyDepth(contract.Name, contract.DependencyDepth);
+
         List<ArchitectureViolation> violations = new();
         ArchitectureContractExecutionContext executionContext = CreateExecutionContext(contract, contract.IgnoredViolations);
 
@@ -65,6 +67,8 @@ public sealed partial class ArchitectureAnalysisSession
             return new List<ArchitectureViolation>();
         }
 
+        RequireDirectDependencyDepth(contract.Name, contract.DependencyDepth);
+
         List<ArchitectureViolation> violations = new();
         ArchitectureContractExecutionContext executionContext = CreateExecutionContext(contract, contract.IgnoredViolations);
 
@@ -107,5 +111,17 @@ public sealed partial class ArchitectureAnalysisSession
         return Context.TargetAssemblies
             .GroupBy(assembly => assembly.GetName().Name ?? string.Empty)
             .ToDictionary(group => group.Key, group => group.First(), StringComparer.Ordinal);
+    }
+
+    private static void RequireDirectDependencyDepth(string contractName, DependencyDepthMode dependencyDepth)
+    {
+        if (dependencyDepth != DependencyDepthMode.Direct)
+        {
+            throw new InvalidOperationException(
+                $"Assembly contract '{contractName}' declares 'dependency_depth: transitive', which is not " +
+                "supported yet. Assembly dependency and assembly allow-only contracts only support " +
+                "'dependency_depth: direct' (the default) in this release; transitive assembly-reference-path " +
+                "resolution is a planned follow-up.");
+        }
     }
 }

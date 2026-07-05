@@ -423,12 +423,14 @@ distinction from namespace/layer independence and Unity `.asmdef` checks.
 Both `source` and every entry in `forbidden` must also appear in `analysis.target_assemblies`,
 or policy loading fails with an actionable error. Detection is direct-reference-only, via
 the source assembly's own referenced-assembly metadata — transitive reference paths are not
-resolved. `dependency_depth` only accepts `direct` (the default) in this release; declaring
-`dependency_depth: transitive` fails policy loading with an actionable error rather than being
-silently ignored — transitive assembly-reference-path resolution is a planned follow-up.
-`ignored_violations` reuses the `source_type`/`forbidden_reference`/`reason` shape, with
-`source_type`/`forbidden_reference` holding assembly names for this family. Violation evidence
-is a deterministic `SourceAssembly -> ForbiddenAssembly` string, not a filesystem path.
+resolved. `dependency_depth` only accepts `direct` (the default) in this release — the JSON
+schema itself only allows `direct` as a value, and `transitive` is also rejected at policy-load
+time (and, defensively, at check time for contracts built programmatically rather than loaded
+from YAML) with an actionable error rather than being silently ignored. Transitive
+assembly-reference-path resolution is a planned follow-up. `ignored_violations` reuses the
+`source_type`/`forbidden_reference`/`reason` shape, with `source_type`/`forbidden_reference`
+holding assembly names for this family. Violation evidence is a deterministic
+`SourceAssembly -> ForbiddenAssembly` string, not a filesystem path.
 
 ### Assembly allow-only contract
 
@@ -447,10 +449,11 @@ or policy loading fails with an actionable error. Detection is direct-reference-
 violation is reported for each direct reference to a *declared* (`analysis.target_assemblies`)
 assembly that is not in `allowed` and not the source itself; references to assemblies outside
 `analysis.target_assemblies` are not flagged. `dependency_depth` only accepts `direct` (the
-default) in this release; declaring `dependency_depth: transitive` fails policy loading with an
-actionable error — transitive assembly-reference-path resolution is a planned follow-up.
-`ignored_violations` reuses the `source_type`/`forbidden_reference`/`reason` shape, with
-`source_type`/`forbidden_reference` holding assembly names for this family.
+default) in this release — the JSON schema itself only allows `direct` as a value, and
+`transitive` is also rejected at policy-load time (and, defensively, at check time for contracts
+built programmatically) with an actionable error. Transitive assembly-reference-path resolution
+is a planned follow-up. `ignored_violations` reuses the `source_type`/`forbidden_reference`/`reason`
+shape, with `source_type`/`forbidden_reference` holding assembly names for this family.
 
 See [Assembly dependency contracts](../contracts/assembly-dependency.md) for the distinction
 from namespace/layer dependency contracts, assembly independence, and Unity `.asmdef` checks.

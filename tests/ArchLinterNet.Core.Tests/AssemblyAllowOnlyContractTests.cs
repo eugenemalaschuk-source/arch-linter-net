@@ -182,4 +182,29 @@ public sealed class AssemblyAllowOnlyContractTests
 
         Assert.That(contract.DependencyDepth, Is.EqualTo(DependencyDepthMode.Direct));
     }
+
+    [Test]
+    public void CheckAssemblyAllowOnlyContract_ProgrammaticTransitiveDepth_ThrowsActionableError()
+    {
+        // Contracts built directly (not via the YAML loader) must still be rejected at check time,
+        // so a programmatic/API caller cannot bypass the loader's dependency_depth guard.
+        string testingName = _testingAssembly.GetName().Name!;
+        string coreName = _coreAssembly.GetName().Name!;
+
+        var contract = new ArchitectureAssemblyAllowOnlyContract
+        {
+            Name = "Testing may not reference anything",
+            Source = testingName,
+            Allowed = new List<string>(),
+            DependencyDepth = DependencyDepthMode.Transitive
+        };
+        var document = CreateDocument(new List<string> { testingName, coreName }, contract);
+        var runner = new ArchitectureContractRunner(CreateContext(_testingAssembly, _coreAssembly), document);
+
+        InvalidOperationException ex = Assert.Throws<InvalidOperationException>(() =>
+            runner.Session.CheckAssemblyAllowOnlyContract(contract))!;
+
+        Assert.That(ex.Message, Does.Contain("dependency_depth: transitive"));
+        Assert.That(ex.Message, Does.Contain("not supported yet"));
+    }
 }
