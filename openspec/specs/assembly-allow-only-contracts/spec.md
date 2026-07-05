@@ -1,7 +1,8 @@
 # assembly-allow-only-contracts Specification
 
 ## Purpose
-TBD - created by archiving change add-assembly-dependency-contracts. Update Purpose after archive.
+Evaluates strict and audit directional assembly allow-only contracts that restrict a named source .NET assembly to only directly referencing an explicitly allowed set of declared assemblies, complementing namespace/layer allow-only contracts with a compiled-assembly-level directional check.
+
 ## Requirements
 ### Requirement: Evaluate directional allow-only assembly references
 The system SHALL verify that a named source assembly in a `strict_assembly_allow_only`/`audit_assembly_allow_only` contract only directly references assemblies listed in the contract's `allowed` list (plus itself).
@@ -81,4 +82,22 @@ Adding the assembly allow-only contract family SHALL NOT change the behavior of 
 #### Scenario: Existing allow-only and assembly independence behavior unchanged
 - **WHEN** a policy defines namespace/layer allow-only contracts, assembly independence contracts, and assembly allow-only contracts together
 - **THEN** the namespace/layer allow-only contracts and assembly independence contracts evaluate exactly as they did before this change was introduced
+
+### Requirement: Assembly allow-only contract accepts an optional dependency_depth field
+An assembly allow-only contract SHALL accept an optional `dependency_depth` field with the same values as namespace-level dependency contracts (`direct` or `transitive`), defaulting to `direct`.
+
+#### Scenario: Default direct mode
+- **WHEN** an assembly allow-only contract has no `dependency_depth` field
+- **THEN** the contract behaves as `dependency_depth: direct`
+
+#### Scenario: Explicit direct mode loads successfully
+- **WHEN** an assembly allow-only contract declares `dependency_depth: direct`
+- **THEN** policy loading succeeds and the contract is evaluated as direct-reference-only
+
+### Requirement: Assembly allow-only rejects transitive depth at load time
+The system SHALL reject, at policy load time, any `strict_assembly_allow_only`/`audit_assembly_allow_only` contract that declares `dependency_depth: transitive`, with a diagnostic identifying the contract and stating that transitive assembly-reference-path resolution is not supported yet.
+
+#### Scenario: Transitive depth rejected at load time
+- **WHEN** an assembly allow-only contract declares `dependency_depth: transitive`
+- **THEN** policy loading fails with an actionable error identifying the contract and stating that only `direct` is currently supported
 

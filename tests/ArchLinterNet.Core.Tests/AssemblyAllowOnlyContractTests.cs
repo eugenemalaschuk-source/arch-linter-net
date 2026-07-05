@@ -174,4 +174,12 @@ public sealed class AssemblyAllowOnlyContractTests
 
         Assert.That(violations, Is.Empty);
     }
+
+    [Test]
+    public void ArchitectureAssemblyAllowOnlyContract_DependencyDepth_DefaultsToDirect()
+    {
+        var contract = new ArchitectureAssemblyAllowOnlyContract();
+
+        Assert.That(contract.DependencyDepth, Is.EqualTo(DependencyDepthMode.Direct));
+    }
 }

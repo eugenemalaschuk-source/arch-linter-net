@@ -99,6 +99,50 @@ public sealed class AssemblyAllowOnlyValidationTests
     }
 
     [Test]
+    public void AssemblyAllowOnly_ExplicitDependencyDepthDirect_LoadsSuccessfully()
+    {
+        string policyPath = WritePolicy($"""
+            version: 1
+            name: Test
+            analysis:
+              target_assemblies: [{AssemblyName}, ArchLinterNet.Core]
+            contracts:
+              strict_assembly_allow_only:
+                - name: assembly-allow-only
+                  source: {AssemblyName}
+                  allowed: [ArchLinterNet.Core]
+                  dependency_depth: direct
+                  reason: Test assembly allow-only contract.
+            """);
+
+        Assert.DoesNotThrow(() => new ArchitecturePolicyDocumentLoader().Load(policyPath));
+    }
+
+    [Test]
+    public void AssemblyAllowOnly_DependencyDepthTransitive_ThrowsActionableError()
+    {
+        string policyPath = WritePolicy($"""
+            version: 1
+            name: Test
+            analysis:
+              target_assemblies: [{AssemblyName}, ArchLinterNet.Core]
+            contracts:
+              strict_assembly_allow_only:
+                - name: assembly-allow-only
+                  source: {AssemblyName}
+                  allowed: [ArchLinterNet.Core]
+                  dependency_depth: transitive
+                  reason: Invalid assembly allow-only contract.
+            """);
+
+        InvalidOperationException ex = Assert.Throws<InvalidOperationException>(() =>
+            new ArchitecturePolicyDocumentLoader().Load(policyPath))!;
+
+        Assert.That(ex.Message, Does.Contain("dependency_depth: transitive"));
+        Assert.That(ex.Message, Does.Contain("not supported yet"));
+    }
+
+    [Test]
     public void AssemblyAllowOnly_DuplicateIds_ThrowsActionableError()
     {
         string policyPath = WritePolicy($"""

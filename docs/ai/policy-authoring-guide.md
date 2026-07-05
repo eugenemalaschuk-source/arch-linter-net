@@ -295,7 +295,10 @@ should only reference an explicit allow-list of other declared assemblies —
 for example, an application assembly that may depend on abstractions but not
 concrete adapters. Both are direct-reference-only, and every assembly name
 referenced (`source`, `forbidden`, `allowed`) must appear in
-`analysis.target_assemblies`.
+`analysis.target_assemblies`. Both accept an optional `dependency_depth` field
+that only supports `direct` (the default) in this release — do not author
+`dependency_depth: transitive` for these two families; it fails policy loading
+with an actionable error rather than being silently ignored.
 
 ```yaml
 contracts:

@@ -99,6 +99,50 @@ public sealed class AssemblyDependencyValidationTests
     }
 
     [Test]
+    public void AssemblyDependency_ExplicitDependencyDepthDirect_LoadsSuccessfully()
+    {
+        string policyPath = WritePolicy($"""
+            version: 1
+            name: Test
+            analysis:
+              target_assemblies: [{AssemblyName}, ArchLinterNet.Core]
+            contracts:
+              strict_assembly_dependency:
+                - name: assembly-dependency
+                  source: {AssemblyName}
+                  forbidden: [ArchLinterNet.Core]
+                  dependency_depth: direct
+                  reason: Test assembly dependency contract.
+            """);
+
+        Assert.DoesNotThrow(() => new ArchitecturePolicyDocumentLoader().Load(policyPath));
+    }
+
+    [Test]
+    public void AssemblyDependency_DependencyDepthTransitive_ThrowsActionableError()
+    {
+        string policyPath = WritePolicy($"""
+            version: 1
+            name: Test
+            analysis:
+              target_assemblies: [{AssemblyName}, ArchLinterNet.Core]
+            contracts:
+              strict_assembly_dependency:
+                - name: assembly-dependency
+                  source: {AssemblyName}
+                  forbidden: [ArchLinterNet.Core]
+                  dependency_depth: transitive
+                  reason: Invalid assembly dependency contract.
+            """);
+
+        InvalidOperationException ex = Assert.Throws<InvalidOperationException>(() =>
+            new ArchitecturePolicyDocumentLoader().Load(policyPath))!;
+
+        Assert.That(ex.Message, Does.Contain("dependency_depth: transitive"));
+        Assert.That(ex.Message, Does.Contain("not supported yet"));
+    }
+
+    [Test]
     public void AssemblyDependency_DuplicateIds_ThrowsActionableError()
     {
         string policyPath = WritePolicy($"""

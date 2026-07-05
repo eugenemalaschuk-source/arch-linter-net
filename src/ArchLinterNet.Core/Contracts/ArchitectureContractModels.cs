@@ -490,6 +490,9 @@ public sealed class ArchitectureAssemblyDependencyContract : IArchitectureContra
 
     [YamlMember(Alias = "forbidden")] public List<string> Forbidden { get; set; } = new();
 
+    [YamlMember(Alias = "dependency_depth")]
+    public DependencyDepthMode DependencyDepth { get; set; } = DependencyDepthMode.Direct;
+
     [YamlMember(Alias = "ignored_violations")]
     public List<ArchitectureIgnoredViolation> IgnoredViolations { get; set; } = new();
 
@@ -505,6 +508,9 @@ public sealed class ArchitectureAssemblyAllowOnlyContract : IArchitectureContrac
     [YamlMember(Alias = "source")] public string Source { get; set; } = string.Empty;
 
     [YamlMember(Alias = "allowed")] public List<string> Allowed { get; set; } = new();
+
+    [YamlMember(Alias = "dependency_depth")]
+    public DependencyDepthMode DependencyDepth { get; set; } = DependencyDepthMode.Direct;
 
     [YamlMember(Alias = "ignored_violations")]
     public List<ArchitectureIgnoredViolation> IgnoredViolations { get; set; } = new();

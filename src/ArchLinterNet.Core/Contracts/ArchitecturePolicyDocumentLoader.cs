@@ -501,6 +501,15 @@ public sealed class ArchitecturePolicyDocumentLoader : IArchitecturePolicyDocume
         foreach (ArchitectureAssemblyDependencyContract contract in document.Contracts.StrictAssemblyDependency
                      .Concat(document.Contracts.AuditAssemblyDependency))
         {
+            if (contract.DependencyDepth != DependencyDepthMode.Direct)
+            {
+                throw new InvalidOperationException(
+                    $"Assembly dependency contract '{contract.Name}' declares 'dependency_depth: transitive', which is " +
+                    "not supported yet. 'strict_assembly_dependency'/'audit_assembly_dependency' only support " +
+                    "'dependency_depth: direct' (the default) in this release; transitive assembly-reference-path " +
+                    "resolution is a planned follow-up.");
+            }
+
             if (!targetAssemblies.Contains(contract.Source))
             {
                 throw new InvalidOperationException(
@@ -529,6 +538,15 @@ public sealed class ArchitecturePolicyDocumentLoader : IArchitecturePolicyDocume
         foreach (ArchitectureAssemblyAllowOnlyContract contract in document.Contracts.StrictAssemblyAllowOnly
                      .Concat(document.Contracts.AuditAssemblyAllowOnly))
         {
+            if (contract.DependencyDepth != DependencyDepthMode.Direct)
+            {
+                throw new InvalidOperationException(
+                    $"Assembly allow-only contract '{contract.Name}' declares 'dependency_depth: transitive', which is " +
+                    "not supported yet. 'strict_assembly_allow_only'/'audit_assembly_allow_only' only support " +
+                    "'dependency_depth: direct' (the default) in this release; transitive assembly-reference-path " +
+                    "resolution is a planned follow-up.");
+            }
+
             if (!targetAssemblies.Contains(contract.Source))
             {
                 throw new InvalidOperationException(

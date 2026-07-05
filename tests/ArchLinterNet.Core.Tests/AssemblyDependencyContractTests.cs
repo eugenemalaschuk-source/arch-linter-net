@@ -81,6 +81,8 @@ public sealed class AssemblyDependencyContractTests
         Assert.That(violations[0].ContractId, Is.EqualTo("testing-no-core"));
         Assert.That(violations[0].SourceType, Is.EqualTo(testingName));
         Assert.That(violations[0].ForbiddenNamespace, Is.EqualTo(coreName));
+        Assert.That(violations[0].ForbiddenReferences, Is.EqualTo(new[] { $"{testingName} -> {coreName}" }),
+            "Evidence must be deterministic source -> forbidden assembly text, not a filesystem path.");
     }
 
     [Test]
@@ -194,5 +196,13 @@ public sealed class AssemblyDependencyContractTests
         List<ArchitectureViolation> violations = runner.Session.CheckAssemblyDependencyContract(contract);
 
         Assert.That(violations, Is.Empty);
+    }
+
+    [Test]
+    public void ArchitectureAssemblyDependencyContract_DependencyDepth_DefaultsToDirect()
+    {
+        var contract = new ArchitectureAssemblyDependencyContract();
+
+        Assert.That(contract.DependencyDepth, Is.EqualTo(DependencyDepthMode.Direct));
     }
 }

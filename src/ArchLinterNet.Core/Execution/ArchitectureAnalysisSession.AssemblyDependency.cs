@@ -51,7 +51,7 @@ public sealed partial class ArchitectureAnalysisSession
                 contract.Id,
                 contract.Source,
                 forbiddenAssemblyName,
-                new[] { sourceAssembly.Location }));
+                new[] { $"{contract.Source} -> {forbiddenAssemblyName}" }));
         }
 
         executionContext.CollectUnmatchedIgnores(_unmatchedIgnoredViolations);

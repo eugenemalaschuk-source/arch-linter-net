@@ -482,6 +482,12 @@
         "id": { "type": "string", "minLength": 1 },
         "source": { "type": "string", "minLength": 1 },
         "forbidden": { "$ref": "#/$defs/stringList" },
+        "dependency_depth": {
+          "type": "string",
+          "enum": ["direct", "transitive"],
+          "default": "direct",
+          "description": "Evaluation depth for assembly dependency checking. Only 'direct' (the default) is currently supported; 'transitive' fails policy loading with an actionable error until transitive assembly-reference-path resolution ships as a follow-up."
+        },
         "ignored_violations": { "$ref": "#/$defs/ignoredViolations" },
         "reason": { "type": "string" }
       }
@@ -495,6 +501,12 @@
         "id": { "type": "string", "minLength": 1 },
         "source": { "type": "string", "minLength": 1 },
         "allowed": { "$ref": "#/$defs/stringList" },
+        "dependency_depth": {
+          "type": "string",
+          "enum": ["direct", "transitive"],
+          "default": "direct",
+          "description": "Evaluation depth for assembly allow-only checking. Only 'direct' (the default) is currently supported; 'transitive' fails policy loading with an actionable error until transitive assembly-reference-path resolution ships as a follow-up."
+        },
         "ignored_violations": { "$ref": "#/$defs/ignoredViolations" },
         "reason": { "type": "string" }
       }
