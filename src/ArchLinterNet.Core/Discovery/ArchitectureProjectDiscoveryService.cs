@@ -125,7 +125,8 @@ public sealed class ArchitectureProjectDiscoveryService : IArchitectureProjectDi
             // build output can be (or needs to be) resolved for assembly seeding.
             sourceRoots.Add(GetRelativeDirectory(repositoryRoot, projectPath));
             discoveredProjects.Add(new ArchitectureDiscoveredProject(
-                GetRelativePath(repositoryRoot, projectPath), projectFile.AssemblyName, projectFile.TargetFrameworks));
+                GetRelativePath(repositoryRoot, projectPath), projectFile.AssemblyName, projectFile.TargetFrameworks,
+                projectFile.PackageReferences));
 
             if (!resolveAssemblyOutputs)
             {

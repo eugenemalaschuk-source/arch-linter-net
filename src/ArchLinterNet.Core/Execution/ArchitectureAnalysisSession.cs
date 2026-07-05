@@ -264,6 +264,8 @@ public sealed partial class ArchitectureAnalysisSession
 
         Dictionary<string, HashSet<string>> layerReferencingContractIds = new(StringComparer.Ordinal);
         HashSet<string> referencedExternalGroups = new(StringComparer.Ordinal);
+        HashSet<string> referencedPackageGroups = new(StringComparer.Ordinal);
+        List<(string ContractName, string? ContractId, string Source)> packageContractSources = new();
 
         void AddLayerNames(string? contractId, IEnumerable<string> names)
         {
@@ -287,6 +289,14 @@ public sealed partial class ArchitectureAnalysisSession
             foreach (string name in names)
             {
                 referencedExternalGroups.Add(name);
+            }
+        }
+
+        void AddPackageGroupNames(IEnumerable<string> names)
+        {
+            foreach (string name in names)
+            {
+                referencedPackageGroups.Add(name);
             }
         }
 
@@ -335,6 +345,18 @@ public sealed partial class ArchitectureAnalysisSession
                 AddLayerNames(c.Id, new[] { c.Source });
                 AddExternalGroupNames(c.Forbidden);
             }
+
+            foreach (ArchitecturePackageDependencyContract c in Document.Contracts.StrictPackageDependency)
+            {
+                AddPackageGroupNames(c.Forbidden);
+                packageContractSources.Add((c.Name, c.Id, c.Source));
+            }
+
+            foreach (ArchitecturePackageAllowOnlyContract c in Document.Contracts.StrictPackageAllowOnly)
+            {
+                AddPackageGroupNames(c.Allowed);
+                packageContractSources.Add((c.Name, c.Id, c.Source));
+            }
         }
         else
         {
@@ -380,6 +402,18 @@ public sealed partial class ArchitectureAnalysisSession
             {
                 AddLayerNames(c.Id, new[] { c.Source });
                 AddExternalGroupNames(c.Forbidden);
+            }
+
+            foreach (ArchitecturePackageDependencyContract c in Document.Contracts.AuditPackageDependency)
+            {
+                AddPackageGroupNames(c.Forbidden);
+                packageContractSources.Add((c.Name, c.Id, c.Source));
+            }
+
+            foreach (ArchitecturePackageAllowOnlyContract c in Document.Contracts.AuditPackageAllowOnly)
+            {
+                AddPackageGroupNames(c.Allowed);
+                packageContractSources.Add((c.Name, c.Id, c.Source));
             }
         }
 
@@ -470,6 +504,73 @@ public sealed partial class ArchitectureAnalysisSession
             {
                 ForbiddenExternalGroup = groupName
             });
+        }
+
+        foreach (string groupName in referencedPackageGroups)
+        {
+            if (!Document.Packages.TryGetValue(groupName, out ArchitecturePackageGroup? group))
+            {
+                violations.Add(new ArchitectureViolation(
+                    "<configuration>",
+                    null,
+                    groupName,
+                    "unknown package group",
+                    new[]
+                    {
+                        $"Package group '{groupName}' is referenced by a contract but is not declared in packages."
+                    })
+                {
+                    ForbiddenPackageGroup = groupName
+                });
+
+                continue;
+            }
+
+            if (ArchitecturePackageDependencyResolver.HasUsableMatchers(group))
+            {
+                continue;
+            }
+
+            violations.Add(new ArchitectureViolation(
+                "<configuration>",
+                null,
+                groupName,
+                "invalid package group",
+                new[]
+                {
+                    $"Package group '{groupName}' must declare at least one non-empty package_ids or package_prefixes matcher."
+                })
+            {
+                ForbiddenPackageGroup = groupName
+            });
+        }
+
+        if (packageContractSources.Count > 0)
+        {
+            HashSet<string> projectsWithPackageData = new(
+                Context.ProjectDiscovery?.DiscoveredProjects.Select(project => project.AssemblyName) ?? Enumerable.Empty<string>(),
+                StringComparer.Ordinal);
+
+            foreach ((string contractName, string? contractId, string source) in packageContractSources
+                         .DistinctBy(entry => (entry.ContractName, entry.ContractId, entry.Source)))
+            {
+                if (projectsWithPackageData.Contains(source))
+                {
+                    continue;
+                }
+
+                violations.Add(new ArchitectureViolation(
+                    contractName,
+                    contractId,
+                    source,
+                    "no package metadata discovered",
+                    new[]
+                    {
+                        $"Contract '{contractName}' declares source '{source}', but no discovered project with that assembly name has package reference metadata available. " +
+                        "Package dependency/allow-only contracts require analysis.solution or analysis.projects to be configured so project discovery can parse PackageReference items; " +
+                        "without it, this contract will never report a violation."
+                    }));
+            }
         }
 
         return violations;

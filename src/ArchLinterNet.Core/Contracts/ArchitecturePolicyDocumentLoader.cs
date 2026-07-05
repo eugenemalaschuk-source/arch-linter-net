@@ -52,6 +52,8 @@ public sealed class ArchitecturePolicyDocumentLoader : IArchitecturePolicyDocume
         ValidateAssemblyIndependenceContracts(document);
         ValidateAssemblyDependencyContracts(document);
         ValidateAssemblyAllowOnlyContracts(document);
+        ValidatePackageDependencyContracts(document);
+        ValidatePackageAllowOnlyContracts(document);
 
         return document;
     }
@@ -101,6 +103,10 @@ public sealed class ArchitecturePolicyDocumentLoader : IArchitecturePolicyDocume
             document.Contracts.AuditAssemblyDependency,
             document.Contracts.StrictAssemblyAllowOnly,
             document.Contracts.AuditAssemblyAllowOnly,
+            document.Contracts.StrictPackageDependency,
+            document.Contracts.AuditPackageDependency,
+            document.Contracts.StrictPackageAllowOnly,
+            document.Contracts.AuditPackageAllowOnly,
             document.Contracts.StrictProtected,
             document.Contracts.AuditProtected,
             document.Contracts.StrictExternal,
@@ -564,6 +570,58 @@ public sealed class ArchitecturePolicyDocumentLoader : IArchitecturePolicyDocume
                         "that is not declared in 'analysis.target_assemblies'. Every assembly referenced by " +
                         "'strict_assembly_allow_only'/'audit_assembly_allow_only' must be a declared target assembly.");
                 }
+            }
+        }
+    }
+
+    private static void ValidatePackageDependencyContracts(ArchitectureContractDocument document)
+    {
+        HashSet<string> targetAssemblies = new(document.Analysis.TargetAssemblies, StringComparer.Ordinal);
+
+        foreach (ArchitecturePackageDependencyContract contract in document.Contracts.StrictPackageDependency
+                     .Concat(document.Contracts.AuditPackageDependency))
+        {
+            if (contract.DependencyDepth != DependencyDepthMode.Direct)
+            {
+                throw new InvalidOperationException(
+                    $"Package dependency contract '{contract.Name}' declares 'dependency_depth: transitive', which is " +
+                    "not supported yet. 'strict_package_dependency'/'audit_package_dependency' only support " +
+                    "'dependency_depth: direct' (the default) in this release; transitive package-reference " +
+                    "resolution is not supported.");
+            }
+
+            if (!targetAssemblies.Contains(contract.Source))
+            {
+                throw new InvalidOperationException(
+                    $"Package dependency contract '{contract.Name}' references source '{contract.Source}' " +
+                    "that is not declared in 'analysis.target_assemblies'. The 'source' of a " +
+                    "'strict_package_dependency'/'audit_package_dependency' contract must be a declared target assembly.");
+            }
+        }
+    }
+
+    private static void ValidatePackageAllowOnlyContracts(ArchitectureContractDocument document)
+    {
+        HashSet<string> targetAssemblies = new(document.Analysis.TargetAssemblies, StringComparer.Ordinal);
+
+        foreach (ArchitecturePackageAllowOnlyContract contract in document.Contracts.StrictPackageAllowOnly
+                     .Concat(document.Contracts.AuditPackageAllowOnly))
+        {
+            if (contract.DependencyDepth != DependencyDepthMode.Direct)
+            {
+                throw new InvalidOperationException(
+                    $"Package allow-only contract '{contract.Name}' declares 'dependency_depth: transitive', which is " +
+                    "not supported yet. 'strict_package_allow_only'/'audit_package_allow_only' only support " +
+                    "'dependency_depth: direct' (the default) in this release; transitive package-reference " +
+                    "resolution is not supported.");
+            }
+
+            if (!targetAssemblies.Contains(contract.Source))
+            {
+                throw new InvalidOperationException(
+                    $"Package allow-only contract '{contract.Name}' references source '{contract.Source}' " +
+                    "that is not declared in 'analysis.target_assemblies'. The 'source' of a " +
+                    "'strict_package_allow_only'/'audit_package_allow_only' contract must be a declared target assembly.");
             }
         }
     }
