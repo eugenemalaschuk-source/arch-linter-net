@@ -110,6 +110,7 @@ contracts:
       source: MyCompany.Product.Modules.Sales
       forbidden:
         - MyCompany.Product.Modules.Billing
+      dependency_depth: direct  # only supported value today; transitive is a planned follow-up
       reason: >-
         Sales must depend on Billing only through public contracts, never through
         a direct compiled assembly reference.
@@ -120,6 +121,7 @@ contracts:
     - name: shared-kernel-assembly-allowed-refs
       source: MyCompany.Product.SharedKernel
       allowed: []
+      dependency_depth: direct  # only supported value today; transitive is a planned follow-up
       reason: >-
         The shared kernel assembly must not directly reference any module
         assembly at the compiled assembly level.
