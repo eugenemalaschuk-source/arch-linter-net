@@ -104,3 +104,24 @@ contracts:
         assembly level, even for code outside the declared namespace layers above.
 
   audit_assembly_independence: []
+
+  strict_assembly_dependency:
+    - name: sales-assembly-must-not-reference-billing-assembly
+      source: MyCompany.Product.Modules.Sales
+      forbidden:
+        - MyCompany.Product.Modules.Billing
+      reason: >-
+        Sales must depend on Billing only through public contracts, never through
+        a direct compiled assembly reference.
+
+  audit_assembly_dependency: []
+
+  strict_assembly_allow_only:
+    - name: shared-kernel-assembly-allowed-refs
+      source: MyCompany.Product.SharedKernel
+      allowed: []
+      reason: >-
+        The shared kernel assembly must not directly reference any module
+        assembly at the compiled assembly level.
+
+  audit_assembly_allow_only: []

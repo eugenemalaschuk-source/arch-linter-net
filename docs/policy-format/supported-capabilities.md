@@ -48,6 +48,14 @@ and fails validation with an actionable error.
 Assembly independence contracts detect only **direct** assembly references; transitive
 reference paths between two listed assemblies are not resolved.
 
+Assembly dependency and assembly allow-only contracts also detect only **direct**
+assembly references, and their optional `dependency_depth` field only accepts `direct`
+(the default) — declaring `dependency_depth: transitive` fails policy loading with an
+actionable error rather than being silently ignored, since transitive assembly-reference-path
+resolution is not implemented yet. Ordered assembly/project layer contracts and
+assembly/project cycle detection are not yet supported either; these are deferred to a
+follow-up contract family.
+
 ## Important distinctions
 
 ### Static references, not runtime behavior

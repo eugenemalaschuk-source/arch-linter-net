@@ -104,6 +104,28 @@ internal sealed class AssemblyIndependenceContractHandler : IArchitectureContrac
     }
 }
 
+internal sealed class AssemblyDependencyContractHandler : IArchitectureContractHandler
+{
+    public string Family => "assembly_dependency";
+
+    public ArchitectureHandlerResult Execute(ArchitectureAnalysisSession session, IArchitectureContract contract)
+    {
+        return ArchitectureHandlerResult.FromViolations(
+            session.CheckAssemblyDependencyContract((ArchitectureAssemblyDependencyContract)contract));
+    }
+}
+
+internal sealed class AssemblyAllowOnlyContractHandler : IArchitectureContractHandler
+{
+    public string Family => "assembly_allow_only";
+
+    public ArchitectureHandlerResult Execute(ArchitectureAnalysisSession session, IArchitectureContract contract)
+    {
+        return ArchitectureHandlerResult.FromViolations(
+            session.CheckAssemblyAllowOnlyContract((ArchitectureAssemblyAllowOnlyContract)contract));
+    }
+}
+
 internal sealed class ProtectedContractHandler : IArchitectureContractHandler
 {
     public string Family => "protected";

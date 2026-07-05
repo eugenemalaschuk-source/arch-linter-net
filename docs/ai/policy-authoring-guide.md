@@ -288,6 +288,38 @@ from Unity `strict_asmdef`/`audit_asmdef` (Unity `.asmdef` manifest checks) —
 see [Assembly independence contracts](../contracts/assembly-independence.md)
 for the distinction.
 
+Use `strict_assembly_dependency` when the boundary you need is directional and
+assembly-scoped — for example, `MyApp.Domain` must never reference
+`MyApp.Infrastructure`. Use `strict_assembly_allow_only` when a source assembly
+should only reference an explicit allow-list of other declared assemblies —
+for example, an application assembly that may depend on abstractions but not
+concrete adapters. Both are direct-reference-only, and every assembly name
+referenced (`source`, `forbidden`, `allowed`) must appear in
+`analysis.target_assemblies`. Both accept an optional `dependency_depth` field
+that only supports `direct` (the default) in this release — do not author
+`dependency_depth: transitive` for these two families; it fails policy loading
+with an actionable error rather than being silently ignored.
+
+```yaml
+contracts:
+  strict_assembly_dependency:
+    - id: domain-no-infrastructure
+      name: domain-must-not-reference-infrastructure
+      source: MyApp.Domain
+      forbidden: [MyApp.Infrastructure]
+      reason: Domain must stay free of infrastructure concerns.
+  strict_assembly_allow_only:
+    - id: application-allowed-refs
+      name: application-may-only-reference-abstractions
+      source: MyApp.Application
+      allowed: [MyApp.Domain, MyApp.Domain.Abstractions]
+      reason: Application may depend on abstractions, not concrete adapters.
+```
+
+These are different from `strict_assembly_independence` (mutual, not
+directional) — see [Assembly dependency contracts](../contracts/assembly-dependency.md)
+for the distinction.
+
 Use `strict_acyclic_siblings` when you want to automatically discover sibling
 namespaces under one or more ancestor namespaces and ensure they don't form
 dependency cycles. This is useful for feature-group architectures where siblings

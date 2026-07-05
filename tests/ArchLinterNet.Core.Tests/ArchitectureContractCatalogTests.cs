@@ -143,7 +143,8 @@ public sealed class ArchitectureContractCatalogTests
         Assert.That(catalog.FamiliesInOrder, Is.EqualTo(new[]
         {
             "dependency", "layer", "layer_template", "allow_only", "cycle", "method_body",
-            "asmdef", "independence", "assembly_independence", "protected", "external", "acyclic_sibling", "coverage",
+            "asmdef", "independence", "assembly_independence", "assembly_dependency", "assembly_allow_only",
+            "protected", "external", "acyclic_sibling", "coverage",
         }));
     }
 
