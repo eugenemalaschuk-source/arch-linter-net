@@ -50,6 +50,8 @@ public sealed class ArchitecturePolicyDocumentLoader : IArchitecturePolicyDocume
         ValidateCoverageNamespaces(document);
         ValidateImplementedCoverageScopes(document);
         ValidateAssemblyIndependenceContracts(document);
+        ValidateAssemblyDependencyContracts(document);
+        ValidateAssemblyAllowOnlyContracts(document);
 
         return document;
     }
@@ -95,6 +97,10 @@ public sealed class ArchitecturePolicyDocumentLoader : IArchitecturePolicyDocume
             document.Contracts.AuditIndependence,
             document.Contracts.StrictAssemblyIndependence,
             document.Contracts.AuditAssemblyIndependence,
+            document.Contracts.StrictAssemblyDependency,
+            document.Contracts.AuditAssemblyDependency,
+            document.Contracts.StrictAssemblyAllowOnly,
+            document.Contracts.AuditAssemblyAllowOnly,
             document.Contracts.StrictProtected,
             document.Contracts.AuditProtected,
             document.Contracts.StrictExternal,
@@ -483,6 +489,80 @@ public sealed class ArchitecturePolicyDocumentLoader : IArchitecturePolicyDocume
                         $"Assembly independence contract '{contract.Name}' references assembly '{assemblyName}' " +
                         "that is not declared in 'analysis.target_assemblies'. Every assembly listed in " +
                         "'strict_assembly_independence'/'audit_assembly_independence' must be a declared target assembly.");
+                }
+            }
+        }
+    }
+
+    private static void ValidateAssemblyDependencyContracts(ArchitectureContractDocument document)
+    {
+        HashSet<string> targetAssemblies = new(document.Analysis.TargetAssemblies, StringComparer.Ordinal);
+
+        foreach (ArchitectureAssemblyDependencyContract contract in document.Contracts.StrictAssemblyDependency
+                     .Concat(document.Contracts.AuditAssemblyDependency))
+        {
+            if (contract.DependencyDepth != DependencyDepthMode.Direct)
+            {
+                throw new InvalidOperationException(
+                    $"Assembly dependency contract '{contract.Name}' declares 'dependency_depth: transitive', which is " +
+                    "not supported yet. 'strict_assembly_dependency'/'audit_assembly_dependency' only support " +
+                    "'dependency_depth: direct' (the default) in this release; transitive assembly-reference-path " +
+                    "resolution is a planned follow-up.");
+            }
+
+            if (!targetAssemblies.Contains(contract.Source))
+            {
+                throw new InvalidOperationException(
+                    $"Assembly dependency contract '{contract.Name}' references source assembly '{contract.Source}' " +
+                    "that is not declared in 'analysis.target_assemblies'. Every assembly referenced by " +
+                    "'strict_assembly_dependency'/'audit_assembly_dependency' must be a declared target assembly.");
+            }
+
+            foreach (string assemblyName in contract.Forbidden)
+            {
+                if (!targetAssemblies.Contains(assemblyName))
+                {
+                    throw new InvalidOperationException(
+                        $"Assembly dependency contract '{contract.Name}' references forbidden assembly '{assemblyName}' " +
+                        "that is not declared in 'analysis.target_assemblies'. Every assembly referenced by " +
+                        "'strict_assembly_dependency'/'audit_assembly_dependency' must be a declared target assembly.");
+                }
+            }
+        }
+    }
+
+    private static void ValidateAssemblyAllowOnlyContracts(ArchitectureContractDocument document)
+    {
+        HashSet<string> targetAssemblies = new(document.Analysis.TargetAssemblies, StringComparer.Ordinal);
+
+        foreach (ArchitectureAssemblyAllowOnlyContract contract in document.Contracts.StrictAssemblyAllowOnly
+                     .Concat(document.Contracts.AuditAssemblyAllowOnly))
+        {
+            if (contract.DependencyDepth != DependencyDepthMode.Direct)
+            {
+                throw new InvalidOperationException(
+                    $"Assembly allow-only contract '{contract.Name}' declares 'dependency_depth: transitive', which is " +
+                    "not supported yet. 'strict_assembly_allow_only'/'audit_assembly_allow_only' only support " +
+                    "'dependency_depth: direct' (the default) in this release; transitive assembly-reference-path " +
+                    "resolution is a planned follow-up.");
+            }
+
+            if (!targetAssemblies.Contains(contract.Source))
+            {
+                throw new InvalidOperationException(
+                    $"Assembly allow-only contract '{contract.Name}' references source assembly '{contract.Source}' " +
+                    "that is not declared in 'analysis.target_assemblies'. Every assembly referenced by " +
+                    "'strict_assembly_allow_only'/'audit_assembly_allow_only' must be a declared target assembly.");
+            }
+
+            foreach (string assemblyName in contract.Allowed)
+            {
+                if (!targetAssemblies.Contains(assemblyName))
+                {
+                    throw new InvalidOperationException(
+                        $"Assembly allow-only contract '{contract.Name}' references allowed assembly '{assemblyName}' " +
+                        "that is not declared in 'analysis.target_assemblies'. Every assembly referenced by " +
+                        "'strict_assembly_allow_only'/'audit_assembly_allow_only' must be a declared target assembly.");
                 }
             }
         }

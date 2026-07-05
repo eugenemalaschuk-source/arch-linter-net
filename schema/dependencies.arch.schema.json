@@ -237,6 +237,26 @@
           "items": { "$ref": "#/$defs/assemblyIndependenceContract" },
           "default": []
         },
+        "strict_assembly_dependency": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/assemblyDependencyContract" },
+          "default": []
+        },
+        "audit_assembly_dependency": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/assemblyDependencyContract" },
+          "default": []
+        },
+        "strict_assembly_allow_only": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/assemblyAllowOnlyContract" },
+          "default": []
+        },
+        "audit_assembly_allow_only": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/assemblyAllowOnlyContract" },
+          "default": []
+        },
         "strict_protected": {
           "type": "array",
           "items": { "$ref": "#/$defs/protectedContract" },
@@ -449,6 +469,44 @@
         "name": { "type": "string", "minLength": 1 },
         "id": { "type": "string", "minLength": 1 },
         "assemblies": { "$ref": "#/$defs/stringList" },
+        "ignored_violations": { "$ref": "#/$defs/ignoredViolations" },
+        "reason": { "type": "string" }
+      }
+    },
+    "assemblyDependencyContract": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "source", "forbidden"],
+      "properties": {
+        "name": { "type": "string", "minLength": 1 },
+        "id": { "type": "string", "minLength": 1 },
+        "source": { "type": "string", "minLength": 1 },
+        "forbidden": { "$ref": "#/$defs/stringList" },
+        "dependency_depth": {
+          "type": "string",
+          "enum": ["direct"],
+          "default": "direct",
+          "description": "Evaluation depth for assembly dependency checking. Only 'direct' (the default) is supported in this release; transitive assembly-reference-path resolution is a planned follow-up and is not yet a valid value here."
+        },
+        "ignored_violations": { "$ref": "#/$defs/ignoredViolations" },
+        "reason": { "type": "string" }
+      }
+    },
+    "assemblyAllowOnlyContract": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "source", "allowed"],
+      "properties": {
+        "name": { "type": "string", "minLength": 1 },
+        "id": { "type": "string", "minLength": 1 },
+        "source": { "type": "string", "minLength": 1 },
+        "allowed": { "$ref": "#/$defs/stringList" },
+        "dependency_depth": {
+          "type": "string",
+          "enum": ["direct"],
+          "default": "direct",
+          "description": "Evaluation depth for assembly allow-only checking. Only 'direct' (the default) is supported in this release; transitive assembly-reference-path resolution is a planned follow-up and is not yet a valid value here."
+        },
         "ignored_violations": { "$ref": "#/$defs/ignoredViolations" },
         "reason": { "type": "string" }
       }

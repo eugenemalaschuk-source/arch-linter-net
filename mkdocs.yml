@@ -43,6 +43,7 @@ nav:
       - Acyclic sibling contracts: contracts/acyclic-siblings.md
       - Independence contracts: contracts/independence.md
       - Assembly independence contracts: contracts/assembly-independence.md
+      - Assembly dependency contracts: contracts/assembly-dependency.md
       - Protected surface contracts: contracts/protected-surface.md
       - External dependency contracts: contracts/external-dependencies.md
       - Method-body contracts: contracts/method-body.md

@@ -150,6 +150,18 @@ public sealed class ArchitectureContractGroups
     [YamlMember(Alias = "audit_assembly_independence")]
     public List<ArchitectureAssemblyIndependenceContract> AuditAssemblyIndependence { get; set; } = new();
 
+    [YamlMember(Alias = "strict_assembly_dependency")]
+    public List<ArchitectureAssemblyDependencyContract> StrictAssemblyDependency { get; set; } = new();
+
+    [YamlMember(Alias = "audit_assembly_dependency")]
+    public List<ArchitectureAssemblyDependencyContract> AuditAssemblyDependency { get; set; } = new();
+
+    [YamlMember(Alias = "strict_assembly_allow_only")]
+    public List<ArchitectureAssemblyAllowOnlyContract> StrictAssemblyAllowOnly { get; set; } = new();
+
+    [YamlMember(Alias = "audit_assembly_allow_only")]
+    public List<ArchitectureAssemblyAllowOnlyContract> AuditAssemblyAllowOnly { get; set; } = new();
+
     [YamlMember(Alias = "strict_protected")]
     public List<ArchitectureProtectedContract> StrictProtected { get; set; } = new();
 
@@ -198,6 +210,8 @@ public sealed class ArchitectureContractGroups
         foreach (var c in StrictAsmdef) yield return c;
         foreach (var c in StrictIndependence) yield return c;
         foreach (var c in StrictAssemblyIndependence) yield return c;
+        foreach (var c in StrictAssemblyDependency) yield return c;
+        foreach (var c in StrictAssemblyAllowOnly) yield return c;
         foreach (var c in StrictProtected) yield return c;
         foreach (var c in StrictExternal) yield return c;
         foreach (var c in StrictAcyclicSiblings) yield return c;
@@ -214,6 +228,8 @@ public sealed class ArchitectureContractGroups
         foreach (var c in AuditAsmdef) yield return c;
         foreach (var c in AuditIndependence) yield return c;
         foreach (var c in AuditAssemblyIndependence) yield return c;
+        foreach (var c in AuditAssemblyDependency) yield return c;
+        foreach (var c in AuditAssemblyAllowOnly) yield return c;
         foreach (var c in AuditProtected) yield return c;
         foreach (var c in AuditExternal) yield return c;
         foreach (var c in AuditAcyclicSiblings) yield return c;
@@ -457,6 +473,44 @@ public sealed class ArchitectureAssemblyIndependenceContract : IArchitectureCont
     [YamlMember(Alias = "id")] public string? Id { get; set; }
 
     [YamlMember(Alias = "assemblies")] public List<string> Assemblies { get; set; } = new();
+
+    [YamlMember(Alias = "ignored_violations")]
+    public List<ArchitectureIgnoredViolation> IgnoredViolations { get; set; } = new();
+
+    [YamlMember(Alias = "reason")] public string Reason { get; set; } = string.Empty;
+}
+
+public sealed class ArchitectureAssemblyDependencyContract : IArchitectureContract
+{
+    [YamlMember(Alias = "name")] public string Name { get; set; } = string.Empty;
+
+    [YamlMember(Alias = "id")] public string? Id { get; set; }
+
+    [YamlMember(Alias = "source")] public string Source { get; set; } = string.Empty;
+
+    [YamlMember(Alias = "forbidden")] public List<string> Forbidden { get; set; } = new();
+
+    [YamlMember(Alias = "dependency_depth")]
+    public DependencyDepthMode DependencyDepth { get; set; } = DependencyDepthMode.Direct;
+
+    [YamlMember(Alias = "ignored_violations")]
+    public List<ArchitectureIgnoredViolation> IgnoredViolations { get; set; } = new();
+
+    [YamlMember(Alias = "reason")] public string Reason { get; set; } = string.Empty;
+}
+
+public sealed class ArchitectureAssemblyAllowOnlyContract : IArchitectureContract
+{
+    [YamlMember(Alias = "name")] public string Name { get; set; } = string.Empty;
+
+    [YamlMember(Alias = "id")] public string? Id { get; set; }
+
+    [YamlMember(Alias = "source")] public string Source { get; set; } = string.Empty;
+
+    [YamlMember(Alias = "allowed")] public List<string> Allowed { get; set; } = new();
+
+    [YamlMember(Alias = "dependency_depth")]
+    public DependencyDepthMode DependencyDepth { get; set; } = DependencyDepthMode.Direct;
 
     [YamlMember(Alias = "ignored_violations")]
     public List<ArchitectureIgnoredViolation> IgnoredViolations { get; set; } = new();
