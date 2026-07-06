@@ -1,5 +1,6 @@
 using System.Reflection;
 using ArchLinterNet.Core.Contracts;
+using ArchLinterNet.Core.Discovery;
 using ArchLinterNet.Core.Model;
 using ArchLinterNet.Core.Resolution;
 using ArchLinterNet.Core.Scanning;
@@ -377,10 +378,14 @@ public sealed partial class ArchitectureAnalysisSession
 
         ArchitectureContractExecutionContext executionContext = CreateExecutionContext(contract, contract.IgnoredViolations);
 
+        (IReadOnlyList<string>? explicitReferenceAssemblyPaths, ArchitectureViolation? fallbackDiagnostic) =
+            ResolveProjectAwareReferenceAssemblyPaths(contract, sourceLayer, sourceRoots);
+
         IReadOnlyList<ArchitectureViolation> roslynViolations = new ArchitectureSourceScanner()
             .FindMethodBodyViolations(Context.RepositoryRoot, sourceLayer.Namespace,
                 contract.ForbiddenCalls, executionContext, sourceRoots: sourceRoots,
-                sourceLayer: sourceLayer, preprocessorSymbols: PreprocessorSymbols)
+                sourceLayer: sourceLayer, preprocessorSymbols: PreprocessorSymbols,
+                explicitReferenceAssemblyPaths: explicitReferenceAssemblyPaths)
             .ToList();
 
         IReadOnlyList<ArchitectureViolation> ilViolations = new ArchitectureIlMethodBodyScanner().FindMethodBodyViolations(
@@ -392,8 +397,122 @@ public sealed partial class ArchitectureAnalysisSession
             .ToList();
 
         List<ArchitectureViolation> violations = ArchitectureNamespaceViolationFinder.MergeMethodBodyViolations(contract.Name, contract.Id, roslynViolations, ilViolations);
+
+        if (fallbackDiagnostic != null)
+        {
+            violations.Add(fallbackDiagnostic);
+        }
+
         executionContext.CollectUnmatchedIgnores(_unmatchedIgnoredViolations);
         return violations;
+    }
+
+    // Attempts project-aware reference resolution for a method-body contract's owning discovered
+    // project. Returns (null, null) when project discovery isn't configured at all, so behavior for
+    // repositories that never opted into analysis.solution/analysis.projects is completely
+    // unchanged. Returns a non-null diagnostic only when discovery IS configured but project-aware
+    // resolution couldn't be used (no/ambiguous owning project, or Buildalyzer evaluation failed),
+    // so the degraded-accuracy fallback is visible rather than silent.
+    private (IReadOnlyList<string>? ReferenceAssemblyPaths, ArchitectureViolation? FallbackDiagnostic)
+        ResolveProjectAwareReferenceAssemblyPaths(
+            ArchitectureMethodBodyContract contract, ArchitectureLayer sourceLayer, string[]? sourceRoots)
+    {
+        ProjectDiscoveryResult? discovery = Context.ProjectDiscovery;
+        if (discovery == null || discovery.DiscoveredProjects.Count == 0)
+        {
+            return (null, null);
+        }
+
+        IReadOnlyList<string> matchedFiles = new ArchitectureSourceScanner()
+            .FindMatchingSourceFiles(Context.RepositoryRoot, sourceLayer, sourceRoots);
+
+        if (matchedFiles.Count == 0)
+        {
+            return (null, null);
+        }
+
+        ArchitectureDiscoveredProject? owningProject = ResolveOwningProject(discovery.DiscoveredProjects, matchedFiles);
+
+        if (owningProject == null)
+        {
+            return (null, BuildFallbackDiagnostic(contract,
+                "no single discovered project owns this contract's source files (files span zero or multiple discovered project directories)"));
+        }
+
+        string projectAbsolutePath = Path.GetFullPath(Path.Combine(Context.RepositoryRoot, owningProject.Path));
+        ArchitectureProjectRoslynResolution resolution =
+            new ArchitectureProjectRoslynContextResolver().Resolve(projectAbsolutePath);
+
+        if (!resolution.Succeeded)
+        {
+            return (null, BuildFallbackDiagnostic(contract,
+                $"project '{owningProject.Path}' could not be evaluated for project-aware Roslyn analysis: {resolution.FailureReason}"));
+        }
+
+        return (resolution.Context!.ReferenceAssemblyPaths, null);
+    }
+
+    private static ArchitectureViolation BuildFallbackDiagnostic(ArchitectureMethodBodyContract contract, string reason)
+    {
+        return new ArchitectureViolation(
+            contract.Name,
+            contract.Id,
+            contract.Source,
+            "project-aware analysis fallback",
+            new[]
+            {
+                $"Method-body contract '{contract.Name}' fell back to lightweight Roslyn compilation because {reason}. " +
+                "Cross-project/package symbol resolution may be less accurate for this check."
+            });
+    }
+
+    // A discovered project "owns" a matched source file when that project's directory is the
+    // nearest (longest-prefix) ancestor directory among all discovered projects. Project-aware
+    // resolution is only attempted when every matched file resolves to exactly the same owning
+    // project — spanning zero or multiple projects falls back rather than guessing.
+    private ArchitectureDiscoveredProject? ResolveOwningProject(
+        IReadOnlyCollection<ArchitectureDiscoveredProject> discoveredProjects, IReadOnlyList<string> matchedFiles)
+    {
+        List<(ArchitectureDiscoveredProject Project, string Directory)> projectDirectories = discoveredProjects
+            .Select(project => (project, NormalizeDirectory(Path.GetFullPath(Path.Combine(
+                Context.RepositoryRoot, Path.GetDirectoryName(project.Path) ?? string.Empty)))))
+            .ToList();
+
+        HashSet<string> owningProjectPaths = new(StringComparer.OrdinalIgnoreCase);
+        ArchitectureDiscoveredProject? owner = null;
+
+        foreach (string filePath in matchedFiles)
+        {
+            string fileDirectory = NormalizeDirectory(Path.GetDirectoryName(Path.GetFullPath(filePath)) ?? string.Empty);
+
+            ArchitectureDiscoveredProject? bestMatch = null;
+            int bestLength = -1;
+
+            foreach ((ArchitectureDiscoveredProject candidate, string candidateDirectory) in projectDirectories)
+            {
+                if (fileDirectory.StartsWith(candidateDirectory, StringComparison.OrdinalIgnoreCase)
+                    && candidateDirectory.Length > bestLength)
+                {
+                    bestMatch = candidate;
+                    bestLength = candidateDirectory.Length;
+                }
+            }
+
+            if (bestMatch == null)
+            {
+                return null;
+            }
+
+            owningProjectPaths.Add(bestMatch.Path);
+            owner = bestMatch;
+        }
+
+        return owningProjectPaths.Count == 1 ? owner : null;
+    }
+
+    private static string NormalizeDirectory(string path)
+    {
+        return path.Replace('\\', '/').TrimEnd('/') + "/";
     }
 
     public List<ArchitectureViolation> CheckAsmdefContract(ArchitectureAsmdefContract contract)

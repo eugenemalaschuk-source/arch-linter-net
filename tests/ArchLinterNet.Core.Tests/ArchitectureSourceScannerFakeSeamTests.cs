@@ -20,7 +20,8 @@ public sealed class ArchitectureSourceScannerFakeSeamTests
             IReadOnlyList<string> sourceFilePaths,
             IReadOnlyList<string>? preprocessorSymbols,
             IArchitectureFileSystem fileSystem,
-            IArchitectureAssemblyLoader assemblyLoader)
+            IArchitectureAssemblyLoader assemblyLoader,
+            IReadOnlyList<string>? explicitReferenceAssemblyPaths = null)
         {
             WasCalled = true;
 

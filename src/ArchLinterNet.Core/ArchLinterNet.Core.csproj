@@ -15,9 +15,14 @@
   </ItemGroup>
 
   <ItemGroup>
+    <PackageReference Include="Buildalyzer" Version="9.0.0" />
     <PackageReference Include="YamlDotNet" Version="16.3.0" />
     <PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="4.14.0" />
+    <PackageReference Include="Microsoft.CodeAnalysis.VisualBasic" Version="4.14.0" />
     <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="9.0.0" />
+    <!-- Pins Buildalyzer's transitive System.Security.Cryptography.Xml above the version flagged by
+         GHSA-37gx-xxp4-5rgx / GHSA-w3x6-4m5h-cxqf (CVE-2026-33116 EncryptedXml DoS). -->
+    <PackageReference Include="System.Security.Cryptography.Xml" Version="9.0.17" />
   </ItemGroup>
 
 </Project>

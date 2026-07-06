@@ -12,7 +12,8 @@ public sealed class RoslynCompilationFactory : IRoslynCompilationFactory
         IReadOnlyList<string> sourceFilePaths,
         IReadOnlyList<string>? preprocessorSymbols,
         IArchitectureFileSystem fileSystem,
-        IArchitectureAssemblyLoader assemblyLoader)
+        IArchitectureAssemblyLoader assemblyLoader,
+        IReadOnlyList<string>? explicitReferenceAssemblyPaths = null)
     {
         CSharpParseOptions? parseOptions = preprocessorSymbols is { Count: > 0 }
             ? CSharpParseOptions.Default.WithPreprocessorSymbols(preprocessorSymbols)
@@ -25,13 +26,24 @@ public sealed class RoslynCompilationFactory : IRoslynCompilationFactory
                 path: filePath))
             .ToList();
 
-        List<MetadataReference> references = BuildMetadataReferences(fileSystem, assemblyLoader);
+        List<MetadataReference> references = explicitReferenceAssemblyPaths is { Count: > 0 }
+            ? BuildMetadataReferences(explicitReferenceAssemblyPaths, fileSystem)
+            : BuildMetadataReferences(fileSystem, assemblyLoader);
 
         return CSharpCompilation.Create(
             assemblyName,
             syntaxTrees,
             references,
             new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+    }
+
+    private static List<MetadataReference> BuildMetadataReferences(
+        IReadOnlyList<string> referenceAssemblyPaths, IArchitectureFileSystem fileSystem)
+    {
+        return referenceAssemblyPaths
+            .Where(fileSystem.FileExists)
+            .Select(path => (MetadataReference)MetadataReference.CreateFromFile(path))
+            .ToList();
     }
 
     private static List<MetadataReference> BuildMetadataReferences(

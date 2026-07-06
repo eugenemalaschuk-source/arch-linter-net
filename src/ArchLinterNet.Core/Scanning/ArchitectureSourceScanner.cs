@@ -20,7 +20,14 @@ internal interface IArchitectureSourceScanner
         IReadOnlyList<string>? preprocessorSymbols = null,
         IArchitectureFileSystem? fileSystem = null,
         IRoslynCompilationFactory? compilationFactory = null,
-        IArchitectureAssemblyLoader? assemblyLoader = null);
+        IArchitectureAssemblyLoader? assemblyLoader = null,
+        IReadOnlyList<string>? explicitReferenceAssemblyPaths = null);
+
+    IReadOnlyList<string> FindMatchingSourceFiles(
+        string repositoryRoot,
+        ArchitectureLayer layer,
+        string[]? sourceRoots = null,
+        IArchitectureFileSystem? fileSystem = null);
 }
 
 internal sealed class ArchitectureSourceScanner : IArchitectureSourceScanner
@@ -37,23 +44,24 @@ internal sealed class ArchitectureSourceScanner : IArchitectureSourceScanner
         IReadOnlyList<string>? preprocessorSymbols = null,
         IArchitectureFileSystem? fileSystem = null,
         IRoslynCompilationFactory? compilationFactory = null,
-        IArchitectureAssemblyLoader? assemblyLoader = null)
+        IArchitectureAssemblyLoader? assemblyLoader = null,
+        IReadOnlyList<string>? explicitReferenceAssemblyPaths = null)
     {
         fileSystem ??= ArchitectureFileSystem.Real;
         compilationFactory ??= RoslynCompilationFactory.Real;
         assemblyLoader ??= ArchitectureAssemblyLoader.Real;
 
-        string[] roots = sourceRoots ?? _defaultSourceRoots;
         ArchitectureLayer effectiveLayer = sourceLayer
                                           ?? new ArchitectureLayer { Namespace = sourceNamespacePrefix };
-        List<string> sourceFiles = FindSourceFilesForNamespace(repositoryRoot, effectiveLayer, roots, fileSystem);
+        List<string> sourceFiles = FindMatchingSourceFiles(repositoryRoot, effectiveLayer, sourceRoots, fileSystem).ToList();
         if (sourceFiles.Count == 0)
         {
             return Array.Empty<ArchitectureViolation>();
         }
 
         CSharpCompilation compilation = compilationFactory.Create(
-            "ArchitectureSourceScanner", sourceFiles, preprocessorSymbols, fileSystem, assemblyLoader);
+            "ArchitectureSourceScanner", sourceFiles, preprocessorSymbols, fileSystem, assemblyLoader,
+            explicitReferenceAssemblyPaths);
         IReadOnlyList<ForbiddenCallPattern> patterns =
             ArchitectureForbiddenCallMatcher.NormalizePatterns(forbiddenCallPatterns);
         Dictionary<string, bool> matchCache = new(StringComparer.Ordinal);
@@ -97,6 +105,17 @@ internal sealed class ArchitectureSourceScanner : IArchitectureSourceScanner
         }
 
         return violations;
+    }
+
+    public IReadOnlyList<string> FindMatchingSourceFiles(
+        string repositoryRoot,
+        ArchitectureLayer layer,
+        string[]? sourceRoots = null,
+        IArchitectureFileSystem? fileSystem = null)
+    {
+        fileSystem ??= ArchitectureFileSystem.Real;
+        string[] roots = sourceRoots ?? _defaultSourceRoots;
+        return FindSourceFilesForNamespace(repositoryRoot, layer, roots, fileSystem);
     }
 
     private static List<string> FindForbiddenUsagesInBodies(
@@ -237,7 +256,12 @@ internal sealed class ArchitectureSourceScanner : IArchitectureSourceScanner
 
             foreach (string filePath in fileSystem.EnumerateFiles(fullRoot, "*.cs", SearchOption.AllDirectories))
             {
-                if (FileContainsNamespace(filePath, layer, fileSystem))
+                // Checked relative to the scanned root (not the absolute path) so an ancestor
+                // directory name outside the repository — e.g. the OS temp directory a test
+                // fixture or CI checkout happens to live under — can never be mistaken for a
+                // generated/build-output segment inside the repository itself.
+                string relativeToRoot = Path.GetRelativePath(fullRoot, filePath);
+                if (!ArchitectureGeneratedFileFilter.IsExcluded(relativeToRoot) && FileContainsNamespace(filePath, layer, fileSystem))
                 {
                     result.Add(filePath);
                 }
