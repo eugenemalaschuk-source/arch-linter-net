@@ -131,6 +131,41 @@ public partial class CliIntegrationTests
         });
     }
 
+    [Test]
+    public void Graph_UnknownContractId_ExitsTwoWithDiagnostic()
+    {
+        var (exitCode, _, stderr) = RunCli(
+            "graph", "--policy", _graphPolicy, "--contract", "no-execution-to-contractss");
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(exitCode, Is.EqualTo(2));
+            Assert.That(stderr, Does.Contain("Unknown contract IDs"));
+            Assert.That(stderr, Does.Contain("no-execution-to-contractss"));
+            Assert.That(stderr, Does.Contain("no-execution-to-contracts"));
+        });
+    }
+
+    [Test]
+    public void Graph_ValidContractId_RestrictsExecutionAndSucceeds()
+    {
+        var (exitCode, stdout, stderr) = RunCli(
+            "graph", "--policy", _graphPolicy, "--contract", "no-execution-to-contracts", "--format", "json");
+
+        Assert.That(exitCode, Is.EqualTo(0), $"stderr: {stderr}");
+
+        using JsonDocument doc = JsonDocument.Parse(stdout);
+        JsonElement edges = doc.RootElement.GetProperty("edges");
+
+        bool found = edges.EnumerateArray().Any(edge =>
+            edge.GetProperty("source").GetString() == "ArchLinterNet.Core.Execution"
+            && edge.GetProperty("target").GetString() == "ArchLinterNet.Core.Contracts"
+            && edge.GetProperty("contractIds").EnumerateArray()
+                .Any(id => id.GetString() == "no-execution-to-contracts"));
+
+        Assert.That(found, Is.True, $"expected the selected contract's edge to still be tagged, stdout: {stdout}");
+    }
+
     /* explain */
 
     [Test]

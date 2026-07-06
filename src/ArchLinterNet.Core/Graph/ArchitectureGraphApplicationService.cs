@@ -35,6 +35,19 @@ public sealed class ArchitectureGraphApplicationService(
             ? new HashSet<string>(request.ContractIds, StringComparer.OrdinalIgnoreCase)
             : null;
 
+        if (selectedIds != null)
+        {
+            HashSet<string> availableIds = CollectAvailableContractIds(document, request.Mode);
+            List<string> unknownIds = selectedIds.Where(id => !availableIds.Contains(id)).ToList();
+
+            if (unknownIds.Count > 0)
+            {
+                throw new InvalidOperationException(
+                    $"Unknown contract IDs: {string.Join(", ", unknownIds)}{Environment.NewLine}" +
+                    $"Available IDs in {request.Mode} mode: {string.Join(", ", availableIds.OrderBy(id => id))}");
+            }
+        }
+
         ArchitectureRunnerSetup setup = runnerSetupService.BuildRunner(
             document,
             request.PolicyPath,
@@ -65,5 +78,19 @@ public sealed class ArchitectureGraphApplicationService(
         }
 
         return runner.Session;
+    }
+
+    private static HashSet<string> CollectAvailableContractIds(ArchitectureContractDocument document, string mode)
+    {
+        ArchitectureContractCatalog catalog = ArchitectureContractCatalog.Build(document);
+
+        if (mode == "all")
+        {
+            HashSet<string> ids = new(catalog.AvailableContractIds("strict"), StringComparer.OrdinalIgnoreCase);
+            ids.UnionWith(catalog.AvailableContractIds("audit"));
+            return ids;
+        }
+
+        return catalog.AvailableContractIds(mode);
     }
 }
