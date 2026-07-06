@@ -239,6 +239,7 @@ contracts:
   strict_external: []
   strict_external_allow_only: []
   strict_acyclic_siblings: []
+  strict_type_placement: []
   strict_coverage: []
 
   audit: []                     # Non-blocking contracts (same types)
@@ -256,6 +257,7 @@ contracts:
   audit_external: []
   audit_external_allow_only: []
   audit_acyclic_siblings: []
+  audit_type_placement: []
   audit_coverage: []
 ```
 
@@ -508,6 +510,38 @@ that is not present in `allowed` is evaluated as disallowed; groups not declared
 `external_dependencies` at all (including BCL/system namespaces, unless a policy author
 explicitly declares a matching group) are never in scope. See
 [External allow-only contracts](../contracts/external-allow-only.md) for full semantics.
+
+### Type placement contract
+
+```yaml
+- id: <string>                        # Optional
+  name: <string>
+  types_matching:                     # Required — constrained type selector
+    name_suffix: <string>             # Optional
+    name_prefix: <string>             # Optional
+    namespace: <namespace-prefix>     # Optional
+    layer: <layer-name>               # Optional
+    base_type: <full-type-name>       # Optional
+    implements_interface: <full-type-name>  # Optional
+    has_attribute: <full-type-name>   # Optional
+  must_reside_in_layers: []           # Optional — union with the three lists below
+  must_reside_in_namespaces: []       # Optional
+  must_reside_in_projects: []         # Optional — resolved to assembly names via project discovery
+  must_reside_in_assemblies: []       # Optional
+  required_name_suffix: <string>      # Optional
+  required_name_prefix: <string>      # Optional
+  forbidden_name_suffix: <string>     # Optional
+  forbidden_name_prefix: <string>     # Optional
+  ignored_violations: []              # Optional — baseline known violations
+  reason: <string>
+```
+
+Type placement contracts select architectural roles by constrained matchers and require
+them to reside in a declared layer/namespace/project/assembly and/or carry a declared
+naming suffix/prefix. At least one placement (`must_reside_in_*`) or naming
+(`required_name_*`/`forbidden_name_*`) expectation is required — a selector with neither
+fails policy loading with an actionable error. See
+[Type placement contracts](../contracts/type-placement.md) for full semantics.
 
 ### Coverage contract
 

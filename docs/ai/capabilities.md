@@ -33,6 +33,7 @@ The policy file is usually `architecture/dependencies.arch.yml` and contains:
 | External dependency | `strict_external` | `audit_external` | Source layer does not reference forbidden vendor/framework dependency groups. |
 | External allow-only | `strict_external_allow_only` | `audit_external_allow_only` | Source layer references only explicitly allowed vendor/framework dependency groups. |
 | Layer template | `strict_layer_templates` | `audit_layer_templates` | Reusable layer order applied to multiple containers. |
+| Type placement | `strict_type_placement` | `audit_type_placement` | A selected architectural role resides in a declared layer/namespace/project/assembly and/or carries a declared naming suffix/prefix. |
 | Coverage | `strict_coverage` | `audit_coverage` | First-party namespaces, discovered projects, and resolved assemblies are covered by a layer, template expansion, or explicit exclusion. |
 
 ## Matching semantics
@@ -46,6 +47,8 @@ Layer `namespace` also supports constrained glob patterns using `*` as a full na
 `external_dependencies.namespace_prefixes` match exact namespaces and child namespaces. `external_dependencies.type_prefixes` match full referenced type names by prefix.
 
 `ignored_violations` should be exact and narrow. Broad patterns should be treated as temporary migration debt and reviewed by a human.
+
+Type placement `types_matching` fields (`name_suffix`, `name_prefix`, `namespace`, `layer`, `base_type`, `implements_interface`, `has_attribute`) combine with AND semantics — every populated field must match. There is no regex or expression-language selector. `must_reside_in_projects` resolves to assembly-name matching via project discovery (see [Type placement contracts](../contracts/type-placement.md)); it is not physical `.csproj`-membership tracking.
 
 ## Strict versus audit
 
