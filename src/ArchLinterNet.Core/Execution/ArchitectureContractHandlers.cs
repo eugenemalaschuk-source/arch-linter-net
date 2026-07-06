@@ -181,6 +181,17 @@ internal sealed class ExternalAllowOnlyContractHandler : IArchitectureContractHa
     }
 }
 
+internal sealed class TypePlacementContractHandler : IArchitectureContractHandler
+{
+    public string Family => "type_placement";
+
+    public ArchitectureHandlerResult Execute(ArchitectureAnalysisSession session, IArchitectureContract contract)
+    {
+        return ArchitectureHandlerResult.FromViolations(
+            session.CheckTypePlacementContract((ArchitectureTypePlacementContract)contract));
+    }
+}
+
 internal sealed class AcyclicSiblingContractHandler : IArchitectureContractHandler
 {
     public string Family => "acyclic_sibling";

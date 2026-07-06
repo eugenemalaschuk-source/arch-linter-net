@@ -52,6 +52,7 @@ nav:
       - Method-body contracts: contracts/method-body.md
       - Unity asmdef contracts: contracts/asmdef.md
       - Layer templates: contracts/layer-templates.md
+      - Type placement contracts: contracts/type-placement.md
       - Coverage contracts: contracts/coverage.md
   - Guides:
       - Adopt in an existing repository: guides/adoption.md

@@ -21,6 +21,7 @@ ArchLinterNet supports static architecture validation through documented YAML po
 - method-body forbidden API contracts;
 - Unity `.asmdef` contracts;
 - reusable layer templates;
+- type placement and naming governance contracts (name suffix/prefix, namespace, layer, base type, interface, and attribute selectors; layer/namespace/project/assembly residency; required/forbidden naming);
 - coverage contracts (`scope: namespace`, `scope: rule_input`, `scope: project`, `scope: assembly`);
 - strict and audit contract groups;
 - constrained namespace glob patterns;
@@ -62,6 +63,13 @@ reference metadata (base types, interfaces, fields, properties, method signature
 arguments) — unlike `strict_external`/`audit_external`, they do not yet scan method bodies
 via IL. This is a deliberate scope decision, not an oversight, and may be added as a
 follow-up.
+
+Type placement contracts' `must_reside_in_projects` resolves a configured project name to
+its assembly name via project discovery and checks it identically to
+`must_reside_in_assemblies` — there is no true type-to-`.csproj` mapping in this tool, so
+"must reside in project X" means "must reside in the assembly project X produces," not
+physical file placement within a project. Type placement contracts also do not scan method
+bodies; types are matched structurally (name, namespace, base type, interfaces, attributes).
 
 ## Important distinctions
 

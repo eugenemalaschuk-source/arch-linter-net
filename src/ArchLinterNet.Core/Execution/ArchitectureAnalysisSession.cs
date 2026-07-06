@@ -363,6 +363,11 @@ public sealed partial class ArchitectureAnalysisSession
                 AddPackageGroupNames(c.Allowed);
                 packageContractSources.Add((c.Name, c.Id, c.Source));
             }
+
+            foreach (ArchitectureTypePlacementContract c in Document.Contracts.StrictTypePlacement)
+            {
+                AddLayerNames(c.Id, GetTypePlacementReferencedLayerNames(c));
+            }
         }
         else
         {
@@ -426,6 +431,11 @@ public sealed partial class ArchitectureAnalysisSession
             {
                 AddPackageGroupNames(c.Allowed);
                 packageContractSources.Add((c.Name, c.Id, c.Source));
+            }
+
+            foreach (ArchitectureTypePlacementContract c in Document.Contracts.AuditTypePlacement)
+            {
+                AddLayerNames(c.Id, GetTypePlacementReferencedLayerNames(c));
             }
         }
 

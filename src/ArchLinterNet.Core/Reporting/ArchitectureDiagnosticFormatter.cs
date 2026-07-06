@@ -246,6 +246,7 @@ public sealed class ArchitectureDiagnosticFormatter : IArchitectureDiagnosticFor
         DependencyDiagnostic d => d.SourceType,
         ConfigurationDiagnostic d => d.SourceType,
         ExternalDependencyDiagnostic d => d.SourceType,
+        TypePlacementDiagnostic d => d.SourceType,
         _ => string.Empty
     };
 
@@ -254,6 +255,7 @@ public sealed class ArchitectureDiagnosticFormatter : IArchitectureDiagnosticFor
         DependencyDiagnostic d => d.ForbiddenNamespace,
         ConfigurationDiagnostic d => d.ForbiddenNamespace,
         ExternalDependencyDiagnostic d => d.ForbiddenNamespace,
+        TypePlacementDiagnostic d => d.ForbiddenNamespace,
         _ => string.Empty
     };
 
@@ -262,6 +264,7 @@ public sealed class ArchitectureDiagnosticFormatter : IArchitectureDiagnosticFor
         DependencyDiagnostic d => d.ForbiddenReferences,
         ConfigurationDiagnostic d => d.ForbiddenReferences,
         ExternalDependencyDiagnostic d => d.ForbiddenReferences,
+        TypePlacementDiagnostic d => d.ForbiddenReferences,
         _ => Array.Empty<string>()
     };
 
@@ -281,6 +284,22 @@ public sealed class ArchitectureDiagnosticFormatter : IArchitectureDiagnosticFor
         if (diagnostic is ExternalDependencyDiagnostic external)
         {
             context += $" (external_group: {external.ForbiddenExternalGroup})";
+        }
+
+        if (diagnostic is TypePlacementDiagnostic typePlacement)
+        {
+            List<string> parts = new();
+            if (typePlacement.ExpectedTypeLocation != null)
+            {
+                parts.Add($"expected_location: {typePlacement.ExpectedTypeLocation}, actual_location: {typePlacement.ActualTypeLocation}");
+            }
+
+            if (typePlacement.ExpectedTypeName != null)
+            {
+                parts.Add($"expected_name: {typePlacement.ExpectedTypeName}, actual_name: {typePlacement.ActualTypeName}");
+            }
+
+            context += $" ({string.Join("; ", parts)})";
         }
 
         string forbiddenNamespace = ForbiddenNamespaceOf(diagnostic);
@@ -391,6 +410,21 @@ public sealed class ArchitectureDiagnosticFormatter : IArchitectureDiagnosticFor
         if (diagnostic is ExternalDependencyDiagnostic external)
         {
             obj["forbidden_external_group"] = external.ForbiddenExternalGroup;
+        }
+
+        if (diagnostic is TypePlacementDiagnostic typePlacement)
+        {
+            if (typePlacement.ExpectedTypeLocation != null)
+                obj["expected_type_location"] = typePlacement.ExpectedTypeLocation;
+
+            if (typePlacement.ActualTypeLocation != null)
+                obj["actual_type_location"] = typePlacement.ActualTypeLocation;
+
+            if (typePlacement.ExpectedTypeName != null)
+                obj["expected_type_name"] = typePlacement.ExpectedTypeName;
+
+            if (typePlacement.ActualTypeName != null)
+                obj["actual_type_name"] = typePlacement.ActualTypeName;
         }
 
         if (diagnostic is ConfigurationDiagnostic configuration)

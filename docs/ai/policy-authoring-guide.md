@@ -156,6 +156,49 @@ only make the contract more restrictive than intended, never less. Detection is
 type-level only (no method-body IL scanning yet, unlike `strict_external`). See
 [External allow-only contracts](../contracts/external-allow-only.md) for full semantics.
 
+## Use Type Placement For Where A Role Lives And How It's Named
+
+When an architectural role (a controller, a handler, a domain event, a Unity
+`MonoBehaviour`) must live in a specific layer/namespace/project/assembly
+and/or carry a specific naming convention, use `strict_type_placement` /
+`audit_type_placement` instead of trying to express this with dependency or
+allow-only contracts:
+
+```yaml
+layers:
+  api:
+    namespace: MyApp.Api
+
+contracts:
+  strict_type_placement:
+    - id: controllers-in-api
+      name: controllers-must-live-in-api-layer
+      types_matching:
+        name_suffix: Controller
+      must_reside_in_layers: [api]
+      required_name_suffix: Controller
+      reason: Controller types are API boundary types and must be named and placed consistently.
+```
+
+`types_matching` selects candidate types using only `name_suffix`,
+`name_prefix`, `namespace`, `layer`, `base_type`, `implements_interface`, and
+`has_attribute` — every populated field combines with AND, and there is no
+regex or expression-language selector. `must_reside_in_layers`,
+`must_reside_in_namespaces`, `must_reside_in_projects`, and
+`must_reside_in_assemblies` together form one set of allowed locations (a
+match against any one of them satisfies placement). `required_name_suffix`,
+`required_name_prefix`, `forbidden_name_suffix`, and `forbidden_name_prefix`
+check the type's simple name.
+
+A contract must declare at least one placement or naming expectation —
+declaring only `types_matching` with no expectation fails policy loading with
+an actionable error, since such a rule could never produce a violation.
+
+`must_reside_in_projects` resolves to assembly-name matching via project
+discovery; it is not physical `.csproj`-membership tracking, since there is no
+type-to-project mapping in this tool beyond a project's own assembly name. See
+[Type placement contracts](../contracts/type-placement.md) for full semantics.
+
 ## Use Transitive Depth For Indirect Coupling
 
 When a dependency should be blocked at any depth (direct or indirect), use

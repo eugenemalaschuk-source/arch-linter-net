@@ -90,6 +90,8 @@ public sealed class ArchitectureContractCatalog
         AddGroup("audit_external_allow_only", "audit", "external_allow_only", groups.AuditExternalAllowOnly);
         AddGroup("strict_acyclic_siblings", "strict", "acyclic_sibling", groups.StrictAcyclicSiblings);
         AddGroup("audit_acyclic_siblings", "audit", "acyclic_sibling", groups.AuditAcyclicSiblings);
+        AddGroup("strict_type_placement", "strict", "type_placement", groups.StrictTypePlacement);
+        AddGroup("audit_type_placement", "audit", "type_placement", groups.AuditTypePlacement);
         AddGroup("strict_coverage", "strict", "coverage", groups.StrictCoverage);
         AddGroup("audit_coverage", "audit", "coverage", groups.AuditCoverage);
 

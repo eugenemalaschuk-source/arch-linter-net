@@ -122,6 +122,7 @@ contracts:
   strict_acyclic_siblings: []
   strict_protected: []
   strict_layer_templates: []
+  strict_type_placement: []
   strict_coverage: []
 
   audit: []
@@ -139,6 +140,7 @@ contracts:
   audit_acyclic_siblings: []
   audit_protected: []
   audit_layer_templates: []
+  audit_type_placement: []
   audit_coverage: []
 ```
 

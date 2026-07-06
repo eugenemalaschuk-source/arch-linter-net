@@ -66,6 +66,8 @@ public sealed partial class ArchitectureAnalysisSession
         AddGroup("audit_external_allow_only", "audit", "external_allow_only", groups.AuditExternalAllowOnly);
         AddGroup("strict_asmdef", "strict", "asmdef", groups.StrictAsmdef);
         AddGroup("audit_asmdef", "audit", "asmdef", groups.AuditAsmdef);
+        AddGroup("strict_type_placement", "strict", "type_placement", groups.StrictTypePlacement);
+        AddGroup("audit_type_placement", "audit", "type_placement", groups.AuditTypePlacement);
 
         AddGroup("strict_layer_templates", "strict", "layer_template",
             LayerTemplateExpander.Expand(groups.StrictLayerTemplates));
@@ -577,7 +579,22 @@ public sealed partial class ArchitectureAnalysisSession
             ArchitectureProtectedContract c => c.Protected.Concat(c.AllowedImporters),
             ArchitectureExternalDependencyContract c => new[] { c.Source },
             ArchitectureExternalAllowOnlyContract c => new[] { c.Source },
+            ArchitectureTypePlacementContract c => GetTypePlacementReferencedLayerNames(c),
             _ => Array.Empty<string>()
         };
+    }
+
+    // Shared by GetReferencedLayerNames (dangling-layer deferral, policy-consistency) and
+    // CheckConfiguration's own layer collection, so a typo'd layer name in either
+    // types_matching.layer or must_reside_in_layers gets the same "referenced but undeclared
+    // layer" / rule-input-coverage-deferral treatment every other layer-bearing contract family
+    // gets, instead of surfacing only as an uncaught ArchitectureLayerResolver exception.
+    private static IEnumerable<string> GetTypePlacementReferencedLayerNames(ArchitectureTypePlacementContract contract)
+    {
+        IEnumerable<string> selectorLayer = string.IsNullOrEmpty(contract.TypesMatching.Layer)
+            ? Array.Empty<string>()
+            : new[] { contract.TypesMatching.Layer };
+
+        return selectorLayer.Concat(contract.MustResideInLayers);
     }
 }
