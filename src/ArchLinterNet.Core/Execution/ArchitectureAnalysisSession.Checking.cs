@@ -593,4 +593,39 @@ public sealed partial class ArchitectureAnalysisSession
         executionContext.CollectUnmatchedIgnores(_unmatchedIgnoredViolations);
         return violations;
     }
+
+    public List<ArchitectureViolation> CheckExternalAllowOnlyContract(ArchitectureExternalAllowOnlyContract contract)
+    {
+        if (!IsContractSelected(contract.Id) || IsDanglingButCoveredByRuleInputCoverage(contract))
+        {
+            return new List<ArchitectureViolation>();
+        }
+
+        ArchitectureLayer sourceLayer = ArchitectureLayerResolver.ResolveLayer(Document, contract.Name, contract.Source);
+        Type[] sourceTypes = ArchitectureTypeScanner.FindTypesInLayer(Context.TargetAssemblies, sourceLayer);
+        List<ArchitectureViolation> violations = new();
+
+        ArchitectureContractExecutionContext executionContext = CreateExecutionContext(contract, contract.IgnoredViolations);
+
+        var allowedGroups = contract.Allowed.ToHashSet(StringComparer.Ordinal);
+        IEnumerable<string> disallowedGroups = Document.ExternalDependencies.Keys
+            .Where(name => !allowedGroups.Contains(name))
+            .OrderBy(name => name, StringComparer.Ordinal);
+
+        string allowedGroupsSuffix = $" (allowed groups: [{string.Join(", ", contract.Allowed)}])";
+
+        foreach (string externalGroupName in disallowedGroups)
+        {
+            ArchitectureExternalDependencyGroup externalGroup = Document.ExternalDependencies[externalGroupName];
+
+            foreach (ArchitectureViolation violation in ArchitectureExternalDependencyViolationFinder.FindViolations(
+                         externalGroupName, sourceTypes, externalGroup, executionContext, contract.AllowedTypes))
+            {
+                violations.Add(violation with { ForbiddenNamespace = violation.ForbiddenNamespace + allowedGroupsSuffix });
+            }
+        }
+
+        executionContext.CollectUnmatchedIgnores(_unmatchedIgnoredViolations);
+        return violations;
+    }
 }

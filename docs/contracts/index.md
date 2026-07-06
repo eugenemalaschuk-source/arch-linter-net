@@ -22,6 +22,7 @@ Most contract families have two variants:
 | [Assembly allow-only](assembly-dependency.md) | `strict_assembly_allow_only` | `audit_assembly_allow_only` | A source assembly may only directly reference explicitly allowed assemblies. |
 | [Protected surface](protected-surface.md) | `strict_protected` | `audit_protected` | A target layer may only be imported by approved layers. |
 | [External dependency](external-dependencies.md) | `strict_external` | `audit_external` | Source code must not leak forbidden vendor/framework dependencies. |
+| [External allow-only](external-allow-only.md) | `strict_external_allow_only` | `audit_external_allow_only` | A source layer may reference only explicitly allowed vendor/framework dependency groups. |
 | [Method body](method-body.md) | `strict_method_body` | `audit_method_body` | Source code must not call forbidden APIs inside executable bodies. |
 | [Unity asmdef](asmdef.md) | `strict_asmdef` | `audit_asmdef` | Unity assembly definition references must follow architecture rules. |
 | [Layer template](layer-templates.md) | `strict_layer_templates` | `audit_layer_templates` | The same ordered layer shape applies to multiple namespace containers. |
