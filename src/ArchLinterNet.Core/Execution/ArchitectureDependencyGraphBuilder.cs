@@ -1,0 +1,302 @@
+using System.Reflection;
+using ArchLinterNet.Core.Model;
+using ArchLinterNet.Core.Scanning;
+
+namespace ArchLinterNet.Core.Execution;
+
+// Builds a normalized ArchitectureDependencyGraph as a *view* over data the engine already computes
+// for validation (ArchitectureReferenceGraph, ArchitectureCoverageInventory, the assembly-dependency
+// lookup, and the violation collection from a normal contract run) rather than running a second,
+// independent analysis pass that could drift from what `validate` reports.
+internal static class ArchitectureDependencyGraphBuilder
+{
+    public static ArchitectureDependencyGraph Build(
+        ArchitectureAnalysisSession session,
+        ArchitectureGraphLevel level,
+        IReadOnlyCollection<ArchitectureViolation> violations)
+    {
+        ArgumentNullException.ThrowIfNull(session);
+        ArgumentNullException.ThrowIfNull(violations);
+
+        ArchitectureGraphNodeKind kind = ToNodeKind(level);
+
+        Dictionary<string, ArchitectureGraphNodeKind> nodeKinds = new(StringComparer.Ordinal);
+        Dictionary<(string Source, string Target), HashSet<string>> edgeContractIds = new();
+
+        Func<string, string?> resolveId = level switch
+        {
+            ArchitectureGraphLevel.Namespace => BuildNamespaceIdResolver(session, nodeKinds),
+            ArchitectureGraphLevel.Type => BuildTypeIdResolver(session, nodeKinds, edgeContractIds),
+            ArchitectureGraphLevel.Assembly => BuildAssemblyIdResolver(session, nodeKinds, edgeContractIds),
+            _ => throw new ArgumentOutOfRangeException(nameof(level), level, "Unknown graph level."),
+        };
+
+        if (level == ArchitectureGraphLevel.Namespace)
+        {
+            SeedNamespaceEdges(session, nodeKinds, edgeContractIds);
+        }
+
+        OverlayViolations(violations, level, kind, resolveId, nodeKinds, edgeContractIds);
+
+        return ToGraph(nodeKinds, edgeContractIds);
+    }
+
+    private static ArchitectureGraphNodeKind ToNodeKind(ArchitectureGraphLevel level) => level switch
+    {
+        ArchitectureGraphLevel.Namespace => ArchitectureGraphNodeKind.Namespace,
+        ArchitectureGraphLevel.Type => ArchitectureGraphNodeKind.Type,
+        ArchitectureGraphLevel.Assembly => ArchitectureGraphNodeKind.Assembly,
+        _ => throw new ArgumentOutOfRangeException(nameof(level), level, "Unknown graph level."),
+    };
+
+    private static void SeedNamespaceEdges(
+        ArchitectureAnalysisSession session,
+        Dictionary<string, ArchitectureGraphNodeKind> nodeKinds,
+        Dictionary<(string Source, string Target), HashSet<string>> edgeContractIds)
+    {
+        ArchitectureCoverageInventory inventory = session.BuildCoverageInventory(session.Document);
+
+        foreach (ArchitectureCoverageNamespaceEntry entry in inventory.Namespaces)
+        {
+            nodeKinds[entry.Namespace] = ArchitectureGraphNodeKind.Namespace;
+        }
+
+        foreach (ArchitectureCoverageDependencyEdge edge in inventory.DependencyEdges)
+        {
+            GetOrAddEdgeSet(edgeContractIds, edge.SourceNamespace, edge.TargetNamespace);
+        }
+    }
+
+    private static Func<string, string?> BuildNamespaceIdResolver(
+        ArchitectureAnalysisSession session,
+        Dictionary<string, ArchitectureGraphNodeKind> nodeKinds)
+    {
+        Dictionary<string, string> namespaceByTypeFullName = new(StringComparer.Ordinal);
+
+        foreach (Type type in session.TypeIndex.AllTypes())
+        {
+            string fullName = ArchitectureTypeNames.SafeFullName(type);
+            if (string.IsNullOrEmpty(fullName))
+            {
+                continue;
+            }
+
+            namespaceByTypeFullName[fullName] = ArchitectureTypeNames.SafeNamespace(type);
+        }
+
+        return name => namespaceByTypeFullName.TryGetValue(name, out string? ns) && nodeKinds.ContainsKey(ns)
+            ? ns
+            : null;
+    }
+
+    private static Func<string, string?> BuildTypeIdResolver(
+        ArchitectureAnalysisSession session,
+        Dictionary<string, ArchitectureGraphNodeKind> nodeKinds,
+        Dictionary<(string Source, string Target), HashSet<string>> edgeContractIds)
+    {
+        Type[] allTypes = session.TypeIndex.AllTypes();
+        HashSet<Type> firstPartyTypes = new(allTypes);
+        HashSet<string> typeFullNames = new(StringComparer.Ordinal);
+
+        foreach (Type type in allTypes)
+        {
+            string fullName = ArchitectureTypeNames.SafeFullName(type);
+            if (string.IsNullOrEmpty(fullName))
+            {
+                continue;
+            }
+
+            typeFullNames.Add(fullName);
+            nodeKinds[fullName] = ArchitectureGraphNodeKind.Type;
+        }
+
+        foreach (Type source in allTypes)
+        {
+            string sourceId = ArchitectureTypeNames.SafeFullName(source);
+            if (string.IsNullOrEmpty(sourceId))
+            {
+                continue;
+            }
+
+            foreach (Type target in session.ReferenceGraph.GetReferencedTypes(source))
+            {
+                if (ReferenceEquals(source, target) || !firstPartyTypes.Contains(target))
+                {
+                    continue;
+                }
+
+                string targetId = ArchitectureTypeNames.SafeFullName(target);
+                if (string.IsNullOrEmpty(targetId) || string.Equals(sourceId, targetId, StringComparison.Ordinal))
+                {
+                    continue;
+                }
+
+                GetOrAddEdgeSet(edgeContractIds, sourceId, targetId);
+            }
+        }
+
+        return name => typeFullNames.Contains(name) ? name : null;
+    }
+
+    private static Func<string, string?> BuildAssemblyIdResolver(
+        ArchitectureAnalysisSession session,
+        Dictionary<string, ArchitectureGraphNodeKind> nodeKinds,
+        Dictionary<(string Source, string Target), HashSet<string>> edgeContractIds)
+    {
+        Dictionary<string, Assembly> assembliesByName = session.Context.TargetAssemblies
+            .GroupBy(assembly => assembly.GetName().Name ?? string.Empty)
+            .Where(group => !string.IsNullOrEmpty(group.Key))
+            .ToDictionary(group => group.Key, group => group.First(), StringComparer.Ordinal);
+
+        foreach (string name in assembliesByName.Keys)
+        {
+            nodeKinds[name] = ArchitectureGraphNodeKind.Assembly;
+        }
+
+        foreach ((string sourceId, Assembly assembly) in assembliesByName)
+        {
+            foreach (AssemblyName referenced in assembly.GetReferencedAssemblies())
+            {
+                string targetId = referenced.Name ?? string.Empty;
+                if (string.IsNullOrEmpty(targetId) || string.Equals(sourceId, targetId, StringComparison.Ordinal))
+                {
+                    continue;
+                }
+
+                if (!assembliesByName.ContainsKey(targetId))
+                {
+                    continue;
+                }
+
+                GetOrAddEdgeSet(edgeContractIds, sourceId, targetId);
+            }
+        }
+
+        return name => assembliesByName.ContainsKey(name) ? name : null;
+    }
+
+    private static void OverlayViolations(
+        IReadOnlyCollection<ArchitectureViolation> violations,
+        ArchitectureGraphLevel level,
+        ArchitectureGraphNodeKind kind,
+        Func<string, string?> resolveId,
+        Dictionary<string, ArchitectureGraphNodeKind> nodeKinds,
+        Dictionary<(string Source, string Target), HashSet<string>> edgeContractIds)
+    {
+        foreach (ArchitectureViolation violation in violations)
+        {
+            if (violation.ContractId == null)
+            {
+                continue;
+            }
+
+            string? sourceId = resolveId(violation.SourceType);
+            if (sourceId == null)
+            {
+                continue;
+            }
+
+            if (violation.ForbiddenExternalGroup != null)
+            {
+                if (level == ArchitectureGraphLevel.Assembly)
+                {
+                    continue;
+                }
+
+                string externalId = violation.ForbiddenExternalGroup;
+                nodeKinds.TryAdd(externalId, ArchitectureGraphNodeKind.External);
+                TagEdge(edgeContractIds, sourceId, externalId, violation.ContractId);
+                continue;
+            }
+
+            if (violation.DependencyPaths is { Count: > 0 })
+            {
+                foreach (IReadOnlyCollection<string> path in violation.DependencyPaths)
+                {
+                    string[] hops = path.ToArray();
+                    for (int i = 0; i < hops.Length - 1; i++)
+                    {
+                        string? hopSource = resolveId(hops[i]);
+                        string? hopTarget = resolveId(hops[i + 1]);
+                        if (hopSource != null && hopTarget != null)
+                        {
+                            TagEdge(edgeContractIds, hopSource, hopTarget, violation.ContractId);
+                        }
+                    }
+                }
+
+                continue;
+            }
+
+            List<string> targetIds = violation.ForbiddenReferences
+                .Select(resolveId)
+                .Where(id => id != null)
+                .Select(id => id!)
+                .Distinct(StringComparer.Ordinal)
+                .ToList();
+
+            if (targetIds.Count == 0)
+            {
+                string? fallback = resolveId(violation.ForbiddenNamespace);
+                if (fallback != null)
+                {
+                    targetIds.Add(fallback);
+                }
+            }
+
+            foreach (string targetId in targetIds)
+            {
+                TagEdge(edgeContractIds, sourceId, targetId, violation.ContractId);
+            }
+        }
+    }
+
+    private static HashSet<string> GetOrAddEdgeSet(
+        Dictionary<(string Source, string Target), HashSet<string>> edgeContractIds,
+        string sourceId,
+        string targetId)
+    {
+        (string sourceId, string targetId) key = (sourceId, targetId);
+        if (!edgeContractIds.TryGetValue(key, out HashSet<string>? contractIds))
+        {
+            contractIds = new HashSet<string>(StringComparer.Ordinal);
+            edgeContractIds[key] = contractIds;
+        }
+
+        return contractIds;
+    }
+
+    private static void TagEdge(
+        Dictionary<(string Source, string Target), HashSet<string>> edgeContractIds,
+        string sourceId,
+        string targetId,
+        string contractId)
+    {
+        GetOrAddEdgeSet(edgeContractIds, sourceId, targetId).Add(contractId);
+    }
+
+    private static ArchitectureDependencyGraph ToGraph(
+        Dictionary<string, ArchitectureGraphNodeKind> nodeKinds,
+        Dictionary<(string Source, string Target), HashSet<string>> edgeContractIds)
+    {
+        List<ArchitectureGraphNode> nodes = nodeKinds
+            .Select(pair => new ArchitectureGraphNode(pair.Key, pair.Value))
+            .OrderBy(node => (int)node.Kind)
+            .ThenBy(node => node.Id, StringComparer.Ordinal)
+            .ToList();
+
+        List<ArchitectureGraphEdge> edges = edgeContractIds
+            .Select(pair => new ArchitectureGraphEdge(
+                pair.Key.Source,
+                pair.Key.Target,
+                nodeKinds[pair.Key.Source],
+                nodeKinds[pair.Key.Target],
+                pair.Value.OrderBy(id => id, StringComparer.Ordinal).ToList()))
+            .OrderBy(edge => edge.SourceId, StringComparer.Ordinal)
+            .ThenBy(edge => edge.TargetId, StringComparer.Ordinal)
+            .ThenBy(edge => (int)edge.SourceKind)
+            .ToList();
+
+        return new ArchitectureDependencyGraph(nodes, edges);
+    }
+}

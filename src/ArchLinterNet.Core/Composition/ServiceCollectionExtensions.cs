@@ -6,6 +6,8 @@ using ArchLinterNet.Core.Discovery;
 using ArchLinterNet.Core.Discovery.Abstractions;
 using ArchLinterNet.Core.Execution;
 using ArchLinterNet.Core.Execution.Abstractions;
+using ArchLinterNet.Core.Graph;
+using ArchLinterNet.Core.Graph.Abstractions;
 using ArchLinterNet.Core.IO;
 using ArchLinterNet.Core.Reporting;
 using ArchLinterNet.Core.Resolution;
@@ -67,6 +69,9 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<IArchitectureValidationApplicationService, ArchitectureValidationApplicationService>();
         services.AddSingleton<IArchitectureBaselineApplicationService, ArchitectureBaselineApplicationService>();
         services.AddSingleton<IAsmdefValidationService, AsmdefValidationService>();
+        services.AddSingleton<IArchitectureGraphFormatter, ArchitectureGraphFormatter>();
+        services.AddSingleton<IArchitectureGraphApplicationService, ArchitectureGraphApplicationService>();
+        services.AddSingleton<IArchitectureExplainApplicationService, ArchitectureExplainApplicationService>();
         return services;
     }
 
