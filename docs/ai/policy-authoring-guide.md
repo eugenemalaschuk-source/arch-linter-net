@@ -124,6 +124,38 @@ calls, field/property access, type references inside method bodies). They do
 not analyze third-party package internals. This is static reference analysis,
 not semantic data-flow or runtime validation.
 
+## Use External Allow-Only For A Small, Known Vendor Surface
+
+When a layer should only ever use one or a few approved vendor/framework
+dependency groups instead of an ever-growing forbidden list, use
+`strict_external_allow_only` / `audit_external_allow_only`:
+
+```yaml
+external_dependencies:
+  approved_sdk:
+    namespace_prefixes:
+      - MyApp.Vendor.ApprovedSdk
+  legacy_sdk:
+    namespace_prefixes:
+      - MyApp.Vendor.LegacySdk
+
+contracts:
+  strict_external_allow_only:
+    - id: adapter-approved-sdk-only
+      name: adapter-may-only-reference-approved-sdk
+      source: infrastructure_adapter
+      allowed: [approved_sdk]
+      reason: This adapter may only use the approved SDK, not any other declared vendor dependency group.
+```
+
+Only groups declared in `external_dependencies` are ever evaluated — a group not present
+in `allowed` is disallowed, but a reference that matches no declared group at all
+(including BCL/system references, unless a policy author explicitly declares a matching
+group) is never a violation. A misspelled `allowed` entry has no relaxing effect: it can
+only make the contract more restrictive than intended, never less. Detection is
+type-level only (no method-body IL scanning yet, unlike `strict_external`). See
+[External allow-only contracts](../contracts/external-allow-only.md) for full semantics.
+
 ## Use Transitive Depth For Indirect Coupling
 
 When a dependency should be blocked at any depth (direct or indirect), use

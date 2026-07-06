@@ -17,6 +17,7 @@ ArchLinterNet supports static architecture validation through documented YAML po
 - assembly independence contracts (direct .NET assembly reference detection);
 - protected surface contracts;
 - external dependency contracts;
+- external allow-only whitelist contracts;
 - method-body forbidden API contracts;
 - Unity `.asmdef` contracts;
 - reusable layer templates;
@@ -55,6 +56,12 @@ actionable error rather than being silently ignored, since transitive assembly-r
 resolution is not implemented yet. Ordered assembly/project layer contracts and
 assembly/project cycle detection are not yet supported either; these are deferred to a
 follow-up contract family.
+
+External allow-only contracts detect forbidden references only through **type-level**
+reference metadata (base types, interfaces, fields, properties, method signatures, generic
+arguments) — unlike `strict_external`/`audit_external`, they do not yet scan method bodies
+via IL. This is a deliberate scope decision, not an oversight, and may be added as a
+follow-up.
 
 ## Important distinctions
 

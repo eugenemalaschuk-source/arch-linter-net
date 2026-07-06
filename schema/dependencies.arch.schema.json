@@ -335,6 +335,16 @@
           "items": { "$ref": "#/$defs/externalDependencyContract" },
           "default": []
         },
+        "strict_external_allow_only": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/externalAllowOnlyContract" },
+          "default": []
+        },
+        "audit_external_allow_only": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/externalAllowOnlyContract" },
+          "default": []
+        },
         "strict_layer_templates": {
           "type": "array",
           "items": { "$ref": "#/$defs/layerTemplateContract" },
@@ -638,6 +648,25 @@
             "id": { "type": "string", "minLength": 1 },
             "source": { "type": "string", "minLength": 1 },
             "forbidden": { "$ref": "#/$defs/stringList" },
+            "ignored_violations": { "$ref": "#/$defs/ignoredViolations" },
+            "reason": { "type": "string" }
+          }
+        }
+      ]
+    },
+    "externalAllowOnlyContract": {
+      "allOf": [
+        { "$ref": "#/$defs/baseContractFields" },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["name", "source", "allowed"],
+          "properties": {
+            "name": { "type": "string", "minLength": 1 },
+            "id": { "type": "string", "minLength": 1 },
+            "source": { "type": "string", "minLength": 1 },
+            "allowed": { "$ref": "#/$defs/stringList" },
+            "allowed_types": { "$ref": "#/$defs/stringList" },
             "ignored_violations": { "$ref": "#/$defs/ignoredViolations" },
             "reason": { "type": "string" }
           }

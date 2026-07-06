@@ -31,6 +31,7 @@ The policy file is usually `architecture/dependencies.arch.yml` and contains:
 | Assembly allow-only | `strict_assembly_allow_only` | `audit_assembly_allow_only` | Source assembly directly references only itself and explicitly allowed declared assemblies. |
 | Protected surface | `strict_protected` | `audit_protected` | Protected layers are referenced only by explicitly allowed importers. |
 | External dependency | `strict_external` | `audit_external` | Source layer does not reference forbidden vendor/framework dependency groups. |
+| External allow-only | `strict_external_allow_only` | `audit_external_allow_only` | Source layer references only explicitly allowed vendor/framework dependency groups. |
 | Layer template | `strict_layer_templates` | `audit_layer_templates` | Reusable layer order applied to multiple containers. |
 | Coverage | `strict_coverage` | `audit_coverage` | First-party namespaces, discovered projects, and resolved assemblies are covered by a layer, template expansion, or explicit exclusion. |
 

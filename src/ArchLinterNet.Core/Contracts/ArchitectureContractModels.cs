@@ -198,6 +198,12 @@ public sealed class ArchitectureContractGroups
     [YamlMember(Alias = "audit_external")]
     public List<ArchitectureExternalDependencyContract> AuditExternal { get; set; } = new();
 
+    [YamlMember(Alias = "strict_external_allow_only")]
+    public List<ArchitectureExternalAllowOnlyContract> StrictExternalAllowOnly { get; set; } = new();
+
+    [YamlMember(Alias = "audit_external_allow_only")]
+    public List<ArchitectureExternalAllowOnlyContract> AuditExternalAllowOnly { get; set; } = new();
+
     [YamlMember(Alias = "strict_layer_templates")]
     public List<ArchitectureLayerTemplateContract> StrictLayerTemplates { get; set; } = new();
 
@@ -240,6 +246,7 @@ public sealed class ArchitectureContractGroups
         foreach (var c in StrictPackageAllowOnly) yield return c;
         foreach (var c in StrictProtected) yield return c;
         foreach (var c in StrictExternal) yield return c;
+        foreach (var c in StrictExternalAllowOnly) yield return c;
         foreach (var c in StrictAcyclicSiblings) yield return c;
         foreach (var c in StrictCoverage) yield return c;
     }
@@ -260,6 +267,7 @@ public sealed class ArchitectureContractGroups
         foreach (var c in AuditPackageAllowOnly) yield return c;
         foreach (var c in AuditProtected) yield return c;
         foreach (var c in AuditExternal) yield return c;
+        foreach (var c in AuditExternalAllowOnly) yield return c;
         foreach (var c in AuditAcyclicSiblings) yield return c;
         foreach (var c in AuditCoverage) yield return c;
     }
@@ -274,6 +282,24 @@ public sealed class ArchitectureExternalDependencyContract : IArchitectureContra
     [YamlMember(Alias = "source")] public string Source { get; set; } = string.Empty;
 
     [YamlMember(Alias = "forbidden")] public List<string> Forbidden { get; set; } = new();
+
+    [YamlMember(Alias = "ignored_violations")]
+    public List<ArchitectureIgnoredViolation> IgnoredViolations { get; set; } = new();
+
+    [YamlMember(Alias = "reason")] public string Reason { get; set; } = string.Empty;
+}
+
+public sealed class ArchitectureExternalAllowOnlyContract : IArchitectureContract
+{
+    [YamlMember(Alias = "name")] public string Name { get; set; } = string.Empty;
+
+    [YamlMember(Alias = "id")] public string? Id { get; set; }
+
+    [YamlMember(Alias = "source")] public string Source { get; set; } = string.Empty;
+
+    [YamlMember(Alias = "allowed")] public List<string> Allowed { get; set; } = new();
+
+    [YamlMember(Alias = "allowed_types")] public List<string> AllowedTypes { get; set; } = new();
 
     [YamlMember(Alias = "ignored_violations")]
     public List<ArchitectureIgnoredViolation> IgnoredViolations { get; set; } = new();

@@ -11,7 +11,8 @@ internal static class ArchitectureExternalDependencyViolationFinder
         string externalGroupName,
         Type[] sourceTypes,
         ArchitectureExternalDependencyGroup externalGroup,
-        ArchitectureContractExecutionContext executionContext)
+        ArchitectureContractExecutionContext executionContext,
+        IReadOnlyCollection<string>? excludedTypes = null)
     {
         return sourceTypes
             .Select(type =>
@@ -27,6 +28,7 @@ internal static class ArchitectureExternalDependencyViolationFinder
                     .Where(reference =>
                         ArchitectureExternalDependencyResolver.MatchesGroup(externalGroup, reference.FullName,
                             reference.Namespace))
+                    .Where(reference => excludedTypes == null || !excludedTypes.Contains(reference.FullName))
                     .Where(reference => !executionContext.IsIgnored(sourceType, reference.FullName))
                     .Select(reference => reference.FullName)
                     .Distinct(StringComparer.Ordinal)

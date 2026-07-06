@@ -111,6 +111,8 @@ public sealed class ArchitecturePolicyDocumentLoader : IArchitecturePolicyDocume
             document.Contracts.AuditProtected,
             document.Contracts.StrictExternal,
             document.Contracts.AuditExternal,
+            document.Contracts.StrictExternalAllowOnly,
+            document.Contracts.AuditExternalAllowOnly,
             document.Contracts.StrictLayerTemplates,
             document.Contracts.AuditLayerTemplates,
             document.Contracts.StrictAcyclicSiblings,
@@ -655,6 +657,8 @@ public sealed class ArchitecturePolicyDocumentLoader : IArchitecturePolicyDocume
             document.Contracts.AuditProtected,
             document.Contracts.StrictExternal,
             document.Contracts.AuditExternal,
+            document.Contracts.StrictExternalAllowOnly,
+            document.Contracts.AuditExternalAllowOnly,
         ];
 
         return new HashSet<string>(

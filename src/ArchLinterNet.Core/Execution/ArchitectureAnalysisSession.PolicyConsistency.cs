@@ -62,6 +62,8 @@ public sealed partial class ArchitectureAnalysisSession
         AddGroup("audit_protected", "audit", "protected", groups.AuditProtected);
         AddGroup("strict_external", "strict", "external", groups.StrictExternal);
         AddGroup("audit_external", "audit", "external", groups.AuditExternal);
+        AddGroup("strict_external_allow_only", "strict", "external_allow_only", groups.StrictExternalAllowOnly);
+        AddGroup("audit_external_allow_only", "audit", "external_allow_only", groups.AuditExternalAllowOnly);
         AddGroup("strict_asmdef", "strict", "asmdef", groups.StrictAsmdef);
         AddGroup("audit_asmdef", "audit", "asmdef", groups.AuditAsmdef);
 
@@ -574,6 +576,7 @@ public sealed partial class ArchitectureAnalysisSession
             ArchitectureLayerContract c => c.Layers,
             ArchitectureProtectedContract c => c.Protected.Concat(c.AllowedImporters),
             ArchitectureExternalDependencyContract c => new[] { c.Source },
+            ArchitectureExternalAllowOnlyContract c => new[] { c.Source },
             _ => Array.Empty<string>()
         };
     }

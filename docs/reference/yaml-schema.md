@@ -237,6 +237,7 @@ contracts:
   strict_assembly_allow_only: []
   strict_protected: []
   strict_external: []
+  strict_external_allow_only: []
   strict_acyclic_siblings: []
   strict_coverage: []
 
@@ -253,6 +254,7 @@ contracts:
   audit_assembly_allow_only: []
   audit_protected: []
   audit_external: []
+  audit_external_allow_only: []
   audit_acyclic_siblings: []
   audit_coverage: []
 ```
@@ -487,6 +489,25 @@ need not be listed in `allowed_importers`.
 
 External dependency contracts use named groups from `external_dependencies` and
 report references from source types into those vendor/framework surfaces.
+
+### External allow-only contract
+
+```yaml
+- id: <string>                  # Optional
+  name: <string>
+  source: <layer-name>          # Required — first-party source layer
+  allowed: [<group-name>]       # Required — whitelist of allowed external dependency groups
+  allowed_types: []             # Optional — type-level exceptions
+  ignored_violations: []        # Optional — baseline known violations
+  reason: <string>
+```
+
+External allow-only contracts restrict a source layer to only referencing external
+dependency groups declared in `allowed`. Every group declared in `external_dependencies`
+that is not present in `allowed` is evaluated as disallowed; groups not declared in
+`external_dependencies` at all (including BCL/system namespaces, unless a policy author
+explicitly declares a matching group) are never in scope. See
+[External allow-only contracts](../contracts/external-allow-only.md) for full semantics.
 
 ### Coverage contract
 

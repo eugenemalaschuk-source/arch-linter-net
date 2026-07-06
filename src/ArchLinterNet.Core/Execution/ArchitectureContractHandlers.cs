@@ -170,6 +170,17 @@ internal sealed class ExternalContractHandler : IArchitectureContractHandler
     }
 }
 
+internal sealed class ExternalAllowOnlyContractHandler : IArchitectureContractHandler
+{
+    public string Family => "external_allow_only";
+
+    public ArchitectureHandlerResult Execute(ArchitectureAnalysisSession session, IArchitectureContract contract)
+    {
+        return ArchitectureHandlerResult.FromViolations(
+            session.CheckExternalAllowOnlyContract((ArchitectureExternalAllowOnlyContract)contract));
+    }
+}
+
 internal sealed class AcyclicSiblingContractHandler : IArchitectureContractHandler
 {
     public string Family => "acyclic_sibling";
