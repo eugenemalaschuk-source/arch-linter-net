@@ -460,6 +460,50 @@ public sealed class ExternalAllowOnlyContractTests
     }
 
     [Test]
+    public void CheckConfiguration_ExternalAllowOnlyImplicitDisallowedGroupWithoutMatchers_ReturnsViolation()
+    {
+        var contract = new ArchitectureExternalAllowOnlyContract
+        {
+            Name = "core-allow-only",
+            Source = "core",
+            Allowed = new List<string>()
+        };
+        var document = CreateDocument(
+            new Dictionary<string, ArchitectureExternalDependencyGroup>
+            {
+                ["empty_group"] = new()
+            },
+            contract);
+
+        var runner = new ArchitectureContractRunner(CreateContext(), document);
+        var violations = runner.CheckConfiguration();
+
+        Assert.That(violations.Any(v => v.ForbiddenNamespace == "invalid external dependency group"), Is.True);
+    }
+
+    [Test]
+    public void CheckConfiguration_ExternalAllowOnlyAllowedGroupWithoutMatchers_DoesNotReturnViolation()
+    {
+        var contract = new ArchitectureExternalAllowOnlyContract
+        {
+            Name = "core-allow-only",
+            Source = "core",
+            Allowed = new List<string> { "empty_group" }
+        };
+        var document = CreateDocument(
+            new Dictionary<string, ArchitectureExternalDependencyGroup>
+            {
+                ["empty_group"] = new()
+            },
+            contract);
+
+        var runner = new ArchitectureContractRunner(CreateContext(), document);
+        var violations = runner.CheckConfiguration();
+
+        Assert.That(violations.Any(v => v.ForbiddenNamespace == "invalid external dependency group"), Is.False);
+    }
+
+    [Test]
     public void CheckExternalAllowOnlyContract_Violation_MessageIncludesAllowedGroups()
     {
         var contract = new ArchitectureExternalAllowOnlyContract

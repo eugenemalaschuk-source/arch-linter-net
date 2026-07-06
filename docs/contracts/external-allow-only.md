@@ -46,6 +46,8 @@ Only *declared* external dependency groups are ever evaluated. A reference that 
 
 An `allowed` entry naming a group that does not exist in `external_dependencies` (for example, a typo) has no effect: it can't exclude anything from the disallowed-group set because it never matches a real declared group. The contract fails closed — a misspelled `allowed` entry can only make the contract more restrictive than intended, never less.
 
+Every group that becomes disallowed for at least one `external_allow_only` contract (any declared group not in that contract's `allowed`) must declare at least one non-empty `namespace_prefixes` or `type_prefixes` matcher, the same requirement [external dependency contracts](external-dependencies.md) already enforce for `forbidden` groups. A disallowed group without a usable matcher fails validation with an `invalid external dependency group` configuration diagnostic instead of silently never matching anything. A group that is *only* ever referenced through some contract's `allowed` list (never disallowed) is not required to have a matcher, since it is never evaluated.
+
 Use `allowed_types` for narrow exact type exceptions within an otherwise-disallowed group:
 
 ```yaml
