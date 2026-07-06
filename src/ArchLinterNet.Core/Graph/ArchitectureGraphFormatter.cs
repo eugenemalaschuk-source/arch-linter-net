@@ -42,8 +42,13 @@ public sealed class ArchitectureGraphFormatter : IArchitectureGraphFormatter
         StringBuilder builder = new();
         builder.AppendLine("digraph {");
 
+        HashSet<string> connectedNodeIds = new(StringComparer.Ordinal);
+
         foreach (ArchitectureGraphEdge edge in graph.Edges)
         {
+            connectedNodeIds.Add(edge.SourceId);
+            connectedNodeIds.Add(edge.TargetId);
+
             string source = Quote(edge.SourceId);
             string target = Quote(edge.TargetId);
 
@@ -55,6 +60,14 @@ public sealed class ArchitectureGraphFormatter : IArchitectureGraphFormatter
             else
             {
                 builder.AppendLine($"  {source} -> {target};");
+            }
+        }
+
+        foreach (ArchitectureGraphNode node in graph.Nodes)
+        {
+            if (!connectedNodeIds.Contains(node.Id))
+            {
+                builder.AppendLine($"  {Quote(node.Id)};");
             }
         }
 
@@ -92,6 +105,17 @@ public sealed class ArchitectureGraphFormatter : IArchitectureGraphFormatter
 
             builder.AppendLine(
                 $"  {sourceAlias}[\"{EscapeMermaidLabel(edge.SourceId)}\"] -->{label} {targetAlias}[\"{EscapeMermaidLabel(edge.TargetId)}\"]");
+        }
+
+        foreach (ArchitectureGraphNode node in graph.Nodes)
+        {
+            if (aliases.ContainsKey(node.Id))
+            {
+                continue;
+            }
+
+            string alias = AliasFor(node.Id);
+            builder.AppendLine($"  {alias}[\"{EscapeMermaidLabel(node.Id)}\"]");
         }
 
         return builder.ToString().TrimEnd('\r', '\n');

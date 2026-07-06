@@ -256,8 +256,69 @@ public sealed class ArchitectureDependencyGraphBuilderTests
         ArchitectureGraphNode externalNode = graph.Nodes.Single(n => n.Kind == ArchitectureGraphNodeKind.External);
         Assert.That(externalNode.Id, Is.EqualTo("json"));
 
-        ArchitectureGraphEdge edge = graph.Edges.Single(e => e.TargetId == "json");
-        Assert.That(edge.SourceId, Is.EqualTo(ReportingNamespace));
+        ArchitectureGraphEdge edge = graph.Edges.Single(e => e.SourceId == ReportingNamespace && e.TargetId == "json");
         Assert.That(edge.ContractIds, Does.Contain("reporting-no-json"));
+    }
+
+    [Test]
+    public void Build_ExternalGroupWithNoContract_StillProducesNodeAndEdgeWithEmptyContractIds()
+    {
+        var document = new ArchitectureContractDocument
+        {
+            Version = 1,
+            Name = "Test",
+            ExternalDependencies = new Dictionary<string, ArchitectureExternalDependencyGroup>
+            {
+                ["json"] = new() { NamespacePrefixes = new List<string> { "System.Text.Json" } },
+            },
+            Analysis = new ArchitectureAnalysisConfiguration
+            {
+                TargetAssemblies = new List<string> { "ArchLinterNet.Core" },
+            },
+            Contracts = new ArchitectureContractGroups(),
+        };
+
+        var context = CreateContext();
+        var runner = new ArchitectureContractRunner(context, document);
+
+        ArchitectureDependencyGraph graph = ArchitectureDependencyGraphBuilder.Build(
+            runner.Session, ArchitectureGraphLevel.Namespace, Array.Empty<ArchitectureViolation>());
+
+        ArchitectureGraphNode externalNode = graph.Nodes.Single(n => n.Kind == ArchitectureGraphNodeKind.External);
+        Assert.That(externalNode.Id, Is.EqualTo("json"));
+
+        ArchitectureGraphEdge edge = graph.Edges.Single(
+            e => e.SourceId == ReportingNamespace && e.TargetId == "json");
+        Assert.That(edge.ContractIds, Is.Empty,
+            "No contract references this group, so the edge is real but not tied to a violation");
+    }
+
+    [Test]
+    public void Build_DeclaredExternalGroupWithNoMatchingReference_StillProducesIsolatedNode()
+    {
+        var document = new ArchitectureContractDocument
+        {
+            Version = 1,
+            Name = "Test",
+            ExternalDependencies = new Dictionary<string, ArchitectureExternalDependencyGroup>
+            {
+                ["never-used"] = new() { NamespacePrefixes = new List<string> { "TotallyUnreferenced.Namespace" } },
+            },
+            Analysis = new ArchitectureAnalysisConfiguration
+            {
+                TargetAssemblies = new List<string> { "ArchLinterNet.Core" },
+            },
+            Contracts = new ArchitectureContractGroups(),
+        };
+
+        var context = CreateContext();
+        var runner = new ArchitectureContractRunner(context, document);
+
+        ArchitectureDependencyGraph graph = ArchitectureDependencyGraphBuilder.Build(
+            runner.Session, ArchitectureGraphLevel.Namespace, Array.Empty<ArchitectureViolation>());
+
+        ArchitectureGraphNode externalNode = graph.Nodes.Single(n => n.Id == "never-used");
+        Assert.That(externalNode.Kind, Is.EqualTo(ArchitectureGraphNodeKind.External));
+        Assert.That(graph.Edges.Any(e => e.TargetId == "never-used"), Is.False);
     }
 }

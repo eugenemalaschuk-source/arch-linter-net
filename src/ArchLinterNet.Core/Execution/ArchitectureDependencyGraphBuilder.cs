@@ -1,5 +1,7 @@
 using System.Reflection;
+using ArchLinterNet.Core.Contracts;
 using ArchLinterNet.Core.Model;
+using ArchLinterNet.Core.Resolution;
 using ArchLinterNet.Core.Scanning;
 
 namespace ArchLinterNet.Core.Execution;
@@ -36,6 +38,11 @@ internal static class ArchitectureDependencyGraphBuilder
             SeedNamespaceEdges(session, nodeKinds, edgeContractIds);
         }
 
+        if (level != ArchitectureGraphLevel.Assembly)
+        {
+            SeedExternalNodesAndEdges(session, resolveId, nodeKinds, edgeContractIds);
+        }
+
         OverlayViolations(violations, level, kind, resolveId, nodeKinds, edgeContractIds);
 
         return ToGraph(nodeKinds, edgeContractIds);
@@ -64,6 +71,55 @@ internal static class ArchitectureDependencyGraphBuilder
         foreach (ArchitectureCoverageDependencyEdge edge in inventory.DependencyEdges)
         {
             GetOrAddEdgeSet(edgeContractIds, edge.SourceNamespace, edge.TargetNamespace);
+        }
+    }
+
+    // Every declared external dependency group becomes a node, and every first-party reference
+    // matching a group's pattern becomes an edge, regardless of whether any contract currently
+    // checks that group. This reuses the same two detectors CheckExternalContract composes for
+    // validation — ArchitectureExternalDependencyViolationFinder (field/property/parameter/base-type
+    // references) and ArchitectureExternalDependencyIlScanner (method-body references, the common
+    // case for something like a bare `JsonSerializer.Serialize(...)` call) — run unconditionally
+    // over every declared group and every first-party type, with no ignored_violations applied,
+    // rather than only when an active contract happens to raise a violation. That keeps `graph`/
+    // `explain` showing the real dependency (with an empty ContractIds) even when it is currently
+    // allowed or untracked by any contract.
+    private static void SeedExternalNodesAndEdges(
+        ArchitectureAnalysisSession session,
+        Func<string, string?> resolveId,
+        Dictionary<string, ArchitectureGraphNodeKind> nodeKinds,
+        Dictionary<(string Source, string Target), HashSet<string>> edgeContractIds)
+    {
+        Dictionary<string, ArchitectureExternalDependencyGroup> externalGroups = session.Document.ExternalDependencies;
+        if (externalGroups.Count == 0)
+        {
+            return;
+        }
+
+        foreach (string groupName in externalGroups.Keys)
+        {
+            nodeKinds[groupName] = ArchitectureGraphNodeKind.External;
+        }
+
+        Type[] allTypes = session.TypeIndex.AllTypes();
+        ArchitectureContractExecutionContext executionContext = new(
+            "graph-seed", null, Array.Empty<ArchitectureIgnoredViolation>(), enableUnmatchedIgnoreTracking: false, null, null);
+        ArchitectureExternalDependencyIlScanner ilScanner = new();
+
+        foreach ((string groupName, ArchitectureExternalDependencyGroup group) in externalGroups)
+        {
+            IEnumerable<ArchitectureViolation> matches = ArchitectureExternalDependencyViolationFinder.FindViolations(
+                    groupName, allTypes, group, executionContext)
+                .Concat(ilScanner.FindMethodBodyViolations(allTypes, groupName, group, executionContext));
+
+            foreach (ArchitectureViolation match in matches)
+            {
+                string? sourceId = resolveId(match.SourceType);
+                if (sourceId != null)
+                {
+                    GetOrAddEdgeSet(edgeContractIds, sourceId, groupName);
+                }
+            }
         }
     }
 
