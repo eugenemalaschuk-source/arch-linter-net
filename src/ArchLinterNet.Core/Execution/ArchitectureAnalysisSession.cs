@@ -346,6 +346,11 @@ public sealed partial class ArchitectureAnalysisSession
                 AddExternalGroupNames(c.Forbidden);
             }
 
+            foreach (ArchitectureExternalAllowOnlyContract c in Document.Contracts.StrictExternalAllowOnly)
+            {
+                AddLayerNames(c.Id, new[] { c.Source });
+            }
+
             foreach (ArchitecturePackageDependencyContract c in Document.Contracts.StrictPackageDependency)
             {
                 AddPackageGroupNames(c.Forbidden);
@@ -402,6 +407,11 @@ public sealed partial class ArchitectureAnalysisSession
             {
                 AddLayerNames(c.Id, new[] { c.Source });
                 AddExternalGroupNames(c.Forbidden);
+            }
+
+            foreach (ArchitectureExternalAllowOnlyContract c in Document.Contracts.AuditExternalAllowOnly)
+            {
+                AddLayerNames(c.Id, new[] { c.Source });
             }
 
             foreach (ArchitecturePackageDependencyContract c in Document.Contracts.AuditPackageDependency)

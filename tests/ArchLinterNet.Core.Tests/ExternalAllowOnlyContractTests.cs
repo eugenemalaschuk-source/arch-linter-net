@@ -428,4 +428,60 @@ public sealed class ExternalAllowOnlyContractTests
         Assert.That(outcome.CoverageFindings.Single().ForbiddenNamespace, Is.EqualTo("unresolved"));
         Assert.That(outcome.CoverageFindings.Single().ForbiddenReferences, Is.EqualTo(new[] { "does_not_exist_layer" }));
     }
+
+    [Test]
+    public void CheckConfiguration_ExternalAllowOnlyEmptySourceLayer_ReturnsViolation()
+    {
+        var document = new ArchitectureContractDocument
+        {
+            Version = 1,
+            Name = "Test",
+            Layers = new Dictionary<string, ArchitectureLayer>
+            {
+                ["empty"] = new() { Namespace = "Test.Empty.Namespace.That.Has.No.Types" }
+            },
+            Analysis = new ArchitectureAnalysisConfiguration
+            {
+                TargetAssemblies = new List<string> { "ArchLinterNet.Core" }
+            },
+            Contracts = new ArchitectureContractGroups
+            {
+                StrictExternalAllowOnly = new List<ArchitectureExternalAllowOnlyContract>
+                {
+                    new() { Name = "test", Source = "empty", Allowed = new List<string>() }
+                }
+            }
+        };
+
+        var runner = new ArchitectureContractRunner(CreateContext(), document);
+        var violations = runner.CheckConfiguration();
+
+        Assert.That(violations.Any(v => v.ForbiddenNamespace == "empty layer namespace"), Is.True);
+    }
+
+    [Test]
+    public void CheckExternalAllowOnlyContract_Violation_MessageIncludesAllowedGroups()
+    {
+        var contract = new ArchitectureExternalAllowOnlyContract
+        {
+            Name = "core-allow-only",
+            Source = "core",
+            Allowed = new List<string> { "approved_sdk" }
+        };
+        var document = CreateDocument(
+            new Dictionary<string, ArchitectureExternalDependencyGroup>
+            {
+                ["approved_sdk"] = new() { NamespacePrefixes = new List<string> { "Does.Not.Exist" } },
+                ["system"] = new() { NamespacePrefixes = new List<string> { "System" } }
+            },
+            contract);
+        var runner = new ArchitectureContractRunner(CreateContext(), document);
+
+        var violations = runner.Session.CheckExternalAllowOnlyContract(contract);
+
+        Assert.That(violations, Is.Not.Empty);
+        Assert.That(
+            violations.All(v => v.ForbiddenNamespace.Contains("allowed groups: [approved_sdk]", StringComparison.Ordinal)),
+            Is.True);
+    }
 }

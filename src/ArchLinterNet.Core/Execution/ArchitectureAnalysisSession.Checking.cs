@@ -612,12 +612,17 @@ public sealed partial class ArchitectureAnalysisSession
             .Where(name => !allowedGroups.Contains(name))
             .OrderBy(name => name, StringComparer.Ordinal);
 
+        string allowedGroupsSuffix = $" (allowed groups: [{string.Join(", ", contract.Allowed)}])";
+
         foreach (string externalGroupName in disallowedGroups)
         {
             ArchitectureExternalDependencyGroup externalGroup = Document.ExternalDependencies[externalGroupName];
 
-            violations.AddRange(ArchitectureExternalDependencyViolationFinder.FindViolations(
-                externalGroupName, sourceTypes, externalGroup, executionContext, contract.AllowedTypes));
+            foreach (ArchitectureViolation violation in ArchitectureExternalDependencyViolationFinder.FindViolations(
+                         externalGroupName, sourceTypes, externalGroup, executionContext, contract.AllowedTypes))
+            {
+                violations.Add(violation with { ForbiddenNamespace = violation.ForbiddenNamespace + allowedGroupsSuffix });
+            }
         }
 
         executionContext.CollectUnmatchedIgnores(_unmatchedIgnoredViolations);

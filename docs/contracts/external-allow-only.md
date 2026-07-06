@@ -62,7 +62,7 @@ contracts:
 
 `allowed_types` entries are exact full type names, not namespace patterns — the same convention as the namespace-level [allow-only contract](allow-only.md)'s `allowed_types`.
 
-Violations identify the source type, the disallowed external dependency group, and the matched reference(s), using the same violation shape as [external dependency contracts](external-dependencies.md).
+Violations identify the source type, the disallowed external dependency group, the matched reference(s), and the contract's full `allowed` group list (so the diagnostic makes clear what *is* permitted, not just what isn't), using the same violation shape as [external dependency contracts](external-dependencies.md).
 
 `ignored_violations` entries use the same `source_type`/`forbidden_reference`/`reason` shape as other contract families.
 
