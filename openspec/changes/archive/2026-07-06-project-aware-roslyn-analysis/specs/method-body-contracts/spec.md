@@ -1,8 +1,5 @@
-# Method Body Contracts Specification
+## MODIFIED Requirements
 
-## Purpose
-Detects forbidden method calls inside method bodies via Roslyn semantic analysis, falling back to IL token inspection when needed.
-## Requirements
 ### Requirement: Detect forbidden calls via Roslyn semantic analysis
 The system SHALL parse C# source files, build a Roslyn compilation, walk executable bodies (methods, constructors, accessors, local functions), resolve symbols via `SemanticModel`, and match against forbidden call patterns. When project discovery is configured and project-aware compilation context resolves successfully for the contract's single owning project, the compilation SHALL use that project's resolved reference assembly paths (project references, package references, and framework references) instead of the AppDomain-loaded reference list; otherwise the system SHALL use the existing lightweight, AppDomain-based reference list unchanged.
 
@@ -26,24 +23,6 @@ The system SHALL parse C# source files, build a Roslyn compilation, walk executa
 - **WHEN** `analysis.solution` and `analysis.projects` are both unset for a repository
 - **THEN** method-body scanning behaves exactly as before this change, using the AppDomain-based reference list
 
-### Requirement: Detect forbidden calls via IL token fallback
-The system SHALL read raw IL byte arrays from compiled assemblies, decode opcodes, resolve metadata tokens to `MemberInfo`, and match against forbidden call patterns.
-
-#### Scenario: IL-level forbidden call found
-- **WHEN** a method's IL contains a call token matching a forbidden pattern
-- **THEN** a violation is returned with the IL offset, method name, matched pattern, and resolved member
-
-#### Scenario: Missing assembly gracefully handled
-- **WHEN** a method body cannot be read due to `FileNotFoundException`
-- **THEN** that method is skipped without error
-
-### Requirement: Merge duplicate semantic/IL matches
-The system SHALL merge violations from Roslyn and IL scanning by normalized descriptor to reduce duplicate findings.
-
-#### Scenario: Same call found by both scanners
-- **WHEN** both Roslyn and IL scanning find the same forbidden call
-- **THEN** only one violation entry is produced for that call
-
 ### Requirement: Method body contract accepts optional id
 A method body contract SHALL accept an optional `id` field. When provided, violations from this contract SHALL include the contract ID.
 
@@ -54,6 +33,8 @@ A method body contract SHALL accept an optional `id` field. When provided, viola
 #### Scenario: Violation without explicit ID
 - **WHEN** a method body contract without explicit `id` produces a violation
 - **THEN** the violation SHALL have `ContractId` set to the fallback ID derived from `name`
+
+## ADDED Requirements
 
 ### Requirement: Exclude generated and build-output files from source scanning
 The system SHALL exclude source files from method-body scanning when their path contains a `bin`, `obj`, `Library`, `Temp`, or `PackageCache` directory segment, or when their filename ends in `.g.cs`, `.g.i.cs`, or `.designer.cs` (case-insensitive), regardless of whether the file list came from directory enumeration or from project-aware resolution.
@@ -73,4 +54,3 @@ The system SHALL exclude source files from method-body scanning when their path 
 #### Scenario: Ordinary source file is not excluded
 - **WHEN** a `.cs` file is under a source root with no excluded directory segment and no excluded filename suffix
 - **THEN** that file remains eligible for method-body scanning
-

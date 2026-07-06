@@ -37,6 +37,7 @@ public static class ServiceCollectionExtensions
             sp.GetRequiredService<IArchitectureFileSystem>(),
             sp.GetRequiredService<IArchitectureSolutionParser>(),
             sp.GetRequiredService<IArchitectureProjectFileParser>()));
+        services.AddSingleton<IArchitectureProjectRoslynContextResolver, ArchitectureProjectRoslynContextResolver>();
         services.AddSingleton<IArchitectureAssemblyResolutionService, ArchitectureAssemblyResolutionService>();
         services.AddSingleton<IArchitectureAsmdefScanner, ArchitectureAsmdefScanner>();
         services.AddSingleton<IArchitectureSourceScanner, ArchitectureSourceScanner>();
