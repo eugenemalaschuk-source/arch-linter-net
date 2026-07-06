@@ -1,6 +1,7 @@
 using ArchLinterNet.Core.Contracts;
 using ArchLinterNet.Core.Execution;
 using ArchLinterNet.Core.Model;
+using ArchLinterNet.Core.Validation;
 using NUnit.Framework;
 
 namespace ArchLinterNet.Core.Tests;
@@ -8,6 +9,31 @@ namespace ArchLinterNet.Core.Tests;
 [TestFixture]
 public sealed class ExternalAllowOnlyContractTests
 {
+    private string _tempDir = null!;
+
+    [SetUp]
+    public void SetUp()
+    {
+        _tempDir = Path.Combine(Path.GetTempPath(), $"arch-linter-external-allow-only-test-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(_tempDir);
+    }
+
+    [TearDown]
+    public void TearDown()
+    {
+        if (Directory.Exists(_tempDir))
+        {
+            Directory.Delete(_tempDir, true);
+        }
+    }
+
+    private string WritePolicy(string yaml)
+    {
+        string path = Path.Combine(_tempDir, "dependencies.arch.yml");
+        File.WriteAllText(path, yaml);
+        return path;
+    }
+
     private static ArchitectureAnalysisContext CreateContext()
     {
         return new ArchitectureAnalysisContext(
@@ -332,5 +358,74 @@ public sealed class ExternalAllowOnlyContractTests
 
         Assert.That(violations, Is.Not.Empty);
         Assert.That(document.Contracts.StrictExternalAllowOnly, Is.Empty);
+    }
+
+    [Test]
+    public void CheckExternalAllowOnlyContract_AllowedTypesException_DoesNotAppearAsBaselineCandidate()
+    {
+        var contract = new ArchitectureExternalAllowOnlyContract
+        {
+            Name = "core-allow-only",
+            Id = "core-allow-only",
+            Source = "core",
+            Allowed = new List<string>(),
+            AllowedTypes = new List<string> { "System.String" }
+        };
+        var document = CreateDocument(
+            new Dictionary<string, ArchitectureExternalDependencyGroup>
+            {
+                ["system"] = new() { NamespacePrefixes = new List<string> { "System" } }
+            },
+            contract);
+        var runner = new ArchitectureContractRunner(CreateContext(), document);
+
+        runner.Session.CheckExternalAllowOnlyContract(contract);
+
+        Assert.That(
+            runner.BaselineCandidates.Any(c => c.ForbiddenReference == "System.String"),
+            Is.False,
+            "A reference excluded via allowed_types is not a violation and should not be suggested as a baseline candidate.");
+    }
+
+    [Test]
+    public void ValidateStrict_DanglingSourceLayerCoveredByRuleInputCoverage_ReportsUnresolvedWithoutThrowing()
+    {
+        string policyPath = WritePolicy($"""
+            version: 1
+            name: Test
+
+            layers:
+              audio:
+                namespace: ArchLinterNet.Core
+
+            analysis:
+              target_assemblies: [ArchLinterNet.Core]
+
+            contracts:
+              strict_external_allow_only:
+                - id: audio-allow-only-typo
+                  name: audio-allow-only-typo
+                  source: does_not_exist_layer
+                  allowed: []
+                  reason: Placeholder with a dangling source layer.
+              strict_coverage:
+                - id: rule-input-coverage
+                  name: rule-input-coverage
+                  scope: rule_input
+                  contract_ids: [audio-allow-only-typo]
+                  reason: Flag dangling layer references.
+            """);
+
+        ValidationOutcome outcome = ArchitectureValidationService.Validate(new ValidationRequest
+        {
+            PolicyPath = policyPath,
+            Mode = "strict"
+        });
+
+        Assert.That(outcome.Passed, Is.False);
+        Assert.That(outcome.Violations, Is.Empty);
+        Assert.That(outcome.CoverageFindings, Has.Count.EqualTo(1));
+        Assert.That(outcome.CoverageFindings.Single().ForbiddenNamespace, Is.EqualTo("unresolved"));
+        Assert.That(outcome.CoverageFindings.Single().ForbiddenReferences, Is.EqualTo(new[] { "does_not_exist_layer" }));
     }
 }

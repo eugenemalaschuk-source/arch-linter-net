@@ -616,32 +616,11 @@ public sealed partial class ArchitectureAnalysisSession
         {
             ArchitectureExternalDependencyGroup externalGroup = Document.ExternalDependencies[externalGroupName];
 
-            foreach (ArchitectureViolation violation in ArchitectureExternalDependencyViolationFinder.FindViolations(
-                         externalGroupName, sourceTypes, externalGroup, executionContext))
-            {
-                ArchitectureViolation? filtered = ExcludeAllowedTypes(violation, contract.AllowedTypes);
-                if (filtered != null)
-                {
-                    violations.Add(filtered);
-                }
-            }
+            violations.AddRange(ArchitectureExternalDependencyViolationFinder.FindViolations(
+                externalGroupName, sourceTypes, externalGroup, executionContext, contract.AllowedTypes));
         }
 
         executionContext.CollectUnmatchedIgnores(_unmatchedIgnoredViolations);
         return violations;
-    }
-
-    private static ArchitectureViolation? ExcludeAllowedTypes(ArchitectureViolation violation, List<string> allowedTypes)
-    {
-        if (allowedTypes.Count == 0)
-        {
-            return violation;
-        }
-
-        string[] remaining = violation.ForbiddenReferences
-            .Where(reference => !allowedTypes.Contains(reference))
-            .ToArray();
-
-        return remaining.Length == 0 ? null : violation with { ForbiddenReferences = remaining };
     }
 }
