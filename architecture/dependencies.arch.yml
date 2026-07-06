@@ -37,6 +37,10 @@ external_dependencies:
   dependency_injection_container:
     namespace_prefixes:
       - Microsoft.Extensions.DependencyInjection
+  msbuild_project_evaluation:
+    namespace_prefixes:
+      - Buildalyzer
+      - Microsoft.Build
 
 analysis:
   target_assemblies:
@@ -201,6 +205,71 @@ contracts:
       source: unity
       forbidden: [dependency_injection_container]
       reason: Adapters must consume the composition root's facade, not container APIs directly.
+
+    - name: core-model-must-not-depend-on-msbuild
+      source: core_model
+      forbidden: [msbuild_project_evaluation]
+      reason: MSBuild/Buildalyzer project evaluation APIs must stay confined to Core.Discovery.
+
+    - name: core-io-must-not-depend-on-msbuild
+      source: core_io
+      forbidden: [msbuild_project_evaluation]
+      reason: MSBuild/Buildalyzer project evaluation APIs must stay confined to Core.Discovery.
+
+    - name: core-reporting-must-not-depend-on-msbuild
+      source: core_reporting
+      forbidden: [msbuild_project_evaluation]
+      reason: MSBuild/Buildalyzer project evaluation APIs must stay confined to Core.Discovery.
+
+    - name: core-resolution-must-not-depend-on-msbuild
+      source: core_resolution
+      forbidden: [msbuild_project_evaluation]
+      reason: MSBuild/Buildalyzer project evaluation APIs must stay confined to Core.Discovery.
+
+    - name: core-scanning-must-not-depend-on-msbuild
+      source: core_scanning
+      forbidden: [msbuild_project_evaluation]
+      reason: MSBuild/Buildalyzer project evaluation APIs must stay confined to Core.Discovery.
+
+    - name: core-contracts-must-not-depend-on-msbuild
+      source: core_contracts
+      forbidden: [msbuild_project_evaluation]
+      reason: MSBuild/Buildalyzer project evaluation APIs must stay confined to Core.Discovery.
+
+    - name: core-execution-must-not-depend-on-msbuild
+      source: core_execution
+      forbidden: [msbuild_project_evaluation]
+      reason: MSBuild/Buildalyzer project evaluation APIs must stay confined to Core.Discovery.
+
+    - name: core-validation-must-not-depend-on-msbuild
+      source: core_validation
+      forbidden: [msbuild_project_evaluation]
+      reason: MSBuild/Buildalyzer project evaluation APIs must stay confined to Core.Discovery.
+
+    - name: core-asmdef-must-not-depend-on-msbuild
+      source: core_asmdef
+      forbidden: [msbuild_project_evaluation]
+      reason: MSBuild/Buildalyzer project evaluation APIs must stay confined to Core.Discovery.
+
+    - name: core-composition-must-not-depend-on-msbuild
+      source: core_composition
+      forbidden: [msbuild_project_evaluation]
+      reason: MSBuild/Buildalyzer project evaluation APIs must stay confined to Core.Discovery; the composition root wires the resolver's interface, not Buildalyzer itself.
+
+    - name: cli-must-not-depend-on-msbuild
+      source: cli
+      forbidden: [msbuild_project_evaluation]
+      reason: Adapters must consume the composition root's facade, not MSBuild/Buildalyzer APIs directly.
+
+    - name: testing-must-not-depend-on-msbuild
+      source: testing
+      forbidden: [msbuild_project_evaluation]
+      reason: Adapters must consume the composition root's facade, not MSBuild/Buildalyzer APIs directly.
+
+    - name: unity-must-not-depend-on-msbuild
+      source: unity
+      forbidden: [msbuild_project_evaluation]
+      reason: Adapters must consume the composition root's facade, not MSBuild/Buildalyzer APIs directly.
 
   strict_layers:
     - name: core-layering
