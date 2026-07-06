@@ -20,6 +20,8 @@ layers:
     namespace: ArchLinterNet.Core.Contracts
   core_execution:
     namespace: ArchLinterNet.Core.Execution
+  core_graph:
+    namespace: ArchLinterNet.Core.Graph
   core_validation:
     namespace: ArchLinterNet.Core.Validation
   core_asmdef:
@@ -97,6 +99,12 @@ contracts:
       source: core_execution
       forbidden: [cli, testing, unity]
       reason: Contract execution and handler internals must stay usable from any host and must not couple back to a specific CLI, testing, or Unity adapter.
+
+    - name: core-graph-must-not-depend-on-hosts
+      id: core-graph-must-not-depend-on-hosts
+      source: core_graph
+      forbidden: [cli, testing, unity]
+      reason: The dependency graph and explain application seam must stay usable from any host and must not couple back to a specific CLI, testing, or Unity adapter.
 
     - name: core-reporting-stays-a-diagnostics-leaf
       id: core-reporting-stays-a-diagnostics-leaf
@@ -186,6 +194,11 @@ contracts:
       forbidden: [dependency_injection_container]
       reason: Application services consume the composition root's interfaces, not container APIs directly.
 
+    - name: core-graph-must-not-depend-on-di-container
+      source: core_graph
+      forbidden: [dependency_injection_container]
+      reason: Application services consume the composition root's interfaces, not container APIs directly.
+
     - name: core-asmdef-must-not-depend-on-di-container
       source: core_asmdef
       forbidden: [dependency_injection_container]
@@ -243,6 +256,11 @@ contracts:
 
     - name: core-validation-must-not-depend-on-msbuild
       source: core_validation
+      forbidden: [msbuild_project_evaluation]
+      reason: MSBuild/Buildalyzer project evaluation APIs must stay confined to Core.Discovery.
+
+    - name: core-graph-must-not-depend-on-msbuild
+      source: core_graph
       forbidden: [msbuild_project_evaluation]
       reason: MSBuild/Buildalyzer project evaluation APIs must stay confined to Core.Discovery.
 

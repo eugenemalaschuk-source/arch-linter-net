@@ -410,6 +410,7 @@ contracts:
                 "ArchLinterNet.Core.Contracts",
                 "ArchLinterNet.Core.Discovery",
                 "ArchLinterNet.Core.Execution",
+                "ArchLinterNet.Core.Graph",
                 "ArchLinterNet.Core.IO",
                 "ArchLinterNet.Core.Model",
                 "ArchLinterNet.Core.Reporting",
