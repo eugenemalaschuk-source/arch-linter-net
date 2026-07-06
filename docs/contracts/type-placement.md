@@ -50,6 +50,8 @@ Use type placement contracts when an architectural role needs to be governed by 
 
 There is no regex or expression-language selector. Every matcher is an exact/prefix/suffix/full-name string comparison.
 
+At least one `types_matching` field must be populated. An omitted, empty (`types_matching: {}`), or entirely typo'd selector is rejected at policy load time — an unselective matcher would otherwise match every loaded type, silently turning a role-specific rule into a global one.
+
 ### Placement expectations
 
 `must_reside_in_layers`, `must_reside_in_namespaces`, `must_reside_in_projects`, and `must_reside_in_assemblies` are all optional lists that together form a single set of allowed locations: a selected type's actual location must satisfy **at least one** entry across all four lists, or it's a placement violation.

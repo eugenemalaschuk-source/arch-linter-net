@@ -636,6 +636,24 @@ public sealed class ArchitecturePolicyDocumentLoader : IArchitecturePolicyDocume
         foreach (ArchitectureTypePlacementContract contract in document.Contracts.StrictTypePlacement
                      .Concat(document.Contracts.AuditTypePlacement))
         {
+            ArchitectureTypeMatcher matcher = contract.TypesMatching;
+            bool hasSelectorField = !string.IsNullOrEmpty(matcher.NameSuffix)
+                || !string.IsNullOrEmpty(matcher.NamePrefix)
+                || !string.IsNullOrEmpty(matcher.Namespace)
+                || !string.IsNullOrEmpty(matcher.Layer)
+                || !string.IsNullOrEmpty(matcher.BaseType)
+                || !string.IsNullOrEmpty(matcher.ImplementsInterface)
+                || !string.IsNullOrEmpty(matcher.HasAttribute);
+
+            if (!hasSelectorField)
+            {
+                throw new InvalidOperationException(
+                    $"Type placement contract '{contract.Name}' declares no usable types_matching selector field " +
+                    "(name_suffix/name_prefix/namespace/layer/base_type/implements_interface/has_attribute). " +
+                    "An empty or omitted selector would match every loaded type, turning a role-specific rule into " +
+                    "a global one. Declare at least one selector field, or check for a typo'd field name.");
+            }
+
             bool hasPlacementExpectation = contract.MustResideInLayers.Count > 0
                 || contract.MustResideInNamespaces.Count > 0
                 || contract.MustResideInProjects.Count > 0

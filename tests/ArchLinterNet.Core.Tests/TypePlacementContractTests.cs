@@ -462,6 +462,75 @@ public sealed class TypePlacementContractTests
     }
 
     [Test]
+    public void TypePlacement_EmptyTypesMatching_ThrowsActionableError()
+    {
+        string policyPath = WritePolicy("""
+            version: 1
+            name: Test
+            analysis:
+              target_assemblies: [ArchLinterNet.Core]
+            contracts:
+              strict_type_placement:
+                - name: controllers-empty-selector
+                  types_matching: {}
+                  required_name_suffix: Controller
+                  reason: Empty selector would match every loaded type.
+            """);
+
+        InvalidOperationException ex = Assert.Throws<InvalidOperationException>(() =>
+            new ArchitecturePolicyDocumentLoader().Load(policyPath))!;
+
+        Assert.That(ex.Message, Does.Contain("no usable types_matching selector field"));
+        Assert.That(ex.Message, Does.Contain("controllers-empty-selector"));
+    }
+
+    [Test]
+    public void TypePlacement_TypoedSelectorFieldName_ThrowsActionableError()
+    {
+        string policyPath = WritePolicy("""
+            version: 1
+            name: Test
+            analysis:
+              target_assemblies: [ArchLinterNet.Core]
+            contracts:
+              strict_type_placement:
+                - name: controllers-typoed-selector
+                  types_matching:
+                    name_sufix: Controller
+                  required_name_suffix: Controller
+                  reason: Typo'd selector field name is silently ignored by the YAML deserializer.
+            """);
+
+        InvalidOperationException ex = Assert.Throws<InvalidOperationException>(() =>
+            new ArchitecturePolicyDocumentLoader().Load(policyPath))!;
+
+        Assert.That(ex.Message, Does.Contain("no usable types_matching selector field"));
+        Assert.That(ex.Message, Does.Contain("controllers-typoed-selector"));
+    }
+
+    [Test]
+    public void TypePlacement_OmittedTypesMatching_ThrowsActionableError()
+    {
+        string policyPath = WritePolicy("""
+            version: 1
+            name: Test
+            analysis:
+              target_assemblies: [ArchLinterNet.Core]
+            contracts:
+              strict_type_placement:
+                - name: controllers-omitted-selector
+                  required_name_suffix: Controller
+                  reason: Omitted types_matching defaults to an empty matcher.
+            """);
+
+        InvalidOperationException ex = Assert.Throws<InvalidOperationException>(() =>
+            new ArchitecturePolicyDocumentLoader().Load(policyPath))!;
+
+        Assert.That(ex.Message, Does.Contain("no usable types_matching selector field"));
+        Assert.That(ex.Message, Does.Contain("controllers-omitted-selector"));
+    }
+
+    [Test]
     public void ValidateStrict_DanglingMustResideInLayerCoveredByRuleInputCoverage_ReportsUnresolvedWithoutThrowing()
     {
         string policyPath = WritePolicy($"""
