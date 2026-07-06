@@ -36,6 +36,19 @@ public static class ArchitectureDiagnosticMapper
                 violation.ForbiddenNamespace, violation.ForbiddenReferences, violation.ForbiddenPackageGroup);
         }
 
+        if (violation.ExpectedTypeLocation != null || violation.ExpectedTypeName != null)
+        {
+            return new TypePlacementDiagnostic(
+                violation.ContractName, violation.ContractId, violation.SourceType,
+                violation.ForbiddenNamespace, violation.ForbiddenReferences)
+            {
+                ExpectedTypeLocation = violation.ExpectedTypeLocation,
+                ActualTypeLocation = violation.ActualTypeLocation,
+                ExpectedTypeName = violation.ExpectedTypeName,
+                ActualTypeName = violation.ActualTypeName
+            };
+        }
+
         return new DependencyDiagnostic(
             violation.ContractName, violation.ContractId, violation.SourceType,
             violation.ForbiddenNamespace, violation.ForbiddenReferences)

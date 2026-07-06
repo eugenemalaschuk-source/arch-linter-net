@@ -54,6 +54,7 @@ public sealed class ArchitecturePolicyDocumentLoader : IArchitecturePolicyDocume
         ValidateAssemblyAllowOnlyContracts(document);
         ValidatePackageDependencyContracts(document);
         ValidatePackageAllowOnlyContracts(document);
+        ValidateTypePlacementContracts(document);
 
         return document;
     }
@@ -117,6 +118,8 @@ public sealed class ArchitecturePolicyDocumentLoader : IArchitecturePolicyDocume
             document.Contracts.AuditLayerTemplates,
             document.Contracts.StrictAcyclicSiblings,
             document.Contracts.AuditAcyclicSiblings,
+            document.Contracts.StrictTypePlacement,
+            document.Contracts.AuditTypePlacement,
             document.Contracts.StrictCoverage,
             document.Contracts.AuditCoverage,
         ];
@@ -624,6 +627,32 @@ public sealed class ArchitecturePolicyDocumentLoader : IArchitecturePolicyDocume
                     $"Package allow-only contract '{contract.Name}' references source '{contract.Source}' " +
                     "that is not declared in 'analysis.target_assemblies'. The 'source' of a " +
                     "'strict_package_allow_only'/'audit_package_allow_only' contract must be a declared target assembly.");
+            }
+        }
+    }
+
+    private static void ValidateTypePlacementContracts(ArchitectureContractDocument document)
+    {
+        foreach (ArchitectureTypePlacementContract contract in document.Contracts.StrictTypePlacement
+                     .Concat(document.Contracts.AuditTypePlacement))
+        {
+            bool hasPlacementExpectation = contract.MustResideInLayers.Count > 0
+                || contract.MustResideInNamespaces.Count > 0
+                || contract.MustResideInProjects.Count > 0
+                || contract.MustResideInAssemblies.Count > 0;
+
+            bool hasNamingExpectation = !string.IsNullOrEmpty(contract.RequiredNameSuffix)
+                || !string.IsNullOrEmpty(contract.RequiredNamePrefix)
+                || !string.IsNullOrEmpty(contract.ForbiddenNameSuffix)
+                || !string.IsNullOrEmpty(contract.ForbiddenNamePrefix);
+
+            if (!hasPlacementExpectation && !hasNamingExpectation)
+            {
+                throw new InvalidOperationException(
+                    $"Type placement contract '{contract.Name}' declares a types_matching selector but no placement " +
+                    "(must_reside_in_layers/must_reside_in_namespaces/must_reside_in_projects/must_reside_in_assemblies) " +
+                    "or naming (required_name_suffix/required_name_prefix/forbidden_name_suffix/forbidden_name_prefix) " +
+                    "expectation. Declare at least one, or the rule can never produce a violation.");
             }
         }
     }

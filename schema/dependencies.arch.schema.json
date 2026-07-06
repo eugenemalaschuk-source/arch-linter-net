@@ -365,6 +365,16 @@
           "items": { "$ref": "#/$defs/acyclicSiblingContract" },
           "default": []
         },
+        "strict_type_placement": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/typePlacementContract" },
+          "default": []
+        },
+        "audit_type_placement": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/typePlacementContract" },
+          "default": []
+        },
         "strict_coverage": {
           "type": "array",
           "items": { "$ref": "#/$defs/coverageContract" },
@@ -667,6 +677,44 @@
             "source": { "type": "string", "minLength": 1 },
             "allowed": { "$ref": "#/$defs/stringList" },
             "allowed_types": { "$ref": "#/$defs/stringList" },
+            "ignored_violations": { "$ref": "#/$defs/ignoredViolations" },
+            "reason": { "type": "string" }
+          }
+        }
+      ]
+    },
+    "typeMatcher": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "name_suffix": { "type": "string", "minLength": 1 },
+        "name_prefix": { "type": "string", "minLength": 1 },
+        "namespace": { "type": "string", "minLength": 1 },
+        "layer": { "type": "string", "minLength": 1 },
+        "base_type": { "type": "string", "minLength": 1 },
+        "implements_interface": { "type": "string", "minLength": 1 },
+        "has_attribute": { "type": "string", "minLength": 1 }
+      }
+    },
+    "typePlacementContract": {
+      "allOf": [
+        { "$ref": "#/$defs/baseContractFields" },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["name", "types_matching"],
+          "properties": {
+            "name": { "type": "string", "minLength": 1 },
+            "id": { "type": "string", "minLength": 1 },
+            "types_matching": { "$ref": "#/$defs/typeMatcher" },
+            "must_reside_in_layers": { "$ref": "#/$defs/stringList" },
+            "must_reside_in_namespaces": { "$ref": "#/$defs/stringList" },
+            "must_reside_in_projects": { "$ref": "#/$defs/stringList" },
+            "must_reside_in_assemblies": { "$ref": "#/$defs/stringList" },
+            "required_name_suffix": { "type": "string", "minLength": 1 },
+            "required_name_prefix": { "type": "string", "minLength": 1 },
+            "forbidden_name_suffix": { "type": "string", "minLength": 1 },
+            "forbidden_name_prefix": { "type": "string", "minLength": 1 },
             "ignored_violations": { "$ref": "#/$defs/ignoredViolations" },
             "reason": { "type": "string" }
           }

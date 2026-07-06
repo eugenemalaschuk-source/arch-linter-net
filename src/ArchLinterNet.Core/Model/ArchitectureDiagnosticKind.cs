@@ -8,5 +8,6 @@ public enum ArchitectureDiagnosticKind
     Configuration,
     ExternalDependency,
     PolicyConsistency,
-    PackageDependency
+    PackageDependency,
+    TypePlacement
 }
