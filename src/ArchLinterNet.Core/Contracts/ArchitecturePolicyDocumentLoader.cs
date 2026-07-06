@@ -688,6 +688,8 @@ public sealed class ArchitecturePolicyDocumentLoader : IArchitecturePolicyDocume
             document.Contracts.AuditExternal,
             document.Contracts.StrictExternalAllowOnly,
             document.Contracts.AuditExternalAllowOnly,
+            document.Contracts.StrictTypePlacement,
+            document.Contracts.AuditTypePlacement,
         ];
 
         return new HashSet<string>(

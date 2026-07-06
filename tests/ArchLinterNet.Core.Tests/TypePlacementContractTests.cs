@@ -1,6 +1,7 @@
 using ArchLinterNet.Core.Contracts;
 using ArchLinterNet.Core.Discovery;
 using ArchLinterNet.Core.Execution;
+using ArchLinterNet.Core.Validation;
 using NUnit.Framework;
 using RoleFixtures = TypePlacementContractTestFixtures.Roles;
 
@@ -458,5 +459,109 @@ public sealed class TypePlacementContractTests
 
         Assert.That(ex.Message, Does.Contain("no placement"));
         Assert.That(ex.Message, Does.Contain("controllers-no-expectation"));
+    }
+
+    [Test]
+    public void ValidateStrict_DanglingMustResideInLayerCoveredByRuleInputCoverage_ReportsUnresolvedWithoutThrowing()
+    {
+        string policyPath = WritePolicy($"""
+            version: 1
+            name: Test
+
+            analysis:
+              target_assemblies: [{typeof(TypePlacementContractTests).Assembly.GetName().Name}]
+
+            contracts:
+              strict_type_placement:
+                - id: controllers-dangling-layer
+                  name: controllers-dangling-layer
+                  types_matching:
+                    name_suffix: Controller
+                  must_reside_in_layers: [does_not_exist_layer]
+                  reason: Placeholder with a dangling must_reside_in_layers entry.
+              strict_coverage:
+                - id: rule-input-coverage
+                  name: rule-input-coverage
+                  scope: rule_input
+                  contract_ids: [controllers-dangling-layer]
+                  reason: Flag dangling layer references.
+            """);
+
+        ValidationOutcome outcome = ArchitectureValidationService.Validate(new ValidationRequest
+        {
+            PolicyPath = policyPath,
+            Mode = "strict"
+        });
+
+        Assert.That(outcome.Passed, Is.False);
+        Assert.That(outcome.Violations, Is.Empty);
+        Assert.That(outcome.CoverageFindings, Has.Count.EqualTo(1));
+        Assert.That(outcome.CoverageFindings.Single().ForbiddenNamespace, Is.EqualTo("unresolved"));
+        Assert.That(outcome.CoverageFindings.Single().ForbiddenReferences, Is.EqualTo(new[] { "does_not_exist_layer" }));
+    }
+
+    [Test]
+    public void ValidateStrict_DanglingMustResideInLayerNotCoveredByRuleInputCoverage_ThrowsActionableError()
+    {
+        string policyPath = WritePolicy($"""
+            version: 1
+            name: Test
+
+            analysis:
+              target_assemblies: [{typeof(TypePlacementContractTests).Assembly.GetName().Name}]
+
+            contracts:
+              strict_type_placement:
+                - id: controllers-dangling-layer
+                  name: controllers-dangling-layer
+                  types_matching:
+                    name_suffix: Controller
+                  must_reside_in_layers: [does_not_exist_layer]
+                  reason: Placeholder with a dangling must_reside_in_layers entry and no coverage deferral.
+            """);
+
+        InvalidOperationException ex = Assert.Throws<InvalidOperationException>(() =>
+            ArchitectureValidationService.Validate(new ValidationRequest
+            {
+                PolicyPath = policyPath,
+                Mode = "strict"
+            }))!;
+
+        Assert.That(ex.Message, Does.Contain("unknown layer 'does_not_exist_layer'"));
+    }
+
+    [Test]
+    public void CheckConfiguration_TypePlacementEmptyMustResideInLayer_ReturnsViolation()
+    {
+        var document = new ArchitectureContractDocument
+        {
+            Version = 1,
+            Name = "Test",
+            Layers = new Dictionary<string, ArchitectureLayer>
+            {
+                ["empty"] = new() { Namespace = "Test.Empty.Namespace.That.Has.No.Types" }
+            },
+            Analysis = new ArchitectureAnalysisConfiguration
+            {
+                TargetAssemblies = new List<string> { typeof(TypePlacementContractTests).Assembly.GetName().Name! }
+            },
+            Contracts = new ArchitectureContractGroups
+            {
+                StrictTypePlacement = new List<ArchitectureTypePlacementContract>
+                {
+                    new()
+                    {
+                        Name = "test",
+                        TypesMatching = new ArchitectureTypeMatcher { NameSuffix = "Controller" },
+                        MustResideInLayers = new List<string> { "empty" }
+                    }
+                }
+            }
+        };
+
+        var runner = new ArchitectureContractRunner(CreateContext(), document);
+        var violations = runner.CheckConfiguration();
+
+        Assert.That(violations.Any(v => v.ForbiddenNamespace == "empty layer namespace"), Is.True);
     }
 }
