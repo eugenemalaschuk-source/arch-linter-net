@@ -1,5 +1,7 @@
 using ArchLinterNet.Core.Asmdef;
 using ArchLinterNet.Core.Asmdef.Abstractions;
+using ArchLinterNet.Core.Graph;
+using ArchLinterNet.Core.Graph.Abstractions;
 using ArchLinterNet.Core.Reporting;
 using ArchLinterNet.Core.Validation;
 using ArchLinterNet.Core.Validation.Abstractions;
@@ -33,6 +35,21 @@ public sealed class ArchitectureEngine : IDisposable, IAsyncDisposable
         return _serviceProvider.GetRequiredService<IAsmdefValidationService>()
             .Validate(request);
     }
+
+    public ArchitectureGraphOutcome BuildGraph(ArchitectureGraphRequest request)
+    {
+        return _serviceProvider.GetRequiredService<IArchitectureGraphApplicationService>()
+            .BuildGraph(request);
+    }
+
+    public ArchitectureExplainOutcome Explain(ArchitectureExplainRequest request)
+    {
+        return _serviceProvider.GetRequiredService<IArchitectureExplainApplicationService>()
+            .Explain(request);
+    }
+
+    public IArchitectureGraphFormatter GraphFormatter =>
+        _serviceProvider.GetRequiredService<IArchitectureGraphFormatter>();
 
     public void Dispose()
     {
