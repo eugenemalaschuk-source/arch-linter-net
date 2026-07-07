@@ -1,7 +1,8 @@
 # composition-contracts Specification
 
 ## Purpose
-TBD - created by archiving change composition-root-service-locator-contracts. Update Purpose after archive.
+Define the composition contract family that confines dependency-injection registration, service-locator resolution, and container Resolve/Register API calls to explicitly declared composition boundaries using static IL call-site detection.
+
 ## Requirements
 ### Requirement: Declare composition contracts
 The system SHALL allow `contracts.strict_composition` and `contracts.audit_composition` entries, each declaring at least one forbidden API selector (a non-empty `forbidden_apis`) and at least one allowed composition boundary selector (a non-empty `allowed_only_in_layers`, `allowed_only_in_namespaces`, `allowed_only_in_projects`, and/or `allowed_only_in_assemblies`).
