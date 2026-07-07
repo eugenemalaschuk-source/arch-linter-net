@@ -22,6 +22,7 @@ ArchLinterNet supports static architecture validation through documented YAML po
 - Unity `.asmdef` contracts;
 - reusable layer templates;
 - type placement and naming governance contracts (name suffix/prefix, namespace, layer, base type, interface, and attribute selectors; layer/namespace/project/assembly residency; required/forbidden naming);
+- public API surface governance contracts (per-assembly declared exported public/protected/protected-internal type and member allowlist, undeclared-surface detection, optional forbid-public-constants-unless-declared lever);
 - coverage contracts (`scope: namespace`, `scope: rule_input`, `scope: project`, `scope: assembly`);
 - strict and audit contract groups;
 - constrained namespace glob patterns;
@@ -70,6 +71,12 @@ its assembly name via project discovery and checks it identically to
 "must reside in project X" means "must reside in the assembly project X produces," not
 physical file placement within a project. Type placement contracts also do not scan method
 bodies; types are matched structurally (name, namespace, base type, interfaces, attributes).
+
+Public API surface contracts only detect **undeclared** exported surface (a new `public`/
+`protected`/`protected internal` type or member not present in `declared_api`) — they do not
+detect *removed* or *changed* declared signatures and are not a substitute for full .NET
+binary/package compatibility validation. They are reflection-based, like protected surface
+and type placement contracts, not project-aware Roslyn compilation.
 
 ## Important distinctions
 

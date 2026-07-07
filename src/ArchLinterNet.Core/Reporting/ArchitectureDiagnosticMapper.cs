@@ -49,6 +49,19 @@ public static class ArchitectureDiagnosticMapper
             };
         }
 
+        if (violation.UndeclaredApiSignature != null)
+        {
+            return new PublicApiSurfaceDiagnostic(
+                violation.ContractName, violation.ContractId, violation.SourceType,
+                violation.ForbiddenNamespace, violation.ForbiddenReferences)
+            {
+                UndeclaredApiSignature = violation.UndeclaredApiSignature,
+                ForbiddenPublicConstant = violation.ForbiddenPublicConstant,
+                ApiAssemblyName = violation.ApiAssemblyName,
+                ApiVisibility = violation.ApiVisibility
+            };
+        }
+
         return new DependencyDiagnostic(
             violation.ContractName, violation.ContractId, violation.SourceType,
             violation.ForbiddenNamespace, violation.ForbiddenReferences)
