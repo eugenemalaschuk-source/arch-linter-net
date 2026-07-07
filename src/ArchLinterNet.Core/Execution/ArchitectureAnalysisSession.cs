@@ -373,6 +373,16 @@ public sealed partial class ArchitectureAnalysisSession
             {
                 AddLayerNames(c.Id, GetAttributeUsageReferencedLayerNames(c));
             }
+
+            foreach (ArchitectureInheritanceContract c in Document.Contracts.StrictInheritance)
+            {
+                AddLayerNames(c.Id, c.SourceLayers);
+            }
+
+            foreach (ArchitectureInterfaceImplementationContract c in Document.Contracts.StrictInterfaceImplementation)
+            {
+                AddLayerNames(c.Id, GetInterfaceImplementationReferencedLayerNames(c));
+            }
         }
         else
         {
@@ -446,6 +456,16 @@ public sealed partial class ArchitectureAnalysisSession
             foreach (ArchitectureAttributeUsageContract c in Document.Contracts.AuditAttributeUsage)
             {
                 AddLayerNames(c.Id, GetAttributeUsageReferencedLayerNames(c));
+            }
+
+            foreach (ArchitectureInheritanceContract c in Document.Contracts.AuditInheritance)
+            {
+                AddLayerNames(c.Id, c.SourceLayers);
+            }
+
+            foreach (ArchitectureInterfaceImplementationContract c in Document.Contracts.AuditInterfaceImplementation)
+            {
+                AddLayerNames(c.Id, GetInterfaceImplementationReferencedLayerNames(c));
             }
         }
 

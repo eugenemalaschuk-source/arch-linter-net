@@ -11,5 +11,7 @@ public enum ArchitectureDiagnosticKind
     PackageDependency,
     TypePlacement,
     PublicApiSurface,
-    AttributeUsage
+    AttributeUsage,
+    Inheritance,
+    InterfaceImplementation
 }

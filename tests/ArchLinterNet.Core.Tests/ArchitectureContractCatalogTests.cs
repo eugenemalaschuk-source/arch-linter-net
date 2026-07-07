@@ -146,7 +146,7 @@ public sealed class ArchitectureContractCatalogTests
             "asmdef", "independence", "assembly_independence", "assembly_dependency", "assembly_allow_only",
             "package_dependency", "package_allow_only",
             "protected", "external", "external_allow_only", "acyclic_sibling", "type_placement",
-            "public_api_surface", "attribute_usage", "coverage",
+            "public_api_surface", "attribute_usage", "inheritance", "interface_implementation", "coverage",
         }));
     }
 

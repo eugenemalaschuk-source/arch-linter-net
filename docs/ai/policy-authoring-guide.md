@@ -283,6 +283,64 @@ marker (e.g. "every controller action must carry `[Authorize]` or
 follow-up. See [Attribute usage contracts](../contracts/attribute-usage.md)
 for full semantics.
 
+## Use Inheritance Contracts For Framework Base Type Boundaries
+
+When types in a protected surface must not derive from a framework or boundary
+base class (a Unity `MonoBehaviour`, an EF Core `DbContext`, an ASP.NET
+controller base), use `strict_inheritance` / `audit_inheritance`:
+
+```yaml
+contracts:
+  strict_inheritance:
+    - id: domain-no-framework-base-types
+      name: domain-must-not-inherit-framework-types
+      source_layers: [domain]
+      forbidden_base_types:
+        - UnityEngine.MonoBehaviour
+        - Microsoft.EntityFrameworkCore.DbContext
+      reason: Domain types must stay framework-independent.
+```
+
+`source_layers` names declared layers; `source_namespaces` adds namespace
+prefixes — at least one of the two is required. `forbidden_base_types` matches
+a base type's fully-qualified name exactly; `forbidden_base_type_prefixes`
+matches by prefix (e.g. `UnityEngine.`) — at least one of the two is required.
+Missing either selector fails policy loading with an actionable error.
+
+The full base-class chain is walked, so inheriting through an intermediate
+class is still a violation. Constructed generic base types match by their
+generic type definition's CLR name (arity suffix, e.g. `` App.Repository`1 ``).
+Interface implementation is **not** inheritance — use interface implementation
+contracts for that. See [Inheritance contracts](../contracts/inheritance.md).
+
+## Use Interface Implementation Contracts For Port Boundaries
+
+When implementations of an interface family must be confined to (or kept out
+of) a layer — application ports implemented only by adapters, infrastructure
+abstractions never implemented by domain types — use
+`strict_interface_implementation` / `audit_interface_implementation`:
+
+```yaml
+contracts:
+  strict_interface_implementation:
+    - id: ports-implemented-only-by-adapters
+      name: application-ports-implemented-only-by-adapters
+      interface_prefixes: [MyApp.Application.Ports.]
+      allowed_only_in_layers: [infrastructure]
+      reason: Port implementations belong to the infrastructure boundary.
+```
+
+`interfaces` matches an interface's fully-qualified name exactly;
+`interface_prefixes` matches by prefix — at least one of the two is required.
+The location fields follow the same allow-list/deny-list semantics as
+attribute usage (`allowed_only_in_*` → `misplaced`, `forbidden_in_*` →
+`forbidden`, at least one required). A type matches through its full interface
+set, including interfaces implemented by its base classes; an interface
+*extending* a selected interface is never a violation. This is static
+metadata validation — it does not resolve runtime dependency-injection
+registrations. See
+[Interface implementation contracts](../contracts/interface-implementation.md).
+
 ## Use Transitive Depth For Indirect Coupling
 
 When a dependency should be blocked at any depth (direct or indirect), use
