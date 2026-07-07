@@ -60,11 +60,11 @@ The system SHALL allow `ignored_violations` entries on a `composition` contract 
 - **THEN** the system SHALL record that entry as an unmatched ignored violation
 
 ### Requirement: Emit deterministic composition diagnostics
-The system SHALL emit, for each composition violation, a diagnostic identifying the violating type, the matched forbidden API's fully-qualified name, the contract, and the expected composition boundary, with violations ordered deterministically by the violating type's fully-qualified name and then by matched API (ordinal), and at most one violation per (type, matched API) pair.
+The system SHALL emit, for each composition violation, a diagnostic identifying the violating type, the violating source member, the matched forbidden API's fully-qualified name, the contract, and the expected composition boundary, with violations ordered deterministically by the violating type's fully-qualified name, then by matched API (ordinal), then by source member (ordinal), and at most one violation per (type, source member, matched API) tuple.
 
 #### Scenario: Diagnostic identifies the forbidden composition API usage
 - **WHEN** a type outside the allowed composition boundary calls a forbidden API
-- **THEN** the emitted diagnostic SHALL include the violating type's fully-qualified name, the matched forbidden API, and the expected composition boundary description
+- **THEN** the emitted diagnostic SHALL include the violating type's fully-qualified name, the violating source member, the matched forbidden API, and the expected composition boundary description
 
 #### Scenario: Repeated runs produce identical ordering
 - **WHEN** the same policy is validated twice against the same assemblies with multiple composition violations
@@ -76,4 +76,3 @@ The system SHALL restrict composition contracts to static detection of forbidden
 #### Scenario: Documentation states the runtime limitation
 - **WHEN** a user reads the composition contract documentation
 - **THEN** it SHALL state that runtime DI resolution correctness is not validated by this family
-

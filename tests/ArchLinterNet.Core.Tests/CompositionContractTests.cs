@@ -278,7 +278,7 @@ public sealed class CompositionContractTests
     }
 
     [Test]
-    public void CheckCompositionContract_ViolationOrder_IsDeterministicBySourceThenMatchedApi()
+    public void CheckCompositionContract_ViolationOrder_IsDeterministicBySourceMemberThenMatchedApi()
     {
         var contract = new ArchitectureCompositionContract
         {
@@ -293,16 +293,21 @@ public sealed class CompositionContractTests
         var violationsOne = runnerOne.Session.CheckCompositionContract(contract);
         var violationsTwo = runnerTwo.Session.CheckCompositionContract(contract);
 
-        string[] orderOne = violationsOne.Select(v => $"{v.SourceType}|{v.MatchedForbiddenApi}").ToArray();
-        string[] orderTwo = violationsTwo.Select(v => $"{v.SourceType}|{v.MatchedForbiddenApi}").ToArray();
+        string[] orderOne = violationsOne
+            .Select(v => $"{v.SourceType}|{v.SourceMember}|{v.MatchedForbiddenApi}")
+            .ToArray();
+        string[] orderTwo = violationsTwo
+            .Select(v => $"{v.SourceType}|{v.SourceMember}|{v.MatchedForbiddenApi}")
+            .ToArray();
 
         Assert.That(orderOne, Is.Not.Empty);
         Assert.That(orderOne, Is.EqualTo(orderTwo));
         Assert.That(orderOne, Is.EqualTo(orderOne.Distinct().ToArray()),
-            "At most one violation per (type, matched forbidden API) pair.");
+            "At most one violation per (type, source member, matched forbidden API) tuple.");
 
         string[] sortedByOrdinal = orderOne
             .OrderBy(key => key.Split('|')[0], StringComparer.Ordinal)
+            .ThenBy(key => key.Split('|')[2], StringComparer.Ordinal)
             .ThenBy(key => key.Split('|')[1], StringComparer.Ordinal)
             .ToArray();
         Assert.That(orderOne, Is.EqualTo(sortedByOrdinal));
@@ -328,6 +333,29 @@ public sealed class CompositionContractTests
 
         Assert.That(ex.Message, Does.Contain("no 'forbidden_apis'"));
         Assert.That(ex.Message, Does.Contain("no-forbidden-apis"));
+    }
+
+    [Test]
+    public void Composition_BlankForbiddenApisSelector_ThrowsActionableError()
+    {
+        string policyPath = WritePolicy("""
+            version: 1
+            name: Test
+            analysis:
+              target_assemblies: [ArchLinterNet.Core]
+            contracts:
+              strict_composition:
+                - name: blank-forbidden-apis
+                  forbidden_apis: [" "]
+                  allowed_only_in_layers: [composition]
+                  reason: Blank forbidden_apis should not become a no-op rule.
+            """);
+
+        InvalidOperationException ex = Assert.Throws<InvalidOperationException>(() =>
+            new ArchitecturePolicyDocumentLoader().Load(policyPath))!;
+
+        Assert.That(ex.Message, Does.Contain("no 'forbidden_apis'"));
+        Assert.That(ex.Message, Does.Contain("blank-forbidden-apis"));
     }
 
     [Test]

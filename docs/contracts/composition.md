@@ -69,7 +69,7 @@ Scanning is reflection/IL-only (no Roslyn dual-scan): every loaded type's method
 
 ### Violations
 
-Each violation identifies the calling type outside the composition boundary, the matched forbidden API's fully-qualified name, and the expected composition boundary description. Violations are emitted deterministically: types ordered by fully-qualified name, matched APIs within a type ordered ordinally, with at most one violation per (type, matched API) pair.
+Each violation identifies the calling type and source member outside the composition boundary, the matched forbidden API's fully-qualified name, and the expected composition boundary description. Violations are emitted deterministically: types ordered by fully-qualified name, matched APIs within a type ordered ordinally, source members ordered ordinally within each matched API, with at most one violation per (type, source member, matched API) tuple.
 
 `ignored_violations` entries use the same `source_type`/`forbidden_reference`/`reason` shape as other contract families, matching the calling type and the matched forbidden API's fully-qualified name.
 

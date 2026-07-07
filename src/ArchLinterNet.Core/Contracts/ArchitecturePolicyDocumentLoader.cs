@@ -504,7 +504,7 @@ public sealed partial class ArchitecturePolicyDocumentLoader : IArchitecturePoli
         foreach (ArchitectureCompositionContract contract in document.Contracts.StrictComposition
                      .Concat(document.Contracts.AuditComposition))
         {
-            if (contract.ForbiddenApis.Count == 0)
+            if (!HasNonBlankEntry(contract.ForbiddenApis))
             {
                 throw new InvalidOperationException(
                     $"Composition contract '{contract.Name}' declares no 'forbidden_apis'. A contract with " +
@@ -512,10 +512,10 @@ public sealed partial class ArchitecturePolicyDocumentLoader : IArchitecturePoli
                     "selector (member name, Type.Member name, fully qualified member, or namespace/type prefix).");
             }
 
-            bool hasAllowedOnlyExpectation = contract.AllowedOnlyInLayers.Count > 0
-                || contract.AllowedOnlyInNamespaces.Count > 0
-                || contract.AllowedOnlyInProjects.Count > 0
-                || contract.AllowedOnlyInAssemblies.Count > 0;
+            bool hasAllowedOnlyExpectation = HasNonBlankEntry(contract.AllowedOnlyInLayers)
+                || HasNonBlankEntry(contract.AllowedOnlyInNamespaces)
+                || HasNonBlankEntry(contract.AllowedOnlyInProjects)
+                || HasNonBlankEntry(contract.AllowedOnlyInAssemblies);
 
             if (!hasAllowedOnlyExpectation)
             {
@@ -526,6 +526,11 @@ public sealed partial class ArchitecturePolicyDocumentLoader : IArchitecturePoli
                     "considered outside the boundary.");
             }
         }
+    }
+
+    private static bool HasNonBlankEntry(IEnumerable<string> values)
+    {
+        return values.Any(value => !string.IsNullOrWhiteSpace(value));
     }
 
     // Limited to the contract families ArchitectureContractRunner's GetReferencedLayerNames
