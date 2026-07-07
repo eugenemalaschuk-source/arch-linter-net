@@ -16,10 +16,10 @@ public sealed class ArchitectureProjectDiscoveryServiceFakeFileSystemTests
     [Test]
     public void ResolveAndApply_FakeFileSystem_DiscoversProjectWithoutTouchingRealDisk()
     {
-        string repositoryRoot = "/fake/repo";
-        string projectPath = "/fake/repo/ProjA/ProjA.csproj";
-        string outputDirectory = "/fake/repo/ProjA/bin/Debug/net9.0";
-        string dllPath = "/fake/repo/ProjA/bin/Debug/net9.0/ProjA.dll";
+        string repositoryRoot = FakePaths.Root("/fake/repo");
+        string projectPath = $"{repositoryRoot}/ProjA/ProjA.csproj";
+        string outputDirectory = $"{repositoryRoot}/ProjA/bin/Debug/net9.0";
+        string dllPath = $"{repositoryRoot}/ProjA/bin/Debug/net9.0/ProjA.dll";
 
         var fileSystem = new FakeArchitectureFileSystem();
         fileSystem.AddFile(projectPath, """
@@ -48,16 +48,16 @@ public sealed class ArchitectureProjectDiscoveryServiceFakeFileSystemTests
 
         Assert.That(result.Diagnostics, Is.Empty);
         Assert.That(result.TargetAssemblyNames, Is.EquivalentTo(new[] { "ProjA" }));
-        Assert.That(result.AssemblySearchPaths, Is.EquivalentTo(new[] { outputDirectory }));
+        Assert.That(result.AssemblySearchPaths.Select(p => p.Replace('\\', '/')), Is.EquivalentTo(new[] { outputDirectory }));
         Assert.That(document.Analysis.TargetAssemblies, Is.EquivalentTo(new[] { "ProjA" }));
     }
 
     [Test]
     public void ResolveAndApply_FakeFileSystem_StaleBuildOutput_ReportsStaleDiagnostic()
     {
-        string repositoryRoot = "/fake/repo";
-        string projectPath = "/fake/repo/ProjA/ProjA.csproj";
-        string dllPath = "/fake/repo/ProjA/bin/Debug/net9.0/ProjA.dll";
+        string repositoryRoot = FakePaths.Root("/fake/repo");
+        string projectPath = $"{repositoryRoot}/ProjA/ProjA.csproj";
+        string dllPath = $"{repositoryRoot}/ProjA/bin/Debug/net9.0/ProjA.dll";
 
         var fileSystem = new FakeArchitectureFileSystem();
         fileSystem.AddFile(projectPath, """

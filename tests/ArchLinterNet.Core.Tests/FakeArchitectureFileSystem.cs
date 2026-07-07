@@ -11,28 +11,29 @@ internal sealed class FakeArchitectureFileSystem : IArchitectureFileSystem
 
     public void AddFile(string path, string content, DateTime lastWriteTimeUtc)
     {
-        _files[path] = content;
-        _lastWriteTimesUtc[path] = lastWriteTimeUtc;
+        string normalized = Normalize(path);
+        _files[normalized] = content;
+        _lastWriteTimesUtc[normalized] = lastWriteTimeUtc;
     }
 
     public void AddDirectory(string path)
     {
-        _directories.Add(path);
+        _directories.Add(Normalize(path));
     }
 
     public void SetCurrentDirectory(string path)
     {
-        _currentDirectory = path;
+        _currentDirectory = Normalize(path);
     }
 
     public bool FileExists(string path)
     {
-        return _files.ContainsKey(path);
+        return _files.ContainsKey(Normalize(path));
     }
 
     public string ReadAllText(string path)
     {
-        return _files.TryGetValue(path, out string? content)
+        return _files.TryGetValue(Normalize(path), out string? content)
             ? content
             : throw new FileNotFoundException($"Fake file not found: {path}");
     }
@@ -44,17 +45,17 @@ internal sealed class FakeArchitectureFileSystem : IArchitectureFileSystem
 
     public bool DirectoryExists(string path)
     {
-        return _directories.Contains(path);
+        return _directories.Contains(Normalize(path));
     }
 
     public IEnumerable<string> EnumerateFiles(string path, string searchPattern, SearchOption searchOption)
     {
-        string normalizedDirectory = path.TrimEnd('/', '\\') + "/";
+        string normalizedDirectory = Normalize(path).TrimEnd('/') + "/";
         string extension = searchPattern.TrimStart('*');
 
         foreach (string filePath in _files.Keys)
         {
-            if (!filePath.Replace('\\', '/').StartsWith(normalizedDirectory, StringComparison.OrdinalIgnoreCase))
+            if (!filePath.StartsWith(normalizedDirectory, StringComparison.OrdinalIgnoreCase))
             {
                 continue;
             }
@@ -64,7 +65,7 @@ internal sealed class FakeArchitectureFileSystem : IArchitectureFileSystem
                 continue;
             }
 
-            string relative = filePath.Replace('\\', '/')[normalizedDirectory.Length..];
+            string relative = filePath[normalizedDirectory.Length..];
             if (searchOption == SearchOption.TopDirectoryOnly && relative.Contains('/'))
             {
                 continue;
@@ -76,11 +77,13 @@ internal sealed class FakeArchitectureFileSystem : IArchitectureFileSystem
 
     public DateTime GetLastWriteTimeUtc(string path)
     {
-        return _lastWriteTimesUtc.TryGetValue(path, out DateTime writeTime) ? writeTime : DateTime.MinValue;
+        return _lastWriteTimesUtc.TryGetValue(Normalize(path), out DateTime writeTime) ? writeTime : DateTime.MinValue;
     }
 
     public string GetCurrentDirectory()
     {
         return _currentDirectory;
     }
+
+    private static string Normalize(string path) => path.Replace('\\', '/');
 }
