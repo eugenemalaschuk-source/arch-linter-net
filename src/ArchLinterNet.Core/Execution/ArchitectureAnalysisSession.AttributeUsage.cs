@@ -49,13 +49,21 @@ public sealed partial class ArchitectureAnalysisSession
 
         string expectedAllowedOnlyLocation = DescribeAllowedOnlyLocation(contract);
 
-        foreach (Type type in TypeIndex.AllTypes())
+        Type[] candidateTypes = TypeIndex.AllTypes()
+            .OrderBy(ArchitectureTypeNames.SafeFullName, StringComparer.Ordinal)
+            .ToArray();
+
+        foreach (Type type in candidateTypes)
         {
             string actualNamespace = ArchitectureTypeNames.SafeNamespace(type);
             string actualAssemblyName = type.Assembly.GetName().Name ?? string.Empty;
             string actualLocationDescription = $"namespace:{actualNamespace} (assembly {actualAssemblyName})";
 
-            foreach (var match in ArchitectureAttributeUsageScanner.GetMatches(type, contract.Attributes, contract.AttributePrefixes))
+            var matches = ArchitectureAttributeUsageScanner.GetMatches(type, contract.Attributes, contract.AttributePrefixes)
+                .OrderBy(m => m.SourceIdentifier, StringComparer.Ordinal)
+                .ThenBy(m => m.MatchedAttribute, StringComparer.Ordinal);
+
+            foreach (var match in matches)
             {
                 bool misplaced = hasAllowedOnlyExpectation && !IsAllowedLocation(
                     actualNamespace, actualAssemblyName, allowedLayers, contract.AllowedOnlyInNamespaces, allowedAssemblyNames);

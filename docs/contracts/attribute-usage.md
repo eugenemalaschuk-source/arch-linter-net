@@ -66,6 +66,8 @@ Each violation identifies the source member (or type), the matched attribute's f
 
 Constructor and method source identifiers include a parameter-type signature (e.g. `MyApp.Foo.Bar(System.Int32)`) so that two overloads of the same member — each possibly carrying different attributes — produce distinct, individually addressable identifiers instead of colliding on `Type.Method`.
 
+Violations are emitted in a deterministic order: types are sorted by fully-qualified name, and matches within a type are sorted by source identifier, then by matched attribute name, both ordinal — independent of reflection metadata enumeration order, matching the ordering guarantee `type_placement` and `public_api_surface` already provide.
+
 `ignored_violations` entries use the same `source_type`/`forbidden_reference`/`reason` shape as other contract families, matching the source identifier and the matched attribute's fully-qualified name.
 
 ## Non-goals

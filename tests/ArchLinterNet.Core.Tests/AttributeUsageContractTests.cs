@@ -202,6 +202,24 @@ public sealed class AttributeUsageContractTests
     }
 
     [Test]
+    public void CheckAttributeUsageContract_ConstructorLevelMatch_IsDetected()
+    {
+        var contract = new ArchitectureAttributeUsageContract
+        {
+            Name = "constructor-level-match",
+            Attributes = new List<string> { TestMarkerAttributeName },
+            AllowedOnlyInNamespaces = new List<string> { "AttributeUsageContractTestFixtures.Allowed" }
+        };
+        var document = CreateDocument(contract);
+        var runner = new ArchitectureContractRunner(CreateContext(), document);
+
+        var violations = runner.Session.CheckAttributeUsageContract(contract);
+
+        Assert.That(violations.Any(v =>
+            v.SourceType == "AttributeUsageContractTestFixtures.Wrong.WrongHolder..ctor()"), Is.True);
+    }
+
+    [Test]
     public void CheckAttributeUsageContract_PropertyLevelMatch_IsDetected()
     {
         var contract = new ArchitectureAttributeUsageContract
@@ -278,6 +296,35 @@ public sealed class AttributeUsageContractTests
         Assert.That(parameterlessOverload[0].MatchedAttribute, Is.EqualTo(TestMarkerAttributeName));
         Assert.That(intOverload, Has.Count.EqualTo(1));
         Assert.That(intOverload[0].MatchedAttribute, Is.EqualTo(SecondMarkerAttributeName));
+    }
+
+    [Test]
+    public void CheckAttributeUsageContract_ViolationOrder_IsDeterministicBySourceThenAttribute()
+    {
+        var contract = new ArchitectureAttributeUsageContract
+        {
+            Name = "deterministic-order",
+            Attributes = new List<string> { TestMarkerAttributeName, SecondMarkerAttributeName },
+            AllowedOnlyInNamespaces = new List<string> { "AttributeUsageContractTestFixtures.Allowed" }
+        };
+        var document = CreateDocument(contract);
+        var runnerOne = new ArchitectureContractRunner(CreateContext(), document);
+        var runnerTwo = new ArchitectureContractRunner(CreateContext(), document);
+
+        var violationsOne = runnerOne.Session.CheckAttributeUsageContract(contract);
+        var violationsTwo = runnerTwo.Session.CheckAttributeUsageContract(contract);
+
+        string[] orderOne = violationsOne.Select(v => $"{v.SourceType}|{v.MatchedAttribute}").ToArray();
+        string[] orderTwo = violationsTwo.Select(v => $"{v.SourceType}|{v.MatchedAttribute}").ToArray();
+
+        Assert.That(orderOne, Is.Not.Empty);
+        Assert.That(orderOne, Is.EqualTo(orderTwo));
+
+        string[] sortedByOrdinal = orderOne
+            .OrderBy(key => key.Split('|')[0], StringComparer.Ordinal)
+            .ThenBy(key => key.Split('|')[1], StringComparer.Ordinal)
+            .ToArray();
+        Assert.That(orderOne, Is.EqualTo(sortedByOrdinal));
     }
 
     [Test]

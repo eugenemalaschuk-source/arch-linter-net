@@ -54,6 +54,11 @@ namespace AttributeUsageContractTestFixtures.Wrong
     public sealed class WrongHolder
     {
         [TestMarker]
+        public WrongHolder()
+        {
+        }
+
+        [TestMarker]
         private readonly int _markedPrivateField;
 
         [TestMarker]
