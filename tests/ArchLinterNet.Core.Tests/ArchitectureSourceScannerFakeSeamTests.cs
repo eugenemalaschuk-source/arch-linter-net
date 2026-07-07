@@ -59,10 +59,12 @@ public sealed class ArchitectureSourceScannerFakeSeamTests
     [Test]
     public void FindMethodBodyViolations_FakeCompilationFactory_UsesFakeCompilationInsteadOfRealRoslynPipeline()
     {
+        string repoRoot = FakePaths.Root("/fake/repo");
+
         var fileSystem = new FakeArchitectureFileSystem();
-        fileSystem.AddDirectory("/fake/repo/src");
+        fileSystem.AddDirectory($"{repoRoot}/src");
         fileSystem.AddFile(
-            "/fake/repo/src/Widget.cs",
+            $"{repoRoot}/src/Widget.cs",
             "namespace Fake.Forbidden.Namespace;\nclass Widget { }\n",
             DateTime.UtcNow);
 
@@ -73,7 +75,7 @@ public sealed class ArchitectureSourceScannerFakeSeamTests
             enableUnmatchedIgnoreTracking: false, contractGroup: null, baselineCandidates: null);
 
         List<ArchitectureViolation> violations = new ArchitectureSourceScanner().FindMethodBodyViolations(
-            "/fake/repo",
+            repoRoot,
             "Fake.Forbidden.Namespace",
             new[] { "System.Console.WriteLine" },
             executionContext,
