@@ -220,11 +220,20 @@ internal sealed class ArchitectureProjectFileParser : IArchitectureProjectFilePa
         return document.Descendants("ProjectReference")
             .Select(element => element.Attribute("Include")?.Value)
             .Where(value => !string.IsNullOrWhiteSpace(value))
-            .Select(value => Path.GetFullPath(Path.Combine(projectDirectory, value!.Trim())))
+            .Select(value => NormalizeProjectReferencePath(projectDirectory, value!.Trim()))
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .OrderBy(value => value, StringComparer.OrdinalIgnoreCase)
             .Select(value => new ArchitectureDiscoveredProjectReference(value, sourcePath))
             .ToList();
+    }
+
+    private static string NormalizeProjectReferencePath(string projectDirectory, string include)
+    {
+        char separator = Path.DirectorySeparatorChar;
+        string normalized = include
+            .Replace('\\', separator)
+            .Replace('/', separator);
+        return Path.GetFullPath(Path.Combine(projectDirectory, normalized));
     }
 
     private static IEnumerable<string> EnumerateDirectoryBuildProps(string projectPath, IArchitectureFileSystem fileSystem)

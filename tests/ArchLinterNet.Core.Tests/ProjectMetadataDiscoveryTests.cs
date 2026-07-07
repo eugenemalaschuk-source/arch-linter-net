@@ -84,6 +84,118 @@ public sealed class ProjectMetadataDiscoveryTests
     }
 
     [Test]
+    public void Discovery_ParsesProjectReferenceWithBackslashSeparators()
+    {
+        string testsDir = Path.Combine(_repoRoot, "tests", "MyApp.Tests");
+        Directory.CreateDirectory(testsDir);
+        File.WriteAllText(Path.Combine(testsDir, "MyApp.Tests.csproj"), """
+            <Project Sdk="Microsoft.NET.Sdk">
+              <PropertyGroup>
+                <TargetFramework>net10.0</TargetFramework>
+              </PropertyGroup>
+            </Project>
+            """);
+
+        string projectDir = Path.Combine(_repoRoot, "src", "MyApp");
+        Directory.CreateDirectory(projectDir);
+        string csprojContent = string.Join(Environment.NewLine,
+            "<Project Sdk=\"Microsoft.NET.Sdk\">",
+            "  <PropertyGroup>",
+            "    <TargetFramework>net10.0</TargetFramework>",
+            "  </PropertyGroup>",
+            "  <ItemGroup>",
+            "    <ProjectReference Include=\"..\\..\\tests\\MyApp.Tests\\MyApp.Tests.csproj\" />",
+            "  </ItemGroup>",
+            "</Project>",
+            "");
+
+        File.WriteAllText(Path.Combine(projectDir, "MyApp.csproj"), csprojContent);
+
+        var document = new ArchitectureContractDocument
+        {
+            Analysis = new ArchitectureAnalysisConfiguration
+            {
+                Projects = new List<string> { Path.Combine(projectDir, "MyApp.csproj") }
+            }
+        };
+
+        ArchitectureDiscoveredProject project = new ArchitectureProjectDiscoveryService()
+            .ResolveFromDocument(document, _repoRoot, resolveAssemblyOutputs: false)
+            .DiscoveredProjects
+            .Single();
+
+        Assert.That(project.ProjectReferences.Select(entry => entry.Path),
+            Is.EqualTo(new[] { "tests/MyApp.Tests/MyApp.Tests.csproj" }));
+    }
+
+    [Test]
+    public void Discovery_BackslashProjectReference_IsDetectedByForbiddenContract()
+    {
+        string testsDir = Path.Combine(_repoRoot, "tests", "MyApp.Tests");
+        Directory.CreateDirectory(testsDir);
+        File.WriteAllText(Path.Combine(testsDir, "MyApp.Tests.csproj"), """
+            <Project Sdk="Microsoft.NET.Sdk">
+              <PropertyGroup>
+                <TargetFramework>net10.0</TargetFramework>
+              </PropertyGroup>
+            </Project>
+            """);
+
+        string projectDir = Path.Combine(_repoRoot, "src", "MyApp");
+        Directory.CreateDirectory(projectDir);
+        string csprojPath = Path.Combine(projectDir, "MyApp.csproj");
+        string csprojContent = string.Join(Environment.NewLine,
+            "<Project Sdk=\"Microsoft.NET.Sdk\">",
+            "  <PropertyGroup>",
+            "    <TargetFramework>net10.0</TargetFramework>",
+            "  </PropertyGroup>",
+            "  <ItemGroup>",
+            "    <ProjectReference Include=\"..\\..\\tests\\MyApp.Tests\\MyApp.Tests.csproj\" />",
+            "  </ItemGroup>",
+            "</Project>",
+            "");
+
+        File.WriteAllText(csprojPath, csprojContent);
+
+        ArchitectureProjectMetadataContract contract = new()
+        {
+            Id = "forbidden-refs",
+            Name = "forbidden-refs",
+            Projects = new List<string> { "src/MyApp/MyApp.csproj" },
+            ForbiddenProjectReferences = new List<string> { "tests/**/*.csproj" }
+        };
+
+        var document = new ArchitectureContractDocument
+        {
+            Analysis = new ArchitectureAnalysisConfiguration
+            {
+                Projects = new List<string> { csprojPath }
+            },
+            Contracts = new ArchitectureContractGroups
+            {
+                StrictProjectMetadata = new List<ArchitectureProjectMetadataContract> { contract }
+            }
+        };
+
+        ProjectDiscoveryResult discovery = new ArchitectureProjectDiscoveryService()
+            .ResolveFromDocument(document, _repoRoot, resolveAssemblyOutputs: false);
+        ArchitectureAnalysisContext context = new(
+            _repoRoot,
+            new[] { typeof(ProjectMetadataDiscoveryTests).Assembly },
+            Array.Empty<string>(),
+            Array.Empty<string>(),
+            projectDiscovery: discovery);
+        ArchitectureContractRunner runner = new(context, document);
+
+        List<ArchitectureViolation> violations = runner.Session.CheckProjectMetadataContract(contract);
+
+        Assert.That(violations, Has.Count.EqualTo(1));
+        Assert.That(violations[0].ProjectMetadataKind, Is.EqualTo("project_reference"));
+        Assert.That(violations[0].ProjectMetadataActualValue,
+            Is.EqualTo("tests/MyApp.Tests/MyApp.Tests.csproj"));
+    }
+
+    [Test]
     public void NestedDirectoryBuildProps_WithoutExplicitImport_DoesNotMergeRootProperties()
     {
         File.WriteAllText(Path.Combine(_repoRoot, "Directory.Build.props"), """
