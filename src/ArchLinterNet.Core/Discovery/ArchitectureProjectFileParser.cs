@@ -1,6 +1,8 @@
-using System.Text.RegularExpressions;
 using System.Xml.Linq;
 using ArchLinterNet.Core.IO;
+using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp;
+using Microsoft.CodeAnalysis.CSharp.Syntax;
 
 namespace ArchLinterNet.Core.Discovery;
 
@@ -11,9 +13,6 @@ internal interface IArchitectureProjectFileParser
 
 internal sealed class ArchitectureProjectFileParser : IArchitectureProjectFileParser
 {
-    private static readonly Regex _sourceFriendAssemblyRegex = new(
-        @"\[\s*assembly\s*:\s*(?:[A-Za-z_][\w.]*\.)?InternalsVisibleTo(?:Attribute)?\s*\(\s*@?""(?<name>(?:[^""]|"""")*)""",
-        RegexOptions.Compiled | RegexOptions.CultureInvariant);
 
     public DiscoveredProjectFile Parse(string projectPath, IArchitectureFileSystem? fileSystem = null)
     {
@@ -148,22 +147,69 @@ internal sealed class ArchitectureProjectFileParser : IArchitectureProjectFilePa
                      .OrderBy(file => file, StringComparer.OrdinalIgnoreCase))
         {
             string sourceText = fileSystem.ReadAllText(file);
-            foreach (Match match in _sourceFriendAssemblyRegex.Matches(sourceText))
+            SyntaxTree syntaxTree = CSharpSyntaxTree.ParseText(sourceText);
+            CompilationUnitSyntax root = syntaxTree.GetCompilationUnitRoot();
+
+            foreach (string? assemblyName in CollectFriendAssembliesFromAttributes(root.AttributeLists))
             {
-                if (IsMatchInComment(sourceText, match.Index))
+                if (assemblyName != null)
                 {
-                    continue;
+                    yield return new ArchitectureDiscoveredFriendAssembly(assemblyName, Path.GetFullPath(file));
                 }
+            }
 
-                string assemblyName = match.Groups["name"].Value.Replace("\"\"", "\"").Trim();
-                if (assemblyName.Length == 0)
+            foreach (MemberDeclarationSyntax member in root.Members)
+            {
+                foreach (string? assemblyName in CollectFriendAssembliesFromAttributes(member.AttributeLists))
                 {
-                    continue;
+                    if (assemblyName != null)
+                    {
+                        yield return new ArchitectureDiscoveredFriendAssembly(assemblyName, Path.GetFullPath(file));
+                    }
                 }
-
-                yield return new ArchitectureDiscoveredFriendAssembly(assemblyName, Path.GetFullPath(file));
             }
         }
+    }
+
+    private static IEnumerable<string?> CollectFriendAssembliesFromAttributes(SyntaxList<AttributeListSyntax> attributeLists)
+    {
+        foreach (AttributeListSyntax attributeList in attributeLists)
+        {
+            if (attributeList.Target?.Identifier.IsKind(SyntaxKind.AssemblyKeyword) != true)
+            {
+                continue;
+            }
+
+            foreach (AttributeSyntax attribute in attributeList.Attributes)
+            {
+                yield return ExtractInternalsVisibleToAssemblyName(attribute);
+            }
+        }
+    }
+
+    private static string? ExtractInternalsVisibleToAssemblyName(AttributeSyntax attribute)
+    {
+        string nameText = attribute.Name.ToString();
+        if (!nameText.EndsWith("InternalsVisibleTo", StringComparison.Ordinal)
+            && !nameText.EndsWith("InternalsVisibleToAttribute", StringComparison.Ordinal))
+        {
+            return null;
+        }
+
+        SeparatedSyntaxList<AttributeArgumentSyntax>? arguments = attribute.ArgumentList?.Arguments;
+        if (arguments == null || arguments.Value.Count != 1)
+        {
+            return null;
+        }
+
+        ExpressionSyntax expression = arguments.Value[0].Expression;
+        if (expression is LiteralExpressionSyntax literal
+            && literal.IsKind(SyntaxKind.StringLiteralExpression))
+        {
+            return literal.Token.ValueText.Trim();
+        }
+
+        return null;
     }
 
     private static List<ArchitectureDiscoveredProjectReference> ParseProjectReferences(XDocument document, string projectPath)
@@ -212,37 +258,6 @@ internal sealed class ArchitectureProjectFileParser : IArchitectureProjectFilePa
         return segments.Any(segment =>
             string.Equals(segment, "bin", StringComparison.OrdinalIgnoreCase) ||
             string.Equals(segment, "obj", StringComparison.OrdinalIgnoreCase));
-    }
-
-    private static bool IsMatchInComment(string sourceText, int matchIndex)
-    {
-        int lineStart = sourceText.LastIndexOf('\n', matchIndex > 0 ? matchIndex - 1 : 0);
-        if (lineStart < 0)
-        {
-            lineStart = 0;
-        }
-        else
-        {
-            lineStart += 1;
-        }
-
-        ReadOnlySpan<char> line = sourceText.AsSpan(lineStart, matchIndex - lineStart).TrimStart();
-        if (line.StartsWith("//", StringComparison.Ordinal))
-        {
-            return true;
-        }
-
-        int blockStart = sourceText.LastIndexOf("/*", matchIndex, StringComparison.Ordinal);
-        if (blockStart >= 0)
-        {
-            int blockEnd = sourceText.IndexOf("*/", blockStart + 2, StringComparison.Ordinal);
-            if (blockEnd < 0 || blockEnd > matchIndex)
-            {
-                return true;
-            }
-        }
-
-        return false;
     }
 
     private static void MergeScalarProperties(

@@ -380,4 +380,86 @@ public sealed class ProjectMetadataDiscoveryTests
         Assert.That(project.FriendAssemblies.Any(entry => entry.AssemblyName == "MyApp.Tools"), Is.False,
             "Multi-line block-commented InternalsVisibleTo declaration must not be treated as an actual friend assembly.");
     }
+
+    [Test]
+    public void Discovery_SourceLevelInternalsVisibleTo_IgnoresPreprocessorDisabledDeclarations()
+    {
+        string projectDir = Path.Combine(_repoRoot, "src", "MyApp");
+        Directory.CreateDirectory(Path.Combine(projectDir, "Properties"));
+        File.WriteAllText(Path.Combine(projectDir, "Properties", "AssemblyInfo.cs"), """
+            using System.Runtime.CompilerServices;
+
+            #if false
+            [assembly: InternalsVisibleTo("MyApp.Tools")]
+            #endif
+            [assembly: InternalsVisibleTo("MyApp.Tests")]
+            """);
+        File.WriteAllText(Path.Combine(projectDir, "MyApp.csproj"), """
+            <Project Sdk="Microsoft.NET.Sdk">
+              <PropertyGroup>
+                <TargetFramework>net10.0</TargetFramework>
+              </PropertyGroup>
+            </Project>
+            """);
+
+        var document = new ArchitectureContractDocument
+        {
+            Analysis = new ArchitectureAnalysisConfiguration
+            {
+                Projects = new List<string> { Path.Combine(projectDir, "MyApp.csproj") }
+            }
+        };
+
+        ArchitectureDiscoveredProject project = new ArchitectureProjectDiscoveryService()
+            .ResolveFromDocument(document, _repoRoot, resolveAssemblyOutputs: false)
+            .DiscoveredProjects
+            .Single();
+
+        Assert.That(project.FriendAssemblies.Select(entry => entry.AssemblyName),
+            Is.EqualTo(new[] { "MyApp.Tests" }));
+        Assert.That(project.FriendAssemblies.Any(entry => entry.AssemblyName == "MyApp.Tools"), Is.False,
+            "InternalsVisibleTo inside #if false must not be treated as an actual friend assembly.");
+    }
+
+    [Test]
+    public void Discovery_SourceLevelInternalsVisibleTo_IgnoresStringLiteralContainingPattern()
+    {
+        string projectDir = Path.Combine(_repoRoot, "src", "MyApp");
+        Directory.CreateDirectory(Path.Combine(projectDir, "Properties"));
+        File.WriteAllText(Path.Combine(projectDir, "Properties", "AssemblyInfo.cs"), """
+            using System.Runtime.CompilerServices;
+
+            [assembly: InternalsVisibleTo("MyApp.Tests")]
+            internal static class DocExample
+            {
+                public static string GetMessage()
+                {
+                    return "Tests may reference friend assemblies via InternalsVisibleTo.";
+                }
+            }
+            """);
+        File.WriteAllText(Path.Combine(projectDir, "MyApp.csproj"), """
+            <Project Sdk="Microsoft.NET.Sdk">
+              <PropertyGroup>
+                <TargetFramework>net10.0</TargetFramework>
+              </PropertyGroup>
+            </Project>
+            """);
+
+        var document = new ArchitectureContractDocument
+        {
+            Analysis = new ArchitectureAnalysisConfiguration
+            {
+                Projects = new List<string> { Path.Combine(projectDir, "MyApp.csproj") }
+            }
+        };
+
+        ArchitectureDiscoveredProject project = new ArchitectureProjectDiscoveryService()
+            .ResolveFromDocument(document, _repoRoot, resolveAssemblyOutputs: false)
+            .DiscoveredProjects
+            .Single();
+
+        Assert.That(project.FriendAssemblies.Select(entry => entry.AssemblyName),
+            Is.EqualTo(new[] { "MyApp.Tests" }));
+    }
 }
