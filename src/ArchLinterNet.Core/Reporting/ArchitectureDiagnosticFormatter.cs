@@ -310,7 +310,8 @@ public sealed class ArchitectureDiagnosticFormatter : IArchitectureDiagnosticFor
             string reason = publicApiSurface.ForbiddenPublicConstant == true
                 ? "forbidden_public_constant"
                 : "undeclared_api_member";
-            context += $" (reason: {reason}, signature: {publicApiSurface.UndeclaredApiSignature})";
+            context += $" (reason: {reason}, assembly: {publicApiSurface.ApiAssemblyName}, " +
+                       $"visibility: {publicApiSurface.ApiVisibility}, signature: {publicApiSurface.UndeclaredApiSignature})";
         }
 
         string forbiddenNamespace = ForbiddenNamespaceOf(diagnostic);
@@ -445,6 +446,12 @@ public sealed class ArchitectureDiagnosticFormatter : IArchitectureDiagnosticFor
 
             if (publicApiSurface.ForbiddenPublicConstant != null)
                 obj["forbidden_public_constant"] = publicApiSurface.ForbiddenPublicConstant;
+
+            if (publicApiSurface.ApiAssemblyName != null)
+                obj["assembly"] = publicApiSurface.ApiAssemblyName;
+
+            if (publicApiSurface.ApiVisibility != null)
+                obj["visibility"] = publicApiSurface.ApiVisibility;
         }
 
         if (diagnostic is ConfigurationDiagnostic configuration)

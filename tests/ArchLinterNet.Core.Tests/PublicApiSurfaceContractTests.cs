@@ -259,6 +259,87 @@ public sealed class PublicApiSurfaceContractTests
     }
 
     [Test]
+    public void CheckPublicApiSurfaceContract_PublicEnum_DoesNotReportBackingFieldButTracksLiterals()
+    {
+        const string TypeName = "PublicApiSurfaceContractTestFixtures.PublicColor";
+        var contract = new ArchitecturePublicApiSurfaceContract
+        {
+            Name = "enum-surface",
+            Assemblies = new List<string> { AssemblyName },
+            DeclaredApi = new List<string> { $"enum {TypeName}" }
+        };
+        var document = CreateDocument(contract);
+        var runner = new ArchitectureContractRunner(CreateContext(), document);
+
+        var violations = runner.Session.CheckPublicApiSurfaceContract(contract);
+        HashSet<string> signatures = violations
+            .Where(v => v.SourceType == TypeName)
+            .Select(v => v.UndeclaredApiSignature!)
+            .ToHashSet(StringComparer.Ordinal);
+
+        Assert.That(signatures.Any(s => s.Contains("value__", StringComparison.Ordinal)), Is.False);
+        Assert.That(signatures, Contains.Item($"const {TypeName}.Red: {TypeName}"));
+        Assert.That(signatures, Contains.Item($"const {TypeName}.Green: {TypeName}"));
+        Assert.That(signatures, Contains.Item($"const {TypeName}.Blue: {TypeName}"));
+    }
+
+    [Test]
+    public void CheckPublicApiSurfaceContract_UndeclaredMembers_CarryAssemblyAndVisibility()
+    {
+        const string TypeName = "PublicApiSurfaceContractTestFixtures.VisibilityHolder";
+        var contract = new ArchitecturePublicApiSurfaceContract
+        {
+            Name = "visibility-surface",
+            Assemblies = new List<string> { AssemblyName },
+            DeclaredApi = new List<string>
+            {
+                $"class {TypeName}",
+                $"ctor {TypeName}()"
+            }
+        };
+        var document = CreateDocument(contract);
+        var runner = new ArchitectureContractRunner(CreateContext(), document);
+
+        var violations = runner.Session.CheckPublicApiSurfaceContract(contract);
+
+        var publicMethodViolation = violations.Single(v =>
+            v.UndeclaredApiSignature == $"method {TypeName}.PublicMethod(): System.Void");
+        Assert.That(publicMethodViolation.ApiVisibility, Is.EqualTo("public"));
+        Assert.That(publicMethodViolation.ApiAssemblyName, Is.EqualTo(AssemblyName));
+
+        var protectedMethodViolation = violations.Single(v =>
+            v.UndeclaredApiSignature == $"method {TypeName}.ProtectedMethod(): System.Void");
+        Assert.That(protectedMethodViolation.ApiVisibility, Is.EqualTo("protected"));
+        Assert.That(protectedMethodViolation.ApiAssemblyName, Is.EqualTo(AssemblyName));
+    }
+
+    [Test]
+    public void CheckPublicApiSurfaceContract_UndeclaredAndForbiddenConstant_ReportsForbiddenReason()
+    {
+        const string TypeName = "PublicApiSurfaceContractTestFixtures.ConstantHolder";
+        var contract = new ArchitecturePublicApiSurfaceContract
+        {
+            Name = "undeclared-and-forbidden-constant",
+            Assemblies = new List<string> { AssemblyName },
+            ForbidPublicConstantsUnlessDeclared = true,
+            DeclaredApi = new List<string>
+            {
+                $"class {TypeName}",
+                $"ctor {TypeName}()",
+                $"const {TypeName}.DeclaredConst: System.String"
+            }
+        };
+        var document = CreateDocument(contract);
+        var runner = new ArchitectureContractRunner(CreateContext(), document);
+
+        var violations = runner.Session.CheckPublicApiSurfaceContract(contract);
+
+        var violation = violations.Single(v =>
+            v.UndeclaredApiSignature == $"const {TypeName}.UndeclaredConst: System.String");
+        Assert.That(violation.ForbiddenPublicConstant, Is.True);
+    }
+
+    [Test]
     public void CheckPublicApiSurfaceContract_UndeclaredConstant_ReturnsViolationByDefault()
     {
         const string TypeName = "PublicApiSurfaceContractTestFixtures.ConstantHolder";

@@ -116,6 +116,28 @@ namespace PublicApiSurfaceContractTestFixtures
         {
         }
     }
+
+    public enum PublicColor
+    {
+        Red,
+        Green,
+        Blue
+    }
+
+    public class VisibilityHolder
+    {
+        public VisibilityHolder()
+        {
+        }
+
+        public void PublicMethod()
+        {
+        }
+
+        protected void ProtectedMethod()
+        {
+        }
+    }
 }
 
 #pragma warning restore CS0649

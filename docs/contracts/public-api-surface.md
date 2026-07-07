@@ -63,7 +63,7 @@ Parameter, field, property, and return types are rendered via their CLR full nam
 
 A type is exported if it is `public`, or if it is `protected`/`protected internal` **and** every enclosing type in its nesting chain is itself exported. A `protected` nested type inside an `internal` outer type is unreachable from outside the assembly, so it is out of scope even though the modifier says "protected."
 
-For an exported type, its own **directly declared** members (constructors, methods, properties, fields including `const`, and events) are in scope if they are `public`, `protected`, or `protected internal`. Compiler-generated members (property/event backing fields, `get_`/`set_`/`add_`/`remove_` accessor methods — represented instead by the property/event itself) are excluded. Members **inherited** from a base type are not re-reported against the derived type; they belong to the base type's own declared surface.
+For an exported type, its own **directly declared** members (constructors, methods, properties, fields including `const`, and events) are in scope if they are `public`, `protected`, or `protected internal`. Compiler-generated members (property/event backing fields, `get_`/`set_`/`add_`/`remove_` accessor methods — represented instead by the property/event itself) are excluded, as is an enum's synthesized `value__` backing field (an enum's real exported surface is its literal members, e.g. `const MyApp.Color.Red: MyApp.Color`, not this CLR implementation detail). Members **inherited** from a base type are not re-reported against the derived type; they belong to the base type's own declared surface.
 
 ### Undeclared surface
 
@@ -77,7 +77,7 @@ Setting `forbid_public_constants_unless_declared: true` adds a stricter, indepen
 
 ### Violations
 
-Each violation identifies the contract, the declaring type, and the normalized signature of the undeclared member or forbidden constant. `ignored_violations` entries use the same `source_type`/`forbidden_reference`/`reason` shape as other contract families, where `forbidden_reference` is the normalized signature string.
+Each violation identifies the contract, the declaring assembly, the declaring type, the normalized signature of the undeclared member or forbidden constant, the member's visibility (`public`, `protected`, or `protected internal`), and whether the violation reason is an undeclared exported member or a forbidden public constant. When a `const` field is simultaneously undeclared **and** fails the `forbid_public_constants_unless_declared` check, it is reported once, as a forbidden public constant (the stricter of the two reasons). `ignored_violations` entries use the same `source_type`/`forbidden_reference`/`reason` shape as other contract families, where `forbidden_reference` is the normalized signature string.
 
 ## Scope: what's not covered here
 

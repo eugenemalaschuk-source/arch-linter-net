@@ -6,6 +6,8 @@ namespace ArchLinterNet.Core.Scanning;
 internal readonly record struct ArchitectureExportedApiEntry(
     string Signature,
     string DeclaringTypeName,
+    string AssemblyName,
+    string Visibility,
     bool IsConst,
     string? ConstQualifiedName);
 
@@ -20,6 +22,8 @@ internal static class ArchitecturePublicApiSurfaceScanner
 
     public static IEnumerable<ArchitectureExportedApiEntry> GetExportedSurface(Assembly assembly)
     {
+        string assemblyName = assembly.GetName().Name ?? string.Empty;
+
         foreach (Type type in ArchitectureTypeScanner.GetLoadableTypes(assembly))
         {
             if (!IsExportedType(type) || IsCompilerGenerated(type))
@@ -28,9 +32,10 @@ internal static class ArchitecturePublicApiSurfaceScanner
             }
 
             string typeName = ArchitectureTypeNames.SafeFullName(type);
-            yield return new ArchitectureExportedApiEntry(NormalizeType(type), typeName, false, null);
+            yield return new ArchitectureExportedApiEntry(
+                NormalizeType(type), typeName, assemblyName, TypeVisibility(type), false, null);
 
-            foreach (ArchitectureExportedApiEntry member in GetExportedMembers(type))
+            foreach (ArchitectureExportedApiEntry member in GetExportedMembers(type, assemblyName))
             {
                 yield return member;
             }
@@ -77,8 +82,10 @@ internal static class ArchitecturePublicApiSurfaceScanner
         }
     }
 
-    private static IEnumerable<ArchitectureExportedApiEntry> GetExportedMembers(Type type)
+    private static IEnumerable<ArchitectureExportedApiEntry> GetExportedMembers(Type type, string assemblyName)
     {
+        string declaringTypeName = ArchitectureTypeNames.SafeFullName(type);
+
         foreach (ConstructorInfo ctor in SafeGetMembers(type, t => t.GetConstructors(MemberFlags)))
         {
             if (!IsExportedVisibility(ctor) || IsCompilerGenerated(ctor))
@@ -89,7 +96,8 @@ internal static class ArchitecturePublicApiSurfaceScanner
             string? signature = TryNormalizeMethodLike(type, ctor, "ctor", includeName: false);
             if (signature != null)
             {
-                yield return new ArchitectureExportedApiEntry(signature, ArchitectureTypeNames.SafeFullName(type), false, null);
+                yield return new ArchitectureExportedApiEntry(
+                    signature, declaringTypeName, assemblyName, MemberVisibility(ctor), false, null);
             }
         }
 
@@ -108,7 +116,8 @@ internal static class ArchitecturePublicApiSurfaceScanner
             string? signature = TryNormalizeMethodLike(type, method, "method", includeName: true);
             if (signature != null)
             {
-                yield return new ArchitectureExportedApiEntry(signature, ArchitectureTypeNames.SafeFullName(type), false, null);
+                yield return new ArchitectureExportedApiEntry(
+                    signature, declaringTypeName, assemblyName, MemberVisibility(method), false, null);
             }
         }
 
@@ -127,29 +136,34 @@ internal static class ArchitecturePublicApiSurfaceScanner
             string? signature = TryNormalizeProperty(type, property);
             if (signature != null)
             {
-                yield return new ArchitectureExportedApiEntry(signature, ArchitectureTypeNames.SafeFullName(type), false, null);
+                yield return new ArchitectureExportedApiEntry(
+                    signature, declaringTypeName, assemblyName, AccessorVisibility(property.GetMethod, property.SetMethod), false, null);
             }
         }
 
         foreach (FieldInfo field in SafeGetMembers(type, t => t.GetFields(MemberFlags)))
         {
-            if (!IsExportedVisibility(field) || IsCompilerGenerated(field))
+            // Skip compiler/runtime-synthesized special-name fields, most notably an enum's
+            // `value__` backing field, which reflection reports as an ordinary public instance
+            // field alongside the enum's real literal members and is not part of any type's
+            // intentional exported surface.
+            if (!IsExportedVisibility(field) || IsCompilerGenerated(field) || field.IsSpecialName)
             {
                 continue;
             }
 
-            string? typeName = TryRenderTypeName(field.FieldType);
-            if (typeName == null)
+            string? fieldTypeName = TryRenderTypeName(field.FieldType);
+            if (fieldTypeName == null)
             {
                 continue;
             }
 
-            string declaringTypeName = ArchitectureTypeNames.SafeFullName(type);
             bool isConst = field.IsLiteral;
             string kind = isConst ? "const" : "field";
-            string signature = $"{kind} {declaringTypeName}.{field.Name}: {typeName}";
+            string signature = $"{kind} {declaringTypeName}.{field.Name}: {fieldTypeName}";
             string? constQualifiedName = isConst ? $"{declaringTypeName}.{field.Name}" : null;
-            yield return new ArchitectureExportedApiEntry(signature, declaringTypeName, isConst, constQualifiedName);
+            yield return new ArchitectureExportedApiEntry(
+                signature, declaringTypeName, assemblyName, MemberVisibility(field), isConst, constQualifiedName);
         }
 
         foreach (EventInfo evt in SafeGetMembers(type, t => t.GetEvents(MemberFlags)))
@@ -160,14 +174,15 @@ internal static class ArchitecturePublicApiSurfaceScanner
             }
 
             Type? handlerType = evt.EventHandlerType;
-            string? typeName = handlerType != null ? TryRenderTypeName(handlerType) : null;
-            if (typeName == null)
+            string? eventTypeName = handlerType != null ? TryRenderTypeName(handlerType) : null;
+            if (eventTypeName == null)
             {
                 continue;
             }
 
-            string declaringTypeName = ArchitectureTypeNames.SafeFullName(type);
-            yield return new ArchitectureExportedApiEntry($"event {declaringTypeName}.{evt.Name}: {typeName}", declaringTypeName, false, null);
+            yield return new ArchitectureExportedApiEntry(
+                $"event {declaringTypeName}.{evt.Name}: {eventTypeName}",
+                declaringTypeName, assemblyName, MemberVisibility(evt.AddMethod!), false, null);
         }
     }
 
@@ -203,6 +218,66 @@ internal static class ArchitecturePublicApiSurfaceScanner
 
     private static bool IsExportedAccessor(MethodInfo? accessor) =>
         accessor != null && IsExportedVisibility(accessor);
+
+    // Only "public", "protected", and "protected internal" are ever passed here — the caller has
+    // already filtered to IsExportedVisibility, so these three checks are exhaustive.
+    private static string MemberVisibility(MethodBase method)
+    {
+        if (method.IsPublic)
+        {
+            return "public";
+        }
+
+        return method.IsFamilyOrAssembly ? "protected internal" : "protected";
+    }
+
+    private static string MemberVisibility(FieldInfo field)
+    {
+        if (field.IsPublic)
+        {
+            return "public";
+        }
+
+        return field.IsFamilyOrAssembly ? "protected internal" : "protected";
+    }
+
+    private static string TypeVisibility(Type type)
+    {
+        if (!type.IsNested)
+        {
+            return "public";
+        }
+
+        if (type.IsNestedPublic)
+        {
+            return "public";
+        }
+
+        return type.IsNestedFamORAssem ? "protected internal" : "protected";
+    }
+
+    // A property/event is exported if at least one of its accessors is; when both accessors are
+    // exported but at different visibilities (e.g. `public get; protected set;`), the more open
+    // accessor's visibility describes what's actually reachable from outside the assembly.
+    private static string AccessorVisibility(MethodInfo? getMethod, MethodInfo? setMethod)
+    {
+        string? getVisibility = getMethod != null && IsExportedVisibility(getMethod) ? MemberVisibility(getMethod) : null;
+        string? setVisibility = setMethod != null && IsExportedVisibility(setMethod) ? MemberVisibility(setMethod) : null;
+        return MostOpenVisibility(getVisibility, setVisibility);
+    }
+
+    private static string MostOpenVisibility(string? first, string? second)
+    {
+        static int Rank(string? visibility) => visibility switch
+        {
+            "public" => 0,
+            "protected internal" => 1,
+            "protected" => 2,
+            _ => 3
+        };
+
+        return Rank(first) <= Rank(second) ? first ?? "public" : second ?? "public";
+    }
 
     private static bool IsCompilerGenerated(MemberInfo member)
     {

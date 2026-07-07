@@ -12,4 +12,6 @@ public sealed record PublicApiSurfaceDiagnostic(
 
     public string? UndeclaredApiSignature { get; init; }
     public bool? ForbiddenPublicConstant { get; init; }
+    public string? ApiAssemblyName { get; init; }
+    public string? ApiVisibility { get; init; }
 }

@@ -29,7 +29,7 @@ public sealed partial class ArchitectureAnalysisSession
                 continue;
             }
 
-            List<(string Signature, string DeclaringType, bool ForbiddenConstant)> entries = new();
+            List<(ArchitectureExportedApiEntry Entry, bool ForbiddenConstant)> violatingEntries = new();
 
             foreach (ArchitectureExportedApiEntry entry in ArchitecturePublicApiSurfaceScanner.GetExportedSurface(targetAssembly))
             {
@@ -44,14 +44,14 @@ public sealed partial class ArchitectureAnalysisSession
                     continue;
                 }
 
-                entries.Add((entry.Signature, entry.DeclaringTypeName, forbiddenConstant && !undeclared));
+                violatingEntries.Add((entry, forbiddenConstant));
             }
 
-            foreach (var (signature, declaringType, forbiddenConstant) in entries
-                         .OrderBy(e => e.DeclaringType, StringComparer.Ordinal)
-                         .ThenBy(e => e.Signature, StringComparer.Ordinal))
+            foreach (var (entry, forbiddenConstant) in violatingEntries
+                         .OrderBy(v => v.Entry.DeclaringTypeName, StringComparer.Ordinal)
+                         .ThenBy(v => v.Entry.Signature, StringComparer.Ordinal))
             {
-                if (executionContext.IsIgnored(declaringType, signature))
+                if (executionContext.IsIgnored(entry.DeclaringTypeName, entry.Signature))
                 {
                     continue;
                 }
@@ -59,12 +59,14 @@ public sealed partial class ArchitectureAnalysisSession
                 violations.Add(new ArchitectureViolation(
                     contract.Name,
                     contract.Id,
-                    declaringType,
+                    entry.DeclaringTypeName,
                     "public API surface",
-                    new[] { signature })
+                    new[] { entry.Signature })
                 {
-                    UndeclaredApiSignature = signature,
-                    ForbiddenPublicConstant = forbiddenConstant ? true : null
+                    UndeclaredApiSignature = entry.Signature,
+                    ForbiddenPublicConstant = forbiddenConstant ? true : null,
+                    ApiAssemblyName = entry.AssemblyName,
+                    ApiVisibility = entry.Visibility
                 });
             }
         }

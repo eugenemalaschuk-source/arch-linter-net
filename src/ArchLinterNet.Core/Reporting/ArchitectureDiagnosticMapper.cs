@@ -56,7 +56,9 @@ public static class ArchitectureDiagnosticMapper
                 violation.ForbiddenNamespace, violation.ForbiddenReferences)
             {
                 UndeclaredApiSignature = violation.UndeclaredApiSignature,
-                ForbiddenPublicConstant = violation.ForbiddenPublicConstant
+                ForbiddenPublicConstant = violation.ForbiddenPublicConstant,
+                ApiAssemblyName = violation.ApiAssemblyName,
+                ApiVisibility = violation.ApiVisibility
             };
         }
 
