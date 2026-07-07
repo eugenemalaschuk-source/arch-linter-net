@@ -234,6 +234,18 @@ public sealed class ArchitectureContractGroups
     [YamlMember(Alias = "audit_attribute_usage")]
     public List<ArchitectureAttributeUsageContract> AuditAttributeUsage { get; set; } = new();
 
+    [YamlMember(Alias = "strict_inheritance")]
+    public List<ArchitectureInheritanceContract> StrictInheritance { get; set; } = new();
+
+    [YamlMember(Alias = "audit_inheritance")]
+    public List<ArchitectureInheritanceContract> AuditInheritance { get; set; } = new();
+
+    [YamlMember(Alias = "strict_interface_implementation")]
+    public List<ArchitectureInterfaceImplementationContract> StrictInterfaceImplementation { get; set; } = new();
+
+    [YamlMember(Alias = "audit_interface_implementation")]
+    public List<ArchitectureInterfaceImplementationContract> AuditInterfaceImplementation { get; set; } = new();
+
     // Bound (not executed) so a schema-valid coverage contract is detected and rejected with a
     // clear "reserved, not implemented" diagnostic instead of being silently dropped by
     // IgnoreUnmatchedProperties deserialization. See ArchitecturePolicyDocumentLoader.Load.
@@ -269,6 +281,8 @@ public sealed class ArchitectureContractGroups
         foreach (var c in StrictTypePlacement) yield return c;
         foreach (var c in StrictPublicApiSurface) yield return c;
         foreach (var c in StrictAttributeUsage) yield return c;
+        foreach (var c in StrictInheritance) yield return c;
+        foreach (var c in StrictInterfaceImplementation) yield return c;
         foreach (var c in StrictCoverage) yield return c;
     }
 
@@ -293,6 +307,8 @@ public sealed class ArchitectureContractGroups
         foreach (var c in AuditTypePlacement) yield return c;
         foreach (var c in AuditPublicApiSurface) yield return c;
         foreach (var c in AuditAttributeUsage) yield return c;
+        foreach (var c in AuditInheritance) yield return c;
+        foreach (var c in AuditInterfaceImplementation) yield return c;
         foreach (var c in AuditCoverage) yield return c;
     }
 }

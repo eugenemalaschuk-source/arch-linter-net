@@ -24,6 +24,8 @@ ArchLinterNet supports static architecture validation through documented YAML po
 - type placement and naming governance contracts (name suffix/prefix, namespace, layer, base type, interface, and attribute selectors; layer/namespace/project/assembly residency; required/forbidden naming);
 - public API surface governance contracts (per-assembly declared exported public/protected/protected-internal type and member allowlist, undeclared-surface detection, optional forbid-public-constants-unless-declared lever);
 - attribute usage governance contracts (declared attribute/marker types restricted to, or forbidden from, declared layers/namespaces/projects/assemblies; exact and prefix attribute-name matching; type and member scanning regardless of visibility);
+- inheritance boundary contracts (types in declared source layers/namespaces forbidden from inheriting, directly or transitively, from declared base types; exact and prefix base-type-name matching; generic base types matched by generic type definition);
+- interface implementation boundary contracts (implementations of declared interfaces restricted to, or forbidden from, declared layers/namespaces/projects/assemblies; exact and prefix interface-name matching, including interfaces inherited through base classes);
 - coverage contracts (`scope: namespace`, `scope: rule_input`, `scope: project`, `scope: assembly`);
 - strict and audit contract groups;
 - constrained namespace glob patterns;
@@ -86,6 +88,13 @@ grants the right roles). They also do not detect the *absence* of a required mar
 "required attribute" rule such as "every controller action must carry `[Authorize]` or
 `[AllowAnonymous]`") — required-marker enforcement is deferred to a documented follow-up
 and is not implemented by this contract family.
+
+Inheritance contracts only walk the compiled base-class chain; they do not match interface
+implementations, do not support required-inheritance rules ("every X must derive from Y"),
+and stop the chain walk at the last resolvable base type when an assembly cannot be loaded.
+Interface implementation contracts are static metadata checks over each type's implemented
+interface set — they do not resolve runtime dependency-injection registrations and do not
+support required-implementation rules ("interface X must have an implementation in layer Y").
 
 ## Important distinctions
 

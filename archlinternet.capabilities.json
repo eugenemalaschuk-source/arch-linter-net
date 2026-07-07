@@ -112,6 +112,20 @@
       "auditGroup": "audit_attribute_usage",
       "fields": ["name", "id", "attributes", "attribute_prefixes", "allowed_only_in_layers", "allowed_only_in_namespaces", "allowed_only_in_projects", "allowed_only_in_assemblies", "forbidden_in_layers", "forbidden_in_namespaces", "forbidden_in_projects", "forbidden_in_assemblies", "ignored_violations", "reason"],
       "validates": "A declared attribute type (matched by exact fully-qualified name via attributes, and/or by prefix via attribute_prefixes) is restricted to (allowed_only_in_*) or excluded from (forbidden_in_*) a declared layer/namespace/project/assembly. Scans the type itself and every declared member (ctor/method/property/field/event) regardless of visibility. Requires at least one attribute selector and at least one location expectation. Static marker placement validation only: does not evaluate attribute constructor arguments/named properties (not authorization/security correctness validation) and does not detect the absence of a required marker (required-marker enforcement is a deferred follow-up)."
+    },
+    {
+      "kind": "inheritance",
+      "strictGroup": "strict_inheritance",
+      "auditGroup": "audit_inheritance",
+      "fields": ["name", "id", "source_layers", "source_namespaces", "forbidden_base_types", "forbidden_base_type_prefixes", "ignored_violations", "reason"],
+      "validates": "A type residing in a declared source surface (source_layers and/or source_namespaces prefixes) does not inherit, directly or transitively through its base-class chain, from a forbidden base type (matched by exact fully-qualified name via forbidden_base_types, and/or by prefix via forbidden_base_type_prefixes). Constructed generic base types are matched by their generic type definition's CLR name (e.g. App.Repository`1). Requires at least one source surface selector and at least one base type selector. Class inheritance only; interface implementation restrictions belong to interface-implementation contracts."
+    },
+    {
+      "kind": "interface-implementation",
+      "strictGroup": "strict_interface_implementation",
+      "auditGroup": "audit_interface_implementation",
+      "fields": ["name", "id", "interfaces", "interface_prefixes", "allowed_only_in_layers", "allowed_only_in_namespaces", "allowed_only_in_projects", "allowed_only_in_assemblies", "forbidden_in_layers", "forbidden_in_namespaces", "forbidden_in_projects", "forbidden_in_assemblies", "ignored_violations", "reason"],
+      "validates": "A non-interface type implementing a declared interface (matched by exact fully-qualified name via interfaces, and/or by prefix via interface_prefixes, including interfaces inherited through base classes; constructed generic interfaces matched by their generic type definition's CLR name) resides only in (allowed_only_in_*) or outside (forbidden_in_*) declared layers/namespaces/projects/assemblies. Requires at least one interface selector and at least one location expectation. Static type-relationship validation only: does not resolve runtime dependency-injection registrations."
     }
   ],
   "exceptionMechanisms": {

@@ -65,6 +65,8 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<IArchitectureContractHandler, TypePlacementContractHandler>();
         services.AddSingleton<IArchitectureContractHandler, PublicApiSurfaceContractHandler>();
         services.AddSingleton<IArchitectureContractHandler, AttributeUsageContractHandler>();
+        services.AddSingleton<IArchitectureContractHandler, InheritanceContractHandler>();
+        services.AddSingleton<IArchitectureContractHandler, InterfaceImplementationContractHandler>();
         services.AddSingleton<IArchitectureContractHandler, CoverageContractHandler>();
         services.AddSingleton<ArchitectureContractHandlerRegistry>();
         services.AddSingleton<IArchitectureContractHandlerRegistry>(ResolveHandlerRegistry);

@@ -125,6 +125,8 @@ contracts:
   strict_type_placement: []
   strict_public_api_surface: []
   strict_attribute_usage: []
+  strict_inheritance: []
+  strict_interface_implementation: []
   strict_coverage: []
 
   audit: []
@@ -145,6 +147,8 @@ contracts:
   audit_type_placement: []
   audit_public_api_surface: []
   audit_attribute_usage: []
+  audit_inheritance: []
+  audit_interface_implementation: []
   audit_coverage: []
 ```
 

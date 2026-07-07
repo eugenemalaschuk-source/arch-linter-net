@@ -249,6 +249,8 @@ public sealed class ArchitectureDiagnosticFormatter : IArchitectureDiagnosticFor
         TypePlacementDiagnostic d => d.SourceType,
         PublicApiSurfaceDiagnostic d => d.SourceType,
         AttributeUsageDiagnostic d => d.SourceType,
+        InheritanceDiagnostic d => d.SourceType,
+        InterfaceImplementationDiagnostic d => d.SourceType,
         _ => string.Empty
     };
 
@@ -260,6 +262,8 @@ public sealed class ArchitectureDiagnosticFormatter : IArchitectureDiagnosticFor
         TypePlacementDiagnostic d => d.ForbiddenNamespace,
         PublicApiSurfaceDiagnostic d => d.ForbiddenNamespace,
         AttributeUsageDiagnostic d => d.ForbiddenNamespace,
+        InheritanceDiagnostic d => d.ForbiddenNamespace,
+        InterfaceImplementationDiagnostic d => d.ForbiddenNamespace,
         _ => string.Empty
     };
 
@@ -271,6 +275,8 @@ public sealed class ArchitectureDiagnosticFormatter : IArchitectureDiagnosticFor
         TypePlacementDiagnostic d => d.ForbiddenReferences,
         PublicApiSurfaceDiagnostic d => d.ForbiddenReferences,
         AttributeUsageDiagnostic d => d.ForbiddenReferences,
+        InheritanceDiagnostic d => d.ForbiddenReferences,
+        InterfaceImplementationDiagnostic d => d.ForbiddenReferences,
         _ => Array.Empty<string>()
     };
 
@@ -325,6 +331,27 @@ public sealed class ArchitectureDiagnosticFormatter : IArchitectureDiagnosticFor
                            : string.Empty) +
                        (attributeUsage.ActualAttributeLocation != null
                            ? $", actual_location: {attributeUsage.ActualAttributeLocation}"
+                           : string.Empty) +
+                       ")";
+        }
+
+        if (diagnostic is InheritanceDiagnostic inheritance)
+        {
+            context += $" (forbidden_base_type: {inheritance.ForbiddenBaseType}" +
+                       (inheritance.InheritanceSourceSurface != null
+                           ? $", source_surface: {inheritance.InheritanceSourceSurface}"
+                           : string.Empty) +
+                       ")";
+        }
+
+        if (diagnostic is InterfaceImplementationDiagnostic interfaceImplementation)
+        {
+            context += $" (kind: {interfaceImplementation.ImplementationKind}, interface: {interfaceImplementation.MatchedInterface}" +
+                       (interfaceImplementation.ExpectedImplementationLocation != null
+                           ? $", expected_location: {interfaceImplementation.ExpectedImplementationLocation}"
+                           : string.Empty) +
+                       (interfaceImplementation.ActualImplementationLocation != null
+                           ? $", actual_location: {interfaceImplementation.ActualImplementationLocation}"
                            : string.Empty) +
                        ")";
         }
@@ -482,6 +509,30 @@ public sealed class ArchitectureDiagnosticFormatter : IArchitectureDiagnosticFor
 
             if (attributeUsage.ActualAttributeLocation != null)
                 obj["actual_attribute_location"] = attributeUsage.ActualAttributeLocation;
+        }
+
+        if (diagnostic is InheritanceDiagnostic inheritance)
+        {
+            if (inheritance.ForbiddenBaseType != null)
+                obj["forbidden_base_type"] = inheritance.ForbiddenBaseType;
+
+            if (inheritance.InheritanceSourceSurface != null)
+                obj["source_surface"] = inheritance.InheritanceSourceSurface;
+        }
+
+        if (diagnostic is InterfaceImplementationDiagnostic interfaceImplementation)
+        {
+            if (interfaceImplementation.MatchedInterface != null)
+                obj["matched_interface"] = interfaceImplementation.MatchedInterface;
+
+            if (interfaceImplementation.ImplementationKind != null)
+                obj["implementation_kind"] = interfaceImplementation.ImplementationKind;
+
+            if (interfaceImplementation.ExpectedImplementationLocation != null)
+                obj["expected_implementation_location"] = interfaceImplementation.ExpectedImplementationLocation;
+
+            if (interfaceImplementation.ActualImplementationLocation != null)
+                obj["actual_implementation_location"] = interfaceImplementation.ActualImplementationLocation;
         }
 
         if (diagnostic is ConfigurationDiagnostic configuration)
