@@ -150,6 +150,11 @@ internal sealed class ArchitectureProjectFileParser : IArchitectureProjectFilePa
             string sourceText = fileSystem.ReadAllText(file);
             foreach (Match match in _sourceFriendAssemblyRegex.Matches(sourceText))
             {
+                if (IsMatchInComment(sourceText, match.Index))
+                {
+                    continue;
+                }
+
                 string assemblyName = match.Groups["name"].Value.Replace("\"\"", "\"").Trim();
                 if (assemblyName.Length == 0)
                 {
@@ -178,7 +183,6 @@ internal sealed class ArchitectureProjectFileParser : IArchitectureProjectFilePa
 
     private static IEnumerable<string> EnumerateDirectoryBuildProps(string projectPath, IArchitectureFileSystem fileSystem)
     {
-        List<string> propsPaths = new();
         string? directory = Path.GetDirectoryName(Path.GetFullPath(projectPath));
 
         while (!string.IsNullOrEmpty(directory))
@@ -186,7 +190,8 @@ internal sealed class ArchitectureProjectFileParser : IArchitectureProjectFilePa
             string candidate = Path.Combine(directory, "Directory.Build.props");
             if (fileSystem.FileExists(candidate))
             {
-                propsPaths.Add(candidate);
+                yield return candidate;
+                yield break;
             }
 
             string? parent = Path.GetDirectoryName(directory);
@@ -197,9 +202,6 @@ internal sealed class ArchitectureProjectFileParser : IArchitectureProjectFilePa
 
             directory = parent;
         }
-
-        propsPaths.Reverse();
-        return propsPaths;
     }
 
     private static bool IsUnderBuildOutputDirectory(string projectDirectory, string filePath)
@@ -210,6 +212,37 @@ internal sealed class ArchitectureProjectFileParser : IArchitectureProjectFilePa
         return segments.Any(segment =>
             string.Equals(segment, "bin", StringComparison.OrdinalIgnoreCase) ||
             string.Equals(segment, "obj", StringComparison.OrdinalIgnoreCase));
+    }
+
+    private static bool IsMatchInComment(string sourceText, int matchIndex)
+    {
+        int lineStart = sourceText.LastIndexOf('\n', matchIndex > 0 ? matchIndex - 1 : 0);
+        if (lineStart < 0)
+        {
+            lineStart = 0;
+        }
+        else
+        {
+            lineStart += 1;
+        }
+
+        ReadOnlySpan<char> line = sourceText.AsSpan(lineStart, matchIndex - lineStart).TrimStart();
+        if (line.StartsWith("//", StringComparison.Ordinal))
+        {
+            return true;
+        }
+
+        int blockStart = sourceText.LastIndexOf("/*", matchIndex, StringComparison.Ordinal);
+        if (blockStart >= 0)
+        {
+            int blockEnd = sourceText.IndexOf("*/", blockStart + 2, StringComparison.Ordinal);
+            if (blockEnd < 0 || blockEnd > matchIndex)
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private static void MergeScalarProperties(

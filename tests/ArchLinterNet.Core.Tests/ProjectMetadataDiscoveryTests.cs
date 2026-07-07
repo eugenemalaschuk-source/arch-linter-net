@@ -84,6 +84,129 @@ public sealed class ProjectMetadataDiscoveryTests
     }
 
     [Test]
+    public void NestedDirectoryBuildProps_WithoutExplicitImport_DoesNotMergeRootProperties()
+    {
+        File.WriteAllText(Path.Combine(_repoRoot, "Directory.Build.props"), """
+            <Project>
+              <PropertyGroup>
+                <IsPackable>true</IsPackable>
+              </PropertyGroup>
+            </Project>
+            """);
+
+        string srcDir = Path.Combine(_repoRoot, "src");
+        Directory.CreateDirectory(srcDir);
+        File.WriteAllText(Path.Combine(srcDir, "Directory.Build.props"), """
+            <Project>
+              <PropertyGroup>
+                <Nullable>enable</Nullable>
+              </PropertyGroup>
+            </Project>
+            """);
+
+        string projectDir = Path.Combine(srcDir, "MyLib");
+        Directory.CreateDirectory(projectDir);
+        File.WriteAllText(Path.Combine(projectDir, "MyLib.csproj"), """
+            <Project Sdk="Microsoft.NET.Sdk">
+              <PropertyGroup>
+                <TargetFramework>net10.0</TargetFramework>
+              </PropertyGroup>
+            </Project>
+            """);
+
+        var document = new ArchitectureContractDocument
+        {
+            Analysis = new ArchitectureAnalysisConfiguration
+            {
+                Projects = new List<string> { Path.Combine(projectDir, "MyLib.csproj") }
+            }
+        };
+
+        ArchitectureDiscoveredProject project = new ArchitectureProjectDiscoveryService()
+            .ResolveFromDocument(document, _repoRoot, resolveAssemblyOutputs: false)
+            .DiscoveredProjects
+            .Single();
+
+        Assert.That(project.Properties.TryGetValue("Nullable", out ArchitectureDiscoveredProjectProperty? nullable), Is.True);
+        Assert.That(nullable!.Value, Is.EqualTo("enable"));
+        Assert.That(project.Properties.TryGetValue("IsPackable", out ArchitectureDiscoveredProjectProperty? _), Is.False,
+            "Root Directory.Build.props must not merge when an intermediate Directory.Build.props exists without explicit Import.");
+    }
+
+    [Test]
+    public void NestedDirectoryBuildProps_ContractRequiringRootProperty_ReportsViolation()
+    {
+        File.WriteAllText(Path.Combine(_repoRoot, "Directory.Build.props"), """
+            <Project>
+              <PropertyGroup>
+                <IsPackable>true</IsPackable>
+              </PropertyGroup>
+            </Project>
+            """);
+
+        string srcDir = Path.Combine(_repoRoot, "src");
+        Directory.CreateDirectory(srcDir);
+        File.WriteAllText(Path.Combine(srcDir, "Directory.Build.props"), """
+            <Project>
+              <PropertyGroup>
+                <Nullable>enable</Nullable>
+              </PropertyGroup>
+            </Project>
+            """);
+
+        string projectDir = Path.Combine(srcDir, "MyLib");
+        Directory.CreateDirectory(projectDir);
+        string csprojPath = Path.Combine(projectDir, "MyLib.csproj");
+        File.WriteAllText(csprojPath, """
+            <Project Sdk="Microsoft.NET.Sdk">
+              <PropertyGroup>
+                <TargetFramework>net10.0</TargetFramework>
+              </PropertyGroup>
+            </Project>
+            """);
+
+        ArchitectureProjectMetadataContract contract = new()
+        {
+            Id = "packable",
+            Name = "packable",
+            Projects = new List<string> { "src/MyLib/MyLib.csproj" },
+            RequiredProperties = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+            {
+                ["IsPackable"] = "true"
+            }
+        };
+
+        var document = new ArchitectureContractDocument
+        {
+            Analysis = new ArchitectureAnalysisConfiguration
+            {
+                Projects = new List<string> { csprojPath }
+            },
+            Contracts = new ArchitectureContractGroups
+            {
+                StrictProjectMetadata = new List<ArchitectureProjectMetadataContract> { contract }
+            }
+        };
+
+        ProjectDiscoveryResult discovery = new ArchitectureProjectDiscoveryService()
+            .ResolveFromDocument(document, _repoRoot, resolveAssemblyOutputs: false);
+        ArchitectureAnalysisContext context = new(
+            _repoRoot,
+            new[] { typeof(ProjectMetadataDiscoveryTests).Assembly },
+            Array.Empty<string>(),
+            Array.Empty<string>(),
+            projectDiscovery: discovery);
+        ArchitectureContractRunner runner = new(context, document);
+
+        List<ArchitectureViolation> violations = runner.Session.CheckProjectMetadataContract(contract);
+
+        Assert.That(violations, Has.Count.EqualTo(1));
+        Assert.That(violations[0].ProjectMetadataKind, Is.EqualTo("required_property"));
+        Assert.That(violations[0].ProjectMetadataKey, Is.EqualTo("IsPackable"));
+        Assert.That(violations[0].ProjectMetadataActualValue, Is.EqualTo(null));
+    }
+
+    [Test]
     public void Discovery_ParsesSourceLevelInternalsVisibleToAndContractFlagsForbiddenFriendAssembly()
     {
         string projectDir = Path.Combine(_repoRoot, "src", "MyApp");
@@ -139,5 +262,122 @@ public sealed class ProjectMetadataDiscoveryTests
         Assert.That(violations[0].ProjectMetadataKind, Is.EqualTo("friend_assembly"));
         Assert.That(violations[0].ProjectMetadataActualValue, Is.EqualTo("MyApp.Tools"));
         Assert.That(violations[0].ProjectMetadataSourcePath, Is.EqualTo("src/MyApp/Properties/AssemblyInfo.cs"));
+    }
+
+    [Test]
+    public void Discovery_SourceLevelInternalsVisibleTo_DoesNotMatchCommentedDeclarations()
+    {
+        string projectDir = Path.Combine(_repoRoot, "src", "MyApp");
+        Directory.CreateDirectory(Path.Combine(projectDir, "Properties"));
+        File.WriteAllText(Path.Combine(projectDir, "Properties", "AssemblyInfo.cs"), """
+            using System.Runtime.CompilerServices;
+
+            // [assembly: InternalsVisibleTo("MyApp.Tools")]
+            [assembly: InternalsVisibleTo("MyApp.Tests")]
+            """);
+        File.WriteAllText(Path.Combine(projectDir, "MyApp.csproj"), """
+            <Project Sdk="Microsoft.NET.Sdk">
+              <PropertyGroup>
+                <TargetFramework>net10.0</TargetFramework>
+              </PropertyGroup>
+            </Project>
+            """);
+
+        var document = new ArchitectureContractDocument
+        {
+            Analysis = new ArchitectureAnalysisConfiguration
+            {
+                Projects = new List<string> { Path.Combine(projectDir, "MyApp.csproj") }
+            }
+        };
+
+        ArchitectureDiscoveredProject project = new ArchitectureProjectDiscoveryService()
+            .ResolveFromDocument(document, _repoRoot, resolveAssemblyOutputs: false)
+            .DiscoveredProjects
+            .Single();
+
+        Assert.That(project.FriendAssemblies.Select(entry => entry.AssemblyName),
+            Is.EqualTo(new[] { "MyApp.Tests" }));
+        Assert.That(project.FriendAssemblies.Any(entry => entry.AssemblyName == "MyApp.Tools"), Is.False,
+            "Commented InternalsVisibleTo declaration must not be treated as an actual friend assembly.");
+    }
+
+    [Test]
+    public void Discovery_SourceLevelInternalsVisibleTo_DoesNotMatchBlockCommentedDeclarations()
+    {
+        string projectDir = Path.Combine(_repoRoot, "src", "MyApp");
+        Directory.CreateDirectory(Path.Combine(projectDir, "Properties"));
+        File.WriteAllText(Path.Combine(projectDir, "Properties", "AssemblyInfo.cs"), """
+            using System.Runtime.CompilerServices;
+
+            /* [assembly: InternalsVisibleTo("MyApp.Tools")] */
+            [assembly: InternalsVisibleTo("MyApp.Tests")]
+            """);
+        File.WriteAllText(Path.Combine(projectDir, "MyApp.csproj"), """
+            <Project Sdk="Microsoft.NET.Sdk">
+              <PropertyGroup>
+                <TargetFramework>net10.0</TargetFramework>
+              </PropertyGroup>
+            </Project>
+            """);
+
+        var document = new ArchitectureContractDocument
+        {
+            Analysis = new ArchitectureAnalysisConfiguration
+            {
+                Projects = new List<string> { Path.Combine(projectDir, "MyApp.csproj") }
+            }
+        };
+
+        ArchitectureDiscoveredProject project = new ArchitectureProjectDiscoveryService()
+            .ResolveFromDocument(document, _repoRoot, resolveAssemblyOutputs: false)
+            .DiscoveredProjects
+            .Single();
+
+        Assert.That(project.FriendAssemblies.Select(entry => entry.AssemblyName),
+            Is.EqualTo(new[] { "MyApp.Tests" }));
+        Assert.That(project.FriendAssemblies.Any(entry => entry.AssemblyName == "MyApp.Tools"), Is.False,
+            "Block-commented InternalsVisibleTo declaration must not be treated as an actual friend assembly.");
+    }
+
+    [Test]
+    public void Discovery_SourceLevelInternalsVisibleTo_DoesNotMatchMultiLineBlockComment()
+    {
+        string projectDir = Path.Combine(_repoRoot, "src", "MyApp");
+        Directory.CreateDirectory(Path.Combine(projectDir, "Properties"));
+        File.WriteAllText(Path.Combine(projectDir, "Properties", "AssemblyInfo.cs"), """
+            using System.Runtime.CompilerServices;
+
+            /*
+               Previously we used:
+               [assembly: InternalsVisibleTo("MyApp.Tools")]
+            */
+            [assembly: InternalsVisibleTo("MyApp.Tests")]
+            """);
+        File.WriteAllText(Path.Combine(projectDir, "MyApp.csproj"), """
+            <Project Sdk="Microsoft.NET.Sdk">
+              <PropertyGroup>
+                <TargetFramework>net10.0</TargetFramework>
+              </PropertyGroup>
+            </Project>
+            """);
+
+        var document = new ArchitectureContractDocument
+        {
+            Analysis = new ArchitectureAnalysisConfiguration
+            {
+                Projects = new List<string> { Path.Combine(projectDir, "MyApp.csproj") }
+            }
+        };
+
+        ArchitectureDiscoveredProject project = new ArchitectureProjectDiscoveryService()
+            .ResolveFromDocument(document, _repoRoot, resolveAssemblyOutputs: false)
+            .DiscoveredProjects
+            .Single();
+
+        Assert.That(project.FriendAssemblies.Select(entry => entry.AssemblyName),
+            Is.EqualTo(new[] { "MyApp.Tests" }));
+        Assert.That(project.FriendAssemblies.Any(entry => entry.AssemblyName == "MyApp.Tools"), Is.False,
+            "Multi-line block-commented InternalsVisibleTo declaration must not be treated as an actual friend assembly.");
     }
 }
