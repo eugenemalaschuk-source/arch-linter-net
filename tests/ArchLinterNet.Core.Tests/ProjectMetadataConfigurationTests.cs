@@ -52,6 +52,43 @@ public sealed class ProjectMetadataConfigurationTests
     }
 
     [Test]
+    public void CheckConfiguration_WithContractSelection_DoesNotFlagUnselectedContractForMissingProject()
+    {
+        ArchitectureContractDocument document = new()
+        {
+            Version = 1,
+            Name = "Test",
+            Contracts = new ArchitectureContractGroups
+            {
+                StrictProjectMetadata = new List<ArchitectureProjectMetadataContract>
+                {
+                    new()
+                    {
+                        Id = "project-metadata",
+                        Name = "project-metadata",
+                        Projects = new List<string> { "src/MyApp/MyApp.csproj" },
+                        RequiredProperties = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+                        {
+                            ["Nullable"] = "enable"
+                        }
+                    }
+                }
+            }
+        };
+
+        ArchitectureContractRunner runner = new(
+            CreateContext(projectDiscovery: null),
+            document,
+            selectedContractIds: new HashSet<string> { "some-other-contract" });
+
+        List<ArchitectureViolation> violations = runner.CheckConfiguration();
+
+        Assert.That(violations.Any(v =>
+            v.ContractId == "project-metadata" && v.ForbiddenNamespace == "no project metadata discovered"), Is.False,
+            "CheckConfiguration must not report missing-project diagnostics for contracts that are not selected.");
+    }
+
+    [Test]
     public void PolicyLoader_ProjectMetadataContractWithoutProjects_Throws()
     {
         string policyPath = Path.Combine(Path.GetTempPath(), $"arch-linter-project-metadata-policy-{Guid.NewGuid():N}.yml");

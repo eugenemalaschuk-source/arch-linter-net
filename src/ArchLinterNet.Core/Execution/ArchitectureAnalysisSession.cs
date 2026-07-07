@@ -355,18 +355,33 @@ public sealed partial class ArchitectureAnalysisSession
 
             foreach (ArchitecturePackageDependencyContract c in Document.Contracts.StrictPackageDependency)
             {
+                if (!IsContractSelected(c.Id))
+                {
+                    continue;
+                }
+
                 AddPackageGroupNames(c.Forbidden);
                 packageContractSources.Add((c.Name, c.Id, c.Source));
             }
 
             foreach (ArchitecturePackageAllowOnlyContract c in Document.Contracts.StrictPackageAllowOnly)
             {
+                if (!IsContractSelected(c.Id))
+                {
+                    continue;
+                }
+
                 AddPackageGroupNames(c.Allowed);
                 packageContractSources.Add((c.Name, c.Id, c.Source));
             }
 
             foreach (ArchitectureProjectMetadataContract c in Document.Contracts.StrictProjectMetadata)
             {
+                if (!IsContractSelected(c.Id))
+                {
+                    continue;
+                }
+
                 projectMetadataContractProjects.AddRange(c.Projects.Select(project => (c.Name, c.Id, NormalizeProjectPath(project))));
             }
 
@@ -444,18 +459,33 @@ public sealed partial class ArchitectureAnalysisSession
 
             foreach (ArchitecturePackageDependencyContract c in Document.Contracts.AuditPackageDependency)
             {
+                if (!IsContractSelected(c.Id))
+                {
+                    continue;
+                }
+
                 AddPackageGroupNames(c.Forbidden);
                 packageContractSources.Add((c.Name, c.Id, c.Source));
             }
 
             foreach (ArchitecturePackageAllowOnlyContract c in Document.Contracts.AuditPackageAllowOnly)
             {
+                if (!IsContractSelected(c.Id))
+                {
+                    continue;
+                }
+
                 AddPackageGroupNames(c.Allowed);
                 packageContractSources.Add((c.Name, c.Id, c.Source));
             }
 
             foreach (ArchitectureProjectMetadataContract c in Document.Contracts.AuditProjectMetadata)
             {
+                if (!IsContractSelected(c.Id))
+                {
+                    continue;
+                }
+
                 projectMetadataContractProjects.AddRange(c.Projects.Select(project => (c.Name, c.Id, NormalizeProjectPath(project))));
             }
 
