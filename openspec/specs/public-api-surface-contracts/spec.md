@@ -50,7 +50,7 @@ The system SHALL enumerate, for each assembly in a `public_api_surface` contract
 - **THEN** the system SHALL normalize its signature using positional type-parameter naming and report it if not present in `declared_api`, consistently across runs
 
 ### Requirement: Normalize exported signatures deterministically
-The system SHALL normalize each exported type or member into a signature string of the form `<kind> <FullyQualifiedName>[(<parameter types>)][: <member type>]`, where `kind` identifies the declaration category (`class`, `interface`, `struct`, `enum`, `delegate`, `record`, `const`, `field`, `property`, `event`, `method`, or `ctor`), such that identical declarations always normalize to the same string.
+The system SHALL normalize each exported type or member into a signature string of the form `<kind> <FullyQualifiedName>[(<parameter types>)][: <member type>]`, where `kind` identifies the declaration category (`class`, `interface`, `struct`, `enum`, `delegate`, `const`, `field`, `property`, `event`, `method`, or `ctor` — records reflect as an ordinary `class`/`struct`, since reflection has no reliable, non-heuristic way to distinguish a record from a hand-written type), such that identical declarations always normalize to the same string.
 
 #### Scenario: Same declaration normalizes identically across runs
 - **WHEN** the same exported type or member is scanned in two separate validation runs without any source change

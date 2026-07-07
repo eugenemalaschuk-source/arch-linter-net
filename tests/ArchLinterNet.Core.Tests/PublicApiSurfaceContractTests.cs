@@ -558,4 +558,43 @@ public sealed class PublicApiSurfaceContractTests
         Assert.That(outcome.Violations.Any(v =>
             v.SourceType == "PublicApiSurfaceContractTestFixtures.AccidentalPublicType"), Is.True);
     }
+
+    [Test]
+    public void ValidateAudit_PublicApiSurfaceViolation_ReportsWithoutFailingStrictValidation()
+    {
+        string policyPath = WritePolicy($"""
+            version: 1
+            name: Test
+
+            analysis:
+              target_assemblies: [{AssemblyName}]
+
+            contracts:
+              audit_public_api_surface:
+                - id: no-accidental-types-audit
+                  name: no-accidental-types-audit
+                  assemblies: [{AssemblyName}]
+                  declared_api: []
+                  reason: Accidental public type should be discoverable in audit mode without blocking strict.
+            """);
+
+        ValidationOutcome strictOutcome = ArchitectureValidationService.Validate(new ValidationRequest
+        {
+            PolicyPath = policyPath,
+            Mode = "strict"
+        });
+
+        ValidationOutcome auditOutcome = ArchitectureValidationService.Validate(new ValidationRequest
+        {
+            PolicyPath = policyPath,
+            Mode = "audit"
+        });
+
+        Assert.That(strictOutcome.Passed, Is.True,
+            "An audit_public_api_surface contract must not be evaluated (and therefore cannot fail) under strict mode.");
+        Assert.That(strictOutcome.Violations, Is.Empty);
+
+        Assert.That(auditOutcome.Violations.Any(v =>
+            v.SourceType == "PublicApiSurfaceContractTestFixtures.AccidentalPublicType"), Is.True);
+    }
 }
