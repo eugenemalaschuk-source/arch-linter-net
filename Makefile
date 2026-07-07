@@ -55,4 +55,5 @@ fmt: fmt-csharp fmt-docs  ## Auto-format all code and documentation
 
 build: docs-build pack  ## Build documentation site and NuGet packages
 
-acceptance: lint test  ## Full project acceptance: lint + all tests
+acceptance:  ## Full project acceptance: lint + all tests (runs independent checks in parallel)
+	@$(MAKE) -j$(NPROC) lint test

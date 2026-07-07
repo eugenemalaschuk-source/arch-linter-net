@@ -1,6 +1,9 @@
 .PHONY: test clean-results test-coverage test-coverage-badge
 
-test:  ## Run all tests
+# Order-only: test and lint-architecture both build/test the Core.Tests project; running them
+# concurrently races on the same obj/bin output. lint-code-size, lint-docs, and lint-dotnet-format
+# don't touch dotnet build output and are safe to run alongside test.
+test: | lint-architecture  ## Run all tests
 	@dotnet test "$(SLNX)" --no-restore
 
 clean-results:  ## Remove test-results folder
