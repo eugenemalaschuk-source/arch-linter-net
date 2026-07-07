@@ -239,6 +239,50 @@ and is not a substitute for binary/package compatibility validation. See
 [Public API surface contracts](../contracts/public-api-surface.md) for full
 semantics.
 
+## Use Attribute Usage For Where A Marker Is Allowed To Appear
+
+When a specific attribute type (an ASP.NET routing attribute, a Unity
+serialization attribute, a custom marker) should only appear in — or must
+never appear in — a specific layer/namespace/project/assembly, use
+`strict_attribute_usage` / `audit_attribute_usage`:
+
+```yaml
+contracts:
+  strict_attribute_usage:
+    - id: aspnet-attributes-api-only
+      name: aspnet-attributes-must-stay-in-api-layer
+      attributes:
+        - Microsoft.AspNetCore.Mvc.ApiControllerAttribute
+        - Microsoft.AspNetCore.Mvc.RouteAttribute
+      allowed_only_in_layers: [api]
+      reason: ASP.NET attributes define API boundary concerns.
+```
+
+`attributes` matches an attribute type's fully-qualified name exactly;
+`attribute_prefixes` matches by prefix. A contract must declare at least one
+of these — a contract with neither fails policy loading with an actionable
+error. Every declared member (constructor, method, property, field, event) and
+the type itself are scanned **regardless of visibility** — unlike public API
+surface, a `private` field carrying `[SerializeField]` is still in scope.
+
+`allowed_only_in_layers`, `allowed_only_in_namespaces`,
+`allowed_only_in_projects`, and `allowed_only_in_assemblies` together form an
+allow-list (a `misplaced` violation if none match). `forbidden_in_layers`,
+`forbidden_in_namespaces`, `forbidden_in_projects`, and
+`forbidden_in_assemblies` together form a deny-list (a `forbidden` violation if
+any match). A contract must declare at least one allow-list or deny-list entry
+— declaring only an attribute selector with no location expectation fails
+policy loading with an actionable error. If a single matched attribute usage
+fails both checks, only one violation is reported, described as `forbidden`.
+
+This is static marker placement validation only — it does **not** validate
+attribute constructor arguments/named properties (no authorization/security
+correctness checking), and it does **not** detect the absence of a required
+marker (e.g. "every controller action must carry `[Authorize]` or
+`[AllowAnonymous]`"); required-marker enforcement is deferred to a documented
+follow-up. See [Attribute usage contracts](../contracts/attribute-usage.md)
+for full semantics.
+
 ## Use Transitive Depth For Indirect Coupling
 
 When a dependency should be blocked at any depth (direct or indirect), use

@@ -23,6 +23,7 @@ ArchLinterNet supports static architecture validation through documented YAML po
 - reusable layer templates;
 - type placement and naming governance contracts (name suffix/prefix, namespace, layer, base type, interface, and attribute selectors; layer/namespace/project/assembly residency; required/forbidden naming);
 - public API surface governance contracts (per-assembly declared exported public/protected/protected-internal type and member allowlist, undeclared-surface detection, optional forbid-public-constants-unless-declared lever);
+- attribute usage governance contracts (declared attribute/marker types restricted to, or forbidden from, declared layers/namespaces/projects/assemblies; exact and prefix attribute-name matching; type and member scanning regardless of visibility);
 - coverage contracts (`scope: namespace`, `scope: rule_input`, `scope: project`, `scope: assembly`);
 - strict and audit contract groups;
 - constrained namespace glob patterns;
@@ -77,6 +78,14 @@ Public API surface contracts only detect **undeclared** exported surface (a new 
 detect *removed* or *changed* declared signatures and are not a substitute for full .NET
 binary/package compatibility validation. They are reflection-based, like protected surface
 and type placement contracts, not project-aware Roslyn compilation.
+
+Attribute usage contracts are static marker **placement** validation only, not runtime
+authorization/security correctness validation — they cannot evaluate an attribute's
+constructor arguments or named properties (e.g. whether `[Authorize(Roles = "Admin")]`
+grants the right roles). They also do not detect the *absence* of a required marker (a
+"required attribute" rule such as "every controller action must carry `[Authorize]` or
+`[AllowAnonymous]`") — required-marker enforcement is deferred to a documented follow-up
+and is not implemented by this contract family.
 
 ## Important distinctions
 

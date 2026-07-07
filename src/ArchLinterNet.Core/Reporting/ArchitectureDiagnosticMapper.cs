@@ -62,6 +62,19 @@ public static class ArchitectureDiagnosticMapper
             };
         }
 
+        if (violation.MatchedAttribute != null)
+        {
+            return new AttributeUsageDiagnostic(
+                violation.ContractName, violation.ContractId, violation.SourceType,
+                violation.ForbiddenNamespace, violation.ForbiddenReferences)
+            {
+                MatchedAttribute = violation.MatchedAttribute,
+                AttributeUsageKind = violation.AttributeUsageKind,
+                ExpectedAttributeLocation = violation.ExpectedAttributeLocation,
+                ActualAttributeLocation = violation.ActualAttributeLocation
+            };
+        }
+
         return new DependencyDiagnostic(
             violation.ContractName, violation.ContractId, violation.SourceType,
             violation.ForbiddenNamespace, violation.ForbiddenReferences)

@@ -94,6 +94,8 @@ public sealed class ArchitectureContractCatalog
         AddGroup("audit_type_placement", "audit", "type_placement", groups.AuditTypePlacement);
         AddGroup("strict_public_api_surface", "strict", "public_api_surface", groups.StrictPublicApiSurface);
         AddGroup("audit_public_api_surface", "audit", "public_api_surface", groups.AuditPublicApiSurface);
+        AddGroup("strict_attribute_usage", "strict", "attribute_usage", groups.StrictAttributeUsage);
+        AddGroup("audit_attribute_usage", "audit", "attribute_usage", groups.AuditAttributeUsage);
         AddGroup("strict_coverage", "strict", "coverage", groups.StrictCoverage);
         AddGroup("audit_coverage", "audit", "coverage", groups.AuditCoverage);
 

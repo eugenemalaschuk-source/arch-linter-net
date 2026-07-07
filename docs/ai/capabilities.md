@@ -35,6 +35,7 @@ The policy file is usually `architecture/dependencies.arch.yml` and contains:
 | Layer template | `strict_layer_templates` | `audit_layer_templates` | Reusable layer order applied to multiple containers. |
 | Type placement | `strict_type_placement` | `audit_type_placement` | A selected architectural role resides in a declared layer/namespace/project/assembly and/or carries a declared naming suffix/prefix. |
 | Public API surface | `strict_public_api_surface` | `audit_public_api_surface` | An assembly's exported public/protected/protected-internal types and members match a declared signature allowlist. |
+| Attribute usage | `strict_attribute_usage` | `audit_attribute_usage` | A declared attribute/marker type appears only in (or never in) a declared layer/namespace/project/assembly. |
 | Coverage | `strict_coverage` | `audit_coverage` | First-party namespaces, discovered projects, and resolved assemblies are covered by a layer, template expansion, or explicit exclusion. |
 
 ## Matching semantics
@@ -52,6 +53,8 @@ Layer `namespace` also supports constrained glob patterns using `*` as a full na
 Type placement `types_matching` fields (`name_suffix`, `name_prefix`, `namespace`, `layer`, `base_type`, `implements_interface`, `has_attribute`) combine with AND semantics — every populated field must match. There is no regex or expression-language selector. `must_reside_in_projects` resolves to assembly-name matching via project discovery (see [Type placement contracts](../contracts/type-placement.md)); it is not physical `.csproj`-membership tracking.
 
 Public API surface `declared_api` entries are normalized signature strings (`<kind> <FullyQualifiedName>[(<param types>)][: <member type>]`); generic type/method parameters are rendered positionally (`!N`/`!!N`), not by their source-declared name. `forbid_public_constants_unless_declared` is an independent, stricter check layered on top of the general declaration — an exported `const` field can still be forbidden even when its full signature is already in `declared_api`, unless its fully-qualified name is also in `allowed_public_constants`. See [Public API surface contracts](../contracts/public-api-surface.md) for the full grammar.
+
+Attribute usage `attributes` entries match an attribute type's fully-qualified name exactly (ordinal); `attribute_prefixes` entries match by ordinal `StartsWith`. Every declared member is scanned regardless of visibility (unlike public API surface), because markers such as `[SerializeField]` and `[Authorize]` commonly decorate non-public members. `allowed_only_in_*` forms an allow-list (violation if the matched attribute's enclosing type satisfies none of it); `forbidden_in_*` forms a deny-list (violation if it satisfies any of it); a contract must declare at least one attribute selector and at least one location expectation. See [Attribute usage contracts](../contracts/attribute-usage.md) — this family does not implement required-marker ("must carry attribute X") checks; those are deferred to a documented follow-up.
 
 ## Strict versus audit
 
