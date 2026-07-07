@@ -248,6 +248,7 @@ public sealed class ArchitectureDiagnosticFormatter : IArchitectureDiagnosticFor
         ExternalDependencyDiagnostic d => d.SourceType,
         TypePlacementDiagnostic d => d.SourceType,
         PublicApiSurfaceDiagnostic d => d.SourceType,
+        AttributeUsageDiagnostic d => d.SourceType,
         _ => string.Empty
     };
 
@@ -258,6 +259,7 @@ public sealed class ArchitectureDiagnosticFormatter : IArchitectureDiagnosticFor
         ExternalDependencyDiagnostic d => d.ForbiddenNamespace,
         TypePlacementDiagnostic d => d.ForbiddenNamespace,
         PublicApiSurfaceDiagnostic d => d.ForbiddenNamespace,
+        AttributeUsageDiagnostic d => d.ForbiddenNamespace,
         _ => string.Empty
     };
 
@@ -268,6 +270,7 @@ public sealed class ArchitectureDiagnosticFormatter : IArchitectureDiagnosticFor
         ExternalDependencyDiagnostic d => d.ForbiddenReferences,
         TypePlacementDiagnostic d => d.ForbiddenReferences,
         PublicApiSurfaceDiagnostic d => d.ForbiddenReferences,
+        AttributeUsageDiagnostic d => d.ForbiddenReferences,
         _ => Array.Empty<string>()
     };
 
@@ -312,6 +315,18 @@ public sealed class ArchitectureDiagnosticFormatter : IArchitectureDiagnosticFor
                 : "undeclared_api_member";
             context += $" (reason: {reason}, assembly: {publicApiSurface.ApiAssemblyName}, " +
                        $"visibility: {publicApiSurface.ApiVisibility}, signature: {publicApiSurface.UndeclaredApiSignature})";
+        }
+
+        if (diagnostic is AttributeUsageDiagnostic attributeUsage)
+        {
+            context += $" (kind: {attributeUsage.AttributeUsageKind}, attribute: {attributeUsage.MatchedAttribute}" +
+                       (attributeUsage.ExpectedAttributeLocation != null
+                           ? $", expected_location: {attributeUsage.ExpectedAttributeLocation}"
+                           : string.Empty) +
+                       (attributeUsage.ActualAttributeLocation != null
+                           ? $", actual_location: {attributeUsage.ActualAttributeLocation}"
+                           : string.Empty) +
+                       ")";
         }
 
         string forbiddenNamespace = ForbiddenNamespaceOf(diagnostic);
@@ -452,6 +467,21 @@ public sealed class ArchitectureDiagnosticFormatter : IArchitectureDiagnosticFor
 
             if (publicApiSurface.ApiVisibility != null)
                 obj["visibility"] = publicApiSurface.ApiVisibility;
+        }
+
+        if (diagnostic is AttributeUsageDiagnostic attributeUsage)
+        {
+            if (attributeUsage.MatchedAttribute != null)
+                obj["matched_attribute"] = attributeUsage.MatchedAttribute;
+
+            if (attributeUsage.AttributeUsageKind != null)
+                obj["attribute_usage_kind"] = attributeUsage.AttributeUsageKind;
+
+            if (attributeUsage.ExpectedAttributeLocation != null)
+                obj["expected_attribute_location"] = attributeUsage.ExpectedAttributeLocation;
+
+            if (attributeUsage.ActualAttributeLocation != null)
+                obj["actual_attribute_location"] = attributeUsage.ActualAttributeLocation;
         }
 
         if (diagnostic is ConfigurationDiagnostic configuration)

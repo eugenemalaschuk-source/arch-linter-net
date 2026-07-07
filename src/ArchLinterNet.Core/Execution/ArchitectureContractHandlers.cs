@@ -203,6 +203,17 @@ internal sealed class PublicApiSurfaceContractHandler : IArchitectureContractHan
     }
 }
 
+internal sealed class AttributeUsageContractHandler : IArchitectureContractHandler
+{
+    public string Family => "attribute_usage";
+
+    public ArchitectureHandlerResult Execute(ArchitectureAnalysisSession session, IArchitectureContract contract)
+    {
+        return ArchitectureHandlerResult.FromViolations(
+            session.CheckAttributeUsageContract((ArchitectureAttributeUsageContract)contract));
+    }
+}
+
 internal sealed class AcyclicSiblingContractHandler : IArchitectureContractHandler
 {
     public string Family => "acyclic_sibling";

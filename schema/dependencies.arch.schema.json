@@ -385,6 +385,16 @@
           "items": { "$ref": "#/$defs/publicApiSurfaceContract" },
           "default": []
         },
+        "strict_attribute_usage": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/attributeUsageContract" },
+          "default": []
+        },
+        "audit_attribute_usage": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/attributeUsageContract" },
+          "default": []
+        },
         "strict_coverage": {
           "type": "array",
           "items": { "$ref": "#/$defs/coverageContract" },
@@ -750,6 +760,32 @@
               "description": "When true, every exported const field must have its fully-qualified name listed in allowed_public_constants, even if its full signature is present in declared_api."
             },
             "allowed_public_constants": { "$ref": "#/$defs/stringList" },
+            "ignored_violations": { "$ref": "#/$defs/ignoredViolations" },
+            "reason": { "type": "string" }
+          }
+        }
+      ]
+    },
+    "attributeUsageContract": {
+      "allOf": [
+        { "$ref": "#/$defs/baseContractFields" },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["name"],
+          "properties": {
+            "name": { "type": "string", "minLength": 1 },
+            "id": { "type": "string", "minLength": 1 },
+            "attributes": { "$ref": "#/$defs/stringList" },
+            "attribute_prefixes": { "$ref": "#/$defs/stringList" },
+            "allowed_only_in_layers": { "$ref": "#/$defs/stringList" },
+            "allowed_only_in_namespaces": { "$ref": "#/$defs/stringList" },
+            "allowed_only_in_projects": { "$ref": "#/$defs/stringList" },
+            "allowed_only_in_assemblies": { "$ref": "#/$defs/stringList" },
+            "forbidden_in_layers": { "$ref": "#/$defs/stringList" },
+            "forbidden_in_namespaces": { "$ref": "#/$defs/stringList" },
+            "forbidden_in_projects": { "$ref": "#/$defs/stringList" },
+            "forbidden_in_assemblies": { "$ref": "#/$defs/stringList" },
             "ignored_violations": { "$ref": "#/$defs/ignoredViolations" },
             "reason": { "type": "string" }
           }

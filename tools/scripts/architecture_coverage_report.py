@@ -158,6 +158,17 @@ def _classify_unit(scope: str, unit: str | None, coverage_index: dict[tuple[str,
     return ChangedUnit(scope=scope, unit=unit, state="unknown")
 
 
+def is_test_project(csproj_path: Path) -> bool:
+    """Test projects (e.g. ArchLinterNet.Core.Tests.csproj) are never part of the
+    linter's own `analysis.target_assemblies` and are therefore never scanned by the
+    architecture engine at all — their namespaces/projects/assemblies can never appear
+    in any coverage contract's covered/excluded/uncovered/stale buckets, regardless of
+    policy content. Classifying their changed files against coverage scopes would
+    report "unknown" on every single PR that touches a test file, which is repo-wide
+    tooling noise rather than an actual policy gap for the change at hand."""
+    return csproj_path.stem.endswith(".Tests")
+
+
 def classify_changed_file(
     file_path: str,
     repo_root: Path,
@@ -170,11 +181,15 @@ def classify_changed_file(
     uncovered project) — reporting only the first match would hide that gap, so every
     applicable unit is returned. A scope the policy doesn't configure at all is skipped
     entirely rather than synthesized as "unknown", since that would just restate "this
-    repository has no project-coverage contract" on every changed file."""
+    repository has no project-coverage contract" on every changed file. A file inside a
+    test project is skipped entirely for the same reason (see is_test_project)."""
     path_obj = Path(file_path)
-    namespace = detect_namespace(repo_root / path_obj) if "namespace" in scopes else None
-    csproj_path = find_enclosing_csproj(path_obj, repo_root) if ("project" in scopes or "assembly" in scopes) else None
+    csproj_path = find_enclosing_csproj(path_obj, repo_root)
 
+    if csproj_path is not None and is_test_project(csproj_path):
+        return []
+
+    namespace = detect_namespace(repo_root / path_obj) if "namespace" in scopes else None
     project_path = detect_project_path(csproj_path, repo_root) if csproj_path is not None and "project" in scopes else None
     assembly_name = detect_assembly_name(csproj_path) if csproj_path is not None and "assembly" in scopes else None
 

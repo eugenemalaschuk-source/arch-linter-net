@@ -24,4 +24,8 @@ public sealed record ArchitectureViolation(
     public bool? ForbiddenPublicConstant { get; init; }
     public string? ApiAssemblyName { get; init; }
     public string? ApiVisibility { get; init; }
+    public string? MatchedAttribute { get; init; }
+    public string? AttributeUsageKind { get; init; }
+    public string? ExpectedAttributeLocation { get; init; }
+    public string? ActualAttributeLocation { get; init; }
 }
