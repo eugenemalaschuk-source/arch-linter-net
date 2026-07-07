@@ -214,6 +214,28 @@ internal sealed class AttributeUsageContractHandler : IArchitectureContractHandl
     }
 }
 
+internal sealed class InheritanceContractHandler : IArchitectureContractHandler
+{
+    public string Family => "inheritance";
+
+    public ArchitectureHandlerResult Execute(ArchitectureAnalysisSession session, IArchitectureContract contract)
+    {
+        return ArchitectureHandlerResult.FromViolations(
+            session.CheckInheritanceContract((ArchitectureInheritanceContract)contract));
+    }
+}
+
+internal sealed class InterfaceImplementationContractHandler : IArchitectureContractHandler
+{
+    public string Family => "interface_implementation";
+
+    public ArchitectureHandlerResult Execute(ArchitectureAnalysisSession session, IArchitectureContract contract)
+    {
+        return ArchitectureHandlerResult.FromViolations(
+            session.CheckInterfaceImplementationContract((ArchitectureInterfaceImplementationContract)contract));
+    }
+}
+
 internal sealed class AcyclicSiblingContractHandler : IArchitectureContractHandler
 {
     public string Family => "acyclic_sibling";

@@ -28,4 +28,10 @@ public sealed record ArchitectureViolation(
     public string? AttributeUsageKind { get; init; }
     public string? ExpectedAttributeLocation { get; init; }
     public string? ActualAttributeLocation { get; init; }
+    public string? ForbiddenBaseType { get; init; }
+    public string? InheritanceSourceSurface { get; init; }
+    public string? MatchedInterface { get; init; }
+    public string? ImplementationKind { get; init; }
+    public string? ExpectedImplementationLocation { get; init; }
+    public string? ActualImplementationLocation { get; init; }
 }

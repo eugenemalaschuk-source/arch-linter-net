@@ -395,6 +395,26 @@
           "items": { "$ref": "#/$defs/attributeUsageContract" },
           "default": []
         },
+        "strict_inheritance": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/inheritanceContract" },
+          "default": []
+        },
+        "audit_inheritance": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/inheritanceContract" },
+          "default": []
+        },
+        "strict_interface_implementation": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/interfaceImplementationContract" },
+          "default": []
+        },
+        "audit_interface_implementation": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/interfaceImplementationContract" },
+          "default": []
+        },
         "strict_coverage": {
           "type": "array",
           "items": { "$ref": "#/$defs/coverageContract" },
@@ -778,6 +798,52 @@
             "id": { "type": "string", "minLength": 1 },
             "attributes": { "$ref": "#/$defs/stringList" },
             "attribute_prefixes": { "$ref": "#/$defs/stringList" },
+            "allowed_only_in_layers": { "$ref": "#/$defs/stringList" },
+            "allowed_only_in_namespaces": { "$ref": "#/$defs/stringList" },
+            "allowed_only_in_projects": { "$ref": "#/$defs/stringList" },
+            "allowed_only_in_assemblies": { "$ref": "#/$defs/stringList" },
+            "forbidden_in_layers": { "$ref": "#/$defs/stringList" },
+            "forbidden_in_namespaces": { "$ref": "#/$defs/stringList" },
+            "forbidden_in_projects": { "$ref": "#/$defs/stringList" },
+            "forbidden_in_assemblies": { "$ref": "#/$defs/stringList" },
+            "ignored_violations": { "$ref": "#/$defs/ignoredViolations" },
+            "reason": { "type": "string" }
+          }
+        }
+      ]
+    },
+    "inheritanceContract": {
+      "allOf": [
+        { "$ref": "#/$defs/baseContractFields" },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["name"],
+          "properties": {
+            "name": { "type": "string", "minLength": 1 },
+            "id": { "type": "string", "minLength": 1 },
+            "source_layers": { "$ref": "#/$defs/stringList" },
+            "source_namespaces": { "$ref": "#/$defs/stringList" },
+            "forbidden_base_types": { "$ref": "#/$defs/stringList" },
+            "forbidden_base_type_prefixes": { "$ref": "#/$defs/stringList" },
+            "ignored_violations": { "$ref": "#/$defs/ignoredViolations" },
+            "reason": { "type": "string" }
+          }
+        }
+      ]
+    },
+    "interfaceImplementationContract": {
+      "allOf": [
+        { "$ref": "#/$defs/baseContractFields" },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["name"],
+          "properties": {
+            "name": { "type": "string", "minLength": 1 },
+            "id": { "type": "string", "minLength": 1 },
+            "interfaces": { "$ref": "#/$defs/stringList" },
+            "interface_prefixes": { "$ref": "#/$defs/stringList" },
             "allowed_only_in_layers": { "$ref": "#/$defs/stringList" },
             "allowed_only_in_namespaces": { "$ref": "#/$defs/stringList" },
             "allowed_only_in_projects": { "$ref": "#/$defs/stringList" },
