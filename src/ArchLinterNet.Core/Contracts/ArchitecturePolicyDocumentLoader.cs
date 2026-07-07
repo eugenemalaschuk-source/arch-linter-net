@@ -55,6 +55,7 @@ public sealed class ArchitecturePolicyDocumentLoader : IArchitecturePolicyDocume
         ValidatePackageDependencyContracts(document);
         ValidatePackageAllowOnlyContracts(document);
         ValidateTypePlacementContracts(document);
+        ValidatePublicApiSurfaceContracts(document);
 
         return document;
     }
@@ -120,6 +121,8 @@ public sealed class ArchitecturePolicyDocumentLoader : IArchitecturePolicyDocume
             document.Contracts.AuditAcyclicSiblings,
             document.Contracts.StrictTypePlacement,
             document.Contracts.AuditTypePlacement,
+            document.Contracts.StrictPublicApiSurface,
+            document.Contracts.AuditPublicApiSurface,
             document.Contracts.StrictCoverage,
             document.Contracts.AuditCoverage,
         ];
@@ -671,6 +674,20 @@ public sealed class ArchitecturePolicyDocumentLoader : IArchitecturePolicyDocume
                     "(must_reside_in_layers/must_reside_in_namespaces/must_reside_in_projects/must_reside_in_assemblies) " +
                     "or naming (required_name_suffix/required_name_prefix/forbidden_name_suffix/forbidden_name_prefix) " +
                     "expectation. Declare at least one, or the rule can never produce a violation.");
+            }
+        }
+    }
+
+    private static void ValidatePublicApiSurfaceContracts(ArchitectureContractDocument document)
+    {
+        foreach (ArchitecturePublicApiSurfaceContract contract in document.Contracts.StrictPublicApiSurface
+                     .Concat(document.Contracts.AuditPublicApiSurface))
+        {
+            if (contract.Assemblies.Count == 0)
+            {
+                throw new InvalidOperationException(
+                    $"Public API surface contract '{contract.Name}' declares no 'assemblies'. " +
+                    "A contract with nothing to scan is a configuration error; declare at least one target assembly.");
             }
         }
     }

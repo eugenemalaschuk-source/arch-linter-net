@@ -247,6 +247,7 @@ public sealed class ArchitectureDiagnosticFormatter : IArchitectureDiagnosticFor
         ConfigurationDiagnostic d => d.SourceType,
         ExternalDependencyDiagnostic d => d.SourceType,
         TypePlacementDiagnostic d => d.SourceType,
+        PublicApiSurfaceDiagnostic d => d.SourceType,
         _ => string.Empty
     };
 
@@ -256,6 +257,7 @@ public sealed class ArchitectureDiagnosticFormatter : IArchitectureDiagnosticFor
         ConfigurationDiagnostic d => d.ForbiddenNamespace,
         ExternalDependencyDiagnostic d => d.ForbiddenNamespace,
         TypePlacementDiagnostic d => d.ForbiddenNamespace,
+        PublicApiSurfaceDiagnostic d => d.ForbiddenNamespace,
         _ => string.Empty
     };
 
@@ -265,6 +267,7 @@ public sealed class ArchitectureDiagnosticFormatter : IArchitectureDiagnosticFor
         ConfigurationDiagnostic d => d.ForbiddenReferences,
         ExternalDependencyDiagnostic d => d.ForbiddenReferences,
         TypePlacementDiagnostic d => d.ForbiddenReferences,
+        PublicApiSurfaceDiagnostic d => d.ForbiddenReferences,
         _ => Array.Empty<string>()
     };
 
@@ -300,6 +303,14 @@ public sealed class ArchitectureDiagnosticFormatter : IArchitectureDiagnosticFor
             }
 
             context += $" ({string.Join("; ", parts)})";
+        }
+
+        if (diagnostic is PublicApiSurfaceDiagnostic publicApiSurface)
+        {
+            string reason = publicApiSurface.ForbiddenPublicConstant == true
+                ? "forbidden_public_constant"
+                : "undeclared_api_member";
+            context += $" (reason: {reason}, signature: {publicApiSurface.UndeclaredApiSignature})";
         }
 
         string forbiddenNamespace = ForbiddenNamespaceOf(diagnostic);
@@ -425,6 +436,15 @@ public sealed class ArchitectureDiagnosticFormatter : IArchitectureDiagnosticFor
 
             if (typePlacement.ActualTypeName != null)
                 obj["actual_type_name"] = typePlacement.ActualTypeName;
+        }
+
+        if (diagnostic is PublicApiSurfaceDiagnostic publicApiSurface)
+        {
+            if (publicApiSurface.UndeclaredApiSignature != null)
+                obj["undeclared_api_signature"] = publicApiSurface.UndeclaredApiSignature;
+
+            if (publicApiSurface.ForbiddenPublicConstant != null)
+                obj["forbidden_public_constant"] = publicApiSurface.ForbiddenPublicConstant;
         }
 
         if (diagnostic is ConfigurationDiagnostic configuration)

@@ -192,6 +192,17 @@ internal sealed class TypePlacementContractHandler : IArchitectureContractHandle
     }
 }
 
+internal sealed class PublicApiSurfaceContractHandler : IArchitectureContractHandler
+{
+    public string Family => "public_api_surface";
+
+    public ArchitectureHandlerResult Execute(ArchitectureAnalysisSession session, IArchitectureContract contract)
+    {
+        return ArchitectureHandlerResult.FromViolations(
+            session.CheckPublicApiSurfaceContract((ArchitecturePublicApiSurfaceContract)contract));
+    }
+}
+
 internal sealed class AcyclicSiblingContractHandler : IArchitectureContractHandler
 {
     public string Family => "acyclic_sibling";
