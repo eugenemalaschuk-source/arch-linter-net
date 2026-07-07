@@ -1,7 +1,8 @@
 # interface-implementation-contracts Specification
 
 ## Purpose
-TBD - created by archiving change inheritance-implementation-contracts. Update Purpose after archive.
+Let policies restrict where implementations of selected interfaces (application ports, infrastructure abstractions, etc.) may reside — confined to declared layers/namespaces/projects/assemblies via an allow-list, or excluded from them via a deny-list — and report deterministic misplaced/forbidden diagnostics identifying the implementing type, the matched interface, and the expected boundary. This is a static type-relationship check over compiled metadata, not runtime dependency-injection resolution, and does not treat an interface extending a selected interface as an implementation.
+
 ## Requirements
 ### Requirement: Declare interface implementation contracts
 The system SHALL allow `contracts.strict_interface_implementation` and `contracts.audit_interface_implementation` entries, each declaring at least one interface selector (`interfaces` and/or `interface_prefixes`, non-empty) and at least one location expectation (a non-empty `allowed_only_in_layers`/`allowed_only_in_namespaces`/`allowed_only_in_projects`/`allowed_only_in_assemblies` allow-list, or a non-empty `forbidden_in_layers`/`forbidden_in_namespaces`/`forbidden_in_projects`/`forbidden_in_assemblies` deny-list).

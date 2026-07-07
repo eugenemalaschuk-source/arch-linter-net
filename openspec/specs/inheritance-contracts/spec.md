@@ -1,7 +1,8 @@
 # inheritance-contracts Specification
 
 ## Purpose
-TBD - created by archiving change inheritance-implementation-contracts. Update Purpose after archive.
+Let policies forbid types in declared source layers/namespaces from inheriting — directly or transitively through the compiled base-class chain — from selected base types (framework base classes such as `UnityEngine.MonoBehaviour` or `Microsoft.EntityFrameworkCore.DbContext`, or first-party base types that should stay in boundary layers), and report deterministic violations identifying the type, the matched base type, and the expected source surface. This is a static type-relationship check, not runtime behavior validation, and does not match interface implementations (see `interface-implementation-contracts`).
+
 ## Requirements
 ### Requirement: Declare inheritance contracts
 The system SHALL allow `contracts.strict_inheritance` and `contracts.audit_inheritance` entries, each declaring at least one source surface selector (a non-empty `source_layers` and/or `source_namespaces`) and at least one base type selector (a non-empty `forbidden_base_types` and/or `forbidden_base_type_prefixes`).
