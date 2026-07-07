@@ -37,6 +37,8 @@ public sealed class ArchitectureBaselineContractGroups
     [YamlMember(Alias = "audit_protected")] public List<ArchitectureBaselineContractEntry> AuditProtected { get; set; } = new();
     [YamlMember(Alias = "strict_external")] public List<ArchitectureBaselineContractEntry> StrictExternal { get; set; } = new();
     [YamlMember(Alias = "audit_external")] public List<ArchitectureBaselineContractEntry> AuditExternal { get; set; } = new();
+    [YamlMember(Alias = "strict_project_metadata")] public List<ArchitectureBaselineContractEntry> StrictProjectMetadata { get; set; } = new();
+    [YamlMember(Alias = "audit_project_metadata")] public List<ArchitectureBaselineContractEntry> AuditProjectMetadata { get; set; } = new();
     [YamlMember(Alias = "strict_coverage")] public List<ArchitectureBaselineContractEntry> StrictCoverage { get; set; } = new();
     [YamlMember(Alias = "audit_coverage")] public List<ArchitectureBaselineContractEntry> AuditCoverage { get; set; } = new();
 }

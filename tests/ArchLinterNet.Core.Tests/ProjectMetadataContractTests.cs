@@ -151,4 +151,50 @@ public sealed class ProjectMetadataContractTests
         Assert.That(strictResult.Violations, Is.Empty);
         Assert.That(auditResult.Violations, Has.Count.EqualTo(1));
     }
+
+    [Test]
+    public void CheckProjectMetadataContract_IgnoredViolationsSupportBaselineStyleSuppression()
+    {
+        const string ProjectPath = "src/MyApp/MyApp.csproj";
+        ArchitectureProjectMetadataContract contract = new()
+        {
+            Name = "project-metadata",
+            Id = "project-metadata",
+            Projects = new List<string> { ProjectPath },
+            RequiredProperties = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+            {
+                ["IsPackable"] = "true"
+            },
+            AllowedFriendAssemblies = new List<string> { "MyApp.Tests" },
+            IgnoredViolations = new List<ArchitectureIgnoredViolation>
+            {
+                new()
+                {
+                    SourceType = ProjectPath,
+                    ForbiddenReference = "friend_assembly:MyApp.Tools",
+                    Reason = "known debt"
+                }
+            }
+        };
+
+        ArchitectureContractRunner runner = new(
+            CreateContext(Project(
+                ProjectPath,
+                ("IsPackable", "false", ProjectPath))),
+            CreateDocument(contract));
+
+        List<ArchitectureViolation> violations = runner.Session.CheckProjectMetadataContract(contract);
+
+        Assert.That(violations.Select(v => v.ProjectMetadataKind), Is.EquivalentTo(new[]
+        {
+            "required_property"
+        }));
+        Assert.That(violations.Any(v => v.ProjectMetadataActualValue == "MyApp.Tools"), Is.False);
+        Assert.That(runner.BaselineCandidates.Any(candidate =>
+            candidate.ContractGroup == "strict_project_metadata"
+            && candidate.ContractId == "project-metadata"
+            && candidate.SourceType == ProjectPath
+            && candidate.ForbiddenReference == "required_property:IsPackable=false"), Is.True);
+        Assert.That(runner.UnmatchedIgnoredViolations, Is.Empty);
+    }
 }

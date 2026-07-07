@@ -65,6 +65,11 @@ public sealed class ArchitectureAssemblyResolutionService : IArchitectureAssembl
                 $"Architecture YAML must define analysis.target_assemblies. Project discovery did not resolve any assemblies: {details}");
         }
 
+        if (!resolveAssemblyOutputs && document.Analysis.TargetAssemblies.Count == 0)
+        {
+            return new ResolutionResult(Array.Empty<Assembly>(), Array.Empty<string>(), Array.Empty<string>());
+        }
+
         return document.Analysis.TargetAssemblies.Count == 0 && projectCoverageCanReportUnresolvedProjects
             ? new ResolutionResult(Array.Empty<Assembly>(), Array.Empty<string>(), Array.Empty<string>())
             : ResolveFromDocument(document, repositoryRoot, _fileSystem, _environment, _assemblyLoader);

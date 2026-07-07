@@ -686,6 +686,9 @@ public sealed class ArchitectureProjectMetadataContract : IArchitectureContract
     [YamlMember(Alias = "forbidden_project_references")]
     public List<string> ForbiddenProjectReferences { get; set; } = new();
 
+    [YamlMember(Alias = "ignored_violations")]
+    public List<ArchitectureIgnoredViolation> IgnoredViolations { get; set; } = new();
+
     [YamlMember(Alias = "reason")] public string Reason { get; set; } = string.Empty;
 }
 

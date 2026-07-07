@@ -62,6 +62,17 @@ The system SHALL allow `contracts.audit_project_metadata` entries to report meta
 - **WHEN** a policy contains only an `audit_project_metadata` contract that finds a metadata mismatch
 - **THEN** audit validation SHALL report the mismatch and strict validation SHALL still pass
 
+### Requirement: Support ignored violations for project metadata contracts
+The system SHALL allow `contracts.strict_project_metadata` and `contracts.audit_project_metadata` entries to declare `ignored_violations`, participate in baseline generation/loading, and report unmatched entries through the standard unmatched-ignore pipeline.
+
+#### Scenario: Project metadata ignore suppresses a known friend assembly violation
+- **WHEN** a project metadata contract declares `ignored_violations` for project `src/MyApp/MyApp.csproj` with `forbidden_reference: friend_assembly:MyApp.Tools`
+- **THEN** the matching friend-assembly violation SHALL be suppressed for that contract
+
+#### Scenario: Project metadata baseline entry merges into a contract
+- **WHEN** a baseline document contains a `strict_project_metadata` or `audit_project_metadata` entry whose `id` matches a policy contract
+- **THEN** that entry's `ignored_violations` SHALL merge into the contract before validation
+
 ### Requirement: Emit deterministic project metadata diagnostics
 Project metadata violations SHALL identify the contract name, optional contract ID, discovered project, violation kind, evidence subject, expected rule, actual value when known, and source file path when available, ordered deterministically by project path and then evidence subject.
 
@@ -72,4 +83,3 @@ Project metadata violations SHALL identify the contract name, optional contract 
 #### Scenario: Friend assembly diagnostic includes assembly name
 - **WHEN** an undeclared `InternalsVisibleTo` value is reported
 - **THEN** the diagnostic SHALL include the project path and the friend assembly name as deterministic evidence
-

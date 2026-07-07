@@ -21,6 +21,7 @@ contracts:
         <PropertyName>: <value>
       allowed_friend_assemblies: []        # Optional — explicit allowlist for InternalsVisibleTo
       forbidden_project_references: []     # Optional — project path globs matched against ProjectReference targets
+      ignored_violations: []               # Optional — baseline known metadata violations
       reason: <string>                     # Recommended
 ```
 
@@ -80,6 +81,8 @@ analysis:
 ```
 
 Without discovery, the contract cannot evaluate and `CheckConfiguration` reports `no project metadata discovered`.
+
+Metadata-only policies may omit `analysis.target_assemblies`; project discovery still parses the `.csproj` metadata without requiring a resolvable DLL output.
 
 ## Current limits
 

@@ -150,11 +150,15 @@
     "analysis": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["target_assemblies"],
+      "anyOf": [
+        { "required": ["target_assemblies"] },
+        { "required": ["solution"] },
+        { "required": ["projects"] }
+      ],
       "properties": {
         "target_assemblies": {
           "type": "array",
-          "description": "Assembly names to load and scan.",
+          "description": "Assembly names to load and scan. Optional when a metadata-only or discovery-driven policy uses analysis.solution or analysis.projects instead.",
           "items": { "type": "string", "minLength": 1 }
         },
         "assembly_search_paths": {
@@ -716,6 +720,7 @@
             "forbidden_properties": { "$ref": "#/$defs/stringMap" },
             "allowed_friend_assemblies": { "$ref": "#/$defs/nonBlankStringList" },
             "forbidden_project_references": { "$ref": "#/$defs/nonBlankStringList" },
+            "ignored_violations": { "$ref": "#/$defs/ignoredViolations" },
             "reason": { "type": "string" }
           }
         }

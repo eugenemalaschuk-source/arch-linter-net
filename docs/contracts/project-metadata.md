@@ -6,7 +6,7 @@ Two families are covered on this page:
 
 - **Project metadata** (`strict_project_metadata`/`audit_project_metadata`) — selected discovered projects must satisfy required property values, must not carry forbidden property values, may only expose explicitly allowed friend assemblies, and must not declare forbidden project references.
 
-These contracts operate on project discovery output, so they require `analysis.solution` or `analysis.projects` to discover and parse matching `.csproj` files.
+These contracts operate on project discovery output, so they require `analysis.solution` or `analysis.projects` to discover and parse matching `.csproj` files. Metadata-only policies may omit `analysis.target_assemblies`; the runner still parses project metadata even when no build output is available.
 
 ## Example
 
@@ -41,6 +41,8 @@ Project metadata contracts match discovered projects by their repo-relative `.cs
 **Allowed friend assemblies**: when `allowed_friend_assemblies` is non-empty, every discovered `InternalsVisibleTo` declaration must appear in that allowlist. Omitted allowlists mean "do not check friend assemblies."
 
 **Forbidden project references**: every pattern in `forbidden_project_references` is matched against the discovered project's repo-relative referenced `.csproj` paths using the same project-path glob semantics as `analysis.project_include` / `analysis.project_exclude`.
+
+**Ignored violations / baselines**: `ignored_violations` uses `source_type` = the discovered project path and a deterministic `forbidden_reference` such as `required_property:IsPackable=false`, `forbidden_property:IsTestProject=true`, `friend_assembly:MyApp.Tools`, or `project_reference:tests/MyApp.Tests/MyApp.Tests.csproj`.
 
 Violations identify the project path, the metadata kind (`required_property`, `forbidden_property`, `friend_assembly`, or `project_reference`), the relevant key/value or matched path, and the source file path when discovery can determine it.
 

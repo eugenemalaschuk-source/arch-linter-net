@@ -105,6 +105,10 @@ The system SHALL use discovery-derived assembly names and search paths only when
 - **WHEN** `analysis.target_assemblies` is empty and `analysis.solution` resolves 2 projects with existing build outputs
 - **THEN** the effective target assembly names passed to assembly resolution are the 2 discovered assembly names, and the effective search paths include each project's selected output directory
 
+#### Scenario: Metadata-only discovery does not require build outputs
+- **WHEN** `analysis.target_assemblies` is empty, the active validation run selects only `project_metadata` contracts, and `analysis.projects` or `analysis.solution` discovers a project with no resolvable DLL output
+- **THEN** discovery SHALL still expose that project's parsed metadata and source root, and validation SHALL NOT fail solely because the build output is missing
+
 #### Scenario: Discovery seeds empty source_roots
 - **WHEN** `analysis.source_roots` is empty and `analysis.projects` lists project files in `src/Core` and `src/Cli`
 - **THEN** the effective source roots used by source/method-body scanning are `src/Core` and `src/Cli`
@@ -208,4 +212,3 @@ The system SHALL parse `ProjectReference` items from each discovered or explicit
 #### Scenario: Metadata available even when build output is missing
 - **WHEN** a discovered project has no resolvable build output and discovery reports a build-output diagnostic
 - **THEN** the discovered project SHALL still expose its parsed properties, friend assemblies, and project references
-

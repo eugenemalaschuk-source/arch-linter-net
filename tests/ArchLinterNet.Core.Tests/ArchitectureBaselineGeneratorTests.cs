@@ -40,6 +40,7 @@ public sealed class ArchitectureBaselineGeneratorTests
         Assert.That(baseline.Baseline.StrictExternal, Is.Empty);
         Assert.That(baseline.Baseline.StrictIndependence, Is.Empty);
         Assert.That(baseline.Baseline.StrictAllowOnly, Is.Empty);
+        Assert.That(baseline.Baseline.StrictProjectMetadata, Is.Empty);
     }
 
     [Test]
@@ -232,7 +233,8 @@ public sealed class ArchitectureBaselineGeneratorTests
             new("strict_independence", "indep-rule", "Src.Indep", "Ref.Indep"),
             new("strict_protected", "prot-rule", "Src.Prot", "Ref.Prot"),
             new("strict_external", "ext-rule", "Src.Ext", "Ref.Ext"),
-            new("strict_allow_only", "allow-rule", "Src.Allow", "Ref.Allow")
+            new("strict_allow_only", "allow-rule", "Src.Allow", "Ref.Allow"),
+            new("strict_project_metadata", "project-rule", "src/MyApp/MyApp.csproj", "friend_assembly:MyApp.Tools")
         };
 
         var baseline = _generator.Generate(policy, candidates);
@@ -246,6 +248,7 @@ public sealed class ArchitectureBaselineGeneratorTests
         Assert.That(baseline.Baseline.StrictProtected, Has.Count.EqualTo(1));
         Assert.That(baseline.Baseline.StrictExternal, Has.Count.EqualTo(1));
         Assert.That(baseline.Baseline.StrictAllowOnly, Has.Count.EqualTo(1));
+        Assert.That(baseline.Baseline.StrictProjectMetadata, Has.Count.EqualTo(1));
     }
 
     [Test]

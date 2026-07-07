@@ -1,6 +1,7 @@
 using ArchLinterNet.Core.Contracts;
 using ArchLinterNet.Core.Discovery;
 using ArchLinterNet.Core.Model;
+using ArchLinterNet.Core.Resolution;
 
 namespace ArchLinterNet.Core.Execution;
 
@@ -13,6 +14,7 @@ public sealed partial class ArchitectureAnalysisSession
             return new List<ArchitectureViolation>();
         }
 
+        ArchitectureContractExecutionContext executionContext = CreateExecutionContext(contract, contract.IgnoredViolations);
         Dictionary<string, ArchitectureDiscoveredProject> projectsByPath = BuildProjectMetadataLookup();
         List<ArchitectureViolation> violations = new();
 
@@ -26,11 +28,13 @@ public sealed partial class ArchitectureAnalysisSession
                 continue;
             }
 
-            violations.AddRange(CheckRequiredProperties(contract, project));
-            violations.AddRange(CheckForbiddenProperties(contract, project));
-            violations.AddRange(CheckFriendAssemblies(contract, project));
-            violations.AddRange(CheckForbiddenProjectReferences(contract, project));
+            violations.AddRange(CheckRequiredProperties(executionContext, contract, project));
+            violations.AddRange(CheckForbiddenProperties(executionContext, contract, project));
+            violations.AddRange(CheckFriendAssemblies(executionContext, contract, project));
+            violations.AddRange(CheckForbiddenProjectReferences(executionContext, contract, project));
         }
+
+        executionContext.CollectUnmatchedIgnores(_unmatchedIgnoredViolations);
 
         return violations
             .OrderBy(v => v.SourceType, StringComparer.OrdinalIgnoreCase)
@@ -41,6 +45,7 @@ public sealed partial class ArchitectureAnalysisSession
     }
 
     private static IEnumerable<ArchitectureViolation> CheckRequiredProperties(
+        ArchitectureContractExecutionContext executionContext,
         ArchitectureProjectMetadataContract contract,
         ArchitectureDiscoveredProject project)
     {
@@ -51,6 +56,12 @@ public sealed partial class ArchitectureAnalysisSession
             string? actualValue = found ? property!.Value : null;
 
             if (actualValue != null && string.Equals(actualValue, requirement.Value, StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            string forbiddenReference = BuildRequiredPropertyReference(requirement.Key, actualValue);
+            if (executionContext.IsIgnored(project.Path, forbiddenReference))
             {
                 continue;
             }
@@ -75,6 +86,7 @@ public sealed partial class ArchitectureAnalysisSession
     }
 
     private static IEnumerable<ArchitectureViolation> CheckForbiddenProperties(
+        ArchitectureContractExecutionContext executionContext,
         ArchitectureProjectMetadataContract contract,
         ArchitectureDiscoveredProject project)
     {
@@ -83,6 +95,12 @@ public sealed partial class ArchitectureAnalysisSession
         {
             if (!project.Properties.TryGetValue(rule.Key, out ArchitectureDiscoveredProjectProperty? property)
                 || !string.Equals(property.Value, rule.Value, StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            string forbiddenReference = BuildForbiddenPropertyReference(rule.Key, property.Value);
+            if (executionContext.IsIgnored(project.Path, forbiddenReference))
             {
                 continue;
             }
@@ -107,6 +125,7 @@ public sealed partial class ArchitectureAnalysisSession
     }
 
     private static IEnumerable<ArchitectureViolation> CheckFriendAssemblies(
+        ArchitectureContractExecutionContext executionContext,
         ArchitectureProjectMetadataContract contract,
         ArchitectureDiscoveredProject project)
     {
@@ -123,6 +142,12 @@ public sealed partial class ArchitectureAnalysisSession
                      .OrderBy(entry => entry.AssemblyName, StringComparer.Ordinal))
         {
             if (allowed.Contains(friendAssembly.AssemblyName))
+            {
+                continue;
+            }
+
+            string forbiddenReference = BuildFriendAssemblyReference(friendAssembly.AssemblyName);
+            if (executionContext.IsIgnored(project.Path, forbiddenReference))
             {
                 continue;
             }
@@ -146,6 +171,7 @@ public sealed partial class ArchitectureAnalysisSession
     }
 
     private static IEnumerable<ArchitectureViolation> CheckForbiddenProjectReferences(
+        ArchitectureContractExecutionContext executionContext,
         ArchitectureProjectMetadataContract contract,
         ArchitectureDiscoveredProject project)
     {
@@ -158,6 +184,12 @@ public sealed partial class ArchitectureAnalysisSession
                 .FirstOrDefault(pattern => ProjectPathGlob.IsMatch(projectReference.Path, pattern));
 
             if (matchedPattern == null)
+            {
+                continue;
+            }
+
+            string forbiddenReference = BuildProjectReferenceReference(projectReference.Path);
+            if (executionContext.IsIgnored(project.Path, forbiddenReference))
             {
                 continue;
             }
@@ -179,6 +211,26 @@ public sealed partial class ArchitectureAnalysisSession
                 ProjectMetadataSourcePath = projectReference.SourcePath
             };
         }
+    }
+
+    private static string BuildRequiredPropertyReference(string key, string? actualValue)
+    {
+        return $"required_property:{key}={actualValue ?? "<missing>"}";
+    }
+
+    private static string BuildForbiddenPropertyReference(string key, string actualValue)
+    {
+        return $"forbidden_property:{key}={actualValue}";
+    }
+
+    private static string BuildFriendAssemblyReference(string assemblyName)
+    {
+        return $"friend_assembly:{assemblyName}";
+    }
+
+    private static string BuildProjectReferenceReference(string projectPath)
+    {
+        return $"project_reference:{projectPath}";
     }
 
     private Dictionary<string, ArchitectureDiscoveredProject> BuildProjectMetadataLookup()
