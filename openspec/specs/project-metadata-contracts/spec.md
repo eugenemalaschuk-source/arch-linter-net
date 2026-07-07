@@ -44,6 +44,10 @@ The system SHALL allow a project metadata contract to declare `allowed_friend_as
 - **WHEN** a project declares `InternalsVisibleTo` for `ArchLinterNet.Cli` and the contract's `allowed_friend_assemblies` omits `ArchLinterNet.Cli`
 - **THEN** strict validation SHALL report a violation identifying the project and forbidden friend assembly name
 
+#### Scenario: Source-level friend assembly is governed
+- **WHEN** a project declares `[assembly: InternalsVisibleTo("ArchLinterNet.Cli")]` in a `.cs` file and the contract's `allowed_friend_assemblies` omits `ArchLinterNet.Cli`
+- **THEN** strict validation SHALL report a violation identifying the project, forbidden friend assembly name, and source file evidence
+
 ### Requirement: Detect production projects referencing forbidden project targets
 The system SHALL allow a project metadata contract to declare `forbidden_project_references`, and SHALL report a violation for each declared `ProjectReference` whose resolved target project matches one of those forbidden entries.
 

@@ -1,5 +1,7 @@
 using ArchLinterNet.Core.Contracts;
 using ArchLinterNet.Core.Discovery;
+using ArchLinterNet.Core.Execution;
+using ArchLinterNet.Core.Model;
 using NUnit.Framework;
 
 namespace ArchLinterNet.Core.Tests;
@@ -79,5 +81,63 @@ public sealed class ProjectMetadataDiscoveryTests
         Assert.That(project.Properties["TreatWarningsAsErrors"].SourcePath, Is.EqualTo("Directory.Build.props"));
         Assert.That(project.FriendAssemblies.Select(entry => entry.AssemblyName), Is.EqualTo(new[] { "MyApp.Tests" }));
         Assert.That(project.ProjectReferences.Select(entry => entry.Path), Is.EqualTo(new[] { "tests/MyApp.Tests/MyApp.Tests.csproj" }));
+    }
+
+    [Test]
+    public void Discovery_ParsesSourceLevelInternalsVisibleToAndContractFlagsForbiddenFriendAssembly()
+    {
+        string projectDir = Path.Combine(_repoRoot, "src", "MyApp");
+        Directory.CreateDirectory(Path.Combine(projectDir, "Properties"));
+        File.WriteAllText(Path.Combine(projectDir, "Properties", "AssemblyInfo.cs"), """
+            using System.Runtime.CompilerServices;
+
+            [assembly: InternalsVisibleTo("MyApp.Tools")]
+            """);
+        File.WriteAllText(Path.Combine(projectDir, "MyApp.csproj"), """
+            <Project Sdk="Microsoft.NET.Sdk">
+              <PropertyGroup>
+                <TargetFramework>net10.0</TargetFramework>
+              </PropertyGroup>
+            </Project>
+            """);
+
+        ArchitectureProjectMetadataContract contract = new()
+        {
+            Id = "friend-assemblies",
+            Name = "friend-assemblies",
+            Projects = new List<string> { "src/MyApp/MyApp.csproj" },
+            AllowedFriendAssemblies = new List<string> { "MyApp.Tests" }
+        };
+        var document = new ArchitectureContractDocument
+        {
+            Analysis = new ArchitectureAnalysisConfiguration
+            {
+                Projects = new List<string> { Path.Combine(projectDir, "MyApp.csproj") }
+            },
+            Contracts = new ArchitectureContractGroups
+            {
+                StrictProjectMetadata = new List<ArchitectureProjectMetadataContract> { contract }
+            }
+        };
+
+        ProjectDiscoveryResult discovery = new ArchitectureProjectDiscoveryService()
+            .ResolveFromDocument(document, _repoRoot, resolveAssemblyOutputs: false);
+        ArchitectureDiscoveredProject project = discovery.DiscoveredProjects.Single();
+        ArchitectureAnalysisContext context = new(
+            _repoRoot,
+            new[] { typeof(ProjectMetadataDiscoveryTests).Assembly },
+            Array.Empty<string>(),
+            Array.Empty<string>(),
+            projectDiscovery: discovery);
+        ArchitectureContractRunner runner = new(context, document);
+
+        List<ArchitectureViolation> violations = runner.Session.CheckProjectMetadataContract(contract);
+
+        Assert.That(project.FriendAssemblies.Select(entry => entry.AssemblyName), Is.EqualTo(new[] { "MyApp.Tools" }));
+        Assert.That(project.FriendAssemblies.Single().SourcePath, Is.EqualTo("src/MyApp/Properties/AssemblyInfo.cs"));
+        Assert.That(violations, Has.Count.EqualTo(1));
+        Assert.That(violations[0].ProjectMetadataKind, Is.EqualTo("friend_assembly"));
+        Assert.That(violations[0].ProjectMetadataActualValue, Is.EqualTo("MyApp.Tools"));
+        Assert.That(violations[0].ProjectMetadataSourcePath, Is.EqualTo("src/MyApp/Properties/AssemblyInfo.cs"));
     }
 }

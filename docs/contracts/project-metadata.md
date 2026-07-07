@@ -38,7 +38,7 @@ Project metadata contracts match discovered projects by their repo-relative `.cs
 
 **Forbidden properties**: every entry in `forbidden_properties` forbids that exact property/value pair. A project that sets the same value is a violation.
 
-**Allowed friend assemblies**: when `allowed_friend_assemblies` is non-empty, every discovered `InternalsVisibleTo` declaration must appear in that allowlist. Omitted allowlists mean "do not check friend assemblies."
+**Allowed friend assemblies**: when `allowed_friend_assemblies` is non-empty, every discovered `InternalsVisibleTo` declaration must appear in that allowlist. Discovery reads both MSBuild `InternalsVisibleTo` items in `.csproj` files and assembly-level `[assembly: InternalsVisibleTo("...")]` attributes in project `.cs` files. Omitted allowlists mean "do not check friend assemblies."
 
 **Forbidden project references**: every pattern in `forbidden_project_references` is matched against the discovered project's repo-relative referenced `.csproj` paths using the same project-path glob semantics as `analysis.project_include` / `analysis.project_exclude`.
 
@@ -59,7 +59,7 @@ Two safety checks run before execution:
 
 Project metadata contracts are static `.csproj`/`Directory.Build.props` analysis only:
 
-- they do check statically declared scalar properties, friend assemblies, and declared `ProjectReference` items;
+- they do check statically declared scalar properties, friend assemblies declared through project items or source-level assembly attributes, and declared `ProjectReference` items;
 - they do not run MSBuild targets or build the project;
 - they do not perform full conditional/import evaluation for every possible MSBuild construct;
 - they do not replace package validation, signing validation, or runtime behavior checks.

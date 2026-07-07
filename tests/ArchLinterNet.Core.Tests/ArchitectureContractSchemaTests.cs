@@ -69,4 +69,37 @@ public sealed class ArchitectureContractSchemaTests
 
         Assert.That(required.EnumerateArray().Select(v => v.GetString()), Is.EquivalentTo(new[] { "name", "source", "allowed" }));
     }
+
+    [Test]
+    public void Schema_ProjectMetadataPropertyMaps_AcceptScalarValues()
+    {
+        JsonElement schema = LoadSchema();
+        JsonElement projectMetadata = schema.GetProperty("$defs").GetProperty("projectMetadataContract");
+        JsonElement properties = projectMetadata.GetProperty("allOf")[1].GetProperty("properties");
+
+        Assert.That(properties.GetProperty("required_properties").GetProperty("$ref").GetString(), Is.EqualTo("#/$defs/scalarMap"));
+        Assert.That(properties.GetProperty("forbidden_properties").GetProperty("$ref").GetString(), Is.EqualTo("#/$defs/scalarMap"));
+
+        JsonElement scalarValueAnyOf = schema.GetProperty("$defs").GetProperty("scalarValue").GetProperty("anyOf");
+        string[] acceptedTypes = scalarValueAnyOf.EnumerateArray()
+            .Select(option => option.GetProperty("type").GetString()!)
+            .ToArray();
+
+        Assert.That(acceptedTypes, Is.SupersetOf(new[] { "string", "boolean", "number" }));
+    }
+
+    [Test]
+    public void Schema_ProjectMetadataExpectations_RequireNonEmptyValues()
+    {
+        JsonElement schema = LoadSchema();
+        JsonElement anyOf = schema.GetProperty("$defs")
+            .GetProperty("projectMetadataContract")
+            .GetProperty("allOf")[1]
+            .GetProperty("anyOf");
+
+        Assert.That(anyOf[0].GetProperty("properties").GetProperty("required_properties").GetProperty("minProperties").GetInt32(), Is.EqualTo(1));
+        Assert.That(anyOf[1].GetProperty("properties").GetProperty("forbidden_properties").GetProperty("minProperties").GetInt32(), Is.EqualTo(1));
+        Assert.That(anyOf[2].GetProperty("properties").GetProperty("allowed_friend_assemblies").GetProperty("minItems").GetInt32(), Is.EqualTo(1));
+        Assert.That(anyOf[3].GetProperty("properties").GetProperty("forbidden_project_references").GetProperty("minItems").GetInt32(), Is.EqualTo(1));
+    }
 }

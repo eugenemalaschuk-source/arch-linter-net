@@ -314,7 +314,7 @@ contracts:
 `required_properties` and `forbidden_properties` compare exact scalar MSBuild
 property values, case-insensitively, using project-local values plus the
 nearest readable `Directory.Build.props` chain when discovery can resolve it.
-`allowed_friend_assemblies` matches exact `InternalsVisibleTo` names.
+`allowed_friend_assemblies` matches exact `InternalsVisibleTo` names from project-file items and source-level assembly attributes.
 `forbidden_project_references` uses the same project-path glob semantics as
 `analysis.project_include` / `analysis.project_exclude`.
 

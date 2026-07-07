@@ -590,6 +590,8 @@ friend assembly allowlists, and forbidden referenced project paths. `projects`
 matches discovered projects by repo-relative `.csproj` path, so this family
 requires `analysis.solution` or `analysis.projects` to expose project metadata.
 `analysis.target_assemblies` is optional for metadata-only policies using this family.
+Friend assembly discovery reads both project-file `InternalsVisibleTo` items and
+source-level assembly attributes.
 At least one expectation (`required_properties`, `forbidden_properties`,
 `allowed_friend_assemblies`, or `forbidden_project_references`) is required —
 an empty contract fails policy loading with an actionable error. See

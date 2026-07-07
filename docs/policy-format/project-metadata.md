@@ -59,8 +59,8 @@ contracts:
 ## Matching rules
 
 - `projects` entries match discovered projects by repo-relative `.csproj` path.
-- `required_properties` and `forbidden_properties` compare exact scalar property values, case-insensitively.
-- `allowed_friend_assemblies` compares exact friend assembly names from `InternalsVisibleTo Include="..."`.
+- `required_properties` and `forbidden_properties` compare exact scalar property values, case-insensitively. YAML booleans/numbers are accepted by the schema and compared using their scalar text value.
+- `allowed_friend_assemblies` compares exact friend assembly names from `InternalsVisibleTo Include="..."` project items and `[assembly: InternalsVisibleTo("...")]` source attributes.
 - `forbidden_project_references` uses the same project-path glob matching as `analysis.project_include` / `analysis.project_exclude`.
 
 ## Discovery requirements

@@ -185,14 +185,18 @@ The system SHALL parse selected scalar MSBuild properties from each discovered o
 - **THEN** discovery SHALL expose `TreatWarningsAsErrors=true` for that project
 
 ### Requirement: Parse friend assembly declarations for each discovered project
-The system SHALL parse `InternalsVisibleTo` item declarations from each discovered or explicitly listed `.csproj` file and expose the declared friend assembly names for that project.
+The system SHALL parse `InternalsVisibleTo` item declarations from each discovered or explicitly listed `.csproj` file and source-level assembly attributes from project `.cs` files, then expose the declared friend assembly names for that project.
 
 #### Scenario: Multiple friend assemblies are recorded
 - **WHEN** a `.csproj` declares three `InternalsVisibleTo` items
 - **THEN** discovery SHALL expose all three friend assembly names for that project in deterministic order
 
+#### Scenario: Source-level friend assembly is recorded
+- **WHEN** a discovered project's `.cs` file declares `[assembly: InternalsVisibleTo("MyApp.Tools")]`
+- **THEN** discovery SHALL expose `MyApp.Tools` as a friend assembly for that project with the source file as evidence
+
 #### Scenario: Project with no friend assemblies records an empty list
-- **WHEN** a `.csproj` declares no `InternalsVisibleTo` items
+- **WHEN** a project declares no `InternalsVisibleTo` items or source-level assembly attributes
 - **THEN** discovery SHALL expose an empty friend-assembly list for that project
 
 ### Requirement: Parse project references for each discovered project

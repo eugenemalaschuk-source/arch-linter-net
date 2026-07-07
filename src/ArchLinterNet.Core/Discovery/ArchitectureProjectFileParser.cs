@@ -1,3 +1,4 @@
+using System.Text.RegularExpressions;
 using System.Xml.Linq;
 using ArchLinterNet.Core.IO;
 
@@ -10,6 +11,10 @@ internal interface IArchitectureProjectFileParser
 
 internal sealed class ArchitectureProjectFileParser : IArchitectureProjectFileParser
 {
+    private static readonly Regex _sourceFriendAssemblyRegex = new(
+        @"\[\s*assembly\s*:\s*(?:[A-Za-z_][\w.]*\.)?InternalsVisibleTo(?:Attribute)?\s*\(\s*@?""(?<name>(?:[^""]|"""")*)""",
+        RegexOptions.Compiled | RegexOptions.CultureInvariant);
+
     public DiscoveredProjectFile Parse(string projectPath, IArchitectureFileSystem? fileSystem = null)
     {
         fileSystem ??= ArchitectureFileSystem.Real;
@@ -44,7 +49,7 @@ internal sealed class ArchitectureProjectFileParser : IArchitectureProjectFilePa
             ParsePackageReferences(document, projectPath, fileSystem);
         Dictionary<string, ArchitectureDiscoveredProjectProperty> properties =
             ParseProperties(document, projectPath, fileSystem);
-        List<ArchitectureDiscoveredFriendAssembly> friendAssemblies = ParseFriendAssemblies(document, projectPath);
+        List<ArchitectureDiscoveredFriendAssembly> friendAssemblies = ParseFriendAssemblies(document, projectPath, fileSystem);
         List<ArchitectureDiscoveredProjectReference> projectReferences = ParseProjectReferences(document, projectPath);
 
         return new DiscoveredProjectFile(
@@ -112,18 +117,48 @@ internal sealed class ArchitectureProjectFileParser : IArchitectureProjectFilePa
             .ToList();
     }
 
-    private static List<ArchitectureDiscoveredFriendAssembly> ParseFriendAssemblies(XDocument document, string projectPath)
+    private static List<ArchitectureDiscoveredFriendAssembly> ParseFriendAssemblies(
+        XDocument document, string projectPath, IArchitectureFileSystem fileSystem)
     {
         string sourcePath = Path.GetFullPath(projectPath);
-
-        return document.Descendants("InternalsVisibleTo")
+        IEnumerable<ArchitectureDiscoveredFriendAssembly> projectFileDeclarations = document.Descendants("InternalsVisibleTo")
             .Select(element => element.Attribute("Include")?.Value)
             .Where(value => !string.IsNullOrWhiteSpace(value))
-            .Select(value => value!.Trim())
-            .Distinct(StringComparer.Ordinal)
-            .OrderBy(value => value, StringComparer.Ordinal)
-            .Select(value => new ArchitectureDiscoveredFriendAssembly(value, sourcePath))
+            .Select(value => new ArchitectureDiscoveredFriendAssembly(value!.Trim(), sourcePath));
+
+        return projectFileDeclarations
+            .Concat(ParseSourceFriendAssemblies(projectPath, fileSystem))
+            .GroupBy(entry => entry.AssemblyName, StringComparer.Ordinal)
+            .Select(group => group.OrderBy(entry => entry.SourcePath, StringComparer.OrdinalIgnoreCase).First())
+            .OrderBy(entry => entry.AssemblyName, StringComparer.Ordinal)
             .ToList();
+    }
+
+    private static IEnumerable<ArchitectureDiscoveredFriendAssembly> ParseSourceFriendAssemblies(
+        string projectPath, IArchitectureFileSystem fileSystem)
+    {
+        string projectDirectory = Path.GetDirectoryName(Path.GetFullPath(projectPath)) ?? string.Empty;
+        if (!fileSystem.DirectoryExists(projectDirectory))
+        {
+            yield break;
+        }
+
+        foreach (string file in fileSystem.EnumerateFiles(projectDirectory, "*.cs", SearchOption.AllDirectories)
+                     .Where(file => !IsUnderBuildOutputDirectory(projectDirectory, file))
+                     .OrderBy(file => file, StringComparer.OrdinalIgnoreCase))
+        {
+            string sourceText = fileSystem.ReadAllText(file);
+            foreach (Match match in _sourceFriendAssemblyRegex.Matches(sourceText))
+            {
+                string assemblyName = match.Groups["name"].Value.Replace("\"\"", "\"").Trim();
+                if (assemblyName.Length == 0)
+                {
+                    continue;
+                }
+
+                yield return new ArchitectureDiscoveredFriendAssembly(assemblyName, Path.GetFullPath(file));
+            }
+        }
     }
 
     private static List<ArchitectureDiscoveredProjectReference> ParseProjectReferences(XDocument document, string projectPath)
@@ -165,6 +200,16 @@ internal sealed class ArchitectureProjectFileParser : IArchitectureProjectFilePa
 
         propsPaths.Reverse();
         return propsPaths;
+    }
+
+    private static bool IsUnderBuildOutputDirectory(string projectDirectory, string filePath)
+    {
+        string relativePath = Path.GetRelativePath(projectDirectory, filePath);
+        string[] segments = relativePath.Split(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+
+        return segments.Any(segment =>
+            string.Equals(segment, "bin", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(segment, "obj", StringComparison.OrdinalIgnoreCase));
     }
 
     private static void MergeScalarProperties(
