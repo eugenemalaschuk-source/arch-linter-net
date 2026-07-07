@@ -389,7 +389,9 @@ internal static class ArchitecturePublicApiSurfaceScanner
 
         if (type.IsArray)
         {
-            return RenderTypeName(type.GetElementType()!) + "[]";
+            int rank = type.GetArrayRank();
+            string commas = rank > 1 ? new string(',', rank - 1) : string.Empty;
+            return RenderTypeName(type.GetElementType()!) + "[" + commas + "]";
         }
 
         if (type.IsGenericType && !type.IsGenericTypeDefinition)

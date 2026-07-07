@@ -41,7 +41,7 @@ This is not a substitute for `.NET` binary/package compatibility validation (det
 
 ### Declaring the exported surface
 
-`assemblies` names one or more target assemblies (must match a name resolvable via `analysis.target_assemblies`); a contract with an empty or missing `assemblies` list is rejected at policy load time, since it would have nothing to scan.
+`assemblies` names one or more target assemblies; each name must be declared in `analysis.target_assemblies`, and a contract with an empty or missing `assemblies` list is rejected at policy load time. Both are policy load-time errors, not silent no-ops — an assembly name that doesn't resolve is never treated as "nothing to check for it."
 
 `declared_api` is a list of normalized signature strings. The grammar is `"<kind> <FullyQualifiedName>[(<param types>)][: <member type>]"`, where `kind` is one of `class`, `interface`, `struct`, `enum`, `delegate`, `const`, `field`, `property`, `event`, `method`, or `ctor` (records reflect as an ordinary `class`/`struct`; reflection cannot reliably distinguish a record from a hand-written type). Examples:
 
@@ -53,8 +53,9 @@ This is not a substitute for `.NET` binary/package compatibility validation (det
 - `const MyApp.Foo.Version: System.String`
 - `event MyApp.Foo.Changed: System.EventHandler`
 - Nested type: `class MyApp.Outer+Inner` (CLR nested-type notation, `+` not `.`).
-- Generic type: `class MyApp.Box\`1`(arity comes from the CLR, same as`Type.FullName\`).
-- Generic method: `method MyApp.Foo.Map\`1(!0): !!0`— generic parameters are rendered **positionally**, not by their source name:`!N`is the *N*th type parameter of the declaring type,`!!N\` is the *N*th type parameter of the declaring method. This means renaming a generic parameter alone never changes the declared signature.
+- Generic type: `` class MyApp.Box`1 `` (arity comes from the CLR, same as `Type.FullName`).
+- Generic method: `` method MyApp.Foo.Map`1(!0): !!0 `` — generic parameters are rendered **positionally**, not by their source name: `!N` is the *N*th type parameter of the declaring type, `!!N` is the *N*th type parameter of the declaring method. This means renaming a generic parameter alone never changes the declared signature.
+- Array rank is preserved: `int[]` renders as `System.Int32[]`, `int[,]` as `System.Int32[,]`, `int[,,]` as `System.Int32[,,]` — each rank is a distinct signature.
 
 Parameter, field, property, and return types are rendered via their CLR full name (e.g. `System.Int32`, not `int`) — this is a deterministic, own grammar, not an attempt at C#-idiomatic pretty-printing.
 

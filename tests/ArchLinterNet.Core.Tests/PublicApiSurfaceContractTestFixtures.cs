@@ -97,6 +97,25 @@ namespace PublicApiSurfaceContractTestFixtures
             return default!;
         }
     }
+
+    public sealed class ArrayRankHolder
+    {
+        public ArrayRankHolder()
+        {
+        }
+
+        public void TakeVector(int[] values)
+        {
+        }
+
+        public void TakeMatrix(int[,] values)
+        {
+        }
+
+        public void TakeCube(int[,,] values)
+        {
+        }
+    }
 }
 
 #pragma warning restore CS0649

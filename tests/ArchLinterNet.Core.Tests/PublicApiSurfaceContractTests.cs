@@ -1,5 +1,6 @@
 using ArchLinterNet.Core.Contracts;
 using ArchLinterNet.Core.Execution;
+using ArchLinterNet.Core.Validation;
 using NUnit.Framework;
 
 namespace ArchLinterNet.Core.Tests;
@@ -229,6 +230,35 @@ public sealed class PublicApiSurfaceContractTests
     }
 
     [Test]
+    public void CheckPublicApiSurfaceContract_ArrayRank_ProducesDistinctSignaturesPerRank()
+    {
+        const string TypeName = "PublicApiSurfaceContractTestFixtures.ArrayRankHolder";
+        var contract = new ArchitecturePublicApiSurfaceContract
+        {
+            Name = "array-rank-surface",
+            Assemblies = new List<string> { AssemblyName },
+            DeclaredApi = new List<string>
+            {
+                $"class {TypeName}",
+                $"ctor {TypeName}()"
+            }
+        };
+        var document = CreateDocument(contract);
+        var runner = new ArchitectureContractRunner(CreateContext(), document);
+
+        var violations = runner.Session.CheckPublicApiSurfaceContract(contract);
+        HashSet<string> signatures = violations
+            .Where(v => v.SourceType == TypeName)
+            .Select(v => v.UndeclaredApiSignature!)
+            .ToHashSet(StringComparer.Ordinal);
+
+        Assert.That(signatures, Contains.Item($"method {TypeName}.TakeVector(System.Int32[]): System.Void"));
+        Assert.That(signatures, Contains.Item($"method {TypeName}.TakeMatrix(System.Int32[,]): System.Void"));
+        Assert.That(signatures, Contains.Item($"method {TypeName}.TakeCube(System.Int32[,,]): System.Void"));
+        Assert.That(signatures.Count, Is.EqualTo(3));
+    }
+
+    [Test]
     public void CheckPublicApiSurfaceContract_UndeclaredConstant_ReturnsViolationByDefault()
     {
         const string TypeName = "PublicApiSurfaceContractTestFixtures.ConstantHolder";
@@ -394,5 +424,57 @@ public sealed class PublicApiSurfaceContractTests
 
         Assert.That(ex.Message, Does.Contain("no 'assemblies'"));
         Assert.That(ex.Message, Does.Contain("no-assemblies"));
+    }
+
+    [Test]
+    public void PublicApiSurface_AssemblyNotDeclaredInTargetAssemblies_ThrowsActionableError()
+    {
+        string policyPath = WritePolicy("""
+            version: 1
+            name: Test
+            analysis:
+              target_assemblies: [ArchLinterNet.Core]
+            contracts:
+              strict_public_api_surface:
+                - name: typoed-assembly-name
+                  assemblies: [ArchLinterNet.Core.Typo]
+                  reason: Assembly name not present in analysis.target_assemblies.
+            """);
+
+        InvalidOperationException ex = Assert.Throws<InvalidOperationException>(() =>
+            new ArchitecturePolicyDocumentLoader().Load(policyPath))!;
+
+        Assert.That(ex.Message, Does.Contain("ArchLinterNet.Core.Typo"));
+        Assert.That(ex.Message, Does.Contain("not declared in 'analysis.target_assemblies'"));
+    }
+
+    [Test]
+    public void ValidateStrict_PublicApiSurfaceViolation_EndToEndThroughValidationService()
+    {
+        string policyPath = WritePolicy($"""
+            version: 1
+            name: Test
+
+            analysis:
+              target_assemblies: [{AssemblyName}]
+
+            contracts:
+              strict_public_api_surface:
+                - id: no-accidental-types
+                  name: no-accidental-types
+                  assemblies: [{AssemblyName}]
+                  declared_api: []
+                  reason: Accidental public type must be reported end-to-end.
+            """);
+
+        ValidationOutcome outcome = ArchitectureValidationService.Validate(new ValidationRequest
+        {
+            PolicyPath = policyPath,
+            Mode = "strict"
+        });
+
+        Assert.That(outcome.Passed, Is.False);
+        Assert.That(outcome.Violations.Any(v =>
+            v.SourceType == "PublicApiSurfaceContractTestFixtures.AccidentalPublicType"), Is.True);
     }
 }
