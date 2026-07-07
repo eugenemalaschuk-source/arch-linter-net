@@ -197,4 +197,89 @@ public sealed class ProjectMetadataContractTests
             && candidate.ForbiddenReference == "required_property:IsPackable=false"), Is.True);
         Assert.That(runner.UnmatchedIgnoredViolations, Is.Empty);
     }
+
+    [Test]
+    public void CheckProjectMetadataContract_EmptyFriendAllowlist_DeniesAllFriendAssemblies()
+    {
+        const string ProjectPath = "src/MyApp/MyApp.csproj";
+        ArchitectureProjectMetadataContract contract = new()
+        {
+            Name = "no-friends",
+            Id = "no-friends",
+            Projects = new List<string> { ProjectPath },
+            AllowedFriendAssemblies = new List<string>()
+        };
+
+        ArchitectureContractRunner runner = new(
+            CreateContext(Project(ProjectPath)),
+            CreateDocument(contract));
+
+        List<ArchitectureViolation> violations = runner.Session.CheckProjectMetadataContract(contract);
+
+        Assert.That(violations.Count, Is.EqualTo(2));
+        Assert.That(violations.All(v => v.ProjectMetadataKind == "friend_assembly"), Is.True);
+        Assert.That(violations.Select(v => v.ProjectMetadataActualValue),
+            Is.EquivalentTo(new[] { "MyApp.Tests", "MyApp.Tools" }));
+        Assert.That(violations.Any(v => v.ForbiddenReferences.First().Contains("deny-all")), Is.True);
+    }
+
+    [Test]
+    public void CheckProjectMetadataContract_NullFriendAllowlist_SkipsFriendCheck()
+    {
+        const string ProjectPath = "src/MyApp/MyApp.csproj";
+        ArchitectureProjectMetadataContract contract = new()
+        {
+            Name = "no-friend-expectation",
+            Id = "no-friend-expectation",
+            Projects = new List<string> { ProjectPath },
+            RequiredProperties = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+            {
+                ["Nullable"] = "enable"
+            }
+        };
+
+        ArchitectureContractRunner runner = new(
+            CreateContext(Project(ProjectPath, ("Nullable", "enable", ProjectPath))),
+            CreateDocument(contract));
+
+        List<ArchitectureViolation> violations = runner.Session.CheckProjectMetadataContract(contract);
+
+        Assert.That(violations.All(v => v.ProjectMetadataKind != "friend_assembly"), Is.True);
+    }
+
+    [Test]
+    public void CheckProjectMetadataContract_EmptyFriendAllowlist_SupportsBaselineSuppression()
+    {
+        const string ProjectPath = "src/MyApp/MyApp.csproj";
+        ArchitectureProjectMetadataContract contract = new()
+        {
+            Name = "no-friends-baselined",
+            Id = "no-friends-baselined",
+            Projects = new List<string> { ProjectPath },
+            AllowedFriendAssemblies = new List<string>(),
+            IgnoredViolations = new List<ArchitectureIgnoredViolation>
+            {
+                new()
+                {
+                    SourceType = ProjectPath,
+                    ForbiddenReference = "friend_assembly:MyApp.Tools",
+                    Reason = "known debt"
+                }
+            }
+        };
+
+        ArchitectureContractRunner runner = new(
+            CreateContext(Project(ProjectPath)),
+            CreateDocument(contract));
+
+        List<ArchitectureViolation> violations = runner.Session.CheckProjectMetadataContract(contract);
+
+        Assert.That(violations.Count, Is.EqualTo(1));
+        Assert.That(violations[0].ProjectMetadataActualValue, Is.EqualTo("MyApp.Tests"));
+        Assert.That(runner.BaselineCandidates.Any(candidate =>
+            candidate.ContractGroup == "strict_project_metadata"
+            && candidate.ContractId == "no-friends-baselined"
+            && candidate.SourceType == ProjectPath
+            && candidate.ForbiddenReference == "friend_assembly:MyApp.Tests"), Is.True);
+    }
 }

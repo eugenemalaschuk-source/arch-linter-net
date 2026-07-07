@@ -99,7 +99,7 @@ public sealed class ArchitectureContractSchemaTests
 
         Assert.That(anyOf[0].GetProperty("properties").GetProperty("required_properties").GetProperty("minProperties").GetInt32(), Is.EqualTo(1));
         Assert.That(anyOf[1].GetProperty("properties").GetProperty("forbidden_properties").GetProperty("minProperties").GetInt32(), Is.EqualTo(1));
-        Assert.That(anyOf[2].GetProperty("properties").GetProperty("allowed_friend_assemblies").GetProperty("minItems").GetInt32(), Is.EqualTo(1));
+        Assert.That(anyOf[2].GetProperty("required")[0].GetString(), Is.EqualTo("allowed_friend_assemblies"));
         Assert.That(anyOf[3].GetProperty("properties").GetProperty("forbidden_project_references").GetProperty("minItems").GetInt32(), Is.EqualTo(1));
     }
 }

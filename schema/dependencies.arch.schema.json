@@ -729,8 +729,7 @@
               "properties": { "forbidden_properties": { "minProperties": 1 } }
             },
             {
-              "required": ["allowed_friend_assemblies"],
-              "properties": { "allowed_friend_assemblies": { "minItems": 1 } }
+              "required": ["allowed_friend_assemblies"]
             },
             {
               "required": ["forbidden_project_references"],

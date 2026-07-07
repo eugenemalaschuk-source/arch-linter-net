@@ -353,7 +353,7 @@ public sealed partial class ArchitecturePolicyDocumentLoader : IArchitecturePoli
 
             bool hasExpectation = contract.RequiredProperties.Count > 0
                 || contract.ForbiddenProperties.Count > 0
-                || HasNonBlankEntry(contract.AllowedFriendAssemblies)
+                || contract.AllowedFriendAssemblies is not null
                 || HasNonBlankEntry(contract.ForbiddenProjectReferences);
 
             if (!hasExpectation)

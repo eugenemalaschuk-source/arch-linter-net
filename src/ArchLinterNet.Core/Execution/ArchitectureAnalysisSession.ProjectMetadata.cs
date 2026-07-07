@@ -129,7 +129,7 @@ public sealed partial class ArchitectureAnalysisSession
         ArchitectureProjectMetadataContract contract,
         ArchitectureDiscoveredProject project)
     {
-        if (!contract.AllowedFriendAssemblies.Any(value => !string.IsNullOrWhiteSpace(value)))
+        if (contract.AllowedFriendAssemblies is null)
         {
             yield break;
         }
@@ -152,15 +152,16 @@ public sealed partial class ArchitectureAnalysisSession
                 continue;
             }
 
+            string message = allowed.Count > 0
+                ? $"Friend assembly '{friendAssembly.AssemblyName}' is not present in allowed_friend_assemblies."
+                : $"Friend assembly '{friendAssembly.AssemblyName}' is not allowed (allowed_friend_assemblies is empty — deny-all).";
+
             yield return new ArchitectureViolation(
                 contract.Name,
                 contract.Id,
                 project.Path,
                 "forbidden friend assembly",
-                new[]
-                {
-                    $"Friend assembly '{friendAssembly.AssemblyName}' is not present in allowed_friend_assemblies."
-                })
+                new[] { message })
             {
                 ProjectMetadataKind = "friend_assembly",
                 ProjectMetadataKey = "InternalsVisibleTo",

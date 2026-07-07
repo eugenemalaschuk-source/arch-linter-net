@@ -681,7 +681,7 @@ public sealed class ArchitectureProjectMetadataContract : IArchitectureContract
     public Dictionary<string, string> ForbiddenProperties { get; set; } = new(StringComparer.OrdinalIgnoreCase);
 
     [YamlMember(Alias = "allowed_friend_assemblies")]
-    public List<string> AllowedFriendAssemblies { get; set; } = new();
+    public List<string>? AllowedFriendAssemblies { get; set; }
 
     [YamlMember(Alias = "forbidden_project_references")]
     public List<string> ForbiddenProjectReferences { get; set; } = new();
