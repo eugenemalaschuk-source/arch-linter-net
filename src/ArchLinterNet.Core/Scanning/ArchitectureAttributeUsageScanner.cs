@@ -1,3 +1,4 @@
+using System.Linq;
 using System.Reflection;
 
 namespace ArchLinterNet.Core.Scanning;
@@ -28,7 +29,8 @@ internal static class ArchitectureAttributeUsageScanner
         {
             foreach (string matchedAttribute in MatchedAttributes(ctor, attributes, attributePrefixes))
             {
-                yield return new ArchitectureAttributeUsageMatch($"{typeName}.{ctor.Name}", matchedAttribute);
+                yield return new ArchitectureAttributeUsageMatch(
+                    $"{typeName}.{ctor.Name}({ParameterSignature(ctor)})", matchedAttribute);
             }
         }
 
@@ -41,7 +43,8 @@ internal static class ArchitectureAttributeUsageScanner
 
             foreach (string matchedAttribute in MatchedAttributes(method, attributes, attributePrefixes))
             {
-                yield return new ArchitectureAttributeUsageMatch($"{typeName}.{method.Name}", matchedAttribute);
+                yield return new ArchitectureAttributeUsageMatch(
+                    $"{typeName}.{method.Name}({ParameterSignature(method)})", matchedAttribute);
             }
         }
 
@@ -67,6 +70,25 @@ internal static class ArchitectureAttributeUsageScanner
             {
                 yield return new ArchitectureAttributeUsageMatch($"{typeName}.{evt.Name}", matchedAttribute);
             }
+        }
+    }
+
+    // Included so overloaded constructors/methods produce distinct source identifiers: without a
+    // parameter signature, two overloads decorated with different attributes would collapse onto the
+    // same "Type.Method" identifier, making diagnostics and ignored_violations entries ambiguous.
+    private static string ParameterSignature(MethodBase method)
+    {
+        try
+        {
+            return string.Join(", ", method.GetParameters().Select(p => ArchitectureTypeNames.SafeFullName(p.ParameterType)));
+        }
+        catch (TypeLoadException)
+        {
+            return string.Empty;
+        }
+        catch (FileNotFoundException)
+        {
+            return string.Empty;
         }
     }
 

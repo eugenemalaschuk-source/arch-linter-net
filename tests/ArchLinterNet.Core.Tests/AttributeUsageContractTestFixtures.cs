@@ -68,6 +68,19 @@ namespace AttributeUsageContractTestFixtures.Wrong
         [TestMarker]
         [SecondMarker]
         public int DualMarkedField;
+
+        [TestMarker]
+        public event EventHandler? MarkedEvent;
+
+        [TestMarker]
+        public void OverloadedMethod()
+        {
+        }
+
+        [SecondMarker]
+        public void OverloadedMethod(int value)
+        {
+        }
     }
 }
 

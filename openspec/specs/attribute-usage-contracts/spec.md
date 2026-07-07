@@ -1,7 +1,8 @@
 # attribute-usage-contracts Specification
 
 ## Purpose
-TBD - created by archiving change add-attribute-usage-contracts. Update Purpose after archive.
+Let policies declare which layers/namespaces/projects/assemblies specific attribute/marker types (ASP.NET, EF Core, JSON serialization, Unity, custom markers) are allowed only in, or forbidden from, and report deterministic misplaced/forbidden diagnostics. This is static marker-placement governance, not runtime authorization/security correctness validation, and does not check for the absence of a required marker (deferred to a follow-up).
+
 ## Requirements
 ### Requirement: Declare attribute usage contracts
 The system SHALL allow `contracts.strict_attribute_usage` and `contracts.audit_attribute_usage` entries, each declaring at least one attribute selector (`attributes` and/or `attribute_prefixes`, non-empty) and at least one location expectation (a non-empty `allowed_only_in_layers`/`allowed_only_in_namespaces`/`allowed_only_in_projects`/`allowed_only_in_assemblies` allow-list, or a non-empty `forbidden_in_layers`/`forbidden_in_namespaces`/`forbidden_in_projects`/`forbidden_in_assemblies` deny-list).

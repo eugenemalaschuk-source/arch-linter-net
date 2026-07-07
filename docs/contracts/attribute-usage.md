@@ -64,6 +64,8 @@ If a contract declares both an allow-list and a deny-list and a single matched a
 
 Each violation identifies the source member (or type), the matched attribute's fully-qualified name, whether the violation is `misplaced` or `forbidden`, the actual location, and — for `misplaced` violations only — the expected (allow-list) location description.
 
+Constructor and method source identifiers include a parameter-type signature (e.g. `MyApp.Foo.Bar(System.Int32)`) so that two overloads of the same member — each possibly carrying different attributes — produce distinct, individually addressable identifiers instead of colliding on `Type.Method`.
+
 `ignored_violations` entries use the same `source_type`/`forbidden_reference`/`reason` shape as other contract families, matching the source identifier and the matched attribute's fully-qualified name.
 
 ## Non-goals

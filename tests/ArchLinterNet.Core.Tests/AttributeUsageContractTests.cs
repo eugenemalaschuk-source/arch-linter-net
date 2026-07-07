@@ -193,7 +193,7 @@ public sealed class AttributeUsageContractTests
         var violations = runner.Session.CheckAttributeUsageContract(contract);
 
         Assert.That(violations.Any(v =>
-            v.SourceType == "AttributeUsageContractTestFixtures.Wrong.WrongHolder.MarkedMethodTarget"), Is.True);
+            v.SourceType == "AttributeUsageContractTestFixtures.Wrong.WrongHolder.MarkedMethodTarget()"), Is.True);
     }
 
     [Test]
@@ -230,6 +230,49 @@ public sealed class AttributeUsageContractTests
 
         Assert.That(violations.Any(v =>
             v.SourceType == "AttributeUsageContractTestFixtures.Wrong.WrongHolder._markedPrivateField"), Is.True);
+    }
+
+    [Test]
+    public void CheckAttributeUsageContract_EventLevelMatch_IsDetected()
+    {
+        var contract = new ArchitectureAttributeUsageContract
+        {
+            Name = "event-level-match",
+            Attributes = new List<string> { TestMarkerAttributeName },
+            AllowedOnlyInNamespaces = new List<string> { "AttributeUsageContractTestFixtures.Allowed" }
+        };
+        var document = CreateDocument(contract);
+        var runner = new ArchitectureContractRunner(CreateContext(), document);
+
+        var violations = runner.Session.CheckAttributeUsageContract(contract);
+
+        Assert.That(violations.Any(v =>
+            v.SourceType == "AttributeUsageContractTestFixtures.Wrong.WrongHolder.MarkedEvent"), Is.True);
+    }
+
+    [Test]
+    public void CheckAttributeUsageContract_OverloadedMethods_ProduceDistinctSourceIdentifiers()
+    {
+        var contract = new ArchitectureAttributeUsageContract
+        {
+            Name = "overloaded-methods",
+            Attributes = new List<string> { TestMarkerAttributeName, SecondMarkerAttributeName },
+            AllowedOnlyInNamespaces = new List<string> { "AttributeUsageContractTestFixtures.Allowed" }
+        };
+        var document = CreateDocument(contract);
+        var runner = new ArchitectureContractRunner(CreateContext(), document);
+
+        var violations = runner.Session.CheckAttributeUsageContract(contract);
+
+        var parameterlessOverload = violations.Where(v =>
+            v.SourceType == "AttributeUsageContractTestFixtures.Wrong.WrongHolder.OverloadedMethod()").ToList();
+        var intOverload = violations.Where(v =>
+            v.SourceType == "AttributeUsageContractTestFixtures.Wrong.WrongHolder.OverloadedMethod(System.Int32)").ToList();
+
+        Assert.That(parameterlessOverload, Has.Count.EqualTo(1));
+        Assert.That(parameterlessOverload[0].MatchedAttribute, Is.EqualTo(TestMarkerAttributeName));
+        Assert.That(intOverload, Has.Count.EqualTo(1));
+        Assert.That(intOverload[0].MatchedAttribute, Is.EqualTo(SecondMarkerAttributeName));
     }
 
     [Test]
