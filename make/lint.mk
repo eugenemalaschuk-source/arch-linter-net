@@ -65,4 +65,4 @@ architecture-coverage-report:  ## Show full-solution architecture coverage repor
 	@cat "$(PROJECT_ROOT)/architecture-coverage.md"
 	@echo ""
 	@echo "===== Architecture coverage report (JSON) ====="
-	@python3 -m json.tool < "$(PROJECT_ROOT)/architecture-strict.json"
+	@python -m json.tool < "$(PROJECT_ROOT)/architecture-strict.json"
