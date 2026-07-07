@@ -1,10 +1,15 @@
-.PHONY: test clean-results test-coverage test-coverage-badge
+.PHONY: test clean-results test-coverage test-coverage-badge _acceptance-test
 
-# Order-only: test and lint-architecture both build/test the Core.Tests project; running them
-# concurrently races on the same obj/bin output. lint-code-size, lint-docs, and lint-dotnet-format
-# don't touch dotnet build output and are safe to run alongside test.
-test: | lint-architecture  ## Run all tests
+test:  ## Run all tests
 	@dotnet test "$(SLNX)" --no-restore
+
+# Used only by `make acceptance` (see Makefile). test and lint-architecture both build/test the
+# Core.Tests project; running them concurrently races on the same obj/bin output, so acceptance
+# routes test through this order-only-after-lint-architecture wrapper instead of adding that
+# ordering to the public `test` target itself — standalone `make test` stays exactly "run all
+# tests", with no implicit architecture-check prerequisite.
+_acceptance-test: | lint-architecture
+	@$(MAKE) test
 
 clean-results:  ## Remove test-results folder
 	rm -rf "$(RESULTS_DIR)"

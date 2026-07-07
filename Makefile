@@ -57,4 +57,4 @@ build: docs-build pack  ## Build documentation site and NuGet packages
 
 acceptance:  ## Full project acceptance: lint + all tests (runs independent checks in parallel)
 	@echo "acceptance: running with NPROC=$(NPROC) (override with 'make acceptance NPROC=1' to force serial)"
-	@$(MAKE) -j$(NPROC) lint test
+	@$(MAKE) -j$(NPROC) lint _acceptance-test
