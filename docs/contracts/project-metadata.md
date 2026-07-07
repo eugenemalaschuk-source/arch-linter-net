@@ -38,7 +38,7 @@ Project metadata contracts match discovered projects by their repo-relative `.cs
 
 **Forbidden properties**: every entry in `forbidden_properties` forbids that exact property/value pair. A project that sets the same value is a violation.
 
-**Allowed friend assemblies**: when `allowed_friend_assemblies` is non-empty, every discovered `InternalsVisibleTo` declaration must appear in that allowlist. Discovery reads both MSBuild `InternalsVisibleTo` items in `.csproj` files and assembly-level `[assembly: InternalsVisibleTo("...")]` attributes in project `.cs` files. Omitted allowlists mean "do not check friend assemblies."
+**Allowed friend assemblies**: `allowed_friend_assemblies` may be omitted (the key is absent from the YAML), set to an empty list, or set to a non-empty list. Omitted means "do not check friend assemblies" (the contract has no friend-assembly expectation). An empty list (`[]`) means "deny all" — every discovered `InternalsVisibleTo` declaration is a violation. A non-empty list is an explicit allowlist: every discovered `InternalsVisibleTo` declaration must appear in that list. Discovery reads both MSBuild `InternalsVisibleTo` items in `.csproj` files and assembly-level `[assembly: InternalsVisibleTo("...")]` attributes in project `.cs` files.
 
 **Forbidden project references**: every pattern in `forbidden_project_references` is matched against the discovered project's repo-relative referenced `.csproj` paths using the same project-path glob semantics as `analysis.project_include` / `analysis.project_exclude`.
 

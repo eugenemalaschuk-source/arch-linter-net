@@ -578,7 +578,7 @@ for the signature grammar and full semantics.
   projects: [<project-path>]          # Required — repo-relative discovered .csproj paths
   required_properties: {}             # Optional — exact property/value requirements
   forbidden_properties: {}            # Optional — exact forbidden property/value pairs
-  allowed_friend_assemblies: []       # Optional — exact InternalsVisibleTo allowlist
+  allowed_friend_assemblies: []       # Optional — omit=skip, []=deny-all, non-empty=allowlist for InternalsVisibleTo
   forbidden_project_references: []    # Optional — project path globs matched against ProjectReference targets
   ignored_violations: []              # Optional — baseline known metadata violations
   reason: <string>

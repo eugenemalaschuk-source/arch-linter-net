@@ -19,7 +19,7 @@ contracts:
         <PropertyName>: <value>
       forbidden_properties:                # Optional — exact forbidden value pairs
         <PropertyName>: <value>
-      allowed_friend_assemblies: []        # Optional — explicit allowlist for InternalsVisibleTo
+      allowed_friend_assemblies: []        # Optional — omit to skip, [] = deny-all, non-empty = allowlist
       forbidden_project_references: []     # Optional — project path globs matched against ProjectReference targets
       ignored_violations: []               # Optional — baseline known metadata violations
       reason: <string>                     # Recommended
@@ -60,7 +60,7 @@ contracts:
 
 - `projects` entries match discovered projects by repo-relative `.csproj` path.
 - `required_properties` and `forbidden_properties` compare exact scalar property values, case-insensitively. YAML booleans/numbers are accepted by the schema and compared using their scalar text value.
-- `allowed_friend_assemblies` compares exact friend assembly names from `InternalsVisibleTo Include="..."` project items and `[assembly: InternalsVisibleTo("...")]` source attributes.
+- `allowed_friend_assemblies` has three states: omitted (skip friend checking), empty list `[]` (deny-all — every `InternalsVisibleTo` is a violation), or non-empty list (explicit allowlist — only listed assemblies are allowed). Discovery reads `InternalsVisibleTo Include="..."` project items and `[assembly: InternalsVisibleTo("...")]` source attributes.
 - `forbidden_project_references` uses the same project-path glob matching as `analysis.project_include` / `analysis.project_exclude`.
 
 ## Discovery requirements
