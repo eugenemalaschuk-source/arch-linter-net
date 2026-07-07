@@ -54,6 +54,14 @@
       "items": { "type": "string", "minLength": 1, "pattern": ".*\\S.*" },
       "default": []
     },
+    "stringMap": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "string",
+        "minLength": 1
+      },
+      "default": {}
+    },
     "layer": {
       "type": "object",
       "additionalProperties": false,
@@ -310,9 +318,19 @@
           "items": { "$ref": "#/$defs/packageAllowOnlyContract" },
           "default": []
         },
+        "strict_project_metadata": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/projectMetadataContract" },
+          "default": []
+        },
         "audit_package_allow_only": {
           "type": "array",
           "items": { "$ref": "#/$defs/packageAllowOnlyContract" },
+          "default": []
+        },
+        "audit_project_metadata": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/projectMetadataContract" },
           "default": []
         },
         "strict_protected": {
@@ -676,6 +694,32 @@
         "ignored_violations": { "$ref": "#/$defs/ignoredViolations" },
         "reason": { "type": "string" }
       }
+    },
+    "projectMetadataContract": {
+      "allOf": [
+        { "$ref": "#/$defs/baseContractFields" },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["name", "projects"],
+          "anyOf": [
+            { "required": ["required_properties"] },
+            { "required": ["forbidden_properties"] },
+            { "required": ["allowed_friend_assemblies"] },
+            { "required": ["forbidden_project_references"] }
+          ],
+          "properties": {
+            "name": { "type": "string", "minLength": 1 },
+            "id": { "type": "string", "minLength": 1 },
+            "projects": { "$ref": "#/$defs/nonBlankStringList" },
+            "required_properties": { "$ref": "#/$defs/stringMap" },
+            "forbidden_properties": { "$ref": "#/$defs/stringMap" },
+            "allowed_friend_assemblies": { "$ref": "#/$defs/nonBlankStringList" },
+            "forbidden_project_references": { "$ref": "#/$defs/nonBlankStringList" },
+            "reason": { "type": "string" }
+          }
+        }
+      ]
     },
     "protectedContract": {
       "allOf": [

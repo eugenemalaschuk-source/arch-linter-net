@@ -42,9 +42,35 @@ internal sealed class ArchitectureProjectFileParser : IArchitectureProjectFilePa
 
         List<ArchitectureDiscoveredPackageReference> packageReferences =
             ParsePackageReferences(document, projectPath, fileSystem);
+        Dictionary<string, ArchitectureDiscoveredProjectProperty> properties =
+            ParseProperties(document, projectPath, fileSystem);
+        List<ArchitectureDiscoveredFriendAssembly> friendAssemblies = ParseFriendAssemblies(document, projectPath);
+        List<ArchitectureDiscoveredProjectReference> projectReferences = ParseProjectReferences(document, projectPath);
 
         return new DiscoveredProjectFile(
-            Path.GetFullPath(projectPath), resolvedAssemblyName, frameworks, packageReferences);
+            Path.GetFullPath(projectPath),
+            resolvedAssemblyName,
+            frameworks,
+            packageReferences,
+            properties,
+            friendAssemblies,
+            projectReferences);
+    }
+
+    private static Dictionary<string, ArchitectureDiscoveredProjectProperty> ParseProperties(
+        XDocument document, string projectPath, IArchitectureFileSystem fileSystem)
+    {
+        Dictionary<string, ArchitectureDiscoveredProjectProperty> properties =
+            new(StringComparer.OrdinalIgnoreCase);
+
+        foreach (string propsPath in EnumerateDirectoryBuildProps(projectPath, fileSystem))
+        {
+            XDocument propsDocument = XDocument.Parse(fileSystem.ReadAllText(propsPath));
+            MergeScalarProperties(propsDocument, propsPath, properties);
+        }
+
+        MergeScalarProperties(document, Path.GetFullPath(projectPath), properties);
+        return properties;
     }
 
     private static List<ArchitectureDiscoveredPackageReference> ParsePackageReferences(
@@ -84,6 +110,84 @@ internal sealed class ArchitectureProjectFileParser : IArchitectureProjectFilePa
                 return new ArchitectureDiscoveredPackageReference(reference.PackageId, resolvedVersion);
             })
             .ToList();
+    }
+
+    private static List<ArchitectureDiscoveredFriendAssembly> ParseFriendAssemblies(XDocument document, string projectPath)
+    {
+        string sourcePath = Path.GetFullPath(projectPath);
+
+        return document.Descendants("InternalsVisibleTo")
+            .Select(element => element.Attribute("Include")?.Value)
+            .Where(value => !string.IsNullOrWhiteSpace(value))
+            .Select(value => value!.Trim())
+            .Distinct(StringComparer.Ordinal)
+            .OrderBy(value => value, StringComparer.Ordinal)
+            .Select(value => new ArchitectureDiscoveredFriendAssembly(value, sourcePath))
+            .ToList();
+    }
+
+    private static List<ArchitectureDiscoveredProjectReference> ParseProjectReferences(XDocument document, string projectPath)
+    {
+        string projectDirectory = Path.GetDirectoryName(Path.GetFullPath(projectPath)) ?? string.Empty;
+        string sourcePath = Path.GetFullPath(projectPath);
+
+        return document.Descendants("ProjectReference")
+            .Select(element => element.Attribute("Include")?.Value)
+            .Where(value => !string.IsNullOrWhiteSpace(value))
+            .Select(value => Path.GetFullPath(Path.Combine(projectDirectory, value!.Trim())))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .OrderBy(value => value, StringComparer.OrdinalIgnoreCase)
+            .Select(value => new ArchitectureDiscoveredProjectReference(value, sourcePath))
+            .ToList();
+    }
+
+    private static IEnumerable<string> EnumerateDirectoryBuildProps(string projectPath, IArchitectureFileSystem fileSystem)
+    {
+        List<string> propsPaths = new();
+        string? directory = Path.GetDirectoryName(Path.GetFullPath(projectPath));
+
+        while (!string.IsNullOrEmpty(directory))
+        {
+            string candidate = Path.Combine(directory, "Directory.Build.props");
+            if (fileSystem.FileExists(candidate))
+            {
+                propsPaths.Add(candidate);
+            }
+
+            string? parent = Path.GetDirectoryName(directory);
+            if (string.Equals(parent, directory, StringComparison.OrdinalIgnoreCase))
+            {
+                break;
+            }
+
+            directory = parent;
+        }
+
+        propsPaths.Reverse();
+        return propsPaths;
+    }
+
+    private static void MergeScalarProperties(
+        XDocument document,
+        string sourcePath,
+        IDictionary<string, ArchitectureDiscoveredProjectProperty> properties)
+    {
+        foreach (XElement element in document.Descendants("PropertyGroup").Elements())
+        {
+            if (element.HasElements)
+            {
+                continue;
+            }
+
+            string name = element.Name.LocalName;
+            string? value = element.Value;
+            if (string.IsNullOrWhiteSpace(name) || string.IsNullOrWhiteSpace(value))
+            {
+                continue;
+            }
+
+            properties[name] = new ArchitectureDiscoveredProjectProperty(name, value.Trim(), sourcePath);
+        }
     }
 
     private static Dictionary<string, string> LoadCentralPackageVersions(

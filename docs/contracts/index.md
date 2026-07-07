@@ -20,6 +20,7 @@ Most contract families have two variants:
 | [Assembly independence](assembly-independence.md) | `strict_assembly_independence` | `audit_assembly_independence` | A set of compiled .NET assemblies must not directly reference each other. |
 | [Assembly dependency](assembly-dependency.md) | `strict_assembly_dependency` | `audit_assembly_dependency` | A source assembly must not directly reference forbidden assemblies. |
 | [Assembly allow-only](assembly-dependency.md) | `strict_assembly_allow_only` | `audit_assembly_allow_only` | A source assembly may only directly reference explicitly allowed assemblies. |
+| [Project metadata](project-metadata.md) | `strict_project_metadata` | `audit_project_metadata` | Selected discovered projects must preserve required metadata, restrict friend assemblies, and avoid forbidden project references. |
 | [Protected surface](protected-surface.md) | `strict_protected` | `audit_protected` | A target layer may only be imported by approved layers. |
 | [External dependency](external-dependencies.md) | `strict_external` | `audit_external` | Source code must not leak forbidden vendor/framework dependencies. |
 | [External allow-only](external-allow-only.md) | `strict_external_allow_only` | `audit_external_allow_only` | A source layer may reference only explicitly allowed vendor/framework dependency groups. |

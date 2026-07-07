@@ -14,5 +14,6 @@ public enum ArchitectureDiagnosticKind
     AttributeUsage,
     Inheritance,
     InterfaceImplementation,
-    Composition
+    Composition,
+    ProjectMetadata
 }

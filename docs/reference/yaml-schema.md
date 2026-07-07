@@ -235,6 +235,7 @@ contracts:
   strict_assembly_independence: []
   strict_assembly_dependency: []
   strict_assembly_allow_only: []
+  strict_project_metadata: []
   strict_protected: []
   strict_external: []
   strict_external_allow_only: []
@@ -254,6 +255,7 @@ contracts:
   audit_assembly_independence: []
   audit_assembly_dependency: []
   audit_assembly_allow_only: []
+  audit_project_metadata: []
   audit_protected: []
   audit_external: []
   audit_external_allow_only: []
@@ -566,6 +568,29 @@ general declaration: an exported `const` field is forbidden unless its fully-qua
 member name is in `allowed_public_constants`, even if its full signature is already present
 in `declared_api`. See [Public API surface contracts](../contracts/public-api-surface.md)
 for the signature grammar and full semantics.
+
+### Project metadata contract
+
+```yaml
+- id: <string>                        # Optional
+  name: <string>
+  projects: [<project-path>]          # Required — repo-relative discovered .csproj paths
+  required_properties: {}             # Optional — exact property/value requirements
+  forbidden_properties: {}            # Optional — exact forbidden property/value pairs
+  allowed_friend_assemblies: []       # Optional — exact InternalsVisibleTo allowlist
+  forbidden_project_references: []    # Optional — project path globs matched against ProjectReference targets
+  reason: <string>
+```
+
+Project metadata contracts validate statically discovered `.csproj` metadata for
+selected projects: exact required/forbidden scalar MSBuild property values,
+friend assembly allowlists, and forbidden referenced project paths. `projects`
+matches discovered projects by repo-relative `.csproj` path, so this family
+requires `analysis.solution` or `analysis.projects` to expose project metadata.
+At least one expectation (`required_properties`, `forbidden_properties`,
+`allowed_friend_assemblies`, or `forbidden_project_references`) is required —
+an empty contract fails policy loading with an actionable error. See
+[Project metadata contracts](../contracts/project-metadata.md) for full semantics.
 
 ### Coverage contract
 

@@ -54,6 +54,7 @@ public sealed partial class ArchitecturePolicyDocumentLoader : IArchitecturePoli
         ValidateAssemblyAllowOnlyContracts(document);
         ValidatePackageDependencyContracts(document);
         ValidatePackageAllowOnlyContracts(document);
+        ValidateProjectMetadataContracts(document);
         ValidateTypePlacementContracts(document);
         ValidatePublicApiSurfaceContracts(document);
         ValidateAttributeUsageContracts(document);
@@ -113,6 +114,8 @@ public sealed partial class ArchitecturePolicyDocumentLoader : IArchitecturePoli
             document.Contracts.AuditPackageDependency,
             document.Contracts.StrictPackageAllowOnly,
             document.Contracts.AuditPackageAllowOnly,
+            document.Contracts.StrictProjectMetadata,
+            document.Contracts.AuditProjectMetadata,
             document.Contracts.StrictProtected,
             document.Contracts.AuditProtected,
             document.Contracts.StrictExternal,
@@ -332,6 +335,33 @@ public sealed partial class ArchitecturePolicyDocumentLoader : IArchitecturePoli
                     $"Package allow-only contract '{contract.Name}' references source '{contract.Source}' " +
                     "that is not declared in 'analysis.target_assemblies'. The 'source' of a " +
                     "'strict_package_allow_only'/'audit_package_allow_only' contract must be a declared target assembly.");
+            }
+        }
+    }
+
+    private static void ValidateProjectMetadataContracts(ArchitectureContractDocument document)
+    {
+        foreach (ArchitectureProjectMetadataContract contract in document.Contracts.StrictProjectMetadata
+                     .Concat(document.Contracts.AuditProjectMetadata))
+        {
+            if (contract.Projects.Count == 0 || contract.Projects.All(string.IsNullOrWhiteSpace))
+            {
+                throw new InvalidOperationException(
+                    $"Project metadata contract '{contract.Name}' declares no usable 'projects'. " +
+                    "Declare at least one discovered project path, or the contract will never match anything.");
+            }
+
+            bool hasExpectation = contract.RequiredProperties.Count > 0
+                || contract.ForbiddenProperties.Count > 0
+                || HasNonBlankEntry(contract.AllowedFriendAssemblies)
+                || HasNonBlankEntry(contract.ForbiddenProjectReferences);
+
+            if (!hasExpectation)
+            {
+                throw new InvalidOperationException(
+                    $"Project metadata contract '{contract.Name}' declares no metadata expectation. " +
+                    "Declare required_properties, forbidden_properties, allowed_friend_assemblies, or " +
+                    "forbidden_project_references.");
             }
         }
     }

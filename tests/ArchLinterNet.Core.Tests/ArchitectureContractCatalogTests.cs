@@ -144,7 +144,7 @@ public sealed class ArchitectureContractCatalogTests
         {
             "dependency", "layer", "layer_template", "allow_only", "cycle", "method_body",
             "asmdef", "independence", "assembly_independence", "assembly_dependency", "assembly_allow_only",
-            "package_dependency", "package_allow_only",
+            "package_dependency", "package_allow_only", "project_metadata",
             "protected", "external", "external_allow_only", "acyclic_sibling", "type_placement",
             "public_api_surface", "attribute_usage", "inheritance", "interface_implementation", "composition", "coverage",
         }));
