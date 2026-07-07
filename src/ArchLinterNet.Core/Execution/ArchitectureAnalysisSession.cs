@@ -368,6 +368,11 @@ public sealed partial class ArchitectureAnalysisSession
             {
                 AddLayerNames(c.Id, GetTypePlacementReferencedLayerNames(c));
             }
+
+            foreach (ArchitectureAttributeUsageContract c in Document.Contracts.StrictAttributeUsage)
+            {
+                AddLayerNames(c.Id, GetAttributeUsageReferencedLayerNames(c));
+            }
         }
         else
         {
@@ -436,6 +441,11 @@ public sealed partial class ArchitectureAnalysisSession
             foreach (ArchitectureTypePlacementContract c in Document.Contracts.AuditTypePlacement)
             {
                 AddLayerNames(c.Id, GetTypePlacementReferencedLayerNames(c));
+            }
+
+            foreach (ArchitectureAttributeUsageContract c in Document.Contracts.AuditAttributeUsage)
+            {
+                AddLayerNames(c.Id, GetAttributeUsageReferencedLayerNames(c));
             }
         }
 

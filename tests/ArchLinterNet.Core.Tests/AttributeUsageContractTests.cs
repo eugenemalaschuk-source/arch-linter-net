@@ -1,4 +1,5 @@
 using ArchLinterNet.Core.Contracts;
+using ArchLinterNet.Core.Discovery;
 using ArchLinterNet.Core.Execution;
 using ArchLinterNet.Core.Validation;
 using NUnit.Framework;
@@ -39,17 +40,20 @@ public sealed class AttributeUsageContractTests
 
     private static string AssemblyName => typeof(AttributeUsageContractTests).Assembly.GetName().Name!;
 
-    private static ArchitectureAnalysisContext CreateContext()
+    private static ArchitectureAnalysisContext CreateContext(ProjectDiscoveryResult? projectDiscovery = null)
     {
         return new ArchitectureAnalysisContext(
             "/tmp",
             new[] { typeof(AttributeUsageContractTests).Assembly },
             Array.Empty<string>(),
-            Array.Empty<string>());
+            Array.Empty<string>(),
+            null,
+            projectDiscovery);
     }
 
     private static ArchitectureContractDocument CreateDocument(
         ArchitectureAttributeUsageContract contract,
+        Dictionary<string, ArchitectureLayer>? layers = null,
         bool audit = false)
     {
         var groups = new ArchitectureContractGroups();
@@ -66,6 +70,7 @@ public sealed class AttributeUsageContractTests
         {
             Version = 1,
             Name = "Test",
+            Layers = layers ?? new Dictionary<string, ArchitectureLayer>(),
             Analysis = new ArchitectureAnalysisConfiguration
             {
                 TargetAssemblies = new List<string> { AssemblyName }
@@ -430,6 +435,144 @@ public sealed class AttributeUsageContractTests
 
         Assert.That(ex.Message, Does.Contain("no-location-expectation"));
         Assert.That(ex.Message, Does.Contain("location expectation"));
+    }
+
+    [Test]
+    public void CheckAttributeUsageContract_AllowedOnlyInLayers_ResolvesViaDeclaredLayerNamespace()
+    {
+        var layers = new Dictionary<string, ArchitectureLayer>
+        {
+            ["allowed-layer"] = new() { Namespace = "AttributeUsageContractTestFixtures.Allowed" },
+            ["forbidden-layer"] = new() { Namespace = "AttributeUsageContractTestFixtures.Forbidden" }
+        };
+        var contract = new ArchitectureAttributeUsageContract
+        {
+            Name = "marker-allowed-layer",
+            Attributes = new List<string> { TestMarkerAttributeName },
+            AllowedOnlyInLayers = new List<string> { "allowed-layer" }
+        };
+        var document = CreateDocument(contract, layers);
+        var runner = new ArchitectureContractRunner(CreateContext(), document);
+
+        var violations = runner.Session.CheckAttributeUsageContract(contract);
+
+        Assert.That(violations.Any(v => v.SourceType.StartsWith("AttributeUsageContractTestFixtures.Allowed", StringComparison.Ordinal)), Is.False);
+        Assert.That(violations.Any(v => v.SourceType == "AttributeUsageContractTestFixtures.Forbidden.ForbiddenHolder"), Is.True);
+    }
+
+    [Test]
+    public void CheckAttributeUsageContract_ForbiddenInAssemblies_ReturnsForbiddenViolation()
+    {
+        var contract = new ArchitectureAttributeUsageContract
+        {
+            Name = "marker-forbidden-assembly",
+            Attributes = new List<string> { TestMarkerAttributeName },
+            ForbiddenInAssemblies = new List<string> { AssemblyName }
+        };
+        var document = CreateDocument(contract);
+        var runner = new ArchitectureContractRunner(CreateContext(), document);
+
+        var violations = runner.Session.CheckAttributeUsageContract(contract);
+
+        Assert.That(violations, Is.Not.Empty);
+        Assert.That(violations.All(v => v.AttributeUsageKind == "forbidden"), Is.True);
+    }
+
+    [Test]
+    public void CheckAttributeUsageContract_AllowedOnlyInProjects_ResolvesViaProjectDiscoveryToAssemblyName()
+    {
+        var projectDiscovery = new ProjectDiscoveryResult(
+            new[] { AssemblyName },
+            Array.Empty<string>(),
+            Array.Empty<string>(),
+            Array.Empty<ArchitectureProjectDiscoveryDiagnostic>())
+        {
+            DiscoveredProjects = new[]
+            {
+                new ArchitectureDiscoveredProject(
+                    Path.Combine("/repo", "MyApp.Tests.csproj"), AssemblyName, new List<string> { "net10.0" })
+            }
+        };
+
+        var contract = new ArchitectureAttributeUsageContract
+        {
+            Name = "marker-allowed-project",
+            Attributes = new List<string> { TestMarkerAttributeName },
+            AllowedOnlyInProjects = new List<string> { "MyApp.Tests" }
+        };
+        var document = CreateDocument(contract);
+        var runner = new ArchitectureContractRunner(CreateContext(projectDiscovery), document);
+
+        var violations = runner.Session.CheckAttributeUsageContract(contract);
+
+        Assert.That(violations, Is.Empty);
+    }
+
+    [Test]
+    public void ValidateStrict_DanglingAllowedOnlyInLayerNotCoveredByRuleInputCoverage_ThrowsActionableError()
+    {
+        string policyPath = WritePolicy($"""
+            version: 1
+            name: Test
+
+            analysis:
+              target_assemblies: [{AssemblyName}]
+
+            contracts:
+              strict_attribute_usage:
+                - id: marker-dangling-layer
+                  name: marker-dangling-layer
+                  attributes: [{TestMarkerAttributeName}]
+                  allowed_only_in_layers: [does_not_exist_layer]
+                  reason: Placeholder with a dangling allowed_only_in_layers entry and no coverage deferral.
+            """);
+
+        InvalidOperationException ex = Assert.Throws<InvalidOperationException>(() =>
+            ArchitectureValidationService.Validate(new ValidationRequest
+            {
+                PolicyPath = policyPath,
+                Mode = "strict"
+            }))!;
+
+        Assert.That(ex.Message, Does.Contain("unknown layer 'does_not_exist_layer'"));
+    }
+
+    [Test]
+    public void ValidateStrict_DanglingForbiddenInLayerCoveredByRuleInputCoverage_ReportsUnresolvedWithoutThrowing()
+    {
+        string policyPath = WritePolicy($"""
+            version: 1
+            name: Test
+
+            analysis:
+              target_assemblies: [{AssemblyName}]
+
+            contracts:
+              strict_attribute_usage:
+                - id: marker-dangling-forbidden-layer
+                  name: marker-dangling-forbidden-layer
+                  attributes: [{TestMarkerAttributeName}]
+                  forbidden_in_layers: [does_not_exist_layer]
+                  reason: Placeholder with a dangling forbidden_in_layers entry.
+              strict_coverage:
+                - id: rule-input-coverage
+                  name: rule-input-coverage
+                  scope: rule_input
+                  contract_ids: [marker-dangling-forbidden-layer]
+                  reason: Flag dangling layer references.
+            """);
+
+        ValidationOutcome outcome = ArchitectureValidationService.Validate(new ValidationRequest
+        {
+            PolicyPath = policyPath,
+            Mode = "strict"
+        });
+
+        Assert.That(outcome.Passed, Is.False);
+        Assert.That(outcome.Violations, Is.Empty);
+        Assert.That(outcome.CoverageFindings, Has.Count.EqualTo(1));
+        Assert.That(outcome.CoverageFindings.Single().ForbiddenNamespace, Is.EqualTo("unresolved"));
+        Assert.That(outcome.CoverageFindings.Single().ForbiddenReferences, Is.EqualTo(new[] { "does_not_exist_layer" }));
     }
 
     [Test]

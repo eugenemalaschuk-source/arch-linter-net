@@ -466,6 +466,8 @@ public sealed partial class ArchitecturePolicyDocumentLoader : IArchitecturePoli
             document.Contracts.AuditExternalAllowOnly,
             document.Contracts.StrictTypePlacement,
             document.Contracts.AuditTypePlacement,
+            document.Contracts.StrictAttributeUsage,
+            document.Contracts.AuditAttributeUsage,
         ];
 
         return new HashSet<string>(
