@@ -341,6 +341,54 @@ metadata validation — it does not resolve runtime dependency-injection
 registrations. See
 [Interface implementation contracts](../contracts/interface-implementation.md).
 
+## Use Composition Contracts For Composition-Root/Service-Locator Boundaries
+
+When composition-root or service-locator APIs (DI registration, service
+resolution, container `Resolve`/`Register`) must be confined to a bootstrap
+boundary, use `strict_composition` / `audit_composition`. A server ASP.NET
+example:
+
+```yaml
+contracts:
+  strict_composition:
+    - id: service-locator-confined-to-composition-root
+      name: service-locator-confined-to-composition-root
+      allowed_only_in_layers: [composition]
+      forbidden_apis:
+        - System.IServiceProvider.GetService
+        - Microsoft.Extensions.DependencyInjection.IServiceCollection.
+      reason: Service resolution and DI registration must happen only in the composition root.
+```
+
+A Unity/VContainer-style bootstrap example, using container-specific member
+names instead of BCL/ASP.NET members:
+
+```yaml
+contracts:
+  strict_composition:
+    - id: container-confined-to-bootstrap
+      name: container-confined-to-bootstrap
+      allowed_only_in_namespaces: [MyGame.Bootstrap]
+      forbidden_apis:
+        - Resolve
+        - Register
+      reason: Container resolution/registration must happen only during bootstrap.
+```
+
+`forbidden_apis` uses the same call-pattern vocabulary as method-body
+contracts (member names, `Type.Member`, fully qualified members, namespace/type
+prefixes) — at least one entry is required. `allowed_only_in_layers`/
+`allowed_only_in_namespaces`/`allowed_only_in_projects`/
+`allowed_only_in_assemblies` together form the composition boundary — at least
+one entry across all four is required, since there is no separate
+`forbidden_in_*` deny-list (everything outside the allow-list is forbidden by
+definition). Every loaded type outside the boundary is scanned
+reflection/IL-only for forbidden calls in its methods and constructors; a type
+inside the boundary is never scanned. This is static call-site detection —
+it does not validate runtime dependency-injection resolution or prove every
+service is registered correctly. See
+[Composition contracts](../contracts/composition.md).
+
 ## Use Transitive Depth For Indirect Coupling
 
 When a dependency should be blocked at any depth (direct or indirect), use

@@ -4,6 +4,8 @@ version: 1
 name: Unity asmdef Boundaries Policy Recipe
 
 layers:
+  bootstrap:
+    namespace: MyCompany.Game.Bootstrap
   game_core:
     namespace: MyCompany.Game.Core
   gameplay_runtime:
@@ -99,3 +101,16 @@ contracts:
   audit_asmdef: []
   strict_independence: []
   audit_independence: []
+
+  strict_composition:
+    - id: container-confined-to-bootstrap
+      name: container-confined-to-bootstrap
+      allowed_only_in_layers: [bootstrap]
+      forbidden_apis:
+        - Resolve
+        - Register
+      reason: >-
+        VContainer/Unity-style container Resolve/Register calls must happen
+        only during scene/lifetime-scope bootstrap, not from gameplay code.
+
+  audit_composition: []

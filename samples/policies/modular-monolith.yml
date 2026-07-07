@@ -4,6 +4,8 @@ version: 1
 name: Modular Monolith Policy Recipe
 
 layers:
+  composition_root:
+    namespace: MyCompany.Product.Host.Composition
   shared_kernel:
     namespace: MyCompany.Product.SharedKernel
   module_impls:
@@ -127,3 +129,16 @@ contracts:
         assembly at the compiled assembly level.
 
   audit_assembly_allow_only: []
+
+  strict_composition:
+    - id: service-locator-confined-to-composition-root
+      name: service-locator-confined-to-composition-root
+      allowed_only_in_layers: [composition_root]
+      forbidden_apis:
+        - System.IServiceProvider.GetService
+        - Microsoft.Extensions.DependencyInjection.IServiceCollection.
+      reason: >-
+        Service resolution and DI registration must happen only in the host's
+        composition root, not scattered through module implementation code.
+
+  audit_composition: []
