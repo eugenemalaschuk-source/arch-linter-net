@@ -97,6 +97,29 @@ public sealed class ArchitectureDiagnosticMapperTests
     }
 
     [Test]
+    public void FromViolation_ProjectMetadataFields_ReturnsProjectMetadataDiagnostic()
+    {
+        var violation = new ArchitectureViolation(
+            "contract", "project-metadata", "src/MyApp/MyApp.csproj", "required project property mismatch", new[] { "ref1" })
+        {
+            ProjectMetadataKind = "required_property",
+            ProjectMetadataKey = "Nullable",
+            ProjectMetadataExpectedValue = "enable",
+            ProjectMetadataActualValue = "disable",
+            ProjectMetadataSourcePath = "Directory.Build.props"
+        };
+
+        var diagnostic = ArchitectureDiagnosticMapper.FromViolation(violation);
+
+        Assert.That(diagnostic, Is.InstanceOf<ProjectMetadataDiagnostic>());
+        Assert.That(diagnostic.Kind, Is.EqualTo(ArchitectureDiagnosticKind.ProjectMetadata));
+        var projectMetadata = (ProjectMetadataDiagnostic)diagnostic;
+        Assert.That(projectMetadata.ProjectMetadataKey, Is.EqualTo("Nullable"));
+        Assert.That(projectMetadata.ProjectMetadataExpectedValue, Is.EqualTo("enable"));
+        Assert.That(projectMetadata.ProjectMetadataActualValue, Is.EqualTo("disable"));
+    }
+
+    [Test]
     public void FromViolation_DependencyPaths_ReturnsConfigurationDiagnosticWithPaths()
     {
         var paths = new IReadOnlyCollection<string>[] { new[] { "A", "B" } };

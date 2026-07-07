@@ -186,6 +186,12 @@ public sealed class ArchitectureContractGroups
     [YamlMember(Alias = "audit_package_allow_only")]
     public List<ArchitecturePackageAllowOnlyContract> AuditPackageAllowOnly { get; set; } = new();
 
+    [YamlMember(Alias = "strict_project_metadata")]
+    public List<ArchitectureProjectMetadataContract> StrictProjectMetadata { get; set; } = new();
+
+    [YamlMember(Alias = "audit_project_metadata")]
+    public List<ArchitectureProjectMetadataContract> AuditProjectMetadata { get; set; } = new();
+
     [YamlMember(Alias = "strict_protected")]
     public List<ArchitectureProtectedContract> StrictProtected { get; set; } = new();
 
@@ -280,6 +286,7 @@ public sealed class ArchitectureContractGroups
         foreach (var c in StrictAssemblyAllowOnly) yield return c;
         foreach (var c in StrictPackageDependency) yield return c;
         foreach (var c in StrictPackageAllowOnly) yield return c;
+        foreach (var c in StrictProjectMetadata) yield return c;
         foreach (var c in StrictProtected) yield return c;
         foreach (var c in StrictExternal) yield return c;
         foreach (var c in StrictExternalAllowOnly) yield return c;
@@ -307,6 +314,7 @@ public sealed class ArchitectureContractGroups
         foreach (var c in AuditAssemblyAllowOnly) yield return c;
         foreach (var c in AuditPackageDependency) yield return c;
         foreach (var c in AuditPackageAllowOnly) yield return c;
+        foreach (var c in AuditProjectMetadata) yield return c;
         foreach (var c in AuditProtected) yield return c;
         foreach (var c in AuditExternal) yield return c;
         foreach (var c in AuditExternalAllowOnly) yield return c;
@@ -651,6 +659,32 @@ public sealed class ArchitecturePackageAllowOnlyContract : IArchitectureContract
 
     [YamlMember(Alias = "dependency_depth")]
     public DependencyDepthMode DependencyDepth { get; set; } = DependencyDepthMode.Direct;
+
+    [YamlMember(Alias = "ignored_violations")]
+    public List<ArchitectureIgnoredViolation> IgnoredViolations { get; set; } = new();
+
+    [YamlMember(Alias = "reason")] public string Reason { get; set; } = string.Empty;
+}
+
+public sealed class ArchitectureProjectMetadataContract : IArchitectureContract
+{
+    [YamlMember(Alias = "name")] public string Name { get; set; } = string.Empty;
+
+    [YamlMember(Alias = "id")] public string? Id { get; set; }
+
+    [YamlMember(Alias = "projects")] public List<string> Projects { get; set; } = new();
+
+    [YamlMember(Alias = "required_properties")]
+    public Dictionary<string, string> RequiredProperties { get; set; } = new(StringComparer.OrdinalIgnoreCase);
+
+    [YamlMember(Alias = "forbidden_properties")]
+    public Dictionary<string, string> ForbiddenProperties { get; set; } = new(StringComparer.OrdinalIgnoreCase);
+
+    [YamlMember(Alias = "allowed_friend_assemblies")]
+    public List<string>? AllowedFriendAssemblies { get; set; }
+
+    [YamlMember(Alias = "forbidden_project_references")]
+    public List<string> ForbiddenProjectReferences { get; set; } = new();
 
     [YamlMember(Alias = "ignored_violations")]
     public List<ArchitectureIgnoredViolation> IgnoredViolations { get; set; } = new();

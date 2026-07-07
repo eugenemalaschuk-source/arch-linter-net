@@ -252,6 +252,7 @@ public sealed class ArchitectureDiagnosticFormatter : IArchitectureDiagnosticFor
         InheritanceDiagnostic d => d.SourceType,
         InterfaceImplementationDiagnostic d => d.SourceType,
         CompositionDiagnostic d => d.SourceType,
+        ProjectMetadataDiagnostic d => d.SourceType,
         _ => string.Empty
     };
 
@@ -266,6 +267,7 @@ public sealed class ArchitectureDiagnosticFormatter : IArchitectureDiagnosticFor
         InheritanceDiagnostic d => d.ForbiddenNamespace,
         InterfaceImplementationDiagnostic d => d.ForbiddenNamespace,
         CompositionDiagnostic d => d.ForbiddenNamespace,
+        ProjectMetadataDiagnostic d => d.ForbiddenNamespace,
         _ => string.Empty
     };
 
@@ -280,6 +282,7 @@ public sealed class ArchitectureDiagnosticFormatter : IArchitectureDiagnosticFor
         InheritanceDiagnostic d => d.ForbiddenReferences,
         InterfaceImplementationDiagnostic d => d.ForbiddenReferences,
         CompositionDiagnostic d => d.ForbiddenReferences,
+        ProjectMetadataDiagnostic d => d.ForbiddenReferences,
         _ => Array.Empty<string>()
     };
 
@@ -367,6 +370,24 @@ public sealed class ArchitectureDiagnosticFormatter : IArchitectureDiagnosticFor
                            : string.Empty) +
                        (composition.ExpectedCompositionBoundary != null
                            ? $", expected_boundary: {composition.ExpectedCompositionBoundary}"
+                           : string.Empty) +
+                       ")";
+        }
+
+        if (diagnostic is ProjectMetadataDiagnostic projectMetadata)
+        {
+            context += $" (kind: {projectMetadata.ProjectMetadataKind}" +
+                       (projectMetadata.ProjectMetadataKey != null
+                           ? $", key: {projectMetadata.ProjectMetadataKey}"
+                           : string.Empty) +
+                       (projectMetadata.ProjectMetadataExpectedValue != null
+                           ? $", expected: {projectMetadata.ProjectMetadataExpectedValue}"
+                           : string.Empty) +
+                       (projectMetadata.ProjectMetadataActualValue != null
+                           ? $", actual: {projectMetadata.ProjectMetadataActualValue}"
+                           : string.Empty) +
+                       (projectMetadata.ProjectMetadataSourcePath != null
+                           ? $", source_path: {projectMetadata.ProjectMetadataSourcePath}"
                            : string.Empty) +
                        ")";
         }
@@ -560,6 +581,24 @@ public sealed class ArchitectureDiagnosticFormatter : IArchitectureDiagnosticFor
 
             if (composition.ExpectedCompositionBoundary != null)
                 obj["expected_composition_boundary"] = composition.ExpectedCompositionBoundary;
+        }
+
+        if (diagnostic is ProjectMetadataDiagnostic projectMetadata)
+        {
+            if (projectMetadata.ProjectMetadataKind != null)
+                obj["project_metadata_kind"] = projectMetadata.ProjectMetadataKind;
+
+            if (projectMetadata.ProjectMetadataKey != null)
+                obj["project_metadata_key"] = projectMetadata.ProjectMetadataKey;
+
+            if (projectMetadata.ProjectMetadataExpectedValue != null)
+                obj["project_metadata_expected_value"] = projectMetadata.ProjectMetadataExpectedValue;
+
+            if (projectMetadata.ProjectMetadataActualValue != null)
+                obj["project_metadata_actual_value"] = projectMetadata.ProjectMetadataActualValue;
+
+            if (projectMetadata.ProjectMetadataSourcePath != null)
+                obj["project_metadata_source_path"] = projectMetadata.ProjectMetadataSourcePath;
         }
 
         if (diagnostic is ConfigurationDiagnostic configuration)

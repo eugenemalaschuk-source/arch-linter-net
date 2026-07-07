@@ -37,4 +37,9 @@ public sealed record ArchitectureViolation(
     public string? SourceMember { get; init; }
     public string? MatchedForbiddenApi { get; init; }
     public string? ExpectedCompositionBoundary { get; init; }
+    public string? ProjectMetadataKind { get; init; }
+    public string? ProjectMetadataKey { get; init; }
+    public string? ProjectMetadataExpectedValue { get; init; }
+    public string? ProjectMetadataActualValue { get; init; }
+    public string? ProjectMetadataSourcePath { get; init; }
 }

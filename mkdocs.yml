@@ -32,6 +32,7 @@ nav:
       - Layers and namespace patterns: policy-format/layers-and-namespaces.md
       - External dependencies: policy-format/external-dependencies.md
       - Package dependencies: policy-format/package-dependencies.md
+      - Project metadata: policy-format/project-metadata.md
       - Condition sets: policy-format/condition-sets.md
       - Ignored violations and baselines: guides/migration-baselines.md
       - Supported capabilities and non-goals: policy-format/supported-capabilities.md
@@ -46,6 +47,7 @@ nav:
       - Assembly independence contracts: contracts/assembly-independence.md
       - Assembly dependency contracts: contracts/assembly-dependency.md
       - Package dependency contracts: contracts/package-dependencies.md
+      - Project metadata contracts: contracts/project-metadata.md
       - Protected surface contracts: contracts/protected-surface.md
       - External dependency contracts: contracts/external-dependencies.md
       - External allow-only contracts: contracts/external-allow-only.md

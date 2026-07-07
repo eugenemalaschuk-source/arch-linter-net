@@ -283,6 +283,45 @@ marker (e.g. "every controller action must carry `[Authorize]` or
 follow-up. See [Attribute usage contracts](../contracts/attribute-usage.md)
 for full semantics.
 
+## Use Project Metadata Contracts For `.csproj` And Friend-Assembly Governance
+
+When architecture policy must govern package-facing `.csproj` metadata,
+friend assembly declarations, or production-to-test project references, use
+`strict_project_metadata` / `audit_project_metadata`:
+
+```yaml
+analysis:
+  solution: ArchLinterNet.slnx
+
+contracts:
+  strict_project_metadata:
+    - id: core-project-governance
+      name: core-project-governance
+      projects:
+        - src/ArchLinterNet.Core/ArchLinterNet.Core.csproj
+      required_properties:
+        Nullable: enable
+        TreatWarningsAsErrors: true
+      allowed_friend_assemblies:
+        - ArchLinterNet.Core.Tests
+      forbidden_project_references:
+        - tests/**/*.csproj
+      reason: Core must keep package defaults, expose internals only to approved assemblies, and avoid test-project references.
+```
+
+`projects` matches discovered `.csproj` paths, so this family requires
+`analysis.solution` or `analysis.projects` to run project discovery first.
+`required_properties` and `forbidden_properties` compare exact scalar MSBuild
+property values, case-insensitively, using project-local values plus the
+nearest readable `Directory.Build.props` chain when discovery can resolve it.
+`allowed_friend_assemblies` matches exact `InternalsVisibleTo` names from project-file items and source-level assembly attributes.
+`forbidden_project_references` uses the same project-path glob semantics as
+`analysis.project_include` / `analysis.project_exclude`.
+
+This is static project metadata analysis only — it does not run MSBuild,
+evaluate arbitrary targets/import graphs, or replace package validation.
+See [Project metadata contracts](../contracts/project-metadata.md).
+
 ## Use Inheritance Contracts For Framework Base Type Boundaries
 
 When types in a protected surface must not derive from a framework or boundary

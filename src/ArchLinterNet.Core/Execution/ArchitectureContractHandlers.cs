@@ -148,6 +148,17 @@ internal sealed class PackageAllowOnlyContractHandler : IArchitectureContractHan
     }
 }
 
+internal sealed class ProjectMetadataContractHandler : IArchitectureContractHandler
+{
+    public string Family => "project_metadata";
+
+    public ArchitectureHandlerResult Execute(ArchitectureAnalysisSession session, IArchitectureContract contract)
+    {
+        return ArchitectureHandlerResult.FromViolations(
+            session.CheckProjectMetadataContract((ArchitectureProjectMetadataContract)contract));
+    }
+}
+
 internal sealed class ProtectedContractHandler : IArchitectureContractHandler
 {
     public string Family => "protected";
