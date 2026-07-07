@@ -10,5 +10,6 @@ public enum ArchitectureDiagnosticKind
     PolicyConsistency,
     PackageDependency,
     TypePlacement,
-    PublicApiSurface
+    PublicApiSurface,
+    AttributeUsage
 }

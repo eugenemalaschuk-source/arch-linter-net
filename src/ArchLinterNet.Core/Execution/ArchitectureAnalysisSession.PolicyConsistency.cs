@@ -68,6 +68,8 @@ public sealed partial class ArchitectureAnalysisSession
         AddGroup("audit_asmdef", "audit", "asmdef", groups.AuditAsmdef);
         AddGroup("strict_type_placement", "strict", "type_placement", groups.StrictTypePlacement);
         AddGroup("audit_type_placement", "audit", "type_placement", groups.AuditTypePlacement);
+        AddGroup("strict_attribute_usage", "strict", "attribute_usage", groups.StrictAttributeUsage);
+        AddGroup("audit_attribute_usage", "audit", "attribute_usage", groups.AuditAttributeUsage);
 
         AddGroup("strict_layer_templates", "strict", "layer_template",
             LayerTemplateExpander.Expand(groups.StrictLayerTemplates));
@@ -580,6 +582,7 @@ public sealed partial class ArchitectureAnalysisSession
             ArchitectureExternalDependencyContract c => new[] { c.Source },
             ArchitectureExternalAllowOnlyContract c => new[] { c.Source },
             ArchitectureTypePlacementContract c => GetTypePlacementReferencedLayerNames(c),
+            ArchitectureAttributeUsageContract c => GetAttributeUsageReferencedLayerNames(c),
             _ => Array.Empty<string>()
         };
     }
@@ -596,5 +599,14 @@ public sealed partial class ArchitectureAnalysisSession
             : new[] { contract.TypesMatching.Layer };
 
         return selectorLayer.Concat(contract.MustResideInLayers);
+    }
+
+    // Same rationale as GetTypePlacementReferencedLayerNames: a typo'd allowed_only_in_layers/
+    // forbidden_in_layers entry must get the shared "referenced but undeclared layer" /
+    // rule-input-coverage-deferral treatment instead of surfacing as an uncaught
+    // ArchitectureLayerResolver exception from CheckAttributeUsageContract.
+    private static IEnumerable<string> GetAttributeUsageReferencedLayerNames(ArchitectureAttributeUsageContract contract)
+    {
+        return contract.AllowedOnlyInLayers.Concat(contract.ForbiddenInLayers);
     }
 }

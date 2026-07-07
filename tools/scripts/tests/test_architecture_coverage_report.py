@@ -433,6 +433,36 @@ def test_classify_changed_file_skips_unconfigured_project_scope(tmp_path: Path) 
     assert "assembly" not in scopes_seen
 
 
+def test_classify_changed_file_skips_test_project_files(tmp_path: Path) -> None:
+    """A changed file inside a *.Tests project must not be classified against any
+    coverage scope at all — its namespace/project/assembly can never be scanned by the
+    architecture engine (test projects aren't in analysis.target_assemblies), so
+    reporting "unknown" for it is tooling noise, not a real policy gap."""
+    file_rel = "tests/Foo.Tests/BarTests.cs"
+    write_file(tmp_path, file_rel, "namespace FooTestFixtures;\n\nclass BarTests {}\n")
+    write_file(tmp_path, "tests/Foo.Tests/Foo.Tests.csproj", "<Project Sdk=\"Microsoft.NET.Sdk\"></Project>\n")
+
+    report = make_report(True, [])
+    coverage_index = build_coverage_index(report)
+
+    units = classify_changed_file(file_rel, tmp_path, coverage_index, ALL_SCOPES)
+
+    assert units == []
+
+
+def test_render_new_code_section_omits_test_project_noise(tmp_path: Path) -> None:
+    file_rel = "tests/Foo.Tests/BarTests.cs"
+    write_file(tmp_path, file_rel, "namespace FooTestFixtures;\n\nclass BarTests {}\n")
+    write_file(tmp_path, "tests/Foo.Tests/Foo.Tests.csproj", "<Project Sdk=\"Microsoft.NET.Sdk\"></Project>\n")
+
+    report = make_report(True, [])
+
+    markdown = render_report(report, [file_rel], tmp_path)
+
+    assert "FooTestFixtures" not in markdown
+    assert "| Requiring policy update | none |" in markdown
+
+
 def test_render_new_code_section_omits_unconfigured_project_scope_noise(tmp_path: Path) -> None:
     file_rel = "src/Foo/Bar.cs"
     write_file(tmp_path, file_rel, "namespace Foo.Bar;\n\nclass C {}\n")

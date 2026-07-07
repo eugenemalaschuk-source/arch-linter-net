@@ -105,6 +105,13 @@
       "auditGroup": "audit_public_api_surface",
       "fields": ["name", "id", "assemblies", "declared_api", "forbid_public_constants_unless_declared", "allowed_public_constants", "ignored_violations", "reason"],
       "validates": "An assembly's exported (public/protected/protected-internal) types and directly-declared members match a normalized signature allowlist (declared_api). assemblies must be non-empty. Undeclared exported types/members are violations. forbid_public_constants_unless_declared adds an independent, stricter check: an exported const field is forbidden unless its fully-qualified name is in allowed_public_constants, even if its full signature is already in declared_api. Detects only undeclared additions, not removed/changed signatures; not a substitute for binary/package compatibility validation."
+    },
+    {
+      "kind": "attribute-usage",
+      "strictGroup": "strict_attribute_usage",
+      "auditGroup": "audit_attribute_usage",
+      "fields": ["name", "id", "attributes", "attribute_prefixes", "allowed_only_in_layers", "allowed_only_in_namespaces", "allowed_only_in_projects", "allowed_only_in_assemblies", "forbidden_in_layers", "forbidden_in_namespaces", "forbidden_in_projects", "forbidden_in_assemblies", "ignored_violations", "reason"],
+      "validates": "A declared attribute type (matched by exact fully-qualified name via attributes, and/or by prefix via attribute_prefixes) is restricted to (allowed_only_in_*) or excluded from (forbidden_in_*) a declared layer/namespace/project/assembly. Scans the type itself and every declared member (ctor/method/property/field/event) regardless of visibility. Requires at least one attribute selector and at least one location expectation. Static marker placement validation only: does not evaluate attribute constructor arguments/named properties (not authorization/security correctness validation) and does not detect the absence of a required marker (required-marker enforcement is a deferred follow-up)."
     }
   ],
   "exceptionMechanisms": {

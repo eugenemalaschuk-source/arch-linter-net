@@ -124,6 +124,7 @@ contracts:
   strict_layer_templates: []
   strict_type_placement: []
   strict_public_api_surface: []
+  strict_attribute_usage: []
   strict_coverage: []
 
   audit: []
@@ -143,6 +144,7 @@ contracts:
   audit_layer_templates: []
   audit_type_placement: []
   audit_public_api_surface: []
+  audit_attribute_usage: []
   audit_coverage: []
 ```
 
