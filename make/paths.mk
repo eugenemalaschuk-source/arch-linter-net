@@ -14,6 +14,9 @@ BREW      ?= brew
 POWERSHELL ?= pwsh
 NPM       ?= npm
 
+# Parallel job count for `make acceptance` — override with `make acceptance NPROC=1` to force serial.
+NPROC ?= $(shell nproc 2>/dev/null || getconf _NPROCESSORS_ONLN 2>/dev/null || echo 4)
+
 ifeq ($(OS),Windows_NT)
 BUNDLE_OS := windows
 else

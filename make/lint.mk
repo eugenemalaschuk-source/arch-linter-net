@@ -8,7 +8,8 @@ lint: lint-code-size lint-dotnet-format lint-architecture lint-docs  ## Run all 
 lint-architecture:  ## Run strict architecture contracts on self
 	@dotnet build "$(PROJECT_ROOT)/src/ArchLinterNet.Cli/ArchLinterNet.Cli.csproj" --nologo -v minimal
 	@dotnet build "$(PROJECT_ROOT)/src/ArchLinterNet.Unity/ArchLinterNet.Unity.csproj" --nologo -v minimal
-	@dotnet test "$(TESTS_DIR)/ArchLinterNet.Core.Tests/ArchLinterNet.Core.Tests.csproj" --no-restore
+	@dotnet test "$(TESTS_DIR)/ArchLinterNet.Core.Tests/ArchLinterNet.Core.Tests.csproj" --no-restore \
+		--filter "FullyQualifiedName=ArchLinterNet.Core.Tests.SelfArchitecturePolicyTests.RepositoryPolicy_ValidatesOwnInternalBoundaries"
 
 audit-architecture:  ## Run diagnostic architecture audit contracts
 	@dotnet build "$(PROJECT_ROOT)/src/ArchLinterNet.Testing/ArchLinterNet.Testing.csproj" --nologo -q 2>/dev/null
