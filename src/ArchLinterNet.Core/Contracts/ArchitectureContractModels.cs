@@ -222,6 +222,12 @@ public sealed class ArchitectureContractGroups
     [YamlMember(Alias = "audit_type_placement")]
     public List<ArchitectureTypePlacementContract> AuditTypePlacement { get; set; } = new();
 
+    [YamlMember(Alias = "strict_public_api_surface")]
+    public List<ArchitecturePublicApiSurfaceContract> StrictPublicApiSurface { get; set; } = new();
+
+    [YamlMember(Alias = "audit_public_api_surface")]
+    public List<ArchitecturePublicApiSurfaceContract> AuditPublicApiSurface { get; set; } = new();
+
     // Bound (not executed) so a schema-valid coverage contract is detected and rejected with a
     // clear "reserved, not implemented" diagnostic instead of being silently dropped by
     // IgnoreUnmatchedProperties deserialization. See ArchitecturePolicyDocumentLoader.Load.
@@ -255,6 +261,7 @@ public sealed class ArchitectureContractGroups
         foreach (var c in StrictExternalAllowOnly) yield return c;
         foreach (var c in StrictAcyclicSiblings) yield return c;
         foreach (var c in StrictTypePlacement) yield return c;
+        foreach (var c in StrictPublicApiSurface) yield return c;
         foreach (var c in StrictCoverage) yield return c;
     }
 
@@ -277,6 +284,7 @@ public sealed class ArchitectureContractGroups
         foreach (var c in AuditExternalAllowOnly) yield return c;
         foreach (var c in AuditAcyclicSiblings) yield return c;
         foreach (var c in AuditTypePlacement) yield return c;
+        foreach (var c in AuditPublicApiSurface) yield return c;
         foreach (var c in AuditCoverage) yield return c;
     }
 }
@@ -696,6 +704,28 @@ public sealed class ArchitectureTypePlacementContract : IArchitectureContract
 
     [YamlMember(Alias = "forbidden_name_prefix")]
     public string ForbiddenNamePrefix { get; set; } = string.Empty;
+
+    [YamlMember(Alias = "ignored_violations")]
+    public List<ArchitectureIgnoredViolation> IgnoredViolations { get; set; } = new();
+
+    [YamlMember(Alias = "reason")] public string Reason { get; set; } = string.Empty;
+}
+
+public sealed class ArchitecturePublicApiSurfaceContract : IArchitectureContract
+{
+    [YamlMember(Alias = "name")] public string Name { get; set; } = string.Empty;
+
+    [YamlMember(Alias = "id")] public string? Id { get; set; }
+
+    [YamlMember(Alias = "assemblies")] public List<string> Assemblies { get; set; } = new();
+
+    [YamlMember(Alias = "declared_api")] public List<string> DeclaredApi { get; set; } = new();
+
+    [YamlMember(Alias = "forbid_public_constants_unless_declared")]
+    public bool ForbidPublicConstantsUnlessDeclared { get; set; }
+
+    [YamlMember(Alias = "allowed_public_constants")]
+    public List<string> AllowedPublicConstants { get; set; } = new();
 
     [YamlMember(Alias = "ignored_violations")]
     public List<ArchitectureIgnoredViolation> IgnoredViolations { get; set; } = new();

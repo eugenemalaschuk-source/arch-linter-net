@@ -375,6 +375,16 @@
           "items": { "$ref": "#/$defs/typePlacementContract" },
           "default": []
         },
+        "strict_public_api_surface": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/publicApiSurfaceContract" },
+          "default": []
+        },
+        "audit_public_api_surface": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/publicApiSurfaceContract" },
+          "default": []
+        },
         "strict_coverage": {
           "type": "array",
           "items": { "$ref": "#/$defs/coverageContract" },
@@ -716,6 +726,30 @@
             "required_name_prefix": { "type": "string", "minLength": 1 },
             "forbidden_name_suffix": { "type": "string", "minLength": 1 },
             "forbidden_name_prefix": { "type": "string", "minLength": 1 },
+            "ignored_violations": { "$ref": "#/$defs/ignoredViolations" },
+            "reason": { "type": "string" }
+          }
+        }
+      ]
+    },
+    "publicApiSurfaceContract": {
+      "allOf": [
+        { "$ref": "#/$defs/baseContractFields" },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["name", "assemblies"],
+          "properties": {
+            "name": { "type": "string", "minLength": 1 },
+            "id": { "type": "string", "minLength": 1 },
+            "assemblies": { "$ref": "#/$defs/stringList" },
+            "declared_api": { "$ref": "#/$defs/stringList" },
+            "forbid_public_constants_unless_declared": {
+              "type": "boolean",
+              "default": false,
+              "description": "When true, every exported const field must have its fully-qualified name listed in allowed_public_constants, even if its full signature is present in declared_api."
+            },
+            "allowed_public_constants": { "$ref": "#/$defs/stringList" },
             "ignored_violations": { "$ref": "#/$defs/ignoredViolations" },
             "reason": { "type": "string" }
           }

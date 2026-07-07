@@ -199,6 +199,46 @@ discovery; it is not physical `.csproj`-membership tracking, since there is no
 type-to-project mapping in this tool beyond a project's own assembly name. See
 [Type placement contracts](../contracts/type-placement.md) for full semantics.
 
+## Use Public API Surface For A Library's Exported Boundary
+
+When a library assembly's exported (`public`/`protected`/`protected internal`)
+API should be intentional and reviewed before every release, use
+`strict_public_api_surface` / `audit_public_api_surface` instead of trusting
+default visibility everywhere:
+
+```yaml
+contracts:
+  strict_public_api_surface:
+    - id: core-public-api
+      name: core-public-api-declared
+      assemblies: [MyApp.Core]
+      declared_api:
+        - "class MyApp.Core.Foo"
+        - "ctor MyApp.Core.Foo()"
+        - "method MyApp.Core.Foo.Bar(System.Int32): System.Void"
+      forbid_public_constants_unless_declared: true
+      allowed_public_constants: []
+      reason: Track Core's exact exported surface before every NuGet release.
+```
+
+`assemblies` must be non-empty — a contract with nothing to scan fails policy
+loading with an actionable error. `declared_api` entries are normalized
+signature strings (`<kind> <FullyQualifiedName>[(<param types>)][: <member type>]`, e.g. `class`/`ctor`/`method`/`property`/`field`/`const`/`event`); CLR
+full type names are used throughout (e.g. `System.Int32`, not `int`), and
+generic type/method parameters are rendered positionally (`!N`/`!!N`) so
+renaming a generic parameter alone never changes a declared signature.
+`protected`/`protected internal` members are treated as exported by default,
+same as `public`.
+
+`forbid_public_constants_unless_declared` is an independent, stricter check —
+an exported `const` field can still be a violation even when its full
+signature is already in `declared_api`, unless its fully-qualified member name
+is also present in `allowed_public_constants`. This only detects **undeclared**
+exported surface; it does not detect removed or changed declared signatures
+and is not a substitute for binary/package compatibility validation. See
+[Public API surface contracts](../contracts/public-api-surface.md) for full
+semantics.
+
 ## Use Transitive Depth For Indirect Coupling
 
 When a dependency should be blocked at any depth (direct or indirect), use

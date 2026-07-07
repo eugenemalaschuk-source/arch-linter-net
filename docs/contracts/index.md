@@ -27,6 +27,7 @@ Most contract families have two variants:
 | [Unity asmdef](asmdef.md) | `strict_asmdef` | `audit_asmdef` | Unity assembly definition references must follow architecture rules. |
 | [Layer template](layer-templates.md) | `strict_layer_templates` | `audit_layer_templates` | The same ordered layer shape applies to multiple namespace containers. |
 | [Type placement](type-placement.md) | `strict_type_placement` | `audit_type_placement` | An architectural role must live in a declared layer/namespace/project/assembly and/or carry a declared naming suffix/prefix. |
+| [Public API surface](public-api-surface.md) | `strict_public_api_surface` | `audit_public_api_surface` | An assembly's exported public/protected types and members must match a declared allowlist. |
 | [Coverage contracts](coverage.md) | `strict_coverage` | `audit_coverage` | First-party namespaces, discovered projects, and resolved assemblies must be modeled by layers, templates, or explicit exclusions. |
 
 ## Strict or audit?

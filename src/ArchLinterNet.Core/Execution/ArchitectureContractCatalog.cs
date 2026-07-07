@@ -92,6 +92,8 @@ public sealed class ArchitectureContractCatalog
         AddGroup("audit_acyclic_siblings", "audit", "acyclic_sibling", groups.AuditAcyclicSiblings);
         AddGroup("strict_type_placement", "strict", "type_placement", groups.StrictTypePlacement);
         AddGroup("audit_type_placement", "audit", "type_placement", groups.AuditTypePlacement);
+        AddGroup("strict_public_api_surface", "strict", "public_api_surface", groups.StrictPublicApiSurface);
+        AddGroup("audit_public_api_surface", "audit", "public_api_surface", groups.AuditPublicApiSurface);
         AddGroup("strict_coverage", "strict", "coverage", groups.StrictCoverage);
         AddGroup("audit_coverage", "audit", "coverage", groups.AuditCoverage);
 

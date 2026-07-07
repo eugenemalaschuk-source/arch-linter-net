@@ -98,6 +98,13 @@
       "auditGroup": "audit_type_placement",
       "fields": ["name", "id", "types_matching.name_suffix", "types_matching.name_prefix", "types_matching.namespace", "types_matching.layer", "types_matching.base_type", "types_matching.implements_interface", "types_matching.has_attribute", "must_reside_in_layers", "must_reside_in_namespaces", "must_reside_in_projects", "must_reside_in_assemblies", "required_name_suffix", "required_name_prefix", "forbidden_name_suffix", "forbidden_name_prefix", "ignored_violations", "reason"],
       "validates": "A type selected by constrained matchers (name suffix/prefix, namespace, layer, base type, implemented interface, attribute) resides in a declared layer/namespace/project/assembly and/or carries a declared naming suffix/prefix. must_reside_in_projects resolves to assembly-name matching via project discovery, not physical .csproj-membership tracking. Requires at least one placement or naming expectation."
+    },
+    {
+      "kind": "public-api-surface",
+      "strictGroup": "strict_public_api_surface",
+      "auditGroup": "audit_public_api_surface",
+      "fields": ["name", "id", "assemblies", "declared_api", "forbid_public_constants_unless_declared", "allowed_public_constants", "ignored_violations", "reason"],
+      "validates": "An assembly's exported (public/protected/protected-internal) types and directly-declared members match a normalized signature allowlist (declared_api). assemblies must be non-empty. Undeclared exported types/members are violations. forbid_public_constants_unless_declared adds an independent, stricter check: an exported const field is forbidden unless its fully-qualified name is in allowed_public_constants, even if its full signature is already in declared_api. Detects only undeclared additions, not removed/changed signatures; not a substitute for binary/package compatibility validation."
     }
   ],
   "exceptionMechanisms": {

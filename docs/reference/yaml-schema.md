@@ -240,6 +240,7 @@ contracts:
   strict_external_allow_only: []
   strict_acyclic_siblings: []
   strict_type_placement: []
+  strict_public_api_surface: []
   strict_coverage: []
 
   audit: []                     # Non-blocking contracts (same types)
@@ -258,6 +259,7 @@ contracts:
   audit_external_allow_only: []
   audit_acyclic_siblings: []
   audit_type_placement: []
+  audit_public_api_surface: []
   audit_coverage: []
 ```
 
@@ -542,6 +544,28 @@ naming suffix/prefix. At least one placement (`must_reside_in_*`) or naming
 (`required_name_*`/`forbidden_name_*`) expectation is required — a selector with neither
 fails policy loading with an actionable error. See
 [Type placement contracts](../contracts/type-placement.md) for full semantics.
+
+### Public API surface contract
+
+```yaml
+- id: <string>                                    # Optional
+  name: <string>
+  assemblies: [<assembly-name>]                    # Required — non-empty
+  declared_api: []                                 # Optional — normalized signature allowlist
+  forbid_public_constants_unless_declared: false   # Optional — default false
+  allowed_public_constants: []                     # Optional — fully-qualified const member names
+  ignored_violations: []                           # Optional — baseline known violations
+  reason: <string>
+```
+
+Public API surface contracts declare the intended exported (`public`/`protected`/`protected internal`) API surface of one or more assemblies as a normalized signature allowlist and
+report any exported type or member not present in it. `assemblies` must be non-empty — a
+contract with nothing to scan fails policy loading with an actionable error.
+`forbid_public_constants_unless_declared` adds an independent, stricter check on top of the
+general declaration: an exported `const` field is forbidden unless its fully-qualified
+member name is in `allowed_public_constants`, even if its full signature is already present
+in `declared_api`. See [Public API surface contracts](../contracts/public-api-surface.md)
+for the signature grammar and full semantics.
 
 ### Coverage contract
 

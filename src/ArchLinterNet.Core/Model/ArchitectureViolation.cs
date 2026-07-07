@@ -20,4 +20,8 @@ public sealed record ArchitectureViolation(
     public string? ActualTypeLocation { get; init; }
     public string? ExpectedTypeName { get; init; }
     public string? ActualTypeName { get; init; }
+    public string? UndeclaredApiSignature { get; init; }
+    public bool? ForbiddenPublicConstant { get; init; }
+    public string? ApiAssemblyName { get; init; }
+    public string? ApiVisibility { get; init; }
 }
