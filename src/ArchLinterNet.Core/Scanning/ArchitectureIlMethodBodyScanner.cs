@@ -79,6 +79,26 @@ internal sealed class ArchitectureIlMethodBodyScanner : IArchitectureIlMethodBod
         }
     }
 
+    // Shared per-type IL scan loop, extracted so callers outside the namespace/layer-scoped public
+    // entry point (e.g. composition contracts, which scan an already-filtered arbitrary type set
+    // rather than a single named source layer) can reuse the same IL matching logic without
+    // duplicating it. Returns the matched forbidden API's fully-qualified member name per match
+    // (not the "il <offset> (...)" diagnostic-formatted strings FindMethodMatches yields for
+    // method-body violations), since composition diagnostics report the matched API itself.
+    internal static IEnumerable<string> FindMatchesForType(
+        Type type,
+        IReadOnlyList<ForbiddenCallPattern> patterns,
+        Dictionary<string, bool> matchCache)
+    {
+        foreach (MethodBase method in EnumerateMethods(type))
+        {
+            foreach (IlForbiddenCallMatch match in FindMethodMatchDetails(method, patterns, matchCache))
+            {
+                yield return match.MatchedMember;
+            }
+        }
+    }
+
     private static IEnumerable<MethodBase> EnumerateMethods(Type sourceType)
     {
         const BindingFlags Flags =
@@ -97,6 +117,24 @@ internal sealed class ArchitectureIlMethodBodyScanner : IArchitectureIlMethodBod
     }
 
     private static IEnumerable<string> FindMethodMatches(
+        MethodBase method,
+        IReadOnlyList<ForbiddenCallPattern> patterns,
+        Dictionary<string, bool> matchCache)
+    {
+        foreach (IlForbiddenCallMatch match in FindMethodMatchDetails(method, patterns, matchCache))
+        {
+            yield return
+                $"il {match.InstructionOffset:X4} ({match.MethodName}): {match.MatchedPattern} -> {match.MatchedMember}";
+        }
+    }
+
+    private readonly record struct IlForbiddenCallMatch(
+        int InstructionOffset,
+        string MethodName,
+        string MatchedPattern,
+        string MatchedMember);
+
+    private static IEnumerable<IlForbiddenCallMatch> FindMethodMatchDetails(
         MethodBase method,
         IReadOnlyList<ForbiddenCallPattern> patterns,
         Dictionary<string, bool> matchCache)
@@ -154,8 +192,7 @@ internal sealed class ArchitectureIlMethodBodyScanner : IArchitectureIlMethodBod
             }
 
             string methodName = $"{method.DeclaringType?.FullName}.{method.Name}";
-            yield return
-                $"il {instructionOffset:X4} ({methodName}): {matchedPattern} -> {descriptor.FullyQualifiedMember}";
+            yield return new IlForbiddenCallMatch(instructionOffset, methodName, matchedPattern, descriptor.FullyQualifiedMember);
         }
     }
 

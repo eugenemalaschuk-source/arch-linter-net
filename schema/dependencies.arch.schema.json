@@ -415,6 +415,16 @@
           "items": { "$ref": "#/$defs/interfaceImplementationContract" },
           "default": []
         },
+        "strict_composition": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/compositionContract" },
+          "default": []
+        },
+        "audit_composition": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/compositionContract" },
+          "default": []
+        },
         "strict_coverage": {
           "type": "array",
           "items": { "$ref": "#/$defs/coverageContract" },
@@ -852,6 +862,27 @@
             "forbidden_in_namespaces": { "$ref": "#/$defs/stringList" },
             "forbidden_in_projects": { "$ref": "#/$defs/stringList" },
             "forbidden_in_assemblies": { "$ref": "#/$defs/stringList" },
+            "ignored_violations": { "$ref": "#/$defs/ignoredViolations" },
+            "reason": { "type": "string" }
+          }
+        }
+      ]
+    },
+    "compositionContract": {
+      "allOf": [
+        { "$ref": "#/$defs/baseContractFields" },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["name", "forbidden_apis"],
+          "properties": {
+            "name": { "type": "string", "minLength": 1 },
+            "id": { "type": "string", "minLength": 1 },
+            "forbidden_apis": { "$ref": "#/$defs/stringList" },
+            "allowed_only_in_layers": { "$ref": "#/$defs/stringList" },
+            "allowed_only_in_namespaces": { "$ref": "#/$defs/stringList" },
+            "allowed_only_in_projects": { "$ref": "#/$defs/stringList" },
+            "allowed_only_in_assemblies": { "$ref": "#/$defs/stringList" },
             "ignored_violations": { "$ref": "#/$defs/ignoredViolations" },
             "reason": { "type": "string" }
           }

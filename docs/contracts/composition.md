@@ -1,0 +1,80 @@
+# Composition Contracts
+
+Composition contracts restrict where composition-root and service-locator APIs may be called from: dependency-injection registration (`IServiceCollection.AddSingleton`, etc.), service-locator resolution (`IServiceProvider.GetService`), and container `Resolve`/`Register` calls in Unity/VContainer-style bootstraps. This is a static reflection/IL-based check on call sites outside a declared composition boundary, not runtime dependency-injection resolution.
+
+Groups:
+
+- `strict_composition`
+- `audit_composition`
+
+## Example
+
+```yaml
+contracts:
+  strict_composition:
+    - id: service-locator-confined-to-composition-root
+      name: service-locator-confined-to-composition-root
+      allowed_only_in_layers: [composition]
+      forbidden_apis:
+        - System.IServiceProvider.GetService
+        - Microsoft.Extensions.DependencyInjection.IServiceCollection.
+      reason: Service resolution and DI registration must happen only in the composition root.
+```
+
+A Unity/VContainer-style bootstrap boundary looks the same shape, with container-specific member names or namespace prefixes:
+
+```yaml
+contracts:
+  strict_composition:
+    - id: container-confined-to-bootstrap
+      name: container-confined-to-bootstrap
+      allowed_only_in_namespaces: [MyGame.Bootstrap]
+      forbidden_apis:
+        - Resolve
+        - Register
+      reason: Container resolution/registration must happen only during bootstrap.
+```
+
+## When to use
+
+Use composition contracts when a service-locator or DI-registration API should be confined to a composition root or bootstrap boundary:
+
+- `IServiceProvider.GetService`/`IServiceCollection.AddSingleton`-style calls should occur only in a server application's composition root, not scattered through application/domain code;
+- Unity/VContainer-style container `Resolve`/`Register` calls should occur only during a scene or lifetime-scope bootstrap, not from arbitrary gameplay code.
+
+For forbidding calls scoped to a single named source layer (rather than an allow-listed boundary spanning the rest of the codebase), use [method-body contracts](method-body.md) instead — composition contracts invert that shape: they scan every type *outside* the allow-list.
+
+## Semantics
+
+### Composition boundary
+
+`allowed_only_in_layers`, `allowed_only_in_namespaces`, `allowed_only_in_projects`, and `allowed_only_in_assemblies` together form an allow-list: any type whose location does not satisfy **at least one** entry across all four lists is scanned for forbidden API calls. A type inside the boundary is never scanned — calling a forbidden API from inside the composition boundary is exactly what the boundary is for.
+
+A contract must declare at least one entry across these four lists; a contract with none is rejected at policy load time (every call site in the codebase would otherwise be considered outside the boundary).
+
+`allowed_only_in_projects` resolves each configured project name to its assembly name via project discovery — the same assembly-name-equivalence semantics documented for `type_placement`'s `must_reside_in_projects`.
+
+### Matching surface
+
+`forbidden_apis` uses the same call-pattern vocabulary as [method-body contracts](method-body.md):
+
+- member names;
+- `Type.Member` names;
+- fully qualified members;
+- namespace or type prefixes (entries ending in `.`).
+
+A contract must declare at least one `forbidden_apis` entry; a contract with none is rejected at policy load time.
+
+Scanning is reflection/IL-only (no Roslyn dual-scan): every loaded type's methods and constructors are inspected via `MethodBase.GetMethodBody()`, matching the approach used by the method-body IL fallback. This means calls made through delegates, expression trees, or reflection-invoked members are not visible to the scanner.
+
+### Violations
+
+Each violation identifies the calling type outside the composition boundary, the matched forbidden API's fully-qualified name, and the expected composition boundary description. Violations are emitted deterministically: types ordered by fully-qualified name, matched APIs within a type ordered ordinally, with at most one violation per (type, matched API) pair.
+
+`ignored_violations` entries use the same `source_type`/`forbidden_reference`/`reason` shape as other contract families, matching the calling type and the matched forbidden API's fully-qualified name.
+
+## Non-goals
+
+- **Runtime DI resolution correctness is not validated.** The contract detects static call sites to selected APIs outside a declared boundary; it does not resolve, simulate, or verify runtime service registration or resolution, and it does not prove every service is registered correctly.
+- Not a substitute for reflection/plugin-loading validation.
+- No semantic data-flow analysis — only static reflection/IL member-reference matching.

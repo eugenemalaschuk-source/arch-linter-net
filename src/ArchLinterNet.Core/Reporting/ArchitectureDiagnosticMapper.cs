@@ -99,6 +99,17 @@ public static class ArchitectureDiagnosticMapper
             };
         }
 
+        if (violation.MatchedForbiddenApi != null)
+        {
+            return new CompositionDiagnostic(
+                violation.ContractName, violation.ContractId, violation.SourceType,
+                violation.ForbiddenNamespace, violation.ForbiddenReferences)
+            {
+                MatchedForbiddenApi = violation.MatchedForbiddenApi,
+                ExpectedCompositionBoundary = violation.ExpectedCompositionBoundary
+            };
+        }
+
         return new DependencyDiagnostic(
             violation.ContractName, violation.ContractId, violation.SourceType,
             violation.ForbiddenNamespace, violation.ForbiddenReferences)
