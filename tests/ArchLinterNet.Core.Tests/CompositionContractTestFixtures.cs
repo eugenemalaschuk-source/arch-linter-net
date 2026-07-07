@@ -14,6 +14,17 @@ namespace CompositionContractTestFixtures.Fakes
         void AddSingleton(System.Type serviceType);
     }
 
+    public interface IFakeAspNetServiceCollection
+    {
+    }
+
+    public static class FakeServiceCollectionServiceExtensions
+    {
+        public static void AddSingleton(this IFakeAspNetServiceCollection services, System.Type serviceType)
+        {
+        }
+    }
+
     // Mirrors a Unity/VContainer-style container API surface (Resolve/Register) distinct from the
     // ASP.NET-shaped fakes above, so tests can exercise both example call shapes named in the issue.
     public sealed class FakeContainer
@@ -35,6 +46,11 @@ namespace CompositionContractTestFixtures.Composition
     public sealed class CompositionRoot
     {
         public void ConfigureServices(IFakeServiceCollection services)
+        {
+            services.AddSingleton(typeof(object));
+        }
+
+        public void ConfigureAspNetServices(IFakeAspNetServiceCollection services)
         {
             services.AddSingleton(typeof(object));
         }
@@ -72,6 +88,14 @@ namespace CompositionContractTestFixtures.Application
     public sealed class DiRegistrationLeak
     {
         public void ConfigureServices(IFakeServiceCollection services)
+        {
+            services.AddSingleton(typeof(object));
+        }
+    }
+
+    public sealed class AspNetDiRegistrationLeak
+    {
+        public void ConfigureServices(IFakeAspNetServiceCollection services)
         {
             services.AddSingleton(typeof(object));
         }

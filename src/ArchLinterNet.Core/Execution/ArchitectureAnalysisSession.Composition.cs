@@ -53,12 +53,14 @@ public sealed partial class ArchitectureAnalysisSession
 
             string sourceType = ArchitectureTypeNames.SafeFullName(type);
 
-            var matches = ArchitectureIlMethodBodyScanner.FindMatchesForType(type, patterns, matchCache)
-                .Distinct(StringComparer.Ordinal)
-                .OrderBy(match => match, StringComparer.Ordinal);
+            var matches = ArchitectureIlMethodBodyScanner.FindMatchDetailsForType(type, patterns, matchCache)
+                .Distinct()
+                .OrderBy(match => match.MatchedMember, StringComparer.Ordinal)
+                .ThenBy(match => match.SourceMember, StringComparer.Ordinal);
 
-            foreach (string matchedForbiddenApi in matches)
+            foreach (ArchitectureIlForbiddenCallMatch match in matches)
             {
+                string matchedForbiddenApi = match.MatchedMember;
                 if (executionContext.IsIgnored(sourceType, matchedForbiddenApi))
                 {
                     continue;
@@ -72,6 +74,7 @@ public sealed partial class ArchitectureAnalysisSession
                     new[] { matchedForbiddenApi })
                 {
                     MatchedForbiddenApi = matchedForbiddenApi,
+                    SourceMember = match.SourceMember,
                     ExpectedCompositionBoundary = expectedCompositionBoundary
                 });
             }

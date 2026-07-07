@@ -57,6 +57,43 @@ public sealed class ForbiddenCallMatcherTests
     }
 
     [Test]
+    public void TryMatch_TrailingDotPattern_MatchesFullyQualifiedTypePrefix()
+    {
+        IReadOnlyList<ForbiddenCallPattern> patterns = ArchitectureForbiddenCallMatcher.NormalizePatterns(
+            new[] { "MyApp.Services.MyService." });
+        var descriptor = new SymbolDescriptor(
+            "MyMethod",
+            "MyService",
+            "MyApp.Services",
+            "MyApp.Services.MyService.MyMethod");
+        var cache = new Dictionary<string, bool>();
+
+        bool matched = ArchitectureForbiddenCallMatcher.TryMatch(descriptor, patterns, cache, out string raw);
+
+        Assert.That(matched, Is.True);
+        Assert.That(raw, Is.EqualTo("MyApp.Services.MyService."));
+    }
+
+    [Test]
+    public void TryMatch_TrailingDotPattern_MatchesExtensionReceiverType()
+    {
+        IReadOnlyList<ForbiddenCallPattern> patterns = ArchitectureForbiddenCallMatcher.NormalizePatterns(
+            new[] { "Microsoft.Extensions.DependencyInjection.IServiceCollection." });
+        var descriptor = new SymbolDescriptor(
+            "AddSingleton",
+            "ServiceCollectionServiceExtensions",
+            "Microsoft.Extensions.DependencyInjection",
+            "Microsoft.Extensions.DependencyInjection.ServiceCollectionServiceExtensions.AddSingleton",
+            "Microsoft.Extensions.DependencyInjection.IServiceCollection");
+        var cache = new Dictionary<string, bool>();
+
+        bool matched = ArchitectureForbiddenCallMatcher.TryMatch(descriptor, patterns, cache, out string raw);
+
+        Assert.That(matched, Is.True);
+        Assert.That(raw, Is.EqualTo("Microsoft.Extensions.DependencyInjection.IServiceCollection."));
+    }
+
+    [Test]
     public void TryMatch_FullyQualifiedMatch_ReturnsTrue()
     {
         IReadOnlyList<ForbiddenCallPattern> patterns = ArchitectureForbiddenCallMatcher.NormalizePatterns(

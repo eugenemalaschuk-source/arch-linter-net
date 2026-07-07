@@ -34,6 +34,7 @@ public sealed record ArchitectureViolation(
     public string? ImplementationKind { get; init; }
     public string? ExpectedImplementationLocation { get; init; }
     public string? ActualImplementationLocation { get; init; }
+    public string? SourceMember { get; init; }
     public string? MatchedForbiddenApi { get; init; }
     public string? ExpectedCompositionBoundary { get; init; }
 }

@@ -10,6 +10,7 @@ public sealed record CompositionDiagnostic(
 {
     public override ArchitectureDiagnosticKind Kind => ArchitectureDiagnosticKind.Composition;
 
+    public string? SourceMember { get; init; }
     public string? MatchedForbiddenApi { get; init; }
     public string? ExpectedCompositionBoundary { get; init; }
 }

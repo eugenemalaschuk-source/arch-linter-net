@@ -16,6 +16,11 @@ internal interface IArchitectureIlMethodBodyScanner
         ArchitectureLayer? sourceLayer = null);
 }
 
+internal readonly record struct ArchitectureIlForbiddenCallMatch(
+    string SourceMember,
+    string MatchedPattern,
+    string MatchedMember);
+
 internal sealed class ArchitectureIlMethodBodyScanner : IArchitectureIlMethodBodyScanner
 {
     private static readonly Dictionary<ushort, OpCode> _opCodes = BuildOpCodeMap();
@@ -90,11 +95,23 @@ internal sealed class ArchitectureIlMethodBodyScanner : IArchitectureIlMethodBod
         IReadOnlyList<ForbiddenCallPattern> patterns,
         Dictionary<string, bool> matchCache)
     {
+        return FindMatchDetailsForType(type, patterns, matchCache)
+            .Select(match => match.MatchedMember);
+    }
+
+    internal static IEnumerable<ArchitectureIlForbiddenCallMatch> FindMatchDetailsForType(
+        Type type,
+        IReadOnlyList<ForbiddenCallPattern> patterns,
+        Dictionary<string, bool> matchCache)
+    {
         foreach (MethodBase method in EnumerateMethods(type))
         {
             foreach (IlForbiddenCallMatch match in FindMethodMatchDetails(method, patterns, matchCache))
             {
-                yield return match.MatchedMember;
+                yield return new ArchitectureIlForbiddenCallMatch(
+                    match.MethodName,
+                    match.MatchedPattern,
+                    match.MatchedMember);
             }
         }
     }

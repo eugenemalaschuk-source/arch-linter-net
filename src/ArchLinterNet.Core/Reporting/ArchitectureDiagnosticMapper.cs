@@ -105,6 +105,7 @@ public static class ArchitectureDiagnosticMapper
                 violation.ContractName, violation.ContractId, violation.SourceType,
                 violation.ForbiddenNamespace, violation.ForbiddenReferences)
             {
+                SourceMember = violation.SourceMember,
                 MatchedForbiddenApi = violation.MatchedForbiddenApi,
                 ExpectedCompositionBoundary = violation.ExpectedCompositionBoundary
             };

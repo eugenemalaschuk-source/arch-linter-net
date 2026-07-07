@@ -12,6 +12,10 @@ public sealed class CompositionContractTests
     private const string ApplicationNamespace = "CompositionContractTestFixtures.Application";
     private const string GetServiceApi = "CompositionContractTestFixtures.Fakes.IFakeServiceProvider.GetService";
     private const string AddSingletonApi = "CompositionContractTestFixtures.Fakes.IFakeServiceCollection.AddSingleton";
+    private const string AspNetServiceCollectionSelector =
+        "CompositionContractTestFixtures.Fakes.IFakeAspNetServiceCollection.";
+    private const string AspNetAddSingletonApi =
+        "CompositionContractTestFixtures.Fakes.FakeServiceCollectionServiceExtensions.AddSingleton";
     private const string ContainerNamespacePrefix = "CompositionContractTestFixtures.Fakes.";
 
     private string _tempDir = null!;
@@ -111,7 +115,32 @@ public sealed class CompositionContractTests
 
         Assert.That(violations.Any(v =>
             v.SourceType == "CompositionContractTestFixtures.Application.ServiceLocatorLeak"
-            && v.MatchedForbiddenApi == GetServiceApi), Is.True);
+            && v.MatchedForbiddenApi == GetServiceApi
+            && v.SourceMember == "CompositionContractTestFixtures.Application.ServiceLocatorLeak.ResolveFromLocator"),
+            Is.True);
+    }
+
+    [Test]
+    public void CheckCompositionContract_TrailingDotInterfaceSelector_MatchesExtensionMethodReceiverType()
+    {
+        var contract = new ArchitectureCompositionContract
+        {
+            Name = "aspnet-di-confined-to-composition",
+            ForbiddenApis = new List<string> { AspNetServiceCollectionSelector },
+            AllowedOnlyInNamespaces = new List<string> { CompositionNamespace }
+        };
+        var document = CreateDocument(contract);
+        var runner = new ArchitectureContractRunner(CreateContext(), document);
+
+        var violations = runner.Session.CheckCompositionContract(contract);
+
+        Assert.That(violations.Any(v =>
+            v.SourceType == "CompositionContractTestFixtures.Application.AspNetDiRegistrationLeak"
+            && v.SourceMember == "CompositionContractTestFixtures.Application.AspNetDiRegistrationLeak.ConfigureServices"
+            && v.MatchedForbiddenApi == AspNetAddSingletonApi), Is.True);
+        Assert.That(violations.Any(v =>
+            v.SourceType == "CompositionContractTestFixtures.Composition.CompositionRoot"
+            && v.MatchedForbiddenApi == AspNetAddSingletonApi), Is.False);
     }
 
     [Test]

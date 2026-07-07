@@ -362,6 +362,9 @@ public sealed class ArchitectureDiagnosticFormatter : IArchitectureDiagnosticFor
         if (diagnostic is CompositionDiagnostic composition)
         {
             context += $" (matched_api: {composition.MatchedForbiddenApi}" +
+                       (composition.SourceMember != null
+                           ? $", source_member: {composition.SourceMember}"
+                           : string.Empty) +
                        (composition.ExpectedCompositionBoundary != null
                            ? $", expected_boundary: {composition.ExpectedCompositionBoundary}"
                            : string.Empty) +
@@ -549,6 +552,9 @@ public sealed class ArchitectureDiagnosticFormatter : IArchitectureDiagnosticFor
 
         if (diagnostic is CompositionDiagnostic composition)
         {
+            if (composition.SourceMember != null)
+                obj["source_member"] = composition.SourceMember;
+
             if (composition.MatchedForbiddenApi != null)
                 obj["matched_forbidden_api"] = composition.MatchedForbiddenApi;
 
