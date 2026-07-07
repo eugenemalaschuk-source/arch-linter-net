@@ -62,7 +62,7 @@ public sealed class ArchitectureRunnerSetupService(
         ArchitectureContractRunner runner;
         using (timing?.Measure("assembly_resolution", indent: 1))
         {
-            bool resolveAssemblyOutputs = document.Analysis.TargetAssemblies.Count == 0;
+            bool resolveAssemblyOutputs = ShouldResolveAssemblyOutputs(document, mode, selectedContractIds);
             ProjectDiscoveryResult discovery = projectDiscoveryService.ResolveAndApply(
                 document, repositoryRoot, resolveAssemblyOutputs);
 
@@ -78,6 +78,38 @@ public sealed class ArchitectureRunnerSetupService(
         }
 
         return new ArchitectureRunnerSetup(repositoryRoot, runner);
+    }
+
+    private static bool ShouldResolveAssemblyOutputs(
+        ArchitectureContractDocument document,
+        string? mode,
+        HashSet<string>? selectedContractIds)
+    {
+        if (document.Analysis.TargetAssemblies.Count > 0)
+        {
+            return false;
+        }
+
+        return !CanRunWithoutResolvedAssemblies(document, mode, selectedContractIds);
+    }
+
+    private static bool CanRunWithoutResolvedAssemblies(
+        ArchitectureContractDocument document,
+        string? mode,
+        HashSet<string>? selectedContractIds)
+    {
+        ArchitectureContractCatalog catalog = ArchitectureContractCatalog.Build(document);
+        IEnumerable<IArchitectureContract> relevantContracts = mode != null
+            ? catalog.ContractsFor(mode)
+            : catalog.ContractsFor("strict").Concat(catalog.ContractsFor("audit"));
+
+        List<IArchitectureContract> selectedContracts = relevantContracts
+            .Where(contract => selectedContractIds == null || selectedContractIds.Count == 0
+                || (contract.Id != null && selectedContractIds.Contains(contract.Id)))
+            .ToList();
+
+        return selectedContracts.Count > 0
+            && selectedContracts.All(static contract => contract is ArchitectureProjectMetadataContract);
     }
 
     private static ArchitectureAnalysisContext CreateAnalysisContext(

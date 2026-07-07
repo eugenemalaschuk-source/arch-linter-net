@@ -111,6 +111,20 @@ public static class ArchitectureDiagnosticMapper
             };
         }
 
+        if (violation.ProjectMetadataKind != null)
+        {
+            return new ProjectMetadataDiagnostic(
+                violation.ContractName, violation.ContractId, violation.SourceType,
+                violation.ForbiddenNamespace, violation.ForbiddenReferences)
+            {
+                ProjectMetadataKind = violation.ProjectMetadataKind,
+                ProjectMetadataKey = violation.ProjectMetadataKey,
+                ProjectMetadataExpectedValue = violation.ProjectMetadataExpectedValue,
+                ProjectMetadataActualValue = violation.ProjectMetadataActualValue,
+                ProjectMetadataSourcePath = violation.ProjectMetadataSourcePath
+            };
+        }
+
         return new DependencyDiagnostic(
             violation.ContractName, violation.ContractId, violation.SourceType,
             violation.ForbiddenNamespace, violation.ForbiddenReferences)

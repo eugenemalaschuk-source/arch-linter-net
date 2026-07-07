@@ -15,6 +15,7 @@ ArchLinterNet supports static architecture validation through documented YAML po
 - acyclic sibling namespace contracts;
 - independence contracts;
 - assembly independence contracts (direct .NET assembly reference detection);
+- project metadata governance contracts (exact required/forbidden MSBuild property values, friend-assembly allowlists, forbidden project-reference path matches, driven from discovered `.csproj` metadata);
 - protected surface contracts;
 - external dependency contracts;
 - external allow-only whitelist contracts;
@@ -45,6 +46,7 @@ ArchLinterNet does not currently validate:
 - code ownership or review ownership;
 - semantic data-flow analysis;
 - third-party package internals;
+- full MSBuild evaluation, target execution, or arbitrary imported-property semantics;
 - unrestricted custom contract families outside the documented YAML schema;
 - unrestricted namespace pattern systems;
 - arbitrary YAML fields such as `severity`, `from`, `to`, `regex`, `owner`, or custom rule groups unless the schema documents them.

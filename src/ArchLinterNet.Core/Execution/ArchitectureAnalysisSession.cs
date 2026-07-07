@@ -266,6 +266,7 @@ public sealed partial class ArchitectureAnalysisSession
         HashSet<string> referencedExternalGroups = new(StringComparer.Ordinal);
         HashSet<string> referencedPackageGroups = new(StringComparer.Ordinal);
         List<(string ContractName, string? ContractId, string Source)> packageContractSources = new();
+        List<(string ContractName, string? ContractId, string ProjectPath)> projectMetadataContractProjects = new();
 
         void AddLayerNames(string? contractId, IEnumerable<string> names)
         {
@@ -354,14 +355,34 @@ public sealed partial class ArchitectureAnalysisSession
 
             foreach (ArchitecturePackageDependencyContract c in Document.Contracts.StrictPackageDependency)
             {
+                if (!IsContractSelected(c.Id))
+                {
+                    continue;
+                }
+
                 AddPackageGroupNames(c.Forbidden);
                 packageContractSources.Add((c.Name, c.Id, c.Source));
             }
 
             foreach (ArchitecturePackageAllowOnlyContract c in Document.Contracts.StrictPackageAllowOnly)
             {
+                if (!IsContractSelected(c.Id))
+                {
+                    continue;
+                }
+
                 AddPackageGroupNames(c.Allowed);
                 packageContractSources.Add((c.Name, c.Id, c.Source));
+            }
+
+            foreach (ArchitectureProjectMetadataContract c in Document.Contracts.StrictProjectMetadata)
+            {
+                if (!IsContractSelected(c.Id))
+                {
+                    continue;
+                }
+
+                projectMetadataContractProjects.AddRange(c.Projects.Select(project => (c.Name, c.Id, NormalizeProjectPath(project))));
             }
 
             foreach (ArchitectureTypePlacementContract c in Document.Contracts.StrictTypePlacement)
@@ -438,14 +459,34 @@ public sealed partial class ArchitectureAnalysisSession
 
             foreach (ArchitecturePackageDependencyContract c in Document.Contracts.AuditPackageDependency)
             {
+                if (!IsContractSelected(c.Id))
+                {
+                    continue;
+                }
+
                 AddPackageGroupNames(c.Forbidden);
                 packageContractSources.Add((c.Name, c.Id, c.Source));
             }
 
             foreach (ArchitecturePackageAllowOnlyContract c in Document.Contracts.AuditPackageAllowOnly)
             {
+                if (!IsContractSelected(c.Id))
+                {
+                    continue;
+                }
+
                 AddPackageGroupNames(c.Allowed);
                 packageContractSources.Add((c.Name, c.Id, c.Source));
+            }
+
+            foreach (ArchitectureProjectMetadataContract c in Document.Contracts.AuditProjectMetadata)
+            {
+                if (!IsContractSelected(c.Id))
+                {
+                    continue;
+                }
+
+                projectMetadataContractProjects.AddRange(c.Projects.Select(project => (c.Name, c.Id, NormalizeProjectPath(project))));
             }
 
             foreach (ArchitectureTypePlacementContract c in Document.Contracts.AuditTypePlacement)
@@ -625,7 +666,43 @@ public sealed partial class ArchitectureAnalysisSession
             }
         }
 
+        if (projectMetadataContractProjects.Count > 0)
+        {
+            HashSet<string> discoveredProjectPaths = new(
+                Context.ProjectDiscovery?.DiscoveredProjects.Select(project => NormalizeProjectPath(project.Path))
+                ?? Enumerable.Empty<string>(),
+                StringComparer.OrdinalIgnoreCase);
+
+            foreach ((string contractName, string? contractId, string projectPath) in projectMetadataContractProjects
+                         .DistinctBy(entry => (entry.ContractName, entry.ContractId, entry.ProjectPath)))
+            {
+                if (discoveredProjectPaths.Contains(projectPath))
+                {
+                    continue;
+                }
+
+                violations.Add(new ArchitectureViolation(
+                    contractName,
+                    contractId,
+                    projectPath,
+                    "no project metadata discovered",
+                    new[]
+                    {
+                        $"Contract '{contractName}' targets project '{projectPath}', but project discovery did not expose metadata for that path. " +
+                        "Project metadata contracts require analysis.solution or analysis.projects to discover and parse the matching .csproj file."
+                    })
+                {
+                    ProjectMetadataKind = "missing_project"
+                });
+            }
+        }
+
         return violations;
+    }
+
+    private static string NormalizeProjectPath(string path)
+    {
+        return path.Replace('\\', '/').Trim();
     }
 
     // Only contracts that ArchitectureContractExecutor will actually run for this request can

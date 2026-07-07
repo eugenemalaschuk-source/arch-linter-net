@@ -109,6 +109,8 @@ internal sealed class ArchitectureBaselineGenerator : IArchitectureBaselineGener
             case "audit_protected": groups.AuditProtected = entries; break;
             case "strict_external": groups.StrictExternal = entries; break;
             case "audit_external": groups.AuditExternal = entries; break;
+            case "strict_project_metadata": groups.StrictProjectMetadata = entries; break;
+            case "audit_project_metadata": groups.AuditProjectMetadata = entries; break;
             case "strict_coverage": groups.StrictCoverage = entries; break;
             case "audit_coverage": groups.AuditCoverage = entries; break;
         }

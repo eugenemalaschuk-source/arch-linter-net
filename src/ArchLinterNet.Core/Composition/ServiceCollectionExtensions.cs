@@ -59,6 +59,7 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<IArchitectureContractHandler, AssemblyAllowOnlyContractHandler>();
         services.AddSingleton<IArchitectureContractHandler, PackageDependencyContractHandler>();
         services.AddSingleton<IArchitectureContractHandler, PackageAllowOnlyContractHandler>();
+        services.AddSingleton<IArchitectureContractHandler, ProjectMetadataContractHandler>();
         services.AddSingleton<IArchitectureContractHandler, ProtectedContractHandler>();
         services.AddSingleton<IArchitectureContractHandler, ExternalContractHandler>();
         services.AddSingleton<IArchitectureContractHandler, ExternalAllowOnlyContractHandler>();

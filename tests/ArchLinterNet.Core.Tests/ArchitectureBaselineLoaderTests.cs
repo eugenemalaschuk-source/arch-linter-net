@@ -99,4 +99,60 @@ baseline:
             _service.LoadFromPath(Path.Combine(_tempDir, "baseline.yml")));
         Assert.That(ex!.Message, Does.Contain("forbidden_reference"));
     }
+
+    [Test]
+    public void MergeAndValidate_ProjectMetadataGroup_AppliesIgnoredViolations()
+    {
+        ArchitectureContractDocument policy = new()
+        {
+            Version = 1,
+            Name = "Test",
+            Contracts = new ArchitectureContractGroups
+            {
+                StrictProjectMetadata = new List<ArchitectureProjectMetadataContract>
+                {
+                    new()
+                    {
+                        Name = "project-metadata",
+                        Id = "project-metadata",
+                        Projects = new List<string> { "src/MyApp/MyApp.csproj" },
+                        RequiredProperties = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+                        {
+                            ["Nullable"] = "enable"
+                        }
+                    }
+                }
+            }
+        };
+
+        ArchitectureBaselineDocument baseline = new()
+        {
+            Version = 1,
+            Baseline = new ArchitectureBaselineContractGroups
+            {
+                StrictProjectMetadata = new List<ArchitectureBaselineContractEntry>
+                {
+                    new()
+                    {
+                        Id = "project-metadata",
+                        IgnoredViolations = new List<ArchitectureIgnoredViolation>
+                        {
+                            new()
+                            {
+                                SourceType = "src/MyApp/MyApp.csproj",
+                                ForbiddenReference = "friend_assembly:MyApp.Tools",
+                                Reason = "known debt"
+                            }
+                        }
+                    }
+                }
+            }
+        };
+
+        _service.MergeAndValidate(policy, baseline);
+
+        Assert.That(policy.Contracts.StrictProjectMetadata[0].IgnoredViolations, Has.Count.EqualTo(1));
+        Assert.That(policy.Contracts.StrictProjectMetadata[0].IgnoredViolations[0].ForbiddenReference,
+            Is.EqualTo("friend_assembly:MyApp.Tools"));
+    }
 }

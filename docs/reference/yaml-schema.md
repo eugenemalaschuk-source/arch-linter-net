@@ -95,7 +95,7 @@ Assembly resolution and linter behavior configuration.
 
 ```yaml
 analysis:
-  target_assemblies:            # Required, unless solution/projects discovery resolves assemblies — list of assembly names to scan
+  target_assemblies:            # Required only for assembly-scanning policies — metadata-only/discovery-only policies may omit it
     - <assembly-name>
   assembly_search_paths: []     # Optional — additional probe directories
   source_roots: []              # Optional — source directory roots for Roslyn resolution
@@ -139,7 +139,8 @@ build output is older than the project's `.csproj` or any of its `*.cs`
 source files, the linter reports it as a stale configuration error instead
 of silently validating an outdated assembly — rebuild the project to clear
 it. Build-output and staleness checks only run when `analysis.target_assemblies`
-is empty; an explicit `target_assemblies` policy is never affected by
+is empty and the active policy still needs assemblies to be resolved; metadata-only
+project discovery can run without a resolvable DLL. An explicit `target_assemblies` policy is never affected by
 discovered projects' build state. Discovered project directories are also
 used as `source_roots` when `source_roots` is not set explicitly, independent
 of whether their build output resolves. Explicit `target_assemblies`, `assembly_search_paths`, and
@@ -235,6 +236,7 @@ contracts:
   strict_assembly_independence: []
   strict_assembly_dependency: []
   strict_assembly_allow_only: []
+  strict_project_metadata: []
   strict_protected: []
   strict_external: []
   strict_external_allow_only: []
@@ -254,6 +256,7 @@ contracts:
   audit_assembly_independence: []
   audit_assembly_dependency: []
   audit_assembly_allow_only: []
+  audit_project_metadata: []
   audit_protected: []
   audit_external: []
   audit_external_allow_only: []
@@ -567,6 +570,33 @@ member name is in `allowed_public_constants`, even if its full signature is alre
 in `declared_api`. See [Public API surface contracts](../contracts/public-api-surface.md)
 for the signature grammar and full semantics.
 
+### Project metadata contract
+
+```yaml
+- id: <string>                        # Optional
+  name: <string>
+  projects: [<project-path>]          # Required — repo-relative discovered .csproj paths
+  required_properties: {}             # Optional — exact property/value requirements
+  forbidden_properties: {}            # Optional — exact forbidden property/value pairs
+  allowed_friend_assemblies: []       # Optional — omit=skip, []=deny-all, non-empty=allowlist for InternalsVisibleTo
+  forbidden_project_references: []    # Optional — project path globs matched against ProjectReference targets
+  ignored_violations: []              # Optional — baseline known metadata violations
+  reason: <string>
+```
+
+Project metadata contracts validate statically discovered `.csproj` metadata for
+selected projects: exact required/forbidden scalar MSBuild property values,
+friend assembly allowlists, and forbidden referenced project paths. `projects`
+matches discovered projects by repo-relative `.csproj` path, so this family
+requires `analysis.solution` or `analysis.projects` to expose project metadata.
+`analysis.target_assemblies` is optional for metadata-only policies using this family.
+Friend assembly discovery reads both project-file `InternalsVisibleTo` items and
+source-level assembly attributes.
+At least one expectation (`required_properties`, `forbidden_properties`,
+`allowed_friend_assemblies`, or `forbidden_project_references`) is required —
+an empty contract fails policy loading with an actionable error. See
+[Project metadata contracts](../contracts/project-metadata.md) for full semantics.
+
 ### Coverage contract
 
 Current runtime support covers `scope: namespace`, `scope: rule_input`, `scope: project`,
@@ -684,7 +714,7 @@ For a user-oriented guide, see [Coverage contracts](../contracts/coverage.md).
 
 ### Ignored violations
 
-Dependency, layer, allow-only, cycle, acyclic sibling, method-body, independence, protected, and external contracts
+Dependency, layer, allow-only, cycle, acyclic sibling, method-body, independence, protected, external, and project metadata contracts
 may include an `ignored_violations` block (asmdef contracts do not support this):
 
 ```yaml

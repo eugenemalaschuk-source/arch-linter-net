@@ -2,6 +2,7 @@ using ArchLinterNet.Core.Contracts;
 using ArchLinterNet.Core.Discovery;
 using ArchLinterNet.Core.Execution;
 using ArchLinterNet.Core.Execution.Abstractions;
+using ArchLinterNet.Core.Model;
 using ArchLinterNet.Core.Resolution;
 using NUnit.Framework;
 
@@ -146,6 +147,55 @@ public sealed class ArchitectureRunnerSetupServiceDiscoveryTests
 
         Assert.That(exception!.Message, Does.Contain("analysis.target_assemblies"));
         Assert.That(exception.Message, Does.Contain("NoOutput"));
+    }
+
+    [Test]
+    public void BuildRunner_ProjectMetadataOnlyPolicy_ProjectWithNoBuildOutput_DoesNotRequireResolvedAssemblies()
+    {
+        string projectDir = Path.Combine(_repoRoot, "NoOutput");
+        Directory.CreateDirectory(projectDir);
+        File.WriteAllText(Path.Combine(projectDir, "NoOutput.csproj"), """
+            <Project Sdk="Microsoft.NET.Sdk">
+              <PropertyGroup>
+                <TargetFramework>net9.0</TargetFramework>
+                <Nullable>enable</Nullable>
+              </PropertyGroup>
+            </Project>
+            """);
+
+        var document = new ArchitectureContractDocument
+        {
+            Version = 1,
+            Name = "Test",
+            Analysis = new ArchitectureAnalysisConfiguration
+            {
+                Projects = new List<string> { Path.Combine(projectDir, "NoOutput.csproj") }
+            },
+            Contracts = new ArchitectureContractGroups
+            {
+                StrictProjectMetadata = new List<ArchitectureProjectMetadataContract>
+                {
+                    new()
+                    {
+                        Name = "project-metadata",
+                        Id = "project-metadata",
+                        Projects = new List<string> { "NoOutput/NoOutput.csproj" },
+                        RequiredProperties = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+                        {
+                            ["Nullable"] = "enable"
+                        }
+                    }
+                }
+            }
+        };
+
+        ArchitectureRunnerSetup setup = _runnerSetupService.BuildRunner(document, _policyPath, mode: "strict");
+        List<ArchitectureViolation> configurationViolations = setup.Runner.CheckConfiguration();
+
+        Assert.That(document.Analysis.TargetAssemblies, Is.Empty);
+        Assert.That(configurationViolations.Any(v => v.ForbiddenNamespace == "missing project build output"), Is.False);
+        Assert.That(configurationViolations.Any(v => v.ForbiddenNamespace == "no project metadata discovered"), Is.False);
+        Assert.That(document.Analysis.SourceRoots, Is.EquivalentTo(new[] { "NoOutput" }));
     }
 
     private void CreateProjectWithOutput(string assemblyName, string targetFramework)
