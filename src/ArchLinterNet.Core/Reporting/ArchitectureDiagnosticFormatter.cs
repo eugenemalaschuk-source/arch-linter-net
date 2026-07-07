@@ -251,6 +251,7 @@ public sealed class ArchitectureDiagnosticFormatter : IArchitectureDiagnosticFor
         AttributeUsageDiagnostic d => d.SourceType,
         InheritanceDiagnostic d => d.SourceType,
         InterfaceImplementationDiagnostic d => d.SourceType,
+        CompositionDiagnostic d => d.SourceType,
         _ => string.Empty
     };
 
@@ -264,6 +265,7 @@ public sealed class ArchitectureDiagnosticFormatter : IArchitectureDiagnosticFor
         AttributeUsageDiagnostic d => d.ForbiddenNamespace,
         InheritanceDiagnostic d => d.ForbiddenNamespace,
         InterfaceImplementationDiagnostic d => d.ForbiddenNamespace,
+        CompositionDiagnostic d => d.ForbiddenNamespace,
         _ => string.Empty
     };
 
@@ -277,6 +279,7 @@ public sealed class ArchitectureDiagnosticFormatter : IArchitectureDiagnosticFor
         AttributeUsageDiagnostic d => d.ForbiddenReferences,
         InheritanceDiagnostic d => d.ForbiddenReferences,
         InterfaceImplementationDiagnostic d => d.ForbiddenReferences,
+        CompositionDiagnostic d => d.ForbiddenReferences,
         _ => Array.Empty<string>()
     };
 
@@ -352,6 +355,18 @@ public sealed class ArchitectureDiagnosticFormatter : IArchitectureDiagnosticFor
                            : string.Empty) +
                        (interfaceImplementation.ActualImplementationLocation != null
                            ? $", actual_location: {interfaceImplementation.ActualImplementationLocation}"
+                           : string.Empty) +
+                       ")";
+        }
+
+        if (diagnostic is CompositionDiagnostic composition)
+        {
+            context += $" (matched_api: {composition.MatchedForbiddenApi}" +
+                       (composition.SourceMember != null
+                           ? $", source_member: {composition.SourceMember}"
+                           : string.Empty) +
+                       (composition.ExpectedCompositionBoundary != null
+                           ? $", expected_boundary: {composition.ExpectedCompositionBoundary}"
                            : string.Empty) +
                        ")";
         }
@@ -533,6 +548,18 @@ public sealed class ArchitectureDiagnosticFormatter : IArchitectureDiagnosticFor
 
             if (interfaceImplementation.ActualImplementationLocation != null)
                 obj["actual_implementation_location"] = interfaceImplementation.ActualImplementationLocation;
+        }
+
+        if (diagnostic is CompositionDiagnostic composition)
+        {
+            if (composition.SourceMember != null)
+                obj["source_member"] = composition.SourceMember;
+
+            if (composition.MatchedForbiddenApi != null)
+                obj["matched_forbidden_api"] = composition.MatchedForbiddenApi;
+
+            if (composition.ExpectedCompositionBoundary != null)
+                obj["expected_composition_boundary"] = composition.ExpectedCompositionBoundary;
         }
 
         if (diagnostic is ConfigurationDiagnostic configuration)

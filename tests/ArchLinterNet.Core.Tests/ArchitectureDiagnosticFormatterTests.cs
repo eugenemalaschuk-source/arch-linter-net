@@ -107,6 +107,44 @@ public sealed class ArchitectureDiagnosticFormatterTests
     }
 
     [Test]
+    public void FormatViolationsForHumans_CompositionDiagnostic_IncludesSourceMember()
+    {
+        var violations = new List<ArchitectureViolation>
+        {
+            new("composition", null, "Source.Type", "Forbidden.Api", new[] { "Forbidden.Api" })
+            {
+                SourceMember = "Source.Type.Configure",
+                MatchedForbiddenApi = "Forbidden.Api",
+                ExpectedCompositionBoundary = "namespaces: [Composition]"
+            }
+        };
+
+        string output = _formatter.FormatViolationsForHumans(violations);
+
+        Assert.That(output, Does.Contain("source_member: Source.Type.Configure"));
+    }
+
+    [Test]
+    public void FormatResultForCiArtifacts_CompositionDiagnostic_IncludesSourceMember()
+    {
+        var violations = new List<ArchitectureViolation>
+        {
+            new("composition", null, "Source.Type", "Forbidden.Api", new[] { "Forbidden.Api" })
+            {
+                SourceMember = "Source.Type.Configure",
+                MatchedForbiddenApi = "Forbidden.Api"
+            }
+        };
+
+        string json = _formatter.FormatResultForCiArtifacts(
+            "strict", false, violations, Array.Empty<string>());
+
+        using var doc = JsonDocument.Parse(json);
+        JsonElement violation = doc.RootElement.GetProperty("violations")[0];
+        Assert.That(violation.GetProperty("source_member").GetString(), Is.EqualTo("Source.Type.Configure"));
+    }
+
+    [Test]
     public void FormatCyclesForHumans_MultipleCycles_SortedAlphabetically()
     {
         var cycles = new[] { "Z -> Y -> Z", "A -> B -> A" };

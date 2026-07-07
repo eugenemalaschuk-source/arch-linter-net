@@ -26,6 +26,7 @@ ArchLinterNet supports static architecture validation through documented YAML po
 - attribute usage governance contracts (declared attribute/marker types restricted to, or forbidden from, declared layers/namespaces/projects/assemblies; exact and prefix attribute-name matching; type and member scanning regardless of visibility);
 - inheritance boundary contracts (types in declared source layers/namespaces forbidden from inheriting, directly or transitively, from declared base types; exact and prefix base-type-name matching; generic base types matched by generic type definition);
 - interface implementation boundary contracts (implementations of declared interfaces restricted to, or forbidden from, declared layers/namespaces/projects/assemblies; exact and prefix interface-name matching, including interfaces inherited through base classes);
+- composition contracts (composition-root/service-locator API calls restricted to a declared allowed layers/namespaces/projects/assemblies boundary; same call-pattern vocabulary as method-body contracts — member names, `Type.Member`, fully qualified members, namespace/type prefixes; static reflection/IL-based call-site detection only, does not validate runtime dependency-injection resolution or prove every service is registered correctly);
 - coverage contracts (`scope: namespace`, `scope: rule_input`, `scope: project`, `scope: assembly`);
 - strict and audit contract groups;
 - constrained namespace glob patterns;

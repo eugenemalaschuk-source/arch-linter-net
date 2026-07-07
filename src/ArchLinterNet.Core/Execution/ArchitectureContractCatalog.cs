@@ -100,6 +100,8 @@ public sealed class ArchitectureContractCatalog
         AddGroup("audit_inheritance", "audit", "inheritance", groups.AuditInheritance);
         AddGroup("strict_interface_implementation", "strict", "interface_implementation", groups.StrictInterfaceImplementation);
         AddGroup("audit_interface_implementation", "audit", "interface_implementation", groups.AuditInterfaceImplementation);
+        AddGroup("strict_composition", "strict", "composition", groups.StrictComposition);
+        AddGroup("audit_composition", "audit", "composition", groups.AuditComposition);
         AddGroup("strict_coverage", "strict", "coverage", groups.StrictCoverage);
         AddGroup("audit_coverage", "audit", "coverage", groups.AuditCoverage);
 

@@ -13,5 +13,6 @@ public enum ArchitectureDiagnosticKind
     PublicApiSurface,
     AttributeUsage,
     Inheritance,
-    InterfaceImplementation
+    InterfaceImplementation,
+    Composition
 }

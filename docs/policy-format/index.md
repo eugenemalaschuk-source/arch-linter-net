@@ -127,6 +127,7 @@ contracts:
   strict_attribute_usage: []
   strict_inheritance: []
   strict_interface_implementation: []
+  strict_composition: []
   strict_coverage: []
 
   audit: []
@@ -149,6 +150,7 @@ contracts:
   audit_attribute_usage: []
   audit_inheritance: []
   audit_interface_implementation: []
+  audit_composition: []
   audit_coverage: []
 ```
 

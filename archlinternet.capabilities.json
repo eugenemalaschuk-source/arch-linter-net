@@ -126,6 +126,13 @@
       "auditGroup": "audit_interface_implementation",
       "fields": ["name", "id", "interfaces", "interface_prefixes", "allowed_only_in_layers", "allowed_only_in_namespaces", "allowed_only_in_projects", "allowed_only_in_assemblies", "forbidden_in_layers", "forbidden_in_namespaces", "forbidden_in_projects", "forbidden_in_assemblies", "ignored_violations", "reason"],
       "validates": "A non-interface type implementing a declared interface (matched by exact fully-qualified name via interfaces, and/or by prefix via interface_prefixes, including interfaces inherited through base classes; constructed generic interfaces matched by their generic type definition's CLR name) resides only in (allowed_only_in_*) or outside (forbidden_in_*) declared layers/namespaces/projects/assemblies. Requires at least one interface selector and at least one location expectation. Static type-relationship validation only: does not resolve runtime dependency-injection registrations."
+    },
+    {
+      "kind": "composition",
+      "strictGroup": "strict_composition",
+      "auditGroup": "audit_composition",
+      "fields": ["name", "id", "forbidden_apis", "allowed_only_in_layers", "allowed_only_in_namespaces", "allowed_only_in_projects", "allowed_only_in_assemblies", "ignored_violations", "reason"],
+      "validates": "A type residing outside a declared composition boundary (allowed_only_in_layers/namespaces/projects/assemblies) does not call a forbidden composition-root/service-locator API (matched with the same call-pattern vocabulary as method-body contracts: exact member names, Type.Member names, fully qualified members, and namespace/type prefixes via forbidden_apis). Requires at least one forbidden_apis selector and at least one allowed_only_in_* composition boundary selector. Reflection/IL-based static detection of call sites only: does NOT validate runtime dependency-injection resolution and does not prove every service is registered correctly."
     }
   ],
   "exceptionMechanisms": {

@@ -74,6 +74,8 @@ public sealed partial class ArchitectureAnalysisSession
         AddGroup("audit_inheritance", "audit", "inheritance", groups.AuditInheritance);
         AddGroup("strict_interface_implementation", "strict", "interface_implementation", groups.StrictInterfaceImplementation);
         AddGroup("audit_interface_implementation", "audit", "interface_implementation", groups.AuditInterfaceImplementation);
+        AddGroup("strict_composition", "strict", "composition", groups.StrictComposition);
+        AddGroup("audit_composition", "audit", "composition", groups.AuditComposition);
 
         AddGroup("strict_layer_templates", "strict", "layer_template",
             LayerTemplateExpander.Expand(groups.StrictLayerTemplates));
@@ -589,6 +591,7 @@ public sealed partial class ArchitectureAnalysisSession
             ArchitectureAttributeUsageContract c => GetAttributeUsageReferencedLayerNames(c),
             ArchitectureInheritanceContract c => c.SourceLayers,
             ArchitectureInterfaceImplementationContract c => GetInterfaceImplementationReferencedLayerNames(c),
+            ArchitectureCompositionContract c => c.AllowedOnlyInLayers,
             _ => Array.Empty<string>()
         };
     }

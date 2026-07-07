@@ -1,4 +1,5 @@
 using System.Reflection;
+using System.Runtime.CompilerServices;
 using Microsoft.CodeAnalysis;
 
 namespace ArchLinterNet.Core.Scanning;
@@ -9,9 +10,10 @@ internal sealed record SymbolDescriptor(
     string Name,
     string ContainingTypeName,
     string ContainingNamespace,
-    string FullyQualifiedMember)
+    string FullyQualifiedMember,
+    string? ExtensionReceiverType = null)
 {
-    public string CacheKey => $"{ContainingNamespace}|{ContainingTypeName}|{Name}|{FullyQualifiedMember}";
+    public string CacheKey => $"{ContainingNamespace}|{ContainingTypeName}|{Name}|{FullyQualifiedMember}|{ExtensionReceiverType}";
 }
 
 internal static class ArchitectureForbiddenCallMatcher
@@ -82,8 +84,11 @@ internal static class ArchitectureForbiddenCallMatcher
         string fullyQualifiedMember = string.IsNullOrWhiteSpace(symbol.ContainingType?.ToDisplayString())
             ? name
             : $"{symbol.ContainingType!.ToDisplayString()}.{name}";
+        string? extensionReceiverType = symbol is IMethodSymbol methodSymbol
+            ? GetRoslynExtensionReceiverType(methodSymbol)
+            : null;
 
-        return new SymbolDescriptor(name, containingTypeName, containingNamespace, fullyQualifiedMember);
+        return new SymbolDescriptor(name, containingTypeName, containingNamespace, fullyQualifiedMember, extensionReceiverType);
     }
 
     public static SymbolDescriptor FromMemberInfo(MemberInfo memberInfo)
@@ -95,16 +100,20 @@ internal static class ArchitectureForbiddenCallMatcher
         string fullyQualifiedMember = string.IsNullOrWhiteSpace(containingType?.FullName)
             ? name
             : $"{containingType!.FullName}.{name}";
+        string? extensionReceiverType = memberInfo is MethodInfo methodInfo
+            ? GetReflectionExtensionReceiverType(methodInfo)
+            : null;
 
-        return new SymbolDescriptor(name, containingTypeName, containingNamespace, fullyQualifiedMember);
+        return new SymbolDescriptor(name, containingTypeName, containingNamespace, fullyQualifiedMember, extensionReceiverType);
     }
 
     private static bool Matches(SymbolDescriptor symbol, ForbiddenCallPattern pattern)
     {
         if (pattern.IsNamespacePrefix)
         {
-            return !string.IsNullOrEmpty(symbol.ContainingNamespace)
-                   && symbol.ContainingNamespace.StartsWith(pattern.Normalized, StringComparison.Ordinal);
+            return PrefixMatches(symbol.ContainingNamespace, pattern.Normalized)
+                   || PrefixMatches(symbol.FullyQualifiedMember, pattern.Normalized)
+                   || PrefixMatches(symbol.ExtensionReceiverType, pattern.Normalized);
         }
 
         if (symbol.Name.Equals(pattern.Normalized, StringComparison.Ordinal))
@@ -122,5 +131,38 @@ internal static class ArchitectureForbiddenCallMatcher
         }
 
         return symbol.FullyQualifiedMember.Equals(pattern.Normalized, StringComparison.Ordinal);
+    }
+
+    private static bool PrefixMatches(string? value, string normalizedPrefix)
+    {
+        if (string.IsNullOrEmpty(value))
+        {
+            return false;
+        }
+
+        return value.Equals(normalizedPrefix, StringComparison.Ordinal)
+               || value.StartsWith(normalizedPrefix + ".", StringComparison.Ordinal);
+    }
+
+    private static string? GetRoslynExtensionReceiverType(IMethodSymbol methodSymbol)
+    {
+        IMethodSymbol sourceMethod = methodSymbol.ReducedFrom ?? methodSymbol;
+        if (!sourceMethod.IsExtensionMethod || sourceMethod.Parameters.Length == 0)
+        {
+            return null;
+        }
+
+        return sourceMethod.Parameters[0].Type.ToDisplayString();
+    }
+
+    private static string? GetReflectionExtensionReceiverType(MethodInfo methodInfo)
+    {
+        if (!methodInfo.IsDefined(typeof(ExtensionAttribute), inherit: false))
+        {
+            return null;
+        }
+
+        ParameterInfo[] parameters = methodInfo.GetParameters();
+        return parameters.Length == 0 ? null : parameters[0].ParameterType.FullName;
     }
 }

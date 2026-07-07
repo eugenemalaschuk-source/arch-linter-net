@@ -89,3 +89,6 @@ contracts:
       ancestors:
         - MyApp
       reason: Direct sibling namespaces under MyApp must not form cycles.
+
+  strict_composition: []
+  audit_composition: []

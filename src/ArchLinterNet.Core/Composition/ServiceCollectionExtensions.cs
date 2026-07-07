@@ -67,6 +67,7 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<IArchitectureContractHandler, AttributeUsageContractHandler>();
         services.AddSingleton<IArchitectureContractHandler, InheritanceContractHandler>();
         services.AddSingleton<IArchitectureContractHandler, InterfaceImplementationContractHandler>();
+        services.AddSingleton<IArchitectureContractHandler, CompositionContractHandler>();
         services.AddSingleton<IArchitectureContractHandler, CoverageContractHandler>();
         services.AddSingleton<ArchitectureContractHandlerRegistry>();
         services.AddSingleton<IArchitectureContractHandlerRegistry>(ResolveHandlerRegistry);

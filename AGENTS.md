@@ -12,7 +12,19 @@ Every shell command MUST be prefixed with `rtk`:
 rtk make acceptance
 rtk dotnet restore
 ```
-Bootstrap dependencies: `rtk brew bundle` (macOS) or `rtk make bundle`.
+
+RTK itself is bootstrapped the same way as the rest of the developer toolchain:
+- `Brewfile` includes `brew "rtk"` for macOS/Linux Homebrew installs.
+- `make bundle` runs the platform-specific `tools/scripts/configure_rtk_*` script.
+- `make rtk-init` re-runs only the RTK agent integration setup.
+
+If `rtk` is missing and therefore cannot prefix commands yet, run only the RTK bootstrap script directly, then restart the shell/session and return to the mandatory `rtk` prefix:
+```
+pwsh -NoProfile -ExecutionPolicy Bypass -File tools/scripts/configure_rtk_windows.ps1
+sh tools/scripts/configure_rtk_unix.sh
+```
+
+Bootstrap dependencies after RTK is available: `rtk brew bundle` (macOS) or `rtk make bundle`.
 
 ## Key commands
 ```

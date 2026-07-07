@@ -236,6 +236,17 @@ internal sealed class InterfaceImplementationContractHandler : IArchitectureCont
     }
 }
 
+internal sealed class CompositionContractHandler : IArchitectureContractHandler
+{
+    public string Family => "composition";
+
+    public ArchitectureHandlerResult Execute(ArchitectureAnalysisSession session, IArchitectureContract contract)
+    {
+        return ArchitectureHandlerResult.FromViolations(
+            session.CheckCompositionContract((ArchitectureCompositionContract)contract));
+    }
+}
+
 internal sealed class AcyclicSiblingContractHandler : IArchitectureContractHandler
 {
     public string Family => "acyclic_sibling";
