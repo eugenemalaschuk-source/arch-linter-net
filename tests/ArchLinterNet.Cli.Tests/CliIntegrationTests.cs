@@ -13,6 +13,7 @@ public partial class CliIntegrationTests
     private static string _failingPolicy = null!;
     private static string _coveragePolicy = null!;
     private static string _graphPolicy = null!;
+    private static string _passingWithIdsPolicy = null!;
 
     [OneTimeSetUp]
     public void OneTimeSetUp()
@@ -27,6 +28,8 @@ public partial class CliIntegrationTests
             _repoRoot, "tests", "ArchLinterNet.Cli.Tests", "TestPolicies", "coverage-policy.yml");
         _graphPolicy = Path.Combine(
             _repoRoot, "tests", "ArchLinterNet.Cli.Tests", "TestPolicies", "graph-policy.yml");
+        _passingWithIdsPolicy = Path.Combine(
+            _repoRoot, "tests", "ArchLinterNet.Cli.Tests", "TestPolicies", "passing-with-ids.yml");
 
         using var build = new Process
         {

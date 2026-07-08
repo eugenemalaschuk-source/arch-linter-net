@@ -6,7 +6,7 @@ using ArchLinterNet.Core.Validation;
 
 namespace ArchLinterNet.Cli;
 
-public static class Program
+public static partial class Program
 {
     private static readonly ArchitectureDiagnosticFormatter _formatter = new();
 
@@ -31,103 +31,6 @@ public static class Program
         }
 
         return RunValidateCommand(args);
-    }
-
-    private static int RunBaselineCommand(string[] args)
-    {
-        int argIndex = 0;
-        if (argIndex < args.Length && args[argIndex] == "generate")
-        {
-            argIndex++;
-        }
-
-        string policyPath = "architecture/dependencies.arch.yml";
-        string? outputPath = null;
-        string reason = "generated baseline";
-        string mode = "all";
-        string? conditionSetName = null;
-
-        for (int i = argIndex; i < args.Length; i++)
-        {
-            switch (args[i])
-            {
-                case "--help" or "-h":
-                    PrintBaselineHelp();
-                    return 0;
-                case "--config" when i + 1 < args.Length:
-                    policyPath = args[++i];
-                    break;
-                case "--output" when i + 1 < args.Length:
-                    outputPath = args[++i];
-                    break;
-                case "--reason" when i + 1 < args.Length:
-                    reason = args[++i];
-                    break;
-                case "--mode" or "-m" when i + 1 < args.Length:
-                    mode = args[++i];
-                    break;
-                case "--condition-set" when i + 1 < args.Length:
-                    conditionSetName = args[++i];
-                    break;
-                default:
-                    Console.Error.WriteLine($"Unknown option: {args[i]}");
-                    Console.Error.WriteLine("Run 'arch-linter-net baseline --help' for usage information.");
-                    return 2;
-            }
-        }
-
-        if (mode is not ("strict" or "audit" or "all"))
-        {
-            Console.Error.WriteLine($"Invalid mode: {mode}. Use 'strict', 'audit', or 'all'.");
-            return 2;
-        }
-
-        if (outputPath == null)
-        {
-            Console.Error.WriteLine("--output is required for baseline generate.");
-            return 2;
-        }
-
-        if (!File.Exists(policyPath))
-        {
-            Console.Error.WriteLine($"Policy file not found: {policyPath}");
-            return 2;
-        }
-
-        try
-        {
-            BaselineGenerationRequest request = new()
-            {
-                PolicyPath = policyPath,
-                Mode = mode,
-                ConditionSetName = conditionSetName,
-                Reason = reason,
-            };
-
-            BaselineGenerationOutcome outcome = _engine.Value.GenerateBaseline(request);
-
-            if (!outcome.Succeeded)
-            {
-                Console.Error.WriteLine("Configuration violations detected — baseline cannot be generated:");
-                foreach (ArchitectureViolation v in outcome.ConfigurationViolations)
-                {
-                    Console.Error.WriteLine($"  {v.SourceType}: {v.ForbiddenNamespace}");
-                }
-                return 2;
-            }
-
-            File.WriteAllText(outputPath, outcome.Yaml);
-
-            Console.WriteLine($"Generated baseline with {outcome.CandidateCount} violation entries.");
-            Console.WriteLine($"Output: {outputPath}");
-
-            return 0;
-        }
-        catch (Exception ex)
-        {
-            Console.Error.WriteLine($"Baseline generation error: {ex.Message}");
-            return 2;
-        }
     }
 
     private static int RunValidateCommand(string[] args)
@@ -576,34 +479,6 @@ public static class Program
               0   All contracts passed
               1   One or more contracts failed
               2   Runtime error (invalid arguments, file not found, etc.)
-            """);
-    }
-
-    private static void PrintBaselineHelp()
-    {
-        Console.WriteLine("""
-            arch-linter-net baseline generate — generate a baseline of current violations
-
-            Usage:
-              arch-linter-net baseline generate --config <path> --output <path> [options]
-
-            Options:
-              --config <path>     Path to YAML contract file
-                                  (default: architecture/dependencies.arch.yml)
-              --output <path>     Path to write the generated baseline file (required)
-              --mode <mode>       Contract mode: strict, audit, or all (default: all)
-              --reason <text>     Reason text for baseline entries
-                                  (default: "generated baseline")
-              --condition-set <name>
-                                  Use a named condition set from analysis.condition_sets
-                                  to control conditional compilation symbols during
-                                  Roslyn source analysis (default: policy
-                                  default_condition_set, otherwise empty symbol set)
-              -h, --help          Show this help message
-
-            Exit codes:
-              0   Baseline generated successfully
-              2   Runtime error (invalid arguments, file not found, config violations, etc.)
             """);
     }
 

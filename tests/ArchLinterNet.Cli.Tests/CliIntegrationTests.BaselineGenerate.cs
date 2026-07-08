@@ -254,6 +254,84 @@ public partial class CliIntegrationTests
         }
     }
 
+    /* baseline generate --contract */
+
+    [Test]
+    public void BaselineGenerate_WithContract_ScopesGenerationToThatContract()
+    {
+        string outputPath = Path.Combine(Path.GetTempPath(), $"baseline-{Guid.NewGuid():N}.yml");
+        try
+        {
+            var (exitCode, stdout, stderr) = RunCli("baseline", "generate",
+                "--config", _graphPolicy,
+                "--output", outputPath,
+                "--contract", "no-execution-to-contracts");
+
+            Assert.Multiple(() =>
+            {
+                Assert.That(exitCode, Is.EqualTo(0), $"Baseline generate with --contract failed, stderr: {stderr}");
+                Assert.That(stdout, Does.Contain("Generated baseline"));
+            });
+
+            string content = File.ReadAllText(outputPath);
+            Assert.That(content, Does.Contain("no-execution-to-contracts"));
+        }
+        finally
+        {
+            if (File.Exists(outputPath))
+                File.Delete(outputPath);
+        }
+    }
+
+    [Test]
+    public void BaselineGenerate_WithUnknownContract_ExitsTwo()
+    {
+        string outputPath = Path.Combine(Path.GetTempPath(), $"baseline-{Guid.NewGuid():N}.yml");
+        try
+        {
+            var (exitCode, _, stderr) = RunCli("baseline", "generate",
+                "--config", _graphPolicy,
+                "--output", outputPath,
+                "--contract", "missing-contract-id");
+
+            Assert.Multiple(() =>
+            {
+                Assert.That(exitCode, Is.EqualTo(2));
+                Assert.That(stderr, Does.Contain("Unknown contract IDs"));
+                Assert.That(stderr, Does.Contain("missing-contract-id"));
+            });
+        }
+        finally
+        {
+            if (File.Exists(outputPath))
+                File.Delete(outputPath);
+        }
+    }
+
+    [Test]
+    public void BaselineGenerate_WithPolicyAlias_ProducesValidFile()
+    {
+        string outputPath = Path.Combine(Path.GetTempPath(), $"baseline-{Guid.NewGuid():N}.yml");
+        try
+        {
+            var (exitCode, stdout, stderr) = RunCli("baseline", "generate",
+                "--policy", _passingPolicy,
+                "--output", outputPath);
+
+            Assert.Multiple(() =>
+            {
+                Assert.That(exitCode, Is.EqualTo(0), $"Baseline generate failed, stderr: {stderr}");
+                Assert.That(File.Exists(outputPath), Is.True);
+                Assert.That(stdout, Does.Contain("Generated baseline"));
+            });
+        }
+        finally
+        {
+            if (File.Exists(outputPath))
+                File.Delete(outputPath);
+        }
+    }
+
     /* baseline --help */
 
     [Test]

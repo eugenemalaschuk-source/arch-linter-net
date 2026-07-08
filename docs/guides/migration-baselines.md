@@ -89,10 +89,72 @@ baseline:
 
 ### Baseline lifecycle
 
-1. **Generate** — create the baseline from current violations
+1. **Generate** — create the baseline from current violations (`baseline generate`)
 1. **Merge** — run `arch-linter-net --policy ... --baseline baseline.yml --mode strict` to enforce boundaries going forward
-1. **Clean up** — as violations are fixed, remove individual entries from the baseline file
-1. **Regenerate** — when the codebase changes significantly, regenerate to capture the new state
+1. **Update** — run `baseline update` to add newly-introduced debt while preserving the `reason` text on entries that are still valid, without hand-editing YAML
+1. **Prune** — run `baseline prune` to remove entries whose violation has been fixed or whose contract ID no longer exists, and see exactly what was removed
+1. **Diff** — run `baseline diff` at any time to see new/existing/resolved/configuration-error entries without changing the file
+1. **Verify** — run `baseline verify` in CI to fail the build if the baseline has drifted out of sync (resolved entries or unknown contract IDs), keeping the baseline honest over time
+
+These five subcommands share `--config`/`--policy`, `--mode` (`strict`/`audit`/`all`),
+`--condition-set`, and `--contract` (repeatable, restricts to specific contract IDs),
+consistent with `validate`.
+
+#### Update
+
+```bash
+arch-linter-net baseline update \
+  --config architecture/dependencies.arch.yml \
+  --baseline baseline.yml \
+  --output baseline.yml \
+  --reason "Newly accepted debt — tracked in #456"
+```
+
+Entries whose `(contract id, source_type, forbidden_reference)` still matches a
+current violation are kept unchanged, including their original `reason`. New
+violations are appended using the default or `--reason` text. Entries that no
+longer match any violation are left in place — `update` never removes entries;
+that is `prune`'s job.
+
+#### Prune
+
+```bash
+arch-linter-net baseline prune \
+  --config architecture/dependencies.arch.yml \
+  --baseline baseline.yml \
+  --output baseline.yml
+```
+
+Removes baseline entries that no longer match any current violation (resolved
+debt) or that reference a contract ID that no longer exists in the policy
+(configuration error), and reports exactly what was removed and why. Add
+`--json` to get the removed-entry list as structured data.
+
+#### Diff
+
+```bash
+arch-linter-net baseline diff \
+  --config architecture/dependencies.arch.yml \
+  --baseline baseline.yml
+```
+
+Read-only comparison of the baseline against current violations. Reports four
+categories: **new** (unbaselined violations), **existing/frozen** (still
+matched), **resolved** (stale entries), and **configuration errors** (unknown
+contract IDs). Never writes a file.
+
+#### Verify
+
+```bash
+arch-linter-net baseline verify \
+  --config architecture/dependencies.arch.yml \
+  --baseline baseline.yml
+```
+
+Runs the same comparison as `diff` but exits non-zero if any resolved entries
+or configuration errors are found — intended as a CI gate that keeps a
+baseline from silently accumulating stale debt. It does not fail on new,
+unbaselined violations (that's `validate`'s job).
 
 ### Merge semantics
 

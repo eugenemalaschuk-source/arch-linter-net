@@ -30,6 +30,30 @@ public sealed class ArchitectureEngine : IDisposable, IAsyncDisposable
             .Generate(request);
     }
 
+    public BaselineUpdateOutcome UpdateBaseline(BaselineUpdateRequest request)
+    {
+        return _serviceProvider.GetRequiredService<IArchitectureBaselineApplicationService>()
+            .Update(request);
+    }
+
+    public BaselinePruneOutcome PruneBaseline(BaselinePruneRequest request)
+    {
+        return _serviceProvider.GetRequiredService<IArchitectureBaselineApplicationService>()
+            .Prune(request);
+    }
+
+    public BaselineDiffOutcome DiffBaseline(BaselineDiffRequest request)
+    {
+        return _serviceProvider.GetRequiredService<IArchitectureBaselineApplicationService>()
+            .Diff(request);
+    }
+
+    public BaselineVerifyOutcome VerifyBaseline(BaselineVerifyRequest request)
+    {
+        return _serviceProvider.GetRequiredService<IArchitectureBaselineApplicationService>()
+            .Verify(request);
+    }
+
     public AsmdefValidationOutcome ValidateAsmdef(AsmdefValidationRequest request)
     {
         return _serviceProvider.GetRequiredService<IAsmdefValidationService>()

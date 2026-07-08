@@ -9,4 +9,6 @@ public sealed record BaselineGenerationRequest
     public string? ConditionSetName { get; init; }
 
     public string Reason { get; init; } = "generated baseline";
+
+    public IReadOnlyCollection<string>? ContractIds { get; init; }
 }
