@@ -25,6 +25,11 @@ public sealed class ArchitectureBaselineLoadingService : IArchitectureBaselineLo
         MergeAndValidate(document, baseline);
     }
 
+    public ArchitectureBaselineDocument Load(string baselinePath)
+    {
+        return LoadFromPath(baselinePath);
+    }
+
     internal ArchitectureBaselineDocument LoadFromPath(string baselinePath)
     {
         if (!_fileSystem.FileExists(baselinePath))

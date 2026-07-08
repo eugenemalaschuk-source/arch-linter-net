@@ -1,4 +1,5 @@
 using ArchLinterNet.Core.Contracts.Abstractions;
+using ArchLinterNet.Core.Model;
 using YamlDotNet.Serialization;
 using YamlDotNet.Serialization.NamingConventions;
 
@@ -11,48 +12,53 @@ internal sealed class ArchitectureBaselineGenerator : IArchitectureBaselineGener
         IReadOnlyList<ArchitectureBaselineCandidate> candidates,
         string reason = "generated baseline")
     {
+        var entries = candidates
+            .Where(c => c.ContractId != null)
+            .Select(c => new ArchitectureBaselineComparisonEntry(c.ContractGroup, c.ContractId!, c.SourceType, c.ForbiddenReference, reason))
+            .ToList();
+
+        return BuildFromEntries(entries);
+    }
+
+    public ArchitectureBaselineDocument BuildFromEntries(IReadOnlyList<ArchitectureBaselineComparisonEntry> entries)
+    {
         var baseline = new ArchitectureBaselineDocument
         {
             Version = 1,
             Baseline = new ArchitectureBaselineContractGroups()
         };
 
-        var ordered = candidates
-            .OrderBy(c => c.ContractGroup, StringComparer.Ordinal)
-            .ThenBy(c => c.ContractId, StringComparer.Ordinal)
-            .ThenBy(c => c.SourceType, StringComparer.Ordinal)
-            .ThenBy(c => c.ForbiddenReference, StringComparer.Ordinal)
+        var ordered = entries
+            .OrderBy(e => e.ContractGroup, StringComparer.Ordinal)
+            .ThenBy(e => e.ContractId, StringComparer.Ordinal)
+            .ThenBy(e => e.SourceType, StringComparer.Ordinal)
+            .ThenBy(e => e.ForbiddenReference, StringComparer.Ordinal)
             .ToList();
 
         var entriesByGroup = new Dictionary<string, Dictionary<string, List<ArchitectureIgnoredViolation>>>(StringComparer.Ordinal);
 
-        foreach (var candidate in ordered)
+        foreach (var entry in ordered)
         {
-            if (candidate.ContractId == null)
-            {
-                continue;
-            }
-
-            if (!entriesByGroup.TryGetValue(candidate.ContractGroup, out var groupEntries))
+            if (!entriesByGroup.TryGetValue(entry.ContractGroup, out var groupEntries))
             {
                 groupEntries = new Dictionary<string, List<ArchitectureIgnoredViolation>>(StringComparer.Ordinal);
-                entriesByGroup[candidate.ContractGroup] = groupEntries;
+                entriesByGroup[entry.ContractGroup] = groupEntries;
             }
 
-            if (!groupEntries.TryGetValue(candidate.ContractId, out var violations))
+            if (!groupEntries.TryGetValue(entry.ContractId, out var violations))
             {
                 violations = new List<ArchitectureIgnoredViolation>();
-                groupEntries[candidate.ContractId] = violations;
+                groupEntries[entry.ContractId] = violations;
             }
 
             var ignoreEntry = new ArchitectureIgnoredViolation
             {
-                SourceType = candidate.SourceType,
-                ForbiddenReference = candidate.ForbiddenReference,
-                Reason = reason
+                SourceType = entry.SourceType,
+                ForbiddenReference = entry.ForbiddenReference,
+                Reason = entry.Reason ?? "generated baseline"
             };
 
-            string key = $"{candidate.SourceType}|{candidate.ForbiddenReference}";
+            string key = $"{entry.SourceType}|{entry.ForbiddenReference}";
             if (!violations.Any(v => $"{v.SourceType}|{v.ForbiddenReference}" == key))
             {
                 violations.Add(ignoreEntry);
@@ -60,9 +66,9 @@ internal sealed class ArchitectureBaselineGenerator : IArchitectureBaselineGener
         }
 
         var groups = baseline.Baseline;
-        foreach (var (groupName, entries) in entriesByGroup)
+        foreach (var (groupName, groupEntries) in entriesByGroup)
         {
-            var list = entries
+            var list = groupEntries
                 .OrderBy(e => e.Key, StringComparer.Ordinal)
                 .Select(e => new ArchitectureBaselineContractEntry
                 {

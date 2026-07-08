@@ -105,6 +105,26 @@
           "type": "array",
           "items": { "$ref": "#/$defs/baselineContractEntry" },
           "default": []
+        },
+        "strict_project_metadata": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/baselineContractEntry" },
+          "default": []
+        },
+        "audit_project_metadata": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/baselineContractEntry" },
+          "default": []
+        },
+        "strict_coverage": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/baselineContractEntry" },
+          "default": []
+        },
+        "audit_coverage": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/baselineContractEntry" },
+          "default": []
         }
       },
       "additionalProperties": false

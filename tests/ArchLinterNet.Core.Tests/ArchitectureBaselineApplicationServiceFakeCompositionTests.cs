@@ -124,6 +124,8 @@ public sealed class ArchitectureBaselineApplicationServiceFakeCompositionTests
 
         public string YamlToReturn { get; set; } = "fake-baseline-yaml";
 
+        public IReadOnlyList<ArchitectureBaselineComparisonEntry>? EntriesReceived { get; private set; }
+
         public ArchitectureBaselineDocument Generate(
             ArchitectureContractDocument policyDocument,
             IReadOnlyList<ArchitectureBaselineCandidate> candidates,
@@ -134,9 +136,31 @@ public sealed class ArchitectureBaselineApplicationServiceFakeCompositionTests
             return new ArchitectureBaselineDocument { Version = 1 };
         }
 
+        public ArchitectureBaselineDocument BuildFromEntries(IReadOnlyList<ArchitectureBaselineComparisonEntry> entries)
+        {
+            WasCalled = true;
+            EntriesReceived = entries;
+            return new ArchitectureBaselineDocument { Version = 1 };
+        }
+
         public string Serialize(ArchitectureBaselineDocument document)
         {
             return YamlToReturn;
+        }
+    }
+
+    private sealed class FakeBaselineLoadingService : IArchitectureBaselineLoadingService
+    {
+        public ArchitectureBaselineDocument DocumentToReturn { get; set; } =
+            new() { Version = 1, Baseline = new ArchitectureBaselineContractGroups() };
+
+        public void LoadAndMerge(ArchitectureContractDocument document, string baselinePath)
+        {
+        }
+
+        public ArchitectureBaselineDocument Load(string baselinePath)
+        {
+            return DocumentToReturn;
         }
     }
 
@@ -165,7 +189,7 @@ public sealed class ArchitectureBaselineApplicationServiceFakeCompositionTests
         var baselineGenerator = new FakeBaselineGenerator();
 
         var applicationService = new ArchitectureBaselineApplicationService(
-            runnerSetupService, handlerRegistry, contractExecutor, baselineGenerator);
+            runnerSetupService, handlerRegistry, contractExecutor, baselineGenerator, new FakeBaselineLoadingService());
 
         BaselineGenerationOutcome outcome = applicationService.Generate(
             new BaselineGenerationRequest
@@ -200,7 +224,7 @@ public sealed class ArchitectureBaselineApplicationServiceFakeCompositionTests
         var baselineGenerator = new FakeBaselineGenerator();
 
         var applicationService = new ArchitectureBaselineApplicationService(
-            runnerSetupService, handlerRegistry, contractExecutor, baselineGenerator);
+            runnerSetupService, handlerRegistry, contractExecutor, baselineGenerator, new FakeBaselineLoadingService());
 
         BaselineGenerationOutcome outcome = applicationService.Generate(
             new BaselineGenerationRequest { PolicyPath = "unused-by-fakes.arch.yml", Mode = "all" });
@@ -220,7 +244,7 @@ public sealed class ArchitectureBaselineApplicationServiceFakeCompositionTests
         var baselineGenerator = new FakeBaselineGenerator();
 
         var applicationService = new ArchitectureBaselineApplicationService(
-            runnerSetupService, handlerRegistry, contractExecutor, baselineGenerator);
+            runnerSetupService, handlerRegistry, contractExecutor, baselineGenerator, new FakeBaselineLoadingService());
 
         Assert.That(
             () => applicationService.Generate(
@@ -231,5 +255,225 @@ public sealed class ArchitectureBaselineApplicationServiceFakeCompositionTests
         Assert.That(runnerSetupService.BuildRunnerCalled, Is.False);
         Assert.That(contractExecutor.ModesReceived, Is.Empty);
         Assert.That(baselineGenerator.WasCalled, Is.False);
+    }
+
+    // Update/Prune/Diff/Verify all build on the same classification: a "known-rule" entry whose
+    // (source, forbidden) still matches a candidate is frozen; a "known-rule" entry with no matching
+    // candidate is resolved (stale); an "unknown-rule" entry is a configuration error; a candidate with
+    // no matching baseline entry is new.
+    private static ArchitectureContractDocument CreateDocumentWithKnownRule()
+    {
+        return new ArchitectureContractDocument
+        {
+            Version = 1,
+            Name = "Fake",
+            Contracts = new ArchitectureContractGroups
+            {
+                Strict = new List<ArchitectureDependencyContract>
+                {
+                    new() { Id = "known-rule", Name = "known-rule", Source = "core" },
+                },
+            },
+        };
+    }
+
+    private static ArchitectureBaselineDocument CreateMixedBaseline()
+    {
+        return new ArchitectureBaselineDocument
+        {
+            Version = 1,
+            Baseline = new ArchitectureBaselineContractGroups
+            {
+                Strict = new List<ArchitectureBaselineContractEntry>
+                {
+                    new()
+                    {
+                        Id = "known-rule",
+                        IgnoredViolations = new List<ArchitectureIgnoredViolation>
+                        {
+                            new() { SourceType = "SrcA", ForbiddenReference = "RefA", Reason = "old reason A" },
+                            new() { SourceType = "SrcB", ForbiddenReference = "RefB", Reason = "old reason B" },
+                        },
+                    },
+                    new()
+                    {
+                        Id = "unknown-rule",
+                        IgnoredViolations = new List<ArchitectureIgnoredViolation>
+                        {
+                            new() { SourceType = "SrcC", ForbiddenReference = "RefC", Reason = "old reason C" },
+                        },
+                    },
+                },
+            },
+        };
+    }
+
+    private static (FakeRunnerSetupService RunnerSetupService, FakeContractExecutor ContractExecutor,
+        FakeBaselineGenerator BaselineGenerator, FakeBaselineLoadingService BaselineLoadingService)
+        CreateMixedScenarioCollaborators()
+    {
+        var document = CreateDocumentWithKnownRule();
+        var runnerSetupService = new FakeRunnerSetupService { DocumentToReturn = document };
+        var runner = new FakeContractRunner(CreateEmptySession(document))
+        {
+            BaselineCandidates = new List<ArchitectureBaselineCandidate>
+            {
+                new("strict", "known-rule", "SrcA", "RefA"),
+                new("strict", "known-rule", "SrcNew", "RefNew"),
+            },
+        };
+        runnerSetupService.RunnerToReturn = runner;
+
+        return (runnerSetupService, new FakeContractExecutor(), new FakeBaselineGenerator(),
+            new FakeBaselineLoadingService { DocumentToReturn = CreateMixedBaseline() });
+    }
+
+    [Test]
+    public void Update_PreservesFrozenReasonAndAddsNewEntry()
+    {
+        (var runnerSetupService, var contractExecutor, var baselineGenerator, var baselineLoadingService) =
+            CreateMixedScenarioCollaborators();
+
+        var applicationService = new ArchitectureBaselineApplicationService(
+            runnerSetupService, new FakeContractHandlerRegistry(), contractExecutor, baselineGenerator, baselineLoadingService);
+
+        BaselineUpdateOutcome outcome = applicationService.Update(new BaselineUpdateRequest
+        {
+            PolicyPath = "unused-by-fakes.arch.yml",
+            BaselinePath = "unused-by-fakes.baseline.yml",
+            Mode = "all",
+            Reason = "freshly generated",
+        });
+
+        Assert.That(outcome.Succeeded, Is.True);
+        Assert.That(outcome.PreservedCount, Is.EqualTo(1));
+        Assert.That(outcome.NewCount, Is.EqualTo(1));
+
+        var entries = baselineGenerator.EntriesReceived!;
+        Assert.That(entries, Has.Count.EqualTo(4));
+        Assert.That(entries.Single(e => e.SourceType == "SrcA").Reason, Is.EqualTo("old reason A"));
+        Assert.That(entries.Single(e => e.SourceType == "SrcB").Reason, Is.EqualTo("old reason B"));
+        Assert.That(entries.Single(e => e.SourceType == "SrcC").Reason, Is.EqualTo("old reason C"));
+        Assert.That(entries.Single(e => e.SourceType == "SrcNew").Reason, Is.EqualTo("freshly generated"));
+    }
+
+    [Test]
+    public void Prune_RemovesResolvedAndConfigurationErrorEntriesOnly()
+    {
+        (var runnerSetupService, var contractExecutor, var baselineGenerator, var baselineLoadingService) =
+            CreateMixedScenarioCollaborators();
+
+        var applicationService = new ArchitectureBaselineApplicationService(
+            runnerSetupService, new FakeContractHandlerRegistry(), contractExecutor, baselineGenerator, baselineLoadingService);
+
+        BaselinePruneOutcome outcome = applicationService.Prune(new BaselinePruneRequest
+        {
+            PolicyPath = "unused-by-fakes.arch.yml",
+            BaselinePath = "unused-by-fakes.baseline.yml",
+            Mode = "all",
+        });
+
+        Assert.That(outcome.Succeeded, Is.True);
+        Assert.That(baselineGenerator.EntriesReceived, Has.Count.EqualTo(1));
+        Assert.That(baselineGenerator.EntriesReceived!.Single().SourceType, Is.EqualTo("SrcA"));
+
+        Assert.That(outcome.RemovedEntries, Has.Count.EqualTo(2));
+        Assert.That(outcome.RemovedEntries.Single(r => r.Entry.SourceType == "SrcB").RemovalReason, Is.EqualTo("resolved"));
+        Assert.That(outcome.RemovedEntries.Single(r => r.Entry.SourceType == "SrcC").RemovalReason, Is.EqualTo("configuration-error"));
+    }
+
+    [Test]
+    public void Diff_ReportsAllFourCategories()
+    {
+        (var runnerSetupService, var contractExecutor, var baselineGenerator, var baselineLoadingService) =
+            CreateMixedScenarioCollaborators();
+
+        var applicationService = new ArchitectureBaselineApplicationService(
+            runnerSetupService, new FakeContractHandlerRegistry(), contractExecutor, baselineGenerator, baselineLoadingService);
+
+        BaselineDiffOutcome outcome = applicationService.Diff(new BaselineDiffRequest
+        {
+            PolicyPath = "unused-by-fakes.arch.yml",
+            BaselinePath = "unused-by-fakes.baseline.yml",
+            Mode = "all",
+        });
+
+        Assert.That(outcome.Succeeded, Is.True);
+        Assert.That(outcome.New.Single().SourceType, Is.EqualTo("SrcNew"));
+        Assert.That(outcome.Frozen.Single().SourceType, Is.EqualTo("SrcA"));
+        Assert.That(outcome.Resolved.Single().SourceType, Is.EqualTo("SrcB"));
+        Assert.That(outcome.ConfigurationErrors.Single().SourceType, Is.EqualTo("SrcC"));
+    }
+
+    [Test]
+    public void Verify_OutOfSync_WhenResolvedOrConfigurationErrorsExist()
+    {
+        (var runnerSetupService, var contractExecutor, var baselineGenerator, var baselineLoadingService) =
+            CreateMixedScenarioCollaborators();
+
+        var applicationService = new ArchitectureBaselineApplicationService(
+            runnerSetupService, new FakeContractHandlerRegistry(), contractExecutor, baselineGenerator, baselineLoadingService);
+
+        BaselineVerifyOutcome outcome = applicationService.Verify(new BaselineVerifyRequest
+        {
+            PolicyPath = "unused-by-fakes.arch.yml",
+            BaselinePath = "unused-by-fakes.baseline.yml",
+            Mode = "all",
+        });
+
+        Assert.That(outcome.Succeeded, Is.True);
+        Assert.That(outcome.InSync, Is.False);
+    }
+
+    [Test]
+    public void Verify_InSync_WhenOnlyNewDebtPresent()
+    {
+        var document = CreateDocumentWithKnownRule();
+        var runnerSetupService = new FakeRunnerSetupService { DocumentToReturn = document };
+        var runner = new FakeContractRunner(CreateEmptySession(document))
+        {
+            BaselineCandidates = new List<ArchitectureBaselineCandidate>
+            {
+                new("strict", "known-rule", "SrcA", "RefA"),
+                new("strict", "known-rule", "SrcNew", "RefNew"),
+            },
+        };
+        runnerSetupService.RunnerToReturn = runner;
+
+        var baselineLoadingService = new FakeBaselineLoadingService
+        {
+            DocumentToReturn = new ArchitectureBaselineDocument
+            {
+                Version = 1,
+                Baseline = new ArchitectureBaselineContractGroups
+                {
+                    Strict = new List<ArchitectureBaselineContractEntry>
+                    {
+                        new()
+                        {
+                            Id = "known-rule",
+                            IgnoredViolations = new List<ArchitectureIgnoredViolation>
+                            {
+                                new() { SourceType = "SrcA", ForbiddenReference = "RefA", Reason = "old reason A" },
+                            },
+                        },
+                    },
+                },
+            },
+        };
+
+        var applicationService = new ArchitectureBaselineApplicationService(
+            runnerSetupService, new FakeContractHandlerRegistry(), new FakeContractExecutor(), new FakeBaselineGenerator(), baselineLoadingService);
+
+        BaselineVerifyOutcome outcome = applicationService.Verify(new BaselineVerifyRequest
+        {
+            PolicyPath = "unused-by-fakes.arch.yml",
+            BaselinePath = "unused-by-fakes.baseline.yml",
+            Mode = "all",
+        });
+
+        Assert.That(outcome.Succeeded, Is.True);
+        Assert.That(outcome.InSync, Is.True);
+        Assert.That(outcome.New.Single().SourceType, Is.EqualTo("SrcNew"));
     }
 }
