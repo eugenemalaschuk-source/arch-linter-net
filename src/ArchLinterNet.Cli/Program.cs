@@ -9,6 +9,7 @@ namespace ArchLinterNet.Cli;
 public static partial class Program
 {
     private static readonly ArchitectureDiagnosticFormatter _formatter = new();
+    private static readonly ArchitectureSarifFormatter _sarifFormatter = new();
 
     private static readonly Lazy<ArchitectureEngine> _engine =
         new(() => new ArchitectureEngineBuilder().AddArchLinterNetCore().Build());
@@ -98,9 +99,9 @@ public static partial class Program
             return 2;
         }
 
-        if (format is not ("human" or "json"))
+        if (format is not ("human" or "json" or "sarif"))
         {
-            Console.Error.WriteLine($"Invalid format: {format}. Use 'human' or 'json'.");
+            Console.Error.WriteLine($"Invalid format: {format}. Use 'human', 'json', or 'sarif'.");
             return 2;
         }
 
@@ -135,6 +136,11 @@ public static partial class Program
                         ? Array.Empty<PolicyConsistencyDiagnostic>()
                         : outcome.PolicyConsistencyFindings,
                     outcome.CoverageSummaries));
+            }
+            else if (format == "sarif")
+            {
+                Console.WriteLine(_sarifFormatter.FormatResultAsSarif(
+                    mode, outcome.Violations, outcome.Cycles, version));
             }
             else
             {
@@ -470,7 +476,11 @@ public static partial class Program
                                     otherwise empty symbol set)
                   --baseline <path> Path to baseline file to merge with policy ignores
                   --timings         Print phase-level timing report to stderr
-              -f, --format <fmt>    Output format: human or json (default: human)
+              -f, --format <fmt>    Output format: human, json, or sarif (default: human)
+                                    sarif covers violations and cycles only; coverage,
+                                    unmatched-ignore, and policy-consistency findings can
+                                    still fail the run (exit code 1) without appearing in
+                                    SARIF results — use --format json to see those
                   --json            Shortcut for --format json
               -h, --help            Show this help message
               -v, --version         Show version

@@ -267,6 +267,47 @@ public partial class CliIntegrationTests
         Assert.DoesNotThrow(() => JsonDocument.Parse(stdout));
     }
 
+    /* --format sarif */
+
+    [Test]
+    public void SarifOutput_IsValidSarifWithExpectedSchema()
+    {
+        var (exitCode, stdout, _) = RunCli("--policy", _passingPolicy, "--format", "sarif");
+
+        Assert.That(exitCode, Is.EqualTo(0));
+
+        using var doc = JsonDocument.Parse(stdout);
+        JsonElement root = doc.RootElement;
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(root.GetProperty("version").GetString(), Is.EqualTo("2.1.0"));
+            Assert.That(root.TryGetProperty("$schema", out _), Is.True);
+            JsonElement run = root.GetProperty("runs")[0];
+            Assert.That(run.GetProperty("tool").GetProperty("driver").GetProperty("name").GetString(),
+                Is.EqualTo("arch-linter-net"));
+            Assert.That(run.TryGetProperty("results", out _), Is.True);
+        });
+    }
+
+    [Test]
+    public void SarifOutput_WithViolations_IncludesResultWithNormalizedRuleId()
+    {
+        var (exitCode, stdout, _) = RunCli("--policy", _failingPolicy, "--format", "sarif", "--strict");
+
+        Assert.That(exitCode, Is.EqualTo(1));
+
+        using var doc = JsonDocument.Parse(stdout);
+        JsonElement results = doc.RootElement.GetProperty("runs")[0].GetProperty("results");
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(results.GetArrayLength(), Is.GreaterThan(0));
+            Assert.That(results[0].GetProperty("ruleId").GetString(), Is.EqualTo("configuration"));
+            Assert.That(results[0].GetProperty("level").GetString(), Is.EqualTo("error"));
+        });
+    }
+
     /* Exit codes */
 
     [Test]
