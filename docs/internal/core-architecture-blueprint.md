@@ -106,8 +106,17 @@ Adding a new contract family requires:
 1. Adding an `IArchitectureContractHandler` implementation for the family.
 1. Registering it with the composition root (`services.AddSingleton<IArchitectureContractHandler, NewFamilyHandler>()`).
 1. Adding one descriptor to `ArchitectureContractFamilyRegistry.All` (`src/ArchLinterNet.Core/Execution/ArchitectureContractFamilyRegistry.cs`) so the family is selectable by mode.
+1. If the family's YAML configuration needs load-time validation (beyond schema deserialization), adding an `IArchitecturePolicyDocumentValidator` implementation under `Contracts/Validators/` and registering it in `ArchitecturePolicyDocumentValidatorPipeline.All` (`src/ArchLinterNet.Core/Contracts/Validators/ArchitecturePolicyDocumentValidatorPipeline.cs`) — see [Policy document validation pipeline](#policy-document-validation-pipeline) below.
 
 No step requires editing a central god executor or a static default-handler list. In particular, `ArchitectureContractCatalog.cs` should not need edits for a new family — it builds its descriptors and family order generically from `ArchitectureContractFamilyRegistry.All` (see the `contract-family-registry` OpenSpec capability); only a rare cross-family ordering policy change would touch that file directly. This is the concrete acceptance signal for #137 and the post-coverage expansion story (#104).
+
+## Policy document validation pipeline
+
+`ArchitecturePolicyDocumentLoader.Load` (`src/ArchLinterNet.Core/Contracts/ArchitecturePolicyDocumentLoader.cs`) deserializes `dependencies.arch.yml` and then runs an ordered pipeline of `IArchitecturePolicyDocumentValidator` instances (`ArchitecturePolicyDocumentValidatorPipeline.All`, `src/ArchLinterNet.Core/Contracts/Validators/`) against the parsed document, one class per contract family plus two cross-family checks (duplicate ids, layer namespaces). No step of that pipeline lives on the loader class itself — see the `policy-document-validation-pipeline` OpenSpec capability.
+
+This is a separate mechanism from the `ArchitectureContractFamilyRegistry`/`ArchitectureContractFamilyDescriptor` extension point described above, and intentionally so: `Contracts` depends on nothing else in Core (see the dependency-direction table below), while the registry lives in `Execution`. `ArchitectureContractFamilyDescriptor.AdditionalValidation` therefore cannot be invoked from `Load` without inverting that dependency direction, and remains unused. Do not try to unify the two registries across the module boundary — keep contract cataloguing (`Execution`) and policy-document validation (`Contracts`) as separate, independently-ordered lists.
+
+The pipeline order is load-bearing: validators throw eagerly and first-match-wins, so a document invalid in more than one family always fails with the first pipeline entry's exception. Preserve the existing order when adding an entry unless a reviewed compatibility note says otherwise.
 
 ## Session/state ownership
 
