@@ -30,4 +30,4 @@
 ## 6. Archive and PR
 
 - [x] 6.1 Run `opsx-archive` to fold delta specs into `openspec/specs/shared-validation-service/spec.md` and `openspec/specs/test-adapter/spec.md`
-- [ ] 6.2 Open the PR referencing issue #64
+- [x] 6.2 Open the PR referencing issue #64
