@@ -21,9 +21,10 @@ public sealed class ArchitectureContractCatalog
         _familiesInOrder = familiesInOrder;
     }
 
-    // The order new families first appear in Build below, deduplicated. ArchitectureContractExecutor
-    // iterates this list to dispatch each family through the handler registry, so a new family becomes
-    // executable as soon as it is added here (plus a handler/registration) with no executor changes.
+    // The order families first appear while Build below iterates ArchitectureContractFamilyRegistry.All,
+    // deduplicated. ArchitectureContractExecutor iterates this list to dispatch each family through the
+    // handler registry, so a new family becomes executable as soon as it has a descriptor in the registry
+    // (plus a handler/registration) - no edits to this file are needed.
     public IReadOnlyList<string> FamiliesInOrder => _familiesInOrder;
 
     public static ArchitectureContractCatalog Build(ArchitectureContractDocument document)
