@@ -476,4 +476,247 @@ public sealed class ArchitectureBaselineApplicationServiceFakeCompositionTests
         Assert.That(outcome.InSync, Is.True);
         Assert.That(outcome.New.Single().SourceType, Is.EqualTo("SrcNew"));
     }
+
+    // Scoped update/prune must only classify (and potentially remove) entries within the
+    // requested --contract/--mode scope; entries outside that scope must be carried through
+    // to the output baseline untouched, even if they would otherwise be "resolved".
+    private static ArchitectureContractDocument CreateDocumentWithTwoContractRules()
+    {
+        return new ArchitectureContractDocument
+        {
+            Version = 1,
+            Name = "Fake",
+            Contracts = new ArchitectureContractGroups
+            {
+                Strict = new List<ArchitectureDependencyContract>
+                {
+                    new() { Id = "known-rule", Name = "known-rule", Source = "core" },
+                    new() { Id = "other-rule", Name = "other-rule", Source = "core" },
+                },
+            },
+        };
+    }
+
+    private static ArchitectureBaselineDocument CreateBaselineWithTwoContractRules()
+    {
+        return new ArchitectureBaselineDocument
+        {
+            Version = 1,
+            Baseline = new ArchitectureBaselineContractGroups
+            {
+                Strict = new List<ArchitectureBaselineContractEntry>
+                {
+                    new()
+                    {
+                        Id = "known-rule",
+                        IgnoredViolations = new List<ArchitectureIgnoredViolation>
+                        {
+                            new() { SourceType = "SrcA", ForbiddenReference = "RefA", Reason = "old reason A" },
+                        },
+                    },
+                    new()
+                    {
+                        Id = "other-rule",
+                        IgnoredViolations = new List<ArchitectureIgnoredViolation>
+                        {
+                            new() { SourceType = "SrcX", ForbiddenReference = "RefX", Reason = "old reason X" },
+                        },
+                    },
+                },
+            },
+        };
+    }
+
+    [Test]
+    public void Update_ScopedToOneContract_PreservesOutOfScopeContractEntries()
+    {
+        var document = CreateDocumentWithTwoContractRules();
+        var runnerSetupService = new FakeRunnerSetupService { DocumentToReturn = document };
+        var runner = new FakeContractRunner(CreateEmptySession(document))
+        {
+            BaselineCandidates = new List<ArchitectureBaselineCandidate>
+            {
+                new("strict", "known-rule", "SrcA", "RefA"),
+            },
+        };
+        runnerSetupService.RunnerToReturn = runner;
+        var baselineGenerator = new FakeBaselineGenerator();
+        var baselineLoadingService = new FakeBaselineLoadingService { DocumentToReturn = CreateBaselineWithTwoContractRules() };
+
+        var applicationService = new ArchitectureBaselineApplicationService(
+            runnerSetupService, new FakeContractHandlerRegistry(), new FakeContractExecutor(), baselineGenerator, baselineLoadingService);
+
+        BaselineUpdateOutcome outcome = applicationService.Update(new BaselineUpdateRequest
+        {
+            PolicyPath = "unused-by-fakes.arch.yml",
+            BaselinePath = "unused-by-fakes.baseline.yml",
+            Mode = "all",
+            ContractIds = new[] { "known-rule" },
+        });
+
+        Assert.That(outcome.Succeeded, Is.True);
+        var entries = baselineGenerator.EntriesReceived!;
+        Assert.That(entries, Has.Count.EqualTo(2));
+        Assert.That(entries.Single(e => e.ContractId == "known-rule").SourceType, Is.EqualTo("SrcA"));
+        Assert.That(entries.Single(e => e.ContractId == "other-rule").SourceType, Is.EqualTo("SrcX"));
+        Assert.That(entries.Single(e => e.ContractId == "other-rule").Reason, Is.EqualTo("old reason X"));
+    }
+
+    [Test]
+    public void Prune_ScopedToOneContract_PreservesOutOfScopeContractEntriesEvenIfStale()
+    {
+        var document = CreateDocumentWithTwoContractRules();
+        var runnerSetupService = new FakeRunnerSetupService { DocumentToReturn = document };
+        var runner = new FakeContractRunner(CreateEmptySession(document))
+        {
+            // No candidate for "other-rule" — its baseline entry would be classified "resolved"
+            // if it were in scope, but --contract known-rule must keep it untouched.
+            BaselineCandidates = new List<ArchitectureBaselineCandidate>
+            {
+                new("strict", "known-rule", "SrcA", "RefA"),
+            },
+        };
+        runnerSetupService.RunnerToReturn = runner;
+        var baselineGenerator = new FakeBaselineGenerator();
+        var baselineLoadingService = new FakeBaselineLoadingService { DocumentToReturn = CreateBaselineWithTwoContractRules() };
+
+        var applicationService = new ArchitectureBaselineApplicationService(
+            runnerSetupService, new FakeContractHandlerRegistry(), new FakeContractExecutor(), baselineGenerator, baselineLoadingService);
+
+        BaselinePruneOutcome outcome = applicationService.Prune(new BaselinePruneRequest
+        {
+            PolicyPath = "unused-by-fakes.arch.yml",
+            BaselinePath = "unused-by-fakes.baseline.yml",
+            Mode = "all",
+            ContractIds = new[] { "known-rule" },
+        });
+
+        Assert.That(outcome.Succeeded, Is.True);
+        Assert.That(outcome.RemovedEntries, Is.Empty);
+        var entries = baselineGenerator.EntriesReceived!;
+        Assert.That(entries, Has.Count.EqualTo(2));
+        Assert.That(entries.Single(e => e.ContractId == "known-rule").SourceType, Is.EqualTo("SrcA"));
+        Assert.That(entries.Single(e => e.ContractId == "other-rule").SourceType, Is.EqualTo("SrcX"));
+    }
+
+    private static ArchitectureContractDocument CreateDocumentWithStrictAndAuditRules()
+    {
+        return new ArchitectureContractDocument
+        {
+            Version = 1,
+            Name = "Fake",
+            Contracts = new ArchitectureContractGroups
+            {
+                Strict = new List<ArchitectureDependencyContract>
+                {
+                    new() { Id = "known-rule", Name = "known-rule", Source = "core" },
+                },
+                Audit = new List<ArchitectureDependencyContract>
+                {
+                    new() { Id = "audit-rule", Name = "audit-rule", Source = "core" },
+                },
+            },
+        };
+    }
+
+    private static ArchitectureBaselineDocument CreateBaselineWithStrictAndAuditEntries()
+    {
+        return new ArchitectureBaselineDocument
+        {
+            Version = 1,
+            Baseline = new ArchitectureBaselineContractGroups
+            {
+                Strict = new List<ArchitectureBaselineContractEntry>
+                {
+                    new()
+                    {
+                        Id = "known-rule",
+                        IgnoredViolations = new List<ArchitectureIgnoredViolation>
+                        {
+                            new() { SourceType = "SrcA", ForbiddenReference = "RefA", Reason = "old reason A" },
+                        },
+                    },
+                },
+                Audit = new List<ArchitectureBaselineContractEntry>
+                {
+                    new()
+                    {
+                        Id = "audit-rule",
+                        IgnoredViolations = new List<ArchitectureIgnoredViolation>
+                        {
+                            new() { SourceType = "SrcY", ForbiddenReference = "RefY", Reason = "old reason Y" },
+                        },
+                    },
+                },
+            },
+        };
+    }
+
+    [Test]
+    public void Update_ScopedToStrictMode_PreservesAuditBaselineEntries()
+    {
+        var document = CreateDocumentWithStrictAndAuditRules();
+        var runnerSetupService = new FakeRunnerSetupService { DocumentToReturn = document };
+        var runner = new FakeContractRunner(CreateEmptySession(document))
+        {
+            BaselineCandidates = new List<ArchitectureBaselineCandidate>
+            {
+                new("strict", "known-rule", "SrcA", "RefA"),
+            },
+        };
+        runnerSetupService.RunnerToReturn = runner;
+        var baselineGenerator = new FakeBaselineGenerator();
+        var baselineLoadingService = new FakeBaselineLoadingService { DocumentToReturn = CreateBaselineWithStrictAndAuditEntries() };
+
+        var applicationService = new ArchitectureBaselineApplicationService(
+            runnerSetupService, new FakeContractHandlerRegistry(), new FakeContractExecutor(), baselineGenerator, baselineLoadingService);
+
+        BaselineUpdateOutcome outcome = applicationService.Update(new BaselineUpdateRequest
+        {
+            PolicyPath = "unused-by-fakes.arch.yml",
+            BaselinePath = "unused-by-fakes.baseline.yml",
+            Mode = "strict",
+        });
+
+        Assert.That(outcome.Succeeded, Is.True);
+        var entries = baselineGenerator.EntriesReceived!;
+        Assert.That(entries, Has.Count.EqualTo(2));
+        Assert.That(entries.Single(e => e.ContractGroup == "audit").SourceType, Is.EqualTo("SrcY"));
+        Assert.That(entries.Single(e => e.ContractGroup == "audit").Reason, Is.EqualTo("old reason Y"));
+    }
+
+    [Test]
+    public void Prune_ScopedToStrictMode_PreservesAuditBaselineEntriesEvenIfStale()
+    {
+        var document = CreateDocumentWithStrictAndAuditRules();
+        var runnerSetupService = new FakeRunnerSetupService { DocumentToReturn = document };
+        var runner = new FakeContractRunner(CreateEmptySession(document))
+        {
+            // No candidate for the audit rule — it would be "resolved" if audit were in scope,
+            // but --mode strict must leave the audit group untouched.
+            BaselineCandidates = new List<ArchitectureBaselineCandidate>
+            {
+                new("strict", "known-rule", "SrcA", "RefA"),
+            },
+        };
+        runnerSetupService.RunnerToReturn = runner;
+        var baselineGenerator = new FakeBaselineGenerator();
+        var baselineLoadingService = new FakeBaselineLoadingService { DocumentToReturn = CreateBaselineWithStrictAndAuditEntries() };
+
+        var applicationService = new ArchitectureBaselineApplicationService(
+            runnerSetupService, new FakeContractHandlerRegistry(), new FakeContractExecutor(), baselineGenerator, baselineLoadingService);
+
+        BaselinePruneOutcome outcome = applicationService.Prune(new BaselinePruneRequest
+        {
+            PolicyPath = "unused-by-fakes.arch.yml",
+            BaselinePath = "unused-by-fakes.baseline.yml",
+            Mode = "strict",
+        });
+
+        Assert.That(outcome.Succeeded, Is.True);
+        Assert.That(outcome.RemovedEntries, Is.Empty);
+        var entries = baselineGenerator.EntriesReceived!;
+        Assert.That(entries, Has.Count.EqualTo(2));
+        Assert.That(entries.Single(e => e.ContractGroup == "audit").SourceType, Is.EqualTo("SrcY"));
+    }
 }

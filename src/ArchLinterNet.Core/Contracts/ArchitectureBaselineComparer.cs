@@ -15,6 +15,7 @@ public static class ArchitectureBaselineComparer
         var frozen = new List<ArchitectureBaselineComparisonEntry>();
         var resolved = new List<ArchitectureBaselineComparisonEntry>();
         var configurationErrors = new List<ArchitectureBaselineComparisonEntry>();
+        var outOfScope = new List<ArchitectureBaselineComparisonEntry>();
 
         HashSet<string>? selectedIds = selectedContractIds is { Count: > 0 }
             ? new HashSet<string>(selectedContractIds, StringComparer.OrdinalIgnoreCase)
@@ -24,6 +25,15 @@ public static class ArchitectureBaselineComparer
         {
             if (!IsInScope(groupName, mode))
             {
+                foreach (var entry in GetEntries(baselineDocument.Baseline, groupName))
+                {
+                    foreach (var ignore in entry.IgnoredViolations)
+                    {
+                        outOfScope.Add(new ArchitectureBaselineComparisonEntry(
+                            groupName, entry.Id, ignore.SourceType, ignore.ForbiddenReference, ignore.Reason));
+                    }
+                }
+
                 continue;
             }
 
@@ -35,6 +45,12 @@ public static class ArchitectureBaselineComparer
             {
                 if (selectedIds != null && !selectedIds.Contains(entry.Id))
                 {
+                    foreach (var ignore in entry.IgnoredViolations)
+                    {
+                        outOfScope.Add(new ArchitectureBaselineComparisonEntry(
+                            groupName, entry.Id, ignore.SourceType, ignore.ForbiddenReference, ignore.Reason));
+                    }
+
                     continue;
                 }
 
@@ -87,7 +103,7 @@ public static class ArchitectureBaselineComparer
             }
         }
 
-        return new ArchitectureBaselineComparisonResult(newEntries, frozen, resolved, configurationErrors);
+        return new ArchitectureBaselineComparisonResult(newEntries, frozen, resolved, configurationErrors, outOfScope);
     }
 
     private static bool HasMatchingCandidate(

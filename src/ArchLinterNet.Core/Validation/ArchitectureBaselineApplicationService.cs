@@ -55,11 +55,12 @@ public sealed class ArchitectureBaselineApplicationService(
             .ToList();
 
         List<ArchitectureBaselineComparisonEntry> entries = new(comparison.Frozen.Count + comparison.Resolved.Count
-            + comparison.ConfigurationErrors.Count + newEntries.Count);
+            + comparison.ConfigurationErrors.Count + newEntries.Count + comparison.OutOfScope.Count);
         entries.AddRange(comparison.Frozen);
         entries.AddRange(comparison.Resolved);
         entries.AddRange(comparison.ConfigurationErrors);
         entries.AddRange(newEntries);
+        entries.AddRange(comparison.OutOfScope);
 
         ArchitectureBaselineDocument updated = baselineGenerator.BuildFromEntries(entries);
         string yaml = baselineGenerator.Serialize(updated);
@@ -87,7 +88,11 @@ public sealed class ArchitectureBaselineApplicationService(
         ArchitectureBaselineComparisonResult comparison = ArchitectureBaselineComparer.Compare(
             document, existingBaseline, candidates, request.Mode, request.ContractIds);
 
-        ArchitectureBaselineDocument pruned = baselineGenerator.BuildFromEntries(comparison.Frozen);
+        List<ArchitectureBaselineComparisonEntry> survivors = new(comparison.Frozen.Count + comparison.OutOfScope.Count);
+        survivors.AddRange(comparison.Frozen);
+        survivors.AddRange(comparison.OutOfScope);
+
+        ArchitectureBaselineDocument pruned = baselineGenerator.BuildFromEntries(survivors);
         string yaml = baselineGenerator.Serialize(pruned);
 
         List<BaselineRemovedEntry> removed = comparison.Resolved

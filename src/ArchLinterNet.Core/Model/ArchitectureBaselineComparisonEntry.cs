@@ -11,4 +11,5 @@ public sealed record ArchitectureBaselineComparisonResult(
     IReadOnlyList<ArchitectureBaselineComparisonEntry> New,
     IReadOnlyList<ArchitectureBaselineComparisonEntry> Frozen,
     IReadOnlyList<ArchitectureBaselineComparisonEntry> Resolved,
-    IReadOnlyList<ArchitectureBaselineComparisonEntry> ConfigurationErrors);
+    IReadOnlyList<ArchitectureBaselineComparisonEntry> ConfigurationErrors,
+    IReadOnlyList<ArchitectureBaselineComparisonEntry> OutOfScope);
