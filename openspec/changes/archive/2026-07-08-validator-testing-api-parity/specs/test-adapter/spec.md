@@ -15,14 +15,14 @@
 - **THEN** the violation SHALL NOT appear in `ArchitectureValidationResult.Violations` and SHALL NOT affect `Passed`
 
 ### Requirement: Test adapter supports enforcing unmatched-ignored-violations policy
-`ArchitectureValidationBuilder.EnforceUnmatchedIgnoredViolationsPolicy(bool enforce = true)` SHALL control whether the subsequent validation run enforces the policy's `analysis.unmatched_ignored_violations` (`error`/`warn`/`off`) configuration, mirroring `ValidationRequest.EnforceUnmatchedIgnoredViolationsPolicy`. When not called, behavior SHALL remain unchanged from today (not enforced).
+`ArchitectureValidationBuilder.WithUnmatchedIgnoredViolationsPolicy(bool enforce = true)` SHALL control whether the subsequent validation run enforces the policy's `analysis.unmatched_ignored_violations` (`error`/`warn`/`off`) configuration, mirroring `ValidationRequest.EnforceUnmatchedIgnoredViolationsPolicy`. When not called, behavior SHALL remain unchanged from today (not enforced).
 
 #### Scenario: Enforcement toggled on fails the run
-- **WHEN** `EnforceUnmatchedIgnoredViolationsPolicy()` is called on a builder for a policy with `analysis.unmatched_ignored_violations: error` and unmatched ignored violations exist, but no other violations or cycles
+- **WHEN** `WithUnmatchedIgnoredViolationsPolicy()` is called on a builder for a policy with `analysis.unmatched_ignored_violations: error` and unmatched ignored violations exist, but no other violations or cycles
 - **THEN** `ValidateStrict()` SHALL return `Passed = false`
 
 #### Scenario: Default behavior unchanged when not called
-- **WHEN** `EnforceUnmatchedIgnoredViolationsPolicy()` is never called, against the same policy as above
+- **WHEN** `WithUnmatchedIgnoredViolationsPolicy()` is never called, against the same policy as above
 - **THEN** `ValidateStrict()` SHALL return `Passed = true`, matching current (pre-change) behavior
 
 ### Requirement: Test adapter supports collecting validation timings

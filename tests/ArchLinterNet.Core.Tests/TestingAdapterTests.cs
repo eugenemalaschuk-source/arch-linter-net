@@ -277,6 +277,54 @@ contracts:
         Assert.That(result.Violations, Is.Empty);
     }
 
+    private string WriteSelfForbiddenAuditPolicy()
+    {
+        string contractDir = Path.Combine(_tempDir, "architecture");
+        Directory.CreateDirectory(contractDir);
+        string contractPath = Path.Combine(contractDir, "dependencies.arch.yml");
+
+        File.WriteAllText(contractPath, @"
+version: 1
+name: Audit Builder Test
+layers:
+  core:
+    namespace: ArchLinterNet.Core
+analysis:
+  target_assemblies:
+    - ArchLinterNet.Core
+contracts:
+  audit:
+    - id: self-forbidden
+      name: core-must-not-depend-on-itself
+      source: core
+      forbidden: [core]
+    - id: harmless
+      name: harmless-rule
+      source: core
+      forbidden: []
+");
+        return contractPath;
+    }
+
+    [Test]
+    public void ValidateAudit_WithContracts_OnlySelectedContractRuns()
+    {
+        string contractPath = WriteSelfForbiddenAuditPolicy();
+
+        var withHarmlessOnly = ArchitectureAssertions.FromPolicy(contractPath)
+            .WithContracts("harmless")
+            .ValidateAudit();
+
+        Assert.That(withHarmlessOnly.Passed, Is.True);
+        Assert.That(withHarmlessOnly.Violations, Is.Empty);
+
+        var unfiltered = ArchitectureAssertions.FromPolicy(contractPath).ValidateAudit();
+
+        Assert.That(unfiltered.Passed, Is.False,
+            "Without a contract filter, the self-forbidden audit contract should still report violations");
+        Assert.That(unfiltered.Violations, Is.Not.Empty);
+    }
+
     [Test]
     public void WithBaseline_SuppressesKnownViolation()
     {
@@ -343,7 +391,7 @@ contracts:
     }
 
     [Test]
-    public void EnforceUnmatchedIgnoredViolationsPolicy_NotCalled_PassesByDefault()
+    public void WithUnmatchedIgnoredViolationsPolicy_NotCalled_PassesByDefault()
     {
         string contractPath = WriteUnmatchedIgnorePolicy();
 
@@ -354,12 +402,12 @@ contracts:
     }
 
     [Test]
-    public void EnforceUnmatchedIgnoredViolationsPolicy_Called_Fails()
+    public void WithUnmatchedIgnoredViolationsPolicy_Called_Fails()
     {
         string contractPath = WriteUnmatchedIgnorePolicy();
 
         var result = ArchitectureAssertions.FromPolicy(contractPath)
-            .EnforceUnmatchedIgnoredViolationsPolicy()
+            .WithUnmatchedIgnoredViolationsPolicy()
             .ValidateStrict();
 
         Assert.That(result.Passed, Is.False);
@@ -372,7 +420,7 @@ contracts:
         string contractPath = WriteUnmatchedIgnorePolicy();
 
         var result = ArchitectureAssertions.FromPolicy(contractPath)
-            .EnforceUnmatchedIgnoredViolationsPolicy()
+            .WithUnmatchedIgnoredViolationsPolicy()
             .ValidateStrict();
 
         var ex = Assert.Throws<InvalidOperationException>(() => result.ShouldPass());

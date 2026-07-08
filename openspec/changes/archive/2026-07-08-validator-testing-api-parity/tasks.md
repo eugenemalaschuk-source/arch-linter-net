@@ -7,7 +7,7 @@
 
 - [x] 2.1 Add `WithContracts(IEnumerable<string> contractIds)` and `WithContracts(params string[] contractIds)` to `src/ArchLinterNet.Testing/ArchitectureValidationBuilder.cs`
 - [x] 2.2 Add `WithBaseline(string baselinePath)`
-- [x] 2.3 Add `EnforceUnmatchedIgnoredViolationsPolicy(bool enforce = true)`
+- [x] 2.3 Add `WithUnmatchedIgnoredViolationsPolicy(bool enforce = true)`
 - [x] 2.4 Add `WithTimings()`, allocating a `ValidationTiming` and threading it through to `_engine.Value.Validate(request, timing)`
 - [x] 2.5 Update the private `Validate(string mode)` method to populate `ContractIds`, `BaselinePath`, and `EnforceUnmatchedIgnoredViolationsPolicy` on the built `ValidationRequest` from the new builder state
 
@@ -19,7 +19,7 @@
 
 ## 4. Tests: Testing adapter
 
-- [x] 4.1 Add tests in `tests/ArchLinterNet.Core.Tests/TestingAdapterTests.cs` covering: `WithContracts` restricting execution, `WithBaseline` suppressing a known violation, `EnforceUnmatchedIgnoredViolationsPolicy` toggled on/off, `WithTimings` populating `Timing`, coverage findings/summaries surfaced on the result, and `ShouldPass()` failure messages including unmatched-ignored/coverage detail
+- [x] 4.1 Add tests in `tests/ArchLinterNet.Core.Tests/TestingAdapterTests.cs` covering: `WithContracts` restricting execution, `WithBaseline` suppressing a known violation, `WithUnmatchedIgnoredViolationsPolicy` toggled on/off, `WithTimings` populating `Timing`, coverage findings/summaries surfaced on the result, and `ShouldPass()` failure messages including unmatched-ignored/coverage detail
 - [x] 4.2 Where a CLI integration test fixture (`tests/ArchLinterNet.Cli.Tests/TestPolicies/*.yml`) already covers an equivalent scenario (contract selection, baseline merge, unmatched-ignore config), mirror that policy's shape in the new Core/Testing tests for shared-fixture parity
 
 ## 5. Spec synchronization
@@ -31,3 +31,9 @@
 
 - [x] 6.1 Run `opsx-archive` to fold delta specs into `openspec/specs/shared-validation-service/spec.md` and `openspec/specs/test-adapter/spec.md`
 - [x] 6.2 Open the PR referencing issue #64
+
+## 7. Code review follow-ups (PR #204)
+
+- [x] 7.1 Add audit-mode test coverage for the new capabilities (`Validate_RequestOverload_AuditMode_SelectsOnlySpecifiedContract` in Core, `ValidateAudit_WithContracts_OnlySelectedContractRuns` in Testing) — acceptance criteria explicitly named `audit` as a required test dimension
+- [x] 7.2 Strengthen `Validate_RequestOverload_ConditionSet_ResolvesNamedSet` to assert on a real `#if MY_SYMBOL` branch via a `strict_method_body` contract and `source_roots`, proving condition-set symbol resolution actually changes the outcome instead of only checking the absence of an exception
+- [x] 7.3 Rename `ArchitectureValidationBuilder.EnforceUnmatchedIgnoredViolationsPolicy(...)` to `WithUnmatchedIgnoredViolationsPolicy(...)` to match the `With...` naming convention used by every other fluent method on the builder

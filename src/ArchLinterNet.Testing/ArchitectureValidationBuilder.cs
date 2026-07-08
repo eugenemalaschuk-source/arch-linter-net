@@ -44,7 +44,7 @@ public sealed class ArchitectureValidationBuilder
         return this;
     }
 
-    public ArchitectureValidationBuilder EnforceUnmatchedIgnoredViolationsPolicy(bool enforce = true)
+    public ArchitectureValidationBuilder WithUnmatchedIgnoredViolationsPolicy(bool enforce = true)
     {
         _enforceUnmatchedIgnoredViolationsPolicy = enforce;
         return this;

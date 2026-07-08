@@ -247,9 +247,85 @@ contracts:
         Assert.That(outcome.Violations, Is.Empty);
     }
 
+    private string WriteSelfForbiddenAuditPolicy()
+    {
+        string contractDir = Path.Combine(_tempDir, "architecture");
+        Directory.CreateDirectory(contractDir);
+        string contractPath = Path.Combine(contractDir, "dependencies.arch.yml");
+
+        File.WriteAllText(contractPath, @"
+version: 1
+name: Audit Request Overload Test
+layers:
+  core:
+    namespace: ArchLinterNet.Core
+analysis:
+  target_assemblies:
+    - ArchLinterNet.Core
+contracts:
+  audit:
+    - id: self-forbidden
+      name: core-must-not-depend-on-itself
+      source: core
+      forbidden: [core]
+    - id: harmless
+      name: harmless-rule
+      source: core
+      forbidden: []
+");
+        return contractPath;
+    }
+
+    [Test]
+    public void Validate_RequestOverload_AuditMode_SelectsOnlySpecifiedContract()
+    {
+        string contractPath = WriteSelfForbiddenAuditPolicy();
+        var validator = new ArchitectureValidator();
+
+        ValidationOutcome withHarmlessOnly = validator.Validate(new ValidationRequest
+        {
+            PolicyPath = contractPath,
+            Mode = "audit",
+            ContractIds = new[] { "harmless" },
+        });
+
+        Assert.That(withHarmlessOnly.Passed, Is.True);
+        Assert.That(withHarmlessOnly.Violations, Is.Empty);
+
+        ValidationOutcome unfiltered = validator.Validate(new ValidationRequest
+        {
+            PolicyPath = contractPath,
+            Mode = "audit",
+        });
+
+        Assert.That(unfiltered.Passed, Is.False,
+            "Without a contract filter, the self-forbidden audit contract should still report violations");
+        Assert.That(unfiltered.Violations, Is.Not.Empty);
+    }
+
     [Test]
     public void Validate_RequestOverload_ConditionSet_ResolvesNamedSet()
     {
+        // The layer namespace must match a namespace that actually exists in the loaded
+        // target assembly (ArchLinterNet.Core), otherwise the configuration check reports
+        // "contains no types in loaded assemblies" and fails the run regardless of the
+        // condition set under test. The Roslyn source scan below is independent of the
+        // real compiled assembly — it freshly parses whatever .cs files live under
+        // source_roots, so this probe class never needs to really exist in ArchLinterNet.Core.dll.
+        string sourceFile = Path.Combine(_tempDir, "ConditionSetProbe.cs");
+        File.WriteAllText(sourceFile, @"
+namespace ArchLinterNet.Core;
+public class ConditionSetProbeClass
+{
+    public void Run()
+    {
+#if MY_SYMBOL
+        System.Console.WriteLine(""gated"");
+#endif
+    }
+}
+");
+
         string contractDir = Path.Combine(_tempDir, "architecture");
         Directory.CreateDirectory(contractDir);
         string contractPath = Path.Combine(contractDir, "dependencies.arch.yml");
@@ -263,22 +339,42 @@ layers:
 analysis:
   target_assemblies:
     - ArchLinterNet.Core
+  source_roots:
+    - "".""
   condition_sets:
     runtime: []
+    editor: [MY_SYMBOL]
 contracts:
-  strict: []
+  strict_method_body:
+    - id: no-console-write
+      name: core-forbids-console-write
+      source: core
+      forbidden_calls: [System.Console.WriteLine]
 ");
 
         var validator = new ArchitectureValidator();
 
-        ValidationOutcome outcome = validator.Validate(new ValidationRequest
+        ValidationOutcome runtimeOutcome = validator.Validate(new ValidationRequest
         {
             PolicyPath = contractPath,
             Mode = "strict",
             ConditionSetName = "runtime",
         });
 
-        Assert.That(outcome.Passed, Is.True);
+        Assert.That(runtimeOutcome.Passed, Is.True,
+            "Without MY_SYMBOL defined, the #if-gated forbidden call should not compile in and should not be reported");
+        Assert.That(runtimeOutcome.Violations, Is.Empty);
+
+        ValidationOutcome editorOutcome = validator.Validate(new ValidationRequest
+        {
+            PolicyPath = contractPath,
+            Mode = "strict",
+            ConditionSetName = "editor",
+        });
+
+        Assert.That(editorOutcome.Passed, Is.False,
+            "With MY_SYMBOL defined via the editor condition set, the forbidden call should be compiled in and reported");
+        Assert.That(editorOutcome.Violations, Is.Not.Empty);
     }
 
     [Test]
