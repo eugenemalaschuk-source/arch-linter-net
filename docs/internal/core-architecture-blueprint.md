@@ -105,9 +105,9 @@ Adding a new contract family requires:
 1. Adding the contract schema/model under `Contracts/`.
 1. Adding an `IArchitectureContractHandler` implementation for the family.
 1. Registering it with the composition root (`services.AddSingleton<IArchitectureContractHandler, NewFamilyHandler>()`).
-1. Wiring catalog/schema lookup so the family is selectable by mode.
+1. Adding one descriptor to `ArchitectureContractFamilyRegistry.All` (`src/ArchLinterNet.Core/Execution/ArchitectureContractFamilyRegistry.cs`) so the family is selectable by mode.
 
-No step requires editing a central god executor or a static default-handler list. This is the concrete acceptance signal for #137 and the post-coverage expansion story (#104).
+No step requires editing a central god executor or a static default-handler list. In particular, `ArchitectureContractCatalog.cs` should not need edits for a new family — it builds its descriptors and family order generically from `ArchitectureContractFamilyRegistry.All` (see the `contract-family-registry` OpenSpec capability); only a rare cross-family ordering policy change would touch that file directly. This is the concrete acceptance signal for #137 and the post-coverage expansion story (#104).
 
 ## Session/state ownership
 
