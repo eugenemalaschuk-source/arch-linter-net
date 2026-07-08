@@ -277,12 +277,12 @@
         "source_type": {
           "type": "string",
           "minLength": 1,
-          "description": "Source type name or narrow glob pattern to suppress."
+          "description": "Exact source type name to suppress."
         },
         "forbidden_reference": {
           "type": "string",
           "minLength": 1,
-          "description": "Forbidden reference name or narrow glob pattern to suppress."
+          "description": "Exact forbidden reference name to suppress."
         },
         "reason": {
           "type": "string",

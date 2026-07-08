@@ -5,7 +5,7 @@ public static partial class Program
     private static void PrintBaselineHelp()
     {
         Console.WriteLine("""
-            arch-linter-net baseline generate — generate a baseline of current violations
+            arch-linter-net baseline — manage baseline lifecycle commands
 
             Usage:
               arch-linter-net baseline generate --config <path> --output <path> [options]
@@ -40,7 +40,8 @@ public static partial class Program
             Run 'arch-linter-net baseline <subcommand> --help' for subcommand-specific options.
 
             Exit codes:
-              0   Baseline generated successfully
+              0   Command completed successfully
+              1   Baseline verify found resolved entries or configuration errors
               2   Runtime error (invalid arguments, file not found, config violations, etc.)
             """);
     }
