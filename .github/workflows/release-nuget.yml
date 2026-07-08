@@ -112,17 +112,21 @@ jobs:
       - name: Acceptance
         run: make acceptance
 
+      - name: Prepare NuGet package release notes
+        shell: bash
+        run: echo "PACKAGE_RELEASE_NOTES=See GitHub release notes for $TARGET_TAG." >> "$GITHUB_ENV"
+
       - name: Pack Core
-        run: dotnet pack src/ArchLinterNet.Core/ArchLinterNet.Core.csproj --configuration Release --no-build --output "$PACKAGE_OUTPUT" -p:PackageVersion="$PACKAGE_VERSION" -p:Version="$PACKAGE_VERSION" -p:PackageReleaseNotes="$(cat artifacts/release-notes/release-notes.md)"
+        run: dotnet pack src/ArchLinterNet.Core/ArchLinterNet.Core.csproj --configuration Release --no-build --output "$PACKAGE_OUTPUT" -p:PackageVersion="$PACKAGE_VERSION" -p:Version="$PACKAGE_VERSION" -p:PackageReleaseNotes="$PACKAGE_RELEASE_NOTES"
 
       - name: Pack CLI
-        run: dotnet pack src/ArchLinterNet.Cli/ArchLinterNet.Cli.csproj --configuration Release --no-build --output "$PACKAGE_OUTPUT" -p:PackageVersion="$PACKAGE_VERSION" -p:Version="$PACKAGE_VERSION" -p:PackageReleaseNotes="$(cat artifacts/release-notes/release-notes.md)"
+        run: dotnet pack src/ArchLinterNet.Cli/ArchLinterNet.Cli.csproj --configuration Release --no-build --output "$PACKAGE_OUTPUT" -p:PackageVersion="$PACKAGE_VERSION" -p:Version="$PACKAGE_VERSION" -p:PackageReleaseNotes="$PACKAGE_RELEASE_NOTES"
 
       - name: Pack Testing
-        run: dotnet pack src/ArchLinterNet.Testing/ArchLinterNet.Testing.csproj --configuration Release --no-build --output "$PACKAGE_OUTPUT" -p:PackageVersion="$PACKAGE_VERSION" -p:Version="$PACKAGE_VERSION" -p:PackageReleaseNotes="$(cat artifacts/release-notes/release-notes.md)"
+        run: dotnet pack src/ArchLinterNet.Testing/ArchLinterNet.Testing.csproj --configuration Release --no-build --output "$PACKAGE_OUTPUT" -p:PackageVersion="$PACKAGE_VERSION" -p:Version="$PACKAGE_VERSION" -p:PackageReleaseNotes="$PACKAGE_RELEASE_NOTES"
 
       - name: Pack Unity
-        run: dotnet pack src/ArchLinterNet.Unity/ArchLinterNet.Unity.csproj --configuration Release --no-build --output "$PACKAGE_OUTPUT" -p:PackageVersion="$PACKAGE_VERSION" -p:Version="$PACKAGE_VERSION" -p:PackageReleaseNotes="$(cat artifacts/release-notes/release-notes.md)"
+        run: dotnet pack src/ArchLinterNet.Unity/ArchLinterNet.Unity.csproj --configuration Release --no-build --output "$PACKAGE_OUTPUT" -p:PackageVersion="$PACKAGE_VERSION" -p:Version="$PACKAGE_VERSION" -p:PackageReleaseNotes="$PACKAGE_RELEASE_NOTES"
 
       - name: Upload package artifacts
         uses: actions/upload-artifact@v4
