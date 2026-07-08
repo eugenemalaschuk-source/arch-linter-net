@@ -477,6 +477,10 @@ public static partial class Program
                   --baseline <path> Path to baseline file to merge with policy ignores
                   --timings         Print phase-level timing report to stderr
               -f, --format <fmt>    Output format: human, json, or sarif (default: human)
+                                    sarif covers violations and cycles only; coverage,
+                                    unmatched-ignore, and policy-consistency findings can
+                                    still fail the run (exit code 1) without appearing in
+                                    SARIF results — use --format json to see those
                   --json            Shortcut for --format json
               -h, --help            Show this help message
               -v, --version         Show version

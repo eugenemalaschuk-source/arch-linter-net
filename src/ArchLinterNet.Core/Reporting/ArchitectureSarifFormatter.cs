@@ -21,6 +21,7 @@ public sealed class ArchitectureSarifFormatter : IArchitectureSarifFormatter
 
     private const string ToolName = "arch-linter-net";
     private const string MethodBodyCategory = "method-body";
+    private const string MethodBodyIlCategory = "method-body-il";
     private const string CycleRuleFallback = "dependency-cycle";
 
     private static readonly Regex _methodBodyLinePattern = new(@"^line (?<line>\d+):", RegexOptions.CultureInvariant);
@@ -44,13 +45,12 @@ public sealed class ArchitectureSarifFormatter : IArchitectureSarifFormatter
             .ToList();
 
         object[] rules = entries
-            .Select(e => (e.RuleId, e.ContractName))
-            .Distinct()
-            .OrderBy(r => r.RuleId, StringComparer.Ordinal)
-            .Select(r => (object)new Dictionary<string, object?>
+            .GroupBy(e => e.RuleId, StringComparer.Ordinal)
+            .OrderBy(g => g.Key, StringComparer.Ordinal)
+            .Select(g => (object)new Dictionary<string, object?>
             {
-                ["id"] = r.RuleId,
-                ["shortDescription"] = new Dictionary<string, object?> { ["text"] = r.ContractName },
+                ["id"] = g.Key,
+                ["shortDescription"] = new Dictionary<string, object?> { ["text"] = g.First().ContractName },
             })
             .ToArray();
 
@@ -102,7 +102,7 @@ public sealed class ArchitectureSarifFormatter : IArchitectureSarifFormatter
         }
         else
         {
-            json["logicalLocations"] = BuildLogicalLocations(sourceType, LogicalLocationKindFor(diagnostic));
+            json["logicalLocations"] = BuildLogicalLocations(sourceType, LogicalLocationKindFor(diagnostic, forbiddenNamespace));
         }
 
         return new ResultEntry(ruleId, diagnostic.ContractName, sourceType, forbiddenNamespace, json);
@@ -172,12 +172,23 @@ public sealed class ArchitectureSarifFormatter : IArchitectureSarifFormatter
 
     // Best-effort hint: no diagnostic kind carries an explicit "this identifier is a
     // namespace/type/package" flag, so the kind is inferred from the diagnostic's concrete subtype.
-    private static string LogicalLocationKindFor(ArchitectureDiagnostic diagnostic) => diagnostic switch
+    // IL-scanned method-body violations are a special case: they map to the generic
+    // DependencyDiagnostic subtype like namespace/layer violations do, but SourceType is a
+    // type's fully-qualified name (see ArchitectureIlMethodBodyScanner), not a namespace.
+    private static string LogicalLocationKindFor(ArchitectureDiagnostic diagnostic, string forbiddenNamespace)
     {
-        DependencyDiagnostic or ConfigurationDiagnostic => "namespace",
-        PackageDependencyDiagnostic => "package",
-        _ => "type",
-    };
+        if (forbiddenNamespace == MethodBodyIlCategory)
+        {
+            return "type";
+        }
+
+        return diagnostic switch
+        {
+            DependencyDiagnostic or ConfigurationDiagnostic => "namespace",
+            PackageDependencyDiagnostic => "package",
+            _ => "type",
+        };
+    }
 
     private static (string SourceType, string ForbiddenNamespace, IReadOnlyCollection<string> References) ExtractFields(
         ArchitectureDiagnostic diagnostic) => diagnostic switch

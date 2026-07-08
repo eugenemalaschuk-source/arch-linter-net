@@ -90,6 +90,25 @@ public sealed class ArchitectureSarifFormatterTests
     }
 
     [Test]
+    public void FormatResultAsSarif_SameRuleIdDifferentContractName_RulesAreDeduplicatedById()
+    {
+        // Dedup must key strictly on ruleId, not on (ruleId, contractName) — otherwise a policy
+        // where the same id is reused with a slightly different name would produce two SARIF
+        // rule entries sharing one id, which SARIF consumers can reject as invalid.
+        var violations = new List<ArchitectureViolation>
+        {
+            new("My Contract", "my-rule", "Source.A", "Forbidden.Namespace", new[] { "ref1" }),
+            new("My Contract (renamed)", "my-rule", "Source.B", "Forbidden.Namespace", new[] { "ref2" })
+        };
+
+        JsonElement root = Run("strict", violations);
+
+        JsonElement rules = root.GetProperty("runs")[0].GetProperty("tool").GetProperty("driver").GetProperty("rules");
+        Assert.That(rules.GetArrayLength(), Is.EqualTo(1));
+        Assert.That(rules[0].GetProperty("id").GetString(), Is.EqualTo("my-rule"));
+    }
+
+    [Test]
     public void FormatResultAsSarif_StrictMode_LevelIsError()
     {
         var violations = new List<ArchitectureViolation>
@@ -214,6 +233,32 @@ public sealed class ArchitectureSarifFormatterTests
     }
 
     [Test]
+    public void FormatResultAsSarif_MethodBodyIlViolation_LogicalLocationKindIsType()
+    {
+        // ArchitectureIlMethodBodyScanner produces DependencyDiagnostic instances (same as
+        // namespace/layer violations) with ForbiddenNamespace == "method-body-il" and SourceType
+        // set to a type's fully-qualified name, not a namespace or a file — the kind must reflect
+        // that, not fall through to the DependencyDiagnostic default of "namespace".
+        var violations = new List<ArchitectureViolation>
+        {
+            new("method-body-il-rule", "method-body-il-rule", "MyApp.Infrastructure.LegacyService", "method-body-il",
+                new[] { "il 0012 (MyApp.Infrastructure.LegacyService.Run): Forbidden.Call -> Forbidden.Type.Call" })
+        };
+
+        JsonElement root = Run("strict", violations);
+
+        JsonElement result = root.GetProperty("runs")[0].GetProperty("results")[0];
+        Assert.That(result.TryGetProperty("locations", out _), Is.False);
+        JsonElement logicalLocation = result.GetProperty("logicalLocations")[0];
+        Assert.Multiple(() =>
+        {
+            Assert.That(logicalLocation.GetProperty("fullyQualifiedName").GetString(),
+                Is.EqualTo("MyApp.Infrastructure.LegacyService"));
+            Assert.That(logicalLocation.GetProperty("kind").GetString(), Is.EqualTo("type"));
+        });
+    }
+
+    [Test]
     public void FormatResultAsSarif_CycleWithIdPrefix_UsesEmbeddedIdAsRuleIdAndStripsPrefixFromPath()
     {
         var cycles = new[] { "[cycle-check] A -> B -> A" };
@@ -241,24 +286,23 @@ public sealed class ArchitectureSarifFormatterTests
     }
 
     [Test]
-    public void FormatResultAsSarif_MixedViolationKindsAndCycles_DeterministicOrdering()
+    public void FormatResultAsSarif_MixedViolationKindsAndCycles_OutputIsIndependentOfInputOrder()
     {
-        var violations = new List<ArchitectureViolation>
+        var violationA = new ArchitectureViolation("a-contract", "a-rule", "Source.A", "Forbidden.A", new[] { "ref-a" })
         {
-            new("b-contract", "b-rule", "Source.B", "Forbidden.B", new[] { "ref-b" }),
-            new("a-contract", "a-rule", "Source.A", "Forbidden.A", new[] { "ref-a" })
-            {
-                ForbiddenExternalGroup = "external-group"
-            }
+            ForbiddenExternalGroup = "external-group"
         };
-        var cycles = new[] { "[m-rule] X -> Y -> X" };
+        var violationB = new ArchitectureViolation("b-contract", "b-rule", "Source.B", "Forbidden.B", new[] { "ref-b" });
+        var cycle = "[m-rule] X -> Y -> X";
 
-        string first = _formatter.FormatResultAsSarif("strict", violations, cycles, "1.0.0");
-        string second = _formatter.FormatResultAsSarif("strict", violations, cycles, "1.0.0");
+        string inOriginalOrder = _formatter.FormatResultAsSarif(
+            "strict", new[] { violationB, violationA }, new[] { cycle }, "1.0.0");
+        string inReversedOrder = _formatter.FormatResultAsSarif(
+            "strict", new[] { violationA, violationB }, new[] { cycle }, "1.0.0");
 
-        Assert.That(first, Is.EqualTo(second));
+        Assert.That(inOriginalOrder, Is.EqualTo(inReversedOrder));
 
-        using var doc = JsonDocument.Parse(first);
+        using var doc = JsonDocument.Parse(inOriginalOrder);
         JsonElement results = doc.RootElement.GetProperty("runs")[0].GetProperty("results");
         var ruleIds = results.EnumerateArray().Select(r => r.GetProperty("ruleId").GetString()).ToArray();
         Assert.That(ruleIds, Is.EqualTo(new[] { "a-rule", "b-rule", "m-rule" }));
