@@ -159,6 +159,38 @@ public sealed class ArchitectureContractCatalogTests
     }
 
     [Test]
+    public void Build_HandlesAuditOnlyAndFullyEmptyFamilies()
+    {
+        // Regression coverage for descriptor-driven catalog construction (#209): every family is
+        // discovered from ArchitectureContractFamilyRegistry.All regardless of which YAML groups a
+        // document actually populates, so an audit-only family (layer, here) and a family with no
+        // contracts in either group (cycle, here) must both behave correctly with no special-casing.
+        var document = new ArchitectureContractDocument
+        {
+            Version = 1,
+            Name = "Test",
+            Contracts = new ArchitectureContractGroups
+            {
+                AuditLayers = new List<ArchitectureLayerContract>
+                {
+                    new() { Id = "layer-audit", Name = "Layer Audit", Layers = { "core", "runtime" } }
+                },
+            },
+        };
+
+        ArchitectureContractCatalog catalog = ArchitectureContractCatalog.Build(document);
+
+        Assert.That(catalog.ContractsFor("audit", "layer").Select(c => c.Id), Is.EqualTo(new[] { "layer-audit" }));
+        Assert.That(catalog.ContractsFor("strict", "layer"), Is.Empty);
+        Assert.That(catalog.AvailableContractIds("audit"), Does.Contain("layer-audit"));
+        Assert.That(catalog.AvailableContractIds("strict"), Does.Not.Contain("layer-audit"));
+
+        Assert.That(catalog.ContractsFor("strict", "cycle"), Is.Empty);
+        Assert.That(catalog.ContractsFor("audit", "cycle"), Is.Empty);
+        Assert.That(catalog.FamiliesInOrder, Does.Contain("cycle"));
+    }
+
+    [Test]
     public void ResolveGroup_ReturnsGroupForKnownContractByReference()
     {
         ArchitectureContractDocument document = BuildDocument();
