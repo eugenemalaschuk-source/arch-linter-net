@@ -1,6 +1,6 @@
 # Output Formats
 
-ArchLinterNet supports human-readable output for local development and JSON output for CI artifacts and downstream automation.
+ArchLinterNet supports human-readable output for local development, JSON output for CI artifacts and downstream automation, and SARIF output for code-scanning viewers.
 
 ## Human output
 
@@ -147,6 +147,23 @@ Behavior for non-violation finding families is controlled separately:
 - `analysis.coverage: error|warn|off` controls whether `coverage_findings` fail the run, report without failing, or are suppressed — this applies uniformly across every implemented coverage scope (`namespace`, `rule_input`, `project`, `assembly`, `dependency_edge`), not just namespace/rule-input coverage.
 - `analysis.policy_consistency: error|warn|off` controls whether `policy_consistency_findings` fail the run, report without failing, or are suppressed.
 - `analysis.unmatched_ignored_violations: error|warn|off` controls whether stale ignore entries fail the run, report without failing, or are suppressed.
+
+## SARIF output
+
+Use SARIF output to feed violations into GitHub code scanning or other standard static-analysis viewers:
+
+```bash
+arch-linter-net --mode strict --format sarif > architecture-violations.sarif
+```
+
+SARIF output is a single SARIF 2.1.0 document (`version: "2.1.0"`, with a `$schema` pointing at the SARIF 2.1.0 schema) containing one `run`:
+
+- `tool.driver.name` identifies the CLI, and `tool.driver.rules` lists every contract ID that produced a result, deduplicated by rule ID.
+- Each `result.ruleId` is the violating contract's ID (or a normalized fallback derived from its name when no ID is set).
+- Each `result.level` is `error` in `--mode strict` and `warning` in `--mode audit` — SARIF severity reflects the run's mode uniformly, not a per-contract setting.
+- Method-body violations (source-scanned forbidden calls) include a `physicalLocation` with the source file and line number. Every other violation kind (dependency/layer, external-dependency, package-dependency, type-placement, IL-scanned method-body calls, etc.) includes a `logicalLocations` entry naming the type, namespace, assembly, or package involved, since no file position is available for those checks.
+
+**SARIF output only covers violations and cycles.** Coverage findings, unmatched-ignored violations, and policy-consistency findings — the same supplemental categories shown in the human and JSON output above — are *not* included in SARIF results, since they describe the policy configuration itself rather than a violation found in scanned code. If a run fails (exit code `1`) because of one of those categories with zero violations or cycles, the SARIF document will report an empty `results` array even though the run failed. Use `--format json` (or human output) alongside SARIF if you need visibility into those categories in CI.
 
 ## CI artifact pattern
 

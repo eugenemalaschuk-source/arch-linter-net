@@ -2,9 +2,7 @@
 
 ## Purpose
 Formats violations for human-readable terminal output and for machine-readable CI JSON artifacts.
-
 ## Requirements
-
 ### Requirement: Format violations for human-readable output
 The system SHALL format violation lists as sorted bullet lines with format `- {SourceType} -> {ForbiddenNamespace}: {refs}`.
 
@@ -37,7 +35,6 @@ The system SHALL format cycles as a JSON object with `kind = "architecture_cycle
 - **WHEN** a contract produces 1 cycle
 - **THEN** the JSON contains `{"kind":"architecture_cycles","contract":"...","cycles":["A -> B -> A"]}`
 
-
 ### Requirement: Human output includes contract ID
 The human-readable violation formatter SHALL prefix each violation line with the contract ID in square brackets when available.
 
@@ -59,3 +56,22 @@ The JSON formatter SHALL include a `contract_id` field alongside the existing `c
 #### Scenario: JSON cycle with ID
 - **WHEN** a cycle contract with `id: cycle-check` detects a cycle
 - **THEN** the JSON cycle object contains `"contract_id": "cycle-check"`
+
+### Requirement: Format violations and cycles as SARIF
+The system SHALL format violations and cycles as a SARIF 2.1.0 `run`, with each violation or cycle rendered as a `result` referencing a `rule` keyed by contract ID.
+
+#### Scenario: SARIF violation result
+- **WHEN** a contract named `"my-contract"` with `id: my-rule` produces a violation
+- **THEN** the SARIF output contains a result with `ruleId == "my-rule"` and a `message.text` describing the violation
+
+#### Scenario: SARIF cycle result
+- **WHEN** a cycle contract with `id: cycle-check` detects a cycle
+- **THEN** the SARIF output contains a result with `ruleId == "cycle-check"` and a `message.text` containing the cycle path
+
+### Requirement: Existing human and JSON formatting are unaffected
+Adding SARIF formatting SHALL NOT change the output of `FormatViolationsForHumans`, `FormatCyclesForHumans`, or `FormatResultForCiArtifacts`.
+
+#### Scenario: Human and JSON output unchanged
+- **WHEN** the same violations and cycles are formatted for human and JSON output before and after the SARIF formatter is added
+- **THEN** the human and JSON output is byte-identical
+

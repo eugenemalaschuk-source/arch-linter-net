@@ -31,6 +31,7 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<IArchitectureBaselineLoadingService, ArchitectureBaselineLoadingService>();
         services.AddSingleton<IArchitectureBaselineGenerator, ArchitectureBaselineGenerator>();
         services.AddSingleton<IArchitectureDiagnosticFormatter, ArchitectureDiagnosticFormatter>();
+        services.AddSingleton<IArchitectureSarifFormatter, ArchitectureSarifFormatter>();
         services.AddSingleton<IArchitectureRepositoryRootResolver, ArchitectureRepositoryRootResolver>();
         services.AddSingleton<IConditionSetResolutionService, ConditionSetResolutionService>();
         services.AddSingleton<IArchitectureSolutionParser, ArchitectureSolutionParser>();

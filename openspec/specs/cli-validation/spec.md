@@ -2,9 +2,7 @@
 
 ## Purpose
 Defines the CLI's validation command: policy/mode/format flags, exit codes, help/version output, and packaging as a .NET tool.
-
 ## Requirements
-
 ### Requirement: CLI accepts --policy flag
 The CLI SHALL accept a `--policy` (or `-p`) flag specifying the path to a YAML architecture contract file. If omitted, the default SHALL be `architecture/dependencies.arch.yml`.
 
@@ -40,7 +38,7 @@ The CLI SHALL accept a `--mode` (or `-m`) flag with values `strict` or `audit`. 
 - **THEN** the behavior SHALL be identical to `--mode audit`
 
 ### Requirement: CLI supports human and JSON output formats
-The CLI SHALL accept a `--format` (or `-f`) flag with values `human` or `json`. Human format SHALL produce readable terminal output. JSON format SHALL produce structured JSON suitable for CI artifact capture.
+The CLI SHALL accept a `--format` (or `-f`) flag with values `human`, `json`, or `sarif`. Human format SHALL produce readable terminal output. JSON format SHALL produce structured JSON suitable for CI artifact capture. SARIF format SHALL produce a SARIF 2.1.0 document suitable for code-scanning viewers.
 
 #### Scenario: Human output format
 - **WHEN** the CLI is invoked with `--format human`
@@ -53,6 +51,14 @@ The CLI SHALL accept a `--format` (or `-f`) flag with values `human` or `json`. 
 #### Scenario: --json shortcut
 - **WHEN** the CLI is invoked with `--json`
 - **THEN** the behavior SHALL be identical to `--format json`
+
+#### Scenario: SARIF output format
+- **WHEN** the CLI is invoked with `--format sarif`
+- **THEN** output SHALL be a valid SARIF 2.1.0 document representing the run's violations and cycles
+
+#### Scenario: Invalid format still rejected
+- **WHEN** the CLI is invoked with `--format xml`
+- **THEN** exit code 2 SHALL be returned with an error message listing the valid values `human`, `json`, and `sarif`
 
 ### Requirement: CLI returns correct exit codes
 The CLI SHALL return exit code 0 when all contracts pass, exit code 1 when any contract fails, and exit code 2 on runtime errors (invalid arguments, missing file, policy parse error).
@@ -99,7 +105,6 @@ The CLI project SHALL be configured with `<PackAsTool>true</PackAsTool>` and `<T
 - **WHEN** a consumer runs `dotnet arch-linter-net --help`
 - **THEN** the tool SHALL respond identically to the `dotnet run` invocation
 
-
 ### Requirement: CLI accepts --contract flag for selective contract execution
 The CLI SHALL accept a `--contract` flag that specifies one or more contract IDs to execute. The flag MAY be specified multiple times. When specified, only contracts with matching IDs SHALL be validated.
 
@@ -122,3 +127,4 @@ The CLI SHALL accept a `--contract` flag that specifies one or more contract IDs
 #### Scenario: --contract with --mode audit
 - **WHEN** the CLI is invoked with `--mode audit --contract audit-rule`
 - **THEN** only the audit contract with ID `audit-rule` is validated
+

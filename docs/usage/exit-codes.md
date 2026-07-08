@@ -19,6 +19,8 @@ Exit code `1` means the tool worked and found architecture violations. Examples:
 - the policy-consistency pass reported `policy_consistency_findings` while `analysis.policy_consistency` is `error`;
 - a stale ignored violation is treated as a blocking policy error by current configuration.
 
+Note: coverage, policy-consistency, and unmatched-ignore failures do not appear in `--format sarif` results — see [Output Formats — SARIF output](output-formats.md#sarif-output) if you rely on SARIF alone in CI.
+
 ## Exit code 2
 
 Exit code `2` means the run could not be trusted as normal validation. Examples:
