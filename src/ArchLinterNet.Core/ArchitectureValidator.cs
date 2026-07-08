@@ -1,5 +1,6 @@
 using ArchLinterNet.Core.Composition;
 using ArchLinterNet.Core.Model;
+using ArchLinterNet.Core.Reporting;
 using ArchLinterNet.Core.Validation;
 
 namespace ArchLinterNet.Core;
@@ -8,6 +9,11 @@ public sealed class ArchitectureValidator
 {
     private static readonly Lazy<ArchitectureEngine> _engine =
         new(() => new ArchitectureEngineBuilder().AddArchLinterNetCore().Build());
+
+    public ValidationOutcome Validate(ValidationRequest request, ValidationTiming? timing = null)
+    {
+        return _engine.Value.Validate(request, timing);
+    }
 
     public bool Validate(string policyPath)
     {
