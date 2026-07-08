@@ -1,5 +1,6 @@
 using ArchLinterNet.Core.Contracts;
 using ArchLinterNet.Core.Contracts.Abstractions;
+using ArchLinterNet.Core.Execution;
 using ArchLinterNet.Core.Execution.Abstractions;
 using ArchLinterNet.Core.Model;
 using ArchLinterNet.Core.Validation.Abstractions;
@@ -183,12 +184,37 @@ public sealed class ArchitectureBaselineApplicationService(
             ? new HashSet<string>(contractIds, StringComparer.OrdinalIgnoreCase)
             : null;
 
+        if (selectedContractIds != null)
+        {
+            HashSet<string> availableIds = CollectAvailableContractIds(document, mode);
+            List<string> unknownIds = selectedContractIds.Where(id => !availableIds.Contains(id)).ToList();
+
+            if (unknownIds.Count > 0)
+            {
+                throw new InvalidOperationException(
+                    $"Unknown contract IDs: {string.Join(", ", unknownIds)}{Environment.NewLine}" +
+                    $"Available IDs in {mode} mode: {string.Join(", ", availableIds.OrderBy(id => id))}");
+            }
+        }
+
         ArchitectureRunnerSetup setup = runnerSetupService.BuildRunner(
-            document, policyPath, conditionSetName, selectedContractIds: selectedContractIds, enableUnmatchedIgnoreTracking: true);
+            document,
+            policyPath,
+            conditionSetName,
+            selectedContractIds: selectedContractIds,
+            enableUnmatchedIgnoreTracking: true,
+            mode: mode == "all" ? null : mode);
 
         IArchitectureContractRunner runner = setup.Runner;
 
-        List<ArchitectureViolation> configViolations = runner.CheckConfiguration(strict: true);
+        List<ArchitectureViolation> configViolations = mode switch
+        {
+            "strict" => runner.CheckConfiguration(strict: true),
+            "audit" => runner.CheckConfiguration(strict: false),
+            "all" => runner.CheckConfiguration(),
+            _ => throw new ArgumentOutOfRangeException(nameof(mode), mode, "Unsupported baseline mode."),
+        };
+
         if (configViolations.Count > 0)
         {
             return (document, null, configViolations);
@@ -208,5 +234,19 @@ public sealed class ArchitectureBaselineApplicationService(
         }
 
         return (document, runner.BaselineCandidates, new List<ArchitectureViolation>());
+    }
+
+    private static HashSet<string> CollectAvailableContractIds(ArchitectureContractDocument document, string mode)
+    {
+        ArchitectureContractCatalog catalog = ArchitectureContractCatalog.Build(document);
+
+        if (mode == "all")
+        {
+            HashSet<string> ids = new(catalog.AvailableContractIds("strict"), StringComparer.OrdinalIgnoreCase);
+            ids.UnionWith(catalog.AvailableContractIds("audit"));
+            return ids;
+        }
+
+        return catalog.AvailableContractIds(mode);
     }
 }

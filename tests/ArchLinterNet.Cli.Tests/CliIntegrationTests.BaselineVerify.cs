@@ -150,6 +150,59 @@ baseline:
     }
 
     [Test]
+    public void BaselineVerify_WithUnknownContract_ExitsTwo()
+    {
+        string baselinePath = Path.Combine(Path.GetTempPath(), $"baseline-{Guid.NewGuid():N}.yml");
+        try
+        {
+            var (genExit, _, genStderr) = RunCli("baseline", "generate",
+                "--config", _graphPolicy, "--output", baselinePath);
+            Assert.That(genExit, Is.EqualTo(0), $"Baseline generation should succeed, stderr: {genStderr}");
+
+            var (exitCode, _, stderr) = RunCli("baseline", "verify",
+                "--config", _graphPolicy, "--baseline", baselinePath, "--contract", "missing-contract-id");
+
+            Assert.Multiple(() =>
+            {
+                Assert.That(exitCode, Is.EqualTo(2));
+                Assert.That(stderr, Does.Contain("Unknown contract IDs"));
+                Assert.That(stderr, Does.Contain("missing-contract-id"));
+            });
+        }
+        finally
+        {
+            if (File.Exists(baselinePath))
+                File.Delete(baselinePath);
+        }
+    }
+
+    [Test]
+    public void BaselineVerify_WithPolicyAlias_ExitsZeroForInSyncBaseline()
+    {
+        string baselinePath = Path.Combine(Path.GetTempPath(), $"baseline-{Guid.NewGuid():N}.yml");
+        try
+        {
+            var (genExit, _, genStderr) = RunCli("baseline", "generate",
+                "--config", _graphPolicy, "--output", baselinePath);
+            Assert.That(genExit, Is.EqualTo(0), $"Baseline generation should succeed, stderr: {genStderr}");
+
+            var (exitCode, stdout, stderr) = RunCli("baseline", "verify",
+                "--policy", _graphPolicy, "--baseline", baselinePath);
+
+            Assert.Multiple(() =>
+            {
+                Assert.That(exitCode, Is.EqualTo(0), $"Verify should pass, stderr: {stderr}");
+                Assert.That(stdout, Does.Contain("Baseline is in sync."));
+            });
+        }
+        finally
+        {
+            if (File.Exists(baselinePath))
+                File.Delete(baselinePath);
+        }
+    }
+
+    [Test]
     public void BaselineVerify_MissingBaselineFile_ExitsTwo()
     {
         var (exitCode, _, stderr) = RunCli("baseline", "verify",

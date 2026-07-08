@@ -21,29 +21,28 @@ public static class ArchitectureBaselineComparer
             ? new HashSet<string>(selectedContractIds, StringComparer.OrdinalIgnoreCase)
             : null;
 
-        foreach (var groupName in _allGroupNames)
+        Dictionary<string, Dictionary<string, string>> canonicalIdsByGroup =
+            BuildCanonicalIdsByGroup(policyDocument.Contracts);
+
+        foreach (var groupName in ArchitectureBaselineContractGroups.GroupNames)
         {
-            if (!IsInScope(groupName, mode))
-            {
-                foreach (var entry in GetEntries(baselineDocument.Baseline, groupName))
-                {
-                    foreach (var ignore in entry.IgnoredViolations)
-                    {
-                        outOfScope.Add(new ArchitectureBaselineComparisonEntry(
-                            groupName, entry.Id, ignore.SourceType, ignore.ForbiddenReference, ignore.Reason));
-                    }
-                }
-
-                continue;
-            }
-
-            List<ArchitectureBaselineContractEntry> entries = GetEntries(baselineDocument.Baseline, groupName);
-            HashSet<string> knownIds = GetKnownContractIds(policyDocument.Contracts, groupName);
+            List<ArchitectureBaselineContractEntry> entries = baselineDocument.Baseline.GetGroup(groupName);
+            bool groupInScope = IsInScope(groupName, mode);
+            HashSet<string> knownIds = groupInScope
+                ? GetKnownContractIds(policyDocument.Contracts, groupName)
+                : new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            Dictionary<string, string> canonicalIds = canonicalIdsByGroup.TryGetValue(groupName, out Dictionary<string, string>? ids)
+                ? ids
+                : new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
             var baselineKeys = new HashSet<string>(StringComparer.Ordinal);
 
             foreach (var entry in entries)
             {
-                if (selectedIds != null && !selectedIds.Contains(entry.Id))
+                bool entryInScope = groupInScope && (selectedIds == null || selectedIds.Contains(entry.Id));
+
+                // Out-of-scope entries (wrong mode, or not among the selected --contract ids) are
+                // carried through verbatim so scoped update/prune never drops unrelated debt.
+                if (!entryInScope)
                 {
                     foreach (var ignore in entry.IgnoredViolations)
                     {
@@ -55,10 +54,11 @@ public static class ArchitectureBaselineComparer
                 }
 
                 bool idKnown = knownIds.Contains(entry.Id);
+                string canonicalContractId = CanonicalizeContractId(canonicalIds, entry.Id);
 
                 foreach (var ignore in entry.IgnoredViolations)
                 {
-                    string key = $"{entry.Id}|{ignore.SourceType}|{ignore.ForbiddenReference}";
+                    string key = BuildComparisonKey(canonicalContractId, ignore.SourceType, ignore.ForbiddenReference);
                     baselineKeys.Add(key);
 
                     var comparisonEntry = new ArchitectureBaselineComparisonEntry(
@@ -68,7 +68,7 @@ public static class ArchitectureBaselineComparer
                     {
                         configurationErrors.Add(comparisonEntry);
                     }
-                    else if (HasMatchingCandidate(candidates, groupName, entry.Id, ignore.SourceType, ignore.ForbiddenReference))
+                    else if (HasMatchingCandidate(candidates, groupName, canonicalContractId, ignore.SourceType, ignore.ForbiddenReference))
                     {
                         frozen.Add(comparisonEntry);
                     }
@@ -77,6 +77,11 @@ public static class ArchitectureBaselineComparer
                         resolved.Add(comparisonEntry);
                     }
                 }
+            }
+
+            if (!groupInScope)
+            {
+                continue;
             }
 
             var seenNewKeys = new HashSet<string>(StringComparer.Ordinal);
@@ -92,7 +97,10 @@ public static class ArchitectureBaselineComparer
                     continue;
                 }
 
-                string key = $"{candidate.ContractId}|{candidate.SourceType}|{candidate.ForbiddenReference}";
+                string key = BuildComparisonKey(
+                    CanonicalizeContractId(canonicalIds, candidate.ContractId),
+                    candidate.SourceType,
+                    candidate.ForbiddenReference);
                 if (baselineKeys.Contains(key) || !seenNewKeys.Add(key))
                 {
                     continue;
@@ -106,80 +114,22 @@ public static class ArchitectureBaselineComparer
         return new ArchitectureBaselineComparisonResult(newEntries, frozen, resolved, configurationErrors, outOfScope);
     }
 
-    private static bool HasMatchingCandidate(
-        IReadOnlyList<ArchitectureBaselineCandidate> candidates,
-        string groupName,
-        string contractId,
-        string sourceType,
-        string forbiddenReference)
+    private static Dictionary<string, Dictionary<string, string>> BuildCanonicalIdsByGroup(ArchitectureContractGroups groups)
     {
-        foreach (var candidate in candidates)
+        Dictionary<string, Dictionary<string, string>> result = new(StringComparer.Ordinal);
+
+        foreach (string groupName in ArchitectureBaselineContractGroups.GroupNames)
         {
-            if (candidate.ContractGroup == groupName
-                && candidate.ContractId == contractId
-                && candidate.SourceType == sourceType
-                && candidate.ForbiddenReference == forbiddenReference)
+            Dictionary<string, string> ids = new(StringComparer.OrdinalIgnoreCase);
+            foreach (string contractId in GetKnownContractIds(groups, groupName))
             {
-                return true;
+                ids[contractId] = contractId;
             }
+
+            result[groupName] = ids;
         }
 
-        return false;
-    }
-
-    private static bool IsInScope(string groupName, string mode)
-    {
-        if (mode == "all")
-        {
-            return true;
-        }
-
-        return groupName == mode || groupName.StartsWith(mode + "_", StringComparison.Ordinal);
-    }
-
-    private static readonly string[] _allGroupNames =
-    {
-        "strict", "audit",
-        "strict_layers", "audit_layers",
-        "strict_allow_only", "audit_allow_only",
-        "strict_cycles", "audit_cycles",
-        "strict_acyclic_siblings", "audit_acyclic_siblings",
-        "strict_method_body", "audit_method_body",
-        "strict_independence", "audit_independence",
-        "strict_protected", "audit_protected",
-        "strict_external", "audit_external",
-        "strict_project_metadata", "audit_project_metadata",
-        "strict_coverage", "audit_coverage",
-    };
-
-    private static List<ArchitectureBaselineContractEntry> GetEntries(ArchitectureBaselineContractGroups groups, string groupName)
-    {
-        return groupName switch
-        {
-            "strict" => groups.Strict,
-            "audit" => groups.Audit,
-            "strict_layers" => groups.StrictLayers,
-            "audit_layers" => groups.AuditLayers,
-            "strict_allow_only" => groups.StrictAllowOnly,
-            "audit_allow_only" => groups.AuditAllowOnly,
-            "strict_cycles" => groups.StrictCycles,
-            "audit_cycles" => groups.AuditCycles,
-            "strict_acyclic_siblings" => groups.StrictAcyclicSiblings,
-            "audit_acyclic_siblings" => groups.AuditAcyclicSiblings,
-            "strict_method_body" => groups.StrictMethodBody,
-            "audit_method_body" => groups.AuditMethodBody,
-            "strict_independence" => groups.StrictIndependence,
-            "audit_independence" => groups.AuditIndependence,
-            "strict_protected" => groups.StrictProtected,
-            "audit_protected" => groups.AuditProtected,
-            "strict_external" => groups.StrictExternal,
-            "audit_external" => groups.AuditExternal,
-            "strict_project_metadata" => groups.StrictProjectMetadata,
-            "audit_project_metadata" => groups.AuditProjectMetadata,
-            "strict_coverage" => groups.StrictCoverage,
-            "audit_coverage" => groups.AuditCoverage,
-            _ => new List<ArchitectureBaselineContractEntry>(),
-        };
+        return result;
     }
 
     private static HashSet<string> GetKnownContractIds(ArchitectureContractGroups groups, string groupName)
@@ -194,23 +144,90 @@ public static class ArchitectureBaselineComparer
             "audit_allow_only" => groups.AuditAllowOnly.Select(c => c.Id),
             "strict_cycles" => groups.StrictCycles.Select(c => c.Id),
             "audit_cycles" => groups.AuditCycles.Select(c => c.Id),
-            "strict_acyclic_siblings" => groups.StrictAcyclicSiblings.Select(c => c.Id),
-            "audit_acyclic_siblings" => groups.AuditAcyclicSiblings.Select(c => c.Id),
             "strict_method_body" => groups.StrictMethodBody.Select(c => c.Id),
             "audit_method_body" => groups.AuditMethodBody.Select(c => c.Id),
             "strict_independence" => groups.StrictIndependence.Select(c => c.Id),
             "audit_independence" => groups.AuditIndependence.Select(c => c.Id),
+            "strict_assembly_independence" => groups.StrictAssemblyIndependence.Select(c => c.Id),
+            "audit_assembly_independence" => groups.AuditAssemblyIndependence.Select(c => c.Id),
+            "strict_assembly_dependency" => groups.StrictAssemblyDependency.Select(c => c.Id),
+            "audit_assembly_dependency" => groups.AuditAssemblyDependency.Select(c => c.Id),
+            "strict_assembly_allow_only" => groups.StrictAssemblyAllowOnly.Select(c => c.Id),
+            "audit_assembly_allow_only" => groups.AuditAssemblyAllowOnly.Select(c => c.Id),
+            "strict_package_dependency" => groups.StrictPackageDependency.Select(c => c.Id),
+            "audit_package_dependency" => groups.AuditPackageDependency.Select(c => c.Id),
+            "strict_package_allow_only" => groups.StrictPackageAllowOnly.Select(c => c.Id),
+            "audit_package_allow_only" => groups.AuditPackageAllowOnly.Select(c => c.Id),
+            "strict_project_metadata" => groups.StrictProjectMetadata.Select(c => c.Id),
+            "audit_project_metadata" => groups.AuditProjectMetadata.Select(c => c.Id),
             "strict_protected" => groups.StrictProtected.Select(c => c.Id),
             "audit_protected" => groups.AuditProtected.Select(c => c.Id),
             "strict_external" => groups.StrictExternal.Select(c => c.Id),
             "audit_external" => groups.AuditExternal.Select(c => c.Id),
-            "strict_project_metadata" => groups.StrictProjectMetadata.Select(c => c.Id),
-            "audit_project_metadata" => groups.AuditProjectMetadata.Select(c => c.Id),
+            "strict_external_allow_only" => groups.StrictExternalAllowOnly.Select(c => c.Id),
+            "audit_external_allow_only" => groups.AuditExternalAllowOnly.Select(c => c.Id),
+            "strict_acyclic_siblings" => groups.StrictAcyclicSiblings.Select(c => c.Id),
+            "audit_acyclic_siblings" => groups.AuditAcyclicSiblings.Select(c => c.Id),
+            "strict_type_placement" => groups.StrictTypePlacement.Select(c => c.Id),
+            "audit_type_placement" => groups.AuditTypePlacement.Select(c => c.Id),
+            "strict_public_api_surface" => groups.StrictPublicApiSurface.Select(c => c.Id),
+            "audit_public_api_surface" => groups.AuditPublicApiSurface.Select(c => c.Id),
+            "strict_attribute_usage" => groups.StrictAttributeUsage.Select(c => c.Id),
+            "audit_attribute_usage" => groups.AuditAttributeUsage.Select(c => c.Id),
+            "strict_inheritance" => groups.StrictInheritance.Select(c => c.Id),
+            "audit_inheritance" => groups.AuditInheritance.Select(c => c.Id),
+            "strict_interface_implementation" => groups.StrictInterfaceImplementation.Select(c => c.Id),
+            "audit_interface_implementation" => groups.AuditInterfaceImplementation.Select(c => c.Id),
+            "strict_composition" => groups.StrictComposition.Select(c => c.Id),
+            "audit_composition" => groups.AuditComposition.Select(c => c.Id),
             "strict_coverage" => groups.StrictCoverage.Select(c => c.Id),
             "audit_coverage" => groups.AuditCoverage.Select(c => c.Id),
             _ => Enumerable.Empty<string?>(),
         };
 
         return new HashSet<string>(ids.Where(id => id != null)!, StringComparer.OrdinalIgnoreCase);
+    }
+
+    private static bool HasMatchingCandidate(
+        IReadOnlyList<ArchitectureBaselineCandidate> candidates,
+        string groupName,
+        string contractId,
+        string sourceType,
+        string forbiddenReference)
+    {
+        foreach (var candidate in candidates)
+        {
+            if (candidate.ContractGroup == groupName
+                && string.Equals(candidate.ContractId, contractId, StringComparison.OrdinalIgnoreCase)
+                && candidate.SourceType == sourceType
+                && candidate.ForbiddenReference == forbiddenReference)
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static string CanonicalizeContractId(IReadOnlyDictionary<string, string> canonicalIds, string contractId)
+    {
+        return canonicalIds.TryGetValue(contractId, out string? canonicalId)
+            ? canonicalId
+            : contractId;
+    }
+
+    private static string BuildComparisonKey(string contractId, string sourceType, string forbiddenReference)
+    {
+        return $"{contractId}|{sourceType}|{forbiddenReference}";
+    }
+
+    private static bool IsInScope(string groupName, string mode)
+    {
+        if (mode == "all")
+        {
+            return true;
+        }
+
+        return groupName == mode || groupName.StartsWith(mode + "_", StringComparison.Ordinal);
     }
 }

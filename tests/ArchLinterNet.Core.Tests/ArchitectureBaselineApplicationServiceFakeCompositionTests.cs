@@ -9,10 +9,7 @@ using NUnit.Framework;
 
 namespace ArchLinterNet.Core.Tests;
 
-// Same fake-service-composition style as ArchitectureValidationApplicationServiceFakeCompositionTests:
-// ArchitectureBaselineApplicationService's four collaborators are all interfaces, so baseline
-// generation's request validation, configuration-violation short-circuit, and strict/audit mode
-// selection can be proven without a real runner, executor, or YAML serializer.
+// Fake-composition tests for baseline application-service orchestration.
 [TestFixture]
 public sealed class ArchitectureBaselineApplicationServiceFakeCompositionTests
 {
@@ -21,6 +18,10 @@ public sealed class ArchitectureBaselineApplicationServiceFakeCompositionTests
         public bool LoadDocumentCalled { get; private set; }
 
         public bool BuildRunnerCalled { get; private set; }
+
+        public HashSet<string>? SelectedContractIdsReceived { get; private set; }
+
+        public string? ModeReceived { get; private set; }
 
         public ArchitectureContractDocument DocumentToReturn { get; set; } = new() { Version = 1, Name = "Fake" };
 
@@ -44,6 +45,8 @@ public sealed class ArchitectureBaselineApplicationServiceFakeCompositionTests
             string? mode = null)
         {
             BuildRunnerCalled = true;
+            SelectedContractIdsReceived = selectedContractIds;
+            ModeReceived = mode;
             return new ArchitectureRunnerSetup("/fake/repository/root", RunnerToReturn);
         }
     }
@@ -56,6 +59,8 @@ public sealed class ArchitectureBaselineApplicationServiceFakeCompositionTests
         }
 
         public List<ArchitectureViolation> ConfigurationViolationsToReturn { get; set; } = new();
+
+        public List<bool> StrictArgumentsReceived { get; } = new();
 
         public ArchitectureAnalysisSession Session { get; }
 
@@ -72,6 +77,7 @@ public sealed class ArchitectureBaselineApplicationServiceFakeCompositionTests
 
         public List<ArchitectureViolation> CheckConfiguration(bool strict)
         {
+            StrictArgumentsReceived.Add(strict);
             return ConfigurationViolationsToReturn;
         }
 
@@ -204,6 +210,8 @@ public sealed class ArchitectureBaselineApplicationServiceFakeCompositionTests
         Assert.That(baselineGenerator.WasCalled, Is.True);
         Assert.That(baselineGenerator.ReasonReceived, Is.EqualTo("fake reason"));
         Assert.That(contractExecutor.ModesReceived, Is.EquivalentTo(new[] { "strict", "audit" }));
+        Assert.That(runner.StrictArgumentsReceived, Is.EqualTo(new[] { true }));
+        Assert.That(runnerSetupService.ModeReceived, Is.Null);
     }
 
     [Test]
@@ -233,6 +241,7 @@ public sealed class ArchitectureBaselineApplicationServiceFakeCompositionTests
         Assert.That(outcome.ConfigurationViolations, Has.Count.EqualTo(1));
         Assert.That(contractExecutor.ModesReceived, Is.Empty);
         Assert.That(baselineGenerator.WasCalled, Is.False);
+        Assert.That(runner.StrictArgumentsReceived, Is.EqualTo(new[] { true }));
     }
 
     [Test]
@@ -257,10 +266,83 @@ public sealed class ArchitectureBaselineApplicationServiceFakeCompositionTests
         Assert.That(baselineGenerator.WasCalled, Is.False);
     }
 
-    // Update/Prune/Diff/Verify all build on the same classification: a "known-rule" entry whose
-    // (source, forbidden) still matches a candidate is frozen; a "known-rule" entry with no matching
-    // candidate is resolved (stale); an "unknown-rule" entry is a configuration error; a candidate with
-    // no matching baseline entry is new.
+    [Test]
+    public void Generate_UnknownSelectedContract_ThrowsBeforeRunnerSetup()
+    {
+        var document = CreateDocumentWithKnownRule();
+        var runnerSetupService = new FakeRunnerSetupService { DocumentToReturn = document, RunnerToReturn = new FakeContractRunner(CreateEmptySession(document)) };
+        var applicationService = new ArchitectureBaselineApplicationService(
+            runnerSetupService,
+            new FakeContractHandlerRegistry(),
+            new FakeContractExecutor(),
+            new FakeBaselineGenerator(),
+            new FakeBaselineLoadingService());
+
+        var ex = Assert.Throws<InvalidOperationException>(() => applicationService.Generate(
+            new BaselineGenerationRequest
+            {
+                PolicyPath = "unused-by-fakes.arch.yml",
+                Mode = "all",
+                ContractIds = new[] { "missing-rule" },
+            }));
+
+        Assert.That(ex!.Message, Does.Contain("Unknown contract IDs"));
+        Assert.That(ex.Message, Does.Contain("missing-rule"));
+        Assert.That(runnerSetupService.BuildRunnerCalled, Is.False);
+    }
+
+    [Test]
+    public void Verify_AuditMode_UsesAuditConfigurationScopeAndPassesModeToRunnerSetup()
+    {
+        var document = CreateDocumentWithStrictAndAuditRules();
+        var runnerSetupService = new FakeRunnerSetupService { DocumentToReturn = document };
+        var runner = new FakeContractRunner(CreateEmptySession(document))
+        {
+            BaselineCandidates = new List<ArchitectureBaselineCandidate>
+            {
+                new("audit", "audit-rule", "SrcY", "RefY"),
+            },
+        };
+        runnerSetupService.RunnerToReturn = runner;
+        var baselineLoadingService = new FakeBaselineLoadingService
+        {
+            DocumentToReturn = new ArchitectureBaselineDocument
+            {
+                Version = 1,
+                Baseline = new ArchitectureBaselineContractGroups
+                {
+                    Audit = new List<ArchitectureBaselineContractEntry>
+                    {
+                        new()
+                        {
+                            Id = "audit-rule",
+                            IgnoredViolations = new List<ArchitectureIgnoredViolation>
+                            {
+                                new() { SourceType = "SrcY", ForbiddenReference = "RefY", Reason = "audit reason" },
+                            },
+                        },
+                    },
+                },
+            },
+        };
+
+        var applicationService = new ArchitectureBaselineApplicationService(
+            runnerSetupService, new FakeContractHandlerRegistry(), new FakeContractExecutor(), new FakeBaselineGenerator(), baselineLoadingService);
+
+        BaselineVerifyOutcome outcome = applicationService.Verify(new BaselineVerifyRequest
+        {
+            PolicyPath = "unused-by-fakes.arch.yml",
+            BaselinePath = "unused-by-fakes.baseline.yml",
+            Mode = "audit",
+        });
+
+        Assert.That(outcome.Succeeded, Is.True);
+        Assert.That(outcome.InSync, Is.True);
+        Assert.That(runner.StrictArgumentsReceived, Is.EqualTo(new[] { false }));
+        Assert.That(runnerSetupService.ModeReceived, Is.EqualTo("audit"));
+    }
+
+    // Mixed baseline: frozen + resolved + configuration-error + new candidate.
     private static ArchitectureContractDocument CreateDocumentWithKnownRule()
     {
         return new ArchitectureContractDocument
@@ -477,9 +559,7 @@ public sealed class ArchitectureBaselineApplicationServiceFakeCompositionTests
         Assert.That(outcome.New.Single().SourceType, Is.EqualTo("SrcNew"));
     }
 
-    // Scoped update/prune must only classify (and potentially remove) entries within the
-    // requested --contract/--mode scope; entries outside that scope must be carried through
-    // to the output baseline untouched, even if they would otherwise be "resolved".
+    // Scoped update/prune must preserve out-of-scope entries untouched.
     private static ArchitectureContractDocument CreateDocumentWithTwoContractRules()
     {
         return new ArchitectureContractDocument
@@ -569,8 +649,6 @@ public sealed class ArchitectureBaselineApplicationServiceFakeCompositionTests
         var runnerSetupService = new FakeRunnerSetupService { DocumentToReturn = document };
         var runner = new FakeContractRunner(CreateEmptySession(document))
         {
-            // No candidate for "other-rule" — its baseline entry would be classified "resolved"
-            // if it were in scope, but --contract known-rule must keep it untouched.
             BaselineCandidates = new List<ArchitectureBaselineCandidate>
             {
                 new("strict", "known-rule", "SrcA", "RefA"),
@@ -692,8 +770,6 @@ public sealed class ArchitectureBaselineApplicationServiceFakeCompositionTests
         var runnerSetupService = new FakeRunnerSetupService { DocumentToReturn = document };
         var runner = new FakeContractRunner(CreateEmptySession(document))
         {
-            // No candidate for the audit rule — it would be "resolved" if audit were in scope,
-            // but --mode strict must leave the audit group untouched.
             BaselineCandidates = new List<ArchitectureBaselineCandidate>
             {
                 new("strict", "known-rule", "SrcA", "RefA"),

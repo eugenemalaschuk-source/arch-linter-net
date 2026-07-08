@@ -42,7 +42,7 @@ public static partial class Program
                 case "--help" or "-h":
                     PrintBaselineHelp();
                     return 0;
-                case "--config" when i + 1 < args.Length:
+                case "--config" or "--policy" when i + 1 < args.Length:
                     policyPath = args[++i];
                     break;
                 case "--output" when i + 1 < args.Length:
@@ -139,7 +139,7 @@ public static partial class Program
                 case "--help" or "-h":
                     PrintBaselineUpdateHelp();
                     return 0;
-                case "--config" when i + 1 < args.Length:
+                case "--config" or "--policy" when i + 1 < args.Length:
                     policyPath = args[++i];
                     break;
                 case "--baseline" when i + 1 < args.Length:
@@ -252,7 +252,7 @@ public static partial class Program
                 case "--help" or "-h":
                     PrintBaselinePruneHelp();
                     return 0;
-                case "--config" when i + 1 < args.Length:
+                case "--config" or "--policy" when i + 1 < args.Length:
                     policyPath = args[++i];
                     break;
                 case "--baseline" when i + 1 < args.Length:
@@ -270,7 +270,7 @@ public static partial class Program
                 case "--contract" when i + 1 < args.Length:
                     contractIds.Add(args[++i]);
                     break;
-                case "--json":
+                case "--json" or "-f":
                     format = "json";
                     break;
                 default:
@@ -388,7 +388,7 @@ public static partial class Program
                 case "--help" or "-h":
                     PrintBaselineDiffHelp();
                     return 0;
-                case "--config" when i + 1 < args.Length:
+                case "--config" or "--policy" when i + 1 < args.Length:
                     policyPath = args[++i];
                     break;
                 case "--baseline" when i + 1 < args.Length:
@@ -496,7 +496,7 @@ public static partial class Program
                 case "--help" or "-h":
                     PrintBaselineVerifyHelp();
                     return 0;
-                case "--config" when i + 1 < args.Length:
+                case "--config" or "--policy" when i + 1 < args.Length:
                     policyPath = args[++i];
                     break;
                 case "--baseline" when i + 1 < args.Length:

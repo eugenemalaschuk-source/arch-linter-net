@@ -56,16 +56,6 @@
           "items": { "$ref": "#/$defs/baselineContractEntry" },
           "default": []
         },
-        "strict_acyclic_siblings": {
-          "type": "array",
-          "items": { "$ref": "#/$defs/baselineContractEntry" },
-          "default": []
-        },
-        "audit_acyclic_siblings": {
-          "type": "array",
-          "items": { "$ref": "#/$defs/baselineContractEntry" },
-          "default": []
-        },
         "strict_method_body": {
           "type": "array",
           "items": { "$ref": "#/$defs/baselineContractEntry" },
@@ -82,6 +72,66 @@
           "default": []
         },
         "audit_independence": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/baselineContractEntry" },
+          "default": []
+        },
+        "strict_assembly_independence": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/baselineContractEntry" },
+          "default": []
+        },
+        "audit_assembly_independence": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/baselineContractEntry" },
+          "default": []
+        },
+        "strict_assembly_dependency": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/baselineContractEntry" },
+          "default": []
+        },
+        "audit_assembly_dependency": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/baselineContractEntry" },
+          "default": []
+        },
+        "strict_assembly_allow_only": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/baselineContractEntry" },
+          "default": []
+        },
+        "audit_assembly_allow_only": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/baselineContractEntry" },
+          "default": []
+        },
+        "strict_package_dependency": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/baselineContractEntry" },
+          "default": []
+        },
+        "audit_package_dependency": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/baselineContractEntry" },
+          "default": []
+        },
+        "strict_package_allow_only": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/baselineContractEntry" },
+          "default": []
+        },
+        "audit_package_allow_only": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/baselineContractEntry" },
+          "default": []
+        },
+        "strict_project_metadata": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/baselineContractEntry" },
+          "default": []
+        },
+        "audit_project_metadata": {
           "type": "array",
           "items": { "$ref": "#/$defs/baselineContractEntry" },
           "default": []
@@ -106,12 +156,82 @@
           "items": { "$ref": "#/$defs/baselineContractEntry" },
           "default": []
         },
-        "strict_project_metadata": {
+        "strict_external_allow_only": {
           "type": "array",
           "items": { "$ref": "#/$defs/baselineContractEntry" },
           "default": []
         },
-        "audit_project_metadata": {
+        "audit_external_allow_only": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/baselineContractEntry" },
+          "default": []
+        },
+        "strict_acyclic_siblings": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/baselineContractEntry" },
+          "default": []
+        },
+        "audit_acyclic_siblings": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/baselineContractEntry" },
+          "default": []
+        },
+        "strict_type_placement": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/baselineContractEntry" },
+          "default": []
+        },
+        "audit_type_placement": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/baselineContractEntry" },
+          "default": []
+        },
+        "strict_public_api_surface": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/baselineContractEntry" },
+          "default": []
+        },
+        "audit_public_api_surface": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/baselineContractEntry" },
+          "default": []
+        },
+        "strict_attribute_usage": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/baselineContractEntry" },
+          "default": []
+        },
+        "audit_attribute_usage": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/baselineContractEntry" },
+          "default": []
+        },
+        "strict_inheritance": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/baselineContractEntry" },
+          "default": []
+        },
+        "audit_inheritance": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/baselineContractEntry" },
+          "default": []
+        },
+        "strict_interface_implementation": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/baselineContractEntry" },
+          "default": []
+        },
+        "audit_interface_implementation": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/baselineContractEntry" },
+          "default": []
+        },
+        "strict_composition": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/baselineContractEntry" },
+          "default": []
+        },
+        "audit_composition": {
           "type": "array",
           "items": { "$ref": "#/$defs/baselineContractEntry" },
           "default": []
@@ -126,7 +246,7 @@
           "items": { "$ref": "#/$defs/baselineContractEntry" },
           "default": []
         }
-      },
+            },
       "additionalProperties": false
     }
   },

@@ -84,6 +84,34 @@ baseline:
     }
 
     [Test]
+    public void BaselinePrune_JsonShortFlag_IsAccepted()
+    {
+        string baselinePath = Path.Combine(Path.GetTempPath(), $"baseline-{Guid.NewGuid():N}.yml");
+        string prunedPath = Path.Combine(Path.GetTempPath(), $"pruned-{Guid.NewGuid():N}.yml");
+        try
+        {
+            var (genExit, _, genStderr) = RunCli("baseline", "generate",
+                "--config", _graphPolicy, "--output", baselinePath);
+            Assert.That(genExit, Is.EqualTo(0), $"Baseline generation should succeed, stderr: {genStderr}");
+
+            var (exitCode, stdout, stderr) = RunCli("baseline", "prune",
+                "--config", _graphPolicy, "--baseline", baselinePath, "--output", prunedPath, "-f");
+
+            Assert.That(exitCode, Is.EqualTo(0), $"Prune should succeed, stderr: {stderr}");
+
+            using var doc = JsonDocument.Parse(stdout);
+            Assert.That(doc.RootElement.TryGetProperty("removed", out _), Is.True);
+        }
+        finally
+        {
+            if (File.Exists(baselinePath))
+                File.Delete(baselinePath);
+            if (File.Exists(prunedPath))
+                File.Delete(prunedPath);
+        }
+    }
+
+    [Test]
     public void BaselinePrune_MissingBaselineFlag_ExitsTwo()
     {
         var (exitCode, _, stderr) = RunCli("baseline", "prune",

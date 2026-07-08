@@ -15,7 +15,8 @@ public static partial class Program
               arch-linter-net baseline verify --config <path> --baseline <path> [options]
 
             Options:
-              --config <path>     Path to YAML contract file
+              --policy, --config <path>
+                                  Path to YAML contract file
                                   (default: architecture/dependencies.arch.yml)
               --output <path>     Path to write the generated baseline file (required)
               --mode <mode>       Contract mode: strict, audit, or all (default: all)
@@ -53,7 +54,8 @@ public static partial class Program
               arch-linter-net baseline update --config <path> --baseline <path> --output <path> [options]
 
             Options:
-              --config <path>     Path to YAML contract file
+              --policy, --config <path>
+                                  Path to YAML contract file
                                   (default: architecture/dependencies.arch.yml)
               --baseline <path>   Path to the existing baseline file to update (required)
               --output <path>     Path to write the updated baseline file (required)
@@ -80,7 +82,8 @@ public static partial class Program
               arch-linter-net baseline prune --config <path> --baseline <path> --output <path> [options]
 
             Options:
-              --config <path>     Path to YAML contract file
+              --policy, --config <path>
+                                  Path to YAML contract file
                                   (default: architecture/dependencies.arch.yml)
               --baseline <path>   Path to the existing baseline file to prune (required)
               --output <path>     Path to write the pruned baseline file (required)
@@ -88,7 +91,7 @@ public static partial class Program
               --contract <id>     Restrict to this contract ID (may be repeated)
               --condition-set <name>
                                   Use a named condition set from analysis.condition_sets
-              -f, --json          Report removed entries as JSON
+              --json              Report removed entries as JSON
               -h, --help          Show this help message
 
             Exit codes:
@@ -106,7 +109,8 @@ public static partial class Program
               arch-linter-net baseline diff --config <path> --baseline <path> [options]
 
             Options:
-              --config <path>     Path to YAML contract file
+              --policy, --config <path>
+                                  Path to YAML contract file
                                   (default: architecture/dependencies.arch.yml)
               --baseline <path>   Path to the baseline file to diff against (required)
               --mode <mode>       Contract mode: strict, audit, or all (default: all)
@@ -131,7 +135,8 @@ public static partial class Program
               arch-linter-net baseline verify --config <path> --baseline <path> [options]
 
             Options:
-              --config <path>     Path to YAML contract file
+              --policy, --config <path>
+                                  Path to YAML contract file
                                   (default: architecture/dependencies.arch.yml)
               --baseline <path>   Path to the baseline file to verify (required)
               --mode <mode>       Contract mode: strict, audit, or all (default: all)

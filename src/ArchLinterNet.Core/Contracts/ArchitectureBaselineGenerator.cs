@@ -77,7 +77,7 @@ internal sealed class ArchitectureBaselineGenerator : IArchitectureBaselineGener
                 })
                 .ToList();
 
-            SetGroupEntries(groups, groupName, list);
+            groups.SetGroup(groupName, list);
         }
 
         return baseline;
@@ -87,38 +87,9 @@ internal sealed class ArchitectureBaselineGenerator : IArchitectureBaselineGener
     {
         ISerializer serializer = new SerializerBuilder()
             .WithNamingConvention(UnderscoredNamingConvention.Instance)
-            .ConfigureDefaultValuesHandling(DefaultValuesHandling.OmitNull)
+            .ConfigureDefaultValuesHandling(DefaultValuesHandling.OmitDefaults | DefaultValuesHandling.OmitEmptyCollections)
             .Build();
 
         return serializer.Serialize(document);
-    }
-
-    private static void SetGroupEntries(ArchitectureBaselineContractGroups groups, string groupName, List<ArchitectureBaselineContractEntry> entries)
-    {
-        switch (groupName)
-        {
-            case "strict": groups.Strict = entries; break;
-            case "audit": groups.Audit = entries; break;
-            case "strict_layers": groups.StrictLayers = entries; break;
-            case "audit_layers": groups.AuditLayers = entries; break;
-            case "strict_allow_only": groups.StrictAllowOnly = entries; break;
-            case "audit_allow_only": groups.AuditAllowOnly = entries; break;
-            case "strict_cycles": groups.StrictCycles = entries; break;
-            case "audit_cycles": groups.AuditCycles = entries; break;
-            case "strict_acyclic_siblings": groups.StrictAcyclicSiblings = entries; break;
-            case "audit_acyclic_siblings": groups.AuditAcyclicSiblings = entries; break;
-            case "strict_method_body": groups.StrictMethodBody = entries; break;
-            case "audit_method_body": groups.AuditMethodBody = entries; break;
-            case "strict_independence": groups.StrictIndependence = entries; break;
-            case "audit_independence": groups.AuditIndependence = entries; break;
-            case "strict_protected": groups.StrictProtected = entries; break;
-            case "audit_protected": groups.AuditProtected = entries; break;
-            case "strict_external": groups.StrictExternal = entries; break;
-            case "audit_external": groups.AuditExternal = entries; break;
-            case "strict_project_metadata": groups.StrictProjectMetadata = entries; break;
-            case "audit_project_metadata": groups.AuditProjectMetadata = entries; break;
-            case "strict_coverage": groups.StrictCoverage = entries; break;
-            case "audit_coverage": groups.AuditCoverage = entries; break;
-        }
     }
 }
