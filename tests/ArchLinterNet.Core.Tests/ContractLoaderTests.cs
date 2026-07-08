@@ -155,4 +155,41 @@ contracts:
         Assert.Throws<InvalidNamespacePatternException>(() =>
             new ArchitecturePolicyDocumentLoader().Load(contractPath));
     }
+
+    [Test]
+    public void LoadFromPath_DuplicateIdsAndUnrelatedFamilyInvalid_ThrowsDuplicateIdErrorFirst()
+    {
+        string contractDir = Path.Combine(_tempDir, "architecture");
+        Directory.CreateDirectory(contractDir);
+        string contractPath = Path.Combine(contractDir, "dependencies.arch.yml");
+
+        string assemblyName = typeof(ContractLoaderTests).Assembly.GetName().Name!;
+
+        File.WriteAllText(contractPath, $"""
+            version: 1
+            name: Pipeline Order Test
+            analysis:
+              target_assemblies: [{assemblyName}]
+            contracts:
+              strict_assembly_independence:
+                - name: assembly-independence-one
+                  id: dup-id
+                  assemblies: [{assemblyName}]
+                  reason: First contract.
+                - name: assembly-independence-two
+                  id: dup-id
+                  assemblies: [{assemblyName}]
+                  reason: Second contract.
+              strict_attribute_usage:
+                - name: no-attributes
+                  allowed_only_in_layers: [api]
+                  reason: Missing attributes/attribute_prefixes.
+            """);
+
+        InvalidOperationException ex = Assert.Throws<InvalidOperationException>(() =>
+            new ArchitecturePolicyDocumentLoader().Load(contractPath))!;
+
+        Assert.That(ex.Message, Does.Contain("Duplicate contract IDs found"));
+        Assert.That(ex.Message, Does.Not.Contain("attributes' or 'attribute_prefixes'"));
+    }
 }

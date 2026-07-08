@@ -1,7 +1,18 @@
-namespace ArchLinterNet.Core.Contracts;
+using ArchLinterNet.Core.Contracts;
 
-public sealed partial class ArchitecturePolicyDocumentLoader
+namespace ArchLinterNet.Core.Contracts.Validators;
+
+internal sealed class CoverageValidator : IArchitecturePolicyDocumentValidator
 {
+    private static readonly string[] _implementedCoverageScopes =
+        { "namespace", "rule_input", "project", "assembly", "dependency_edge" };
+
+    public void Validate(ArchitectureContractDocument document)
+    {
+        ValidateCoverageNamespaces(document);
+        ValidateImplementedCoverageScopes(document);
+    }
+
     private static void ValidateCoverageNamespaces(ArchitectureContractDocument document)
     {
         foreach (ArchitectureCoverageContract contract in document.Contracts.StrictCoverage
@@ -310,5 +321,71 @@ public sealed partial class ArchitecturePolicyDocumentLoader
                     $"'{matcherField}' matcher. {scopeLabel} coverage exclusions must declare '{matcherField}'.");
             }
         }
+    }
+
+    private static void ValidateImplementedCoverageScopes(ArchitectureContractDocument document)
+    {
+        List<ArchitectureCoverageContract> unsupported = document.Contracts.StrictCoverage
+            .Concat(document.Contracts.AuditCoverage)
+            .Where(contract => !_implementedCoverageScopes.Contains(contract.Scope, StringComparer.Ordinal))
+            .ToList();
+
+        if (unsupported.Count == 0)
+        {
+            return;
+        }
+
+        string details = string.Join(", ", unsupported.Select(contract => $"{contract.Name} ({contract.Scope})"));
+        throw new InvalidOperationException(
+            "Only coverage contracts with scope 'namespace', 'rule_input', 'project', 'assembly', or " +
+            $"'dependency_edge' are implemented right now. Unsupported coverage contract scopes: {details}.");
+    }
+
+    // Limited to the contract families ArchitectureContractRunner's GetReferencedLayerNames
+    // actually maps to document.Layers keys. Asmdef (source_assemblies, not a layer namespace),
+    // acyclic_sibling (ancestors are namespace prefixes, not layer keys), and layer_template are
+    // intentionally excluded: layer_template's expanded ArchitectureLayerContract instances carry
+    // synthetic IDs ("<template>/<container>") distinct from the authored template ID, and their
+    // Layers entries are concrete namespaces rather than document.Layers keys, so neither the ID
+    // nor the field values resolve the way rule-input coverage expects. Referencing one of these
+    // families is therefore rejected below as an unknown contract ID rather than silently
+    // producing zero findings.
+    private static HashSet<string> CollectLayerBearingContractIds(ArchitectureContractDocument document)
+    {
+        IEnumerable<IArchitectureContract>[] groups =
+        [
+            document.Contracts.Strict,
+            document.Contracts.Audit,
+            document.Contracts.StrictLayers,
+            document.Contracts.AuditLayers,
+            document.Contracts.StrictAllowOnly,
+            document.Contracts.AuditAllowOnly,
+            document.Contracts.StrictCycles,
+            document.Contracts.AuditCycles,
+            document.Contracts.StrictMethodBody,
+            document.Contracts.AuditMethodBody,
+            document.Contracts.StrictIndependence,
+            document.Contracts.AuditIndependence,
+            document.Contracts.StrictProtected,
+            document.Contracts.AuditProtected,
+            document.Contracts.StrictExternal,
+            document.Contracts.AuditExternal,
+            document.Contracts.StrictExternalAllowOnly,
+            document.Contracts.AuditExternalAllowOnly,
+            document.Contracts.StrictTypePlacement,
+            document.Contracts.AuditTypePlacement,
+            document.Contracts.StrictAttributeUsage,
+            document.Contracts.AuditAttributeUsage,
+            document.Contracts.StrictInheritance,
+            document.Contracts.AuditInheritance,
+            document.Contracts.StrictInterfaceImplementation,
+            document.Contracts.AuditInterfaceImplementation,
+            document.Contracts.StrictComposition,
+            document.Contracts.AuditComposition,
+        ];
+
+        return new HashSet<string>(
+            groups.SelectMany(group => group).Select(c => c.Id).Where(id => !string.IsNullOrEmpty(id))!,
+            StringComparer.OrdinalIgnoreCase);
     }
 }
