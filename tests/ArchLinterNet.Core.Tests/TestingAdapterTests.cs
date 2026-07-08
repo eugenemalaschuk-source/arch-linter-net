@@ -234,4 +234,261 @@ contracts:
         Assert.That(ex.Message, Does.Contain("core-no-forbidden"));
         Assert.That(ex.Message, Does.Contain("contracts-no-forbidden"));
     }
+
+    private string WriteSelfForbiddenPolicy()
+    {
+        string contractDir = Path.Combine(_tempDir, "architecture");
+        Directory.CreateDirectory(contractDir);
+        string contractPath = Path.Combine(contractDir, "dependencies.arch.yml");
+
+        File.WriteAllText(contractPath, @"
+version: 1
+name: Builder Test
+layers:
+  core:
+    namespace: ArchLinterNet.Core
+analysis:
+  target_assemblies:
+    - ArchLinterNet.Core
+contracts:
+  strict:
+    - id: self-forbidden
+      name: core-must-not-depend-on-itself
+      source: core
+      forbidden: [core]
+    - id: harmless
+      name: harmless-rule
+      source: core
+      forbidden: []
+");
+        return contractPath;
+    }
+
+    [Test]
+    public void WithContracts_OnlySelectedContractRuns()
+    {
+        string contractPath = WriteSelfForbiddenPolicy();
+
+        var result = ArchitectureAssertions.FromPolicy(contractPath)
+            .WithContracts("harmless")
+            .ValidateStrict();
+
+        Assert.That(result.Passed, Is.True);
+        Assert.That(result.Violations, Is.Empty);
+    }
+
+    private string WriteSelfForbiddenAuditPolicy()
+    {
+        string contractDir = Path.Combine(_tempDir, "architecture");
+        Directory.CreateDirectory(contractDir);
+        string contractPath = Path.Combine(contractDir, "dependencies.arch.yml");
+
+        File.WriteAllText(contractPath, @"
+version: 1
+name: Audit Builder Test
+layers:
+  core:
+    namespace: ArchLinterNet.Core
+analysis:
+  target_assemblies:
+    - ArchLinterNet.Core
+contracts:
+  audit:
+    - id: self-forbidden
+      name: core-must-not-depend-on-itself
+      source: core
+      forbidden: [core]
+    - id: harmless
+      name: harmless-rule
+      source: core
+      forbidden: []
+");
+        return contractPath;
+    }
+
+    [Test]
+    public void ValidateAudit_WithContracts_OnlySelectedContractRuns()
+    {
+        string contractPath = WriteSelfForbiddenAuditPolicy();
+
+        var withHarmlessOnly = ArchitectureAssertions.FromPolicy(contractPath)
+            .WithContracts("harmless")
+            .ValidateAudit();
+
+        Assert.That(withHarmlessOnly.Passed, Is.True);
+        Assert.That(withHarmlessOnly.Violations, Is.Empty);
+
+        var unfiltered = ArchitectureAssertions.FromPolicy(contractPath).ValidateAudit();
+
+        Assert.That(unfiltered.Passed, Is.False,
+            "Without a contract filter, the self-forbidden audit contract should still report violations");
+        Assert.That(unfiltered.Violations, Is.Not.Empty);
+    }
+
+    [Test]
+    public void WithBaseline_SuppressesKnownViolation()
+    {
+        string contractPath = WriteSelfForbiddenPolicy();
+
+        var before = ArchitectureAssertions.FromPolicy(contractPath)
+            .WithContracts("self-forbidden")
+            .ValidateStrict();
+
+        Assert.That(before.Violations, Is.Not.Empty, "Expected at least one baseline violation for test validity");
+        var known = before.Violations.First();
+        string forbiddenRef = known.ForbiddenReferences.First();
+
+        string baselinePath = Path.Combine(_tempDir, "baseline.yml");
+        File.WriteAllText(baselinePath, $@"
+version: 1
+baseline:
+  strict:
+    - id: self-forbidden
+      ignored_violations:
+        - source_type: {known.SourceType}
+          forbidden_reference: {forbiddenRef}
+          reason: known debt
+");
+
+        var after = ArchitectureAssertions.FromPolicy(contractPath)
+            .WithContracts("self-forbidden")
+            .WithBaseline(baselinePath)
+            .ValidateStrict();
+
+        Assert.That(after.Violations,
+            Has.None.Matches<ArchLinterNet.Core.Model.ArchitectureViolation>(v =>
+                v.SourceType == known.SourceType && v.ForbiddenReferences.Contains(forbiddenRef)),
+            "Baselined violation should be suppressed");
+    }
+
+    private string WriteUnmatchedIgnorePolicy()
+    {
+        string contractDir = Path.Combine(_tempDir, "architecture");
+        Directory.CreateDirectory(contractDir);
+        string contractPath = Path.Combine(contractDir, "dependencies.arch.yml");
+
+        File.WriteAllText(contractPath, @"
+version: 1
+name: Unmatched Ignore Test
+layers:
+  core:
+    namespace: ArchLinterNet.Core
+analysis:
+  target_assemblies:
+    - ArchLinterNet.Core
+  unmatched_ignored_violations: error
+contracts:
+  strict:
+    - name: harmless-with-stale-ignore
+      source: core
+      forbidden: []
+      ignored_violations:
+        - source_type: Does.Not.Exist
+          forbidden_reference: Also.Does.Not.Exist
+          reason: stale
+");
+        return contractPath;
+    }
+
+    [Test]
+    public void WithUnmatchedIgnoredViolationsPolicy_NotCalled_PassesByDefault()
+    {
+        string contractPath = WriteUnmatchedIgnorePolicy();
+
+        var result = ArchitectureAssertions.FromPolicy(contractPath).ValidateStrict();
+
+        Assert.That(result.Passed, Is.True);
+        Assert.That(result.UnmatchedIgnoredViolations, Is.Empty);
+    }
+
+    [Test]
+    public void WithUnmatchedIgnoredViolationsPolicy_Called_Fails()
+    {
+        string contractPath = WriteUnmatchedIgnorePolicy();
+
+        var result = ArchitectureAssertions.FromPolicy(contractPath)
+            .WithUnmatchedIgnoredViolationsPolicy()
+            .ValidateStrict();
+
+        Assert.That(result.Passed, Is.False);
+        Assert.That(result.UnmatchedIgnoredViolations, Is.Not.Empty);
+    }
+
+    [Test]
+    public void ShouldPass_UnmatchedIgnoredDetail_IncludedInMessage()
+    {
+        string contractPath = WriteUnmatchedIgnorePolicy();
+
+        var result = ArchitectureAssertions.FromPolicy(contractPath)
+            .WithUnmatchedIgnoredViolationsPolicy()
+            .ValidateStrict();
+
+        var ex = Assert.Throws<InvalidOperationException>(() => result.ShouldPass());
+
+        Assert.That(ex!.Message, Does.Contain("Unmatched ignored violations"));
+        Assert.That(ex.Message, Does.Contain("Does.Not.Exist"));
+    }
+
+    [Test]
+    public void WithTimings_PopulatesTiming()
+    {
+        string contractPath = WriteSelfForbiddenPolicy();
+
+        var result = ArchitectureAssertions.FromPolicy(contractPath)
+            .WithContracts("harmless")
+            .WithTimings()
+            .ValidateStrict();
+
+        Assert.That(result.Timing, Is.Not.Null);
+
+        using var writer = new StringWriter();
+        result.Timing!.WriteReport(writer);
+
+        Assert.That(writer.ToString(), Does.Contain("total"));
+    }
+
+    [Test]
+    public void ValidateStrict_WithoutTimings_TimingIsNull()
+    {
+        string contractPath = WriteSelfForbiddenPolicy();
+
+        var result = ArchitectureAssertions.FromPolicy(contractPath)
+            .WithContracts("harmless")
+            .ValidateStrict();
+
+        Assert.That(result.Timing, Is.Null);
+    }
+
+    [Test]
+    public void ValidateStrict_CoverageContract_SurfacesFindingsAndSummaries()
+    {
+        string contractDir = Path.Combine(_tempDir, "architecture");
+        Directory.CreateDirectory(contractDir);
+        string contractPath = Path.Combine(contractDir, "dependencies.arch.yml");
+
+        File.WriteAllText(contractPath, @"
+version: 1
+name: Coverage Test
+analysis:
+  target_assemblies:
+    - ArchLinterNet.Core
+contracts:
+  strict_coverage:
+    - id: namespace-coverage
+      name: namespace-coverage
+      scope: namespace
+      roots:
+        - namespace: ArchLinterNet.Core
+      reason: All namespaces must be mapped or excluded.
+");
+
+        var result = ArchitectureAssertions.FromPolicy(contractPath).ValidateStrict();
+
+        Assert.That(result.Passed, Is.False);
+        Assert.That(result.CoverageFindings, Is.Not.Empty);
+        Assert.That(result.CoverageSummaries, Is.Not.Empty);
+
+        var ex = Assert.Throws<InvalidOperationException>(() => result.ShouldPass());
+        Assert.That(ex!.Message, Does.Contain("Coverage findings"));
+    }
 }
