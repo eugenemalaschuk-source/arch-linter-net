@@ -12,7 +12,7 @@ namespace ArchLinterNet.Core.Execution;
 //
 // Adding a new contract family means appending one descriptor here instead of hand-editing
 // ArchitectureContractCatalog.Build.
-public static class ArchitectureContractFamilyRegistry
+internal static class ArchitectureContractFamilyRegistry
 {
     public static IReadOnlyList<ArchitectureContractFamilyDescriptor> All { get; } = new List<ArchitectureContractFamilyDescriptor>
     {

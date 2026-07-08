@@ -6,7 +6,7 @@ namespace ArchLinterNet.Core.Execution;
 // consumed by ArchitectureContractCatalog.Build. OwnedContractTypes and AdditionalValidation are
 // inert extension surface reserved for future family-decomposition tasks (see issue #208); neither
 // is read by any production code path in this change.
-public sealed record ArchitectureContractFamilyDescriptor(
+internal sealed record ArchitectureContractFamilyDescriptor(
     string FamilyId,
     string StrictGroupName,
     string AuditGroupName,
