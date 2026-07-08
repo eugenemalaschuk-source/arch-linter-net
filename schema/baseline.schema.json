@@ -56,16 +56,6 @@
           "items": { "$ref": "#/$defs/baselineContractEntry" },
           "default": []
         },
-        "strict_acyclic_siblings": {
-          "type": "array",
-          "items": { "$ref": "#/$defs/baselineContractEntry" },
-          "default": []
-        },
-        "audit_acyclic_siblings": {
-          "type": "array",
-          "items": { "$ref": "#/$defs/baselineContractEntry" },
-          "default": []
-        },
         "strict_method_body": {
           "type": "array",
           "items": { "$ref": "#/$defs/baselineContractEntry" },
@@ -82,6 +72,66 @@
           "default": []
         },
         "audit_independence": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/baselineContractEntry" },
+          "default": []
+        },
+        "strict_assembly_independence": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/baselineContractEntry" },
+          "default": []
+        },
+        "audit_assembly_independence": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/baselineContractEntry" },
+          "default": []
+        },
+        "strict_assembly_dependency": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/baselineContractEntry" },
+          "default": []
+        },
+        "audit_assembly_dependency": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/baselineContractEntry" },
+          "default": []
+        },
+        "strict_assembly_allow_only": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/baselineContractEntry" },
+          "default": []
+        },
+        "audit_assembly_allow_only": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/baselineContractEntry" },
+          "default": []
+        },
+        "strict_package_dependency": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/baselineContractEntry" },
+          "default": []
+        },
+        "audit_package_dependency": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/baselineContractEntry" },
+          "default": []
+        },
+        "strict_package_allow_only": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/baselineContractEntry" },
+          "default": []
+        },
+        "audit_package_allow_only": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/baselineContractEntry" },
+          "default": []
+        },
+        "strict_project_metadata": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/baselineContractEntry" },
+          "default": []
+        },
+        "audit_project_metadata": {
           "type": "array",
           "items": { "$ref": "#/$defs/baselineContractEntry" },
           "default": []
@@ -105,8 +155,98 @@
           "type": "array",
           "items": { "$ref": "#/$defs/baselineContractEntry" },
           "default": []
+        },
+        "strict_external_allow_only": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/baselineContractEntry" },
+          "default": []
+        },
+        "audit_external_allow_only": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/baselineContractEntry" },
+          "default": []
+        },
+        "strict_acyclic_siblings": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/baselineContractEntry" },
+          "default": []
+        },
+        "audit_acyclic_siblings": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/baselineContractEntry" },
+          "default": []
+        },
+        "strict_type_placement": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/baselineContractEntry" },
+          "default": []
+        },
+        "audit_type_placement": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/baselineContractEntry" },
+          "default": []
+        },
+        "strict_public_api_surface": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/baselineContractEntry" },
+          "default": []
+        },
+        "audit_public_api_surface": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/baselineContractEntry" },
+          "default": []
+        },
+        "strict_attribute_usage": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/baselineContractEntry" },
+          "default": []
+        },
+        "audit_attribute_usage": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/baselineContractEntry" },
+          "default": []
+        },
+        "strict_inheritance": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/baselineContractEntry" },
+          "default": []
+        },
+        "audit_inheritance": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/baselineContractEntry" },
+          "default": []
+        },
+        "strict_interface_implementation": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/baselineContractEntry" },
+          "default": []
+        },
+        "audit_interface_implementation": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/baselineContractEntry" },
+          "default": []
+        },
+        "strict_composition": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/baselineContractEntry" },
+          "default": []
+        },
+        "audit_composition": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/baselineContractEntry" },
+          "default": []
+        },
+        "strict_coverage": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/baselineContractEntry" },
+          "default": []
+        },
+        "audit_coverage": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/baselineContractEntry" },
+          "default": []
         }
-      },
+            },
       "additionalProperties": false
     }
   },
@@ -137,12 +277,12 @@
         "source_type": {
           "type": "string",
           "minLength": 1,
-          "description": "Source type name or narrow glob pattern to suppress."
+          "description": "Exact source type name to suppress."
         },
         "forbidden_reference": {
           "type": "string",
           "minLength": 1,
-          "description": "Forbidden reference name or narrow glob pattern to suppress."
+          "description": "Exact forbidden reference name to suppress."
         },
         "reason": {
           "type": "string",

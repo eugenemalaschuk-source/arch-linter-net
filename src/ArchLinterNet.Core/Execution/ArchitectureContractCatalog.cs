@@ -147,6 +147,42 @@ public sealed class ArchitectureContractCatalog
         return ids;
     }
 
+    // Distinct groups whose contracts can produce baseline candidates (every family except asmdef and
+    // layer_templates, which never route through ArchitectureContractExecutionContext.IsIgnored). The
+    // baseline model must be able to represent all of these; a guard test asserts the two sets match.
+    public IReadOnlyCollection<string> BaselineCapableGroups()
+    {
+        HashSet<string> groups = new(StringComparer.Ordinal);
+
+        foreach (ArchitectureContractDescriptor descriptor in _descriptors)
+        {
+            if (IsGroupResolvable(descriptor.Family))
+            {
+                groups.Add(descriptor.Group);
+            }
+        }
+
+        return groups;
+    }
+
+    // Contract IDs declared in the policy for a given baseline group. The baseline comparer uses this
+    // to tell a still-configured contract (frozen/resolved) from one whose id no longer exists in the
+    // policy (configuration-error), sourcing "known ids" from the same catalog the executor runs.
+    public HashSet<string> ContractIdsInGroup(string group)
+    {
+        HashSet<string> ids = new(StringComparer.OrdinalIgnoreCase);
+
+        foreach (ArchitectureContractDescriptor descriptor in _descriptors)
+        {
+            if (descriptor.Group == group && descriptor.Id != null)
+            {
+                ids.Add(descriptor.Id);
+            }
+        }
+
+        return ids;
+    }
+
     public string? ResolveGroup(IArchitectureContract contract)
     {
         foreach (ArchitectureContractDescriptor descriptor in _descriptors)

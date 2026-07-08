@@ -25,6 +25,11 @@ public sealed class ArchitectureBaselineLoadingService : IArchitectureBaselineLo
         MergeAndValidate(document, baseline);
     }
 
+    public ArchitectureBaselineDocument Load(string baselinePath)
+    {
+        return LoadFromPath(baselinePath);
+    }
+
     internal ArchitectureBaselineDocument LoadFromPath(string baselinePath)
     {
         if (!_fileSystem.FileExists(baselinePath))
@@ -57,28 +62,10 @@ public sealed class ArchitectureBaselineLoadingService : IArchitectureBaselineLo
                 $"Unsupported baseline version: {document.Version}. Only version 1 is supported.");
         }
 
-        ValidateGroupEntries(document.Baseline.Strict, "strict");
-        ValidateGroupEntries(document.Baseline.Audit, "audit");
-        ValidateGroupEntries(document.Baseline.StrictLayers, "strict_layers");
-        ValidateGroupEntries(document.Baseline.AuditLayers, "audit_layers");
-        ValidateGroupEntries(document.Baseline.StrictAllowOnly, "strict_allow_only");
-        ValidateGroupEntries(document.Baseline.AuditAllowOnly, "audit_allow_only");
-        ValidateGroupEntries(document.Baseline.StrictCycles, "strict_cycles");
-        ValidateGroupEntries(document.Baseline.AuditCycles, "audit_cycles");
-        ValidateGroupEntries(document.Baseline.StrictAcyclicSiblings, "strict_acyclic_siblings");
-        ValidateGroupEntries(document.Baseline.AuditAcyclicSiblings, "audit_acyclic_siblings");
-        ValidateGroupEntries(document.Baseline.StrictMethodBody, "strict_method_body");
-        ValidateGroupEntries(document.Baseline.AuditMethodBody, "audit_method_body");
-        ValidateGroupEntries(document.Baseline.StrictIndependence, "strict_independence");
-        ValidateGroupEntries(document.Baseline.AuditIndependence, "audit_independence");
-        ValidateGroupEntries(document.Baseline.StrictProtected, "strict_protected");
-        ValidateGroupEntries(document.Baseline.AuditProtected, "audit_protected");
-        ValidateGroupEntries(document.Baseline.StrictExternal, "strict_external");
-        ValidateGroupEntries(document.Baseline.AuditExternal, "audit_external");
-        ValidateGroupEntries(document.Baseline.StrictProjectMetadata, "strict_project_metadata");
-        ValidateGroupEntries(document.Baseline.AuditProjectMetadata, "audit_project_metadata");
-        ValidateGroupEntries(document.Baseline.StrictCoverage, "strict_coverage");
-        ValidateGroupEntries(document.Baseline.AuditCoverage, "audit_coverage");
+        foreach (string groupName in ArchitectureBaselineContractGroups.GroupNames)
+        {
+            ValidateGroupEntries(document.Baseline.GetGroup(groupName), groupName);
+        }
     }
 
     private static void ValidateGroupEntries(List<ArchitectureBaselineContractEntry> entries, string groupName)
@@ -116,30 +103,10 @@ public sealed class ArchitectureBaselineLoadingService : IArchitectureBaselineLo
     internal void Merge(ArchitectureContractDocument policyDocument, ArchitectureBaselineDocument baselineDocument)
     {
         var groupMerger = new ContractGroupMerger(policyDocument.Contracts);
-        var baseline = baselineDocument.Baseline;
-
-        groupMerger.MergeGroup(baseline.Strict, "strict");
-        groupMerger.MergeGroup(baseline.Audit, "audit");
-        groupMerger.MergeGroup(baseline.StrictLayers, "strict_layers");
-        groupMerger.MergeGroup(baseline.AuditLayers, "audit_layers");
-        groupMerger.MergeGroup(baseline.StrictAllowOnly, "strict_allow_only");
-        groupMerger.MergeGroup(baseline.AuditAllowOnly, "audit_allow_only");
-        groupMerger.MergeGroup(baseline.StrictCycles, "strict_cycles");
-        groupMerger.MergeGroup(baseline.AuditCycles, "audit_cycles");
-        groupMerger.MergeGroup(baseline.StrictAcyclicSiblings, "strict_acyclic_siblings");
-        groupMerger.MergeGroup(baseline.AuditAcyclicSiblings, "audit_acyclic_siblings");
-        groupMerger.MergeGroup(baseline.StrictMethodBody, "strict_method_body");
-        groupMerger.MergeGroup(baseline.AuditMethodBody, "audit_method_body");
-        groupMerger.MergeGroup(baseline.StrictIndependence, "strict_independence");
-        groupMerger.MergeGroup(baseline.AuditIndependence, "audit_independence");
-        groupMerger.MergeGroup(baseline.StrictProtected, "strict_protected");
-        groupMerger.MergeGroup(baseline.AuditProtected, "audit_protected");
-        groupMerger.MergeGroup(baseline.StrictExternal, "strict_external");
-        groupMerger.MergeGroup(baseline.AuditExternal, "audit_external");
-        groupMerger.MergeGroup(baseline.StrictProjectMetadata, "strict_project_metadata");
-        groupMerger.MergeGroup(baseline.AuditProjectMetadata, "audit_project_metadata");
-        groupMerger.MergeGroup(baseline.StrictCoverage, "strict_coverage");
-        groupMerger.MergeGroup(baseline.AuditCoverage, "audit_coverage");
+        foreach (string groupName in ArchitectureBaselineContractGroups.GroupNames)
+        {
+            groupMerger.MergeGroup(baselineDocument.Baseline.GetGroup(groupName), groupName);
+        }
     }
 
     internal void MergeAndValidate(
@@ -148,30 +115,11 @@ public sealed class ArchitectureBaselineLoadingService : IArchitectureBaselineLo
     {
         var unknownIds = new List<(string GroupName, string ContractId)>();
         var groupMerger = new ContractGroupMerger(policyDocument.Contracts);
-        var baseline = baselineDocument.Baseline;
 
-        unknownIds.AddRange(groupMerger.MergeGroup(baseline.Strict, "strict"));
-        unknownIds.AddRange(groupMerger.MergeGroup(baseline.Audit, "audit"));
-        unknownIds.AddRange(groupMerger.MergeGroup(baseline.StrictLayers, "strict_layers"));
-        unknownIds.AddRange(groupMerger.MergeGroup(baseline.AuditLayers, "audit_layers"));
-        unknownIds.AddRange(groupMerger.MergeGroup(baseline.StrictAllowOnly, "strict_allow_only"));
-        unknownIds.AddRange(groupMerger.MergeGroup(baseline.AuditAllowOnly, "audit_allow_only"));
-        unknownIds.AddRange(groupMerger.MergeGroup(baseline.StrictCycles, "strict_cycles"));
-        unknownIds.AddRange(groupMerger.MergeGroup(baseline.AuditCycles, "audit_cycles"));
-        unknownIds.AddRange(groupMerger.MergeGroup(baseline.StrictAcyclicSiblings, "strict_acyclic_siblings"));
-        unknownIds.AddRange(groupMerger.MergeGroup(baseline.AuditAcyclicSiblings, "audit_acyclic_siblings"));
-        unknownIds.AddRange(groupMerger.MergeGroup(baseline.StrictMethodBody, "strict_method_body"));
-        unknownIds.AddRange(groupMerger.MergeGroup(baseline.AuditMethodBody, "audit_method_body"));
-        unknownIds.AddRange(groupMerger.MergeGroup(baseline.StrictIndependence, "strict_independence"));
-        unknownIds.AddRange(groupMerger.MergeGroup(baseline.AuditIndependence, "audit_independence"));
-        unknownIds.AddRange(groupMerger.MergeGroup(baseline.StrictProtected, "strict_protected"));
-        unknownIds.AddRange(groupMerger.MergeGroup(baseline.AuditProtected, "audit_protected"));
-        unknownIds.AddRange(groupMerger.MergeGroup(baseline.StrictExternal, "strict_external"));
-        unknownIds.AddRange(groupMerger.MergeGroup(baseline.AuditExternal, "audit_external"));
-        unknownIds.AddRange(groupMerger.MergeGroup(baseline.StrictProjectMetadata, "strict_project_metadata"));
-        unknownIds.AddRange(groupMerger.MergeGroup(baseline.AuditProjectMetadata, "audit_project_metadata"));
-        unknownIds.AddRange(groupMerger.MergeGroup(baseline.StrictCoverage, "strict_coverage"));
-        unknownIds.AddRange(groupMerger.MergeGroup(baseline.AuditCoverage, "audit_coverage"));
+        foreach (string groupName in ArchitectureBaselineContractGroups.GroupNames)
+        {
+            unknownIds.AddRange(groupMerger.MergeGroup(baselineDocument.Baseline.GetGroup(groupName), groupName));
+        }
 
         if (unknownIds.Count > 0)
         {
@@ -249,12 +197,36 @@ public sealed class ArchitectureBaselineLoadingService : IArchitectureBaselineLo
                 "audit_method_body" => _groups.AuditMethodBody.Select(c => (IArchitectureContract)c).ToList(),
                 "strict_independence" => _groups.StrictIndependence.Select(c => (IArchitectureContract)c).ToList(),
                 "audit_independence" => _groups.AuditIndependence.Select(c => (IArchitectureContract)c).ToList(),
+                "strict_assembly_independence" => _groups.StrictAssemblyIndependence.Select(c => (IArchitectureContract)c).ToList(),
+                "audit_assembly_independence" => _groups.AuditAssemblyIndependence.Select(c => (IArchitectureContract)c).ToList(),
+                "strict_assembly_dependency" => _groups.StrictAssemblyDependency.Select(c => (IArchitectureContract)c).ToList(),
+                "audit_assembly_dependency" => _groups.AuditAssemblyDependency.Select(c => (IArchitectureContract)c).ToList(),
+                "strict_assembly_allow_only" => _groups.StrictAssemblyAllowOnly.Select(c => (IArchitectureContract)c).ToList(),
+                "audit_assembly_allow_only" => _groups.AuditAssemblyAllowOnly.Select(c => (IArchitectureContract)c).ToList(),
+                "strict_package_dependency" => _groups.StrictPackageDependency.Select(c => (IArchitectureContract)c).ToList(),
+                "audit_package_dependency" => _groups.AuditPackageDependency.Select(c => (IArchitectureContract)c).ToList(),
+                "strict_package_allow_only" => _groups.StrictPackageAllowOnly.Select(c => (IArchitectureContract)c).ToList(),
+                "audit_package_allow_only" => _groups.AuditPackageAllowOnly.Select(c => (IArchitectureContract)c).ToList(),
+                "strict_project_metadata" => _groups.StrictProjectMetadata.Select(c => (IArchitectureContract)c).ToList(),
+                "audit_project_metadata" => _groups.AuditProjectMetadata.Select(c => (IArchitectureContract)c).ToList(),
                 "strict_protected" => _groups.StrictProtected.Select(c => (IArchitectureContract)c).ToList(),
                 "audit_protected" => _groups.AuditProtected.Select(c => (IArchitectureContract)c).ToList(),
                 "strict_external" => _groups.StrictExternal.Select(c => (IArchitectureContract)c).ToList(),
                 "audit_external" => _groups.AuditExternal.Select(c => (IArchitectureContract)c).ToList(),
-                "strict_project_metadata" => _groups.StrictProjectMetadata.Select(c => (IArchitectureContract)c).ToList(),
-                "audit_project_metadata" => _groups.AuditProjectMetadata.Select(c => (IArchitectureContract)c).ToList(),
+                "strict_external_allow_only" => _groups.StrictExternalAllowOnly.Select(c => (IArchitectureContract)c).ToList(),
+                "audit_external_allow_only" => _groups.AuditExternalAllowOnly.Select(c => (IArchitectureContract)c).ToList(),
+                "strict_type_placement" => _groups.StrictTypePlacement.Select(c => (IArchitectureContract)c).ToList(),
+                "audit_type_placement" => _groups.AuditTypePlacement.Select(c => (IArchitectureContract)c).ToList(),
+                "strict_public_api_surface" => _groups.StrictPublicApiSurface.Select(c => (IArchitectureContract)c).ToList(),
+                "audit_public_api_surface" => _groups.AuditPublicApiSurface.Select(c => (IArchitectureContract)c).ToList(),
+                "strict_attribute_usage" => _groups.StrictAttributeUsage.Select(c => (IArchitectureContract)c).ToList(),
+                "audit_attribute_usage" => _groups.AuditAttributeUsage.Select(c => (IArchitectureContract)c).ToList(),
+                "strict_inheritance" => _groups.StrictInheritance.Select(c => (IArchitectureContract)c).ToList(),
+                "audit_inheritance" => _groups.AuditInheritance.Select(c => (IArchitectureContract)c).ToList(),
+                "strict_interface_implementation" => _groups.StrictInterfaceImplementation.Select(c => (IArchitectureContract)c).ToList(),
+                "audit_interface_implementation" => _groups.AuditInterfaceImplementation.Select(c => (IArchitectureContract)c).ToList(),
+                "strict_composition" => _groups.StrictComposition.Select(c => (IArchitectureContract)c).ToList(),
+                "audit_composition" => _groups.AuditComposition.Select(c => (IArchitectureContract)c).ToList(),
                 "strict_coverage" => _groups.StrictCoverage.Select(c => (IArchitectureContract)c).ToList(),
                 "audit_coverage" => _groups.AuditCoverage.Select(c => (IArchitectureContract)c).ToList(),
                 _ => new List<IArchitectureContract>()
@@ -272,9 +244,21 @@ public sealed class ArchitectureBaselineLoadingService : IArchitectureBaselineLo
                 ArchitectureAcyclicSiblingContract c => c.IgnoredViolations,
                 ArchitectureMethodBodyContract c => c.IgnoredViolations,
                 ArchitectureIndependenceContract c => c.IgnoredViolations,
+                ArchitectureAssemblyIndependenceContract c => c.IgnoredViolations,
+                ArchitectureAssemblyDependencyContract c => c.IgnoredViolations,
+                ArchitectureAssemblyAllowOnlyContract c => c.IgnoredViolations,
+                ArchitecturePackageDependencyContract c => c.IgnoredViolations,
+                ArchitecturePackageAllowOnlyContract c => c.IgnoredViolations,
+                ArchitectureProjectMetadataContract c => c.IgnoredViolations,
                 ArchitectureProtectedContract c => c.IgnoredViolations,
                 ArchitectureExternalDependencyContract c => c.IgnoredViolations,
-                ArchitectureProjectMetadataContract c => c.IgnoredViolations,
+                ArchitectureExternalAllowOnlyContract c => c.IgnoredViolations,
+                ArchitectureTypePlacementContract c => c.IgnoredViolations,
+                ArchitecturePublicApiSurfaceContract c => c.IgnoredViolations,
+                ArchitectureAttributeUsageContract c => c.IgnoredViolations,
+                ArchitectureInheritanceContract c => c.IgnoredViolations,
+                ArchitectureInterfaceImplementationContract c => c.IgnoredViolations,
+                ArchitectureCompositionContract c => c.IgnoredViolations,
                 ArchitectureCoverageContract c => c.IgnoredViolations,
                 _ => null!
             };

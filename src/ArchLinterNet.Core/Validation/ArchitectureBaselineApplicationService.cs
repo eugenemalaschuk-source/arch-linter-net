@@ -1,5 +1,6 @@
 using ArchLinterNet.Core.Contracts;
 using ArchLinterNet.Core.Contracts.Abstractions;
+using ArchLinterNet.Core.Execution;
 using ArchLinterNet.Core.Execution.Abstractions;
 using ArchLinterNet.Core.Model;
 using ArchLinterNet.Core.Validation.Abstractions;
@@ -10,32 +11,217 @@ public sealed class ArchitectureBaselineApplicationService(
     IArchitectureRunnerSetupService runnerSetupService,
     IArchitectureContractHandlerRegistry handlerRegistry,
     IArchitectureContractExecutor contractExecutor,
-    IArchitectureBaselineGenerator baselineGenerator)
+    IArchitectureBaselineGenerator baselineGenerator,
+    IArchitectureBaselineLoadingService baselineLoadingService)
     : IArchitectureBaselineApplicationService
 {
     public BaselineGenerationOutcome Generate(BaselineGenerationRequest request)
     {
-        if (request.Mode is not ("strict" or "audit" or "all"))
-        {
-            throw new ArgumentException($"Invalid mode: {request.Mode}. Use 'strict', 'audit', or 'all'.", nameof(request));
-        }
+        (ArchitectureContractDocument document, IReadOnlyList<ArchitectureBaselineCandidate>? candidates, List<ArchitectureViolation> configViolations) =
+            CollectCandidates(request.PolicyPath, request.Mode, request.ConditionSetName, request.ContractIds);
 
-        ArchitectureContractDocument document = runnerSetupService.LoadDocument(request.PolicyPath);
-
-        ArchitectureRunnerSetup setup = runnerSetupService.BuildRunner(
-            document, request.PolicyPath, request.ConditionSetName, enableUnmatchedIgnoreTracking: true);
-
-        IArchitectureContractRunner runner = setup.Runner;
-
-        List<ArchitectureViolation> configViolations = runner.CheckConfiguration(strict: true);
-        if (configViolations.Count > 0)
+        if (candidates == null)
         {
             return new BaselineGenerationOutcome(
                 Succeeded: false, Yaml: null, CandidateCount: 0, ConfigurationViolations: configViolations);
         }
 
-        bool includeStrict = request.Mode is "strict" or "all";
-        bool includeAudit = request.Mode is "audit" or "all";
+        ArchitectureBaselineDocument baseline = baselineGenerator.Generate(document, candidates, request.Reason);
+        string yaml = baselineGenerator.Serialize(baseline);
+
+        return new BaselineGenerationOutcome(
+            Succeeded: true,
+            Yaml: yaml,
+            CandidateCount: candidates.Count,
+            ConfigurationViolations: Array.Empty<ArchitectureViolation>());
+    }
+
+    public BaselineUpdateOutcome Update(BaselineUpdateRequest request)
+    {
+        (ArchitectureContractDocument document, IReadOnlyList<ArchitectureBaselineCandidate>? candidates, List<ArchitectureViolation> configViolations) =
+            CollectCandidates(request.PolicyPath, request.Mode, request.ConditionSetName, request.ContractIds);
+
+        if (candidates == null)
+        {
+            return new BaselineUpdateOutcome(
+                Succeeded: false, Yaml: null, PreservedCount: 0, NewCount: 0, ConfigurationViolations: configViolations);
+        }
+
+        ArchitectureBaselineDocument existingBaseline = baselineLoadingService.Load(request.BaselinePath);
+        ArchitectureBaselineComparisonResult comparison = ArchitectureBaselineComparer.Compare(
+            document, existingBaseline, candidates, request.Mode, request.ContractIds);
+
+        var newEntries = comparison.New
+            .Select(e => e with { Reason = request.Reason })
+            .ToList();
+
+        List<ArchitectureBaselineComparisonEntry> entries = new(comparison.Frozen.Count + comparison.Resolved.Count
+            + comparison.ConfigurationErrors.Count + newEntries.Count + comparison.OutOfScope.Count);
+        entries.AddRange(comparison.Frozen);
+        entries.AddRange(comparison.Resolved);
+        entries.AddRange(comparison.ConfigurationErrors);
+        entries.AddRange(newEntries);
+        entries.AddRange(comparison.OutOfScope);
+
+        ArchitectureBaselineDocument updated = baselineGenerator.BuildFromEntries(entries);
+        string yaml = baselineGenerator.Serialize(updated);
+
+        return new BaselineUpdateOutcome(
+            Succeeded: true,
+            Yaml: yaml,
+            PreservedCount: comparison.Frozen.Count,
+            NewCount: newEntries.Count,
+            ConfigurationViolations: Array.Empty<ArchitectureViolation>());
+    }
+
+    public BaselinePruneOutcome Prune(BaselinePruneRequest request)
+    {
+        (ArchitectureContractDocument document, IReadOnlyList<ArchitectureBaselineCandidate>? candidates, List<ArchitectureViolation> configViolations) =
+            CollectCandidates(request.PolicyPath, request.Mode, request.ConditionSetName, request.ContractIds);
+
+        if (candidates == null)
+        {
+            return new BaselinePruneOutcome(
+                Succeeded: false, Yaml: null, RemovedEntries: Array.Empty<BaselineRemovedEntry>(), ConfigurationViolations: configViolations);
+        }
+
+        ArchitectureBaselineDocument existingBaseline = baselineLoadingService.Load(request.BaselinePath);
+        ArchitectureBaselineComparisonResult comparison = ArchitectureBaselineComparer.Compare(
+            document, existingBaseline, candidates, request.Mode, request.ContractIds);
+
+        List<ArchitectureBaselineComparisonEntry> survivors = new(comparison.Frozen.Count + comparison.OutOfScope.Count);
+        survivors.AddRange(comparison.Frozen);
+        survivors.AddRange(comparison.OutOfScope);
+
+        ArchitectureBaselineDocument pruned = baselineGenerator.BuildFromEntries(survivors);
+        string yaml = baselineGenerator.Serialize(pruned);
+
+        List<BaselineRemovedEntry> removed = comparison.Resolved
+            .Select(e => new BaselineRemovedEntry(e, "resolved"))
+            .Concat(comparison.ConfigurationErrors.Select(e => new BaselineRemovedEntry(e, "configuration-error")))
+            .ToList();
+
+        return new BaselinePruneOutcome(
+            Succeeded: true,
+            Yaml: yaml,
+            RemovedEntries: removed,
+            ConfigurationViolations: Array.Empty<ArchitectureViolation>());
+    }
+
+    public BaselineDiffOutcome Diff(BaselineDiffRequest request)
+    {
+        (ArchitectureContractDocument document, IReadOnlyList<ArchitectureBaselineCandidate>? candidates, List<ArchitectureViolation> configViolations) =
+            CollectCandidates(request.PolicyPath, request.Mode, request.ConditionSetName, request.ContractIds);
+
+        if (candidates == null)
+        {
+            return new BaselineDiffOutcome(
+                Succeeded: false,
+                New: Array.Empty<ArchitectureBaselineComparisonEntry>(),
+                Frozen: Array.Empty<ArchitectureBaselineComparisonEntry>(),
+                Resolved: Array.Empty<ArchitectureBaselineComparisonEntry>(),
+                ConfigurationErrors: Array.Empty<ArchitectureBaselineComparisonEntry>(),
+                ConfigurationViolations: configViolations);
+        }
+
+        ArchitectureBaselineDocument existingBaseline = baselineLoadingService.Load(request.BaselinePath);
+        ArchitectureBaselineComparisonResult comparison = ArchitectureBaselineComparer.Compare(
+            document, existingBaseline, candidates, request.Mode, request.ContractIds);
+
+        return new BaselineDiffOutcome(
+            Succeeded: true,
+            New: comparison.New,
+            Frozen: comparison.Frozen,
+            Resolved: comparison.Resolved,
+            ConfigurationErrors: comparison.ConfigurationErrors,
+            ConfigurationViolations: Array.Empty<ArchitectureViolation>());
+    }
+
+    public BaselineVerifyOutcome Verify(BaselineVerifyRequest request)
+    {
+        (ArchitectureContractDocument document, IReadOnlyList<ArchitectureBaselineCandidate>? candidates, List<ArchitectureViolation> configViolations) =
+            CollectCandidates(request.PolicyPath, request.Mode, request.ConditionSetName, request.ContractIds);
+
+        if (candidates == null)
+        {
+            return new BaselineVerifyOutcome(
+                Succeeded: false,
+                InSync: false,
+                New: Array.Empty<ArchitectureBaselineComparisonEntry>(),
+                Frozen: Array.Empty<ArchitectureBaselineComparisonEntry>(),
+                Resolved: Array.Empty<ArchitectureBaselineComparisonEntry>(),
+                ConfigurationErrors: Array.Empty<ArchitectureBaselineComparisonEntry>(),
+                ConfigurationViolations: configViolations);
+        }
+
+        ArchitectureBaselineDocument existingBaseline = baselineLoadingService.Load(request.BaselinePath);
+        ArchitectureBaselineComparisonResult comparison = ArchitectureBaselineComparer.Compare(
+            document, existingBaseline, candidates, request.Mode, request.ContractIds);
+
+        bool inSync = comparison.Resolved.Count == 0 && comparison.ConfigurationErrors.Count == 0;
+
+        return new BaselineVerifyOutcome(
+            Succeeded: true,
+            InSync: inSync,
+            New: comparison.New,
+            Frozen: comparison.Frozen,
+            Resolved: comparison.Resolved,
+            ConfigurationErrors: comparison.ConfigurationErrors,
+            ConfigurationViolations: Array.Empty<ArchitectureViolation>());
+    }
+
+    private (ArchitectureContractDocument Document, IReadOnlyList<ArchitectureBaselineCandidate>? Candidates, List<ArchitectureViolation> ConfigurationViolations)
+        CollectCandidates(string policyPath, string mode, string? conditionSetName, IReadOnlyCollection<string>? contractIds)
+    {
+        if (mode is not ("strict" or "audit" or "all"))
+        {
+            throw new ArgumentException($"Invalid mode: {mode}. Use 'strict', 'audit', or 'all'.", nameof(mode));
+        }
+
+        ArchitectureContractDocument document = runnerSetupService.LoadDocument(policyPath);
+
+        HashSet<string>? selectedContractIds = contractIds is { Count: > 0 }
+            ? new HashSet<string>(contractIds, StringComparer.OrdinalIgnoreCase)
+            : null;
+
+        if (selectedContractIds != null)
+        {
+            HashSet<string> availableIds = CollectAvailableContractIds(document, mode);
+            List<string> unknownIds = selectedContractIds.Where(id => !availableIds.Contains(id)).ToList();
+
+            if (unknownIds.Count > 0)
+            {
+                throw new InvalidOperationException(
+                    $"Unknown contract IDs: {string.Join(", ", unknownIds)}{Environment.NewLine}" +
+                    $"Available IDs in {mode} mode: {string.Join(", ", availableIds.OrderBy(id => id))}");
+            }
+        }
+
+        ArchitectureRunnerSetup setup = runnerSetupService.BuildRunner(
+            document,
+            policyPath,
+            conditionSetName,
+            selectedContractIds: selectedContractIds,
+            enableUnmatchedIgnoreTracking: true,
+            mode: mode == "all" ? null : mode);
+
+        IArchitectureContractRunner runner = setup.Runner;
+
+        List<ArchitectureViolation> configViolations = mode switch
+        {
+            "strict" => runner.CheckConfiguration(strict: true),
+            "audit" => runner.CheckConfiguration(strict: false),
+            "all" => runner.CheckConfiguration(),
+            _ => throw new ArgumentOutOfRangeException(nameof(mode), mode, "Unsupported baseline mode."),
+        };
+
+        if (configViolations.Count > 0)
+        {
+            return (document, null, configViolations);
+        }
+
+        bool includeStrict = mode is "strict" or "all";
+        bool includeAudit = mode is "audit" or "all";
 
         if (includeStrict)
         {
@@ -47,15 +233,20 @@ public sealed class ArchitectureBaselineApplicationService(
             contractExecutor.Execute(runner.Session, "audit", handlerRegistry, includeAsmdefContracts: false);
         }
 
-        ArchitectureBaselineDocument baseline = baselineGenerator.Generate(
-            document, runner.BaselineCandidates, request.Reason);
+        return (document, runner.BaselineCandidates, new List<ArchitectureViolation>());
+    }
 
-        string yaml = baselineGenerator.Serialize(baseline);
+    private static HashSet<string> CollectAvailableContractIds(ArchitectureContractDocument document, string mode)
+    {
+        ArchitectureContractCatalog catalog = ArchitectureContractCatalog.Build(document);
 
-        return new BaselineGenerationOutcome(
-            Succeeded: true,
-            Yaml: yaml,
-            CandidateCount: runner.BaselineCandidates.Count,
-            ConfigurationViolations: Array.Empty<ArchitectureViolation>());
+        if (mode == "all")
+        {
+            HashSet<string> ids = new(catalog.AvailableContractIds("strict"), StringComparer.OrdinalIgnoreCase);
+            ids.UnionWith(catalog.AvailableContractIds("audit"));
+            return ids;
+        }
+
+        return catalog.AvailableContractIds(mode);
     }
 }

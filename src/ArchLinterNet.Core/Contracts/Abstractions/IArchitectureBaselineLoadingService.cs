@@ -5,4 +5,6 @@ namespace ArchLinterNet.Core.Contracts.Abstractions;
 public interface IArchitectureBaselineLoadingService
 {
     void LoadAndMerge(ArchitectureContractDocument document, string baselinePath);
+
+    ArchitectureBaselineDocument Load(string baselinePath);
 }
