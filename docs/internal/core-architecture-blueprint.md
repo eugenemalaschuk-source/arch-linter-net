@@ -213,6 +213,13 @@ The `ArchitectureContractChecker` delegate, `IArchitectureContractExecutor.Execu
 
 Self-policy guardrail candidate for [#142](https://github.com/eugenemalaschuk-source/arch-linter-net/issues/142): forbid any `*.Abstractions` namespace from depending on its sibling implementation namespace, with one precise, named exception — `ArchLinterNet.Core.Execution.Abstractions` referencing `ArchLinterNet.Core.Execution.ArchitectureAnalysisSession` (as a parameter or property type) is allowed; no other `Execution` type, and no reference from any other `*.Abstractions` namespace to its sibling, is exempted. Also forbid introducing any `ArchLinterNet.Core.Interfaces` namespace.
 
+Self-policy guardrail candidate for [#215](https://github.com/eugenemalaschuk-source/arch-linter-net/issues/215): the #208–#216 refactor chain replaced this repo's central contract-family bottlenecks with focused extension points; none of the following four regressions can be expressed as an `architecture/dependencies.arch.yml` contract (no family inspects file structure, branch count, or a dispatch pattern's shape), so they stay code-review-governed. A reviewer should reject a change that reintroduces any of them:
+
+- `ArchLinterNet.Core.Execution.ArchitectureContractFamilyRegistry` and `ArchLinterNet.Core.Contracts.ArchitectureContractFamilyBindings` (`Contracts/ArchitectureContractFamilyBindings.cs`) growing a new inline per-family conditional instead of one appended `ArchitectureContractFamilyDescriptor`/`ArchitectureContractFamilyBinding` entry.
+- `ArchitectureAnalysisSession` regaining inline per-family checking or configuration-inspection logic instead of a new class under `ArchLinterNet.Core.Execution.Checkers` or a new `ArchitectureConfigurationContributor` under `ArchLinterNet.Core.Execution.Abstractions`.
+- `ArchitectureDiagnosticMapper.FromViolation` (`Reporting/ArchitectureDiagnosticMapper.cs`) regrowing an if/switch dispatch chain instead of a new family supplying an `IArchitectureDiagnosticPayload` under `ArchLinterNet.Core.Model` (see [Adding a new diagnostic family](#adding-a-new-diagnostic-family)).
+- `ArchitectureContractModels.cs`/`ArchitectureContractGroups` regrowing an inline `[YamlMember]` cluster for a new contract group instead of a new file under `ArchLinterNet.Core.Contracts.Families`.
+
 ## Test architecture
 
 Two fake-based test styles cover the seams this refactor introduced, and new contract-family tests should follow whichever shape fits the code under test rather than defaulting to a full end-to-end fixture:
