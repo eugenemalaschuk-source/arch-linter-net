@@ -1,6 +1,6 @@
-namespace ArchLinterNet.Cli;
+namespace ArchLinterNet.Cli.Commands;
 
-public static partial class Program
+internal static partial class BaselineCommand
 {
     private static void PrintBaselineHelp()
     {
