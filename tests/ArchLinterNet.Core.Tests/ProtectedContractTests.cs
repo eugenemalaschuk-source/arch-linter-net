@@ -427,10 +427,10 @@ public sealed partial class ProtectedContractTests
         Assert.That(violations, Is.Not.Empty);
         var violation = violations[0];
 
-        Assert.That(violation.SourceLayer, Is.Null, "Source with no matching layer should have null SourceLayer");
-        Assert.That(violation.TargetLayer, Is.EqualTo("execution"));
-        Assert.That(violation.AllowedImporters, Is.Not.Null);
-        Assert.That(violation.AllowedImporters, Is.Empty);
+        Assert.That((violation.Payload as DependencyPayload)?.SourceLayer, Is.Null, "Source with no matching layer should have null SourceLayer");
+        Assert.That((violation.Payload as DependencyPayload)?.TargetLayer, Is.EqualTo("execution"));
+        Assert.That((violation.Payload as DependencyPayload)?.AllowedImporters, Is.Not.Null);
+        Assert.That((violation.Payload as DependencyPayload)?.AllowedImporters, Is.Empty);
         Assert.That(violation.ForbiddenNamespace, Does.Contain("protected layer 'execution'"));
     }
 }

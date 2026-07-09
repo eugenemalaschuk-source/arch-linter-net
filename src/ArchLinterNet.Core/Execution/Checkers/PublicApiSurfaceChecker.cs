@@ -59,10 +59,11 @@ internal sealed class PublicApiSurfaceChecker
                     "public API surface",
                     new[] { entry.Signature })
                 {
-                    UndeclaredApiSignature = entry.Signature,
-                    ForbiddenPublicConstant = forbiddenConstant ? true : null,
-                    ApiAssemblyName = entry.AssemblyName,
-                    ApiVisibility = entry.Visibility
+                    Payload = new PublicApiSurfacePayload(
+                        UndeclaredApiSignature: entry.Signature,
+                        ForbiddenPublicConstant: forbiddenConstant ? true : null,
+                        ApiAssemblyName: entry.AssemblyName,
+                        ApiVisibility: entry.Visibility)
                 });
             }
         }

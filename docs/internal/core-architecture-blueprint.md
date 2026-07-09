@@ -226,6 +226,18 @@ Two fake-based test styles cover the seams this refactor introduced, and new con
 
 Checkers/handlers produce structured diagnostics/violations only. Formatters and mappers under `Reporting/` (`ArchitectureDiagnosticFormatter`, `ArchitectureDiagnosticMapper`, `ArchitectureCoverageSummary`) only format already-structured results — they must not reach back into `Execution`, `Discovery`, `Resolution`, or `Scanning`. CLI output concerns stay at the `ArchLinterNet.Cli` boundary. JSON and human-readable output compatibility is preserved unless a behavior change is deliberately reviewed and documented (out of scope for this refactor per #132's non-goals).
 
+### Adding a new diagnostic family
+
+`ArchitectureViolation` (`Model/ArchitectureViolation.cs`) carries only fields common to every family — `ContractName`, `ContractId`, `SourceType`, `ForbiddenNamespace`, `ForbiddenReferences`, `MatchedNamespacePrefixes` — plus one `Payload` slot of type `IArchitectureDiagnosticPayload`. Family-specific evidence never goes on `ArchitectureViolation` itself. To add a new family:
+
+1. Add a sealed `ArchitectureDiagnostic` subtype for the family's output shape (as today).
+1. Add a sealed payload record implementing `IArchitectureDiagnosticPayload` (one method, `ToDiagnostic(ArchitectureViolation violation)`) that builds the family's diagnostic from the payload's own fields plus the violation's common fields. See `InheritancePayload`, `CompositionPayload`, etc. for the pattern.
+1. At the checker/finder that detects the violation, construct `new ArchitectureViolation(...) { Payload = new YourFamilyPayload(...) }`.
+
+That's it — `ArchitectureDiagnosticMapper.FromViolation` dispatches via `violation.Payload?.ToDiagnostic(violation)` and needs no edits for a new family, nor does `ArchitectureViolation` gain new fields. A violation with no `Payload` set falls through to a plain `DependencyDiagnostic`, which is the correct behavior for checkers that never carry family-specific evidence (e.g. `AssemblyIndependenceChecker`).
+
+`PolicyConsistencyDiagnostic` predates this pattern and is constructed directly by its own contributor without going through `ArchitectureViolation`/the mapper at all — that remains valid for diagnostics that never share the common violation shape.
+
 ## Non-goals
 
 - This document does not implement any part of the refactor; #134–#142 do.

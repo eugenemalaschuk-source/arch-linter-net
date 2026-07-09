@@ -98,16 +98,16 @@ public sealed class ProjectMetadataContractTests
 
         List<ArchitectureViolation> violations = runner.Session.CheckProjectMetadataContract(contract);
 
-        Assert.That(violations.Select(v => v.ProjectMetadataKind), Is.EquivalentTo(new[]
+        Assert.That(violations.Select(v => (v.Payload as ProjectMetadataPayload)?.ProjectMetadataKind), Is.EquivalentTo(new[]
         {
             "required_property",
             "forbidden_property",
             "friend_assembly",
             "project_reference"
         }));
-        Assert.That(violations.Any(v => v.ProjectMetadataKey == "IsPackable" && v.ProjectMetadataExpectedValue == "true" && v.ProjectMetadataActualValue == "false"), Is.True);
-        Assert.That(violations.Any(v => v.ProjectMetadataActualValue == "MyApp.Tools"), Is.True);
-        Assert.That(violations.Any(v => v.ProjectMetadataActualValue == "tests/MyApp.Tests/MyApp.Tests.csproj"), Is.True);
+        Assert.That(violations.Any(v => (v.Payload as ProjectMetadataPayload)?.ProjectMetadataKey == "IsPackable" && (v.Payload as ProjectMetadataPayload)?.ProjectMetadataExpectedValue == "true" && (v.Payload as ProjectMetadataPayload)?.ProjectMetadataActualValue == "false"), Is.True);
+        Assert.That(violations.Any(v => (v.Payload as ProjectMetadataPayload)?.ProjectMetadataActualValue == "MyApp.Tools"), Is.True);
+        Assert.That(violations.Any(v => (v.Payload as ProjectMetadataPayload)?.ProjectMetadataActualValue == "tests/MyApp.Tests/MyApp.Tests.csproj"), Is.True);
     }
 
     [Test]
@@ -182,11 +182,11 @@ public sealed class ProjectMetadataContractTests
 
         List<ArchitectureViolation> violations = runner.Session.CheckProjectMetadataContract(contract);
 
-        Assert.That(violations.Select(v => v.ProjectMetadataKind), Is.EquivalentTo(new[]
+        Assert.That(violations.Select(v => (v.Payload as ProjectMetadataPayload)?.ProjectMetadataKind), Is.EquivalentTo(new[]
         {
             "required_property"
         }));
-        Assert.That(violations.Any(v => v.ProjectMetadataActualValue == "MyApp.Tools"), Is.False);
+        Assert.That(violations.Any(v => (v.Payload as ProjectMetadataPayload)?.ProjectMetadataActualValue == "MyApp.Tools"), Is.False);
         Assert.That(runner.BaselineCandidates.Any(candidate =>
             candidate.ContractGroup == "strict_project_metadata"
             && candidate.ContractId == "project-metadata"
@@ -214,8 +214,8 @@ public sealed class ProjectMetadataContractTests
         List<ArchitectureViolation> violations = runner.Session.CheckProjectMetadataContract(contract);
 
         Assert.That(violations.Count, Is.EqualTo(2));
-        Assert.That(violations.All(v => v.ProjectMetadataKind == "friend_assembly"), Is.True);
-        Assert.That(violations.Select(v => v.ProjectMetadataActualValue),
+        Assert.That(violations.All(v => (v.Payload as ProjectMetadataPayload)?.ProjectMetadataKind == "friend_assembly"), Is.True);
+        Assert.That(violations.Select(v => (v.Payload as ProjectMetadataPayload)?.ProjectMetadataActualValue),
             Is.EquivalentTo(new[] { "MyApp.Tests", "MyApp.Tools" }));
         Assert.That(violations.Any(v => v.ForbiddenReferences.First().Contains("deny-all")), Is.True);
     }
@@ -241,7 +241,7 @@ public sealed class ProjectMetadataContractTests
 
         List<ArchitectureViolation> violations = runner.Session.CheckProjectMetadataContract(contract);
 
-        Assert.That(violations.All(v => v.ProjectMetadataKind != "friend_assembly"), Is.True);
+        Assert.That(violations.All(v => (v.Payload as ProjectMetadataPayload)?.ProjectMetadataKind != "friend_assembly"), Is.True);
     }
 
     [Test]
@@ -272,7 +272,7 @@ public sealed class ProjectMetadataContractTests
         List<ArchitectureViolation> violations = runner.Session.CheckProjectMetadataContract(contract);
 
         Assert.That(violations.Count, Is.EqualTo(1));
-        Assert.That(violations[0].ProjectMetadataActualValue, Is.EqualTo("MyApp.Tests"));
+        Assert.That((violations[0].Payload as ProjectMetadataPayload)?.ProjectMetadataActualValue, Is.EqualTo("MyApp.Tests"));
         Assert.That(runner.BaselineCandidates.Any(candidate =>
             candidate.ContractGroup == "strict_project_metadata"
             && candidate.ContractId == "no-friends-baselined"

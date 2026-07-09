@@ -6,132 +6,15 @@ public static class ArchitectureDiagnosticMapper
 {
     public static ArchitectureDiagnostic FromViolation(ArchitectureViolation violation)
     {
-        if (violation.TemplateName != null || violation.ContainerNamespace != null || violation.DependencyPaths != null)
+        if (violation.Payload != null)
         {
-            return new ConfigurationDiagnostic(
-                violation.ContractName, violation.ContractId, violation.SourceType,
-                violation.ForbiddenNamespace, violation.ForbiddenReferences)
-            {
-                TemplateName = violation.TemplateName,
-                ContainerNamespace = violation.ContainerNamespace,
-                DependencyPaths = violation.DependencyPaths,
-                MatchedNamespacePrefixes = violation.MatchedNamespacePrefixes
-            };
-        }
-
-        if (violation.ForbiddenExternalGroup != null)
-        {
-            return new ExternalDependencyDiagnostic(
-                violation.ContractName, violation.ContractId, violation.SourceType,
-                violation.ForbiddenNamespace, violation.ForbiddenReferences, violation.ForbiddenExternalGroup)
-            {
-                MatchedNamespacePrefixes = violation.MatchedNamespacePrefixes
-            };
-        }
-
-        if (violation.ForbiddenPackageGroup != null)
-        {
-            return new PackageDependencyDiagnostic(
-                violation.ContractName, violation.ContractId, violation.SourceType,
-                violation.ForbiddenNamespace, violation.ForbiddenReferences, violation.ForbiddenPackageGroup);
-        }
-
-        if (violation.ExpectedTypeLocation != null || violation.ExpectedTypeName != null)
-        {
-            return new TypePlacementDiagnostic(
-                violation.ContractName, violation.ContractId, violation.SourceType,
-                violation.ForbiddenNamespace, violation.ForbiddenReferences)
-            {
-                ExpectedTypeLocation = violation.ExpectedTypeLocation,
-                ActualTypeLocation = violation.ActualTypeLocation,
-                ExpectedTypeName = violation.ExpectedTypeName,
-                ActualTypeName = violation.ActualTypeName
-            };
-        }
-
-        if (violation.UndeclaredApiSignature != null)
-        {
-            return new PublicApiSurfaceDiagnostic(
-                violation.ContractName, violation.ContractId, violation.SourceType,
-                violation.ForbiddenNamespace, violation.ForbiddenReferences)
-            {
-                UndeclaredApiSignature = violation.UndeclaredApiSignature,
-                ForbiddenPublicConstant = violation.ForbiddenPublicConstant,
-                ApiAssemblyName = violation.ApiAssemblyName,
-                ApiVisibility = violation.ApiVisibility
-            };
-        }
-
-        if (violation.MatchedAttribute != null)
-        {
-            return new AttributeUsageDiagnostic(
-                violation.ContractName, violation.ContractId, violation.SourceType,
-                violation.ForbiddenNamespace, violation.ForbiddenReferences)
-            {
-                MatchedAttribute = violation.MatchedAttribute,
-                AttributeUsageKind = violation.AttributeUsageKind,
-                ExpectedAttributeLocation = violation.ExpectedAttributeLocation,
-                ActualAttributeLocation = violation.ActualAttributeLocation
-            };
-        }
-
-        if (violation.ForbiddenBaseType != null)
-        {
-            return new InheritanceDiagnostic(
-                violation.ContractName, violation.ContractId, violation.SourceType,
-                violation.ForbiddenNamespace, violation.ForbiddenReferences)
-            {
-                ForbiddenBaseType = violation.ForbiddenBaseType,
-                InheritanceSourceSurface = violation.InheritanceSourceSurface
-            };
-        }
-
-        if (violation.MatchedInterface != null)
-        {
-            return new InterfaceImplementationDiagnostic(
-                violation.ContractName, violation.ContractId, violation.SourceType,
-                violation.ForbiddenNamespace, violation.ForbiddenReferences)
-            {
-                MatchedInterface = violation.MatchedInterface,
-                ImplementationKind = violation.ImplementationKind,
-                ExpectedImplementationLocation = violation.ExpectedImplementationLocation,
-                ActualImplementationLocation = violation.ActualImplementationLocation
-            };
-        }
-
-        if (violation.MatchedForbiddenApi != null)
-        {
-            return new CompositionDiagnostic(
-                violation.ContractName, violation.ContractId, violation.SourceType,
-                violation.ForbiddenNamespace, violation.ForbiddenReferences)
-            {
-                SourceMember = violation.SourceMember,
-                MatchedForbiddenApi = violation.MatchedForbiddenApi,
-                ExpectedCompositionBoundary = violation.ExpectedCompositionBoundary
-            };
-        }
-
-        if (violation.ProjectMetadataKind != null)
-        {
-            return new ProjectMetadataDiagnostic(
-                violation.ContractName, violation.ContractId, violation.SourceType,
-                violation.ForbiddenNamespace, violation.ForbiddenReferences)
-            {
-                ProjectMetadataKind = violation.ProjectMetadataKind,
-                ProjectMetadataKey = violation.ProjectMetadataKey,
-                ProjectMetadataExpectedValue = violation.ProjectMetadataExpectedValue,
-                ProjectMetadataActualValue = violation.ProjectMetadataActualValue,
-                ProjectMetadataSourcePath = violation.ProjectMetadataSourcePath
-            };
+            return violation.Payload.ToDiagnostic(violation);
         }
 
         return new DependencyDiagnostic(
             violation.ContractName, violation.ContractId, violation.SourceType,
             violation.ForbiddenNamespace, violation.ForbiddenReferences)
         {
-            SourceLayer = violation.SourceLayer,
-            TargetLayer = violation.TargetLayer,
-            AllowedImporters = violation.AllowedImporters,
             MatchedNamespacePrefixes = violation.MatchedNamespacePrefixes
         };
     }

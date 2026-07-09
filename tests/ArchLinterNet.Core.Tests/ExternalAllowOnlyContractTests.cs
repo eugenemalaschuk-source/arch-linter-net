@@ -135,7 +135,7 @@ public sealed class ExternalAllowOnlyContractTests
         var violations = runner.Session.CheckExternalAllowOnlyContract(contract);
 
         Assert.That(violations, Is.Not.Empty);
-        Assert.That(violations.All(v => v.ForbiddenExternalGroup == "system"), Is.True);
+        Assert.That(violations.All(v => (v.Payload as ExternalDependencyPayload)?.ForbiddenExternalGroup == "system"), Is.True);
         Assert.That(
             violations.SelectMany(v => v.ForbiddenReferences).Any(r => r.StartsWith("System", StringComparison.Ordinal)),
             Is.True);
@@ -162,7 +162,7 @@ public sealed class ExternalAllowOnlyContractTests
         var violations = runner.Session.CheckExternalAllowOnlyContract(contract);
 
         HashSet<string> matchedGroups = violations
-            .Select(v => v.ForbiddenExternalGroup!)
+            .Select(v => (v.Payload as ExternalDependencyPayload)?.ForbiddenExternalGroup!)
             .ToHashSet(StringComparer.Ordinal);
 
         Assert.That(matchedGroups, Does.Contain("system"));
@@ -300,7 +300,7 @@ public sealed class ExternalAllowOnlyContractTests
 
         var violations = runner.Session.CheckExternalAllowOnlyContract(contract);
 
-        Assert.That(violations.Any(v => v.ForbiddenExternalGroup == "bcl"), Is.True);
+        Assert.That(violations.Any(v => (v.Payload as ExternalDependencyPayload)?.ForbiddenExternalGroup == "bcl"), Is.True);
     }
 
     [Test]
@@ -332,7 +332,7 @@ public sealed class ExternalAllowOnlyContractTests
         var runnerCorrect = new ArchitectureContractRunner(CreateContext(), documentCorrect);
         var violationsCorrect = runnerCorrect.Session.CheckExternalAllowOnlyContract(contractCorrect);
 
-        Assert.That(violationsWithTypo.Any(v => v.ForbiddenExternalGroup == "system"), Is.True);
+        Assert.That(violationsWithTypo.Any(v => (v.Payload as ExternalDependencyPayload)?.ForbiddenExternalGroup == "system"), Is.True);
         Assert.That(violationsWithTypo.Count, Is.EqualTo(violationsCorrect.Count));
     }
 

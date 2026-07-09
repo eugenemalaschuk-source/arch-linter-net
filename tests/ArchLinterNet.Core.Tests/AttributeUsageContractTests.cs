@@ -1,6 +1,7 @@
 using ArchLinterNet.Core.Contracts;
 using ArchLinterNet.Core.Discovery;
 using ArchLinterNet.Core.Execution;
+using ArchLinterNet.Core.Model;
 using ArchLinterNet.Core.Validation;
 using NUnit.Framework;
 
@@ -116,10 +117,10 @@ public sealed class AttributeUsageContractTests
         var violations = runner.Session.CheckAttributeUsageContract(contract);
 
         Assert.That(violations, Is.Not.Empty);
-        Assert.That(violations.All(v => v.AttributeUsageKind == "misplaced"), Is.True);
+        Assert.That(violations.All(v => (v.Payload as AttributeUsagePayload)?.AttributeUsageKind == "misplaced"), Is.True);
         Assert.That(violations.Any(v =>
             v.SourceType == "AttributeUsageContractTestFixtures.Wrong.WrongHolder"
-            && v.MatchedAttribute == TestMarkerAttributeName), Is.True);
+            && (v.Payload as AttributeUsagePayload)?.MatchedAttribute == TestMarkerAttributeName), Is.True);
         Assert.That(violations.All(v => v.SourceType.StartsWith("AttributeUsageContractTestFixtures.Allowed", StringComparison.Ordinal) == false), Is.True);
     }
 
@@ -138,7 +139,7 @@ public sealed class AttributeUsageContractTests
         var violations = runner.Session.CheckAttributeUsageContract(contract);
 
         Assert.That(violations, Is.Not.Empty);
-        Assert.That(violations.All(v => v.AttributeUsageKind == "forbidden"), Is.True);
+        Assert.That(violations.All(v => (v.Payload as AttributeUsagePayload)?.AttributeUsageKind == "forbidden"), Is.True);
         Assert.That(violations.All(v =>
             v.SourceType.StartsWith("AttributeUsageContractTestFixtures.Forbidden", StringComparison.Ordinal)), Is.True);
     }
@@ -163,7 +164,7 @@ public sealed class AttributeUsageContractTests
             .ToList();
 
         Assert.That(forbiddenHolderViolations, Has.Count.EqualTo(1));
-        Assert.That(forbiddenHolderViolations[0].AttributeUsageKind, Is.EqualTo("forbidden"));
+        Assert.That((forbiddenHolderViolations[0].Payload as AttributeUsagePayload)?.AttributeUsageKind, Is.EqualTo("forbidden"));
     }
 
     [Test]
@@ -293,9 +294,9 @@ public sealed class AttributeUsageContractTests
             v.SourceType == "AttributeUsageContractTestFixtures.Wrong.WrongHolder.OverloadedMethod(System.Int32)").ToList();
 
         Assert.That(parameterlessOverload, Has.Count.EqualTo(1));
-        Assert.That(parameterlessOverload[0].MatchedAttribute, Is.EqualTo(TestMarkerAttributeName));
+        Assert.That((parameterlessOverload[0].Payload as AttributeUsagePayload)?.MatchedAttribute, Is.EqualTo(TestMarkerAttributeName));
         Assert.That(intOverload, Has.Count.EqualTo(1));
-        Assert.That(intOverload[0].MatchedAttribute, Is.EqualTo(SecondMarkerAttributeName));
+        Assert.That((intOverload[0].Payload as AttributeUsagePayload)?.MatchedAttribute, Is.EqualTo(SecondMarkerAttributeName));
     }
 
     [Test]
@@ -314,8 +315,8 @@ public sealed class AttributeUsageContractTests
         var violationsOne = runnerOne.Session.CheckAttributeUsageContract(contract);
         var violationsTwo = runnerTwo.Session.CheckAttributeUsageContract(contract);
 
-        string[] orderOne = violationsOne.Select(v => $"{v.SourceType}|{v.MatchedAttribute}").ToArray();
-        string[] orderTwo = violationsTwo.Select(v => $"{v.SourceType}|{v.MatchedAttribute}").ToArray();
+        string[] orderOne = violationsOne.Select(v => $"{v.SourceType}|{(v.Payload as AttributeUsagePayload)?.MatchedAttribute}").ToArray();
+        string[] orderTwo = violationsTwo.Select(v => $"{v.SourceType}|{(v.Payload as AttributeUsagePayload)?.MatchedAttribute}").ToArray();
 
         Assert.That(orderOne, Is.Not.Empty);
         Assert.That(orderOne, Is.EqualTo(orderTwo));
@@ -343,7 +344,7 @@ public sealed class AttributeUsageContractTests
 
         Assert.That(violations.Any(v =>
             v.SourceType == "AttributeUsageContractTestFixtures.Wrong.WrongHolder.PrefixMatchedField"
-            && v.MatchedAttribute!.StartsWith(PrefixedNamespace, StringComparison.Ordinal)), Is.True);
+            && (v.Payload as AttributeUsagePayload)?.MatchedAttribute?.StartsWith(PrefixedNamespace, StringComparison.Ordinal) == true), Is.True);
     }
 
     [Test]
@@ -365,7 +366,7 @@ public sealed class AttributeUsageContractTests
             .ToList();
 
         Assert.That(dualFieldViolations, Has.Count.EqualTo(2));
-        Assert.That(dualFieldViolations.Select(v => v.MatchedAttribute),
+        Assert.That(dualFieldViolations.Select(v => (v.Payload as AttributeUsagePayload)?.MatchedAttribute),
             Is.EquivalentTo(new[] { TestMarkerAttributeName, SecondMarkerAttributeName }));
     }
 
@@ -410,7 +411,7 @@ public sealed class AttributeUsageContractTests
 
         Assert.That(violations.Any(v =>
             v.SourceType == "AttributeUsageContractTestFixtures.Wrong.WrongHolder"
-            && v.MatchedAttribute == TestMarkerAttributeName), Is.False);
+            && (v.Payload as AttributeUsagePayload)?.MatchedAttribute == TestMarkerAttributeName), Is.False);
     }
 
     [Test]
@@ -522,7 +523,7 @@ public sealed class AttributeUsageContractTests
         var violations = runner.Session.CheckAttributeUsageContract(contract);
 
         Assert.That(violations, Is.Not.Empty);
-        Assert.That(violations.All(v => v.AttributeUsageKind == "forbidden"), Is.True);
+        Assert.That(violations.All(v => (v.Payload as AttributeUsagePayload)?.AttributeUsageKind == "forbidden"), Is.True);
     }
 
     [Test]

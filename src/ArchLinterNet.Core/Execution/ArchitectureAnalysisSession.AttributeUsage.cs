@@ -91,10 +91,11 @@ public sealed partial class ArchitectureAnalysisSession
                     match.MatchedAttribute,
                     new[] { actualLocationDescription })
                 {
-                    MatchedAttribute = match.MatchedAttribute,
-                    AttributeUsageKind = attributeUsageKind,
-                    ActualAttributeLocation = actualLocationDescription,
-                    ExpectedAttributeLocation = expectedAttributeLocation
+                    Payload = new AttributeUsagePayload(
+                        MatchedAttribute: match.MatchedAttribute,
+                        AttributeUsageKind: attributeUsageKind,
+                        ActualAttributeLocation: actualLocationDescription,
+                        ExpectedAttributeLocation: expectedAttributeLocation)
                 });
             }
         }

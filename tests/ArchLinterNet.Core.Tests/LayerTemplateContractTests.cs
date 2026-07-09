@@ -232,8 +232,8 @@ public sealed class LayerTemplateContractTests
         List<ArchitectureViolation> violations = runner.CheckLayerContract(contract);
 
         Assert.That(violations, Is.Not.Empty);
-        Assert.That(violations[0].TemplateName, Is.EqualTo("feature-clean-architecture"));
-        Assert.That(violations[0].ContainerNamespace, Is.EqualTo("MyApp.Features.Fishing"));
+        Assert.That((violations[0].Payload as ConfigurationPayload)?.TemplateName, Is.EqualTo("feature-clean-architecture"));
+        Assert.That((violations[0].Payload as ConfigurationPayload)?.ContainerNamespace, Is.EqualTo("MyApp.Features.Fishing"));
     }
 
     [Test]
@@ -274,8 +274,8 @@ public sealed class LayerTemplateContractTests
         List<ArchitectureViolation> violations = runner.CheckLayerContract(contract);
 
         Assert.That(violations, Is.Not.Empty);
-        Assert.That(violations.Any(v => v.TemplateName == "fca"), Is.True);
-        Assert.That(violations.Any(v => v.ContainerNamespace == "MyApp.Features.Fishing"), Is.True);
+        Assert.That(violations.Any(v => (v.Payload as ConfigurationPayload)?.TemplateName == "fca"), Is.True);
+        Assert.That(violations.Any(v => (v.Payload as ConfigurationPayload)?.ContainerNamespace == "MyApp.Features.Fishing"), Is.True);
     }
 
     [Test]

@@ -145,7 +145,7 @@ public sealed class UnifiedJsonOutputTests
             new("core-no-unity", "core-no-unity", "MyApp.Core.PlayerModel", "external dependency group 'unity_runtime'",
                 new[] { "UnityEngine.Vector3" })
             {
-                ForbiddenExternalGroup = "unity_runtime"
+                Payload = new ExternalDependencyPayload("unity_runtime")
             }
         };
 
@@ -165,7 +165,7 @@ public sealed class UnifiedJsonOutputTests
             new("core-no-unity", "core-no-unity", "MyApp.Core.PlayerModel", "external dependency group 'unity_runtime'",
                 new[] { "UnityEngine.Vector3" })
             {
-                ForbiddenExternalGroup = "unity_runtime"
+                Payload = new ExternalDependencyPayload("unity_runtime")
             }
         };
 

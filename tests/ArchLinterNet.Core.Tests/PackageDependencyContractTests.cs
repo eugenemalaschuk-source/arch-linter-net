@@ -102,7 +102,7 @@ public sealed class PackageDependencyContractTests
         Assert.That(violations, Has.Count.EqualTo(1));
         Assert.That(violations[0].ContractId, Is.EqualTo("domain-no-ef"));
         Assert.That(violations[0].SourceType, Is.EqualTo(SourceAssemblyName));
-        Assert.That(violations[0].ForbiddenPackageGroup, Is.EqualTo("forbidden_infra"));
+        Assert.That((violations[0].Payload as PackageDependencyPayload)?.ForbiddenPackageGroup, Is.EqualTo("forbidden_infra"));
         Assert.That(violations[0].ForbiddenReferences, Is.EqualTo(new[] { "Microsoft.EntityFrameworkCore@8.0.0" }));
     }
 

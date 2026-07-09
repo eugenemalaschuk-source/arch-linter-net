@@ -57,8 +57,9 @@ internal sealed class InheritanceChecker
                     matchedBaseType,
                     new[] { matchedBaseType })
                 {
-                    ForbiddenBaseType = matchedBaseType,
-                    InheritanceSourceSurface = sourceSurfaceDescription
+                    Payload = new InheritancePayload(
+                        ForbiddenBaseType: matchedBaseType,
+                        InheritanceSourceSurface: sourceSurfaceDescription)
                 });
             }
         }

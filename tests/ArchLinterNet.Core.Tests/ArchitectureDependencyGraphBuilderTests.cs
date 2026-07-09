@@ -145,10 +145,10 @@ public sealed class ArchitectureDependencyGraphBuilderTests
         var runner = new ArchitectureContractRunner(context, document);
         var violations = runner.CheckContract(document.Contracts.Strict[0]).ToList();
 
-        ArchitectureViolation? withPath = violations.FirstOrDefault(v => v.DependencyPaths is { Count: > 0 });
+        ArchitectureViolation? withPath = violations.FirstOrDefault(v => (v.Payload as ConfigurationPayload)?.DependencyPaths is { Count: > 0 });
         Assert.That(withPath, Is.Not.Null, "expected at least one violation with a multi-hop DependencyPaths entry");
 
-        IReadOnlyCollection<string> path = withPath!.DependencyPaths!.First(p => p.Count > 2);
+        IReadOnlyCollection<string> path = ((ConfigurationPayload)withPath!.Payload!).DependencyPaths!.First(p => p.Count > 2);
 
         ArchitectureDependencyGraph graph = ArchitectureDependencyGraphBuilder.Build(
             runner.Session, ArchitectureGraphLevel.Type, violations);

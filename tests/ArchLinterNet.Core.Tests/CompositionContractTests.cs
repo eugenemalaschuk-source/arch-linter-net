@@ -1,5 +1,6 @@
 using ArchLinterNet.Core.Contracts;
 using ArchLinterNet.Core.Execution;
+using ArchLinterNet.Core.Model;
 using ArchLinterNet.Core.Validation;
 using NUnit.Framework;
 
@@ -115,8 +116,8 @@ public sealed class CompositionContractTests
 
         Assert.That(violations.Any(v =>
             v.SourceType == "CompositionContractTestFixtures.Application.ServiceLocatorLeak"
-            && v.MatchedForbiddenApi == GetServiceApi
-            && v.SourceMember == "CompositionContractTestFixtures.Application.ServiceLocatorLeak.ResolveFromLocator"),
+            && (v.Payload as CompositionPayload)?.MatchedForbiddenApi == GetServiceApi
+            && (v.Payload as CompositionPayload)?.SourceMember == "CompositionContractTestFixtures.Application.ServiceLocatorLeak.ResolveFromLocator"),
             Is.True);
     }
 
@@ -136,11 +137,11 @@ public sealed class CompositionContractTests
 
         Assert.That(violations.Any(v =>
             v.SourceType == "CompositionContractTestFixtures.Application.AspNetDiRegistrationLeak"
-            && v.SourceMember == "CompositionContractTestFixtures.Application.AspNetDiRegistrationLeak.ConfigureServices"
-            && v.MatchedForbiddenApi == AspNetAddSingletonApi), Is.True);
+            && (v.Payload as CompositionPayload)?.SourceMember == "CompositionContractTestFixtures.Application.AspNetDiRegistrationLeak.ConfigureServices"
+            && (v.Payload as CompositionPayload)?.MatchedForbiddenApi == AspNetAddSingletonApi), Is.True);
         Assert.That(violations.Any(v =>
             v.SourceType == "CompositionContractTestFixtures.Composition.CompositionRoot"
-            && v.MatchedForbiddenApi == AspNetAddSingletonApi), Is.False);
+            && (v.Payload as CompositionPayload)?.MatchedForbiddenApi == AspNetAddSingletonApi), Is.False);
     }
 
     [Test]
@@ -159,10 +160,10 @@ public sealed class CompositionContractTests
 
         Assert.That(violations.Any(v =>
             v.SourceType == "CompositionContractTestFixtures.Application.ContainerLeak"
-            && v.MatchedForbiddenApi == "CompositionContractTestFixtures.Fakes.FakeContainer.Resolve"), Is.True);
+            && (v.Payload as CompositionPayload)?.MatchedForbiddenApi == "CompositionContractTestFixtures.Fakes.FakeContainer.Resolve"), Is.True);
         Assert.That(violations.Any(v =>
             v.SourceType == "CompositionContractTestFixtures.Application.ContainerLeak"
-            && v.MatchedForbiddenApi == "CompositionContractTestFixtures.Fakes.FakeContainer.Register"), Is.True);
+            && (v.Payload as CompositionPayload)?.MatchedForbiddenApi == "CompositionContractTestFixtures.Fakes.FakeContainer.Register"), Is.True);
         Assert.That(violations.Any(v =>
             v.SourceType.StartsWith(CompositionNamespace, StringComparison.Ordinal)), Is.False);
     }
@@ -294,10 +295,10 @@ public sealed class CompositionContractTests
         var violationsTwo = runnerTwo.Session.CheckCompositionContract(contract);
 
         string[] orderOne = violationsOne
-            .Select(v => $"{v.SourceType}|{v.SourceMember}|{v.MatchedForbiddenApi}")
+            .Select(v => $"{v.SourceType}|{(v.Payload as CompositionPayload)?.SourceMember}|{(v.Payload as CompositionPayload)?.MatchedForbiddenApi}")
             .ToArray();
         string[] orderTwo = violationsTwo
-            .Select(v => $"{v.SourceType}|{v.SourceMember}|{v.MatchedForbiddenApi}")
+            .Select(v => $"{v.SourceType}|{(v.Payload as CompositionPayload)?.SourceMember}|{(v.Payload as CompositionPayload)?.MatchedForbiddenApi}")
             .ToArray();
 
         Assert.That(orderOne, Is.Not.Empty);
@@ -408,7 +409,7 @@ public sealed class CompositionContractTests
         Assert.That(outcome.Passed, Is.False);
         Assert.That(outcome.Violations.Any(v =>
             v.SourceType == "CompositionContractTestFixtures.Application.ServiceLocatorLeak"
-            && v.MatchedForbiddenApi == GetServiceApi), Is.True);
+            && (v.Payload as CompositionPayload)?.MatchedForbiddenApi == GetServiceApi), Is.True);
     }
 
     [Test]

@@ -1,6 +1,7 @@
 using ArchLinterNet.Core.Contracts;
 using ArchLinterNet.Core.Discovery;
 using ArchLinterNet.Core.Execution;
+using ArchLinterNet.Core.Model;
 using ArchLinterNet.Core.Validation;
 using NUnit.Framework;
 using RoleFixtures = TypePlacementContractTestFixtures.Roles;
@@ -227,9 +228,9 @@ public sealed class TypePlacementContractTests
         var violations = runner.Session.CheckTypePlacementContract(contract);
 
         var violation = violations.Single(v => v.SourceType.Contains("Wrong.SampleController", StringComparison.Ordinal));
-        Assert.That(violation.ExpectedTypeLocation, Does.Contain("TypePlacementContractTestFixtures.Correct"));
-        Assert.That(violation.ActualTypeLocation, Does.Contain("TypePlacementContractTestFixtures.Wrong"));
-        Assert.That(violation.ExpectedTypeName, Is.Null);
+        Assert.That((violation.Payload as TypePlacementPayload)?.ExpectedTypeLocation, Does.Contain("TypePlacementContractTestFixtures.Correct"));
+        Assert.That((violation.Payload as TypePlacementPayload)?.ActualTypeLocation, Does.Contain("TypePlacementContractTestFixtures.Wrong"));
+        Assert.That((violation.Payload as TypePlacementPayload)?.ExpectedTypeName, Is.Null);
     }
 
     [Test]
@@ -300,9 +301,9 @@ public sealed class TypePlacementContractTests
         var violations = runner.Session.CheckTypePlacementContract(contract);
 
         var violation = violations.Single(v => v.SourceType.EndsWith("SampleHandler", StringComparison.Ordinal));
-        Assert.That(violation.ExpectedTypeName, Does.Contain("required_suffix: Controller"));
-        Assert.That(violation.ActualTypeName, Is.EqualTo("SampleHandler"));
-        Assert.That(violation.ExpectedTypeLocation, Is.Null);
+        Assert.That((violation.Payload as TypePlacementPayload)?.ExpectedTypeName, Does.Contain("required_suffix: Controller"));
+        Assert.That((violation.Payload as TypePlacementPayload)?.ActualTypeName, Is.EqualTo("SampleHandler"));
+        Assert.That((violation.Payload as TypePlacementPayload)?.ExpectedTypeLocation, Is.Null);
     }
 
     [Test]
@@ -319,8 +320,8 @@ public sealed class TypePlacementContractTests
 
         var violations = runner.Session.CheckTypePlacementContract(contract);
 
-        Assert.That(violations.Any(v => v.ActualTypeName == "SampleHandlerImpl"), Is.True);
-        Assert.That(violations.Any(v => v.ActualTypeName == "SampleHandler"), Is.False);
+        Assert.That(violations.Any(v => (v.Payload as TypePlacementPayload)?.ActualTypeName == "SampleHandlerImpl"), Is.True);
+        Assert.That(violations.Any(v => (v.Payload as TypePlacementPayload)?.ActualTypeName == "SampleHandler"), Is.False);
     }
 
     [Test]
@@ -356,10 +357,10 @@ public sealed class TypePlacementContractTests
         var violations = runner.Session.CheckTypePlacementContract(contract);
 
         var violation = violations.Single(v => v.SourceType.EndsWith("SampleHandler", StringComparison.Ordinal));
-        Assert.That(violation.ExpectedTypeLocation, Is.Not.Null);
-        Assert.That(violation.ActualTypeLocation, Is.Not.Null);
-        Assert.That(violation.ExpectedTypeName, Is.Not.Null);
-        Assert.That(violation.ActualTypeName, Is.Not.Null);
+        Assert.That((violation.Payload as TypePlacementPayload)?.ExpectedTypeLocation, Is.Not.Null);
+        Assert.That((violation.Payload as TypePlacementPayload)?.ActualTypeLocation, Is.Not.Null);
+        Assert.That((violation.Payload as TypePlacementPayload)?.ExpectedTypeName, Is.Not.Null);
+        Assert.That((violation.Payload as TypePlacementPayload)?.ActualTypeName, Is.Not.Null);
     }
 
     [Test]

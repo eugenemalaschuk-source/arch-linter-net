@@ -20,9 +20,10 @@ public sealed partial class ProtectedContractTests
             "protected layer 'execution' (allowed importers: [core])",
             new[] { "ArchLinterNet.Core.Execution.ArchitectureContractRunner" })
         {
-            SourceLayer = "test_area",
-            TargetLayer = "execution",
-            AllowedImporters = new[] { "core" }
+            Payload = new DependencyPayload(
+                SourceLayer: "test_area",
+                TargetLayer: "execution",
+                AllowedImporters: new[] { "core" })
         };
 
         string json = _formatter.FormatResultForCiArtifacts(
@@ -128,7 +129,7 @@ public sealed partial class ProtectedContractTests
             v => v.SourceType == "ProtectedGlob.Importers.DirectImporter");
 
         Assert.That(violation, Is.Not.Null);
-        Assert.That(violation!.SourceLayer, Is.Null,
+        Assert.That((violation!.Payload as DependencyPayload)?.SourceLayer, Is.Null,
             "A type declared directly in 'ProtectedGlob.Importers' (no descendant segment) must not be " +
             "classified as belonging to the glob layer 'ProtectedGlob.Importers.*', which requires one " +
             "additional namespace segment.");
@@ -290,7 +291,7 @@ public sealed partial class ProtectedContractTests
         Assert.That(violations, Is.Not.Empty);
         foreach (var violation in violations)
         {
-            Assert.That(violation.TargetLayer, Is.EqualTo("core_execution"),
+            Assert.That((violation.Payload as DependencyPayload)?.TargetLayer, Is.EqualTo("core_execution"),
                 "TargetLayer must be the protected layer name, not a nested child layer");
         }
     }
@@ -350,7 +351,7 @@ public sealed partial class ProtectedContractTests
 
         Assert.That(globalViolations, Is.Not.Empty,
             "Global-namespace types referencing protected layers must produce violations");
-        Assert.That(globalViolations[0].SourceLayer, Is.Null,
+        Assert.That((globalViolations[0].Payload as DependencyPayload)?.SourceLayer, Is.Null,
             "Global-namespace types should have null SourceLayer");
     }
 

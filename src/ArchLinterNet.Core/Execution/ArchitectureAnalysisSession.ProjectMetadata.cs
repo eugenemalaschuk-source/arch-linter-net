@@ -38,7 +38,7 @@ public sealed partial class ArchitectureAnalysisSession
 
         return violations
             .OrderBy(v => v.SourceType, StringComparer.OrdinalIgnoreCase)
-            .ThenBy(v => v.ProjectMetadataKey ?? string.Empty, StringComparer.Ordinal)
+            .ThenBy(v => (v.Payload as ProjectMetadataPayload)?.ProjectMetadataKey ?? string.Empty, StringComparer.Ordinal)
             .ThenBy(v => v.ForbiddenNamespace, StringComparer.Ordinal)
             .ThenBy(v => v.ForbiddenReferences.FirstOrDefault() ?? string.Empty, StringComparer.Ordinal)
             .ToList();
@@ -76,11 +76,12 @@ public sealed partial class ArchitectureAnalysisSession
                     $"Property '{requirement.Key}' expected '{requirement.Value}' but actual value was '{actualValue ?? "<missing>"}'."
                 })
             {
-                ProjectMetadataKind = "required_property",
-                ProjectMetadataKey = requirement.Key,
-                ProjectMetadataExpectedValue = requirement.Value,
-                ProjectMetadataActualValue = actualValue,
-                ProjectMetadataSourcePath = property?.SourcePath
+                Payload = new ProjectMetadataPayload(
+                    ProjectMetadataKind: "required_property",
+                    ProjectMetadataKey: requirement.Key,
+                    ProjectMetadataExpectedValue: requirement.Value,
+                    ProjectMetadataActualValue: actualValue,
+                    ProjectMetadataSourcePath: property?.SourcePath)
             };
         }
     }
@@ -115,11 +116,12 @@ public sealed partial class ArchitectureAnalysisSession
                     $"Property '{rule.Key}' must not be '{rule.Value}'."
                 })
             {
-                ProjectMetadataKind = "forbidden_property",
-                ProjectMetadataKey = rule.Key,
-                ProjectMetadataExpectedValue = rule.Value,
-                ProjectMetadataActualValue = property.Value,
-                ProjectMetadataSourcePath = property.SourcePath
+                Payload = new ProjectMetadataPayload(
+                    ProjectMetadataKind: "forbidden_property",
+                    ProjectMetadataKey: rule.Key,
+                    ProjectMetadataExpectedValue: rule.Value,
+                    ProjectMetadataActualValue: property.Value,
+                    ProjectMetadataSourcePath: property.SourcePath)
             };
         }
     }
@@ -163,10 +165,11 @@ public sealed partial class ArchitectureAnalysisSession
                 "forbidden friend assembly",
                 new[] { message })
             {
-                ProjectMetadataKind = "friend_assembly",
-                ProjectMetadataKey = "InternalsVisibleTo",
-                ProjectMetadataActualValue = friendAssembly.AssemblyName,
-                ProjectMetadataSourcePath = friendAssembly.SourcePath
+                Payload = new ProjectMetadataPayload(
+                    ProjectMetadataKind: "friend_assembly",
+                    ProjectMetadataKey: "InternalsVisibleTo",
+                    ProjectMetadataActualValue: friendAssembly.AssemblyName,
+                    ProjectMetadataSourcePath: friendAssembly.SourcePath)
             };
         }
     }
@@ -205,11 +208,12 @@ public sealed partial class ArchitectureAnalysisSession
                     $"Project reference '{projectReference.Path}' matches forbidden pattern '{matchedPattern}'."
                 })
             {
-                ProjectMetadataKind = "project_reference",
-                ProjectMetadataKey = "ProjectReference",
-                ProjectMetadataExpectedValue = matchedPattern,
-                ProjectMetadataActualValue = projectReference.Path,
-                ProjectMetadataSourcePath = projectReference.SourcePath
+                Payload = new ProjectMetadataPayload(
+                    ProjectMetadataKind: "project_reference",
+                    ProjectMetadataKey: "ProjectReference",
+                    ProjectMetadataExpectedValue: matchedPattern,
+                    ProjectMetadataActualValue: projectReference.Path,
+                    ProjectMetadataSourcePath: projectReference.SourcePath)
             };
         }
     }

@@ -25,9 +25,10 @@ public sealed class ArchitectureDiagnosticMapperTests
         var violation = new ArchitectureViolation(
             "contract", null, "Source.Type", "protected layer 'Core'", new[] { "ref1" })
         {
-            SourceLayer = "Web",
-            TargetLayer = "Core",
-            AllowedImporters = new[] { "Api" }
+            Payload = new DependencyPayload(
+                SourceLayer: "Web",
+                TargetLayer: "Core",
+                AllowedImporters: new[] { "Api" })
         };
 
         var diagnostic = ArchitectureDiagnosticMapper.FromViolation(violation);
@@ -45,9 +46,10 @@ public sealed class ArchitectureDiagnosticMapperTests
         var violation = new ArchitectureViolation(
             "contract", null, "Source.Type", "protected layer 'Core'", new[] { "ref1" })
         {
-            SourceLayer = "Web",
-            TargetLayer = "Core",
-            AllowedImporters = new[] { "Api" },
+            Payload = new DependencyPayload(
+                SourceLayer: "Web",
+                TargetLayer: "Core",
+                AllowedImporters: new[] { "Api" }),
             MatchedNamespacePrefixes = new[] { "Core.Internal" }
         };
 
@@ -67,7 +69,7 @@ public sealed class ArchitectureDiagnosticMapperTests
             "contract", "core-no-unity", "MyApp.Core.PlayerModel", "external dependency group 'unity_runtime'",
             new[] { "UnityEngine.Vector3" })
         {
-            ForbiddenExternalGroup = "unity_runtime"
+            Payload = new ExternalDependencyPayload("unity_runtime")
         };
 
         var diagnostic = ArchitectureDiagnosticMapper.FromViolation(violation);
@@ -83,8 +85,9 @@ public sealed class ArchitectureDiagnosticMapperTests
         var violation = new ArchitectureViolation(
             "contract", null, "Source.Type", "Forbidden.Namespace", new[] { "ref1" })
         {
-            TemplateName = "asmdef-template",
-            ContainerNamespace = "MyApp.Modules"
+            Payload = new ConfigurationPayload(
+                TemplateName: "asmdef-template",
+                ContainerNamespace: "MyApp.Modules")
         };
 
         var diagnostic = ArchitectureDiagnosticMapper.FromViolation(violation);
@@ -102,11 +105,12 @@ public sealed class ArchitectureDiagnosticMapperTests
         var violation = new ArchitectureViolation(
             "contract", "project-metadata", "src/MyApp/MyApp.csproj", "required project property mismatch", new[] { "ref1" })
         {
-            ProjectMetadataKind = "required_property",
-            ProjectMetadataKey = "Nullable",
-            ProjectMetadataExpectedValue = "enable",
-            ProjectMetadataActualValue = "disable",
-            ProjectMetadataSourcePath = "Directory.Build.props"
+            Payload = new ProjectMetadataPayload(
+                ProjectMetadataKind: "required_property",
+                ProjectMetadataKey: "Nullable",
+                ProjectMetadataExpectedValue: "enable",
+                ProjectMetadataActualValue: "disable",
+                ProjectMetadataSourcePath: "Directory.Build.props")
         };
 
         var diagnostic = ArchitectureDiagnosticMapper.FromViolation(violation);
@@ -126,13 +130,103 @@ public sealed class ArchitectureDiagnosticMapperTests
         var violation = new ArchitectureViolation(
             "contract", null, "Source.Type", "Forbidden.Namespace", new[] { "ref1" })
         {
-            DependencyPaths = paths
+            Payload = new ConfigurationPayload(DependencyPaths: paths)
         };
 
         var diagnostic = ArchitectureDiagnosticMapper.FromViolation(violation);
 
         Assert.That(diagnostic, Is.InstanceOf<ConfigurationDiagnostic>());
         Assert.That(((ConfigurationDiagnostic)diagnostic).DependencyPaths, Is.EqualTo(paths));
+    }
+
+    [Test]
+    public void FromViolation_TypePlacementPayload_ReturnsTypePlacementDiagnostic()
+    {
+        var violation = new ArchitectureViolation(
+            "contract", null, "Source.Type", "expected-location", new[] { "ref1" })
+        {
+            Payload = new TypePlacementPayload(
+                ExpectedTypeLocation: "namespace:MyApp.Domain",
+                ActualTypeLocation: "namespace:MyApp.Infra",
+                ExpectedTypeName: "IFoo",
+                ActualTypeName: "Foo")
+        };
+
+        var diagnostic = ArchitectureDiagnosticMapper.FromViolation(violation);
+
+        Assert.That(diagnostic, Is.InstanceOf<TypePlacementDiagnostic>());
+        Assert.That(diagnostic.Kind, Is.EqualTo(ArchitectureDiagnosticKind.TypePlacement));
+        var typePlacement = (TypePlacementDiagnostic)diagnostic;
+        Assert.That(typePlacement.ExpectedTypeLocation, Is.EqualTo("namespace:MyApp.Domain"));
+        Assert.That(typePlacement.ActualTypeLocation, Is.EqualTo("namespace:MyApp.Infra"));
+        Assert.That(typePlacement.ExpectedTypeName, Is.EqualTo("IFoo"));
+        Assert.That(typePlacement.ActualTypeName, Is.EqualTo("Foo"));
+    }
+
+    [Test]
+    public void FromViolation_PublicApiSurfacePayload_ReturnsPublicApiSurfaceDiagnostic()
+    {
+        var violation = new ArchitectureViolation(
+            "contract", null, "MyApp.Public.Thing", "public API surface", new[] { "MyApp.Public.Thing.Method()" })
+        {
+            Payload = new PublicApiSurfacePayload(
+                UndeclaredApiSignature: "MyApp.Public.Thing.Method()",
+                ForbiddenPublicConstant: true,
+                ApiAssemblyName: "MyApp",
+                ApiVisibility: "public")
+        };
+
+        var diagnostic = ArchitectureDiagnosticMapper.FromViolation(violation);
+
+        Assert.That(diagnostic, Is.InstanceOf<PublicApiSurfaceDiagnostic>());
+        Assert.That(diagnostic.Kind, Is.EqualTo(ArchitectureDiagnosticKind.PublicApiSurface));
+        var publicApiSurface = (PublicApiSurfaceDiagnostic)diagnostic;
+        Assert.That(publicApiSurface.UndeclaredApiSignature, Is.EqualTo("MyApp.Public.Thing.Method()"));
+        Assert.That(publicApiSurface.ForbiddenPublicConstant, Is.True);
+        Assert.That(publicApiSurface.ApiAssemblyName, Is.EqualTo("MyApp"));
+        Assert.That(publicApiSurface.ApiVisibility, Is.EqualTo("public"));
+    }
+
+    [Test]
+    public void FromViolation_InheritancePayload_ReturnsInheritanceDiagnostic()
+    {
+        var violation = new ArchitectureViolation(
+            "contract", null, "MyApp.Domain.Thing", "System.Object", new[] { "System.Object" })
+        {
+            Payload = new InheritancePayload(
+                ForbiddenBaseType: "System.Object",
+                InheritanceSourceSurface: "layers: [domain]")
+        };
+
+        var diagnostic = ArchitectureDiagnosticMapper.FromViolation(violation);
+
+        Assert.That(diagnostic, Is.InstanceOf<InheritanceDiagnostic>());
+        Assert.That(diagnostic.Kind, Is.EqualTo(ArchitectureDiagnosticKind.Inheritance));
+        var inheritance = (InheritanceDiagnostic)diagnostic;
+        Assert.That(inheritance.ForbiddenBaseType, Is.EqualTo("System.Object"));
+        Assert.That(inheritance.InheritanceSourceSurface, Is.EqualTo("layers: [domain]"));
+    }
+
+    [Test]
+    public void FromViolation_CompositionPayload_ReturnsCompositionDiagnostic()
+    {
+        var violation = new ArchitectureViolation(
+            "contract", null, "MyApp.Domain.Thing", "Container.Resolve", new[] { "Container.Resolve" })
+        {
+            Payload = new CompositionPayload(
+                SourceMember: "MyApp.Domain.Thing.DoWork()",
+                MatchedForbiddenApi: "Container.Resolve",
+                ExpectedCompositionBoundary: "composition root")
+        };
+
+        var diagnostic = ArchitectureDiagnosticMapper.FromViolation(violation);
+
+        Assert.That(diagnostic, Is.InstanceOf<CompositionDiagnostic>());
+        Assert.That(diagnostic.Kind, Is.EqualTo(ArchitectureDiagnosticKind.Composition));
+        var composition = (CompositionDiagnostic)diagnostic;
+        Assert.That(composition.SourceMember, Is.EqualTo("MyApp.Domain.Thing.DoWork()"));
+        Assert.That(composition.MatchedForbiddenApi, Is.EqualTo("Container.Resolve"));
+        Assert.That(composition.ExpectedCompositionBoundary, Is.EqualTo("composition root"));
     }
 
     [Test]

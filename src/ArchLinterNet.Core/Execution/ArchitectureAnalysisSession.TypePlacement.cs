@@ -76,10 +76,11 @@ public sealed partial class ArchitectureAnalysisSession
                 expectedTypeLocation ?? expectedTypeName ?? string.Empty,
                 new[] { forbiddenReference })
             {
-                ExpectedTypeLocation = expectedTypeLocation,
-                ActualTypeLocation = actualTypeLocation,
-                ExpectedTypeName = expectedTypeName,
-                ActualTypeName = actualTypeName
+                Payload = new TypePlacementPayload(
+                    ExpectedTypeLocation: expectedTypeLocation,
+                    ActualTypeLocation: actualTypeLocation,
+                    ExpectedTypeName: expectedTypeName,
+                    ActualTypeName: actualTypeName)
             });
         }
 
