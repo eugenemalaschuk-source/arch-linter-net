@@ -2,7 +2,7 @@ using ArchLinterNet.Cli.Abstractions;
 
 namespace ArchLinterNet.Cli.Commands.Graph;
 
-internal sealed class GraphCommandModule : ICliSubcommandModule
+internal sealed class GraphCommandModule : ITopLevelCliSubcommandModule
 {
     public string CommandName => "graph";
 

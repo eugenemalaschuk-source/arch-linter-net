@@ -2,7 +2,7 @@ using ArchLinterNet.Cli.Abstractions;
 
 namespace ArchLinterNet.Cli.Commands.Explain;
 
-internal sealed class ExplainCommandModule : ICliSubcommandModule
+internal sealed class ExplainCommandModule : ITopLevelCliSubcommandModule
 {
     public string CommandName => "explain";
 

@@ -10,9 +10,9 @@ internal sealed class CliCompositionRoot
         IFileSystem fileSystem = new FileSystem();
         ICliRuntime runtime = new CliRuntime();
 
-        IRootCliCommandModule rootCommandModule = CliCommandModuleCatalog.CreateRootModule(runtime, console, fileSystem);
-        IReadOnlyList<ICliSubcommandModule> subcommandModules =
-            CliCommandModuleCatalog.CreateSubcommandModules(runtime, console, fileSystem);
+        IRootCliCommandModule rootCommandModule = CliCommandModuleCatalog.CreateRootModule();
+        IReadOnlyList<ITopLevelCliSubcommandModule> subcommandModules =
+            CliCommandModuleCatalog.CreateSubcommandModules();
 
         ICliRootCommandFactory rootCommandFactory = new CliRootCommandFactory(
             rootCommandModule,
@@ -41,4 +41,4 @@ internal sealed record CliComposition(
     ICliRootCommandFactory RootCommandFactory,
     ICliRuntime Runtime,
     IRootCliCommandModule RootCommandModule,
-    IReadOnlyList<ICliSubcommandModule> SubcommandModules);
+    IReadOnlyList<ITopLevelCliSubcommandModule> SubcommandModules);

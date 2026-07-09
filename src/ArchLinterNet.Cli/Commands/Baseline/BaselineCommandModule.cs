@@ -3,13 +3,13 @@ using ArchLinterNet.Cli.Abstractions;
 
 namespace ArchLinterNet.Cli.Commands.Baseline;
 
-internal sealed class BaselineCommandModule : ICliSubcommandModule
+internal sealed class BaselineCommandModule : ITopLevelCliSubcommandModule
 {
     public string CommandName => "baseline";
 
     public Command CreateCommand(ICliRuntime runtime, ICliConsole console, IFileSystem fileSystem)
     {
-        IReadOnlyList<IBaselineSubcommandModule> subcommandModules = BaselineSubcommandCatalog.CreateModules(runtime, console, fileSystem);
+        IReadOnlyList<IBaselineSubcommandModule> subcommandModules = BaselineSubcommandCatalog.CreateModules();
         IDefaultBaselineSubcommandModule defaultModule = subcommandModules.OfType<IDefaultBaselineSubcommandModule>().Single();
         Command baselineCommand = defaultModule.CreateDefaultCommand("baseline", runtime, console, fileSystem);
 

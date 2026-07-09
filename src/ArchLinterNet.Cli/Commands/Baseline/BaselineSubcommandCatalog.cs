@@ -5,10 +5,7 @@ namespace ArchLinterNet.Cli.Commands.Baseline;
 
 internal static class BaselineSubcommandCatalog
 {
-    public static IReadOnlyList<IBaselineSubcommandModule> CreateModules(
-        ICliRuntime runtime,
-        ICliConsole console,
-        IFileSystem fileSystem)
+    public static IReadOnlyList<IBaselineSubcommandModule> CreateModules()
     {
         return Assembly.GetExecutingAssembly()
             .GetTypes()

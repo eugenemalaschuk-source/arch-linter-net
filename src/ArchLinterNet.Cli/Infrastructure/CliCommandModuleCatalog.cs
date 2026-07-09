@@ -5,19 +5,16 @@ namespace ArchLinterNet.Cli.Infrastructure;
 
 internal static class CliCommandModuleCatalog
 {
-    public static IRootCliCommandModule CreateRootModule(ICliRuntime runtime, ICliConsole console, IFileSystem fileSystem)
+    public static IRootCliCommandModule CreateRootModule()
     {
         Type moduleType = GetModuleTypes<IRootCliCommandModule>().Single();
         return CreateModule<IRootCliCommandModule>(moduleType);
     }
 
-    public static IReadOnlyList<ICliSubcommandModule> CreateSubcommandModules(
-        ICliRuntime runtime,
-        ICliConsole console,
-        IFileSystem fileSystem)
+    public static IReadOnlyList<ITopLevelCliSubcommandModule> CreateSubcommandModules()
     {
-        return GetModuleTypes<ICliSubcommandModule>()
-            .Select(CreateModule<ICliSubcommandModule>)
+        return GetModuleTypes<ITopLevelCliSubcommandModule>()
+            .Select(CreateModule<ITopLevelCliSubcommandModule>)
             .ToArray();
     }
 

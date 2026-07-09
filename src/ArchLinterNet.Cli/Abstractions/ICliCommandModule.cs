@@ -13,3 +13,7 @@ internal interface ICliSubcommandModule
 
     Command CreateCommand(ICliRuntime runtime, ICliConsole console, IFileSystem fileSystem);
 }
+
+internal interface ITopLevelCliSubcommandModule : ICliSubcommandModule
+{
+}
