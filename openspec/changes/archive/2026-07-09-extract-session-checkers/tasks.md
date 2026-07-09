@@ -27,6 +27,6 @@
 
 ## 6. Validation
 
-- [ ] 6.1 Run `make fmt`.
-- [ ] 6.2 Run `make acceptance` and confirm it is green.
-- [ ] 6.3 Run `openspec archive extract-session-checkers` and `openspec validate --all`.
+- [x] 6.1 Run `make fmt`.
+- [x] 6.2 Run `make acceptance` and confirm it is green.
+- [x] 6.3 Run `openspec archive extract-session-checkers` and `openspec validate --all`.

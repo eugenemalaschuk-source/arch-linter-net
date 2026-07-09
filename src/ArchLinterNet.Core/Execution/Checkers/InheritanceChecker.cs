@@ -1,5 +1,4 @@
 using ArchLinterNet.Core.Contracts;
-using ArchLinterNet.Core.Execution;
 using ArchLinterNet.Core.Model;
 using ArchLinterNet.Core.Resolution;
 using ArchLinterNet.Core.Scanning;
