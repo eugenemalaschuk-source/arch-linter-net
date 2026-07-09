@@ -15,9 +15,5 @@ public sealed record ArchitectureHandlerResult(
         new(Array.Empty<ArchitectureViolation>(), cycles);
 }
 
-public interface IArchitectureContractHandler
-{
-    string Family { get; }
-
-    ArchitectureHandlerResult Execute(ArchitectureAnalysisSession session, IArchitectureContract contract);
-}
+public delegate ArchitectureHandlerResult ArchitectureContractChecker(
+    ArchitectureAnalysisSession session, IArchitectureContract contract);

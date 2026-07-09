@@ -140,10 +140,7 @@ public sealed class ProjectMetadataContractTests
             preprocessorSymbols: null);
 
         var executor = new ArchitectureContractExecutor();
-        var registry = new ArchitectureContractHandlerRegistry(new IArchitectureContractHandler[]
-        {
-            new ProjectMetadataContractHandler()
-        });
+        var registry = new ArchitectureContractHandlerRegistry();
 
         ArchitectureContractExecutionResult strictResult = executor.Execute(strictSession, "strict", registry);
         ArchitectureContractExecutionResult auditResult = executor.Execute(auditSession, "audit", registry);
