@@ -155,7 +155,7 @@ The following currently-static, I/O-touching classes become instance services be
 | Environment variable access | scattered `Environment.GetEnvironmentVariable` calls | `IEnvironment` |
 | Clock/time access (stale-output checks) | `DateTime.UtcNow`/`DateTime.Now` calls | `IClock` |
 
-These seams are consumed by `Discovery`, `Resolution`, and `Scanning` services (and, narrowly, by the Unity `IAsmdefValidationService`) — not by `Execution` handlers directly, preserving the dependency direction above.
+These seams are consumed by `Discovery`, `Resolution`, and `Scanning` services (and, narrowly, by Core's own `Asmdef.AsmdefValidationService`, which serves the Unity host through `IAsmdefValidationService`) — not by `Execution` handlers directly, preserving the dependency direction above.
 
 ## Static helper vs. static-service rule
 
@@ -191,7 +191,8 @@ Current inventory:
 | `IArchitectureProjectDiscoveryService` | Replaceable infrastructure seam | `ArchLinterNet.Core.Discovery.Abstractions` |
 | `IArchitectureRepositoryRootResolver` | Replaceable infrastructure seam | `ArchLinterNet.Core.Resolution.Abstractions` |
 | `IArchitectureFileSystem`, `IArchitectureEnvironment`, `IArchitectureAssemblyLoader`, `IRoslynCompilationFactory` | Replaceable infrastructure seam | `ArchLinterNet.Core.IO` — namespace unchanged (documented equivalent to `.Abstractions`), but files live under `IO/Abstractions/` for folder-layout consistency with the other modules. This is the one place folder path and namespace intentionally diverge. |
-| `IArchitectureAssemblyResolutionService`, `IArchitectureDiagnosticFormatter`, `IArchitectureSolutionParser`, `IArchitectureProjectFileParser`, `IArchitectureAsmdefScanner`, `IArchitectureSourceScanner`, `IArchitectureExternalDependencyIlScanner`, `IArchitectureIlMethodBodyScanner` | Internal feature seam | stays with its feature (`Execution`, `Reporting`, `Discovery`, `Scanning`) — consumed only from its own module plus `Composition` |
+| `IArchitectureAsmdefScanner` | Replaceable infrastructure seam | `ArchLinterNet.Core.Scanning.Abstractions` — moved by #201 once `Asmdef.AsmdefValidationService` started consuming it, crossing the `Scanning` → `Asmdef` module boundary; it was an internal feature seam at the time of the 2026-07-03 audit above. |
+| `IArchitectureAssemblyResolutionService`, `IArchitectureDiagnosticFormatter`, `IArchitectureSarifFormatter`, `IArchitectureSolutionParser`, `IArchitectureProjectFileParser`, `IArchitectureSourceScanner`, `IArchitectureExternalDependencyIlScanner`, `IArchitectureIlMethodBodyScanner` | Internal feature seam | stays with its feature (`Execution`, `Reporting`, `Discovery`, `Scanning`) — consumed only from its own module plus `Composition`. Re-audited by #201: all of `Reporting`'s and the rest of `Scanning`'s interfaces were re-checked against the classification rule above and confirmed to still be consumed only within their own module, so none of them moved. |
 | `IArchitectureContract` | Data/model marker interface | stays in `Contracts` with the other contract models |
 
 ### Accepted exception: `Execution.Abstractions` referencing `ArchitectureAnalysisSession`
