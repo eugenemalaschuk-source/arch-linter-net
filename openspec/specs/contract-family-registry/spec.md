@@ -37,8 +37,8 @@ Defines, per architecture contract family, its YAML group names, dispatch order,
 - **WHEN** `ArchitectureContractCatalog.ResolveGroup` is called with an `ArchitectureAsmdefContract` instance from the catalog's source document
 - **THEN** it SHALL return `null`, matching current behavior
 
-### Requirement: Descriptor exposes an inert extension surface for future family decomposition
-`ArchitectureContractFamilyDescriptor` SHALL expose an `OwnedContractTypes` property (`IReadOnlyList<Type>`) and an `AdditionalValidation` property (`Action<ArchitectureContractDocument>?`, defaulting to `null`), both still inert and unread by `ArchitectureContractCatalog.Build` or any other production code path. `ArchitectureContractFamilyDescriptor` SHALL additionally expose a `Checker` property of type `ArchitectureContractChecker` (a delegate taking an `ArchitectureAnalysisSession` and an `IArchitectureContract`, returning an `ArchitectureHandlerResult`). Unlike `OwnedContractTypes` and `AdditionalValidation`, `Checker` is not inert: `ArchitectureContractHandlerRegistry` reads and invokes it for every family during contract execution.
+### Requirement: Descriptor owns its family's checker and exposes an inert extension surface for future family decomposition
+`ArchitectureContractFamilyDescriptor` SHALL expose a `Checker` property of type `ArchitectureContractChecker` (a delegate taking an `ArchitectureAnalysisSession` and an `IArchitectureContract`, returning an `ArchitectureHandlerResult`); `ArchitectureContractHandlerRegistry` SHALL read and invoke it for every family during contract execution. `ArchitectureContractFamilyDescriptor` SHALL additionally expose an `OwnedContractTypes` property (`IReadOnlyList<Type>`) and an `AdditionalValidation` property (`Action<ArchitectureContractDocument>?`, defaulting to `null`); unlike `Checker`, both of these remain inert and unread by `ArchitectureContractCatalog.Build` or any other production code path.
 
 #### Scenario: AdditionalValidation is never invoked
 - **WHEN** `ArchitectureContractCatalog.Build` processes any document, including one containing contracts for every family
