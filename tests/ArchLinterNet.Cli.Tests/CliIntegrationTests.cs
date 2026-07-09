@@ -72,7 +72,7 @@ public partial class CliIntegrationTests
         var startInfo = new ProcessStartInfo
         {
             FileName = "dotnet",
-            Arguments = $"run --project \"{_cliProjectPath}\" -- {joinedArgs}",
+            Arguments = $"run --no-build --project \"{_cliProjectPath}\" -- {joinedArgs}",
             RedirectStandardOutput = true,
             RedirectStandardError = true,
             UseShellExecute = false,
