@@ -3,7 +3,7 @@ using ArchLinterNet.Core.Contracts;
 using ArchLinterNet.Core.Contracts.Abstractions;
 using ArchLinterNet.Core.Model;
 using ArchLinterNet.Core.Resolution.Abstractions;
-using ArchLinterNet.Core.Scanning;
+using ArchLinterNet.Core.Scanning.Abstractions;
 
 namespace ArchLinterNet.Core.Asmdef;
 

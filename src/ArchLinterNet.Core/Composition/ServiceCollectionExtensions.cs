@@ -13,6 +13,7 @@ using ArchLinterNet.Core.Reporting;
 using ArchLinterNet.Core.Resolution;
 using ArchLinterNet.Core.Resolution.Abstractions;
 using ArchLinterNet.Core.Scanning;
+using ArchLinterNet.Core.Scanning.Abstractions;
 using ArchLinterNet.Core.Validation;
 using ArchLinterNet.Core.Validation.Abstractions;
 using Microsoft.Extensions.DependencyInjection;

@@ -2,19 +2,9 @@ using System.Text.Json;
 using ArchLinterNet.Core.Contracts;
 using ArchLinterNet.Core.IO;
 using ArchLinterNet.Core.Model;
+using ArchLinterNet.Core.Scanning.Abstractions;
 
 namespace ArchLinterNet.Core.Scanning;
-
-public interface IArchitectureAsmdefScanner
-{
-    IEnumerable<ArchitectureViolation> FindAsmdefViolations(
-        string contractName,
-        string? contractId,
-        string repositoryRoot,
-        ArchitectureAsmdefContract contract,
-        string? asmdefRoot = null,
-        IArchitectureFileSystem? fileSystem = null);
-}
 
 public sealed class ArchitectureAsmdefScanner : IArchitectureAsmdefScanner
 {
