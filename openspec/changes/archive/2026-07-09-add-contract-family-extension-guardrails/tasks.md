@@ -8,12 +8,13 @@
 
 - [x] 2.1 Add a "Guardrail candidate for #215" paragraph to `docs/internal/core-architecture-blueprint.md`, alongside the existing #142 paragraph, naming: central catalog/binding branch growth (`ArchitectureContractFamilyRegistry`/`ArchitectureContractFamilyBindings`), god-session regression (`ArchitectureAnalysisSession`), diagnostic-mapper dispatch regrowth (`ArchitectureDiagnosticMapper.FromViolation`), and YAML DTO regrowth (`ArchitectureContractModels`/`ArchitectureContractGroups`)
 - [x] 2.2 Confirm no other docs cross-reference needs updating for the two new contract IDs (`docs/policy-format`/`docs/contracts` describe generic contract shape, not this repo's specific rule set) — confirmed, no update needed
+- [x] 2.3 (Follow-up, added after archiving in response to PR review) Add a fifth guardrail to the same "Guardrail candidate for #215" paragraph and to `openspec/specs/self-architecture-policy/spec.md`: checkers/validators/contributors must depend only on abstractions/context, not on a CLI/reporting adapter — documented as code-review-governed (not a YAML rule) because `core_execution` already legitimately depends on `core_reporting` for seam-signature data (`IArchitectureRunnerSetupService.BuildRunner`'s `ValidationTiming` parameter), so a blanket dependency rule would break that valid dependency. The paragraph and requirement now cover five guardrails total (four structural-growth patterns plus this one dependency-direction guardrail), not four.
 
 ## 3. Validation
 
 - [x] 3.1 Run `make fmt`
 - [x] 3.2 Run `make acceptance` (lint + full test suite) and confirm the repository's own policy still passes in strict mode with the two new rules and extended coverage list — exit 0, 952 Core + 112 Cli + 3 Unity tests passed, including `SelfArchitecturePolicyTests.RepositoryPolicy_ValidatesOwnInternalBoundaries`
-- [x] 3.3 Confirm `openspec validate --all` passes after spec sync — 79/79 passed
+- [x] 3.3 Confirm `openspec validate --all` passes after spec sync — 79/79 passed at archive time (78 specs + this change, still active); 78/78 specs-only once this change moved to `archive/` and stopped counting as a separate change item
 
 ## 4. Spec sync and archive
 
