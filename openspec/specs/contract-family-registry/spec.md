@@ -2,9 +2,7 @@
 
 ## Purpose
 Defines, per architecture contract family, its YAML group names, dispatch order, baseline capability, and contract accessors as an ordered descriptor registry — the extension point `ArchitectureContractCatalog` builds from instead of hand-written per-family wiring.
-
 ## Requirements
-
 ### Requirement: Contract family catalog metadata is defined by an ordered descriptor registry
 `ArchLinterNet.Core.Execution.ArchitectureContractFamilyRegistry` SHALL expose an ordered `IReadOnlyList<ArchitectureContractFamilyDescriptor>` (`All`) containing exactly one descriptor per contract family known to `ArchitectureContractCatalog`. Each descriptor SHALL carry: a family id, the strict YAML group name, the audit YAML group name, a baseline-capability flag, an accessor that extracts that family's strict contracts from an `ArchitectureContractGroups` instance, an accessor that extracts its audit contracts, and an informational list of the CLR types the family owns.
 
@@ -39,9 +37,18 @@ Defines, per architecture contract family, its YAML group names, dispatch order,
 - **WHEN** `ArchitectureContractCatalog.ResolveGroup` is called with an `ArchitectureAsmdefContract` instance from the catalog's source document
 - **THEN** it SHALL return `null`, matching current behavior
 
-### Requirement: Descriptor exposes an inert extension surface for future family decomposition
-`ArchitectureContractFamilyDescriptor` SHALL expose an `OwnedContractTypes` property (`IReadOnlyList<Type>`) and an `AdditionalValidation` property (`Action<ArchitectureContractDocument>?`, defaulting to `null`). Neither property SHALL be read by `ArchitectureContractCatalog.Build` or any other production code path in this change.
+### Requirement: Descriptor owns its family's checker and exposes an inert extension surface for future family decomposition
+`ArchitectureContractFamilyDescriptor` SHALL expose a `Checker` property of type `ArchitectureContractChecker` (a delegate taking an `ArchitectureAnalysisSession` and an `IArchitectureContract`, returning an `ArchitectureHandlerResult`); `ArchitectureContractHandlerRegistry` SHALL read and invoke it for every family during contract execution. `ArchitectureContractFamilyDescriptor` SHALL additionally expose an `OwnedContractTypes` property (`IReadOnlyList<Type>`) and an `AdditionalValidation` property (`Action<ArchitectureContractDocument>?`, defaulting to `null`); unlike `Checker`, both of these remain inert and unread by `ArchitectureContractCatalog.Build` or any other production code path.
 
 #### Scenario: AdditionalValidation is never invoked
 - **WHEN** `ArchitectureContractCatalog.Build` processes any document, including one containing contracts for every family
 - **THEN** no descriptor's `AdditionalValidation` delegate SHALL be invoked, and `ArchitecturePolicyDocumentLoader.Load`'s existing validation sequence SHALL be unchanged
+
+#### Scenario: Every descriptor has a non-null Checker
+- **WHEN** `ArchitectureContractFamilyRegistry.All` is enumerated
+- **THEN** every descriptor's `Checker` property SHALL be non-null
+
+#### Scenario: Checker is invoked during contract execution
+- **WHEN** `ArchitectureContractHandlerRegistry.Execute(family, session, contract)` is called for a family present in `ArchitectureContractFamilyRegistry.All`
+- **THEN** that family's descriptor's `Checker` delegate SHALL be invoked with the given `session` and `contract`, and its return value SHALL be returned unchanged
+

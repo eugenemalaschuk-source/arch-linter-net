@@ -64,6 +64,16 @@ public sealed class ArchitectureContractFamilyRegistryTests
     }
 
     [Test]
+    public void All_EveryDescriptorHasANonNullChecker()
+    {
+        foreach (ArchitectureContractFamilyDescriptor descriptor in ArchitectureContractFamilyRegistry.All)
+        {
+            Assert.That(descriptor.Checker, Is.Not.Null,
+                $"Family '{descriptor.FamilyId}' must expose a live Checker delegate.");
+        }
+    }
+
+    [Test]
     public void LayerTemplateDescriptor_AccessorsExpandTemplatesLikeCatalogDoes()
     {
         ArchitectureContractFamilyDescriptor descriptor = ArchitectureContractFamilyRegistry.All

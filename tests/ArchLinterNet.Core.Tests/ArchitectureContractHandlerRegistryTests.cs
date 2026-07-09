@@ -43,25 +43,7 @@ public sealed class ArchitectureContractHandlerRegistryTests
 
     private static ArchitectureContractHandlerRegistry CreateRegistry()
     {
-        return new ArchitectureContractHandlerRegistry(new IArchitectureContractHandler[]
-        {
-            new DependencyContractHandler(),
-            new LayerContractHandler(),
-            new AllowOnlyContractHandler(),
-            new CycleContractHandler(),
-            new AcyclicSiblingContractHandler(),
-            new MethodBodyContractHandler(),
-            new AsmdefContractHandler(),
-            new IndependenceContractHandler(),
-            new AssemblyIndependenceContractHandler(),
-            new AssemblyDependencyContractHandler(),
-            new AssemblyAllowOnlyContractHandler(),
-            new PackageDependencyContractHandler(),
-            new PackageAllowOnlyContractHandler(),
-            new ProtectedContractHandler(),
-            new ExternalContractHandler(),
-            new CoverageContractHandler(),
-        });
+        return new ArchitectureContractHandlerRegistry();
     }
 
     private static IReadOnlyList<object> Project(IEnumerable<ArchitectureViolation> violations)

@@ -12,12 +12,11 @@ Core already has the right directory shape (`Contracts/`, `Discovery/`, `Executi
 
 - `ArchitectureValidator` is already a thin compatibility facade that delegates to `Validation.ArchitectureValidationService`.
 - `ArchitectureAnalysisSession`/`ArchitectureAnalysisContext` already separate per-run state (`TypeIndex`, `ReferenceGraph`, coverage inventory cache) from a runner.
-- `IArchitectureContractHandler` already exists and is used for 4 of ~11 contract families (dependency, layer, cycle, coverage).
+- Every contract family executes through a checker resolved from `ArchitectureContractFamilyRegistry.All` (see [Handler/checker extension model](#handlerchecker-extension-model)); there is no remaining family invoked as a direct `runner.CheckXxx()` call inline in `ArchitectureContractExecutor` (#211).
 
 What is not yet healthy:
 
 - `ArchitectureContractRunner` is a 2,428-line `sealed partial class` split across four files (`ArchitectureContractRunner.cs`, `.Checking.cs`, `.Coverage.cs`, `.PolicyConsistency.cs`). It owns per-run state *and* the checking logic for nearly every contract family — the "god object" this refactor must shrink.
-- Contract execution is inconsistent: dependency/layer/cycle/coverage go through `IArchitectureContractHandler`; allow_only, method_body, asmdef, independence, protected, external, and acyclic_sibling are invoked as direct `runner.CheckXxx()` calls inline in the static `ArchitectureContractExecutor`.
 - Most orchestration classes (`ArchitectureRunnerFactory`, `ArchitectureContractExecutor`, `ArchitectureValidationService`, `ArchitectureBaselineService`) are static, and several I/O-touching classes (`ArchitectureRepositoryRootLocator`, `ArchitectureProjectDiscovery`/`ArchitectureSolutionParser`/`ArchitectureProjectFileParser`, `ArchitectureAssemblyResolver`, the `Scanning/` classes) are static too, so none of them can be substituted with fakes in tests.
 - `ArchLinterNet.Unity.AsmdefValidator` bypasses the application seam entirely (see [Unity-facing adapter seam](#unity-facing-adapter-seam)).
 
@@ -29,7 +28,9 @@ Adapters (Cli, public API, Testing, Unity)
                    IAsmdefValidationService; ArchitectureValidator/
                    ArchitectureBaselineService stay as compatibility facades)
       -> Execution (ArchitectureEngine/EngineBuilder, per-run session/context,
-                     IArchitectureContractHandler registry and handlers)
+                     ArchitectureContractFamilyRegistry descriptors and their
+                     Checker delegates, resolved through
+                     ArchitectureContractHandlerRegistry)
           -> Discovery, Resolution, Scanning
               -> Infrastructure seams (file system, YAML file loading, source
                                          discovery, Roslyn, assembly loading,
@@ -92,23 +93,21 @@ Rules:
 
 ## Handler/checker extension model
 
-Every contract family executes through an `IArchitectureContractHandler` (or a documented modular equivalent). This generalizes the pattern already used for dependency/layer/cycle/coverage to allow_only, method_body, asmdef, independence, protected, external, and acyclic_sibling, so #137 can remove the remaining direct `runner.CheckXxx()` calls from `ArchitectureContractExecutor`.
+Every contract family executes through an `ArchitectureContractChecker` delegate (`ArchLinterNet.Core.Execution.Abstractions`) owned by that family's `ArchitectureContractFamilyDescriptor.Checker` — not a per-family `IArchitectureContractHandler` implementation class. This superseded the earlier handler-class-per-family model (#211): dependency, layer, cycle, coverage, allow_only, method_body, asmdef, independence, protected, external, acyclic_sibling, and every other family all resolve their checker the same way, from the same descriptor list.
 
-The handler registry is **DI-populated**, not a static `CreateDefault()` factory:
+`ArchitectureContractHandlerRegistry` is **descriptor-populated**, not DI-populated and not a static `CreateDefault()` factory:
 
-- Each family handler is registered explicitly: `services.AddSingleton<IArchitectureContractHandler, DependencyContractHandler>()`, one registration per family.
-- The registry (if one is retained as a convenience lookup) is an instance service built from `IEnumerable<IArchitectureContractHandler>` at composition time, keyed by `Family`.
-- Neither the registry nor any handler depends on `IServiceProvider`.
+- It has a parameterless constructor: it builds its family-keyed lookup by iterating `ArchitectureContractFamilyRegistry.All` (`src/ArchLinterNet.Core/Execution/ArchitectureContractFamilyRegistry.cs`) and reading each descriptor's `Checker`.
+- There is no per-family DI registration (`services.AddSingleton<...>()`) — the composition root registers `ArchitectureContractHandlerRegistry` itself as a single singleton, with no constructor arguments.
+- Neither the registry nor any `Checker` delegate depends on `IServiceProvider`.
 
 Adding a new contract family requires:
 
 1. Adding the contract schema/model under `Contracts/`.
-1. Adding an `IArchitectureContractHandler` implementation for the family.
-1. Registering it with the composition root (`services.AddSingleton<IArchitectureContractHandler, NewFamilyHandler>()`).
-1. Adding one descriptor to `ArchitectureContractFamilyRegistry.All` (`src/ArchLinterNet.Core/Execution/ArchitectureContractFamilyRegistry.cs`) so the family is selectable by mode.
+1. Adding one descriptor to `ArchitectureContractFamilyRegistry.All` (`src/ArchLinterNet.Core/Execution/ArchitectureContractFamilyRegistry.cs`) carrying that family's catalog metadata (YAML group names, baseline capability, strict/audit accessors) *and* its `Checker` delegate (typically a one-line lambda that casts the contract and calls the matching `ArchitectureAnalysisSession.CheckXxxContract` method).
 1. If the family's YAML configuration needs load-time validation (beyond schema deserialization), adding an `IArchitecturePolicyDocumentValidator` implementation under `Contracts/Validators/` and registering it in `ArchitecturePolicyDocumentValidatorPipeline.All` (`src/ArchLinterNet.Core/Contracts/Validators/ArchitecturePolicyDocumentValidatorPipeline.cs`) — see [Policy document validation pipeline](#policy-document-validation-pipeline) below.
 
-No step requires editing a central god executor or a static default-handler list. In particular, `ArchitectureContractCatalog.cs` should not need edits for a new family — it builds its descriptors and family order generically from `ArchitectureContractFamilyRegistry.All` (see the `contract-family-registry` OpenSpec capability); only a rare cross-family ordering policy change would touch that file directly. This is the concrete acceptance signal for #137 and the post-coverage expansion story (#104).
+No step requires editing a central god executor, adding a new handler class, or adding a composition-root registration line. In particular, `ArchitectureContractCatalog.cs` should not need edits for a new family — it builds its descriptors and family order generically from `ArchitectureContractFamilyRegistry.All` (see the `contract-family-registry` OpenSpec capability); only a rare cross-family ordering policy change would touch that file directly. This is the concrete acceptance signal for #137, #211, and the post-coverage expansion story (#104).
 
 ## Policy document validation pipeline
 
@@ -173,7 +172,7 @@ These seams are consumed by `Discovery`, `Resolution`, and `Scanning` services (
 - `ArchitectureRunnerFactory`, `ArchitectureContractExecutor`, `ArchitectureValidationService`, `ArchitectureBaselineService` (become composed instance services; existing static methods become compatibility facades only).
 - `ArchitectureRepositoryRootLocator`, `ArchitectureProjectDiscovery`/`ArchitectureSolutionParser`/`ArchitectureProjectFileParser`, `ArchitectureAssemblyResolver`.
 - `ArchitectureSourceScanner`, `ArchitectureIlMethodBodyScanner`, `ArchitectureAsmdefScanner`, `ArchitectureReferenceScanner`.
-- The `ArchitectureContractHandlerRegistry.CreateDefault()` static factory (becomes DI-populated; see [Handler/checker extension model](#handlerchecker-extension-model)).
+- The `ArchitectureContractHandlerRegistry.CreateDefault()` static factory (superseded — the registry now has a parameterless constructor that reads `ArchitectureContractFamilyRegistry.All`; see [Handler/checker extension model](#handlerchecker-extension-model)).
 
 ## Core interface namespace convention
 
@@ -184,7 +183,7 @@ Current inventory:
 | Interface | Category | Namespace |
 |---|---|---|
 | `IArchitectureValidationApplicationService`, `IArchitectureBaselineApplicationService` | Public/application seam | `ArchLinterNet.Core.Validation.Abstractions` |
-| `IArchitectureContractHandler` (+ `ArchitectureHandlerResult`) | Extension/plugin contract | `ArchLinterNet.Core.Execution.Abstractions` |
+| `ArchitectureContractChecker` delegate (+ `ArchitectureHandlerResult`) | Extension/plugin contract | `ArchLinterNet.Core.Execution.Abstractions` |
 | `IArchitectureContractExecutor` (+ `ArchitectureContractExecutionResult`), `IArchitectureRunnerSetupService` (+ `ArchitectureRunnerSetup`) | Public/application seam | `ArchLinterNet.Core.Execution.Abstractions` |
 | `IArchitectureContractHandlerRegistry`, `IArchitectureContractRunner` | Public/application seam (extracted from `ArchitectureContractHandlerRegistry`/`ArchitectureContractRunner` so the seam interfaces above don't take a concrete Execution type as a parameter or payload) | `ArchLinterNet.Core.Execution.Abstractions` |
 | `IArchitecturePolicyDocumentLoader`, `IArchitectureBaselineLoadingService`, `IArchitectureBaselineGenerator`, `IConditionSetResolutionService` | Replaceable infrastructure seam | `ArchLinterNet.Core.Contracts.Abstractions` |
@@ -197,7 +196,7 @@ Current inventory:
 
 ### Accepted exception: `Execution.Abstractions` referencing `ArchitectureAnalysisSession`
 
-`IArchitectureContractHandler.Execute`, `IArchitectureContractExecutor.Execute`, and `IArchitectureContractHandlerRegistry.Execute` all take `ArchLinterNet.Core.Execution.ArchitectureAnalysisSession` as a parameter, and `IArchitectureContractRunner.Session` exposes it as a property getter — every one of these is a reference from `Execution.Abstractions` to that same concrete, behavior-owning class, which stays in `Execution`, not `Execution.Abstractions`. This is a deliberate, reviewed exception rather than an oversight: `ArchitectureAnalysisSession` is the per-run session/context object every contract-family handler and orchestrator is handed by design (see [Session/state ownership](#sessionstate-ownership)); it is also the active target of the god-object shrink tracked by #137/#138. Introducing a full `IArchitectureAnalysisSession` seam now — mirroring a ~2,500-line class still being decomposed elsewhere — would be a speculative abstraction this refactor's own non-goals rule out ("creating interfaces for every class", "moving all interfaces blindly"). `ArchitectureContractHandlerRegistry` and `ArchitectureContractRunner` did get extracted (above) because both were small, stable, already-thin facades where the extraction was cheap; `ArchitectureAnalysisSession` is neither. Revisit this exception if/when #137/#138 finish shrinking the session type.
+The `ArchitectureContractChecker` delegate, `IArchitectureContractExecutor.Execute`, and `IArchitectureContractHandlerRegistry.Execute` all take `ArchLinterNet.Core.Execution.ArchitectureAnalysisSession` as a parameter, and `IArchitectureContractRunner.Session` exposes it as a property getter — every one of these is a reference from `Execution.Abstractions` to that same concrete, behavior-owning class, which stays in `Execution`, not `Execution.Abstractions`. This is a deliberate, reviewed exception rather than an oversight: `ArchitectureAnalysisSession` is the per-run session/context object every contract-family checker and orchestrator is handed by design (see [Session/state ownership](#sessionstate-ownership)); it is also the active target of the god-object shrink tracked by #137/#138. Introducing a full `IArchitectureAnalysisSession` seam now — mirroring a ~2,500-line class still being decomposed elsewhere — would be a speculative abstraction this refactor's own non-goals rule out ("creating interfaces for every class", "moving all interfaces blindly"). `ArchitectureContractHandlerRegistry` and `ArchitectureContractRunner` did get extracted (above) because both were small, stable, already-thin facades where the extraction was cheap; `ArchitectureAnalysisSession` is neither. Revisit this exception if/when #137/#138 finish shrinking the session type.
 
 Self-policy guardrail candidate for [#142](https://github.com/eugenemalaschuk-source/arch-linter-net/issues/142): forbid any `*.Abstractions` namespace from depending on its sibling implementation namespace, with one precise, named exception — `ArchLinterNet.Core.Execution.Abstractions` referencing `ArchLinterNet.Core.Execution.ArchitectureAnalysisSession` (as a parameter or property type) is allowed; no other `Execution` type, and no reference from any other `*.Abstractions` namespace to its sibling, is exempted. Also forbid introducing any `ArchLinterNet.Core.Interfaces` namespace.
 

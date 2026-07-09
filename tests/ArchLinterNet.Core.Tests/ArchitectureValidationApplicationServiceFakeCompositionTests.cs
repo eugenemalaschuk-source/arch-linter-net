@@ -91,9 +91,9 @@ public sealed class ArchitectureValidationApplicationServiceFakeCompositionTests
 
     private sealed class FakeContractHandlerRegistry : IArchitectureContractHandlerRegistry
     {
-        public bool TryGetHandler(string family, out IArchitectureContractHandler? handler)
+        public bool TryGetHandler(string family, out ArchitectureContractChecker? checker)
         {
-            handler = null;
+            checker = null;
             return false;
         }
 
