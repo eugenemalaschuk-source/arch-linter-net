@@ -25,6 +25,12 @@ internal static class ArchitectureContractFamilyRegistry
                 session.CheckContract((ArchitectureDependencyContract)contract)))
         {
             OwnedContractTypes = new[] { typeof(ArchitectureDependencyContract) },
+            ConfigurationContributor = (session, collector, contract) =>
+            {
+                var c = (ArchitectureDependencyContract)contract;
+                collector.AddLayerNames(c.Id, new[] { c.Source });
+                collector.AddLayerNames(c.Id, c.Forbidden);
+            },
         },
         new(
             "layer", "strict_layers", "audit_layers", true,
@@ -32,6 +38,11 @@ internal static class ArchitectureContractFamilyRegistry
             CheckLayerContract)
         {
             OwnedContractTypes = new[] { typeof(ArchitectureLayerContract) },
+            ConfigurationContributor = (session, collector, contract) =>
+            {
+                var c = (ArchitectureLayerContract)contract;
+                collector.AddLayerNames(c.Id, c.Layers);
+            },
         },
         new(
             "layer_template", "strict_layer_templates", "audit_layer_templates", false,
@@ -48,6 +59,12 @@ internal static class ArchitectureContractFamilyRegistry
                 session.CheckAllowOnlyContract((ArchitectureAllowOnlyContract)contract)))
         {
             OwnedContractTypes = new[] { typeof(ArchitectureAllowOnlyContract) },
+            ConfigurationContributor = (session, collector, contract) =>
+            {
+                var c = (ArchitectureAllowOnlyContract)contract;
+                collector.AddLayerNames(c.Id, new[] { c.Source });
+                collector.AddLayerNames(c.Id, c.Allowed);
+            },
         },
         new(
             "cycle", "strict_cycles", "audit_cycles", true,
@@ -61,6 +78,11 @@ internal static class ArchitectureContractFamilyRegistry
             })
         {
             OwnedContractTypes = new[] { typeof(ArchitectureCycleContract) },
+            ConfigurationContributor = (session, collector, contract) =>
+            {
+                var c = (ArchitectureCycleContract)contract;
+                collector.AddLayerNames(c.Id, c.Layers);
+            },
         },
         new(
             "method_body", "strict_method_body", "audit_method_body", true,
@@ -69,6 +91,11 @@ internal static class ArchitectureContractFamilyRegistry
                 session.CheckMethodBodyContract((ArchitectureMethodBodyContract)contract)))
         {
             OwnedContractTypes = new[] { typeof(ArchitectureMethodBodyContract) },
+            ConfigurationContributor = (session, collector, contract) =>
+            {
+                var c = (ArchitectureMethodBodyContract)contract;
+                collector.AddLayerNames(c.Id, new[] { c.Source });
+            },
         },
         new(
             "asmdef", "strict_asmdef", "audit_asmdef", false,
@@ -85,6 +112,11 @@ internal static class ArchitectureContractFamilyRegistry
                 session.CheckIndependenceContract((ArchitectureIndependenceContract)contract)))
         {
             OwnedContractTypes = new[] { typeof(ArchitectureIndependenceContract) },
+            ConfigurationContributor = (session, collector, contract) =>
+            {
+                var c = (ArchitectureIndependenceContract)contract;
+                collector.AddLayerNames(c.Id, c.Layers);
+            },
         },
         new(
             "assembly_independence", "strict_assembly_independence", "audit_assembly_independence", true,
@@ -117,6 +149,17 @@ internal static class ArchitectureContractFamilyRegistry
                 session.CheckPackageDependencyContract((ArchitecturePackageDependencyContract)contract)))
         {
             OwnedContractTypes = new[] { typeof(ArchitecturePackageDependencyContract) },
+            ConfigurationContributor = (session, collector, contract) =>
+            {
+                var c = (ArchitecturePackageDependencyContract)contract;
+                if (!session.IsContractSelected(c.Id))
+                {
+                    return;
+                }
+
+                collector.AddPackageGroupNames(c.Forbidden);
+                collector.AddPackageContractSource(c.Name, c.Id, c.Source);
+            },
         },
         new(
             "package_allow_only", "strict_package_allow_only", "audit_package_allow_only", true,
@@ -125,6 +168,17 @@ internal static class ArchitectureContractFamilyRegistry
                 session.CheckPackageAllowOnlyContract((ArchitecturePackageAllowOnlyContract)contract)))
         {
             OwnedContractTypes = new[] { typeof(ArchitecturePackageAllowOnlyContract) },
+            ConfigurationContributor = (session, collector, contract) =>
+            {
+                var c = (ArchitecturePackageAllowOnlyContract)contract;
+                if (!session.IsContractSelected(c.Id))
+                {
+                    return;
+                }
+
+                collector.AddPackageGroupNames(c.Allowed);
+                collector.AddPackageContractSource(c.Name, c.Id, c.Source);
+            },
         },
         new(
             "project_metadata", "strict_project_metadata", "audit_project_metadata", true,
@@ -133,6 +187,19 @@ internal static class ArchitectureContractFamilyRegistry
                 session.CheckProjectMetadataContract((ArchitectureProjectMetadataContract)contract)))
         {
             OwnedContractTypes = new[] { typeof(ArchitectureProjectMetadataContract) },
+            ConfigurationContributor = (session, collector, contract) =>
+            {
+                var c = (ArchitectureProjectMetadataContract)contract;
+                if (!session.IsContractSelected(c.Id))
+                {
+                    return;
+                }
+
+                foreach (string project in c.Projects)
+                {
+                    collector.AddProjectMetadataProject(c.Name, c.Id, ArchitectureAnalysisSession.NormalizeProjectPath(project));
+                }
+            },
         },
         new(
             "protected", "strict_protected", "audit_protected", true,
@@ -141,6 +208,12 @@ internal static class ArchitectureContractFamilyRegistry
                 session.CheckProtectedContract((ArchitectureProtectedContract)contract)))
         {
             OwnedContractTypes = new[] { typeof(ArchitectureProtectedContract) },
+            ConfigurationContributor = (session, collector, contract) =>
+            {
+                var c = (ArchitectureProtectedContract)contract;
+                collector.AddLayerNames(c.Id, c.Protected);
+                collector.AddLayerNames(c.Id, c.AllowedImporters);
+            },
         },
         new(
             "external", "strict_external", "audit_external", true,
@@ -149,6 +222,12 @@ internal static class ArchitectureContractFamilyRegistry
                 session.CheckExternalContract((ArchitectureExternalDependencyContract)contract)))
         {
             OwnedContractTypes = new[] { typeof(ArchitectureExternalDependencyContract) },
+            ConfigurationContributor = (session, collector, contract) =>
+            {
+                var c = (ArchitectureExternalDependencyContract)contract;
+                collector.AddLayerNames(c.Id, new[] { c.Source });
+                collector.AddExternalGroupNames(c.Forbidden);
+            },
         },
         new(
             "external_allow_only", "strict_external_allow_only", "audit_external_allow_only", true,
@@ -157,6 +236,12 @@ internal static class ArchitectureContractFamilyRegistry
                 session.CheckExternalAllowOnlyContract((ArchitectureExternalAllowOnlyContract)contract)))
         {
             OwnedContractTypes = new[] { typeof(ArchitectureExternalAllowOnlyContract) },
+            ConfigurationContributor = (session, collector, contract) =>
+            {
+                var c = (ArchitectureExternalAllowOnlyContract)contract;
+                collector.AddLayerNames(c.Id, new[] { c.Source });
+                collector.AddExternalGroupNames(session.Document.ExternalDependencies.Keys.Where(name => !c.Allowed.Contains(name)));
+            },
         },
         new(
             "acyclic_sibling", "strict_acyclic_siblings", "audit_acyclic_siblings", true,
@@ -178,6 +263,11 @@ internal static class ArchitectureContractFamilyRegistry
                 session.CheckTypePlacementContract((ArchitectureTypePlacementContract)contract)))
         {
             OwnedContractTypes = new[] { typeof(ArchitectureTypePlacementContract) },
+            ConfigurationContributor = (session, collector, contract) =>
+            {
+                var c = (ArchitectureTypePlacementContract)contract;
+                collector.AddLayerNames(c.Id, ArchitectureAnalysisSession.GetTypePlacementReferencedLayerNames(c));
+            },
         },
         new(
             "public_api_surface", "strict_public_api_surface", "audit_public_api_surface", true,
@@ -194,6 +284,11 @@ internal static class ArchitectureContractFamilyRegistry
                 session.CheckAttributeUsageContract((ArchitectureAttributeUsageContract)contract)))
         {
             OwnedContractTypes = new[] { typeof(ArchitectureAttributeUsageContract) },
+            ConfigurationContributor = (session, collector, contract) =>
+            {
+                var c = (ArchitectureAttributeUsageContract)contract;
+                collector.AddLayerNames(c.Id, ArchitectureAnalysisSession.GetAttributeUsageReferencedLayerNames(c));
+            },
         },
         new(
             "inheritance", "strict_inheritance", "audit_inheritance", true,
@@ -202,6 +297,11 @@ internal static class ArchitectureContractFamilyRegistry
                 session.CheckInheritanceContract((ArchitectureInheritanceContract)contract)))
         {
             OwnedContractTypes = new[] { typeof(ArchitectureInheritanceContract) },
+            ConfigurationContributor = (session, collector, contract) =>
+            {
+                var c = (ArchitectureInheritanceContract)contract;
+                collector.AddLayerNames(c.Id, c.SourceLayers);
+            },
         },
         new(
             "interface_implementation", "strict_interface_implementation", "audit_interface_implementation", true,
@@ -210,6 +310,11 @@ internal static class ArchitectureContractFamilyRegistry
                 session.CheckInterfaceImplementationContract((ArchitectureInterfaceImplementationContract)contract)))
         {
             OwnedContractTypes = new[] { typeof(ArchitectureInterfaceImplementationContract) },
+            ConfigurationContributor = (session, collector, contract) =>
+            {
+                var c = (ArchitectureInterfaceImplementationContract)contract;
+                collector.AddLayerNames(c.Id, ArchitectureAnalysisSession.GetInterfaceImplementationReferencedLayerNames(c));
+            },
         },
         new(
             "composition", "strict_composition", "audit_composition", true,
