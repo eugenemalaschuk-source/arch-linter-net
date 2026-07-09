@@ -1,11 +1,11 @@
 using ArchLinterNet.Core.Model;
 using ArchLinterNet.Core.Validation;
 
-namespace ArchLinterNet.Cli;
+namespace ArchLinterNet.Cli.Commands;
 
-public static partial class Program
+internal static partial class BaselineCommand
 {
-    private static int RunBaselineCommand(string[] args)
+    public static int Run(string[] args)
     {
         if (args.Length > 0 && args[0] is "--help" or "-h")
         {
@@ -16,17 +16,17 @@ public static partial class Program
         return args.Length > 0
             ? args[0] switch
             {
-                "generate" => RunBaselineGenerateCommand(args[1..]),
-                "update" => RunBaselineUpdateCommand(args[1..]),
-                "prune" => RunBaselinePruneCommand(args[1..]),
-                "diff" => RunBaselineDiffCommand(args[1..]),
-                "verify" => RunBaselineVerifyCommand(args[1..]),
-                _ => RunBaselineGenerateCommand(args),
+                "generate" => RunGenerateCommand(args[1..]),
+                "update" => RunUpdateCommand(args[1..]),
+                "prune" => RunPruneCommand(args[1..]),
+                "diff" => RunDiffCommand(args[1..]),
+                "verify" => RunVerifyCommand(args[1..]),
+                _ => RunGenerateCommand(args),
             }
-            : RunBaselineGenerateCommand(args);
+            : RunGenerateCommand(args);
     }
 
-    private static int RunBaselineGenerateCommand(string[] args)
+    private static int RunGenerateCommand(string[] args)
     {
         string policyPath = "architecture/dependencies.arch.yml";
         string? outputPath = null;
@@ -96,7 +96,7 @@ public static partial class Program
                 ContractIds = contractIds,
             };
 
-            BaselineGenerationOutcome outcome = _engine.Value.GenerateBaseline(request);
+            BaselineGenerationOutcome outcome = CliEngine.Engine.Value.GenerateBaseline(request);
 
             if (!outcome.Succeeded)
             {
@@ -122,7 +122,7 @@ public static partial class Program
         }
     }
 
-    private static int RunBaselineUpdateCommand(string[] args)
+    private static int RunUpdateCommand(string[] args)
     {
         string policyPath = "architecture/dependencies.arch.yml";
         string? baselinePath = null;
@@ -209,7 +209,7 @@ public static partial class Program
                 ContractIds = contractIds,
             };
 
-            BaselineUpdateOutcome outcome = _engine.Value.UpdateBaseline(request);
+            BaselineUpdateOutcome outcome = CliEngine.Engine.Value.UpdateBaseline(request);
 
             if (!outcome.Succeeded)
             {
@@ -235,7 +235,7 @@ public static partial class Program
         }
     }
 
-    private static int RunBaselinePruneCommand(string[] args)
+    private static int RunPruneCommand(string[] args)
     {
         string policyPath = "architecture/dependencies.arch.yml";
         string? baselinePath = null;
@@ -321,7 +321,7 @@ public static partial class Program
                 ContractIds = contractIds,
             };
 
-            BaselinePruneOutcome outcome = _engine.Value.PruneBaseline(request);
+            BaselinePruneOutcome outcome = CliEngine.Engine.Value.PruneBaseline(request);
 
             if (!outcome.Succeeded)
             {
@@ -372,7 +372,7 @@ public static partial class Program
         }
     }
 
-    private static int RunBaselineDiffCommand(string[] args)
+    private static int RunDiffCommand(string[] args)
     {
         string policyPath = "architecture/dependencies.arch.yml";
         string? baselinePath = null;
@@ -448,7 +448,7 @@ public static partial class Program
                 ContractIds = contractIds,
             };
 
-            BaselineDiffOutcome outcome = _engine.Value.DiffBaseline(request);
+            BaselineDiffOutcome outcome = CliEngine.Engine.Value.DiffBaseline(request);
 
             if (!outcome.Succeeded)
             {
@@ -480,7 +480,7 @@ public static partial class Program
         }
     }
 
-    private static int RunBaselineVerifyCommand(string[] args)
+    private static int RunVerifyCommand(string[] args)
     {
         string policyPath = "architecture/dependencies.arch.yml";
         string? baselinePath = null;
@@ -556,7 +556,7 @@ public static partial class Program
                 ContractIds = contractIds,
             };
 
-            BaselineVerifyOutcome outcome = _engine.Value.VerifyBaseline(request);
+            BaselineVerifyOutcome outcome = CliEngine.Engine.Value.VerifyBaseline(request);
 
             if (!outcome.Succeeded)
             {
