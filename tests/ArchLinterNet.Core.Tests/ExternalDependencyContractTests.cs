@@ -1,6 +1,7 @@
 using ArchLinterNet.Core;
 using ArchLinterNet.Core.Contracts;
 using ArchLinterNet.Core.Execution;
+using ArchLinterNet.Core.Model;
 using ArchLinterNet.Core.Resolution;
 using ArchLinterNet.Testing;
 using NUnit.Framework;
@@ -218,7 +219,7 @@ contracts:
         var violations = runner.CheckExternalContract(document.Contracts.StrictExternal[0]);
 
         Assert.That(violations, Is.Not.Empty);
-        Assert.That(violations.All(v => v.ForbiddenExternalGroup == "system"), Is.True);
+        Assert.That(violations.All(v => (v.Payload as ExternalDependencyPayload)?.ForbiddenExternalGroup == "system"), Is.True);
         Assert.That(violations.SelectMany(v => v.ForbiddenReferences).Any(r => r.StartsWith("System", StringComparison.Ordinal)),
             Is.True);
     }
@@ -725,7 +726,7 @@ contracts:
         var result = ArchitectureAssertions.FromPolicy(contractPath).ValidateAudit();
 
         Assert.That(result.Passed, Is.False);
-        Assert.That(result.Violations.Any(v => v.ForbiddenExternalGroup == "system"), Is.True);
+        Assert.That(result.Violations.Any(v => (v.Payload as ExternalDependencyPayload)?.ForbiddenExternalGroup == "system"), Is.True);
     }
 
     [Test]

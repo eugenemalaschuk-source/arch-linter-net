@@ -1,5 +1,6 @@
 using ArchLinterNet.Core.Contracts;
 using ArchLinterNet.Core.Execution;
+using ArchLinterNet.Core.Model;
 using ArchLinterNet.Core.Validation;
 using NUnit.Framework;
 
@@ -110,7 +111,7 @@ public sealed class PublicApiSurfaceContractTests
         var violations = runner.Session.CheckPublicApiSurfaceContract(contract);
 
         Assert.That(violations.Any(v =>
-            v.SourceType == TypeName && v.UndeclaredApiSignature == $"class {TypeName}"), Is.True);
+            v.SourceType == TypeName && (v.Payload as PublicApiSurfacePayload)?.UndeclaredApiSignature == $"class {TypeName}"), Is.True);
     }
 
     [Test]
@@ -133,7 +134,7 @@ public sealed class PublicApiSurfaceContractTests
         var violations = runner.Session.CheckPublicApiSurfaceContract(contract);
         HashSet<string> signatures = violations
             .Where(v => v.SourceType == TypeName)
-            .Select(v => v.UndeclaredApiSignature!)
+            .Select(v => (v.Payload as PublicApiSurfacePayload)?.UndeclaredApiSignature!)
             .ToHashSet(StringComparer.Ordinal);
 
         Assert.That(signatures, Contains.Item($"field {TypeName}.UndeclaredField: System.Int32"));
@@ -162,7 +163,7 @@ public sealed class PublicApiSurfaceContractTests
         var violations = runner.Session.CheckPublicApiSurfaceContract(contract);
         HashSet<string> signatures = violations
             .Where(v => v.SourceType == TypeName)
-            .Select(v => v.UndeclaredApiSignature!)
+            .Select(v => (v.Payload as PublicApiSurfacePayload)?.UndeclaredApiSignature!)
             .ToHashSet(StringComparer.Ordinal);
 
         Assert.That(signatures, Contains.Item($"field {TypeName}.ProtectedField: System.Int32"));
@@ -182,7 +183,7 @@ public sealed class PublicApiSurfaceContractTests
         var runner = new ArchitectureContractRunner(CreateContext(), document);
 
         var violations = runner.Session.CheckPublicApiSurfaceContract(contract);
-        HashSet<string> signatures = violations.Select(v => v.UndeclaredApiSignature!).ToHashSet(StringComparer.Ordinal);
+        HashSet<string> signatures = violations.Select(v => (v.Payload as PublicApiSurfacePayload)?.UndeclaredApiSignature!).ToHashSet(StringComparer.Ordinal);
 
         Assert.That(signatures, Contains.Item($"class {ContainerName}+NestedPublicType"));
         Assert.That(signatures, Contains.Item($"class {ContainerName}+NestedProtectedType"));
@@ -221,7 +222,7 @@ public sealed class PublicApiSurfaceContractTests
         var violations = runner.Session.CheckPublicApiSurfaceContract(contract);
         HashSet<string> signatures = violations
             .Where(v => v.SourceType == TypeName)
-            .Select(v => v.UndeclaredApiSignature!)
+            .Select(v => (v.Payload as PublicApiSurfacePayload)?.UndeclaredApiSignature!)
             .ToHashSet(StringComparer.Ordinal);
 
         Assert.That(signatures, Contains.Item($"class {TypeName}"));
@@ -249,7 +250,7 @@ public sealed class PublicApiSurfaceContractTests
         var violations = runner.Session.CheckPublicApiSurfaceContract(contract);
         HashSet<string> signatures = violations
             .Where(v => v.SourceType == TypeName)
-            .Select(v => v.UndeclaredApiSignature!)
+            .Select(v => (v.Payload as PublicApiSurfacePayload)?.UndeclaredApiSignature!)
             .ToHashSet(StringComparer.Ordinal);
 
         Assert.That(signatures, Contains.Item($"method {TypeName}.TakeVector(System.Int32[]): System.Void"));
@@ -274,7 +275,7 @@ public sealed class PublicApiSurfaceContractTests
         var violations = runner.Session.CheckPublicApiSurfaceContract(contract);
         HashSet<string> signatures = violations
             .Where(v => v.SourceType == TypeName)
-            .Select(v => v.UndeclaredApiSignature!)
+            .Select(v => (v.Payload as PublicApiSurfacePayload)?.UndeclaredApiSignature!)
             .ToHashSet(StringComparer.Ordinal);
 
         Assert.That(signatures.Any(s => s.Contains("value__", StringComparison.Ordinal)), Is.False);
@@ -303,14 +304,14 @@ public sealed class PublicApiSurfaceContractTests
         var violations = runner.Session.CheckPublicApiSurfaceContract(contract);
 
         var publicMethodViolation = violations.Single(v =>
-            v.UndeclaredApiSignature == $"method {TypeName}.PublicMethod(): System.Void");
-        Assert.That(publicMethodViolation.ApiVisibility, Is.EqualTo("public"));
-        Assert.That(publicMethodViolation.ApiAssemblyName, Is.EqualTo(AssemblyName));
+            (v.Payload as PublicApiSurfacePayload)?.UndeclaredApiSignature == $"method {TypeName}.PublicMethod(): System.Void");
+        Assert.That((publicMethodViolation.Payload as PublicApiSurfacePayload)?.ApiVisibility, Is.EqualTo("public"));
+        Assert.That((publicMethodViolation.Payload as PublicApiSurfacePayload)?.ApiAssemblyName, Is.EqualTo(AssemblyName));
 
         var protectedMethodViolation = violations.Single(v =>
-            v.UndeclaredApiSignature == $"method {TypeName}.ProtectedMethod(): System.Void");
-        Assert.That(protectedMethodViolation.ApiVisibility, Is.EqualTo("protected"));
-        Assert.That(protectedMethodViolation.ApiAssemblyName, Is.EqualTo(AssemblyName));
+            (v.Payload as PublicApiSurfacePayload)?.UndeclaredApiSignature == $"method {TypeName}.ProtectedMethod(): System.Void");
+        Assert.That((protectedMethodViolation.Payload as PublicApiSurfacePayload)?.ApiVisibility, Is.EqualTo("protected"));
+        Assert.That((protectedMethodViolation.Payload as PublicApiSurfacePayload)?.ApiAssemblyName, Is.EqualTo(AssemblyName));
     }
 
     [Test]
@@ -335,8 +336,8 @@ public sealed class PublicApiSurfaceContractTests
         var violations = runner.Session.CheckPublicApiSurfaceContract(contract);
 
         var violation = violations.Single(v =>
-            v.UndeclaredApiSignature == $"const {TypeName}.UndeclaredConst: System.String");
-        Assert.That(violation.ForbiddenPublicConstant, Is.True);
+            (v.Payload as PublicApiSurfacePayload)?.UndeclaredApiSignature == $"const {TypeName}.UndeclaredConst: System.String");
+        Assert.That((violation.Payload as PublicApiSurfacePayload)?.ForbiddenPublicConstant, Is.True);
     }
 
     [Test]
@@ -360,9 +361,9 @@ public sealed class PublicApiSurfaceContractTests
         var violations = runner.Session.CheckPublicApiSurfaceContract(contract);
 
         Assert.That(violations.Any(v =>
-            v.UndeclaredApiSignature == $"const {TypeName}.UndeclaredConst: System.String"), Is.True);
+            (v.Payload as PublicApiSurfacePayload)?.UndeclaredApiSignature == $"const {TypeName}.UndeclaredConst: System.String"), Is.True);
         Assert.That(violations.Any(v =>
-            v.UndeclaredApiSignature == $"const {TypeName}.DeclaredConst: System.String"), Is.False);
+            (v.Payload as PublicApiSurfacePayload)?.UndeclaredApiSignature == $"const {TypeName}.DeclaredConst: System.String"), Is.False);
     }
 
     [Test]
@@ -388,8 +389,8 @@ public sealed class PublicApiSurfaceContractTests
         var violations = runner.Session.CheckPublicApiSurfaceContract(contract);
 
         var violation = violations.Single(v =>
-            v.UndeclaredApiSignature == $"const {TypeName}.DeclaredConst: System.String");
-        Assert.That(violation.ForbiddenPublicConstant, Is.True);
+            (v.Payload as PublicApiSurfacePayload)?.UndeclaredApiSignature == $"const {TypeName}.DeclaredConst: System.String");
+        Assert.That((violation.Payload as PublicApiSurfacePayload)?.ForbiddenPublicConstant, Is.True);
     }
 
     [Test]
@@ -416,7 +417,7 @@ public sealed class PublicApiSurfaceContractTests
         var violations = runner.Session.CheckPublicApiSurfaceContract(contract);
 
         Assert.That(violations.Any(v =>
-            v.UndeclaredApiSignature == $"const {TypeName}.DeclaredConst: System.String"), Is.False);
+            (v.Payload as PublicApiSurfacePayload)?.UndeclaredApiSignature == $"const {TypeName}.DeclaredConst: System.String"), Is.False);
     }
 
     [Test]
@@ -457,7 +458,7 @@ public sealed class PublicApiSurfaceContractTests
 
         var violations = runner.Session.CheckPublicApiSurfaceContract(contract);
 
-        Assert.That(violations.Any(v => v.UndeclaredApiSignature == $"class {TypeName}"), Is.False);
+        Assert.That(violations.Any(v => (v.Payload as PublicApiSurfacePayload)?.UndeclaredApiSignature == $"class {TypeName}"), Is.False);
     }
 
     [Test]

@@ -73,9 +73,10 @@ public sealed partial class ArchitectureAnalysisSession
                     matchedForbiddenApi,
                     new[] { matchedForbiddenApi })
                 {
-                    MatchedForbiddenApi = matchedForbiddenApi,
-                    SourceMember = match.SourceMember,
-                    ExpectedCompositionBoundary = expectedCompositionBoundary
+                    Payload = new CompositionPayload(
+                        MatchedForbiddenApi: matchedForbiddenApi,
+                        SourceMember: match.SourceMember,
+                        ExpectedCompositionBoundary: expectedCompositionBoundary)
                 });
             }
         }

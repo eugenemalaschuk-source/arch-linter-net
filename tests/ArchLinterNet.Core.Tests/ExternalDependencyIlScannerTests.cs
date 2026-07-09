@@ -1,6 +1,7 @@
 using ArchLinterNet.Core;
 using ArchLinterNet.Core.Contracts;
 using ArchLinterNet.Core.Execution;
+using ArchLinterNet.Core.Model;
 using ArchLinterNet.Core.Resolution;
 using ArchLinterNet.Core.Scanning;
 using ArchLinterNet.Testing;
@@ -348,7 +349,7 @@ contracts:
             var auditResult = ArchitectureAssertions.FromPolicy(contractPath).ValidateAudit();
             Assert.That(auditResult.Passed, Is.False);
             Assert.That(auditResult.Violations.Any(v =>
-                v.ForbiddenExternalGroup == "vendor_sdk" &&
+                (v.Payload as ExternalDependencyPayload)?.ForbiddenExternalGroup == "vendor_sdk" &&
                 v.ForbiddenReferences.Any(r => r.Contains("VendorSdk.Client"))),
                 Is.True);
         }

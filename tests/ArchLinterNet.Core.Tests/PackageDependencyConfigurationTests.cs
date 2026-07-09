@@ -58,7 +58,7 @@ public sealed class PackageDependencyConfigurationTests
             CreateContext(DiscoveryWithProject(SourceAssemblyName, ("Newtonsoft.Json", "13.0.3"))), document);
         List<ArchitectureViolation> violations = runner.CheckConfiguration();
 
-        Assert.That(violations.Any(v => v.ForbiddenNamespace == "unknown package group" && v.ForbiddenPackageGroup == "unknown_group"), Is.True);
+        Assert.That(violations.Any(v => v.ForbiddenNamespace == "unknown package group" && (v.Payload as PackageDependencyPayload)?.ForbiddenPackageGroup == "unknown_group"), Is.True);
     }
 
     [Test]
@@ -120,7 +120,7 @@ public sealed class PackageDependencyConfigurationTests
             CreateContext(DiscoveryWithProject(SourceAssemblyName)), document);
         List<ArchitectureViolation> violations = runner.CheckConfiguration();
 
-        Assert.That(violations.Any(v => v.ForbiddenNamespace == "invalid package group" && v.ForbiddenPackageGroup == "empty_group"), Is.True);
+        Assert.That(violations.Any(v => v.ForbiddenNamespace == "invalid package group" && (v.Payload as PackageDependencyPayload)?.ForbiddenPackageGroup == "empty_group"), Is.True);
     }
 
     [Test]
@@ -237,7 +237,7 @@ public sealed class PackageDependencyConfigurationTests
             CreateContext(DiscoveryWithProject(SourceAssemblyName, ("Newtonsoft.Json", "13.0.3"))), document);
         List<ArchitectureViolation> violations = runner.CheckConfiguration();
 
-        Assert.That(violations.Any(v => v.ForbiddenNamespace == "unknown package group" && v.ForbiddenPackageGroup == "unknown_group"), Is.True);
+        Assert.That(violations.Any(v => v.ForbiddenNamespace == "unknown package group" && (v.Payload as PackageDependencyPayload)?.ForbiddenPackageGroup == "unknown_group"), Is.True);
     }
 
     [Test]

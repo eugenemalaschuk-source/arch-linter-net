@@ -17,9 +17,10 @@ public sealed class ArchitectureDiagnosticFormatterTests
         {
             new("contract", null, "Source.Type", "protected layer 'Core'", new[] { "ref1" })
             {
-                SourceLayer = "Web",
-                TargetLayer = "Core",
-                AllowedImporters = new[] { "Api" }
+                Payload = new DependencyPayload(
+                    SourceLayer: "Web",
+                    TargetLayer: "Core",
+                    AllowedImporters: new[] { "Api" })
             }
         };
 
@@ -37,7 +38,8 @@ public sealed class ArchitectureDiagnosticFormatterTests
         {
             new("contract", null, "Source.Type", "Forbidden.Namespace", new[] { "ref1" })
             {
-                DependencyPaths = new IReadOnlyCollection<string>[] { new[] { "Source.Type", "Mid", "Forbidden.Namespace" } }
+                Payload = new ConfigurationPayload(
+                    DependencyPaths: new IReadOnlyCollection<string>[] { new[] { "Source.Type", "Mid", "Forbidden.Namespace" } })
             }
         };
 
@@ -69,8 +71,9 @@ public sealed class ArchitectureDiagnosticFormatterTests
         {
             new("contract", null, "Source.Type", "Forbidden.Namespace", new[] { "ref1" })
             {
-                TemplateName = "asmdef-template",
-                ContainerNamespace = "MyApp.Modules"
+                Payload = new ConfigurationPayload(
+                    TemplateName: "asmdef-template",
+                    ContainerNamespace: "MyApp.Modules")
             }
         };
 
@@ -90,9 +93,10 @@ public sealed class ArchitectureDiagnosticFormatterTests
         {
             new("contract", null, "Source.Type", "protected layer 'Core'", new[] { "ref1" })
             {
-                SourceLayer = "Web",
-                TargetLayer = "Core",
-                AllowedImporters = new[] { "Api" },
+                Payload = new DependencyPayload(
+                    SourceLayer: "Web",
+                    TargetLayer: "Core",
+                    AllowedImporters: new[] { "Api" }),
                 MatchedNamespacePrefixes = new[] { "Core.Internal" }
             }
         };
@@ -113,9 +117,10 @@ public sealed class ArchitectureDiagnosticFormatterTests
         {
             new("composition", null, "Source.Type", "Forbidden.Api", new[] { "Forbidden.Api" })
             {
-                SourceMember = "Source.Type.Configure",
-                MatchedForbiddenApi = "Forbidden.Api",
-                ExpectedCompositionBoundary = "namespaces: [Composition]"
+                Payload = new CompositionPayload(
+                    SourceMember: "Source.Type.Configure",
+                    MatchedForbiddenApi: "Forbidden.Api",
+                    ExpectedCompositionBoundary: "namespaces: [Composition]")
             }
         };
 
@@ -131,8 +136,9 @@ public sealed class ArchitectureDiagnosticFormatterTests
         {
             new("composition", null, "Source.Type", "Forbidden.Api", new[] { "Forbidden.Api" })
             {
-                SourceMember = "Source.Type.Configure",
-                MatchedForbiddenApi = "Forbidden.Api"
+                Payload = new CompositionPayload(
+                    SourceMember: "Source.Type.Configure",
+                    MatchedForbiddenApi: "Forbidden.Api")
             }
         };
 

@@ -203,7 +203,7 @@ public sealed class ArchitectureSarifFormatterTests
         {
             new("package-rule", "package-rule", "MyApp.Csproj", "forbidden-packages", new[] { "Newtonsoft.Json" })
             {
-                ForbiddenPackageGroup = "legacy-json"
+                Payload = new PackageDependencyPayload("legacy-json")
             }
         };
 
@@ -221,7 +221,7 @@ public sealed class ArchitectureSarifFormatterTests
         {
             new("type-placement-rule", "type-placement-rule", "MyApp.Foo", "expected-location", new[] { "ref1" })
             {
-                ExpectedTypeLocation = "MyApp.Correct"
+                Payload = new TypePlacementPayload(ExpectedTypeLocation: "MyApp.Correct")
             }
         };
 
@@ -290,7 +290,7 @@ public sealed class ArchitectureSarifFormatterTests
     {
         var violationA = new ArchitectureViolation("a-contract", "a-rule", "Source.A", "Forbidden.A", new[] { "ref-a" })
         {
-            ForbiddenExternalGroup = "external-group"
+            Payload = new ExternalDependencyPayload("external-group")
         };
         var violationB = new ArchitectureViolation("b-contract", "b-rule", "Source.B", "Forbidden.B", new[] { "ref-b" });
         var cycle = "[m-rule] X -> Y -> X";

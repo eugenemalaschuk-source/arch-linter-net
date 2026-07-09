@@ -37,7 +37,7 @@ public sealed class InheritanceCheckerTests
 
         Assert.That(violations.Any(v =>
             v.SourceType == "InheritanceContractTestFixtures.Domain.DirectViolation"
-            && v.ForbiddenBaseType == "InheritanceContractTestFixtures.Framework.FrameworkBase"), Is.True);
+            && (v.Payload as InheritancePayload)?.ForbiddenBaseType == "InheritanceContractTestFixtures.Framework.FrameworkBase"), Is.True);
         Assert.That(violations.Any(v =>
             v.SourceType == "InheritanceContractTestFixtures.Domain.CleanDomainType"), Is.False);
     }

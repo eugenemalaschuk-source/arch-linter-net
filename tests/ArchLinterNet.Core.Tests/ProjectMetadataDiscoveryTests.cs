@@ -190,8 +190,8 @@ public sealed class ProjectMetadataDiscoveryTests
         List<ArchitectureViolation> violations = runner.Session.CheckProjectMetadataContract(contract);
 
         Assert.That(violations, Has.Count.EqualTo(1));
-        Assert.That(violations[0].ProjectMetadataKind, Is.EqualTo("project_reference"));
-        Assert.That(violations[0].ProjectMetadataActualValue,
+        Assert.That((violations[0].Payload as ProjectMetadataPayload)?.ProjectMetadataKind, Is.EqualTo("project_reference"));
+        Assert.That((violations[0].Payload as ProjectMetadataPayload)?.ProjectMetadataActualValue,
             Is.EqualTo("tests/MyApp.Tests/MyApp.Tests.csproj"));
     }
 
@@ -313,9 +313,9 @@ public sealed class ProjectMetadataDiscoveryTests
         List<ArchitectureViolation> violations = runner.Session.CheckProjectMetadataContract(contract);
 
         Assert.That(violations, Has.Count.EqualTo(1));
-        Assert.That(violations[0].ProjectMetadataKind, Is.EqualTo("required_property"));
-        Assert.That(violations[0].ProjectMetadataKey, Is.EqualTo("IsPackable"));
-        Assert.That(violations[0].ProjectMetadataActualValue, Is.EqualTo(null));
+        Assert.That((violations[0].Payload as ProjectMetadataPayload)?.ProjectMetadataKind, Is.EqualTo("required_property"));
+        Assert.That((violations[0].Payload as ProjectMetadataPayload)?.ProjectMetadataKey, Is.EqualTo("IsPackable"));
+        Assert.That((violations[0].Payload as ProjectMetadataPayload)?.ProjectMetadataActualValue, Is.EqualTo(null));
     }
 
     [Test]
@@ -371,9 +371,9 @@ public sealed class ProjectMetadataDiscoveryTests
         Assert.That(project.FriendAssemblies.Select(entry => entry.AssemblyName), Is.EqualTo(new[] { "MyApp.Tools" }));
         Assert.That(project.FriendAssemblies.Single().SourcePath, Is.EqualTo("src/MyApp/Properties/AssemblyInfo.cs"));
         Assert.That(violations, Has.Count.EqualTo(1));
-        Assert.That(violations[0].ProjectMetadataKind, Is.EqualTo("friend_assembly"));
-        Assert.That(violations[0].ProjectMetadataActualValue, Is.EqualTo("MyApp.Tools"));
-        Assert.That(violations[0].ProjectMetadataSourcePath, Is.EqualTo("src/MyApp/Properties/AssemblyInfo.cs"));
+        Assert.That((violations[0].Payload as ProjectMetadataPayload)?.ProjectMetadataKind, Is.EqualTo("friend_assembly"));
+        Assert.That((violations[0].Payload as ProjectMetadataPayload)?.ProjectMetadataActualValue, Is.EqualTo("MyApp.Tools"));
+        Assert.That((violations[0].Payload as ProjectMetadataPayload)?.ProjectMetadataSourcePath, Is.EqualTo("src/MyApp/Properties/AssemblyInfo.cs"));
     }
 
     [Test]

@@ -54,7 +54,7 @@ public sealed partial class ArchitectureAnalysisSession
                 $"package group '{packageGroupName}'",
                 forbiddenReferences)
             {
-                ForbiddenPackageGroup = packageGroupName
+                Payload = new PackageDependencyPayload(packageGroupName)
             });
         }
 
