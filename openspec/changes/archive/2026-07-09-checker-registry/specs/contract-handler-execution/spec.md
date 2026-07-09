@@ -1,8 +1,5 @@
-# contract-handler-execution Specification
+## MODIFIED Requirements
 
-## Purpose
-Defines the contract-family handler/checker execution model: every contract family executes through an `IArchitectureContractHandler`, the handler registry is a DI-populated instance service rather than a static default-handler factory, and neither handlers nor the registry depend on `IServiceProvider`.
-## Requirements
 ### Requirement: Every contract family executes through an IArchitectureContractHandler
 `ArchLinterNet.Core.Execution.ArchitectureContractExecutor` SHALL dispatch every contract family (`dependency`, `layer`, `layer_template`, `allow_only`, `cycle`, `acyclic_sibling`, `method_body`, `asmdef`, `independence`, `assembly_independence`, `assembly_dependency`, `assembly_allow_only`, `package_dependency`, `package_allow_only`, `project_metadata`, `protected`, `external`, `external_allow_only`, `type_placement`, `public_api_surface`, `attribute_usage`, `inheritance`, `interface_implementation`, `composition`, `coverage`) through `ArchitectureContractHandlerRegistry.Execute(family, session, contract)`, where `session` is the per-run `ArchitectureAnalysisSession`. The registry SHALL resolve the checker for each family from that family's `ArchitectureContractFamilyDescriptor.Checker` delegate (an `ArchitectureContractChecker`) rather than from a DI-registered `IArchitectureContractHandler` instance. `ArchitectureContractExecutor` SHALL NOT call `ArchitectureContractRunner.CheckXxxContract` methods directly for any family, and no checker SHALL receive an `ArchitectureContractRunner` instance.
 
@@ -38,4 +35,3 @@ No `ArchitectureContractChecker` delegate assignment, no `ArchitectureContractFa
 #### Scenario: Adding a new family requires only a descriptor entry
 - **WHEN** a new contract family's descriptor (including its `Checker` delegate) is appended to `ArchitectureContractFamilyRegistry.All`
 - **THEN** `ArchitectureContractExecutor` and `ServiceCollectionExtensions.AddArchLinterNetCore()` require no source changes to dispatch contracts of that family through the registry
-
