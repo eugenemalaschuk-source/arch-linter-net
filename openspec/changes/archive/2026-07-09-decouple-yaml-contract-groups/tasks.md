@@ -58,5 +58,5 @@ For each family below: move its two `[YamlMember]` properties and its `IArchitec
 
 ## 6. Archive and PR
 
-- [ ] 6.1 Run `opsx-archive` to fold the spec delta into `openspec/specs/yaml-contract-loading/spec.md` and run `openspec validate --all`.
+- [x] 6.1 Run `opsx-archive` to fold the spec delta into `openspec/specs/yaml-contract-loading/spec.md` and run `openspec validate --all`.
 - [ ] 6.2 Open the PR referencing issue #216 with Summary, Architecture notes, Scope/non-goals, Tests run, Risks/follow-ups.
