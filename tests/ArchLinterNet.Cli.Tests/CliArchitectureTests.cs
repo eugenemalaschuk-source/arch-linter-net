@@ -43,9 +43,12 @@ public sealed class CliArchitectureTests
     [Test]
     public void BaselineModule_ComposesSubcommandsFromModules()
     {
-        BaselineCommandModule module = new(new FakeCliRuntime(), new FakeCliConsole(), new FakeFileSystem(exists: true));
+        FakeCliRuntime runtime = new();
+        FakeCliConsole console = new();
+        FakeFileSystem fileSystem = new(exists: true);
+        BaselineCommandModule module = new();
 
-        var commandNames = module.CreateCommand().Subcommands.Select(static command => command.Name).ToArray();
+        var commandNames = module.CreateCommand(runtime, console, fileSystem).Subcommands.Select(static command => command.Name).ToArray();
 
         Assert.That(commandNames, Is.EquivalentTo(new[] { "generate", "update", "prune", "diff", "verify" }));
     }

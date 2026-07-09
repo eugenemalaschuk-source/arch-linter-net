@@ -8,9 +8,8 @@ internal sealed class CliHost(ICliRootCommandFactory rootCommandFactory, ICliCon
 {
     public int Run(string[] args)
     {
-        if (args.Length == 1 && args[0] is "--version" or "-v")
+        if (TryHandleLegacyValidateShortCircuit(args))
         {
-            console.Out.WriteLine($"arch-linter-net {runtime.Version}");
             return CliExitCodes.Success;
         }
 
@@ -23,6 +22,47 @@ internal sealed class CliHost(ICliRootCommandFactory rootCommandFactory, ICliCon
         }
 
         return parseResult.Invoke();
+    }
+
+    private bool TryHandleLegacyValidateShortCircuit(string[] args)
+    {
+        if (args.Length == 0 || IsTopLevelCommand(args[0]))
+        {
+            return false;
+        }
+
+        for (int i = 0; i < args.Length; i++)
+        {
+            string arg = args[i];
+            switch (arg)
+            {
+                case "--help" or "-h":
+                    console.Out.WriteLine(Commands.Validate.ValidateCommandDefinition.HelpText);
+                    return true;
+                case "--version" or "-v":
+                    console.Out.WriteLine($"arch-linter-net {runtime.Version}");
+                    return true;
+                case "--policy" or "-p" or "--mode" or "-m" or "--format" or "-f" or "--contract" or "--condition-set" or "--baseline":
+                    if (i + 1 >= args.Length)
+                    {
+                        return false;
+                    }
+
+                    i++;
+                    break;
+                case "--strict" or "--audit" or "--json" or "--timings":
+                    break;
+                default:
+                    return false;
+            }
+        }
+
+        return false;
+    }
+
+    private static bool IsTopLevelCommand(string arg)
+    {
+        return arg is "baseline" or "graph" or "explain";
     }
 
     private void WriteParseErrors(ParseResult parseResult)

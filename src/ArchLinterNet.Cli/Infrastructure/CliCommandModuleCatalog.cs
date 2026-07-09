@@ -8,7 +8,7 @@ internal static class CliCommandModuleCatalog
     public static IRootCliCommandModule CreateRootModule(ICliRuntime runtime, ICliConsole console, IFileSystem fileSystem)
     {
         Type moduleType = GetModuleTypes<IRootCliCommandModule>().Single();
-        return CreateModule<IRootCliCommandModule>(moduleType, runtime, console, fileSystem);
+        return CreateModule<IRootCliCommandModule>(moduleType);
     }
 
     public static IReadOnlyList<ICliSubcommandModule> CreateSubcommandModules(
@@ -17,7 +17,7 @@ internal static class CliCommandModuleCatalog
         IFileSystem fileSystem)
     {
         return GetModuleTypes<ICliSubcommandModule>()
-            .Select(type => CreateModule<ICliSubcommandModule>(type, runtime, console, fileSystem))
+            .Select(CreateModule<ICliSubcommandModule>)
             .ToArray();
     }
 
@@ -30,9 +30,9 @@ internal static class CliCommandModuleCatalog
             .ToArray();
     }
 
-    private static TModule CreateModule<TModule>(Type type, ICliRuntime runtime, ICliConsole console, IFileSystem fileSystem)
+    private static TModule CreateModule<TModule>(Type type)
     {
-        object? instance = Activator.CreateInstance(type, runtime, console, fileSystem);
+        object? instance = Activator.CreateInstance(type);
         if (instance is TModule module)
         {
             return module;

@@ -14,7 +14,12 @@ internal sealed class CliCompositionRoot
         IReadOnlyList<ICliSubcommandModule> subcommandModules =
             CliCommandModuleCatalog.CreateSubcommandModules(runtime, console, fileSystem);
 
-        ICliRootCommandFactory rootCommandFactory = new CliRootCommandFactory(rootCommandModule, subcommandModules);
+        ICliRootCommandFactory rootCommandFactory = new CliRootCommandFactory(
+            rootCommandModule,
+            subcommandModules,
+            runtime,
+            console,
+            fileSystem);
         CliHost host = new(rootCommandFactory, console, runtime);
 
         return new CliComposition(

@@ -14,13 +14,13 @@ internal static class BaselineSubcommandCatalog
             .GetTypes()
             .Where(type => typeof(IBaselineSubcommandModule).IsAssignableFrom(type) && type is { IsAbstract: false, IsClass: true })
             .OrderBy(static type => type.FullName, StringComparer.Ordinal)
-            .Select(type => CreateModule(type, runtime, console, fileSystem))
+            .Select(CreateModule)
             .ToArray();
     }
 
-    private static IBaselineSubcommandModule CreateModule(Type type, ICliRuntime runtime, ICliConsole console, IFileSystem fileSystem)
+    private static IBaselineSubcommandModule CreateModule(Type type)
     {
-        object? instance = Activator.CreateInstance(type, runtime, console, fileSystem);
+        object? instance = Activator.CreateInstance(type);
         if (instance is IBaselineSubcommandModule module)
         {
             return module;

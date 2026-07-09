@@ -5,17 +5,11 @@ namespace ArchLinterNet.Cli.Commands.Baseline;
 
 internal sealed class UpdateBaselineSubcommandModule : IBaselineSubcommandModule
 {
-    private readonly BaselineUpdateCommandHandler _handler;
-
-    public UpdateBaselineSubcommandModule(ICliRuntime runtime, ICliConsole console, IFileSystem fileSystem)
-    {
-        _handler = new BaselineUpdateCommandHandler(runtime, console, fileSystem);
-    }
-
     public string CommandName => "update";
 
-    public Command CreateCommand()
+    public Command CreateCommand(ICliRuntime runtime, ICliConsole console, IFileSystem fileSystem)
     {
+        BaselineUpdateCommandHandler handler = new(runtime, console, fileSystem);
         Command command = new(CommandName);
         Option<string> policyOption = BaselineOptionsFactory.CreatePolicyOption();
         Option<string> baselineOption = new("--baseline");
@@ -37,7 +31,7 @@ internal sealed class UpdateBaselineSubcommandModule : IBaselineSubcommandModule
         command.Options.Add(contractOption);
         command.Options.Add(helpOption);
 
-        command.SetAction(parseResult => _handler.Execute(new BaselineUpdateCommandOptions(
+        command.SetAction(parseResult => handler.Execute(new BaselineUpdateCommandOptions(
             BaselineOptionsFactory.GetPolicyPath(parseResult, policyOption),
             parseResult.GetValue(baselineOption),
             parseResult.GetValue(outputOption),

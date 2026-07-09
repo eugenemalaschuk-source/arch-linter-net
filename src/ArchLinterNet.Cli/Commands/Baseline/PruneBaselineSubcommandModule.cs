@@ -5,17 +5,11 @@ namespace ArchLinterNet.Cli.Commands.Baseline;
 
 internal sealed class PruneBaselineSubcommandModule : IBaselineSubcommandModule
 {
-    private readonly BaselinePruneCommandHandler _handler;
-
-    public PruneBaselineSubcommandModule(ICliRuntime runtime, ICliConsole console, IFileSystem fileSystem)
-    {
-        _handler = new BaselinePruneCommandHandler(runtime, console, fileSystem);
-    }
-
     public string CommandName => "prune";
 
-    public Command CreateCommand()
+    public Command CreateCommand(ICliRuntime runtime, ICliConsole console, IFileSystem fileSystem)
     {
+        BaselinePruneCommandHandler handler = new(runtime, console, fileSystem);
         Command command = new(CommandName);
         Option<string> policyOption = BaselineOptionsFactory.CreatePolicyOption();
         Option<string> baselineOption = new("--baseline");
@@ -38,7 +32,7 @@ internal sealed class PruneBaselineSubcommandModule : IBaselineSubcommandModule
         command.Options.Add(shortFormatOption);
         command.Options.Add(helpOption);
 
-        command.SetAction(parseResult => _handler.Execute(new BaselinePruneCommandOptions(
+        command.SetAction(parseResult => handler.Execute(new BaselinePruneCommandOptions(
             BaselineOptionsFactory.GetPolicyPath(parseResult, policyOption),
             parseResult.GetValue(baselineOption),
             parseResult.GetValue(outputOption),

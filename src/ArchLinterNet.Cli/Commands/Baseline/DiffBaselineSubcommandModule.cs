@@ -5,17 +5,11 @@ namespace ArchLinterNet.Cli.Commands.Baseline;
 
 internal sealed class DiffBaselineSubcommandModule : IBaselineSubcommandModule
 {
-    private readonly BaselineDiffCommandHandler _handler;
-
-    public DiffBaselineSubcommandModule(ICliRuntime runtime, ICliConsole console, IFileSystem fileSystem)
-    {
-        _handler = new BaselineDiffCommandHandler(runtime, console, fileSystem);
-    }
-
     public string CommandName => "diff";
 
-    public Command CreateCommand()
+    public Command CreateCommand(ICliRuntime runtime, ICliConsole console, IFileSystem fileSystem)
     {
+        BaselineDiffCommandHandler handler = new(runtime, console, fileSystem);
         Command command = new(CommandName);
         Option<string> policyOption = BaselineOptionsFactory.CreatePolicyOption();
         Option<string> baselineOption = new("--baseline");
@@ -34,7 +28,7 @@ internal sealed class DiffBaselineSubcommandModule : IBaselineSubcommandModule
         command.Options.Add(jsonOption);
         command.Options.Add(helpOption);
 
-        command.SetAction(parseResult => _handler.Execute(new BaselineDiffCommandOptions(
+        command.SetAction(parseResult => handler.Execute(new BaselineDiffCommandOptions(
             BaselineOptionsFactory.GetPolicyPath(parseResult, policyOption),
             parseResult.GetValue(baselineOption),
             parseResult.GetValue(modeOption) ?? "all",

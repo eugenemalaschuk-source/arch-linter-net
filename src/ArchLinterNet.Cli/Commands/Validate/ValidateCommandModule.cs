@@ -4,12 +4,8 @@ namespace ArchLinterNet.Cli.Commands.Validate;
 
 internal sealed class ValidateCommandModule : IRootCliCommandModule
 {
-    private readonly ValidateCommandDefinition _definition;
-
-    public ValidateCommandModule(ICliRuntime runtime, ICliConsole console, IFileSystem fileSystem)
+    public System.CommandLine.RootCommand CreateRootCommand(ICliRuntime runtime, ICliConsole console, IFileSystem fileSystem)
     {
-        _definition = new ValidateCommandDefinition(new ValidateCommandHandler(runtime, console, fileSystem));
+        return new ValidateCommandDefinition(new ValidateCommandHandler(runtime, console, fileSystem)).CreateRootCommand();
     }
-
-    public System.CommandLine.RootCommand CreateRootCommand() => _definition.CreateRootCommand();
 }

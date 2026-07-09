@@ -5,27 +5,21 @@ namespace ArchLinterNet.Cli.Commands.Baseline;
 
 internal sealed class GenerateBaselineSubcommandModule : IDefaultBaselineSubcommandModule
 {
-    private readonly BaselineGenerateCommandHandler _handler;
-
-    public GenerateBaselineSubcommandModule(ICliRuntime runtime, ICliConsole console, IFileSystem fileSystem)
-    {
-        _handler = new BaselineGenerateCommandHandler(runtime, console, fileSystem);
-    }
-
     public string CommandName => "generate";
 
-    public Command CreateCommand()
+    public Command CreateCommand(ICliRuntime runtime, ICliConsole console, IFileSystem fileSystem)
     {
-        return CreateCommand("generate");
+        return CreateCommand("generate", runtime, console, fileSystem);
     }
 
-    public Command CreateDefaultCommand(string commandName)
+    public Command CreateDefaultCommand(string commandName, ICliRuntime runtime, ICliConsole console, IFileSystem fileSystem)
     {
-        return CreateCommand(commandName);
+        return CreateCommand(commandName, runtime, console, fileSystem);
     }
 
-    private Command CreateCommand(string commandName)
+    private static Command CreateCommand(string commandName, ICliRuntime runtime, ICliConsole console, IFileSystem fileSystem)
     {
+        BaselineGenerateCommandHandler handler = new(runtime, console, fileSystem);
         Command command = new(commandName);
         Option<string> policyOption = BaselineOptionsFactory.CreatePolicyOption();
         Option<string> outputOption = new("--output");
@@ -45,7 +39,7 @@ internal sealed class GenerateBaselineSubcommandModule : IDefaultBaselineSubcomm
         command.Options.Add(contractOption);
         command.Options.Add(helpOption);
 
-        command.SetAction(parseResult => _handler.Execute(new BaselineGenerateCommandOptions(
+        command.SetAction(parseResult => handler.Execute(new BaselineGenerateCommandOptions(
             BaselineOptionsFactory.GetPolicyPath(parseResult, policyOption),
             parseResult.GetValue(outputOption),
             parseResult.GetValue(reasonOption) ?? "generated baseline",
