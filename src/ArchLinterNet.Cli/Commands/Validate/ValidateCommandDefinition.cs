@@ -131,21 +131,8 @@ internal sealed class ValidateCommandDefinition(ValidateCommandHandler handler)
         Option<bool> helpOption,
         Option<bool> versionOption)
     {
-        string mode = parseResult.GetValue(modeOption) ?? "strict";
-        if (parseResult.GetValue(strictOption))
-        {
-            mode = "strict";
-        }
-        else if (parseResult.GetValue(auditOption))
-        {
-            mode = "audit";
-        }
-
-        string format = parseResult.GetValue(formatOption) ?? "human";
-        if (parseResult.GetValue(jsonOption))
-        {
-            format = "json";
-        }
+        string mode = ResolveMode(parseResult);
+        string format = ResolveFormat(parseResult);
 
         return new ValidateCommandOptions(
             parseResult.GetValue(policyOption) ?? "architecture/dependencies.arch.yml",
@@ -157,6 +144,136 @@ internal sealed class ValidateCommandDefinition(ValidateCommandHandler handler)
             parseResult.GetValue(baselineOption),
             parseResult.GetValue(helpOption),
             parseResult.GetValue(versionOption));
+    }
+
+    private static string ResolveMode(ParseResult parseResult)
+    {
+        string mode = "strict";
+        bool expectModeValue = false;
+
+        foreach (string token in EnumerateTokenValues(parseResult))
+        {
+            if (expectModeValue)
+            {
+                expectModeValue = false;
+                mode = NormalizeModeOrPreserve(token);
+                continue;
+            }
+
+            if (IsOption(token, "--mode", "-m"))
+            {
+                expectModeValue = true;
+                continue;
+            }
+
+            if (IsOption(token, "--strict"))
+            {
+                mode = "strict";
+                continue;
+            }
+
+            if (IsOption(token, "--audit"))
+            {
+                mode = "audit";
+            }
+        }
+
+        return mode;
+    }
+
+    private static string ResolveFormat(ParseResult parseResult)
+    {
+        string format = "human";
+        bool expectFormatValue = false;
+
+        foreach (string token in EnumerateTokenValues(parseResult))
+        {
+            if (expectFormatValue)
+            {
+                expectFormatValue = false;
+                format = NormalizeFormatOrPreserve(token);
+                continue;
+            }
+
+            if (IsOption(token, "--format", "-f"))
+            {
+                expectFormatValue = true;
+                continue;
+            }
+
+            if (IsOption(token, "--json"))
+            {
+                format = "json";
+            }
+        }
+
+        return format;
+    }
+
+    private static IEnumerable<string> EnumerateTokenValues(ParseResult parseResult)
+    {
+        return parseResult.Tokens.Select(static token => token.Value);
+    }
+
+    private static bool IsModeValue(string token)
+    {
+        return string.Equals(token, "strict", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(token, "audit", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static string NormalizeModeOrPreserve(string token)
+    {
+        if (string.Equals(token, "audit", StringComparison.OrdinalIgnoreCase))
+        {
+            return "audit";
+        }
+
+        if (string.Equals(token, "strict", StringComparison.OrdinalIgnoreCase))
+        {
+            return "strict";
+        }
+
+        return token;
+    }
+
+    private static bool IsFormatValue(string token)
+    {
+        return string.Equals(token, "human", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(token, "json", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(token, "sarif", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static string NormalizeFormatOrPreserve(string token)
+    {
+        if (string.Equals(token, "json", StringComparison.OrdinalIgnoreCase))
+        {
+            return "json";
+        }
+
+        if (string.Equals(token, "sarif", StringComparison.OrdinalIgnoreCase))
+        {
+            return "sarif";
+        }
+
+        if (string.Equals(token, "human", StringComparison.OrdinalIgnoreCase))
+        {
+            return "human";
+        }
+
+        return token;
+    }
+
+    private static bool IsOption(string token, params string[] names)
+    {
+        foreach (string name in names)
+        {
+            if (string.Equals(token, name, StringComparison.Ordinal))
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private static Option<string> CreateOption(string name, string defaultValue)
