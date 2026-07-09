@@ -3,7 +3,7 @@ using ArchLinterNet.Core.Model;
 using ArchLinterNet.Core.Reporting;
 using ArchLinterNet.Core.Validation;
 
-namespace ArchLinterNet.Cli;
+namespace ArchLinterNet.Cli.Abstractions;
 
 internal interface ICliRuntime
 {

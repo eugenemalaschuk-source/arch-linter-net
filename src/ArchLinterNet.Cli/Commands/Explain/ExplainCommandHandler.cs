@@ -1,4 +1,5 @@
 using System.Text.Json;
+using ArchLinterNet.Cli.Abstractions;
 using ArchLinterNet.Core.Graph;
 using ArchLinterNet.Core.Model;
 

@@ -1,10 +1,11 @@
+using ArchLinterNet.Cli.Abstractions;
 using ArchLinterNet.Core.Composition;
 using ArchLinterNet.Core.Graph;
 using ArchLinterNet.Core.Model;
 using ArchLinterNet.Core.Reporting;
 using ArchLinterNet.Core.Validation;
 
-namespace ArchLinterNet.Cli;
+namespace ArchLinterNet.Cli.Infrastructure;
 
 internal sealed class CliRuntime : ICliRuntime
 {

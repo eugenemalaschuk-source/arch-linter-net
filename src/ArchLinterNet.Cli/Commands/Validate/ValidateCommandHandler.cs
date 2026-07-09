@@ -1,3 +1,4 @@
+using ArchLinterNet.Cli.Abstractions;
 using ArchLinterNet.Core.Model;
 using ArchLinterNet.Core.Reporting;
 using ArchLinterNet.Core.Validation;

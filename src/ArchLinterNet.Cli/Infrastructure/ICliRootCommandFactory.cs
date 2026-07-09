@@ -1,6 +1,7 @@
 using System.CommandLine;
+using ArchLinterNet.Cli.Abstractions;
 
-namespace ArchLinterNet.Cli;
+namespace ArchLinterNet.Cli.Infrastructure;
 
 internal interface ICliRootCommandFactory
 {

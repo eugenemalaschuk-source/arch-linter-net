@@ -1,3 +1,4 @@
+using ArchLinterNet.Cli.Abstractions;
 using ArchLinterNet.Core.Model;
 using ArchLinterNet.Core.Validation;
 
@@ -9,7 +10,7 @@ internal sealed class BaselineGenerateCommandHandler(ICliRuntime runtime, ICliCo
     {
         if (options.ShowHelp)
         {
-            console.Out.WriteLine(BaselineCommandDefinition.HelpText);
+            console.Out.WriteLine(BaselineHelpTexts.HelpText);
             return CliExitCodes.Success;
         }
 

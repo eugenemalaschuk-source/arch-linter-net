@@ -1,4 +1,5 @@
 using System.Text.Json;
+using ArchLinterNet.Cli.Abstractions;
 using ArchLinterNet.Core.Model;
 using ArchLinterNet.Core.Validation;
 
@@ -10,7 +11,7 @@ internal sealed class BaselineVerifyCommandHandler(ICliRuntime runtime, ICliCons
     {
         if (options.ShowHelp)
         {
-            console.Out.WriteLine(BaselineCommandDefinition.VerifyHelpText);
+            console.Out.WriteLine(BaselineHelpTexts.VerifyHelpText);
             return CliExitCodes.Success;
         }
 

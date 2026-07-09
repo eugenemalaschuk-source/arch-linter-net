@@ -1,6 +1,11 @@
 using System.Text;
 using ArchLinterNet.Cli;
+using ArchLinterNet.Cli.Abstractions;
+using ArchLinterNet.Cli.Commands.Baseline;
+using ArchLinterNet.Cli.Commands.Explain;
+using ArchLinterNet.Cli.Commands.Graph;
 using ArchLinterNet.Cli.Commands.Validate;
+using ArchLinterNet.Cli.Infrastructure;
 using ArchLinterNet.Core.Graph;
 using ArchLinterNet.Core.Model;
 using ArchLinterNet.Core.Reporting;
@@ -22,9 +27,27 @@ public sealed class CliArchitectureTests
             Assert.That(composition.Host, Is.Not.Null);
             Assert.That(composition.RootCommandFactory, Is.Not.Null);
             Assert.That(composition.Runtime, Is.Not.Null);
-            Assert.That(composition.ValidateHandler, Is.Not.Null);
-            Assert.That(composition.ValidateDefinition, Is.Not.Null);
+            Assert.That(composition.RootCommandModule, Is.InstanceOf<ValidateCommandModule>());
+            Assert.That(composition.SubcommandModules.Select(static module => module.GetType()), Is.EquivalentTo(new[]
+            {
+                typeof(BaselineCommandModule),
+                typeof(GraphCommandModule),
+                typeof(ExplainCommandModule),
+            }));
+            Assert.That(
+                composition.RootCommandFactory.Create().Subcommands.Select(static command => command.Name),
+                Is.EquivalentTo(new[] { "baseline", "graph", "explain" }));
         });
+    }
+
+    [Test]
+    public void BaselineModule_ComposesSubcommandsFromModules()
+    {
+        BaselineCommandModule module = new(new FakeCliRuntime(), new FakeCliConsole(), new FakeFileSystem(exists: true));
+
+        var commandNames = module.CreateCommand().Subcommands.Select(static command => command.Name).ToArray();
+
+        Assert.That(commandNames, Is.EquivalentTo(new[] { "generate", "update", "prune", "diff", "verify" }));
     }
 
     [Test]

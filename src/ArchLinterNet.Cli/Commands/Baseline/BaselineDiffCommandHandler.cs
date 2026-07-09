@@ -1,4 +1,5 @@
 using System.Text.Json;
+using ArchLinterNet.Cli.Abstractions;
 using ArchLinterNet.Core.Model;
 using ArchLinterNet.Core.Validation;
 
@@ -10,7 +11,7 @@ internal sealed class BaselineDiffCommandHandler(ICliRuntime runtime, ICliConsol
     {
         if (options.ShowHelp)
         {
-            console.Out.WriteLine(BaselineCommandDefinition.DiffHelpText);
+            console.Out.WriteLine(BaselineHelpTexts.DiffHelpText);
             return CliExitCodes.Success;
         }
 

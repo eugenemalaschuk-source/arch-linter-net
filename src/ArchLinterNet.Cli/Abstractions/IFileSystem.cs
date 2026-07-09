@@ -1,4 +1,4 @@
-namespace ArchLinterNet.Cli;
+namespace ArchLinterNet.Cli.Abstractions;
 
 internal interface IFileSystem
 {

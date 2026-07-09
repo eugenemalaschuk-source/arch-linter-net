@@ -1,4 +1,6 @@
-namespace ArchLinterNet.Cli;
+using ArchLinterNet.Cli.Abstractions;
+
+namespace ArchLinterNet.Cli.Infrastructure;
 
 internal sealed class SystemCliConsole : ICliConsole
 {

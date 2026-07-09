@@ -1,3 +1,5 @@
+using ArchLinterNet.Cli.Infrastructure;
+
 namespace ArchLinterNet.Cli;
 
 public static class Program

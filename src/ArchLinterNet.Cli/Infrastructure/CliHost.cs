@@ -1,12 +1,19 @@
 using System.CommandLine;
 using System.CommandLine.Parsing;
+using ArchLinterNet.Cli.Abstractions;
 
-namespace ArchLinterNet.Cli;
+namespace ArchLinterNet.Cli.Infrastructure;
 
-internal sealed class CliHost(ICliRootCommandFactory rootCommandFactory, ICliConsole console)
+internal sealed class CliHost(ICliRootCommandFactory rootCommandFactory, ICliConsole console, ICliRuntime runtime)
 {
     public int Run(string[] args)
     {
+        if (args.Length == 1 && args[0] is "--version" or "-v")
+        {
+            console.Out.WriteLine($"arch-linter-net {runtime.Version}");
+            return CliExitCodes.Success;
+        }
+
         Command rootCommand = rootCommandFactory.Create();
         ParseResult parseResult = rootCommand.Parse(args);
         if (parseResult.Errors.Count > 0)

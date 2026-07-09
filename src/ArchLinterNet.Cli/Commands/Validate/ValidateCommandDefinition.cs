@@ -44,9 +44,10 @@ internal sealed class ValidateCommandDefinition(ValidateCommandHandler handler)
           2   Runtime error (invalid arguments, file not found, etc.)
         """;
 
-    public Command CreateRootCommand()
+    public RootCommand CreateRootCommand()
     {
-        Command command = new("arch-linter-net");
+        RootCommand command = new("arch-linter-net");
+        RemoveBuiltInRootOptions(command);
 
         Option<string> policyOption = CreateOption("--policy", "architecture/dependencies.arch.yml");
         policyOption.Aliases.Add("-p");
@@ -98,6 +99,21 @@ internal sealed class ValidateCommandDefinition(ValidateCommandHandler handler)
             versionOption)));
 
         return command;
+    }
+
+    private static void RemoveBuiltInRootOptions(RootCommand command)
+    {
+        Option? helpOption = command.Options.SingleOrDefault(static option => option.Name == "help");
+        if (helpOption is not null)
+        {
+            command.Options.Remove(helpOption);
+        }
+
+        Option? versionOption = command.Options.SingleOrDefault(static option => option.Name == "version");
+        if (versionOption is not null)
+        {
+            command.Options.Remove(versionOption);
+        }
     }
 
     private static ValidateCommandOptions MapOptions(

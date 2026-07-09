@@ -30,6 +30,12 @@ layers:
     namespace: ArchLinterNet.Core.Composition
   cli:
     namespace: ArchLinterNet.Cli
+  cli_abstractions:
+    namespace: ArchLinterNet.Cli.Abstractions
+  cli_infrastructure:
+    namespace: ArchLinterNet.Cli.Infrastructure
+  cli_commands:
+    namespace: ArchLinterNet.Cli.Commands
   testing:
     namespace: ArchLinterNet.Testing
   unity:
@@ -81,6 +87,24 @@ contracts:
       source: cli
       forbidden: [core_execution, core_contracts, core_resolution, core_scanning]
       reason: CLI must call the Core.Validation application seam instead of constructing contract runners or loading policies directly.
+
+    - name: cli-abstractions-must-stay-separate-from-infrastructure-and-command-implementations
+      id: cli-abstractions-must-stay-separate-from-infrastructure-and-command-implementations
+      source: cli_abstractions
+      forbidden: [cli_infrastructure, cli_commands, testing, unity, core_execution, core_contracts, core_resolution, core_scanning, core_discovery]
+      reason: CLI abstractions must remain a narrow contract boundary and must not drift into infrastructure details, command implementations, or Core internals below the application seam.
+
+    - name: cli-commands-must-not-depend-on-cli-infrastructure
+      id: cli-commands-must-not-depend-on-cli-infrastructure
+      source: cli_commands
+      forbidden: [cli_infrastructure]
+      reason: CLI commands must depend on CLI abstractions, not concrete host/runtime/file-system infrastructure implementations.
+
+    - name: cli-infrastructure-must-not-depend-on-cli-command-implementations
+      id: cli-infrastructure-must-not-depend-on-cli-command-implementations
+      source: cli_infrastructure
+      forbidden: [cli_commands]
+      reason: CLI infrastructure should compose command modules through abstractions and discovery, not by coupling back to command implementation namespaces.
 
     - name: testing-must-use-validation-application-seam
       id: testing-must-use-validation-application-seam

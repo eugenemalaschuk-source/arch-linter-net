@@ -1,4 +1,5 @@
 using System.Text.Json;
+using ArchLinterNet.Cli.Abstractions;
 using ArchLinterNet.Core.Model;
 using ArchLinterNet.Core.Validation;
 
@@ -10,7 +11,7 @@ internal sealed class BaselinePruneCommandHandler(ICliRuntime runtime, ICliConso
     {
         if (options.ShowHelp)
         {
-            console.Out.WriteLine(BaselineCommandDefinition.PruneHelpText);
+            console.Out.WriteLine(BaselineHelpTexts.PruneHelpText);
             return CliExitCodes.Success;
         }
 

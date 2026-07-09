@@ -1,3 +1,4 @@
+using ArchLinterNet.Cli.Abstractions;
 using ArchLinterNet.Core.Model;
 using ArchLinterNet.Core.Validation;
 
@@ -9,7 +10,7 @@ internal sealed class BaselineUpdateCommandHandler(ICliRuntime runtime, ICliCons
     {
         if (options.ShowHelp)
         {
-            console.Out.WriteLine(BaselineCommandDefinition.UpdateHelpText);
+            console.Out.WriteLine(BaselineHelpTexts.UpdateHelpText);
             return CliExitCodes.Success;
         }
 
