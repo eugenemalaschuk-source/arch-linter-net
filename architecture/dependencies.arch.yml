@@ -148,6 +148,18 @@ contracts:
       forbidden: [core_scanning, core_discovery, core_resolution, core_io]
       reason: The application seam must reach scanning, discovery, resolution, and infrastructure IO only through Core.Execution (or Core.Asmdef for Unity), not by depending on their internals directly.
 
+    - name: core-contracts-must-not-depend-on-hosts
+      id: core-contracts-must-not-depend-on-hosts
+      source: core_contracts
+      forbidden: [cli, testing, unity]
+      reason: Contract-family and validator internals must stay usable from any host and must not couple back to a specific CLI, testing, or Unity adapter.
+
+    - name: core-contracts-must-not-depend-on-execution
+      id: core-contracts-must-not-depend-on-execution
+      source: core_contracts
+      forbidden: [core_execution]
+      reason: Contracts must stay independent of Execution's runtime checker/registry internals; the deliberately-duplicated ArchitectureContractFamilyBindings/ArchitectureContractFamilyBinding registry depends on this separation holding.
+
   strict_external:
     - name: core-model-must-not-depend-on-di-container
       source: core_model
@@ -377,4 +389,6 @@ contracts:
         - core-layering
         - core-application-seam-layering
         - package-cycles
+        - core-contracts-must-not-depend-on-hosts
+        - core-contracts-must-not-depend-on-execution
       reason: The recovered Core architecture's base package rules, seam, leaf-isolation, and protected-surface rules must keep matching real code so a renamed or deleted layer cannot silently stop being enforced.
