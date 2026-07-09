@@ -4,6 +4,10 @@
     <ProjectReference Include="..\ArchLinterNet.Core\ArchLinterNet.Core.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <PackageReference Include="System.CommandLine" Version="2.0.9" />
+  </ItemGroup>
+
   <PropertyGroup>
     <OutputType>Exe</OutputType>
     <TargetFramework>net10.0</TargetFramework>
@@ -15,5 +19,9 @@
     <PackageId>ArchLinterNet.Cli</PackageId>
     <Description>.NET tool for running ArchLinterNet architecture contracts from YAML policies. Supports strict and audit modes with human and JSON output.</Description>
   </PropertyGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="ArchLinterNet.Cli.Tests" />
+  </ItemGroup>
 
 </Project>

@@ -72,7 +72,7 @@ public partial class CliIntegrationTests
         var startInfo = new ProcessStartInfo
         {
             FileName = "dotnet",
-            Arguments = $"run --project \"{_cliProjectPath}\" -- {joinedArgs}",
+            Arguments = $"run --no-build --project \"{_cliProjectPath}\" -- {joinedArgs}",
             RedirectStandardOutput = true,
             RedirectStandardError = true,
             UseShellExecute = false,
@@ -145,6 +145,19 @@ public partial class CliIntegrationTests
         {
             Assert.That(exitCode, Is.EqualTo(0));
             Assert.That(stdout, Does.Contain("arch-linter-net"));
+        });
+    }
+
+    [Test]
+    public void Version_WithAdditionalRootArguments_StillPrintsVersionAndExitsZero()
+    {
+        var (exitCode, stdout, stderr) = RunCli("--policy", _passingPolicy, "--version");
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(exitCode, Is.EqualTo(0));
+            Assert.That(stdout, Does.Contain("arch-linter-net"));
+            Assert.That(stderr, Is.Empty);
         });
     }
 
@@ -225,6 +238,30 @@ public partial class CliIntegrationTests
         Assert.That(auditExit, Is.EqualTo(modeExit));
     }
 
+    [Test]
+    public void ValidateModeFlags_RespectLeftToRightPrecedence()
+    {
+        var strictFromTail = RunCli("--policy", _failingPolicy, "--audit", "--mode", "strict");
+        var strictCanonical = RunCli("--policy", _failingPolicy, "--mode", "strict");
+        var auditFromTail = RunCli("--policy", _failingPolicy, "--mode", "strict", "--audit");
+        var auditCanonical = RunCli("--policy", _failingPolicy, "--mode", "audit");
+
+        AssertCliResultEquals(strictCanonical, strictFromTail);
+        AssertCliResultEquals(auditCanonical, auditFromTail);
+    }
+
+    [Test]
+    public void ValidateModeShortcuts_RespectLeftToRightPrecedence()
+    {
+        var auditFromTail = RunCli("--policy", _failingPolicy, "--strict", "--audit");
+        var auditCanonical = RunCli("--policy", _failingPolicy, "--mode", "audit");
+        var strictFromTail = RunCli("--policy", _failingPolicy, "--audit", "--strict");
+        var strictCanonical = RunCli("--policy", _failingPolicy, "--mode", "strict");
+
+        AssertCliResultEquals(auditCanonical, auditFromTail);
+        AssertCliResultEquals(strictCanonical, strictFromTail);
+    }
+
     /* --format human / json */
 
     [Test]
@@ -265,6 +302,18 @@ public partial class CliIntegrationTests
 
         Assert.That(exitCode, Is.EqualTo(0));
         Assert.DoesNotThrow(() => JsonDocument.Parse(stdout));
+    }
+
+    [Test]
+    public void ValidateFormatFlags_RespectLeftToRightPrecedence()
+    {
+        var sarifFromTail = RunCli("--policy", _failingPolicy, "--json", "--format", "sarif", "--strict");
+        var sarifCanonical = RunCli("--policy", _failingPolicy, "--format", "sarif", "--strict");
+        var jsonFromTail = RunCli("--policy", _failingPolicy, "--format", "sarif", "--json", "--strict");
+        var jsonCanonical = RunCli("--policy", _failingPolicy, "--format", "json", "--strict");
+
+        AssertCliResultEquals(sarifCanonical, sarifFromTail);
+        AssertCliResultEquals(jsonCanonical, jsonFromTail);
     }
 
     /* --format sarif */
@@ -540,6 +589,18 @@ public partial class CliIntegrationTests
         var (_, _, stderr) = RunCli("--policy", _passingPolicy, "--strict");
 
         Assert.That(stderr, Is.Empty);
+    }
+
+    private static void AssertCliResultEquals(
+        (int ExitCode, string StdOut, string StdErr) expected,
+        (int ExitCode, string StdOut, string StdErr) actual)
+    {
+        Assert.Multiple(() =>
+        {
+            Assert.That(actual.ExitCode, Is.EqualTo(expected.ExitCode));
+            Assert.That(actual.StdOut, Is.EqualTo(expected.StdOut));
+            Assert.That(actual.StdErr, Is.EqualTo(expected.StdErr));
+        });
     }
 
 }
