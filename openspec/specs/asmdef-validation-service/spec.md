@@ -4,7 +4,7 @@
 Defines the narrow Core application service that composes policy loading, repository-root resolution, and `strict_asmdef` contract scanning for asmdef-only callers (Unity), without pulling them into the full CLI/public-API/Testing validation seam.
 ## Requirements
 ### Requirement: Narrow asmdef application service composes loader, resolver, and scanner
-`ArchLinterNet.Core.Asmdef.Abstractions.IAsmdefValidationService` SHALL expose `AsmdefValidationOutcome Validate(AsmdefValidationRequest request)`. Its default implementation, `ArchLinterNet.Core.Asmdef.AsmdefValidationService`, SHALL load the policy document at `AsmdefValidationRequest.PolicyPath`, resolve the repository root from that path, and run `strict_asmdef` contract scanning against the resolved root, returning the aggregated violations.
+`ArchLinterNet.Core.Asmdef.Abstractions.IAsmdefValidationService` SHALL expose `AsmdefValidationOutcome Validate(AsmdefValidationRequest request)`. Its default implementation, `ArchLinterNet.Core.Asmdef.AsmdefValidationService`, SHALL load the policy document at `AsmdefValidationRequest.PolicyPath`, resolve the repository root from that path, and run `strict_asmdef` contract scanning against the resolved root through its constructor-injected `ArchLinterNet.Core.Scanning.Abstractions.IArchitectureAsmdefScanner` collaborator, returning the aggregated violations.
 
 #### Scenario: Validate wraps load, resolve, and scan
 - **WHEN** `AsmdefValidationService.Validate` is called with a `AsmdefValidationRequest.PolicyPath` pointing at a valid policy containing `strict_asmdef` contracts
