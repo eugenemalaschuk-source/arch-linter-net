@@ -406,6 +406,44 @@ contracts:
     }
 
     [Test]
+    public void CheckConfiguration_AuditMode_UnknownExternalGroup_ReturnsViolation()
+    {
+        // Audit-mode counterpart of CheckConfiguration_UnknownExternalGroup_ReturnsViolation:
+        // proves the single registry-driven contribution loop (introduced in #212) still validates
+        // the audit branch identically to strict, now that both modes share the same code path.
+        var document = new ArchitectureContractDocument
+        {
+            Version = 1,
+            Name = "Test",
+            Layers = new Dictionary<string, ArchitectureLayer>
+            {
+                ["core"] = new() { Namespace = "ArchLinterNet.Core" }
+            },
+            Analysis = new ArchitectureAnalysisConfiguration
+            {
+                TargetAssemblies = new List<string> { "ArchLinterNet.Core" }
+            },
+            Contracts = new ArchitectureContractGroups
+            {
+                AuditExternal = new List<ArchitectureExternalDependencyContract>
+                {
+                    new()
+                    {
+                        Name = "core-no-unknown-audit",
+                        Source = "core",
+                        Forbidden = new List<string> { "unknown_group" }
+                    }
+                }
+            }
+        };
+
+        var runner = new ArchitectureContractRunner(CreateContext(), document);
+        var violations = runner.CheckConfiguration(strict: false);
+
+        Assert.That(violations.Any(v => v.ForbiddenNamespace == "unknown external dependency group"), Is.True);
+    }
+
+    [Test]
     public void CheckConfiguration_ExternalGroupWithoutMatchers_ReturnsViolation()
     {
         var document = new ArchitectureContractDocument

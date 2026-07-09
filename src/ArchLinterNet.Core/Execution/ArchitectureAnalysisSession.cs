@@ -1,5 +1,6 @@
 using ArchLinterNet.Core.Contracts;
 using ArchLinterNet.Core.Discovery;
+using ArchLinterNet.Core.Execution.Abstractions;
 using ArchLinterNet.Core.Model;
 using ArchLinterNet.Core.Resolution;
 using ArchLinterNet.Core.Scanning;
@@ -262,257 +263,28 @@ public sealed partial class ArchitectureAnalysisSession
                 new[] { discoveryDiagnostic.Message }));
         }
 
-        Dictionary<string, HashSet<string>> layerReferencingContractIds = new(StringComparer.Ordinal);
-        HashSet<string> referencedExternalGroups = new(StringComparer.Ordinal);
-        HashSet<string> referencedPackageGroups = new(StringComparer.Ordinal);
-        List<(string ContractName, string? ContractId, string Source)> packageContractSources = new();
-        List<(string ContractName, string? ContractId, string ProjectPath)> projectMetadataContractProjects = new();
+        ArchitectureConfigurationReferenceCollector collector = new();
 
-        void AddLayerNames(string? contractId, IEnumerable<string> names)
+        foreach (ArchitectureContractFamilyDescriptor descriptor in ArchitectureContractFamilyRegistry.All)
         {
-            foreach (string name in names)
+            if (descriptor.ConfigurationContributor is null)
             {
-                if (!layerReferencingContractIds.TryGetValue(name, out HashSet<string>? contractIds))
-                {
-                    contractIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-                    layerReferencingContractIds[name] = contractIds;
-                }
-
-                if (contractId != null)
-                {
-                    contractIds.Add(contractId);
-                }
-            }
-        }
-
-        void AddExternalGroupNames(IEnumerable<string> names)
-        {
-            foreach (string name in names)
-            {
-                referencedExternalGroups.Add(name);
-            }
-        }
-
-        void AddPackageGroupNames(IEnumerable<string> names)
-        {
-            foreach (string name in names)
-            {
-                referencedPackageGroups.Add(name);
-            }
-        }
-
-        if (strict)
-        {
-            foreach (ArchitectureDependencyContract c in Document.Contracts.Strict)
-            {
-                AddLayerNames(c.Id, new[] { c.Source });
-                AddLayerNames(c.Id, c.Forbidden);
+                continue;
             }
 
-            foreach (ArchitectureAllowOnlyContract c in Document.Contracts.StrictAllowOnly)
+            IEnumerable<IArchitectureContract> contracts = strict
+                ? descriptor.StrictContracts(Document.Contracts)
+                : descriptor.AuditContracts(Document.Contracts);
+
+            foreach (IArchitectureContract contract in contracts)
             {
-                AddLayerNames(c.Id, new[] { c.Source });
-                AddLayerNames(c.Id, c.Allowed);
-            }
-
-            foreach (ArchitectureCycleContract c in Document.Contracts.StrictCycles)
-            {
-                AddLayerNames(c.Id, c.Layers);
-            }
-
-            foreach (ArchitectureMethodBodyContract c in Document.Contracts.StrictMethodBody)
-            {
-                AddLayerNames(c.Id, new[] { c.Source });
-            }
-
-            foreach (ArchitectureIndependenceContract c in Document.Contracts.StrictIndependence)
-            {
-                AddLayerNames(c.Id, c.Layers);
-            }
-
-            foreach (ArchitectureLayerContract c in Document.Contracts.StrictLayers)
-            {
-                AddLayerNames(c.Id, c.Layers);
-            }
-
-            foreach (ArchitectureProtectedContract c in Document.Contracts.StrictProtected)
-            {
-                AddLayerNames(c.Id, c.Protected);
-                AddLayerNames(c.Id, c.AllowedImporters);
-            }
-
-            foreach (ArchitectureExternalDependencyContract c in Document.Contracts.StrictExternal)
-            {
-                AddLayerNames(c.Id, new[] { c.Source });
-                AddExternalGroupNames(c.Forbidden);
-            }
-
-            foreach (ArchitectureExternalAllowOnlyContract c in Document.Contracts.StrictExternalAllowOnly)
-            {
-                AddLayerNames(c.Id, new[] { c.Source });
-                AddExternalGroupNames(Document.ExternalDependencies.Keys.Where(name => !c.Allowed.Contains(name)));
-            }
-
-            foreach (ArchitecturePackageDependencyContract c in Document.Contracts.StrictPackageDependency)
-            {
-                if (!IsContractSelected(c.Id))
-                {
-                    continue;
-                }
-
-                AddPackageGroupNames(c.Forbidden);
-                packageContractSources.Add((c.Name, c.Id, c.Source));
-            }
-
-            foreach (ArchitecturePackageAllowOnlyContract c in Document.Contracts.StrictPackageAllowOnly)
-            {
-                if (!IsContractSelected(c.Id))
-                {
-                    continue;
-                }
-
-                AddPackageGroupNames(c.Allowed);
-                packageContractSources.Add((c.Name, c.Id, c.Source));
-            }
-
-            foreach (ArchitectureProjectMetadataContract c in Document.Contracts.StrictProjectMetadata)
-            {
-                if (!IsContractSelected(c.Id))
-                {
-                    continue;
-                }
-
-                projectMetadataContractProjects.AddRange(c.Projects.Select(project => (c.Name, c.Id, NormalizeProjectPath(project))));
-            }
-
-            foreach (ArchitectureTypePlacementContract c in Document.Contracts.StrictTypePlacement)
-            {
-                AddLayerNames(c.Id, GetTypePlacementReferencedLayerNames(c));
-            }
-
-            foreach (ArchitectureAttributeUsageContract c in Document.Contracts.StrictAttributeUsage)
-            {
-                AddLayerNames(c.Id, GetAttributeUsageReferencedLayerNames(c));
-            }
-
-            foreach (ArchitectureInheritanceContract c in Document.Contracts.StrictInheritance)
-            {
-                AddLayerNames(c.Id, c.SourceLayers);
-            }
-
-            foreach (ArchitectureInterfaceImplementationContract c in Document.Contracts.StrictInterfaceImplementation)
-            {
-                AddLayerNames(c.Id, GetInterfaceImplementationReferencedLayerNames(c));
-            }
-        }
-        else
-        {
-            foreach (ArchitectureDependencyContract c in Document.Contracts.Audit)
-            {
-                AddLayerNames(c.Id, new[] { c.Source });
-                AddLayerNames(c.Id, c.Forbidden);
-            }
-
-            foreach (ArchitectureAllowOnlyContract c in Document.Contracts.AuditAllowOnly)
-            {
-                AddLayerNames(c.Id, new[] { c.Source });
-                AddLayerNames(c.Id, c.Allowed);
-            }
-
-            foreach (ArchitectureCycleContract c in Document.Contracts.AuditCycles)
-            {
-                AddLayerNames(c.Id, c.Layers);
-            }
-
-            foreach (ArchitectureMethodBodyContract c in Document.Contracts.AuditMethodBody)
-            {
-                AddLayerNames(c.Id, new[] { c.Source });
-            }
-
-            foreach (ArchitectureIndependenceContract c in Document.Contracts.AuditIndependence)
-            {
-                AddLayerNames(c.Id, c.Layers);
-            }
-
-            foreach (ArchitectureLayerContract c in Document.Contracts.AuditLayers)
-            {
-                AddLayerNames(c.Id, c.Layers);
-            }
-
-            foreach (ArchitectureProtectedContract c in Document.Contracts.AuditProtected)
-            {
-                AddLayerNames(c.Id, c.Protected);
-                AddLayerNames(c.Id, c.AllowedImporters);
-            }
-
-            foreach (ArchitectureExternalDependencyContract c in Document.Contracts.AuditExternal)
-            {
-                AddLayerNames(c.Id, new[] { c.Source });
-                AddExternalGroupNames(c.Forbidden);
-            }
-
-            foreach (ArchitectureExternalAllowOnlyContract c in Document.Contracts.AuditExternalAllowOnly)
-            {
-                AddLayerNames(c.Id, new[] { c.Source });
-                AddExternalGroupNames(Document.ExternalDependencies.Keys.Where(name => !c.Allowed.Contains(name)));
-            }
-
-            foreach (ArchitecturePackageDependencyContract c in Document.Contracts.AuditPackageDependency)
-            {
-                if (!IsContractSelected(c.Id))
-                {
-                    continue;
-                }
-
-                AddPackageGroupNames(c.Forbidden);
-                packageContractSources.Add((c.Name, c.Id, c.Source));
-            }
-
-            foreach (ArchitecturePackageAllowOnlyContract c in Document.Contracts.AuditPackageAllowOnly)
-            {
-                if (!IsContractSelected(c.Id))
-                {
-                    continue;
-                }
-
-                AddPackageGroupNames(c.Allowed);
-                packageContractSources.Add((c.Name, c.Id, c.Source));
-            }
-
-            foreach (ArchitectureProjectMetadataContract c in Document.Contracts.AuditProjectMetadata)
-            {
-                if (!IsContractSelected(c.Id))
-                {
-                    continue;
-                }
-
-                projectMetadataContractProjects.AddRange(c.Projects.Select(project => (c.Name, c.Id, NormalizeProjectPath(project))));
-            }
-
-            foreach (ArchitectureTypePlacementContract c in Document.Contracts.AuditTypePlacement)
-            {
-                AddLayerNames(c.Id, GetTypePlacementReferencedLayerNames(c));
-            }
-
-            foreach (ArchitectureAttributeUsageContract c in Document.Contracts.AuditAttributeUsage)
-            {
-                AddLayerNames(c.Id, GetAttributeUsageReferencedLayerNames(c));
-            }
-
-            foreach (ArchitectureInheritanceContract c in Document.Contracts.AuditInheritance)
-            {
-                AddLayerNames(c.Id, c.SourceLayers);
-            }
-
-            foreach (ArchitectureInterfaceImplementationContract c in Document.Contracts.AuditInterfaceImplementation)
-            {
-                AddLayerNames(c.Id, GetInterfaceImplementationReferencedLayerNames(c));
+                descriptor.ConfigurationContributor(this, collector, contract);
             }
         }
 
         HashSet<string> ruleInputCoveredContractIds = CollectRuleInputCoveredContractIds(strict);
 
-        foreach ((string layerName, HashSet<string> referencingContractIds) in layerReferencingContractIds)
+        foreach ((string layerName, HashSet<string> referencingContractIds) in collector.LayerReferencingContractIds)
         {
             bool isFullyOwnedByRuleInputCoverage = referencingContractIds.Count > 0
                 && referencingContractIds.All(ruleInputCoveredContractIds.Contains);
@@ -560,7 +332,7 @@ public sealed partial class ArchitectureAnalysisSession
             }
         }
 
-        foreach (string groupName in referencedExternalGroups)
+        foreach (string groupName in collector.ReferencedExternalGroups)
         {
             if (!Document.ExternalDependencies.TryGetValue(groupName, out ArchitectureExternalDependencyGroup? group))
             {
@@ -599,7 +371,7 @@ public sealed partial class ArchitectureAnalysisSession
             });
         }
 
-        foreach (string groupName in referencedPackageGroups)
+        foreach (string groupName in collector.ReferencedPackageGroups)
         {
             if (!Document.Packages.TryGetValue(groupName, out ArchitecturePackageGroup? group))
             {
@@ -638,13 +410,13 @@ public sealed partial class ArchitectureAnalysisSession
             });
         }
 
-        if (packageContractSources.Count > 0)
+        if (collector.PackageContractSources.Count > 0)
         {
             HashSet<string> projectsWithPackageData = new(
                 Context.ProjectDiscovery?.DiscoveredProjects.Select(project => project.AssemblyName) ?? Enumerable.Empty<string>(),
                 StringComparer.Ordinal);
 
-            foreach ((string contractName, string? contractId, string source) in packageContractSources
+            foreach ((string contractName, string? contractId, string source) in collector.PackageContractSources
                          .DistinctBy(entry => (entry.ContractName, entry.ContractId, entry.Source)))
             {
                 if (projectsWithPackageData.Contains(source))
@@ -666,14 +438,14 @@ public sealed partial class ArchitectureAnalysisSession
             }
         }
 
-        if (projectMetadataContractProjects.Count > 0)
+        if (collector.ProjectMetadataContractProjects.Count > 0)
         {
             HashSet<string> discoveredProjectPaths = new(
                 Context.ProjectDiscovery?.DiscoveredProjects.Select(project => NormalizeProjectPath(project.Path))
                 ?? Enumerable.Empty<string>(),
                 StringComparer.OrdinalIgnoreCase);
 
-            foreach ((string contractName, string? contractId, string projectPath) in projectMetadataContractProjects
+            foreach ((string contractName, string? contractId, string projectPath) in collector.ProjectMetadataContractProjects
                          .DistinctBy(entry => (entry.ContractName, entry.ContractId, entry.ProjectPath)))
             {
                 if (discoveredProjectPaths.Contains(projectPath))
@@ -700,7 +472,7 @@ public sealed partial class ArchitectureAnalysisSession
         return violations;
     }
 
-    private static string NormalizeProjectPath(string path)
+    internal static string NormalizeProjectPath(string path)
     {
         return path.Replace('\\', '/').Trim();
     }
