@@ -601,7 +601,7 @@ public sealed partial class ArchitectureAnalysisSession
     // types_matching.layer or must_reside_in_layers gets the same "referenced but undeclared
     // layer" / rule-input-coverage-deferral treatment every other layer-bearing contract family
     // gets, instead of surfacing only as an uncaught ArchitectureLayerResolver exception.
-    private static IEnumerable<string> GetTypePlacementReferencedLayerNames(ArchitectureTypePlacementContract contract)
+    internal static IEnumerable<string> GetTypePlacementReferencedLayerNames(ArchitectureTypePlacementContract contract)
     {
         IEnumerable<string> selectorLayer = string.IsNullOrEmpty(contract.TypesMatching.Layer)
             ? Array.Empty<string>()
@@ -614,7 +614,7 @@ public sealed partial class ArchitectureAnalysisSession
     // forbidden_in_layers entry must get the shared "referenced but undeclared layer" /
     // rule-input-coverage-deferral treatment instead of surfacing as an uncaught
     // ArchitectureLayerResolver exception from CheckAttributeUsageContract.
-    private static IEnumerable<string> GetAttributeUsageReferencedLayerNames(ArchitectureAttributeUsageContract contract)
+    internal static IEnumerable<string> GetAttributeUsageReferencedLayerNames(ArchitectureAttributeUsageContract contract)
     {
         return contract.AllowedOnlyInLayers.Concat(contract.ForbiddenInLayers);
     }
@@ -623,7 +623,7 @@ public sealed partial class ArchitectureAnalysisSession
     // forbidden_in_layers entry must get the shared "referenced but undeclared layer" /
     // rule-input-coverage-deferral treatment instead of surfacing as an uncaught
     // ArchitectureLayerResolver exception from CheckInterfaceImplementationContract.
-    private static IEnumerable<string> GetInterfaceImplementationReferencedLayerNames(
+    internal static IEnumerable<string> GetInterfaceImplementationReferencedLayerNames(
         ArchitectureInterfaceImplementationContract contract)
     {
         return contract.AllowedOnlyInLayers.Concat(contract.ForbiddenInLayers);

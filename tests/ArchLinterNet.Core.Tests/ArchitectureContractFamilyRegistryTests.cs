@@ -74,6 +74,34 @@ public sealed class ArchitectureContractFamilyRegistryTests
     }
 
     [Test]
+    public void All_OnlySixteenFamiliesHaveANonNullConfigurationContributor()
+    {
+        // Families that CheckConfiguration hand-validated configuration references for before #212;
+        // every other family (including composition, whose AllowedOnlyInLayers is already handled
+        // by GetReferencedLayerNames elsewhere but was never fed into CheckConfiguration) must stay
+        // null so the refactor does not silently start producing new violations for previously-silent
+        // policies.
+        string[] expectedContributingFamilies =
+        {
+            "dependency", "layer", "allow_only", "cycle", "method_body", "independence", "protected",
+            "external", "external_allow_only", "package_dependency", "package_allow_only", "project_metadata",
+            "type_placement", "attribute_usage", "inheritance", "interface_implementation",
+        };
+
+        List<string> actualContributingFamilies = ArchitectureContractFamilyRegistry.All
+            .Where(d => d.ConfigurationContributor is not null)
+            .Select(d => d.FamilyId)
+            .ToList();
+
+        Assert.That(actualContributingFamilies, Is.EquivalentTo(expectedContributingFamilies));
+
+        ArchitectureContractFamilyDescriptor compositionDescriptor = ArchitectureContractFamilyRegistry.All
+            .Single(d => d.FamilyId == "composition");
+        Assert.That(compositionDescriptor.ConfigurationContributor, Is.Null,
+            "composition intentionally has no ConfigurationContributor yet - see design.md for the documented gap.");
+    }
+
+    [Test]
     public void LayerTemplateDescriptor_AccessorsExpandTemplatesLikeCatalogDoes()
     {
         ArchitectureContractFamilyDescriptor descriptor = ArchitectureContractFamilyRegistry.All

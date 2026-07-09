@@ -214,6 +214,33 @@ public sealed class PackageDependencyConfigurationTests
     }
 
     [Test]
+    public void CheckConfiguration_PackageAllowOnly_UnknownPackageGroup_ReturnsViolation()
+    {
+        // Same "unknown package group" diagnostic as package_dependency, but exercised through
+        // package_allow_only's ConfigurationContributor to prove the per-family registry wiring
+        // (introduced in #212) still reports both package-referencing families identically.
+        var document = new ArchitectureContractDocument
+        {
+            Version = 1,
+            Name = "Test",
+            Analysis = new ArchitectureAnalysisConfiguration { TargetAssemblies = new List<string> { SourceAssemblyName } },
+            Contracts = new ArchitectureContractGroups
+            {
+                StrictPackageAllowOnly = new List<ArchitecturePackageAllowOnlyContract>
+                {
+                    new() { Name = "domain-allow-only-known", Source = SourceAssemblyName, Allowed = new List<string> { "unknown_group" } }
+                }
+            }
+        };
+
+        var runner = new ArchitectureContractRunner(
+            CreateContext(DiscoveryWithProject(SourceAssemblyName, ("Newtonsoft.Json", "13.0.3"))), document);
+        List<ArchitectureViolation> violations = runner.CheckConfiguration();
+
+        Assert.That(violations.Any(v => v.ForbiddenNamespace == "unknown package group" && v.ForbiddenPackageGroup == "unknown_group"), Is.True);
+    }
+
+    [Test]
     public void CheckConfiguration_SourceAmongDiscoveredProjects_ReturnsNoMissingMetadataViolation()
     {
         var document = new ArchitectureContractDocument

@@ -481,4 +481,76 @@ public sealed class InterfaceImplementationContractTests
         Assert.That(auditOutcome.Violations.Any(v =>
             v.SourceType == "InterfaceImplementationContractTestFixtures.Domain.DomainPaymentImplementation"), Is.True);
     }
+
+    [Test]
+    public void ValidateStrict_DanglingAllowedOnlyInLayerNotCoveredByRuleInputCoverage_ThrowsActionableError()
+    {
+        // Interface_implementation counterpart of the equivalent type_placement/attribute_usage
+        // tests: proves GetInterfaceImplementationReferencedLayerNames (promoted to internal static
+        // for #212) is still reached through this family's new ConfigurationContributor, so a
+        // dangling allowed_only_in_layers entry with no rule_input coverage still throws instead of
+        // silently passing.
+        string policyPath = WritePolicy($"""
+            version: 1
+            name: Test
+
+            analysis:
+              target_assemblies: [{AssemblyName}]
+
+            contracts:
+              strict_interface_implementation:
+                - id: port-dangling-layer
+                  name: port-dangling-layer
+                  interfaces: [{PaymentPortName}]
+                  allowed_only_in_layers: [does_not_exist_layer]
+                  reason: Placeholder with a dangling allowed_only_in_layers entry and no coverage deferral.
+            """);
+
+        InvalidOperationException ex = Assert.Throws<InvalidOperationException>(() =>
+            ArchitectureValidationService.Validate(new ValidationRequest
+            {
+                PolicyPath = policyPath,
+                Mode = "strict"
+            }))!;
+
+        Assert.That(ex.Message, Does.Contain("unknown layer 'does_not_exist_layer'"));
+    }
+
+    [Test]
+    public void ValidateStrict_DanglingForbiddenInLayerCoveredByRuleInputCoverage_ReportsUnresolvedWithoutThrowing()
+    {
+        string policyPath = WritePolicy($"""
+            version: 1
+            name: Test
+
+            analysis:
+              target_assemblies: [{AssemblyName}]
+
+            contracts:
+              strict_interface_implementation:
+                - id: port-dangling-forbidden-layer
+                  name: port-dangling-forbidden-layer
+                  interfaces: [{PaymentPortName}]
+                  forbidden_in_layers: [does_not_exist_layer]
+                  reason: Placeholder with a dangling forbidden_in_layers entry.
+              strict_coverage:
+                - id: rule-input-coverage
+                  name: rule-input-coverage
+                  scope: rule_input
+                  contract_ids: [port-dangling-forbidden-layer]
+                  reason: Flag dangling layer references.
+            """);
+
+        ValidationOutcome outcome = ArchitectureValidationService.Validate(new ValidationRequest
+        {
+            PolicyPath = policyPath,
+            Mode = "strict"
+        });
+
+        Assert.That(outcome.Passed, Is.False);
+        Assert.That(outcome.Violations, Is.Empty);
+        Assert.That(outcome.CoverageFindings, Has.Count.EqualTo(1));
+        Assert.That(outcome.CoverageFindings.Single().ForbiddenNamespace, Is.EqualTo("unresolved"));
+        Assert.That(outcome.CoverageFindings.Single().ForbiddenReferences, Is.EqualTo(new[] { "does_not_exist_layer" }));
+    }
 }
