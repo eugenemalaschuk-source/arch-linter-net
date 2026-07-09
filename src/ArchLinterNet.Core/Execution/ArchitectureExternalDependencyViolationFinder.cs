@@ -47,7 +47,7 @@ internal static class ArchitectureExternalDependencyViolationFinder
                     $"external dependency group '{externalGroupName}'",
                     forbiddenReferences)
                 {
-                    ForbiddenExternalGroup = externalGroupName
+                    Payload = new ExternalDependencyPayload(externalGroupName)
                 };
             })
             .Where(violation => violation != null)!;

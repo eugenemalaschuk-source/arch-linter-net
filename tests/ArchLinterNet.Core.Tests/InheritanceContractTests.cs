@@ -1,5 +1,6 @@
 using ArchLinterNet.Core.Contracts;
 using ArchLinterNet.Core.Execution;
+using ArchLinterNet.Core.Model;
 using ArchLinterNet.Core.Validation;
 using NUnit.Framework;
 
@@ -96,7 +97,7 @@ public sealed class InheritanceContractTests
 
         Assert.That(violations.Any(v =>
             v.SourceType == "InheritanceContractTestFixtures.Domain.DirectViolation"
-            && v.ForbiddenBaseType == FrameworkBaseName), Is.True);
+            && (v.Payload as InheritancePayload)?.ForbiddenBaseType == FrameworkBaseName), Is.True);
     }
 
     [Test]
@@ -115,7 +116,7 @@ public sealed class InheritanceContractTests
 
         Assert.That(violations.Any(v =>
             v.SourceType == "InheritanceContractTestFixtures.Domain.TransitiveViolation"
-            && v.ForbiddenBaseType == FrameworkBaseName), Is.True);
+            && (v.Payload as InheritancePayload)?.ForbiddenBaseType == FrameworkBaseName), Is.True);
     }
 
     [Test]
@@ -134,7 +135,7 @@ public sealed class InheritanceContractTests
 
         Assert.That(violations.Any(v =>
             v.SourceType == "InheritanceContractTestFixtures.Domain.GenericBaseViolation"
-            && v.ForbiddenBaseType == GenericRepositoryName), Is.True);
+            && (v.Payload as InheritancePayload)?.ForbiddenBaseType == GenericRepositoryName), Is.True);
     }
 
     [Test]
@@ -153,7 +154,7 @@ public sealed class InheritanceContractTests
 
         Assert.That(violations.Any(v =>
             v.SourceType == "InheritanceContractTestFixtures.Domain.PrefixViolation"
-            && v.ForbiddenBaseType!.StartsWith(PrefixedFrameworkNamespace, StringComparison.Ordinal)), Is.True);
+            && (v.Payload as InheritancePayload)?.ForbiddenBaseType?.StartsWith(PrefixedFrameworkNamespace, StringComparison.Ordinal) == true), Is.True);
     }
 
     [Test]
@@ -172,7 +173,7 @@ public sealed class InheritanceContractTests
 
         Assert.That(violations.Any(v =>
             v.SourceType == "InheritanceContractTestFixtures.Domain.Outer+NestedViolation"
-            && v.ForbiddenBaseType == FrameworkBaseName), Is.True);
+            && (v.Payload as InheritancePayload)?.ForbiddenBaseType == FrameworkBaseName), Is.True);
     }
 
     [Test]
@@ -269,8 +270,8 @@ public sealed class InheritanceContractTests
         var violationsOne = runnerOne.Session.CheckInheritanceContract(contract);
         var violationsTwo = runnerTwo.Session.CheckInheritanceContract(contract);
 
-        string[] orderOne = violationsOne.Select(v => $"{v.SourceType}|{v.ForbiddenBaseType}").ToArray();
-        string[] orderTwo = violationsTwo.Select(v => $"{v.SourceType}|{v.ForbiddenBaseType}").ToArray();
+        string[] orderOne = violationsOne.Select(v => $"{v.SourceType}|{(v.Payload as InheritancePayload)?.ForbiddenBaseType}").ToArray();
+        string[] orderTwo = violationsTwo.Select(v => $"{v.SourceType}|{(v.Payload as InheritancePayload)?.ForbiddenBaseType}").ToArray();
 
         Assert.That(orderOne, Is.Not.Empty);
         Assert.That(orderOne, Is.EqualTo(orderTwo));
@@ -430,7 +431,7 @@ public sealed class InheritanceContractTests
         Assert.That(outcome.Passed, Is.False);
         Assert.That(outcome.Violations.Any(v =>
             v.SourceType == "InheritanceContractTestFixtures.Domain.DirectViolation"
-            && v.ForbiddenBaseType == FrameworkBaseName), Is.True);
+            && (v.Payload as InheritancePayload)?.ForbiddenBaseType == FrameworkBaseName), Is.True);
     }
 
     [Test]

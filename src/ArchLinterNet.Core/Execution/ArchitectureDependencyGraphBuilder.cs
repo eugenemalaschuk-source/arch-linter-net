@@ -252,22 +252,22 @@ internal static class ArchitectureDependencyGraphBuilder
                 continue;
             }
 
-            if (violation.ForbiddenExternalGroup != null)
+            if (violation.Payload is ExternalDependencyPayload externalDependency)
             {
                 if (level == ArchitectureGraphLevel.Assembly)
                 {
                     continue;
                 }
 
-                string externalId = violation.ForbiddenExternalGroup;
+                string externalId = externalDependency.ForbiddenExternalGroup;
                 nodeKinds.TryAdd(externalId, ArchitectureGraphNodeKind.External);
                 TagEdge(edgeContractIds, sourceId, externalId, violation.ContractId);
                 continue;
             }
 
-            if (violation.DependencyPaths is { Count: > 0 })
+            if (violation.Payload is ConfigurationPayload { DependencyPaths.Count: > 0 } configuration)
             {
-                foreach (IReadOnlyCollection<string> path in violation.DependencyPaths)
+                foreach (IReadOnlyCollection<string> path in configuration.DependencyPaths!)
                 {
                     string[] hops = path.ToArray();
                     for (int i = 0; i < hops.Length - 1; i++)

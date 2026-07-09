@@ -55,7 +55,7 @@ public sealed class TransitiveDependencyContractTests
         var violations = runner.CheckContract(document.Contracts.Strict[0]).ToList();
 
         Assert.That(violations.Count, Is.GreaterThan(0));
-        Assert.That(violations.All(v => v.DependencyPaths == null), Is.True);
+        Assert.That(violations.All(v => (v.Payload as ConfigurationPayload)?.DependencyPaths == null), Is.True);
     }
 
     [Test]
@@ -94,8 +94,8 @@ public sealed class TransitiveDependencyContractTests
         var violations = runner.CheckContract(document.Contracts.Strict[0]).ToList();
 
         Assert.That(violations.Count, Is.GreaterThan(0));
-        Assert.That(violations.All(v => v.DependencyPaths != null), Is.True);
-        Assert.That(violations.All(v => v.DependencyPaths!.Count == v.ForbiddenReferences.Count), Is.True);
+        Assert.That(violations.All(v => (v.Payload as ConfigurationPayload)?.DependencyPaths != null), Is.True);
+        Assert.That(violations.All(v => (v.Payload as ConfigurationPayload)?.DependencyPaths!.Count == v.ForbiddenReferences.Count), Is.True);
     }
 
     [Test]
@@ -136,8 +136,8 @@ public sealed class TransitiveDependencyContractTests
         Assert.That(violations.Count, Is.GreaterThan(0));
         foreach (var violation in violations)
         {
-            Assert.That(violation.DependencyPaths, Is.Not.Null);
-            foreach (var path in violation.DependencyPaths!)
+            Assert.That((violation.Payload as ConfigurationPayload)?.DependencyPaths, Is.Not.Null);
+            foreach (var path in (violation.Payload as ConfigurationPayload)?.DependencyPaths!)
             {
                 Assert.That(path.First(), Is.EqualTo(violation.SourceType));
             }
@@ -182,11 +182,12 @@ public sealed class TransitiveDependencyContractTests
         Assert.That(violations.Count, Is.GreaterThan(0));
         foreach (var violation in violations)
         {
-            Assert.That(violation.DependencyPaths, Is.Not.Null);
+            var configurationPayload = (ConfigurationPayload)violation.Payload!;
+            Assert.That(configurationPayload.DependencyPaths, Is.Not.Null);
             var refsList = violation.ForbiddenReferences.ToList();
             for (int i = 0; i < refsList.Count; i++)
             {
-                var path = violation.DependencyPaths!.ElementAt(i);
+                var path = configurationPayload.DependencyPaths!.ElementAt(i);
                 Assert.That(path.Last(), Is.EqualTo(refsList[i]));
             }
         }
@@ -361,7 +362,7 @@ public sealed class TransitiveDependencyContractTests
         var results = runner.CheckContract(violations).ToList();
 
         Assert.That(results.Count, Is.GreaterThan(0));
-        Assert.That(results.All(v => v.DependencyPaths != null), Is.True);
+        Assert.That(results.All(v => (v.Payload as ConfigurationPayload)?.DependencyPaths != null), Is.True);
     }
 
     [Test]

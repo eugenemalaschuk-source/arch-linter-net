@@ -143,7 +143,8 @@ internal static class ArchitectureNamespaceViolationFinder
                     ArchitectureLayerResolver.DescribeLayer(forbiddenLayer),
                     paired.Select(x => x.refName).ToArray())
                 {
-                    DependencyPaths = paired.Select(x => x.path).ToArray(),
+                    Payload = new ConfigurationPayload(
+                        DependencyPaths: paired.Select(x => x.path).ToArray()),
                     MatchedNamespacePrefixes = matchedPrefixes.Count > 0
                         ? matchedPrefixes.OrderBy(prefix => prefix, StringComparer.Ordinal).ToArray()
                         : null

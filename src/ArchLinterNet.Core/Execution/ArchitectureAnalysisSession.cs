@@ -346,7 +346,7 @@ public sealed partial class ArchitectureAnalysisSession
                         $"External dependency group '{groupName}' is referenced by a contract but is not declared in external_dependencies."
                     })
                 {
-                    ForbiddenExternalGroup = groupName
+                    Payload = new ExternalDependencyPayload(groupName)
                 });
 
                 continue;
@@ -367,7 +367,7 @@ public sealed partial class ArchitectureAnalysisSession
                     $"External dependency group '{groupName}' must declare at least one non-empty namespace_prefixes or type_prefixes matcher."
                 })
             {
-                ForbiddenExternalGroup = groupName
+                Payload = new ExternalDependencyPayload(groupName)
             });
         }
 
@@ -385,7 +385,7 @@ public sealed partial class ArchitectureAnalysisSession
                         $"Package group '{groupName}' is referenced by a contract but is not declared in packages."
                     })
                 {
-                    ForbiddenPackageGroup = groupName
+                    Payload = new PackageDependencyPayload(groupName)
                 });
 
                 continue;
@@ -406,7 +406,7 @@ public sealed partial class ArchitectureAnalysisSession
                     $"Package group '{groupName}' must declare at least one non-empty package_ids or package_prefixes matcher."
                 })
             {
-                ForbiddenPackageGroup = groupName
+                Payload = new PackageDependencyPayload(groupName)
             });
         }
 
@@ -464,7 +464,7 @@ public sealed partial class ArchitectureAnalysisSession
                         "Project metadata contracts require analysis.solution or analysis.projects to discover and parse the matching .csproj file."
                     })
                 {
-                    ProjectMetadataKind = "missing_project"
+                    Payload = new ProjectMetadataPayload(ProjectMetadataKind: "missing_project")
                 });
             }
         }

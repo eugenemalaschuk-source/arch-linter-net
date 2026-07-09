@@ -93,10 +93,11 @@ public sealed partial class ArchitectureAnalysisSession
                     matchedInterface,
                     new[] { actualLocationDescription })
                 {
-                    MatchedInterface = matchedInterface,
-                    ImplementationKind = implementationKind,
-                    ActualImplementationLocation = actualLocationDescription,
-                    ExpectedImplementationLocation = expectedImplementationLocation
+                    Payload = new InterfaceImplementationPayload(
+                        MatchedInterface: matchedInterface,
+                        ImplementationKind: implementationKind,
+                        ActualImplementationLocation: actualLocationDescription,
+                        ExpectedImplementationLocation: expectedImplementationLocation)
                 });
             }
         }

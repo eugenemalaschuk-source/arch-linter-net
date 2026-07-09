@@ -94,8 +94,9 @@ public sealed partial class ArchitectureAnalysisSession
                         "empty layer namespace",
                         new[] { $"Required layer '{layerEntry}' namespace '{layer.Namespace}' contains no types in loaded assemblies." })
                     {
-                        TemplateName = contract.TemplateName,
-                        ContainerNamespace = contract.ContainerNamespace
+                        Payload = new ConfigurationPayload(
+                            TemplateName: contract.TemplateName,
+                            ContainerNamespace: contract.ContainerNamespace)
                     });
                 }
             }
@@ -117,8 +118,9 @@ public sealed partial class ArchitectureAnalysisSession
                 {
                     violations.Add(v with
                     {
-                        TemplateName = contract.TemplateName,
-                        ContainerNamespace = contract.ContainerNamespace
+                        Payload = new ConfigurationPayload(
+                            TemplateName: contract.TemplateName,
+                            ContainerNamespace: contract.ContainerNamespace)
                     });
                 }
             }
@@ -150,8 +152,9 @@ public sealed partial class ArchitectureAnalysisSession
                         "unmapped sibling namespace",
                         new[] { $"Namespace '{childNs}' contains types but is not mapped into any declared layer in template '{contract.TemplateName}'." })
                     {
-                        TemplateName = contract.TemplateName,
-                        ContainerNamespace = contract.ContainerNamespace
+                        Payload = new ConfigurationPayload(
+                            TemplateName: contract.TemplateName,
+                            ContainerNamespace: contract.ContainerNamespace)
                     });
                 }
             }
@@ -664,9 +667,10 @@ public sealed partial class ArchitectureAnalysisSession
                         MatchedNamespacePrefixes = matchedNamespacePrefixes.Count > 0
                             ? matchedNamespacePrefixes.OrderBy(prefix => prefix, StringComparer.Ordinal).ToArray()
                             : null,
-                        SourceLayer = sourceLayerName,
-                        TargetLayer = protectedLayerName,
-                        AllowedImporters = contract.AllowedImporters
+                        Payload = new DependencyPayload(
+                            SourceLayer: sourceLayerName,
+                            TargetLayer: protectedLayerName,
+                            AllowedImporters: contract.AllowedImporters)
                     });
                 }
             }

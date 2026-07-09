@@ -1,5 +1,6 @@
 using ArchLinterNet.Core.Contracts;
 using ArchLinterNet.Core.Execution;
+using ArchLinterNet.Core.Model;
 using ArchLinterNet.Core.Validation;
 using NUnit.Framework;
 
@@ -112,10 +113,10 @@ public sealed class InterfaceImplementationContractTests
         var violations = runner.Session.CheckInterfaceImplementationContract(contract);
 
         Assert.That(violations, Is.Not.Empty);
-        Assert.That(violations.All(v => v.ImplementationKind == "misplaced"), Is.True);
+        Assert.That(violations.All(v => (v.Payload as InterfaceImplementationPayload)?.ImplementationKind == "misplaced"), Is.True);
         Assert.That(violations.Any(v =>
             v.SourceType == "InterfaceImplementationContractTestFixtures.Domain.DomainPaymentImplementation"
-            && v.MatchedInterface == PaymentPortName), Is.True);
+            && (v.Payload as InterfaceImplementationPayload)?.MatchedInterface == PaymentPortName), Is.True);
         Assert.That(violations.Any(v =>
             v.SourceType.StartsWith(AdaptersNamespace, StringComparison.Ordinal)), Is.False);
     }
@@ -135,7 +136,7 @@ public sealed class InterfaceImplementationContractTests
         var violations = runner.Session.CheckInterfaceImplementationContract(contract);
 
         Assert.That(violations, Is.Not.Empty);
-        Assert.That(violations.All(v => v.ImplementationKind == "forbidden"), Is.True);
+        Assert.That(violations.All(v => (v.Payload as InterfaceImplementationPayload)?.ImplementationKind == "forbidden"), Is.True);
         Assert.That(violations.All(v =>
             v.SourceType.StartsWith(DomainNamespace, StringComparison.Ordinal)), Is.True);
     }
@@ -160,7 +161,7 @@ public sealed class InterfaceImplementationContractTests
             .ToList();
 
         Assert.That(domainViolations, Has.Count.EqualTo(1));
-        Assert.That(domainViolations[0].ImplementationKind, Is.EqualTo("forbidden"));
+        Assert.That((domainViolations[0].Payload as InterfaceImplementationPayload)?.ImplementationKind, Is.EqualTo("forbidden"));
     }
 
     [Test]
@@ -179,7 +180,7 @@ public sealed class InterfaceImplementationContractTests
 
         Assert.That(violations.Any(v =>
             v.SourceType == "InterfaceImplementationContractTestFixtures.Domain.InheritedImplementation"
-            && v.MatchedInterface == PaymentPortName), Is.True);
+            && (v.Payload as InterfaceImplementationPayload)?.MatchedInterface == PaymentPortName), Is.True);
     }
 
     [Test]
@@ -198,7 +199,7 @@ public sealed class InterfaceImplementationContractTests
 
         Assert.That(violations.Any(v =>
             v.SourceType == "InterfaceImplementationContractTestFixtures.Domain.GenericPortImplementation"
-            && v.MatchedInterface == GenericPortName), Is.True);
+            && (v.Payload as InterfaceImplementationPayload)?.MatchedInterface == GenericPortName), Is.True);
     }
 
     [Test]
@@ -217,7 +218,7 @@ public sealed class InterfaceImplementationContractTests
 
         Assert.That(violations.Any(v =>
             v.SourceType == "InterfaceImplementationContractTestFixtures.Domain.PrefixedPortImplementation"
-            && v.MatchedInterface!.StartsWith(PrefixedPortsNamespace, StringComparison.Ordinal)), Is.True);
+            && (v.Payload as InterfaceImplementationPayload)?.MatchedInterface?.StartsWith(PrefixedPortsNamespace, StringComparison.Ordinal) == true), Is.True);
     }
 
     [Test]
@@ -279,8 +280,8 @@ public sealed class InterfaceImplementationContractTests
         var violationsOne = runnerOne.Session.CheckInterfaceImplementationContract(contract);
         var violationsTwo = runnerTwo.Session.CheckInterfaceImplementationContract(contract);
 
-        string[] orderOne = violationsOne.Select(v => $"{v.SourceType}|{v.MatchedInterface}").ToArray();
-        string[] orderTwo = violationsTwo.Select(v => $"{v.SourceType}|{v.MatchedInterface}").ToArray();
+        string[] orderOne = violationsOne.Select(v => $"{v.SourceType}|{(v.Payload as InterfaceImplementationPayload)?.MatchedInterface}").ToArray();
+        string[] orderTwo = violationsTwo.Select(v => $"{v.SourceType}|{(v.Payload as InterfaceImplementationPayload)?.MatchedInterface}").ToArray();
 
         Assert.That(orderOne, Is.Not.Empty);
         Assert.That(orderOne, Is.EqualTo(orderTwo));
@@ -440,7 +441,7 @@ public sealed class InterfaceImplementationContractTests
         Assert.That(outcome.Passed, Is.False);
         Assert.That(outcome.Violations.Any(v =>
             v.SourceType == "InterfaceImplementationContractTestFixtures.Domain.DomainPaymentImplementation"
-            && v.MatchedInterface == PaymentPortName), Is.True);
+            && (v.Payload as InterfaceImplementationPayload)?.MatchedInterface == PaymentPortName), Is.True);
     }
 
     [Test]

@@ -46,7 +46,7 @@ internal sealed class ArchitectureExternalDependencyIlScanner : IArchitectureExt
                 $"external dependency group '{externalGroupName}'",
                 forbiddenReferences)
             {
-                ForbiddenExternalGroup = externalGroupName
+                Payload = new ExternalDependencyPayload(externalGroupName)
             };
         }
     }
