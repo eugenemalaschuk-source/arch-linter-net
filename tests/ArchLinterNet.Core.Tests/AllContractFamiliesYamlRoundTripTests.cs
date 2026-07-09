@@ -38,9 +38,12 @@ public sealed class AllContractFamiliesYamlRoundTripTests
         return contractPath;
     }
 
-    // strict/audit are populated (dependency and layer have no dedicated content validator beyond
-    // duplicate-ID checking); every other family is declared empty so every validator in the
-    // pipeline is trivially satisfied while every alias still round-trips through deserialization.
+    // Every family gets one real, non-empty strict entry and one real, non-empty audit entry
+    // (content shaped to satisfy that family's dedicated validator, if it has one - see the
+    // Validators/*.cs requirements this mirrors). Empty lists would round-trip identically whether
+    // an alias is correct or typo'd, since IgnoreUnmatchedProperties silently drops an unrecognized
+    // YAML key and an empty default list looks the same either way; a populated entry only shows up
+    // in the deserialized Count if the [YamlMember] alias actually bound.
     private const string AllFamiliesYaml = @"
 version: 1
 name: Test
@@ -50,10 +53,10 @@ layers:
   runtime:
     namespace: Test.Runtime
 analysis:
-  target_assemblies: []
+  target_assemblies: [Test.Core, Test.Runtime]
 contracts:
   strict:
-    - name: dep rule
+    - name: dep strict rule
       source: core
       forbidden: [runtime]
   audit:
@@ -61,57 +64,189 @@ contracts:
       source: core
       forbidden: [runtime]
   strict_layers:
-    - name: layer rule
+    - name: layer strict rule
       layers: [core, runtime]
   audit_layers:
     - name: layer audit rule
       layers: [core, runtime]
-  strict_layer_templates: []
-  audit_layer_templates: []
-  strict_allow_only: []
-  audit_allow_only: []
-  strict_cycles: []
-  audit_cycles: []
-  strict_method_body: []
-  audit_method_body: []
-  strict_asmdef: []
-  audit_asmdef: []
-  strict_independence: []
-  audit_independence: []
-  strict_assembly_independence: []
-  audit_assembly_independence: []
-  strict_assembly_dependency: []
-  audit_assembly_dependency: []
-  strict_assembly_allow_only: []
-  audit_assembly_allow_only: []
-  strict_package_dependency: []
-  audit_package_dependency: []
-  strict_package_allow_only: []
-  audit_package_allow_only: []
-  strict_project_metadata: []
-  audit_project_metadata: []
-  strict_protected: []
-  audit_protected: []
-  strict_external: []
-  audit_external: []
-  strict_external_allow_only: []
-  audit_external_allow_only: []
-  strict_acyclic_siblings: []
-  audit_acyclic_siblings: []
-  strict_type_placement: []
-  audit_type_placement: []
-  strict_public_api_surface: []
-  audit_public_api_surface: []
-  strict_attribute_usage: []
-  audit_attribute_usage: []
-  strict_inheritance: []
-  audit_inheritance: []
-  strict_interface_implementation: []
-  audit_interface_implementation: []
-  strict_composition: []
-  audit_composition: []
-  strict_coverage: []
-  audit_coverage: []
+  strict_layer_templates:
+    - name: layer template strict rule
+      containers: [App]
+      layers:
+        - name: Core
+  audit_layer_templates:
+    - name: layer template audit rule
+      containers: [App]
+      layers:
+        - name: Core
+  strict_allow_only:
+    - name: allow only strict rule
+      source: core
+      allowed: [runtime]
+  audit_allow_only:
+    - name: allow only audit rule
+      source: core
+      allowed: [runtime]
+  strict_cycles:
+    - name: cycle strict rule
+      layers: [core, runtime]
+  audit_cycles:
+    - name: cycle audit rule
+      layers: [core, runtime]
+  strict_method_body:
+    - name: method body strict rule
+      source: core
+      forbidden_calls: [System.Console.WriteLine]
+  audit_method_body:
+    - name: method body audit rule
+      source: core
+      forbidden_calls: [System.Console.WriteLine]
+  strict_asmdef:
+    - name: asmdef strict rule
+      source_assemblies: [Test.Core]
+  audit_asmdef:
+    - name: asmdef audit rule
+      source_assemblies: [Test.Core]
+  strict_independence:
+    - name: independence strict rule
+      layers: [core]
+  audit_independence:
+    - name: independence audit rule
+      layers: [core]
+  strict_assembly_independence:
+    - name: assembly independence strict rule
+      assemblies: [Test.Core]
+  audit_assembly_independence:
+    - name: assembly independence audit rule
+      assemblies: [Test.Core]
+  strict_assembly_dependency:
+    - name: assembly dependency strict rule
+      source: Test.Core
+      forbidden: [Test.Runtime]
+  audit_assembly_dependency:
+    - name: assembly dependency audit rule
+      source: Test.Core
+      forbidden: [Test.Runtime]
+  strict_assembly_allow_only:
+    - name: assembly allow only strict rule
+      source: Test.Core
+      allowed: [Test.Runtime]
+  audit_assembly_allow_only:
+    - name: assembly allow only audit rule
+      source: Test.Core
+      allowed: [Test.Runtime]
+  strict_package_dependency:
+    - name: package dependency strict rule
+      source: Test.Core
+      forbidden: [Some.Package]
+  audit_package_dependency:
+    - name: package dependency audit rule
+      source: Test.Core
+      forbidden: [Some.Package]
+  strict_package_allow_only:
+    - name: package allow only strict rule
+      source: Test.Core
+      allowed: [Some.Package]
+  audit_package_allow_only:
+    - name: package allow only audit rule
+      source: Test.Core
+      allowed: [Some.Package]
+  strict_project_metadata:
+    - name: project metadata strict rule
+      projects: [src/Sample.csproj]
+      required_properties:
+        Nullable: enable
+  audit_project_metadata:
+    - name: project metadata audit rule
+      projects: [src/Sample.csproj]
+      required_properties:
+        Nullable: enable
+  strict_protected:
+    - name: protected strict rule
+      protected: [Test.Core.Internal]
+  audit_protected:
+    - name: protected audit rule
+      protected: [Test.Core.Internal]
+  strict_external:
+    - name: external strict rule
+      source: core
+      forbidden: [Newtonsoft.Json]
+  audit_external:
+    - name: external audit rule
+      source: core
+      forbidden: [Newtonsoft.Json]
+  strict_external_allow_only:
+    - name: external allow only strict rule
+      source: core
+      allowed: [System.Text.Json]
+  audit_external_allow_only:
+    - name: external allow only audit rule
+      source: core
+      allowed: [System.Text.Json]
+  strict_acyclic_siblings:
+    - name: acyclic sibling strict rule
+      ancestors: [Test.Feature]
+  audit_acyclic_siblings:
+    - name: acyclic sibling audit rule
+      ancestors: [Test.Feature]
+  strict_type_placement:
+    - name: type placement strict rule
+      types_matching:
+        name_suffix: Service
+      must_reside_in_layers: [core]
+  audit_type_placement:
+    - name: type placement audit rule
+      types_matching:
+        name_suffix: Service
+      must_reside_in_layers: [core]
+  strict_public_api_surface:
+    - name: public api surface strict rule
+      assemblies: [Test.Core]
+  audit_public_api_surface:
+    - name: public api surface audit rule
+      assemblies: [Test.Core]
+  strict_attribute_usage:
+    - name: attribute usage strict rule
+      attributes: [System.ObsoleteAttribute]
+      allowed_only_in_layers: [core]
+  audit_attribute_usage:
+    - name: attribute usage audit rule
+      attributes: [System.ObsoleteAttribute]
+      allowed_only_in_layers: [core]
+  strict_inheritance:
+    - name: inheritance strict rule
+      source_layers: [core]
+      forbidden_base_types: [System.Exception]
+  audit_inheritance:
+    - name: inheritance audit rule
+      source_layers: [core]
+      forbidden_base_types: [System.Exception]
+  strict_interface_implementation:
+    - name: interface implementation strict rule
+      interfaces: [System.IDisposable]
+      allowed_only_in_layers: [core]
+  audit_interface_implementation:
+    - name: interface implementation audit rule
+      interfaces: [System.IDisposable]
+      allowed_only_in_layers: [core]
+  strict_composition:
+    - name: composition strict rule
+      forbidden_apis: [System.Console.WriteLine]
+      allowed_only_in_layers: [core]
+  audit_composition:
+    - name: composition audit rule
+      forbidden_apis: [System.Console.WriteLine]
+      allowed_only_in_layers: [core]
+  strict_coverage:
+    - name: coverage strict rule
+      scope: namespace
+      roots:
+        - namespace: Test.Feature
+  audit_coverage:
+    - name: coverage audit rule
+      scope: namespace
+      roots:
+        - namespace: Test.Feature
 ";
 
     [Test]
@@ -126,52 +261,56 @@ contracts:
         Assert.That(contracts.Audit, Has.Count.EqualTo(1));
         Assert.That(contracts.StrictLayers, Has.Count.EqualTo(1));
         Assert.That(contracts.AuditLayers, Has.Count.EqualTo(1));
-        Assert.That(contracts.StrictLayerTemplates, Is.Empty);
-        Assert.That(contracts.AuditLayerTemplates, Is.Empty);
-        Assert.That(contracts.StrictAllowOnly, Is.Empty);
-        Assert.That(contracts.AuditAllowOnly, Is.Empty);
-        Assert.That(contracts.StrictCycles, Is.Empty);
-        Assert.That(contracts.AuditCycles, Is.Empty);
-        Assert.That(contracts.StrictMethodBody, Is.Empty);
-        Assert.That(contracts.AuditMethodBody, Is.Empty);
-        Assert.That(contracts.StrictAsmdef, Is.Empty);
-        Assert.That(contracts.AuditAsmdef, Is.Empty);
-        Assert.That(contracts.StrictIndependence, Is.Empty);
-        Assert.That(contracts.AuditIndependence, Is.Empty);
-        Assert.That(contracts.StrictAssemblyIndependence, Is.Empty);
-        Assert.That(contracts.AuditAssemblyIndependence, Is.Empty);
-        Assert.That(contracts.StrictAssemblyDependency, Is.Empty);
-        Assert.That(contracts.AuditAssemblyDependency, Is.Empty);
-        Assert.That(contracts.StrictAssemblyAllowOnly, Is.Empty);
-        Assert.That(contracts.AuditAssemblyAllowOnly, Is.Empty);
-        Assert.That(contracts.StrictPackageDependency, Is.Empty);
-        Assert.That(contracts.AuditPackageDependency, Is.Empty);
-        Assert.That(contracts.StrictPackageAllowOnly, Is.Empty);
-        Assert.That(contracts.AuditPackageAllowOnly, Is.Empty);
-        Assert.That(contracts.StrictProjectMetadata, Is.Empty);
-        Assert.That(contracts.AuditProjectMetadata, Is.Empty);
-        Assert.That(contracts.StrictProtected, Is.Empty);
-        Assert.That(contracts.AuditProtected, Is.Empty);
-        Assert.That(contracts.StrictExternal, Is.Empty);
-        Assert.That(contracts.AuditExternal, Is.Empty);
-        Assert.That(contracts.StrictExternalAllowOnly, Is.Empty);
-        Assert.That(contracts.AuditExternalAllowOnly, Is.Empty);
-        Assert.That(contracts.StrictAcyclicSiblings, Is.Empty);
-        Assert.That(contracts.AuditAcyclicSiblings, Is.Empty);
-        Assert.That(contracts.StrictTypePlacement, Is.Empty);
-        Assert.That(contracts.AuditTypePlacement, Is.Empty);
-        Assert.That(contracts.StrictPublicApiSurface, Is.Empty);
-        Assert.That(contracts.AuditPublicApiSurface, Is.Empty);
-        Assert.That(contracts.StrictAttributeUsage, Is.Empty);
-        Assert.That(contracts.AuditAttributeUsage, Is.Empty);
-        Assert.That(contracts.StrictInheritance, Is.Empty);
-        Assert.That(contracts.AuditInheritance, Is.Empty);
-        Assert.That(contracts.StrictInterfaceImplementation, Is.Empty);
-        Assert.That(contracts.AuditInterfaceImplementation, Is.Empty);
-        Assert.That(contracts.StrictComposition, Is.Empty);
-        Assert.That(contracts.AuditComposition, Is.Empty);
-        Assert.That(contracts.StrictCoverage, Is.Empty);
-        Assert.That(contracts.AuditCoverage, Is.Empty);
+        Assert.That(contracts.StrictLayerTemplates, Has.Count.EqualTo(1));
+        Assert.That(contracts.AuditLayerTemplates, Has.Count.EqualTo(1));
+        Assert.That(contracts.StrictAllowOnly, Has.Count.EqualTo(1));
+        Assert.That(contracts.AuditAllowOnly, Has.Count.EqualTo(1));
+        Assert.That(contracts.StrictCycles, Has.Count.EqualTo(1));
+        Assert.That(contracts.AuditCycles, Has.Count.EqualTo(1));
+        Assert.That(contracts.StrictMethodBody, Has.Count.EqualTo(1));
+        Assert.That(contracts.AuditMethodBody, Has.Count.EqualTo(1));
+        Assert.That(contracts.StrictAsmdef, Has.Count.EqualTo(1));
+        Assert.That(contracts.AuditAsmdef, Has.Count.EqualTo(1));
+        Assert.That(contracts.StrictIndependence, Has.Count.EqualTo(1));
+        Assert.That(contracts.AuditIndependence, Has.Count.EqualTo(1));
+        Assert.That(contracts.StrictAssemblyIndependence, Has.Count.EqualTo(1));
+        Assert.That(contracts.AuditAssemblyIndependence, Has.Count.EqualTo(1));
+        Assert.That(contracts.StrictAssemblyDependency, Has.Count.EqualTo(1));
+        Assert.That(contracts.AuditAssemblyDependency, Has.Count.EqualTo(1));
+        Assert.That(contracts.StrictAssemblyAllowOnly, Has.Count.EqualTo(1));
+        Assert.That(contracts.AuditAssemblyAllowOnly, Has.Count.EqualTo(1));
+        Assert.That(contracts.StrictPackageDependency, Has.Count.EqualTo(1));
+        Assert.That(contracts.AuditPackageDependency, Has.Count.EqualTo(1));
+        Assert.That(contracts.StrictPackageAllowOnly, Has.Count.EqualTo(1));
+        Assert.That(contracts.AuditPackageAllowOnly, Has.Count.EqualTo(1));
+        Assert.That(contracts.StrictProjectMetadata, Has.Count.EqualTo(1));
+        Assert.That(contracts.AuditProjectMetadata, Has.Count.EqualTo(1));
+        Assert.That(contracts.StrictProtected, Has.Count.EqualTo(1));
+        Assert.That(contracts.AuditProtected, Has.Count.EqualTo(1));
+        Assert.That(contracts.StrictExternal, Has.Count.EqualTo(1));
+        Assert.That(contracts.AuditExternal, Has.Count.EqualTo(1));
+        Assert.That(contracts.StrictExternalAllowOnly, Has.Count.EqualTo(1));
+        Assert.That(contracts.AuditExternalAllowOnly, Has.Count.EqualTo(1));
+        Assert.That(contracts.StrictAcyclicSiblings, Has.Count.EqualTo(1));
+        Assert.That(contracts.AuditAcyclicSiblings, Has.Count.EqualTo(1));
+        Assert.That(contracts.StrictTypePlacement, Has.Count.EqualTo(1));
+        Assert.That(contracts.AuditTypePlacement, Has.Count.EqualTo(1));
+        Assert.That(contracts.StrictPublicApiSurface, Has.Count.EqualTo(1));
+        Assert.That(contracts.AuditPublicApiSurface, Has.Count.EqualTo(1));
+        Assert.That(contracts.StrictAttributeUsage, Has.Count.EqualTo(1));
+        Assert.That(contracts.AuditAttributeUsage, Has.Count.EqualTo(1));
+        Assert.That(contracts.StrictInheritance, Has.Count.EqualTo(1));
+        Assert.That(contracts.AuditInheritance, Has.Count.EqualTo(1));
+        Assert.That(contracts.StrictInterfaceImplementation, Has.Count.EqualTo(1));
+        Assert.That(contracts.AuditInterfaceImplementation, Has.Count.EqualTo(1));
+        Assert.That(contracts.StrictComposition, Has.Count.EqualTo(1));
+        Assert.That(contracts.AuditComposition, Has.Count.EqualTo(1));
+        Assert.That(contracts.StrictCoverage, Has.Count.EqualTo(1));
+        Assert.That(contracts.AuditCoverage, Has.Count.EqualTo(1));
+
+        // AllStrict/AllAudit must reflect the populated groups too, excluding layer_template.
+        Assert.That(contracts.AllStrict.Count(), Is.EqualTo(24));
+        Assert.That(contracts.AllAudit.Count(), Is.EqualTo(24));
     }
 
     [Test]
