@@ -1,8 +1,5 @@
-# GitHub Actions CI Specification
+## MODIFIED Requirements
 
-## Purpose
-Defines the GitHub Actions workflows for pull request validation and the separated CI/release pipeline.
-## Requirements
 ### Requirement: Pull request validation workflow
 ArchLinterNet SHALL provide a GitHub Actions CI workflow that validates pull requests and pushes with the repository acceptance gate and SonarCloud analysis without producing official release packages.
 
@@ -16,21 +13,6 @@ ArchLinterNet SHALL provide a GitHub Actions CI workflow that validates pull req
 - **THEN** the CI workflow restores packages and runs `make acceptance`
 - **AND** it runs SonarCloud branch analysis for `main`
 
-### Requirement: CI release separation
-The CI workflow SHALL NOT perform official release packaging, publication, tagging, or GitHub Release creation.
-
-#### Scenario: CI does not pack release packages
-- **WHEN** the CI workflow runs for a pull request or push
-- **THEN** it does not run `dotnet pack` for official versioned package artifacts
-
-#### Scenario: CI does not use publishing identity
-- **WHEN** the CI workflow runs for a pull request or push
-- **THEN** it does not request publishing identity tokens or package publication credentials
-
-#### Scenario: CI does not publish or release
-- **WHEN** the CI workflow runs for a pull request or push
-- **THEN** it does not publish packages, create tags, or create GitHub Releases
-
 ### Requirement: README quality signal badge
 The repository README SHALL display the CI status badge, the dynamic Codecov coverage badge, and live SonarCloud quality badges, and it SHALL explain that CI includes both the architecture coverage gate and SonarCloud quality-gate analysis.
 
@@ -41,21 +23,7 @@ The repository README SHALL display the CI status badge, the dynamic Codecov cov
 - **AND** it shows live SonarCloud badges for the configured SonarCloud project
 - **AND** it links to documentation explaining that the CI workflow also runs SonarCloud quality-gate analysis
 
-### Requirement: Architecture coverage analysis runs in the existing CI workflow
-The architecture coverage analysis steps (strict/audit JSON artifacts, report generation) SHALL run inside the existing `ci.yml` `validate` job, after `make acceptance`, reusing its already-built solution instead of restoring and building a second time in a separate workflow.
-
-#### Scenario: Coverage steps run after acceptance in the same job
-- **WHEN** the `ci.yml` `validate` job runs
-- **THEN** the architecture coverage analysis steps execute after the `Acceptance` step in the same job
-- **AND** no additional `dotnet restore`/`dotnet build` of the already-built assemblies is performed before invoking the CLI
-
-### Requirement: PR comment posting is a stage of the single validate job
-Posting the architecture coverage PR comment SHALL run as a step inside the same `validate` job that builds and tests repository code, rather than in a separate job — `ci.yml` stays a single job for the whole pipeline (build/test/lint, architecture coverage analysis, and the PR comment).
-
-#### Scenario: A single job runs the whole pipeline
-- **WHEN** `ci.yml` is inspected
-- **THEN** there is one job (`validate`) that includes the acceptance, architecture coverage, and PR comment steps
-- **AND** the top-level workflow `permissions` include `pull-requests: write` so the comment step can run without a second job
+## ADDED Requirements
 
 ### Requirement: SonarCloud analysis runs in the existing CI workflow
 SonarCloud analysis SHALL run inside the existing `ci.yml` `validate` job so the repository reuses the same checkout metadata, restore, build, and test execution that powers the acceptance gate.
@@ -100,4 +68,3 @@ Trusted pull requests SHALL expose SonarCloud results to reviewers through GitHu
 - **WHEN** SonarCloud evaluates a trusted pull request
 - **THEN** the quality gate is applied to the new code introduced by that pull request
 - **AND** the repository does not require the entire historical codebase to be clean before the pull request can merge
-

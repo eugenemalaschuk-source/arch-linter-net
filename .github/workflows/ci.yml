@@ -10,6 +10,11 @@ permissions:
   contents: read
   pull-requests: write
 
+env:
+  SONAR_HOST_URL: https://sonarcloud.io
+  SONAR_PROJECT_KEY: ${{ vars.SONAR_PROJECT_KEY || 'eugenemalaschuk-source_arch-linter-net' }}
+  SONAR_ORGANIZATION: ${{ vars.SONAR_ORGANIZATION || 'eugenemalaschuk-source' }}
+
 jobs:
   validate:
     name: Acceptance
@@ -26,6 +31,12 @@ jobs:
         with:
           dotnet-version: 10.0.x
 
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
       - name: Cache NuGet packages
         uses: actions/cache@v4
         with:
@@ -40,10 +51,60 @@ jobs:
       - name: Restore
         run: make restore
 
+      - name: Cache SonarQube packages
+        if: github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository
+        uses: actions/cache@v4
+        with:
+          path: ~/.sonar/cache
+          key: ${{ runner.os }}-sonar
+          restore-keys: |
+            ${{ runner.os }}-sonar
+
+      - name: Install SonarScanner for .NET
+        if: github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository
+        run: |
+          mkdir -p ./.sonar/scanner
+          dotnet tool update dotnet-sonarscanner --tool-path ./.sonar/scanner
+
+      - name: Validate SonarCloud configuration
+        if: github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        shell: bash
+        run: |
+          missing=()
+          [[ -n "$SONAR_TOKEN" ]] || missing+=("SONAR_TOKEN secret")
+          [[ -n "$SONAR_PROJECT_KEY" ]] || missing+=("SONAR_PROJECT_KEY repository variable or committed default")
+          [[ -n "$SONAR_ORGANIZATION" ]] || missing+=("SONAR_ORGANIZATION repository variable or committed default")
+
+          if [ ${#missing[@]} -gt 0 ]; then
+            printf 'Missing SonarCloud configuration: %s\n' "${missing[*]}" >&2
+            echo "Configure GitHub secret SONAR_TOKEN and, if overriding defaults, repository variables SONAR_PROJECT_KEY / SONAR_ORGANIZATION." >&2
+            exit 1
+          fi
+
+      - name: Begin SonarCloud analysis
+        id: sonar_begin
+        if: github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        shell: bash
+        run: |
+          ./.sonar/scanner/dotnet-sonarscanner begin \
+            /k:"$SONAR_PROJECT_KEY" \
+            /o:"$SONAR_ORGANIZATION" \
+            /d:sonar.token="$SONAR_TOKEN" \
+            /d:sonar.host.url="$SONAR_HOST_URL" \
+            /d:sonar.qualitygate.wait=true \
+            /d:sonar.qualitygate.timeout=300 \
+            /d:sonar.cs.opencover.reportsPaths="test-results/**/coverage.opencover.xml" \
+            /d:sonar.cs.vstest.reportsPaths="test-results/**/*.trx"
+
       - name: Acceptance
         run: make acceptance
 
       - name: Collect test coverage
+        id: test_coverage
         run: make test-coverage
 
       - name: Resolve coverage report paths
@@ -61,6 +122,38 @@ jobs:
           files: ${{ steps.coverage_reports.outputs.files }}
           disable_search: true
           fail_ci_if_error: false
+
+      - name: End SonarCloud analysis
+        id: sonar_end
+        if: success() && steps.sonar_begin.outcome == 'success'
+        continue-on-error: true
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        shell: bash
+        run: |
+          ./.sonar/scanner/dotnet-sonarscanner end /d:sonar.token="$SONAR_TOKEN"
+
+      - name: Publish SonarCloud PR summary link
+        if: always() && github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
+        shell: bash
+        run: |
+          {
+            echo "### SonarCloud PR analysis"
+            echo
+            echo "- Quality gate check: review the Sonar-created GitHub status/check on this pull request."
+            echo "- SonarCloud PR analysis: [Open SonarCloud PR report](https://sonarcloud.io/summary/new_code?id=${SONAR_PROJECT_KEY}&pullRequest=${{ github.event.pull_request.number }})"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Explain SonarCloud skip for fork pull request
+        if: always() && github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository
+        shell: bash
+        run: |
+          {
+            echo "### SonarCloud PR analysis"
+            echo
+            echo "Skipped for this fork pull request because GitHub does not expose repository secrets to untrusted forks."
+            echo "Run the branch from this repository or validate again after merge to verify the SonarCloud quality gate."
+          } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Test architecture coverage report generator
         run: make test-architecture-coverage-report
@@ -84,28 +177,28 @@ jobs:
           make architecture-coverage-ci DIFF_STATUS="$DIFF_STATUS"
 
       - name: Upload strict diagnostics
-        if: always()
+        if: always() && hashFiles('architecture-strict.json') != ''
         uses: actions/upload-artifact@v4
         with:
           name: architecture-strict
           path: architecture-strict.json
 
       - name: Upload audit diagnostics
-        if: always()
+        if: always() && hashFiles('architecture-audit.json') != ''
         uses: actions/upload-artifact@v4
         with:
           name: architecture-audit
           path: architecture-audit.json
 
       - name: Upload architecture coverage report
-        if: always()
+        if: always() && hashFiles('architecture-coverage.md') != ''
         uses: actions/upload-artifact@v4
         with:
           name: architecture-coverage-report
           path: architecture-coverage.md
 
       - name: Comment architecture coverage on pull request
-        if: always() && github.event_name == 'pull_request'
+        if: always() && github.event_name == 'pull_request' && hashFiles('architecture-coverage.md') != ''
         uses: actions/github-script@v7
         with:
           script: |
@@ -139,4 +232,8 @@ jobs:
 
       - name: Fail if strict architecture coverage failed
         if: steps.architecture_coverage.outcome == 'failure'
+        run: exit 1
+
+      - name: Fail if SonarCloud quality gate failed
+        if: steps.sonar_end.outcome == 'failure'
         run: exit 1
