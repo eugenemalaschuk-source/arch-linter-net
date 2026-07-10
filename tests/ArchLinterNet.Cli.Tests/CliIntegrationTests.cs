@@ -133,13 +133,13 @@ public partial class CliIntegrationTests
     [Test]
     public void DotnetProcessArguments_PreserveWhitespaceAndEmbeddedQuotes()
     {
-        const string complexArgument = "path with spaces/\"quoted\".yml";
+        const string ComplexArgument = "path with spaces/\"quoted\".yml";
         var startInfo = new ProcessStartInfo("dotnet");
 
         startInfo.ArgumentList.Add("--policy");
-        startInfo.ArgumentList.Add(complexArgument);
+        startInfo.ArgumentList.Add(ComplexArgument);
 
-        Assert.That(startInfo.ArgumentList, Is.EqualTo(new[] { "--policy", complexArgument }));
+        Assert.That(startInfo.ArgumentList, Is.EqualTo(new[] { "--policy", ComplexArgument }));
     }
 
     /* --version / -v */
