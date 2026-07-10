@@ -52,7 +52,7 @@ jobs:
             ${{ runner.os }}-nuget-
 
       - name: Setup uv
-        uses: astral-sh/setup-uv@v5
+        uses: astral-sh/setup-uv@e58605a9b6da7c637471fab8847a5e5a6b8df081
 
       - name: Restore
         run: make restore
@@ -121,7 +121,7 @@ jobs:
 
       - name: Upload test coverage to Codecov
         if: steps.coverage_reports.outputs.files != '' && github.event.pull_request.head.repo.full_name == github.repository
-        uses: codecov/codecov-action@v5
+        uses: codecov/codecov-action@04b047e8bb82a0c002c8312c1c880fbc6a999d45
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           files: ${{ steps.coverage_reports.outputs.files }}
@@ -272,7 +272,7 @@ jobs:
             ${{ runner.os }}-nuget-
 
       - name: Setup uv
-        uses: astral-sh/setup-uv@v5
+        uses: astral-sh/setup-uv@e58605a9b6da7c637471fab8847a5e5a6b8df081
 
       - name: Restore
         run: make restore
@@ -334,7 +334,7 @@ jobs:
 
       - name: Upload test coverage to Codecov
         if: steps.coverage_reports.outputs.files != ''
-        uses: codecov/codecov-action@v5
+        uses: codecov/codecov-action@04b047e8bb82a0c002c8312c1c880fbc6a999d45
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           files: ${{ steps.coverage_reports.outputs.files }}
