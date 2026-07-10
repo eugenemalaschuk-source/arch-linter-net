@@ -10,6 +10,9 @@ namespace ArchLinterNet.Core.Tests;
 
 public sealed partial class ProtectedContractTests
 {
+    private static readonly Assembly[] _testAssemblyArray = { TestAssembly };
+    private static readonly Assembly[] _coreAssemblyTestAssembly = { CoreAssembly, TestAssembly };
+
     [Test]
     public void CheckProtectedContract_JsonOutput_IncludesProtectedContext()
     {
@@ -70,7 +73,7 @@ public sealed partial class ProtectedContractTests
 
         var context = new ArchitectureAnalysisContext(
             "/tmp",
-            new[] { TestAssembly },
+            _testAssemblyArray,
             Array.Empty<string>(),
             Array.Empty<string>());
 
@@ -118,7 +121,7 @@ public sealed partial class ProtectedContractTests
 
         var context = new ArchitectureAnalysisContext(
             "/tmp",
-            new[] { TestAssembly },
+            _testAssemblyArray,
             Array.Empty<string>(),
             Array.Empty<string>());
 
@@ -234,7 +237,7 @@ public sealed partial class ProtectedContractTests
 
         var context = new ArchitectureAnalysisContext(
             "/tmp",
-            new[] { CoreAssembly, TestAssembly },
+            _coreAssemblyTestAssembly,
             Array.Empty<string>(),
             Array.Empty<string>());
 
@@ -281,7 +284,7 @@ public sealed partial class ProtectedContractTests
 
         var context = new ArchitectureAnalysisContext(
             "/tmp",
-            new[] { CoreAssembly, TestAssembly },
+            _coreAssemblyTestAssembly,
             Array.Empty<string>(),
             Array.Empty<string>());
 

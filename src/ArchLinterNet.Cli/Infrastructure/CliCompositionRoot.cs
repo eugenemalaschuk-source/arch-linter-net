@@ -2,9 +2,9 @@ using ArchLinterNet.Cli.Abstractions;
 
 namespace ArchLinterNet.Cli.Infrastructure;
 
-internal sealed class CliCompositionRoot
+internal static class CliCompositionRoot
 {
-    public CliComposition Compose()
+    public static CliComposition Compose()
     {
         ICliConsole console = new SystemCliConsole();
         IFileSystem fileSystem = new FileSystem();
@@ -30,7 +30,7 @@ internal sealed class CliCompositionRoot
             subcommandModules);
     }
 
-    public CliHost CreateHost()
+    public static CliHost CreateHost()
     {
         return Compose().Host;
     }

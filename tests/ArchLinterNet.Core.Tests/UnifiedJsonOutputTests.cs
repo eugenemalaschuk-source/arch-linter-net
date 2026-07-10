@@ -11,6 +11,9 @@ namespace ArchLinterNet.Core.Tests;
 public sealed class UnifiedJsonOutputTests
 {
     private static readonly ArchitectureDiagnosticFormatter _formatter = new();
+    private static readonly string[] _ref = { "ref" };
+    private static readonly string[] _ref1 = { "ref1" };
+    private static readonly string[] _unityEngineVector3 = { "UnityEngine.Vector3" };
 
     [Test]
     public void FormatResultForCiArtifacts_Passed_ReturnsValidJsonWithPassedTrue()
@@ -50,15 +53,15 @@ public sealed class UnifiedJsonOutputTests
     {
         var violations = new List<ArchitectureViolation>
         {
-            new("c1", null, "src", "ns", new[] { "ref" })
+            new("c1", null, "src", "ns", _ref)
         };
         var cycles = new[] { "X -> Y -> X" };
 
         string json = _formatter.FormatResultForCiArtifacts(
             "strict", false, violations, cycles);
 
-        Assert.That(json.StartsWith("{"), Is.True);
-        Assert.That(json.TrimEnd().EndsWith("}"), Is.True);
+        Assert.That(json.StartsWith('{'), Is.True);
+        Assert.That(json.TrimEnd().EndsWith('}'), Is.True);
 
         int openBraces = json.Count(c => c == '{');
         int closeBraces = json.Count(c => c == '}');
@@ -70,7 +73,7 @@ public sealed class UnifiedJsonOutputTests
     {
         var violations = new List<ArchitectureViolation>
         {
-            new("test-contract", "my-rule", "MyApp.Web.Foo", "MyApp.Core", new[] { "ref1" })
+            new("test-contract", "my-rule", "MyApp.Web.Foo", "MyApp.Core", _ref1)
         };
 
         string json = _formatter.FormatResultForCiArtifacts(
@@ -87,7 +90,7 @@ public sealed class UnifiedJsonOutputTests
     {
         var violations = new List<ArchitectureViolation>
         {
-            new("test-contract", null, "src", "ns", new[] { "ref" })
+            new("test-contract", null, "src", "ns", _ref)
         };
 
         string json = _formatter.FormatResultForCiArtifacts(
@@ -103,7 +106,7 @@ public sealed class UnifiedJsonOutputTests
     {
         var violations = new List<ArchitectureViolation>
         {
-            new("My Contract", "my-rule", "MyApp.Web.Foo", "MyApp.Core", new[] { "ref1" })
+            new("My Contract", "my-rule", "MyApp.Web.Foo", "MyApp.Core", _ref1)
         };
 
         string output = _formatter.FormatViolationsForHumans(violations);
@@ -129,7 +132,7 @@ public sealed class UnifiedJsonOutputTests
     {
         var violations = new List<ArchitectureViolation>
         {
-            new("My Contract", "my-contract", "src", "ns", new[] { "ref" })
+            new("My Contract", "my-contract", "src", "ns", _ref)
         };
 
         string output = _formatter.FormatViolationsForHumans(violations);
@@ -143,7 +146,7 @@ public sealed class UnifiedJsonOutputTests
         var violations = new List<ArchitectureViolation>
         {
             new("core-no-unity", "core-no-unity", "MyApp.Core.PlayerModel", "external dependency group 'unity_runtime'",
-                new[] { "UnityEngine.Vector3" })
+                _unityEngineVector3)
             {
                 Payload = new ExternalDependencyPayload("unity_runtime")
             }
@@ -163,7 +166,7 @@ public sealed class UnifiedJsonOutputTests
         var violations = new List<ArchitectureViolation>
         {
             new("core-no-unity", "core-no-unity", "MyApp.Core.PlayerModel", "external dependency group 'unity_runtime'",
-                new[] { "UnityEngine.Vector3" })
+                _unityEngineVector3)
             {
                 Payload = new ExternalDependencyPayload("unity_runtime")
             }

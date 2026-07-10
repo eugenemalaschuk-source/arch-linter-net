@@ -37,7 +37,7 @@ internal static class ArchitectureLayerResolver
 
         if (!pattern.IsGlob)
         {
-            return MatchLiteral(layer, namespaceName, pattern);
+            return MatchLiteral(layer, namespaceName);
         }
 
         return MatchGlob(layer, namespaceName, pattern);
@@ -109,7 +109,7 @@ internal static class ArchitectureLayerResolver
     }
 
     private static ArchitectureNamespaceMatch MatchLiteral(
-        ArchitectureLayer layer, string namespaceName, NamespaceGlobPattern pattern)
+        ArchitectureLayer layer, string namespaceName)
     {
         bool prefixMatch = MatchesPrefix(namespaceName, layer.Namespace);
 

@@ -9,6 +9,8 @@ namespace ArchLinterNet.Core.Tests;
 public sealed class ArchitectureSarifFormatterTests
 {
     private static readonly ArchitectureSarifFormatter _formatter = new();
+    private static readonly string[] _ref1 = { "ref1" };
+    private static readonly string[] _ref2 = { "ref2" };
 
     private static JsonElement Run(
         string mode,
@@ -50,7 +52,7 @@ public sealed class ArchitectureSarifFormatterTests
     {
         var violations = new List<ArchitectureViolation>
         {
-            new("My Contract", "my-rule", "Source.Type", "Forbidden.Namespace", new[] { "ref1" })
+            new("My Contract", "my-rule", "Source.Type", "Forbidden.Namespace", _ref1)
         };
 
         JsonElement root = Run("strict", violations);
@@ -64,7 +66,7 @@ public sealed class ArchitectureSarifFormatterTests
     {
         var violations = new List<ArchitectureViolation>
         {
-            new("<configuration>", null, "Source.Type", "Forbidden.Namespace", new[] { "ref1" })
+            new("<configuration>", null, "Source.Type", "Forbidden.Namespace", _ref1)
         };
 
         JsonElement root = Run("strict", violations);
@@ -78,8 +80,8 @@ public sealed class ArchitectureSarifFormatterTests
     {
         var violations = new List<ArchitectureViolation>
         {
-            new("My Contract", "my-rule", "Source.A", "Forbidden.Namespace", new[] { "ref1" }),
-            new("My Contract", "my-rule", "Source.B", "Forbidden.Namespace", new[] { "ref2" })
+            new("My Contract", "my-rule", "Source.A", "Forbidden.Namespace", _ref1),
+            new("My Contract", "my-rule", "Source.B", "Forbidden.Namespace", _ref2)
         };
 
         JsonElement root = Run("strict", violations);
@@ -97,8 +99,8 @@ public sealed class ArchitectureSarifFormatterTests
         // rule entries sharing one id, which SARIF consumers can reject as invalid.
         var violations = new List<ArchitectureViolation>
         {
-            new("My Contract", "my-rule", "Source.A", "Forbidden.Namespace", new[] { "ref1" }),
-            new("My Contract (renamed)", "my-rule", "Source.B", "Forbidden.Namespace", new[] { "ref2" })
+            new("My Contract", "my-rule", "Source.A", "Forbidden.Namespace", _ref1),
+            new("My Contract (renamed)", "my-rule", "Source.B", "Forbidden.Namespace", _ref2)
         };
 
         JsonElement root = Run("strict", violations);
@@ -113,7 +115,7 @@ public sealed class ArchitectureSarifFormatterTests
     {
         var violations = new List<ArchitectureViolation>
         {
-            new("contract", "my-rule", "Source.Type", "Forbidden.Namespace", new[] { "ref1" })
+            new("contract", "my-rule", "Source.Type", "Forbidden.Namespace", _ref1)
         };
 
         JsonElement root = Run("strict", violations);
@@ -127,7 +129,7 @@ public sealed class ArchitectureSarifFormatterTests
     {
         var violations = new List<ArchitectureViolation>
         {
-            new("contract", "my-rule", "Source.Type", "Forbidden.Namespace", new[] { "ref1" })
+            new("contract", "my-rule", "Source.Type", "Forbidden.Namespace", _ref1)
         };
 
         JsonElement root = Run("audit", violations);
@@ -181,7 +183,7 @@ public sealed class ArchitectureSarifFormatterTests
     {
         var violations = new List<ArchitectureViolation>
         {
-            new("layer-rule", "layer-rule", "MyApp.Web.Foo", "protected layer 'Core'", new[] { "ref1" })
+            new("layer-rule", "layer-rule", "MyApp.Web.Foo", "protected layer 'Core'", _ref1)
         };
 
         JsonElement root = Run("strict", violations);
@@ -219,7 +221,7 @@ public sealed class ArchitectureSarifFormatterTests
     {
         var violations = new List<ArchitectureViolation>
         {
-            new("type-placement-rule", "type-placement-rule", "MyApp.Foo", "expected-location", new[] { "ref1" })
+            new("type-placement-rule", "type-placement-rule", "MyApp.Foo", "expected-location", _ref1)
             {
                 Payload = new TypePlacementPayload(ExpectedTypeLocation: "MyApp.Correct")
             }

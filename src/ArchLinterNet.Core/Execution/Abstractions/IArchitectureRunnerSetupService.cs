@@ -12,7 +12,7 @@ public interface IArchitectureRunnerSetupService
         string? baselinePath = null,
         ValidationTiming? timing = null);
 
-    ArchitectureRunnerSetup BuildRunner(
+    ArchitectureRunnerSetup BuildRunner( // NOSONAR: each parameter maps to a distinct configuration concern; a parameter object would wrap disparate optional axes without reducing call-site cognitive load
         ArchitectureContractDocument document,
         string policyPath,
         string? conditionSetName = null,

@@ -18,7 +18,7 @@ internal static class CliCommandModuleCatalog
             .ToArray();
     }
 
-    private static IReadOnlyList<Type> GetModuleTypes<TModule>()
+    private static Type[] GetModuleTypes<TModule>()
     {
         return Assembly.GetExecutingAssembly()
             .GetTypes()

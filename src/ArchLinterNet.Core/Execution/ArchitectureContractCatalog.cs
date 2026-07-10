@@ -106,15 +106,9 @@ public sealed class ArchitectureContractCatalog
     public IReadOnlyCollection<string> BaselineCapableGroups()
     {
         HashSet<string> groups = new(StringComparer.Ordinal);
-
-        foreach (ArchitectureContractDescriptor descriptor in _descriptors)
-        {
-            if (IsGroupResolvable(descriptor.Family))
-            {
-                groups.Add(descriptor.Group);
-            }
-        }
-
+        groups.UnionWith(_descriptors
+            .Where(d => IsGroupResolvable(d.Family))
+            .Select(d => d.Group));
         return groups;
     }
 
@@ -138,13 +132,10 @@ public sealed class ArchitectureContractCatalog
 
     public string? ResolveGroup(IArchitectureContract contract)
     {
-        foreach (ArchitectureContractDescriptor descriptor in _descriptors)
-        {
-            if (IsGroupResolvable(descriptor.Family) && ReferenceEquals(descriptor.Contract, contract))
-            {
-                return descriptor.Group;
-            }
-        }
+        string? group = _descriptors
+            .FirstOrDefault(d => IsGroupResolvable(d.Family) && ReferenceEquals(d.Contract, contract))
+            ?.Group;
+        if (group != null) return group;
 
         if (contract.Id == null)
         {

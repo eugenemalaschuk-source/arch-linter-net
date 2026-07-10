@@ -19,30 +19,19 @@ public sealed class ArchitectureValidationResult
     public IReadOnlyCollection<ArchitectureCoverageSummary> CoverageSummaries { get; }
     public ValidationTiming? Timing { get; }
 
-    public ArchitectureValidationResult(
-        bool passed,
-        IReadOnlyCollection<ArchitectureViolation> violations,
-        IReadOnlyCollection<string> cycles,
-        IReadOnlyCollection<PolicyConsistencyDiagnostic>? policyConsistencyFindings = null,
-        string policyConsistencyConfig = "error",
-        IReadOnlyCollection<ArchitectureViolation>? coverageFindings = null,
-        string coverageConfig = "off",
-        IReadOnlyCollection<ArchitectureUnmatchedIgnoredViolation>? unmatchedIgnoredViolations = null,
-        string unmatchedIgnoredViolationsConfig = "off",
-        IReadOnlyCollection<ArchitectureCoverageSummary>? coverageSummaries = null,
-        ValidationTiming? timing = null)
+    public ArchitectureValidationResult(ArchitectureValidationResultParams @params)
     {
-        Passed = passed;
-        Violations = violations;
-        Cycles = cycles;
-        PolicyConsistencyFindings = policyConsistencyFindings ?? Array.Empty<PolicyConsistencyDiagnostic>();
-        PolicyConsistencyConfig = policyConsistencyConfig;
-        CoverageFindings = coverageFindings ?? Array.Empty<ArchitectureViolation>();
-        CoverageConfig = coverageConfig;
-        UnmatchedIgnoredViolations = unmatchedIgnoredViolations ?? Array.Empty<ArchitectureUnmatchedIgnoredViolation>();
-        UnmatchedIgnoredViolationsConfig = unmatchedIgnoredViolationsConfig;
-        CoverageSummaries = coverageSummaries ?? Array.Empty<ArchitectureCoverageSummary>();
-        Timing = timing;
+        Passed = @params.Passed;
+        Violations = @params.Violations;
+        Cycles = @params.Cycles;
+        PolicyConsistencyFindings = @params.PolicyConsistencyFindings ?? Array.Empty<PolicyConsistencyDiagnostic>();
+        PolicyConsistencyConfig = @params.PolicyConsistencyConfig;
+        CoverageFindings = @params.CoverageFindings ?? Array.Empty<ArchitectureViolation>();
+        CoverageConfig = @params.CoverageConfig;
+        UnmatchedIgnoredViolations = @params.UnmatchedIgnoredViolations ?? Array.Empty<ArchitectureUnmatchedIgnoredViolation>();
+        UnmatchedIgnoredViolationsConfig = @params.UnmatchedIgnoredViolationsConfig;
+        CoverageSummaries = @params.CoverageSummaries ?? Array.Empty<ArchitectureCoverageSummary>();
+        Timing = @params.Timing;
     }
 
     public void ShouldPass()
@@ -95,3 +84,16 @@ public sealed class ArchitectureValidationResult
             : $"{label}{Environment.NewLine}{details}{Environment.NewLine}";
     }
 }
+
+public sealed record ArchitectureValidationResultParams(
+    bool Passed,
+    IReadOnlyCollection<ArchitectureViolation> Violations,
+    IReadOnlyCollection<string> Cycles,
+    IReadOnlyCollection<PolicyConsistencyDiagnostic>? PolicyConsistencyFindings = null,
+    string PolicyConsistencyConfig = "error",
+    IReadOnlyCollection<ArchitectureViolation>? CoverageFindings = null,
+    string CoverageConfig = "off",
+    IReadOnlyCollection<ArchitectureUnmatchedIgnoredViolation>? UnmatchedIgnoredViolations = null,
+    string UnmatchedIgnoredViolationsConfig = "off",
+    IReadOnlyCollection<ArchitectureCoverageSummary>? CoverageSummaries = null,
+    ValidationTiming? Timing = null);

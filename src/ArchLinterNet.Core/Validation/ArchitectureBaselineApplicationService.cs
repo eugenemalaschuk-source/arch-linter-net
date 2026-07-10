@@ -15,6 +15,9 @@ public sealed class ArchitectureBaselineApplicationService(
     IArchitectureBaselineLoadingService baselineLoadingService)
     : IArchitectureBaselineApplicationService
 {
+    private const string ModeStrict = "strict";
+    private const string ModeAudit = "audit";
+
     public BaselineGenerationOutcome Generate(BaselineGenerationRequest request)
     {
         (ArchitectureContractDocument document, IReadOnlyList<ArchitectureBaselineCandidate>? candidates, List<ArchitectureViolation> configViolations) =
@@ -173,7 +176,7 @@ public sealed class ArchitectureBaselineApplicationService(
     private (ArchitectureContractDocument Document, IReadOnlyList<ArchitectureBaselineCandidate>? Candidates, List<ArchitectureViolation> ConfigurationViolations)
         CollectCandidates(string policyPath, string mode, string? conditionSetName, IReadOnlyCollection<string>? contractIds)
     {
-        if (mode is not ("strict" or "audit" or "all"))
+        if (mode is not (ModeStrict or ModeAudit or "all"))
         {
             throw new ArgumentException($"Invalid mode: {mode}. Use 'strict', 'audit', or 'all'.", nameof(mode));
         }
@@ -209,8 +212,8 @@ public sealed class ArchitectureBaselineApplicationService(
 
         List<ArchitectureViolation> configViolations = mode switch
         {
-            "strict" => runner.CheckConfiguration(strict: true),
-            "audit" => runner.CheckConfiguration(strict: false),
+            ModeStrict => runner.CheckConfiguration(strict: true),
+            ModeAudit => runner.CheckConfiguration(strict: false),
             "all" => runner.CheckConfiguration(),
             _ => throw new ArgumentOutOfRangeException(nameof(mode), mode, "Unsupported baseline mode."),
         };
@@ -220,17 +223,17 @@ public sealed class ArchitectureBaselineApplicationService(
             return (document, null, configViolations);
         }
 
-        bool includeStrict = mode is "strict" or "all";
-        bool includeAudit = mode is "audit" or "all";
+        bool includeStrict = mode is ModeStrict or "all";
+        bool includeAudit = mode is ModeAudit or "all";
 
         if (includeStrict)
         {
-            contractExecutor.Execute(runner.Session, "strict", handlerRegistry, includeAsmdefContracts: false);
+            contractExecutor.Execute(runner.Session, ModeStrict, handlerRegistry, includeAsmdefContracts: false);
         }
 
         if (includeAudit)
         {
-            contractExecutor.Execute(runner.Session, "audit", handlerRegistry, includeAsmdefContracts: false);
+            contractExecutor.Execute(runner.Session, ModeAudit, handlerRegistry, includeAsmdefContracts: false);
         }
 
         return (document, runner.BaselineCandidates, new List<ArchitectureViolation>());
@@ -242,8 +245,8 @@ public sealed class ArchitectureBaselineApplicationService(
 
         if (mode == "all")
         {
-            HashSet<string> ids = new(catalog.AvailableContractIds("strict"), StringComparer.OrdinalIgnoreCase);
-            ids.UnionWith(catalog.AvailableContractIds("audit"));
+            HashSet<string> ids = new(catalog.AvailableContractIds(ModeStrict), StringComparer.OrdinalIgnoreCase);
+            ids.UnionWith(catalog.AvailableContractIds(ModeAudit));
             return ids;
         }
 

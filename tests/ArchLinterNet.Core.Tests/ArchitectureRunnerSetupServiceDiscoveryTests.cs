@@ -11,9 +11,12 @@ namespace ArchLinterNet.Core.Tests;
 [TestFixture]
 public sealed class ArchitectureRunnerSetupServiceDiscoveryTests
 {
+    private static readonly string[] _archLinterNetCore = { "ArchLinterNet.Core" };
+    private static readonly string[] _noOutput = { "_noOutput" };
+
     private string _repoRoot = null!;
     private string _policyPath = null!;
-    private IArchitectureRunnerSetupService _runnerSetupService = null!;
+    private ArchitectureRunnerSetupService _runnerSetupService = null!;
 
     [SetUp]
     public void SetUp()
@@ -58,7 +61,7 @@ public sealed class ArchitectureRunnerSetupServiceDiscoveryTests
 
         ArchitectureRunnerSetup setup = _runnerSetupService.BuildRunner(document, _policyPath);
 
-        Assert.That(document.Analysis.TargetAssemblies, Is.EquivalentTo(new[] { "ArchLinterNet.Core" }));
+        Assert.That(document.Analysis.TargetAssemblies, Is.EquivalentTo(_archLinterNetCore));
         Assert.That(setup.Runner.CheckConfiguration().Any(v => v.ForbiddenNamespace == "missing project build output"), Is.False);
 
         string discoveredOutputDir = Path.Combine(_repoRoot, "Unresolvable", "bin", "Debug", "net9.0");
@@ -83,17 +86,17 @@ public sealed class ArchitectureRunnerSetupServiceDiscoveryTests
 
         ArchitectureRunnerSetup setup = _runnerSetupService.BuildRunner(document, _policyPath);
 
-        Assert.That(document.Analysis.TargetAssemblies, Is.EquivalentTo(new[] { "ArchLinterNet.Core" }));
-        Assert.That(document.Analysis.SourceRoots, Is.EquivalentTo(new[] { "ArchLinterNet.Core" }));
+        Assert.That(document.Analysis.TargetAssemblies, Is.EquivalentTo(_archLinterNetCore));
+        Assert.That(document.Analysis.SourceRoots, Is.EquivalentTo(_archLinterNetCore));
         Assert.That(setup.Runner.CheckConfiguration().Any(v => v.SourceType.Contains("ArchLinterNet.Core.csproj")), Is.False);
     }
 
     [Test]
     public void BuildRunner_ExplicitTargetAssemblies_ProjectWithNoBuildOutput_DoesNotProduceDiagnosticButStillSeedsSourceRoot()
     {
-        string projectDir = Path.Combine(_repoRoot, "NoOutput");
+        string projectDir = Path.Combine(_repoRoot, "_noOutput");
         Directory.CreateDirectory(projectDir);
-        File.WriteAllText(Path.Combine(projectDir, "NoOutput.csproj"), """
+        File.WriteAllText(Path.Combine(projectDir, "_noOutput.csproj"), """
             <Project Sdk="Microsoft.NET.Sdk">
               <PropertyGroup>
                 <TargetFramework>net9.0</TargetFramework>
@@ -108,23 +111,23 @@ public sealed class ArchitectureRunnerSetupServiceDiscoveryTests
             Analysis = new ArchitectureAnalysisConfiguration
             {
                 TargetAssemblies = new List<string> { "ArchLinterNet.Core" },
-                Projects = new List<string> { Path.Combine(projectDir, "NoOutput.csproj") }
+                Projects = new List<string> { Path.Combine(projectDir, "_noOutput.csproj") }
             }
         };
 
         ArchitectureRunnerSetup setup = _runnerSetupService.BuildRunner(document, _policyPath);
 
-        Assert.That(document.Analysis.TargetAssemblies, Is.EquivalentTo(new[] { "ArchLinterNet.Core" }));
+        Assert.That(document.Analysis.TargetAssemblies, Is.EquivalentTo(_archLinterNetCore));
         Assert.That(setup.Runner.CheckConfiguration().Any(v => v.ForbiddenNamespace == "missing project build output"), Is.False);
-        Assert.That(document.Analysis.SourceRoots, Is.EquivalentTo(new[] { "NoOutput" }));
+        Assert.That(document.Analysis.SourceRoots, Is.EquivalentTo(_noOutput));
     }
 
     [Test]
     public void BuildRunner_NoTargetAssembliesAndDiscoveryYieldsNothing_ThrowsWithDiagnosticDetails()
     {
-        string projectDir = Path.Combine(_repoRoot, "NoOutput");
+        string projectDir = Path.Combine(_repoRoot, "_noOutput");
         Directory.CreateDirectory(projectDir);
-        File.WriteAllText(Path.Combine(projectDir, "NoOutput.csproj"), """
+        File.WriteAllText(Path.Combine(projectDir, "_noOutput.csproj"), """
             <Project Sdk="Microsoft.NET.Sdk">
               <PropertyGroup>
                 <TargetFramework>net9.0</TargetFramework>
@@ -138,7 +141,7 @@ public sealed class ArchitectureRunnerSetupServiceDiscoveryTests
             Name = "Test",
             Analysis = new ArchitectureAnalysisConfiguration
             {
-                Projects = new List<string> { Path.Combine(projectDir, "NoOutput.csproj") }
+                Projects = new List<string> { Path.Combine(projectDir, "_noOutput.csproj") }
             }
         };
 
@@ -146,15 +149,15 @@ public sealed class ArchitectureRunnerSetupServiceDiscoveryTests
             () => _runnerSetupService.BuildRunner(document, _policyPath));
 
         Assert.That(exception!.Message, Does.Contain("analysis.target_assemblies"));
-        Assert.That(exception.Message, Does.Contain("NoOutput"));
+        Assert.That(exception.Message, Does.Contain("_noOutput"));
     }
 
     [Test]
     public void BuildRunner_ProjectMetadataOnlyPolicy_ProjectWithNoBuildOutput_DoesNotRequireResolvedAssemblies()
     {
-        string projectDir = Path.Combine(_repoRoot, "NoOutput");
+        string projectDir = Path.Combine(_repoRoot, "_noOutput");
         Directory.CreateDirectory(projectDir);
-        File.WriteAllText(Path.Combine(projectDir, "NoOutput.csproj"), """
+        File.WriteAllText(Path.Combine(projectDir, "_noOutput.csproj"), """
             <Project Sdk="Microsoft.NET.Sdk">
               <PropertyGroup>
                 <TargetFramework>net9.0</TargetFramework>
@@ -169,7 +172,7 @@ public sealed class ArchitectureRunnerSetupServiceDiscoveryTests
             Name = "Test",
             Analysis = new ArchitectureAnalysisConfiguration
             {
-                Projects = new List<string> { Path.Combine(projectDir, "NoOutput.csproj") }
+                Projects = new List<string> { Path.Combine(projectDir, "_noOutput.csproj") }
             },
             Contracts = new ArchitectureContractGroups
             {
@@ -179,7 +182,7 @@ public sealed class ArchitectureRunnerSetupServiceDiscoveryTests
                     {
                         Name = "project-metadata",
                         Id = "project-metadata",
-                        Projects = new List<string> { "NoOutput/NoOutput.csproj" },
+                        Projects = new List<string> { "_noOutput/_noOutput.csproj" },
                         RequiredProperties = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
                         {
                             ["Nullable"] = "enable"
@@ -195,7 +198,7 @@ public sealed class ArchitectureRunnerSetupServiceDiscoveryTests
         Assert.That(document.Analysis.TargetAssemblies, Is.Empty);
         Assert.That(configurationViolations.Any(v => v.ForbiddenNamespace == "missing project build output"), Is.False);
         Assert.That(configurationViolations.Any(v => v.ForbiddenNamespace == "no project metadata discovered"), Is.False);
-        Assert.That(document.Analysis.SourceRoots, Is.EquivalentTo(new[] { "NoOutput" }));
+        Assert.That(document.Analysis.SourceRoots, Is.EquivalentTo(_noOutput));
     }
 
     private void CreateProjectWithOutput(string assemblyName, string targetFramework)

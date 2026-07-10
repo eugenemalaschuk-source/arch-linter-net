@@ -206,7 +206,7 @@ public sealed class ArchitectureBaselineIntegrationTests
             File.WriteAllText(baselinePath, mergedYaml);
 
             var loadedBaseline = _loadingService.LoadFromPath(baselinePath);
-            _loadingService.MergeAndValidate(policy, loadedBaseline);
+            ArchitectureBaselineLoadingService.MergeAndValidate(policy, loadedBaseline);
 
             var finalRunner = new ArchitectureContractRunner(context, policy);
             var violations1 = finalRunner.CheckContract(policy.Contracts.Strict[0]);

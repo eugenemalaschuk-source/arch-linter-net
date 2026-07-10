@@ -57,10 +57,10 @@ internal static class ArchitectureIgnoreMatcher
             return true;
         }
 
-        if (normalizedPattern.EndsWith("*", StringComparison.Ordinal)
+        if (normalizedPattern.EndsWith('*')
             && !normalizedPattern.Contains("**", StringComparison.Ordinal)
             && normalizedPattern.Count(ch => ch == '*') == 1
-            && !normalizedPattern.Contains('?', StringComparison.Ordinal))
+            && !normalizedPattern.Contains('?'))
         {
             return normalizedValue.StartsWith(normalizedPattern[..^1], StringComparison.Ordinal);
         }

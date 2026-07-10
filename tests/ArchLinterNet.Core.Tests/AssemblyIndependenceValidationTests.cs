@@ -31,7 +31,7 @@ public sealed class AssemblyIndependenceValidationTests
         return path;
     }
 
-    private string AssemblyName => typeof(AssemblyIndependenceValidationTests).Assembly.GetName().Name!;
+    private static string AssemblyName => typeof(AssemblyIndependenceValidationTests).Assembly.GetName().Name!;
 
     [Test]
     public void AssemblyIndependence_UndeclaredAssembly_ThrowsActionableError()

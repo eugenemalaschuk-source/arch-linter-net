@@ -218,7 +218,7 @@ internal static class ArchitectureReferenceScanner
         try
         {
             return type.GetFields(BindingFlags.Instance | BindingFlags.Static | BindingFlags.Public |
-                                  BindingFlags.NonPublic | BindingFlags.DeclaredOnly);
+                                   BindingFlags.NonPublic | BindingFlags.DeclaredOnly); // NOSONAR: intentional — deep type graph traversal needs full member visibility
         }
         catch (FileNotFoundException)
         {
@@ -235,7 +235,7 @@ internal static class ArchitectureReferenceScanner
         try
         {
             return type.GetProperties(BindingFlags.Instance | BindingFlags.Static | BindingFlags.Public |
-                                      BindingFlags.NonPublic | BindingFlags.DeclaredOnly);
+                                       BindingFlags.NonPublic | BindingFlags.DeclaredOnly); // NOSONAR: intentional — deep type graph traversal needs full member visibility
         }
         catch (FileNotFoundException)
         {
@@ -252,7 +252,7 @@ internal static class ArchitectureReferenceScanner
         try
         {
             return type.GetMethods(BindingFlags.Instance | BindingFlags.Static | BindingFlags.Public |
-                                   BindingFlags.NonPublic | BindingFlags.DeclaredOnly);
+                                    BindingFlags.NonPublic | BindingFlags.DeclaredOnly); // NOSONAR: intentional — deep type graph traversal needs full member visibility
         }
         catch (FileNotFoundException)
         {
@@ -269,7 +269,7 @@ internal static class ArchitectureReferenceScanner
         try
         {
             return type.GetConstructors(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic |
-                                        BindingFlags.DeclaredOnly);
+                                         BindingFlags.DeclaredOnly); // NOSONAR: intentional — deep type graph traversal needs full member visibility
         }
         catch (FileNotFoundException)
         {
@@ -383,9 +383,11 @@ internal static class ArchitectureReferenceScanner
         }
         catch (FileNotFoundException)
         {
+            // Swallow — defensive reflection may encounter missing assemblies
         }
         catch (TypeLoadException)
         {
+            // Swallow — defensive reflection may encounter unloadable types
         }
 
         return type;

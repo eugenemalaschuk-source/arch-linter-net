@@ -54,12 +54,10 @@ public sealed class RoslynCompilationFactory : IRoslynCompilationFactory
         string? trustedPlatformAssemblies = AppContext.GetData("TRUSTED_PLATFORM_ASSEMBLIES") as string;
         if (!string.IsNullOrWhiteSpace(trustedPlatformAssemblies))
         {
-            foreach (string path in trustedPlatformAssemblies.Split(Path.PathSeparator))
+            foreach (string path in trustedPlatformAssemblies.Split(Path.PathSeparator)
+                .Where(p => !string.IsNullOrWhiteSpace(p) && fileSystem.FileExists(p)))
             {
-                if (!string.IsNullOrWhiteSpace(path) && fileSystem.FileExists(path))
-                {
-                    paths.Add(path);
-                }
+                paths.Add(path);
             }
         }
 

@@ -7,21 +7,25 @@ namespace ArchLinterNet.Core.Tests;
 [TestFixture]
 public sealed class ForbiddenCallMatcherTests
 {
+    private static readonly string[] _foo = { "_foo" };
+    private static readonly string[] _fooWithParen = { "_foo(" };
+    private static readonly string[] _myAppServices = { "MyApp.Services." };
+
     [Test]
     public void NormalizePatterns_RemovesTrailingParentheses()
     {
         IReadOnlyList<ForbiddenCallPattern> patterns = ArchitectureForbiddenCallMatcher.NormalizePatterns(
-            new[] { "Foo(" });
+            _fooWithParen);
 
         Assert.That(patterns.Count, Is.EqualTo(1));
-        Assert.That(patterns[0].Normalized, Is.EqualTo("Foo"));
+        Assert.That(patterns[0].Normalized, Is.EqualTo("_foo"));
     }
 
     [Test]
     public void NormalizePatterns_DetectsNamespacePrefix()
     {
         IReadOnlyList<ForbiddenCallPattern> patterns = ArchitectureForbiddenCallMatcher.NormalizePatterns(
-            new[] { "MyApp.Services." });
+            _myAppServices);
 
         Assert.That(patterns.Count, Is.EqualTo(1));
         Assert.That(patterns[0].IsNamespacePrefix, Is.True);
@@ -32,21 +36,21 @@ public sealed class ForbiddenCallMatcherTests
     public void TryMatch_ExactNameMatch_ReturnsTrue()
     {
         IReadOnlyList<ForbiddenCallPattern> patterns = ArchitectureForbiddenCallMatcher.NormalizePatterns(
-            new[] { "Foo" });
-        var descriptor = new SymbolDescriptor("Foo", "Bar", "Baz", "Baz.Bar.Foo");
+            _foo);
+        var descriptor = new SymbolDescriptor("_foo", "Bar", "Baz", "Baz.Bar._foo");
         var cache = new Dictionary<string, bool>();
 
         bool matched = ArchitectureForbiddenCallMatcher.TryMatch(descriptor, patterns, cache, out string raw);
 
         Assert.That(matched, Is.True);
-        Assert.That(raw, Is.EqualTo("Foo"));
+        Assert.That(raw, Is.EqualTo("_foo"));
     }
 
     [Test]
     public void TryMatch_NamespacePrefixMatch_ReturnsTrue()
     {
         IReadOnlyList<ForbiddenCallPattern> patterns = ArchitectureForbiddenCallMatcher.NormalizePatterns(
-            new[] { "MyApp.Services." });
+            _myAppServices);
         var descriptor = new SymbolDescriptor("MyMethod", "MyService", "MyApp.Services", "MyApp.Services.MyService.MyMethod");
         var cache = new Dictionary<string, bool>();
 
@@ -112,7 +116,7 @@ public sealed class ForbiddenCallMatcherTests
     {
         IReadOnlyList<ForbiddenCallPattern> patterns = ArchitectureForbiddenCallMatcher.NormalizePatterns(
             new[] { "SomethingElse" });
-        var descriptor = new SymbolDescriptor("Foo", "Bar", "Baz", "Baz.Bar.Foo");
+        var descriptor = new SymbolDescriptor("_foo", "Bar", "Baz", "Baz.Bar._foo");
         var cache = new Dictionary<string, bool>();
 
         bool matched = ArchitectureForbiddenCallMatcher.TryMatch(descriptor, patterns, cache, out _);
@@ -124,8 +128,8 @@ public sealed class ForbiddenCallMatcherTests
     public void TryMatch_CachesResults()
     {
         IReadOnlyList<ForbiddenCallPattern> patterns = ArchitectureForbiddenCallMatcher.NormalizePatterns(
-            new[] { "Foo" });
-        var descriptor = new SymbolDescriptor("Foo", "Bar", "Baz", "Baz.Bar.Foo");
+            _foo);
+        var descriptor = new SymbolDescriptor("_foo", "Bar", "Baz", "Baz.Bar._foo");
         var cache = new Dictionary<string, bool>();
 
         ArchitectureForbiddenCallMatcher.TryMatch(descriptor, patterns, cache, out _);

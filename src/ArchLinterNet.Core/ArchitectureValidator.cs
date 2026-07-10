@@ -5,27 +5,27 @@ using ArchLinterNet.Core.Validation;
 
 namespace ArchLinterNet.Core;
 
-public sealed class ArchitectureValidator
+public static class ArchitectureValidator
 {
     private static readonly Lazy<ArchitectureEngine> _engine =
         new(() => new ArchitectureEngineBuilder().AddArchLinterNetCore().Build());
 
-    public ValidationOutcome Validate(ValidationRequest request, ValidationTiming? timing = null)
+    public static ValidationOutcome Validate(ValidationRequest request, ValidationTiming? timing = null)
     {
         return _engine.Value.Validate(request, timing);
     }
 
-    public bool Validate(string policyPath)
+    public static bool Validate(string policyPath)
     {
         return Validate(policyPath, out _, out _);
     }
 
-    public bool Validate(string policyPath, out IReadOnlyCollection<ArchitectureViolation> violations)
+    public static bool Validate(string policyPath, out IReadOnlyCollection<ArchitectureViolation> violations)
     {
         return Validate(policyPath, out violations, out _);
     }
 
-    public bool Validate(
+    public static bool Validate(
         string policyPath,
         out IReadOnlyCollection<ArchitectureViolation> violations,
         out IReadOnlyCollection<string> cycles,
@@ -40,12 +40,14 @@ public sealed class ArchitectureValidator
 
         ValidationOutcome outcome = _engine.Value.Validate(request);
 
+        IReadOnlyCollection<ArchitectureViolation> coverageViolations = outcome.CoverageConfig == "off"
+            ? Array.Empty<ArchitectureViolation>()
+            : outcome.CoverageFindings;
+
         violations = outcome.PolicyConsistencyConfig == "off"
-            ? outcome.Violations
-                .Concat(outcome.CoverageConfig == "off" ? Array.Empty<ArchitectureViolation>() : outcome.CoverageFindings)
-                .ToArray()
+            ? outcome.Violations.Concat(coverageViolations).ToArray()
             : outcome.Violations
-                .Concat(outcome.CoverageConfig == "off" ? Array.Empty<ArchitectureViolation>() : outcome.CoverageFindings)
+                .Concat(coverageViolations)
                 .Concat(outcome.PolicyConsistencyFindings.Select(ToViolation))
                 .ToArray();
         cycles = outcome.Cycles;

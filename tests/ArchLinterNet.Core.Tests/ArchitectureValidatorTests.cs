@@ -9,6 +9,9 @@ namespace ArchLinterNet.Core.Tests;
 [TestFixture]
 public sealed class ArchitectureValidatorTests
 {
+    private static readonly string[] _harmless = { "harmless" };
+    private static readonly string[] _selfForbidden = { "self-forbidden" };
+
     private string _tempDir = null!;
 
     [SetUp]
@@ -53,8 +56,7 @@ contracts:
   strict_independence: []
 ");
 
-        var validator = new ArchitectureValidator();
-        bool result = validator.Validate(contractPath, out var violations, out var cycles);
+        bool result = ArchitectureValidator.Validate(contractPath, out var violations, out var cycles);
 
         Assert.That(result, Is.True);
         Assert.That(violations, Is.Empty);
@@ -87,8 +89,7 @@ contracts:
   strict_independence: []
 ");
 
-        var validator = new ArchitectureValidator();
-        bool result = validator.Validate(contractPath);
+        bool result = ArchitectureValidator.Validate(contractPath);
 
         Assert.That(result, Is.True);
     }
@@ -116,8 +117,7 @@ contracts:
       forbidden: [core]
 ");
 
-        var validator = new ArchitectureValidator();
-        bool result = validator.Validate(contractPath, out var violations, out var cycles);
+        bool result = ArchitectureValidator.Validate(contractPath, out var violations, out var cycles);
 
         Assert.That(result, Is.False);
         Assert.That(violations, Is.Not.Empty);
@@ -156,8 +156,7 @@ contracts:
       forbidden_asmdef_prefixes: [Forbidden]
 ");
 
-        var validator = new ArchitectureValidator();
-        bool result = validator.Validate(contractPath, out var violations, out var cycles);
+        bool result = ArchitectureValidator.Validate(contractPath, out var violations, out var cycles);
 
         Assert.That(result, Is.False);
         Assert.That(violations, Has.Some.Matches<ArchitectureViolation>(v => v.SourceType == "MyAssembly"));
@@ -194,14 +193,13 @@ contracts:
       allowed: [contracts]
 ");
 
-        var validator = new ArchitectureValidator();
-        bool result = validator.Validate(contractPath, out var violations, out _);
+        bool result = ArchitectureValidator.Validate(contractPath, out var violations, out _);
 
         Assert.That(result, Is.False);
         Assert.That(violations, Has.Some.Matches<ArchitectureViolation>(v => v.SourceType == "allow-forbid-conflict"));
     }
 
-    private string WriteSelfForbiddenPolicy()
+    private string Write_selfForbiddenPolicy()
     {
         string contractDir = Path.Combine(_tempDir, "architecture");
         Directory.CreateDirectory(contractDir);
@@ -233,21 +231,20 @@ contracts:
     [Test]
     public void Validate_RequestOverload_SelectsOnlySpecifiedContract()
     {
-        string contractPath = WriteSelfForbiddenPolicy();
-        var validator = new ArchitectureValidator();
+        string contractPath = Write_selfForbiddenPolicy();
 
-        ValidationOutcome outcome = validator.Validate(new ValidationRequest
+        ValidationOutcome outcome = ArchitectureValidator.Validate(new ValidationRequest
         {
             PolicyPath = contractPath,
             Mode = "strict",
-            ContractIds = new[] { "harmless" },
+            ContractIds = _harmless,
         });
 
         Assert.That(outcome.Passed, Is.True);
         Assert.That(outcome.Violations, Is.Empty);
     }
 
-    private string WriteSelfForbiddenAuditPolicy()
+    private string Write_selfForbiddenAuditPolicy()
     {
         string contractDir = Path.Combine(_tempDir, "architecture");
         Directory.CreateDirectory(contractDir);
@@ -279,20 +276,19 @@ contracts:
     [Test]
     public void Validate_RequestOverload_AuditMode_SelectsOnlySpecifiedContract()
     {
-        string contractPath = WriteSelfForbiddenAuditPolicy();
-        var validator = new ArchitectureValidator();
+        string contractPath = Write_selfForbiddenAuditPolicy();
 
-        ValidationOutcome withHarmlessOnly = validator.Validate(new ValidationRequest
+        ValidationOutcome with_harmlessOnly = ArchitectureValidator.Validate(new ValidationRequest
         {
             PolicyPath = contractPath,
             Mode = "audit",
-            ContractIds = new[] { "harmless" },
+            ContractIds = _harmless,
         });
 
-        Assert.That(withHarmlessOnly.Passed, Is.True);
-        Assert.That(withHarmlessOnly.Violations, Is.Empty);
+        Assert.That(with_harmlessOnly.Passed, Is.True);
+        Assert.That(with_harmlessOnly.Violations, Is.Empty);
 
-        ValidationOutcome unfiltered = validator.Validate(new ValidationRequest
+        ValidationOutcome unfiltered = ArchitectureValidator.Validate(new ValidationRequest
         {
             PolicyPath = contractPath,
             Mode = "audit",
@@ -352,9 +348,7 @@ contracts:
       forbidden_calls: [System.Console.WriteLine]
 ");
 
-        var validator = new ArchitectureValidator();
-
-        ValidationOutcome runtimeOutcome = validator.Validate(new ValidationRequest
+        ValidationOutcome runtimeOutcome = ArchitectureValidator.Validate(new ValidationRequest
         {
             PolicyPath = contractPath,
             Mode = "strict",
@@ -365,7 +359,7 @@ contracts:
             "Without MY_SYMBOL defined, the #if-gated forbidden call should not compile in and should not be reported");
         Assert.That(runtimeOutcome.Violations, Is.Empty);
 
-        ValidationOutcome editorOutcome = validator.Validate(new ValidationRequest
+        ValidationOutcome editorOutcome = ArchitectureValidator.Validate(new ValidationRequest
         {
             PolicyPath = contractPath,
             Mode = "strict",
@@ -380,14 +374,13 @@ contracts:
     [Test]
     public void Validate_RequestOverload_BaselinePath_SuppressesKnownViolation()
     {
-        string contractPath = WriteSelfForbiddenPolicy();
-        var validator = new ArchitectureValidator();
+        string contractPath = Write_selfForbiddenPolicy();
 
-        ValidationOutcome before = validator.Validate(new ValidationRequest
+        ValidationOutcome before = ArchitectureValidator.Validate(new ValidationRequest
         {
             PolicyPath = contractPath,
             Mode = "strict",
-            ContractIds = new[] { "self-forbidden" },
+            ContractIds = _selfForbidden,
         });
 
         Assert.That(before.Violations, Is.Not.Empty, "Expected at least one baseline violation for test validity");
@@ -406,11 +399,11 @@ baseline:
           reason: known debt
 ");
 
-        ValidationOutcome after = validator.Validate(new ValidationRequest
+        ValidationOutcome after = ArchitectureValidator.Validate(new ValidationRequest
         {
             PolicyPath = contractPath,
             Mode = "strict",
-            ContractIds = new[] { "self-forbidden" },
+            ContractIds = _selfForbidden,
             BaselinePath = baselinePath,
         });
 
@@ -448,9 +441,7 @@ contracts:
           reason: stale
 ");
 
-        var validator = new ArchitectureValidator();
-
-        ValidationOutcome outcome = validator.Validate(new ValidationRequest
+        ValidationOutcome outcome = ArchitectureValidator.Validate(new ValidationRequest
         {
             PolicyPath = contractPath,
             Mode = "strict",
@@ -489,9 +480,7 @@ contracts:
           reason: stale
 ");
 
-        var validator = new ArchitectureValidator();
-
-        ValidationOutcome outcome = validator.Validate(new ValidationRequest
+        ValidationOutcome outcome = ArchitectureValidator.Validate(new ValidationRequest
         {
             PolicyPath = contractPath,
             Mode = "strict",
@@ -505,15 +494,14 @@ contracts:
     [Test]
     public void Validate_RequestOverload_WithTimings_PopulatesReport()
     {
-        string contractPath = WriteSelfForbiddenPolicy();
-        var validator = new ArchitectureValidator();
+        string contractPath = Write_selfForbiddenPolicy();
         var timing = new ValidationTiming();
 
-        validator.Validate(new ValidationRequest
+        ArchitectureValidator.Validate(new ValidationRequest
         {
             PolicyPath = contractPath,
             Mode = "strict",
-            ContractIds = new[] { "harmless" },
+            ContractIds = _harmless,
         }, timing);
 
         using var writer = new StringWriter();
@@ -525,10 +513,9 @@ contracts:
     [Test]
     public void Validate_LegacyOverloads_UnaffectedByNewOverload()
     {
-        string contractPath = WriteSelfForbiddenPolicy();
-        var validator = new ArchitectureValidator();
+        string contractPath = Write_selfForbiddenPolicy();
 
-        bool result = validator.Validate(contractPath, out var violations, out var cycles);
+        bool result = ArchitectureValidator.Validate(contractPath, out var violations, out var cycles);
 
         Assert.That(result, Is.False);
         Assert.That(violations, Is.Not.Empty);

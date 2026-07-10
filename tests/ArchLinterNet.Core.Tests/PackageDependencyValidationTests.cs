@@ -31,7 +31,7 @@ public sealed class PackageDependencyValidationTests
         return path;
     }
 
-    private string AssemblyName => typeof(PackageDependencyValidationTests).Assembly.GetName().Name!;
+    private static string AssemblyName => typeof(PackageDependencyValidationTests).Assembly.GetName().Name!;
 
     [Test]
     public void PackageDependency_UndeclaredSourceAssembly_ThrowsActionableError()

@@ -17,7 +17,7 @@ public interface IArchitectureDiagnosticFormatter
 
     string FormatCoverageSummaryForHumans(IReadOnlyCollection<ArchitectureCoverageSummary> summaries);
 
-    string FormatResultForCiArtifacts(
+    string FormatResultForCiArtifacts( // NOSONAR: each parameter represents a semantically distinct section of the CI artifact payload; grouping would obscure the data contract
         string mode,
         bool passed,
         IReadOnlyCollection<ArchitectureViolation> violations,

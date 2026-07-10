@@ -13,182 +13,14 @@ namespace ArchLinterNet.Core.Tests;
 [TestFixture]
 public sealed class ArchitectureBaselineApplicationServiceFakeCompositionTests
 {
-    private sealed class FakeRunnerSetupService : IArchitectureRunnerSetupService
-    {
-        public bool LoadDocumentCalled { get; private set; }
-
-        public bool BuildRunnerCalled { get; private set; }
-
-        public HashSet<string>? SelectedContractIdsReceived { get; private set; }
-
-        public string? ModeReceived { get; private set; }
-
-        public ArchitectureContractDocument DocumentToReturn { get; set; } = new() { Version = 1, Name = "Fake" };
-
-        public IArchitectureContractRunner RunnerToReturn { get; set; } = null!;
-
-        public ArchitectureContractDocument LoadDocument(
-            string policyPath, string? baselinePath = null, ValidationTiming? timing = null)
-        {
-            LoadDocumentCalled = true;
-            return DocumentToReturn;
-        }
-
-        public ArchitectureRunnerSetup BuildRunner(
-            ArchitectureContractDocument document,
-            string policyPath,
-            string? conditionSetName = null,
-            IReadOnlyList<string>? preprocessorSymbols = null,
-            HashSet<string>? selectedContractIds = null,
-            bool enableUnmatchedIgnoreTracking = true,
-            ValidationTiming? timing = null,
-            string? mode = null)
-        {
-            BuildRunnerCalled = true;
-            SelectedContractIdsReceived = selectedContractIds;
-            ModeReceived = mode;
-            return new ArchitectureRunnerSetup("/fake/repository/root", RunnerToReturn);
-        }
-    }
-
-    private sealed class FakeContractRunner : IArchitectureContractRunner
-    {
-        public FakeContractRunner(ArchitectureAnalysisSession session)
-        {
-            Session = session;
-        }
-
-        public List<ArchitectureViolation> ConfigurationViolationsToReturn { get; set; } = new();
-
-        public List<bool> StrictArgumentsReceived { get; } = new();
-
-        public ArchitectureAnalysisSession Session { get; }
-
-        public IReadOnlyList<ArchitectureUnmatchedIgnoredViolation> UnmatchedIgnoredViolations { get; }
-            = Array.Empty<ArchitectureUnmatchedIgnoredViolation>();
-
-        public IReadOnlyList<ArchitectureBaselineCandidate> BaselineCandidates { get; set; }
-            = Array.Empty<ArchitectureBaselineCandidate>();
-
-        public List<ArchitectureViolation> CheckConfiguration()
-        {
-            return CheckConfiguration(strict: true);
-        }
-
-        public List<ArchitectureViolation> CheckConfiguration(bool strict)
-        {
-            StrictArgumentsReceived.Add(strict);
-            return ConfigurationViolationsToReturn;
-        }
-
-        public List<PolicyConsistencyDiagnostic> CheckPolicyConsistency()
-        {
-            return new List<PolicyConsistencyDiagnostic>();
-        }
-    }
-
-    private sealed class FakeContractHandlerRegistry : IArchitectureContractHandlerRegistry
-    {
-        public bool TryGetHandler(string family, out ArchitectureContractChecker? checker)
-        {
-            checker = null;
-            return false;
-        }
-
-        public ArchitectureHandlerResult Execute(
-            string family, ArchitectureAnalysisSession session, IArchitectureContract contract)
-        {
-            throw new InvalidOperationException("Not expected to be called directly by the application service.");
-        }
-    }
-
-    private sealed class FakeContractExecutor : IArchitectureContractExecutor
-    {
-        public List<string> ModesReceived { get; } = new();
-
-        public ArchitectureContractExecutionResult Execute(
-            ArchitectureAnalysisSession session,
-            string mode,
-            IArchitectureContractHandlerRegistry handlerRegistry,
-            bool includeAsmdefContracts = true,
-            ValidationTiming? timing = null)
-        {
-            ModesReceived.Add(mode);
-            return new ArchitectureContractExecutionResult(
-                Array.Empty<ArchitectureViolation>(),
-                Array.Empty<string>(),
-                Array.Empty<ArchitectureViolation>(),
-                Array.Empty<ArchitectureCoverageSummary>());
-        }
-    }
-
-    private sealed class FakeBaselineGenerator : IArchitectureBaselineGenerator
-    {
-        public bool WasCalled { get; private set; }
-
-        public string ReasonReceived { get; private set; } = string.Empty;
-
-        public string YamlToReturn { get; set; } = "fake-baseline-yaml";
-
-        public IReadOnlyList<ArchitectureBaselineComparisonEntry>? EntriesReceived { get; private set; }
-
-        public ArchitectureBaselineDocument Generate(
-            ArchitectureContractDocument policyDocument,
-            IReadOnlyList<ArchitectureBaselineCandidate> candidates,
-            string reason = "generated baseline")
-        {
-            WasCalled = true;
-            ReasonReceived = reason;
-            return new ArchitectureBaselineDocument { Version = 1 };
-        }
-
-        public ArchitectureBaselineDocument BuildFromEntries(IReadOnlyList<ArchitectureBaselineComparisonEntry> entries)
-        {
-            WasCalled = true;
-            EntriesReceived = entries;
-            return new ArchitectureBaselineDocument { Version = 1 };
-        }
-
-        public string Serialize(ArchitectureBaselineDocument document)
-        {
-            return YamlToReturn;
-        }
-    }
-
-    private sealed class FakeBaselineLoadingService : IArchitectureBaselineLoadingService
-    {
-        public ArchitectureBaselineDocument DocumentToReturn { get; set; } =
-            new() { Version = 1, Baseline = new ArchitectureBaselineContractGroups() };
-
-        public void LoadAndMerge(ArchitectureContractDocument document, string baselinePath)
-        {
-        }
-
-        public ArchitectureBaselineDocument Load(string baselinePath)
-        {
-            return DocumentToReturn;
-        }
-    }
-
-    private static ArchitectureAnalysisSession CreateEmptySession(ArchitectureContractDocument document)
-    {
-        var context = new ArchitectureAnalysisContext(
-            "/fake/repository/root",
-            Array.Empty<System.Reflection.Assembly>(),
-            Array.Empty<string>(),
-            Array.Empty<string>());
-
-        return new ArchitectureAnalysisSession(
-            context, document, selectedContractIds: null, enableUnmatchedIgnoreTracking: true,
-            preprocessorSymbols: null);
-    }
+    private static readonly string[] _knownRule = { "known-rule" };
 
     [Test]
     public void Generate_FakeCollaborators_ProducesBaselineWithoutRealInfrastructure()
     {
         var document = new ArchitectureContractDocument { Version = 1, Name = "Fake" };
         var runnerSetupService = new FakeRunnerSetupService { DocumentToReturn = document };
-        var runner = new FakeContractRunner(CreateEmptySession(document));
+        var runner = new FakeContractRunner(ArchitectureBaselineApplicationServiceHelper.CreateEmptySession(document));
         runnerSetupService.RunnerToReturn = runner;
         var handlerRegistry = new FakeContractHandlerRegistry();
         var contractExecutor = new FakeContractExecutor();
@@ -219,7 +51,7 @@ public sealed class ArchitectureBaselineApplicationServiceFakeCompositionTests
     {
         var document = new ArchitectureContractDocument { Version = 1, Name = "Fake" };
         var runnerSetupService = new FakeRunnerSetupService { DocumentToReturn = document };
-        var runner = new FakeContractRunner(CreateEmptySession(document))
+        var runner = new FakeContractRunner(ArchitectureBaselineApplicationServiceHelper.CreateEmptySession(document))
         {
             ConfigurationViolationsToReturn = new List<ArchitectureViolation>
             {
@@ -269,8 +101,8 @@ public sealed class ArchitectureBaselineApplicationServiceFakeCompositionTests
     [Test]
     public void Generate_UnknownSelectedContract_ThrowsBeforeRunnerSetup()
     {
-        var document = CreateDocumentWithKnownRule();
-        var runnerSetupService = new FakeRunnerSetupService { DocumentToReturn = document, RunnerToReturn = new FakeContractRunner(CreateEmptySession(document)) };
+        var document = CreateDocumentWith_knownRule();
+        var runnerSetupService = new FakeRunnerSetupService { DocumentToReturn = document, RunnerToReturn = new FakeContractRunner(ArchitectureBaselineApplicationServiceHelper.CreateEmptySession(document)) };
         var applicationService = new ArchitectureBaselineApplicationService(
             runnerSetupService,
             new FakeContractHandlerRegistry(),
@@ -296,7 +128,7 @@ public sealed class ArchitectureBaselineApplicationServiceFakeCompositionTests
     {
         var document = CreateDocumentWithStrictAndAuditRules();
         var runnerSetupService = new FakeRunnerSetupService { DocumentToReturn = document };
-        var runner = new FakeContractRunner(CreateEmptySession(document))
+        var runner = new FakeContractRunner(ArchitectureBaselineApplicationServiceHelper.CreateEmptySession(document))
         {
             BaselineCandidates = new List<ArchitectureBaselineCandidate>
             {
@@ -343,7 +175,7 @@ public sealed class ArchitectureBaselineApplicationServiceFakeCompositionTests
     }
 
     // Mixed baseline: frozen + resolved + configuration-error + new candidate.
-    private static ArchitectureContractDocument CreateDocumentWithKnownRule()
+    private static ArchitectureContractDocument CreateDocumentWith_knownRule()
     {
         return new ArchitectureContractDocument
         {
@@ -394,9 +226,9 @@ public sealed class ArchitectureBaselineApplicationServiceFakeCompositionTests
         FakeBaselineGenerator BaselineGenerator, FakeBaselineLoadingService BaselineLoadingService)
         CreateMixedScenarioCollaborators()
     {
-        var document = CreateDocumentWithKnownRule();
+        var document = CreateDocumentWith_knownRule();
         var runnerSetupService = new FakeRunnerSetupService { DocumentToReturn = document };
-        var runner = new FakeContractRunner(CreateEmptySession(document))
+        var runner = new FakeContractRunner(ArchitectureBaselineApplicationServiceHelper.CreateEmptySession(document))
         {
             BaselineCandidates = new List<ArchitectureBaselineCandidate>
             {
@@ -510,9 +342,9 @@ public sealed class ArchitectureBaselineApplicationServiceFakeCompositionTests
     [Test]
     public void Verify_InSync_WhenOnlyNewDebtPresent()
     {
-        var document = CreateDocumentWithKnownRule();
+        var document = CreateDocumentWith_knownRule();
         var runnerSetupService = new FakeRunnerSetupService { DocumentToReturn = document };
-        var runner = new FakeContractRunner(CreateEmptySession(document))
+        var runner = new FakeContractRunner(ArchitectureBaselineApplicationServiceHelper.CreateEmptySession(document))
         {
             BaselineCandidates = new List<ArchitectureBaselineCandidate>
             {
@@ -612,7 +444,7 @@ public sealed class ArchitectureBaselineApplicationServiceFakeCompositionTests
     {
         var document = CreateDocumentWithTwoContractRules();
         var runnerSetupService = new FakeRunnerSetupService { DocumentToReturn = document };
-        var runner = new FakeContractRunner(CreateEmptySession(document))
+        var runner = new FakeContractRunner(ArchitectureBaselineApplicationServiceHelper.CreateEmptySession(document))
         {
             BaselineCandidates = new List<ArchitectureBaselineCandidate>
             {
@@ -631,7 +463,7 @@ public sealed class ArchitectureBaselineApplicationServiceFakeCompositionTests
             PolicyPath = "unused-by-fakes.arch.yml",
             BaselinePath = "unused-by-fakes.baseline.yml",
             Mode = "all",
-            ContractIds = new[] { "known-rule" },
+            ContractIds = _knownRule,
         });
 
         Assert.That(outcome.Succeeded, Is.True);
@@ -647,7 +479,7 @@ public sealed class ArchitectureBaselineApplicationServiceFakeCompositionTests
     {
         var document = CreateDocumentWithTwoContractRules();
         var runnerSetupService = new FakeRunnerSetupService { DocumentToReturn = document };
-        var runner = new FakeContractRunner(CreateEmptySession(document))
+        var runner = new FakeContractRunner(ArchitectureBaselineApplicationServiceHelper.CreateEmptySession(document))
         {
             BaselineCandidates = new List<ArchitectureBaselineCandidate>
             {
@@ -666,7 +498,7 @@ public sealed class ArchitectureBaselineApplicationServiceFakeCompositionTests
             PolicyPath = "unused-by-fakes.arch.yml",
             BaselinePath = "unused-by-fakes.baseline.yml",
             Mode = "all",
-            ContractIds = new[] { "known-rule" },
+            ContractIds = _knownRule,
         });
 
         Assert.That(outcome.Succeeded, Is.True);
@@ -735,7 +567,7 @@ public sealed class ArchitectureBaselineApplicationServiceFakeCompositionTests
     {
         var document = CreateDocumentWithStrictAndAuditRules();
         var runnerSetupService = new FakeRunnerSetupService { DocumentToReturn = document };
-        var runner = new FakeContractRunner(CreateEmptySession(document))
+        var runner = new FakeContractRunner(ArchitectureBaselineApplicationServiceHelper.CreateEmptySession(document))
         {
             BaselineCandidates = new List<ArchitectureBaselineCandidate>
             {
@@ -768,7 +600,7 @@ public sealed class ArchitectureBaselineApplicationServiceFakeCompositionTests
     {
         var document = CreateDocumentWithStrictAndAuditRules();
         var runnerSetupService = new FakeRunnerSetupService { DocumentToReturn = document };
-        var runner = new FakeContractRunner(CreateEmptySession(document))
+        var runner = new FakeContractRunner(ArchitectureBaselineApplicationServiceHelper.CreateEmptySession(document))
         {
             BaselineCandidates = new List<ArchitectureBaselineCandidate>
             {

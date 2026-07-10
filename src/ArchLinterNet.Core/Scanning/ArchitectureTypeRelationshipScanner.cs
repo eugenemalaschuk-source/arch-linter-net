@@ -81,12 +81,15 @@ internal static class ArchitectureTypeRelationshipScanner
         }
         catch (TypeLoadException)
         {
+            // Swallow — defensive reflection may encounter unloadable types
         }
         catch (FileNotFoundException)
         {
+            // Swallow — defensive reflection may encounter missing assemblies
         }
         catch (NotSupportedException)
         {
+            // Swallow — defensive reflection may encounter unsupported type metadata
         }
 
         return ArchitectureTypeNames.SafeFullName(target);
@@ -94,23 +97,8 @@ internal static class ArchitectureTypeRelationshipScanner
 
     private static bool IsMatch(string typeName, IReadOnlyList<string> exactNames, IReadOnlyList<string> prefixes)
     {
-        foreach (string candidate in exactNames)
-        {
-            if (string.Equals(typeName, candidate, StringComparison.Ordinal))
-            {
-                return true;
-            }
-        }
-
-        foreach (string prefix in prefixes)
-        {
-            if (typeName.StartsWith(prefix, StringComparison.Ordinal))
-            {
-                return true;
-            }
-        }
-
-        return false;
+        return exactNames.Any(candidate => string.Equals(typeName, candidate, StringComparison.Ordinal))
+            || prefixes.Any(prefix => typeName.StartsWith(prefix, StringComparison.Ordinal));
     }
 
     private static Type? SafeBaseType(Type type)
