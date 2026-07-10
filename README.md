@@ -3,12 +3,16 @@
 </p>
 
 [![CI](https://github.com/eugenemalaschuk-source/arch-linter-net/actions/workflows/ci.yml/badge.svg)](https://github.com/eugenemalaschuk-source/arch-linter-net/actions/workflows/ci.yml)
+[![NuGet version](https://img.shields.io/nuget/v/ArchLinterNet.Cli.svg)](https://www.nuget.org/packages/ArchLinterNet.Cli/)
 [![NuGet downloads](https://img.shields.io/nuget/dt/ArchLinterNet.Cli)](https://www.nuget.org/packages/ArchLinterNet.Cli/)
+[![.NET tool](https://img.shields.io/badge/.NET-tool-512BD4)](https://www.nuget.org/packages/ArchLinterNet.Cli/)
 [![Test coverage](https://codecov.io/github/eugenemalaschuk-source/arch-linter-net/graph/badge.svg)](https://app.codecov.io/github/eugenemalaschuk-source/arch-linter-net)
 [![Sonar Quality Gate](https://sonarcloud.io/api/project_badges/measure?project=eugenemalaschuk-source_arch-linter-net&metric=alert_status&branch=main)](https://sonarcloud.io/summary/overall?id=eugenemalaschuk-source_arch-linter-net&branch=main)
 [![Sonar Maintainability](https://sonarcloud.io/api/project_badges/measure?project=eugenemalaschuk-source_arch-linter-net&metric=sqale_rating&branch=main)](https://sonarcloud.io/summary/overall?id=eugenemalaschuk-source_arch-linter-net&branch=main)
 [![Sonar Reliability](https://sonarcloud.io/api/project_badges/measure?project=eugenemalaschuk-source_arch-linter-net&metric=reliability_rating&branch=main)](https://sonarcloud.io/summary/overall?id=eugenemalaschuk-source_arch-linter-net&branch=main)
 [![Sonar Security](https://sonarcloud.io/api/project_badges/measure?project=eugenemalaschuk-source_arch-linter-net&metric=security_rating&branch=main)](https://sonarcloud.io/summary/overall?id=eugenemalaschuk-source_arch-linter-net&branch=main)
+[![Docs](https://img.shields.io/badge/docs-GitHub%20Pages-blue)](https://eugenemalaschuk-source.github.io/arch-linter-net/)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
 The CI badge tracks one workflow that runs all quality signals in the same `validate` job, so a green badge means all of them passed. SonarCloud also analyzes trusted pull requests, decorates the PR, and evaluates the quality gate on new code rather than forcing the entire historical codebase to be clean before the PR can merge:
 
