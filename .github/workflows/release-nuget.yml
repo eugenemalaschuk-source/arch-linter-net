@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       release_type:
-        description: 'Release scenario'
+        description: "Release scenario"
         required: true
         type: choice
         default: preview
@@ -14,12 +14,12 @@ on:
           - minor
           - major
       publish:
-        description: 'Publish packages to NuGet.org'
+        description: "Publish packages to NuGet.org"
         required: true
         default: false
         type: boolean
       version_override:
-        description: 'Emergency/manual package version override. Leave empty for normal releases.'
+        description: "Emergency/manual package version override. Leave empty for normal releases."
         required: false
         type: string
 
