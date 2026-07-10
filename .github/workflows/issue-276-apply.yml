@@ -1,16 +1,20 @@
 name: Apply issue 276 security fixes
 
 on:
-  push:
+  pull_request:
     branches:
-      - fix/276-code-scanning-hardening
+      - main
+    types:
+      - opened
+      - reopened
+      - synchronize
 
 permissions:
   contents: write
 
 jobs:
   apply:
-    if: github.event.head_commit.message == 'ci: apply issue 276 security fixes'
+    if: github.head_ref == 'fix/276-code-scanning-hardening'
     runs-on: ubuntu-latest
     timeout-minutes: 30
 
