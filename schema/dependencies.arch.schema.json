@@ -188,11 +188,72 @@
       "properties": {
         "precedence": {
           "type": "array",
-          "description": "Subsequence of the fixed source order [yaml_override, type_attribute, assembly_attribute, inheritance, namespace, path]. Sources omitted from this list are disabled. Defaults to all six sources in the fixed order.",
-          "items": {
-            "type": "string",
-            "enum": ["yaml_override", "type_attribute", "assembly_attribute", "inheritance", "namespace", "path"]
-          },
+          "description": "Subsequence of the fixed source order [yaml_override, type_attribute, assembly_attribute, inheritance, namespace, path], preserving relative order with no duplicates. Sources omitted are disabled. Defaults to all six sources in the fixed order. Enumerated as an explicit oneOf of the 63 valid ordered, duplicate-free subsequences so reordering or repeating a source is rejected by the schema.",
+          "oneOf": [
+            { "const": ["yaml_override"] },
+            { "const": ["type_attribute"] },
+            { "const": ["assembly_attribute"] },
+            { "const": ["inheritance"] },
+            { "const": ["namespace"] },
+            { "const": ["path"] },
+            { "const": ["yaml_override", "type_attribute"] },
+            { "const": ["yaml_override", "assembly_attribute"] },
+            { "const": ["yaml_override", "inheritance"] },
+            { "const": ["yaml_override", "namespace"] },
+            { "const": ["yaml_override", "path"] },
+            { "const": ["type_attribute", "assembly_attribute"] },
+            { "const": ["type_attribute", "inheritance"] },
+            { "const": ["type_attribute", "namespace"] },
+            { "const": ["type_attribute", "path"] },
+            { "const": ["assembly_attribute", "inheritance"] },
+            { "const": ["assembly_attribute", "namespace"] },
+            { "const": ["assembly_attribute", "path"] },
+            { "const": ["inheritance", "namespace"] },
+            { "const": ["inheritance", "path"] },
+            { "const": ["namespace", "path"] },
+            { "const": ["yaml_override", "type_attribute", "assembly_attribute"] },
+            { "const": ["yaml_override", "type_attribute", "inheritance"] },
+            { "const": ["yaml_override", "type_attribute", "namespace"] },
+            { "const": ["yaml_override", "type_attribute", "path"] },
+            { "const": ["yaml_override", "assembly_attribute", "inheritance"] },
+            { "const": ["yaml_override", "assembly_attribute", "namespace"] },
+            { "const": ["yaml_override", "assembly_attribute", "path"] },
+            { "const": ["yaml_override", "inheritance", "namespace"] },
+            { "const": ["yaml_override", "inheritance", "path"] },
+            { "const": ["yaml_override", "namespace", "path"] },
+            { "const": ["type_attribute", "assembly_attribute", "inheritance"] },
+            { "const": ["type_attribute", "assembly_attribute", "namespace"] },
+            { "const": ["type_attribute", "assembly_attribute", "path"] },
+            { "const": ["type_attribute", "inheritance", "namespace"] },
+            { "const": ["type_attribute", "inheritance", "path"] },
+            { "const": ["type_attribute", "namespace", "path"] },
+            { "const": ["assembly_attribute", "inheritance", "namespace"] },
+            { "const": ["assembly_attribute", "inheritance", "path"] },
+            { "const": ["assembly_attribute", "namespace", "path"] },
+            { "const": ["inheritance", "namespace", "path"] },
+            { "const": ["yaml_override", "type_attribute", "assembly_attribute", "inheritance"] },
+            { "const": ["yaml_override", "type_attribute", "assembly_attribute", "namespace"] },
+            { "const": ["yaml_override", "type_attribute", "assembly_attribute", "path"] },
+            { "const": ["yaml_override", "type_attribute", "inheritance", "namespace"] },
+            { "const": ["yaml_override", "type_attribute", "inheritance", "path"] },
+            { "const": ["yaml_override", "type_attribute", "namespace", "path"] },
+            { "const": ["yaml_override", "assembly_attribute", "inheritance", "namespace"] },
+            { "const": ["yaml_override", "assembly_attribute", "inheritance", "path"] },
+            { "const": ["yaml_override", "assembly_attribute", "namespace", "path"] },
+            { "const": ["yaml_override", "inheritance", "namespace", "path"] },
+            { "const": ["type_attribute", "assembly_attribute", "inheritance", "namespace"] },
+            { "const": ["type_attribute", "assembly_attribute", "inheritance", "path"] },
+            { "const": ["type_attribute", "assembly_attribute", "namespace", "path"] },
+            { "const": ["type_attribute", "inheritance", "namespace", "path"] },
+            { "const": ["assembly_attribute", "inheritance", "namespace", "path"] },
+            { "const": ["yaml_override", "type_attribute", "assembly_attribute", "inheritance", "namespace"] },
+            { "const": ["yaml_override", "type_attribute", "assembly_attribute", "inheritance", "path"] },
+            { "const": ["yaml_override", "type_attribute", "assembly_attribute", "namespace", "path"] },
+            { "const": ["yaml_override", "type_attribute", "inheritance", "namespace", "path"] },
+            { "const": ["yaml_override", "assembly_attribute", "inheritance", "namespace", "path"] },
+            { "const": ["type_attribute", "assembly_attribute", "inheritance", "namespace", "path"] },
+            { "const": ["yaml_override", "type_attribute", "assembly_attribute", "inheritance", "namespace", "path"] }
+          ],
           "default": ["yaml_override", "type_attribute", "assembly_attribute", "inheritance", "namespace", "path"]
         },
         "attributes": {
@@ -245,7 +306,7 @@
         "role": { "type": "string", "minLength": 1 },
         "metadata": {
           "$ref": "#/$defs/scalarMap",
-          "description": "Values use the metadata extraction syntax: constructor[<index>], property:<Name>, const:<Full.Type.NAME>, or a literal scalar."
+          "description": "Values use the metadata extraction syntax: constructor[<index>], property:<Name>, const:<Full.Type.NAME> (compile-time const field only, never static readonly), or a literal scalar."
         }
       }
     },
@@ -276,7 +337,7 @@
         "role": { "type": "string", "minLength": 1 },
         "metadata": {
           "$ref": "#/$defs/scalarMap",
-          "description": "Inheritance evidence carries no constructor/property arguments; values must be literal scalars or const:<Full.Type.NAME> references."
+          "description": "Inheritance evidence carries no constructor/property arguments; values must be literal scalars or const:<Full.Type.NAME> references to a compile-time const field (never static readonly)."
         }
       }
     },
@@ -318,26 +379,36 @@
       "type": "object",
       "additionalProperties": false,
       "required": ["role"],
-      "anyOf": [
-        { "required": ["type"] },
-        { "required": ["namespace", "reason"] },
-        { "required": ["namespace_suffix", "reason"] }
+      "description": "Exactly one of 'type', 'namespace', or 'namespace_suffix' must be declared - scopes are mutually exclusive, not combinable. 'reason' is required whenever 'namespace' or 'namespace_suffix' is the declared scope, and forbidden from substituting for a missing scope.",
+      "oneOf": [
+        {
+          "required": ["type"],
+          "not": { "anyOf": [{ "required": ["namespace"] }, { "required": ["namespace_suffix"] }] }
+        },
+        {
+          "required": ["namespace", "reason"],
+          "not": { "anyOf": [{ "required": ["type"] }, { "required": ["namespace_suffix"] }] }
+        },
+        {
+          "required": ["namespace_suffix", "reason"],
+          "not": { "anyOf": [{ "required": ["type"] }, { "required": ["namespace"] }] }
+        }
       ],
       "properties": {
         "type": {
           "type": "string",
           "minLength": 1,
-          "description": "Narrow, type-scoped override. Full type name. 'reason' is optional at this scope."
+          "description": "Narrow, type-scoped override. Full type name. 'reason' is optional at this scope. Mutually exclusive with 'namespace'/'namespace_suffix'."
         },
         "namespace": {
           "type": "string",
           "minLength": 1,
-          "description": "Broad, namespace-scoped override. 'reason' is required at this scope."
+          "description": "Broad, namespace-scoped override. 'reason' is required at this scope. Mutually exclusive with 'type'/'namespace_suffix'."
         },
         "namespace_suffix": {
           "type": "string",
           "minLength": 1,
-          "description": "Broad, namespace-suffix-scoped override. 'reason' is required at this scope."
+          "description": "Broad, namespace-suffix-scoped override. 'reason' is required at this scope. Mutually exclusive with 'type'/'namespace'."
         },
         "role": { "type": "string", "minLength": 1 },
         "metadata": { "$ref": "#/$defs/scalarMap" },
@@ -348,10 +419,20 @@
       "type": "object",
       "additionalProperties": false,
       "required": ["reason"],
-      "anyOf": [
-        { "required": ["type"] },
-        { "required": ["namespace"] },
-        { "required": ["namespace_suffix"] }
+      "description": "Exactly one of 'type', 'namespace', or 'namespace_suffix' must be declared - scopes are mutually exclusive, not combinable.",
+      "oneOf": [
+        {
+          "required": ["type"],
+          "not": { "anyOf": [{ "required": ["namespace"] }, { "required": ["namespace_suffix"] }] }
+        },
+        {
+          "required": ["namespace"],
+          "not": { "anyOf": [{ "required": ["type"] }, { "required": ["namespace_suffix"] }] }
+        },
+        {
+          "required": ["namespace_suffix"],
+          "not": { "anyOf": [{ "required": ["type"] }, { "required": ["namespace"] }] }
+        }
       ],
       "properties": {
         "type": { "type": "string", "minLength": 1 },

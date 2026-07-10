@@ -1,0 +1,173 @@
+# Semantic Classification (Reserved)
+
+**Schema-accepted, not yet enforced.** `classification` and
+`layers.<name>.selector` are **reserved by the YAML schema only**. No
+extraction, role-assignment, or selector-matching engine exists yet. A policy
+that declares `classification` or `selector` today is schema-valid, but the
+section has **no effect** on validation — no role is ever assigned, no
+selector ever matches, and no diagnostic is ever produced from it. This page
+documents the reviewed shape so policy authors and AI agents do not treat it as
+a working feature before implementation lands. See
+[Supported capabilities and non-goals](supported-capabilities.md) for the
+authoritative list of what is enforced today.
+
+## Why this section exists
+
+ArchLinterNet's `layers` map namespaces to layer names by glob pattern only. The
+semantic classification design ([issue #107](https://github.com/eugenemalaschuk-source/arch-linter-net/issues/107))
+reviews a YAML shape that will let code itself — attributes, assembly metadata,
+inheritance, and namespace/path conventions — imply an architectural role and
+metadata, so a layer can eventually be selected by discovered role instead of
+(or in addition to) namespace. The full design record lives at
+`openspec/changes/archive/2026-07-10-design-semantic-classification-model/design.md`
+in the repository.
+
+## Reviewed shape
+
+```yaml
+classification:
+  precedence:            # optional; a non-empty, ordered, duplicate-free
+                          # subsequence of the six fixed sources below.
+                          # default: all six, in this order.
+    - yaml_override
+    - type_attribute
+    - assembly_attribute
+    - inheritance
+    - namespace
+    - path
+
+  attributes:
+    - attribute: Acme.Architecture.DomainLayerAttribute   # full type name
+      role: DomainLayer
+      metadata:
+        domain: constructor[0]        # positional constructor argument
+        module: property:Module       # named property/field
+        tier: const:Acme.Architecture.Tiers.CORE   # compile-time const only
+        owner: platform-team          # literal scalar
+
+  assembly_attributes:
+    - attribute: Acme.Architecture.BoundedContextAttribute
+      role: ApplicationLayer
+      metadata:
+        boundedContext: constructor[0]
+
+  inheritance:
+    - base_type: Acme.Domain.AggregateRootBase
+      role: DomainLayer
+      metadata:
+        domain: Sales                 # literal only - no ctor/property evidence
+
+  namespace:
+    - namespace: MyApp.Sales.Domain
+      role: DomainLayer
+      metadata:
+        domain: Sales
+    - namespace_suffix: .Repositories
+      role: Repository
+
+  path:
+    - path_prefix: src/Sales/Domain
+      role: DomainLayer
+      metadata:
+        domain: Sales
+
+  overrides:
+    - type: MyApp.Legacy.OrderProcessor    # narrow: reason optional
+      role: ApplicationLayer
+    - namespace: MyApp.Legacy               # broad: reason required
+      role: Unclassified
+      reason: Legacy area predates attribute adoption; reviewed quarterly.
+
+  exclusions:
+    - namespace_suffix: .Generated
+      reason: Source-generated code is not hand-authored and is exempt from classification.
+
+layers:
+  domain:
+    selector:                 # additive alternative/complement to namespace
+      role: DomainLayer
+      metadata:
+        domain: Sales
+  infrastructure:              # existing namespace-only layers are unaffected
+    namespace: MyApp.Infrastructure
+```
+
+## Precedence
+
+Source precedence is fixed, highest first:
+
+1. `yaml_override`
+1. `type_attribute`
+1. `assembly_attribute`
+1. `inheritance`
+1. `namespace`
+1. `path`
+
+`classification.precedence`, when declared, must be a subsequence of this
+order — the schema rejects a reordered list (e.g. `[namespace, type_attribute]`),
+a repeated entry (e.g. `[namespace, namespace]`), and an empty list. Sources the
+list omits are disabled; omit `precedence` entirely to use all six sources in
+the fixed order.
+
+## Metadata extraction syntax
+
+Each `metadata.<key>` value is interpreted by exactly one of four fixed forms,
+checked in this order:
+
+| Form | Meaning |
+|---|---|
+| `constructor[<index>]` | The attribute's zero-indexed positional constructor argument. Not applicable to `inheritance`/`namespace`/`path`, which carry no constructor evidence. |
+| `property:<Name>` | A named property or field on the attribute instance. `attributes`/`assembly_attributes` only. |
+| `const:<Full.Type.NAME>` | The value of a **compile-time `const` field**, resolved statically by full type-qualified name. |
+| anything else | A literal YAML scalar, used verbatim. |
+
+`const:` deliberately resolves **only compile-time `const` fields**, never
+`static readonly`. A `static readonly` field's initializer can run arbitrary
+code — a method call, an environment-variable read, I/O, or any other
+runtime-computed expression — and evaluating it would require either executing
+that code (which a static-analysis-only tool must not do) or a much narrower
+literal-initializer detection that does not exist yet. A `const:` reference
+that does not resolve to an actual `const` field is a deterministic
+**unresolved-constant** condition, not a silent guess.
+
+## Overrides and exclusions
+
+Every `overrides`/`exclusions` entry declares **exactly one** scope field —
+`type`, `namespace`, or `namespace_suffix`. Combining more than one scope field
+on a single entry is rejected by the schema; author two separate entries
+instead.
+
+- A `type`-scoped override is narrow (the type name is the scope) and does not
+  require `reason`.
+- A `namespace`/`namespace_suffix`-scoped override is broad (affects every type
+  currently or later matching that pattern) and **requires** `reason`.
+- Every `exclusions` entry requires `reason`, regardless of scope.
+
+## `layers.<name>.selector`
+
+A layer may declare `namespace`, `selector`, or both. `selector.role` is an
+exact-match string against whatever role names `classification.attributes`/
+`inheritance`/`namespace`/`path`/`overrides` declare (there is no fixed role
+catalog enforced by the schema). `selector.metadata` is an optional set of
+exact-match, AND-combined key/value constraints — no wildcard or regex value
+matching. Declaring only `namespace` (as every layer did before this design)
+is unaffected.
+
+## Current limits
+
+- No extraction: attributes, assembly attributes, inheritance facts, and
+  namespace/path conventions are never read from scanned code.
+- No role assignment: no type ever receives a role or metadata value.
+- No selector matching: `layers.<name>.selector` never selects any type.
+- No diagnostics: `conflict`, `stale selector`, and `uncovered semantic fact`
+  are vocabulary only — nothing is ever reported.
+- No annotation package: this design does not ship, and does not require, a
+  binary ArchLinterNet annotation assembly.
+- No coverage integration: the planned `scope: semantic_role` coverage variant
+  (tracked by a follow-up issue) does not exist yet.
+
+## Where to look next
+
+- [Supported capabilities and non-goals](supported-capabilities.md)
+- [Layers and namespace patterns](layers-and-namespaces.md)
+- [Coverage contracts](../contracts/coverage.md)
