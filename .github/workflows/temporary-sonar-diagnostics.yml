@@ -12,10 +12,16 @@ jobs:
   diagnostics:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
-        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
-        with:
-          persist-credentials: false
-
       - name: Print public PR issues
-        run: bash tools/diagnostics/print_sonar_pr_issues.sh
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          curl --fail --silent --show-error --get \
+            --data-urlencode 'components=eugenemalaschuk-source_arch-linter-net' \
+            --data-urlencode 'pullRequest=271' \
+            --data-urlencode 'issueStatuses=OPEN,CONFIRMED' \
+            --data-urlencode 'sinceLeakPeriod=true' \
+            --data-urlencode 'ps=100' \
+            'https://sonarcloud.io/api/issues/search' \
+            | jq -r '.issues[] | [.rule, .severity, .component, (.line // 0 | tostring), .message] | @tsv'
