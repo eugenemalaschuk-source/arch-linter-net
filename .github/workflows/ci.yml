@@ -198,7 +198,7 @@ jobs:
           path: architecture-coverage.md
 
       - name: Comment architecture coverage on pull request
-        if: always() && github.event_name == 'pull_request'
+        if: always() && github.event_name == 'pull_request' && hashFiles('architecture-coverage.md') != ''
         uses: actions/github-script@v7
         with:
           script: |
