@@ -160,7 +160,99 @@ function Install-OpenSpec {
     Write-Warning "Add this directory to PATH: $npmGlobalBin"
 }
 
+function Install-Actionlint {
+    if (Test-Command "actionlint") {
+        Write-Host "actionlint is already installed."
+        actionlint -version
+        return
+    }
+
+    Write-Host "actionlint is not installed. Installing latest release binary..."
+
+    $installDir = Join-Path $env:USERPROFILE ".local\bin"
+    New-Item -ItemType Directory -Force -Path $installDir | Out-Null
+
+    $scriptPath = Join-Path $env:TEMP "download-actionlint.bash"
+    Invoke-WebRequest -Uri "https://raw.githubusercontent.com/rhysd/actionlint/main/scripts/download-actionlint.bash" -OutFile $scriptPath
+
+    if (-not (Test-Command "bash")) {
+        throw "bash is required to install actionlint automatically on Windows. Install Git Bash or install actionlint manually."
+    }
+
+    & "bash" $scriptPath latest $installDir
+
+    if ($LASTEXITCODE -ne 0) {
+        throw "actionlint installation failed with exit code $LASTEXITCODE."
+    }
+
+    $env:Path = "$installDir;$env:Path"
+
+    if (Test-Command "actionlint") {
+        Write-Host "actionlint installed successfully."
+        actionlint -version
+        return
+    }
+
+    Write-Warning "actionlint was installed but is not on PATH in this shell."
+    Write-Warning "Add this directory to PATH: $installDir"
+}
+
+function Install-Zizmor {
+    if (Test-Command "zizmor") {
+        Write-Host "zizmor is already installed."
+        zizmor --version
+        return
+    }
+
+    Write-Host "zizmor is not installed. Installing via cargo-binstall or cargo..."
+
+    if (-not (Test-Command "cargo")) {
+        if (-not (Test-Command "winget")) {
+            throw "winget is required to install Rust automatically for zizmor. Install Rust manually or install zizmor manually."
+        }
+
+        Write-Host "Rust is not installed. Installing Rustup via winget..."
+        winget install --id Rustlang.Rustup --exact --source winget --accept-package-agreements --accept-source-agreements
+
+        $cargoBin = Join-Path $env:USERPROFILE ".cargo\bin"
+        $env:Path = "$cargoBin;$env:Path"
+    }
+
+    if (-not (Test-Command "cargo")) {
+        throw "cargo is not available after Rust installation. Restart the shell and run the tool bootstrap again."
+    }
+
+    if (-not (Test-Command "cargo-binstall")) {
+        & "cargo" install cargo-binstall
+        if ($LASTEXITCODE -ne 0) {
+            throw "cargo install cargo-binstall failed with exit code $LASTEXITCODE."
+        }
+    }
+
+    & "cargo-binstall" --no-confirm zizmor
+    if ($LASTEXITCODE -ne 0) {
+        & "cargo" install zizmor
+        if ($LASTEXITCODE -ne 0) {
+            throw "zizmor installation failed with exit code $LASTEXITCODE."
+        }
+    }
+
+    $cargoBin = Join-Path $env:USERPROFILE ".cargo\bin"
+    $env:Path = "$cargoBin;$env:Path"
+
+    if (Test-Command "zizmor") {
+        Write-Host "zizmor installed successfully."
+        zizmor --version
+        return
+    }
+
+    Write-Warning "zizmor was installed but is not on PATH in this shell."
+    Write-Warning "Add this directory to PATH: $cargoBin"
+}
+
 Install-Uv
 Install-NodeJs
 Install-DotNetSdk
 Install-OpenSpec
+Install-Actionlint
+Install-Zizmor

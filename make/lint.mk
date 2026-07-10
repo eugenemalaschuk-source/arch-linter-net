@@ -28,8 +28,16 @@ lint-dotnet-format:  ## Verify C# formatting without changing files
 
 lint-workflows:  ## Lint GitHub Actions workflows (actionlint + zizmor + prettier --check)
 	@printf '\033[1;33m══════════════════════════════════════════\n  🔍  actionlint: .github/workflows/\n══════════════════════════════════════════\033[0m\n'
+	@command -v actionlint >/dev/null 2>&1 || ( \
+		echo "actionlint is not installed or is not on PATH. Run 'rtk make bundle' to install workflow tooling."; \
+		exit 1 \
+	)
 	@actionlint .github/workflows/*.yml
 	@printf '\033[1;33m══════════════════════════════════════════\n  🔐  zizmor: .github/workflows/\n══════════════════════════════════════════\033[0m\n'
+	@command -v zizmor >/dev/null 2>&1 || ( \
+		echo "zizmor is not installed or is not on PATH. Run 'rtk make bundle' to install workflow tooling."; \
+		exit 1 \
+	)
 	@zizmor --min-severity low .github/workflows/*.yml
 	@printf '\033[1;33m══════════════════════════════════════════\n  🎨  prettier --check: .github/workflows/\n══════════════════════════════════════════\033[0m\n'
 	@npx --yes prettier --check ".github/workflows/*.yml"
