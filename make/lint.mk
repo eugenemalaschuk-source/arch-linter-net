@@ -1,9 +1,13 @@
-.PHONY: lint lint-architecture audit-architecture lint-code-size lint-dotnet-format lint-workflows fmt-workflows test-architecture-coverage-report architecture-coverage-report architecture-strict-json architecture-audit-json architecture-coverage-markdown architecture-coverage-ci
+.PHONY: lint _lint-all lint-architecture audit-architecture lint-code-size lint-dotnet-format lint-workflows fmt-workflows test-architecture-coverage-report architecture-coverage-report architecture-strict-json architecture-audit-json architecture-coverage-markdown architecture-coverage-ci
 
 CHANGED_FILES ?= changed-files.txt
 DIFF_STATUS   ?= ok
 
-lint: lint-code-size lint-dotnet-format lint-architecture lint-docs lint-workflows  ## Run all code quality checks
+lint:  ## Run all code quality checks
+	@echo "lint: running with NPROC=$(NPROC) (override with 'make lint NPROC=1' to force serial)"
+	@$(MAKE) -j$(NPROC) _lint-all
+
+_lint-all: lint-code-size lint-dotnet-format lint-architecture lint-docs lint-workflows
 
 lint-architecture:  ## Run strict architecture contracts on self
 	@dotnet build "$(PROJECT_ROOT)/src/ArchLinterNet.Cli/ArchLinterNet.Cli.csproj" --nologo -v minimal
