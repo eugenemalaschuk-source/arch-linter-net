@@ -279,7 +279,7 @@ internal sealed class ArchitectureProjectFileParser : IArchitectureProjectFilePa
     private static void MergeScalarProperties(
         XDocument document,
         string sourcePath,
-        IDictionary<string, ArchitectureDiscoveredProjectProperty> properties)
+        Dictionary<string, ArchitectureDiscoveredProjectProperty> properties)
     {
         foreach (XElement element in document.Descendants("PropertyGroup").Elements())
         {

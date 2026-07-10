@@ -89,10 +89,7 @@ public sealed class ArchitectureAssemblyResolutionService : IArchitectureAssembl
         IArchitectureEnvironment environment,
         IArchitectureAssemblyLoader assemblyLoader)
     {
-        if (document == null)
-        {
-            throw new ArgumentNullException(nameof(document));
-        }
+        ArgumentNullException.ThrowIfNull(document);
 
         List<string> names = document.Analysis.TargetAssemblies;
         if (names.Count == 0)
@@ -165,7 +162,7 @@ public sealed class ArchitectureAssemblyResolutionService : IArchitectureAssembl
             $"Failed to resolve target assembly '{assemblyName}' from architecture YAML. Probing paths: {probes}");
     }
 
-    private static IReadOnlyList<string> ResolveProbingPaths(
+    private static string[] ResolveProbingPaths(
         ArchitectureContractDocument document,
         string? repositoryRoot,
         IArchitectureFileSystem fileSystem,

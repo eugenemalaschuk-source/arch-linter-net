@@ -208,7 +208,7 @@ internal static class ArchitectureAttributeUsageScanner
                || attributePrefixes.Any(prefix => attributeName.StartsWith(prefix, StringComparison.Ordinal));
     }
 
-    private static IEnumerable<TMember> SafeGetMembers<TMember>(Type type, Func<Type, TMember[]> selector)
+    private static TMember[] SafeGetMembers<TMember>(Type type, Func<Type, TMember[]> selector)
     {
         try
         {

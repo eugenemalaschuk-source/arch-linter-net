@@ -35,6 +35,9 @@ public sealed partial class ArchitectureAnalysisSession
 
         string expectedLocationDescription = DescribeExpectedLocation(contract);
         string expectedNameDescription = DescribeExpectedName(contract);
+        var context = new TypePlacementCollectionContext(
+            allowedLayers, allowedAssemblyNames, hasPlacementExpectation,
+            expectedLocationDescription, expectedNameDescription, executionContext);
 
         Type[] candidateTypes = TypeIndex.AllTypes()
             .Where(type => ArchitectureTypeRoleMatcher.Matches(type, contract.TypesMatching, Document, contract.Name))
@@ -46,12 +49,7 @@ public sealed partial class ArchitectureAnalysisSession
             TryAddTypePlacementViolation(
                 type,
                 contract,
-                allowedLayers,
-                allowedAssemblyNames,
-                hasPlacementExpectation,
-                expectedLocationDescription,
-                expectedNameDescription,
-                executionContext,
+                context,
                 violations);
         }
 
@@ -62,20 +60,15 @@ public sealed partial class ArchitectureAnalysisSession
     private static void TryAddTypePlacementViolation(
         Type type,
         ArchitectureTypePlacementContract contract,
-        List<ArchitectureLayer> allowedLayers,
-        HashSet<string> allowedAssemblyNames,
-        bool hasPlacementExpectation,
-        string expectedLocationDescription,
-        string expectedNameDescription,
-        ArchitectureContractExecutionContext executionContext,
+        TypePlacementCollectionContext context,
         List<ArchitectureViolation> violations)
     {
         string sourceType = ArchitectureTypeNames.SafeFullName(type);
         string actualNamespace = ArchitectureTypeNames.SafeNamespace(type);
         string actualAssemblyName = type.Assembly.GetName().Name ?? string.Empty;
 
-        bool placementOk = !hasPlacementExpectation || IsAllowedLocation(
-            actualNamespace, actualAssemblyName, allowedLayers, contract.MustResideInNamespaces, allowedAssemblyNames);
+        bool placementOk = !context.HasPlacementExpectation || IsAllowedLocation(
+            actualNamespace, actualAssemblyName, context.AllowedLayers, contract.MustResideInNamespaces, context.AllowedAssemblyNames);
 
         bool namingOk = IsNamingSatisfied(type.Name, contract);
 
@@ -84,14 +77,14 @@ public sealed partial class ArchitectureAnalysisSession
             return;
         }
 
-        string? expectedTypeLocation = !placementOk ? expectedLocationDescription : null;
+        string? expectedTypeLocation = !placementOk ? context.ExpectedLocationDescription : null;
         string? actualTypeLocation = !placementOk ? $"namespace:{actualNamespace} (assembly {actualAssemblyName})" : null;
-        string? expectedTypeName = !namingOk ? expectedNameDescription : null;
+        string? expectedTypeName = !namingOk ? context.ExpectedNameDescription : null;
         string? actualTypeName = !namingOk ? type.Name : null;
 
         string forbiddenReference = actualTypeLocation ?? actualTypeName ?? sourceType;
 
-        if (executionContext.IsIgnored(sourceType, forbiddenReference))
+        if (context.ExecutionContext.IsIgnored(sourceType, forbiddenReference))
         {
             return;
         }
@@ -110,6 +103,14 @@ public sealed partial class ArchitectureAnalysisSession
                 ActualTypeName: actualTypeName)
         });
     }
+
+    private sealed record TypePlacementCollectionContext(
+        List<ArchitectureLayer> AllowedLayers,
+        HashSet<string> AllowedAssemblyNames,
+        bool HasPlacementExpectation,
+        string ExpectedLocationDescription,
+        string ExpectedNameDescription,
+        ArchitectureContractExecutionContext ExecutionContext);
 
     private static bool IsAllowedLocation(
         string actualNamespace,

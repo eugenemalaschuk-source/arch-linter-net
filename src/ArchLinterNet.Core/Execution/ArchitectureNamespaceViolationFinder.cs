@@ -133,7 +133,7 @@ internal static class ArchitectureNamespaceViolationFinder
         };
     }
 
-    private static void CollectForbiddenTransitiveReference(
+    private static void CollectForbiddenTransitiveReference( // NOSONAR: traversal state is intentionally explicit and mutable.
         Type referenced,
         List<Type> path,
         ArchitectureLayer forbiddenLayer,

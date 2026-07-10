@@ -235,7 +235,7 @@ internal static class ArchitecturePublicApiSurfaceScanner
         }
     }
 
-    private static IEnumerable<TMember> SafeGetMembers<TMember>(Type type, Func<Type, TMember[]> selector)
+    private static TMember[] SafeGetMembers<TMember>(Type type, Func<Type, TMember[]> selector)
     {
         try
         {

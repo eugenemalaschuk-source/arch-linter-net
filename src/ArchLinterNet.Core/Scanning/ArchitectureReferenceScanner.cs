@@ -197,7 +197,7 @@ internal static class ArchitectureReferenceScanner
         }
     }
 
-    private static IEnumerable<Type> SafeGetInterfaces(Type type)
+    private static Type[] SafeGetInterfaces(Type type)
     {
         try
         {
@@ -213,7 +213,7 @@ internal static class ArchitectureReferenceScanner
         }
     }
 
-    private static IEnumerable<FieldInfo> SafeGetFields(Type type)
+    private static FieldInfo[] SafeGetFields(Type type)
     {
         try
         {
@@ -230,7 +230,7 @@ internal static class ArchitectureReferenceScanner
         }
     }
 
-    private static IEnumerable<PropertyInfo> SafeGetProperties(Type type)
+    private static PropertyInfo[] SafeGetProperties(Type type)
     {
         try
         {
@@ -247,7 +247,7 @@ internal static class ArchitectureReferenceScanner
         }
     }
 
-    private static IEnumerable<MethodInfo> SafeGetMethods(Type type)
+    private static MethodInfo[] SafeGetMethods(Type type)
     {
         try
         {
@@ -264,7 +264,7 @@ internal static class ArchitectureReferenceScanner
         }
     }
 
-    private static IEnumerable<ConstructorInfo> SafeGetConstructors(Type type)
+    private static ConstructorInfo[] SafeGetConstructors(Type type)
     {
         try
         {
@@ -329,7 +329,7 @@ internal static class ArchitectureReferenceScanner
         }
     }
 
-    private static IEnumerable<ParameterInfo> SafeGetParameters(MethodBase method)
+    private static ParameterInfo[] SafeGetParameters(MethodBase method)
     {
         try
         {

@@ -48,6 +48,10 @@ public sealed partial class ArchitectureAnalysisSession
             || contract.ForbiddenInAssemblies.Count > 0;
 
         string expectedAllowedOnlyLocation = DescribeAllowedOnlyLocation(contract);
+        var context = new AttributeUsageCollectionContext(
+            allowedLayers, allowedAssemblyNames, hasAllowedOnlyExpectation,
+            forbiddenLayers, forbiddenAssemblyNames, hasForbiddenExpectation,
+            expectedAllowedOnlyLocation, executionContext);
 
         Type[] candidateTypes = TypeIndex.AllTypes()
             .OrderBy(ArchitectureTypeNames.SafeFullName, StringComparer.Ordinal)
@@ -58,14 +62,7 @@ public sealed partial class ArchitectureAnalysisSession
             CollectAttributeUsageViolationsForType(
                 type,
                 contract,
-                allowedLayers,
-                allowedAssemblyNames,
-                hasAllowedOnlyExpectation,
-                forbiddenLayers,
-                forbiddenAssemblyNames,
-                hasForbiddenExpectation,
-                expectedAllowedOnlyLocation,
-                executionContext,
+                context,
                 violations);
         }
 
@@ -76,14 +73,7 @@ public sealed partial class ArchitectureAnalysisSession
     private static void CollectAttributeUsageViolationsForType(
         Type type,
         ArchitectureAttributeUsageContract contract,
-        List<ArchitectureLayer> allowedLayers,
-        HashSet<string> allowedAssemblyNames,
-        bool hasAllowedOnlyExpectation,
-        List<ArchitectureLayer> forbiddenLayers,
-        HashSet<string> forbiddenAssemblyNames,
-        bool hasForbiddenExpectation,
-        string expectedAllowedOnlyLocation,
-        ArchitectureContractExecutionContext executionContext,
+        AttributeUsageCollectionContext context,
         List<ArchitectureViolation> violations)
     {
         string actualNamespace = ArchitectureTypeNames.SafeNamespace(type);
@@ -96,24 +86,24 @@ public sealed partial class ArchitectureAnalysisSession
 
         foreach (var match in matches)
         {
-            bool misplaced = hasAllowedOnlyExpectation && !IsAllowedLocation(
-                actualNamespace, actualAssemblyName, allowedLayers, contract.AllowedOnlyInNamespaces, allowedAssemblyNames);
+            bool misplaced = context.HasAllowedOnlyExpectation && !IsAllowedLocation(
+                actualNamespace, actualAssemblyName, context.AllowedLayers, contract.AllowedOnlyInNamespaces, context.AllowedAssemblyNames);
 
-            bool forbidden = hasForbiddenExpectation && IsAllowedLocation(
-                actualNamespace, actualAssemblyName, forbiddenLayers, contract.ForbiddenInNamespaces, forbiddenAssemblyNames);
+            bool forbidden = context.HasForbiddenExpectation && IsAllowedLocation(
+                actualNamespace, actualAssemblyName, context.ForbiddenLayers, contract.ForbiddenInNamespaces, context.ForbiddenAssemblyNames);
 
             if (!misplaced && !forbidden)
             {
                 continue;
             }
 
-            if (executionContext.IsIgnored(match.SourceIdentifier, match.MatchedAttribute))
+            if (context.ExecutionContext.IsIgnored(match.SourceIdentifier, match.MatchedAttribute))
             {
                 continue;
             }
 
             string attributeUsageKind = forbidden ? "forbidden" : "misplaced";
-            string? expectedAttributeLocation = misplaced && !forbidden ? expectedAllowedOnlyLocation : null;
+            string? expectedAttributeLocation = misplaced && !forbidden ? context.ExpectedAllowedOnlyLocation : null;
 
             violations.Add(new ArchitectureViolation(
                 contract.Name,
@@ -130,6 +120,16 @@ public sealed partial class ArchitectureAnalysisSession
             });
         }
     }
+
+    private sealed record AttributeUsageCollectionContext(
+        List<ArchitectureLayer> AllowedLayers,
+        HashSet<string> AllowedAssemblyNames,
+        bool HasAllowedOnlyExpectation,
+        List<ArchitectureLayer> ForbiddenLayers,
+        HashSet<string> ForbiddenAssemblyNames,
+        bool HasForbiddenExpectation,
+        string ExpectedAllowedOnlyLocation,
+        ArchitectureContractExecutionContext ExecutionContext);
 
     private static string DescribeAllowedOnlyLocation(ArchitectureAttributeUsageContract contract)
     {

@@ -135,7 +135,7 @@ public sealed class ArchitectureProjectDiscoveryService : IArchitectureProjectDi
         };
     }
 
-    private void ProcessProjectPath(
+    private void ProcessProjectPath( // NOSONAR: discovery accumulators remain independently owned by the caller.
         string projectPath,
         ArchitectureAnalysisConfiguration analysis,
         string repositoryRoot,

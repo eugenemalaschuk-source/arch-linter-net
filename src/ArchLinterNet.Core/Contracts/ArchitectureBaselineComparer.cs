@@ -50,7 +50,7 @@ public static class ArchitectureBaselineComparer
         return new ArchitectureBaselineComparisonResult(newEntries, frozen, resolved, configurationErrors, outOfScope);
     }
 
-    private static HashSet<string> ProcessBaselineEntries(
+    private static HashSet<string> ProcessBaselineEntries( // NOSONAR: arguments are separate comparison inputs and outputs.
         string groupName,
         List<ArchitectureBaselineContractEntry> entries,
         bool groupInScope,
@@ -241,7 +241,7 @@ public static class ArchitectureBaselineComparer
         return false;
     }
 
-    private static string CanonicalizeContractId(IReadOnlyDictionary<string, string> canonicalIds, string contractId)
+    private static string CanonicalizeContractId(Dictionary<string, string> canonicalIds, string contractId)
     {
         return canonicalIds.TryGetValue(contractId, out string? canonicalId)
             ? canonicalId

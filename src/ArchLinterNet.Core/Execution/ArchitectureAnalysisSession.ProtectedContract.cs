@@ -40,7 +40,7 @@ public sealed partial class ArchitectureAnalysisSession
         return violations;
     }
 
-    private void CollectProtectedLayerViolations(
+    private void CollectProtectedLayerViolations( // NOSONAR: contract resolution inputs intentionally stay explicit.
         ArchitectureProtectedContract contract,
         string protectedLayerName,
         ArchitectureLayer protectedLayer,
@@ -66,7 +66,7 @@ public sealed partial class ArchitectureAnalysisSession
         }
     }
 
-    private ArchitectureViolation? BuildProtectedContractViolation(
+    private ArchitectureViolation? BuildProtectedContractViolation( // NOSONAR: explicit contract context aids diagnostic construction.
         ArchitectureProtectedContract contract,
         Type sourceType,
         ArchitectureLayer protectedLayer,
