@@ -2,7 +2,7 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
 $RtkVersion = "v0.42.4"
-$RtkCommit = "5d32d0736f686b69d1e8b9dc45c007d4eb77a0a2"
+$RtkCommit = "8a7dd7e5570d7744d4b6508479a3674fe8c49286"
 
 function Test-Command {
     param([Parameter(Mandatory = $true)][string]$Name)
