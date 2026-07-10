@@ -102,9 +102,14 @@ jobs:
             /d:sonar.cs.vstest.reportsPaths="test-results/**/*.trx"
 
       - name: Acceptance
+        if: github.event_name == 'pull_request'
         run: make acceptance
 
       - name: Collect test coverage
+        run: make test-coverage
+
+      - name: Refresh main branch badges
+        if: github.event_name == 'push'
         run: make test-coverage
 
       - name: Resolve coverage report paths
@@ -156,6 +161,7 @@ jobs:
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Test architecture coverage report generator
+        if: github.event_name == 'pull_request'
         run: make test-architecture-coverage-report
 
       - name: Collect changed first-party files
@@ -166,6 +172,7 @@ jobs:
             -- '*.cs' ':!*.g.cs' ':!*Designer.cs' > changed-files.txt
 
       - name: Run architecture coverage analysis
+        if: github.event_name == 'pull_request'
         id: architecture_coverage
         continue-on-error: true
         run: |
@@ -176,21 +183,21 @@ jobs:
           make architecture-coverage-ci DIFF_STATUS="$DIFF_STATUS"
 
       - name: Upload strict diagnostics
-        if: always() && hashFiles('architecture-strict.json') != ''
+        if: always() && github.event_name == 'pull_request' && hashFiles('architecture-strict.json') != ''
         uses: actions/upload-artifact@v4
         with:
           name: architecture-strict
           path: architecture-strict.json
 
       - name: Upload audit diagnostics
-        if: always() && hashFiles('architecture-audit.json') != ''
+        if: always() && github.event_name == 'pull_request' && hashFiles('architecture-audit.json') != ''
         uses: actions/upload-artifact@v4
         with:
           name: architecture-audit
           path: architecture-audit.json
 
       - name: Upload architecture coverage report
-        if: always() && hashFiles('architecture-coverage.md') != ''
+        if: always() && github.event_name == 'pull_request' && hashFiles('architecture-coverage.md') != ''
         uses: actions/upload-artifact@v4
         with:
           name: architecture-coverage-report
