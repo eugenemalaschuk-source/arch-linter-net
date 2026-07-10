@@ -21,7 +21,7 @@ install_rtk_if_missing() {
   elif has_command cargo; then
     cargo install --git https://github.com/rtk-ai/rtk
   elif has_command curl; then
-    curl -fsSL https://raw.githubusercontent.com/rtk-ai/rtk/refs/heads/develop/install.sh | sh
+    curl -fsSL --proto '=https' --tlsv1.2 https://raw.githubusercontent.com/rtk-ai/rtk/refs/heads/develop/install.sh | sh
     export PATH="$HOME/.local/bin:$PATH"
   else
     log "rtk installation requires Homebrew, Cargo, or curl. Install rtk manually and rerun make rtk-init."
