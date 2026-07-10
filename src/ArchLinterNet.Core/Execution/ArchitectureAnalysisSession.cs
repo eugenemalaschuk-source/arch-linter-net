@@ -14,6 +14,8 @@ namespace ArchLinterNet.Core.Execution;
 // this session kept for public API stability; handlers receive this session, not the runner.
 public sealed partial class ArchitectureAnalysisSession
 {
+    private const string ConfigurationSource = "<configuration>";
+
     private ArchitectureCoverageInventory? _cachedCoverageInventory;
     private ArchitectureContractDocument? _cachedCoverageInventoryDocument;
 
@@ -239,6 +241,23 @@ public sealed partial class ArchitectureAnalysisSession
     {
         List<ArchitectureViolation> violations = new();
 
+        AddMissingAssemblyViolations(violations);
+        AddDiscoveryDiagnosticViolations(violations);
+
+        ArchitectureConfigurationReferenceCollector collector = BuildConfigurationReferenceCollector(strict);
+        HashSet<string> ruleInputCoveredContractIds = CollectRuleInputCoveredContractIds(strict);
+
+        AddLayerReferenceViolations(violations, collector, ruleInputCoveredContractIds);
+        AddExternalDependencyGroupViolations(violations, collector);
+        AddPackageGroupViolations(violations, collector);
+        AddPackageMetadataViolations(violations, collector);
+        AddProjectMetadataViolations(violations, collector);
+
+        return violations;
+    }
+
+    private void AddMissingAssemblyViolations(List<ArchitectureViolation> violations)
+    {
         foreach (string missingAssembly in Context.MissingAssemblyNames)
         {
             string probeInfo = Context.AssemblyProbingPaths.Count > 0
@@ -246,23 +265,29 @@ public sealed partial class ArchitectureAnalysisSession
                 : string.Empty;
 
             violations.Add(new ArchitectureViolation(
-                "<configuration>",
+                ConfigurationSource,
                 null,
                 missingAssembly,
                 "missing target assembly",
                 new[] { $"Assembly '{missingAssembly}' is declared in analysis.target_assemblies but could not be resolved.{probeInfo}" }));
         }
+    }
 
+    private void AddDiscoveryDiagnosticViolations(List<ArchitectureViolation> violations)
+    {
         foreach (ArchitectureProjectDiscoveryDiagnostic discoveryDiagnostic in Context.DiscoveryDiagnostics)
         {
             violations.Add(new ArchitectureViolation(
-                "<configuration>",
+                ConfigurationSource,
                 null,
                 discoveryDiagnostic.Subject,
                 discoveryDiagnostic.Kind,
                 new[] { discoveryDiagnostic.Message }));
         }
+    }
 
+    private ArchitectureConfigurationReferenceCollector BuildConfigurationReferenceCollector(bool strict)
+    {
         ArchitectureConfigurationReferenceCollector collector = new();
 
         foreach (ArchitectureContractFamilyDescriptor descriptor in ArchitectureContractFamilyRegistry.All)
@@ -282,27 +307,30 @@ public sealed partial class ArchitectureAnalysisSession
             }
         }
 
-        HashSet<string> ruleInputCoveredContractIds = CollectRuleInputCoveredContractIds(strict);
+        return collector;
+    }
 
+    private void AddLayerReferenceViolations(
+        List<ArchitectureViolation> violations,
+        ArchitectureConfigurationReferenceCollector collector,
+        HashSet<string> ruleInputCoveredContractIds)
+    {
         foreach ((string layerName, HashSet<string> referencingContractIds) in collector.LayerReferencingContractIds)
         {
             bool isFullyOwnedByRuleInputCoverage = referencingContractIds.Count > 0
                 && referencingContractIds.All(ruleInputCoveredContractIds.Contains);
 
-            if (!Document.Layers.ContainsKey(layerName))
+            // A dangling layer name referenced exclusively by contracts a rule_input coverage
+            // contract tracks defers to that coverage contract's own "unresolved" finding
+            // instead of throwing here — otherwise scope: rule_input's unresolved diagnostic
+            // would be unreachable through the real validation pipeline, since this resolution
+            // happens before any contract or coverage check runs.
+            if (!Document.Layers.ContainsKey(layerName) && isFullyOwnedByRuleInputCoverage)
             {
-                // A dangling layer name referenced exclusively by contracts a rule_input coverage
-                // contract tracks defers to that coverage contract's own "unresolved" finding
-                // instead of throwing here — otherwise scope: rule_input's unresolved diagnostic
-                // would be unreachable through the real validation pipeline, since this resolution
-                // happens before any contract or coverage check runs.
-                if (isFullyOwnedByRuleInputCoverage)
-                {
-                    continue;
-                }
+                continue;
             }
 
-            ArchitectureLayer layer = ArchitectureLayerResolver.ResolveLayer(Document, "<configuration>", layerName);
+            ArchitectureLayer layer = ArchitectureLayerResolver.ResolveLayer(Document, ConfigurationSource, layerName);
 
             if (layer.External)
             {
@@ -324,20 +352,24 @@ public sealed partial class ArchitectureAnalysisSession
                 }
 
                 violations.Add(new ArchitectureViolation(
-                    "<configuration>",
+                    ConfigurationSource,
                     null,
                     ArchitectureLayerResolver.DescribeLayer(layer),
                     "empty layer namespace",
                     new[] { $"Layer '{layerName}' namespace '{layer.Namespace}' contains no types in loaded assemblies." }));
             }
         }
+    }
 
+    private void AddExternalDependencyGroupViolations(
+        List<ArchitectureViolation> violations, ArchitectureConfigurationReferenceCollector collector)
+    {
         foreach (string groupName in collector.ReferencedExternalGroups)
         {
             if (!Document.ExternalDependencies.TryGetValue(groupName, out ArchitectureExternalDependencyGroup? group))
             {
                 violations.Add(new ArchitectureViolation(
-                    "<configuration>",
+                    ConfigurationSource,
                     null,
                     groupName,
                     "unknown external dependency group",
@@ -358,7 +390,7 @@ public sealed partial class ArchitectureAnalysisSession
             }
 
             violations.Add(new ArchitectureViolation(
-                "<configuration>",
+                ConfigurationSource,
                 null,
                 groupName,
                 "invalid external dependency group",
@@ -370,13 +402,17 @@ public sealed partial class ArchitectureAnalysisSession
                 Payload = new ExternalDependencyPayload(groupName)
             });
         }
+    }
 
+    private void AddPackageGroupViolations(
+        List<ArchitectureViolation> violations, ArchitectureConfigurationReferenceCollector collector)
+    {
         foreach (string groupName in collector.ReferencedPackageGroups)
         {
             if (!Document.Packages.TryGetValue(groupName, out ArchitecturePackageGroup? group))
             {
                 violations.Add(new ArchitectureViolation(
-                    "<configuration>",
+                    ConfigurationSource,
                     null,
                     groupName,
                     "unknown package group",
@@ -397,7 +433,7 @@ public sealed partial class ArchitectureAnalysisSession
             }
 
             violations.Add(new ArchitectureViolation(
-                "<configuration>",
+                ConfigurationSource,
                 null,
                 groupName,
                 "invalid package group",
@@ -409,67 +445,77 @@ public sealed partial class ArchitectureAnalysisSession
                 Payload = new PackageDependencyPayload(groupName)
             });
         }
+    }
 
-        if (collector.PackageContractSources.Count > 0)
+    private void AddPackageMetadataViolations(
+        List<ArchitectureViolation> violations, ArchitectureConfigurationReferenceCollector collector)
+    {
+        if (collector.PackageContractSources.Count == 0)
         {
-            HashSet<string> projectsWithPackageData = new(
-                Context.ProjectDiscovery?.DiscoveredProjects.Select(project => project.AssemblyName) ?? Enumerable.Empty<string>(),
-                StringComparer.Ordinal);
-
-            foreach ((string contractName, string? contractId, string source) in collector.PackageContractSources
-                         .DistinctBy(entry => (entry.ContractName, entry.ContractId, entry.Source)))
-            {
-                if (projectsWithPackageData.Contains(source))
-                {
-                    continue;
-                }
-
-                violations.Add(new ArchitectureViolation(
-                    contractName,
-                    contractId,
-                    source,
-                    "no package metadata discovered",
-                    new[]
-                    {
-                        $"Contract '{contractName}' declares source '{source}', but no discovered project with that assembly name has package reference metadata available. " +
-                        "Package dependency/allow-only contracts require analysis.solution or analysis.projects to be configured so project discovery can parse PackageReference items; " +
-                        "without it, this contract will never report a violation."
-                    }));
-            }
+            return;
         }
 
-        if (collector.ProjectMetadataContractProjects.Count > 0)
+        HashSet<string> projectsWithPackageData = new(
+            Context.ProjectDiscovery?.DiscoveredProjects.Select(project => project.AssemblyName) ?? Enumerable.Empty<string>(),
+            StringComparer.Ordinal);
+
+        foreach ((string contractName, string? contractId, string source) in collector.PackageContractSources
+                     .DistinctBy(entry => (entry.ContractName, entry.ContractId, entry.Source)))
         {
-            HashSet<string> discoveredProjectPaths = new(
-                Context.ProjectDiscovery?.DiscoveredProjects.Select(project => NormalizeProjectPath(project.Path))
-                ?? Enumerable.Empty<string>(),
-                StringComparer.OrdinalIgnoreCase);
-
-            foreach ((string contractName, string? contractId, string projectPath) in collector.ProjectMetadataContractProjects
-                         .DistinctBy(entry => (entry.ContractName, entry.ContractId, entry.ProjectPath)))
+            if (projectsWithPackageData.Contains(source))
             {
-                if (discoveredProjectPaths.Contains(projectPath))
-                {
-                    continue;
-                }
-
-                violations.Add(new ArchitectureViolation(
-                    contractName,
-                    contractId,
-                    projectPath,
-                    "no project metadata discovered",
-                    new[]
-                    {
-                        $"Contract '{contractName}' targets project '{projectPath}', but project discovery did not expose metadata for that path. " +
-                        "Project metadata contracts require analysis.solution or analysis.projects to discover and parse the matching .csproj file."
-                    })
-                {
-                    Payload = new ProjectMetadataPayload(ProjectMetadataKind: "missing_project")
-                });
+                continue;
             }
+
+            violations.Add(new ArchitectureViolation(
+                contractName,
+                contractId,
+                source,
+                "no package metadata discovered",
+                new[]
+                {
+                    $"Contract '{contractName}' declares source '{source}', but no discovered project with that assembly name has package reference metadata available. " +
+                    "Package dependency/allow-only contracts require analysis.solution or analysis.projects to be configured so project discovery can parse PackageReference items; " +
+                    "without it, this contract will never report a violation."
+                }));
+        }
+    }
+
+    private void AddProjectMetadataViolations(
+        List<ArchitectureViolation> violations, ArchitectureConfigurationReferenceCollector collector)
+    {
+        if (collector.ProjectMetadataContractProjects.Count == 0)
+        {
+            return;
         }
 
-        return violations;
+        HashSet<string> discoveredProjectPaths = new(
+            Context.ProjectDiscovery?.DiscoveredProjects.Select(project => NormalizeProjectPath(project.Path))
+            ?? Enumerable.Empty<string>(),
+            StringComparer.OrdinalIgnoreCase);
+
+        foreach ((string contractName, string? contractId, string projectPath) in collector.ProjectMetadataContractProjects
+                     .DistinctBy(entry => (entry.ContractName, entry.ContractId, entry.ProjectPath)))
+        {
+            if (discoveredProjectPaths.Contains(projectPath))
+            {
+                continue;
+            }
+
+            violations.Add(new ArchitectureViolation(
+                contractName,
+                contractId,
+                projectPath,
+                "no project metadata discovered",
+                new[]
+                {
+                    $"Contract '{contractName}' targets project '{projectPath}', but project discovery did not expose metadata for that path. " +
+                    "Project metadata contracts require analysis.solution or analysis.projects to discover and parse the matching .csproj file."
+                })
+            {
+                Payload = new ProjectMetadataPayload(ProjectMetadataKind: "missing_project")
+            });
+        }
     }
 
     internal static string NormalizeProjectPath(string path)

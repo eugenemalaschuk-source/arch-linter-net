@@ -186,7 +186,7 @@ internal sealed class ArchitectureIlMethodBodyScanner : IArchitectureIlMethodBod
                 yield break;
             }
 
-            if (!TryReadMetadataTokenIfPresent(opCode, il, ref position, out int token))
+            if (!ArchitectureIlOperandSkipper.TryReadMetadataTokenIfPresent(opCode, il, ref position, out int token))
             {
                 yield break;
             }
@@ -256,105 +256,6 @@ internal sealed class ArchitectureIlMethodBodyScanner : IArchitectureIlMethodBod
         byte second = il[position++];
         ushort key = (ushort)((first << 8) | second);
         return _opCodes.TryGetValue(key, out opCode);
-    }
-
-    private static bool TryReadMetadataTokenIfPresent(OpCode opCode, byte[] il, ref int position, out int token)
-    {
-        token = 0;
-
-        switch (opCode.OperandType)
-        {
-            case OperandType.InlineMethod:
-            case OperandType.InlineField:
-            case OperandType.InlineType:
-            case OperandType.InlineTok:
-                if (!CanRead(il, position, 4))
-                {
-                    return false;
-                }
-
-                token = BitConverter.ToInt32(il, position);
-                position += 4;
-                return true;
-
-            case OperandType.InlineSwitch:
-                if (!CanRead(il, position, 4))
-                {
-                    return false;
-                }
-
-                int caseCount = BitConverter.ToInt32(il, position);
-                int size = 4 + caseCount * 4;
-                if (!CanRead(il, position, size))
-                {
-                    return false;
-                }
-
-                position += size;
-                return true;
-
-            case OperandType.ShortInlineBrTarget:
-            case OperandType.ShortInlineI:
-            case OperandType.ShortInlineVar:
-                if (!CanRead(il, position, 1))
-                {
-                    return false;
-                }
-
-                position += 1;
-                return true;
-
-            case OperandType.ShortInlineR:
-                if (!CanRead(il, position, 4))
-                {
-                    return false;
-                }
-
-                position += 4;
-                return true;
-
-            case OperandType.InlineVar:
-                if (!CanRead(il, position, 2))
-                {
-                    return false;
-                }
-
-                position += 2;
-                return true;
-
-            case OperandType.InlineI:
-            case OperandType.InlineBrTarget:
-            case OperandType.InlineSig:
-            case OperandType.InlineString:
-                if (!CanRead(il, position, 4))
-                {
-                    return false;
-                }
-
-                position += 4;
-                return true;
-
-            case OperandType.InlineR:
-            case OperandType.InlineI8:
-                if (!CanRead(il, position, 8))
-                {
-                    return false;
-                }
-
-                position += 8;
-                return true;
-
-            case OperandType.InlineNone:
-                return true;
-
-            default:
-                return true;
-        }
-    }
-
-    private static bool CanRead(byte[] il, int position, int size)
-    {
-        return size >= 0 && position >= 0 && position <= il.Length - size;
     }
 
     private static Dictionary<ushort, OpCode> BuildOpCodeMap()

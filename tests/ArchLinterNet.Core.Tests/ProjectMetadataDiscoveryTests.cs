@@ -1,3 +1,4 @@
+using System.Reflection;
 using ArchLinterNet.Core.Contracts;
 using ArchLinterNet.Core.Discovery;
 using ArchLinterNet.Core.Execution;
@@ -9,6 +10,17 @@ namespace ArchLinterNet.Core.Tests;
 [TestFixture]
 public sealed class ProjectMetadataDiscoveryTests
 {
+    private static readonly string[] _myAppTests = ["MyApp.Tests"];
+    private static readonly string[] _myAppTools = ["MyApp.Tools"];
+    private static readonly string[] _testProjectReference = ["tests/MyApp.Tests/MyApp.Tests.csproj"];
+    private static readonly string[] _targetFrameworks = ["net8.0", "net10.0"];
+    private static readonly (string PackageId, string? Version)[] _packageReferences =
+    [
+        ("Central.Package", "2.3.4"),
+        ("Inline.Package", "1.0.0"),
+        ("Missing.Package", null)
+    ];
+    private static readonly Assembly[] _testAssembly = [typeof(ProjectMetadataDiscoveryTests).Assembly];
     private string _repoRoot = null!;
 
     [SetUp]
@@ -79,8 +91,8 @@ public sealed class ProjectMetadataDiscoveryTests
         Assert.That(project.Properties["Nullable"].Value, Is.EqualTo("enable"));
         Assert.That(project.Properties["TreatWarningsAsErrors"].Value, Is.EqualTo("true"));
         Assert.That(project.Properties["TreatWarningsAsErrors"].SourcePath, Is.EqualTo("Directory.Build.props"));
-        Assert.That(project.FriendAssemblies.Select(entry => entry.AssemblyName), Is.EqualTo(new[] { "MyApp.Tests" }));
-        Assert.That(project.ProjectReferences.Select(entry => entry.Path), Is.EqualTo(new[] { "tests/MyApp.Tests/MyApp.Tests.csproj" }));
+        Assert.That(project.FriendAssemblies.Select(entry => entry.AssemblyName), Is.EqualTo(_myAppTests));
+        Assert.That(project.ProjectReferences.Select(entry => entry.Path), Is.EqualTo(_testProjectReference));
     }
 
     [Test]
@@ -125,7 +137,57 @@ public sealed class ProjectMetadataDiscoveryTests
             .Single();
 
         Assert.That(project.ProjectReferences.Select(entry => entry.Path),
-            Is.EqualTo(new[] { "tests/MyApp.Tests/MyApp.Tests.csproj" }));
+            Is.EqualTo(_testProjectReference));
+    }
+
+    [Test]
+    public void Discovery_ParsesCentralVersionsMultiTargetingAndSourceFriendAttributes()
+    {
+        string projectDir = Path.Combine(_repoRoot, "src", "MyApp");
+        Directory.CreateDirectory(projectDir);
+        File.WriteAllText(Path.Combine(_repoRoot, "Directory.Packages.props"), """
+            <Project>
+              <ItemGroup>
+                <PackageVersion Include="Central.Package" Version="2.3.4" />
+              </ItemGroup>
+            </Project>
+            """);
+        File.WriteAllText(Path.Combine(projectDir, "AssemblyInfo.cs"), """
+            using System.Runtime.CompilerServices;
+            [assembly: InternalsVisibleTo("MyApp.Tools")]
+            namespace MyApp;
+            [assembly: InternalsVisibleTo("MyApp.MemberTools", AllInternalsVisible = true)]
+            public class Marker { }
+            """);
+        string projectPath = Path.Combine(projectDir, "MyApp.csproj");
+        File.WriteAllText(projectPath, """
+            <Project Sdk="Microsoft.NET.Sdk">
+              <PropertyGroup>
+                <AssemblyName> MyApp.Custom </AssemblyName>
+                <TargetFrameworks> net8.0; net10.0 </TargetFrameworks>
+              </PropertyGroup>
+              <ItemGroup>
+                <PackageReference Include="Central.Package" />
+                <PackageReference Include="Inline.Package" Version="1.0.0" />
+                <PackageReference Include="Missing.Package" />
+              </ItemGroup>
+            </Project>
+            """);
+
+        ArchitectureDiscoveredProject project = new ArchitectureProjectDiscoveryService()
+            .ResolveFromDocument(new ArchitectureContractDocument
+            {
+                Analysis = new ArchitectureAnalysisConfiguration
+                {
+                    Projects = new List<string> { projectPath }
+                }
+            }, _repoRoot, resolveAssemblyOutputs: false)
+            .DiscoveredProjects.Single();
+
+        Assert.That(project.AssemblyName, Is.EqualTo("MyApp.Custom"));
+        Assert.That(project.TargetFrameworks, Is.EqualTo(_targetFrameworks));
+        Assert.That(project.PackageReferences.Select(reference => (reference.PackageId, reference.Version)), Is.EquivalentTo(_packageReferences));
+        Assert.That(project.FriendAssemblies.Select(friend => friend.AssemblyName), Is.EquivalentTo(_myAppTools));
     }
 
     [Test]
@@ -181,7 +243,7 @@ public sealed class ProjectMetadataDiscoveryTests
             .ResolveFromDocument(document, _repoRoot, resolveAssemblyOutputs: false);
         ArchitectureAnalysisContext context = new(
             _repoRoot,
-            new[] { typeof(ProjectMetadataDiscoveryTests).Assembly },
+            _testAssembly,
             Array.Empty<string>(),
             Array.Empty<string>(),
             projectDiscovery: discovery);
@@ -304,7 +366,7 @@ public sealed class ProjectMetadataDiscoveryTests
             .ResolveFromDocument(document, _repoRoot, resolveAssemblyOutputs: false);
         ArchitectureAnalysisContext context = new(
             _repoRoot,
-            new[] { typeof(ProjectMetadataDiscoveryTests).Assembly },
+            _testAssembly,
             Array.Empty<string>(),
             Array.Empty<string>(),
             projectDiscovery: discovery);
@@ -360,7 +422,7 @@ public sealed class ProjectMetadataDiscoveryTests
         ArchitectureDiscoveredProject project = discovery.DiscoveredProjects.Single();
         ArchitectureAnalysisContext context = new(
             _repoRoot,
-            new[] { typeof(ProjectMetadataDiscoveryTests).Assembly },
+            _testAssembly,
             Array.Empty<string>(),
             Array.Empty<string>(),
             projectDiscovery: discovery);
@@ -368,7 +430,7 @@ public sealed class ProjectMetadataDiscoveryTests
 
         List<ArchitectureViolation> violations = runner.Session.CheckProjectMetadataContract(contract);
 
-        Assert.That(project.FriendAssemblies.Select(entry => entry.AssemblyName), Is.EqualTo(new[] { "MyApp.Tools" }));
+        Assert.That(project.FriendAssemblies.Select(entry => entry.AssemblyName), Is.EqualTo(_myAppTools));
         Assert.That(project.FriendAssemblies.Single().SourcePath, Is.EqualTo("src/MyApp/Properties/AssemblyInfo.cs"));
         Assert.That(violations, Has.Count.EqualTo(1));
         Assert.That((violations[0].Payload as ProjectMetadataPayload)?.ProjectMetadataKind, Is.EqualTo("friend_assembly"));
@@ -409,7 +471,7 @@ public sealed class ProjectMetadataDiscoveryTests
             .Single();
 
         Assert.That(project.FriendAssemblies.Select(entry => entry.AssemblyName),
-            Is.EqualTo(new[] { "MyApp.Tests" }));
+            Is.EqualTo(_myAppTests));
         Assert.That(project.FriendAssemblies.Any(entry => entry.AssemblyName == "MyApp.Tools"), Is.False,
             "Commented InternalsVisibleTo declaration must not be treated as an actual friend assembly.");
     }
@@ -447,7 +509,7 @@ public sealed class ProjectMetadataDiscoveryTests
             .Single();
 
         Assert.That(project.FriendAssemblies.Select(entry => entry.AssemblyName),
-            Is.EqualTo(new[] { "MyApp.Tests" }));
+            Is.EqualTo(_myAppTests));
         Assert.That(project.FriendAssemblies.Any(entry => entry.AssemblyName == "MyApp.Tools"), Is.False,
             "Block-commented InternalsVisibleTo declaration must not be treated as an actual friend assembly.");
     }
@@ -488,7 +550,7 @@ public sealed class ProjectMetadataDiscoveryTests
             .Single();
 
         Assert.That(project.FriendAssemblies.Select(entry => entry.AssemblyName),
-            Is.EqualTo(new[] { "MyApp.Tests" }));
+            Is.EqualTo(_myAppTests));
         Assert.That(project.FriendAssemblies.Any(entry => entry.AssemblyName == "MyApp.Tools"), Is.False,
             "Multi-line block-commented InternalsVisibleTo declaration must not be treated as an actual friend assembly.");
     }
@@ -528,7 +590,7 @@ public sealed class ProjectMetadataDiscoveryTests
             .Single();
 
         Assert.That(project.FriendAssemblies.Select(entry => entry.AssemblyName),
-            Is.EqualTo(new[] { "MyApp.Tests" }));
+            Is.EqualTo(_myAppTests));
         Assert.That(project.FriendAssemblies.Any(entry => entry.AssemblyName == "MyApp.Tools"), Is.False,
             "InternalsVisibleTo inside #if false must not be treated as an actual friend assembly.");
     }
@@ -572,6 +634,6 @@ public sealed class ProjectMetadataDiscoveryTests
             .Single();
 
         Assert.That(project.FriendAssemblies.Select(entry => entry.AssemblyName),
-            Is.EqualTo(new[] { "MyApp.Tests" }));
+            Is.EqualTo(_myAppTests));
     }
 }

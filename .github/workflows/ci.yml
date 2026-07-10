@@ -79,6 +79,9 @@ jobs:
       - name: Restore
         run: make restore
 
+      - name: Lint
+        run: make lint
+
       - name: Cache SonarQube packages
         if: github.event.pull_request.head.repo.full_name == github.repository
         uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830
@@ -127,9 +130,6 @@ jobs:
             /d:sonar.qualitygate.timeout=300 \
             /d:sonar.cs.opencover.reportsPaths="test-results/**/coverage.opencover.xml" \
             /d:sonar.cs.vstest.reportsPaths="test-results/**/*.trx"
-
-      - name: Lint
-        run: make lint
 
       - name: Collect test coverage
         run: make test-coverage

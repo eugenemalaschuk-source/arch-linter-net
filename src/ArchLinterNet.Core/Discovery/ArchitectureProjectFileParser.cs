@@ -13,6 +13,7 @@ internal interface IArchitectureProjectFileParser
 
 internal sealed class ArchitectureProjectFileParser : IArchitectureProjectFileParser
 {
+    private const string IncludeAttribute = "Include";
 
     public DiscoveredProjectFile Parse(string projectPath, IArchitectureFileSystem? fileSystem = null)
     {
@@ -21,28 +22,8 @@ internal sealed class ArchitectureProjectFileParser : IArchitectureProjectFilePa
 
         IEnumerable<XElement> propertyGroups = document.Descendants("PropertyGroup");
 
-        string? assemblyName = propertyGroups
-            .Select(group => group.Element("AssemblyName")?.Value)
-            .FirstOrDefault(value => !string.IsNullOrWhiteSpace(value));
-
-        string resolvedAssemblyName = string.IsNullOrWhiteSpace(assemblyName)
-            ? Path.GetFileNameWithoutExtension(projectPath)
-            : assemblyName.Trim();
-
-        string? targetFrameworks = propertyGroups
-            .Select(group => group.Element("TargetFrameworks")?.Value)
-            .FirstOrDefault(value => !string.IsNullOrWhiteSpace(value));
-
-        string? targetFramework = propertyGroups
-            .Select(group => group.Element("TargetFramework")?.Value)
-            .FirstOrDefault(value => !string.IsNullOrWhiteSpace(value));
-
-        List<string> frameworks = !string.IsNullOrWhiteSpace(targetFrameworks)
-            ? targetFrameworks.Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
-                .ToList()
-            : !string.IsNullOrWhiteSpace(targetFramework)
-                ? new List<string> { targetFramework.Trim() }
-                : new List<string>();
+        string resolvedAssemblyName = ResolveAssemblyName(propertyGroups, projectPath);
+        List<string> frameworks = ResolveTargetFrameworks(propertyGroups);
 
         List<ArchitectureDiscoveredPackageReference> packageReferences =
             ParsePackageReferences(document, projectPath, fileSystem);
@@ -59,6 +40,38 @@ internal sealed class ArchitectureProjectFileParser : IArchitectureProjectFilePa
             properties,
             friendAssemblies,
             projectReferences);
+    }
+
+    private static string ResolveAssemblyName(IEnumerable<XElement> propertyGroups, string projectPath)
+    {
+        string? assemblyName = propertyGroups
+            .Select(group => group.Element("AssemblyName")?.Value)
+            .FirstOrDefault(value => !string.IsNullOrWhiteSpace(value));
+
+        return string.IsNullOrWhiteSpace(assemblyName)
+            ? Path.GetFileNameWithoutExtension(projectPath)
+            : assemblyName.Trim();
+    }
+
+    private static List<string> ResolveTargetFrameworks(IEnumerable<XElement> propertyGroups)
+    {
+        string? targetFrameworks = propertyGroups
+            .Select(group => group.Element("TargetFrameworks")?.Value)
+            .FirstOrDefault(value => !string.IsNullOrWhiteSpace(value));
+
+        if (!string.IsNullOrWhiteSpace(targetFrameworks))
+        {
+            return targetFrameworks.Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                .ToList();
+        }
+
+        string? targetFramework = propertyGroups
+            .Select(group => group.Element("TargetFramework")?.Value)
+            .FirstOrDefault(value => !string.IsNullOrWhiteSpace(value));
+
+        return !string.IsNullOrWhiteSpace(targetFramework)
+            ? new List<string> { targetFramework.Trim() }
+            : new List<string>();
     }
 
     private static Dictionary<string, ArchitectureDiscoveredProjectProperty> ParseProperties(
@@ -83,7 +96,7 @@ internal sealed class ArchitectureProjectFileParser : IArchitectureProjectFilePa
         List<(string PackageId, string? Version)> rawReferences = document.Descendants("PackageReference")
             .Select(element =>
             {
-                string? id = element.Attribute("Include")?.Value;
+                string? id = element.Attribute(IncludeAttribute)?.Value;
                 string? version = element.Attribute("Version")?.Value ?? element.Element("Version")?.Value;
                 return (Id: id, Version: string.IsNullOrWhiteSpace(version) ? null : version.Trim());
             })
@@ -121,7 +134,7 @@ internal sealed class ArchitectureProjectFileParser : IArchitectureProjectFilePa
     {
         string sourcePath = Path.GetFullPath(projectPath);
         IEnumerable<ArchitectureDiscoveredFriendAssembly> projectFileDeclarations = document.Descendants("InternalsVisibleTo")
-            .Select(element => element.Attribute("Include")?.Value)
+            .Select(element => element.Attribute(IncludeAttribute)?.Value)
             .Where(value => !string.IsNullOrWhiteSpace(value))
             .Select(value => new ArchitectureDiscoveredFriendAssembly(value!.Trim(), sourcePath));
 
@@ -150,22 +163,16 @@ internal sealed class ArchitectureProjectFileParser : IArchitectureProjectFilePa
             SyntaxTree syntaxTree = CSharpSyntaxTree.ParseText(sourceText);
             CompilationUnitSyntax root = syntaxTree.GetCompilationUnitRoot();
 
-            foreach (string? assemblyName in CollectFriendAssembliesFromAttributes(root.AttributeLists))
+            foreach (string assemblyName in CollectFriendAssembliesFromAttributes(root.AttributeLists).OfType<string>())
             {
-                if (assemblyName != null)
-                {
-                    yield return new ArchitectureDiscoveredFriendAssembly(assemblyName, Path.GetFullPath(file));
-                }
+                yield return new ArchitectureDiscoveredFriendAssembly(assemblyName, Path.GetFullPath(file));
             }
 
             foreach (MemberDeclarationSyntax member in root.Members)
             {
-                foreach (string? assemblyName in CollectFriendAssembliesFromAttributes(member.AttributeLists))
+                foreach (string assemblyName in CollectFriendAssembliesFromAttributes(member.AttributeLists).OfType<string>())
                 {
-                    if (assemblyName != null)
-                    {
-                        yield return new ArchitectureDiscoveredFriendAssembly(assemblyName, Path.GetFullPath(file));
-                    }
+                    yield return new ArchitectureDiscoveredFriendAssembly(assemblyName, Path.GetFullPath(file));
                 }
             }
         }
@@ -218,7 +225,7 @@ internal sealed class ArchitectureProjectFileParser : IArchitectureProjectFilePa
         string sourcePath = Path.GetFullPath(projectPath);
 
         return document.Descendants("ProjectReference")
-            .Select(element => element.Attribute("Include")?.Value)
+            .Select(element => element.Attribute(IncludeAttribute)?.Value)
             .Where(value => !string.IsNullOrWhiteSpace(value))
             .Select(value => NormalizeProjectReferencePath(projectDirectory, value!.Trim()))
             .Distinct(StringComparer.OrdinalIgnoreCase)
@@ -272,7 +279,7 @@ internal sealed class ArchitectureProjectFileParser : IArchitectureProjectFilePa
     private static void MergeScalarProperties(
         XDocument document,
         string sourcePath,
-        IDictionary<string, ArchitectureDiscoveredProjectProperty> properties)
+        Dictionary<string, ArchitectureDiscoveredProjectProperty> properties)
     {
         foreach (XElement element in document.Descendants("PropertyGroup").Elements())
         {
@@ -304,7 +311,7 @@ internal sealed class ArchitectureProjectFileParser : IArchitectureProjectFilePa
             {
                 XDocument propsDocument = XDocument.Parse(fileSystem.ReadAllText(candidate));
                 return propsDocument.Descendants("PackageVersion")
-                    .Select(element => (Id: element.Attribute("Include")?.Value, Version: element.Attribute("Version")?.Value))
+                    .Select(element => (Id: element.Attribute(IncludeAttribute)?.Value, Version: element.Attribute("Version")?.Value))
                     .Where(entry => !string.IsNullOrWhiteSpace(entry.Id) && !string.IsNullOrWhiteSpace(entry.Version))
                     .GroupBy(entry => entry.Id!.Trim(), StringComparer.OrdinalIgnoreCase)
                     .ToDictionary(group => group.Key, group => group.First().Version!.Trim(), StringComparer.OrdinalIgnoreCase);

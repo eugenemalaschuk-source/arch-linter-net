@@ -48,6 +48,10 @@ public sealed partial class ArchitectureAnalysisSession
             || contract.ForbiddenInAssemblies.Count > 0;
 
         string expectedAllowedOnlyLocation = DescribeAllowedOnlyLocation(contract);
+        var context = new AttributeUsageCollectionContext(
+            allowedLayers, allowedAssemblyNames, hasAllowedOnlyExpectation,
+            forbiddenLayers, forbiddenAssemblyNames, hasForbiddenExpectation,
+            expectedAllowedOnlyLocation, executionContext);
 
         Type[] candidateTypes = TypeIndex.AllTypes()
             .OrderBy(ArchitectureTypeNames.SafeFullName, StringComparer.Ordinal)
@@ -55,54 +59,77 @@ public sealed partial class ArchitectureAnalysisSession
 
         foreach (Type type in candidateTypes)
         {
-            string actualNamespace = ArchitectureTypeNames.SafeNamespace(type);
-            string actualAssemblyName = type.Assembly.GetName().Name ?? string.Empty;
-            string actualLocationDescription = $"namespace:{actualNamespace} (assembly {actualAssemblyName})";
-
-            var matches = ArchitectureAttributeUsageScanner.GetMatches(type, contract.Attributes, contract.AttributePrefixes)
-                .OrderBy(m => m.SourceIdentifier, StringComparer.Ordinal)
-                .ThenBy(m => m.MatchedAttribute, StringComparer.Ordinal);
-
-            foreach (var match in matches)
-            {
-                bool misplaced = hasAllowedOnlyExpectation && !IsAllowedLocation(
-                    actualNamespace, actualAssemblyName, allowedLayers, contract.AllowedOnlyInNamespaces, allowedAssemblyNames);
-
-                bool forbidden = hasForbiddenExpectation && IsAllowedLocation(
-                    actualNamespace, actualAssemblyName, forbiddenLayers, contract.ForbiddenInNamespaces, forbiddenAssemblyNames);
-
-                if (!misplaced && !forbidden)
-                {
-                    continue;
-                }
-
-                if (executionContext.IsIgnored(match.SourceIdentifier, match.MatchedAttribute))
-                {
-                    continue;
-                }
-
-                string attributeUsageKind = forbidden ? "forbidden" : "misplaced";
-                string? expectedAttributeLocation = misplaced && !forbidden ? expectedAllowedOnlyLocation : null;
-
-                violations.Add(new ArchitectureViolation(
-                    contract.Name,
-                    contract.Id,
-                    match.SourceIdentifier,
-                    match.MatchedAttribute,
-                    new[] { actualLocationDescription })
-                {
-                    Payload = new AttributeUsagePayload(
-                        MatchedAttribute: match.MatchedAttribute,
-                        AttributeUsageKind: attributeUsageKind,
-                        ActualAttributeLocation: actualLocationDescription,
-                        ExpectedAttributeLocation: expectedAttributeLocation)
-                });
-            }
+            CollectAttributeUsageViolationsForType(
+                type,
+                contract,
+                context,
+                violations);
         }
 
         executionContext.CollectUnmatchedIgnores(_unmatchedIgnoredViolations);
         return violations;
     }
+
+    private static void CollectAttributeUsageViolationsForType(
+        Type type,
+        ArchitectureAttributeUsageContract contract,
+        AttributeUsageCollectionContext context,
+        List<ArchitectureViolation> violations)
+    {
+        string actualNamespace = ArchitectureTypeNames.SafeNamespace(type);
+        string actualAssemblyName = type.Assembly.GetName().Name ?? string.Empty;
+        string actualLocationDescription = $"namespace:{actualNamespace} (assembly {actualAssemblyName})";
+
+        var matches = ArchitectureAttributeUsageScanner.GetMatches(type, contract.Attributes, contract.AttributePrefixes)
+            .OrderBy(m => m.SourceIdentifier, StringComparer.Ordinal)
+            .ThenBy(m => m.MatchedAttribute, StringComparer.Ordinal);
+
+        foreach (var match in matches)
+        {
+            bool misplaced = context.HasAllowedOnlyExpectation && !IsAllowedLocation(
+                actualNamespace, actualAssemblyName, context.AllowedLayers, contract.AllowedOnlyInNamespaces, context.AllowedAssemblyNames);
+
+            bool forbidden = context.HasForbiddenExpectation && IsAllowedLocation(
+                actualNamespace, actualAssemblyName, context.ForbiddenLayers, contract.ForbiddenInNamespaces, context.ForbiddenAssemblyNames);
+
+            if (!misplaced && !forbidden)
+            {
+                continue;
+            }
+
+            if (context.ExecutionContext.IsIgnored(match.SourceIdentifier, match.MatchedAttribute))
+            {
+                continue;
+            }
+
+            string attributeUsageKind = forbidden ? "forbidden" : "misplaced";
+            string? expectedAttributeLocation = misplaced && !forbidden ? context.ExpectedAllowedOnlyLocation : null;
+
+            violations.Add(new ArchitectureViolation(
+                contract.Name,
+                contract.Id,
+                match.SourceIdentifier,
+                match.MatchedAttribute,
+                new[] { actualLocationDescription })
+            {
+                Payload = new AttributeUsagePayload(
+                    MatchedAttribute: match.MatchedAttribute,
+                    AttributeUsageKind: attributeUsageKind,
+                    ActualAttributeLocation: actualLocationDescription,
+                    ExpectedAttributeLocation: expectedAttributeLocation)
+            });
+        }
+    }
+
+    private sealed record AttributeUsageCollectionContext(
+        List<ArchitectureLayer> AllowedLayers,
+        HashSet<string> AllowedAssemblyNames,
+        bool HasAllowedOnlyExpectation,
+        List<ArchitectureLayer> ForbiddenLayers,
+        HashSet<string> ForbiddenAssemblyNames,
+        bool HasForbiddenExpectation,
+        string ExpectedAllowedOnlyLocation,
+        ArchitectureContractExecutionContext ExecutionContext);
 
     private static string DescribeAllowedOnlyLocation(ArchitectureAttributeUsageContract contract)
     {

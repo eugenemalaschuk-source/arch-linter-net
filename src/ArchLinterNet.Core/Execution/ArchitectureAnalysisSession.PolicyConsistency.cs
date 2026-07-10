@@ -7,6 +7,9 @@ namespace ArchLinterNet.Core.Execution;
 
 public sealed partial class ArchitectureAnalysisSession
 {
+    private const string StrictMode = "strict";
+    private const string AuditMode = "audit";
+
     public List<PolicyConsistencyDiagnostic> CheckPolicyConsistency()
     {
         List<PolicyConsistencyDiagnostic> findings = new();
@@ -44,48 +47,48 @@ public sealed partial class ArchitectureAnalysisSession
 
         ArchitectureContractGroups groups = Document.Contracts;
 
-        AddGroup("strict", "strict", "dependency", groups.Strict);
-        AddGroup("audit", "audit", "dependency", groups.Audit);
-        AddGroup("strict_layers", "strict", "layer", groups.StrictLayers);
-        AddGroup("audit_layers", "audit", "layer", groups.AuditLayers);
-        AddGroup("strict_allow_only", "strict", "allow_only", groups.StrictAllowOnly);
-        AddGroup("audit_allow_only", "audit", "allow_only", groups.AuditAllowOnly);
-        AddGroup("strict_cycles", "strict", "cycle", groups.StrictCycles);
-        AddGroup("audit_cycles", "audit", "cycle", groups.AuditCycles);
-        AddGroup("strict_acyclic_siblings", "strict", "acyclic_sibling", groups.StrictAcyclicSiblings);
-        AddGroup("audit_acyclic_siblings", "audit", "acyclic_sibling", groups.AuditAcyclicSiblings);
-        AddGroup("strict_method_body", "strict", "method_body", groups.StrictMethodBody);
-        AddGroup("audit_method_body", "audit", "method_body", groups.AuditMethodBody);
-        AddGroup("strict_independence", "strict", "independence", groups.StrictIndependence);
-        AddGroup("audit_independence", "audit", "independence", groups.AuditIndependence);
-        AddGroup("strict_protected", "strict", "protected", groups.StrictProtected);
-        AddGroup("audit_protected", "audit", "protected", groups.AuditProtected);
-        AddGroup("strict_external", "strict", "external", groups.StrictExternal);
-        AddGroup("audit_external", "audit", "external", groups.AuditExternal);
-        AddGroup("strict_external_allow_only", "strict", "external_allow_only", groups.StrictExternalAllowOnly);
-        AddGroup("audit_external_allow_only", "audit", "external_allow_only", groups.AuditExternalAllowOnly);
-        AddGroup("strict_asmdef", "strict", "asmdef", groups.StrictAsmdef);
-        AddGroup("audit_asmdef", "audit", "asmdef", groups.AuditAsmdef);
-        AddGroup("strict_type_placement", "strict", "type_placement", groups.StrictTypePlacement);
-        AddGroup("audit_type_placement", "audit", "type_placement", groups.AuditTypePlacement);
-        AddGroup("strict_attribute_usage", "strict", "attribute_usage", groups.StrictAttributeUsage);
-        AddGroup("audit_attribute_usage", "audit", "attribute_usage", groups.AuditAttributeUsage);
-        AddGroup("strict_inheritance", "strict", "inheritance", groups.StrictInheritance);
-        AddGroup("audit_inheritance", "audit", "inheritance", groups.AuditInheritance);
-        AddGroup("strict_interface_implementation", "strict", "interface_implementation", groups.StrictInterfaceImplementation);
-        AddGroup("audit_interface_implementation", "audit", "interface_implementation", groups.AuditInterfaceImplementation);
-        AddGroup("strict_composition", "strict", "composition", groups.StrictComposition);
-        AddGroup("audit_composition", "audit", "composition", groups.AuditComposition);
+        AddGroup("strict", StrictMode, "dependency", groups.Strict);
+        AddGroup("audit", AuditMode, "dependency", groups.Audit);
+        AddGroup("strict_layers", StrictMode, "layer", groups.StrictLayers);
+        AddGroup("audit_layers", AuditMode, "layer", groups.AuditLayers);
+        AddGroup("strict_allow_only", StrictMode, "allow_only", groups.StrictAllowOnly);
+        AddGroup("audit_allow_only", AuditMode, "allow_only", groups.AuditAllowOnly);
+        AddGroup("strict_cycles", StrictMode, "cycle", groups.StrictCycles);
+        AddGroup("audit_cycles", AuditMode, "cycle", groups.AuditCycles);
+        AddGroup("strict_acyclic_siblings", StrictMode, "acyclic_sibling", groups.StrictAcyclicSiblings);
+        AddGroup("audit_acyclic_siblings", AuditMode, "acyclic_sibling", groups.AuditAcyclicSiblings);
+        AddGroup("strict_method_body", StrictMode, "method_body", groups.StrictMethodBody);
+        AddGroup("audit_method_body", AuditMode, "method_body", groups.AuditMethodBody);
+        AddGroup("strict_independence", StrictMode, "independence", groups.StrictIndependence);
+        AddGroup("audit_independence", AuditMode, "independence", groups.AuditIndependence);
+        AddGroup("strict_protected", StrictMode, "protected", groups.StrictProtected);
+        AddGroup("audit_protected", AuditMode, "protected", groups.AuditProtected);
+        AddGroup("strict_external", StrictMode, "external", groups.StrictExternal);
+        AddGroup("audit_external", AuditMode, "external", groups.AuditExternal);
+        AddGroup("strict_external_allow_only", StrictMode, "external_allow_only", groups.StrictExternalAllowOnly);
+        AddGroup("audit_external_allow_only", AuditMode, "external_allow_only", groups.AuditExternalAllowOnly);
+        AddGroup("strict_asmdef", StrictMode, "asmdef", groups.StrictAsmdef);
+        AddGroup("audit_asmdef", AuditMode, "asmdef", groups.AuditAsmdef);
+        AddGroup("strict_type_placement", StrictMode, "type_placement", groups.StrictTypePlacement);
+        AddGroup("audit_type_placement", AuditMode, "type_placement", groups.AuditTypePlacement);
+        AddGroup("strict_attribute_usage", StrictMode, "attribute_usage", groups.StrictAttributeUsage);
+        AddGroup("audit_attribute_usage", AuditMode, "attribute_usage", groups.AuditAttributeUsage);
+        AddGroup("strict_inheritance", StrictMode, "inheritance", groups.StrictInheritance);
+        AddGroup("audit_inheritance", AuditMode, "inheritance", groups.AuditInheritance);
+        AddGroup("strict_interface_implementation", StrictMode, "interface_implementation", groups.StrictInterfaceImplementation);
+        AddGroup("audit_interface_implementation", AuditMode, "interface_implementation", groups.AuditInterfaceImplementation);
+        AddGroup("strict_composition", StrictMode, "composition", groups.StrictComposition);
+        AddGroup("audit_composition", AuditMode, "composition", groups.AuditComposition);
 
-        AddGroup("strict_layer_templates", "strict", "layer_template",
+        AddGroup("strict_layer_templates", StrictMode, "layer_template",
             LayerTemplateExpander.Expand(groups.StrictLayerTemplates));
-        AddGroup("audit_layer_templates", "audit", "layer_template",
+        AddGroup("audit_layer_templates", AuditMode, "layer_template",
             LayerTemplateExpander.Expand(groups.AuditLayerTemplates));
 
         return descriptors;
     }
 
-    private List<PolicyConsistencyDiagnostic> FindDuplicateContractIds(
+    private static List<PolicyConsistencyDiagnostic> FindDuplicateContractIds(
         List<ArchitectureContractDescriptor> descriptors)
     {
         List<PolicyConsistencyDiagnostic> findings = new();
@@ -120,27 +123,12 @@ public sealed partial class ArchitectureAnalysisSession
 
     private List<PolicyConsistencyDiagnostic> FindAllowForbidConflicts()
     {
-        List<PolicyConsistencyDiagnostic> findings = new();
+        List<(string Source, string Target, ArchitectureDependencyContract Contract)> forbidPairs =
+            BuildForbidPairs();
+        List<(string Source, string Target, ArchitectureAllowOnlyContract Contract)> allowPairs =
+            BuildAllowPairs();
 
-        var forbidPairs = new List<(string Source, string Target, ArchitectureDependencyContract Contract)>();
-        foreach (ArchitectureDependencyContract c in Document.Contracts.Strict.Concat(Document.Contracts.Audit))
-        {
-            foreach (string target in c.Forbidden)
-            {
-                forbidPairs.Add((c.Source, target, c));
-            }
-        }
-
-        var allowPairs = new List<(string Source, string Target, ArchitectureAllowOnlyContract Contract)>();
-        foreach (ArchitectureAllowOnlyContract c in Document.Contracts.StrictAllowOnly.Concat(Document.Contracts.AuditAllowOnly))
-        {
-            foreach (string target in c.Allowed)
-            {
-                allowPairs.Add((c.Source, target, c));
-            }
-        }
-
-        var conflicts = new List<PolicyConsistencyDiagnostic>();
+        List<PolicyConsistencyDiagnostic> conflicts = new();
 
         foreach (var allow in allowPairs)
         {
@@ -152,20 +140,7 @@ public sealed partial class ArchitectureAnalysisSession
                     continue;
                 }
 
-                List<string> conflictNames = new() { allow.Contract.Name, forbid.Contract.Name };
-                List<string> conflictIds = new();
-                if (allow.Contract.Id != null) conflictIds.Add(allow.Contract.Id);
-                if (forbid.Contract.Id != null) conflictIds.Add(forbid.Contract.Id);
-
-                conflicts.Add(new PolicyConsistencyDiagnostic(
-                    allow.Contract.Name,
-                    allow.Contract.Id,
-                    "allow-forbid-conflict",
-                    $"Allow-only contract '{allow.Contract.Name}' allows '{allow.Source} -> {allow.Target}' " +
-                    $"while contract '{forbid.Contract.Name}' forbids the same dependency.",
-                    conflictIds,
-                    conflictNames,
-                    new[] { allow.Source, allow.Target }));
+                conflicts.Add(CreateAllowForbidConflict(allow, forbid));
             }
         }
 
@@ -175,40 +150,129 @@ public sealed partial class ArchitectureAnalysisSession
             .ToList();
     }
 
-    private List<PolicyConsistencyDiagnostic> FindIndependenceConflicts()
+    private List<(string Source, string Target, ArchitectureDependencyContract Contract)> BuildForbidPairs()
     {
-        List<PolicyConsistencyDiagnostic> findings = new();
+        List<(string Source, string Target, ArchitectureDependencyContract Contract)> forbidPairs = new();
 
-        var independenceContracts = Document.Contracts.StrictIndependence
-            .Concat(Document.Contracts.AuditIndependence)
-            .ToList();
+        foreach (ArchitectureDependencyContract c in Document.Contracts.Strict.Concat(Document.Contracts.Audit))
+        {
+            foreach (string target in c.Forbidden)
+            {
+                forbidPairs.Add((c.Source, target, c));
+            }
+        }
 
-        // Dependency contracts only express forbidding, so they are not a source of "explicit
-        // allow" pairs; allow-only and ordered layer contracts are the explicit-allow sources.
-        var explicitDependencyPairs = new List<(string Source, string Target, string Name, string? Id)>();
+        return forbidPairs;
+    }
+
+    private List<(string Source, string Target, ArchitectureAllowOnlyContract Contract)> BuildAllowPairs()
+    {
+        List<(string Source, string Target, ArchitectureAllowOnlyContract Contract)> allowPairs = new();
 
         foreach (ArchitectureAllowOnlyContract c in Document.Contracts.StrictAllowOnly.Concat(Document.Contracts.AuditAllowOnly))
         {
             foreach (string target in c.Allowed)
             {
-                explicitDependencyPairs.Add((c.Source, target, c.Name, c.Id));
+                allowPairs.Add((c.Source, target, c));
             }
         }
 
+        return allowPairs;
+    }
+
+    private static PolicyConsistencyDiagnostic CreateAllowForbidConflict(
+        (string Source, string Target, ArchitectureAllowOnlyContract Contract) allow,
+        (string Source, string Target, ArchitectureDependencyContract Contract) forbid)
+    {
+        List<string> conflictNames = new() { allow.Contract.Name, forbid.Contract.Name };
+        List<string> conflictIds = new();
+        if (allow.Contract.Id != null) conflictIds.Add(allow.Contract.Id);
+        if (forbid.Contract.Id != null) conflictIds.Add(forbid.Contract.Id);
+
+        return new PolicyConsistencyDiagnostic(
+            allow.Contract.Name,
+            allow.Contract.Id,
+            "allow-forbid-conflict",
+            $"Allow-only contract '{allow.Contract.Name}' allows '{allow.Source} -> {allow.Target}' " +
+            $"while contract '{forbid.Contract.Name}' forbids the same dependency.",
+            conflictIds,
+            conflictNames,
+            new[] { allow.Source, allow.Target });
+    }
+
+    private List<PolicyConsistencyDiagnostic> FindIndependenceConflicts()
+    {
+        List<ArchitectureIndependenceContract> independenceContracts = Document.Contracts.StrictIndependence
+            .Concat(Document.Contracts.AuditIndependence)
+            .ToList();
+
+        List<(string Source, string Target, string Name, string? Id)> explicitDependencyPairs =
+            BuildExplicitDependencyPairs();
+
+        List<PolicyConsistencyDiagnostic> conflicts = new();
+
+        foreach (ArchitectureIndependenceContract independence in independenceContracts)
+        {
+            conflicts.AddRange(FindIndependenceConflictsFor(independence, explicitDependencyPairs));
+        }
+
+        return conflicts
+            .OrderBy(f => f.ContractName, StringComparer.Ordinal)
+            .ThenBy(f => string.Join(",", f.Layers), StringComparer.Ordinal)
+            .ToList();
+    }
+
+    private List<(string Source, string Target, string Name, string? Id)> BuildExplicitDependencyPairs()
+    {
+        // Dependency contracts only express forbidding, so they are not a source of "explicit
+        // allow" pairs; allow-only and ordered layer contracts are the explicit-allow sources.
+        List<(string Source, string Target, string Name, string? Id)> pairs = new();
+
+        pairs.AddRange(CollectAllowOnlyDependencyPairs());
+        pairs.AddRange(CollectLayerContractDependencyPairs());
+        pairs.AddRange(CollectExpandedTemplateDependencyPairs());
+
+        return pairs;
+    }
+
+    private List<(string Source, string Target, string Name, string? Id)> CollectAllowOnlyDependencyPairs()
+    {
+        List<(string Source, string Target, string Name, string? Id)> pairs = new();
+
+        foreach (ArchitectureAllowOnlyContract c in Document.Contracts.StrictAllowOnly.Concat(Document.Contracts.AuditAllowOnly))
+        {
+            foreach (string target in c.Allowed)
+            {
+                pairs.Add((c.Source, target, c.Name, c.Id));
+            }
+        }
+
+        return pairs;
+    }
+
+    private List<(string Source, string Target, string Name, string? Id)> CollectLayerContractDependencyPairs()
+    {
+        // Ordered layer contracts express an explicit allowed/ordered dependency between
+        // consecutive layers (later layers may depend on earlier ones). Their `Layers`
+        // entries are already named top-level layer keys, same as independence.Layers.
+        List<(string Source, string Target, string Name, string? Id)> pairs = new();
+
         foreach (ArchitectureLayerContract c in Document.Contracts.StrictLayers.Concat(Document.Contracts.AuditLayers))
         {
-            // Ordered layer contracts express an explicit allowed/ordered dependency between
-            // consecutive layers (later layers may depend on earlier ones). Their `Layers`
-            // entries are already named top-level layer keys, same as independence.Layers.
             for (int i = 0; i < c.Layers.Count; i++)
             {
                 for (int j = 0; j < i; j++)
                 {
-                    explicitDependencyPairs.Add((c.Layers[i], c.Layers[j], c.Name, c.Id));
+                    pairs.Add((c.Layers[i], c.Layers[j], c.Name, c.Id));
                 }
             }
         }
 
+        return pairs;
+    }
+
+    private List<(string Source, string Target, string Name, string? Id)> CollectExpandedTemplateDependencyPairs()
+    {
         // Expanded layer templates produce the same kind of ordered contract, but their `Layers`
         // entries are concrete container namespaces (e.g. "MyApp.Feature.Domain"), not named
         // layer keys. Resolve each one back to the named top-level layer it belongs to before
@@ -218,6 +282,8 @@ public sealed partial class ArchitectureAnalysisSession
         IEnumerable<ArchitectureLayerContract> expandedTemplateContracts =
             LayerTemplateExpander.Expand(Document.Contracts.StrictLayerTemplates)
                 .Concat(LayerTemplateExpander.Expand(Document.Contracts.AuditLayerTemplates));
+
+        List<(string Source, string Target, string Name, string? Id)> pairs = new();
 
         foreach (ArchitectureLayerContract c in expandedTemplateContracts)
         {
@@ -239,180 +305,72 @@ public sealed partial class ArchitectureAnalysisSession
                         continue;
                     }
 
-                    explicitDependencyPairs.Add((resolvedLayers[i]!, resolvedLayers[j]!, c.Name, c.Id));
+                    pairs.Add((resolvedLayers[i]!, resolvedLayers[j]!, c.Name, c.Id));
                 }
             }
         }
 
-        List<PolicyConsistencyDiagnostic> conflicts = new();
-
-        foreach (ArchitectureIndependenceContract independence in independenceContracts)
-        {
-            HashSet<string> independenceLayers = new(independence.Layers, StringComparer.Ordinal);
-
-            foreach (var dep in explicitDependencyPairs)
-            {
-                if (!independenceLayers.Contains(dep.Source) || !independenceLayers.Contains(dep.Target))
-                {
-                    continue;
-                }
-
-                if (string.Equals(dep.Source, dep.Target, StringComparison.Ordinal))
-                {
-                    continue;
-                }
-
-                List<string> conflictNames = new() { independence.Name, dep.Name };
-                List<string> conflictIds = new();
-                if (independence.Id != null) conflictIds.Add(independence.Id);
-                if (dep.Id != null) conflictIds.Add(dep.Id);
-
-                conflicts.Add(new PolicyConsistencyDiagnostic(
-                    independence.Name,
-                    independence.Id,
-                    "independence-conflict",
-                    $"Independence contract '{independence.Name}' requires layers '{dep.Source}' and '{dep.Target}' " +
-                    $"to be mutually independent, but contract '{dep.Name}' explicitly allows or orders a dependency between them.",
-                    conflictIds,
-                    conflictNames,
-                    new[] { dep.Source, dep.Target }));
-            }
-        }
-
-        return conflicts
-            .OrderBy(f => f.ContractName, StringComparer.Ordinal)
-            .ThenBy(f => string.Join(",", f.Layers), StringComparer.Ordinal)
-            .ToList();
+        return pairs;
     }
 
-    private List<PolicyConsistencyDiagnostic> FindProtectedImporterConflicts()
+    private static List<PolicyConsistencyDiagnostic> FindIndependenceConflictsFor(
+        ArchitectureIndependenceContract independence,
+        List<(string Source, string Target, string Name, string? Id)> explicitDependencyPairs)
     {
-        List<PolicyConsistencyDiagnostic> findings = new();
-
-        var protectedContracts = Document.Contracts.StrictProtected
-            .Concat(Document.Contracts.AuditProtected)
-            .ToList();
-
-        // Strict forbidden/protected rules that forbid an importer for the same surface:
-        // a dependency contract forbidding `importer -> protectedSurface`, or another
-        // protected contract over the same surface that does NOT list the importer as allowed.
-        var forbiddingDependencies = new List<(string Source, string Target, string Name, string? Id)>();
-        foreach (ArchitectureDependencyContract c in Document.Contracts.Strict.Concat(Document.Contracts.Audit))
-        {
-            foreach (string target in c.Forbidden)
-            {
-                forbiddingDependencies.Add((c.Source, target, c.Name, c.Id));
-            }
-        }
-
+        HashSet<string> independenceLayers = new(independence.Layers, StringComparer.Ordinal);
         List<PolicyConsistencyDiagnostic> conflicts = new();
 
-        foreach (ArchitectureProtectedContract protectedContract in protectedContracts)
+        foreach (var dep in explicitDependencyPairs)
         {
-            foreach (string protectedSurface in protectedContract.Protected)
+            if (!independenceLayers.Contains(dep.Source) || !independenceLayers.Contains(dep.Target))
             {
-                foreach (string allowedImporter in protectedContract.AllowedImporters)
-                {
-                    foreach (var dep in forbiddingDependencies)
-                    {
-                        if (!string.Equals(dep.Source, allowedImporter, StringComparison.Ordinal)
-                            || !string.Equals(dep.Target, protectedSurface, StringComparison.Ordinal))
-                        {
-                            continue;
-                        }
-
-                        List<string> conflictNames = new() { protectedContract.Name, dep.Name };
-                        List<string> conflictIds = new();
-                        if (protectedContract.Id != null) conflictIds.Add(protectedContract.Id);
-                        if (dep.Id != null) conflictIds.Add(dep.Id);
-
-                        conflicts.Add(new PolicyConsistencyDiagnostic(
-                            protectedContract.Name,
-                            protectedContract.Id,
-                            "protected-importer-conflict",
-                            $"Protected contract '{protectedContract.Name}' allows '{allowedImporter}' to import " +
-                            $"protected surface '{protectedSurface}', but contract '{dep.Name}' forbids that same import.",
-                            conflictIds,
-                            conflictNames,
-                            new[] { protectedSurface, allowedImporter }));
-                    }
-                }
+                continue;
             }
+
+            if (string.Equals(dep.Source, dep.Target, StringComparison.Ordinal))
+            {
+                continue;
+            }
+
+            conflicts.Add(CreateIndependenceConflict(independence, dep));
         }
 
-        // Protected contracts are exhaustive allow-lists: any importer not listed in
-        // AllowedImporters is implicitly forbidden from referencing the protected surface.
-        // Two protected contracts guarding the same surface with different AllowedImporters
-        // sets are therefore in direct conflict over any importer one allows and the other omits.
-        for (int i = 0; i < protectedContracts.Count; i++)
-        {
-            for (int j = 0; j < protectedContracts.Count; j++)
-            {
-                if (i == j)
-                {
-                    continue;
-                }
+        return conflicts;
+    }
 
-                ArchitectureProtectedContract allowing = protectedContracts[i];
-                ArchitectureProtectedContract forbidding = protectedContracts[j];
+    private static PolicyConsistencyDiagnostic CreateIndependenceConflict(
+        ArchitectureIndependenceContract independence,
+        (string Source, string Target, string Name, string? Id) dep)
+    {
+        List<string> conflictNames = new() { independence.Name, dep.Name };
+        List<string> conflictIds = new();
+        if (independence.Id != null) conflictIds.Add(independence.Id);
+        if (dep.Id != null) conflictIds.Add(dep.Id);
 
-                if (allowing.Id != null && string.Equals(allowing.Id, forbidding.Id, StringComparison.OrdinalIgnoreCase))
-                {
-                    continue;
-                }
-
-                IEnumerable<string> sharedSurfaces = allowing.Protected.Intersect(forbidding.Protected, StringComparer.Ordinal);
-
-                foreach (string protectedSurface in sharedSurfaces)
-                {
-                    foreach (string allowedImporter in allowing.AllowedImporters)
-                    {
-                        if (forbidding.AllowedImporters.Contains(allowedImporter, StringComparer.Ordinal)
-                            || string.Equals(allowedImporter, protectedSurface, StringComparison.Ordinal))
-                        {
-                            continue;
-                        }
-
-                        List<string> conflictNames = new() { allowing.Name, forbidding.Name };
-                        List<string> conflictIds = new();
-                        if (allowing.Id != null) conflictIds.Add(allowing.Id);
-                        if (forbidding.Id != null) conflictIds.Add(forbidding.Id);
-
-                        conflicts.Add(new PolicyConsistencyDiagnostic(
-                            allowing.Name,
-                            allowing.Id,
-                            "protected-importer-conflict",
-                            $"Protected contract '{allowing.Name}' allows '{allowedImporter}' to import " +
-                            $"protected surface '{protectedSurface}', but protected contract '{forbidding.Name}' " +
-                            "guards the same surface without listing that importer as allowed.",
-                            conflictIds,
-                            conflictNames,
-                            new[] { protectedSurface, allowedImporter }));
-                    }
-                }
-            }
-        }
-
-        return conflicts
-            .OrderBy(f => f.ContractName, StringComparer.Ordinal)
-            .ThenBy(f => string.Join(",", f.Layers), StringComparer.Ordinal)
-            .ToList();
+        return new PolicyConsistencyDiagnostic(
+            independence.Name,
+            independence.Id,
+            "independence-conflict",
+            $"Independence contract '{independence.Name}' requires layers '{dep.Source}' and '{dep.Target}' " +
+            $"to be mutually independent, but contract '{dep.Name}' explicitly allows or orders a dependency between them.",
+            conflictIds,
+            conflictNames,
+            new[] { dep.Source, dep.Target });
     }
 
     private List<PolicyConsistencyDiagnostic> FindLayerOverlaps()
     {
-        List<PolicyConsistencyDiagnostic> findings = new();
-
-        var internalLayers = Document.Layers
+        List<KeyValuePair<string, ArchitectureLayer>> internalLayers = Document.Layers
             .Where(kvp => !kvp.Value.External)
             .OrderBy(kvp => kvp.Key, StringComparer.Ordinal)
             .ToList();
 
         if (internalLayers.Count < 2)
         {
-            return findings;
+            return new List<PolicyConsistencyDiagnostic>();
         }
 
+        List<PolicyConsistencyDiagnostic> findings = new();
         HashSet<(string, string)> reportedPairs = new();
 
         foreach (System.Reflection.Assembly assembly in Context.TargetAssemblies.Distinct().OrderBy(a => a.FullName, StringComparer.Ordinal))
@@ -420,62 +378,90 @@ public sealed partial class ArchitectureAnalysisSession
             foreach (Type type in ArchitectureTypeScanner.GetLoadableTypes(assembly)
                 .OrderBy(t => ArchitectureTypeNames.SafeFullName(t), StringComparer.Ordinal))
             {
-                string ns = ArchitectureTypeNames.SafeNamespace(type);
-                if (string.IsNullOrEmpty(ns))
-                {
-                    continue;
-                }
-
-                List<string> matchedLayers = internalLayers
-                    .Where(kvp => ArchitectureLayerResolver.MatchesNamespace(kvp.Value, ns))
-                    .Select(kvp => kvp.Key)
-                    .ToList();
-
-                if (matchedLayers.Count < 2)
-                {
-                    continue;
-                }
-
-                for (int i = 0; i < matchedLayers.Count; i++)
-                {
-                    for (int j = i + 1; j < matchedLayers.Count; j++)
-                    {
-                        if (IsContainmentRelationship(internalLayers, matchedLayers[i], matchedLayers[j]))
-                        {
-                            // One layer is a namespace-prefix container of the other (e.g. a coarse
-                            // "core" layer and a nested "core_execution" sub-layer). This is an
-                            // intentional hierarchy, not a contradiction, so it is not flagged.
-                            continue;
-                        }
-
-                        (string, string) pairKey = (matchedLayers[i], matchedLayers[j]);
-                        if (!reportedPairs.Add(pairKey))
-                        {
-                            continue;
-                        }
-
-                        string representativeType = ArchitectureTypeNames.SafeFullName(type);
-
-                        findings.Add(new PolicyConsistencyDiagnostic(
-                            "<policy-consistency>",
-                            null,
-                            "layer-overlap",
-                            $"Layers '{matchedLayers[i]}' and '{matchedLayers[j]}' both match type '{representativeType}' " +
-                            "without an explicit documented allowance.",
-                            Array.Empty<string>(),
-                            Array.Empty<string>(),
-                            new[] { matchedLayers[i], matchedLayers[j] })
-                        {
-                            RepresentativeType = representativeType
-                        });
-                    }
-                }
+                findings.AddRange(FindLayerOverlapsForType(type, internalLayers, reportedPairs));
             }
         }
 
         return findings
             .OrderBy(f => string.Join(",", f.Layers), StringComparer.Ordinal)
             .ToList();
+    }
+
+    private static List<PolicyConsistencyDiagnostic> FindLayerOverlapsForType(
+        Type type,
+        List<KeyValuePair<string, ArchitectureLayer>> internalLayers,
+        HashSet<(string, string)> reportedPairs)
+    {
+        string ns = ArchitectureTypeNames.SafeNamespace(type);
+        if (string.IsNullOrEmpty(ns))
+        {
+            return new List<PolicyConsistencyDiagnostic>();
+        }
+
+        List<string> matchedLayers = internalLayers
+            .Where(kvp => ArchitectureLayerResolver.MatchesNamespace(kvp.Value, ns))
+            .Select(kvp => kvp.Key)
+            .ToList();
+
+        if (matchedLayers.Count < 2)
+        {
+            return new List<PolicyConsistencyDiagnostic>();
+        }
+
+        List<PolicyConsistencyDiagnostic> findings = new();
+
+        for (int i = 0; i < matchedLayers.Count; i++)
+        {
+            for (int j = i + 1; j < matchedLayers.Count; j++)
+            {
+                PolicyConsistencyDiagnostic? finding = TryCreateLayerOverlapFinding(
+                    type, internalLayers, matchedLayers[i], matchedLayers[j], reportedPairs);
+
+                if (finding != null)
+                {
+                    findings.Add(finding);
+                }
+            }
+        }
+
+        return findings;
+    }
+
+    private static PolicyConsistencyDiagnostic? TryCreateLayerOverlapFinding(
+        Type type,
+        List<KeyValuePair<string, ArchitectureLayer>> internalLayers,
+        string layerNameA,
+        string layerNameB,
+        HashSet<(string, string)> reportedPairs)
+    {
+        if (IsContainmentRelationship(internalLayers, layerNameA, layerNameB))
+        {
+            // One layer is a namespace-prefix container of the other (e.g. a coarse
+            // "core" layer and a nested "core_execution" sub-layer). This is an
+            // intentional hierarchy, not a contradiction, so it is not flagged.
+            return null;
+        }
+
+        (string, string) pairKey = (layerNameA, layerNameB);
+        if (!reportedPairs.Add(pairKey))
+        {
+            return null;
+        }
+
+        string representativeType = ArchitectureTypeNames.SafeFullName(type);
+
+        return new PolicyConsistencyDiagnostic(
+            "<policy-consistency>",
+            null,
+            "layer-overlap",
+            $"Layers '{layerNameA}' and '{layerNameB}' both match type '{representativeType}' " +
+            "without an explicit documented allowance.",
+            Array.Empty<string>(),
+            Array.Empty<string>(),
+            new[] { layerNameA, layerNameB })
+        {
+            RepresentativeType = representativeType
+        };
     }
 
     private static bool IsContainmentRelationship(
@@ -513,14 +499,9 @@ public sealed partial class ArchitectureAnalysisSession
     {
         List<PolicyConsistencyDiagnostic> findings = new();
 
-        HashSet<string> unreachableLayerNames = new(StringComparer.Ordinal);
-        foreach (var kvp in Document.Layers)
-        {
-            if (IsStructurallyUnreachable(kvp.Value))
-            {
-                unreachableLayerNames.Add(kvp.Key);
-            }
-        }
+        HashSet<string> unreachableLayerNames = new(
+            Document.Layers.Where(kvp => IsStructurallyUnreachable(kvp.Value)).Select(kvp => kvp.Key),
+            StringComparer.Ordinal);
 
         if (unreachableLayerNames.Count == 0)
         {

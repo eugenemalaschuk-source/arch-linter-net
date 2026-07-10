@@ -35,6 +35,9 @@ public sealed partial class ArchitectureAnalysisSession
 
         string expectedLocationDescription = DescribeExpectedLocation(contract);
         string expectedNameDescription = DescribeExpectedName(contract);
+        var context = new TypePlacementCollectionContext(
+            allowedLayers, allowedAssemblyNames, hasPlacementExpectation,
+            expectedLocationDescription, expectedNameDescription, executionContext);
 
         Type[] candidateTypes = TypeIndex.AllTypes()
             .Where(type => ArchitectureTypeRoleMatcher.Matches(type, contract.TypesMatching, Document, contract.Name))
@@ -43,57 +46,78 @@ public sealed partial class ArchitectureAnalysisSession
 
         foreach (Type type in candidateTypes)
         {
-            string sourceType = ArchitectureTypeNames.SafeFullName(type);
-            string actualNamespace = ArchitectureTypeNames.SafeNamespace(type);
-            string actualAssemblyName = type.Assembly.GetName().Name ?? string.Empty;
-
-            bool placementOk = !hasPlacementExpectation || IsAllowedLocation(
-                actualNamespace, actualAssemblyName, allowedLayers, contract.MustResideInNamespaces, allowedAssemblyNames);
-
-            bool namingOk = IsNamingSatisfied(type.Name, contract);
-
-            if (placementOk && namingOk)
-            {
-                continue;
-            }
-
-            string? expectedTypeLocation = !placementOk ? expectedLocationDescription : null;
-            string? actualTypeLocation = !placementOk ? $"namespace:{actualNamespace} (assembly {actualAssemblyName})" : null;
-            string? expectedTypeName = !namingOk ? expectedNameDescription : null;
-            string? actualTypeName = !namingOk ? type.Name : null;
-
-            string forbiddenReference = actualTypeLocation ?? actualTypeName ?? sourceType;
-
-            if (executionContext.IsIgnored(sourceType, forbiddenReference))
-            {
-                continue;
-            }
-
-            violations.Add(new ArchitectureViolation(
-                contract.Name,
-                contract.Id,
-                sourceType,
-                expectedTypeLocation ?? expectedTypeName ?? string.Empty,
-                new[] { forbiddenReference })
-            {
-                Payload = new TypePlacementPayload(
-                    ExpectedTypeLocation: expectedTypeLocation,
-                    ActualTypeLocation: actualTypeLocation,
-                    ExpectedTypeName: expectedTypeName,
-                    ActualTypeName: actualTypeName)
-            });
+            TryAddTypePlacementViolation(
+                type,
+                contract,
+                context,
+                violations);
         }
 
         executionContext.CollectUnmatchedIgnores(_unmatchedIgnoredViolations);
         return violations;
     }
 
+    private static void TryAddTypePlacementViolation(
+        Type type,
+        ArchitectureTypePlacementContract contract,
+        TypePlacementCollectionContext context,
+        List<ArchitectureViolation> violations)
+    {
+        string sourceType = ArchitectureTypeNames.SafeFullName(type);
+        string actualNamespace = ArchitectureTypeNames.SafeNamespace(type);
+        string actualAssemblyName = type.Assembly.GetName().Name ?? string.Empty;
+
+        bool placementOk = !context.HasPlacementExpectation || IsAllowedLocation(
+            actualNamespace, actualAssemblyName, context.AllowedLayers, contract.MustResideInNamespaces, context.AllowedAssemblyNames);
+
+        bool namingOk = IsNamingSatisfied(type.Name, contract);
+
+        if (placementOk && namingOk)
+        {
+            return;
+        }
+
+        string? expectedTypeLocation = !placementOk ? context.ExpectedLocationDescription : null;
+        string? actualTypeLocation = !placementOk ? $"namespace:{actualNamespace} (assembly {actualAssemblyName})" : null;
+        string? expectedTypeName = !namingOk ? context.ExpectedNameDescription : null;
+        string? actualTypeName = !namingOk ? type.Name : null;
+
+        string forbiddenReference = actualTypeLocation ?? actualTypeName ?? sourceType;
+
+        if (context.ExecutionContext.IsIgnored(sourceType, forbiddenReference))
+        {
+            return;
+        }
+
+        violations.Add(new ArchitectureViolation(
+            contract.Name,
+            contract.Id,
+            sourceType,
+            expectedTypeLocation ?? expectedTypeName ?? string.Empty,
+            new[] { forbiddenReference })
+        {
+            Payload = new TypePlacementPayload(
+                ExpectedTypeLocation: expectedTypeLocation,
+                ActualTypeLocation: actualTypeLocation,
+                ExpectedTypeName: expectedTypeName,
+                ActualTypeName: actualTypeName)
+        });
+    }
+
+    private sealed record TypePlacementCollectionContext(
+        List<ArchitectureLayer> AllowedLayers,
+        HashSet<string> AllowedAssemblyNames,
+        bool HasPlacementExpectation,
+        string ExpectedLocationDescription,
+        string ExpectedNameDescription,
+        ArchitectureContractExecutionContext ExecutionContext);
+
     private static bool IsAllowedLocation(
         string actualNamespace,
         string actualAssemblyName,
         IReadOnlyList<ArchitectureLayer> allowedLayers,
         IReadOnlyList<string> allowedNamespacePrefixes,
-        IReadOnlySet<string> allowedAssemblyNames)
+        HashSet<string> allowedAssemblyNames)
     {
         if (allowedLayers.Any(layer => ArchitectureLayerResolver.MatchesNamespace(layer, actualNamespace)))
         {
@@ -194,7 +218,7 @@ public sealed partial class ArchitectureAnalysisSession
     // name). A project name that doesn't match any discovered project contributes no assembly name,
     // which is fail-closed (never widens what's allowed), consistent with how other allow-only
     // contracts treat an unresolvable name.
-    private IEnumerable<string> ResolveProjectAssemblyNames(IReadOnlyList<string> projectNames)
+    private IEnumerable<string> ResolveProjectAssemblyNames(List<string> projectNames)
     {
         if (projectNames.Count == 0)
         {

@@ -47,55 +47,51 @@ public sealed class ArchitectureValidationResult
 
     public void ShouldPass()
     {
-        if (!Passed)
+        if (Passed)
         {
-            string violationDetails = Violations.Count > 0
-                ? _formatter.FormatViolationsForHumans(Violations)
-                : string.Empty;
-
-            string cycleDetails = Cycles.Count > 0
-                ? _formatter.FormatCyclesForHumans(Cycles)
-                : string.Empty;
-
-            string policyConsistencyDetails = PolicyConsistencyFindings.Count > 0
-                ? _formatter.FormatPolicyConsistencyForHumans(PolicyConsistencyFindings)
-                : string.Empty;
-
-            string coverageDetails = CoverageFindings.Count > 0
-                ? _formatter.FormatCoverageForHumans(CoverageFindings)
-                : string.Empty;
-
-            string unmatchedIgnoredDetails = UnmatchedIgnoredViolations.Count > 0
-                ? _formatter.FormatUnmatchedForHumans(UnmatchedIgnoredViolations)
-                : string.Empty;
-
-            string message = $"Architecture validation failed.{Environment.NewLine}";
-            if (!string.IsNullOrEmpty(violationDetails))
-            {
-                message += $"Violations:{Environment.NewLine}{violationDetails}{Environment.NewLine}";
-            }
-
-            if (!string.IsNullOrEmpty(cycleDetails))
-            {
-                message += $"Cycles:{Environment.NewLine}{cycleDetails}{Environment.NewLine}";
-            }
-
-            if (!string.IsNullOrEmpty(policyConsistencyDetails))
-            {
-                message += $"{policyConsistencyDetails}{Environment.NewLine}";
-            }
-
-            if (!string.IsNullOrEmpty(coverageDetails))
-            {
-                message += $"{coverageDetails}{Environment.NewLine}";
-            }
-
-            if (!string.IsNullOrEmpty(unmatchedIgnoredDetails))
-            {
-                message += $"{unmatchedIgnoredDetails}{Environment.NewLine}";
-            }
-
-            throw new InvalidOperationException(message);
+            return;
         }
+
+        throw new InvalidOperationException(BuildFailureMessage());
+    }
+
+    private string BuildFailureMessage()
+    {
+        string message = $"Architecture validation failed.{Environment.NewLine}";
+
+        message += FormatFailureSection(
+            "Violations:", Violations.Count > 0 ? _formatter.FormatViolationsForHumans(Violations) : string.Empty);
+
+        message += FormatFailureSection(
+            "Cycles:", Cycles.Count > 0 ? _formatter.FormatCyclesForHumans(Cycles) : string.Empty);
+
+        message += FormatFailureSection(
+            null,
+            PolicyConsistencyFindings.Count > 0
+                ? _formatter.FormatPolicyConsistencyForHumans(PolicyConsistencyFindings)
+                : string.Empty);
+
+        message += FormatFailureSection(
+            null, CoverageFindings.Count > 0 ? _formatter.FormatCoverageForHumans(CoverageFindings) : string.Empty);
+
+        message += FormatFailureSection(
+            null,
+            UnmatchedIgnoredViolations.Count > 0
+                ? _formatter.FormatUnmatchedForHumans(UnmatchedIgnoredViolations)
+                : string.Empty);
+
+        return message;
+    }
+
+    private static string FormatFailureSection(string? label, string details)
+    {
+        if (string.IsNullOrEmpty(details))
+        {
+            return string.Empty;
+        }
+
+        return label is null
+            ? $"{details}{Environment.NewLine}"
+            : $"{label}{Environment.NewLine}{details}{Environment.NewLine}";
     }
 }

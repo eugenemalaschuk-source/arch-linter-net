@@ -38,23 +38,7 @@ internal sealed class ArchitectureContractExecutor : IArchitectureContractExecut
         {
             if (family == CoverageFamily)
             {
-                int coverageCount = 0;
-                using (timing?.MeasureContractFamily(CoverageFamily, () => coverageCount))
-                {
-                    foreach (IArchitectureContract contract in session.Catalog.ContractsFor(mode, CoverageFamily))
-                    {
-                        coverageCount++;
-                        coverageViolations.AddRange(handlerRegistry.Execute(CoverageFamily, session, contract).Violations);
-
-                        ArchitectureCoverageSummary? summary =
-                            session.BuildCoverageSummary((ArchitectureCoverageContract)contract);
-                        if (summary != null)
-                        {
-                            coverageSummaries.Add(summary);
-                        }
-                    }
-                }
-
+                ExecuteCoverageFamily(session, mode, handlerRegistry, timing, coverageViolations, coverageSummaries);
                 continue;
             }
 
@@ -63,19 +47,57 @@ internal sealed class ArchitectureContractExecutor : IArchitectureContractExecut
                 continue;
             }
 
-            int count = 0;
-            using (timing?.MeasureContractFamily(family, () => count))
-            {
-                foreach (IArchitectureContract contract in session.Catalog.ContractsFor(mode, family))
-                {
-                    count++;
-                    ArchitectureHandlerResult result = handlerRegistry.Execute(family, session, contract);
-                    violations.AddRange(result.Violations);
-                    cycles.AddRange(result.Cycles);
-                }
-            }
+            ExecuteStandardFamily(session, mode, family, handlerRegistry, timing, violations, cycles);
         }
 
         return new ArchitectureContractExecutionResult(violations, cycles, coverageViolations, coverageSummaries);
+    }
+
+    private static void ExecuteCoverageFamily(
+        ArchitectureAnalysisSession session,
+        string mode,
+        IArchitectureContractHandlerRegistry handlerRegistry,
+        ValidationTiming? timing,
+        List<ArchitectureViolation> coverageViolations,
+        List<ArchitectureCoverageSummary> coverageSummaries)
+    {
+        int coverageCount = 0;
+        using (timing?.MeasureContractFamily(CoverageFamily, () => coverageCount))
+        {
+            foreach (IArchitectureContract contract in session.Catalog.ContractsFor(mode, CoverageFamily))
+            {
+                coverageCount++;
+                coverageViolations.AddRange(handlerRegistry.Execute(CoverageFamily, session, contract).Violations);
+
+                ArchitectureCoverageSummary? summary =
+                    session.BuildCoverageSummary((ArchitectureCoverageContract)contract);
+                if (summary != null)
+                {
+                    coverageSummaries.Add(summary);
+                }
+            }
+        }
+    }
+
+    private static void ExecuteStandardFamily(
+        ArchitectureAnalysisSession session,
+        string mode,
+        string family,
+        IArchitectureContractHandlerRegistry handlerRegistry,
+        ValidationTiming? timing,
+        List<ArchitectureViolation> violations,
+        List<string> cycles)
+    {
+        int count = 0;
+        using (timing?.MeasureContractFamily(family, () => count))
+        {
+            foreach (IArchitectureContract contract in session.Catalog.ContractsFor(mode, family))
+            {
+                count++;
+                ArchitectureHandlerResult result = handlerRegistry.Execute(family, session, contract);
+                violations.AddRange(result.Violations);
+                cycles.AddRange(result.Cycles);
+            }
+        }
     }
 }
