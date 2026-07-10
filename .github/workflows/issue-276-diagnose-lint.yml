@@ -1,0 +1,48 @@
+name: Diagnose issue 276 lint
+
+on:
+  pull_request:
+    branches:
+      - main
+    types:
+      - opened
+      - reopened
+      - synchronize
+
+permissions:
+  contents: read
+
+jobs:
+  lint-target:
+    if: github.head_ref == 'fix/276-code-scanning-hardening'
+    name: ${{ matrix.target }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        target:
+          - lint-code-size
+          - lint-dotnet-format
+          - lint-architecture
+          - lint-docs
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
+
+      - name: Setup uv
+        uses: astral-sh/setup-uv@11f9893b081a58869d3b5fccaea48c9e9e46f990 # v7.5.0
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v5.1.0
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Restore
+        run: make restore
+
+      - name: Run lint target
+        run: make ${{ matrix.target }}
