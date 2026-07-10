@@ -102,4 +102,89 @@ public sealed class ArchitectureContractSchemaTests
         Assert.That(anyOf[2].GetProperty("required")[0].GetString(), Is.EqualTo("allowed_friend_assemblies"));
         Assert.That(anyOf[3].GetProperty("properties").GetProperty("forbidden_project_references").GetProperty("minItems").GetInt32(), Is.EqualTo(1));
     }
+
+    // Regression coverage for the semantic-classification-model design
+    // (openspec/changes/design-semantic-classification-model): schema acceptance only,
+    // no extraction/matching engine exists yet. See design.md for the reviewed shape.
+    [Test]
+    public void Schema_Root_DeclaresClassificationSection()
+    {
+        JsonElement schema = LoadSchema();
+        JsonElement rootProperties = schema.GetProperty("properties");
+
+        Assert.That(rootProperties.TryGetProperty("classification", out JsonElement classificationRef), Is.True);
+        Assert.That(classificationRef.GetProperty("$ref").GetString(), Is.EqualTo("#/$defs/classification"));
+    }
+
+    [TestCase("attributeClassificationEntry")]
+    [TestCase("assemblyAttributeClassificationEntry")]
+    [TestCase("inheritanceClassificationEntry")]
+    [TestCase("namespaceClassificationEntry")]
+    [TestCase("pathClassificationEntry")]
+    [TestCase("classificationOverride")]
+    [TestCase("classificationExclusion")]
+    [TestCase("selector")]
+    public void Schema_DeclaresClassificationSubShapes(string defName)
+    {
+        JsonElement schema = LoadSchema();
+        Assert.That(schema.GetProperty("$defs").TryGetProperty(defName, out _), Is.True,
+            $"$defs.{defName} must be declared in the schema.");
+    }
+
+    [Test]
+    public void Schema_Classification_PrecedenceIsFixedSixSourceEnum()
+    {
+        JsonElement schema = LoadSchema();
+        JsonElement precedence = schema.GetProperty("$defs").GetProperty("classification").GetProperty("properties").GetProperty("precedence");
+        JsonElement itemEnum = precedence.GetProperty("items").GetProperty("enum");
+
+        string[] enumValues = itemEnum.EnumerateArray().Select(v => v.GetString()!).ToArray();
+
+        Assert.That(enumValues, Is.EqualTo(new[]
+        {
+            "yaml_override", "type_attribute", "assembly_attribute", "inheritance", "namespace", "path"
+        }));
+    }
+
+    [Test]
+    public void Schema_Layer_AcceptsSelectorAsAlternativeToNamespace()
+    {
+        JsonElement schema = LoadSchema();
+        JsonElement layer = schema.GetProperty("$defs").GetProperty("layer");
+
+        Assert.That(layer.GetProperty("properties").TryGetProperty("selector", out JsonElement selectorProperty), Is.True);
+        Assert.That(selectorProperty.GetProperty("$ref").GetString(), Is.EqualTo("#/$defs/selector"));
+
+        JsonElement anyOf = layer.GetProperty("anyOf");
+        Assert.That(anyOf[0].GetProperty("required")[0].GetString(), Is.EqualTo("namespace"));
+        Assert.That(anyOf[1].GetProperty("required")[0].GetString(), Is.EqualTo("selector"));
+    }
+
+    [Test]
+    public void Schema_ClassificationExclusion_AlwaysRequiresReason()
+    {
+        JsonElement schema = LoadSchema();
+        JsonElement exclusion = schema.GetProperty("$defs").GetProperty("classificationExclusion");
+
+        JsonElement required = exclusion.GetProperty("required");
+        Assert.That(required.EnumerateArray().Select(v => v.GetString()), Contains.Item("reason"));
+    }
+
+    [Test]
+    public void Schema_ClassificationOverride_RequiresReasonOnlyForBroadScope()
+    {
+        JsonElement schema = LoadSchema();
+        JsonElement classificationOverride = schema.GetProperty("$defs").GetProperty("classificationOverride");
+
+        JsonElement anyOf = classificationOverride.GetProperty("anyOf");
+        Assert.That(anyOf[0].GetProperty("required").EnumerateArray().Select(v => v.GetString()),
+            Is.EquivalentTo(new[] { "type" }),
+            "A type-scoped override must not require 'reason'.");
+        Assert.That(anyOf[1].GetProperty("required").EnumerateArray().Select(v => v.GetString()),
+            Is.EquivalentTo(new[] { "namespace", "reason" }),
+            "A namespace-scoped override must require 'reason'.");
+        Assert.That(anyOf[2].GetProperty("required").EnumerateArray().Select(v => v.GetString()),
+            Is.EquivalentTo(new[] { "namespace_suffix", "reason" }),
+            "A namespace_suffix-scoped override must require 'reason'.");
+    }
 }

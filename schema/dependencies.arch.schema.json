@@ -41,7 +41,8 @@
       "default": []
     },
     "analysis": { "$ref": "#/$defs/analysis" },
-    "contracts": { "$ref": "#/$defs/contracts" }
+    "contracts": { "$ref": "#/$defs/contracts" },
+    "classification": { "$ref": "#/$defs/classification" }
   },
   "$defs": {
     "stringList": {
@@ -78,7 +79,7 @@
     "layer": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["namespace"],
+      "anyOf": [{ "required": ["namespace"] }, { "required": ["selector"] }],
       "properties": {
         "namespace": {
           "type": "string",
@@ -93,6 +94,26 @@
           "type": "boolean",
           "default": false,
           "description": "When true, suppresses the empty-layer configuration diagnostic for this layer. Use for namespaces whose assemblies may not be available in the scan environment (external SDKs, engine types, platform-conditional namespaces)."
+        },
+        "selector": {
+          "$ref": "#/$defs/selector",
+          "description": "Reserved for the semantic-classification-model design (schema acceptance only; no extraction or matching engine exists yet). Matches types by discovered role/metadata instead of, or in addition to, namespace. May be combined with 'namespace'; combination-resolution semantics are owned by a future selector-matching implementation."
+        }
+      }
+    },
+    "selector": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["role"],
+      "properties": {
+        "role": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Exact-match role name assigned by classification. Role names are opaque strings; no fixed role catalog is enforced by this schema."
+        },
+        "metadata": {
+          "$ref": "#/$defs/scalarMap",
+          "description": "Optional exact-match, AND-combined metadata key/value constraints. All declared keys must match."
         }
       }
     },
@@ -157,6 +178,189 @@
         "package_prefixes": {
           "$ref": "#/$defs/nonBlankStringList",
           "description": "NuGet package ID prefixes matched with exact or dot-segment child semantics (case-insensitively) against declared PackageReference items."
+        }
+      }
+    },
+    "classification": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Reserved for the semantic-classification-model design (schema acceptance only; see openspec/changes/design-semantic-classification-model). No extraction, role-assignment, or matching engine exists yet; declaring this section has no runtime effect.",
+      "properties": {
+        "precedence": {
+          "type": "array",
+          "description": "Subsequence of the fixed source order [yaml_override, type_attribute, assembly_attribute, inheritance, namespace, path]. Sources omitted from this list are disabled. Defaults to all six sources in the fixed order.",
+          "items": {
+            "type": "string",
+            "enum": ["yaml_override", "type_attribute", "assembly_attribute", "inheritance", "namespace", "path"]
+          },
+          "default": ["yaml_override", "type_attribute", "assembly_attribute", "inheritance", "namespace", "path"]
+        },
+        "attributes": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/attributeClassificationEntry" },
+          "default": []
+        },
+        "assembly_attributes": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/assemblyAttributeClassificationEntry" },
+          "default": []
+        },
+        "inheritance": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/inheritanceClassificationEntry" },
+          "default": []
+        },
+        "namespace": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/namespaceClassificationEntry" },
+          "default": []
+        },
+        "path": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/pathClassificationEntry" },
+          "default": []
+        },
+        "overrides": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/classificationOverride" },
+          "default": []
+        },
+        "exclusions": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/classificationExclusion" },
+          "default": []
+        }
+      }
+    },
+    "attributeClassificationEntry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["attribute", "role"],
+      "properties": {
+        "attribute": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Full type name of the attribute, matched against attributes declared or referenced in scanned code. No binary ArchLinterNet annotation dependency is required."
+        },
+        "role": { "type": "string", "minLength": 1 },
+        "metadata": {
+          "$ref": "#/$defs/scalarMap",
+          "description": "Values use the metadata extraction syntax: constructor[<index>], property:<Name>, const:<Full.Type.NAME>, or a literal scalar."
+        }
+      }
+    },
+    "assemblyAttributeClassificationEntry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["attribute", "role"],
+      "properties": {
+        "attribute": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Full type name of the assembly-level attribute providing bulk defaults for a project or bounded context."
+        },
+        "role": { "type": "string", "minLength": 1 },
+        "metadata": { "$ref": "#/$defs/scalarMap" }
+      }
+    },
+    "inheritanceClassificationEntry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["base_type", "role"],
+      "properties": {
+        "base_type": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Full name of a base type or interface. Types deriving from or implementing this are assigned the declared role/metadata."
+        },
+        "role": { "type": "string", "minLength": 1 },
+        "metadata": {
+          "$ref": "#/$defs/scalarMap",
+          "description": "Inheritance evidence carries no constructor/property arguments; values must be literal scalars or const:<Full.Type.NAME> references."
+        }
+      }
+    },
+    "namespaceClassificationEntry": {
+      "type": "object",
+      "additionalProperties": false,
+      "anyOf": [{ "required": ["namespace"] }, { "required": ["namespace_suffix"] }],
+      "required": ["role"],
+      "properties": {
+        "namespace": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Same namespace glob syntax already accepted by layers.<name>.namespace."
+        },
+        "namespace_suffix": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Same namespace-suffix syntax already accepted by layers.<name>.namespace_suffix."
+        },
+        "role": { "type": "string", "minLength": 1 },
+        "metadata": { "$ref": "#/$defs/scalarMap" }
+      }
+    },
+    "pathClassificationEntry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path_prefix", "role"],
+      "properties": {
+        "path_prefix": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Repository-relative source path prefix."
+        },
+        "role": { "type": "string", "minLength": 1 },
+        "metadata": { "$ref": "#/$defs/scalarMap" }
+      }
+    },
+    "classificationOverride": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["role"],
+      "anyOf": [
+        { "required": ["type"] },
+        { "required": ["namespace", "reason"] },
+        { "required": ["namespace_suffix", "reason"] }
+      ],
+      "properties": {
+        "type": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Narrow, type-scoped override. Full type name. 'reason' is optional at this scope."
+        },
+        "namespace": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Broad, namespace-scoped override. 'reason' is required at this scope."
+        },
+        "namespace_suffix": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Broad, namespace-suffix-scoped override. 'reason' is required at this scope."
+        },
+        "role": { "type": "string", "minLength": 1 },
+        "metadata": { "$ref": "#/$defs/scalarMap" },
+        "reason": { "type": "string", "minLength": 1 }
+      }
+    },
+    "classificationExclusion": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["reason"],
+      "anyOf": [
+        { "required": ["type"] },
+        { "required": ["namespace"] },
+        { "required": ["namespace_suffix"] }
+      ],
+      "properties": {
+        "type": { "type": "string", "minLength": 1 },
+        "namespace": { "type": "string", "minLength": 1 },
+        "namespace_suffix": { "type": "string", "minLength": 1 },
+        "reason": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Always required, regardless of scope."
         }
       }
     },

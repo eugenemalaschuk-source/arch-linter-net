@@ -3,6 +3,24 @@
 version: 1
 name: Modular Monolith Policy Recipe
 
+# Reserved for the semantic-classification-model design (schema acceptance only;
+# see openspec/changes/design-semantic-classification-model). No extraction or
+# selector-matching engine exists yet, so this section has no effect on the
+# contracts below - it illustrates the reviewed YAML shape for a
+# Sales/Inventory/SharedKernel modular-monolith policy.
+classification:
+  attributes:
+    - attribute: MyCompany.Product.Architecture.DomainLayerAttribute
+      role: DomainLayer
+      metadata:
+        module: constructor[0]
+  namespace:
+    - namespace: MyCompany.Product.SharedKernel
+      role: SharedKernel
+  exclusions:
+    - namespace_suffix: .Generated
+      reason: Source-generated code is not hand-authored and is exempt from classification.
+
 layers:
   composition_root:
     namespace: MyCompany.Product.Host.Composition
@@ -22,6 +40,14 @@ layers:
     namespace: MyCompany.Product.Modules.Inventory.Internal
   inventory_contracts:
     namespace: MyCompany.Product.Modules.Inventory.Contracts
+  # Reserved: a selector-based layer, additive alongside namespace-based layers
+  # above. Matches by discovered role/metadata instead of namespace once #109's
+  # extraction engine and #111's selector matching land.
+  sales_domain_by_role:
+    selector:
+      role: DomainLayer
+      metadata:
+        module: Sales
 
 legacy_runtime_layers: []
 
