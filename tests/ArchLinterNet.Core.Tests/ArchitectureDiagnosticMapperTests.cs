@@ -7,15 +7,15 @@ namespace ArchLinterNet.Core.Tests;
 [TestFixture]
 public sealed class ArchitectureDiagnosticMapperTests
 {
-    private static readonly string[] Ref1 = { "ref1" };
-    private static readonly string[] CoreInternal = { "Core.Internal" };
-    private static readonly string[] Api = { "Api" };
+    private static readonly string[] _ref1 = { "ref1" };
+    private static readonly string[] _coreInternal = { "Core.Internal" };
+    private static readonly string[] _api = { "_api" };
 
     [Test]
     public void FromViolation_PlainViolation_ReturnsDependencyDiagnostic()
     {
         var violation = new ArchitectureViolation(
-            "contract", "contract-id", "Source.Type", "Forbidden.Namespace", Ref1);
+            "contract", "contract-id", "Source.Type", "Forbidden.Namespace", _ref1);
 
         var diagnostic = ArchitectureDiagnosticMapper.FromViolation(violation);
 
@@ -27,12 +27,12 @@ public sealed class ArchitectureDiagnosticMapperTests
     public void FromViolation_LayerFields_ReturnsDependencyDiagnosticWithLayerData()
     {
         var violation = new ArchitectureViolation(
-            "contract", null, "Source.Type", "protected layer 'Core'", Ref1)
+            "contract", null, "Source.Type", "protected layer 'Core'", _ref1)
         {
             Payload = new DependencyPayload(
                 SourceLayer: "Web",
                 TargetLayer: "Core",
-                AllowedImporters: Api)
+                AllowedImporters: _api)
         };
 
         var diagnostic = ArchitectureDiagnosticMapper.FromViolation(violation);
@@ -41,20 +41,20 @@ public sealed class ArchitectureDiagnosticMapperTests
         var dependency = (DependencyDiagnostic)diagnostic;
         Assert.That(dependency.SourceLayer, Is.EqualTo("Web"));
         Assert.That(dependency.TargetLayer, Is.EqualTo("Core"));
-        Assert.That(dependency.AllowedImporters, Is.EquivalentTo(Api));
+        Assert.That(dependency.AllowedImporters, Is.EquivalentTo(_api));
     }
 
     [Test]
     public void FromViolation_LayerFieldsWithMatchedNamespacePrefixes_PreservesBoth()
     {
         var violation = new ArchitectureViolation(
-            "contract", null, "Source.Type", "protected layer 'Core'", Ref1)
+            "contract", null, "Source.Type", "protected layer 'Core'", _ref1)
         {
             Payload = new DependencyPayload(
                 SourceLayer: "Web",
                 TargetLayer: "Core",
-                AllowedImporters: Api),
-            MatchedNamespacePrefixes = CoreInternal
+                AllowedImporters: _api),
+            MatchedNamespacePrefixes = _coreInternal
         };
 
         var diagnostic = ArchitectureDiagnosticMapper.FromViolation(violation);
@@ -62,8 +62,8 @@ public sealed class ArchitectureDiagnosticMapperTests
         Assert.That(diagnostic, Is.InstanceOf<DependencyDiagnostic>());
         var dependency = (DependencyDiagnostic)diagnostic;
         Assert.That(dependency.SourceLayer, Is.EqualTo("Web"));
-        Assert.That(dependency.AllowedImporters, Is.EquivalentTo(Api));
-        Assert.That(dependency.MatchedNamespacePrefixes, Is.EquivalentTo(CoreInternal));
+        Assert.That(dependency.AllowedImporters, Is.EquivalentTo(_api));
+        Assert.That(dependency.MatchedNamespacePrefixes, Is.EquivalentTo(_coreInternal));
     }
 
     [Test]
@@ -87,7 +87,7 @@ public sealed class ArchitectureDiagnosticMapperTests
     public void FromViolation_TemplateAndContainerNamespace_ReturnsConfigurationDiagnostic()
     {
         var violation = new ArchitectureViolation(
-            "contract", null, "Source.Type", "Forbidden.Namespace", Ref1)
+            "contract", null, "Source.Type", "Forbidden.Namespace", _ref1)
         {
             Payload = new ConfigurationPayload(
                 TemplateName: "asmdef-template",
@@ -107,7 +107,7 @@ public sealed class ArchitectureDiagnosticMapperTests
     public void FromViolation_ProjectMetadataFields_ReturnsProjectMetadataDiagnostic()
     {
         var violation = new ArchitectureViolation(
-            "contract", "project-metadata", "src/MyApp/MyApp.csproj", "required project property mismatch", Ref1)
+            "contract", "project-metadata", "src/MyApp/MyApp.csproj", "required project property mismatch", _ref1)
         {
             Payload = new ProjectMetadataPayload(
                 ProjectMetadataKind: "required_property",
@@ -132,7 +132,7 @@ public sealed class ArchitectureDiagnosticMapperTests
     {
         var paths = new IReadOnlyCollection<string>[] { new[] { "A", "B" } };
         var violation = new ArchitectureViolation(
-            "contract", null, "Source.Type", "Forbidden.Namespace", Ref1)
+            "contract", null, "Source.Type", "Forbidden.Namespace", _ref1)
         {
             Payload = new ConfigurationPayload(DependencyPaths: paths)
         };
@@ -147,7 +147,7 @@ public sealed class ArchitectureDiagnosticMapperTests
     public void FromViolation_TypePlacementPayload_ReturnsTypePlacementDiagnostic()
     {
         var violation = new ArchitectureViolation(
-            "contract", null, "Source.Type", "expected-location", Ref1)
+            "contract", null, "Source.Type", "expected-location", _ref1)
         {
             Payload = new TypePlacementPayload(
                 ExpectedTypeLocation: "namespace:MyApp.Domain",

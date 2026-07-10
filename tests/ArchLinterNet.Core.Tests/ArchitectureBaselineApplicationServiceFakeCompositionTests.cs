@@ -13,7 +13,7 @@ namespace ArchLinterNet.Core.Tests;
 [TestFixture]
 public sealed class ArchitectureBaselineApplicationServiceFakeCompositionTests
 {
-    private static readonly string[] KnownRule = { "known-rule" };
+    private static readonly string[] _knownRule = { "known-rule" };
 
     [Test]
     public void Generate_FakeCollaborators_ProducesBaselineWithoutRealInfrastructure()
@@ -101,7 +101,7 @@ public sealed class ArchitectureBaselineApplicationServiceFakeCompositionTests
     [Test]
     public void Generate_UnknownSelectedContract_ThrowsBeforeRunnerSetup()
     {
-        var document = CreateDocumentWithKnownRule();
+        var document = CreateDocumentWith_knownRule();
         var runnerSetupService = new FakeRunnerSetupService { DocumentToReturn = document, RunnerToReturn = new FakeContractRunner(ArchitectureBaselineApplicationServiceHelper.CreateEmptySession(document)) };
         var applicationService = new ArchitectureBaselineApplicationService(
             runnerSetupService,
@@ -175,7 +175,7 @@ public sealed class ArchitectureBaselineApplicationServiceFakeCompositionTests
     }
 
     // Mixed baseline: frozen + resolved + configuration-error + new candidate.
-    private static ArchitectureContractDocument CreateDocumentWithKnownRule()
+    private static ArchitectureContractDocument CreateDocumentWith_knownRule()
     {
         return new ArchitectureContractDocument
         {
@@ -226,7 +226,7 @@ public sealed class ArchitectureBaselineApplicationServiceFakeCompositionTests
         FakeBaselineGenerator BaselineGenerator, FakeBaselineLoadingService BaselineLoadingService)
         CreateMixedScenarioCollaborators()
     {
-        var document = CreateDocumentWithKnownRule();
+        var document = CreateDocumentWith_knownRule();
         var runnerSetupService = new FakeRunnerSetupService { DocumentToReturn = document };
         var runner = new FakeContractRunner(ArchitectureBaselineApplicationServiceHelper.CreateEmptySession(document))
         {
@@ -342,7 +342,7 @@ public sealed class ArchitectureBaselineApplicationServiceFakeCompositionTests
     [Test]
     public void Verify_InSync_WhenOnlyNewDebtPresent()
     {
-        var document = CreateDocumentWithKnownRule();
+        var document = CreateDocumentWith_knownRule();
         var runnerSetupService = new FakeRunnerSetupService { DocumentToReturn = document };
         var runner = new FakeContractRunner(ArchitectureBaselineApplicationServiceHelper.CreateEmptySession(document))
         {
@@ -463,7 +463,7 @@ public sealed class ArchitectureBaselineApplicationServiceFakeCompositionTests
             PolicyPath = "unused-by-fakes.arch.yml",
             BaselinePath = "unused-by-fakes.baseline.yml",
             Mode = "all",
-            ContractIds = KnownRule,
+            ContractIds = _knownRule,
         });
 
         Assert.That(outcome.Succeeded, Is.True);
@@ -498,7 +498,7 @@ public sealed class ArchitectureBaselineApplicationServiceFakeCompositionTests
             PolicyPath = "unused-by-fakes.arch.yml",
             BaselinePath = "unused-by-fakes.baseline.yml",
             Mode = "all",
-            ContractIds = KnownRule,
+            ContractIds = _knownRule,
         });
 
         Assert.That(outcome.Succeeded, Is.True);

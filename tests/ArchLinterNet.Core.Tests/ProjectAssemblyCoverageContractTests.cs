@@ -30,7 +30,7 @@ public sealed class ProjectAssemblyCoverageContractTests
 
     private static readonly System.Reflection.Assembly _coreAssembly = typeof(ArchitectureContractDocument).Assembly;
     private static readonly System.Reflection.Assembly _testingAssembly = typeof(ArchLinterNet.Testing.ArchitectureAssertions).Assembly;
-    private static readonly string[] Net10Point0 = { "net10.0" };
+    private static readonly string[] _net10Point0 = { "net10.0" };
 
     private static ArchitectureContractDocument CreateDocument(ArchitectureCoverageContract contract, ProjectDiscoveryResult? discovery = null)
     {
@@ -160,7 +160,7 @@ public sealed class ProjectAssemblyCoverageContractTests
     public void ProjectCoverage_DiscoveredProjectResolvesToCoveredAssembly_IsCovered()
     {
         ProjectDiscoveryResult discovery = CreateDiscovery(
-            new ArchitectureDiscoveredProject("src/Core/Core.csproj", _coreAssembly.GetName().Name!, Net10Point0));
+            new ArchitectureDiscoveredProject("src/Core/Core.csproj", _coreAssembly.GetName().Name!, _net10Point0));
 
         ArchitectureCoverageContract contract = new()
         {
@@ -184,7 +184,7 @@ public sealed class ProjectAssemblyCoverageContractTests
     {
         string assemblyName = _testingAssembly.GetName().Name!;
         ProjectDiscoveryResult discovery = CreateDiscovery(
-            new ArchitectureDiscoveredProject("src/Testing/Testing.csproj", assemblyName, Net10Point0));
+            new ArchitectureDiscoveredProject("src/Testing/Testing.csproj", assemblyName, _net10Point0));
 
         ArchitectureCoverageContract contract = new()
         {
@@ -217,7 +217,7 @@ public sealed class ProjectAssemblyCoverageContractTests
     public void ProjectCoverage_ExcludedProject_ProducesNoFindingAndIsCountedExcluded()
     {
         ProjectDiscoveryResult discovery = CreateDiscovery(
-            new ArchitectureDiscoveredProject("samples/Demo/Demo.csproj", _testingAssembly.GetName().Name!, Net10Point0));
+            new ArchitectureDiscoveredProject("samples/Demo/Demo.csproj", _testingAssembly.GetName().Name!, _net10Point0));
 
         ArchitectureCoverageContract contract = new()
         {
@@ -245,7 +245,7 @@ public sealed class ProjectAssemblyCoverageContractTests
     public void ProjectCoverage_ExclusionWithDifferentCase_DoesNotMatch()
     {
         ProjectDiscoveryResult discovery = CreateDiscovery(
-            new ArchitectureDiscoveredProject("samples/Demo/Demo.csproj", _testingAssembly.GetName().Name!, Net10Point0));
+            new ArchitectureDiscoveredProject("samples/Demo/Demo.csproj", _testingAssembly.GetName().Name!, _net10Point0));
 
         ArchitectureCoverageContract contract = new()
         {
@@ -276,7 +276,7 @@ public sealed class ProjectAssemblyCoverageContractTests
     public void ProjectCoverage_DiscoveredProjectWithNoResolvedAssembly_IsUnknown()
     {
         ProjectDiscoveryResult discovery = CreateDiscovery(
-            new ArchitectureDiscoveredProject("src/Ghost/Ghost.csproj", "Ghost.Assembly.Not.Resolved", Net10Point0));
+            new ArchitectureDiscoveredProject("src/Ghost/Ghost.csproj", "Ghost.Assembly.Not.Resolved", _net10Point0));
 
         ArchitectureCoverageContract contract = new()
         {

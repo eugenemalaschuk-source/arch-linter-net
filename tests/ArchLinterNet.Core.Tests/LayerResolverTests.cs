@@ -7,7 +7,7 @@ namespace ArchLinterNet.Core.Tests;
 [TestFixture]
 public sealed class LayerResolverTests
 {
-    private static readonly string[] TestCoreTestWeb = { "Test.Core", "Test.Web" };
+    private static readonly string[] _testCoreTestWeb = { "Test.Core", "Test.Web" };
 
     private ArchitectureContractDocument _document = null!;
 
@@ -121,7 +121,7 @@ public sealed class LayerResolverTests
     {
         bool result = ArchitectureLayerResolver.IsInAnyNamespace(
             "Test.Core.Foo",
-            TestCoreTestWeb);
+            _testCoreTestWeb);
 
         Assert.That(result, Is.True);
     }
@@ -131,7 +131,7 @@ public sealed class LayerResolverTests
     {
         bool result = ArchitectureLayerResolver.IsInAnyNamespace(
             "Test.Domain.Foo",
-            TestCoreTestWeb);
+            _testCoreTestWeb);
 
         Assert.That(result, Is.False);
     }
