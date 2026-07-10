@@ -1,5 +1,5 @@
-using System.Text;
 using System.CommandLine;
+using System.Text;
 using ArchLinterNet.Cli.Abstractions;
 using ArchLinterNet.Cli.Commands.Explain;
 using ArchLinterNet.Cli.Commands.Graph;
@@ -15,6 +15,12 @@ namespace ArchLinterNet.Cli.Tests;
 [TestFixture]
 public sealed class CliHandlerCoverageTests
 {
+    private static readonly string[] _ruleA = ["rule-a"];
+    private static readonly string[] _explainPath = ["Source", "Mid", "Target"];
+    private static readonly string[] _helpArgs = ["--help"];
+    private static readonly string[] _versionArgs = ["--version"];
+    private static readonly string[] _graphUnknownOptionArgs = ["graph", "--unknown"];
+
     [TestCase("invalid", "namespace", "json", "Invalid mode")]
     [TestCase("strict", "invalid", "json", "Invalid level")]
     [TestCase("strict", "namespace", "invalid", "Invalid format")]
@@ -34,12 +40,12 @@ public sealed class CliHandlerCoverageTests
         var runtime = new RecordingRuntime { GraphText = "digraph G {}" };
         var console = new RecordingConsole();
         int result = new GraphCommandHandler(runtime, console, new RecordingFileSystem(true)).Execute(
-            new GraphCommandOptions("policy.yml", "audit", "type", "dot", "ci", new[] { "rule-a" }, false));
+            new GraphCommandOptions("policy.yml", "audit", "type", "dot", "ci", _ruleA, false));
 
         Assert.That(result, Is.EqualTo(CliExitCodes.Success));
         Assert.That(runtime.GraphRequest!.Mode, Is.EqualTo("audit"));
         Assert.That(runtime.GraphRequest.Level, Is.EqualTo(ArchitectureGraphLevel.Type));
-        Assert.That(runtime.GraphRequest.ContractIds, Is.EqualTo(new[] { "rule-a" }));
+        Assert.That(runtime.GraphRequest.ContractIds, Is.EqualTo(_ruleA));
         Assert.That(console.OutputText, Does.Contain("digraph G"));
     }
 
@@ -48,7 +54,7 @@ public sealed class CliHandlerCoverageTests
     {
         var runtime = new RecordingRuntime
         {
-            ExplainResult = new ArchitectureExplainOutcome("Source", "Target", new[] { "Source", "Mid", "Target" }, new[] { "rule-a" })
+            ExplainResult = new ArchitectureExplainOutcome("Source", "Target", _explainPath, _ruleA)
         };
         var humanConsole = new RecordingConsole();
         var handler = new ExplainCommandHandler(runtime, humanConsole, new RecordingFileSystem(true));
@@ -81,22 +87,31 @@ public sealed class CliHandlerCoverageTests
         Assert.That(failureConsole.ErrorText, Does.Contain("Explain error: boom"));
     }
 
-    [TestCase(new[] { "--help" }, "arch-linter-net — architecture contract linter")]
-    [TestCase(new[] { "--version" }, "arch-linter-net 1.0.0")]
-    public void Host_LegacyHelpAndVersion_ShortCircuitBeforeParsing(string[] args, string expectedOutput)
+    [Test]
+    public void Host_LegacyHelp_ShortCircuitsBeforeParsing()
     {
         var console = new RecordingConsole();
-        int result = new CliHost(new RootCommandFactory(), console, new RecordingRuntime()).Run(args);
+        int result = new CliHost(new RootCommandFactory(), console, new RecordingRuntime()).Run(_helpArgs);
 
         Assert.That(result, Is.EqualTo(CliExitCodes.Success));
-        Assert.That(console.OutputText, Does.Contain(expectedOutput));
+        Assert.That(console.OutputText, Does.Contain("arch-linter-net — architecture contract linter"));
+    }
+
+    [Test]
+    public void Host_LegacyVersion_ShortCircuitsBeforeParsing()
+    {
+        var console = new RecordingConsole();
+        int result = new CliHost(new RootCommandFactory(), console, new RecordingRuntime()).Run(_versionArgs);
+
+        Assert.That(result, Is.EqualTo(CliExitCodes.Success));
+        Assert.That(console.OutputText, Does.Contain("arch-linter-net 1.0.0"));
     }
 
     [Test]
     public void Host_ParseErrors_AreNormalizedAndIncludeCommandHint()
     {
         var console = new RecordingConsole();
-        int result = new CliHost(new RootCommandFactory(), console, new RecordingRuntime()).Run(new[] { "graph", "--unknown" });
+        int result = new CliHost(new RootCommandFactory(), console, new RecordingRuntime()).Run(_graphUnknownOptionArgs);
 
         Assert.That(result, Is.EqualTo(CliExitCodes.InvalidArgumentsOrRuntimeError));
         Assert.That(console.ErrorText, Does.Contain("Unknown option: --unknown"));
@@ -131,14 +146,14 @@ public sealed class CliHandlerCoverageTests
 
     private sealed class RecordingRuntime : ICliRuntime
     {
-        private static readonly ArchitectureDependencyGraph EmptyGraph = new(Array.Empty<ArchitectureGraphNode>(), Array.Empty<ArchitectureGraphEdge>());
+        private static readonly ArchitectureDependencyGraph _emptyGraph = new(Array.Empty<ArchitectureGraphNode>(), Array.Empty<ArchitectureGraphEdge>());
         public string Version => "1.0.0";
         public string GraphText { get; init; } = "{}";
         public ArchitectureGraphRequest? GraphRequest { get; private set; }
         public ArchitectureExplainOutcome ExplainResult { get; init; } = new("Source", "Target", null, Array.Empty<string>());
         public Exception? ExplainException { get; init; }
         public bool TryParseGraphLevel(string value, out ArchitectureGraphLevel level) => Enum.TryParse(value, true, out level);
-        public ArchitectureGraphOutcome BuildGraph(ArchitectureGraphRequest request) { GraphRequest = request; return new ArchitectureGraphOutcome(EmptyGraph); }
+        public ArchitectureGraphOutcome BuildGraph(ArchitectureGraphRequest request) { GraphRequest = request; return new ArchitectureGraphOutcome(_emptyGraph); }
         public string FormatGraphAsJson(ArchitectureDependencyGraph graph) => GraphText;
         public string FormatGraphAsDot(ArchitectureDependencyGraph graph) => GraphText;
         public string FormatGraphAsMermaid(ArchitectureDependencyGraph graph) => GraphText;

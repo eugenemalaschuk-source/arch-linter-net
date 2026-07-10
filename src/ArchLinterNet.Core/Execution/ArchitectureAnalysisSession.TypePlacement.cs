@@ -117,7 +117,7 @@ public sealed partial class ArchitectureAnalysisSession
         string actualAssemblyName,
         IReadOnlyList<ArchitectureLayer> allowedLayers,
         IReadOnlyList<string> allowedNamespacePrefixes,
-        IReadOnlySet<string> allowedAssemblyNames)
+        HashSet<string> allowedAssemblyNames)
     {
         if (allowedLayers.Any(layer => ArchitectureLayerResolver.MatchesNamespace(layer, actualNamespace)))
         {
@@ -218,7 +218,7 @@ public sealed partial class ArchitectureAnalysisSession
     // name). A project name that doesn't match any discovered project contributes no assembly name,
     // which is fail-closed (never widens what's allowed), consistent with how other allow-only
     // contracts treat an unresolvable name.
-    private IEnumerable<string> ResolveProjectAssemblyNames(IReadOnlyList<string> projectNames)
+    private IEnumerable<string> ResolveProjectAssemblyNames(List<string> projectNames)
     {
         if (projectNames.Count == 0)
         {

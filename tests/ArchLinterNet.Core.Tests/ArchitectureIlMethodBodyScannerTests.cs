@@ -1,3 +1,4 @@
+using System.Reflection;
 using ArchLinterNet.Core.Contracts;
 using ArchLinterNet.Core.Execution;
 using ArchLinterNet.Core.Model;
@@ -10,6 +11,9 @@ namespace ArchLinterNet.Core.Tests;
 [TestFixture]
 public sealed class ArchitectureIlMethodBodyScannerTests
 {
+    private static readonly Assembly[] _fixtureAssembly = [typeof(MethodBodyFixture).Assembly];
+    private static readonly string[] _consoleWriteLinePattern = ["Console.WriteLine"];
+
     [Test]
     public void FindMethodBodyViolations_EmptyNamespace_ReturnsEmpty()
     {
@@ -18,9 +22,9 @@ public sealed class ArchitectureIlMethodBodyScannerTests
             "method-body", "method-body-id", Array.Empty<ArchitectureIgnoredViolation>(), false, null, null);
 
         Assert.That(scanner.FindMethodBodyViolations(
-            new[] { typeof(MethodBodyFixture).Assembly },
+            _fixtureAssembly,
             "NamespaceThatDoesNotExist",
-            new[] { "Console.WriteLine" },
+            _consoleWriteLinePattern,
             context).ToList(), Is.Empty);
     }
 
@@ -28,7 +32,7 @@ public sealed class ArchitectureIlMethodBodyScannerTests
     public void FindMatchesForType_ReturnsMemberAndMethodDetails()
     {
         IReadOnlyList<ForbiddenCallPattern> patterns = ArchitectureForbiddenCallMatcher.NormalizePatterns(
-            new[] { "Console.WriteLine" });
+            _consoleWriteLinePattern);
         var cache = new Dictionary<string, bool>(StringComparer.Ordinal);
 
         var details = ArchitectureIlMethodBodyScanner.FindMatchDetailsForType(
