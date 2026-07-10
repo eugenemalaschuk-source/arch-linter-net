@@ -17,6 +17,10 @@ internal readonly record struct ArchitectureExportedApiEntry(
 // that fail to reflect are skipped rather than crashing the whole scan.
 internal static class ArchitecturePublicApiSurfaceScanner
 {
+    private const string PublicVisibility = "public";
+    private const string ProtectedInternalVisibility = "protected internal";
+    private const string ProtectedVisibility = "protected";
+
     private const BindingFlags MemberFlags =
         BindingFlags.DeclaredOnly | BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.Static;
 
@@ -270,35 +274,35 @@ internal static class ArchitecturePublicApiSurfaceScanner
     {
         if (method.IsPublic)
         {
-            return "public";
+            return PublicVisibility;
         }
 
-        return method.IsFamilyOrAssembly ? "protected internal" : "protected";
+        return method.IsFamilyOrAssembly ? ProtectedInternalVisibility : ProtectedVisibility;
     }
 
     private static string MemberVisibility(FieldInfo field)
     {
         if (field.IsPublic)
         {
-            return "public";
+            return PublicVisibility;
         }
 
-        return field.IsFamilyOrAssembly ? "protected internal" : "protected";
+        return field.IsFamilyOrAssembly ? ProtectedInternalVisibility : ProtectedVisibility;
     }
 
     private static string TypeVisibility(Type type)
     {
         if (!type.IsNested)
         {
-            return "public";
+            return PublicVisibility;
         }
 
         if (type.IsNestedPublic)
         {
-            return "public";
+            return PublicVisibility;
         }
 
-        return type.IsNestedFamORAssem ? "protected internal" : "protected";
+        return type.IsNestedFamORAssem ? ProtectedInternalVisibility : ProtectedVisibility;
     }
 
     // A property/event is exported if at least one of its accessors is; when both accessors are
@@ -315,13 +319,13 @@ internal static class ArchitecturePublicApiSurfaceScanner
     {
         static int Rank(string? visibility) => visibility switch
         {
-            "public" => 0,
-            "protected internal" => 1,
-            "protected" => 2,
+            PublicVisibility => 0,
+            ProtectedInternalVisibility => 1,
+            ProtectedVisibility => 2,
             _ => 3
         };
 
-        return Rank(first) <= Rank(second) ? first ?? "public" : second ?? "public";
+        return Rank(first) <= Rank(second) ? first ?? PublicVisibility : second ?? PublicVisibility;
     }
 
     private static bool IsCompilerGenerated(MemberInfo member)

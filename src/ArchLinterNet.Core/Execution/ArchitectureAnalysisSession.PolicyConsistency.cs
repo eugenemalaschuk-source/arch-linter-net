@@ -88,7 +88,7 @@ public sealed partial class ArchitectureAnalysisSession
         return descriptors;
     }
 
-    private List<PolicyConsistencyDiagnostic> FindDuplicateContractIds(
+    private static List<PolicyConsistencyDiagnostic> FindDuplicateContractIds(
         List<ArchitectureContractDescriptor> descriptors)
     {
         List<PolicyConsistencyDiagnostic> findings = new();

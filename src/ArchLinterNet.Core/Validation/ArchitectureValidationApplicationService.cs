@@ -13,6 +13,8 @@ public sealed class ArchitectureValidationApplicationService(
     IArchitectureContractExecutor contractExecutor)
     : IArchitectureValidationApplicationService
 {
+    private const string ErrorSeverity = "error";
+
     public ValidationOutcome Validate(ValidationRequest request, ValidationTiming? timing = null)
     {
         if (request.Mode is not ("strict" or "audit"))
@@ -63,12 +65,12 @@ public sealed class ArchitectureValidationApplicationService(
             unmatched = FilterUnmatchedForDisabledCoverage(unmatched, coverageConfig);
 
             bool hasBlockingUnmatched = request.EnforceUnmatchedIgnoredViolationsPolicy
-                && unmatchedConfig == "error" && unmatched.Count > 0;
+                && unmatchedConfig == ErrorSeverity && unmatched.Count > 0;
 
             bool hasBlockingPolicyConsistency =
-                policyConsistencyConfig == "error" && policyConsistencyFindings.Count > 0;
+                policyConsistencyConfig == ErrorSeverity && policyConsistencyFindings.Count > 0;
 
-            bool hasBlockingCoverage = coverageConfig == "error" && coverageFindings.Count > 0;
+            bool hasBlockingCoverage = coverageConfig == ErrorSeverity && coverageFindings.Count > 0;
 
             bool passed = allViolations.Count == 0 && execution.Cycles.Count == 0
                 && !hasBlockingUnmatched && !hasBlockingPolicyConsistency && !hasBlockingCoverage;
@@ -130,7 +132,7 @@ public sealed class ArchitectureValidationApplicationService(
 
     private static void EnsureValidSeverityConfig(string value, string settingName)
     {
-        if (value is not ("error" or "warn" or "off"))
+        if (value is not (ErrorSeverity or "warn" or "off"))
         {
             throw new InvalidOperationException($"Invalid {settingName}: {value}. Use 'error', 'warn', or 'off'.");
         }

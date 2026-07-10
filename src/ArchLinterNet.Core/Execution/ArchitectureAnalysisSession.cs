@@ -14,6 +14,8 @@ namespace ArchLinterNet.Core.Execution;
 // this session kept for public API stability; handlers receive this session, not the runner.
 public sealed partial class ArchitectureAnalysisSession
 {
+    private const string ConfigurationSource = "<configuration>";
+
     private ArchitectureCoverageInventory? _cachedCoverageInventory;
     private ArchitectureContractDocument? _cachedCoverageInventoryDocument;
 
@@ -263,7 +265,7 @@ public sealed partial class ArchitectureAnalysisSession
                 : string.Empty;
 
             violations.Add(new ArchitectureViolation(
-                "<configuration>",
+                ConfigurationSource,
                 null,
                 missingAssembly,
                 "missing target assembly",
@@ -276,7 +278,7 @@ public sealed partial class ArchitectureAnalysisSession
         foreach (ArchitectureProjectDiscoveryDiagnostic discoveryDiagnostic in Context.DiscoveryDiagnostics)
         {
             violations.Add(new ArchitectureViolation(
-                "<configuration>",
+                ConfigurationSource,
                 null,
                 discoveryDiagnostic.Subject,
                 discoveryDiagnostic.Kind,
@@ -328,7 +330,7 @@ public sealed partial class ArchitectureAnalysisSession
                 continue;
             }
 
-            ArchitectureLayer layer = ArchitectureLayerResolver.ResolveLayer(Document, "<configuration>", layerName);
+            ArchitectureLayer layer = ArchitectureLayerResolver.ResolveLayer(Document, ConfigurationSource, layerName);
 
             if (layer.External)
             {
@@ -350,7 +352,7 @@ public sealed partial class ArchitectureAnalysisSession
                 }
 
                 violations.Add(new ArchitectureViolation(
-                    "<configuration>",
+                    ConfigurationSource,
                     null,
                     ArchitectureLayerResolver.DescribeLayer(layer),
                     "empty layer namespace",
@@ -367,7 +369,7 @@ public sealed partial class ArchitectureAnalysisSession
             if (!Document.ExternalDependencies.TryGetValue(groupName, out ArchitectureExternalDependencyGroup? group))
             {
                 violations.Add(new ArchitectureViolation(
-                    "<configuration>",
+                    ConfigurationSource,
                     null,
                     groupName,
                     "unknown external dependency group",
@@ -388,7 +390,7 @@ public sealed partial class ArchitectureAnalysisSession
             }
 
             violations.Add(new ArchitectureViolation(
-                "<configuration>",
+                ConfigurationSource,
                 null,
                 groupName,
                 "invalid external dependency group",
@@ -410,7 +412,7 @@ public sealed partial class ArchitectureAnalysisSession
             if (!Document.Packages.TryGetValue(groupName, out ArchitecturePackageGroup? group))
             {
                 violations.Add(new ArchitectureViolation(
-                    "<configuration>",
+                    ConfigurationSource,
                     null,
                     groupName,
                     "unknown package group",
@@ -431,7 +433,7 @@ public sealed partial class ArchitectureAnalysisSession
             }
 
             violations.Add(new ArchitectureViolation(
-                "<configuration>",
+                ConfigurationSource,
                 null,
                 groupName,
                 "invalid package group",

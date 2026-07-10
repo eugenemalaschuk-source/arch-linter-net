@@ -13,6 +13,7 @@ internal interface IArchitectureProjectFileParser
 
 internal sealed class ArchitectureProjectFileParser : IArchitectureProjectFileParser
 {
+    private const string IncludeAttribute = "Include";
 
     public DiscoveredProjectFile Parse(string projectPath, IArchitectureFileSystem? fileSystem = null)
     {
@@ -95,7 +96,7 @@ internal sealed class ArchitectureProjectFileParser : IArchitectureProjectFilePa
         List<(string PackageId, string? Version)> rawReferences = document.Descendants("PackageReference")
             .Select(element =>
             {
-                string? id = element.Attribute("Include")?.Value;
+                string? id = element.Attribute(IncludeAttribute)?.Value;
                 string? version = element.Attribute("Version")?.Value ?? element.Element("Version")?.Value;
                 return (Id: id, Version: string.IsNullOrWhiteSpace(version) ? null : version.Trim());
             })
@@ -133,7 +134,7 @@ internal sealed class ArchitectureProjectFileParser : IArchitectureProjectFilePa
     {
         string sourcePath = Path.GetFullPath(projectPath);
         IEnumerable<ArchitectureDiscoveredFriendAssembly> projectFileDeclarations = document.Descendants("InternalsVisibleTo")
-            .Select(element => element.Attribute("Include")?.Value)
+            .Select(element => element.Attribute(IncludeAttribute)?.Value)
             .Where(value => !string.IsNullOrWhiteSpace(value))
             .Select(value => new ArchitectureDiscoveredFriendAssembly(value!.Trim(), sourcePath));
 
@@ -224,7 +225,7 @@ internal sealed class ArchitectureProjectFileParser : IArchitectureProjectFilePa
         string sourcePath = Path.GetFullPath(projectPath);
 
         return document.Descendants("ProjectReference")
-            .Select(element => element.Attribute("Include")?.Value)
+            .Select(element => element.Attribute(IncludeAttribute)?.Value)
             .Where(value => !string.IsNullOrWhiteSpace(value))
             .Select(value => NormalizeProjectReferencePath(projectDirectory, value!.Trim()))
             .Distinct(StringComparer.OrdinalIgnoreCase)
@@ -310,7 +311,7 @@ internal sealed class ArchitectureProjectFileParser : IArchitectureProjectFilePa
             {
                 XDocument propsDocument = XDocument.Parse(fileSystem.ReadAllText(candidate));
                 return propsDocument.Descendants("PackageVersion")
-                    .Select(element => (Id: element.Attribute("Include")?.Value, Version: element.Attribute("Version")?.Value))
+                    .Select(element => (Id: element.Attribute(IncludeAttribute)?.Value, Version: element.Attribute("Version")?.Value))
                     .Where(entry => !string.IsNullOrWhiteSpace(entry.Id) && !string.IsNullOrWhiteSpace(entry.Version))
                     .GroupBy(entry => entry.Id!.Trim(), StringComparer.OrdinalIgnoreCase)
                     .ToDictionary(group => group.Key, group => group.First().Version!.Trim(), StringComparer.OrdinalIgnoreCase);
