@@ -1,0 +1,21 @@
+name: Temporary Sonar diagnostics
+
+on:
+  push:
+    branches:
+      - task/265-supply-chain-hygiene
+
+permissions:
+  contents: read
+
+jobs:
+  diagnostics:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+        with:
+          persist-credentials: false
+
+      - name: Print public PR issues
+        run: bash tools/diagnostics/print_sonar_pr_issues.sh
