@@ -59,7 +59,7 @@ jobs:
           RELEASE_TYPE: ${{ inputs.release_type }}
           VERSION_OVERRIDE: ${{ inputs.version_override }}
         run: |
-          uv run --no-project python tools/release/calculate_version.py \
+          uv run --project tools --locked python tools/release/calculate_version.py \
             --release-type "$RELEASE_TYPE" \
             --version-override "$VERSION_OVERRIDE" \
             --github-env "$GITHUB_ENV"
