@@ -162,12 +162,12 @@ function Install-OpenSpec {
 
 function Install-Actionlint {
     if (Test-Command "actionlint") {
-        Write-Host "actionlint is already installed."
+        Write-Output "actionlint is already installed."
         actionlint -version
         return
     }
 
-    Write-Host "actionlint is not installed. Installing latest release binary..."
+    Write-Output "actionlint is not installed. Installing latest release binary..."
 
     $installDir = Join-Path $env:USERPROFILE ".local\bin"
     New-Item -ItemType Directory -Force -Path $installDir | Out-Null
@@ -188,7 +188,7 @@ function Install-Actionlint {
     $env:Path = "$installDir;$env:Path"
 
     if (Test-Command "actionlint") {
-        Write-Host "actionlint installed successfully."
+        Write-Output "actionlint installed successfully."
         actionlint -version
         return
     }
@@ -199,19 +199,19 @@ function Install-Actionlint {
 
 function Install-Zizmor {
     if (Test-Command "zizmor") {
-        Write-Host "zizmor is already installed."
+        Write-Output "zizmor is already installed."
         zizmor --version
         return
     }
 
-    Write-Host "zizmor is not installed. Installing via cargo-binstall or cargo..."
+    Write-Output "zizmor is not installed. Installing via cargo-binstall or cargo..."
 
     if (-not (Test-Command "cargo")) {
         if (-not (Test-Command "winget")) {
             throw "winget is required to install Rust automatically for zizmor. Install Rust manually or install zizmor manually."
         }
 
-        Write-Host "Rust is not installed. Installing Rustup via winget..."
+        Write-Output "Rust is not installed. Installing Rustup via winget..."
         winget install --id Rustlang.Rustup --exact --source winget --accept-package-agreements --accept-source-agreements
 
         $cargoBin = Join-Path $env:USERPROFILE ".cargo\bin"
@@ -241,7 +241,7 @@ function Install-Zizmor {
     $env:Path = "$cargoBin;$env:Path"
 
     if (Test-Command "zizmor") {
-        Write-Host "zizmor installed successfully."
+        Write-Output "zizmor installed successfully."
         zizmor --version
         return
     }

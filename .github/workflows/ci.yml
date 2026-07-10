@@ -38,17 +38,24 @@ jobs:
       - name: Setup uv
         uses: astral-sh/setup-uv@e58605a9b6da7c637471fab8847a5e5a6b8df081
 
-      - name: Install workflow lint tooling
-        shell: bash
-        run: |
-          export GOBIN="$HOME/.local/bin"
-          mkdir -p "$GOBIN"
-          go install github.com/rhysd/actionlint/cmd/actionlint@v1.7.12
-          uv tool install zizmor==1.26.1
-          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+      - name: Lint workflows with actionlint
+        uses: raven-actions/actionlint@3d39aea434753780c3b3d4a1a31c854b4dbf49d7
+        with:
+          shellcheck: false
+          pyflakes: false
+          cache: true
+          fail-on-error: true
 
-      - name: Lint workflows
-        run: make lint-workflows
+      - name: Lint workflows with zizmor
+        uses: zizmorcore/zizmor-action@192e21d79ab29983730a13d1382995c2307fbcaa
+        with:
+          advanced-security: false
+          annotations: false
+          min-severity: low
+          inputs: .github/workflows
+
+      - name: Check workflow formatting
+        run: npx --yes prettier --check ".github/workflows/*.yml"
 
       - name: Setup .NET
         uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9
