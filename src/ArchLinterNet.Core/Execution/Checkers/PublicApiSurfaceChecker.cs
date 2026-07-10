@@ -6,12 +6,8 @@ using ArchLinterNet.Core.Scanning;
 
 namespace ArchLinterNet.Core.Execution.Checkers;
 
-internal sealed class PublicApiSurfaceChecker
+internal static class PublicApiSurfaceChecker
 {
-    private PublicApiSurfaceChecker()
-    {
-    }
-
     public static List<ArchitectureViolation> Check(
         ArchitecturePublicApiSurfaceContract contract,
         IReadOnlyDictionary<string, Assembly> resolvedAssemblies,

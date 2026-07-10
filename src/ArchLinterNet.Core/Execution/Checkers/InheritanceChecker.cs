@@ -5,12 +5,8 @@ using ArchLinterNet.Core.Scanning;
 
 namespace ArchLinterNet.Core.Execution.Checkers;
 
-internal sealed class InheritanceChecker
+internal static class InheritanceChecker
 {
-    private InheritanceChecker()
-    {
-    }
-
     public static List<ArchitectureViolation> Check(
         ArchitectureInheritanceContract contract,
         ArchitectureContractDocument document,

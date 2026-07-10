@@ -2,12 +2,8 @@ using ArchLinterNet.Cli.Abstractions;
 
 namespace ArchLinterNet.Cli.Infrastructure;
 
-internal sealed class CliCompositionRoot
+internal static class CliCompositionRoot
 {
-    private CliCompositionRoot()
-    {
-    }
-
     public static CliComposition Compose()
     {
         ICliConsole console = new SystemCliConsole();

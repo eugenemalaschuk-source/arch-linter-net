@@ -3,12 +3,8 @@ using ArchLinterNet.Core.Composition;
 
 namespace ArchLinterNet.Unity;
 
-public sealed class AsmdefValidator
+public static class AsmdefValidator
 {
-    private AsmdefValidator()
-    {
-    }
-
     private static readonly Lazy<ArchitectureEngine> _engine =
         new(() => new ArchitectureEngineBuilder().AddArchLinterNetCore().Build());
 

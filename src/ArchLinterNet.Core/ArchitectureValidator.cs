@@ -5,12 +5,8 @@ using ArchLinterNet.Core.Validation;
 
 namespace ArchLinterNet.Core;
 
-public sealed class ArchitectureValidator
+public static class ArchitectureValidator
 {
-    private ArchitectureValidator()
-    {
-    }
-
     private static readonly Lazy<ArchitectureEngine> _engine =
         new(() => new ArchitectureEngineBuilder().AddArchLinterNetCore().Build());
 
