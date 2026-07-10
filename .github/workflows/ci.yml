@@ -33,6 +33,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          persist-credentials: false
 
       - name: Setup uv
         uses: astral-sh/setup-uv@e58605a9b6da7c637471fab8847a5e5a6b8df081
@@ -181,8 +182,10 @@ jobs:
       - name: Collect changed first-party files
         id: changed_files
         continue-on-error: true
+        env:
+          PR_BASE_REF: ${{ github.event.pull_request.base.ref }}
         run: |
-          git diff --name-only --diff-filter=ACMR "origin/${{ github.event.pull_request.base.ref }}"...HEAD \
+          git diff --name-only --diff-filter=ACMR "origin/$PR_BASE_REF"...HEAD \
             -- '*.cs' ':!*.g.cs' ':!*Designer.cs' > changed-files.txt
 
       - name: Run architecture coverage analysis
@@ -267,6 +270,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          persist-credentials: false
 
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
