@@ -7,6 +7,10 @@ namespace ArchLinterNet.Core.Execution.Checkers;
 
 internal sealed class InheritanceChecker
 {
+    private InheritanceChecker()
+    {
+    }
+
     public static List<ArchitectureViolation> Check(
         ArchitectureInheritanceContract contract,
         ArchitectureContractDocument document,

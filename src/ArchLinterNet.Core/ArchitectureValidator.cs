@@ -7,6 +7,10 @@ namespace ArchLinterNet.Core;
 
 public sealed class ArchitectureValidator
 {
+    private ArchitectureValidator()
+    {
+    }
+
     private static readonly Lazy<ArchitectureEngine> _engine =
         new(() => new ArchitectureEngineBuilder().AddArchLinterNetCore().Build());
 

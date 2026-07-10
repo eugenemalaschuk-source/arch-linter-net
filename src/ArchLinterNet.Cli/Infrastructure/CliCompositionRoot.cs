@@ -4,6 +4,10 @@ namespace ArchLinterNet.Cli.Infrastructure;
 
 internal sealed class CliCompositionRoot
 {
+    private CliCompositionRoot()
+    {
+    }
+
     public static CliComposition Compose()
     {
         ICliConsole console = new SystemCliConsole();

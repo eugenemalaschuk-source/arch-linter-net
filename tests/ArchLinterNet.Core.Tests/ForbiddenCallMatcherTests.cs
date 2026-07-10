@@ -8,13 +8,14 @@ namespace ArchLinterNet.Core.Tests;
 public sealed class ForbiddenCallMatcherTests
 {
     private static readonly string[] _foo = { "_foo" };
+    private static readonly string[] _fooWithParen = { "_foo(" };
     private static readonly string[] _myAppServices = { "MyApp.Services." };
 
     [Test]
     public void NormalizePatterns_RemovesTrailingParentheses()
     {
         IReadOnlyList<ForbiddenCallPattern> patterns = ArchitectureForbiddenCallMatcher.NormalizePatterns(
-            new[] { "_foo(" });
+            _fooWithParen);
 
         Assert.That(patterns.Count, Is.EqualTo(1));
         Assert.That(patterns[0].Normalized, Is.EqualTo("_foo"));

@@ -5,6 +5,10 @@ namespace ArchLinterNet.Unity;
 
 public sealed class AsmdefValidator
 {
+    private AsmdefValidator()
+    {
+    }
+
     private static readonly Lazy<ArchitectureEngine> _engine =
         new(() => new ArchitectureEngineBuilder().AddArchLinterNetCore().Build());
 

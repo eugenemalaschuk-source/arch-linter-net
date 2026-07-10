@@ -8,6 +8,10 @@ namespace ArchLinterNet.Core.Execution.Checkers;
 
 internal sealed class PublicApiSurfaceChecker
 {
+    private PublicApiSurfaceChecker()
+    {
+    }
+
     public static List<ArchitectureViolation> Check(
         ArchitecturePublicApiSurfaceContract contract,
         IReadOnlyDictionary<string, Assembly> resolvedAssemblies,

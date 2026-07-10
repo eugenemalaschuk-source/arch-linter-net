@@ -23,6 +23,64 @@ function Add-DirectoryToUserPath {
     }
 }
 
+function Install-RtkViaCargoOrDownload {
+    param()
+
+    if (Test-Command "cargo") {
+        Write-Output "rtk is not installed. Installing via Cargo from GitHub..."
+        cargo install --git https://github.com/rtk-ai/rtk
+        if ($LASTEXITCODE -ne 0) {
+            throw "cargo install rtk failed with exit code $LASTEXITCODE."
+        }
+        if (Test-Command "rtk") {
+            rtk --version
+            return $true
+        }
+    }
+
+    return $false
+}
+
+function Install-RtkFromDownload {
+    param()
+
+    Write-Output "rtk is not installed. Downloading latest Windows release from GitHub..."
+    $release = Invoke-RestMethod -Uri "https://api.github.com/repos/rtk-ai/rtk/releases/latest"
+    $asset = $release.assets | Where-Object { $_.name -eq "rtk-x86_64-pc-windows-msvc.zip" } | Select-Object -First 1
+    if (-not $asset) {
+        throw "Could not find rtk-x86_64-pc-windows-msvc.zip in the latest RTK release."
+    }
+
+    $installDir = Join-Path $env:USERPROFILE ".local\bin"
+    New-Item -ItemType Directory -Force -Path $installDir | Out-Null
+
+    $zipPath = Join-Path $env:TEMP "rtk-windows.zip"
+    $extractDir = Join-Path $env:TEMP "rtk-windows"
+    Remove-Item $zipPath -Force -ErrorAction SilentlyContinue
+    Remove-Item $extractDir -Recurse -Force -ErrorAction SilentlyContinue
+
+    Invoke-WebRequest -Uri $asset.browser_download_url -OutFile $zipPath
+    Expand-Archive -Path $zipPath -DestinationPath $extractDir -Force
+
+    $rtkExe = Get-ChildItem -Path $extractDir -Filter "rtk.exe" -Recurse | Select-Object -First 1
+    if (-not $rtkExe) {
+        throw "rtk.exe was not found in the downloaded RTK archive."
+    }
+
+    Copy-Item -Path $rtkExe.FullName -Destination (Join-Path $installDir "rtk.exe") -Force
+    Add-DirectoryToUserPath -Directory $installDir
+
+    Remove-Item $zipPath -Force -ErrorAction SilentlyContinue
+    Remove-Item $extractDir -Recurse -Force -ErrorAction SilentlyContinue
+
+    if (-not (Test-Command "rtk")) {
+        throw "rtk.exe was installed to $installDir, but rtk is not available on PATH in this shell."
+    }
+
+    Write-Output "rtk installed successfully:"
+    rtk --version
+}
+
 function Install-RtkIfMissing {
     [CmdletBinding(SupportsShouldProcess)]
     param()
@@ -34,54 +92,10 @@ function Install-RtkIfMissing {
     }
 
     if ($PSCmdlet.ShouldProcess("rtk", "Install RTK agent")) {
-        if (Test-Command "cargo") {
-            Write-Output "rtk is not installed. Installing via Cargo from GitHub..."
-            cargo install --git https://github.com/rtk-ai/rtk
-            if ($LASTEXITCODE -ne 0) {
-                throw "cargo install rtk failed with exit code $LASTEXITCODE."
-            }
-
-            if (Test-Command "rtk") {
-                rtk --version
-                return
-            }
+        if (Install-RtkViaCargoOrDownload) {
+            return
         }
-
-        Write-Output "rtk is not installed. Downloading latest Windows release from GitHub..."
-        $release = Invoke-RestMethod -Uri "https://api.github.com/repos/rtk-ai/rtk/releases/latest"
-        $asset = $release.assets | Where-Object { $_.name -eq "rtk-x86_64-pc-windows-msvc.zip" } | Select-Object -First 1
-        if (-not $asset) {
-            throw "Could not find rtk-x86_64-pc-windows-msvc.zip in the latest RTK release."
-        }
-
-        $installDir = Join-Path $env:USERPROFILE ".local\bin"
-        New-Item -ItemType Directory -Force -Path $installDir | Out-Null
-
-        $zipPath = Join-Path $env:TEMP "rtk-windows.zip"
-        $extractDir = Join-Path $env:TEMP "rtk-windows"
-        Remove-Item $zipPath -Force -ErrorAction SilentlyContinue
-        Remove-Item $extractDir -Recurse -Force -ErrorAction SilentlyContinue
-
-        Invoke-WebRequest -Uri $asset.browser_download_url -OutFile $zipPath
-        Expand-Archive -Path $zipPath -DestinationPath $extractDir -Force
-
-        $rtkExe = Get-ChildItem -Path $extractDir -Filter "rtk.exe" -Recurse | Select-Object -First 1
-        if (-not $rtkExe) {
-            throw "rtk.exe was not found in the downloaded RTK archive."
-        }
-
-        Copy-Item -Path $rtkExe.FullName -Destination (Join-Path $installDir "rtk.exe") -Force
-        Add-DirectoryToUserPath -Directory $installDir
-
-        Remove-Item $zipPath -Force -ErrorAction SilentlyContinue
-        Remove-Item $extractDir -Recurse -Force -ErrorAction SilentlyContinue
-
-        if (-not (Test-Command "rtk")) {
-            throw "rtk.exe was installed to $installDir, but rtk is not available on PATH in this shell."
-        }
-
-        Write-Output "rtk installed successfully:"
-        rtk --version
+        Install-RtkFromDownload
     }
 }
 
