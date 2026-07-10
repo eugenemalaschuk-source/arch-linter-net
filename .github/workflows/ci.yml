@@ -107,15 +107,7 @@ jobs:
             /d:sonar.cs.vstest.reportsPaths="test-results/**/*.trx"
 
       - name: Acceptance
-        if: github.event_name == 'pull_request'
-        run: make acceptance
-
-      - name: Collect test coverage
-        run: make test-coverage
-
-      - name: Refresh main branch badges
-        if: github.event_name == 'push'
-        run: make test-coverage
+        run: make acceptance COVERAGE=1
 
       - name: Resolve coverage report paths
         id: coverage_reports

@@ -1,5 +1,7 @@
 .PHONY: test clean-results test-coverage test-coverage-main-ci test-coverage-badge _acceptance-test
 
+COVERAGE ?= 0
+
 test:  ## Run all tests
 	@dotnet test "$(SLNX)" --no-restore
 
@@ -9,7 +11,7 @@ test:  ## Run all tests
 # ordering to the public `test` target itself — standalone `make test` stays exactly "run all
 # tests", with no implicit architecture-check prerequisite.
 _acceptance-test: | lint-architecture
-	@$(MAKE) test
+	@$(MAKE) $(if $(filter 1,$(COVERAGE)),test-coverage,test)
 
 clean-results:  ## Remove test-results folder
 	rm -rf "$(RESULTS_DIR)"
