@@ -2,7 +2,7 @@
 set -eu
 
 RTK_VERSION="v0.42.4"
-RTK_COMMIT="5d32d0736f686b69d1e8b9dc45c007d4eb77a0a2"
+RTK_COMMIT="8a7dd7e5570d7744d4b6508479a3674fe8c49286"
 RTK_INSTALLER_URL="https://raw.githubusercontent.com/rtk-ai/rtk/${RTK_COMMIT}/install.sh"
 
 log() {
