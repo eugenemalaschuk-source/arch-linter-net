@@ -319,7 +319,8 @@ jobs:
             /d:sonar.cs.vstest.reportsPaths="test-results/**/*.trx"
 
       - name: Collect main branch test coverage
-        run: make test-coverage
+        timeout-minutes: 20
+        run: make test-coverage-main-ci
 
       - name: Resolve coverage report paths
         id: coverage_reports
