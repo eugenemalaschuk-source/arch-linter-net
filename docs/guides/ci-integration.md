@@ -100,6 +100,40 @@ To inspect the same full-solution coverage report locally before pushing, run `m
 
 **All-zero counts can mean two different things.** If `coverage_summary` is an empty list, the policy defines no coverage contracts at all (`strict_coverage`/`audit_coverage` are absent) — the report's note line calls this out explicitly. That is different from a policy that *does* define coverage contracts and reports zero uncovered/stale/unknown items, which means real coverage contracts exist and nothing is currently failing them. This repository's own `architecture/dependencies.arch.yml` defines an `assembly`-scope and a `namespace`-scope `strict_coverage` contract covering all four first-party assemblies and their root namespaces, so the gate reflects real coverage rather than an empty, trivially-passing policy.
 
+## Test coverage with Codecov
+
+This repository treats line test coverage and architecture coverage as two separate CI signals:
+
+- `make test-coverage` runs the NUnit test projects with `XPlat Code Coverage` and writes Cobertura XML files under `test-results/`.
+- `make architecture-coverage-report` evaluates ArchLinterNet coverage contracts and prints architecture-specific Markdown + JSON diagnostics.
+
+The CI workflow runs `make test-coverage` after the acceptance gate, resolves the generated `coverage.cobertura.xml` files, and uploads them with `codecov/codecov-action@v5`. The chosen authentication mode for this repository is the repository secret `CODECOV_TOKEN`, not OIDC.
+
+To inspect the same test-coverage input locally before pushing, run:
+
+```bash
+make test-coverage
+make test-coverage-badge
+```
+
+The first command regenerates the raw Cobertura XML reports in `test-results/`. The second command merges those reports locally and prints the same overall line-coverage percentage that the README badge is expected to reflect once Codecov ingests the upload from `main`.
+
+### Codecov auth and fork behavior
+
+The upload step uses `CODECOV_TOKEN` from GitHub Actions secrets. Secrets are available for pushes to this repository and for pull requests whose head branch also lives in this repository, but not for untrusted fork pull requests.
+
+That is why the workflow gates upload with:
+
+```yaml
+if: github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository
+```
+
+Fork PRs still run the normal acceptance and architecture checks, but they skip the Codecov upload because GitHub does not expose repository secrets to untrusted fork workflows.
+
+### Failure mode expectations
+
+Codecov upload is intentionally configured with `fail_ci_if_error: false`. Test execution remains required, but transient Codecov or network issues should not make an otherwise healthy pull request flaky.
+
 ## Azure Pipelines example
 
 ```yaml
