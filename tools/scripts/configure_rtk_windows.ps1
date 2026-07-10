@@ -31,7 +31,7 @@ function Install-RtkIfMissing {
     }
 
     if (Test-Command "cargo") {
-        Write-Host "rtk is not installed. Installing pinned $RtkVersion via Cargo from GitHub..."
+        Write-Output "rtk is not installed. Installing pinned $RtkVersion via Cargo from GitHub..."
         cargo install --git https://github.com/rtk-ai/rtk --rev $RtkCommit --locked
         if ($LASTEXITCODE -ne 0) {
             throw "cargo install rtk failed with exit code $LASTEXITCODE."
@@ -43,7 +43,7 @@ function Install-RtkIfMissing {
         }
     }
 
-    Write-Host "rtk is not installed. Downloading pinned Windows release $RtkVersion from GitHub..."
+    Write-Output "rtk is not installed. Downloading pinned Windows release $RtkVersion from GitHub..."
     $release = Invoke-RestMethod -Uri "https://api.github.com/repos/rtk-ai/rtk/releases/tags/$RtkVersion"
     $asset = $release.assets | Where-Object { $_.name -eq "rtk-x86_64-pc-windows-msvc.zip" } | Select-Object -First 1
     if (-not $asset) {
