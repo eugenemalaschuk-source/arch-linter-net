@@ -44,12 +44,12 @@ jobs:
       - name: Commit diagnostics
         shell: bash
         run: |
-          if git diff --quiet -- issue-276-format.log && git ls-files --error-unmatch issue-276-format.log >/dev/null 2>&1; then
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -f issue-276-format.log
+          if git diff --cached --quiet; then
             echo "Diagnostics are unchanged."
             exit 0
           fi
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add issue-276-format.log
           git commit -m "chore: capture issue 276 format diagnostics"
           git push origin HEAD:fix/276-code-scanning-hardening
