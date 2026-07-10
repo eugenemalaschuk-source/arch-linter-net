@@ -19,7 +19,7 @@ fi
 
 if ! command -v openspec >/dev/null 2>&1; then
   echo "Installing @fission-ai/openspec via npm..."
-  npm install -g @fission-ai/openspec@latest
+  npm install -g --ignore-scripts @fission-ai/openspec@latest
 fi
 
 echo "Unix tool bootstrap complete."
