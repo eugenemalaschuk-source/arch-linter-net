@@ -177,21 +177,21 @@ jobs:
           make architecture-coverage-ci DIFF_STATUS="$DIFF_STATUS"
 
       - name: Upload strict diagnostics
-        if: always()
+        if: always() && hashFiles('architecture-strict.json') != ''
         uses: actions/upload-artifact@v4
         with:
           name: architecture-strict
           path: architecture-strict.json
 
       - name: Upload audit diagnostics
-        if: always()
+        if: always() && hashFiles('architecture-audit.json') != ''
         uses: actions/upload-artifact@v4
         with:
           name: architecture-audit
           path: architecture-audit.json
 
       - name: Upload architecture coverage report
-        if: always()
+        if: always() && hashFiles('architecture-coverage.md') != ''
         uses: actions/upload-artifact@v4
         with:
           name: architecture-coverage-report
