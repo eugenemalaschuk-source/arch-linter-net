@@ -149,16 +149,14 @@ internal sealed class CoverageValidator : IArchitecturePolicyDocumentValidator
 
         HashSet<string> knownContractIds = CollectLayerBearingContractIds(document);
 
-        foreach (string referencedContractId in contract.ContractIds)
+        string? unknownContractId = contract.ContractIds.FirstOrDefault(id => !knownContractIds.Contains(id));
+        if (unknownContractId != null)
         {
-            if (!knownContractIds.Contains(referencedContractId))
-            {
-                throw new InvalidOperationException(
-                    $"Rule-input coverage contract '{contract.Name}' references unknown contract ID '{referencedContractId}' " +
-                    "in 'contract_ids'. The ID must match a declared dependency, layer, allow_only, cycle, method_body, " +
-                    "independence, protected, or external contract. asmdef, acyclic_sibling, and layer_template contracts " +
-                    "are not valid for scope 'rule_input'.");
-            }
+            throw new InvalidOperationException(
+                $"Rule-input coverage contract '{contract.Name}' references unknown contract ID '{unknownContractId}' " +
+                "in 'contract_ids'. The ID must match a declared dependency, layer, allow_only, cycle, method_body, " +
+                "independence, protected, or external contract. asmdef, acyclic_sibling, and layer_template contracts " +
+                "are not valid for scope 'rule_input'.");
         }
 
         for (int i = 0; i < contract.Exclude.Count; i++)
