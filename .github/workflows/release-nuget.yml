@@ -55,10 +55,13 @@ jobs:
 
       - name: Calculate package version
         shell: bash
+        env:
+          RELEASE_TYPE: ${{ inputs.release_type }}
+          VERSION_OVERRIDE: ${{ inputs.version_override }}
         run: |
           uv run python tools/release/calculate_version.py \
-            --release-type "${{ inputs.release_type }}" \
-            --version-override "${{ inputs.version_override }}" \
+            --release-type "$RELEASE_TYPE" \
+            --version-override "$VERSION_OVERRIDE" \
             --github-env "$GITHUB_ENV"
 
       - name: Export release metadata outputs
@@ -98,7 +101,7 @@ jobs:
           echo "---"
 
       - name: Upload release notes artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: release-notes-${{ env.PACKAGE_VERSION }}
           path: artifacts/release-notes/release-notes.md
@@ -130,7 +133,7 @@ jobs:
         run: dotnet pack src/ArchLinterNet.Unity/ArchLinterNet.Unity.csproj --configuration Release --no-build --output "$PACKAGE_OUTPUT" -p:PackageVersion="$PACKAGE_VERSION" -p:Version="$PACKAGE_VERSION" -p:PackageReleaseNotes="$PACKAGE_RELEASE_NOTES"
 
       - name: Upload package artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: nuget-packages-${{ env.PACKAGE_VERSION }}
           path: |
@@ -140,7 +143,7 @@ jobs:
 
       - name: NuGet login
         if: ${{ inputs.publish == true }}
-        uses: NuGet/login@v1
+        uses: NuGet/login@8d196754b4036150537f80ac539e15c2f1028841
         id: nuget-login
         with:
           user: ${{ secrets.NUGET_USER }}
@@ -162,13 +165,13 @@ jobs:
       contents: write
     steps:
       - name: Download release notes artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
         with:
           name: release-notes-${{ needs.release.outputs.package_version }}
           path: artifacts/release-notes
 
       - name: Download package artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
         with:
           name: nuget-packages-${{ needs.release.outputs.package_version }}
           path: artifacts/packages
