@@ -55,7 +55,7 @@ jobs:
           inputs: .github/workflows
 
       - name: Check workflow formatting
-        run: npx --yes prettier --check ".github/workflows/*.yml"
+        run: npx --yes --ignore-scripts prettier@3.9.5 --check ".github/workflows/*.yml"
 
       - name: Setup .NET
         uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9
