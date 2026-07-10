@@ -19,17 +19,17 @@ Some developer tools are installed by repository scripts rather than by a manife
 
 | Tool | Reviewed version | Immutable input |
 |---|---:|---|
-| RTK | `v0.42.4` | commit `5d32d0736f686b69d1e8b9dc45c007d4eb77a0a2` |
+| RTK | `v0.42.4` | release commit `8a7dd7e5570d7744d4b6508479a3674fe8c49286` |
 | OpenSpec | `1.6.0` | exact npm package version |
 
-RTK's Cargo fallbacks build the reviewed commit. The Unix remote installer is loaded from that commit and receives the reviewed release version explicitly. The Windows fallback resolves the fixed release tag instead of the moving latest release.
+RTK's Cargo fallbacks build the reviewed release commit. The Unix remote installer is loaded from that commit and receives the reviewed release version explicitly. The Windows fallback resolves the fixed release tag instead of the moving latest release.
 
 ## Upgrade procedure
 
 Manual bootstrap pins must be upgraded in a dedicated pull request:
 
 1. Review the upstream release notes, repository changes, and any security advisories.
-2. For RTK, select a reviewed release tag and the exact upstream commit containing that release. Verify that the commit's `Cargo.toml` version matches the intended release.
+2. For RTK, select a reviewed release tag and the exact upstream commit referenced by that release. Verify that the commit's `Cargo.toml` version matches the intended release.
 3. Update `RTK_VERSION`/`RtkVersion` and `RTK_COMMIT`/`RtkCommit` together in:
    - `tools/scripts/configure_rtk_unix.sh`;
    - `tools/scripts/configure_rtk_windows.ps1`.
