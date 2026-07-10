@@ -15,15 +15,16 @@ concurrency:
   group: codeql-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
-permissions:
-  contents: read
-  security-events: write
+permissions: read-all
 
 jobs:
   analyze:
     name: Analyze C#
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    permissions:
+      contents: read
+      security-events: write
 
     steps:
       - name: Checkout
