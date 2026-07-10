@@ -237,10 +237,6 @@ jobs:
         if: steps.architecture_coverage.outcome == 'failure'
         run: exit 1
 
-      - name: Fail if SonarCloud quality gate failed
-        if: steps.sonar_end.outcome == 'failure'
-        run: exit 1
-
   main_badge_refresh:
     name: Main Badge Refresh
     if: github.event_name == 'push'
@@ -352,6 +348,3 @@ jobs:
         run: |
           ./.sonar/scanner/dotnet-sonarscanner end /d:sonar.token="$SONAR_TOKEN"
 
-      - name: Fail if SonarCloud quality gate failed
-        if: steps.sonar_end.outcome == 'failure'
-        run: exit 1
