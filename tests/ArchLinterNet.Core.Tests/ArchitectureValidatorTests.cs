@@ -232,7 +232,6 @@ contracts:
     public void Validate_RequestOverload_SelectsOnlySpecifiedContract()
     {
         string contractPath = Write_selfForbiddenPolicy();
-        var validator = new ArchitectureValidator();
 
         ValidationOutcome outcome = ArchitectureValidator.Validate(new ValidationRequest
         {
@@ -278,7 +277,6 @@ contracts:
     public void Validate_RequestOverload_AuditMode_SelectsOnlySpecifiedContract()
     {
         string contractPath = Write_selfForbiddenAuditPolicy();
-        var validator = new ArchitectureValidator();
 
         ValidationOutcome with_harmlessOnly = ArchitectureValidator.Validate(new ValidationRequest
         {
@@ -350,8 +348,6 @@ contracts:
       forbidden_calls: [System.Console.WriteLine]
 ");
 
-        var validator = new ArchitectureValidator();
-
         ValidationOutcome runtimeOutcome = ArchitectureValidator.Validate(new ValidationRequest
         {
             PolicyPath = contractPath,
@@ -379,7 +375,6 @@ contracts:
     public void Validate_RequestOverload_BaselinePath_SuppressesKnownViolation()
     {
         string contractPath = Write_selfForbiddenPolicy();
-        var validator = new ArchitectureValidator();
 
         ValidationOutcome before = ArchitectureValidator.Validate(new ValidationRequest
         {
@@ -446,8 +441,6 @@ contracts:
           reason: stale
 ");
 
-        var validator = new ArchitectureValidator();
-
         ValidationOutcome outcome = ArchitectureValidator.Validate(new ValidationRequest
         {
             PolicyPath = contractPath,
@@ -487,8 +480,6 @@ contracts:
           reason: stale
 ");
 
-        var validator = new ArchitectureValidator();
-
         ValidationOutcome outcome = ArchitectureValidator.Validate(new ValidationRequest
         {
             PolicyPath = contractPath,
@@ -523,7 +514,6 @@ contracts:
     public void Validate_LegacyOverloads_UnaffectedByNewOverload()
     {
         string contractPath = Write_selfForbiddenPolicy();
-        var validator = new ArchitectureValidator();
 
         bool result = ArchitectureValidator.Validate(contractPath, out var violations, out var cycles);
 

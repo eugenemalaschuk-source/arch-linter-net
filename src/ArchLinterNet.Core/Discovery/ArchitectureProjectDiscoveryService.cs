@@ -6,7 +6,7 @@ namespace ArchLinterNet.Core.Discovery;
 
 public sealed class ArchitectureProjectDiscoveryService : IArchitectureProjectDiscoveryService
 {
-    private static readonly char[] PathSeparators = [Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar];
+    private static readonly char[] _pathSeparators = [Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar];
 
     private readonly IArchitectureFileSystem _fileSystem;
     private readonly IArchitectureSolutionParser _solutionParser;
@@ -318,7 +318,7 @@ public sealed class ArchitectureProjectDiscoveryService : IArchitectureProjectDi
         foreach (string file in fileSystem.EnumerateFiles(projectDirectory, "*.cs", SearchOption.AllDirectories))
         {
             string relativePath = Path.GetRelativePath(projectDirectory, file);
-            string[] segments = relativePath.Split(PathSeparators);
+            string[] segments = relativePath.Split(_pathSeparators);
 
             if (segments.Any(segment =>
                     string.Equals(segment, "bin", StringComparison.OrdinalIgnoreCase) ||

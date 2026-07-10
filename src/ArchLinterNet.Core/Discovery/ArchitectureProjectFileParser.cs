@@ -13,7 +13,7 @@ internal interface IArchitectureProjectFileParser
 
 internal sealed class ArchitectureProjectFileParser : IArchitectureProjectFileParser
 {
-    private static readonly char[] PathSeparators = [Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar];
+    private static readonly char[] _pathSeparators = [Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar];
 
     private const string IncludeAttribute = "Include";
 
@@ -271,7 +271,7 @@ internal sealed class ArchitectureProjectFileParser : IArchitectureProjectFilePa
     private static bool IsUnderBuildOutputDirectory(string projectDirectory, string filePath)
     {
         string relativePath = Path.GetRelativePath(projectDirectory, filePath);
-        string[] segments = relativePath.Split(PathSeparators);
+        string[] segments = relativePath.Split(_pathSeparators);
 
         return segments.Any(segment =>
             string.Equals(segment, "bin", StringComparison.OrdinalIgnoreCase) ||
