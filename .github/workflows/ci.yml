@@ -20,6 +20,7 @@ jobs:
     name: Pull Request Validation
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
+    timeout-minutes: 10
 
     steps:
       - name: Checkout
@@ -248,6 +249,7 @@ jobs:
     name: Main Badge Refresh
     if: github.event_name == 'push'
     runs-on: ubuntu-latest
+    timeout-minutes: 5
 
     steps:
       - name: Checkout
@@ -326,7 +328,6 @@ jobs:
             /d:sonar.cs.vstest.reportsPaths="test-results/**/*.trx"
 
       - name: Collect main branch test coverage
-        timeout-minutes: 20
         run: make test-coverage-main-ci
 
       - name: Resolve coverage report paths
