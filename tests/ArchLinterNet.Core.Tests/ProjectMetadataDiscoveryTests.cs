@@ -129,6 +129,59 @@ public sealed class ProjectMetadataDiscoveryTests
     }
 
     [Test]
+    public void Discovery_ParsesCentralVersionsMultiTargetingAndSourceFriendAttributes()
+    {
+        string projectDir = Path.Combine(_repoRoot, "src", "MyApp");
+        Directory.CreateDirectory(projectDir);
+        File.WriteAllText(Path.Combine(_repoRoot, "Directory.Packages.props"), """
+            <Project>
+              <ItemGroup>
+                <PackageVersion Include="Central.Package" Version="2.3.4" />
+              </ItemGroup>
+            </Project>
+            """);
+        File.WriteAllText(Path.Combine(projectDir, "AssemblyInfo.cs"), """
+            using System.Runtime.CompilerServices;
+            [assembly: InternalsVisibleTo("MyApp.Tools")]
+            namespace MyApp;
+            [assembly: InternalsVisibleTo("MyApp.MemberTools", AllInternalsVisible = true)]
+            public class Marker { }
+            """);
+        string projectPath = Path.Combine(projectDir, "MyApp.csproj");
+        File.WriteAllText(projectPath, """
+            <Project Sdk="Microsoft.NET.Sdk">
+              <PropertyGroup>
+                <AssemblyName> MyApp.Custom </AssemblyName>
+                <TargetFrameworks> net8.0; net10.0 </TargetFrameworks>
+              </PropertyGroup>
+              <ItemGroup>
+                <PackageReference Include="Central.Package" />
+                <PackageReference Include="Inline.Package" Version="1.0.0" />
+                <PackageReference Include="Missing.Package" />
+              </ItemGroup>
+            </Project>
+            """);
+
+        ArchitectureDiscoveredProject project = new ArchitectureProjectDiscoveryService()
+            .ResolveFromDocument(new ArchitectureContractDocument
+            {
+                Analysis = new ArchitectureAnalysisConfiguration
+                {
+                    Projects = new List<string> { projectPath }
+                }
+            }, _repoRoot, resolveAssemblyOutputs: false)
+            .DiscoveredProjects.Single();
+
+        Assert.That(project.AssemblyName, Is.EqualTo("MyApp.Custom"));
+        Assert.That(project.TargetFrameworks, Is.EqualTo(new[] { "net8.0", "net10.0" }));
+        Assert.That(project.PackageReferences.Select(reference => (reference.PackageId, reference.Version)), Is.EquivalentTo(new[]
+        {
+            ("Central.Package", "2.3.4"), ("Inline.Package", "1.0.0"), ("Missing.Package", null)
+        }));
+        Assert.That(project.FriendAssemblies.Select(friend => friend.AssemblyName), Is.EquivalentTo(new[] { "MyApp.Tools" }));
+    }
+
+    [Test]
     public void Discovery_BackslashProjectReference_IsDetectedByForbiddenContract()
     {
         string testsDir = Path.Combine(_repoRoot, "tests", "MyApp.Tests");

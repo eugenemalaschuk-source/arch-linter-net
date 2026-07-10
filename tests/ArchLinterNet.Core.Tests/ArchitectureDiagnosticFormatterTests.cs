@@ -151,6 +151,85 @@ public sealed class ArchitectureDiagnosticFormatterTests
     }
 
     [Test]
+    public void FormatDiagnostics_AllPayloadKinds_IncludesHumanAndCiContext()
+    {
+        var violations = new List<ArchitectureViolation>
+        {
+            new("type", "type-id", "Type.Source", "Type.Forbidden", new[] { "Type.Ref" })
+            { Payload = new TypePlacementPayload("Expected.Location", "Actual.Location", "Expected.Name", "Actual.Name") },
+            new("api", "api-id", "Api.Source", "Api.Forbidden", new[] { "Api.Ref" })
+            { Payload = new PublicApiSurfacePayload("public void Api()", true, "Api.Assembly", "public") },
+            new("attribute", "attribute-id", "Attribute.Source", "Attribute.Forbidden", new[] { "Attribute.Ref" })
+            { Payload = new AttributeUsagePayload("ObsoleteAttribute", "forbidden", "Expected.Attribute", "Actual.Attribute") },
+            new("inheritance", "inheritance-id", "Inheritance.Source", "Inheritance.Forbidden", new[] { "Inheritance.Ref" })
+            { Payload = new InheritancePayload("Forbidden.Base", "public_api") },
+            new("interface", "interface-id", "Interface.Source", "Interface.Forbidden", new[] { "Interface.Ref" })
+            { Payload = new InterfaceImplementationPayload("IForbidden", "missing", "Expected.Interface", "Actual.Interface") },
+            new("composition", "composition-id", "Composition.Source", "Composition.Forbidden", new[] { "Composition.Ref" })
+            { Payload = new CompositionPayload("Composition.Configure", "Forbidden.Api", "Composition boundary") },
+            new("project", "project-id", "Project.Source", "Project.Forbidden", new[] { "Project.Ref" })
+            { Payload = new ProjectMetadataPayload("forbidden_property", "Nullable", "enable", "disable", "src/App.csproj") },
+            new("external", "external-id", "External.Source", "External.Forbidden", new[] { "External.Ref" })
+            { Payload = new ExternalDependencyPayload("vendor_sdk") }
+        };
+
+        string human = _formatter.FormatViolationsForHumans(violations);
+        Assert.That(human, Does.Contain("expected_location: Expected.Location"));
+        Assert.That(human, Does.Contain("reason: forbidden_public_constant"));
+        Assert.That(human, Does.Contain("attribute: ObsoleteAttribute"));
+        Assert.That(human, Does.Contain("forbidden_base_type: Forbidden.Base"));
+        Assert.That(human, Does.Contain("interface: IForbidden"));
+        Assert.That(human, Does.Contain("matched_api: Forbidden.Api"));
+        Assert.That(human, Does.Contain("source_path: src/App.csproj"));
+        Assert.That(human, Does.Contain("external_group: vendor_sdk"));
+
+        using var document = JsonDocument.Parse(_formatter.FormatResultForCiArtifacts(
+            "strict", false, violations, Array.Empty<string>()));
+        JsonElement serialized = document.RootElement.GetProperty("violations");
+        Assert.That(serialized.ToString(), Does.Contain("expected_type_location"));
+        Assert.That(serialized.ToString(), Does.Contain("undeclared_api_signature"));
+        Assert.That(serialized.ToString(), Does.Contain("matched_attribute"));
+        Assert.That(serialized.ToString(), Does.Contain("forbidden_base_type"));
+        Assert.That(serialized.ToString(), Does.Contain("matched_interface"));
+        Assert.That(serialized.ToString(), Does.Contain("project_metadata_source_path"));
+        Assert.That(serialized.ToString(), Does.Contain("forbidden_external_group"));
+    }
+
+    [Test]
+    public void FormatCoverageAndPolicyResults_IncludesSortedDetails()
+    {
+        var summary = new ArchitectureCoverageSummary(
+            "coverage", "coverage-id", "namespace",
+            new ArchitectureCoverageSummaryCounts(1, 1, 1, 1, 1),
+            new[] { new ArchitectureCoverageSummaryExcludedItem("z-excluded", "generated") },
+            new[] { new ArchitectureCoverageSummaryEvidenceItem("a-uncovered", "a-evidence") },
+            new[] { new ArchitectureCoverageSummaryEvidenceItem("b-stale", "b-evidence") },
+            new[] { new ArchitectureCoverageSummaryEvidenceItem("c-unknown", "c-evidence") },
+            new[] { new ArchitectureCoverageSummaryEvidenceItem("d-covered", "d-evidence") });
+        var policy = new PolicyConsistencyDiagnostic(
+            "policy", "policy-id", "duplicate", "conflicting rules",
+            new[] { "first-id" }, new[] { "first", "second" }, new[] { "Core" })
+        { RepresentativeType = "Core.Representative" };
+
+        Assert.That(_formatter.FormatCoverageForHumans(new[]
+        {
+            new ArchitectureViolation("coverage", "coverage-id", "Source", "Forbidden", new[] { "Reference" })
+        }), Does.StartWith("Coverage findings:"));
+        string humanSummary = _formatter.FormatCoverageSummaryForHumans(new[] { summary });
+        Assert.That(humanSummary, Does.Contain("covered=1 excluded=1 uncovered=1 stale=1 unknown=1"));
+        Assert.That(humanSummary, Does.Contain("uncovered: a-uncovered (a-evidence)"));
+        Assert.That(_formatter.FormatPolicyConsistencyForHumans(new[] { policy }), Does.Contain("Core.Representative").Or.Contain("conflicting rules"));
+
+        using var json = JsonDocument.Parse(_formatter.FormatResultForCiArtifacts(
+            "strict", false, Array.Empty<ArchitectureViolation>(), Array.Empty<string>(),
+            policyConsistencyFindings: new[] { policy }, coverageSummaries: new[] { summary }));
+        Assert.That(json.RootElement.GetProperty("policy_consistency_findings")[0].GetProperty("representative_type").GetString(),
+            Is.EqualTo("Core.Representative"));
+        Assert.That(json.RootElement.GetProperty("coverage_summary")[0].GetProperty("covered_items")[0].GetProperty("item").GetString(),
+            Is.EqualTo("d-covered"));
+    }
+
+    [Test]
     public void FormatCyclesForHumans_MultipleCycles_SortedAlphabetically()
     {
         var cycles = new[] { "Z -> Y -> Z", "A -> B -> A" };
