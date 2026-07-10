@@ -1,4 +1,4 @@
-name: Diagnose issue 276 lint
+name: Diagnose issue 276 format
 
 on:
   pull_request:
@@ -10,31 +10,19 @@ on:
       - synchronize
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
-  lint-target:
+  diagnose:
     if: github.head_ref == 'fix/276-code-scanning-hardening'
-    name: ${{ matrix.target }}
     runs-on: ubuntu-latest
-    timeout-minutes: 20
-    strategy:
-      fail-fast: false
-      matrix:
-        target:
-          - lint-code-size
-          - lint-dotnet-format
-          - lint-architecture
-          - lint-docs
+    timeout-minutes: 15
 
     steps:
       - name: Checkout
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
-          persist-credentials: false
-
-      - name: Setup uv
-        uses: astral-sh/setup-uv@11f9893b081a58869d3b5fccaea48c9e9e46f990 # v7.5.0
+          ref: fix/276-code-scanning-hardening
 
       - name: Setup .NET
         uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v5.1.0
@@ -44,5 +32,24 @@ jobs:
       - name: Restore
         run: make restore
 
-      - name: Run lint target
-        run: make ${{ matrix.target }}
+      - name: Capture formatter diagnostics
+        shell: bash
+        run: |
+          set +e
+          dotnet format ArchLinterNet.slnx --verify-no-changes --verbosity diagnostic > /tmp/format.log 2>&1
+          status=$?
+          tail -200 /tmp/format.log > issue-276-format.log
+          echo "FORMAT_EXIT_CODE=$status" >> issue-276-format.log
+
+      - name: Commit diagnostics
+        shell: bash
+        run: |
+          if git diff --quiet -- issue-276-format.log && git ls-files --error-unmatch issue-276-format.log >/dev/null 2>&1; then
+            echo "Diagnostics are unchanged."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add issue-276-format.log
+          git commit -m "chore: capture issue 276 format diagnostics"
+          git push origin HEAD:fix/276-code-scanning-hardening
