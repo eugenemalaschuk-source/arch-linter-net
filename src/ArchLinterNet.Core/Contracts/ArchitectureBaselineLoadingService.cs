@@ -100,7 +100,7 @@ public sealed class ArchitectureBaselineLoadingService : IArchitectureBaselineLo
         }
     }
 
-    internal void Merge(ArchitectureContractDocument policyDocument, ArchitectureBaselineDocument baselineDocument)
+    internal static void Merge(ArchitectureContractDocument policyDocument, ArchitectureBaselineDocument baselineDocument)
     {
         var groupMerger = new ContractGroupMerger(policyDocument.Contracts);
         foreach (string groupName in ArchitectureBaselineContractGroups.GroupNames)
@@ -109,7 +109,7 @@ public sealed class ArchitectureBaselineLoadingService : IArchitectureBaselineLo
         }
     }
 
-    internal void MergeAndValidate(
+    internal static void MergeAndValidate(
         ArchitectureContractDocument policyDocument,
         ArchitectureBaselineDocument baselineDocument)
     {

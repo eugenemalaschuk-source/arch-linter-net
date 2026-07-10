@@ -16,15 +16,16 @@ internal static class ProjectPathGlob
     {
         StringBuilder builder = new("^");
 
-        for (int i = 0; i < pattern.Length; i++)
+        int i = 0;
+        while (i < pattern.Length)
         {
             char current = pattern[i];
 
             if (current == '*' && i + 1 < pattern.Length && pattern[i + 1] == '*')
             {
                 builder.Append(".*");
-                i++;
-                if (i + 1 < pattern.Length && pattern[i + 1] == '/')
+                i += 2;
+                if (i < pattern.Length && pattern[i] == '/')
                 {
                     i++;
                 }
@@ -32,10 +33,12 @@ internal static class ProjectPathGlob
             else if (current == '*')
             {
                 builder.Append("[^/]*");
+                i++;
             }
             else
             {
                 builder.Append(Regex.Escape(current.ToString()));
+                i++;
             }
         }
 

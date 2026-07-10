@@ -54,8 +54,7 @@ contracts:
   strict_independence: []
 ");
 
-        var validator = new ArchitectureValidator();
-        bool result = validator.Validate(contractPath);
+        bool result = ArchitectureValidator.Validate(contractPath);
 
         Assert.That(result, Is.True);
     }
@@ -86,8 +85,7 @@ contracts:
   strict_independence: []
 ");
 
-        var validator = new ArchitectureValidator();
-        bool result = validator.Validate(contractPath);
+        bool result = ArchitectureValidator.Validate(contractPath);
 
         Assert.That(result, Is.True);
     }

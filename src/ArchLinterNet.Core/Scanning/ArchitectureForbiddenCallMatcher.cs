@@ -31,12 +31,12 @@ internal static class ArchitectureForbiddenCallMatcher
 
             string normalized = pattern.Trim();
 
-            if (normalized.EndsWith("(", StringComparison.Ordinal))
+            if (normalized.EndsWith('('))
             {
                 normalized = normalized[..^1];
             }
 
-            bool isNamespacePrefix = normalized.EndsWith(".", StringComparison.Ordinal);
+            bool isNamespacePrefix = normalized.EndsWith('.');
             if (isNamespacePrefix)
             {
                 normalized = normalized.TrimEnd('.');

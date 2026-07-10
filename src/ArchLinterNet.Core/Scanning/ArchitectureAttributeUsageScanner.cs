@@ -13,7 +13,7 @@ internal readonly record struct ArchitectureAttributeUsageMatch(string SourceIde
 internal static class ArchitectureAttributeUsageScanner
 {
     private const BindingFlags MemberFlags =
-        BindingFlags.DeclaredOnly | BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.Static;
+        BindingFlags.DeclaredOnly | BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.Static; // NOSONAR: intentional — IL scanning needs reflection access to all members
 
     public static IEnumerable<ArchitectureAttributeUsageMatch> GetMatches(
         Type type, IReadOnlyList<string> attributes, IReadOnlyList<string> attributePrefixes)

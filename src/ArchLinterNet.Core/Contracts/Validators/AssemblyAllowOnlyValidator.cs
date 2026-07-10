@@ -28,15 +28,13 @@ internal sealed class AssemblyAllowOnlyValidator : IArchitecturePolicyDocumentVa
                     "'strict_assembly_allow_only'/'audit_assembly_allow_only' must be a declared target assembly.");
             }
 
-            foreach (string assemblyName in contract.Allowed)
+            string? invalidAssembly = contract.Allowed.FirstOrDefault(a => !targetAssemblies.Contains(a));
+            if (invalidAssembly != null)
             {
-                if (!targetAssemblies.Contains(assemblyName))
-                {
-                    throw new InvalidOperationException(
-                        $"Assembly allow-only contract '{contract.Name}' references allowed assembly '{assemblyName}' " +
-                        "that is not declared in 'analysis.target_assemblies'. Every assembly referenced by " +
-                        "'strict_assembly_allow_only'/'audit_assembly_allow_only' must be a declared target assembly.");
-                }
+                throw new InvalidOperationException(
+                    $"Assembly allow-only contract '{contract.Name}' references allowed assembly '{invalidAssembly}' " +
+                    "that is not declared in 'analysis.target_assemblies'. Every assembly referenced by " +
+                    "'strict_assembly_allow_only'/'audit_assembly_allow_only' must be a declared target assembly.");
             }
         }
     }

@@ -118,6 +118,44 @@ public sealed class CliHandlerCoverageTests
         Assert.That(console.ErrorText, Does.Contain("graph --help"));
     }
 
+    // The legacy validate short-circuit only intercepts --help/--version; every other
+    // combination walks the arg list and returns false, falling through to normal parsing.
+    // These cases exercise the value-skipping (--policy <value>), flag (--strict), unknown-token,
+    // and dangling-option-value branches of TryHandleLegacyValidateShortCircuit.
+    private static readonly string[] _policyThenFlagArgs = ["--policy", "custom.yml", "--strict"];
+    private static readonly string[] _unknownLeadingTokenArgs = ["not-an-option"];
+    private static readonly string[] _danglingPolicyValueArgs = ["--policy"];
+
+    [TestCaseSource(nameof(LegacyFallThroughCases))]
+    public void Host_LegacyShortCircuit_NonHelpArgs_FallThroughToParsing(string[] args)
+    {
+        var console = new RecordingConsole();
+        int result = new CliHost(new RootCommandFactory(), console, new RecordingRuntime()).Run(args);
+
+        // The fake root command defines no options, so falling through to normal parsing
+        // yields a parse error rather than the legacy Success short-circuit.
+        Assert.That(result, Is.EqualTo(CliExitCodes.InvalidArgumentsOrRuntimeError));
+    }
+
+    private static IEnumerable<string[]> LegacyFallThroughCases()
+    {
+        yield return _policyThenFlagArgs;
+        yield return _unknownLeadingTokenArgs;
+        yield return _danglingPolicyValueArgs;
+    }
+
+    [Test]
+    public void Host_TopLevelCommand_SkipsLegacyShortCircuit()
+    {
+        var console = new RecordingConsole();
+        int result = new CliHost(new RootCommandFactory(), console, new RecordingRuntime()).Run(_graphUnknownOptionArgs);
+
+        // "graph" is a recognized top-level command, so the short-circuit returns immediately
+        // (IsTopLevelCommand branch) and the arg list is handed straight to the parser.
+        Assert.That(result, Is.EqualTo(CliExitCodes.InvalidArgumentsOrRuntimeError));
+        Assert.That(console.ErrorText, Does.Contain("graph --help"));
+    }
+
     private sealed class RecordingFileSystem(bool exists) : IFileSystem
     {
         public bool FileExists(string path) => exists;

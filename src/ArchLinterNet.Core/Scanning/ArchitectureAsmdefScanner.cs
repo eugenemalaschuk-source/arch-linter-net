@@ -48,9 +48,9 @@ public sealed class ArchitectureAsmdefScanner : IArchitectureAsmdefScanner
                                     && r != sourceAssemblyName));
             }
 
-            IReadOnlyList<string> distinct = violations.Distinct().OrderBy(v => v).ToArray();
+            string[] distinct = violations.Distinct().OrderBy(v => v).ToArray();
 
-            if (distinct.Count > 0)
+            if (distinct.Length > 0)
             {
                 yield return new ArchitectureViolation(
                     contractName,

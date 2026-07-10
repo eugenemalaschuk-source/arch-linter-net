@@ -14,7 +14,7 @@ public interface IArchitectureSarifFormatter
         string toolVersion);
 }
 
-public sealed class ArchitectureSarifFormatter : IArchitectureSarifFormatter
+public sealed partial class ArchitectureSarifFormatter : IArchitectureSarifFormatter
 {
     private const string SchemaUri =
         "https://raw.githubusercontent.com/oasis-tcs/sarif-spec/master/Schemata/sarif-schema-2.1.0.json";
@@ -24,8 +24,10 @@ public sealed class ArchitectureSarifFormatter : IArchitectureSarifFormatter
     private const string MethodBodyIlCategory = "method-body-il";
     private const string CycleRuleFallback = "dependency-cycle";
 
-    private static readonly Regex _methodBodyLinePattern = new(@"^line (?<line>\d+):", RegexOptions.CultureInvariant);
-    private static readonly Regex _cycleIdPrefixPattern = new(@"^\[(?<id>[^\]]+)\] ", RegexOptions.CultureInvariant);
+    [GeneratedRegex(@"^line (?<line>\d+):", RegexOptions.CultureInvariant)]
+    private static partial Regex MethodBodyLinePattern();
+    [GeneratedRegex(@"^\[(?<id>[^\]]+)\] ", RegexOptions.CultureInvariant)]
+    private static partial Regex CycleIdPrefixPattern();
 
     public string FormatResultAsSarif(
         string mode,
@@ -110,7 +112,7 @@ public sealed class ArchitectureSarifFormatter : IArchitectureSarifFormatter
 
     private static ResultEntry BuildCycleEntry(string cycle, string level)
     {
-        Match match = _cycleIdPrefixPattern.Match(cycle);
+        Match match = CycleIdPrefixPattern().Match(cycle);
         string ruleId = match.Success ? match.Groups["id"].Value : CycleRuleFallback;
         string path = match.Success ? cycle[match.Length..] : cycle;
 
@@ -148,7 +150,7 @@ public sealed class ArchitectureSarifFormatter : IArchitectureSarifFormatter
                 ["artifactLocation"] = new Dictionary<string, object?> { ["uri"] = filePath },
             };
 
-            Match match = _methodBodyLinePattern.Match(reference);
+            Match match = MethodBodyLinePattern().Match(reference);
             if (match.Success && int.TryParse(match.Groups["line"].Value, out int line))
             {
                 physicalLocation["region"] = new Dictionary<string, object?> { ["startLine"] = line };

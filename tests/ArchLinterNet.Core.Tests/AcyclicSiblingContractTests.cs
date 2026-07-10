@@ -592,8 +592,7 @@ contracts:
 ";
         string path = WriteContract(yaml);
 
-        var validator = new ArchitectureValidator();
-        bool result = validator.Validate(path, out var violations, out var cycles);
+        bool result = ArchitectureValidator.Validate(path, out var violations, out var cycles);
 
         Assert.That(violations, Is.Empty);
         Assert.That(cycles, Has.Count.GreaterThanOrEqualTo(1));
@@ -651,8 +650,7 @@ contracts:
 ";
         string path = WriteContract(yaml);
 
-        var validator = new ArchitectureValidator();
-        validator.Validate(path, out var violations, out var cycles);
+        ArchitectureValidator.Validate(path, out var violations, out var cycles);
 
         Assert.That(violations, Is.Empty);
         Assert.That(cycles, Has.Count.GreaterThanOrEqualTo(1));

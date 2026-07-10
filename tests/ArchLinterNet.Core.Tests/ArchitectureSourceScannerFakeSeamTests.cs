@@ -11,6 +11,9 @@ namespace ArchLinterNet.Core.Tests;
 [TestFixture]
 public sealed class ArchitectureSourceScannerFakeSeamTests
 {
+    private static readonly string[] _consoleWriteLine = ["System.Console.WriteLine"];
+    private static readonly string[] _srcRoot = ["src"];
+
     private sealed class FakeRoslynCompilationFactory : IRoslynCompilationFactory
     {
         public bool WasCalled { get; private set; }
@@ -77,14 +80,52 @@ public sealed class ArchitectureSourceScannerFakeSeamTests
         List<ArchitectureViolation> violations = new ArchitectureSourceScanner().FindMethodBodyViolations(
             repoRoot,
             "Fake.Forbidden.Namespace",
-            new[] { "System.Console.WriteLine" },
+            _consoleWriteLine,
             executionContext,
-            sourceRoots: new[] { "src" },
+            sourceRoots: _srcRoot,
             fileSystem: fileSystem,
             compilationFactory: compilationFactory).ToList();
 
         Assert.That(compilationFactory.WasCalled, Is.True);
         Assert.That(violations, Has.Count.EqualTo(1));
         Assert.That(violations[0].ForbiddenReferences, Has.Some.Contains("System.Console.WriteLine"));
+    }
+
+    [Test]
+    public void FindMethodBodyViolations_AllMatchesIgnored_ProducesNoViolations()
+    {
+        string repoRoot = FakePaths.Root("/fake/repo");
+
+        var fileSystem = new FakeArchitectureFileSystem();
+        fileSystem.AddDirectory($"{repoRoot}/src");
+        fileSystem.AddFile(
+            $"{repoRoot}/src/Widget.cs",
+            "namespace Fake.Forbidden.Namespace;\nclass Widget { }\n",
+            DateTime.UtcNow);
+
+        var compilationFactory = new FakeRoslynCompilationFactory();
+
+        // A wildcard ignore matches the single forbidden call the fake compilation surfaces, so every
+        // match is filtered out and the scanner takes the unignored.Length == 0 continue branch,
+        // yielding no violation for the file even though a forbidden usage was found.
+        var ignoredEverything = new[]
+        {
+            new ArchitectureIgnoredViolation { SourceType = "*", ForbiddenReference = "*", Reason = "test" },
+        };
+        var executionContext = new ArchitectureContractExecutionContext(
+            "fake-contract", "fake-contract-id", ignoredEverything,
+            enableUnmatchedIgnoreTracking: false, contractGroup: null, baselineCandidates: null);
+
+        List<ArchitectureViolation> violations = new ArchitectureSourceScanner().FindMethodBodyViolations(
+            repoRoot,
+            "Fake.Forbidden.Namespace",
+            _consoleWriteLine,
+            executionContext,
+            sourceRoots: _srcRoot,
+            fileSystem: fileSystem,
+            compilationFactory: compilationFactory).ToList();
+
+        Assert.That(compilationFactory.WasCalled, Is.True);
+        Assert.That(violations, Is.Empty);
     }
 }

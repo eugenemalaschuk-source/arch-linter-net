@@ -11,15 +11,13 @@ internal sealed class AssemblyIndependenceValidator : IArchitecturePolicyDocumen
         foreach (ArchitectureAssemblyIndependenceContract contract in document.Contracts.StrictAssemblyIndependence
                      .Concat(document.Contracts.AuditAssemblyIndependence))
         {
-            foreach (string assemblyName in contract.Assemblies)
+            string? invalidAssembly = contract.Assemblies.FirstOrDefault(a => !targetAssemblies.Contains(a));
+            if (invalidAssembly != null)
             {
-                if (!targetAssemblies.Contains(assemblyName))
-                {
-                    throw new InvalidOperationException(
-                        $"Assembly independence contract '{contract.Name}' references assembly '{assemblyName}' " +
-                        "that is not declared in 'analysis.target_assemblies'. Every assembly listed in " +
-                        "'strict_assembly_independence'/'audit_assembly_independence' must be a declared target assembly.");
-                }
+                throw new InvalidOperationException(
+                    $"Assembly independence contract '{contract.Name}' references assembly '{invalidAssembly}' " +
+                    "that is not declared in 'analysis.target_assemblies'. Every assembly listed in " +
+                    "'strict_assembly_independence'/'audit_assembly_independence' must be a declared target assembly.");
             }
         }
     }

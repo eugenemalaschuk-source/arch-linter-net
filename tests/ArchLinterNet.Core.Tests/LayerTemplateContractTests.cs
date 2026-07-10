@@ -318,7 +318,7 @@ contracts:
 ";
             File.WriteAllText(policyPath, yaml);
 
-            bool result = new ArchitectureValidator().Validate(policyPath, out _, out _);
+            bool result = ArchitectureValidator.Validate(policyPath, out _, out _);
             Assert.That(result, Is.True);
         }
         finally
@@ -360,7 +360,7 @@ contracts:
 ";
             File.WriteAllText(policyPath, yaml);
 
-            bool result = new ArchitectureValidator().Validate(policyPath, out _, out _);
+            bool result = ArchitectureValidator.Validate(policyPath, out _, out _);
             Assert.That(result, Is.False);
         }
         finally

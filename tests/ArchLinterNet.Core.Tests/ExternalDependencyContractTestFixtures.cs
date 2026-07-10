@@ -4,9 +4,9 @@ namespace ExternalDependencyContractTestsFixtures.Core
 
     public sealed class CoreTypeWithMethodCall
     {
-        public void DoWork()
+        public static void DoWork()
         {
-            new ExternalDependencyContractTestsFixtures.VendorSdk.Client();
+            _ = new ExternalDependencyContractTestsFixtures.VendorSdk.Client();
         }
     }
 
@@ -14,7 +14,7 @@ namespace ExternalDependencyContractTestsFixtures.Core
     {
         public CoreTypeWithConstructorCall()
         {
-            new ExternalDependencyContractTestsFixtures.VendorSdk.Client();
+            _ = new ExternalDependencyContractTestsFixtures.VendorSdk.Client();
         }
     }
 
@@ -31,7 +31,7 @@ namespace ExternalDependencyContractTestsFixtures.Core
 
     public sealed class CoreTypeWithGenericReference
     {
-        public List<ExternalDependencyContractTestsFixtures.VendorSdk.Client> GetClients()
+        public static List<ExternalDependencyContractTestsFixtures.VendorSdk.Client> GetClients()
         {
             return new List<ExternalDependencyContractTestsFixtures.VendorSdk.Client>();
         }
@@ -39,7 +39,7 @@ namespace ExternalDependencyContractTestsFixtures.Core
 
     public sealed class CoreTypeWithGenericOnlyInBody
     {
-        public void DoWork()
+        public static void DoWork()
         {
             var clients = new List<ExternalDependencyContractTestsFixtures.VendorSdk.Client>();
             _ = clients.Count;
@@ -64,7 +64,7 @@ namespace ExternalDependencyContractTestsFixtures.UnityStyle
 {
     public sealed class CoreTypeWithUnityMethodBody
     {
-        public void LogSomething()
+        public static void LogSomething()
         {
             UnityEngine.Debug.Log("test");
         }

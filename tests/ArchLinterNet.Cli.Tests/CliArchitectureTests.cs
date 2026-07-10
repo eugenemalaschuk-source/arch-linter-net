@@ -20,7 +20,7 @@ public sealed class CliArchitectureTests
     [Test]
     public void Composition_ResolvesCliHostAndHandlersWithoutStaticGlobals()
     {
-        CliComposition composition = new CliCompositionRoot().Compose();
+        CliComposition composition = CliCompositionRoot.Compose();
 
         Assert.Multiple(() =>
         {

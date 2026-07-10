@@ -118,15 +118,7 @@ internal sealed class NamespaceGlobPattern
 
     private static int CountWildcards(string[] segments)
     {
-        int count = 0;
-        foreach (string seg in segments)
-        {
-            if (seg == "*")
-            {
-                count++;
-            }
-        }
-        return count;
+        return segments.Count(seg => seg == "*");
     }
 
     private static bool ContainsGlobChars(string pattern)

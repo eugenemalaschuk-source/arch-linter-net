@@ -12,9 +12,12 @@ public sealed class ArchitectureGraphApplicationService(
     IArchitectureContractExecutor contractExecutor)
     : IArchitectureGraphApplicationService
 {
+    private const string ModeStrict = "strict";
+    private const string ModeAudit = "audit";
+
     public ArchitectureGraphOutcome BuildGraph(ArchitectureGraphRequest request)
     {
-        if (request.Mode is not ("strict" or "audit" or "all"))
+        if (request.Mode is not (ModeStrict or ModeAudit or "all"))
         {
             throw new ArgumentException($"Invalid mode: {request.Mode}. Use 'strict', 'audit', or 'all'.", nameof(request));
         }
@@ -58,22 +61,22 @@ public sealed class ArchitectureGraphApplicationService(
         IArchitectureContractRunner runner = setup.Runner;
 
         violations = new List<ArchitectureViolation>();
-        violations.AddRange(runner.CheckConfiguration(strict: request.Mode != "audit"));
+        violations.AddRange(runner.CheckConfiguration(strict: request.Mode != ModeAudit));
 
-        bool includeStrict = request.Mode is "strict" or "all";
-        bool includeAudit = request.Mode is "audit" or "all";
+        bool includeStrict = request.Mode is ModeStrict or "all";
+        bool includeAudit = request.Mode is ModeAudit or "all";
 
         if (includeStrict)
         {
             violations.AddRange(
-                contractExecutor.Execute(runner.Session, "strict", handlerRegistry, includeAsmdefContracts: false)
+                contractExecutor.Execute(runner.Session, ModeStrict, handlerRegistry, includeAsmdefContracts: false)
                     .Violations);
         }
 
         if (includeAudit)
         {
             violations.AddRange(
-                contractExecutor.Execute(runner.Session, "audit", handlerRegistry, includeAsmdefContracts: false)
+                contractExecutor.Execute(runner.Session, ModeAudit, handlerRegistry, includeAsmdefContracts: false)
                     .Violations);
         }
 
@@ -86,8 +89,8 @@ public sealed class ArchitectureGraphApplicationService(
 
         if (mode == "all")
         {
-            HashSet<string> ids = new(catalog.AvailableContractIds("strict"), StringComparer.OrdinalIgnoreCase);
-            ids.UnionWith(catalog.AvailableContractIds("audit"));
+            HashSet<string> ids = new(catalog.AvailableContractIds(ModeStrict), StringComparer.OrdinalIgnoreCase);
+            ids.UnionWith(catalog.AvailableContractIds(ModeAudit));
             return ids;
         }
 

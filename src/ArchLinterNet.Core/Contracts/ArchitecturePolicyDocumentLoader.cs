@@ -7,7 +7,7 @@ using YamlDotNet.Serialization.NamingConventions;
 
 namespace ArchLinterNet.Core.Contracts;
 
-public sealed class ArchitecturePolicyDocumentLoader : IArchitecturePolicyDocumentLoader
+public sealed partial class ArchitecturePolicyDocumentLoader : IArchitecturePolicyDocumentLoader
 {
     private readonly IArchitectureFileSystem _fileSystem;
 
@@ -55,22 +55,24 @@ public sealed class ArchitecturePolicyDocumentLoader : IArchitecturePolicyDocume
     {
         string normalized = name.ToLowerInvariant();
         normalized = normalized.Replace(" -> ", "-to-");
-        normalized = Regex.Replace(normalized, @"[^a-z0-9-]", "-");
-        normalized = Regex.Replace(normalized, "-{2,}", "-");
+        normalized = NonAlphaNumDashPattern().Replace(normalized, "-");
+        normalized = MultiDashPattern().Replace(normalized, "-");
         normalized = normalized.Trim('-');
         return normalized;
     }
 
     private static void AssignFallbackIds(ArchitectureContractDocument document)
     {
-        foreach (IArchitectureContract contract in GetAllContracts(document))
+        foreach (IArchitectureContract contract in GetAllContracts(document).Where(c => string.IsNullOrEmpty(c.Id)))
         {
-            if (string.IsNullOrEmpty(contract.Id))
-            {
-                contract.Id = NormalizeToContractId(contract.Name);
-            }
+            contract.Id = NormalizeToContractId(contract.Name);
         }
     }
+
+    [GeneratedRegex(@"[^a-z0-9-]", RegexOptions.Compiled)]
+    private static partial Regex NonAlphaNumDashPattern();
+    [GeneratedRegex("-{2,}", RegexOptions.Compiled)]
+    private static partial Regex MultiDashPattern();
 
     private static IEnumerable<IArchitectureContract> GetAllContracts(ArchitectureContractDocument document)
     {

@@ -31,7 +31,8 @@ internal sealed class CliHost(ICliRootCommandFactory rootCommandFactory, ICliCon
             return false;
         }
 
-        for (int i = 0; i < args.Length; i++)
+        int i = 0;
+        while (i < args.Length)
         {
             string arg = args[i];
             switch (arg)
@@ -48,13 +49,15 @@ internal sealed class CliHost(ICliRootCommandFactory rootCommandFactory, ICliCon
                         return false;
                     }
 
-                    i++;
-                    break;
+                    i += 2;
+                    continue;
                 case "--strict" or "--audit" or "--json" or "--timings":
                     break;
                 default:
                     return false;
             }
+
+            i++;
         }
 
         return false;

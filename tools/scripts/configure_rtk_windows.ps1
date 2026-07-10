@@ -10,25 +10,24 @@ function Test-Command {
 }
 
 function Add-DirectoryToUserPath {
+    [CmdletBinding(SupportsShouldProcess)]
     param([Parameter(Mandatory = $true)][string]$Directory)
 
-    $userPath = [System.Environment]::GetEnvironmentVariable("PATH", "User")
-    if ($userPath -notlike "*$Directory*") {
-        [System.Environment]::SetEnvironmentVariable("PATH", "$Directory;$userPath", "User")
-        Write-Host "Added to user PATH: $Directory"
-    }
+    if ($PSCmdlet.ShouldProcess($Directory, "Add directory to user PATH")) {
+        $userPath = [System.Environment]::GetEnvironmentVariable("PATH", "User")
+        if ($userPath -notlike "*$Directory*") {
+            [System.Environment]::SetEnvironmentVariable("PATH", "$Directory;$userPath", "User")
+            Write-Output "Added to user PATH: $Directory"
+        }
 
-    if ($env:PATH -notlike "*$Directory*") {
-        $env:PATH = "$Directory;$env:PATH"
+        if ($env:PATH -notlike "*$Directory*") {
+            $env:PATH = "$Directory;$env:PATH"
+        }
     }
 }
 
-function Install-RtkIfMissing {
-    if (Test-Command "rtk") {
-        Write-Host "rtk is already installed:"
-        rtk --version
-        return
-    }
+function Install-RtkViaCargoOrDownload {
+    param()
 
     if (Test-Command "cargo") {
         Write-Output "rtk is not installed. Installing pinned $RtkVersion via Cargo from GitHub..."
@@ -36,12 +35,17 @@ function Install-RtkIfMissing {
         if ($LASTEXITCODE -ne 0) {
             throw "cargo install rtk failed with exit code $LASTEXITCODE."
         }
-
         if (Test-Command "rtk") {
             rtk --version
-            return
+            return $true
         }
     }
+
+    return $false
+}
+
+function Install-RtkFromDownload {
+    param()
 
     Write-Output "rtk is not installed. Downloading pinned Windows release $RtkVersion from GitHub..."
     $release = Invoke-RestMethod -Uri "https://api.github.com/repos/rtk-ai/rtk/releases/tags/$RtkVersion"
@@ -76,8 +80,26 @@ function Install-RtkIfMissing {
         throw "rtk.exe was installed to $installDir, but rtk is not available on PATH in this shell."
     }
 
-    Write-Host "rtk installed successfully:"
+    Write-Output "rtk installed successfully:"
     rtk --version
+}
+
+function Install-RtkIfMissing {
+    [CmdletBinding(SupportsShouldProcess)]
+    param()
+
+    if (Test-Command "rtk") {
+        Write-Output "rtk is already installed:"
+        rtk --version
+        return
+    }
+
+    if ($PSCmdlet.ShouldProcess("rtk", "Install RTK agent")) {
+        if (Install-RtkViaCargoOrDownload) {
+            return
+        }
+        Install-RtkFromDownload
+    }
 }
 
 function Disable-RtkTelemetry {
@@ -116,15 +138,18 @@ function Test-CodexConfigured {
 }
 
 function Invoke-RtkInit {
+    [CmdletBinding(SupportsShouldProcess)]
     param(
         [Parameter(Mandatory = $true)][string]$Name,
         [Parameter(Mandatory = $true)][string[]]$Arguments
     )
 
-    Write-Host "Configuring RTK for $Name..."
-    & rtk @Arguments
-    if ($LASTEXITCODE -ne 0) {
-        throw "rtk $($Arguments -join ' ') failed with exit code $LASTEXITCODE."
+    if ($PSCmdlet.ShouldProcess($Name, "Run rtk $($Arguments -join ' ')")) {
+        Write-Output "Configuring RTK for $Name..."
+        & rtk @Arguments
+        if ($LASTEXITCODE -ne 0) {
+            throw "rtk $($Arguments -join ' ') failed with exit code $LASTEXITCODE."
+        }
     }
 }
 
@@ -132,7 +157,7 @@ Install-RtkIfMissing
 Disable-RtkTelemetry
 
 if (Test-ClaudeConfigured) {
-    Write-Host "RTK Claude Code integration is already configured."
+    Write-Output "RTK Claude Code integration is already configured."
 }
 else {
     Invoke-RtkInit -Name "Claude Code" -Arguments @("init", "--global", "--auto-patch")
@@ -140,7 +165,7 @@ else {
 }
 
 if (Test-OpenCodeConfigured) {
-    Write-Host "RTK OpenCode integration is already configured."
+    Write-Output "RTK OpenCode integration is already configured."
 }
 else {
     Invoke-RtkInit -Name "OpenCode" -Arguments @("init", "--global", "--opencode")
@@ -148,15 +173,15 @@ else {
 }
 
 if (Test-CodexConfigured) {
-    Write-Host "RTK Codex integration is already configured."
+    Write-Output "RTK Codex integration is already configured."
 }
 else {
     Invoke-RtkInit -Name "Codex" -Arguments @("init", "--global", "--codex")
     Disable-RtkTelemetry
 }
 
-Write-Host "RTK telemetry status:"
+Write-Output "RTK telemetry status:"
 $env:RTK_TELEMETRY_DISABLED = "1"
 & rtk telemetry status
 
-Write-Host "RTK AI agent bootstrap complete. Restart Claude Code, OpenCode, and Codex sessions to apply changes."
+Write-Output "RTK AI agent bootstrap complete. Restart Claude Code, OpenCode, and Codex sessions to apply changes."

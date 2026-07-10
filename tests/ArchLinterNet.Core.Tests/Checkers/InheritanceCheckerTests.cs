@@ -32,8 +32,7 @@ public sealed class InheritanceCheckerTests
             ForbiddenBaseTypes = new List<string> { "InheritanceContractTestFixtures.Framework.FrameworkBase" },
         };
 
-        var checker = new InheritanceChecker();
-        List<ArchitectureViolation> violations = checker.Check(contract, document, typeIndex, CreateExecutionContext());
+        List<ArchitectureViolation> violations = InheritanceChecker.Check(contract, document, typeIndex, CreateExecutionContext());
 
         Assert.That(violations.Any(v =>
             v.SourceType == "InheritanceContractTestFixtures.Domain.DirectViolation"

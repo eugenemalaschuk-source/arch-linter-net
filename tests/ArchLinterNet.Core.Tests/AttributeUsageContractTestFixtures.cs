@@ -36,7 +36,7 @@ namespace AttributeUsageContractTestFixtures.Allowed
         public int MarkedProperty { get; set; }
 
         [TestMarker]
-        public void MarkedMethod()
+        public static void MarkedMethod()
         {
         }
 
@@ -62,7 +62,7 @@ namespace AttributeUsageContractTestFixtures.Wrong
         private readonly int _markedPrivateField;
 
         [TestMarker]
-        public int MarkedMethodTarget() => 0;
+        public static int MarkedMethodTarget() => 0;
 
         [TestMarker]
         public int MarkedProperty { get; set; }
@@ -78,12 +78,12 @@ namespace AttributeUsageContractTestFixtures.Wrong
         public event EventHandler? MarkedEvent;
 
         [TestMarker]
-        public void OverloadedMethod()
+        public static void OverloadedMethod()
         {
         }
 
         [SecondMarker]
-        public void OverloadedMethod(int value)
+        public static void OverloadedMethod(int value)
         {
         }
     }

@@ -11,7 +11,7 @@ namespace PublicApiSurfaceContractTestFixtures
 
         public int Value { get; set; }
 
-        public void DoWork()
+        public static void DoWork()
         {
         }
     }
@@ -28,7 +28,7 @@ namespace PublicApiSurfaceContractTestFixtures
 
         public int UndeclaredProperty { get; set; }
 
-        public void UndeclaredMethod()
+        public static void UndeclaredMethod()
         {
         }
 
@@ -54,7 +54,7 @@ namespace PublicApiSurfaceContractTestFixtures
 
         protected int ProtectedField;
 
-        protected void ProtectedMethod()
+        protected static void ProtectedMethod()
         {
         }
     }
@@ -104,15 +104,15 @@ namespace PublicApiSurfaceContractTestFixtures
         {
         }
 
-        public void TakeVector(int[] values)
+        public static void TakeVector(int[] values)
         {
         }
 
-        public void TakeMatrix(int[,] values)
+        public static void TakeMatrix(int[,] values)
         {
         }
 
-        public void TakeCube(int[,,] values)
+        public static void TakeCube(int[,,] values)
         {
         }
     }
@@ -130,11 +130,11 @@ namespace PublicApiSurfaceContractTestFixtures
         {
         }
 
-        public void PublicMethod()
+        public static void PublicMethod()
         {
         }
 
-        protected void ProtectedMethod()
+        protected static void ProtectedMethod()
         {
         }
     }

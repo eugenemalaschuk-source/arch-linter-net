@@ -10,7 +10,7 @@ namespace ArchLinterNet.Core.Scanning;
 
 internal interface IArchitectureSourceScanner
 {
-    IEnumerable<ArchitectureViolation> FindMethodBodyViolations(
+    IEnumerable<ArchitectureViolation> FindMethodBodyViolations( // NOSONAR: all parameters are independently meaningful (injected services, optional overrides); a parameter object would hide the DI surface at the call site
         string repositoryRoot,
         string sourceNamespacePrefix,
         IReadOnlyList<string> forbiddenCallPatterns,
@@ -85,13 +85,13 @@ internal sealed class ArchitectureSourceScanner : IArchitectureSourceScanner
 
             string relativePath = GetRelativePath(repositoryRoot, syntaxTree.FilePath);
 
-            IReadOnlyList<string> unignored = matches
+            string[] unignored = matches
                 .Where(match => !executionContext.IsIgnored(relativePath, match))
                 .Distinct(StringComparer.Ordinal)
                 .OrderBy(match => match, StringComparer.Ordinal)
                 .ToArray();
 
-            if (unignored.Count == 0)
+            if (unignored.Length == 0)
             {
                 continue;
             }

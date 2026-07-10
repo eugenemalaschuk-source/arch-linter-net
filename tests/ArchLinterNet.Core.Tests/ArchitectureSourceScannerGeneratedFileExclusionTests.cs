@@ -58,7 +58,7 @@ public sealed class ArchitectureSourceScannerGeneratedFileExclusionTests
 
     private List<string> Scan(RecordingCompilationFactory compilationFactory)
     {
-        new ArchitectureSourceScanner().FindMethodBodyViolations(
+        _ = new ArchitectureSourceScanner().FindMethodBodyViolations(
             _repoRoot,
             "Fake.Namespace",
             new[] { "System.Console.WriteLine" },

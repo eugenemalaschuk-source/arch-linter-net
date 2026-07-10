@@ -64,9 +64,7 @@ public sealed class AsmdefValidatorDelegationTests
     [Test]
     public void Validate_WhenStrictAsmdefContractFails_ReturnsCoreViolations()
     {
-        var validator = new AsmdefValidator();
-
-        bool passed = validator.Validate(_policyPath, out IReadOnlyCollection<ArchitectureViolation> violations);
+        bool passed = AsmdefValidator.Validate(_policyPath, out IReadOnlyCollection<ArchitectureViolation> violations);
 
         Assert.That(passed, Is.False);
         ArchitectureViolation violation = AssertSingle(violations);
@@ -80,9 +78,7 @@ public sealed class AsmdefValidatorDelegationTests
     [Test]
     public void Validate_OnlyEvaluatesStrictAsmdefContracts_NotAuditAsmdef()
     {
-        var validator = new AsmdefValidator();
-
-        validator.Validate(_policyPath, out IReadOnlyCollection<ArchitectureViolation> violations);
+        AsmdefValidator.Validate(_policyPath, out IReadOnlyCollection<ArchitectureViolation> violations);
 
         Assert.That(violations, Has.Count.EqualTo(1));
         Assert.That(violations.Select(v => v.ContractName), Does.Not.Contain("audit-only-rule"));

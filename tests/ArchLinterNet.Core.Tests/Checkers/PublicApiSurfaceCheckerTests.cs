@@ -38,8 +38,7 @@ public sealed class PublicApiSurfaceCheckerTests
             [assemblyName] = _fixturesAssembly,
         };
 
-        var checker = new PublicApiSurfaceChecker();
-        List<ArchitectureViolation> violations = checker.Check(contract, resolvedAssemblies, CreateExecutionContext());
+        List<ArchitectureViolation> violations = PublicApiSurfaceChecker.Check(contract, resolvedAssemblies, CreateExecutionContext());
 
         Assert.That(violations.Any(v => v.SourceType == TypeName && (v.Payload as PublicApiSurfacePayload)?.UndeclaredApiSignature == $"class {TypeName}"), Is.True);
     }

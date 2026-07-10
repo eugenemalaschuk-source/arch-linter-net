@@ -28,15 +28,13 @@ internal sealed class AssemblyDependencyValidator : IArchitecturePolicyDocumentV
                     "'strict_assembly_dependency'/'audit_assembly_dependency' must be a declared target assembly.");
             }
 
-            foreach (string assemblyName in contract.Forbidden)
+            string? invalidAssembly = contract.Forbidden.FirstOrDefault(a => !targetAssemblies.Contains(a));
+            if (invalidAssembly != null)
             {
-                if (!targetAssemblies.Contains(assemblyName))
-                {
-                    throw new InvalidOperationException(
-                        $"Assembly dependency contract '{contract.Name}' references forbidden assembly '{assemblyName}' " +
-                        "that is not declared in 'analysis.target_assemblies'. Every assembly referenced by " +
-                        "'strict_assembly_dependency'/'audit_assembly_dependency' must be a declared target assembly.");
-                }
+                throw new InvalidOperationException(
+                    $"Assembly dependency contract '{contract.Name}' references forbidden assembly '{invalidAssembly}' " +
+                    "that is not declared in 'analysis.target_assemblies'. Every assembly referenced by " +
+                    "'strict_assembly_dependency'/'audit_assembly_dependency' must be a declared target assembly.");
             }
         }
     }

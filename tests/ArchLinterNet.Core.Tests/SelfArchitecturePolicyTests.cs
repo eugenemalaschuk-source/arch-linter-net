@@ -21,7 +21,7 @@ public sealed class SelfArchitecturePolicyTests
     private static string FindRepoRoot()
     {
         var dir = new DirectoryInfo(TestContext.CurrentContext.TestDirectory);
-        while (dir != null && !dir.GetFiles("ArchLinterNet.slnx").Any())
+        while (dir != null && dir.GetFiles("ArchLinterNet.slnx").Length == 0)
             dir = dir.Parent;
         return dir?.FullName ?? throw new InvalidOperationException("Could not find repo root");
     }

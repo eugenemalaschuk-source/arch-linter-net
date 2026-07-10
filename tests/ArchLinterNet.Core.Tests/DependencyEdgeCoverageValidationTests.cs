@@ -34,7 +34,7 @@ public sealed class DependencyEdgeCoverageValidationTests
 
     private const string FixtureRoot = "ArchLinterNet.Core.Tests.DependencyEdgeCoverageFixtures";
 
-    private string AssemblyName => typeof(DependencyEdgeCoverageValidationTests).Assembly.GetName().Name!;
+    private static string AssemblyName => typeof(DependencyEdgeCoverageValidationTests).Assembly.GetName().Name!;
 
     [Test]
     public void DependencyEdgeCoverage_EmptyBetween_ThrowsActionableError()
@@ -226,7 +226,7 @@ public sealed class DependencyEdgeCoverageValidationTests
         Assert.That(ex.Message, Does.Contain("not declared in this contract's own 'between' list"));
     }
 
-    private string BuildPolicy(string coverageGroup, string? analysisCoverage = null)
+    private static string BuildPolicy(string coverageGroup, string? analysisCoverage = null)
     {
         string coverageSetting = analysisCoverage is null
             ? string.Empty

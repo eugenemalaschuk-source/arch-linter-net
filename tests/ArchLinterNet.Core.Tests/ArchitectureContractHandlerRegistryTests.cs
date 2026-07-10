@@ -46,7 +46,7 @@ public sealed class ArchitectureContractHandlerRegistryTests
         return new ArchitectureContractHandlerRegistry();
     }
 
-    private static IReadOnlyList<object> Project(IEnumerable<ArchitectureViolation> violations)
+    private static List<object> Project(IEnumerable<ArchitectureViolation> violations)
     {
         return violations
             .Select(v => (object)(v.ContractName, v.ContractId, v.SourceType, v.ForbiddenNamespace,
@@ -458,12 +458,12 @@ public sealed class ArchitectureContractHandlerRegistryTests
         var document = CreateLayerFixtureDocument("layerUpper", "layerLower", new List<string> { "layerLower", "layerUpper" });
 
         var firstRunner = new ArchitectureContractRunner(CreateContext(_layerFixtureAssembly), document);
-        IArchitectureContractExecutor firstExecutor = new ArchitectureContractExecutor();
+        ArchitectureContractExecutor firstExecutor = new();
         ArchitectureContractExecutionResult firstResult =
             firstExecutor.Execute(firstRunner.Session, "strict", CreateRegistry());
 
         var secondRunner = new ArchitectureContractRunner(CreateContext(_layerFixtureAssembly), document);
-        IArchitectureContractExecutor secondExecutor = new ArchitectureContractExecutor();
+        ArchitectureContractExecutor secondExecutor = new();
         ArchitectureContractExecutionResult secondResult =
             secondExecutor.Execute(secondRunner.Session, "strict", CreateRegistry());
 

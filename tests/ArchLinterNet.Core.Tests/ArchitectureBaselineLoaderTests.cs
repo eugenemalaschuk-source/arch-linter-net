@@ -149,7 +149,7 @@ baseline:
             }
         };
 
-        _service.MergeAndValidate(policy, baseline);
+        ArchitectureBaselineLoadingService.MergeAndValidate(policy, baseline);
 
         Assert.That(policy.Contracts.StrictProjectMetadata[0].IgnoredViolations, Has.Count.EqualTo(1));
         Assert.That(policy.Contracts.StrictProjectMetadata[0].IgnoredViolations[0].ForbiddenReference,

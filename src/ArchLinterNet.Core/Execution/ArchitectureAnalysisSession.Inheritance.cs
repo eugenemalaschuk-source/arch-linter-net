@@ -15,8 +15,7 @@ public sealed partial class ArchitectureAnalysisSession
         }
 
         ArchitectureContractExecutionContext executionContext = CreateExecutionContext(contract, contract.IgnoredViolations);
-        List<ArchitectureViolation> violations = new InheritanceChecker()
-            .Check(contract, Document, TypeIndex, executionContext);
+        List<ArchitectureViolation> violations = InheritanceChecker.Check(contract, Document, TypeIndex, executionContext);
         executionContext.CollectUnmatchedIgnores(_unmatchedIgnoredViolations);
         return violations;
     }

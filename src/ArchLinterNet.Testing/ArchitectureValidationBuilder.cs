@@ -81,7 +81,7 @@ public sealed class ArchitectureValidationBuilder
         ValidationTiming? timing = _collectTimings ? new ValidationTiming() : null;
         ValidationOutcome outcome = _engine.Value.Validate(request, timing);
 
-        return new ArchitectureValidationResult(
+        return new ArchitectureValidationResult(new ArchitectureValidationResultParams(
             outcome.Passed,
             outcome.Violations,
             outcome.Cycles,
@@ -92,6 +92,6 @@ public sealed class ArchitectureValidationBuilder
             outcome.UnmatchedIgnoredViolations,
             outcome.UnmatchedIgnoredViolationsConfig,
             outcome.CoverageSummaries,
-            timing);
+            timing));
     }
 }

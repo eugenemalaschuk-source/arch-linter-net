@@ -5,9 +5,9 @@ using ArchLinterNet.Core.Resolution;
 
 namespace ArchLinterNet.Core.Execution.Checkers;
 
-internal sealed class AssemblyIndependenceChecker
+internal static class AssemblyIndependenceChecker
 {
-    public List<ArchitectureViolation> Check(
+    public static List<ArchitectureViolation> Check(
         ArchitectureAssemblyIndependenceContract contract,
         IEnumerable<Assembly> targetAssemblies,
         ArchitectureContractExecutionContext executionContext)

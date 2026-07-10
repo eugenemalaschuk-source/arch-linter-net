@@ -33,9 +33,9 @@ public sealed class RuleInputCoverageValidationTests
 
     private const string FixtureRoot = "ArchLinterNet.Core.Tests.RuleInputCoverageFixtures";
 
-    private string AssemblyName => typeof(RuleInputCoverageValidationTests).Assembly.GetName().Name!;
+    private static string AssemblyName => typeof(RuleInputCoverageValidationTests).Assembly.GetName().Name!;
 
-    private string BuildPolicy(
+    private static string BuildPolicy(
         string coverageGroup,
         string referencedRuleGroup,
         string? analysisCoverage = null,
@@ -268,7 +268,7 @@ public sealed class RuleInputCoverageValidationTests
         Assert.That(outcome.CoverageFindings, Has.Count.EqualTo(1));
     }
 
-    private string BuildDanglingLayerPolicy(string coverageGroup, string referencedRuleGroup)
+    private static string BuildDanglingLayerPolicy(string coverageGroup, string referencedRuleGroup)
     {
         return $"version: 1{Environment.NewLine}" +
                $"name: Test{Environment.NewLine}{Environment.NewLine}" +

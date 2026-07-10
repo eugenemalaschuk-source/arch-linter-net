@@ -153,6 +153,7 @@ public sealed class ArchitectureAssemblyResolutionService : IArchitectureAssembl
                 }
                 catch
                 {
+                    // Swallow — try next probing path
                 }
             }
         }

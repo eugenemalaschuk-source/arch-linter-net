@@ -158,7 +158,7 @@ public sealed class ArchitectureCoverageBaselineTests
         File.WriteAllText(baselinePath, _generator.Serialize(baseline));
 
         ArchitectureBaselineDocument loadedBaseline = _loadingService.LoadFromPath(baselinePath);
-        _loadingService.MergeAndValidate(document, loadedBaseline);
+        ArchitectureBaselineLoadingService.MergeAndValidate(document, loadedBaseline);
 
         ArchitectureContractRunner gateRunner = new(context, document);
         List<ArchitectureViolation> findings = gateRunner.CheckCoverageContract(document.Contracts.StrictCoverage[0]);
@@ -188,7 +188,7 @@ public sealed class ArchitectureCoverageBaselineTests
         File.WriteAllText(baselinePath, _generator.Serialize(baseline));
 
         ArchitectureBaselineDocument loadedBaseline = _loadingService.LoadFromPath(baselinePath);
-        _loadingService.MergeAndValidate(document, loadedBaseline);
+        ArchitectureBaselineLoadingService.MergeAndValidate(document, loadedBaseline);
 
         ArchitectureContractRunner gateRunner = new(context, document);
         List<ArchitectureViolation> findings = gateRunner.CheckCoverageContract(document.Contracts.StrictCoverage[0]);

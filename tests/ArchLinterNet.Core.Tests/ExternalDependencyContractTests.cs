@@ -638,8 +638,7 @@ contracts:
   audit_external: []
 ");
 
-        var validator = new ArchitectureValidator();
-        bool passed = validator.Validate(contractPath, out var violations, out _);
+        bool passed = ArchitectureValidator.Validate(contractPath, out var violations, out _);
 
         Assert.That(passed, Is.False);
         Assert.That(violations.Any(v => v.ForbiddenNamespace == "unknown external dependency group"), Is.True);
@@ -765,8 +764,7 @@ contracts:
       forbidden: [system]
 ");
 
-        var validator = new ArchitectureValidator();
-        bool passed = validator.Validate(contractPath, out var violations, out _);
+        bool passed = ArchitectureValidator.Validate(contractPath, out var violations, out _);
 
         Assert.That(passed, Is.True);
         Assert.That(violations, Is.Empty);

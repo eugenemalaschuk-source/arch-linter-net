@@ -150,7 +150,7 @@ public partial class CliIntegrationTests
     }
 
     [Test]
-    public void CoverageSummary_NoCoverageContracts_OmitsSummarySection()
+    public static void CoverageSummary_NoCoverageContracts_OmitsSummarySection()
     {
         var (exitCode, stdout, _) = RunCli("--policy", _passingPolicy, "--format", "human");
 
@@ -159,7 +159,7 @@ public partial class CliIntegrationTests
     }
 
     [Test]
-    public void CoverageSummary_NoCoverageContracts_JsonStillReportsEmptyArray()
+    public static void CoverageSummary_NoCoverageContracts_JsonStillReportsEmptyArray()
     {
         var (exitCode, stdout, _) = RunCli("--policy", _passingPolicy, "--format", "json");
 

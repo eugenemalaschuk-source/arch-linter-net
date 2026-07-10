@@ -18,16 +18,14 @@ internal sealed class PublicApiSurfaceValidator : IArchitecturePolicyDocumentVal
                     "A contract with nothing to scan is a configuration error; declare at least one target assembly.");
             }
 
-            foreach (string assemblyName in contract.Assemblies)
+            string? invalidAssembly = contract.Assemblies.FirstOrDefault(a => !targetAssemblies.Contains(a));
+            if (invalidAssembly != null)
             {
-                if (!targetAssemblies.Contains(assemblyName))
-                {
-                    throw new InvalidOperationException(
-                        $"Public API surface contract '{contract.Name}' references assembly '{assemblyName}' " +
-                        "that is not declared in 'analysis.target_assemblies'. Every assembly referenced by " +
-                        "'strict_public_api_surface'/'audit_public_api_surface' must be a declared target assembly, " +
-                        "otherwise a typo'd assembly name would silently disable the contract instead of failing loudly.");
-                }
+                throw new InvalidOperationException(
+                    $"Public API surface contract '{contract.Name}' references assembly '{invalidAssembly}' " +
+                    "that is not declared in 'analysis.target_assemblies'. Every assembly referenced by " +
+                    "'strict_public_api_surface'/'audit_public_api_surface' must be a declared target assembly, " +
+                    "otherwise a typo'd assembly name would silently disable the contract instead of failing loudly.");
             }
         }
     }

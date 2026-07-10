@@ -68,7 +68,7 @@ internal sealed class ArchitectureExternalDependencyIlScanner : IArchitectureExt
     {
         const BindingFlags Flags =
             BindingFlags.Instance | BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic |
-            BindingFlags.DeclaredOnly;
+            BindingFlags.DeclaredOnly; // NOSONAR: intentional — IL scanning needs reflection access to all members
 
         foreach (MethodInfo method in sourceType.GetMethods(Flags))
         {
