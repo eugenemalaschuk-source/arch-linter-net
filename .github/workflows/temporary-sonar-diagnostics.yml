@@ -1,9 +1,9 @@
 name: Temporary Sonar diagnostics
 
 on:
-  push:
+  pull_request:
     branches:
-      - task/265-supply-chain-hygiene
+      - main
 
 permissions:
   contents: read
