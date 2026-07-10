@@ -85,20 +85,11 @@ public sealed partial class ArchitectureAnalysisSession
 
     private static bool IsCoveredByExpandedTemplates(ArchitectureCoverageInventory inventory, string namespaceName)
     {
-        foreach (ArchitectureLayerContract expandedTemplate in inventory.ExpandedLayerTemplates)
-        {
-            foreach (string layerNamespace in expandedTemplate.Layers)
-            {
-                if (ArchitectureLayerResolver.MatchesNamespace(
-                        new ArchitectureLayer { Namespace = layerNamespace },
-                        namespaceName))
-                {
-                    return true;
-                }
-            }
-        }
-
-        return false;
+        return inventory.ExpandedLayerTemplates.Any(expandedTemplate =>
+            expandedTemplate.Layers.Any(layerNamespace =>
+                ArchitectureLayerResolver.MatchesNamespace(
+                    new ArchitectureLayer { Namespace = layerNamespace },
+                    namespaceName)));
     }
 
     private static bool MatchesNamespaceRoot(ArchitectureCoverageRoot root, string namespaceName)

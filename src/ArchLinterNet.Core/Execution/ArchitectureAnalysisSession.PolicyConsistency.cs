@@ -499,14 +499,9 @@ public sealed partial class ArchitectureAnalysisSession
     {
         List<PolicyConsistencyDiagnostic> findings = new();
 
-        HashSet<string> unreachableLayerNames = new(StringComparer.Ordinal);
-        foreach (var kvp in Document.Layers)
-        {
-            if (IsStructurallyUnreachable(kvp.Value))
-            {
-                unreachableLayerNames.Add(kvp.Key);
-            }
-        }
+        HashSet<string> unreachableLayerNames = new(
+            Document.Layers.Where(kvp => IsStructurallyUnreachable(kvp.Value)).Select(kvp => kvp.Key),
+            StringComparer.Ordinal);
 
         if (unreachableLayerNames.Count == 0)
         {

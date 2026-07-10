@@ -347,8 +347,11 @@ public sealed partial class ArchitectureAnalysisSession
             .Where(entry => !contract.Exclude.Any(exclusion => MatchesNamespaceExclusion(exclusion, entry.Namespace)))
             .Where(entry => !IsCoveredByDeclaredLayers(inventory, entry.Namespace))
             .Where(entry => !IsCoveredByExpandedTemplates(inventory, entry.Namespace))
+#pragma warning disable S6607 // IsIgnored has an ordered side effect (baseline-candidate
+            // collection), so it must run in this OrderBy-then-Where sequence, not before it.
             .OrderBy(entry => entry.Namespace, StringComparer.Ordinal)
             .Where(entry => !executionContext.IsIgnored(entry.Namespace, "uncovered namespace"))
+#pragma warning restore S6607
             .Select(entry => new ArchitectureViolation(
                 contract.Name,
                 contract.Id,
@@ -459,8 +462,11 @@ public sealed partial class ArchitectureAnalysisSession
             .Where(entry => !contract.Exclude.Any(exclusion => MatchesAssemblyExclusion(exclusion, entry.Name)))
             .Where(entry => !GetAssemblyNamespaces(entry.Assembly)
                 .Any(ns => IsCoveredByDeclaredLayers(inventory, ns) || IsCoveredByExpandedTemplates(inventory, ns)))
+#pragma warning disable S6607 // IsIgnored has an ordered side effect (baseline-candidate
+            // collection), so it must run in this OrderBy-then-Where sequence, not before it.
             .OrderBy(entry => entry.Name, StringComparer.Ordinal)
             .Where(entry => !executionContext.IsIgnored(entry.Name, "uncovered assembly"))
+#pragma warning restore S6607
             .Select(entry => new ArchitectureViolation(
                 contract.Name,
                 contract.Id,
