@@ -113,7 +113,7 @@ function Install-DotNetSdk {
     }
 
     if (-not (Test-Command "winget")) {
-        throw "winget is required to install .NET SDK automatically. Install it or install .NET SDK 10 manually from https://dotnet.microsoft.com/download/dotnet/10"
+        throw "winget is required to install .NET SDK automatically. Install it or install .NET SDK 10 manually from https://dotnet.microsoft.com/download/dotnet/10.0"
     }
 
     Write-Host ".NET SDK 10 is not installed or is broken. Installing winget package: Microsoft.DotNet.SDK.10"
