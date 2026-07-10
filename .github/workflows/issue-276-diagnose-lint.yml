@@ -1,4 +1,4 @@
-name: Apply issue 276 formatter fix
+name: Apply issue 276 naming fix
 
 on:
   pull_request:
@@ -13,10 +13,10 @@ permissions:
   contents: write
 
 jobs:
-  format:
+  fix:
     if: github.head_ref == 'fix/276-code-scanning-hardening'
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 5
 
     steps:
       - name: Checkout
@@ -24,24 +24,22 @@ jobs:
         with:
           ref: fix/276-code-scanning-hardening
 
-      - name: Setup .NET
-        uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v5.1.0
-        with:
-          dotnet-version: 10.0.x
-
-      - name: Restore
-        run: make restore
-
-      - name: Format C#
-        run: dotnet format ArchLinterNet.slnx --verbosity minimal
-
-      - name: Commit formatter fix
+      - name: Apply naming-rule fix
         shell: bash
         run: |
-          if git diff --quiet; then
-            echo "No formatter changes required."
-            exit 0
-          fi
+          python3 - <<'PY'
+          from pathlib import Path
+
+          path = Path("tests/ArchLinterNet.Cli.Tests/CliIntegrationTests.cs")
+          text = path.read_text(encoding="utf-8")
+          if text.count("complexArgument") != 3:
+              raise RuntimeError("Expected exactly three complexArgument references")
+          path.write_text(text.replace("complexArgument", "ComplexArgument"), encoding="utf-8")
+          PY
+
+      - name: Commit naming-rule fix
+        shell: bash
+        run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add tests/ArchLinterNet.Cli.Tests/CliIntegrationTests.cs
