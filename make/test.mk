@@ -14,9 +14,9 @@ _acceptance-test: | lint-architecture
 clean-results:  ## Remove test-results folder
 	rm -rf "$(RESULTS_DIR)"
 
-test-coverage:  ## Run all tests with coverage collection (cobertura XML under test-results/)
+test-coverage:  ## Run all tests with coverage collection (Cobertura + OpenCover XML under test-results/)
 	@rm -rf "$(RESULTS_DIR)"
-	@dotnet test "$(SLNX)" --no-restore --collect:"XPlat Code Coverage" --results-directory "$(RESULTS_DIR)"
+	@dotnet test "$(SLNX)" --no-restore --logger trx --collect:"XPlat Code Coverage" --results-directory "$(RESULTS_DIR)" -- DataCollectionRunSettings.DataCollectors.DataCollector.Configuration.Format=cobertura,opencover
 
 test-coverage-badge: test-coverage  ## Run tests with coverage and print a test-coverage badge Markdown line
 	@cd "$(PROJECT_ROOT)" && UV_PROJECT_ENVIRONMENT="$(PROJECT_ROOT)/.venv" "$(UV)" run --project tools/pyproject.toml \

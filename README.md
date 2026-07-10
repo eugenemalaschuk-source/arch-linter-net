@@ -4,17 +4,23 @@
 
 [![CI](https://github.com/eugenemalaschuk-source/arch-linter-net/actions/workflows/ci.yml/badge.svg)](https://github.com/eugenemalaschuk-source/arch-linter-net/actions/workflows/ci.yml)
 [![Test coverage](https://codecov.io/github/eugenemalaschuk-source/arch-linter-net/graph/badge.svg)](https://app.codecov.io/github/eugenemalaschuk-source/arch-linter-net)
+[![Sonar Quality Gate](https://sonarcloud.io/api/project_badges/measure?project=eugenemalaschuk-source_arch-linter-net&metric=alert_status&branch=main)](https://sonarcloud.io/summary/overall?id=eugenemalaschuk-source_arch-linter-net&branch=main)
+[![Sonar Maintainability](https://sonarcloud.io/api/project_badges/measure?project=eugenemalaschuk-source_arch-linter-net&metric=sqale_rating&branch=main)](https://sonarcloud.io/summary/overall?id=eugenemalaschuk-source_arch-linter-net&branch=main)
+[![Sonar Reliability](https://sonarcloud.io/api/project_badges/measure?project=eugenemalaschuk-source_arch-linter-net&metric=reliability_rating&branch=main)](https://sonarcloud.io/summary/overall?id=eugenemalaschuk-source_arch-linter-net&branch=main)
+[![Sonar Security](https://sonarcloud.io/api/project_badges/measure?project=eugenemalaschuk-source_arch-linter-net&metric=security_rating&branch=main)](https://sonarcloud.io/summary/overall?id=eugenemalaschuk-source_arch-linter-net&branch=main)
 
-The CI badge tracks one workflow that runs all quality signals in the same `validate` job, so a green badge means all of them passed:
+The CI badge tracks one workflow that runs all quality signals in the same `validate` job, so a green badge means all of them passed. SonarCloud also analyzes trusted pull requests, decorates the PR, and evaluates the quality gate on new code rather than forcing the entire historical codebase to be clean before the PR can merge:
 
 | Quality signal | Source |
 |---|---|
 | Build/test | `make acceptance` (lint + all tests) |
 | Test coverage (line %) | CI runs `make test-coverage`, uploads Cobertura XML to Codecov, and the badge above updates dynamically from Codecov |
+| SonarCloud PR quality gate | trusted `pull_request` runs analyze new code, publish a SonarCloud PR result link, and fail CI when the Sonar quality gate fails |
+| SonarCloud main quality signals | the Sonar badges above track the `main` branch project status for quality gate, maintainability, reliability, and security |
 | Architecture validation | strict ArchLinterNet self-policy check (`architecture/dependencies.arch.yml`) |
 | Architecture coverage | strict/audit coverage JSON artifacts + Markdown report + sticky PR comment |
 
-See [CI integration](docs/guides/ci-integration.md#test-coverage-with-codecov) for how test coverage upload, the dynamic badge, and the architecture coverage gate fit together.
+See [CI integration](docs/guides/ci-integration.md#test-coverage-with-codecov-and-sonarcloud) for how test coverage upload, SonarCloud PR analysis, the dynamic badge, and the architecture coverage gate fit together.
 
 Declarative architecture contracts and dependency linting for .NET repositories.
 
