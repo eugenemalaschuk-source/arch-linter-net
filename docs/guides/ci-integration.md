@@ -163,7 +163,7 @@ The current public SonarCloud project metadata indicates that automatic analysis
 
 ### Recommended required check
 
-After the first successful decorated pull request run, configure GitHub branch protection manually to require the Sonar-created PR status/check for this repository. In current Sonar documentation this is typically rendered as `SonarQube Code Analysis`, but maintainers should verify the exact displayed check name in GitHub for this repository before making it required.
+After the first successful decorated pull request run, configure GitHub branch protection manually to require the Sonar-created PR status/check for this repository. For this repository's validated PR flow, GitHub currently renders that check as `SonarCloud Code Analysis`, but maintainers should still verify the exact displayed check name in GitHub before making it required.
 
 ### Post-merge verification
 
