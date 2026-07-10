@@ -25,6 +25,7 @@ sh tools/scripts/configure_rtk_unix.sh
 ```
 
 Bootstrap dependencies after RTK is available: `rtk brew bundle` (macOS) or `rtk make bundle`.
+Pinned bootstrap versions and their upgrade procedure are documented in `docs/internal/dependency-maintenance.md`.
 
 ## Key commands
 ```

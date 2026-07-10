@@ -2,6 +2,7 @@
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+OPENSPEC_VERSION="1.6.0"
 
 if ! command -v brew >/dev/null 2>&1; then
   echo "Homebrew is not installed or is not on PATH."
@@ -18,8 +19,8 @@ if ! command -v npm >/dev/null 2>&1; then
 fi
 
 if ! command -v openspec >/dev/null 2>&1; then
-  echo "Installing @fission-ai/openspec via npm..."
-  npm install -g --ignore-scripts @fission-ai/openspec@latest
+  echo "Installing @fission-ai/openspec@${OPENSPEC_VERSION} via npm..."
+  npm install -g --ignore-scripts "@fission-ai/openspec@${OPENSPEC_VERSION}"
 fi
 
 echo "Unix tool bootstrap complete."
