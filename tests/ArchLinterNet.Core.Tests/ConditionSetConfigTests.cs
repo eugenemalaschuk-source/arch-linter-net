@@ -11,7 +11,7 @@ public sealed class ConditionSetConfigTests
 {
     private static readonly string[] _dot = { "." };
     private static readonly string[] _consoleWriteLine = { "System.Console.WriteLine" };
-    private static readonly string[] _debugWriteLine = { "System.Diagnostics._debug.WriteLine" };
+    private static readonly string[] _debugWriteLine = { "System.Diagnostics.Debug.WriteLine" };
     private static readonly string[] _debug = { "DEBUG" };
     private static readonly string[] _unityEditor = { "UNITY_EDITOR" };
     private string _tempDir = null!;
@@ -260,7 +260,7 @@ public class _debugClass
     public void Run()
     {
 #if DEBUG
-        System.Diagnostics._debug.WriteLine(""debug only"");
+        System.Diagnostics.Debug.WriteLine(""debug only"");
 #endif
     }
 }
