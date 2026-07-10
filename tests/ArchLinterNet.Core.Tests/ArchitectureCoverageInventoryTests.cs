@@ -14,7 +14,7 @@ public sealed class ArchitectureCoverageInventoryTests
 {
     private static readonly Assembly[] _targetAssemblies = { typeof(ArchitectureCoverageInventoryTests).Assembly };
 
-    private static IArchitectureRunnerSetupService CreateRunnerSetupService()
+    private static ArchitectureRunnerSetupService CreateRunnerSetupService()
     {
         return new ArchitectureRunnerSetupService(
             new ArchitecturePolicyDocumentLoader(),

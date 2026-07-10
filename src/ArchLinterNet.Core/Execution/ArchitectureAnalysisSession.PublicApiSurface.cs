@@ -17,8 +17,7 @@ public sealed partial class ArchitectureAnalysisSession
 
         ArchitectureContractExecutionContext executionContext = CreateExecutionContext(contract, contract.IgnoredViolations);
         Dictionary<string, Assembly> resolvedAssemblies = BuildAssemblyLookup();
-        List<ArchitectureViolation> violations = new PublicApiSurfaceChecker()
-            .Check(contract, resolvedAssemblies, executionContext);
+        List<ArchitectureViolation> violations = PublicApiSurfaceChecker.Check(contract, resolvedAssemblies, executionContext);
         executionContext.CollectUnmatchedIgnores(_unmatchedIgnoredViolations);
         return violations;
     }

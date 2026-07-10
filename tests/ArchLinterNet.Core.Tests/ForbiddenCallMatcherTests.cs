@@ -7,6 +7,9 @@ namespace ArchLinterNet.Core.Tests;
 [TestFixture]
 public sealed class ForbiddenCallMatcherTests
 {
+    private static readonly string[] Foo = { "Foo" };
+    private static readonly string[] MyAppServices = { "MyApp.Services." };
+
     [Test]
     public void NormalizePatterns_RemovesTrailingParentheses()
     {
@@ -21,7 +24,7 @@ public sealed class ForbiddenCallMatcherTests
     public void NormalizePatterns_DetectsNamespacePrefix()
     {
         IReadOnlyList<ForbiddenCallPattern> patterns = ArchitectureForbiddenCallMatcher.NormalizePatterns(
-            new[] { "MyApp.Services." });
+            MyAppServices);
 
         Assert.That(patterns.Count, Is.EqualTo(1));
         Assert.That(patterns[0].IsNamespacePrefix, Is.True);
@@ -32,7 +35,7 @@ public sealed class ForbiddenCallMatcherTests
     public void TryMatch_ExactNameMatch_ReturnsTrue()
     {
         IReadOnlyList<ForbiddenCallPattern> patterns = ArchitectureForbiddenCallMatcher.NormalizePatterns(
-            new[] { "Foo" });
+            Foo);
         var descriptor = new SymbolDescriptor("Foo", "Bar", "Baz", "Baz.Bar.Foo");
         var cache = new Dictionary<string, bool>();
 
@@ -46,7 +49,7 @@ public sealed class ForbiddenCallMatcherTests
     public void TryMatch_NamespacePrefixMatch_ReturnsTrue()
     {
         IReadOnlyList<ForbiddenCallPattern> patterns = ArchitectureForbiddenCallMatcher.NormalizePatterns(
-            new[] { "MyApp.Services." });
+            MyAppServices);
         var descriptor = new SymbolDescriptor("MyMethod", "MyService", "MyApp.Services", "MyApp.Services.MyService.MyMethod");
         var cache = new Dictionary<string, bool>();
 
@@ -124,7 +127,7 @@ public sealed class ForbiddenCallMatcherTests
     public void TryMatch_CachesResults()
     {
         IReadOnlyList<ForbiddenCallPattern> patterns = ArchitectureForbiddenCallMatcher.NormalizePatterns(
-            new[] { "Foo" });
+            Foo);
         var descriptor = new SymbolDescriptor("Foo", "Bar", "Baz", "Baz.Bar.Foo");
         var cache = new Dictionary<string, bool>();
 

@@ -11,9 +11,12 @@ namespace ArchLinterNet.Core.Tests;
 [TestFixture]
 public sealed class ArchitectureRunnerSetupServiceDiscoveryTests
 {
+    private static readonly string[] ArchLinterNetCore = { "ArchLinterNet.Core" };
+    private static readonly string[] NoOutput = { "NoOutput" };
+
     private string _repoRoot = null!;
     private string _policyPath = null!;
-    private IArchitectureRunnerSetupService _runnerSetupService = null!;
+    private ArchitectureRunnerSetupService _runnerSetupService = null!;
 
     [SetUp]
     public void SetUp()
@@ -58,7 +61,7 @@ public sealed class ArchitectureRunnerSetupServiceDiscoveryTests
 
         ArchitectureRunnerSetup setup = _runnerSetupService.BuildRunner(document, _policyPath);
 
-        Assert.That(document.Analysis.TargetAssemblies, Is.EquivalentTo(new[] { "ArchLinterNet.Core" }));
+        Assert.That(document.Analysis.TargetAssemblies, Is.EquivalentTo(ArchLinterNetCore));
         Assert.That(setup.Runner.CheckConfiguration().Any(v => v.ForbiddenNamespace == "missing project build output"), Is.False);
 
         string discoveredOutputDir = Path.Combine(_repoRoot, "Unresolvable", "bin", "Debug", "net9.0");
@@ -83,8 +86,8 @@ public sealed class ArchitectureRunnerSetupServiceDiscoveryTests
 
         ArchitectureRunnerSetup setup = _runnerSetupService.BuildRunner(document, _policyPath);
 
-        Assert.That(document.Analysis.TargetAssemblies, Is.EquivalentTo(new[] { "ArchLinterNet.Core" }));
-        Assert.That(document.Analysis.SourceRoots, Is.EquivalentTo(new[] { "ArchLinterNet.Core" }));
+        Assert.That(document.Analysis.TargetAssemblies, Is.EquivalentTo(ArchLinterNetCore));
+        Assert.That(document.Analysis.SourceRoots, Is.EquivalentTo(ArchLinterNetCore));
         Assert.That(setup.Runner.CheckConfiguration().Any(v => v.SourceType.Contains("ArchLinterNet.Core.csproj")), Is.False);
     }
 
@@ -114,9 +117,9 @@ public sealed class ArchitectureRunnerSetupServiceDiscoveryTests
 
         ArchitectureRunnerSetup setup = _runnerSetupService.BuildRunner(document, _policyPath);
 
-        Assert.That(document.Analysis.TargetAssemblies, Is.EquivalentTo(new[] { "ArchLinterNet.Core" }));
+        Assert.That(document.Analysis.TargetAssemblies, Is.EquivalentTo(ArchLinterNetCore));
         Assert.That(setup.Runner.CheckConfiguration().Any(v => v.ForbiddenNamespace == "missing project build output"), Is.False);
-        Assert.That(document.Analysis.SourceRoots, Is.EquivalentTo(new[] { "NoOutput" }));
+        Assert.That(document.Analysis.SourceRoots, Is.EquivalentTo(NoOutput));
     }
 
     [Test]
@@ -195,7 +198,7 @@ public sealed class ArchitectureRunnerSetupServiceDiscoveryTests
         Assert.That(document.Analysis.TargetAssemblies, Is.Empty);
         Assert.That(configurationViolations.Any(v => v.ForbiddenNamespace == "missing project build output"), Is.False);
         Assert.That(configurationViolations.Any(v => v.ForbiddenNamespace == "no project metadata discovered"), Is.False);
-        Assert.That(document.Analysis.SourceRoots, Is.EquivalentTo(new[] { "NoOutput" }));
+        Assert.That(document.Analysis.SourceRoots, Is.EquivalentTo(NoOutput));
     }
 
     private void CreateProjectWithOutput(string assemblyName, string targetFramework)

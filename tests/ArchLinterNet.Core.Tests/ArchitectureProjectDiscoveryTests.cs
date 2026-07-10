@@ -7,6 +7,10 @@ namespace ArchLinterNet.Core.Tests;
 [TestFixture]
 public sealed class ArchitectureProjectDiscoveryTests
 {
+    private static readonly string[] FixtureAssembly = { "Fixture.Assembly" };
+    private static readonly string[] BinDebugNet10 = { "bin/Debug/net10.0" };
+    private static readonly string[] SrcFixture = { "src/Fixture" };
+
     private string _repoRoot = null!;
 
     [SetUp]
@@ -33,9 +37,9 @@ public sealed class ArchitectureProjectDiscoveryTests
         // and 4-value Deconstruct (both part of the public API before project/assembly
         // coverage existed) remain source- and binary-compatible.
         ProjectDiscoveryResult result = new(
-            new[] { "Fixture.Assembly" },
-            new[] { "bin/Debug/net10.0" },
-            new[] { "src/Fixture" },
+            FixtureAssembly,
+            BinDebugNet10,
+            SrcFixture,
             Array.Empty<ArchitectureProjectDiscoveryDiagnostic>());
 
         (IReadOnlyCollection<string> targetAssemblyNames,
@@ -43,9 +47,9 @@ public sealed class ArchitectureProjectDiscoveryTests
             IReadOnlyCollection<string> sourceRoots,
             IReadOnlyCollection<ArchitectureProjectDiscoveryDiagnostic> diagnostics) = result;
 
-        Assert.That(targetAssemblyNames, Is.EquivalentTo(new[] { "Fixture.Assembly" }));
-        Assert.That(assemblySearchPaths, Is.EquivalentTo(new[] { "bin/Debug/net10.0" }));
-        Assert.That(sourceRoots, Is.EquivalentTo(new[] { "src/Fixture" }));
+        Assert.That(targetAssemblyNames, Is.EquivalentTo(FixtureAssembly));
+        Assert.That(assemblySearchPaths, Is.EquivalentTo(BinDebugNet10));
+        Assert.That(sourceRoots, Is.EquivalentTo(SrcFixture));
         Assert.That(diagnostics, Is.Empty);
         Assert.That(result.DiscoveredProjects, Is.Empty);
     }

@@ -15,8 +15,7 @@ public sealed partial class ArchitectureAnalysisSession
         }
 
         ArchitectureContractExecutionContext executionContext = CreateExecutionContext(contract, contract.IgnoredViolations);
-        List<ArchitectureViolation> violations = new AssemblyIndependenceChecker()
-            .Check(contract, Context.TargetAssemblies, executionContext);
+        List<ArchitectureViolation> violations = AssemblyIndependenceChecker.Check(contract, Context.TargetAssemblies, executionContext);
         executionContext.CollectUnmatchedIgnores(_unmatchedIgnoredViolations);
         return violations;
     }

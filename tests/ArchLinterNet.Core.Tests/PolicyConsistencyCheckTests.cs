@@ -8,6 +8,8 @@ namespace ArchLinterNet.Core.Tests;
 [TestFixture]
 public sealed class PolicyConsistencyCheckTests
 {
+    private static readonly string[] DomainApplication = { "domain", "application" };
+
     private static ArchitectureAnalysisContext CreateContext()
     {
         return new ArchitectureAnalysisContext(
@@ -127,7 +129,7 @@ public sealed class PolicyConsistencyCheckTests
 
         var finding = findings.FirstOrDefault(f => f.CheckKind == "allow-forbid-conflict");
         Assert.That(finding, Is.Not.Null);
-        Assert.That(finding!.Layers, Is.EquivalentTo(new[] { "domain", "application" }));
+        Assert.That(finding!.Layers, Is.EquivalentTo(DomainApplication));
         Assert.That(finding.ConflictingContractNames,
             Is.EquivalentTo(new[] { "domain-allows-application", "domain-forbids-application" }));
     }
@@ -214,7 +216,7 @@ public sealed class PolicyConsistencyCheckTests
 
         var finding = findings.FirstOrDefault(f => f.CheckKind == "protected-importer-conflict");
         Assert.That(finding, Is.Not.Null);
-        Assert.That(finding!.Layers, Is.EquivalentTo(new[] { "domain", "application" }));
+        Assert.That(finding!.Layers, Is.EquivalentTo(DomainApplication));
     }
 
     [Test]
@@ -243,7 +245,7 @@ public sealed class PolicyConsistencyCheckTests
         var finding = findings.FirstOrDefault(f => f.CheckKind == "protected-importer-conflict"
             && f.ConflictingContractNames.Contains("domain-protected-no-application"));
         Assert.That(finding, Is.Not.Null);
-        Assert.That(finding!.Layers, Is.EquivalentTo(new[] { "domain", "application" }));
+        Assert.That(finding!.Layers, Is.EquivalentTo(DomainApplication));
         Assert.That(finding.ConflictingContractNames,
             Is.EquivalentTo(new[] { "domain-protected-allows-application", "domain-protected-no-application" }));
     }

@@ -9,6 +9,11 @@ namespace ArchLinterNet.Core.Tests;
 [TestFixture]
 public sealed class ConditionSetConfigTests
 {
+    private static readonly string[] Dot = { "." };
+    private static readonly string[] ConsoleWriteLine = { "System.Console.WriteLine" };
+    private static readonly string[] DebugWriteLine = { "System.Diagnostics.Debug.WriteLine" };
+    private static readonly string[] Debug = { "DEBUG" };
+    private static readonly string[] UnityEditor = { "UNITY_EDITOR" };
     private string _tempDir = null!;
 
     [SetUp]
@@ -79,9 +84,9 @@ public class RuntimeClass
         IReadOnlyList<ArchitectureViolation> violations = new ArchitectureSourceScanner()
             .FindMethodBodyViolations(
                 _tempDir, "TestNamespace",
-                new[] { "System.Console.WriteLine" },
+                ConsoleWriteLine,
                 executionContext,
-                sourceRoots: new[] { "." },
+                sourceRoots: Dot,
                 preprocessorSymbols: Array.Empty<string>())
             .ToList();
 
@@ -111,10 +116,10 @@ public class DebugClass
         IReadOnlyList<ArchitectureViolation> violations = new ArchitectureSourceScanner()
             .FindMethodBodyViolations(
                 _tempDir, "TestNamespace",
-                new[] { "System.Console.WriteLine" },
+                ConsoleWriteLine,
                 executionContext,
-                sourceRoots: new[] { "." },
-                preprocessorSymbols: new[] { "DEBUG" })
+                sourceRoots: Dot,
+                preprocessorSymbols: Debug)
             .ToList();
 
         Assert.That(violations, Is.Not.Empty,
@@ -143,10 +148,10 @@ public class NonDebugClass
         IReadOnlyList<ArchitectureViolation> violations = new ArchitectureSourceScanner()
             .FindMethodBodyViolations(
                 _tempDir, "TestNamespace",
-                new[] { "System.Console.WriteLine" },
+                ConsoleWriteLine,
                 executionContext,
-                sourceRoots: new[] { "." },
-                preprocessorSymbols: new[] { "DEBUG" })
+                sourceRoots: Dot,
+                preprocessorSymbols: Debug)
             .ToList();
 
         Assert.That(violations, Is.Empty,
@@ -171,8 +176,7 @@ public class NonDebugClass
         string policyPath = Path.Combine(_tempDir, "invalid-default.arch.yml");
         File.WriteAllText(policyPath, yaml);
 
-        var validator = new ArchitectureValidator();
-        var ex = Assert.Throws<InvalidOperationException>(() => validator.Validate(policyPath));
+        var ex = Assert.Throws<InvalidOperationException>(() => ArchitectureValidator.Validate(policyPath));
         Assert.That(ex!.Message, Does.Contain("non_existent_set"));
     }
 
@@ -206,7 +210,7 @@ public class NonDebugClass
         {
             Assert.That(resolved, Is.True);
             Assert.That(error, Is.Null);
-            Assert.That(symbols, Is.EquivalentTo(new[] { "UNITY_EDITOR" }));
+            Assert.That(symbols, Is.EquivalentTo(UnityEditor));
         });
     }
 
@@ -241,7 +245,7 @@ public class NonDebugClass
         {
             Assert.That(resolved, Is.True);
             Assert.That(error, Is.Null);
-            Assert.That(symbols, Is.EquivalentTo(new[] { "DEBUG" }));
+            Assert.That(symbols, Is.EquivalentTo(Debug));
         });
     }
 
@@ -265,10 +269,10 @@ public class DebugClass
         IReadOnlyList<ArchitectureViolation> violationsWithDebug = new ArchitectureSourceScanner()
             .FindMethodBodyViolations(
                 _tempDir, "TestNamespace",
-                new[] { "System.Diagnostics.Debug.WriteLine" },
+                DebugWriteLine,
                 new ArchitectureContractExecutionContext(
                     "test-debug", null, Array.Empty<ArchitectureIgnoredViolation>(), false, null, null),
-                sourceRoots: new[] { "." },
+                sourceRoots: Dot,
                 preprocessorSymbols: new[] { "UNITY_EDITOR", "DEBUG" })
             .ToList();
 
@@ -278,11 +282,11 @@ public class DebugClass
         IReadOnlyList<ArchitectureViolation> violationsWithoutDebug = new ArchitectureSourceScanner()
             .FindMethodBodyViolations(
                 _tempDir, "TestNamespace",
-                new[] { "System.Diagnostics.Debug.WriteLine" },
+                DebugWriteLine,
                 new ArchitectureContractExecutionContext(
                     "test-no-debug", null, Array.Empty<ArchitectureIgnoredViolation>(), false, null, null),
-                sourceRoots: new[] { "." },
-                preprocessorSymbols: new[] { "UNITY_EDITOR" })
+                sourceRoots: Dot,
+                preprocessorSymbols: UnityEditor)
             .ToList();
 
         Assert.That(violationsWithoutDebug, Is.Empty,

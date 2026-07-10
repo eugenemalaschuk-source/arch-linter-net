@@ -29,9 +29,9 @@ namespace CompositionContractTestFixtures.Fakes
     // ASP.NET-shaped fakes above, so tests can exercise both example call shapes named in the issue.
     public sealed class FakeContainer
     {
-        public object? Resolve(System.Type serviceType) => null;
+        public object? Resolve(System.Type serviceType) => null; // NOSONAR — instance required for IL scanner tests
 
-        public void Register(System.Type serviceType)
+        public void Register(System.Type serviceType) // NOSONAR — instance required for IL scanner tests
         {
         }
     }
@@ -45,17 +45,17 @@ namespace CompositionContractTestFixtures.Composition
 
     public sealed class CompositionRoot
     {
-        public void ConfigureServices(IFakeServiceCollection services)
+        public static void ConfigureServices(IFakeServiceCollection services)
         {
             services.AddSingleton(typeof(object));
         }
 
-        public void ConfigureAspNetServices(IFakeAspNetServiceCollection services)
+        public static void ConfigureAspNetServices(IFakeAspNetServiceCollection services)
         {
             services.AddSingleton(typeof(object));
         }
 
-        public object? ResolveFromLocator(IFakeServiceProvider provider)
+        public static object? ResolveFromLocator(IFakeServiceProvider provider)
         {
             return provider.GetService(typeof(object));
         }
@@ -63,7 +63,7 @@ namespace CompositionContractTestFixtures.Composition
 
     public sealed class ContainerBootstrap
     {
-        public object? Resolve(FakeContainer container)
+        public static object? Resolve(FakeContainer container)
         {
             container.Register(typeof(object));
             return container.Resolve(typeof(object));
@@ -79,7 +79,7 @@ namespace CompositionContractTestFixtures.Application
 
     public sealed class ServiceLocatorLeak
     {
-        public object? ResolveFromLocator(IFakeServiceProvider provider)
+        public static object? ResolveFromLocator(IFakeServiceProvider provider)
         {
             return provider.GetService(typeof(object));
         }
@@ -87,7 +87,7 @@ namespace CompositionContractTestFixtures.Application
 
     public sealed class DiRegistrationLeak
     {
-        public void ConfigureServices(IFakeServiceCollection services)
+        public static void ConfigureServices(IFakeServiceCollection services)
         {
             services.AddSingleton(typeof(object));
         }
@@ -95,7 +95,7 @@ namespace CompositionContractTestFixtures.Application
 
     public sealed class AspNetDiRegistrationLeak
     {
-        public void ConfigureServices(IFakeAspNetServiceCollection services)
+        public static void ConfigureServices(IFakeAspNetServiceCollection services)
         {
             services.AddSingleton(typeof(object));
         }
@@ -106,7 +106,7 @@ namespace CompositionContractTestFixtures.Application
     // service-locator leak above.
     public sealed class ContainerLeak
     {
-        public object? Resolve(FakeContainer container)
+        public static object? Resolve(FakeContainer container)
         {
             container.Register(typeof(object));
             return container.Resolve(typeof(object));
@@ -115,6 +115,6 @@ namespace CompositionContractTestFixtures.Application
 
     public sealed class CleanApplicationType
     {
-        public int Add(int a, int b) => a + b;
+        public static int Add(int a, int b) => a + b;
     }
 }

@@ -13,7 +13,7 @@ internal interface ICliRuntime
 
     ValidationOutcome Validate(ValidationRequest request, ValidationTiming? timing);
 
-    string FormatResultForCiArtifacts(
+    string FormatResultForCiArtifacts( // NOSONAR: each parameter represents a semantically distinct section of the CI artifact payload; grouping would obscure the data contract
         string mode,
         bool passed,
         IReadOnlyCollection<ArchitectureViolation> violations,

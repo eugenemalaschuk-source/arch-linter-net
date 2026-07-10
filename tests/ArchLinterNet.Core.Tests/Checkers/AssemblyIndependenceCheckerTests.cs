@@ -38,8 +38,7 @@ public sealed class AssemblyIndependenceCheckerTests
             Assemblies = new List<string> { testingName, coreName }
         };
 
-        var checker = new AssemblyIndependenceChecker();
-        List<ArchitectureViolation> violations = checker.Check(
+        List<ArchitectureViolation> violations = AssemblyIndependenceChecker.Check(
             contract, new[] { _testingAssembly, _coreAssembly }, CreateExecutionContext());
 
         Assert.That(violations, Has.Count.EqualTo(1));
@@ -64,8 +63,7 @@ public sealed class AssemblyIndependenceCheckerTests
             new() { SourceType = testingName, ForbiddenReference = coreName, Reason = "fixture" },
         };
 
-        var checker = new AssemblyIndependenceChecker();
-        List<ArchitectureViolation> violations = checker.Check(
+        List<ArchitectureViolation> violations = AssemblyIndependenceChecker.Check(
             contract, new[] { _testingAssembly, _coreAssembly }, CreateExecutionContext(ignoredViolations));
 
         Assert.That(violations, Is.Empty);

@@ -8,12 +8,12 @@ public sealed class AsmdefValidator
     private static readonly Lazy<ArchitectureEngine> _engine =
         new(() => new ArchitectureEngineBuilder().AddArchLinterNetCore().Build());
 
-    public bool Validate(string contractPath)
+    public static bool Validate(string contractPath)
     {
         return Validate(contractPath, out _);
     }
 
-    public bool Validate(string contractPath, out IReadOnlyCollection<Core.Model.ArchitectureViolation> violations)
+    public static bool Validate(string contractPath, out IReadOnlyCollection<Core.Model.ArchitectureViolation> violations)
     {
         AsmdefValidationOutcome outcome = _engine.Value.ValidateAsmdef(new AsmdefValidationRequest
         {

@@ -7,7 +7,7 @@ namespace ArchLinterNet.Core.Execution.Checkers;
 
 internal sealed class AssemblyIndependenceChecker
 {
-    public List<ArchitectureViolation> Check(
+    public static List<ArchitectureViolation> Check(
         ArchitectureAssemblyIndependenceContract contract,
         IEnumerable<Assembly> targetAssemblies,
         ArchitectureContractExecutionContext executionContext)

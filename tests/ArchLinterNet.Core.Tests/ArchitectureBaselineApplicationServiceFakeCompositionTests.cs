@@ -13,6 +13,9 @@ namespace ArchLinterNet.Core.Tests;
 [TestFixture]
 public sealed class ArchitectureBaselineApplicationServiceFakeCompositionTests
 {
+    private static readonly bool[] True = { true };
+    private static readonly string[] KnownRule = { "known-rule" };
+
     private sealed class FakeRunnerSetupService : IArchitectureRunnerSetupService
     {
         public bool LoadDocumentCalled { get; private set; }
@@ -210,7 +213,7 @@ public sealed class ArchitectureBaselineApplicationServiceFakeCompositionTests
         Assert.That(baselineGenerator.WasCalled, Is.True);
         Assert.That(baselineGenerator.ReasonReceived, Is.EqualTo("fake reason"));
         Assert.That(contractExecutor.ModesReceived, Is.EquivalentTo(new[] { "strict", "audit" }));
-        Assert.That(runner.StrictArgumentsReceived, Is.EqualTo(new[] { true }));
+        Assert.That(runner.StrictArgumentsReceived, Is.EqualTo(True));
         Assert.That(runnerSetupService.ModeReceived, Is.Null);
     }
 
@@ -241,7 +244,7 @@ public sealed class ArchitectureBaselineApplicationServiceFakeCompositionTests
         Assert.That(outcome.ConfigurationViolations, Has.Count.EqualTo(1));
         Assert.That(contractExecutor.ModesReceived, Is.Empty);
         Assert.That(baselineGenerator.WasCalled, Is.False);
-        Assert.That(runner.StrictArgumentsReceived, Is.EqualTo(new[] { true }));
+        Assert.That(runner.StrictArgumentsReceived, Is.EqualTo(True));
     }
 
     [Test]
@@ -631,7 +634,7 @@ public sealed class ArchitectureBaselineApplicationServiceFakeCompositionTests
             PolicyPath = "unused-by-fakes.arch.yml",
             BaselinePath = "unused-by-fakes.baseline.yml",
             Mode = "all",
-            ContractIds = new[] { "known-rule" },
+            ContractIds = KnownRule,
         });
 
         Assert.That(outcome.Succeeded, Is.True);
@@ -666,7 +669,7 @@ public sealed class ArchitectureBaselineApplicationServiceFakeCompositionTests
             PolicyPath = "unused-by-fakes.arch.yml",
             BaselinePath = "unused-by-fakes.baseline.yml",
             Mode = "all",
-            ContractIds = new[] { "known-rule" },
+            ContractIds = KnownRule,
         });
 
         Assert.That(outcome.Succeeded, Is.True);

@@ -5,6 +5,10 @@ namespace ArchLinterNet.Cli.Commands.Validate;
 
 internal sealed class ValidateCommandDefinition(ValidateCommandHandler handler)
 {
+    private const string StrictMode = "strict";
+    private const string AuditMode = "audit";
+    private const string HumanFormat = "human";
+
     public const string HelpText =
         """
         arch-linter-net — architecture contract linter for .NET
@@ -52,10 +56,10 @@ internal sealed class ValidateCommandDefinition(ValidateCommandHandler handler)
         Option<string> policyOption = CreateOption("--policy", "architecture/dependencies.arch.yml");
         policyOption.Aliases.Add("-p");
 
-        Option<string> modeOption = CreateOption("--mode", "strict");
+        Option<string> modeOption = CreateOption("--mode", StrictMode);
         modeOption.Aliases.Add("-m");
 
-        Option<string> formatOption = CreateOption("--format", "human");
+        Option<string> formatOption = CreateOption("--format", HumanFormat);
         formatOption.Aliases.Add("-f");
 
         Option<string[]> contractOption = new("--contract");
@@ -86,14 +90,9 @@ internal sealed class ValidateCommandDefinition(ValidateCommandHandler handler)
         command.SetAction(parseResult => handler.Execute(MapOptions(
             parseResult,
             policyOption,
-            modeOption,
-            formatOption,
             contractOption,
             conditionSetOption,
             baselineOption,
-            strictOption,
-            auditOption,
-            jsonOption,
             timingsOption,
             helpOption,
             versionOption)));
@@ -116,17 +115,12 @@ internal sealed class ValidateCommandDefinition(ValidateCommandHandler handler)
         }
     }
 
-    private static ValidateCommandOptions MapOptions(
+    private static ValidateCommandOptions MapOptions( // NOSONAR: individual Option<T> parameters are required by the System.CommandLine API pattern; grouping into a single definitions object would add indirection without eliminating any field
         ParseResult parseResult,
         Option<string> policyOption,
-        Option<string> modeOption,
-        Option<string> formatOption,
         Option<string[]> contractOption,
         Option<string> conditionSetOption,
         Option<string> baselineOption,
-        Option<bool> strictOption,
-        Option<bool> auditOption,
-        Option<bool> jsonOption,
         Option<bool> timingsOption,
         Option<bool> helpOption,
         Option<bool> versionOption)
@@ -148,7 +142,7 @@ internal sealed class ValidateCommandDefinition(ValidateCommandHandler handler)
 
     private static string ResolveMode(ParseResult parseResult)
     {
-        string mode = "strict";
+        string mode = StrictMode;
         bool expectModeValue = false;
 
         foreach (string token in EnumerateTokenValues(parseResult))
@@ -168,13 +162,13 @@ internal sealed class ValidateCommandDefinition(ValidateCommandHandler handler)
 
             if (IsOption(token, "--strict"))
             {
-                mode = "strict";
+                mode = StrictMode;
                 continue;
             }
 
             if (IsOption(token, "--audit"))
             {
-                mode = "audit";
+                mode = AuditMode;
             }
         }
 
@@ -183,7 +177,7 @@ internal sealed class ValidateCommandDefinition(ValidateCommandHandler handler)
 
     private static string ResolveFormat(ParseResult parseResult)
     {
-        string format = "human";
+        string format = HumanFormat;
         bool expectFormatValue = false;
 
         foreach (string token in EnumerateTokenValues(parseResult))
@@ -215,32 +209,19 @@ internal sealed class ValidateCommandDefinition(ValidateCommandHandler handler)
         return parseResult.Tokens.Select(static token => token.Value);
     }
 
-    private static bool IsModeValue(string token)
-    {
-        return string.Equals(token, "strict", StringComparison.OrdinalIgnoreCase)
-            || string.Equals(token, "audit", StringComparison.OrdinalIgnoreCase);
-    }
-
     private static string NormalizeModeOrPreserve(string token)
     {
-        if (string.Equals(token, "audit", StringComparison.OrdinalIgnoreCase))
+        if (string.Equals(token, AuditMode, StringComparison.OrdinalIgnoreCase))
         {
-            return "audit";
+            return AuditMode;
         }
 
-        if (string.Equals(token, "strict", StringComparison.OrdinalIgnoreCase))
+        if (string.Equals(token, StrictMode, StringComparison.OrdinalIgnoreCase))
         {
-            return "strict";
+            return StrictMode;
         }
 
         return token;
-    }
-
-    private static bool IsFormatValue(string token)
-    {
-        return string.Equals(token, "human", StringComparison.OrdinalIgnoreCase)
-            || string.Equals(token, "json", StringComparison.OrdinalIgnoreCase)
-            || string.Equals(token, "sarif", StringComparison.OrdinalIgnoreCase);
     }
 
     private static string NormalizeFormatOrPreserve(string token)
@@ -255,9 +236,9 @@ internal sealed class ValidateCommandDefinition(ValidateCommandHandler handler)
             return "sarif";
         }
 
-        if (string.Equals(token, "human", StringComparison.OrdinalIgnoreCase))
+        if (string.Equals(token, HumanFormat, StringComparison.OrdinalIgnoreCase))
         {
-            return "human";
+            return HumanFormat;
         }
 
         return token;
@@ -265,15 +246,7 @@ internal sealed class ValidateCommandDefinition(ValidateCommandHandler handler)
 
     private static bool IsOption(string token, params string[] names)
     {
-        foreach (string name in names)
-        {
-            if (string.Equals(token, name, StringComparison.Ordinal))
-            {
-                return true;
-            }
-        }
-
-        return false;
+        return names.Any(name => string.Equals(token, name, StringComparison.Ordinal));
     }
 
     private static Option<string> CreateOption(string name, string defaultValue)

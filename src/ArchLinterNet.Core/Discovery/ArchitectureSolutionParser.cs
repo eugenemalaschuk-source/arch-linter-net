@@ -9,11 +9,11 @@ internal interface IArchitectureSolutionParser
     IReadOnlyList<string> ParseProjectPaths(string solutionPath, IArchitectureFileSystem? fileSystem = null);
 }
 
-internal sealed class ArchitectureSolutionParser : IArchitectureSolutionParser
+internal sealed partial class ArchitectureSolutionParser : IArchitectureSolutionParser
 {
-    private static readonly Regex _classicSlnProjectLine = new(
-        "^Project\\(\"\\{[^}]*}\"\\)\\s*=\\s*\"[^\"]*\",\\s*\"([^\"]*)\",\\s*\"\\{[^}]*}\"",
-        RegexOptions.Compiled);
+    [GeneratedRegex("^Project\\(\"\\{[^}]*}\"\\)\\s*=\\s*\"[^\"]*\",\\s*\"([^\"]*)\",\\s*\"\\{[^}]*}\"",
+        RegexOptions.Compiled)]
+    private static partial Regex ClassicSlnProjectLine();
 
     public IReadOnlyList<string> ParseProjectPaths(string solutionPath, IArchitectureFileSystem? fileSystem = null)
     {
@@ -42,7 +42,7 @@ internal sealed class ArchitectureSolutionParser : IArchitectureSolutionParser
             .Select(path => path!);
     }
 
-    private static IEnumerable<string> ParseClassicSln(string solutionPath, IArchitectureFileSystem fileSystem)
+    private static List<string> ParseClassicSln(string solutionPath, IArchitectureFileSystem fileSystem)
     {
         List<string> paths = new();
         bool hasHeader = false;
@@ -55,7 +55,7 @@ internal sealed class ArchitectureSolutionParser : IArchitectureSolutionParser
                 hasHeader = true;
             }
 
-            Match match = _classicSlnProjectLine.Match(line);
+            Match match = ClassicSlnProjectLine().Match(line);
             if (match.Success)
             {
                 paths.Add(match.Groups[1].Value);

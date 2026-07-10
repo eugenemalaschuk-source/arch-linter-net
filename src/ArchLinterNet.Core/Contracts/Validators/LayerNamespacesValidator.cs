@@ -6,14 +6,9 @@ internal sealed class LayerNamespacesValidator : IArchitecturePolicyDocumentVali
 {
     public void Validate(ArchitectureContractDocument document)
     {
-        foreach (KeyValuePair<string, ArchitectureLayer> pair in document.Layers)
+        foreach (ArchitectureLayer layer in document.Layers.Values.Where(l => !string.IsNullOrWhiteSpace(l.Namespace)))
         {
-            ArchitectureLayer layer = pair.Value;
-
-            if (!string.IsNullOrWhiteSpace(layer.Namespace))
-            {
-                _ = layer.GlobPattern;
-            }
+            _ = layer.GlobPattern;
         }
     }
 }

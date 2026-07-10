@@ -31,7 +31,7 @@ public sealed class AssemblyAllowOnlyValidationTests
         return path;
     }
 
-    private string AssemblyName => typeof(AssemblyAllowOnlyValidationTests).Assembly.GetName().Name!;
+    private static string AssemblyName => typeof(AssemblyAllowOnlyValidationTests).Assembly.GetName().Name!;
 
     [Test]
     public void AssemblyAllowOnly_UndeclaredSourceAssembly_ThrowsActionableError()

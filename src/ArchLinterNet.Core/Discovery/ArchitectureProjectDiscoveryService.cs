@@ -316,7 +316,7 @@ public sealed class ArchitectureProjectDiscoveryService : IArchitectureProjectDi
         foreach (string file in fileSystem.EnumerateFiles(projectDirectory, "*.cs", SearchOption.AllDirectories))
         {
             string relativePath = Path.GetRelativePath(projectDirectory, file);
-            string[] segments = relativePath.Split(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+            string[] segments = relativePath.Split([Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar]);
 
             if (segments.Any(segment =>
                     string.Equals(segment, "bin", StringComparison.OrdinalIgnoreCase) ||

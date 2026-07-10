@@ -269,7 +269,7 @@ internal sealed class ArchitectureProjectFileParser : IArchitectureProjectFilePa
     private static bool IsUnderBuildOutputDirectory(string projectDirectory, string filePath)
     {
         string relativePath = Path.GetRelativePath(projectDirectory, filePath);
-        string[] segments = relativePath.Split(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+        string[] segments = relativePath.Split([Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar]);
 
         return segments.Any(segment =>
             string.Equals(segment, "bin", StringComparison.OrdinalIgnoreCase) ||
