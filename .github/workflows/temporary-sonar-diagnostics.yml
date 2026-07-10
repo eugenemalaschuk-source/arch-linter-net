@@ -17,11 +17,13 @@ jobs:
         run: |
           set -euo pipefail
 
-          curl --fail --silent --show-error --get \
-            --data-urlencode 'components=eugenemalaschuk-source_arch-linter-net' \
+          response="$(curl --silent --show-error --get \
+            --data-urlencode 'componentKeys=eugenemalaschuk-source_arch-linter-net' \
             --data-urlencode 'pullRequest=271' \
             --data-urlencode 'statuses=OPEN,CONFIRMED' \
-            --data-urlencode 'sinceLeakPeriod=true' \
+            --data-urlencode 'inNewCodePeriod=true' \
             --data-urlencode 'ps=100' \
-            'https://sonarcloud.io/api/issues/search' \
-            | jq -r '.issues[] | [.rule, .severity, .component, (.line // 0 | tostring), .message] | @tsv'
+            'https://sonarcloud.io/api/issues/search')"
+
+          echo "$response" | jq .
+          echo "$response" | jq -r '.issues[] | [.rule, .severity, .component, (.line // 0 | tostring), .message] | @tsv'
