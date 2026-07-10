@@ -3,18 +3,18 @@
 </p>
 
 [![CI](https://github.com/eugenemalaschuk-source/arch-linter-net/actions/workflows/ci.yml/badge.svg)](https://github.com/eugenemalaschuk-source/arch-linter-net/actions/workflows/ci.yml)
-[![Test coverage](https://img.shields.io/badge/test%20coverage-79%25-yellow)](https://github.com/eugenemalaschuk-source/arch-linter-net/actions/workflows/ci.yml)
+[![Test coverage](https://codecov.io/github/eugenemalaschuk-source/arch-linter-net/graph/badge.svg)](https://app.codecov.io/github/eugenemalaschuk-source/arch-linter-net)
 
 The CI badge tracks one workflow that runs all quality signals in the same `validate` job, so a green badge means all of them passed:
 
 | Quality signal | Source |
 |---|---|
 | Build/test | `make acceptance` (lint + all tests) |
-| Test coverage (line %) | `make test-coverage-badge` — merged cobertura line coverage across all test projects; regenerate and update the badge above when it changes meaningfully |
+| Test coverage (line %) | CI runs `make test-coverage`, uploads Cobertura XML to Codecov, and the badge above updates dynamically from Codecov |
 | Architecture validation | strict ArchLinterNet self-policy check (`architecture/dependencies.arch.yml`) |
 | Architecture coverage | strict/audit coverage JSON artifacts + Markdown report + sticky PR comment |
 
-See [CI integration](docs/guides/ci-integration.md#baseline-debt-semantics-in-the-coverage-gate) for how the coverage gate and PR comment work.
+See [CI integration](docs/guides/ci-integration.md#test-coverage-with-codecov) for how test coverage upload, the dynamic badge, and the architecture coverage gate fit together.
 
 Declarative architecture contracts and dependency linting for .NET repositories.
 

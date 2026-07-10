@@ -43,6 +43,25 @@ jobs:
       - name: Acceptance
         run: make acceptance
 
+      - name: Collect test coverage
+        run: make test-coverage
+
+      - name: Resolve coverage report paths
+        id: coverage_reports
+        shell: bash
+        run: |
+          files="$(find test-results -name 'coverage.cobertura.xml' -print | sed 's#^#./#' | paste -sd, -)"
+          echo "files=$files" >> "$GITHUB_OUTPUT"
+
+      - name: Upload test coverage to Codecov
+        if: steps.coverage_reports.outputs.files != '' && (github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository)
+        uses: codecov/codecov-action@v5
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: ${{ steps.coverage_reports.outputs.files }}
+          disable_search: true
+          fail_ci_if_error: false
+
       - name: Test architecture coverage report generator
         run: make test-architecture-coverage-report
 
