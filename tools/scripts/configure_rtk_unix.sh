@@ -1,6 +1,10 @@
 #!/usr/bin/env sh
 set -eu
 
+RTK_VERSION="v0.42.4"
+RTK_COMMIT="8a7dd7e5570d7744d4b6508479a3674fe8c49286"
+RTK_INSTALLER_URL="https://raw.githubusercontent.com/rtk-ai/rtk/${RTK_COMMIT}/install.sh"
+
 log() {
   printf '%s\n' "$*"
 }
@@ -15,13 +19,13 @@ install_rtk_if_missing() {
     return
   fi
 
-  log "rtk is not installed. Installing rtk..."
+  log "rtk is not installed. Installing pinned ${RTK_VERSION}..."
   if has_command brew; then
     brew install rtk
   elif has_command cargo; then
-    cargo install --git https://github.com/rtk-ai/rtk
+    cargo install --git https://github.com/rtk-ai/rtk --rev "$RTK_COMMIT" --locked
   elif has_command curl; then
-    curl -fsSL --proto '=https' --tlsv1.2 https://raw.githubusercontent.com/rtk-ai/rtk/refs/heads/develop/install.sh | sh
+    curl -fsSL --proto '=https' --tlsv1.2 "$RTK_INSTALLER_URL" | RTK_VERSION="$RTK_VERSION" sh
     export PATH="$HOME/.local/bin:$PATH"
   else
     log "rtk installation requires Homebrew, Cargo, or curl. Install rtk manually and rerun make rtk-init."

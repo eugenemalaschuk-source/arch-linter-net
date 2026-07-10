@@ -1,6 +1,8 @@
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
+$OpenSpecVersion = "1.6.0"
+
 function Test-Command {
     param([Parameter(Mandatory = $true)][string]$Name)
     return $null -ne (Get-Command $Name -ErrorAction SilentlyContinue)
@@ -157,15 +159,15 @@ function Install-OpenSpec {
         return
     }
 
-    if ($PSCmdlet.ShouldProcess("openspec", "Install @fission-ai/openspec")) {
-        Write-Output "openspec is not installed. Installing @fission-ai/openspec via npm..."
+    if ($PSCmdlet.ShouldProcess("openspec", "Install @fission-ai/openspec@$OpenSpecVersion")) {
+        Write-Output "openspec is not installed. Installing @fission-ai/openspec@$OpenSpecVersion via npm..."
 
         Install-NodeJs
 
-        & "npm" install -g @fission-ai/openspec@latest
+        & "npm" install -g "@fission-ai/openspec@$OpenSpecVersion"
 
         if ($LASTEXITCODE -ne 0) {
-            throw "npm install @fission-ai/openspec failed with exit code $LASTEXITCODE."
+            throw "npm install @fission-ai/openspec@$OpenSpecVersion failed with exit code $LASTEXITCODE."
         }
 
         if (Test-Command "openspec") {
