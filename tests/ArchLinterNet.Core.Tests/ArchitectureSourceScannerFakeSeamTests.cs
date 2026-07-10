@@ -11,6 +11,9 @@ namespace ArchLinterNet.Core.Tests;
 [TestFixture]
 public sealed class ArchitectureSourceScannerFakeSeamTests
 {
+    private static readonly string[] _consoleWriteLine = ["System.Console.WriteLine"];
+    private static readonly string[] _srcRoot = ["src"];
+
     private sealed class FakeRoslynCompilationFactory : IRoslynCompilationFactory
     {
         public bool WasCalled { get; private set; }
@@ -77,9 +80,9 @@ public sealed class ArchitectureSourceScannerFakeSeamTests
         List<ArchitectureViolation> violations = new ArchitectureSourceScanner().FindMethodBodyViolations(
             repoRoot,
             "Fake.Forbidden.Namespace",
-            new[] { "System.Console.WriteLine" },
+            _consoleWriteLine,
             executionContext,
-            sourceRoots: new[] { "src" },
+            sourceRoots: _srcRoot,
             fileSystem: fileSystem,
             compilationFactory: compilationFactory).ToList();
 
@@ -116,9 +119,9 @@ public sealed class ArchitectureSourceScannerFakeSeamTests
         List<ArchitectureViolation> violations = new ArchitectureSourceScanner().FindMethodBodyViolations(
             repoRoot,
             "Fake.Forbidden.Namespace",
-            new[] { "System.Console.WriteLine" },
+            _consoleWriteLine,
             executionContext,
-            sourceRoots: new[] { "src" },
+            sourceRoots: _srcRoot,
             fileSystem: fileSystem,
             compilationFactory: compilationFactory).ToList();
 

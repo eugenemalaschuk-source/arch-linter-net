@@ -19,6 +19,9 @@ public sealed class ArchitectureGraphApplicationServiceFakeCompositionTests
 {
     private static readonly string[] _knownId = ["dep-known"];
     private static readonly string[] _unknownId = ["ghost-id"];
+    private static readonly string[] _strictOnly = ["strict"];
+    private static readonly string[] _auditOnly = ["audit"];
+    private static readonly string[] _strictThenAudit = ["strict", "audit"];
 
     [Test]
     public void BuildGraph_InvalidMode_ThrowsArgumentExceptionWithoutTouchingCollaborators()
@@ -50,7 +53,7 @@ public sealed class ArchitectureGraphApplicationServiceFakeCompositionTests
             new ArchitectureGraphRequest { PolicyPath = "unused.yml", Mode = "strict" });
 
         Assert.That(outcome.Graph, Is.Not.Null);
-        Assert.That(contractExecutor.ModesReceived, Is.EqualTo(new[] { "strict" }));
+        Assert.That(contractExecutor.ModesReceived, Is.EqualTo(_strictOnly));
     }
 
     [Test]
@@ -64,7 +67,7 @@ public sealed class ArchitectureGraphApplicationServiceFakeCompositionTests
 
         service.BuildGraph(new ArchitectureGraphRequest { PolicyPath = "unused.yml", Mode = "audit" });
 
-        Assert.That(contractExecutor.ModesReceived, Is.EqualTo(new[] { "audit" }));
+        Assert.That(contractExecutor.ModesReceived, Is.EqualTo(_auditOnly));
     }
 
     [Test]
@@ -78,7 +81,7 @@ public sealed class ArchitectureGraphApplicationServiceFakeCompositionTests
 
         service.BuildGraph(new ArchitectureGraphRequest { PolicyPath = "unused.yml", Mode = "all" });
 
-        Assert.That(contractExecutor.ModesReceived, Is.EqualTo(new[] { "strict", "audit" }));
+        Assert.That(contractExecutor.ModesReceived, Is.EqualTo(_strictThenAudit));
     }
 
     [Test]
@@ -98,7 +101,7 @@ public sealed class ArchitectureGraphApplicationServiceFakeCompositionTests
         });
 
         Assert.That(outcome.Graph, Is.Not.Null);
-        Assert.That(contractExecutor.ModesReceived, Is.EqualTo(new[] { "strict" }));
+        Assert.That(contractExecutor.ModesReceived, Is.EqualTo(_strictOnly));
     }
 
     [Test]
