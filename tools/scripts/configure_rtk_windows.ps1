@@ -1,6 +1,9 @@
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
+$RtkVersion = "v0.42.4"
+$RtkCommit = "5d32d0736f686b69d1e8b9dc45c007d4eb77a0a2"
+
 function Test-Command {
     param([Parameter(Mandatory = $true)][string]$Name)
     return $null -ne (Get-Command $Name -ErrorAction SilentlyContinue)
@@ -28,8 +31,8 @@ function Install-RtkIfMissing {
     }
 
     if (Test-Command "cargo") {
-        Write-Host "rtk is not installed. Installing via Cargo from GitHub..."
-        cargo install --git https://github.com/rtk-ai/rtk
+        Write-Host "rtk is not installed. Installing pinned $RtkVersion via Cargo from GitHub..."
+        cargo install --git https://github.com/rtk-ai/rtk --rev $RtkCommit --locked
         if ($LASTEXITCODE -ne 0) {
             throw "cargo install rtk failed with exit code $LASTEXITCODE."
         }
@@ -40,11 +43,11 @@ function Install-RtkIfMissing {
         }
     }
 
-    Write-Host "rtk is not installed. Downloading latest Windows release from GitHub..."
-    $release = Invoke-RestMethod -Uri "https://api.github.com/repos/rtk-ai/rtk/releases/latest"
+    Write-Host "rtk is not installed. Downloading pinned Windows release $RtkVersion from GitHub..."
+    $release = Invoke-RestMethod -Uri "https://api.github.com/repos/rtk-ai/rtk/releases/tags/$RtkVersion"
     $asset = $release.assets | Where-Object { $_.name -eq "rtk-x86_64-pc-windows-msvc.zip" } | Select-Object -First 1
     if (-not $asset) {
-        throw "Could not find rtk-x86_64-pc-windows-msvc.zip in the latest RTK release."
+        throw "Could not find rtk-x86_64-pc-windows-msvc.zip in RTK release $RtkVersion."
     }
 
     $installDir = Join-Path $env:USERPROFILE ".local\bin"
