@@ -1,6 +1,8 @@
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
+$OpenSpecVersion = "1.6.0"
+
 function Test-Command {
     param([Parameter(Mandatory = $true)][string]$Name)
     return $null -ne (Get-Command $Name -ErrorAction SilentlyContinue)
@@ -111,7 +113,7 @@ function Install-DotNetSdk {
     }
 
     if (-not (Test-Command "winget")) {
-        throw "winget is required to install .NET SDK automatically. Install it or install .NET SDK 10 manually from https://dotnet.microsoft.com/download/dotnet/10.0"
+        throw "winget is required to install .NET SDK automatically. Install it or install .NET SDK 10 manually from https://dotnet.microsoft.com/download/dotnet/10"
     }
 
     Write-Host ".NET SDK 10 is not installed or is broken. Installing winget package: Microsoft.DotNet.SDK.10"
@@ -139,14 +141,14 @@ function Install-OpenSpec {
         return
     }
 
-    Write-Host "openspec is not installed. Installing @fission-ai/openspec via npm..."
+    Write-Host "openspec is not installed. Installing @fission-ai/openspec@$OpenSpecVersion via npm..."
 
     Install-NodeJs
 
-    & "npm" install -g @fission-ai/openspec@latest
+    & "npm" install -g "@fission-ai/openspec@$OpenSpecVersion"
 
     if ($LASTEXITCODE -ne 0) {
-        throw "npm install @fission-ai/openspec failed with exit code $LASTEXITCODE."
+        throw "npm install @fission-ai/openspec@$OpenSpecVersion failed with exit code $LASTEXITCODE."
     }
 
     if (Test-Command "openspec") {
