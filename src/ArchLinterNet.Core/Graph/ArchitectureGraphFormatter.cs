@@ -109,6 +109,9 @@ public sealed class ArchitectureGraphFormatter : IArchitectureGraphFormatter
 
         foreach (ArchitectureGraphNode node in graph.Nodes)
         {
+            // Not dead code: the edges loop above populates aliases via the AliasFor
+            // local function, which static analysis cannot trace through closures.
+            // This skips nodes already rendered as part of an edge line.
             if (aliases.ContainsKey(node.Id))
             {
                 continue;
