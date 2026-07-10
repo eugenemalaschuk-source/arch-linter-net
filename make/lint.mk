@@ -1,9 +1,9 @@
-.PHONY: lint lint-architecture audit-architecture lint-code-size lint-dotnet-format test-architecture-coverage-report architecture-coverage-report architecture-strict-json architecture-audit-json architecture-coverage-markdown architecture-coverage-ci
+.PHONY: lint lint-architecture audit-architecture lint-code-size lint-dotnet-format lint-workflows fmt-workflows test-architecture-coverage-report architecture-coverage-report architecture-strict-json architecture-audit-json architecture-coverage-markdown architecture-coverage-ci
 
 CHANGED_FILES ?= changed-files.txt
 DIFF_STATUS   ?= ok
 
-lint: lint-code-size lint-dotnet-format lint-architecture lint-docs  ## Run all code quality checks
+lint: lint-code-size lint-dotnet-format lint-architecture lint-docs lint-workflows  ## Run all code quality checks
 
 lint-architecture:  ## Run strict architecture contracts on self
 	@dotnet build "$(PROJECT_ROOT)/src/ArchLinterNet.Cli/ArchLinterNet.Cli.csproj" --nologo -v minimal
@@ -25,6 +25,18 @@ lint-code-size:  ## Size lint for C# and documentation files
 
 lint-dotnet-format:  ## Verify C# formatting without changing files
 	@dotnet format "$(SLNX)" --verify-no-changes --verbosity minimal
+
+lint-workflows:  ## Lint GitHub Actions workflows (actionlint + zizmor + prettier --check)
+	@printf '\033[1;33m══════════════════════════════════════════\n  🔍  actionlint: .github/workflows/\n══════════════════════════════════════════\033[0m\n'
+	@actionlint .github/workflows/*.yml
+	@printf '\033[1;33m══════════════════════════════════════════\n  🔐  zizmor: .github/workflows/\n══════════════════════════════════════════\033[0m\n'
+	@zizmor --min-severity low .github/workflows/*.yml
+	@printf '\033[1;33m══════════════════════════════════════════\n  🎨  prettier --check: .github/workflows/\n══════════════════════════════════════════\033[0m\n'
+	@npx --yes prettier --check ".github/workflows/*.yml"
+
+fmt-workflows:  ## Format GitHub Actions workflows with prettier
+	@printf '\033[1;36m══════════════════════════════════════════\n  🎨  prettier --write: .github/workflows/\n══════════════════════════════════════════\033[0m\n'
+	@npx --yes prettier --write ".github/workflows/*.yml"
 
 test-architecture-coverage-report:  ## Run tests for the architecture coverage report generator
 	@cd "$(PROJECT_ROOT)" && UV_PROJECT_ENVIRONMENT="$(PROJECT_ROOT)/.venv" "$(UV)" run --project tools/pyproject.toml \
