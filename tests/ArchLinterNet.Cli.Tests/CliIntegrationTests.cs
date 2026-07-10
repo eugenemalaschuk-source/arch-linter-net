@@ -36,13 +36,17 @@ public partial class CliIntegrationTests
             StartInfo = new ProcessStartInfo
             {
                 FileName = "dotnet",
-                Arguments = $"build \"{_cliProjectPath}\" --nologo --verbosity quiet",
                 RedirectStandardOutput = true,
                 RedirectStandardError = true,
                 UseShellExecute = false,
                 WorkingDirectory = _repoRoot
             }
         };
+        build.StartInfo.ArgumentList.Add("build");
+        build.StartInfo.ArgumentList.Add(_cliProjectPath);
+        build.StartInfo.ArgumentList.Add("--nologo");
+        build.StartInfo.ArgumentList.Add("--verbosity");
+        build.StartInfo.ArgumentList.Add("quiet");
         build.Start();
 
         string buildStderr = build.StandardError.ReadToEnd();
@@ -65,19 +69,24 @@ public partial class CliIntegrationTests
 
     private static (int ExitCode, string StdOut, string StdErr) RunCli(params string[] args)
     {
-        string joinedArgs = args.Length > 0
-            ? string.Join(" ", args.Select(a => a.Contains(' ') ? $"\"{a}\"" : a))
-            : string.Empty;
-
         var startInfo = new ProcessStartInfo
         {
             FileName = "dotnet",
-            Arguments = $"run --no-build --project \"{_cliProjectPath}\" -- {joinedArgs}",
             RedirectStandardOutput = true,
             RedirectStandardError = true,
             UseShellExecute = false,
             WorkingDirectory = _repoRoot
         };
+
+        startInfo.ArgumentList.Add("run");
+        startInfo.ArgumentList.Add("--no-build");
+        startInfo.ArgumentList.Add("--project");
+        startInfo.ArgumentList.Add(_cliProjectPath);
+        startInfo.ArgumentList.Add("--");
+        foreach (string argument in args)
+        {
+            startInfo.ArgumentList.Add(argument);
+        }
 
         using var process = new Process { StartInfo = startInfo };
         process.Start();
@@ -119,6 +128,18 @@ public partial class CliIntegrationTests
             Assert.That(exitCode, Is.EqualTo(0));
             Assert.That(stdout, Does.Contain("arch-linter-net"));
         });
+    }
+
+    [Test]
+    public void DotnetProcessArguments_PreserveWhitespaceAndEmbeddedQuotes()
+    {
+        const string ComplexArgument = "path with spaces/\"quoted\".yml";
+        var startInfo = new ProcessStartInfo("dotnet");
+
+        startInfo.ArgumentList.Add("--policy");
+        startInfo.ArgumentList.Add(ComplexArgument);
+
+        Assert.That(startInfo.ArgumentList, Is.EqualTo(new[] { "--policy", ComplexArgument }));
     }
 
     /* --version / -v */

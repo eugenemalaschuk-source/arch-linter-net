@@ -83,7 +83,7 @@ public sealed class ArchitectureAnalysisSessionMethodBodyProjectAwareTests
             }
             """);
 
-        RunDotnet($"build \"{consumerProjectPath}\"", _fixtureRoot);
+        RunDotnet(_fixtureRoot, "build", consumerProjectPath);
     }
 
     [OneTimeTearDown]
@@ -95,9 +95,9 @@ public sealed class ArchitectureAnalysisSessionMethodBodyProjectAwareTests
         }
     }
 
-    private static void RunDotnet(string arguments, string workingDirectory)
+    private static void RunDotnet(string workingDirectory, params string[] arguments)
     {
-        var psi = new ProcessStartInfo("dotnet", arguments)
+        var psi = new ProcessStartInfo("dotnet")
         {
             WorkingDirectory = workingDirectory,
             RedirectStandardOutput = true,
@@ -105,7 +105,13 @@ public sealed class ArchitectureAnalysisSessionMethodBodyProjectAwareTests
             UseShellExecute = false,
         };
 
-        using Process process = Process.Start(psi)!;
+        foreach (string argument in arguments)
+        {
+            psi.ArgumentList.Add(argument);
+        }
+
+        using Process process = Process.Start(psi)
+            ?? throw new InvalidOperationException("Failed to start dotnet.");
         string stdout = process.StandardOutput.ReadToEnd();
         string stderr = process.StandardError.ReadToEnd();
         process.WaitForExit();
@@ -113,7 +119,7 @@ public sealed class ArchitectureAnalysisSessionMethodBodyProjectAwareTests
         if (process.ExitCode != 0)
         {
             throw new InvalidOperationException(
-                $"'dotnet {arguments}' failed with exit code {process.ExitCode}.\n{stdout}\n{stderr}");
+                $"'dotnet' failed with exit code {process.ExitCode}.\n{stdout}\n{stderr}");
         }
     }
 

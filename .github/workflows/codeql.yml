@@ -46,6 +46,7 @@ jobs:
         with:
           languages: csharp
           build-mode: manual
+          queries: security-extended
 
       - name: Build
         run: dotnet build ArchLinterNet.slnx --configuration Release --no-restore --nologo
