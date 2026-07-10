@@ -1,0 +1,274 @@
+name: Apply issue 276 security fixes
+
+on:
+  push:
+    branches:
+      - fix/276-code-scanning-hardening
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    if: github.event.head_commit.message == 'ci: apply issue 276 security fixes'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          ref: fix/276-code-scanning-hardening
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@26b0ec14cb23fa6904739307f278c14f94c95bf1 # v5.4.0
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Apply targeted source changes
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          def replace_exact(path: str, old: str, new: str) -> None:
+              file_path = Path(path)
+              text = file_path.read_text(encoding="utf-8")
+              count = text.count(old)
+              if count != 1:
+                  raise RuntimeError(f"Expected exactly one match in {path}, found {count}")
+              file_path.write_text(text.replace(old, new), encoding="utf-8")
+
+          cli_path = "tests/ArchLinterNet.Cli.Tests/CliIntegrationTests.cs"
+
+          replace_exact(
+              cli_path,
+              '''        using var build = new Process
+          {
+              StartInfo = new ProcessStartInfo
+              {
+                  FileName = "dotnet",
+                  Arguments = $"build \\"{_cliProjectPath}\\" --nologo --verbosity quiet",
+                  RedirectStandardOutput = true,
+                  RedirectStandardError = true,
+                  UseShellExecute = false,
+                  WorkingDirectory = _repoRoot
+              }
+          };''',
+              '''        using var build = new Process
+          {
+              StartInfo = CreateDotnetStartInfo(
+                  "build", _cliProjectPath, "--nologo", "--verbosity", "quiet")
+          };''')
+
+          replace_exact(
+              cli_path,
+              '''    private static (int ExitCode, string StdOut, string StdErr) RunCli(params string[] args)
+          {
+              string joinedArgs = args.Length > 0
+                  ? string.Join(" ", args.Select(a => a.Contains(' ') ? $"\\"{a}\\"" : a))
+                  : string.Empty;
+
+              var startInfo = new ProcessStartInfo
+              {
+                  FileName = "dotnet",
+                  Arguments = $"run --no-build --project \\"{_cliProjectPath}\\" -- {joinedArgs}",
+                  RedirectStandardOutput = true,
+                  RedirectStandardError = true,
+                  UseShellExecute = false,
+                  WorkingDirectory = _repoRoot
+              };
+
+              using var process = new Process { StartInfo = startInfo };
+              process.Start();
+
+              string stdout = process.StandardOutput.ReadToEnd();
+              string stderr = process.StandardError.ReadToEnd();
+              process.WaitForExit();
+
+              return (process.ExitCode, stdout, stderr);
+          }''',
+              '''    private static ProcessStartInfo CreateDotnetStartInfo(params string[] arguments)
+          {
+              var startInfo = new ProcessStartInfo("dotnet")
+              {
+                  RedirectStandardOutput = true,
+                  RedirectStandardError = true,
+                  UseShellExecute = false,
+                  WorkingDirectory = _repoRoot
+              };
+
+              foreach (string argument in arguments)
+              {
+                  startInfo.ArgumentList.Add(argument);
+              }
+
+              return startInfo;
+          }
+
+          private static (int ExitCode, string StdOut, string StdErr) RunCli(params string[] args)
+          {
+              var dotnetArguments = new List<string>
+              {
+                  "run",
+                  "--no-build",
+                  "--project",
+                  _cliProjectPath,
+                  "--"
+              };
+              dotnetArguments.AddRange(args);
+
+              using var process = new Process
+              {
+                  StartInfo = CreateDotnetStartInfo(dotnetArguments.ToArray())
+              };
+              process.Start();
+
+              string stdout = process.StandardOutput.ReadToEnd();
+              string stderr = process.StandardError.ReadToEnd();
+              process.WaitForExit();
+
+              return (process.ExitCode, stdout, stderr);
+          }''')
+
+          replace_exact(
+              cli_path,
+              '''    /* --version / -v */''',
+              '''    [Test]
+          public void DotnetProcessArguments_PreserveWhitespaceAndEmbeddedQuotes()
+          {
+              const string complexArgument = "path with spaces/\\\"quoted\\\".yml";
+
+              ProcessStartInfo startInfo = CreateDotnetStartInfo("--policy", complexArgument);
+
+              Assert.That(startInfo.ArgumentList, Is.EqualTo(new[] { "--policy", complexArgument }));
+          }
+
+          /* --version / -v */''')
+
+          resolver_path = "tests/ArchLinterNet.Core.Tests/ArchitectureProjectRoslynContextResolverTests.cs"
+          replace_exact(
+              resolver_path,
+              '''        RunDotnet($"build \\"{_consumerProjectPath}\\"", _fixtureRoot);''',
+              '''        RunDotnet(_fixtureRoot, "build", _consumerProjectPath);''')
+          replace_exact(
+              resolver_path,
+              '''    private static void RunDotnet(string arguments, string workingDirectory)
+          {
+              var psi = new ProcessStartInfo("dotnet", arguments)
+              {
+                  WorkingDirectory = workingDirectory,
+                  RedirectStandardOutput = true,
+                  RedirectStandardError = true,
+                  UseShellExecute = false,
+              };
+
+              using Process process = Process.Start(psi)!;
+              string stdout = process.StandardOutput.ReadToEnd();
+              string stderr = process.StandardError.ReadToEnd();
+              process.WaitForExit();
+
+              if (process.ExitCode != 0)
+              {
+                  throw new InvalidOperationException(
+                      $"'dotnet {arguments}' failed with exit code {process.ExitCode}.\\n{stdout}\\n{stderr}");
+              }
+          }''',
+              '''    private static void RunDotnet(string workingDirectory, params string[] arguments)
+          {
+              var startInfo = new ProcessStartInfo("dotnet")
+              {
+                  WorkingDirectory = workingDirectory,
+                  RedirectStandardOutput = true,
+                  RedirectStandardError = true,
+                  UseShellExecute = false,
+              };
+
+              foreach (string argument in arguments)
+              {
+                  startInfo.ArgumentList.Add(argument);
+              }
+
+              using Process process = Process.Start(startInfo)
+                  ?? throw new InvalidOperationException("Failed to start dotnet.");
+              string stdout = process.StandardOutput.ReadToEnd();
+              string stderr = process.StandardError.ReadToEnd();
+              process.WaitForExit();
+
+              if (process.ExitCode != 0)
+              {
+                  throw new InvalidOperationException(
+                      $"'dotnet' failed with exit code {process.ExitCode}.\\n{stdout}\\n{stderr}");
+              }
+          }''')
+
+          session_path = "tests/ArchLinterNet.Core.Tests/ArchitectureAnalysisSessionMethodBodyProjectAwareTests.cs"
+          replace_exact(
+              session_path,
+              '''        RunDotnet($"build \\"{consumerProjectPath}\\"", _fixtureRoot);''',
+              '''        RunDotnet(_fixtureRoot, "build", consumerProjectPath);''')
+          replace_exact(
+              session_path,
+              '''    private static void RunDotnet(string arguments, string workingDirectory)
+          {
+              var psi = new ProcessStartInfo("dotnet", arguments)
+              {
+                  WorkingDirectory = workingDirectory,
+                  RedirectStandardOutput = true,
+                  RedirectStandardError = true,
+                  UseShellExecute = false,
+              };
+
+              using Process process = Process.Start(psi)!;
+              string stdout = process.StandardOutput.ReadToEnd();
+              string stderr = process.StandardError.ReadToEnd();
+              process.WaitForExit();
+
+              if (process.ExitCode != 0)
+              {
+                  throw new InvalidOperationException(
+                      $"'dotnet {arguments}' failed with exit code {process.ExitCode}.\\n{stdout}\\n{stderr}");
+              }
+          }''',
+              '''    private static void RunDotnet(string workingDirectory, params string[] arguments)
+          {
+              var startInfo = new ProcessStartInfo("dotnet")
+              {
+                  WorkingDirectory = workingDirectory,
+                  RedirectStandardOutput = true,
+                  RedirectStandardError = true,
+                  UseShellExecute = false,
+              };
+
+              foreach (string argument in arguments)
+              {
+                  startInfo.ArgumentList.Add(argument);
+              }
+
+              using Process process = Process.Start(startInfo)
+                  ?? throw new InvalidOperationException("Failed to start dotnet.");
+              string stdout = process.StandardOutput.ReadToEnd();
+              string stderr = process.StandardError.ReadToEnd();
+              process.WaitForExit();
+
+              if (process.ExitCode != 0)
+              {
+                  throw new InvalidOperationException(
+                      $"'dotnet' failed with exit code {process.ExitCode}.\\n{stdout}\\n{stderr}");
+              }
+          }''')
+          PY
+
+      - name: Run test suite
+        run: dotnet test ArchLinterNet.slnx --configuration Release --nologo
+
+      - name: Commit source fixes
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add tests/ArchLinterNet.Cli.Tests/CliIntegrationTests.cs \
+            tests/ArchLinterNet.Core.Tests/ArchitectureProjectRoslynContextResolverTests.cs \
+            tests/ArchLinterNet.Core.Tests/ArchitectureAnalysisSessionMethodBodyProjectAwareTests.cs
+          git commit -m "test: pass process arguments without command-line composition"
+          git push origin HEAD:fix/276-code-scanning-hardening
