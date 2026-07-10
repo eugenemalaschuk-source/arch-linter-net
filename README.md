@@ -23,17 +23,19 @@ The CI badge tracks one workflow that runs all quality signals in the same `vali
 
 See [CI integration](docs/guides/ci-integration.md#test-coverage-with-codecov-and-sonarcloud) for how test coverage upload, SonarCloud PR analysis, the dynamic badge, and the architecture coverage gate fit together.
 
-Declarative architecture contracts and dependency linting for .NET repositories.
+YAML-first architecture governance for .NET repositories.
 
-ArchLinterNet helps teams keep architecture boundaries executable: define a YAML policy, run it locally or in CI, and catch dependency drift before it becomes hidden design debt.
+ArchLinterNet turns architectural decisions into executable contracts: layered boundaries, protected internal APIs, dependency policies, baseline-aware adoption, architecture coverage, and CI-ready diagnostics. It helps teams catch architecture drift in pull requests before it becomes hidden design debt.
+
+The goal is not just to lint dependencies. ArchLinterNet makes architecture rules explicit, reviewable, enforceable, and safe to evolve as a normal part of development.
 
 > Status: early preview. The YAML policy surface is being stabilized for the first public `0.x` NuGet and .NET tool releases.
 
 ## Why ArchLinterNet?
 
-Many .NET projects enforce architecture with handwritten test helpers or tribal knowledge. That works, but policy quickly becomes hard to discover, hard to reuse across repositories, and hard for humans or AI agents to review.
+Architecture rules often start as diagrams, ADRs, review comments, handwritten test helpers, or tribal knowledge. That works for a while, but the rules quickly become hard to discover, hard to reuse across repositories, and hard for humans or AI agents to review consistently.
 
-ArchLinterNet uses a repository-owned policy file as the source of truth:
+ArchLinterNet uses a repository-owned YAML policy file as the source of truth:
 
 ```text
 architecture/dependencies.arch.yml
