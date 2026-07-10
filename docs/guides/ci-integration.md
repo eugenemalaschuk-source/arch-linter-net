@@ -100,14 +100,14 @@ To inspect the same full-solution coverage report locally before pushing, run `m
 
 **All-zero counts can mean two different things.** If `coverage_summary` is an empty list, the policy defines no coverage contracts at all (`strict_coverage`/`audit_coverage` are absent) — the report's note line calls this out explicitly. That is different from a policy that *does* define coverage contracts and reports zero uncovered/stale/unknown items, which means real coverage contracts exist and nothing is currently failing them. This repository's own `architecture/dependencies.arch.yml` defines an `assembly`-scope and a `namespace`-scope `strict_coverage` contract covering all four first-party assemblies and their root namespaces, so the gate reflects real coverage rather than an empty, trivially-passing policy.
 
-## Test coverage with Codecov
+## Test coverage with Codecov and SonarCloud
 
 This repository treats line test coverage and architecture coverage as two separate CI signals:
 
-- `make test-coverage` runs the NUnit test projects with `XPlat Code Coverage` and writes Cobertura XML files under `test-results/`.
+- `make test-coverage` runs the NUnit test projects with `XPlat Code Coverage`, writes Cobertura XML for Codecov, writes OpenCover XML for SonarCloud, and emits TRX test result files under `test-results/`.
 - `make architecture-coverage-report` evaluates ArchLinterNet coverage contracts and prints architecture-specific Markdown + JSON diagnostics.
 
-The CI workflow runs `make test-coverage` after the acceptance gate, resolves the generated `coverage.cobertura.xml` files, and uploads them with `codecov/codecov-action@v5`. The chosen authentication mode for this repository is the repository secret `CODECOV_TOKEN`, not OIDC.
+The CI workflow runs `make test-coverage` after the acceptance gate, resolves the generated `coverage.cobertura.xml` files, uploads them with `codecov/codecov-action@v5`, and points SonarScanner for .NET at the generated `coverage.opencover.xml` and `.trx` files before ending the SonarCloud analysis. The chosen Codecov authentication mode for this repository is the repository secret `CODECOV_TOKEN`, not OIDC.
 
 To inspect the same test-coverage input locally before pushing, run:
 
@@ -116,7 +116,7 @@ make test-coverage
 make test-coverage-badge
 ```
 
-The first command regenerates the raw Cobertura XML reports in `test-results/`. The second command merges those reports locally and prints the same overall line-coverage percentage that the README badge is expected to reflect once Codecov ingests the upload from `main`.
+The first command regenerates the raw Cobertura XML reports, OpenCover XML reports, and TRX files in `test-results/`. The second command merges the Cobertura reports locally and prints the same overall line-coverage percentage that the README badge is expected to reflect once Codecov ingests the upload from `main`.
 
 ### Codecov auth and fork behavior
 
@@ -133,6 +133,46 @@ Fork PRs still run the normal acceptance and architecture checks, but they skip 
 ### Failure mode expectations
 
 Codecov upload is intentionally configured with `fail_ci_if_error: false`. Test execution remains required, but transient Codecov or network issues should not make an otherwise healthy pull request flaky.
+
+## SonarCloud pull request analysis
+
+The same `ci.yml` `validate` job also runs SonarCloud analysis for `main` pushes and trusted pull requests from branches in this repository:
+
+- The workflow checks out the repository with `fetch-depth: 0` so SonarCloud can compare a pull request branch against its base branch.
+- The scanner waits for the SonarCloud quality gate result, so the workflow fails when the Sonar quality gate fails.
+- For pull requests, the workflow publishes a job summary link to `https://sonarcloud.io/summary/new_code?id=<project-key>&pullRequest=<number>` so reviewers have a direct path to the SonarCloud PR analysis in addition to the GitHub PR decoration/check created by SonarCloud.
+- The gate is evaluated on new code introduced by the PR, as configured by SonarCloud for pull-request analysis.
+
+### Required GitHub configuration
+
+The repository workflow expects:
+
+- `SONAR_TOKEN` GitHub Actions secret for SonarCloud authentication.
+- Optional `SONAR_PROJECT_KEY` repository variable. If unset, the workflow uses the public project key `eugenemalaschuk-source_arch-linter-net`.
+- Optional `SONAR_ORGANIZATION` repository variable. If unset, the workflow uses the public organization key `eugenemalaschuk-source`.
+
+If a trusted push or same-repository pull request is missing required SonarCloud configuration, the workflow fails with an explicit diagnostic instead of silently skipping analysis.
+
+### Fork pull requests
+
+GitHub does not expose repository secrets to untrusted fork pull requests. For that reason, fork PRs do not run the trusted SonarCloud analysis path from this repository workflow. The job summary explains that the SonarCloud PR gate was skipped for that fork run, while same-repository PRs remain fail-closed.
+
+### Automatic analysis caveat
+
+The current public SonarCloud project metadata indicates that automatic analysis is enabled. For CI-based analysis with coverage import and PR quality-gate enforcement to be the source of truth, maintainers should confirm the project is using the intended CI-based analysis mode in SonarCloud and disable automatic analysis there if it would otherwise compete with the GitHub Actions scan.
+
+### Recommended required check
+
+After the first successful decorated pull request run, configure GitHub branch protection manually to require the Sonar-created PR status/check for this repository. In current Sonar documentation this is typically rendered as `SonarQube Code Analysis`, but maintainers should verify the exact displayed check name in GitHub for this repository before making it required.
+
+### Post-merge verification
+
+After merging the workflow change:
+
+- open or update a same-repository test pull request;
+- confirm GitHub shows the SonarCloud PR status/check and decoration;
+- confirm the workflow summary link opens the SonarCloud PR analysis page;
+- confirm the `main` project page updates at `https://sonarcloud.io/summary/overall?id=eugenemalaschuk-source_arch-linter-net&branch=main`.
 
 ## Azure Pipelines example
 
