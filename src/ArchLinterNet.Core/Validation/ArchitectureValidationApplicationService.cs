@@ -23,7 +23,6 @@ public sealed class ArchitectureValidationApplicationService(
         using (timing?.Measure("total"))
         {
             LoadAndSetupOutcome loadAndSetup = LoadAndSetup(request, timing);
-            ArchitectureContractDocument document = loadAndSetup.Document;
             string unmatchedConfig = loadAndSetup.UnmatchedConfig;
             string policyConsistencyConfig = loadAndSetup.PolicyConsistencyConfig;
             string coverageConfig = loadAndSetup.CoverageConfig;

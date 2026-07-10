@@ -20,8 +20,6 @@ internal static class ArchitectureDependencyGraphBuilder
         ArgumentNullException.ThrowIfNull(session);
         ArgumentNullException.ThrowIfNull(violations);
 
-        ArchitectureGraphNodeKind kind = ToNodeKind(level);
-
         Dictionary<string, ArchitectureGraphNodeKind> nodeKinds = new(StringComparer.Ordinal);
         Dictionary<(string Source, string Target), HashSet<string>> edgeContractIds = new();
 
@@ -43,18 +41,10 @@ internal static class ArchitectureDependencyGraphBuilder
             SeedExternalNodesAndEdges(session, resolveId, nodeKinds, edgeContractIds);
         }
 
-        OverlayViolations(violations, level, kind, resolveId, nodeKinds, edgeContractIds);
+        OverlayViolations(violations, level, resolveId, nodeKinds, edgeContractIds);
 
         return ToGraph(nodeKinds, edgeContractIds);
     }
-
-    private static ArchitectureGraphNodeKind ToNodeKind(ArchitectureGraphLevel level) => level switch
-    {
-        ArchitectureGraphLevel.Namespace => ArchitectureGraphNodeKind.Namespace,
-        ArchitectureGraphLevel.Type => ArchitectureGraphNodeKind.Type,
-        ArchitectureGraphLevel.Assembly => ArchitectureGraphNodeKind.Assembly,
-        _ => throw new ArgumentOutOfRangeException(nameof(level), level, "Unknown graph level."),
-    };
 
     private static void SeedNamespaceEdges(
         ArchitectureAnalysisSession session,
@@ -250,7 +240,6 @@ internal static class ArchitectureDependencyGraphBuilder
     private static void OverlayViolations(
         IReadOnlyCollection<ArchitectureViolation> violations,
         ArchitectureGraphLevel level,
-        ArchitectureGraphNodeKind kind,
         Func<string, string?> resolveId,
         Dictionary<string, ArchitectureGraphNodeKind> nodeKinds,
         Dictionary<(string Source, string Target), HashSet<string>> edgeContractIds)
