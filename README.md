@@ -165,6 +165,10 @@ NuGet packages should expose only public user-facing links:
 
 NuGet metadata must not point users to internal backlog governance, OpenSpec archives, or maintenance-agent instructions as product documentation.
 
+## Security
+
+Report suspected vulnerabilities privately through GitHub Private Vulnerability Reporting. Do not disclose unresolved vulnerabilities in public issues, pull requests, or discussions. See the [security policy](SECURITY.md) for supported preview releases, reporting guidance, and disclosure expectations.
+
 ## License
 
 MIT.
