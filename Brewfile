@@ -1,5 +1,7 @@
 brew "uv"
 brew "node"
+brew "actionlint"
+brew "zizmor"
 brew "openspec"
 brew "opencode"
 brew "rtk"

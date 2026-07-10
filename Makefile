@@ -11,6 +11,7 @@
 ##   make fmt                  — auto-format all code and documentation
 ##   make fmt-csharp           — auto-format all C# code
 ##   make fmt-docs             — auto-format markdown documentation
+##   make fmt-workflows        — format GitHub Actions workflows with prettier
 ##
 ## Linting & quality:
 ##   make lint                              — run all code quality checks
@@ -19,6 +20,7 @@
 ##   make lint-code-size                    — size lint for C# and documentation files
 ##   make lint-dotnet-format                — verify C# formatting without changing files
 ##   make lint-docs                         — verify MkDocs documentation structure
+##   make lint-workflows                    — lint GitHub Actions workflows
 ##   make architecture-coverage-report      — show full-solution coverage report locally (Markdown + JSON)
 ##   make test-architecture-coverage-report — run tests for the coverage report generator
 ##
@@ -51,7 +53,7 @@ help:
 
 setup: bundle restore venv  ## Full project bootstrap: tools + NuGet + Python venv
 
-fmt: fmt-csharp fmt-docs  ## Auto-format all code and documentation
+fmt: fmt-csharp fmt-docs fmt-workflows  ## Auto-format all code and documentation
 
 build: docs-build pack  ## Build documentation site and NuGet packages
 
