@@ -3,6 +3,7 @@
 </p>
 
 [![CI](https://github.com/eugenemalaschuk-source/arch-linter-net/actions/workflows/ci.yml/badge.svg)](https://github.com/eugenemalaschuk-source/arch-linter-net/actions/workflows/ci.yml)
+[![NuGet downloads](https://img.shields.io/nuget/dt/ArchLinterNet.Cli)](https://www.nuget.org/packages/ArchLinterNet.Cli/)
 [![Test coverage](https://codecov.io/github/eugenemalaschuk-source/arch-linter-net/graph/badge.svg)](https://app.codecov.io/github/eugenemalaschuk-source/arch-linter-net)
 [![Sonar Quality Gate](https://sonarcloud.io/api/project_badges/measure?project=eugenemalaschuk-source_arch-linter-net&metric=alert_status&branch=main)](https://sonarcloud.io/summary/overall?id=eugenemalaschuk-source_arch-linter-net&branch=main)
 [![Sonar Maintainability](https://sonarcloud.io/api/project_badges/measure?project=eugenemalaschuk-source_arch-linter-net&metric=sqale_rating&branch=main)](https://sonarcloud.io/summary/overall?id=eugenemalaschuk-source_arch-linter-net&branch=main)
