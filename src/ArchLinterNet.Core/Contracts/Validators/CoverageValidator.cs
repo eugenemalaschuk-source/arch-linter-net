@@ -18,106 +18,110 @@ internal sealed class CoverageValidator : IArchitecturePolicyDocumentValidator
         foreach (ArchitectureCoverageContract contract in document.Contracts.StrictCoverage
                      .Concat(document.Contracts.AuditCoverage))
         {
-            if (string.Equals(contract.Scope, "rule_input", StringComparison.Ordinal))
+            switch (contract.Scope)
             {
-                ValidateRuleInputCoverageContract(document, contract);
-                continue;
+                case "rule_input":
+                    ValidateRuleInputCoverageContract(document, contract);
+                    continue;
+                case "project":
+                    ValidateProjectOrAssemblyCoverageContract(document, contract, "Project");
+                    continue;
+                case "assembly":
+                    ValidateProjectOrAssemblyCoverageContract(document, contract, "Assembly");
+                    continue;
+                case "dependency_edge":
+                    ValidateDependencyEdgeCoverageContract(document, contract);
+                    continue;
+                case "namespace":
+                    ValidateNamespaceCoverageContract(contract);
+                    continue;
+                default:
+                    continue;
             }
+        }
+    }
 
-            if (string.Equals(contract.Scope, "project", StringComparison.Ordinal))
-            {
-                ValidateProjectOrAssemblyCoverageContract(document, contract, "Project");
-                continue;
-            }
+    private static void ValidateNamespaceCoverageContract(ArchitectureCoverageContract contract)
+    {
+        if (contract.Roots.Count == 0)
+        {
+            throw new InvalidOperationException(
+                $"Namespace coverage contract '{contract.Name}' must declare at least one root with a non-empty namespace.");
+        }
 
-            if (string.Equals(contract.Scope, "assembly", StringComparison.Ordinal))
-            {
-                ValidateProjectOrAssemblyCoverageContract(document, contract, "Assembly");
-                continue;
-            }
+        if (contract.Between.Count > 0)
+        {
+            throw new InvalidOperationException(
+                $"Namespace coverage contract '{contract.Name}' cannot declare 'between'. That field is only valid for scope 'dependency_edge'.");
+        }
 
-            if (string.Equals(contract.Scope, "dependency_edge", StringComparison.Ordinal))
-            {
-                ValidateDependencyEdgeCoverageContract(document, contract);
-                continue;
-            }
+        if (contract.ContractIds.Count > 0)
+        {
+            throw new InvalidOperationException(
+                $"Namespace coverage contract '{contract.Name}' cannot declare 'contract_ids'. That field is only valid for scope 'rule_input'.");
+        }
 
-            if (!string.Equals(contract.Scope, "namespace", StringComparison.Ordinal))
-            {
-                continue;
-            }
+        ValidateNamespaceCoverageRoots(contract);
+        ValidateNamespaceCoverageExclusions(contract);
+    }
 
-            if (contract.Roots.Count == 0)
+    private static void ValidateNamespaceCoverageRoots(ArchitectureCoverageContract contract)
+    {
+        for (int i = 0; i < contract.Roots.Count; i++)
+        {
+            ArchitectureCoverageRoot root = contract.Roots[i];
+
+            if (string.IsNullOrWhiteSpace(root.Namespace))
             {
                 throw new InvalidOperationException(
-                    $"Namespace coverage contract '{contract.Name}' must declare at least one root with a non-empty namespace.");
+                    $"Namespace coverage contract '{contract.Name}' has a root at index {i} without a non-empty namespace. Namespace coverage roots must use the layer namespace matcher shape.");
             }
 
-            if (contract.Between.Count > 0)
+            if (root.Include.Count > 0 || root.Exclude.Count > 0)
             {
                 throw new InvalidOperationException(
-                    $"Namespace coverage contract '{contract.Name}' cannot declare 'between'. That field is only valid for scope 'dependency_edge'.");
+                    $"Namespace coverage contract '{contract.Name}' has a root at index {i} using include/exclude discovery fields. Namespace coverage roots must use only namespace and optional namespace_suffix.");
             }
 
-            if (contract.ContractIds.Count > 0)
+            _ = new ArchitectureLayer
+            {
+                Namespace = root.Namespace,
+                NamespaceSuffix = root.NamespaceSuffix
+            }.GlobPattern;
+        }
+    }
+
+    private static void ValidateNamespaceCoverageExclusions(ArchitectureCoverageContract contract)
+    {
+        for (int i = 0; i < contract.Exclude.Count; i++)
+        {
+            ArchitectureCoverageExclusion exclusion = contract.Exclude[i];
+
+            if (string.IsNullOrWhiteSpace(exclusion.Reason))
             {
                 throw new InvalidOperationException(
-                    $"Namespace coverage contract '{contract.Name}' cannot declare 'contract_ids'. That field is only valid for scope 'rule_input'.");
+                    $"Namespace coverage contract '{contract.Name}' has an exclusion at index {i} without a non-empty reason.");
             }
 
-            for (int i = 0; i < contract.Roots.Count; i++)
+            if (!string.IsNullOrWhiteSpace(exclusion.Project) || !string.IsNullOrWhiteSpace(exclusion.Assembly))
             {
-                ArchitectureCoverageRoot root = contract.Roots[i];
+                throw new InvalidOperationException(
+                    $"Namespace coverage contract '{contract.Name}' has an exclusion at index {i} using project/assembly fields. Namespace coverage exclusions must use namespace and/or namespace_suffix only.");
+            }
 
-                if (string.IsNullOrWhiteSpace(root.Namespace))
-                {
-                    throw new InvalidOperationException(
-                        $"Namespace coverage contract '{contract.Name}' has a root at index {i} without a non-empty namespace. Namespace coverage roots must use the layer namespace matcher shape.");
-                }
+            if (string.IsNullOrWhiteSpace(exclusion.Namespace) && string.IsNullOrWhiteSpace(exclusion.NamespaceSuffix))
+            {
+                throw new InvalidOperationException(
+                    $"Namespace coverage contract '{contract.Name}' has an exclusion at index {i} without a namespace or namespace_suffix matcher.");
+            }
 
-                if (root.Include.Count > 0 || root.Exclude.Count > 0)
-                {
-                    throw new InvalidOperationException(
-                        $"Namespace coverage contract '{contract.Name}' has a root at index {i} using include/exclude discovery fields. Namespace coverage roots must use only namespace and optional namespace_suffix.");
-                }
-
+            if (!string.IsNullOrWhiteSpace(exclusion.Namespace))
+            {
                 _ = new ArchitectureLayer
                 {
-                    Namespace = root.Namespace,
-                    NamespaceSuffix = root.NamespaceSuffix
+                    Namespace = exclusion.Namespace,
+                    NamespaceSuffix = exclusion.NamespaceSuffix
                 }.GlobPattern;
-            }
-
-            for (int i = 0; i < contract.Exclude.Count; i++)
-            {
-                ArchitectureCoverageExclusion exclusion = contract.Exclude[i];
-
-                if (string.IsNullOrWhiteSpace(exclusion.Reason))
-                {
-                    throw new InvalidOperationException(
-                        $"Namespace coverage contract '{contract.Name}' has an exclusion at index {i} without a non-empty reason.");
-                }
-
-                if (!string.IsNullOrWhiteSpace(exclusion.Project) || !string.IsNullOrWhiteSpace(exclusion.Assembly))
-                {
-                    throw new InvalidOperationException(
-                        $"Namespace coverage contract '{contract.Name}' has an exclusion at index {i} using project/assembly fields. Namespace coverage exclusions must use namespace and/or namespace_suffix only.");
-                }
-
-                if (string.IsNullOrWhiteSpace(exclusion.Namespace) && string.IsNullOrWhiteSpace(exclusion.NamespaceSuffix))
-                {
-                    throw new InvalidOperationException(
-                        $"Namespace coverage contract '{contract.Name}' has an exclusion at index {i} without a namespace or namespace_suffix matcher.");
-                }
-
-                if (!string.IsNullOrWhiteSpace(exclusion.Namespace))
-                {
-                    _ = new ArchitectureLayer
-                    {
-                        Namespace = exclusion.Namespace,
-                        NamespaceSuffix = exclusion.NamespaceSuffix
-                    }.GlobPattern;
-                }
             }
         }
     }
@@ -145,16 +149,14 @@ internal sealed class CoverageValidator : IArchitecturePolicyDocumentValidator
 
         HashSet<string> knownContractIds = CollectLayerBearingContractIds(document);
 
-        foreach (string referencedContractId in contract.ContractIds)
+        string? unknownContractId = contract.ContractIds.FirstOrDefault(id => !knownContractIds.Contains(id));
+        if (unknownContractId != null)
         {
-            if (!knownContractIds.Contains(referencedContractId))
-            {
-                throw new InvalidOperationException(
-                    $"Rule-input coverage contract '{contract.Name}' references unknown contract ID '{referencedContractId}' " +
-                    "in 'contract_ids'. The ID must match a declared dependency, layer, allow_only, cycle, method_body, " +
-                    "independence, protected, or external contract. asmdef, acyclic_sibling, and layer_template contracts " +
-                    "are not valid for scope 'rule_input'.");
-            }
+            throw new InvalidOperationException(
+                $"Rule-input coverage contract '{contract.Name}' references unknown contract ID '{unknownContractId}' " +
+                "in 'contract_ids'. The ID must match a declared dependency, layer, allow_only, cycle, method_body, " +
+                "independence, protected, or external contract. asmdef, acyclic_sibling, and layer_template contracts " +
+                "are not valid for scope 'rule_input'.");
         }
 
         for (int i = 0; i < contract.Exclude.Count; i++)
@@ -197,6 +199,18 @@ internal sealed class CoverageValidator : IArchitecturePolicyDocumentValidator
                 $"Dependency-edge coverage contract '{contract.Name}' cannot declare 'contract_ids'. That field is only valid for scope 'rule_input'.");
         }
 
+        ValidateDependencyEdgeBetweenPairs(document, contract);
+
+        HashSet<string> declaredPairs = new(
+            contract.Between.Select(pair => $"{pair[0]}→{pair[1]}"),
+            StringComparer.Ordinal);
+
+        ValidateDependencyEdgeExclusions(document, contract, declaredPairs);
+    }
+
+    private static void ValidateDependencyEdgeBetweenPairs(
+        ArchitectureContractDocument document, ArchitectureCoverageContract contract)
+    {
         for (int i = 0; i < contract.Between.Count; i++)
         {
             List<string> pair = contract.Between[i];
@@ -207,20 +221,18 @@ internal sealed class CoverageValidator : IArchitecturePolicyDocumentValidator
                     $"Dependency-edge coverage contract '{contract.Name}' has a 'between' entry at index {i} that is not a pair of two non-empty declared layer names.");
             }
 
-            foreach (string layerName in pair)
+            string? missingLayer = pair.FirstOrDefault(layerName => !document.Layers.ContainsKey(layerName));
+            if (missingLayer != null)
             {
-                if (!document.Layers.ContainsKey(layerName))
-                {
-                    throw new InvalidOperationException(
-                        $"Dependency-edge coverage contract '{contract.Name}' has a 'between' entry at index {i} referencing undeclared layer '{layerName}'.");
-                }
+                throw new InvalidOperationException(
+                    $"Dependency-edge coverage contract '{contract.Name}' has a 'between' entry at index {i} referencing undeclared layer '{missingLayer}'.");
             }
         }
+    }
 
-        HashSet<string> declaredPairs = new(
-            contract.Between.Select(pair => $"{pair[0]}→{pair[1]}"),
-            StringComparer.Ordinal);
-
+    private static void ValidateDependencyEdgeExclusions(
+        ArchitectureContractDocument document, ArchitectureCoverageContract contract, HashSet<string> declaredPairs)
+    {
         for (int i = 0; i < contract.Exclude.Count; i++)
         {
             ArchitectureCoverageExclusion exclusion = contract.Exclude[i];
@@ -248,13 +260,11 @@ internal sealed class CoverageValidator : IArchitecturePolicyDocumentValidator
                     "Dependency-edge coverage exclusions must use 'between' only — those other matchers belong to other coverage scopes and an exclusion always suppresses the whole declared pair regardless of any other field.");
             }
 
-            foreach (string layerName in exclusion.Between)
+            string? missingLayer = exclusion.Between.FirstOrDefault(layerName => !document.Layers.ContainsKey(layerName));
+            if (missingLayer != null)
             {
-                if (!document.Layers.ContainsKey(layerName))
-                {
-                    throw new InvalidOperationException(
-                        $"Dependency-edge coverage contract '{contract.Name}' has an exclusion at index {i} referencing undeclared layer '{layerName}'.");
-                }
+                throw new InvalidOperationException(
+                    $"Dependency-edge coverage contract '{contract.Name}' has an exclusion at index {i} referencing undeclared layer '{missingLayer}'.");
             }
 
             string excludedPairKey = $"{exclusion.Between[0]}→{exclusion.Between[1]}";

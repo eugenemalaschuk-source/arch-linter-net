@@ -34,84 +34,116 @@ public static class ArchitectureBaselineComparer
             Dictionary<string, string> canonicalIds = canonicalIdsByGroup.TryGetValue(groupName, out Dictionary<string, string>? ids)
                 ? ids
                 : new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-            var baselineKeys = new HashSet<string>(StringComparer.Ordinal);
 
-            foreach (var entry in entries)
-            {
-                bool entryInScope = groupInScope && (selectedIds == null || selectedIds.Contains(entry.Id));
-
-                // Out-of-scope entries (wrong mode, or not among the selected --contract ids) are
-                // carried through verbatim so scoped update/prune never drops unrelated debt.
-                if (!entryInScope)
-                {
-                    foreach (var ignore in entry.IgnoredViolations)
-                    {
-                        outOfScope.Add(new ArchitectureBaselineComparisonEntry(
-                            groupName, entry.Id, ignore.SourceType, ignore.ForbiddenReference, ignore.Reason));
-                    }
-
-                    continue;
-                }
-
-                bool idKnown = knownIds.Contains(entry.Id);
-                string canonicalContractId = CanonicalizeContractId(canonicalIds, entry.Id);
-
-                foreach (var ignore in entry.IgnoredViolations)
-                {
-                    string key = BuildComparisonKey(canonicalContractId, ignore.SourceType, ignore.ForbiddenReference);
-                    baselineKeys.Add(key);
-
-                    var comparisonEntry = new ArchitectureBaselineComparisonEntry(
-                        groupName, entry.Id, ignore.SourceType, ignore.ForbiddenReference, ignore.Reason);
-
-                    if (!idKnown)
-                    {
-                        configurationErrors.Add(comparisonEntry);
-                    }
-                    else if (HasMatchingCandidate(candidates, groupName, canonicalContractId, ignore.SourceType, ignore.ForbiddenReference))
-                    {
-                        frozen.Add(comparisonEntry);
-                    }
-                    else
-                    {
-                        resolved.Add(comparisonEntry);
-                    }
-                }
-            }
+            HashSet<string> baselineKeys = ProcessBaselineEntries(
+                groupName, entries, groupInScope, selectedIds, knownIds, canonicalIds, candidates,
+                outOfScope, configurationErrors, frozen, resolved);
 
             if (!groupInScope)
             {
                 continue;
             }
 
-            var seenNewKeys = new HashSet<string>(StringComparer.Ordinal);
-            foreach (var candidate in candidates)
-            {
-                if (candidate.ContractGroup != groupName || candidate.ContractId == null)
-                {
-                    continue;
-                }
-
-                if (selectedIds != null && !selectedIds.Contains(candidate.ContractId))
-                {
-                    continue;
-                }
-
-                string key = BuildComparisonKey(
-                    CanonicalizeContractId(canonicalIds, candidate.ContractId),
-                    candidate.SourceType,
-                    candidate.ForbiddenReference);
-                if (baselineKeys.Contains(key) || !seenNewKeys.Add(key))
-                {
-                    continue;
-                }
-
-                newEntries.Add(new ArchitectureBaselineComparisonEntry(
-                    groupName, candidate.ContractId, candidate.SourceType, candidate.ForbiddenReference, null));
-            }
+            ProcessNewCandidates(groupName, candidates, selectedIds, canonicalIds, baselineKeys, newEntries);
         }
 
         return new ArchitectureBaselineComparisonResult(newEntries, frozen, resolved, configurationErrors, outOfScope);
+    }
+
+    private static HashSet<string> ProcessBaselineEntries( // NOSONAR: arguments are separate comparison inputs and outputs.
+        string groupName,
+        List<ArchitectureBaselineContractEntry> entries,
+        bool groupInScope,
+        HashSet<string>? selectedIds,
+        HashSet<string> knownIds,
+        Dictionary<string, string> canonicalIds,
+        IReadOnlyList<ArchitectureBaselineCandidate> candidates,
+        List<ArchitectureBaselineComparisonEntry> outOfScope,
+        List<ArchitectureBaselineComparisonEntry> configurationErrors,
+        List<ArchitectureBaselineComparisonEntry> frozen,
+        List<ArchitectureBaselineComparisonEntry> resolved)
+    {
+        var baselineKeys = new HashSet<string>(StringComparer.Ordinal);
+
+        foreach (var entry in entries)
+        {
+            bool entryInScope = groupInScope && (selectedIds == null || selectedIds.Contains(entry.Id));
+
+            // Out-of-scope entries (wrong mode, or not among the selected --contract ids) are
+            // carried through verbatim so scoped update/prune never drops unrelated debt.
+            if (!entryInScope)
+            {
+                foreach (var ignore in entry.IgnoredViolations)
+                {
+                    outOfScope.Add(new ArchitectureBaselineComparisonEntry(
+                        groupName, entry.Id, ignore.SourceType, ignore.ForbiddenReference, ignore.Reason));
+                }
+
+                continue;
+            }
+
+            bool idKnown = knownIds.Contains(entry.Id);
+            string canonicalContractId = CanonicalizeContractId(canonicalIds, entry.Id);
+
+            foreach (var ignore in entry.IgnoredViolations)
+            {
+                string key = BuildComparisonKey(canonicalContractId, ignore.SourceType, ignore.ForbiddenReference);
+                baselineKeys.Add(key);
+
+                var comparisonEntry = new ArchitectureBaselineComparisonEntry(
+                    groupName, entry.Id, ignore.SourceType, ignore.ForbiddenReference, ignore.Reason);
+
+                if (!idKnown)
+                {
+                    configurationErrors.Add(comparisonEntry);
+                }
+                else if (HasMatchingCandidate(candidates, groupName, canonicalContractId, ignore.SourceType, ignore.ForbiddenReference))
+                {
+                    frozen.Add(comparisonEntry);
+                }
+                else
+                {
+                    resolved.Add(comparisonEntry);
+                }
+            }
+        }
+
+        return baselineKeys;
+    }
+
+    private static void ProcessNewCandidates(
+        string groupName,
+        IReadOnlyList<ArchitectureBaselineCandidate> candidates,
+        HashSet<string>? selectedIds,
+        Dictionary<string, string> canonicalIds,
+        HashSet<string> baselineKeys,
+        List<ArchitectureBaselineComparisonEntry> newEntries)
+    {
+        var seenNewKeys = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var candidate in candidates)
+        {
+            if (candidate.ContractGroup != groupName || candidate.ContractId == null)
+            {
+                continue;
+            }
+
+            if (selectedIds != null && !selectedIds.Contains(candidate.ContractId))
+            {
+                continue;
+            }
+
+            string key = BuildComparisonKey(
+                CanonicalizeContractId(canonicalIds, candidate.ContractId),
+                candidate.SourceType,
+                candidate.ForbiddenReference);
+            if (baselineKeys.Contains(key) || !seenNewKeys.Add(key))
+            {
+                continue;
+            }
+
+            newEntries.Add(new ArchitectureBaselineComparisonEntry(
+                groupName, candidate.ContractId, candidate.SourceType, candidate.ForbiddenReference, null));
+        }
     }
 
     private static Dictionary<string, Dictionary<string, string>> BuildCanonicalIdsByGroup(ArchitectureContractGroups groups)
@@ -209,7 +241,7 @@ public static class ArchitectureBaselineComparer
         return false;
     }
 
-    private static string CanonicalizeContractId(IReadOnlyDictionary<string, string> canonicalIds, string contractId)
+    private static string CanonicalizeContractId(Dictionary<string, string> canonicalIds, string contractId)
     {
         return canonicalIds.TryGetValue(contractId, out string? canonicalId)
             ? canonicalId

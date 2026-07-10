@@ -57,37 +57,7 @@ public sealed class ArchitectureProjectDiscoveryService : IArchitectureProjectDi
 
         if (hasSolution)
         {
-            string solutionPath = ResolvePath(analysis.Solution, repositoryRoot);
-
-            if (!_fileSystem.FileExists(solutionPath))
-            {
-                diagnostics.Add(new ArchitectureProjectDiscoveryDiagnostic(
-                    "missing solution file", analysis.Solution,
-                    $"Solution file '{analysis.Solution}' (resolved to '{solutionPath}') does not exist."));
-            }
-            else
-            {
-                try
-                {
-                    IReadOnlyList<string> discovered = _solutionParser.ParseProjectPaths(solutionPath, _fileSystem);
-                    List<string> filtered = FilterProjects(discovered, repositoryRoot, analysis).ToList();
-
-                    if (filtered.Count == 0)
-                    {
-                        diagnostics.Add(new ArchitectureProjectDiscoveryDiagnostic(
-                            "no C# projects discovered", analysis.Solution,
-                            $"Solution file '{analysis.Solution}' was parsed successfully but no .csproj entries were discovered (after project_include/project_exclude filtering, if configured)."));
-                    }
-
-                    projectPaths.AddRange(filtered);
-                }
-                catch (Exception ex)
-                {
-                    diagnostics.Add(new ArchitectureProjectDiscoveryDiagnostic(
-                        "unparsable solution file", analysis.Solution,
-                        $"Solution file '{analysis.Solution}' could not be parsed: {ex.Message}"));
-                }
-            }
+            projectPaths.AddRange(ResolveSolutionProjectPaths(analysis, repositoryRoot, diagnostics));
         }
 
         foreach (string explicitProject in analysis.Projects)
@@ -95,6 +65,54 @@ public sealed class ArchitectureProjectDiscoveryService : IArchitectureProjectDi
             projectPaths.Add(ResolvePath(explicitProject, repositoryRoot));
         }
 
+        return BuildDiscoveryResult(projectPaths, analysis, repositoryRoot, resolveAssemblyOutputs, diagnostics);
+    }
+
+    private List<string> ResolveSolutionProjectPaths(
+        ArchitectureAnalysisConfiguration analysis,
+        string repositoryRoot,
+        List<ArchitectureProjectDiscoveryDiagnostic> diagnostics)
+    {
+        string solutionPath = ResolvePath(analysis.Solution, repositoryRoot);
+
+        if (!_fileSystem.FileExists(solutionPath))
+        {
+            diagnostics.Add(new ArchitectureProjectDiscoveryDiagnostic(
+                "missing solution file", analysis.Solution,
+                $"Solution file '{analysis.Solution}' (resolved to '{solutionPath}') does not exist."));
+            return new List<string>();
+        }
+
+        try
+        {
+            IReadOnlyList<string> discovered = _solutionParser.ParseProjectPaths(solutionPath, _fileSystem);
+            List<string> filtered = FilterProjects(discovered, repositoryRoot, analysis).ToList();
+
+            if (filtered.Count == 0)
+            {
+                diagnostics.Add(new ArchitectureProjectDiscoveryDiagnostic(
+                    "no C# projects discovered", analysis.Solution,
+                    $"Solution file '{analysis.Solution}' was parsed successfully but no .csproj entries were discovered (after project_include/project_exclude filtering, if configured)."));
+            }
+
+            return filtered;
+        }
+        catch (Exception ex)
+        {
+            diagnostics.Add(new ArchitectureProjectDiscoveryDiagnostic(
+                "unparsable solution file", analysis.Solution,
+                $"Solution file '{analysis.Solution}' could not be parsed: {ex.Message}"));
+            return new List<string>();
+        }
+    }
+
+    private ProjectDiscoveryResult BuildDiscoveryResult(
+        List<string> projectPaths,
+        ArchitectureAnalysisConfiguration analysis,
+        string repositoryRoot,
+        bool resolveAssemblyOutputs,
+        List<ArchitectureProjectDiscoveryDiagnostic> diagnostics)
+    {
         List<string> targetAssemblyNames = new();
         List<string> assemblySearchPaths = new();
         List<string> sourceRoots = new();
@@ -102,69 +120,9 @@ public sealed class ArchitectureProjectDiscoveryService : IArchitectureProjectDi
 
         foreach (string projectPath in projectPaths.Distinct(StringComparer.OrdinalIgnoreCase))
         {
-            if (!_fileSystem.FileExists(projectPath))
-            {
-                diagnostics.Add(new ArchitectureProjectDiscoveryDiagnostic(
-                    "missing project file", projectPath, $"Project file '{projectPath}' does not exist."));
-                continue;
-            }
-
-            DiscoveredProjectFile projectFile;
-            try
-            {
-                projectFile = _projectFileParser.Parse(projectPath, _fileSystem);
-            }
-            catch (Exception ex)
-            {
-                diagnostics.Add(new ArchitectureProjectDiscoveryDiagnostic(
-                    "unparsable project file", projectPath, $"Project file '{projectPath}' could not be parsed: {ex.Message}"));
-                continue;
-            }
-
-            // A project is a valid source root as soon as it parses, regardless of whether its
-            // build output can be (or needs to be) resolved for assembly seeding.
-            sourceRoots.Add(GetRelativeDirectory(repositoryRoot, projectPath));
-            discoveredProjects.Add(new ArchitectureDiscoveredProject(
-                GetRelativePath(repositoryRoot, projectPath),
-                projectFile.AssemblyName,
-                projectFile.TargetFrameworks,
-                projectFile.PackageReferences,
-                projectFile.Properties.ToDictionary(
-                    pair => pair.Key,
-                    pair => pair.Value with { SourcePath = GetRelativePath(repositoryRoot, pair.Value.SourcePath) },
-                    StringComparer.OrdinalIgnoreCase),
-                projectFile.FriendAssemblies
-                    .Select(entry => entry with { SourcePath = GetRelativePath(repositoryRoot, entry.SourcePath) })
-                    .ToList(),
-                projectFile.ProjectReferences
-                    .Select(entry => entry with
-                    {
-                        Path = GetRelativePath(repositoryRoot, entry.Path),
-                        SourcePath = GetRelativePath(repositoryRoot, entry.SourcePath)
-                    })
-                    .ToList()));
-
-            if (!resolveAssemblyOutputs)
-            {
-                continue;
-            }
-
-            if (projectFile.TargetFrameworks.Count == 0)
-            {
-                diagnostics.Add(new ArchitectureProjectDiscoveryDiagnostic(
-                    "missing target framework", projectPath,
-                    $"Project '{projectPath}' declares no <TargetFramework> or <TargetFrameworks>."));
-                continue;
-            }
-
-            if (!TryResolveOutput(projectFile, analysis, _fileSystem, out string outputDirectory, out ArchitectureProjectDiscoveryDiagnostic? diagnostic))
-            {
-                diagnostics.Add(diagnostic!);
-                continue;
-            }
-
-            targetAssemblyNames.Add(projectFile.AssemblyName);
-            assemblySearchPaths.Add(outputDirectory);
+            ProcessProjectPath(
+                projectPath, analysis, repositoryRoot, resolveAssemblyOutputs,
+                diagnostics, targetAssemblyNames, assemblySearchPaths, sourceRoots, discoveredProjects);
         }
 
         return new ProjectDiscoveryResult(
@@ -175,6 +133,88 @@ public sealed class ArchitectureProjectDiscoveryService : IArchitectureProjectDi
         {
             DiscoveredProjects = discoveredProjects
         };
+    }
+
+    private void ProcessProjectPath( // NOSONAR: discovery accumulators remain independently owned by the caller.
+        string projectPath,
+        ArchitectureAnalysisConfiguration analysis,
+        string repositoryRoot,
+        bool resolveAssemblyOutputs,
+        List<ArchitectureProjectDiscoveryDiagnostic> diagnostics,
+        List<string> targetAssemblyNames,
+        List<string> assemblySearchPaths,
+        List<string> sourceRoots,
+        List<ArchitectureDiscoveredProject> discoveredProjects)
+    {
+        if (!_fileSystem.FileExists(projectPath))
+        {
+            diagnostics.Add(new ArchitectureProjectDiscoveryDiagnostic(
+                "missing project file", projectPath, $"Project file '{projectPath}' does not exist."));
+            return;
+        }
+
+        DiscoveredProjectFile projectFile;
+        try
+        {
+            projectFile = _projectFileParser.Parse(projectPath, _fileSystem);
+        }
+        catch (Exception ex)
+        {
+            diagnostics.Add(new ArchitectureProjectDiscoveryDiagnostic(
+                "unparsable project file", projectPath, $"Project file '{projectPath}' could not be parsed: {ex.Message}"));
+            return;
+        }
+
+        // A project is a valid source root as soon as it parses, regardless of whether its
+        // build output can be (or needs to be) resolved for assembly seeding.
+        sourceRoots.Add(GetRelativeDirectory(repositoryRoot, projectPath));
+        discoveredProjects.Add(BuildDiscoveredProject(projectFile, projectPath, repositoryRoot));
+
+        if (!resolveAssemblyOutputs)
+        {
+            return;
+        }
+
+        if (projectFile.TargetFrameworks.Count == 0)
+        {
+            diagnostics.Add(new ArchitectureProjectDiscoveryDiagnostic(
+                "missing target framework", projectPath,
+                $"Project '{projectPath}' declares no <TargetFramework> or <TargetFrameworks>."));
+            return;
+        }
+
+        if (!TryResolveOutput(projectFile, analysis, _fileSystem, out string outputDirectory, out ArchitectureProjectDiscoveryDiagnostic? diagnostic))
+        {
+            diagnostics.Add(diagnostic!);
+            return;
+        }
+
+        targetAssemblyNames.Add(projectFile.AssemblyName);
+        assemblySearchPaths.Add(outputDirectory);
+    }
+
+    private static ArchitectureDiscoveredProject BuildDiscoveredProject(
+        DiscoveredProjectFile projectFile, string projectPath, string repositoryRoot)
+    {
+        return new ArchitectureDiscoveredProject(
+            GetRelativePath(repositoryRoot, projectPath),
+            projectFile.AssemblyName,
+            projectFile.TargetFrameworks,
+            projectFile.PackageReferences,
+            projectFile.Properties.ToDictionary(
+                pair => pair.Key,
+                pair => pair.Value with { SourcePath = GetRelativePath(repositoryRoot, pair.Value.SourcePath) },
+                StringComparer.OrdinalIgnoreCase),
+            projectFile.FriendAssemblies
+                .Select(entry => entry with { SourcePath = GetRelativePath(repositoryRoot, entry.SourcePath) })
+                .ToList(),
+            projectFile.ProjectReferences
+                .Select(entry => entry with
+                {
+                    Path = GetRelativePath(repositoryRoot, entry.Path),
+                    SourcePath = GetRelativePath(repositoryRoot, entry.SourcePath)
+                })
+                .ToList());
     }
 
     private static bool TryResolveOutput(

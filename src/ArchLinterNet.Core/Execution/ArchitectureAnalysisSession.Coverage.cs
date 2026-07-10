@@ -347,8 +347,11 @@ public sealed partial class ArchitectureAnalysisSession
             .Where(entry => !contract.Exclude.Any(exclusion => MatchesNamespaceExclusion(exclusion, entry.Namespace)))
             .Where(entry => !IsCoveredByDeclaredLayers(inventory, entry.Namespace))
             .Where(entry => !IsCoveredByExpandedTemplates(inventory, entry.Namespace))
+#pragma warning disable S6607 // IsIgnored has an ordered side effect (baseline-candidate
+            // collection), so it must run in this OrderBy-then-Where sequence, not before it.
             .OrderBy(entry => entry.Namespace, StringComparer.Ordinal)
             .Where(entry => !executionContext.IsIgnored(entry.Namespace, "uncovered namespace"))
+#pragma warning restore S6607
             .Select(entry => new ArchitectureViolation(
                 contract.Name,
                 contract.Id,
@@ -393,40 +396,8 @@ public sealed partial class ArchitectureAnalysisSession
                 continue;
             }
 
-            IReadOnlyList<string> referencedLayerNames = GetReferencedLayerNames(descriptor.Contract)
-                .Distinct(StringComparer.Ordinal)
-                .ToList();
-
-            foreach (string layerName in referencedLayerNames)
-            {
-                if (!Document.Layers.TryGetValue(layerName, out ArchitectureLayer? layer))
-                {
-                    if (!executionContext.IsIgnored(referencedContractId, layerName))
-                    {
-                        findings.Add(new ArchitectureViolation(
-                            contract.Name,
-                            contract.Id,
-                            referencedContractId,
-                            "unresolved",
-                            new[] { layerName }));
-                    }
-
-                    continue;
-                }
-
-                bool matchesAnyCode = inventory.Namespaces.Any(entry =>
-                    ArchitectureLayerResolver.MatchesNamespace(layer, entry.Namespace));
-
-                if (!matchesAnyCode && !executionContext.IsIgnored(referencedContractId, layerName))
-                {
-                    findings.Add(new ArchitectureViolation(
-                        contract.Name,
-                        contract.Id,
-                        referencedContractId,
-                        "empty-input",
-                        new[] { layerName }));
-                }
-            }
+            AddRuleInputCoverageFindingsForContract(
+                contract, referencedContractId, descriptor, inventory, executionContext, findings);
         }
 
         executionContext.CollectUnmatchedIgnores(_unmatchedIgnoredViolations);
@@ -435,6 +406,50 @@ public sealed partial class ArchitectureAnalysisSession
             .OrderBy(f => f.SourceType, StringComparer.Ordinal)
             .ThenBy(f => f.ForbiddenReferences.First(), StringComparer.Ordinal)
             .ToList();
+    }
+
+    private void AddRuleInputCoverageFindingsForContract(
+        ArchitectureCoverageContract contract,
+        string referencedContractId,
+        ArchitectureContractDescriptor descriptor,
+        ArchitectureCoverageInventory inventory,
+        ArchitectureContractExecutionContext executionContext,
+        List<ArchitectureViolation> findings)
+    {
+        IReadOnlyList<string> referencedLayerNames = GetReferencedLayerNames(descriptor.Contract)
+            .Distinct(StringComparer.Ordinal)
+            .ToList();
+
+        foreach (string layerName in referencedLayerNames)
+        {
+            if (!Document.Layers.TryGetValue(layerName, out ArchitectureLayer? layer))
+            {
+                if (!executionContext.IsIgnored(referencedContractId, layerName))
+                {
+                    findings.Add(new ArchitectureViolation(
+                        contract.Name,
+                        contract.Id,
+                        referencedContractId,
+                        "unresolved",
+                        new[] { layerName }));
+                }
+
+                continue;
+            }
+
+            bool matchesAnyCode = inventory.Namespaces.Any(entry =>
+                ArchitectureLayerResolver.MatchesNamespace(layer, entry.Namespace));
+
+            if (!matchesAnyCode && !executionContext.IsIgnored(referencedContractId, layerName))
+            {
+                findings.Add(new ArchitectureViolation(
+                    contract.Name,
+                    contract.Id,
+                    referencedContractId,
+                    "empty-input",
+                    new[] { layerName }));
+            }
+        }
     }
 
     private List<ArchitectureViolation> CheckAssemblyCoverageContract(ArchitectureCoverageContract contract)
@@ -447,8 +462,11 @@ public sealed partial class ArchitectureAnalysisSession
             .Where(entry => !contract.Exclude.Any(exclusion => MatchesAssemblyExclusion(exclusion, entry.Name)))
             .Where(entry => !GetAssemblyNamespaces(entry.Assembly)
                 .Any(ns => IsCoveredByDeclaredLayers(inventory, ns) || IsCoveredByExpandedTemplates(inventory, ns)))
+#pragma warning disable S6607 // IsIgnored has an ordered side effect (baseline-candidate
+            // collection), so it must run in this OrderBy-then-Where sequence, not before it.
             .OrderBy(entry => entry.Name, StringComparer.Ordinal)
             .Where(entry => !executionContext.IsIgnored(entry.Name, "uncovered assembly"))
+#pragma warning restore S6607
             .Select(entry => new ArchitectureViolation(
                 contract.Name,
                 contract.Id,
@@ -659,133 +677,4 @@ public sealed partial class ArchitectureAnalysisSession
                && string.Equals(exclusion.Between[1], targetLayer, StringComparison.Ordinal);
     }
 
-    private Assembly? ResolveProjectAssembly(ArchitectureDiscoveredProject project)
-    {
-        return Context.TargetAssemblies.FirstOrDefault(assembly =>
-            string.Equals(GetAssemblyName(assembly), project.AssemblyName, StringComparison.Ordinal));
-    }
-
-    private static string GetAssemblyName(Assembly assembly)
-    {
-        return assembly.GetName().Name ?? assembly.FullName ?? assembly.ToString();
-    }
-
-    private static string[] GetAssemblyNamespaces(Assembly assembly)
-    {
-        return ArchitectureTypeScanner.GetLoadableTypes(assembly)
-            .Select(ArchitectureTypeNames.SafeNamespace)
-            .Distinct(StringComparer.Ordinal)
-            .ToArray();
-    }
-
-    private static string GetRepresentativeType(Assembly assembly)
-    {
-        Type? representative = ArchitectureTypeScanner.GetLoadableTypes(assembly)
-            .OrderBy(type => type.FullName, StringComparer.Ordinal)
-            .FirstOrDefault();
-
-        return representative?.FullName ?? representative?.Name ?? GetAssemblyName(assembly);
-    }
-
-    private static string[] GetAssemblyForbiddenReferences(Assembly assembly)
-    {
-        string representativeType = GetRepresentativeType(assembly);
-
-        return string.IsNullOrEmpty(assembly.Location)
-            ? new[] { representativeType }
-            : new[] { assembly.Location, representativeType };
-    }
-
-    private static string GetAssemblyEvidence(Assembly assembly)
-    {
-        string representativeType = GetRepresentativeType(assembly);
-
-        return string.IsNullOrEmpty(assembly.Location)
-            ? representativeType
-            : $"{assembly.Location} ({representativeType})";
-    }
-
-    private static string GetProjectEvidence(ArchitectureDiscoveredProject project, Assembly resolvedAssembly)
-    {
-        return $"{project.AssemblyName}: {GetRepresentativeType(resolvedAssembly)}";
-    }
-
-    private static bool MatchesAssemblyExclusion(ArchitectureCoverageExclusion exclusion, string assemblyName)
-    {
-        return !string.IsNullOrWhiteSpace(exclusion.Assembly)
-               && string.Equals(exclusion.Assembly, assemblyName, StringComparison.Ordinal);
-    }
-
-    private static bool MatchesProjectExclusion(ArchitectureCoverageExclusion exclusion, ArchitectureDiscoveredProject project)
-    {
-        if (string.IsNullOrWhiteSpace(exclusion.Project))
-        {
-            return false;
-        }
-
-        return string.Equals(exclusion.Project, project.Path, StringComparison.Ordinal)
-               || string.Equals(exclusion.Project, Path.GetFileName(project.Path), StringComparison.Ordinal);
-    }
-
-    private static bool IsCoveredByDeclaredLayers(ArchitectureCoverageInventory inventory, string namespaceName)
-    {
-        return inventory.DeclaredLayers.Any(layerEntry =>
-            ArchitectureLayerResolver.MatchesNamespace(layerEntry.Layer, namespaceName));
-    }
-
-    private static bool IsCoveredByExpandedTemplates(ArchitectureCoverageInventory inventory, string namespaceName)
-    {
-        foreach (ArchitectureLayerContract expandedTemplate in inventory.ExpandedLayerTemplates)
-        {
-            foreach (string layerNamespace in expandedTemplate.Layers)
-            {
-                if (ArchitectureLayerResolver.MatchesNamespace(
-                        new ArchitectureLayer { Namespace = layerNamespace },
-                        namespaceName))
-                {
-                    return true;
-                }
-            }
-        }
-
-        return false;
-    }
-
-    private static bool MatchesNamespaceRoot(ArchitectureCoverageRoot root, string namespaceName)
-    {
-        if (string.IsNullOrWhiteSpace(root.Namespace))
-        {
-            return false;
-        }
-
-        return ArchitectureLayerResolver.MatchesNamespace(
-            new ArchitectureLayer
-            {
-                Namespace = root.Namespace,
-                NamespaceSuffix = root.NamespaceSuffix
-            },
-            namespaceName);
-    }
-
-    private static bool MatchesNamespaceExclusion(ArchitectureCoverageExclusion exclusion, string namespaceName)
-    {
-        if (!string.IsNullOrWhiteSpace(exclusion.Namespace))
-        {
-            return ArchitectureLayerResolver.MatchesNamespace(
-                new ArchitectureLayer
-                {
-                    Namespace = exclusion.Namespace,
-                    NamespaceSuffix = exclusion.NamespaceSuffix
-                },
-                namespaceName);
-        }
-
-        if (!string.IsNullOrWhiteSpace(exclusion.NamespaceSuffix))
-        {
-            return string.Equals(namespaceName, exclusion.NamespaceSuffix, StringComparison.Ordinal)
-                   || namespaceName.EndsWith("." + exclusion.NamespaceSuffix, StringComparison.Ordinal);
-        }
-
-        return false;
-    }
 }

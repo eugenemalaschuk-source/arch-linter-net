@@ -17,6 +17,10 @@ internal readonly record struct ArchitectureExportedApiEntry(
 // that fail to reflect are skipped rather than crashing the whole scan.
 internal static class ArchitecturePublicApiSurfaceScanner
 {
+    private const string PublicVisibility = "public";
+    private const string ProtectedInternalVisibility = "protected internal";
+    private const string ProtectedVisibility = "protected";
+
     private const BindingFlags MemberFlags =
         BindingFlags.DeclaredOnly | BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.Static;
 
@@ -86,6 +90,35 @@ internal static class ArchitecturePublicApiSurfaceScanner
     {
         string declaringTypeName = ArchitectureTypeNames.SafeFullName(type);
 
+        foreach (ArchitectureExportedApiEntry entry in GetExportedConstructors(type, declaringTypeName, assemblyName))
+        {
+            yield return entry;
+        }
+
+        foreach (ArchitectureExportedApiEntry entry in GetExportedMethods(type, declaringTypeName, assemblyName))
+        {
+            yield return entry;
+        }
+
+        foreach (ArchitectureExportedApiEntry entry in GetExportedProperties(type, declaringTypeName, assemblyName))
+        {
+            yield return entry;
+        }
+
+        foreach (ArchitectureExportedApiEntry entry in GetExportedFields(type, declaringTypeName, assemblyName))
+        {
+            yield return entry;
+        }
+
+        foreach (ArchitectureExportedApiEntry entry in GetExportedEvents(type, declaringTypeName, assemblyName))
+        {
+            yield return entry;
+        }
+    }
+
+    private static IEnumerable<ArchitectureExportedApiEntry> GetExportedConstructors(
+        Type type, string declaringTypeName, string assemblyName)
+    {
         foreach (ConstructorInfo ctor in SafeGetMembers(type, t => t.GetConstructors(MemberFlags)))
         {
             if (!IsExportedVisibility(ctor) || IsCompilerGenerated(ctor))
@@ -100,7 +133,11 @@ internal static class ArchitecturePublicApiSurfaceScanner
                     signature, declaringTypeName, assemblyName, MemberVisibility(ctor), false, null);
             }
         }
+    }
 
+    private static IEnumerable<ArchitectureExportedApiEntry> GetExportedMethods(
+        Type type, string declaringTypeName, string assemblyName)
+    {
         foreach (MethodInfo method in SafeGetMembers(type, t => t.GetMethods(MemberFlags)))
         {
             if (!IsExportedVisibility(method) || IsCompilerGenerated(method))
@@ -120,7 +157,11 @@ internal static class ArchitecturePublicApiSurfaceScanner
                     signature, declaringTypeName, assemblyName, MemberVisibility(method), false, null);
             }
         }
+    }
 
+    private static IEnumerable<ArchitectureExportedApiEntry> GetExportedProperties(
+        Type type, string declaringTypeName, string assemblyName)
+    {
         foreach (PropertyInfo property in SafeGetMembers(type, t => t.GetProperties(MemberFlags)))
         {
             if (!IsExportedAccessor(property.GetMethod) && !IsExportedAccessor(property.SetMethod))
@@ -140,7 +181,11 @@ internal static class ArchitecturePublicApiSurfaceScanner
                     signature, declaringTypeName, assemblyName, AccessorVisibility(property.GetMethod, property.SetMethod), false, null);
             }
         }
+    }
 
+    private static IEnumerable<ArchitectureExportedApiEntry> GetExportedFields(
+        Type type, string declaringTypeName, string assemblyName)
+    {
         foreach (FieldInfo field in SafeGetMembers(type, t => t.GetFields(MemberFlags)))
         {
             // Skip compiler/runtime-synthesized special-name fields, most notably an enum's
@@ -165,7 +210,11 @@ internal static class ArchitecturePublicApiSurfaceScanner
             yield return new ArchitectureExportedApiEntry(
                 signature, declaringTypeName, assemblyName, MemberVisibility(field), isConst, constQualifiedName);
         }
+    }
 
+    private static IEnumerable<ArchitectureExportedApiEntry> GetExportedEvents(
+        Type type, string declaringTypeName, string assemblyName)
+    {
         foreach (EventInfo evt in SafeGetMembers(type, t => t.GetEvents(MemberFlags)))
         {
             if (!IsExportedAccessor(evt.AddMethod) || IsCompilerGenerated(evt))
@@ -186,7 +235,7 @@ internal static class ArchitecturePublicApiSurfaceScanner
         }
     }
 
-    private static IEnumerable<TMember> SafeGetMembers<TMember>(Type type, Func<Type, TMember[]> selector)
+    private static TMember[] SafeGetMembers<TMember>(Type type, Func<Type, TMember[]> selector)
     {
         try
         {
@@ -225,35 +274,35 @@ internal static class ArchitecturePublicApiSurfaceScanner
     {
         if (method.IsPublic)
         {
-            return "public";
+            return PublicVisibility;
         }
 
-        return method.IsFamilyOrAssembly ? "protected internal" : "protected";
+        return method.IsFamilyOrAssembly ? ProtectedInternalVisibility : ProtectedVisibility;
     }
 
     private static string MemberVisibility(FieldInfo field)
     {
         if (field.IsPublic)
         {
-            return "public";
+            return PublicVisibility;
         }
 
-        return field.IsFamilyOrAssembly ? "protected internal" : "protected";
+        return field.IsFamilyOrAssembly ? ProtectedInternalVisibility : ProtectedVisibility;
     }
 
     private static string TypeVisibility(Type type)
     {
         if (!type.IsNested)
         {
-            return "public";
+            return PublicVisibility;
         }
 
         if (type.IsNestedPublic)
         {
-            return "public";
+            return PublicVisibility;
         }
 
-        return type.IsNestedFamORAssem ? "protected internal" : "protected";
+        return type.IsNestedFamORAssem ? ProtectedInternalVisibility : ProtectedVisibility;
     }
 
     // A property/event is exported if at least one of its accessors is; when both accessors are
@@ -270,13 +319,13 @@ internal static class ArchitecturePublicApiSurfaceScanner
     {
         static int Rank(string? visibility) => visibility switch
         {
-            "public" => 0,
-            "protected internal" => 1,
-            "protected" => 2,
+            PublicVisibility => 0,
+            ProtectedInternalVisibility => 1,
+            ProtectedVisibility => 2,
             _ => 3
         };
 
-        return Rank(first) <= Rank(second) ? first ?? "public" : second ?? "public";
+        return Rank(first) <= Rank(second) ? first ?? PublicVisibility : second ?? PublicVisibility;
     }
 
     private static bool IsCompilerGenerated(MemberInfo member)

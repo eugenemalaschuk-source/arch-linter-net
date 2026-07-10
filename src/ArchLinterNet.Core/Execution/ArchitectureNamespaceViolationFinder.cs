@@ -79,78 +79,103 @@ internal static class ArchitectureNamespaceViolationFinder
 
         return sourceTypes
             .OrderBy(type => ArchitectureTypeNames.SafeFullName(type), StringComparer.Ordinal)
-            .Select(type =>
-            {
-                string sourceFullName = ArchitectureTypeNames.SafeFullName(type);
-                List<string> forbiddenRefs = new();
-                HashSet<string> matchedPrefixes = new(StringComparer.Ordinal);
-                List<IReadOnlyCollection<string>> paths = new();
-
-                IEnumerable<(Type referenced, List<Type> path)> transitiveReferences = referenceGraph != null
-                    ? referenceGraph.GetTransitiveReferencedTypes(type, traversePredicate)
-                    : ArchitectureReferenceScanner.GetTransitiveReferencedTypes(type, traversePredicate);
-
-                foreach (var (referenced, path) in transitiveReferences)
-                {
-                    string refFullName = ArchitectureTypeNames.SafeFullName(referenced);
-                    if (string.IsNullOrEmpty(refFullName))
-                    {
-                        continue;
-                    }
-
-                    ArchitectureNamespaceMatch match = ArchitectureLayerResolver.MatchNamespace(forbiddenLayer,
-                        ArchitectureTypeNames.SafeNamespace(referenced));
-                    if (!match.Matched)
-                    {
-                        continue;
-                    }
-
-                    if (allowedTypeFullNames.Contains(refFullName))
-                    {
-                        continue;
-                    }
-
-                    if (executionContext.IsIgnored(sourceFullName, refFullName))
-                    {
-                        continue;
-                    }
-
-                    forbiddenRefs.Add(refFullName);
-                    if (!string.IsNullOrEmpty(match.MatchedNamespacePrefix))
-                    {
-                        matchedPrefixes.Add(match.MatchedNamespacePrefix);
-                    }
-
-                    paths.Add(path.Select(ArchitectureTypeNames.SafeFullName)
-                        .Where(n => !string.IsNullOrEmpty(n))
-                        .ToArray());
-                }
-
-                if (forbiddenRefs.Count == 0)
-                {
-                    return null;
-                }
-
-                var paired = forbiddenRefs
-                    .Zip(paths, (rf, p) => (refName: rf, path: p))
-                    .OrderBy(x => x.refName, StringComparer.Ordinal)
-                    .ToList();
-
-                return new ArchitectureViolation(
-                    executionContext.ContractName,
-                    executionContext.ContractId,
-                    sourceFullName,
-                    ArchitectureLayerResolver.DescribeLayer(forbiddenLayer),
-                    paired.Select(x => x.refName).ToArray())
-                {
-                    Payload = new ConfigurationPayload(
-                        DependencyPaths: paired.Select(x => x.path).ToArray()),
-                    MatchedNamespacePrefixes = matchedPrefixes.Count > 0
-                        ? matchedPrefixes.OrderBy(prefix => prefix, StringComparer.Ordinal).ToArray()
-                        : null
-                };
-            })
+            .Select(type => BuildTransitiveViolation(
+                type, forbiddenLayer, allowedTypeFullNames, executionContext, referenceGraph, traversePredicate))
             .Where(violation => violation != null)!;
+    }
+
+    private static ArchitectureViolation? BuildTransitiveViolation(
+        Type type,
+        ArchitectureLayer forbiddenLayer,
+        IReadOnlyCollection<string> allowedTypeFullNames,
+        ArchitectureContractExecutionContext executionContext,
+        ArchitectureReferenceGraph? referenceGraph,
+        Func<Type, bool> traversePredicate)
+    {
+        string sourceFullName = ArchitectureTypeNames.SafeFullName(type);
+        List<string> forbiddenRefs = new();
+        HashSet<string> matchedPrefixes = new(StringComparer.Ordinal);
+        List<IReadOnlyCollection<string>> paths = new();
+
+        IEnumerable<(Type referenced, List<Type> path)> transitiveReferences = referenceGraph != null
+            ? referenceGraph.GetTransitiveReferencedTypes(type, traversePredicate)
+            : ArchitectureReferenceScanner.GetTransitiveReferencedTypes(type, traversePredicate);
+
+        foreach (var (referenced, path) in transitiveReferences)
+        {
+            CollectForbiddenTransitiveReference(
+                referenced, path, forbiddenLayer, allowedTypeFullNames, executionContext, sourceFullName,
+                forbiddenRefs, matchedPrefixes, paths);
+        }
+
+        if (forbiddenRefs.Count == 0)
+        {
+            return null;
+        }
+
+        var paired = forbiddenRefs
+            .Zip(paths, (rf, p) => (refName: rf, path: p))
+            .OrderBy(x => x.refName, StringComparer.Ordinal)
+            .ToList();
+
+        return new ArchitectureViolation(
+            executionContext.ContractName,
+            executionContext.ContractId,
+            sourceFullName,
+            ArchitectureLayerResolver.DescribeLayer(forbiddenLayer),
+            paired.Select(x => x.refName).ToArray())
+        {
+            Payload = new ConfigurationPayload(
+                DependencyPaths: paired.Select(x => x.path).ToArray()),
+            MatchedNamespacePrefixes = matchedPrefixes.Count > 0
+                ? matchedPrefixes.OrderBy(prefix => prefix, StringComparer.Ordinal).ToArray()
+                : null
+        };
+    }
+
+    private static void CollectForbiddenTransitiveReference( // NOSONAR: traversal state is intentionally explicit and mutable.
+        Type referenced,
+        List<Type> path,
+        ArchitectureLayer forbiddenLayer,
+        IReadOnlyCollection<string> allowedTypeFullNames,
+        ArchitectureContractExecutionContext executionContext,
+        string sourceFullName,
+        List<string> forbiddenRefs,
+        HashSet<string> matchedPrefixes,
+        List<IReadOnlyCollection<string>> paths)
+    {
+        string refFullName = ArchitectureTypeNames.SafeFullName(referenced);
+        if (string.IsNullOrEmpty(refFullName))
+        {
+            return;
+        }
+
+        ArchitectureNamespaceMatch match = ArchitectureLayerResolver.MatchNamespace(forbiddenLayer,
+            ArchitectureTypeNames.SafeNamespace(referenced));
+        if (!match.Matched)
+        {
+            return;
+        }
+
+        if (allowedTypeFullNames.Contains(refFullName))
+        {
+            return;
+        }
+
+        if (executionContext.IsIgnored(sourceFullName, refFullName))
+        {
+            return;
+        }
+
+        forbiddenRefs.Add(refFullName);
+        if (!string.IsNullOrEmpty(match.MatchedNamespacePrefix))
+        {
+            matchedPrefixes.Add(match.MatchedNamespacePrefix);
+        }
+
+        paths.Add(path.Select(ArchitectureTypeNames.SafeFullName)
+            .Where(n => !string.IsNullOrEmpty(n))
+            .ToArray());
     }
 
     public static List<ArchitectureViolation> MergeMethodBodyViolations(
