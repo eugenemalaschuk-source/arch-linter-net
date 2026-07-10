@@ -21,28 +21,8 @@ internal sealed class ArchitectureProjectFileParser : IArchitectureProjectFilePa
 
         IEnumerable<XElement> propertyGroups = document.Descendants("PropertyGroup");
 
-        string? assemblyName = propertyGroups
-            .Select(group => group.Element("AssemblyName")?.Value)
-            .FirstOrDefault(value => !string.IsNullOrWhiteSpace(value));
-
-        string resolvedAssemblyName = string.IsNullOrWhiteSpace(assemblyName)
-            ? Path.GetFileNameWithoutExtension(projectPath)
-            : assemblyName.Trim();
-
-        string? targetFrameworks = propertyGroups
-            .Select(group => group.Element("TargetFrameworks")?.Value)
-            .FirstOrDefault(value => !string.IsNullOrWhiteSpace(value));
-
-        string? targetFramework = propertyGroups
-            .Select(group => group.Element("TargetFramework")?.Value)
-            .FirstOrDefault(value => !string.IsNullOrWhiteSpace(value));
-
-        List<string> frameworks = !string.IsNullOrWhiteSpace(targetFrameworks)
-            ? targetFrameworks.Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
-                .ToList()
-            : !string.IsNullOrWhiteSpace(targetFramework)
-                ? new List<string> { targetFramework.Trim() }
-                : new List<string>();
+        string resolvedAssemblyName = ResolveAssemblyName(propertyGroups, projectPath);
+        List<string> frameworks = ResolveTargetFrameworks(propertyGroups);
 
         List<ArchitectureDiscoveredPackageReference> packageReferences =
             ParsePackageReferences(document, projectPath, fileSystem);
@@ -59,6 +39,38 @@ internal sealed class ArchitectureProjectFileParser : IArchitectureProjectFilePa
             properties,
             friendAssemblies,
             projectReferences);
+    }
+
+    private static string ResolveAssemblyName(IEnumerable<XElement> propertyGroups, string projectPath)
+    {
+        string? assemblyName = propertyGroups
+            .Select(group => group.Element("AssemblyName")?.Value)
+            .FirstOrDefault(value => !string.IsNullOrWhiteSpace(value));
+
+        return string.IsNullOrWhiteSpace(assemblyName)
+            ? Path.GetFileNameWithoutExtension(projectPath)
+            : assemblyName.Trim();
+    }
+
+    private static List<string> ResolveTargetFrameworks(IEnumerable<XElement> propertyGroups)
+    {
+        string? targetFrameworks = propertyGroups
+            .Select(group => group.Element("TargetFrameworks")?.Value)
+            .FirstOrDefault(value => !string.IsNullOrWhiteSpace(value));
+
+        if (!string.IsNullOrWhiteSpace(targetFrameworks))
+        {
+            return targetFrameworks.Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                .ToList();
+        }
+
+        string? targetFramework = propertyGroups
+            .Select(group => group.Element("TargetFramework")?.Value)
+            .FirstOrDefault(value => !string.IsNullOrWhiteSpace(value));
+
+        return !string.IsNullOrWhiteSpace(targetFramework)
+            ? new List<string> { targetFramework.Trim() }
+            : new List<string>();
     }
 
     private static Dictionary<string, ArchitectureDiscoveredProjectProperty> ParseProperties(

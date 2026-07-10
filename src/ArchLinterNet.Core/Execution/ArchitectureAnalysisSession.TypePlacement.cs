@@ -43,49 +43,72 @@ public sealed partial class ArchitectureAnalysisSession
 
         foreach (Type type in candidateTypes)
         {
-            string sourceType = ArchitectureTypeNames.SafeFullName(type);
-            string actualNamespace = ArchitectureTypeNames.SafeNamespace(type);
-            string actualAssemblyName = type.Assembly.GetName().Name ?? string.Empty;
-
-            bool placementOk = !hasPlacementExpectation || IsAllowedLocation(
-                actualNamespace, actualAssemblyName, allowedLayers, contract.MustResideInNamespaces, allowedAssemblyNames);
-
-            bool namingOk = IsNamingSatisfied(type.Name, contract);
-
-            if (placementOk && namingOk)
-            {
-                continue;
-            }
-
-            string? expectedTypeLocation = !placementOk ? expectedLocationDescription : null;
-            string? actualTypeLocation = !placementOk ? $"namespace:{actualNamespace} (assembly {actualAssemblyName})" : null;
-            string? expectedTypeName = !namingOk ? expectedNameDescription : null;
-            string? actualTypeName = !namingOk ? type.Name : null;
-
-            string forbiddenReference = actualTypeLocation ?? actualTypeName ?? sourceType;
-
-            if (executionContext.IsIgnored(sourceType, forbiddenReference))
-            {
-                continue;
-            }
-
-            violations.Add(new ArchitectureViolation(
-                contract.Name,
-                contract.Id,
-                sourceType,
-                expectedTypeLocation ?? expectedTypeName ?? string.Empty,
-                new[] { forbiddenReference })
-            {
-                Payload = new TypePlacementPayload(
-                    ExpectedTypeLocation: expectedTypeLocation,
-                    ActualTypeLocation: actualTypeLocation,
-                    ExpectedTypeName: expectedTypeName,
-                    ActualTypeName: actualTypeName)
-            });
+            TryAddTypePlacementViolation(
+                type,
+                contract,
+                allowedLayers,
+                allowedAssemblyNames,
+                hasPlacementExpectation,
+                expectedLocationDescription,
+                expectedNameDescription,
+                executionContext,
+                violations);
         }
 
         executionContext.CollectUnmatchedIgnores(_unmatchedIgnoredViolations);
         return violations;
+    }
+
+    private static void TryAddTypePlacementViolation(
+        Type type,
+        ArchitectureTypePlacementContract contract,
+        List<ArchitectureLayer> allowedLayers,
+        HashSet<string> allowedAssemblyNames,
+        bool hasPlacementExpectation,
+        string expectedLocationDescription,
+        string expectedNameDescription,
+        ArchitectureContractExecutionContext executionContext,
+        List<ArchitectureViolation> violations)
+    {
+        string sourceType = ArchitectureTypeNames.SafeFullName(type);
+        string actualNamespace = ArchitectureTypeNames.SafeNamespace(type);
+        string actualAssemblyName = type.Assembly.GetName().Name ?? string.Empty;
+
+        bool placementOk = !hasPlacementExpectation || IsAllowedLocation(
+            actualNamespace, actualAssemblyName, allowedLayers, contract.MustResideInNamespaces, allowedAssemblyNames);
+
+        bool namingOk = IsNamingSatisfied(type.Name, contract);
+
+        if (placementOk && namingOk)
+        {
+            return;
+        }
+
+        string? expectedTypeLocation = !placementOk ? expectedLocationDescription : null;
+        string? actualTypeLocation = !placementOk ? $"namespace:{actualNamespace} (assembly {actualAssemblyName})" : null;
+        string? expectedTypeName = !namingOk ? expectedNameDescription : null;
+        string? actualTypeName = !namingOk ? type.Name : null;
+
+        string forbiddenReference = actualTypeLocation ?? actualTypeName ?? sourceType;
+
+        if (executionContext.IsIgnored(sourceType, forbiddenReference))
+        {
+            return;
+        }
+
+        violations.Add(new ArchitectureViolation(
+            contract.Name,
+            contract.Id,
+            sourceType,
+            expectedTypeLocation ?? expectedTypeName ?? string.Empty,
+            new[] { forbiddenReference })
+        {
+            Payload = new TypePlacementPayload(
+                ExpectedTypeLocation: expectedTypeLocation,
+                ActualTypeLocation: actualTypeLocation,
+                ExpectedTypeName: expectedTypeName,
+                ActualTypeName: actualTypeName)
+        });
     }
 
     private static bool IsAllowedLocation(

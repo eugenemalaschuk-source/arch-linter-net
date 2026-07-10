@@ -85,19 +85,10 @@ public sealed partial class ArchitectureAnalysisSession
                     continue;
                 }
 
-                if (contract.TemplateName != null)
+                ArchitectureViolation? emptyLayerViolation = BuildEmptyLayerViolation(contract, layerEntry, layer);
+                if (emptyLayerViolation != null)
                 {
-                    violations.Add(new ArchitectureViolation(
-                        contract.Name,
-                        contract.Id,
-                        ArchitectureLayerResolver.DescribeLayer(layer),
-                        "empty layer namespace",
-                        new[] { $"Required layer '{layerEntry}' namespace '{layer.Namespace}' contains no types in loaded assemblies." })
-                    {
-                        Payload = new ConfigurationPayload(
-                            TemplateName: contract.TemplateName,
-                            ContainerNamespace: contract.ContainerNamespace)
-                    });
+                    violations.Add(emptyLayerViolation);
                 }
             }
 
@@ -106,6 +97,42 @@ public sealed partial class ArchitectureAnalysisSession
 
         ArchitectureContractExecutionContext executionContext = CreateExecutionContext(contract, contract.IgnoredViolations);
 
+        CollectLayerOrderingViolations(effectiveLayers, contract, executionContext, violations);
+
+        executionContext.CollectUnmatchedIgnores(_unmatchedIgnoredViolations);
+
+        CollectExhaustiveSiblingViolations(effectiveLayers, contract, violations);
+
+        return violations;
+    }
+
+    private static ArchitectureViolation? BuildEmptyLayerViolation(
+        ArchitectureLayerContract contract, string layerEntry, ArchitectureLayer layer)
+    {
+        if (contract.TemplateName == null)
+        {
+            return null;
+        }
+
+        return new ArchitectureViolation(
+            contract.Name,
+            contract.Id,
+            ArchitectureLayerResolver.DescribeLayer(layer),
+            "empty layer namespace",
+            new[] { $"Required layer '{layerEntry}' namespace '{layer.Namespace}' contains no types in loaded assemblies." })
+        {
+            Payload = new ConfigurationPayload(
+                TemplateName: contract.TemplateName,
+                ContainerNamespace: contract.ContainerNamespace)
+        };
+    }
+
+    private void CollectLayerOrderingViolations(
+        List<(string name, ArchitectureLayer layer, Type[] types)> effectiveLayers,
+        ArchitectureLayerContract contract,
+        ArchitectureContractExecutionContext executionContext,
+        List<ArchitectureViolation> violations)
+    {
         for (int sourceIndex = 0; sourceIndex < effectiveLayers.Count; sourceIndex++)
         {
             var (_, _, sourceTypes) = effectiveLayers[sourceIndex];
@@ -125,42 +152,46 @@ public sealed partial class ArchitectureAnalysisSession
                 }
             }
         }
+    }
 
-        executionContext.CollectUnmatchedIgnores(_unmatchedIgnoredViolations);
-
-        if (contract.Exhaustive && contract.ContainerNamespace != null)
+    private void CollectExhaustiveSiblingViolations(
+        List<(string name, ArchitectureLayer layer, Type[] types)> effectiveLayers,
+        ArchitectureLayerContract contract,
+        List<ArchitectureViolation> violations)
+    {
+        if (!contract.Exhaustive || contract.ContainerNamespace == null)
         {
-            HashSet<string> expectedNamespaces = new(
-                effectiveLayers.Select(l => l.layer.Namespace),
-                StringComparer.Ordinal);
-
-            foreach (string childNs in TypeIndex.FindDirectChildNamespaces(contract.ContainerNamespace).OrderBy(ns => ns, StringComparer.Ordinal))
-            {
-                if (expectedNamespaces.Contains(childNs))
-                {
-                    continue;
-                }
-
-                Type[] childTypes = TypeIndex.FindTypesInNamespace(childNs);
-
-                if (childTypes.Length > 0)
-                {
-                    violations.Add(new ArchitectureViolation(
-                        contract.Name,
-                        contract.Id,
-                        contract.ContainerNamespace,
-                        "unmapped sibling namespace",
-                        new[] { $"Namespace '{childNs}' contains types but is not mapped into any declared layer in template '{contract.TemplateName}'." })
-                    {
-                        Payload = new ConfigurationPayload(
-                            TemplateName: contract.TemplateName,
-                            ContainerNamespace: contract.ContainerNamespace)
-                    });
-                }
-            }
+            return;
         }
 
-        return violations;
+        HashSet<string> expectedNamespaces = new(
+            effectiveLayers.Select(l => l.layer.Namespace),
+            StringComparer.Ordinal);
+
+        foreach (string childNs in TypeIndex.FindDirectChildNamespaces(contract.ContainerNamespace).OrderBy(ns => ns, StringComparer.Ordinal))
+        {
+            if (expectedNamespaces.Contains(childNs))
+            {
+                continue;
+            }
+
+            Type[] childTypes = TypeIndex.FindTypesInNamespace(childNs);
+
+            if (childTypes.Length > 0)
+            {
+                violations.Add(new ArchitectureViolation(
+                    contract.Name,
+                    contract.Id,
+                    contract.ContainerNamespace,
+                    "unmapped sibling namespace",
+                    new[] { $"Namespace '{childNs}' contains types but is not mapped into any declared layer in template '{contract.TemplateName}'." })
+                {
+                    Payload = new ConfigurationPayload(
+                        TemplateName: contract.TemplateName,
+                        ContainerNamespace: contract.ContainerNamespace)
+                });
+            }
+        }
     }
 
     private ArchitectureLayer ResolveLayerEntry(
@@ -239,38 +270,48 @@ public sealed partial class ArchitectureAnalysisSession
 
         foreach (string sourceLayerName in contract.Layers)
         {
-            ArchitectureLayer sourceLayer =
-                ArchitectureLayerResolver.ResolveLayer(Document, contract.Name, sourceLayerName);
-            Type[] sourceTypes = TypeIndex.FindTypesInLayer(sourceLayer);
-
-            foreach (Type sourceType in sourceTypes)
-            {
-                string sourceTypeName = ArchitectureTypeNames.SafeFullName(sourceType);
-
-                foreach (Type referencedType in ReferenceGraph.GetReferencedTypes(sourceType))
-                {
-                    string referencedTypeName = ArchitectureTypeNames.SafeFullName(referencedType);
-                    string referencedNamespace = ArchitectureTypeNames.SafeNamespace(referencedType);
-                    string? referencedLayerName =
-                        ArchitectureLayerResolver.ResolveContainingLayer(Document, referencedNamespace, contractLayers);
-
-                    if (referencedLayerName == null || referencedLayerName == sourceLayerName)
-                    {
-                        continue;
-                    }
-
-                    if (executionContext.IsIgnored(sourceTypeName, referencedTypeName))
-                    {
-                        continue;
-                    }
-
-                    graph[sourceLayerName].Add(referencedLayerName);
-                }
-            }
+            CollectCycleEdgesForLayer(contract, sourceLayerName, contractLayers, executionContext, graph);
         }
 
         executionContext.CollectUnmatchedIgnores(_unmatchedIgnoredViolations);
         return ArchitectureCycleDetector.FindCycles(graph);
+    }
+
+    private void CollectCycleEdgesForLayer(
+        ArchitectureCycleContract contract,
+        string sourceLayerName,
+        HashSet<string> contractLayers,
+        ArchitectureContractExecutionContext executionContext,
+        Dictionary<string, HashSet<string>> graph)
+    {
+        ArchitectureLayer sourceLayer =
+            ArchitectureLayerResolver.ResolveLayer(Document, contract.Name, sourceLayerName);
+        Type[] sourceTypes = TypeIndex.FindTypesInLayer(sourceLayer);
+
+        foreach (Type sourceType in sourceTypes)
+        {
+            string sourceTypeName = ArchitectureTypeNames.SafeFullName(sourceType);
+
+            foreach (Type referencedType in ReferenceGraph.GetReferencedTypes(sourceType))
+            {
+                string referencedTypeName = ArchitectureTypeNames.SafeFullName(referencedType);
+                string referencedNamespace = ArchitectureTypeNames.SafeNamespace(referencedType);
+                string? referencedLayerName =
+                    ArchitectureLayerResolver.ResolveContainingLayer(Document, referencedNamespace, contractLayers);
+
+                if (referencedLayerName == null || referencedLayerName == sourceLayerName)
+                {
+                    continue;
+                }
+
+                if (executionContext.IsIgnored(sourceTypeName, referencedTypeName))
+                {
+                    continue;
+                }
+
+                graph[sourceLayerName].Add(referencedLayerName);
+            }
+        }
     }
 
     public IReadOnlyCollection<string> CheckAcyclicSiblingContract(ArchitectureAcyclicSiblingContract contract)
@@ -293,40 +334,7 @@ public sealed partial class ArchitectureAnalysisSession
                 continue;
             }
 
-            Dictionary<string, HashSet<string>> graph = new(StringComparer.Ordinal);
-
-            foreach (string siblingName in siblingGroups.Keys)
-            {
-                graph[siblingName] = new HashSet<string>(StringComparer.Ordinal);
-            }
-
-            foreach (KeyValuePair<string, List<Type>> sourceEntry in siblingGroups)
-            {
-                string sourceSibling = sourceEntry.Key;
-
-                foreach (Type sourceType in sourceEntry.Value)
-                {
-                    string sourceTypeName = ArchitectureTypeNames.SafeFullName(sourceType);
-
-                    foreach (Type referencedType in ArchitectureReferenceScanner.GetReferencedTypes(sourceType))
-                    {
-                        string referencedTypeName = ArchitectureTypeNames.SafeFullName(referencedType);
-                        string? referencedSibling = ResolveSiblingGroup(siblingGroups, referencedTypeName, ancestor);
-
-                        if (referencedSibling == null || referencedSibling == sourceSibling)
-                        {
-                            continue;
-                        }
-
-                        if (executionContext.IsIgnored(sourceTypeName, referencedTypeName))
-                        {
-                            continue;
-                        }
-
-                        graph[sourceSibling].Add(referencedSibling);
-                    }
-                }
-            }
+            Dictionary<string, HashSet<string>> graph = BuildSiblingReferenceGraph(siblingGroups, ancestor, executionContext);
 
             IReadOnlyCollection<string> ancestorCycles = ArchitectureCycleDetector.FindCycles(graph);
 
@@ -336,6 +344,60 @@ public sealed partial class ArchitectureAnalysisSession
 
         executionContext.CollectUnmatchedIgnores(_unmatchedIgnoredViolations);
         return allCycles;
+    }
+
+    private static Dictionary<string, HashSet<string>> BuildSiblingReferenceGraph(
+        Dictionary<string, List<Type>> siblingGroups,
+        string ancestor,
+        ArchitectureContractExecutionContext executionContext)
+    {
+        Dictionary<string, HashSet<string>> graph = new(StringComparer.Ordinal);
+
+        foreach (string siblingName in siblingGroups.Keys)
+        {
+            graph[siblingName] = new HashSet<string>(StringComparer.Ordinal);
+        }
+
+        foreach (KeyValuePair<string, List<Type>> sourceEntry in siblingGroups)
+        {
+            string sourceSibling = sourceEntry.Key;
+
+            foreach (Type sourceType in sourceEntry.Value)
+            {
+                CollectSiblingCycleEdges(sourceType, sourceSibling, siblingGroups, ancestor, executionContext, graph);
+            }
+        }
+
+        return graph;
+    }
+
+    private static void CollectSiblingCycleEdges(
+        Type sourceType,
+        string sourceSibling,
+        Dictionary<string, List<Type>> siblingGroups,
+        string ancestor,
+        ArchitectureContractExecutionContext executionContext,
+        Dictionary<string, HashSet<string>> graph)
+    {
+        string sourceTypeName = ArchitectureTypeNames.SafeFullName(sourceType);
+
+        foreach (Type referencedType in ArchitectureReferenceScanner.GetReferencedTypes(sourceType))
+        {
+            string referencedTypeName = ArchitectureTypeNames.SafeFullName(referencedType);
+            string? referencedSibling = ResolveSiblingGroup(siblingGroups, referencedTypeName, ancestor);
+
+            if (referencedSibling == null || referencedSibling == sourceSibling)
+            {
+                continue;
+            }
+
+            if (executionContext.IsIgnored(sourceTypeName, referencedTypeName))
+            {
+                continue;
+            }
+
+            graph[sourceSibling].Add(referencedSibling);
+        }
     }
 
     private static string? ResolveSiblingGroup(
@@ -556,123 +618,6 @@ public sealed partial class ArchitectureAnalysisSession
                     ArchitectureLayerResolver.ResolveLayer(Document, contract.Name, forbiddenLayerName);
                 violations.AddRange(ArchitectureNamespaceViolationFinder.FindNamespaceViolations(sourceTypes, forbiddenLayer,
                     Array.Empty<string>(), executionContext));
-            }
-        }
-
-        executionContext.CollectUnmatchedIgnores(_unmatchedIgnoredViolations);
-        return violations;
-    }
-
-    public List<ArchitectureViolation> CheckProtectedContract(ArchitectureProtectedContract contract)
-    {
-        if (!IsContractSelected(contract.Id) || IsDanglingButCoveredByRuleInputCoverage(contract))
-        {
-            return new List<ArchitectureViolation>();
-        }
-
-        List<ArchitectureViolation> violations = new();
-        HashSet<string> allowedTypes = new(contract.AllowedTypes, StringComparer.Ordinal);
-
-        HashSet<string> allLayerNames = new(Document.Layers.Keys, StringComparer.Ordinal);
-
-        List<ArchitectureLayer> allowedImporterLayers = contract.AllowedImporters
-            .Select(name => ArchitectureLayerResolver.ResolveLayer(Document, contract.Name, name))
-            .ToList();
-
-        ArchitectureContractExecutionContext executionContext = CreateExecutionContext(contract, contract.IgnoredViolations);
-
-        foreach (string protectedLayerName in contract.Protected)
-        {
-            ArchitectureLayer protectedLayer =
-                ArchitectureLayerResolver.ResolveLayer(Document, contract.Name, protectedLayerName);
-
-            foreach (Assembly assembly in Context.TargetAssemblies)
-            {
-                foreach (Type sourceType in ArchitectureTypeScanner.GetLoadableTypes(assembly))
-                {
-                    string sourceTypeFullName = ArchitectureTypeNames.SafeFullName(sourceType);
-                    if (string.IsNullOrEmpty(sourceTypeFullName))
-                    {
-                        continue;
-                    }
-
-                    string sourceNs = ArchitectureTypeNames.SafeNamespace(sourceType);
-
-                    if (!string.IsNullOrEmpty(sourceNs) &&
-                        ArchitectureLayerResolver.MatchesNamespace(protectedLayer, sourceNs))
-                    {
-                        continue;
-                    }
-
-                    if (!string.IsNullOrEmpty(sourceNs) &&
-                        allowedImporterLayers.Any(l => ArchitectureLayerResolver.MatchesNamespace(l, sourceNs)))
-                    {
-                        continue;
-                    }
-
-                    string? sourceLayerName = ArchitectureLayerResolver.ResolveContainingLayer(
-                        Document, sourceNs, allLayerNames);
-
-                    List<string> matchingRefs = new();
-                    HashSet<string> matchedNamespacePrefixes = new(StringComparer.Ordinal);
-
-                    foreach (Type refType in ArchitectureReferenceScanner.GetReferencedTypes(sourceType))
-                    {
-                        string refFullName = ArchitectureTypeNames.SafeFullName(refType);
-                        if (string.IsNullOrEmpty(refFullName))
-                        {
-                            continue;
-                        }
-
-                        ArchitectureNamespaceMatch protectedMatch = ArchitectureLayerResolver.MatchNamespace(
-                            protectedLayer, ArchitectureTypeNames.SafeNamespace(refType));
-                        if (!protectedMatch.Matched)
-                        {
-                            continue;
-                        }
-
-                        if (allowedTypes.Contains(sourceTypeFullName))
-                        {
-                            continue;
-                        }
-
-                        if (executionContext.IsIgnored(sourceTypeFullName, refFullName))
-                        {
-                            continue;
-                        }
-
-                        matchingRefs.Add(refFullName);
-                        if (!string.IsNullOrEmpty(protectedMatch.MatchedNamespacePrefix))
-                        {
-                            matchedNamespacePrefixes.Add(protectedMatch.MatchedNamespacePrefix);
-                        }
-                    }
-
-                    if (matchingRefs.Count == 0)
-                    {
-                        continue;
-                    }
-
-                    string[] normalizedRefs = matchingRefs
-                        .Distinct(StringComparer.Ordinal)
-                        .OrderBy(name => name, StringComparer.Ordinal)
-                        .ToArray();
-
-                    violations.Add(new ArchitectureViolation(
-                        contract.Name, contract.Id,
-                        sourceTypeFullName,
-                        $"protected layer '{protectedLayerName}' (allowed importers: [{string.Join(", ", contract.AllowedImporters)}])",
-                        normalizedRefs)
-                    {
-                        MatchedNamespacePrefixes = matchedNamespacePrefixes.Count > 0
-                            ? matchedNamespacePrefixes.OrderBy(prefix => prefix, StringComparer.Ordinal).ToArray()
-                            : null,
-                        Payload = new DependencyPayload(
-                            SourceLayer: sourceLayerName,
-                            TargetLayer: protectedLayerName,
-                            AllowedImporters: contract.AllowedImporters)
-                    });
-                }
             }
         }
 

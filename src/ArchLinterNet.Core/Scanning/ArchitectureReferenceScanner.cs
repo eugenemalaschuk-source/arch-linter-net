@@ -6,6 +6,39 @@ internal static class ArchitectureReferenceScanner
 {
     public static IEnumerable<Type> GetReferencedTypes(Type type)
     {
+        foreach (Type expanded in InterfaceReferencedTypes(type))
+        {
+            yield return expanded;
+        }
+
+        foreach (Type expanded in BaseTypeReferencedTypes(type))
+        {
+            yield return expanded;
+        }
+
+        foreach (Type expanded in FieldReferencedTypes(type))
+        {
+            yield return expanded;
+        }
+
+        foreach (Type expanded in PropertyReferencedTypes(type))
+        {
+            yield return expanded;
+        }
+
+        foreach (Type expanded in MethodReferencedTypes(type))
+        {
+            yield return expanded;
+        }
+
+        foreach (Type expanded in ConstructorReferencedTypes(type))
+        {
+            yield return expanded;
+        }
+    }
+
+    private static IEnumerable<Type> InterfaceReferencedTypes(Type type)
+    {
         foreach (Type interfaceType in SafeGetInterfaces(type))
         {
             foreach (Type expanded in ExpandType(interfaceType))
@@ -13,7 +46,10 @@ internal static class ArchitectureReferenceScanner
                 yield return expanded;
             }
         }
+    }
 
+    private static IEnumerable<Type> BaseTypeReferencedTypes(Type type)
+    {
         foreach (Type baseType in EnumerateBaseTypes(type))
         {
             foreach (Type expanded in ExpandType(baseType))
@@ -21,68 +57,78 @@ internal static class ArchitectureReferenceScanner
                 yield return expanded;
             }
         }
+    }
 
+    private static IEnumerable<Type> FieldReferencedTypes(Type type)
+    {
         foreach (FieldInfo field in SafeGetFields(type))
         {
-            Type? fieldType = SafeGetFieldType(field);
-            if (fieldType != null)
+            foreach (Type expanded in ExpandIfNotNull(SafeGetFieldType(field)))
             {
-                foreach (Type expanded in ExpandType(fieldType))
-                {
-                    yield return expanded;
-                }
+                yield return expanded;
             }
         }
+    }
 
+    private static IEnumerable<Type> PropertyReferencedTypes(Type type)
+    {
         foreach (PropertyInfo property in SafeGetProperties(type))
         {
-            Type? propertyType = SafeGetPropertyType(property);
-            if (propertyType != null)
+            foreach (Type expanded in ExpandIfNotNull(SafeGetPropertyType(property)))
             {
-                foreach (Type expanded in ExpandType(propertyType))
-                {
-                    yield return expanded;
-                }
+                yield return expanded;
             }
         }
+    }
 
+    private static IEnumerable<Type> MethodReferencedTypes(Type type)
+    {
         foreach (MethodInfo method in SafeGetMethods(type))
         {
-            Type? returnType = SafeGetReturnType(method);
-            if (returnType != null)
+            foreach (Type expanded in ExpandIfNotNull(SafeGetReturnType(method)))
             {
-                foreach (Type expanded in ExpandType(returnType))
-                {
-                    yield return expanded;
-                }
+                yield return expanded;
             }
 
-            foreach (ParameterInfo parameter in SafeGetParameters(method))
+            foreach (Type expanded in ParameterReferencedTypes(method))
             {
-                Type? parameterType = SafeGetParameterType(parameter);
-                if (parameterType != null)
-                {
-                    foreach (Type expanded in ExpandType(parameterType))
-                    {
-                        yield return expanded;
-                    }
-                }
+                yield return expanded;
             }
         }
+    }
 
+    private static IEnumerable<Type> ConstructorReferencedTypes(Type type)
+    {
         foreach (ConstructorInfo constructor in SafeGetConstructors(type))
         {
-            foreach (ParameterInfo parameter in SafeGetParameters(constructor))
+            foreach (Type expanded in ParameterReferencedTypes(constructor))
             {
-                Type? parameterType = SafeGetParameterType(parameter);
-                if (parameterType != null)
-                {
-                    foreach (Type expanded in ExpandType(parameterType))
-                    {
-                        yield return expanded;
-                    }
-                }
+                yield return expanded;
             }
+        }
+    }
+
+    private static IEnumerable<Type> ParameterReferencedTypes(MethodBase method)
+    {
+        foreach (ParameterInfo parameter in SafeGetParameters(method))
+        {
+            foreach (Type expanded in ExpandIfNotNull(SafeGetParameterType(parameter)))
+            {
+                yield return expanded;
+            }
+        }
+    }
+
+    private static IEnumerable<Type> ExpandIfNotNull(Type? type)
+    {
+        if (type == null)
+        {
+            yield break;
+        }
+
+        foreach (Type expanded in ExpandType(type))
+        {
+            yield return expanded;
         }
     }
 

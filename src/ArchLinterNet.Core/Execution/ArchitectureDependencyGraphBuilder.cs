@@ -154,6 +154,17 @@ internal static class ArchitectureDependencyGraphBuilder
         HashSet<Type> firstPartyTypes = new(allTypes);
         HashSet<string> typeFullNames = new(StringComparer.Ordinal);
 
+        PopulateTypeNodes(allTypes, nodeKinds, typeFullNames);
+        PopulateTypeEdges(session, allTypes, firstPartyTypes, edgeContractIds);
+
+        return name => typeFullNames.Contains(name) ? name : null;
+    }
+
+    private static void PopulateTypeNodes(
+        Type[] allTypes,
+        Dictionary<string, ArchitectureGraphNodeKind> nodeKinds,
+        HashSet<string> typeFullNames)
+    {
         foreach (Type type in allTypes)
         {
             string fullName = ArchitectureTypeNames.SafeFullName(type);
@@ -165,7 +176,14 @@ internal static class ArchitectureDependencyGraphBuilder
             typeFullNames.Add(fullName);
             nodeKinds[fullName] = ArchitectureGraphNodeKind.Type;
         }
+    }
 
+    private static void PopulateTypeEdges(
+        ArchitectureAnalysisSession session,
+        Type[] allTypes,
+        HashSet<Type> firstPartyTypes,
+        Dictionary<(string Source, string Target), HashSet<string>> edgeContractIds)
+    {
         foreach (Type source in allTypes)
         {
             string sourceId = ArchitectureTypeNames.SafeFullName(source);
@@ -190,8 +208,6 @@ internal static class ArchitectureDependencyGraphBuilder
                 GetOrAddEdgeSet(edgeContractIds, sourceId, targetId);
             }
         }
-
-        return name => typeFullNames.Contains(name) ? name : null;
     }
 
     private static Func<string, string?> BuildAssemblyIdResolver(
@@ -252,58 +268,99 @@ internal static class ArchitectureDependencyGraphBuilder
                 continue;
             }
 
-            if (violation.Payload is ExternalDependencyPayload externalDependency)
+            OverlayViolation(violation, level, resolveId, nodeKinds, edgeContractIds, sourceId, violation.ContractId);
+        }
+    }
+
+    private static void OverlayViolation(
+        ArchitectureViolation violation,
+        ArchitectureGraphLevel level,
+        Func<string, string?> resolveId,
+        Dictionary<string, ArchitectureGraphNodeKind> nodeKinds,
+        Dictionary<(string Source, string Target), HashSet<string>> edgeContractIds,
+        string sourceId,
+        string contractId)
+    {
+        if (violation.Payload is ExternalDependencyPayload externalDependency)
+        {
+            OverlayExternalDependencyViolation(level, nodeKinds, edgeContractIds, sourceId, contractId, externalDependency);
+            return;
+        }
+
+        if (violation.Payload is ConfigurationPayload { DependencyPaths.Count: > 0 } configuration)
+        {
+            OverlayConfigurationDependencyPaths(resolveId, edgeContractIds, contractId, configuration);
+            return;
+        }
+
+        OverlayForbiddenReferenceTargets(violation, resolveId, edgeContractIds, sourceId, contractId);
+    }
+
+    private static void OverlayExternalDependencyViolation(
+        ArchitectureGraphLevel level,
+        Dictionary<string, ArchitectureGraphNodeKind> nodeKinds,
+        Dictionary<(string Source, string Target), HashSet<string>> edgeContractIds,
+        string sourceId,
+        string contractId,
+        ExternalDependencyPayload externalDependency)
+    {
+        if (level == ArchitectureGraphLevel.Assembly)
+        {
+            return;
+        }
+
+        string externalId = externalDependency.ForbiddenExternalGroup;
+        nodeKinds.TryAdd(externalId, ArchitectureGraphNodeKind.External);
+        TagEdge(edgeContractIds, sourceId, externalId, contractId);
+    }
+
+    private static void OverlayConfigurationDependencyPaths(
+        Func<string, string?> resolveId,
+        Dictionary<(string Source, string Target), HashSet<string>> edgeContractIds,
+        string contractId,
+        ConfigurationPayload configuration)
+    {
+        foreach (IReadOnlyCollection<string> path in configuration.DependencyPaths!)
+        {
+            string[] hops = path.ToArray();
+            for (int i = 0; i < hops.Length - 1; i++)
             {
-                if (level == ArchitectureGraphLevel.Assembly)
+                string? hopSource = resolveId(hops[i]);
+                string? hopTarget = resolveId(hops[i + 1]);
+                if (hopSource != null && hopTarget != null)
                 {
-                    continue;
-                }
-
-                string externalId = externalDependency.ForbiddenExternalGroup;
-                nodeKinds.TryAdd(externalId, ArchitectureGraphNodeKind.External);
-                TagEdge(edgeContractIds, sourceId, externalId, violation.ContractId);
-                continue;
-            }
-
-            if (violation.Payload is ConfigurationPayload { DependencyPaths.Count: > 0 } configuration)
-            {
-                foreach (IReadOnlyCollection<string> path in configuration.DependencyPaths!)
-                {
-                    string[] hops = path.ToArray();
-                    for (int i = 0; i < hops.Length - 1; i++)
-                    {
-                        string? hopSource = resolveId(hops[i]);
-                        string? hopTarget = resolveId(hops[i + 1]);
-                        if (hopSource != null && hopTarget != null)
-                        {
-                            TagEdge(edgeContractIds, hopSource, hopTarget, violation.ContractId);
-                        }
-                    }
-                }
-
-                continue;
-            }
-
-            List<string> targetIds = violation.ForbiddenReferences
-                .Select(resolveId)
-                .Where(id => id != null)
-                .Select(id => id!)
-                .Distinct(StringComparer.Ordinal)
-                .ToList();
-
-            if (targetIds.Count == 0)
-            {
-                string? fallback = resolveId(violation.ForbiddenNamespace);
-                if (fallback != null)
-                {
-                    targetIds.Add(fallback);
+                    TagEdge(edgeContractIds, hopSource, hopTarget, contractId);
                 }
             }
+        }
+    }
 
-            foreach (string targetId in targetIds)
+    private static void OverlayForbiddenReferenceTargets(
+        ArchitectureViolation violation,
+        Func<string, string?> resolveId,
+        Dictionary<(string Source, string Target), HashSet<string>> edgeContractIds,
+        string sourceId,
+        string contractId)
+    {
+        List<string> targetIds = violation.ForbiddenReferences
+            .Select(resolveId)
+            .Where(id => id != null)
+            .Select(id => id!)
+            .Distinct(StringComparer.Ordinal)
+            .ToList();
+
+        if (targetIds.Count == 0)
+        {
+            string? fallback = resolveId(violation.ForbiddenNamespace);
+            if (fallback != null)
             {
-                TagEdge(edgeContractIds, sourceId, targetId, violation.ContractId);
+                targetIds.Add(fallback);
             }
+        }
+
+        foreach (string targetId in targetIds)
+        {
+            TagEdge(edgeContractIds, sourceId, targetId, contractId);
         }
     }
 

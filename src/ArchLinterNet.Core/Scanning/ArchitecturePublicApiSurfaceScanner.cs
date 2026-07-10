@@ -86,6 +86,35 @@ internal static class ArchitecturePublicApiSurfaceScanner
     {
         string declaringTypeName = ArchitectureTypeNames.SafeFullName(type);
 
+        foreach (ArchitectureExportedApiEntry entry in GetExportedConstructors(type, declaringTypeName, assemblyName))
+        {
+            yield return entry;
+        }
+
+        foreach (ArchitectureExportedApiEntry entry in GetExportedMethods(type, declaringTypeName, assemblyName))
+        {
+            yield return entry;
+        }
+
+        foreach (ArchitectureExportedApiEntry entry in GetExportedProperties(type, declaringTypeName, assemblyName))
+        {
+            yield return entry;
+        }
+
+        foreach (ArchitectureExportedApiEntry entry in GetExportedFields(type, declaringTypeName, assemblyName))
+        {
+            yield return entry;
+        }
+
+        foreach (ArchitectureExportedApiEntry entry in GetExportedEvents(type, declaringTypeName, assemblyName))
+        {
+            yield return entry;
+        }
+    }
+
+    private static IEnumerable<ArchitectureExportedApiEntry> GetExportedConstructors(
+        Type type, string declaringTypeName, string assemblyName)
+    {
         foreach (ConstructorInfo ctor in SafeGetMembers(type, t => t.GetConstructors(MemberFlags)))
         {
             if (!IsExportedVisibility(ctor) || IsCompilerGenerated(ctor))
@@ -100,7 +129,11 @@ internal static class ArchitecturePublicApiSurfaceScanner
                     signature, declaringTypeName, assemblyName, MemberVisibility(ctor), false, null);
             }
         }
+    }
 
+    private static IEnumerable<ArchitectureExportedApiEntry> GetExportedMethods(
+        Type type, string declaringTypeName, string assemblyName)
+    {
         foreach (MethodInfo method in SafeGetMembers(type, t => t.GetMethods(MemberFlags)))
         {
             if (!IsExportedVisibility(method) || IsCompilerGenerated(method))
@@ -120,7 +153,11 @@ internal static class ArchitecturePublicApiSurfaceScanner
                     signature, declaringTypeName, assemblyName, MemberVisibility(method), false, null);
             }
         }
+    }
 
+    private static IEnumerable<ArchitectureExportedApiEntry> GetExportedProperties(
+        Type type, string declaringTypeName, string assemblyName)
+    {
         foreach (PropertyInfo property in SafeGetMembers(type, t => t.GetProperties(MemberFlags)))
         {
             if (!IsExportedAccessor(property.GetMethod) && !IsExportedAccessor(property.SetMethod))
@@ -140,7 +177,11 @@ internal static class ArchitecturePublicApiSurfaceScanner
                     signature, declaringTypeName, assemblyName, AccessorVisibility(property.GetMethod, property.SetMethod), false, null);
             }
         }
+    }
 
+    private static IEnumerable<ArchitectureExportedApiEntry> GetExportedFields(
+        Type type, string declaringTypeName, string assemblyName)
+    {
         foreach (FieldInfo field in SafeGetMembers(type, t => t.GetFields(MemberFlags)))
         {
             // Skip compiler/runtime-synthesized special-name fields, most notably an enum's
@@ -165,7 +206,11 @@ internal static class ArchitecturePublicApiSurfaceScanner
             yield return new ArchitectureExportedApiEntry(
                 signature, declaringTypeName, assemblyName, MemberVisibility(field), isConst, constQualifiedName);
         }
+    }
 
+    private static IEnumerable<ArchitectureExportedApiEntry> GetExportedEvents(
+        Type type, string declaringTypeName, string assemblyName)
+    {
         foreach (EventInfo evt in SafeGetMembers(type, t => t.GetEvents(MemberFlags)))
         {
             if (!IsExportedAccessor(evt.AddMethod) || IsCompilerGenerated(evt))

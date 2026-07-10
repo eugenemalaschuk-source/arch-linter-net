@@ -173,32 +173,8 @@ public sealed class ArchitectureAssemblyResolutionService : IArchitectureAssembl
     {
         List<string> result = new();
 
-        foreach (string path in ResolveEnvProbingPaths(fileSystem, environment))
-        {
-            result.Add(path);
-        }
-
-        foreach (string rawPath in document.Analysis.AssemblySearchPaths)
-        {
-            if (string.IsNullOrWhiteSpace(rawPath))
-            {
-                continue;
-            }
-
-            string normalizedPath = rawPath.Trim();
-            string resolvedPath = Path.IsPathRooted(normalizedPath)
-                ? normalizedPath
-                : string.IsNullOrWhiteSpace(repositoryRoot)
-                    ? normalizedPath
-                    : Path.GetFullPath(Path.Combine(repositoryRoot, normalizedPath));
-
-            if (!fileSystem.DirectoryExists(resolvedPath))
-            {
-                continue;
-            }
-
-            result.Add(resolvedPath);
-        }
+        result.AddRange(ResolveEnvProbingPaths(fileSystem, environment));
+        result.AddRange(ResolveConfiguredSearchPaths(document, repositoryRoot, fileSystem));
 
         string appBaseDirectory = environment.BaseDirectory;
         if (fileSystem.DirectoryExists(appBaseDirectory))
@@ -206,27 +182,69 @@ public sealed class ArchitectureAssemblyResolutionService : IArchitectureAssembl
             result.Add(appBaseDirectory);
         }
 
+        AddRepositoryRootProbingPaths(repositoryRoot, fileSystem, result);
+
+        return result.Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
+    }
+
+    private static IEnumerable<string> ResolveConfiguredSearchPaths(
+        ArchitectureContractDocument document,
+        string? repositoryRoot,
+        IArchitectureFileSystem fileSystem)
+    {
+        foreach (string rawPath in document.Analysis.AssemblySearchPaths)
+        {
+            if (string.IsNullOrWhiteSpace(rawPath))
+            {
+                continue;
+            }
+
+            string resolvedPath = ResolveConfiguredSearchPath(rawPath.Trim(), repositoryRoot);
+            if (!fileSystem.DirectoryExists(resolvedPath))
+            {
+                continue;
+            }
+
+            yield return resolvedPath;
+        }
+    }
+
+    private static string ResolveConfiguredSearchPath(string normalizedPath, string? repositoryRoot)
+    {
+        if (Path.IsPathRooted(normalizedPath))
+        {
+            return normalizedPath;
+        }
+
+        return string.IsNullOrWhiteSpace(repositoryRoot)
+            ? normalizedPath
+            : Path.GetFullPath(Path.Combine(repositoryRoot, normalizedPath));
+    }
+
+    private static void AddRepositoryRootProbingPaths(
+        string? repositoryRoot, IArchitectureFileSystem fileSystem, List<string> result)
+    {
         if (!string.IsNullOrWhiteSpace(repositoryRoot) && fileSystem.DirectoryExists(repositoryRoot))
         {
             result.Add(repositoryRoot);
         }
 
-        if (!string.IsNullOrWhiteSpace(repositoryRoot))
+        if (string.IsNullOrWhiteSpace(repositoryRoot))
         {
-            string artifactsBin = Path.Combine(repositoryRoot, "artifacts", "bin");
-            if (fileSystem.DirectoryExists(artifactsBin))
-            {
-                result.Add(artifactsBin);
-            }
-
-            string repoBin = Path.Combine(repositoryRoot, "bin");
-            if (fileSystem.DirectoryExists(repoBin))
-            {
-                result.Add(repoBin);
-            }
+            return;
         }
 
-        return result.Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
+        string artifactsBin = Path.Combine(repositoryRoot, "artifacts", "bin");
+        if (fileSystem.DirectoryExists(artifactsBin))
+        {
+            result.Add(artifactsBin);
+        }
+
+        string repoBin = Path.Combine(repositoryRoot, "bin");
+        if (fileSystem.DirectoryExists(repoBin))
+        {
+            result.Add(repoBin);
+        }
     }
 
     private static IEnumerable<string> ResolveEnvProbingPaths(

@@ -289,14 +289,24 @@ public sealed class ArchitectureDiagnosticFormatter : IArchitectureDiagnosticFor
     private static string FormatForHumans(ArchitectureDiagnostic diagnostic)
     {
         string idPrefix = diagnostic.ContractId != null ? $"[{diagnostic.ContractId}] " : string.Empty;
+        string context = BuildHumanContext(diagnostic);
+
+        string forbiddenNamespace = ForbiddenNamespaceOf(diagnostic);
+        string nsDisplay = FormatNamespaceDisplayForHumans(forbiddenNamespace, diagnostic.MatchedNamespacePrefixes);
+
+        string refs = string.Join(", ", ForbiddenReferencesOf(diagnostic));
+        string pathSuffix = FormatConfigurationPathSuffixForHumans(diagnostic);
+
+        return $"- {idPrefix}[{diagnostic.ContractName}] {SourceTypeOf(diagnostic)} -> {nsDisplay}{context}: {refs}{pathSuffix}";
+    }
+
+    private static string BuildHumanContext(ArchitectureDiagnostic diagnostic)
+    {
         string context = string.Empty;
 
         if (diagnostic is DependencyDiagnostic { AllowedImporters: not null } dependency)
         {
-            string srcLayer = dependency.SourceLayer ?? "?";
-            string tgtLayer = dependency.TargetLayer ?? "?";
-            string importers = string.Join(", ", dependency.AllowedImporters);
-            context = $" (source_layer: {srcLayer}, target_layer: {tgtLayer}, allowed_importers: [{importers}])";
+            context = FormatDependencyContextForHumans(dependency);
         }
 
         if (diagnostic is ExternalDependencyDiagnostic external)
@@ -306,112 +316,160 @@ public sealed class ArchitectureDiagnosticFormatter : IArchitectureDiagnosticFor
 
         if (diagnostic is TypePlacementDiagnostic typePlacement)
         {
-            List<string> parts = new();
-            if (typePlacement.ExpectedTypeLocation != null)
-            {
-                parts.Add($"expected_location: {typePlacement.ExpectedTypeLocation}, actual_location: {typePlacement.ActualTypeLocation}");
-            }
-
-            if (typePlacement.ExpectedTypeName != null)
-            {
-                parts.Add($"expected_name: {typePlacement.ExpectedTypeName}, actual_name: {typePlacement.ActualTypeName}");
-            }
-
-            context += $" ({string.Join("; ", parts)})";
+            context += FormatTypePlacementContextForHumans(typePlacement);
         }
 
         if (diagnostic is PublicApiSurfaceDiagnostic publicApiSurface)
         {
-            string reason = publicApiSurface.ForbiddenPublicConstant == true
-                ? "forbidden_public_constant"
-                : "undeclared_api_member";
-            context += $" (reason: {reason}, assembly: {publicApiSurface.ApiAssemblyName}, " +
-                       $"visibility: {publicApiSurface.ApiVisibility}, signature: {publicApiSurface.UndeclaredApiSignature})";
+            context += FormatPublicApiSurfaceContextForHumans(publicApiSurface);
         }
 
         if (diagnostic is AttributeUsageDiagnostic attributeUsage)
         {
-            context += $" (kind: {attributeUsage.AttributeUsageKind}, attribute: {attributeUsage.MatchedAttribute}" +
-                       (attributeUsage.ExpectedAttributeLocation != null
-                           ? $", expected_location: {attributeUsage.ExpectedAttributeLocation}"
-                           : string.Empty) +
-                       (attributeUsage.ActualAttributeLocation != null
-                           ? $", actual_location: {attributeUsage.ActualAttributeLocation}"
-                           : string.Empty) +
-                       ")";
+            context += FormatAttributeUsageContextForHumans(attributeUsage);
         }
 
         if (diagnostic is InheritanceDiagnostic inheritance)
         {
-            context += $" (forbidden_base_type: {inheritance.ForbiddenBaseType}" +
-                       (inheritance.InheritanceSourceSurface != null
-                           ? $", source_surface: {inheritance.InheritanceSourceSurface}"
-                           : string.Empty) +
-                       ")";
+            context += FormatInheritanceContextForHumans(inheritance);
         }
 
         if (diagnostic is InterfaceImplementationDiagnostic interfaceImplementation)
         {
-            context += $" (kind: {interfaceImplementation.ImplementationKind}, interface: {interfaceImplementation.MatchedInterface}" +
-                       (interfaceImplementation.ExpectedImplementationLocation != null
-                           ? $", expected_location: {interfaceImplementation.ExpectedImplementationLocation}"
-                           : string.Empty) +
-                       (interfaceImplementation.ActualImplementationLocation != null
-                           ? $", actual_location: {interfaceImplementation.ActualImplementationLocation}"
-                           : string.Empty) +
-                       ")";
+            context += FormatInterfaceImplementationContextForHumans(interfaceImplementation);
         }
 
         if (diagnostic is CompositionDiagnostic composition)
         {
-            context += $" (matched_api: {composition.MatchedForbiddenApi}" +
-                       (composition.SourceMember != null
-                           ? $", source_member: {composition.SourceMember}"
-                           : string.Empty) +
-                       (composition.ExpectedCompositionBoundary != null
-                           ? $", expected_boundary: {composition.ExpectedCompositionBoundary}"
-                           : string.Empty) +
-                       ")";
+            context += FormatCompositionContextForHumans(composition);
         }
 
         if (diagnostic is ProjectMetadataDiagnostic projectMetadata)
         {
-            context += $" (kind: {projectMetadata.ProjectMetadataKind}" +
-                       (projectMetadata.ProjectMetadataKey != null
-                           ? $", key: {projectMetadata.ProjectMetadataKey}"
-                           : string.Empty) +
-                       (projectMetadata.ProjectMetadataExpectedValue != null
-                           ? $", expected: {projectMetadata.ProjectMetadataExpectedValue}"
-                           : string.Empty) +
-                       (projectMetadata.ProjectMetadataActualValue != null
-                           ? $", actual: {projectMetadata.ProjectMetadataActualValue}"
-                           : string.Empty) +
-                       (projectMetadata.ProjectMetadataSourcePath != null
-                           ? $", source_path: {projectMetadata.ProjectMetadataSourcePath}"
-                           : string.Empty) +
-                       ")";
+            context += FormatProjectMetadataContextForHumans(projectMetadata);
         }
 
-        string forbiddenNamespace = ForbiddenNamespaceOf(diagnostic);
-        string nsDisplay = diagnostic.MatchedNamespacePrefixes switch
+        return context;
+    }
+
+    private static string FormatDependencyContextForHumans(DependencyDiagnostic dependency)
+    {
+        string srcLayer = dependency.SourceLayer ?? "?";
+        string tgtLayer = dependency.TargetLayer ?? "?";
+        string importers = string.Join(", ", dependency.AllowedImporters!);
+        return $" (source_layer: {srcLayer}, target_layer: {tgtLayer}, allowed_importers: [{importers}])";
+    }
+
+    private static string FormatTypePlacementContextForHumans(TypePlacementDiagnostic typePlacement)
+    {
+        List<string> parts = new();
+        if (typePlacement.ExpectedTypeLocation != null)
+        {
+            parts.Add($"expected_location: {typePlacement.ExpectedTypeLocation}, actual_location: {typePlacement.ActualTypeLocation}");
+        }
+
+        if (typePlacement.ExpectedTypeName != null)
+        {
+            parts.Add($"expected_name: {typePlacement.ExpectedTypeName}, actual_name: {typePlacement.ActualTypeName}");
+        }
+
+        return $" ({string.Join("; ", parts)})";
+    }
+
+    private static string FormatPublicApiSurfaceContextForHumans(PublicApiSurfaceDiagnostic publicApiSurface)
+    {
+        string reason = publicApiSurface.ForbiddenPublicConstant == true
+            ? "forbidden_public_constant"
+            : "undeclared_api_member";
+        return $" (reason: {reason}, assembly: {publicApiSurface.ApiAssemblyName}, " +
+               $"visibility: {publicApiSurface.ApiVisibility}, signature: {publicApiSurface.UndeclaredApiSignature})";
+    }
+
+    private static string FormatAttributeUsageContextForHumans(AttributeUsageDiagnostic attributeUsage)
+    {
+        return $" (kind: {attributeUsage.AttributeUsageKind}, attribute: {attributeUsage.MatchedAttribute}" +
+               (attributeUsage.ExpectedAttributeLocation != null
+                   ? $", expected_location: {attributeUsage.ExpectedAttributeLocation}"
+                   : string.Empty) +
+               (attributeUsage.ActualAttributeLocation != null
+                   ? $", actual_location: {attributeUsage.ActualAttributeLocation}"
+                   : string.Empty) +
+               ")";
+    }
+
+    private static string FormatInheritanceContextForHumans(InheritanceDiagnostic inheritance)
+    {
+        return $" (forbidden_base_type: {inheritance.ForbiddenBaseType}" +
+               (inheritance.InheritanceSourceSurface != null
+                   ? $", source_surface: {inheritance.InheritanceSourceSurface}"
+                   : string.Empty) +
+               ")";
+    }
+
+    private static string FormatInterfaceImplementationContextForHumans(InterfaceImplementationDiagnostic interfaceImplementation)
+    {
+        return $" (kind: {interfaceImplementation.ImplementationKind}, interface: {interfaceImplementation.MatchedInterface}" +
+               (interfaceImplementation.ExpectedImplementationLocation != null
+                   ? $", expected_location: {interfaceImplementation.ExpectedImplementationLocation}"
+                   : string.Empty) +
+               (interfaceImplementation.ActualImplementationLocation != null
+                   ? $", actual_location: {interfaceImplementation.ActualImplementationLocation}"
+                   : string.Empty) +
+               ")";
+    }
+
+    private static string FormatCompositionContextForHumans(CompositionDiagnostic composition)
+    {
+        return $" (matched_api: {composition.MatchedForbiddenApi}" +
+               (composition.SourceMember != null
+                   ? $", source_member: {composition.SourceMember}"
+                   : string.Empty) +
+               (composition.ExpectedCompositionBoundary != null
+                   ? $", expected_boundary: {composition.ExpectedCompositionBoundary}"
+                   : string.Empty) +
+               ")";
+    }
+
+    private static string FormatProjectMetadataContextForHumans(ProjectMetadataDiagnostic projectMetadata)
+    {
+        return $" (kind: {projectMetadata.ProjectMetadataKind}" +
+               (projectMetadata.ProjectMetadataKey != null
+                   ? $", key: {projectMetadata.ProjectMetadataKey}"
+                   : string.Empty) +
+               (projectMetadata.ProjectMetadataExpectedValue != null
+                   ? $", expected: {projectMetadata.ProjectMetadataExpectedValue}"
+                   : string.Empty) +
+               (projectMetadata.ProjectMetadataActualValue != null
+                   ? $", actual: {projectMetadata.ProjectMetadataActualValue}"
+                   : string.Empty) +
+               (projectMetadata.ProjectMetadataSourcePath != null
+                   ? $", source_path: {projectMetadata.ProjectMetadataSourcePath}"
+                   : string.Empty) +
+               ")";
+    }
+
+    private static string FormatNamespaceDisplayForHumans(string forbiddenNamespace, IReadOnlyCollection<string>? matchedNamespacePrefixes)
+    {
+        return matchedNamespacePrefixes switch
         {
             { Count: 1 } prefixes => $"{forbiddenNamespace} (matched {prefixes.First()})",
             { Count: > 1 } prefixes =>
                 $"{forbiddenNamespace} (matched {string.Join(", ", prefixes.OrderBy(p => p, StringComparer.Ordinal))})",
             _ => forbiddenNamespace
         };
+    }
 
-        string refs = string.Join(", ", ForbiddenReferencesOf(diagnostic));
-        string pathSuffix = string.Empty;
+    private static string FormatConfigurationPathSuffixForHumans(ArchitectureDiagnostic diagnostic)
+    {
         if (diagnostic is ConfigurationDiagnostic { DependencyPaths: { Count: > 0 } dependencyPaths } configuration)
         {
             var pathLines = dependencyPaths
                 .Zip(configuration.ForbiddenReferences, (path, reference) => (path, reference))
                 .Select(x => $"  via: {string.Join(" -> ", x.path)}");
-            pathSuffix = Environment.NewLine + string.Join(Environment.NewLine, pathLines);
+            return Environment.NewLine + string.Join(Environment.NewLine, pathLines);
         }
 
-        return $"- {idPrefix}[{diagnostic.ContractName}] {SourceTypeOf(diagnostic)} -> {nsDisplay}{context}: {refs}{pathSuffix}";
+        return string.Empty;
     }
 
     private static Dictionary<string, object?> ToPolicyConsistencyJsonObject(PolicyConsistencyDiagnostic finding)
@@ -485,133 +543,7 @@ public sealed class ArchitectureDiagnosticFormatter : IArchitectureDiagnosticFor
         obj["forbidden_namespace"] = ForbiddenNamespaceOf(diagnostic);
         obj["forbidden_references"] = ForbiddenReferencesOf(diagnostic).ToArray();
 
-        if (diagnostic is DependencyDiagnostic dependency)
-        {
-            if (dependency.SourceLayer != null)
-                obj["source_layer"] = dependency.SourceLayer;
-
-            if (dependency.TargetLayer != null)
-                obj["target_layer"] = dependency.TargetLayer;
-
-            if (dependency.AllowedImporters != null)
-                obj["allowed_importers"] = dependency.AllowedImporters.ToArray();
-        }
-
-        if (diagnostic is ExternalDependencyDiagnostic external)
-        {
-            obj["forbidden_external_group"] = external.ForbiddenExternalGroup;
-        }
-
-        if (diagnostic is TypePlacementDiagnostic typePlacement)
-        {
-            if (typePlacement.ExpectedTypeLocation != null)
-                obj["expected_type_location"] = typePlacement.ExpectedTypeLocation;
-
-            if (typePlacement.ActualTypeLocation != null)
-                obj["actual_type_location"] = typePlacement.ActualTypeLocation;
-
-            if (typePlacement.ExpectedTypeName != null)
-                obj["expected_type_name"] = typePlacement.ExpectedTypeName;
-
-            if (typePlacement.ActualTypeName != null)
-                obj["actual_type_name"] = typePlacement.ActualTypeName;
-        }
-
-        if (diagnostic is PublicApiSurfaceDiagnostic publicApiSurface)
-        {
-            if (publicApiSurface.UndeclaredApiSignature != null)
-                obj["undeclared_api_signature"] = publicApiSurface.UndeclaredApiSignature;
-
-            if (publicApiSurface.ForbiddenPublicConstant != null)
-                obj["forbidden_public_constant"] = publicApiSurface.ForbiddenPublicConstant;
-
-            if (publicApiSurface.ApiAssemblyName != null)
-                obj["assembly"] = publicApiSurface.ApiAssemblyName;
-
-            if (publicApiSurface.ApiVisibility != null)
-                obj["visibility"] = publicApiSurface.ApiVisibility;
-        }
-
-        if (diagnostic is AttributeUsageDiagnostic attributeUsage)
-        {
-            if (attributeUsage.MatchedAttribute != null)
-                obj["matched_attribute"] = attributeUsage.MatchedAttribute;
-
-            if (attributeUsage.AttributeUsageKind != null)
-                obj["attribute_usage_kind"] = attributeUsage.AttributeUsageKind;
-
-            if (attributeUsage.ExpectedAttributeLocation != null)
-                obj["expected_attribute_location"] = attributeUsage.ExpectedAttributeLocation;
-
-            if (attributeUsage.ActualAttributeLocation != null)
-                obj["actual_attribute_location"] = attributeUsage.ActualAttributeLocation;
-        }
-
-        if (diagnostic is InheritanceDiagnostic inheritance)
-        {
-            if (inheritance.ForbiddenBaseType != null)
-                obj["forbidden_base_type"] = inheritance.ForbiddenBaseType;
-
-            if (inheritance.InheritanceSourceSurface != null)
-                obj["source_surface"] = inheritance.InheritanceSourceSurface;
-        }
-
-        if (diagnostic is InterfaceImplementationDiagnostic interfaceImplementation)
-        {
-            if (interfaceImplementation.MatchedInterface != null)
-                obj["matched_interface"] = interfaceImplementation.MatchedInterface;
-
-            if (interfaceImplementation.ImplementationKind != null)
-                obj["implementation_kind"] = interfaceImplementation.ImplementationKind;
-
-            if (interfaceImplementation.ExpectedImplementationLocation != null)
-                obj["expected_implementation_location"] = interfaceImplementation.ExpectedImplementationLocation;
-
-            if (interfaceImplementation.ActualImplementationLocation != null)
-                obj["actual_implementation_location"] = interfaceImplementation.ActualImplementationLocation;
-        }
-
-        if (diagnostic is CompositionDiagnostic composition)
-        {
-            if (composition.SourceMember != null)
-                obj["source_member"] = composition.SourceMember;
-
-            if (composition.MatchedForbiddenApi != null)
-                obj["matched_forbidden_api"] = composition.MatchedForbiddenApi;
-
-            if (composition.ExpectedCompositionBoundary != null)
-                obj["expected_composition_boundary"] = composition.ExpectedCompositionBoundary;
-        }
-
-        if (diagnostic is ProjectMetadataDiagnostic projectMetadata)
-        {
-            if (projectMetadata.ProjectMetadataKind != null)
-                obj["project_metadata_kind"] = projectMetadata.ProjectMetadataKind;
-
-            if (projectMetadata.ProjectMetadataKey != null)
-                obj["project_metadata_key"] = projectMetadata.ProjectMetadataKey;
-
-            if (projectMetadata.ProjectMetadataExpectedValue != null)
-                obj["project_metadata_expected_value"] = projectMetadata.ProjectMetadataExpectedValue;
-
-            if (projectMetadata.ProjectMetadataActualValue != null)
-                obj["project_metadata_actual_value"] = projectMetadata.ProjectMetadataActualValue;
-
-            if (projectMetadata.ProjectMetadataSourcePath != null)
-                obj["project_metadata_source_path"] = projectMetadata.ProjectMetadataSourcePath;
-        }
-
-        if (diagnostic is ConfigurationDiagnostic configuration)
-        {
-            if (configuration.TemplateName != null)
-                obj["template_name"] = configuration.TemplateName;
-
-            if (configuration.ContainerNamespace != null)
-                obj["container_namespace"] = configuration.ContainerNamespace;
-
-            if (configuration.DependencyPaths != null)
-                obj["dependency_paths"] = configuration.DependencyPaths.Select(p => p.ToArray()).ToArray();
-        }
+        ApplyDiagnosticSpecificCiFields(diagnostic, obj);
 
         if (diagnostic.MatchedNamespacePrefixes != null)
         {
@@ -621,5 +553,182 @@ public sealed class ArchitectureDiagnosticFormatter : IArchitectureDiagnosticFor
         }
 
         return obj;
+    }
+
+    private static void ApplyDiagnosticSpecificCiFields(ArchitectureDiagnostic diagnostic, Dictionary<string, object?> obj)
+    {
+        if (diagnostic is DependencyDiagnostic dependency)
+        {
+            ApplyDependencyCiFields(dependency, obj);
+        }
+
+        if (diagnostic is ExternalDependencyDiagnostic external)
+        {
+            obj["forbidden_external_group"] = external.ForbiddenExternalGroup;
+        }
+
+        if (diagnostic is TypePlacementDiagnostic typePlacement)
+        {
+            ApplyTypePlacementCiFields(typePlacement, obj);
+        }
+
+        if (diagnostic is PublicApiSurfaceDiagnostic publicApiSurface)
+        {
+            ApplyPublicApiSurfaceCiFields(publicApiSurface, obj);
+        }
+
+        if (diagnostic is AttributeUsageDiagnostic attributeUsage)
+        {
+            ApplyAttributeUsageCiFields(attributeUsage, obj);
+        }
+
+        if (diagnostic is InheritanceDiagnostic inheritance)
+        {
+            ApplyInheritanceCiFields(inheritance, obj);
+        }
+
+        if (diagnostic is InterfaceImplementationDiagnostic interfaceImplementation)
+        {
+            ApplyInterfaceImplementationCiFields(interfaceImplementation, obj);
+        }
+
+        if (diagnostic is CompositionDiagnostic composition)
+        {
+            ApplyCompositionCiFields(composition, obj);
+        }
+
+        if (diagnostic is ProjectMetadataDiagnostic projectMetadata)
+        {
+            ApplyProjectMetadataCiFields(projectMetadata, obj);
+        }
+
+        if (diagnostic is ConfigurationDiagnostic configuration)
+        {
+            ApplyConfigurationCiFields(configuration, obj);
+        }
+    }
+
+    private static void ApplyDependencyCiFields(DependencyDiagnostic dependency, Dictionary<string, object?> obj)
+    {
+        if (dependency.SourceLayer != null)
+            obj["source_layer"] = dependency.SourceLayer;
+
+        if (dependency.TargetLayer != null)
+            obj["target_layer"] = dependency.TargetLayer;
+
+        if (dependency.AllowedImporters != null)
+            obj["allowed_importers"] = dependency.AllowedImporters.ToArray();
+    }
+
+    private static void ApplyTypePlacementCiFields(TypePlacementDiagnostic typePlacement, Dictionary<string, object?> obj)
+    {
+        if (typePlacement.ExpectedTypeLocation != null)
+            obj["expected_type_location"] = typePlacement.ExpectedTypeLocation;
+
+        if (typePlacement.ActualTypeLocation != null)
+            obj["actual_type_location"] = typePlacement.ActualTypeLocation;
+
+        if (typePlacement.ExpectedTypeName != null)
+            obj["expected_type_name"] = typePlacement.ExpectedTypeName;
+
+        if (typePlacement.ActualTypeName != null)
+            obj["actual_type_name"] = typePlacement.ActualTypeName;
+    }
+
+    private static void ApplyPublicApiSurfaceCiFields(PublicApiSurfaceDiagnostic publicApiSurface, Dictionary<string, object?> obj)
+    {
+        if (publicApiSurface.UndeclaredApiSignature != null)
+            obj["undeclared_api_signature"] = publicApiSurface.UndeclaredApiSignature;
+
+        if (publicApiSurface.ForbiddenPublicConstant != null)
+            obj["forbidden_public_constant"] = publicApiSurface.ForbiddenPublicConstant;
+
+        if (publicApiSurface.ApiAssemblyName != null)
+            obj["assembly"] = publicApiSurface.ApiAssemblyName;
+
+        if (publicApiSurface.ApiVisibility != null)
+            obj["visibility"] = publicApiSurface.ApiVisibility;
+    }
+
+    private static void ApplyAttributeUsageCiFields(AttributeUsageDiagnostic attributeUsage, Dictionary<string, object?> obj)
+    {
+        if (attributeUsage.MatchedAttribute != null)
+            obj["matched_attribute"] = attributeUsage.MatchedAttribute;
+
+        if (attributeUsage.AttributeUsageKind != null)
+            obj["attribute_usage_kind"] = attributeUsage.AttributeUsageKind;
+
+        if (attributeUsage.ExpectedAttributeLocation != null)
+            obj["expected_attribute_location"] = attributeUsage.ExpectedAttributeLocation;
+
+        if (attributeUsage.ActualAttributeLocation != null)
+            obj["actual_attribute_location"] = attributeUsage.ActualAttributeLocation;
+    }
+
+    private static void ApplyInheritanceCiFields(InheritanceDiagnostic inheritance, Dictionary<string, object?> obj)
+    {
+        if (inheritance.ForbiddenBaseType != null)
+            obj["forbidden_base_type"] = inheritance.ForbiddenBaseType;
+
+        if (inheritance.InheritanceSourceSurface != null)
+            obj["source_surface"] = inheritance.InheritanceSourceSurface;
+    }
+
+    private static void ApplyInterfaceImplementationCiFields(
+        InterfaceImplementationDiagnostic interfaceImplementation, Dictionary<string, object?> obj)
+    {
+        if (interfaceImplementation.MatchedInterface != null)
+            obj["matched_interface"] = interfaceImplementation.MatchedInterface;
+
+        if (interfaceImplementation.ImplementationKind != null)
+            obj["implementation_kind"] = interfaceImplementation.ImplementationKind;
+
+        if (interfaceImplementation.ExpectedImplementationLocation != null)
+            obj["expected_implementation_location"] = interfaceImplementation.ExpectedImplementationLocation;
+
+        if (interfaceImplementation.ActualImplementationLocation != null)
+            obj["actual_implementation_location"] = interfaceImplementation.ActualImplementationLocation;
+    }
+
+    private static void ApplyCompositionCiFields(CompositionDiagnostic composition, Dictionary<string, object?> obj)
+    {
+        if (composition.SourceMember != null)
+            obj["source_member"] = composition.SourceMember;
+
+        if (composition.MatchedForbiddenApi != null)
+            obj["matched_forbidden_api"] = composition.MatchedForbiddenApi;
+
+        if (composition.ExpectedCompositionBoundary != null)
+            obj["expected_composition_boundary"] = composition.ExpectedCompositionBoundary;
+    }
+
+    private static void ApplyProjectMetadataCiFields(ProjectMetadataDiagnostic projectMetadata, Dictionary<string, object?> obj)
+    {
+        if (projectMetadata.ProjectMetadataKind != null)
+            obj["project_metadata_kind"] = projectMetadata.ProjectMetadataKind;
+
+        if (projectMetadata.ProjectMetadataKey != null)
+            obj["project_metadata_key"] = projectMetadata.ProjectMetadataKey;
+
+        if (projectMetadata.ProjectMetadataExpectedValue != null)
+            obj["project_metadata_expected_value"] = projectMetadata.ProjectMetadataExpectedValue;
+
+        if (projectMetadata.ProjectMetadataActualValue != null)
+            obj["project_metadata_actual_value"] = projectMetadata.ProjectMetadataActualValue;
+
+        if (projectMetadata.ProjectMetadataSourcePath != null)
+            obj["project_metadata_source_path"] = projectMetadata.ProjectMetadataSourcePath;
+    }
+
+    private static void ApplyConfigurationCiFields(ConfigurationDiagnostic configuration, Dictionary<string, object?> obj)
+    {
+        if (configuration.TemplateName != null)
+            obj["template_name"] = configuration.TemplateName;
+
+        if (configuration.ContainerNamespace != null)
+            obj["container_namespace"] = configuration.ContainerNamespace;
+
+        if (configuration.DependencyPaths != null)
+            obj["dependency_paths"] = configuration.DependencyPaths.Select(p => p.ToArray()).ToArray();
     }
 }

@@ -55,55 +55,82 @@ public sealed partial class ArchitectureAnalysisSession
 
         foreach (Type type in candidateTypes)
         {
-            string actualNamespace = ArchitectureTypeNames.SafeNamespace(type);
-            string actualAssemblyName = type.Assembly.GetName().Name ?? string.Empty;
-            string actualLocationDescription = $"namespace:{actualNamespace} (assembly {actualAssemblyName})";
-
-            bool misplaced = hasAllowedOnlyExpectation && !IsAllowedLocation(
-                actualNamespace, actualAssemblyName, allowedLayers, contract.AllowedOnlyInNamespaces, allowedAssemblyNames);
-
-            bool forbidden = hasForbiddenExpectation && IsAllowedLocation(
-                actualNamespace, actualAssemblyName, forbiddenLayers, contract.ForbiddenInNamespaces, forbiddenAssemblyNames);
-
-            if (!misplaced && !forbidden)
-            {
-                continue;
-            }
-
-            string sourceType = ArchitectureTypeNames.SafeFullName(type);
-
-            var matches = ArchitectureTypeRelationshipScanner
-                .GetImplementedInterfaceMatches(type, contract.Interfaces, contract.InterfacePrefixes)
-                .OrderBy(m => m, StringComparer.Ordinal);
-
-            foreach (string matchedInterface in matches)
-            {
-                if (executionContext.IsIgnored(sourceType, matchedInterface))
-                {
-                    continue;
-                }
-
-                string implementationKind = forbidden ? "forbidden" : "misplaced";
-                string? expectedImplementationLocation = misplaced && !forbidden ? expectedAllowedOnlyLocation : null;
-
-                violations.Add(new ArchitectureViolation(
-                    contract.Name,
-                    contract.Id,
-                    sourceType,
-                    matchedInterface,
-                    new[] { actualLocationDescription })
-                {
-                    Payload = new InterfaceImplementationPayload(
-                        MatchedInterface: matchedInterface,
-                        ImplementationKind: implementationKind,
-                        ActualImplementationLocation: actualLocationDescription,
-                        ExpectedImplementationLocation: expectedImplementationLocation)
-                });
-            }
+            CollectInterfaceImplementationViolationsForType(
+                type,
+                contract,
+                allowedLayers,
+                allowedAssemblyNames,
+                hasAllowedOnlyExpectation,
+                forbiddenLayers,
+                forbiddenAssemblyNames,
+                hasForbiddenExpectation,
+                expectedAllowedOnlyLocation,
+                executionContext,
+                violations);
         }
 
         executionContext.CollectUnmatchedIgnores(_unmatchedIgnoredViolations);
         return violations;
+    }
+
+    private static void CollectInterfaceImplementationViolationsForType(
+        Type type,
+        ArchitectureInterfaceImplementationContract contract,
+        List<ArchitectureLayer> allowedLayers,
+        HashSet<string> allowedAssemblyNames,
+        bool hasAllowedOnlyExpectation,
+        List<ArchitectureLayer> forbiddenLayers,
+        HashSet<string> forbiddenAssemblyNames,
+        bool hasForbiddenExpectation,
+        string expectedAllowedOnlyLocation,
+        ArchitectureContractExecutionContext executionContext,
+        List<ArchitectureViolation> violations)
+    {
+        string actualNamespace = ArchitectureTypeNames.SafeNamespace(type);
+        string actualAssemblyName = type.Assembly.GetName().Name ?? string.Empty;
+        string actualLocationDescription = $"namespace:{actualNamespace} (assembly {actualAssemblyName})";
+
+        bool misplaced = hasAllowedOnlyExpectation && !IsAllowedLocation(
+            actualNamespace, actualAssemblyName, allowedLayers, contract.AllowedOnlyInNamespaces, allowedAssemblyNames);
+
+        bool forbidden = hasForbiddenExpectation && IsAllowedLocation(
+            actualNamespace, actualAssemblyName, forbiddenLayers, contract.ForbiddenInNamespaces, forbiddenAssemblyNames);
+
+        if (!misplaced && !forbidden)
+        {
+            return;
+        }
+
+        string sourceType = ArchitectureTypeNames.SafeFullName(type);
+
+        var matches = ArchitectureTypeRelationshipScanner
+            .GetImplementedInterfaceMatches(type, contract.Interfaces, contract.InterfacePrefixes)
+            .OrderBy(m => m, StringComparer.Ordinal);
+
+        foreach (string matchedInterface in matches)
+        {
+            if (executionContext.IsIgnored(sourceType, matchedInterface))
+            {
+                continue;
+            }
+
+            string implementationKind = forbidden ? "forbidden" : "misplaced";
+            string? expectedImplementationLocation = misplaced && !forbidden ? expectedAllowedOnlyLocation : null;
+
+            violations.Add(new ArchitectureViolation(
+                contract.Name,
+                contract.Id,
+                sourceType,
+                matchedInterface,
+                new[] { actualLocationDescription })
+            {
+                Payload = new InterfaceImplementationPayload(
+                    MatchedInterface: matchedInterface,
+                    ImplementationKind: implementationKind,
+                    ActualImplementationLocation: actualLocationDescription,
+                    ExpectedImplementationLocation: expectedImplementationLocation)
+            });
+        }
     }
 
     private static string DescribeAllowedOnlyImplementationLocation(ArchitectureInterfaceImplementationContract contract)

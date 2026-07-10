@@ -20,11 +20,49 @@ internal static class ArchitectureAttributeUsageScanner
     {
         string typeName = ArchitectureTypeNames.SafeFullName(type);
 
+        foreach (ArchitectureAttributeUsageMatch match in TypeMatches(type, typeName, attributes, attributePrefixes))
+        {
+            yield return match;
+        }
+
+        foreach (ArchitectureAttributeUsageMatch match in ConstructorMatches(type, typeName, attributes, attributePrefixes))
+        {
+            yield return match;
+        }
+
+        foreach (ArchitectureAttributeUsageMatch match in MethodMatches(type, typeName, attributes, attributePrefixes))
+        {
+            yield return match;
+        }
+
+        foreach (ArchitectureAttributeUsageMatch match in PropertyMatches(type, typeName, attributes, attributePrefixes))
+        {
+            yield return match;
+        }
+
+        foreach (ArchitectureAttributeUsageMatch match in FieldMatches(type, typeName, attributes, attributePrefixes))
+        {
+            yield return match;
+        }
+
+        foreach (ArchitectureAttributeUsageMatch match in EventMatches(type, typeName, attributes, attributePrefixes))
+        {
+            yield return match;
+        }
+    }
+
+    private static IEnumerable<ArchitectureAttributeUsageMatch> TypeMatches(
+        Type type, string typeName, IReadOnlyList<string> attributes, IReadOnlyList<string> attributePrefixes)
+    {
         foreach (string matchedAttribute in MatchedAttributes(type, attributes, attributePrefixes))
         {
             yield return new ArchitectureAttributeUsageMatch(typeName, matchedAttribute);
         }
+    }
 
+    private static IEnumerable<ArchitectureAttributeUsageMatch> ConstructorMatches(
+        Type type, string typeName, IReadOnlyList<string> attributes, IReadOnlyList<string> attributePrefixes)
+    {
         foreach (ConstructorInfo ctor in SafeGetMembers(type, t => t.GetConstructors(MemberFlags)))
         {
             foreach (string matchedAttribute in MatchedAttributes(ctor, attributes, attributePrefixes))
@@ -33,7 +71,11 @@ internal static class ArchitectureAttributeUsageScanner
                     $"{typeName}.{ctor.Name}({ParameterSignature(ctor)})", matchedAttribute);
             }
         }
+    }
 
+    private static IEnumerable<ArchitectureAttributeUsageMatch> MethodMatches(
+        Type type, string typeName, IReadOnlyList<string> attributes, IReadOnlyList<string> attributePrefixes)
+    {
         foreach (MethodInfo method in SafeGetMembers(type, t => t.GetMethods(MemberFlags)))
         {
             if (method.IsSpecialName && IsAccessorMethodName(method.Name))
@@ -47,7 +89,11 @@ internal static class ArchitectureAttributeUsageScanner
                     $"{typeName}.{method.Name}({ParameterSignature(method)})", matchedAttribute);
             }
         }
+    }
 
+    private static IEnumerable<ArchitectureAttributeUsageMatch> PropertyMatches(
+        Type type, string typeName, IReadOnlyList<string> attributes, IReadOnlyList<string> attributePrefixes)
+    {
         foreach (PropertyInfo property in SafeGetMembers(type, t => t.GetProperties(MemberFlags)))
         {
             foreach (string matchedAttribute in MatchedAttributes(property, attributes, attributePrefixes))
@@ -55,7 +101,11 @@ internal static class ArchitectureAttributeUsageScanner
                 yield return new ArchitectureAttributeUsageMatch($"{typeName}.{property.Name}", matchedAttribute);
             }
         }
+    }
 
+    private static IEnumerable<ArchitectureAttributeUsageMatch> FieldMatches(
+        Type type, string typeName, IReadOnlyList<string> attributes, IReadOnlyList<string> attributePrefixes)
+    {
         foreach (FieldInfo field in SafeGetMembers(type, t => t.GetFields(MemberFlags)))
         {
             foreach (string matchedAttribute in MatchedAttributes(field, attributes, attributePrefixes))
@@ -63,7 +113,11 @@ internal static class ArchitectureAttributeUsageScanner
                 yield return new ArchitectureAttributeUsageMatch($"{typeName}.{field.Name}", matchedAttribute);
             }
         }
+    }
 
+    private static IEnumerable<ArchitectureAttributeUsageMatch> EventMatches(
+        Type type, string typeName, IReadOnlyList<string> attributes, IReadOnlyList<string> attributePrefixes)
+    {
         foreach (EventInfo evt in SafeGetMembers(type, t => t.GetEvents(MemberFlags)))
         {
             foreach (string matchedAttribute in MatchedAttributes(evt, attributes, attributePrefixes))
