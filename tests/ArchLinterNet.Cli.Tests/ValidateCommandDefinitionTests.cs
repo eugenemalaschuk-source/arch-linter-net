@@ -13,6 +13,8 @@ namespace ArchLinterNet.Cli.Tests;
 [TestFixture]
 public sealed class ValidateCommandDefinitionTests
 {
+    private static readonly string[] _ruleAandB = ["rule-a", "rule-b"];
+
     [TestCase(new string[0], "strict")]
     [TestCase(new[] { "--mode", "audit" }, "audit")]
     [TestCase(new[] { "-m", "audit" }, "audit")]
@@ -77,7 +79,7 @@ public sealed class ValidateCommandDefinitionTests
         ]);
 
         Assert.That(runtime.LastRequest!.PolicyPath, Is.EqualTo("custom.arch.yml"));
-        Assert.That(runtime.LastRequest.ContractIds, Is.EquivalentTo(new[] { "rule-a", "rule-b" }));
+        Assert.That(runtime.LastRequest.ContractIds, Is.EquivalentTo(_ruleAandB));
         Assert.That(runtime.LastRequest.ConditionSetName, Is.EqualTo("ci"));
         Assert.That(runtime.LastRequest.BaselinePath, Is.EqualTo("baseline.yml"));
     }
