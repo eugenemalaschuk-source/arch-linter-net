@@ -141,7 +141,7 @@ function Install-OpenSpec {
         return
     }
 
-    Write-Host "openspec is not installed. Installing @fission-ai/openspec@$OpenSpecVersion via npm..."
+    Write-Output "openspec is not installed. Installing @fission-ai/openspec@$OpenSpecVersion via npm..."
 
     Install-NodeJs
 
