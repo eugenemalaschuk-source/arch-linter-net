@@ -204,23 +204,8 @@ internal static class ArchitectureAttributeUsageScanner
 
     private static bool IsMatch(string attributeName, IReadOnlyList<string> attributes, IReadOnlyList<string> attributePrefixes)
     {
-        foreach (string candidate in attributes)
-        {
-            if (string.Equals(attributeName, candidate, StringComparison.Ordinal))
-            {
-                return true;
-            }
-        }
-
-        foreach (string prefix in attributePrefixes)
-        {
-            if (attributeName.StartsWith(prefix, StringComparison.Ordinal))
-            {
-                return true;
-            }
-        }
-
-        return false;
+        return attributes.Any(candidate => string.Equals(attributeName, candidate, StringComparison.Ordinal))
+               || attributePrefixes.Any(prefix => attributeName.StartsWith(prefix, StringComparison.Ordinal));
     }
 
     private static IEnumerable<TMember> SafeGetMembers<TMember>(Type type, Func<Type, TMember[]> selector)

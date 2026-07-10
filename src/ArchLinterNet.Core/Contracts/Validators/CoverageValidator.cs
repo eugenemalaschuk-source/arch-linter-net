@@ -223,13 +223,11 @@ internal sealed class CoverageValidator : IArchitecturePolicyDocumentValidator
                     $"Dependency-edge coverage contract '{contract.Name}' has a 'between' entry at index {i} that is not a pair of two non-empty declared layer names.");
             }
 
-            foreach (string layerName in pair)
+            string? missingLayer = pair.FirstOrDefault(layerName => !document.Layers.ContainsKey(layerName));
+            if (missingLayer != null)
             {
-                if (!document.Layers.ContainsKey(layerName))
-                {
-                    throw new InvalidOperationException(
-                        $"Dependency-edge coverage contract '{contract.Name}' has a 'between' entry at index {i} referencing undeclared layer '{layerName}'.");
-                }
+                throw new InvalidOperationException(
+                    $"Dependency-edge coverage contract '{contract.Name}' has a 'between' entry at index {i} referencing undeclared layer '{missingLayer}'.");
             }
         }
     }
@@ -264,13 +262,11 @@ internal sealed class CoverageValidator : IArchitecturePolicyDocumentValidator
                     "Dependency-edge coverage exclusions must use 'between' only — those other matchers belong to other coverage scopes and an exclusion always suppresses the whole declared pair regardless of any other field.");
             }
 
-            foreach (string layerName in exclusion.Between)
+            string? missingLayer = exclusion.Between.FirstOrDefault(layerName => !document.Layers.ContainsKey(layerName));
+            if (missingLayer != null)
             {
-                if (!document.Layers.ContainsKey(layerName))
-                {
-                    throw new InvalidOperationException(
-                        $"Dependency-edge coverage contract '{contract.Name}' has an exclusion at index {i} referencing undeclared layer '{layerName}'.");
-                }
+                throw new InvalidOperationException(
+                    $"Dependency-edge coverage contract '{contract.Name}' has an exclusion at index {i} referencing undeclared layer '{missingLayer}'.");
             }
 
             string excludedPairKey = $"{exclusion.Between[0]}→{exclusion.Between[1]}";

@@ -162,22 +162,16 @@ internal sealed class ArchitectureProjectFileParser : IArchitectureProjectFilePa
             SyntaxTree syntaxTree = CSharpSyntaxTree.ParseText(sourceText);
             CompilationUnitSyntax root = syntaxTree.GetCompilationUnitRoot();
 
-            foreach (string? assemblyName in CollectFriendAssembliesFromAttributes(root.AttributeLists))
+            foreach (string assemblyName in CollectFriendAssembliesFromAttributes(root.AttributeLists).OfType<string>())
             {
-                if (assemblyName != null)
-                {
-                    yield return new ArchitectureDiscoveredFriendAssembly(assemblyName, Path.GetFullPath(file));
-                }
+                yield return new ArchitectureDiscoveredFriendAssembly(assemblyName, Path.GetFullPath(file));
             }
 
             foreach (MemberDeclarationSyntax member in root.Members)
             {
-                foreach (string? assemblyName in CollectFriendAssembliesFromAttributes(member.AttributeLists))
+                foreach (string assemblyName in CollectFriendAssembliesFromAttributes(member.AttributeLists).OfType<string>())
                 {
-                    if (assemblyName != null)
-                    {
-                        yield return new ArchitectureDiscoveredFriendAssembly(assemblyName, Path.GetFullPath(file));
-                    }
+                    yield return new ArchitectureDiscoveredFriendAssembly(assemblyName, Path.GetFullPath(file));
                 }
             }
         }
