@@ -1,0 +1,51 @@
+name: Format issue 276 changes
+
+on:
+  pull_request:
+    branches:
+      - main
+    types:
+      - opened
+      - reopened
+      - synchronize
+
+permissions:
+  contents: write
+
+jobs:
+  format:
+    if: github.head_ref == 'fix/276-code-scanning-hardening'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          ref: fix/276-code-scanning-hardening
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@26b0ec14cb23fa6904739307f278c14f94c95bf1 # v5.4.0
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Restore
+        run: make restore
+
+      - name: Format C#
+        run: dotnet format ArchLinterNet.slnx --verbosity minimal --no-restore
+
+      - name: Commit formatting
+        shell: bash
+        run: |
+          if git diff --quiet; then
+            echo "No formatting changes required."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add tests/ArchLinterNet.Cli.Tests/CliIntegrationTests.cs \
+            tests/ArchLinterNet.Core.Tests/ArchitectureProjectRoslynContextResolverTests.cs \
+            tests/ArchLinterNet.Core.Tests/ArchitectureAnalysisSessionMethodBodyProjectAwareTests.cs
+          git commit -m "style: format issue 276 changes"
+          git push origin HEAD:fix/276-code-scanning-hardening
