@@ -106,8 +106,11 @@ jobs:
             /d:sonar.cs.opencover.reportsPaths="test-results/**/coverage.opencover.xml" \
             /d:sonar.cs.vstest.reportsPaths="test-results/**/*.trx"
 
-      - name: Acceptance
-        run: make acceptance COVERAGE=1
+      - name: Lint
+        run: make lint
+
+      - name: Collect test coverage
+        run: make test-coverage
 
       - name: Resolve coverage report paths
         id: coverage_reports
