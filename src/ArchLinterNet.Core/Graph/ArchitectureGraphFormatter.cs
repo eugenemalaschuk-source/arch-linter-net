@@ -63,12 +63,9 @@ public sealed class ArchitectureGraphFormatter : IArchitectureGraphFormatter
             }
         }
 
-        foreach (ArchitectureGraphNode node in graph.Nodes)
+        foreach (ArchitectureGraphNode node in graph.Nodes.Where(node => !connectedNodeIds.Contains(node.Id)))
         {
-            if (!connectedNodeIds.Contains(node.Id))
-            {
-                builder.AppendLine($"  {Quote(node.Id)};");
-            }
+            builder.AppendLine($"  {Quote(node.Id)};");
         }
 
         builder.Append('}');
@@ -107,18 +104,19 @@ public sealed class ArchitectureGraphFormatter : IArchitectureGraphFormatter
                 $"  {sourceAlias}[\"{EscapeMermaidLabel(edge.SourceId)}\"] -->{label} {targetAlias}[\"{EscapeMermaidLabel(edge.TargetId)}\"]");
         }
 
-        foreach (ArchitectureGraphNode node in graph.Nodes)
+        foreach (string id in graph.Nodes.Select(node => node.Id))
         {
-            // Not dead code: the edges loop above populates aliases via the AliasFor
-            // local function, which static analysis cannot trace through closures.
-            // This skips nodes already rendered as part of an edge line.
-            if (aliases.ContainsKey(node.Id))
+#pragma warning disable S4158 // Not dead code: the edges loop above populates aliases via the
+            // AliasFor local function, which static analysis cannot trace through closures. This
+            // skips ids already rendered as part of an edge line.
+            if (aliases.ContainsKey(id))
             {
                 continue;
             }
+#pragma warning restore S4158
 
-            string alias = AliasFor(node.Id);
-            builder.AppendLine($"  {alias}[\"{EscapeMermaidLabel(node.Id)}\"]");
+            string alias = AliasFor(id);
+            builder.AppendLine($"  {alias}[\"{EscapeMermaidLabel(id)}\"]");
         }
 
         return builder.ToString().TrimEnd('\r', '\n');
