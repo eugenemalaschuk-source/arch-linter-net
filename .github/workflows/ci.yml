@@ -34,6 +34,21 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Setup uv
+        uses: astral-sh/setup-uv@e58605a9b6da7c637471fab8847a5e5a6b8df081
+
+      - name: Install workflow lint tooling
+        shell: bash
+        run: |
+          mkdir -p "$HOME/.local/bin"
+          curl -fsSL https://raw.githubusercontent.com/rhysd/actionlint/main/scripts/download-actionlint.bash | bash -s -- latest "$HOME/.local/bin"
+          uv tool install zizmor
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+          echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
+
+      - name: Lint workflows
+        run: make lint-workflows
+
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
         with:
@@ -52,18 +67,6 @@ jobs:
           key: ${{ runner.os }}-nuget-${{ hashFiles('**/*.csproj') }}
           restore-keys: |
             ${{ runner.os }}-nuget-
-
-      - name: Setup uv
-        uses: astral-sh/setup-uv@e58605a9b6da7c637471fab8847a5e5a6b8df081
-
-      - name: Install workflow lint tooling
-        shell: bash
-        run: |
-          mkdir -p "$HOME/.local/bin"
-          curl -fsSL https://raw.githubusercontent.com/rhysd/actionlint/main/scripts/download-actionlint.bash | bash -s -- latest "$HOME/.local/bin"
-          uv tool install zizmor
-          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
-          echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
 
       - name: Restore
         run: make restore
