@@ -4,6 +4,7 @@
 
 [![CI](https://github.com/eugenemalaschuk-source/arch-linter-net/actions/workflows/ci.yml/badge.svg)](https://github.com/eugenemalaschuk-source/arch-linter-net/actions/workflows/ci.yml)
 [![CodeQL](https://github.com/eugenemalaschuk-source/arch-linter-net/actions/workflows/codeql.yml/badge.svg)](https://github.com/eugenemalaschuk-source/arch-linter-net/actions/workflows/codeql.yml)
+[![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/eugenemalaschuk-source/arch-linter-net/badge)](https://scorecard.dev/viewer/?uri=github.com/eugenemalaschuk-source/arch-linter-net)
 [![NuGet version](https://img.shields.io/nuget/v/ArchLinterNet.Cli.svg)](https://www.nuget.org/packages/ArchLinterNet.Cli/)
 [![NuGet downloads](https://img.shields.io/nuget/dt/ArchLinterNet.Cli)](https://www.nuget.org/packages/ArchLinterNet.Cli/)
 [![.NET tool](https://img.shields.io/badge/.NET-tool-512BD4)](https://www.nuget.org/packages/ArchLinterNet.Cli/)
@@ -23,6 +24,7 @@ The CI badge tracks one workflow that runs all quality signals in the same `vali
 | Test coverage (line %) | CI runs `make test-coverage`, uploads Cobertura XML to Codecov, and the badge above updates dynamically from Codecov |
 | SonarCloud PR quality gate | trusted `pull_request` runs analyze new code, publish a SonarCloud PR result link, and fail CI when the Sonar quality gate fails |
 | SonarCloud main quality signals | the Sonar badges above track the `main` branch project status for quality gate, maintainability, reliability, and security |
+| OpenSSF Scorecard | trusted pull requests produce reviewable SARIF; default-branch and scheduled runs publish the supply-chain score to the public Scorecard API and GitHub code scanning |
 | Architecture validation | strict ArchLinterNet self-policy check (`architecture/dependencies.arch.yml`) |
 | Architecture coverage | strict/audit coverage JSON artifacts + Markdown report + sticky PR comment |
 
