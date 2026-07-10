@@ -44,6 +44,10 @@ jobs:
               file_path.write_text(text.replace(old, new), encoding="utf-8")
 
           cli = "tests/ArchLinterNet.Cli.Tests/CliIntegrationTests.cs"
+          if "string joinedArgs = args.Length > 0" not in Path(cli).read_text(encoding="utf-8"):
+              print("Issue 276 source changes are already applied.")
+              raise SystemExit(0)
+
           replace_exact(
               cli,
               '                Arguments = $"build \\"{_cliProjectPath}\\" --nologo --verbosity quiet",\n',
@@ -128,12 +132,13 @@ jobs:
                   '$"\'dotnet\' failed with exit code {process.ExitCode}.\\n{stdout}\\n{stderr}"')
           PY
 
-      - name: Run test suite
-        run: dotnet test ArchLinterNet.slnx --configuration Release --nologo
-
       - name: Commit source fixes
         shell: bash
         run: |
+          if git diff --quiet; then
+            echo "No source changes to commit."
+            exit 0
+          fi
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add tests/ArchLinterNet.Cli.Tests/CliIntegrationTests.cs \
@@ -141,3 +146,6 @@ jobs:
             tests/ArchLinterNet.Core.Tests/ArchitectureAnalysisSessionMethodBodyProjectAwareTests.cs
           git commit -m "test: pass process arguments without command-line composition"
           git push origin HEAD:fix/276-code-scanning-hardening
+
+      - name: Run test suite
+        run: dotnet test ArchLinterNet.slnx --configuration Release --nologo
