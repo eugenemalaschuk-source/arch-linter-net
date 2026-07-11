@@ -209,7 +209,9 @@ Read [Migration baselines](../guides/migration-baselines.md) for the full lifecy
 
 `classification.attributes`/`classification.assembly_attributes` extract role and
 metadata facts from type-level and assembly-level attributes mapped by full type
-name. The rest of the `classification` section and `layers.<name>.selector` remain
+name, cached per run in a role index and surfaced as explainable `classification_roles`
+output (role, metadata, source, and the specific attribute evidence behind it). The
+rest of the `classification` section and `layers.<name>.selector` remain
 reserved by the YAML schema for a future semantic-role-discovery capability —
 schema-accepted today but with no effect on validation. See
 [Semantic classification](semantic-classification.md) before using any of these

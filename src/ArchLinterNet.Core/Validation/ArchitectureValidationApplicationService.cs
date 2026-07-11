@@ -77,11 +77,15 @@ public sealed class ArchitectureValidationApplicationService(
 
             (IReadOnlyList<ArchitectureClassificationConflict> classificationConflicts,
                 IReadOnlyList<ArchitectureClassificationMetadataFailure> classificationMetadataFailures) = runner.Session.CheckClassificationFacts();
+            IReadOnlyList<ArchitectureClassificationRoleFact> classificationRoles = runner.Session.CheckClassificationRoles();
 
             return new ValidationOutcome(
                 passed, allViolations, execution.Cycles, coverageFindings, coverageConfig, unmatched, unmatchedConfig,
                 policyConsistencyFindings, policyConsistencyConfig, execution.CoverageSummaries,
-                classificationConflicts, classificationMetadataFailures);
+                classificationConflicts, classificationMetadataFailures)
+            {
+                ClassificationRoles = classificationRoles
+            };
         }
     }
 

@@ -23,7 +23,8 @@ internal interface ICliRuntime
         IReadOnlyCollection<PolicyConsistencyDiagnostic> policyConsistencyFindings,
         IReadOnlyCollection<ArchitectureCoverageSummary> coverageSummaries,
         IReadOnlyCollection<ArchitectureClassificationConflict> classificationConflicts,
-        IReadOnlyCollection<ArchitectureClassificationMetadataFailure> classificationMetadataFailures);
+        IReadOnlyCollection<ArchitectureClassificationMetadataFailure> classificationMetadataFailures,
+        IReadOnlyCollection<ArchitectureClassificationRoleFact> classificationRoles);
 
     string FormatResultAsSarif(
         string mode,

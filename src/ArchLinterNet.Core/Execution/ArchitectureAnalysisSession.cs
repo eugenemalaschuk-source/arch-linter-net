@@ -39,6 +39,7 @@ public sealed partial class ArchitectureAnalysisSession
         PreprocessorSymbols = preprocessorSymbols;
         Catalog = ArchitectureContractCatalog.Build(document);
         TypeIndex = new ArchitectureTypeIndex(context.TargetAssemblies);
+        RoleIndex = new ArchitectureRoleIndex(document.Classification, TypeIndex);
     }
 
     public ArchitectureAnalysisContext Context { get; }
@@ -54,6 +55,8 @@ public sealed partial class ArchitectureAnalysisSession
     public ArchitectureContractCatalog Catalog { get; }
 
     public ArchitectureTypeIndex TypeIndex { get; }
+
+    public ArchitectureRoleIndex RoleIndex { get; }
 
     public ArchitectureReferenceGraph ReferenceGraph { get; } = new();
 

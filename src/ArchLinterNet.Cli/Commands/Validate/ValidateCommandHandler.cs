@@ -68,7 +68,8 @@ internal sealed class ValidateCommandHandler(ICliRuntime runtime, ICliConsole co
                         : outcome.PolicyConsistencyFindings,
                     outcome.CoverageSummaries,
                     outcome.ClassificationConflicts,
-                    outcome.ClassificationMetadataFailures));
+                    outcome.ClassificationMetadataFailures,
+                    outcome.ClassificationRoles));
             }
             else if (options.Format == "sarif")
             {

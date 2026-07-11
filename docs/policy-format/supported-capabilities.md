@@ -56,9 +56,10 @@ and fails validation with an actionable error.
 
 `classification.attributes`/`classification.assembly_attributes` are **implemented**:
 type-level and assembly-level attributes mapped by full type name are extracted into
-role/metadata facts, and `validate` surfaces resulting conflict/evidence-extraction-failure
-facts as informational output — though those facts are not wired into any contract
-family's pass/fail evaluation. Every other part of `classification` and
+role/metadata facts, cached per validation run in a role index, and `validate` surfaces
+resulting role/conflict/evidence-extraction-failure facts as informational output —
+though those facts are not wired into any contract family's pass/fail evaluation, nor
+consumed by any selector or coverage check yet. Every other part of `classification` and
 `layers.<name>.selector` remains **schema-accepted but not enforced** — no extraction,
 role-assignment, or selector-matching engine exists yet for them, and declaring them
 has no effect on validation. See [Semantic classification](semantic-classification.md).
