@@ -1,7 +1,7 @@
 using ArchLinterNet.Core.Contracts;
+using ArchLinterNet.Core.Contracts.Validators;
 using ArchLinterNet.Core.Execution;
 using ArchLinterNet.Core.Resolution;
-using ArchLinterNet.Core.Contracts.Validators;
 using AttributeRoleExtractionTestFixtures;
 using NUnit.Framework;
 
