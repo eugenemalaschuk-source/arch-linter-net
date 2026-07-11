@@ -193,7 +193,7 @@ classification:
         boundedContext: constructor[0]
 ```
 
-An illustrative optional source-only shape is:
+An illustrative user-owned attribute usage shape is:
 
 ```csharp
 [DomainLayer("Sales")]
