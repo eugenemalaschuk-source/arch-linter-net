@@ -416,4 +416,50 @@ contracts:
         Assert.That(ex.Message, Does.Contain("Duplicate contract IDs found"));
         Assert.That(ex.Message, Does.Not.Contain("attributes' or 'attribute_prefixes'"));
     }
+
+    [TestCase("        domains: [Sales, Billing]", "domains")]
+    [TestCase("        domains:\n          - Sales\n          - Billing", "domains")]
+    [TestCase("        domains:\n          primary: Sales", "domains")]
+    [TestCase("        domains: null", "domains")]
+    public void LoadFromPath_SelectorMetadataNonScalar_ThrowsDeterministicValidationError(string metadataYaml, string key)
+    {
+        string contractDir = Path.Combine(_tempDir, "architecture");
+        Directory.CreateDirectory(contractDir);
+        string contractPath = Path.Combine(contractDir, "dependencies.arch.yml");
+
+        File.WriteAllText(contractPath, $"""
+version: 1
+name: Invalid Selector Metadata
+layers:
+  semantic:
+    selector:
+      role: DomainLayer
+      metadata:
+{metadataYaml}
+analysis:
+  target_assemblies: []
+contracts:
+  strict: []
+  audit: []
+  strict_layers: []
+  audit_layers: []
+  strict_allow_only: []
+  audit_allow_only: []
+  strict_cycles: []
+  audit_cycles: []
+  strict_method_body: []
+  audit_method_body: []
+  strict_asmdef: []
+  audit_asmdef: []
+  strict_independence: []
+  audit_independence: []
+""");
+
+        InvalidOperationException ex = Assert.Throws<InvalidOperationException>(() =>
+            new ArchitecturePolicyDocumentLoader().Load(contractPath))!;
+
+        Assert.That(ex.Message, Does.Contain("Layer 'semantic'"));
+        Assert.That(ex.Message, Does.Contain($"selector metadata key '{key}'"));
+        Assert.That(ex.Message, Does.Contain("string, boolean, or finite numeric scalar"));
+    }
 }

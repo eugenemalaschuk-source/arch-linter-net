@@ -1,3 +1,4 @@
+using System.Globalization;
 using ArchLinterNet.Core.Contracts;
 
 namespace ArchLinterNet.Core.Resolution;
@@ -93,8 +94,22 @@ internal static class ArchitectureLayerResolver
 
         string metadata = layer.Selector.Metadata.Count == 0
             ? string.Empty
-            : $", metadata: {string.Join(", ", layer.Selector.Metadata.OrderBy(e => e.Key, StringComparer.Ordinal).Select(e => $"{e.Key}={e.Value}"))}";
+            : $", metadata: {string.Join(", ", layer.Selector.Metadata.OrderBy(e => e.Key, StringComparer.Ordinal).Select(e => $"{e.Key}={FormatScalar(e.Value)}"))}";
         return $"selector(role: {layer.Selector.Role}{metadata})";
+    }
+
+    private static string FormatScalar(object value)
+    {
+        return value switch
+        {
+            null => string.Empty,
+            string s => s,
+            bool b => b ? "True" : "False",
+            byte or sbyte or short or ushort or int or uint or long or ulong or float or double or decimal =>
+                Convert.ToString(value, CultureInfo.InvariantCulture) ?? string.Empty,
+            IFormattable formattable => formattable.ToString(null, CultureInfo.InvariantCulture),
+            _ => value.ToString() ?? string.Empty
+        };
     }
 
     public static string? ResolveContainingLayer(

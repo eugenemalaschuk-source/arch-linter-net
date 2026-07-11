@@ -1,3 +1,4 @@
+using System.Globalization;
 using ArchLinterNet.Core.Contracts;
 using ArchLinterNet.Core.Contracts.Validators;
 using ArchLinterNet.Core.Execution;
@@ -417,6 +418,26 @@ public sealed class LayerResolverTests
     }
 
     [Test]
+    public void LayerValidation_SelectorWithNonScalarMetadataValue_IsRejected()
+    {
+        Assert.Throws<InvalidOperationException>(() => new LayerNamespacesValidator().Validate(
+            new ArchitectureContractDocument
+            {
+                Layers = new Dictionary<string, ArchitectureLayer>
+                {
+                    ["domain"] = new()
+                    {
+                        Selector = new ArchitectureLayerSelector
+                        {
+                            Role = "DomainLayer",
+                            Metadata = new Dictionary<string, object> { ["domains"] = new[] { "Sales", "Billing" } }
+                        }
+                    }
+                }
+            }));
+    }
+
+    [Test]
     public void LayerValidation_WithoutNamespaceOrSelector_IsRejected()
     {
         Assert.Throws<InvalidOperationException>(() => new LayerNamespacesValidator().Validate(
@@ -477,5 +498,35 @@ public sealed class LayerResolverTests
             Assert.That(stringVsNumber, Is.Empty);
             Assert.That(boolVsString, Is.Empty);
         });
+    }
+
+    [Test]
+    public void DescribeLayer_SelectorNumericMetadata_UsesInvariantCulture()
+    {
+        CultureInfo previousCulture = CultureInfo.CurrentCulture;
+        CultureInfo previousUiCulture = CultureInfo.CurrentUICulture;
+
+        try
+        {
+            CultureInfo.CurrentCulture = CultureInfo.GetCultureInfo("fr-FR");
+            CultureInfo.CurrentUICulture = CultureInfo.GetCultureInfo("fr-FR");
+
+            ArchitectureLayer layer = new()
+            {
+                Selector = new ArchitectureLayerSelector
+                {
+                    Role = "DomainLayer",
+                    Metadata = new Dictionary<string, object> { ["ratio"] = 1.5m }
+                }
+            };
+
+            Assert.That(ArchitectureLayerResolver.DescribeLayer(layer),
+                Is.EqualTo("selector(role: DomainLayer, metadata: ratio=1.5)"));
+        }
+        finally
+        {
+            CultureInfo.CurrentCulture = previousCulture;
+            CultureInfo.CurrentUICulture = previousUiCulture;
+        }
     }
 }
