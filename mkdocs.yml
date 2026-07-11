@@ -36,6 +36,7 @@ nav:
       - Condition sets: policy-format/condition-sets.md
       - Ignored violations and baselines: guides/migration-baselines.md
       - Semantic classification (reserved): policy-format/semantic-classification.md
+      - Semantic role catalog: policy-format/semantic-role-catalog.md
       - Supported capabilities and non-goals: policy-format/supported-capabilities.md
   - Contracts:
       - Overview: contracts/index.md

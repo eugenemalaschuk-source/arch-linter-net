@@ -214,6 +214,11 @@ selector-matching engine exists yet. See
 [Semantic classification (reserved)](semantic-classification.md) before using
 either field.
 
+The reviewed vocabulary for future role discovery is in the [semantic role
+catalog](semantic-role-catalog.md). It defines first-wave roles, metadata keys,
+support tiers, and YAML-first examples; it does not make the reserved fields
+active.
+
 ## Supported capabilities and non-goals
 
 Before adding fields, check [Supported capabilities and non-goals](supported-capabilities.md). ArchLinterNet intentionally does not validate runtime dependency injection behavior, security/authorization correctness, code ownership, or semantic data flow.

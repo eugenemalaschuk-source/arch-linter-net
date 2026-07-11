@@ -10,6 +10,7 @@ Internal repository-maintenance instructions, backlog governance, issue-writing 
 
 - [Agent Guide](agent-guide.md) — investigation workflow before editing a policy.
 - [Policy Authoring Guide](policy-authoring-guide.md) — YAML authoring rules.
+- [Semantic role catalog](../policy-format/semantic-role-catalog.md) — reviewed role and metadata vocabulary for future semantic policies.
 - [Capabilities](capabilities.md) — supported contract families and limits.
 - [Policy Review Checklist](policy-review-checklist.md) — review checks before opening a PR.
 
