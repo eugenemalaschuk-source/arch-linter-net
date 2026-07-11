@@ -21,6 +21,18 @@ override, type attribute, assembly attribute, inheritance/interface fact,
 namespace, then path. The table identifies useful evidence, not an automatic
 inference promise.
 
+## Single-role classification
+
+Classification assigns a type exactly one role and the metadata from that
+winning source. Catalog roles are alternative classifications, not accumulated
+tags: a type cannot simultaneously retain `DomainLayer` and `AggregateRoot`,
+`PresentationLayer` and `Controller`, or `UnityRuntime` and
+`MonoBehaviourAdapter` through the current model. When a policy needs context
+such as a bounded context, module, platform, or layer, use the winning role's
+metadata or an existing namespace layer. Adding roles together, or merging
+metadata from a lower-precedence source, needs a separately reviewed model
+extension.
+
 ## Role catalog
 
 Each row has: definition; intended static evidence; typical metadata; example;
@@ -105,12 +117,12 @@ dependent. Prefer explicit mappings for them.
 
 | Role | Definition; evidence; metadata; example | Tier |
 | --- | --- | --- |
-| `UnityRuntime` | Player/runtime code; assembly metadata/asmdef/Ns; `platform`, `runtime`; gameplay assembly. | Optional annotation candidate |
-| `UnityEditor` | Editor-only tooling; assembly metadata/asmdef/Ns; `platform`, `runtime`; importer. | Optional annotation candidate |
-| `Feature` | Coherent client feature; Ns/Path/asmdef/Attr; `feature`, `module`; gameplay feature. | Custom-mapping expected |
+| `UnityRuntime` | Player/runtime code; assembly Attr/Ns; `platform`, `runtime`; gameplay assembly. | Optional annotation candidate |
+| `UnityEditor` | Editor-only tooling; assembly Attr/Ns; `platform`, `runtime`; importer. | Optional annotation candidate |
+| `Feature` | Coherent client feature; Ns/Path/Attr; `feature`, `module`; gameplay feature. | Custom-mapping expected |
 | `System` | Focused client responsibility; Base/Ns/Attr; `feature`, `runtime`; gameplay system. | Custom-mapping expected |
 | `MonoBehaviourAdapter` | Unity component adapter; Base/Ns/Attr; `platform`, `adapter`; scene adapter. | Examples-only |
-| `ScriptableObjectAsset` | Asset-backed configuration/data; Base/asmdef/Ns; `platform`, `feature`; balance asset. | Examples-only |
+| `ScriptableObjectAsset` | Asset-backed configuration/data; Base/Ns/Attr; `platform`, `feature`; balance asset. | Examples-only |
 | `Installer` | Static composition entry point; Ns/Attr/Path; `platform`, `runtime`; client installer. | Examples-only |
 | `InputAdapter` | Input-to-intent adapter; Base/Ns/Attr; `platform`, `adapter`; controller input. | Optional annotation candidate |
 | `SceneAdapter` | Scene-to-application adapter; Base/Ns/Attr; `platform`, `adapter`; scene boundary. | Examples-only |
@@ -121,7 +133,7 @@ dependent. Prefer explicit mappings for them.
 | --- | --- | --- |
 | `DbContext` | Database session boundary; Base/Ns/Attr; `subsystem`, `adapter`; EF context. | Optional annotation candidate |
 | `RepositoryImplementation` | Repository port implementation; interface/Ns/Attr; `adapter`, `boundedContext`; SQL repo. | Canonical |
-| `ExternalClient` | External service/SDK client; Base/package refs/Ns; `adapter`, `direction`; payment client. | Canonical |
+| `ExternalClient` | External service/SDK client; Base/Ns/Attr; `adapter`, `direction`; payment client. | Canonical |
 | `MessageBusAdapter` | Message transport adapter; Base/Ns/Attr; `adapter`, `direction`; bus adapter. | Optional annotation candidate |
 | `FileSystemAdapter` | File-system boundary; Base/Ns/Attr; `adapter`, `platform`; document adapter. | Optional annotation candidate |
 | `ClockAdapter` | Time boundary; Base/Ns/Attr; `adapter`, `platform`; system clock. | Optional annotation candidate |
@@ -173,7 +185,8 @@ classification:
       metadata:
         domain: constructor[0]
   assembly_attributes:
-    - attribute: MyCompany.Architecture.BoundedContextAttribute
+    - attribute: MyCompany.Architecture.SharedKernelAttribute
+      role: SharedKernel
       metadata:
         boundedContext: constructor[0]
 ```
@@ -184,12 +197,20 @@ An illustrative optional source-only shape is:
 [DomainLayer("Sales")]
 public sealed class Order { }
 
-[assembly: BoundedContext("Billing")]
+[assembly: SharedKernel("Billing")]
 ```
 
 These names are vocabulary examples, not types supplied by the current
 product. The defined extraction forms are `constructor[N]`, `property:Name`,
 `const:Full.Type.NAME`, and literal scalar values.
+
+A role-bearing assembly mapping is valid only when the assembly-attribute
+source wins for a type. The current model cannot use
+`[assembly: BoundedContext("Billing")]` as metadata-only shared context for
+types that already have a higher-precedence type role: every mapping requires a
+role, and metadata from losing sources is not merged. Metadata-only assembly
+context is deferred until a separate semantic-classification-model/schema change
+defines both its shape and merge semantics.
 
 ## Worked examples
 
@@ -249,9 +270,12 @@ layers:
 ```
 
 `namespace` remains required on every layer; `selector` is additive in the
-current model. Use asmdef and namespace facts, not scene inspection, for Unity
-boundaries. These reserved shapes describe future consumers; they do not make
-classification or selectors active today.
+current model. Use namespace facts, not scene inspection, for Unity boundaries.
+Asmdef and package-reference facts are useful future discovery guidance, but
+they are not among the current six classification sources and require a separate
+semantic-classification-model change before automatic use. These reserved shapes
+describe future consumers; they do not make classification or selectors active
+today.
 
 ## Conflict and safe policy guidance
 
