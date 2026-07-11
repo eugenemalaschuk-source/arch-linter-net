@@ -12,6 +12,8 @@ namespace ArchLinterNet.Core.Tests;
 public sealed class NamespaceViolationFinderGlobTests
 {
     private static readonly ArchitectureDiagnosticFormatter _formatter = new();
+    private static readonly string[] _matchedInternalPrefixes =
+        { "ReviewTest.Modules.Billing.Internal", "ReviewTest.Modules.Sales.Internal" };
 
     [Test]
     public void FindNamespaceViolations_GlobLayer_CollectsConcreteMatchedPrefixesFromForbiddenReferences()
@@ -30,11 +32,7 @@ public sealed class NamespaceViolationFinderGlobTests
         Assert.That(violations, Has.Length.EqualTo(1));
         Assert.That(
             violations[0].MatchedNamespacePrefixes,
-            Is.EquivalentTo(new[]
-            {
-                "ReviewTest.Modules.Billing.Internal",
-                "ReviewTest.Modules.Sales.Internal"
-            }));
+            Is.EquivalentTo(_matchedInternalPrefixes));
     }
 
     [Test]

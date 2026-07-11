@@ -10,6 +10,7 @@ namespace ArchLinterNet.Core.Tests;
 public sealed class PolicyConsistencyCheckTests
 {
     private static readonly string[] _domainApplication = { "domain", "application" };
+    private static readonly string[] _semanticLayers = { "semantic_a", "semantic_b" };
 
     private static ArchitectureAnalysisContext CreateContext()
     {
@@ -430,7 +431,7 @@ public sealed class PolicyConsistencyCheckTests
 
         var finding = findings.FirstOrDefault(f => f.CheckKind == "layer-overlap");
         Assert.That(finding, Is.Not.Null);
-        Assert.That(finding!.Layers, Is.EquivalentTo(new[] { "semantic_a", "semantic_b" }));
+        Assert.That(finding!.Layers, Is.EquivalentTo(_semanticLayers));
     }
 
     [Test]

@@ -12,6 +12,7 @@ namespace ArchLinterNet.Core.Tests;
 public sealed class LayerResolverTests
 {
     private static readonly string[] _candidateLayerNames = { "semantic", "core" };
+    private static readonly string[] _selectorMetadataDomains = { "Sales", "Billing" };
 
     private static readonly string[] _testCoreTestWeb = { "Test.Core", "Test.Web" };
 
@@ -430,7 +431,7 @@ public sealed class LayerResolverTests
                         Selector = new ArchitectureLayerSelector
                         {
                             Role = "DomainLayer",
-                            Metadata = new Dictionary<string, object> { ["domains"] = new[] { "Sales", "Billing" } }
+                            Metadata = new Dictionary<string, object> { ["domains"] = _selectorMetadataDomains }
                         }
                     }
                 }
