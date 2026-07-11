@@ -241,8 +241,7 @@ public sealed partial class ArchitectureAnalysisSession
                     })
                     .Where(r => !string.IsNullOrEmpty(r.FullName))
                     .Where(r => !contract.AllowedTypes.Contains(r.FullName))
-                    .Where(r => ArchitectureLayerResolver.IsProjectType(Document, r.Namespace)
-                        || r.Type != null && allowedLayers.Any(layer => layer.Selector != null))
+                    .Where(r => r.Type != null && IsInAnyProjectLayer(r.Type))
                     .Where(r => !ArchitectureNamespaceViolationFinder.IsInAnyAllowedLayer(
                         r.Type!, allowedLayers, RoleIndex))
                     .Where(r => !executionContext.IsIgnored(sourceFullName, r.FullName))
@@ -302,9 +301,7 @@ public sealed partial class ArchitectureAnalysisSession
             foreach (Type referencedType in ReferenceGraph.GetReferencedTypes(sourceType))
             {
                 string referencedTypeName = ArchitectureTypeNames.SafeFullName(referencedType);
-                string referencedNamespace = ArchitectureTypeNames.SafeNamespace(referencedType);
-                string? referencedLayerName =
-                    ArchitectureLayerResolver.ResolveContainingLayer(Document, referencedNamespace, contractLayers);
+                string? referencedLayerName = ResolveContainingLayer(referencedType, contractLayers);
 
                 if (referencedLayerName == null || referencedLayerName == sourceLayerName)
                 {

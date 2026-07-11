@@ -315,6 +315,23 @@ public sealed class LayerResolverTests
     }
 
     [Test]
+    public void DescribeLayer_NamespaceAndSelector_UsesBothDescriptions()
+    {
+        ArchitectureLayer layer = new()
+        {
+            Namespace = "Test.Domain",
+            Selector = new ArchitectureLayerSelector
+            {
+                Role = "DomainLayer",
+                Metadata = new Dictionary<string, object> { ["domain"] = "Sales" }
+            }
+        };
+
+        Assert.That(ArchitectureLayerResolver.DescribeLayer(layer),
+            Is.EqualTo("Test.Domain + selector(role: DomainLayer, metadata: domain=Sales)"));
+    }
+
+    [Test]
     public void ResolveContainingLayer_SelectorOnlyLayer_IsIgnoredByNamespaceResolution()
     {
         ArchitectureContractDocument document = new()
@@ -410,5 +427,55 @@ public sealed class LayerResolverTests
                     ["domain"] = new()
                 }
             }));
+    }
+
+    [Test]
+    public void FindTypesInLayer_SelectorMetadataCrossDomainMismatch_ReturnsNoMatchWithoutThrowing()
+    {
+        var classification = new ArchitectureClassificationConfiguration
+        {
+            Attributes =
+            {
+                new ArchitectureAttributeClassificationMapping
+                {
+                    Attribute = "AttributeRoleExtractionTestFixtures.DomainMarkerAttribute",
+                    Role = "DomainLayer",
+                    Metadata = new Dictionary<string, object>
+                    {
+                        ["domain"] = "constructor[0]",
+                        ["enabled"] = "property:Enabled"
+                    }
+                }
+            }
+        };
+        var typeIndex = new ArchitectureTypeIndex(new[] { typeof(TypeWithBooleanProperty).Assembly });
+        var roleIndex = new ArchitectureRoleIndex(classification, typeIndex);
+
+        Assert.DoesNotThrow(() =>
+        {
+            Type[] stringVsNumber = typeIndex.FindTypesInLayer(
+                new ArchitectureLayer
+                {
+                    Selector = new ArchitectureLayerSelector
+                    {
+                        Role = "DomainLayer",
+                        Metadata = new Dictionary<string, object> { ["domain"] = 5 }
+                    }
+                },
+                roleIndex);
+            Type[] boolVsString = typeIndex.FindTypesInLayer(
+                new ArchitectureLayer
+                {
+                    Selector = new ArchitectureLayerSelector
+                    {
+                        Role = "DomainLayer",
+                        Metadata = new Dictionary<string, object> { ["enabled"] = "true" }
+                    }
+                },
+                roleIndex);
+
+            Assert.That(stringVsNumber, Is.Empty);
+            Assert.That(boolVsString, Is.Empty);
+        });
     }
 }

@@ -4,6 +4,7 @@ using System.Reflection.Emit;
 using ArchLinterNet.Core.Contracts;
 using ArchLinterNet.Core.Execution;
 using ArchLinterNet.Core.Model;
+using AttributeRoleExtractionTestFixtures;
 using NUnit.Framework;
 
 namespace ArchLinterNet.Core.Tests;
@@ -356,6 +357,147 @@ public sealed partial class ProtectedContractTests
             "Global-namespace types referencing protected layers must produce violations");
         Assert.That((globalViolations[0].Payload as DependencyPayload)?.SourceLayer, Is.Null,
             "Global-namespace types should have null SourceLayer");
+    }
+
+    [Test]
+    public void CheckProtectedContract_SelectorOnlyProtectedLayer_ReportsViolations()
+    {
+        var document = new ArchitectureContractDocument
+        {
+            Version = 1,
+            Name = "Test",
+            Classification = new ArchitectureClassificationConfiguration
+            {
+                Attributes =
+                {
+                    new ArchitectureAttributeClassificationMapping
+                    {
+                        Attribute = "AttributeRoleExtractionTestFixtures.DomainMarkerAttribute",
+                        Role = "DomainLayer",
+                        Metadata = new Dictionary<string, object>
+                        {
+                            ["domain"] = "constructor[0]",
+                            ["enabled"] = "property:Enabled"
+                        }
+                    }
+                }
+            },
+            Layers = new Dictionary<string, ArchitectureLayer>
+            {
+                ["protected_semantic"] = new()
+                {
+                    Selector = new ArchitectureLayerSelector
+                    {
+                        Role = "DomainLayer",
+                        Metadata = new Dictionary<string, object>
+                        {
+                            ["domain"] = "Sales",
+                            ["enabled"] = true
+                        }
+                    }
+                }
+            },
+            Analysis = new ArchitectureAnalysisConfiguration
+            {
+                TargetAssemblies = new List<string> { "ArchLinterNet.Core.Tests" }
+            },
+            Contracts = new ArchitectureContractGroups
+            {
+                StrictProtected = new List<ArchitectureProtectedContract>
+                {
+                    new()
+                    {
+                        Name = "semantic-is-protected",
+                        Protected = new List<string> { "protected_semantic" },
+                        AllowedImporters = new List<string>()
+                    }
+                }
+            }
+        };
+
+        var context = new ArchitectureAnalysisContext(
+            "/tmp",
+            _testAssemblyArray,
+            Array.Empty<string>(),
+            Array.Empty<string>());
+
+        var runner = new ArchitectureContractRunner(context, document);
+        var violations = runner.CheckProtectedContract(document.Contracts.StrictProtected[0]);
+
+        Assert.That(violations.Any(v =>
+            v.SourceType == typeof(SelectorReferenceSource).FullName
+            && v.ForbiddenReferences.Contains(typeof(TypeWithBooleanProperty).FullName!)), Is.True);
+    }
+
+    [Test]
+    public void CheckProtectedContract_NamespaceAndSelectorProtectedLayer_DoesNotTreatWholeNamespaceAsProtected()
+    {
+        var document = new ArchitectureContractDocument
+        {
+            Version = 1,
+            Name = "Test",
+            Classification = new ArchitectureClassificationConfiguration
+            {
+                Attributes =
+                {
+                    new ArchitectureAttributeClassificationMapping
+                    {
+                        Attribute = "AttributeRoleExtractionTestFixtures.DomainMarkerAttribute",
+                        Role = "DomainLayer",
+                        Metadata = new Dictionary<string, object>
+                        {
+                            ["domain"] = "constructor[0]",
+                            ["enabled"] = "property:Enabled"
+                        }
+                    }
+                }
+            },
+            Layers = new Dictionary<string, ArchitectureLayer>
+            {
+                ["protected_semantic"] = new()
+                {
+                    Namespace = "AttributeRoleExtractionTestFixtures",
+                    Selector = new ArchitectureLayerSelector
+                    {
+                        Role = "DomainLayer",
+                        Metadata = new Dictionary<string, object>
+                        {
+                            ["domain"] = "Sales",
+                            ["enabled"] = true
+                        }
+                    }
+                }
+            },
+            Analysis = new ArchitectureAnalysisConfiguration
+            {
+                TargetAssemblies = new List<string> { "ArchLinterNet.Core.Tests" }
+            },
+            Contracts = new ArchitectureContractGroups
+            {
+                StrictProtected = new List<ArchitectureProtectedContract>
+                {
+                    new()
+                    {
+                        Name = "combined-semantic-is-protected",
+                        Protected = new List<string> { "protected_semantic" },
+                        AllowedImporters = new List<string>()
+                    }
+                }
+            }
+        };
+
+        var context = new ArchitectureAnalysisContext(
+            "/tmp",
+            _testAssemblyArray,
+            Array.Empty<string>(),
+            Array.Empty<string>());
+
+        var runner = new ArchitectureContractRunner(context, document);
+        var violations = runner.CheckProtectedContract(document.Contracts.StrictProtected[0]);
+
+        Assert.That(violations.Any(v =>
+            v.SourceType == typeof(UnclassifiedFixtureConsumer).FullName
+            && v.ForbiddenReferences.Contains(typeof(TypeWithBooleanProperty).FullName!)), Is.True);
     }
 
     public sealed class ExecutionUser

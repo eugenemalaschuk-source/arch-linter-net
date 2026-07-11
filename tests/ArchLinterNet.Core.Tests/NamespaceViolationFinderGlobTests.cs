@@ -98,6 +98,71 @@ public sealed class NamespaceViolationFinderGlobTests
         Assert.That(violations[0].ForbiddenReferences,
             Does.Contain(typeof(TypeWithBooleanProperty).FullName));
     }
+
+    [Test]
+    public void CheckAllowOnlyContract_SelectorBackedSource_IgnoresExternalClrReferences()
+    {
+        var document = new ArchitectureContractDocument
+        {
+            Version = 1,
+            Name = "Test",
+            Classification = new ArchitectureClassificationConfiguration
+            {
+                Attributes =
+                {
+                    new ArchitectureAttributeClassificationMapping
+                    {
+                        Attribute = "AttributeRoleExtractionTestFixtures.DomainMarkerAttribute",
+                        Role = "DomainLayer",
+                        Metadata = new Dictionary<string, object> { ["domain"] = "constructor[0]" }
+                    }
+                }
+            },
+            Layers = new Dictionary<string, ArchitectureLayer>
+            {
+                ["semantic"] = new()
+                {
+                    Namespace = "AttributeRoleExtractionTestFixtures",
+                    Selector = new ArchitectureLayerSelector
+                    {
+                        Role = "DomainLayer",
+                        Metadata = new Dictionary<string, object> { ["domain"] = "Sales" }
+                    }
+                },
+                ["fixtures"] = new()
+                {
+                    Namespace = "AttributeRoleExtractionTestFixtures"
+                }
+            },
+            Analysis = new ArchitectureAnalysisConfiguration
+            {
+                TargetAssemblies = new List<string> { "ArchLinterNet.Core.Tests" }
+            },
+            Contracts = new ArchitectureContractGroups
+            {
+                StrictAllowOnly = new List<ArchitectureAllowOnlyContract>
+                {
+                    new()
+                    {
+                        Name = "selector-allow-only",
+                        Source = "semantic",
+                        Allowed = new List<string> { "fixtures" }
+                    }
+                }
+            }
+        };
+
+        var context = new ArchitectureAnalysisContext(
+            "/tmp",
+            new[] { typeof(TypeWithConstructorDefault).Assembly },
+            Array.Empty<string>(),
+            Array.Empty<string>());
+
+        var runner = new ArchitectureContractRunner(context, document);
+        var violations = runner.CheckAllowOnlyContract(document.Contracts.StrictAllowOnly[0]);
+
+        Assert.That(violations, Is.Empty);
+    }
 }
 
 public sealed class SelectorReferenceSource

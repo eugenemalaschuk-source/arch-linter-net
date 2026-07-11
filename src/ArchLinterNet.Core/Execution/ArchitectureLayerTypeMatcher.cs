@@ -54,6 +54,13 @@ internal static class ArchitectureLayerTypeMatcher
 
     private static bool TryDecimal(object value, out decimal result)
     {
+        if (value is not byte and not sbyte and not short and not ushort and not int and not uint and not long and not ulong
+            and not float and not double and not decimal)
+        {
+            result = default;
+            return false;
+        }
+
         try
         {
             if (value is float f && (float.IsNaN(f) || float.IsInfinity(f))
@@ -64,10 +71,9 @@ internal static class ArchitectureLayerTypeMatcher
             }
 
             result = Convert.ToDecimal(value, CultureInfo.InvariantCulture);
-            return value is byte or sbyte or short or ushort or int or uint or long or ulong
-                or float or double or decimal;
+            return true;
         }
-        catch (OverflowException)
+        catch (Exception ex) when (ex is OverflowException or FormatException or InvalidCastException)
         {
             result = default;
             return false;

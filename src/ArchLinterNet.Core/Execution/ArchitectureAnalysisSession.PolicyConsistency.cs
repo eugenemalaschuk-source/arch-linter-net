@@ -537,7 +537,7 @@ public sealed partial class ArchitectureAnalysisSession
 
     private static bool IsStructurallyUnreachable(ArchitectureLayer layer)
     {
-        if (string.IsNullOrWhiteSpace(layer.Namespace))
+        if (string.IsNullOrWhiteSpace(layer.Namespace) && layer.Selector == null)
         {
             return true;
         }

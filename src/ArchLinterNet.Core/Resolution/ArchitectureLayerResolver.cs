@@ -55,6 +55,17 @@ internal static class ArchitectureLayerResolver
             return DescribeSelector(layer);
         }
 
+        string namespaceDescription = DescribeNamespacePart(layer);
+        if (layer.Selector == null)
+        {
+            return namespaceDescription;
+        }
+
+        return $"{namespaceDescription} + {DescribeSelector(layer)}";
+    }
+
+    private static string DescribeNamespacePart(ArchitectureLayer layer)
+    {
         NamespaceGlobPattern pattern = layer.GlobPattern;
         bool hasSuffix = !string.IsNullOrEmpty(layer.NamespaceSuffix);
 

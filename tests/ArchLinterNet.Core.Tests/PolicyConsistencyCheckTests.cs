@@ -349,6 +349,25 @@ public sealed class PolicyConsistencyCheckTests
     }
 
     [Test]
+    public void UnreachableContract_SelectorOnlyLayer_IsNotFlagged()
+    {
+        var document = BaseDocument();
+        document.Layers["semantic"] = new ArchitectureLayer
+        {
+            Selector = new ArchitectureLayerSelector { Role = "DomainLayer" }
+        };
+        document.Contracts.Strict = new List<ArchitectureDependencyContract>
+        {
+            new() { Name = "uses-selector", Source = "semantic", Forbidden = new List<string> { "application" } }
+        };
+
+        var runner = new ArchitectureContractRunner(CreateContext(), document);
+        var findings = runner.CheckPolicyConsistency();
+
+        Assert.That(findings.Any(f => f.CheckKind == "unreachable-contract"), Is.False);
+    }
+
+    [Test]
     public void StrictAndAuditFamilies_DuplicateIdsDetectedAcrossFamilies()
     {
         var document = BaseDocument();

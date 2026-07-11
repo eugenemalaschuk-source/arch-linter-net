@@ -63,6 +63,51 @@ public sealed partial class ArchitectureAnalysisSession
         return TypeIndex.FindTypesInLayer(layer, RoleIndex);
     }
 
+    private bool MatchesLayer(ArchitectureLayer layer, Type type)
+    {
+        return ArchitectureLayerTypeMatcher.Matches(layer, type, RoleIndex);
+    }
+
+    private bool IsInAnyProjectLayer(Type type)
+    {
+        return Document.Layers.Values.Any(layer => !layer.External && MatchesLayer(layer, type));
+    }
+
+    private string? ResolveContainingLayer(Type type, IReadOnlySet<string> candidateLayerNames)
+    {
+        return candidateLayerNames
+            .Select(layerName => new
+            {
+                LayerName = layerName,
+                Layer = ArchitectureLayerResolver.ResolveLayer(Document, "type-resolution", layerName)
+            })
+            .Where(entry => MatchesLayer(entry.Layer, type))
+            .Select(entry =>
+            {
+                bool hasNamespace = !string.IsNullOrWhiteSpace(entry.Layer.Namespace);
+                NamespaceGlobPattern? pattern = hasNamespace ? entry.Layer.GlobPattern : null;
+                return new
+                {
+                    entry.LayerName,
+                    HasSelector = entry.Layer.Selector != null,
+                    HasNamespace = hasNamespace,
+                    IsGlob = pattern?.IsGlob ?? false,
+                    LiteralCount = pattern?.LiteralCount ?? -1,
+                    HasSuffix = !string.IsNullOrEmpty(entry.Layer.NamespaceSuffix),
+                    WildcardCount = pattern?.WildcardCount ?? int.MaxValue
+                };
+            })
+            .OrderByDescending(entry => entry.HasSelector)
+            .ThenByDescending(entry => entry.HasNamespace)
+            .ThenByDescending(entry => entry.HasNamespace && !entry.IsGlob)
+            .ThenByDescending(entry => entry.LiteralCount)
+            .ThenByDescending(entry => entry.HasSuffix)
+            .ThenBy(entry => entry.WildcardCount)
+            .ThenBy(entry => entry.LayerName, StringComparer.Ordinal)
+            .Select(entry => entry.LayerName)
+            .FirstOrDefault();
+    }
+
     public ArchitectureReferenceGraph ReferenceGraph { get; } = new();
 
     public IReadOnlyList<ArchitectureUnmatchedIgnoredViolation> UnmatchedIgnoredViolations
