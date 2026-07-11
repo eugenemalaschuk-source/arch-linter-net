@@ -383,6 +383,78 @@ public sealed class ArchitectureDiagnosticFormatterTests
         Assert.That(subjects, Is.EqualTo(new[] { "MyApp.Alpha", "MyApp.Zeta" }));
     }
 
+    // Guards against the roles-overload silently resolving to IArchitectureDiagnosticFormatter's
+    // default interface implementation (which drops classificationRoles for compatibility with
+    // pre-existing third-party implementers) instead of ArchitectureDiagnosticFormatter's own
+    // override, when called through the interface rather than the concrete type.
+    [Test]
+    public void FormatResultForCiArtifacts_CalledThroughInterface_UsesConcreteOverrideNotDefaultImplementation()
+    {
+        IArchitectureDiagnosticFormatter formatter = new ArchitectureDiagnosticFormatter();
+        var roles = new[]
+        {
+            new Model.ArchitectureClassificationRoleFact(
+                "MyApp.Order", "DomainLayer", Model.ArchitectureClassificationSource.TypeAttribute, null, new Dictionary<string, object>())
+        };
+
+        using var json = JsonDocument.Parse(formatter.FormatResultForCiArtifacts(
+            "strict", true, Array.Empty<ArchitectureViolation>(), Array.Empty<string>(), roles));
+
+        Assert.That(json.RootElement.GetProperty("classification_roles").GetArrayLength(), Is.EqualTo(1));
+    }
+
+    // A third-party IArchitectureDiagnosticFormatter implementer that predates the roles overload
+    // and only implements the members that existed before it must still compile and function —
+    // proving the roles overload's default interface implementation satisfies the interface
+    // contract without forcing every implementer to add a new member.
+    private sealed class PreExistingThirdPartyFormatter : IArchitectureDiagnosticFormatter
+    {
+        public string FormatViolationsForHumans(IReadOnlyCollection<ArchitectureViolation> violations) => string.Empty;
+        public string FormatCyclesForHumans(IReadOnlyCollection<string> cycles) => string.Empty;
+        public string FormatUnmatchedForHumans(IReadOnlyCollection<ArchitectureUnmatchedIgnoredViolation> unmatched) => string.Empty;
+        public string FormatPolicyConsistencyForHumans(IReadOnlyCollection<PolicyConsistencyDiagnostic> findings) => string.Empty;
+        public string FormatCoverageForHumans(IReadOnlyCollection<ArchitectureViolation> findings) => string.Empty;
+        public string FormatCoverageSummaryForHumans(IReadOnlyCollection<ArchitectureCoverageSummary> summaries) => string.Empty;
+
+        public string FormatClassificationFactsForHumans(
+            IReadOnlyCollection<Model.ArchitectureClassificationConflict> conflicts,
+            IReadOnlyCollection<Model.ArchitectureClassificationMetadataFailure> metadataFailures) => string.Empty;
+
+        public string FormatResultForCiArtifacts(
+            string mode, bool passed, IReadOnlyCollection<ArchitectureViolation> violations, IReadOnlyCollection<string> cycles,
+            IReadOnlyCollection<ArchitectureViolation>? coverageFindings = null,
+            IReadOnlyCollection<ArchitectureUnmatchedIgnoredViolation>? unmatched = null,
+            IReadOnlyCollection<PolicyConsistencyDiagnostic>? policyConsistencyFindings = null,
+            IReadOnlyCollection<ArchitectureCoverageSummary>? coverageSummaries = null,
+            IReadOnlyCollection<Model.ArchitectureClassificationConflict>? classificationConflicts = null,
+            IReadOnlyCollection<Model.ArchitectureClassificationMetadataFailure>? classificationMetadataFailures = null)
+            => "pre-existing-implementation";
+
+        // Deliberately does NOT implement the classificationRoles overload — relies entirely on
+        // IArchitectureDiagnosticFormatter's default interface implementation.
+
+        public string FormatViolationsForCiArtifacts(string contractName, string? contractId,
+            IReadOnlyCollection<ArchitectureViolation> violations) => string.Empty;
+
+        public string FormatCyclesForCiArtifacts(string contractName, string? contractId, IReadOnlyCollection<string> cycles) => string.Empty;
+    }
+
+    [Test]
+    public void FormatResultForCiArtifacts_PreExistingImplementerWithoutRolesOverload_CompilesAndFallsBackToOriginalMember()
+    {
+        IArchitectureDiagnosticFormatter formatter = new PreExistingThirdPartyFormatter();
+        var roles = new[]
+        {
+            new Model.ArchitectureClassificationRoleFact(
+                "MyApp.Order", "DomainLayer", Model.ArchitectureClassificationSource.TypeAttribute, null, new Dictionary<string, object>())
+        };
+
+        string result = formatter.FormatResultForCiArtifacts(
+            "strict", true, Array.Empty<ArchitectureViolation>(), Array.Empty<string>(), roles);
+
+        Assert.That(result, Is.EqualTo("pre-existing-implementation"));
+    }
+
     [Test]
     public void FormatCyclesForHumans_MultipleCycles_SortedAlphabetically()
     {

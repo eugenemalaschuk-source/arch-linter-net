@@ -36,7 +36,11 @@ public interface IArchitectureDiagnosticFormatter
     // Additive overload (not a modification of the method above) so binaries already compiled
     // against the original 10-parameter FormatResultForCiArtifacts keep resolving to it unchanged;
     // classificationRoles is required here (no default) specifically so it stays unambiguous
-    // against the original overload for any call site, named or positional.
+    // against the original overload for any call site, named or positional. Declared with a
+    // default interface implementation — delegating to the original overload and omitting
+    // classificationRoles — so third-party IArchitectureDiagnosticFormatter implementers that
+    // predate this member are not forced to implement it to keep compiling; only
+    // ArchitectureDiagnosticFormatter itself overrides it with real role serialization.
     string FormatResultForCiArtifacts( // NOSONAR: each parameter represents a semantically distinct section of the CI artifact payload; grouping would obscure the data contract
         string mode,
         bool passed,
@@ -48,7 +52,10 @@ public interface IArchitectureDiagnosticFormatter
         IReadOnlyCollection<PolicyConsistencyDiagnostic>? policyConsistencyFindings = null,
         IReadOnlyCollection<ArchitectureCoverageSummary>? coverageSummaries = null,
         IReadOnlyCollection<ArchitectureClassificationConflict>? classificationConflicts = null,
-        IReadOnlyCollection<ArchitectureClassificationMetadataFailure>? classificationMetadataFailures = null);
+        IReadOnlyCollection<ArchitectureClassificationMetadataFailure>? classificationMetadataFailures = null)
+        => FormatResultForCiArtifacts(
+            mode, passed, violations, cycles, coverageFindings, unmatched,
+            policyConsistencyFindings, coverageSummaries, classificationConflicts, classificationMetadataFailures);
 
     string FormatViolationsForCiArtifacts(string contractName, string? contractId,
         IReadOnlyCollection<ArchitectureViolation> violations);
