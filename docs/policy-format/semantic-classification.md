@@ -220,9 +220,46 @@ is unaffected.
 - No diagnostics: `conflict`, `stale selector`, and `uncovered semantic fact`
   are vocabulary only — nothing is ever reported.
 - No annotation package: this design does not ship, and does not require, a
-  binary ArchLinterNet annotation assembly.
+  binary ArchLinterNet annotation assembly — see
+  [Annotation strategy](#annotation-strategy) below for the full adoption
+  decision.
 - No coverage integration: the planned `scope: semantic_role` coverage variant
   (tracked by a follow-up issue) does not exist yet.
+
+## Annotation strategy
+
+**Decision ([issue #108](https://github.com/eugenemalaschuk-source/arch-linter-net/issues/108)):**
+ArchLinterNet ships no binary annotation package and no source-only
+annotation package. **User-defined attributes mapped by full type name in
+YAML are the sole supported adoption path.** A project that wants
+`classification.attributes` evidence defines its own attribute — commonly a
+handful of lines, as in the [reviewed shape](#reviewed-shape) example above —
+and maps it by full type name. No package reference, and no dependency on any
+ArchLinterNet-provided assembly, is required or offered.
+
+This is a first-wave decision, not a permanent restriction: an optional
+package remains possible as a future, separately-decided convenience if
+concrete adoption need emerges. It is not the default path today.
+
+### Trade-offs considered
+
+| Path | Dependency footprint | Setup cost | Versioning | Status |
+|---|---|---|---|---|
+| User-owned attribute | None — the attribute lives in the adopting project's own code | One small attribute class, written once | No annotation-package version coupling; YAML and extraction compatibility still follow ArchLinterNet's own compatibility policy | **Recommended adoption path** — schema/design reviewed; runtime extraction not yet implemented ([Current limits](#current-limits)) |
+| Source-only annotation package | No runtime assembly reference, but still a versioned artifact ArchLinterNet must design, ship, and support | Add a package reference; attribute ships pre-written | Coupled to ArchLinterNet's release/compatibility policy | Not shipped; possible future convenience |
+| Binary annotation package | Adds a compile-time (and possibly runtime/dependency-graph) reference to `ArchLinterNet.Annotations` in every consuming project | Add a package reference; attribute ships pre-written | Coupled to ArchLinterNet's release/compatibility policy | Not shipped; explicitly ruled out as a default or required path |
+
+A binary package was rejected as the default because it would add exactly the
+kind of mandatory runtime/dependency-graph reference ArchLinterNet's
+non-invasive positioning is meant to avoid. A source-only package was not
+shipped in this wave either, since no extraction engine exists yet
+([Current limits](#current-limits)) and no consumer need has been
+demonstrated — adding one now would be speculative packaging work with no
+current user. User-owned attributes need neither: the reviewed mapping shape
+in [Reviewed shape](#reviewed-shape) accepts any full attribute type name,
+regardless of which assembly declares it — but until extraction ships, no
+YAML mapping is actually evaluated against scanned code; see
+[Current limits](#current-limits).
 
 ## Where to look next
 

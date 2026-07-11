@@ -193,7 +193,7 @@ classification:
         boundedContext: constructor[0]
 ```
 
-An illustrative optional source-only shape is:
+An illustrative user-owned attribute usage shape is:
 
 ```csharp
 [DomainLayer("Sales")]
@@ -204,9 +204,14 @@ public sealed class Order { }
 
 These names are vocabulary candidates/examples, not types supplied by the
 current product. The defined extraction forms are `constructor[N]`,
-`property:Name`, `const:Full.Type.NAME`, and literal scalar values. Issue #108
-owns any future decision to provide an optional annotation package or source-
-only distribution, including its packaging strategy.
+`property:Name`, `const:Full.Type.NAME`, and literal scalar values.
+[Issue #108](https://github.com/eugenemalaschuk-source/arch-linter-net/issues/108)
+resolved the packaging decision: ArchLinterNet ships no binary and no
+source-only annotation package in this wave — user-defined attributes mapped
+by full type name in YAML remain the sole supported adoption path. See
+[Annotation strategy](semantic-classification.md#annotation-strategy) for
+the full decision and trade-offs. A future optional package remains possible
+as a separate, separately-decided change if concrete adoption need emerges.
 
 A role-bearing assembly mapping is valid only when the assembly-attribute
 source wins for a type. The current model cannot use
