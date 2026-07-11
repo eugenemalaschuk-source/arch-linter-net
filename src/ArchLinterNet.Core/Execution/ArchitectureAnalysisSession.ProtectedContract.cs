@@ -82,22 +82,17 @@ public sealed partial class ArchitectureAnalysisSession
             return null;
         }
 
-        string sourceNs = ArchitectureTypeNames.SafeNamespace(sourceType);
-
-        if (!string.IsNullOrEmpty(sourceNs) &&
-            ArchitectureLayerResolver.MatchesNamespace(protectedLayer, sourceNs))
+        if (MatchesLayer(protectedLayer, sourceType))
         {
             return null;
         }
 
-        if (!string.IsNullOrEmpty(sourceNs) &&
-            allowedImporterLayers.Any(l => ArchitectureLayerResolver.MatchesNamespace(l, sourceNs)))
+        if (allowedImporterLayers.Any(layer => MatchesLayer(layer, sourceType)))
         {
             return null;
         }
 
-        string? sourceLayerName = ArchitectureLayerResolver.ResolveContainingLayer(
-            Document, sourceNs, allLayerNames);
+        string? sourceLayerName = ResolveContainingLayer(sourceType, allLayerNames);
 
         List<string> matchingRefs = new();
         HashSet<string> matchedNamespacePrefixes = new(StringComparer.Ordinal);
@@ -131,7 +126,7 @@ public sealed partial class ArchitectureAnalysisSession
         };
     }
 
-    private static void CollectProtectedLayerReferences(
+    private void CollectProtectedLayerReferences(
         Type sourceType,
         string sourceTypeFullName,
         ArchitectureLayer protectedLayer,
@@ -148,9 +143,7 @@ public sealed partial class ArchitectureAnalysisSession
                 continue;
             }
 
-            ArchitectureNamespaceMatch protectedMatch = ArchitectureLayerResolver.MatchNamespace(
-                protectedLayer, ArchitectureTypeNames.SafeNamespace(refType));
-            if (!protectedMatch.Matched)
+            if (!MatchesLayer(protectedLayer, refType))
             {
                 continue;
             }
@@ -166,6 +159,8 @@ public sealed partial class ArchitectureAnalysisSession
             }
 
             matchingRefs.Add(refFullName);
+            ArchitectureNamespaceMatch protectedMatch = ArchitectureLayerResolver.MatchNamespace(
+                protectedLayer, ArchitectureTypeNames.SafeNamespace(refType));
             if (!string.IsNullOrEmpty(protectedMatch.MatchedNamespacePrefix))
             {
                 matchedNamespacePrefixes.Add(protectedMatch.MatchedNamespacePrefix);

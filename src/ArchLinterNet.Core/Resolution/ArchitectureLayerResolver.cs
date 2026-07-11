@@ -1,3 +1,4 @@
+using System.Globalization;
 using ArchLinterNet.Core.Contracts;
 
 namespace ArchLinterNet.Core.Resolution;
@@ -33,6 +34,11 @@ internal static class ArchitectureLayerResolver
 
     public static ArchitectureNamespaceMatch MatchNamespace(ArchitectureLayer layer, string namespaceName)
     {
+        if (string.IsNullOrWhiteSpace(layer.Namespace))
+        {
+            return new ArchitectureNamespaceMatch(false, string.Empty, null);
+        }
+
         NamespaceGlobPattern pattern = layer.GlobPattern;
 
         if (!pattern.IsGlob)
@@ -44,6 +50,22 @@ internal static class ArchitectureLayerResolver
     }
 
     public static string DescribeLayer(ArchitectureLayer layer)
+    {
+        if (string.IsNullOrWhiteSpace(layer.Namespace))
+        {
+            return DescribeSelector(layer);
+        }
+
+        string namespaceDescription = DescribeNamespacePart(layer);
+        if (layer.Selector == null)
+        {
+            return namespaceDescription;
+        }
+
+        return $"{namespaceDescription} + {DescribeSelector(layer)}";
+    }
+
+    private static string DescribeNamespacePart(ArchitectureLayer layer)
     {
         NamespaceGlobPattern pattern = layer.GlobPattern;
         bool hasSuffix = !string.IsNullOrEmpty(layer.NamespaceSuffix);
@@ -63,6 +85,33 @@ internal static class ArchitectureLayerResolver
         return $"{layer.Namespace}.{layer.NamespaceSuffix}";
     }
 
+    private static string DescribeSelector(ArchitectureLayer layer)
+    {
+        if (layer.Selector == null)
+        {
+            return "<empty layer>";
+        }
+
+        string metadata = layer.Selector.Metadata.Count == 0
+            ? string.Empty
+            : $", metadata: {string.Join(", ", layer.Selector.Metadata.OrderBy(e => e.Key, StringComparer.Ordinal).Select(e => $"{e.Key}={FormatScalar(e.Value)}"))}";
+        return $"selector(role: {layer.Selector.Role}{metadata})";
+    }
+
+    private static string FormatScalar(object value)
+    {
+        return value switch
+        {
+            null => string.Empty,
+            string s => s,
+            bool b => b ? "True" : "False",
+            byte or sbyte or short or ushort or int or uint or long or ulong or float or double or decimal =>
+                Convert.ToString(value, CultureInfo.InvariantCulture) ?? string.Empty,
+            IFormattable formattable => formattable.ToString(null, CultureInfo.InvariantCulture),
+            _ => value.ToString() ?? string.Empty
+        };
+    }
+
     public static string? ResolveContainingLayer(
         ArchitectureContractDocument document,
         string namespaceName,
@@ -74,6 +123,7 @@ internal static class ArchitectureLayerResolver
                 LayerName = layerName,
                 Layer = ResolveLayer(document, "cycle-resolution", layerName)
             })
+            .Where(layer => !string.IsNullOrWhiteSpace(layer.Layer.Namespace))
             .Select(layer => new
             {
                 layer.LayerName,
@@ -94,7 +144,8 @@ internal static class ArchitectureLayerResolver
     public static bool IsProjectType(ArchitectureContractDocument document, string namespaceName)
     {
         return document.Layers.Values.Any(layer =>
-            MatchesNamespace(layer, namespaceName));
+            !string.IsNullOrWhiteSpace(layer.Namespace)
+            && MatchesNamespace(layer, namespaceName));
     }
 
     public static bool IsInAnyNamespace(string typeName, IEnumerable<string> namespacePrefixes)

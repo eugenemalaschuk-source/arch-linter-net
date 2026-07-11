@@ -110,6 +110,44 @@ contracts:
     }
 
     [Test]
+    public void Validate_SelectorOnlyLayer_PassesDefaultPolicyConsistencyPipeline()
+    {
+        string contractDir = Path.Combine(_tempDir, "architecture");
+        Directory.CreateDirectory(contractDir);
+        string contractPath = Path.Combine(contractDir, "dependencies.arch.yml");
+
+        File.WriteAllText(contractPath, @"
+version: 1
+name: Selector Only Validation Test
+classification:
+  attributes:
+    - attribute: AttributeRoleExtractionTestFixtures.DomainMarkerAttribute
+      role: DomainLayer
+      metadata:
+        domain: constructor[0]
+layers:
+  semantic:
+    selector:
+      role: DomainLayer
+      metadata:
+        domain: Sales
+analysis:
+  target_assemblies:
+    - ArchLinterNet.Core.Tests
+contracts:
+  strict_layers:
+    - name: semantic-layer-exists
+      layers: [semantic]
+");
+
+        bool result = ArchitectureValidator.Validate(contractPath, out var violations, out var cycles);
+
+        Assert.That(result, Is.True);
+        Assert.That(violations, Is.Empty);
+        Assert.That(cycles, Is.Empty);
+    }
+
+    [Test]
     public void Validate_ThreeArgOverload_ReturnsViolationsAndCycles()
     {
         string contractDir = Path.Combine(_tempDir, "architecture");

@@ -1,5 +1,9 @@
+using System.Globalization;
 using ArchLinterNet.Core.Contracts;
+using ArchLinterNet.Core.Contracts.Validators;
+using ArchLinterNet.Core.Execution;
 using ArchLinterNet.Core.Resolution;
+using AttributeRoleExtractionTestFixtures;
 using NUnit.Framework;
 
 namespace ArchLinterNet.Core.Tests;
@@ -7,6 +11,9 @@ namespace ArchLinterNet.Core.Tests;
 [TestFixture]
 public sealed class LayerResolverTests
 {
+    private static readonly string[] _candidateLayerNames = { "semantic", "core" };
+    private static readonly string[] _selectorMetadataDomains = { "Sales", "Billing" };
+
     private static readonly string[] _testCoreTestWeb = { "Test.Core", "Test.Web" };
 
     private ArchitectureContractDocument _document = null!;
@@ -162,5 +169,365 @@ public sealed class LayerResolverTests
             new[] { "Test.Core" });
 
         Assert.That(result, Is.False);
+    }
+
+    [Test]
+    public void FindTypesInLayer_SelectorOnlyMatchesRole()
+    {
+        var index = new ArchitectureRoleIndex(
+            new ArchitectureClassificationConfiguration
+            {
+                Attributes =
+                {
+                    new ArchitectureAttributeClassificationMapping
+                    {
+                        Attribute = "AttributeRoleExtractionTestFixtures.DomainMarkerAttribute",
+                        Role = "DomainLayer"
+                    }
+                }
+            },
+            new ArchitectureTypeIndex(new[] { typeof(TypeWithConstructorDefault).Assembly }));
+
+        ArchitectureLayer layer = new()
+        {
+            Selector = new ArchitectureLayerSelector { Role = "DomainLayer" }
+        };
+
+        Type[] matches = new ArchitectureTypeIndex(new[] { typeof(TypeWithConstructorDefault).Assembly })
+            .FindTypesInLayer(layer, index);
+
+        Assert.That(matches, Does.Contain(typeof(TypeWithConstructorDefault)));
+        Assert.That(matches, Does.Not.Contain(typeof(PlainType)));
+    }
+
+    [Test]
+    public void FindTypesInLayer_NamespaceAndSelectorRequireBoth()
+    {
+        var index = new ArchitectureRoleIndex(
+            new ArchitectureClassificationConfiguration
+            {
+                Attributes =
+                {
+                    new ArchitectureAttributeClassificationMapping
+                    {
+                        Attribute = "AttributeRoleExtractionTestFixtures.DomainMarkerAttribute",
+                        Role = "DomainLayer"
+                    }
+                }
+            },
+            new ArchitectureTypeIndex(new[] { typeof(TypeWithConstructorDefault).Assembly }));
+
+        ArchitectureLayer layer = new()
+        {
+            Namespace = "AttributeRoleExtractionTestFixtures",
+            Selector = new ArchitectureLayerSelector { Role = "OtherLayer" }
+        };
+
+        Type[] matches = new ArchitectureTypeIndex(new[] { typeof(TypeWithConstructorDefault).Assembly })
+            .FindTypesInLayer(layer, index);
+
+        Assert.That(matches, Is.Empty);
+    }
+
+    [Test]
+    public void FindTypesInLayer_SelectorMetadataUsesExactAndMatching()
+    {
+        var classification = new ArchitectureClassificationConfiguration
+        {
+            Attributes =
+            {
+                new ArchitectureAttributeClassificationMapping
+                {
+                    Attribute = "AttributeRoleExtractionTestFixtures.DomainMarkerAttribute",
+                    Role = "DomainLayer",
+                    Metadata = new Dictionary<string, object>
+                    {
+                        ["domain"] = "constructor[0]",
+                        ["enabled"] = "property:Enabled"
+                    }
+                }
+            }
+        };
+        var typeIndex = new ArchitectureTypeIndex(new[] { typeof(TypeWithBooleanProperty).Assembly });
+        var roleIndex = new ArchitectureRoleIndex(classification, typeIndex);
+        ArchitectureLayer layer = new()
+        {
+            Selector = new ArchitectureLayerSelector
+            {
+                Role = "DomainLayer",
+                Metadata = new Dictionary<string, object>
+                {
+                    ["domain"] = "Sales",
+                    ["enabled"] = true
+                }
+            }
+        };
+
+        Type[] matches = typeIndex.FindTypesInLayer(layer, roleIndex);
+
+        Assert.That(matches, Does.Contain(typeof(TypeWithBooleanProperty)));
+        Assert.That(matches, Does.Not.Contain(typeof(TypeWithConstructorDefault)));
+    }
+
+    [Test]
+    public void FindTypesInLayer_SelectorMetadataComparesNumericValuesByValue()
+    {
+        var classification = new ArchitectureClassificationConfiguration
+        {
+            Attributes =
+            {
+                new ArchitectureAttributeClassificationMapping
+                {
+                    Attribute = "AttributeRoleExtractionTestFixtures.DomainMarkerAttribute",
+                    Role = "DomainLayer",
+                    Metadata = new Dictionary<string, object> { ["priority"] = 5 }
+                }
+            }
+        };
+        var typeIndex = new ArchitectureTypeIndex(new[] { typeof(TypeWithConstructorDefault).Assembly });
+        var roleIndex = new ArchitectureRoleIndex(classification, typeIndex);
+        ArchitectureLayer layer = new()
+        {
+            Selector = new ArchitectureLayerSelector
+            {
+                Role = "DomainLayer",
+                Metadata = new Dictionary<string, object> { ["priority"] = 5.0 }
+            }
+        };
+
+        Type[] matches = typeIndex.FindTypesInLayer(layer, roleIndex);
+
+        Assert.That(matches, Does.Contain(typeof(TypeWithConstructorDefault)));
+    }
+
+    [Test]
+    public void DescribeLayer_SelectorOnlyLayer_UsesSelectorDescription()
+    {
+        ArchitectureLayer layer = new()
+        {
+            Selector = new ArchitectureLayerSelector
+            {
+                Role = "DomainLayer",
+                Metadata = new Dictionary<string, object> { ["domain"] = "Sales" }
+            }
+        };
+
+        Assert.That(ArchitectureLayerResolver.DescribeLayer(layer),
+            Is.EqualTo("selector(role: DomainLayer, metadata: domain=Sales)"));
+    }
+
+    [Test]
+    public void DescribeLayer_NamespaceAndSelector_UsesBothDescriptions()
+    {
+        ArchitectureLayer layer = new()
+        {
+            Namespace = "Test.Domain",
+            Selector = new ArchitectureLayerSelector
+            {
+                Role = "DomainLayer",
+                Metadata = new Dictionary<string, object> { ["domain"] = "Sales" }
+            }
+        };
+
+        Assert.That(ArchitectureLayerResolver.DescribeLayer(layer),
+            Is.EqualTo("Test.Domain + selector(role: DomainLayer, metadata: domain=Sales)"));
+    }
+
+    [Test]
+    public void ResolveContainingLayer_SelectorOnlyLayer_IsIgnoredByNamespaceResolution()
+    {
+        ArchitectureContractDocument document = new()
+        {
+            Layers = new Dictionary<string, ArchitectureLayer>
+            {
+                ["semantic"] = new()
+                {
+                    Selector = new ArchitectureLayerSelector { Role = "DomainLayer" }
+                },
+                ["core"] = new() { Namespace = "Test.Core" }
+            }
+        };
+
+        string? layer = ArchitectureLayerResolver.ResolveContainingLayer(
+            document,
+            "Test.Core.Services",
+            new HashSet<string>(_candidateLayerNames, StringComparer.Ordinal));
+
+        Assert.That(layer, Is.EqualTo("core"));
+    }
+
+    [Test]
+    public void MatchesNamespace_SelectorOnlyLayer_ReturnsFalseWithoutThrowing()
+    {
+        Assert.That(
+            ArchitectureLayerResolver.MatchesNamespace(
+                new ArchitectureLayer
+                {
+                    Selector = new ArchitectureLayerSelector { Role = "DomainLayer" }
+                },
+                "Test.Domain"),
+            Is.False);
+    }
+
+    [Test]
+    public void LayerValidation_SelectorOnlyLayer_IsValid()
+    {
+        Assert.DoesNotThrow(() => new LayerNamespacesValidator().Validate(
+            new ArchitectureContractDocument
+            {
+                Layers = new Dictionary<string, ArchitectureLayer>
+                {
+                    ["domain"] = new()
+                    {
+                        Selector = new ArchitectureLayerSelector { Role = "DomainLayer" }
+                    }
+                }
+            }));
+    }
+
+    [Test]
+    public void LayerValidation_SelectorWithoutRole_IsRejected()
+    {
+        Assert.Throws<InvalidOperationException>(() => new LayerNamespacesValidator().Validate(
+            new ArchitectureContractDocument
+            {
+                Layers = new Dictionary<string, ArchitectureLayer>
+                {
+                    ["domain"] = new() { Selector = new ArchitectureLayerSelector() }
+                }
+            }));
+    }
+
+    [Test]
+    public void LayerValidation_SelectorWithEmptyMetadataKey_IsRejected()
+    {
+        Assert.Throws<InvalidOperationException>(() => new LayerNamespacesValidator().Validate(
+            new ArchitectureContractDocument
+            {
+                Layers = new Dictionary<string, ArchitectureLayer>
+                {
+                    ["domain"] = new()
+                    {
+                        Selector = new ArchitectureLayerSelector
+                        {
+                            Role = "DomainLayer",
+                            Metadata = new Dictionary<string, object> { [string.Empty] = "Sales" }
+                        }
+                    }
+                }
+            }));
+    }
+
+    [Test]
+    public void LayerValidation_SelectorWithNonScalarMetadataValue_IsRejected()
+    {
+        Assert.Throws<InvalidOperationException>(() => new LayerNamespacesValidator().Validate(
+            new ArchitectureContractDocument
+            {
+                Layers = new Dictionary<string, ArchitectureLayer>
+                {
+                    ["domain"] = new()
+                    {
+                        Selector = new ArchitectureLayerSelector
+                        {
+                            Role = "DomainLayer",
+                            Metadata = new Dictionary<string, object> { ["domains"] = _selectorMetadataDomains }
+                        }
+                    }
+                }
+            }));
+    }
+
+    [Test]
+    public void LayerValidation_WithoutNamespaceOrSelector_IsRejected()
+    {
+        Assert.Throws<InvalidOperationException>(() => new LayerNamespacesValidator().Validate(
+            new ArchitectureContractDocument
+            {
+                Layers = new Dictionary<string, ArchitectureLayer>
+                {
+                    ["domain"] = new()
+                }
+            }));
+    }
+
+    [Test]
+    public void FindTypesInLayer_SelectorMetadataCrossDomainMismatch_ReturnsNoMatchWithoutThrowing()
+    {
+        var classification = new ArchitectureClassificationConfiguration
+        {
+            Attributes =
+            {
+                new ArchitectureAttributeClassificationMapping
+                {
+                    Attribute = "AttributeRoleExtractionTestFixtures.DomainMarkerAttribute",
+                    Role = "DomainLayer",
+                    Metadata = new Dictionary<string, object>
+                    {
+                        ["domain"] = "constructor[0]",
+                        ["enabled"] = "property:Enabled"
+                    }
+                }
+            }
+        };
+        var typeIndex = new ArchitectureTypeIndex(new[] { typeof(TypeWithBooleanProperty).Assembly });
+        var roleIndex = new ArchitectureRoleIndex(classification, typeIndex);
+
+        Assert.DoesNotThrow(() =>
+        {
+            Type[] stringVsNumber = typeIndex.FindTypesInLayer(
+                new ArchitectureLayer
+                {
+                    Selector = new ArchitectureLayerSelector
+                    {
+                        Role = "DomainLayer",
+                        Metadata = new Dictionary<string, object> { ["domain"] = 5 }
+                    }
+                },
+                roleIndex);
+            Type[] boolVsString = typeIndex.FindTypesInLayer(
+                new ArchitectureLayer
+                {
+                    Selector = new ArchitectureLayerSelector
+                    {
+                        Role = "DomainLayer",
+                        Metadata = new Dictionary<string, object> { ["enabled"] = "true" }
+                    }
+                },
+                roleIndex);
+
+            Assert.That(stringVsNumber, Is.Empty);
+            Assert.That(boolVsString, Is.Empty);
+        });
+    }
+
+    [Test]
+    public void DescribeLayer_SelectorNumericMetadata_UsesInvariantCulture()
+    {
+        CultureInfo previousCulture = CultureInfo.CurrentCulture;
+        CultureInfo previousUiCulture = CultureInfo.CurrentUICulture;
+
+        try
+        {
+            CultureInfo.CurrentCulture = CultureInfo.GetCultureInfo("fr-FR");
+            CultureInfo.CurrentUICulture = CultureInfo.GetCultureInfo("fr-FR");
+
+            ArchitectureLayer layer = new()
+            {
+                Selector = new ArchitectureLayerSelector
+                {
+                    Role = "DomainLayer",
+                    Metadata = new Dictionary<string, object> { ["ratio"] = 1.5m }
+                }
+            };
+
+            Assert.That(ArchitectureLayerResolver.DescribeLayer(layer),
+                Is.EqualTo("selector(role: DomainLayer, metadata: ratio=1.5)"));
+        }
+        finally
+        {
+            CultureInfo.CurrentCulture = previousCulture;
+            CultureInfo.CurrentUICulture = previousUiCulture;
+        }
     }
 }

@@ -1,7 +1,7 @@
 # semantic-classification-model Specification
 
 ## Purpose
-Define the semantic-classification vocabulary, the reserved `classification` YAML section, and the `layers.<name>.selector` shape that future role-discovery/extraction work (#108-#114) implements against. This capability is design-only: no attribute/inheritance/namespace/path extraction, role assignment, selector matching, or runtime binding is implemented by it.
+Define the semantic-classification vocabulary, the `classification` YAML section, and the executable `layers.<name>.selector` behavior across runtime layer matching and diagnostics. Attribute-based role assignment is implemented, and selector-backed layers participate in runtime binding; remaining classification sources and semantic coverage follow-up work stay in their own capabilities.
 ## Requirements
 ### Requirement: Classification vocabulary is defined
 The semantic classification model SHALL define exactly ten classification terms with non-overlapping meanings: `role`, `metadata`, `source`, `evidence`, `confidence`/`precedence`, `conflict`, `override`, `exclusion`, `stale selector`, and `uncovered semantic fact`.
@@ -155,24 +155,25 @@ Each of `constructor[<index>]`, `property:<Name>`, and `const:<Full.Type.NAME>` 
 - **WHEN** a `const:<Full.Type.NAME>` reference does not resolve to a compile-time `const` field
 - **THEN** that metadata key is omitted from the type's assigned metadata, the type still receives the entry's declared `role`, and the failure is recorded as an explainable fact
 
-### Requirement: Selector syntax is additive to the existing layer shape, and namespace remains required
-`layers.<name>.selector` SHALL be a new optional field on the existing `layer` schema shape, sibling to `namespace`/`namespace_suffix`/`external`, requiring `role` and allowing an optional exact-match `metadata` object. `namespace` SHALL remain a required field on every layer; `selector` is additive alongside it, never a substitute for it — a selector-only layer (no `namespace`) is schema-invalid, because `ArchitectureLayerResolver.IsProjectType` iterates every declared layer unconditionally and evaluates `layer.GlobPattern`, which throws for an empty `Namespace` at real execution time, not only at schema-validation or YAML-load time.
+### Requirement: Selector syntax is additive to the existing layer shape, and selector-only layers are valid
+The policy schema and runtime SHALL support `layers.<name>.selector` as an optional exact-match selector sibling to `namespace`/`namespace_suffix`/`external`. A selector SHALL require a non-empty `role` and MAY declare scalar metadata constraints. A layer SHALL declare either a non-empty `namespace` or a selector; when both are present, both predicates SHALL match. Namespace-only layers SHALL retain their existing behavior.
 
-#### Scenario: Selector-only layer is rejected
-- **WHEN** a layer declares `selector` with a `role` and no `namespace`
-- **THEN** the reviewed schema SHALL reject the layer definition as invalid
+#### Scenario: Selector-only layer is accepted and resolves classified types
+- **WHEN** a layer declares `selector: { role: DomainLayer }` without `namespace`
+- **AND** a loaded type has the exact role `DomainLayer`
+- **THEN** schema validation accepts the layer and layer lookup includes that type
 
 #### Scenario: A layer may declare namespace and selector together
-- **WHEN** a layer declares both `namespace` and `selector`
-- **THEN** the reviewed schema SHALL accept the layer definition as valid
+- **WHEN** a layer declares `namespace: MyApp.Domain` and `selector: { role: DomainLayer }`
+- **THEN** a type must match both the namespace pattern and the semantic selector to belong to the layer
 
 #### Scenario: Existing namespace-only layers are unaffected
-- **WHEN** a layer declares only `namespace` (no `selector`), as every layer did before this change
-- **THEN** the reviewed schema SHALL continue to accept and interpret it identically to its pre-change behavior
+- **WHEN** a layer declares only `namespace` (with optional glob, suffix, or external settings)
+- **THEN** it is accepted and interpreted identically to its pre-selector behavior
 
 #### Scenario: Selector metadata matching is exact and AND-combined
-- **WHEN** a `layers.<name>.selector` declares `metadata` with more than one key
-- **THEN** the reviewed design requires every declared key to match exactly for a type to be selected — no wildcard or regex value matching is introduced
+- **WHEN** a selector declares multiple metadata key/value constraints
+- **THEN** every declared key must match the type descriptor exactly, with no wildcard or regex matching
 
 ### Requirement: Overrides require a reason only when broad
 A `classification.overrides` entry scoped to a single `type` SHALL NOT require `reason`. A `classification.overrides` entry scoped to a `namespace` or `namespace_suffix` SHALL require a non-empty `reason`.
@@ -210,16 +211,20 @@ The design SHALL state that a future `scope: semantic_role` variant of the exist
 - **WHEN** a role is discovered by classification but consumed by no coverage-participating construct and named by no exclusion (including a role assigned by an `override`, which does not by itself exempt a type from coverage)
 - **THEN** the reviewed design classifies this using the same conceptual status as the architecture-coverage-model's `uncovered`, for a future `scope: semantic_role` coverage variant to implement
 
-### Requirement: No runtime behavior is introduced by this design
-This change SHALL NOT add any C# binding or extraction/role-assignment logic for the `inheritance`, `namespace`, or `path` classification sources, for `classification.overrides`/`classification.exclusions`, or for `layers.<name>.selector` matching/consumption, and SHALL NOT add any load-time guard rejecting policies that declare these constructs. A policy declaring any of these constructs before their bindings exist SHALL be schema-valid but produce no behavior for them. This requirement no longer applies to the `type_attribute` and `assembly_attribute` classification sources (`classification.attributes` and `classification.assembly_attributes`), which the `attribute-role-extraction` capability makes fully functional.
+### Requirement: Runtime behavior is introduced only for implemented classification sources and layer selectors
+The runtime SHALL execute `classification.attributes`, `classification.assembly_attributes`, and `layers.<name>.selector` matching/binding according to their implemented capabilities. `classification.inheritance`, `classification.namespace`, `classification.path`, `classification.overrides`, and `classification.exclusions` remain schema-valid reserved constructs until their own execution capabilities land.
 
-#### Scenario: Declaring unimplemented classification constructs does not throw
-- **WHEN** a policy declares `classification.overrides`, `classification.exclusions`, `classification.inheritance`, `classification.namespace`, `classification.path`, or a `layers.<name>.selector` field before their implementation lands
-- **THEN** policy loading and validation SHALL proceed exactly as if the construct were absent, with no exception thrown and no role ever assigned from it
+#### Scenario: Declaring reserved unimplemented classification constructs does not throw
+- **WHEN** a policy declares `classification.overrides`, `classification.exclusions`, `classification.inheritance`, `classification.namespace`, or `classification.path` before their implementation lands
+- **THEN** policy loading and validation SHALL proceed without exception and those reserved constructs SHALL produce no role assignment yet
 
-#### Scenario: Declaring classification.attributes or classification.assembly_attributes now produces role/metadata assignments
+#### Scenario: Declaring implemented selector-backed layers now affects runtime layer matching
+- **WHEN** a policy declares a `layers.<name>.selector` field matching a classified type
+- **THEN** the runtime uses that selector during layer membership, dependency checking, cycle detection, protected-layer checks, and related selector-aware diagnostics
+
+#### Scenario: Declaring classification.attributes or classification.assembly_attributes now produces role or metadata assignments
 - **WHEN** a policy declares `classification.attributes` or `classification.assembly_attributes` entries matching attributes present in scanned code
-- **THEN** the extraction engine assigns role/metadata per the `attribute-role-extraction` capability, rather than treating the declaration as an inert no-op
+- **THEN** the extraction engine assigns role or metadata per the `attribute-role-extraction` capability, rather than treating the declaration as an inert no-op
 
 ### Requirement: Existing policies remain unaffected
 A policy with no `classification` section and no `layers.<name>.selector` field SHALL behave identically to its behavior before the classification model existed.
@@ -228,3 +233,21 @@ A policy with no `classification` section and no `layers.<name>.selector` field 
 - **WHEN** a policy declares no `classification` section and no layer uses `selector`
 - **THEN** no classification-related schema field constrains that policy beyond what already applied before this change
 
+### Requirement: Layer selector diagnostics are deterministic and explainable
+The system SHALL reject invalid selector definitions with deterministic configuration diagnostics, and SHALL expose a deterministic empty-match diagnostic for a valid selector that matches no classified type unless the layer is external. Layer descriptions and relevant diagnostics SHALL identify semantic selection when a selector participates.
+
+#### Scenario: Selector without a role is rejected
+- **WHEN** a layer declares `selector` without a non-empty `role`
+- **THEN** policy validation rejects the document with a selector configuration diagnostic
+
+#### Scenario: Empty selector match is visible
+- **WHEN** a non-external selector-backed layer matches no loaded type
+- **THEN** configuration or coverage diagnostics report that the semantic selector matched no types
+
+#### Scenario: External empty selector is suppressed consistently
+- **WHEN** an external selector-backed layer matches no loaded type
+- **THEN** the existing external-layer empty-layer suppression behavior is preserved
+
+#### Scenario: Match diagnostics identify the matching mechanism
+- **WHEN** a type is resolved into a selector-backed layer
+- **THEN** layer descriptions or diagnostics can distinguish namespace matching, semantic selector matching, and their combination

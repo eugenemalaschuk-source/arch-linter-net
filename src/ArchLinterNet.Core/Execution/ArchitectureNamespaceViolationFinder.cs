@@ -13,7 +13,8 @@ internal static class ArchitectureNamespaceViolationFinder
         ArchitectureLayer forbiddenLayer,
         IReadOnlyCollection<string> allowedTypeFullNames,
         ArchitectureContractExecutionContext executionContext,
-        ArchitectureReferenceGraph? referenceGraph = null)
+        ArchitectureReferenceGraph? referenceGraph = null,
+        ArchitectureRoleIndex? roleIndex = null)
     {
         return sourceTypes
             .Select(type =>
@@ -25,8 +26,7 @@ internal static class ArchitectureNamespaceViolationFinder
                     .Select(reference => new
                     {
                         Reference = reference,
-                        Match = ArchitectureLayerResolver.MatchNamespace(forbiddenLayer,
-                            ArchitectureTypeNames.SafeNamespace(reference))
+                        Match = MatchReference(forbiddenLayer, reference, roleIndex)
                     })
                     .Where(x => x.Match.Matched)
                     .Select(x => new
@@ -72,7 +72,8 @@ internal static class ArchitectureNamespaceViolationFinder
         IReadOnlyCollection<string> allowedTypeFullNames,
         IReadOnlyCollection<Assembly> targetAssemblies,
         ArchitectureContractExecutionContext executionContext,
-        ArchitectureReferenceGraph? referenceGraph = null)
+        ArchitectureReferenceGraph? referenceGraph = null,
+        ArchitectureRoleIndex? roleIndex = null)
     {
         HashSet<Assembly> assemblySet = targetAssemblies.ToHashSet();
         Func<Type, bool> traversePredicate = t => assemblySet.Contains(t.Assembly);
@@ -80,7 +81,7 @@ internal static class ArchitectureNamespaceViolationFinder
         return sourceTypes
             .OrderBy(type => ArchitectureTypeNames.SafeFullName(type), StringComparer.Ordinal)
             .Select(type => BuildTransitiveViolation(
-                type, forbiddenLayer, allowedTypeFullNames, executionContext, referenceGraph, traversePredicate))
+                type, forbiddenLayer, allowedTypeFullNames, executionContext, referenceGraph, traversePredicate, roleIndex))
             .Where(violation => violation != null)!;
     }
 
@@ -90,7 +91,8 @@ internal static class ArchitectureNamespaceViolationFinder
         IReadOnlyCollection<string> allowedTypeFullNames,
         ArchitectureContractExecutionContext executionContext,
         ArchitectureReferenceGraph? referenceGraph,
-        Func<Type, bool> traversePredicate)
+        Func<Type, bool> traversePredicate,
+        ArchitectureRoleIndex? roleIndex)
     {
         string sourceFullName = ArchitectureTypeNames.SafeFullName(type);
         List<string> forbiddenRefs = new();
@@ -105,7 +107,7 @@ internal static class ArchitectureNamespaceViolationFinder
         {
             CollectForbiddenTransitiveReference(
                 referenced, path, forbiddenLayer, allowedTypeFullNames, executionContext, sourceFullName,
-                forbiddenRefs, matchedPrefixes, paths);
+                forbiddenRefs, matchedPrefixes, paths, roleIndex);
         }
 
         if (forbiddenRefs.Count == 0)
@@ -142,7 +144,8 @@ internal static class ArchitectureNamespaceViolationFinder
         string sourceFullName,
         List<string> forbiddenRefs,
         HashSet<string> matchedPrefixes,
-        List<IReadOnlyCollection<string>> paths)
+        List<IReadOnlyCollection<string>> paths,
+        ArchitectureRoleIndex? roleIndex)
     {
         string refFullName = ArchitectureTypeNames.SafeFullName(referenced);
         if (string.IsNullOrEmpty(refFullName))
@@ -150,8 +153,7 @@ internal static class ArchitectureNamespaceViolationFinder
             return;
         }
 
-        ArchitectureNamespaceMatch match = ArchitectureLayerResolver.MatchNamespace(forbiddenLayer,
-            ArchitectureTypeNames.SafeNamespace(referenced));
+        ArchitectureNamespaceMatch match = MatchReference(forbiddenLayer, referenced, roleIndex);
         if (!match.Matched)
         {
             return;
@@ -233,6 +235,35 @@ internal static class ArchitectureNamespaceViolationFinder
     public static bool IsInAnyAllowedLayer(string namespaceName, IReadOnlyList<ArchitectureLayer> allowedLayers)
     {
         return allowedLayers.Any(layer => ArchitectureLayerResolver.MatchesNamespace(layer, namespaceName));
+    }
+
+    public static bool IsInAnyAllowedLayer(Type type, IReadOnlyList<ArchitectureLayer> allowedLayers, ArchitectureRoleIndex roleIndex)
+    {
+        return allowedLayers.Any(layer => ArchitectureLayerTypeMatcher.Matches(layer, type, roleIndex));
+    }
+
+    private static ArchitectureNamespaceMatch MatchReference(
+        ArchitectureLayer layer,
+        Type referenced,
+        ArchitectureRoleIndex? roleIndex)
+    {
+        if (roleIndex == null)
+        {
+            return ArchitectureLayerResolver.MatchNamespace(
+                layer,
+                ArchitectureTypeNames.SafeNamespace(referenced));
+        }
+
+        if (!ArchitectureLayerTypeMatcher.Matches(layer, referenced, roleIndex))
+        {
+            return new ArchitectureNamespaceMatch(false, string.Empty, null);
+        }
+
+        return string.IsNullOrWhiteSpace(layer.Namespace)
+            ? new ArchitectureNamespaceMatch(true, ArchitectureLayerResolver.DescribeLayer(layer), null)
+            : ArchitectureLayerResolver.MatchNamespace(
+                layer,
+                ArchitectureTypeNames.SafeNamespace(referenced));
     }
 
     private static string ExtractNormalizedKey(string reference)

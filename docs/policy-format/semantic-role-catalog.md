@@ -278,13 +278,14 @@ layers:
       metadata: { platform: Unity }
 ```
 
-`namespace` remains required on every layer; `selector` is additive in the
-current model. Use namespace facts, not scene inspection, for Unity boundaries.
+`namespace` is optional when a layer declares `selector`; when both are
+present, both constraints must match. Use namespace facts, not scene
+inspection, for Unity boundaries.
 Asmdef and package-reference facts are useful future discovery guidance, but
 they are not among the current six classification sources and require a separate
-semantic-classification-model change before automatic use. These reserved shapes
-describe future consumers; they do not make classification or selectors active
-today.
+semantic-classification-model change before automatic use. These shapes now
+have an active selector consumer; classification sources remain limited to the
+implemented extraction capabilities.
 
 ## Conflict and safe policy guidance
 
