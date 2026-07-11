@@ -158,6 +158,12 @@ type-level only (no method-body IL scanning yet, unlike `strict_external`). See
 
 ## Use Type Placement For Where A Role Lives And How It's Named
 
+For the reviewed vocabulary of roles such as controllers, handlers, domain
+events, Unity systems, and their contextual metadata, see the [semantic role
+catalog](../policy-format/semantic-role-catalog.md). Treat its reserved
+classification examples as design guidance until extraction and selector
+evaluation are implemented; keep policy selectors narrow and explicit.
+
 When an architectural role (a controller, a handler, a domain event, a Unity
 `MonoBehaviour`) must live in a specific layer/namespace/project/assembly
 and/or carry a specific naming convention, use `strict_type_placement` /
