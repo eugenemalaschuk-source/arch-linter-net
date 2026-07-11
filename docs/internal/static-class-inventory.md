@@ -4,7 +4,7 @@ This is internal project documentation for maintaining the `arch-linter-net` rep
 
 Issue #154 asks for every production `static class` under `src/` to be classified so static code stays limited to intentional pure helpers, extension methods, constants, or compatibility facades, while services/orchestrators that own behavior, state, or collaborators become instance-based and composition-root managed. This document is that inventory. It also seeds guardrail candidates for #142's self-policy work.
 
-35 production `static class` declarations existed under `src/` (none in `src/ArchLinterNet.Unity/`) before #158's change converted `ArchitectureContractExecutor`, leaving 34 classified below. #159 converted the remaining 14 production service/orchestrator/scanner/resolver/parser/loader classes tracked in section (e) below (2 of which held hidden `static Lazy<T>` global state); the 20 pure-helper/extension/facade classes in sections (a), (b), and (d) are unchanged and remain intentionally static.
+The original #154 audit tracked 35 production `static class` declarations before #158 converted `ArchitectureContractExecutor`. #159 then converted the remaining production service/orchestrator/scanner/resolver/parser/loader classes. Issue #301 moved the asmdef convenience facade from the deleted Unity adapter project into `Core/Asmdef/AsmdefValidator.cs`, where it is now classified alongside the other intentional facades below.
 
 ## (a) Pure helper / deterministic mapper — allowed static
 
@@ -38,9 +38,9 @@ No state, no I/O side effects beyond what's passed in as parameters (e.g. an inj
 
 None found.
 
-## (d) Compatibility facade delegating to a composed service — allowed static
+## (d) Compatibility or entry-point facade delegating to composed services — allowed static
 
-Each of these builds or delegates to an `ArchitectureEngine`/DI-composed service rather than owning behavior itself.
+Each of these builds or delegates to an `ArchitectureEngine`/DI-composed service rather than owning validation algorithms itself.
 
 | File | Class | What it does |
 |---|---|---|
@@ -48,6 +48,7 @@ Each of these builds or delegates to an `ArchitectureEngine`/DI-composed service
 | `Testing/ArchitectureAssertions.cs` | `ArchitectureAssertions` | Entry point returning a fluent `ArchitectureValidationBuilder` |
 | `Core/Validation/ArchitectureValidationService.cs` | `ArchitectureValidationService` | Static facade holding a `Lazy<ArchitectureEngine>` built via `ArchitectureEngineBuilder().AddArchLinterNetCore()`; used by `ArchitectureValidator`, CLI, Testing |
 | `Core/Validation/ArchitectureBaselineService.cs` | `ArchitectureBaselineService` | Same `Lazy<ArchitectureEngine>` facade pattern, for baseline generation |
+| `Core/Asmdef/AsmdefValidator.cs` | `AsmdefValidator` | Asmdef-only convenience facade preserving the former public `Validate` signatures while delegating to `ArchitectureEngine.ValidateAsmdef` inside Core |
 
 ## (e) Production service/orchestrator — converted
 
@@ -74,6 +75,6 @@ These owned real logic; all are now instance classes. #158 converted the one the
 ## Guardrail candidates for #142
 
 - Forbid new `static class` declarations under `src/ArchLinterNet.Core/**` that are not one of: extension method container (`this` first parameter on every public method), a class whose only fields are `const`/`static readonly` value types or immutable collections (constants/options holder), or a class explicitly listed in the (a)/(d) tables above.
-- Flag any `static readonly Lazy<T>` field in production code as a hidden-global-state smell requiring explicit review. As of #159, zero such fields remain outside the two intentional, already-documented compatibility facades (`ArchitectureValidationService`, `ArchitectureBaselineService`); a new one appearing anywhere else is a regression.
+- Flag any `static readonly Lazy<T>` field in production code as a hidden-global-state smell requiring explicit review. As of #301, zero such fields remain outside the three intentional, documented facades (`ArchitectureValidationService`, `ArchitectureBaselineService`, and `AsmdefValidator`); a new one appearing anywhere else is a regression.
 - Require any new orchestrator/scanner/resolver/finder/parser/loader class to be added as an instance class registered in `ServiceCollectionExtensions.AddArchLinterNetCore()` (or, for a stateless per-run collaborator consumed only by a non-DI-composed domain object such as `ArchitectureAnalysisSession`, an instance class constructed directly at the point of use — see the scanner entries in section (e) above), not as a new `static class`.
 - As of #159, section (e) is empty of "follow-up candidate" entries — every class in this repo classified as a production service/orchestrator/scanner/resolver/parser/loader is instance-based. A new static class matching that classification should be treated as new debt, not a continuation of pre-existing debt.
