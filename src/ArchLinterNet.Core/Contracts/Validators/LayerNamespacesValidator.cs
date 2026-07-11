@@ -15,10 +15,23 @@ internal sealed class LayerNamespacesValidator : IArchitecturePolicyDocumentVali
                     $"Layer '{name}' must declare a non-empty namespace or selector.");
             }
 
+            if (!string.IsNullOrWhiteSpace(layer.NamespaceSuffix)
+                && string.IsNullOrWhiteSpace(layer.Namespace))
+            {
+                throw new InvalidOperationException(
+                    $"Layer '{name}' namespace_suffix requires a non-empty namespace.");
+            }
+
             if (layer.Selector == null)
             {
                 _ = layer.GlobPattern;
                 continue;
+            }
+
+            if (layer.Selector.Metadata == null)
+            {
+                throw new InvalidOperationException(
+                    $"Layer '{name}' selector metadata must be an object when declared.");
             }
 
             if (string.IsNullOrWhiteSpace(layer.Selector.Role))
@@ -35,6 +48,12 @@ internal sealed class LayerNamespacesValidator : IArchitecturePolicyDocumentVali
 
             foreach ((string key, object value) in layer.Selector.Metadata)
             {
+                if (value is string stringValue && stringValue.Length == 0)
+                {
+                    throw new InvalidOperationException(
+                        $"Layer '{name}' selector metadata key '{key}' must not be an empty string.");
+                }
+
                 if (!IsSupportedScalar(value))
                 {
                     throw new InvalidOperationException(

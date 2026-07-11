@@ -212,6 +212,38 @@ public sealed class ArchitectureContractSchemaInstanceValidationTests
         Assert.That(Validate(Yaml, "layer"), Is.False);
     }
 
+    [Test]
+    public void Layer_SelectorExplicitNull_IsRejected()
+    {
+        const string Yaml = "namespace: MyApp.Domain\nselector: null\n";
+
+        Assert.That(Validate(Yaml, "layer"), Is.False);
+    }
+
+    [Test]
+    public void Layer_SelectorMetadataExplicitNull_IsRejected()
+    {
+        const string Yaml = "selector:\n  role: DomainLayer\n  metadata: null\n";
+
+        Assert.That(Validate(Yaml, "layer"), Is.False);
+    }
+
+    [Test]
+    public void Layer_SelectorOnlyWithNamespaceSuffix_IsRejected()
+    {
+        const string Yaml = "namespace_suffix: Generated\nselector:\n  role: DomainLayer\n";
+
+        Assert.That(Validate(Yaml, "layer"), Is.False);
+    }
+
+    [Test]
+    public void Layer_SelectorMetadataEmptyString_IsRejected()
+    {
+        const string Yaml = "selector:\n  role: DomainLayer\n  metadata:\n    domain: \"\"\n";
+
+        Assert.That(Validate(Yaml, "layer"), Is.False);
+    }
+
     [TestCase("samples/policies/modular-monolith.yml")]
     [TestCase("samples/policies/unity-asmdef-boundaries.yml")]
     [TestCase("samples/policies/basic-clean-architecture.yml")]

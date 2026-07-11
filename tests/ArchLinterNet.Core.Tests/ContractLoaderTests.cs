@@ -462,4 +462,164 @@ contracts:
         Assert.That(ex.Message, Does.Contain($"selector metadata key '{key}'"));
         Assert.That(ex.Message, Does.Contain("string, boolean, or finite numeric scalar"));
     }
+
+    [Test]
+    public void LoadFromPath_SelectorExplicitNull_ThrowsDeterministicValidationError()
+    {
+        string contractDir = Path.Combine(_tempDir, "architecture");
+        Directory.CreateDirectory(contractDir);
+        string contractPath = Path.Combine(contractDir, "dependencies.arch.yml");
+
+        File.WriteAllText(contractPath, """
+version: 1
+name: Null Selector
+layers:
+  semantic:
+    namespace: MyApp.Domain
+    selector: null
+analysis:
+  target_assemblies: []
+contracts:
+  strict: []
+  audit: []
+  strict_layers: []
+  audit_layers: []
+  strict_allow_only: []
+  audit_allow_only: []
+  strict_cycles: []
+  audit_cycles: []
+  strict_method_body: []
+  audit_method_body: []
+  strict_asmdef: []
+  audit_asmdef: []
+  strict_independence: []
+  audit_independence: []
+""");
+
+        InvalidOperationException ex = Assert.Throws<InvalidOperationException>(() =>
+            new ArchitecturePolicyDocumentLoader().Load(contractPath))!;
+
+        Assert.That(ex.Message, Does.Contain("Layer 'semantic' selector must be an object"));
+    }
+
+    [Test]
+    public void LoadFromPath_SelectorMetadataExplicitNull_ThrowsDeterministicValidationError()
+    {
+        string contractDir = Path.Combine(_tempDir, "architecture");
+        Directory.CreateDirectory(contractDir);
+        string contractPath = Path.Combine(contractDir, "dependencies.arch.yml");
+
+        File.WriteAllText(contractPath, """
+version: 1
+name: Null Selector Metadata
+layers:
+  semantic:
+    selector:
+      role: DomainLayer
+      metadata: null
+analysis:
+  target_assemblies: []
+contracts:
+  strict: []
+  audit: []
+  strict_layers: []
+  audit_layers: []
+  strict_allow_only: []
+  audit_allow_only: []
+  strict_cycles: []
+  audit_cycles: []
+  strict_method_body: []
+  audit_method_body: []
+  strict_asmdef: []
+  audit_asmdef: []
+  strict_independence: []
+  audit_independence: []
+""");
+
+        InvalidOperationException ex = Assert.Throws<InvalidOperationException>(() =>
+            new ArchitecturePolicyDocumentLoader().Load(contractPath))!;
+
+        Assert.That(ex.Message, Does.Contain("Layer 'semantic' selector metadata must be an object"));
+    }
+
+    [Test]
+    public void LoadFromPath_SelectorOnlyLayerWithNamespaceSuffix_ThrowsDeterministicValidationError()
+    {
+        string contractDir = Path.Combine(_tempDir, "architecture");
+        Directory.CreateDirectory(contractDir);
+        string contractPath = Path.Combine(contractDir, "dependencies.arch.yml");
+
+        File.WriteAllText(contractPath, """
+version: 1
+name: Selector Only With Suffix
+layers:
+  semantic:
+    namespace_suffix: Generated
+    selector:
+      role: DomainLayer
+analysis:
+  target_assemblies: []
+contracts:
+  strict: []
+  audit: []
+  strict_layers: []
+  audit_layers: []
+  strict_allow_only: []
+  audit_allow_only: []
+  strict_cycles: []
+  audit_cycles: []
+  strict_method_body: []
+  audit_method_body: []
+  strict_asmdef: []
+  audit_asmdef: []
+  strict_independence: []
+  audit_independence: []
+""");
+
+        InvalidOperationException ex = Assert.Throws<InvalidOperationException>(() =>
+            new ArchitecturePolicyDocumentLoader().Load(contractPath))!;
+
+        Assert.That(ex.Message, Does.Contain("Layer 'semantic' namespace_suffix requires a non-empty namespace"));
+    }
+
+    [Test]
+    public void LoadFromPath_SelectorMetadataEmptyString_ThrowsDeterministicValidationError()
+    {
+        string contractDir = Path.Combine(_tempDir, "architecture");
+        Directory.CreateDirectory(contractDir);
+        string contractPath = Path.Combine(contractDir, "dependencies.arch.yml");
+
+        File.WriteAllText(contractPath, """
+version: 1
+name: Empty String Selector Metadata
+layers:
+  semantic:
+    selector:
+      role: DomainLayer
+      metadata:
+        domain: ""
+analysis:
+  target_assemblies: []
+contracts:
+  strict: []
+  audit: []
+  strict_layers: []
+  audit_layers: []
+  strict_allow_only: []
+  audit_allow_only: []
+  strict_cycles: []
+  audit_cycles: []
+  strict_method_body: []
+  audit_method_body: []
+  strict_asmdef: []
+  audit_asmdef: []
+  strict_independence: []
+  audit_independence: []
+""");
+
+        InvalidOperationException ex = Assert.Throws<InvalidOperationException>(() =>
+            new ArchitecturePolicyDocumentLoader().Load(contractPath))!;
+
+        Assert.That(ex.Message, Does.Contain("selector metadata key 'domain' must not be an empty string"));
+    }
 }

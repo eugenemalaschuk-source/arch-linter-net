@@ -79,6 +79,12 @@
     "layer": {
       "type": "object",
       "additionalProperties": false,
+      "allOf": [
+        {
+          "if": { "required": ["namespace_suffix"] },
+          "then": { "required": ["namespace"] }
+        }
+      ],
       "anyOf": [
         { "required": ["namespace"] },
         { "required": ["selector"] }
