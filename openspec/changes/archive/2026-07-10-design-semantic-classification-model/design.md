@@ -187,21 +187,24 @@ classification:
 
 layers:
   sales-domain:
+    namespace: Acme.Sales.Domain   # required — selector is additive, not a substitute
     selector:
       role: DomainLayer
       metadata:
         domain: Sales
   inventory-domain:
+    namespace: Acme.Inventory.Domain
     selector:
       role: DomainLayer
       metadata:
         domain: Inventory
   shared-kernel:
+    namespace: Acme.SharedKernel
     selector:
       role: SharedKernel
 ```
 
-`[DomainLayer("Sales")] class Order { }` in any namespace is classified `role: DomainLayer, domain: Sales` and matched by the `sales-domain` selector regardless of which namespace the type physically lives in — the scenario #106 calls out explicitly ("A repository can start with namespace conventions and gradually add attributes for stronger intent").
+`[DomainLayer("Sales")] class Order { }` is classified `role: DomainLayer, domain: Sales` by the attribute alone, regardless of which namespace the type physically lives in — the scenario #106 calls out explicitly ("A repository can start with namespace conventions and gradually add attributes for stronger intent"). The `sales-domain` layer's `selector` is reviewed shape only in this design (no matching engine exists yet, #111); until #111 lands, membership in `sales-domain` is still determined by its required `namespace: Acme.Sales.Domain`, exactly as it would be without `selector` present at all. A future policy revision where `selector` alone determines membership independent of physical namespace is exactly the selector-only case Decision 7 explicitly defers to #111, not something this design's schema accepts today.
 
 ### Worked example: Unity/client-style namespace-convention policy
 
@@ -219,14 +222,16 @@ classification:
 
 layers:
   gameplay-systems:
+    namespace: Game.Gameplay.Systems   # required — selector is additive, not a substitute
     selector:
       role: System
   view-models:
+    namespace: Game.Gameplay.ViewModels
     selector:
       role: ViewModel
 ```
 
-No attributes are declared at all; `classification.precedence: [namespace]` disables every other tier, so every type's role falls through directly to the namespace-convention tier — the "optional annotations, namespace conventions provide initial classification" path #106 requires for Unity/client-style repositories.
+No attributes are declared at all; `classification.precedence: [namespace]` disables every other tier, so every type's role falls through directly to the namespace-convention tier — the "optional annotations, namespace conventions provide initial classification" path #106 requires for Unity/client-style repositories. As above, each layer's `namespace` (not `selector`) is what actually determines membership until #111 implements selector-based resolution; `selector` is reviewed shape only.
 
 ## Risks / Trade-offs
 

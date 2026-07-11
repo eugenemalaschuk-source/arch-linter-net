@@ -231,4 +231,97 @@ public sealed class ArchitectureContractSchemaInstanceValidationTests
         Assert.That(results.IsValid, Is.True,
             string.Join(Environment.NewLine, results.Details.Where(d => !d.IsValid).Select(d => $"{d.InstanceLocation}: {string.Join(';', d.Errors?.Values ?? [])}")));
     }
+
+    // A review round found that design.md's/the docs page's illustrative ```yaml Markdown code
+    // blocks had drifted from the schema (a selector-only layer slipped past several earlier review
+    // rounds because only the schema-validated sample-policy files above were tested, never the
+    // Markdown prose itself). These tests extract every ```yaml fenced block from the design record
+    // and the public docs page and validate their 'classification' and 'layers' fragments against
+    // the corresponding schema $defs, so Markdown snippets can't silently diverge from the schema
+    // again. Blocks are partial policy fragments (no 'version'/'analysis'/'contracts'), so each
+    // fragment is validated against its own $def rather than the full root schema.
+    [TestCase("openspec/changes/archive/2026-07-10-design-semantic-classification-model/design.md")]
+    [TestCase("docs/policy-format/semantic-classification.md")]
+    public void MarkdownYamlBlocks_ClassificationAndLayerFragmentsValidateAgainstSchema(string relativePath)
+    {
+        string repositoryRoot = new ArchitectureRepositoryRootResolver().Resolve();
+        string markdownPath = Path.Combine(repositoryRoot, relativePath.Replace('/', Path.DirectorySeparatorChar));
+        string markdown = File.ReadAllText(markdownPath);
+
+        List<string> yamlBlocks = ExtractYamlCodeBlocks(markdown);
+        Assert.That(yamlBlocks, Is.Not.Empty, $"{relativePath} is expected to contain at least one ```yaml code block.");
+
+        var failures = new List<string>();
+
+        for (int blockIndex = 0; blockIndex < yamlBlocks.Count; blockIndex++)
+        {
+            JsonNode? instance = ToJsonNode(yamlBlocks[blockIndex]);
+            if (instance is not JsonObject root)
+            {
+                continue;
+            }
+
+            if (root.TryGetPropertyValue("classification", out JsonNode? classification) && classification is not null)
+            {
+                CollectFailures(classification, "classification", $"block {blockIndex}", failures);
+            }
+
+            if (root.TryGetPropertyValue("layers", out JsonNode? layers) && layers is JsonObject layerMap)
+            {
+                foreach ((string layerName, JsonNode? layer) in layerMap)
+                {
+                    if (layer is not null)
+                    {
+                        CollectFailures(layer, "layer", $"block {blockIndex}, layer '{layerName}'", failures);
+                    }
+                }
+            }
+        }
+
+        Assert.That(failures, Is.Empty, string.Join(Environment.NewLine, failures));
+    }
+
+    private static void CollectFailures(JsonNode instance, string defName, string location, List<string> failures)
+    {
+        JsonSchema subSchema = LoadSubSchema(defName);
+        EvaluationResults results = subSchema.Evaluate(instance, new EvaluationOptions { OutputFormat = OutputFormat.List });
+
+        if (!results.IsValid)
+        {
+            string errors = string.Join(';', results.Details.Where(d => !d.IsValid).SelectMany(d => d.Errors?.Values ?? []));
+            failures.Add($"{location} ($defs/{defName}): {errors}");
+        }
+    }
+
+    private static List<string> ExtractYamlCodeBlocks(string markdown)
+    {
+        var blocks = new List<string>();
+        string[] lines = markdown.Replace("\r\n", "\n").Split('\n');
+        var current = new List<string>();
+        bool inYamlBlock = false;
+
+        foreach (string line in lines)
+        {
+            if (!inYamlBlock && line.Trim() == "```yaml")
+            {
+                inYamlBlock = true;
+                current.Clear();
+                continue;
+            }
+
+            if (inYamlBlock && line.Trim() == "```")
+            {
+                inYamlBlock = false;
+                blocks.Add(string.Join('\n', current));
+                continue;
+            }
+
+            if (inYamlBlock)
+            {
+                current.Add(line);
+            }
+        }
+
+        return blocks;
+    }
 }
