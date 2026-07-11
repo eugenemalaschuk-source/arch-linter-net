@@ -16,10 +16,10 @@ as a working feature before their own implementation issues land. See
 authoritative list of what is enforced today.
 
 **This capability produces facts, not contract results.** Extraction records role,
-metadata, and `conflict`/evidence-extraction-failure facts on an in-memory result —
-it is not yet wired into any `strict_*`/`audit_*` contract family's pass/fail
-evaluation, CLI output, or SARIF diagnostics. A future issue is expected to surface
-these facts through the diagnostics pipeline.
+metadata, and `conflict`/evidence-extraction-failure facts, and `validate` surfaces
+them in human, JSON, and CI-artifact output as informational "Classification
+findings" — but they are not wired into any `strict_*`/`audit_*` contract family's
+pass/fail evaluation or SARIF diagnostics, and never affect the command's exit code.
 
 ## Why this section exists
 
@@ -234,10 +234,10 @@ is unaffected.
 - No selector matching: `layers.<name>.selector` never selects any type, even
   though `classification.attributes`/`assembly_attributes` now produce real
   role/metadata facts a future selector-matching engine could consume.
-- Facts, not surfaced diagnostics: `conflict` and evidence-extraction-failure
-  facts are recorded on the in-memory extraction result for the implemented
-  sources, but nothing wires them into CLI output, SARIF, or any contract
-  family's pass/fail evaluation yet. `stale selector` and `uncovered semantic fact` remain vocabulary only.
+- Informational only: `conflict` and evidence-extraction-failure facts for the
+  implemented sources are surfaced by `validate`'s human/JSON/CI-artifact output
+  as a "Classification findings" section, but nothing wires them into SARIF or
+  any contract family's pass/fail evaluation. `stale selector` and `uncovered semantic fact` remain vocabulary only.
 - No annotation package: this design does not ship, and does not require, a
   binary ArchLinterNet annotation assembly — see
   [Annotation strategy](#annotation-strategy) below for the full adoption

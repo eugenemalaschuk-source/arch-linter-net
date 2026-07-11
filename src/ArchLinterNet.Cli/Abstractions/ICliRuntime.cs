@@ -21,7 +21,9 @@ internal interface ICliRuntime
         IReadOnlyCollection<ArchitectureViolation> coverageFindings,
         IReadOnlyList<ArchitectureUnmatchedIgnoredViolation> unmatchedIgnoredViolations,
         IReadOnlyCollection<PolicyConsistencyDiagnostic> policyConsistencyFindings,
-        IReadOnlyCollection<ArchitectureCoverageSummary> coverageSummaries);
+        IReadOnlyCollection<ArchitectureCoverageSummary> coverageSummaries,
+        IReadOnlyCollection<ArchitectureClassificationConflict> classificationConflicts,
+        IReadOnlyCollection<ArchitectureClassificationMetadataFailure> classificationMetadataFailures);
 
     string FormatResultAsSarif(
         string mode,
@@ -39,6 +41,10 @@ internal interface ICliRuntime
     string FormatCoverageForHumans(IReadOnlyCollection<ArchitectureViolation> coverageFindings);
 
     string FormatCoverageSummaryForHumans(IReadOnlyCollection<ArchitectureCoverageSummary> coverageSummaries);
+
+    string FormatClassificationFactsForHumans(
+        IReadOnlyCollection<ArchitectureClassificationConflict> conflicts,
+        IReadOnlyCollection<ArchitectureClassificationMetadataFailure> metadataFailures);
 
     BaselineGenerationOutcome GenerateBaseline(BaselineGenerationRequest request);
 

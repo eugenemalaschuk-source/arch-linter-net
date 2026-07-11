@@ -148,7 +148,9 @@ public sealed class ValidateCommandDefinitionTests
                 "off",
                 Array.Empty<PolicyConsistencyDiagnostic>(),
                 "off",
-                Array.Empty<ArchitectureCoverageSummary>());
+                Array.Empty<ArchitectureCoverageSummary>(),
+                Array.Empty<ArchitectureClassificationConflict>(),
+                Array.Empty<ArchitectureClassificationMetadataFailure>());
         }
 
         public string FormatResultForCiArtifacts(
@@ -159,7 +161,9 @@ public sealed class ValidateCommandDefinitionTests
             IReadOnlyCollection<ArchitectureViolation> coverageFindings,
             IReadOnlyList<ArchitectureUnmatchedIgnoredViolation> unmatchedIgnoredViolations,
             IReadOnlyCollection<PolicyConsistencyDiagnostic> policyConsistencyFindings,
-            IReadOnlyCollection<ArchitectureCoverageSummary> coverageSummaries) => "formatted";
+            IReadOnlyCollection<ArchitectureCoverageSummary> coverageSummaries,
+            IReadOnlyCollection<ArchitectureClassificationConflict> classificationConflicts,
+            IReadOnlyCollection<ArchitectureClassificationMetadataFailure> classificationMetadataFailures) => "formatted";
 
         public string FormatResultAsSarif(string mode, IReadOnlyCollection<ArchitectureViolation> violations, IReadOnlyCollection<string> cycles) => "formatted";
         public string FormatViolationsForHumans(IReadOnlyCollection<ArchitectureViolation> violations) => "formatted";
@@ -168,6 +172,9 @@ public sealed class ValidateCommandDefinitionTests
         public string FormatUnmatchedForHumans(IReadOnlyList<ArchitectureUnmatchedIgnoredViolation> unmatchedViolations) => "formatted";
         public string FormatCoverageForHumans(IReadOnlyCollection<ArchitectureViolation> coverageFindings) => "formatted";
         public string FormatCoverageSummaryForHumans(IReadOnlyCollection<ArchitectureCoverageSummary> coverageSummaries) => "formatted";
+        public string FormatClassificationFactsForHumans(
+            IReadOnlyCollection<ArchitectureClassificationConflict> conflicts,
+            IReadOnlyCollection<ArchitectureClassificationMetadataFailure> metadataFailures) => "formatted";
         public BaselineGenerationOutcome GenerateBaseline(BaselineGenerationRequest request) => throw new NotSupportedException();
         public BaselineUpdateOutcome UpdateBaseline(BaselineUpdateRequest request) => throw new NotSupportedException();
         public BaselinePruneOutcome PruneBaseline(BaselinePruneRequest request) => throw new NotSupportedException();

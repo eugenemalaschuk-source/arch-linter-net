@@ -1,6 +1,7 @@
 using System.Linq;
 using System.Reflection;
 using ArchLinterNet.Core.Contracts;
+using ArchLinterNet.Core.Model;
 
 namespace ArchLinterNet.Core.Scanning;
 

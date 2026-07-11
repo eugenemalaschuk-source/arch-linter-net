@@ -137,3 +137,18 @@ Whenever `constructor[<index>]`, `property:<Name>`, `const:<Full.Type.NAME>`, or
 - **WHEN** a `classification.attributes` entry declares `metadata: { module: property:Module }` and the matched attribute instance has no named argument called `Module`
 - **THEN** the `module` key is omitted from the type's assigned metadata, the type still receives the entry's declared role, and the failure is recorded as a fact
 
+### Requirement: Conflict and evidence-extraction-failure facts are surfaced by the validate command
+Recorded conflict and evidence-extraction-failure facts SHALL be exposed by the `validate` command's human, JSON, and CI-artifact output — deduplicated across every scanned type an assembly-level fact recurs for — without affecting `Passed`/exit-code pass/fail evaluation for any contract family.
+
+#### Scenario: Human output includes classification findings when facts exist
+- **WHEN** `validate` runs against a policy whose `classification.attributes`/`classification.assembly_attributes` produce at least one conflict or evidence-extraction-failure fact
+- **THEN** the human-readable output includes a "Classification findings:" section listing each fact, and the command's pass/fail result is unaffected by their presence
+
+#### Scenario: JSON output includes classification findings
+- **WHEN** `validate --format json` runs against a policy producing classification facts
+- **THEN** the JSON payload includes `classification_conflicts` and `classification_metadata_failures` arrays
+
+#### Scenario: Assembly-level fact is not duplicated per type
+- **WHEN** an assembly-level conflict or evidence-extraction-failure fact applies identically to every type declared in that assembly
+- **THEN** the surfaced output lists that fact once, not once per type
+

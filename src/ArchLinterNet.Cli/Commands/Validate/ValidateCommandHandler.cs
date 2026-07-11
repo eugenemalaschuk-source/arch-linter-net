@@ -66,7 +66,9 @@ internal sealed class ValidateCommandHandler(ICliRuntime runtime, ICliConsole co
                     outcome.PolicyConsistencyConfig == "off"
                         ? Array.Empty<PolicyConsistencyDiagnostic>()
                         : outcome.PolicyConsistencyFindings,
-                    outcome.CoverageSummaries));
+                    outcome.CoverageSummaries,
+                    outcome.ClassificationConflicts,
+                    outcome.ClassificationMetadataFailures));
             }
             else if (options.Format == "sarif")
             {
@@ -121,6 +123,10 @@ internal sealed class ValidateCommandHandler(ICliRuntime runtime, ICliConsole co
         WriteOptionalSection(
             outcome.CoverageSummaries.Count > 0,
             () => runtime.FormatCoverageSummaryForHumans(outcome.CoverageSummaries));
+
+        WriteOptionalSection(
+            outcome.ClassificationConflicts.Count > 0 || outcome.ClassificationMetadataFailures.Count > 0,
+            () => runtime.FormatClassificationFactsForHumans(outcome.ClassificationConflicts, outcome.ClassificationMetadataFailures));
     }
 
     private void WriteOptionalSection(bool shouldWrite, Func<string> contentFactory)

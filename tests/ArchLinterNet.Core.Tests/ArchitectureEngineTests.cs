@@ -1,6 +1,7 @@
 using ArchLinterNet.Core.Composition;
 using ArchLinterNet.Core.Execution;
 using ArchLinterNet.Core.Execution.Abstractions;
+using ArchLinterNet.Core.Model;
 using ArchLinterNet.Core.Reporting;
 using ArchLinterNet.Core.Validation;
 using ArchLinterNet.Core.Validation.Abstractions;
@@ -185,7 +186,9 @@ public sealed class ArchitectureEngineTests
                 UnmatchedIgnoredViolationsConfig: "off",
                 PolicyConsistencyFindings: Array.Empty<Model.PolicyConsistencyDiagnostic>(),
                 PolicyConsistencyConfig: "off",
-                CoverageSummaries: Array.Empty<ArchitectureCoverageSummary>());
+                CoverageSummaries: Array.Empty<ArchitectureCoverageSummary>(),
+                ClassificationConflicts: Array.Empty<ArchitectureClassificationConflict>(),
+                ClassificationMetadataFailures: Array.Empty<ArchitectureClassificationMetadataFailure>());
         }
 
         public void Dispose()
@@ -208,7 +211,9 @@ public sealed class ArchitectureEngineTests
             UnmatchedIgnoredViolationsConfig: "off",
             PolicyConsistencyFindings: Array.Empty<Model.PolicyConsistencyDiagnostic>(),
             PolicyConsistencyConfig: "off",
-            CoverageSummaries: Array.Empty<ArchitectureCoverageSummary>());
+            CoverageSummaries: Array.Empty<ArchitectureCoverageSummary>(),
+            ClassificationConflicts: Array.Empty<ArchitectureClassificationConflict>(),
+            ClassificationMetadataFailures: Array.Empty<ArchitectureClassificationMetadataFailure>());
 
         public ValidationOutcome Validate(ValidationRequest request, ValidationTiming? timing = null)
         {
