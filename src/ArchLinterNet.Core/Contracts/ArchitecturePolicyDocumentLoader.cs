@@ -77,6 +77,9 @@ public sealed partial class ArchitecturePolicyDocumentLoader : IArchitecturePoli
                 continue;
             }
 
+            ValidateLayerNodeKeys(layerNode, layerName);
+            ValidateNamespaceValue(layerNode, layerName);
+
             bool hasNamespace = TryGetNonNullChild(layerNode, "namespace", out _);
             bool hasNamespaceSuffix = TryGetNonNullChild(layerNode, "namespace_suffix", out _);
             YamlNode? selectorNode = null;
@@ -115,6 +118,33 @@ public sealed partial class ArchitecturePolicyDocumentLoader : IArchitecturePoli
                         $"Layer '{layerName}' selector contains unknown property '{selKeyScalar.Value}'.");
                 }
             }
+        }
+    }
+
+    private static void ValidateLayerNodeKeys(YamlMappingNode layerNode, string layerName)
+    {
+        foreach ((YamlNode keyNode, _) in layerNode.Children)
+        {
+            if (keyNode is YamlScalarNode scalar
+                && !string.Equals(scalar.Value, "namespace", StringComparison.Ordinal)
+                && !string.Equals(scalar.Value, "namespace_suffix", StringComparison.Ordinal)
+                && !string.Equals(scalar.Value, "external", StringComparison.Ordinal)
+                && !string.Equals(scalar.Value, "selector", StringComparison.Ordinal))
+            {
+                throw new InvalidOperationException(
+                    $"Layer '{layerName}' contains unknown property '{scalar.Value}'.");
+            }
+        }
+    }
+
+    private static void ValidateNamespaceValue(YamlMappingNode layerNode, string layerName)
+    {
+        if (TryGetChild(layerNode, "namespace", out YamlNode? nsNode)
+            && nsNode is YamlScalarNode nsScalar
+            && (IsExplicitNull(nsScalar) || string.IsNullOrWhiteSpace(nsScalar.Value)))
+        {
+            throw new InvalidOperationException(
+                $"Layer '{layerName}' namespace must be a non-empty string.");
         }
     }
 
