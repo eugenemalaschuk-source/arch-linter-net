@@ -1,6 +1,7 @@
 using ArchLinterNet.Core.Contracts;
 using ArchLinterNet.Core.Execution;
 using ArchLinterNet.Core.Resolution;
+using ArchLinterNet.Core.Contracts.Validators;
 using AttributeRoleExtractionTestFixtures;
 using NUnit.Framework;
 
@@ -332,5 +333,80 @@ public sealed class LayerResolverTests
             new HashSet<string>(new[] { "semantic", "core" }, StringComparer.Ordinal));
 
         Assert.That(layer, Is.EqualTo("core"));
+    }
+
+    [Test]
+    public void MatchesNamespace_SelectorOnlyLayer_ReturnsFalseWithoutThrowing()
+    {
+        Assert.That(
+            ArchitectureLayerResolver.MatchesNamespace(
+                new ArchitectureLayer
+                {
+                    Selector = new ArchitectureLayerSelector { Role = "DomainLayer" }
+                },
+                "Test.Domain"),
+            Is.False);
+    }
+
+    [Test]
+    public void LayerValidation_SelectorOnlyLayer_IsValid()
+    {
+        Assert.DoesNotThrow(() => new LayerNamespacesValidator().Validate(
+            new ArchitectureContractDocument
+            {
+                Layers = new Dictionary<string, ArchitectureLayer>
+                {
+                    ["domain"] = new()
+                    {
+                        Selector = new ArchitectureLayerSelector { Role = "DomainLayer" }
+                    }
+                }
+            }));
+    }
+
+    [Test]
+    public void LayerValidation_SelectorWithoutRole_IsRejected()
+    {
+        Assert.Throws<InvalidOperationException>(() => new LayerNamespacesValidator().Validate(
+            new ArchitectureContractDocument
+            {
+                Layers = new Dictionary<string, ArchitectureLayer>
+                {
+                    ["domain"] = new() { Selector = new ArchitectureLayerSelector() }
+                }
+            }));
+    }
+
+    [Test]
+    public void LayerValidation_SelectorWithEmptyMetadataKey_IsRejected()
+    {
+        Assert.Throws<InvalidOperationException>(() => new LayerNamespacesValidator().Validate(
+            new ArchitectureContractDocument
+            {
+                Layers = new Dictionary<string, ArchitectureLayer>
+                {
+                    ["domain"] = new()
+                    {
+                        Selector = new ArchitectureLayerSelector
+                        {
+                            Role = "DomainLayer",
+                            Metadata = new Dictionary<string, object> { [string.Empty] = "Sales" }
+                        }
+                    }
+                }
+            }));
+    }
+
+    [Test]
+    public void LayerValidation_WithoutNamespaceOrSelector_IsRejected()
+    {
+        Assert.Throws<InvalidOperationException>(() => new LayerNamespacesValidator().Validate(
+            new ArchitectureContractDocument
+            {
+                Layers = new Dictionary<string, ArchitectureLayer>
+                {
+                    ["domain"] = new()
+                }
+            }));
     }
 }
