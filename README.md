@@ -2,34 +2,14 @@
   <img src="docs/assets/logo.png" alt="ArchLinterNet" width="420">
 </p>
 
-[![CI](https://github.com/eugenemalaschuk-source/arch-linter-net/actions/workflows/ci.yml/badge.svg)](https://github.com/eugenemalaschuk-source/arch-linter-net/actions/workflows/ci.yml)
-[![CodeQL](https://github.com/eugenemalaschuk-source/arch-linter-net/actions/workflows/codeql.yml/badge.svg)](https://github.com/eugenemalaschuk-source/arch-linter-net/actions/workflows/codeql.yml)
-[![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/eugenemalaschuk-source/arch-linter-net/badge)](https://scorecard.dev/viewer/?uri=github.com/eugenemalaschuk-source/arch-linter-net)
-[![OpenSSF Best Practices](https://www.bestpractices.dev/projects/13572/badge)](https://www.bestpractices.dev/en/projects/13572/passing)
-[![NuGet version](https://img.shields.io/nuget/v/ArchLinterNet.Cli.svg)](https://www.nuget.org/packages/ArchLinterNet.Cli/)
-[![NuGet downloads](https://img.shields.io/nuget/dt/ArchLinterNet.Cli)](https://www.nuget.org/packages/ArchLinterNet.Cli/)
-[![.NET tool](https://img.shields.io/badge/.NET-tool-512BD4)](https://www.nuget.org/packages/ArchLinterNet.Cli/)
-[![Test coverage](https://codecov.io/github/eugenemalaschuk-source/arch-linter-net/graph/badge.svg)](https://app.codecov.io/github/eugenemalaschuk-source/arch-linter-net)
-[![Sonar Quality Gate](https://sonarcloud.io/api/project_badges/measure?project=eugenemalaschuk-source_arch-linter-net&metric=alert_status&branch=main)](https://sonarcloud.io/summary/overall?id=eugenemalaschuk-source_arch-linter-net&branch=main)
-[![Sonar Maintainability](https://sonarcloud.io/api/project_badges/measure?project=eugenemalaschuk-source_arch-linter-net&metric=sqale_rating&branch=main)](https://sonarcloud.io/summary/overall?id=eugenemalaschuk-source_arch-linter-net&branch=main)
-[![Sonar Reliability](https://sonarcloud.io/api/project_badges/measure?project=eugenemalaschuk-source_arch-linter-net&metric=reliability_rating&branch=main)](https://sonarcloud.io/summary/overall?id=eugenemalaschuk-source_arch-linter-net&branch=main)
-[![Sonar Security](https://sonarcloud.io/api/project_badges/measure?project=eugenemalaschuk-source_arch-linter-net&metric=security_rating&branch=main)](https://sonarcloud.io/summary/overall?id=eugenemalaschuk-source_arch-linter-net&branch=main)
-[![Docs](https://img.shields.io/badge/docs-GitHub%20Pages-blue)](https://eugenemalaschuk-source.github.io/arch-linter-net/)
-[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
-
-The CI badge tracks one workflow that runs all quality signals in the same `validate` job, so a green badge means all of them passed. SonarCloud also analyzes trusted pull requests, decorates the PR, and evaluates the quality gate on new code rather than forcing the entire historical codebase to be clean before the PR can merge:
-
-| Quality signal | Source |
-|---|---|
-| Build/test | `make acceptance` (lint + all tests) |
-| Test coverage (line %) | CI runs `make test-coverage`, uploads Cobertura XML to Codecov, and the badge above updates dynamically from Codecov |
-| SonarCloud PR quality gate | trusted `pull_request` runs analyze new code, publish a SonarCloud PR result link, and fail CI when the Sonar quality gate fails |
-| SonarCloud main quality signals | the Sonar badges above track the `main` branch project status for quality gate, maintainability, reliability, and security |
-| OpenSSF Scorecard | trusted pull requests produce reviewable SARIF; default-branch and scheduled runs publish the supply-chain score to the public Scorecard API and GitHub code scanning |
-| Architecture validation | strict ArchLinterNet self-policy check (`architecture/dependencies.arch.yml`) |
-| Architecture coverage | strict/audit coverage JSON artifacts + Markdown report + sticky PR comment |
-
-See [CI integration](docs/guides/ci-integration.md#test-coverage-with-codecov-and-sonarcloud) for how test coverage upload, SonarCloud PR analysis, the dynamic badge, and the architecture coverage gate fit together.
+<p align="center">
+  <a href="https://www.nuget.org/packages/ArchLinterNet.Cli/"><img alt="NuGet version" src="https://img.shields.io/nuget/v/ArchLinterNet.Cli.svg"></a>
+  <a href="https://www.nuget.org/packages/ArchLinterNet.Cli/"><img alt="NuGet downloads" src="https://img.shields.io/nuget/dt/ArchLinterNet.Cli"></a>
+  <a href="https://github.com/eugenemalaschuk-source/arch-linter-net/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/eugenemalaschuk-source/arch-linter-net/actions/workflows/ci.yml/badge.svg"></a>
+  <a href="https://app.codecov.io/github/eugenemalaschuk-source/arch-linter-net"><img alt="Test coverage" src="https://codecov.io/github/eugenemalaschuk-source/arch-linter-net/graph/badge.svg"></a>
+  <a href="https://eugenemalaschuk-source.github.io/arch-linter-net/"><img alt="Documentation" src="https://img.shields.io/badge/docs-GitHub%20Pages-blue"></a>
+  <a href="LICENSE"><img alt="License: MIT" src="https://img.shields.io/badge/license-MIT-blue.svg"></a>
+</p>
 
 YAML-first architecture governance for .NET repositories.
 
@@ -154,6 +134,37 @@ make lint-docs   # strict documentation validation
 ```
 
 Generated `site/` output is a build artifact and should not be committed.
+
+## Project health and assurance
+
+<details>
+<summary>Security, maintainability, and supply-chain status</summary>
+
+<p>
+  <a href="https://github.com/eugenemalaschuk-source/arch-linter-net/actions/workflows/codeql.yml"><img alt="CodeQL" src="https://github.com/eugenemalaschuk-source/arch-linter-net/actions/workflows/codeql.yml/badge.svg"></a>
+  <a href="https://scorecard.dev/viewer/?uri=github.com/eugenemalaschuk-source/arch-linter-net"><img alt="OpenSSF Scorecard" src="https://api.scorecard.dev/projects/github.com/eugenemalaschuk-source/arch-linter-net/badge"></a>
+  <a href="https://www.bestpractices.dev/en/projects/13572/passing"><img alt="OpenSSF Best Practices" src="https://www.bestpractices.dev/projects/13572/badge"></a>
+  <a href="https://sonarcloud.io/summary/overall?id=eugenemalaschuk-source_arch-linter-net&branch=main"><img alt="Sonar Quality Gate" src="https://sonarcloud.io/api/project_badges/measure?project=eugenemalaschuk-source_arch-linter-net&metric=alert_status&branch=main"></a>
+  <a href="https://sonarcloud.io/summary/overall?id=eugenemalaschuk-source_arch-linter-net&branch=main"><img alt="Sonar Maintainability" src="https://sonarcloud.io/api/project_badges/measure?project=eugenemalaschuk-source_arch-linter-net&metric=sqale_rating&branch=main"></a>
+  <a href="https://sonarcloud.io/summary/overall?id=eugenemalaschuk-source_arch-linter-net&branch=main"><img alt="Sonar Reliability" src="https://sonarcloud.io/api/project_badges/measure?project=eugenemalaschuk-source_arch-linter-net&metric=reliability_rating&branch=main"></a>
+  <a href="https://sonarcloud.io/summary/overall?id=eugenemalaschuk-source_arch-linter-net&branch=main"><img alt="Sonar Security" src="https://sonarcloud.io/api/project_badges/measure?project=eugenemalaschuk-source_arch-linter-net&metric=security_rating&branch=main"></a>
+</p>
+
+The CI badge tracks one workflow that runs all quality signals in the same `validate` job, so a green badge means all of them passed. SonarCloud also analyzes trusted pull requests, decorates the PR, and evaluates the quality gate on new code rather than forcing the entire historical codebase to be clean before the PR can merge:
+
+| Quality signal | Source |
+|---|---|
+| Build/test | `make acceptance` (lint + all tests) |
+| Test coverage (line %) | CI runs `make test-coverage`, uploads Cobertura XML to Codecov, and the primary coverage badge updates dynamically from Codecov |
+| SonarCloud PR quality gate | trusted `pull_request` runs analyze new code, publish a SonarCloud PR result link, and fail CI when the Sonar quality gate fails |
+| SonarCloud main quality signals | the Sonar badges track the `main` branch project status for quality gate, maintainability, reliability, and security |
+| OpenSSF Scorecard | trusted pull requests produce reviewable SARIF; default-branch and scheduled runs publish the supply-chain score to the public Scorecard API and GitHub code scanning |
+| Architecture validation | strict ArchLinterNet self-policy check (`architecture/dependencies.arch.yml`) |
+| Architecture coverage | strict/audit coverage JSON artifacts + Markdown report + sticky PR comment |
+
+See [CI integration](docs/guides/ci-integration.md#test-coverage-with-codecov-and-sonarcloud) for how test coverage upload, SonarCloud PR analysis, the dynamic badge, and the architecture coverage gate fit together.
+
+</details>
 
 ## NuGet and repository links
 
