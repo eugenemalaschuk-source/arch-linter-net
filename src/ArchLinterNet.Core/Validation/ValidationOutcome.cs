@@ -15,5 +15,12 @@ public sealed record ValidationOutcome(
     string PolicyConsistencyConfig,
     IReadOnlyCollection<ArchitectureCoverageSummary> CoverageSummaries,
     IReadOnlyCollection<ArchitectureClassificationConflict> ClassificationConflicts,
-    IReadOnlyCollection<ArchitectureClassificationMetadataFailure> ClassificationMetadataFailures,
-    IReadOnlyCollection<ArchitectureClassificationRoleFact> ClassificationRoles);
+    IReadOnlyCollection<ArchitectureClassificationMetadataFailure> ClassificationMetadataFailures)
+{
+    // Declared as an init-only property outside the primary constructor, not as a 13th positional
+    // parameter, so existing positional `new ValidationOutcome(...)` call sites and Deconstruct
+    // usages compiled against the prior (12-parameter) shape keep working unchanged; callers who
+    // want discovered roles opt in via an object initializer.
+    public IReadOnlyCollection<ArchitectureClassificationRoleFact> ClassificationRoles { get; init; } =
+        Array.Empty<ArchitectureClassificationRoleFact>();
+}

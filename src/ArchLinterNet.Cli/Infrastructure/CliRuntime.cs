@@ -57,13 +57,13 @@ internal sealed class CliRuntime : ICliRuntime
             passed,
             violations,
             cycles,
+            classificationRoles,
             coverageFindings,
             unmatchedIgnoredViolations,
             policyConsistencyFindings,
             coverageSummaries,
             classificationConflicts,
-            classificationMetadataFailures,
-            classificationRoles);
+            classificationMetadataFailures);
     }
 
     public string FormatResultAsSarif(

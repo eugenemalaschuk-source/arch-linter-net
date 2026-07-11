@@ -188,8 +188,7 @@ public sealed class ArchitectureEngineTests
                 PolicyConsistencyConfig: "off",
                 CoverageSummaries: Array.Empty<ArchitectureCoverageSummary>(),
                 ClassificationConflicts: Array.Empty<ArchitectureClassificationConflict>(),
-                ClassificationMetadataFailures: Array.Empty<ArchitectureClassificationMetadataFailure>(),
-                ClassificationRoles: Array.Empty<ArchitectureClassificationRoleFact>());
+                ClassificationMetadataFailures: Array.Empty<ArchitectureClassificationMetadataFailure>());
         }
 
         public void Dispose()
@@ -214,8 +213,7 @@ public sealed class ArchitectureEngineTests
             PolicyConsistencyConfig: "off",
             CoverageSummaries: Array.Empty<ArchitectureCoverageSummary>(),
             ClassificationConflicts: Array.Empty<ArchitectureClassificationConflict>(),
-            ClassificationMetadataFailures: Array.Empty<ArchitectureClassificationMetadataFailure>(),
-            ClassificationRoles: Array.Empty<ArchitectureClassificationRoleFact>());
+            ClassificationMetadataFailures: Array.Empty<ArchitectureClassificationMetadataFailure>());
 
         public ValidationOutcome Validate(ValidationRequest request, ValidationTiming? timing = null)
         {

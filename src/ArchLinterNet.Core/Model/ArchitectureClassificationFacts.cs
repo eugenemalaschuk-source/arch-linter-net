@@ -28,8 +28,11 @@ public sealed record ArchitectureClassificationMetadataFailure(
 // A discovered role descriptor for one type, surfaced by the validate command alongside conflicts
 // and metadata failures. Subject is the type's full name. Metadata mirrors the winning source's
 // canonicalized values (string/boolean/decimal), per attribute-role-extraction canonicalization.
+// Evidence is the full type name of the attribute whose mapping produced Role/Metadata — the
+// concrete fact backing the assignment, distinct from Source (which only names the mechanism).
 public sealed record ArchitectureClassificationRoleFact(
     string Subject,
     string Role,
     ArchitectureClassificationSource Source,
+    string? Evidence,
     IReadOnlyDictionary<string, object> Metadata);

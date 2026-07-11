@@ -112,8 +112,7 @@ public sealed class CliArchitectureTests
                 PolicyConsistencyConfig: "off",
                 CoverageSummaries: Array.Empty<ArchitectureCoverageSummary>(),
                 ClassificationConflicts: Array.Empty<ArchitectureClassificationConflict>(),
-                ClassificationMetadataFailures: Array.Empty<ArchitectureClassificationMetadataFailure>(),
-                ClassificationRoles: Array.Empty<ArchitectureClassificationRoleFact>());
+                ClassificationMetadataFailures: Array.Empty<ArchitectureClassificationMetadataFailure>());
         }
 
         public string FormatResultForCiArtifacts(

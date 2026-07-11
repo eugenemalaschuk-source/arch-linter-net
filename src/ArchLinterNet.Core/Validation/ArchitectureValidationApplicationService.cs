@@ -82,7 +82,10 @@ public sealed class ArchitectureValidationApplicationService(
             return new ValidationOutcome(
                 passed, allViolations, execution.Cycles, coverageFindings, coverageConfig, unmatched, unmatchedConfig,
                 policyConsistencyFindings, policyConsistencyConfig, execution.CoverageSummaries,
-                classificationConflicts, classificationMetadataFailures, classificationRoles);
+                classificationConflicts, classificationMetadataFailures)
+            {
+                ClassificationRoles = classificationRoles
+            };
         }
     }
 

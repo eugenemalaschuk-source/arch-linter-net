@@ -27,7 +27,7 @@ public sealed partial class ArchitectureAnalysisSession
             }
 
             roles.Add(new ArchitectureClassificationRoleFact(
-                ArchitectureTypeNames.SafeFullName(type), descriptor.Role!, descriptor.Source!.Value, descriptor.Metadata));
+                ArchitectureTypeNames.SafeFullName(type), descriptor.Role!, descriptor.Source!.Value, descriptor.Evidence, descriptor.Metadata));
         }
 
         roles.Sort((a, b) => string.CompareOrdinal(a.Subject, b.Subject));

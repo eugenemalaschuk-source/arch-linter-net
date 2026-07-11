@@ -339,7 +339,7 @@ public sealed class ArchitectureDiagnosticFormatterTests
         {
             new Model.ArchitectureClassificationRoleFact(
                 "MyApp.Order", "DomainLayer", Model.ArchitectureClassificationSource.TypeAttribute,
-                new Dictionary<string, object> { ["domain"] = "Sales" })
+                "MyApp.DomainMarkerAttribute", new Dictionary<string, object> { ["domain"] = "Sales" })
         };
 
         using var json = JsonDocument.Parse(_formatter.FormatResultForCiArtifacts(
@@ -350,6 +350,7 @@ public sealed class ArchitectureDiagnosticFormatterTests
         Assert.That(role.GetProperty("subject").GetString(), Is.EqualTo("MyApp.Order"));
         Assert.That(role.GetProperty("role").GetString(), Is.EqualTo("DomainLayer"));
         Assert.That(role.GetProperty("source").GetString(), Is.EqualTo("TypeAttribute"));
+        Assert.That(role.GetProperty("evidence").GetString(), Is.EqualTo("MyApp.DomainMarkerAttribute"));
         Assert.That(role.GetProperty("metadata").GetProperty("domain").GetString(), Is.EqualTo("Sales"));
     }
 
@@ -368,9 +369,9 @@ public sealed class ArchitectureDiagnosticFormatterTests
         var roles = new[]
         {
             new Model.ArchitectureClassificationRoleFact(
-                "MyApp.Zeta", "DomainLayer", Model.ArchitectureClassificationSource.TypeAttribute, new Dictionary<string, object>()),
+                "MyApp.Zeta", "DomainLayer", Model.ArchitectureClassificationSource.TypeAttribute, null, new Dictionary<string, object>()),
             new Model.ArchitectureClassificationRoleFact(
-                "MyApp.Alpha", "DomainLayer", Model.ArchitectureClassificationSource.TypeAttribute, new Dictionary<string, object>())
+                "MyApp.Alpha", "DomainLayer", Model.ArchitectureClassificationSource.TypeAttribute, null, new Dictionary<string, object>())
         };
 
         using var json = JsonDocument.Parse(_formatter.FormatResultForCiArtifacts(

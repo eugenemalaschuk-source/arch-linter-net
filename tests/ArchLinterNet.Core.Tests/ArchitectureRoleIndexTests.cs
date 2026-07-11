@@ -43,6 +43,7 @@ public sealed class ArchitectureRoleIndexTests
         Assert.That(found, Is.True);
         Assert.That(descriptor.Role, Is.EqualTo("DomainLayer"));
         Assert.That(descriptor.Source, Is.EqualTo(ArchitectureClassificationSource.TypeAttribute));
+        Assert.That(descriptor.Evidence, Is.EqualTo("AttributeRoleExtractionTestFixtures.DomainMarkerAttribute"));
         Assert.That(descriptor.Metadata["domain"], Is.EqualTo("Sales"));
     }
 
@@ -83,9 +84,11 @@ public sealed class ArchitectureRoleIndexTests
 
         Assert.That(index.TryGetRole(typeof(TypeOverridingAssemblyAttribute), out ArchitectureTypeClassificationResult overridden), Is.True);
         Assert.That(overridden.Source, Is.EqualTo(ArchitectureClassificationSource.TypeAttribute));
+        Assert.That(overridden.Evidence, Is.EqualTo("AttributeRoleExtractionTestFixtures.DomainMarkerAttribute"));
 
         Assert.That(index.TryGetRole(typeof(TypeRelyingOnAssemblyAttribute), out ArchitectureTypeClassificationResult fallback), Is.True);
         Assert.That(fallback.Source, Is.EqualTo(ArchitectureClassificationSource.AssemblyAttribute));
+        Assert.That(fallback.Evidence, Is.EqualTo("AttributeRoleExtractionTestFixtures.BoundedContextMarkerAttribute"));
     }
 
     [Test]

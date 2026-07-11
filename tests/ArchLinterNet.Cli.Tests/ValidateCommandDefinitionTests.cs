@@ -150,8 +150,7 @@ public sealed class ValidateCommandDefinitionTests
                 "off",
                 Array.Empty<ArchitectureCoverageSummary>(),
                 Array.Empty<ArchitectureClassificationConflict>(),
-                Array.Empty<ArchitectureClassificationMetadataFailure>(),
-                Array.Empty<ArchitectureClassificationRoleFact>());
+                Array.Empty<ArchitectureClassificationMetadataFailure>());
         }
 
         public string FormatResultForCiArtifacts(

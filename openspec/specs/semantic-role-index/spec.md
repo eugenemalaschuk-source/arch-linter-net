@@ -1,7 +1,10 @@
 # semantic-role-index Specification
 
 ## Purpose
-TBD - created by archiving change add-semantic-role-index. Update Purpose after archive.
+Provide a per-validation-run, lazily-computed index of every scanned type's resolved semantic
+role — role, metadata, classification source, and evidence — built from a single
+`ArchitectureAttributeRoleExtractor` pass, with lookup APIs for future selectors/coverage checks
+and explainable diagnostics (including a `classification_roles` JSON output) surfaced by `validate`.
 ## Requirements
 ### Requirement: Role index is scoped to one validation run
 The system SHALL provide an `ArchitectureRoleIndex` constructed once per validation run from `ArchitectureAnalysisSession`, exposed alongside `TypeIndex`/`ReferenceGraph`, and never reused across assemblies or runs.
@@ -43,12 +46,20 @@ The system SHALL provide a lookup API that enumerates every type in the session'
 - **WHEN** the role index has computed descriptors for a run
 - **THEN** the enumeration API returns exactly the set of types that have a resolved role descriptor, with no duplicates
 
-### Requirement: Descriptors are explainable by classification source
-Each role descriptor SHALL report which classification source produced the winning assignment (`type_attribute` or `assembly_attribute`), enabling diagnostics to explain why a type was assigned a role.
+### Requirement: Descriptors are explainable by classification source and concrete evidence
+Each role descriptor SHALL report both which classification source produced the winning assignment (`type_attribute` or `assembly_attribute`) and the concrete evidence backing it — the full type name of the specific attribute whose mapping produced the role — so diagnostics can explain not only the mechanism but which fact justified the assignment.
 
 #### Scenario: Descriptor names the winning source
 - **WHEN** a type's role comes from a type-level attribute overriding an assembly-level attribute
 - **THEN** the descriptor's classification source is `type_attribute`, not `assembly_attribute`
+
+#### Scenario: Descriptor names the winning attribute as evidence
+- **WHEN** a type's role is assigned by a `classification.attributes` entry matching `Acme.Architecture.DomainLayerAttribute`
+- **THEN** the descriptor's evidence is the full type name `Acme.Architecture.DomainLayerAttribute`, distinguishing this assignment from any other entry mapped to the same classification source
+
+#### Scenario: Unresolved type has no evidence
+- **WHEN** a type resolves no role from any source
+- **THEN** the descriptor's evidence is absent (no fact to report)
 
 ### Requirement: Conflicts and metadata failures are exposed by the index
 The system SHALL expose the run's classification conflicts and metadata-extraction failures as index-level collections, computed as part of the same single cached pass used for role descriptors.
@@ -65,7 +76,7 @@ When `Document.Classification` declares no `attributes` or `assembly_attributes`
 - **THEN** the role index's descriptor enumeration, conflicts, and metadata failures are all empty, and existing namespace-only contract behavior is unaffected
 
 ### Requirement: JSON output exposes discovered role descriptors
-The `validate` command's JSON and CI-artifact output SHALL include a `classification_roles` array describing every classified type's subject (type full name), role, metadata, and classification source, deterministically ordered by subject.
+The `validate` command's JSON and CI-artifact output SHALL include a `classification_roles` array describing every classified type's subject (type full name), role, metadata, classification source, and evidence (the matched attribute's full type name), deterministically ordered by subject.
 
 #### Scenario: JSON output includes classification_roles
 - **WHEN** `validate --format json` runs against a policy whose classification produces at least one resolved role
