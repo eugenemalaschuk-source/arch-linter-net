@@ -33,13 +33,39 @@ public interface IArchitectureDiagnosticFormatter
         IReadOnlyCollection<ArchitectureClassificationConflict>? classificationConflicts = null,
         IReadOnlyCollection<ArchitectureClassificationMetadataFailure>? classificationMetadataFailures = null);
 
+    /// <summary>
+    /// Additive overload, not a modification of the member above: any caller already compiled
+    /// against the original ten-parameter overload keeps resolving to it, unaffected.
+    /// <c>classificationRoles</c> is required here, with no default value, specifically so this
+    /// overload stays unambiguous against the original for every call site, named or positional.
+    /// Declared with a default interface implementation that delegates to the original overload
+    /// and omits classification roles, so a third-party implementer that predates this member is
+    /// not forced to add it just to keep compiling — only <see cref="ArchitectureDiagnosticFormatter"/>
+    /// itself overrides it with real role serialization.
+    /// </summary>
+    string FormatResultForCiArtifacts( // NOSONAR: each parameter represents a semantically distinct section of the CI artifact payload; grouping would obscure the data contract
+        string mode,
+        bool passed,
+        IReadOnlyCollection<ArchitectureViolation> violations,
+        IReadOnlyCollection<string> cycles,
+        IReadOnlyCollection<ArchitectureClassificationRoleFact> classificationRoles,
+        IReadOnlyCollection<ArchitectureViolation>? coverageFindings = null,
+        IReadOnlyCollection<ArchitectureUnmatchedIgnoredViolation>? unmatched = null,
+        IReadOnlyCollection<PolicyConsistencyDiagnostic>? policyConsistencyFindings = null,
+        IReadOnlyCollection<ArchitectureCoverageSummary>? coverageSummaries = null,
+        IReadOnlyCollection<ArchitectureClassificationConflict>? classificationConflicts = null,
+        IReadOnlyCollection<ArchitectureClassificationMetadataFailure>? classificationMetadataFailures = null)
+        => FormatResultForCiArtifacts(
+            mode, passed, violations, cycles, coverageFindings, unmatched,
+            policyConsistencyFindings, coverageSummaries, classificationConflicts, classificationMetadataFailures);
+
     string FormatViolationsForCiArtifacts(string contractName, string? contractId,
         IReadOnlyCollection<ArchitectureViolation> violations);
 
     string FormatCyclesForCiArtifacts(string contractName, string? contractId, IReadOnlyCollection<string> cycles);
 }
 
-public sealed class ArchitectureDiagnosticFormatter : IArchitectureDiagnosticFormatter
+public sealed partial class ArchitectureDiagnosticFormatter : IArchitectureDiagnosticFormatter
 {
     public string FormatViolationsForHumans(IReadOnlyCollection<ArchitectureViolation> violations)
     {
@@ -160,114 +186,6 @@ public sealed class ArchitectureDiagnosticFormatter : IArchitectureDiagnosticFor
         return string.Join(
             Environment.NewLine,
             new[] { header }.Concat(excludedLines).Concat(uncoveredLines).Concat(staleLines).Concat(unknownLines));
-    }
-
-    public string FormatClassificationFactsForHumans(
-        IReadOnlyCollection<ArchitectureClassificationConflict> conflicts,
-        IReadOnlyCollection<ArchitectureClassificationMetadataFailure> metadataFailures)
-    {
-        if (conflicts.Count == 0 && metadataFailures.Count == 0)
-        {
-            return string.Empty;
-        }
-
-        var conflictLines = conflicts
-            .OrderBy(c => c.Subject, StringComparer.Ordinal)
-            .ThenBy(c => c.Source)
-            .ThenBy(c => c.MetadataDetail, StringComparer.Ordinal)
-            .Select(c => $"  conflict: [{c.Source}] {c.Subject}: kept '{c.WinningRole}', discarded '{c.DiscardedRole}'"
-                + (c.MetadataDetail != null ? $" ({c.MetadataDetail})" : string.Empty));
-
-        var failureLines = metadataFailures
-            .OrderBy(f => f.Subject, StringComparer.Ordinal)
-            .ThenBy(f => f.MetadataKey, StringComparer.Ordinal)
-            .Select(f => $"  metadata_failure: [{f.Source}] {f.Subject}.{f.MetadataKey}: {f.Reason}");
-
-        return "Classification findings:" + Environment.NewLine
-            + string.Join(Environment.NewLine, conflictLines.Concat(failureLines));
-    }
-
-    public string FormatResultForCiArtifacts(
-        string mode,
-        bool passed,
-        IReadOnlyCollection<ArchitectureViolation> violations,
-        IReadOnlyCollection<string> cycles,
-        IReadOnlyCollection<ArchitectureViolation>? coverageFindings = null,
-        IReadOnlyCollection<ArchitectureUnmatchedIgnoredViolation>? unmatched = null,
-        IReadOnlyCollection<PolicyConsistencyDiagnostic>? policyConsistencyFindings = null,
-        IReadOnlyCollection<ArchitectureCoverageSummary>? coverageSummaries = null,
-        IReadOnlyCollection<ArchitectureClassificationConflict>? classificationConflicts = null,
-        IReadOnlyCollection<ArchitectureClassificationMetadataFailure>? classificationMetadataFailures = null)
-    {
-        var unmatchedSerialized = (unmatched ?? Array.Empty<ArchitectureUnmatchedIgnoredViolation>())
-            .Select(ArchitectureDiagnosticMapper.FromUnmatchedIgnore)
-            .Select(u => new
-            {
-                contract = u.ContractName,
-                contract_id = u.ContractId,
-                ignore_index = u.IgnoreIndex,
-                source_type = u.SourceType,
-                forbidden_reference = u.ForbiddenReference,
-                reason = u.Reason
-            })
-            .ToArray();
-
-        var policyConsistencySerialized = (policyConsistencyFindings ?? Array.Empty<PolicyConsistencyDiagnostic>())
-            .Select(ToPolicyConsistencyJsonObject)
-            .ToArray();
-
-        var classificationConflictsSerialized = (classificationConflicts ?? Array.Empty<ArchitectureClassificationConflict>())
-            .OrderBy(c => c.Subject, StringComparer.Ordinal)
-            .ThenBy(c => c.MetadataDetail, StringComparer.Ordinal)
-            .Select(c => new
-            {
-                subject = c.Subject,
-                source = c.Source.ToString(),
-                winning_role = c.WinningRole,
-                discarded_role = c.DiscardedRole,
-                metadata_detail = c.MetadataDetail
-            })
-            .ToArray();
-
-        var classificationMetadataFailuresSerialized = (classificationMetadataFailures ?? Array.Empty<ArchitectureClassificationMetadataFailure>())
-            .OrderBy(f => f.Subject, StringComparer.Ordinal)
-            .ThenBy(f => f.MetadataKey, StringComparer.Ordinal)
-            .Select(f => new
-            {
-                subject = f.Subject,
-                source = f.Source.ToString(),
-                metadata_key = f.MetadataKey,
-                reason = f.Reason
-            })
-            .ToArray();
-
-        var payload = new
-        {
-            passed,
-            mode,
-            violations = violations
-                .Select(ArchitectureDiagnosticMapper.FromViolation)
-                .Select(d => ToCiJsonObject(d, includeContract: true))
-                .ToArray(),
-            cycles = cycles
-                .Select(cycle => ArchitectureDiagnosticMapper.FromCycle(cycle, contractName: string.Empty, contractId: null))
-                .Select(d => d.Path)
-                .ToArray(),
-            coverage_findings = (coverageFindings ?? Array.Empty<ArchitectureViolation>())
-                .Select(ArchitectureDiagnosticMapper.FromViolation)
-                .Select(d => ToCiJsonObject(d, includeContract: true))
-                .ToArray(),
-            unmatched_ignored_violations = unmatchedSerialized,
-            policy_consistency_findings = policyConsistencySerialized,
-            coverage_summary = (coverageSummaries ?? Array.Empty<ArchitectureCoverageSummary>())
-                .OrderBy(s => s.ContractId ?? s.ContractName, StringComparer.Ordinal)
-                .Select(ToCoverageSummaryJsonObject)
-                .ToArray(),
-            classification_conflicts = classificationConflictsSerialized,
-            classification_metadata_failures = classificationMetadataFailuresSerialized
-        };
-
-        return JsonSerializer.Serialize(payload);
     }
 
     public string FormatViolationsForCiArtifacts(string contractName, string? contractId,

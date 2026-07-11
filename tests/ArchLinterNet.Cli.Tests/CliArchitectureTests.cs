@@ -125,7 +125,8 @@ public sealed class CliArchitectureTests
             IReadOnlyCollection<PolicyConsistencyDiagnostic> policyConsistencyFindings,
             IReadOnlyCollection<ArchitectureCoverageSummary> coverageSummaries,
             IReadOnlyCollection<ArchitectureClassificationConflict> classificationConflicts,
-            IReadOnlyCollection<ArchitectureClassificationMetadataFailure> classificationMetadataFailures)
+            IReadOnlyCollection<ArchitectureClassificationMetadataFailure> classificationMetadataFailures,
+            IReadOnlyCollection<ArchitectureClassificationRoleFact> classificationRoles)
         {
             throw new NotSupportedException();
         }

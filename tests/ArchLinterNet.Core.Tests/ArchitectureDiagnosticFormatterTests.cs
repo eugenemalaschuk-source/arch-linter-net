@@ -28,6 +28,7 @@ public sealed class ArchitectureDiagnosticFormatterTests
     private static readonly ArchitectureCoverageSummaryEvidenceItem[] _staleCoverageItems = [new("b-stale", "b-evidence")];
     private static readonly ArchitectureCoverageSummaryEvidenceItem[] _unknownCoverageItems = [new("c-unknown", "c-evidence")];
     private static readonly ArchitectureCoverageSummaryEvidenceItem[] _coveredCoverageItems = [new("d-covered", "d-evidence")];
+    private static readonly string[] _expectedRoleSubjectsSorted = ["MyApp.Alpha", "MyApp.Zeta"];
     private static readonly string[] _firstPolicyId = ["first-id"];
     private static readonly string[] _policyContractNames = ["first", "second"];
     private static readonly string[] _policyLayers = ["Core"];
@@ -330,6 +331,129 @@ public sealed class ArchitectureDiagnosticFormatterTests
             conflicts.Reverse().ToArray(), Array.Empty<Model.ArchitectureClassificationMetadataFailure>());
 
         Assert.That(firstOrder, Is.EqualTo(reversedOrder));
+    }
+
+    [Test]
+    public void FormatResultForCiArtifacts_ClassificationRoles_IncludesRoleMetadataAndSource()
+    {
+        var roles = new[]
+        {
+            new Model.ArchitectureClassificationRoleFact(
+                "MyApp.Order", "DomainLayer", Model.ArchitectureClassificationSource.TypeAttribute,
+                "MyApp.DomainMarkerAttribute", new Dictionary<string, object> { ["domain"] = "Sales" })
+        };
+
+        using var json = JsonDocument.Parse(_formatter.FormatResultForCiArtifacts(
+            "strict", true, Array.Empty<ArchitectureViolation>(), Array.Empty<string>(),
+            classificationRoles: roles));
+
+        JsonElement role = json.RootElement.GetProperty("classification_roles")[0];
+        Assert.That(role.GetProperty("subject").GetString(), Is.EqualTo("MyApp.Order"));
+        Assert.That(role.GetProperty("role").GetString(), Is.EqualTo("DomainLayer"));
+        Assert.That(role.GetProperty("source").GetString(), Is.EqualTo("TypeAttribute"));
+        Assert.That(role.GetProperty("evidence").GetString(), Is.EqualTo("MyApp.DomainMarkerAttribute"));
+        Assert.That(role.GetProperty("metadata").GetProperty("domain").GetString(), Is.EqualTo("Sales"));
+    }
+
+    [Test]
+    public void FormatResultForCiArtifacts_NoClassificationRoles_IncludesEmptyArray()
+    {
+        using var json = JsonDocument.Parse(_formatter.FormatResultForCiArtifacts(
+            "strict", true, Array.Empty<ArchitectureViolation>(), Array.Empty<string>()));
+
+        Assert.That(json.RootElement.GetProperty("classification_roles").GetArrayLength(), Is.EqualTo(0));
+    }
+
+    [Test]
+    public void FormatResultForCiArtifacts_MultipleClassificationRoles_OrdersBySubject()
+    {
+        var roles = new[]
+        {
+            new Model.ArchitectureClassificationRoleFact(
+                "MyApp.Zeta", "DomainLayer", Model.ArchitectureClassificationSource.TypeAttribute, null, new Dictionary<string, object>()),
+            new Model.ArchitectureClassificationRoleFact(
+                "MyApp.Alpha", "DomainLayer", Model.ArchitectureClassificationSource.TypeAttribute, null, new Dictionary<string, object>())
+        };
+
+        using var json = JsonDocument.Parse(_formatter.FormatResultForCiArtifacts(
+            "strict", true, Array.Empty<ArchitectureViolation>(), Array.Empty<string>(),
+            classificationRoles: roles));
+
+        JsonElement.ArrayEnumerator classificationRoles = json.RootElement.GetProperty("classification_roles").EnumerateArray();
+        List<string?> subjects = classificationRoles.Select(r => r.GetProperty("subject").GetString()).ToList();
+        Assert.That(subjects, Is.EqualTo(_expectedRoleSubjectsSorted));
+    }
+
+    // Guards against the roles-overload silently resolving to IArchitectureDiagnosticFormatter's
+    // default interface implementation (which drops classificationRoles for compatibility with
+    // pre-existing third-party implementers) instead of ArchitectureDiagnosticFormatter's own
+    // override, when called through the interface rather than the concrete type.
+    [Test]
+    public void FormatResultForCiArtifacts_CalledThroughInterface_UsesConcreteOverrideNotDefaultImplementation()
+    {
+        IArchitectureDiagnosticFormatter formatter = new ArchitectureDiagnosticFormatter();
+        var roles = new[]
+        {
+            new Model.ArchitectureClassificationRoleFact(
+                "MyApp.Order", "DomainLayer", Model.ArchitectureClassificationSource.TypeAttribute, null, new Dictionary<string, object>())
+        };
+
+        using var json = JsonDocument.Parse(formatter.FormatResultForCiArtifacts(
+            "strict", true, Array.Empty<ArchitectureViolation>(), Array.Empty<string>(), roles));
+
+        Assert.That(json.RootElement.GetProperty("classification_roles").GetArrayLength(), Is.EqualTo(1));
+    }
+
+    // A third-party IArchitectureDiagnosticFormatter implementer that predates the roles overload
+    // and only implements the members that existed before it must still compile and function —
+    // proving the roles overload's default interface implementation satisfies the interface
+    // contract without forcing every implementer to add a new member.
+    private sealed class PreExistingThirdPartyFormatter : IArchitectureDiagnosticFormatter
+    {
+        public string FormatViolationsForHumans(IReadOnlyCollection<ArchitectureViolation> violations) => string.Empty;
+        public string FormatCyclesForHumans(IReadOnlyCollection<string> cycles) => string.Empty;
+        public string FormatUnmatchedForHumans(IReadOnlyCollection<ArchitectureUnmatchedIgnoredViolation> unmatched) => string.Empty;
+        public string FormatPolicyConsistencyForHumans(IReadOnlyCollection<PolicyConsistencyDiagnostic> findings) => string.Empty;
+        public string FormatCoverageForHumans(IReadOnlyCollection<ArchitectureViolation> findings) => string.Empty;
+        public string FormatCoverageSummaryForHumans(IReadOnlyCollection<ArchitectureCoverageSummary> summaries) => string.Empty;
+
+        public string FormatClassificationFactsForHumans(
+            IReadOnlyCollection<Model.ArchitectureClassificationConflict> conflicts,
+            IReadOnlyCollection<Model.ArchitectureClassificationMetadataFailure> metadataFailures) => string.Empty;
+
+        public string FormatResultForCiArtifacts(
+            string mode, bool passed, IReadOnlyCollection<ArchitectureViolation> violations, IReadOnlyCollection<string> cycles,
+            IReadOnlyCollection<ArchitectureViolation>? coverageFindings = null,
+            IReadOnlyCollection<ArchitectureUnmatchedIgnoredViolation>? unmatched = null,
+            IReadOnlyCollection<PolicyConsistencyDiagnostic>? policyConsistencyFindings = null,
+            IReadOnlyCollection<ArchitectureCoverageSummary>? coverageSummaries = null,
+            IReadOnlyCollection<Model.ArchitectureClassificationConflict>? classificationConflicts = null,
+            IReadOnlyCollection<Model.ArchitectureClassificationMetadataFailure>? classificationMetadataFailures = null)
+            => "pre-existing-implementation";
+
+        // Deliberately does NOT implement the classificationRoles overload — relies entirely on
+        // IArchitectureDiagnosticFormatter's default interface implementation.
+
+        public string FormatViolationsForCiArtifacts(string contractName, string? contractId,
+            IReadOnlyCollection<ArchitectureViolation> violations) => string.Empty;
+
+        public string FormatCyclesForCiArtifacts(string contractName, string? contractId, IReadOnlyCollection<string> cycles) => string.Empty;
+    }
+
+    [Test]
+    public void FormatResultForCiArtifacts_PreExistingImplementerWithoutRolesOverload_CompilesAndFallsBackToOriginalMember()
+    {
+        IArchitectureDiagnosticFormatter formatter = new PreExistingThirdPartyFormatter();
+        var roles = new[]
+        {
+            new Model.ArchitectureClassificationRoleFact(
+                "MyApp.Order", "DomainLayer", Model.ArchitectureClassificationSource.TypeAttribute, null, new Dictionary<string, object>())
+        };
+
+        string result = formatter.FormatResultForCiArtifacts(
+            "strict", true, Array.Empty<ArchitectureViolation>(), Array.Empty<string>(), roles);
+
+        Assert.That(result, Is.EqualTo("pre-existing-implementation"));
     }
 
     [Test]

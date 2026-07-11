@@ -117,4 +117,62 @@ public sealed class ArchitectureAnalysisSessionClassificationTests
         Assert.That(conflicts, Is.Empty);
         Assert.That(failures, Is.Empty);
     }
+
+    [Test]
+    public void CheckClassificationFacts_RepeatedCalls_ReuseTheSameCachedRoleIndexPass()
+    {
+        var classification = new ArchitectureClassificationConfiguration
+        {
+            Attributes =
+            {
+                new ArchitectureAttributeClassificationMapping
+                {
+                    Attribute = "AttributeRoleExtractionTestFixtures.DomainMarkerAttribute",
+                    Role = "DomainLayer",
+                    Metadata = new Dictionary<string, object> { ["module"] = "property:Module" }
+                }
+            }
+        };
+
+        ArchitectureAnalysisSession session = CreateSession(classification);
+
+        (IReadOnlyList<Model.ArchitectureClassificationConflict> firstConflicts, _) = session.CheckClassificationFacts();
+        (IReadOnlyList<Model.ArchitectureClassificationConflict> secondConflicts, _) = session.CheckClassificationFacts();
+
+        Assert.That(ReferenceEquals(firstConflicts, secondConflicts), Is.True);
+    }
+
+    [Test]
+    public void CheckClassificationRoles_ReturnsDiscoveredRolesSortedBySubject()
+    {
+        var classification = new ArchitectureClassificationConfiguration
+        {
+            Attributes =
+            {
+                new ArchitectureAttributeClassificationMapping
+                {
+                    Attribute = "AttributeRoleExtractionTestFixtures.DomainMarkerAttribute",
+                    Role = "DomainLayer",
+                    Metadata = new Dictionary<string, object> { ["domain"] = "constructor[0]" }
+                }
+            }
+        };
+
+        IReadOnlyList<Model.ArchitectureClassificationRoleFact> roles = CreateSession(classification).CheckClassificationRoles();
+
+        Assert.That(roles, Is.Not.Empty);
+        Assert.That(roles, Is.Ordered.By(nameof(Model.ArchitectureClassificationRoleFact.Subject)));
+        Assert.That(
+            roles.Any(r => r.Subject == "AttributeRoleExtractionTestFixtures.TypeWithConstructorDefault" && r.Role == "DomainLayer"),
+            Is.True);
+    }
+
+    [Test]
+    public void CheckClassificationRoles_NoClassificationConfigured_ReturnsEmpty()
+    {
+        IReadOnlyList<Model.ArchitectureClassificationRoleFact> roles =
+            CreateSession(new ArchitectureClassificationConfiguration()).CheckClassificationRoles();
+
+        Assert.That(roles, Is.Empty);
+    }
 }

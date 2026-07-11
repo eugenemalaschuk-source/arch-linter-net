@@ -76,16 +76,18 @@ public sealed class ArchitectureAttributeRoleExtractor
         if (typeCandidate.Role != null)
         {
             return new ArchitectureTypeClassificationResult(
-                typeCandidate.Role, ArchitectureClassificationSource.TypeAttribute, typeCandidate.Metadata, conflicts, failures);
+                typeCandidate.Role, ArchitectureClassificationSource.TypeAttribute, typeCandidate.Metadata,
+                typeCandidate.Evidence, conflicts, failures);
         }
 
         if (assemblyCandidate.Role != null)
         {
             return new ArchitectureTypeClassificationResult(
-                assemblyCandidate.Role, ArchitectureClassificationSource.AssemblyAttribute, assemblyCandidate.Metadata, conflicts, failures);
+                assemblyCandidate.Role, ArchitectureClassificationSource.AssemblyAttribute, assemblyCandidate.Metadata,
+                assemblyCandidate.Evidence, conflicts, failures);
         }
 
-        return new ArchitectureTypeClassificationResult(null, null, new Dictionary<string, object>(), conflicts, failures);
+        return new ArchitectureTypeClassificationResult(null, null, new Dictionary<string, object>(), null, conflicts, failures);
     }
 
     private ArchitectureAttributeClassificationCandidate ResolveCandidate(
@@ -97,6 +99,7 @@ public sealed class ArchitectureAttributeRoleExtractor
         List<ArchitectureClassificationConflict> conflicts = new();
         List<ArchitectureClassificationMetadataFailure> failures = new();
         string? winningRole = null;
+        string? winningEvidence = null;
         IReadOnlyDictionary<string, object> winningMetadata = new Dictionary<string, object>();
 
         foreach (ArchitectureAttributeClassificationMapping mapping in mappings)
@@ -117,6 +120,7 @@ public sealed class ArchitectureAttributeRoleExtractor
             {
                 winningRole = entryResult.Role;
                 winningMetadata = entryResult.Metadata;
+                winningEvidence = mapping.Attribute;
             }
             else if (!RoleMetadataEqual(winningRole, winningMetadata, entryResult.Role, entryResult.Metadata))
             {
@@ -125,7 +129,7 @@ public sealed class ArchitectureAttributeRoleExtractor
             }
         }
 
-        return new ArchitectureAttributeClassificationCandidate(winningRole, winningMetadata, conflicts, failures);
+        return new ArchitectureAttributeClassificationCandidate(winningRole, winningMetadata, winningEvidence, conflicts, failures);
     }
 
     private (string Role, IReadOnlyDictionary<string, object> Metadata) ResolveEntryAcrossInstances(

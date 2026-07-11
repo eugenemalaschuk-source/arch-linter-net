@@ -21,6 +21,36 @@ them in human, JSON, and CI-artifact output as informational "Classification
 findings" — but they are not wired into any `strict_*`/`audit_*` contract family's
 pass/fail evaluation or SARIF diagnostics, and never affect the command's exit code.
 
+**Discovered roles are indexed once per validation run** (see
+[issue #110](https://github.com/eugenemalaschuk-source/arch-linter-net/issues/110)
+and `openspec/specs/semantic-role-index`): every scanned type's resolved role,
+metadata, classification source, and evidence is computed in a single pass and
+cached for the run, rather than recomputed on every lookup. `validate --format json`/CI-artifact output includes a `classification_roles` array alongside
+`classification_conflicts`/`classification_metadata_failures`, one entry per
+classified type:
+
+```json
+{
+  "classification_roles": [
+    {
+      "subject": "MyApp.Sales.Order",
+      "role": "DomainLayer",
+      "source": "TypeAttribute",
+      "evidence": "Acme.Architecture.DomainLayerAttribute",
+      "metadata": { "domain": "Sales" }
+    }
+  ]
+}
+```
+
+`source` names the classification *mechanism* (`TypeAttribute` or
+`AssemblyAttribute`); `evidence` names the specific attribute type whose
+mapping produced the role, so the two together answer both "how" and
+"which fact" a role assignment came from. `evidence` is `null` when no role
+was resolved. This index is purely informational output, like the conflict
+and metadata-failure facts above — it is not yet consumed by any selector or
+coverage check (see [Current limits](#current-limits)).
+
 ## Why this section exists
 
 ArchLinterNet's `layers` map namespaces to layer names by glob pattern only. The
@@ -238,6 +268,11 @@ is unaffected.
   implemented sources are surfaced by `validate`'s human/JSON/CI-artifact output
   as a "Classification findings" section, but nothing wires them into SARIF or
   any contract family's pass/fail evaluation. `stale selector` and `uncovered semantic fact` remain vocabulary only.
+- Role index: implemented as a per-run, lazily-computed cache
+  (`ArchitectureRoleIndex`) of every classified type's role/metadata/source/
+  evidence, surfaced as `classification_roles` in JSON/CI-artifact output. It
+  is a read-only lookup and diagnostic surface only — no selector, coverage
+  check, or contract handler consumes it yet.
 - No annotation package: this design does not ship, and does not require, a
   binary ArchLinterNet annotation assembly — see
   [Annotation strategy](#annotation-strategy) below for the full adoption
