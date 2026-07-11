@@ -5,8 +5,13 @@ The semantic classification model SHALL define exactly ten classification terms 
 
 #### Scenario: Uncovered semantic fact is distinguished from an unclassified type
 - **WHEN** a type receives a role/metadata assignment from some classification source
-- **AND** no `layers.<name>.selector` matches that role/metadata and no `override`/`exclusion` names the type
+- **AND** no `layers.<name>.selector` matches that role/metadata and no `exclusion` names the type
 - **THEN** the model classifies this as an `uncovered semantic fact`, a status distinct from a type that received no role at all
+
+#### Scenario: An override-assigned role does not by itself exempt a type from coverage
+- **WHEN** a type's role/metadata was assigned by a `classification.overrides` entry
+- **AND** no `layers.<name>.selector` matches that role/metadata and no `exclusion` names the type
+- **THEN** the model SHALL still classify this as an `uncovered semantic fact` — `override` is a classification source, not a coverage-exemption mechanism, and only `exclusion` removes a type from coverage consideration
 
 #### Scenario: Stale selector is distinguished from an unmatched namespace layer
 - **WHEN** a `layers.<name>.selector`'s `role`/`metadata` criteria match zero types classified by the model
@@ -44,6 +49,21 @@ The reviewed schema SHALL fix the classification source precedence order as `yam
 #### Scenario: User-defined attribute is mappable by full type name
 - **WHEN** a `classification.attributes` entry declares `attribute: Acme.Architecture.DomainLayerAttribute`
 - **THEN** the model maps that attribute to the declared `role`/`metadata` regardless of which assembly defines `Acme.Architecture.DomainLayerAttribute`
+
+### Requirement: Same-tier conflicts across mapping entries resolve by YAML declaration order, for every source
+When two or more entries *within the same source list* (`classification.attributes`, `classification.assembly_attributes`, `classification.inheritance`, `classification.namespace`, `classification.path`, or `classification.overrides`) match one type with contradictory role/metadata, the model SHALL deterministically select the *first-declared entry's* role/metadata and SHALL record the discarded alternative as a `conflict` fact. This rule applies uniformly across all six sources and is distinct from precedence (Decision covering source precedence), which resolves conflicts *between* sources, not within one.
+
+#### Scenario: Two namespace mapping entries matching one namespace resolve by declaration order
+- **WHEN** two `classification.namespace` entries both match the same namespace and assign different roles
+- **THEN** the model assigns the first-declared entry's role and records the discarded entry's role as a `conflict` fact
+
+#### Scenario: Two override entries matching one type resolve by declaration order
+- **WHEN** a `classification.overrides` entry naming a type directly (`type: MyApp.Order`) and a separate broad `classification.overrides` entry (`namespace: MyApp`) both match the same type with different roles
+- **THEN** the model assigns the first-declared entry's role and records the discarded entry's role as a `conflict` fact
+
+#### Scenario: Within-source conflict resolution does not override source precedence
+- **WHEN** a `classification.namespace` entry and a `classification.overrides` entry both match one type
+- **THEN** the fixed source precedence (`yaml_override` before `namespace`) decides the winner, not declaration order — declaration-order tie-breaking applies only among entries within the same source
 
 ### Requirement: Repeated instances of one mapped attribute resolve by metadata order, not YAML order
 When a repeatable attribute mapped by a single `classification.attributes`/`classification.assembly_attributes` entry appears more than once on one declaration, the model SHALL resolve the resulting conflict using the attribute instances' `CustomAttributeData` metadata order (first instance wins), not YAML declaration order (there is only one mapping entry to order). Identical instances (same role and same metadata for every key the entry maps) SHALL NOT be treated as a conflict.
@@ -83,7 +103,7 @@ Each `metadata.<key>` value SHALL be interpreted using exactly one of four forms
 - **THEN** extraction SHALL NOT instantiate the attribute or read `Module`'s declared default/initializer value, and this resolves as the same evidence-extraction failure as a nonexistent property
 
 ### Requirement: Metadata values are canonicalized into a fixed set of comparable domains
-Every metadata value — extracted or literal — SHALL be canonicalized into exactly one of three domains before comparison: **string** (CLR `string`; `System.Type` canonicalized to `Type.FullName`; enum values canonicalized to their declared member name), **boolean**, or **decimal** (every CLR numeric primitive and every YAML/JSON numeric literal canonicalized to `decimal`). A value with no representation in any of these three domains SHALL be treated as an evidence-extraction failure.
+Every metadata value — extracted or literal — SHALL be canonicalized into exactly one of three domains before comparison: **string** (CLR `string`; `System.Type` canonicalized to `Type.FullName`; enum values canonicalized to their declared member name), **boolean**, or **decimal** (every CLR numeric primitive — `byte`, `sbyte`, `short`, `ushort`, `int`, `uint`, `long`, `ulong`, `float`, `double`, and `decimal` itself — and every YAML/JSON numeric literal canonicalized to `decimal`). A value with no representation in any of these three domains SHALL be treated as an evidence-extraction failure.
 
 #### Scenario: Enum values canonicalize to their declared member name, not the underlying integer
 - **WHEN** an extracted metadata value is an enum instance
@@ -96,6 +116,10 @@ Every metadata value — extracted or literal — SHALL be canonicalized into ex
 #### Scenario: Cross-representation numeric values compare equal
 - **WHEN** one metadata value originates from a CLR numeric primitive (e.g. `int` `1`) and another originates from a YAML/JSON numeric literal (e.g. `1.0`)
 - **THEN** both SHALL canonicalize to the same `decimal` value and SHALL compare equal
+
+#### Scenario: const decimal resolves through the canonical numeric domain
+- **WHEN** a `const:<Full.Type.NAME>` reference resolves to a compile-time `const decimal` field
+- **THEN** the value SHALL canonicalize into the `decimal` domain directly (it is already that domain's own CLR representation) and SHALL compare equal to any other value that canonicalizes to the same `decimal` number
 
 #### Scenario: Unsupported value shapes are an evidence-extraction failure
 - **WHEN** an extracted metadata value is an array, another attribute-typed value, `null`, an unmapped enum value, or a number with no `decimal` representation (e.g. `NaN`, `Infinity`)
@@ -164,7 +188,7 @@ Every `classification.exclusions` entry SHALL require a non-empty `reason` field
 The design SHALL state that a future `scope: semantic_role` variant of the existing architecture-coverage-model contract (`covered`/`excluded`/`uncovered`/`unknown`/`stale`/`empty-input`, per the `architecture-coverage-model` capability) is the intended integration point for classification's `uncovered semantic fact` and `stale selector` concepts, rather than introducing a separate coverage-like diagnostic vocabulary.
 
 #### Scenario: Uncovered semantic fact aligns with coverage's uncovered term
-- **WHEN** a role is discovered by classification but matched by no selector and named by no override/exclusion
+- **WHEN** a role is discovered by classification but matched by no selector and named by no exclusion (including a role assigned by an `override`, which does not by itself exempt a type from coverage)
 - **THEN** the reviewed design classifies this using the same conceptual status as the architecture-coverage-model's `uncovered`, for a future `scope: semantic_role` coverage variant to implement
 
 ### Requirement: No runtime behavior is introduced by this design

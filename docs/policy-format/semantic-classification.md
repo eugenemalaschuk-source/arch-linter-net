@@ -142,11 +142,14 @@ extraction failure as a property that does not exist at all.
 before matching**: **string** (CLR `string`; `System.Type` values as
 `Type.FullName`; enum values as their declared member name, not the
 underlying integer); **boolean**; and **decimal** (every CLR numeric
-primitive and every YAML/JSON numeric literal), so a CLR `int` `1` and a YAML
-`1.0` canonicalize to the same value and compare equal. Arrays, other
-attribute-typed values, `null`, unmapped enum values, and non-`decimal`-representable
-numbers (`NaN`, `Infinity`) have no representation in any of the three domains
-and are an extraction failure, the same as an unresolved reference.
+primitive — `byte`/`sbyte`/`short`/`ushort`/`int`/`uint`/`long`/`ulong`/
+`float`/`double`/`decimal` — and every YAML/JSON numeric literal), so a CLR
+`int` `1` and a YAML `1.0` canonicalize to the same value and compare equal.
+A `const decimal` field canonicalizes trivially, since `decimal` is already
+the canonical domain's own representation. Arrays, other attribute-typed
+values, `null`, unmapped enum values, and non-`decimal`-representable numbers
+(`NaN`, `Infinity`) have no representation in any of the three domains and are
+an extraction failure, the same as an unresolved reference.
 
 **Evidence-extraction failure is uniform across all three evidence-referencing
 forms and every canonicalization failure above, and never blocks role
@@ -179,6 +182,14 @@ instead.
 - A `namespace`/`namespace_suffix`-scoped override is broad (affects every type
   currently or later matching that pattern) and **requires** `reason`.
 - Every `exclusions` entry requires `reason`, regardless of scope.
+
+**An override does not by itself exempt a type from coverage.** `overrides` is
+a classification *source* — the highest-precedence one — not a
+coverage-exemption mechanism. A type whose role came from an override still
+needs a `selector` (or a future contextual contract) to actually consume that
+fact, or it remains an `uncovered semantic fact` exactly like a role assigned
+by any other source. Only `exclusions` removes a type from coverage
+consideration entirely.
 
 ## `layers.<name>.selector`
 
