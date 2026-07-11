@@ -68,9 +68,9 @@ public sealed partial class ArchitectureAnalysisSession
         return ArchitectureLayerTypeMatcher.Matches(layer, type, RoleIndex);
     }
 
-    private bool IsInAnyProjectLayer(Type type)
+    private bool IsInAnyDeclaredLayer(Type type)
     {
-        return Document.Layers.Values.Any(layer => !layer.External && MatchesLayer(layer, type));
+        return Document.Layers.Values.Any(layer => MatchesLayer(layer, type));
     }
 
     private string? ResolveContainingLayer(Type type, IReadOnlySet<string> candidateLayerNames)

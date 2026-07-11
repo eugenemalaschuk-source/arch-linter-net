@@ -241,7 +241,7 @@ public sealed partial class ArchitectureAnalysisSession
                     })
                     .Where(r => !string.IsNullOrEmpty(r.FullName))
                     .Where(r => !contract.AllowedTypes.Contains(r.FullName))
-                    .Where(r => r.Type != null && IsInAnyProjectLayer(r.Type))
+                    .Where(r => r.Type != null && IsInAnyDeclaredLayer(r.Type))
                     .Where(r => !ArchitectureNamespaceViolationFinder.IsInAnyAllowedLayer(
                         r.Type!, allowedLayers, RoleIndex))
                     .Where(r => !executionContext.IsIgnored(sourceFullName, r.FullName))

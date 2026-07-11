@@ -254,9 +254,16 @@ internal static class ArchitectureNamespaceViolationFinder
                 ArchitectureTypeNames.SafeNamespace(referenced));
         }
 
-        return ArchitectureLayerTypeMatcher.Matches(layer, referenced, roleIndex)
+        if (!ArchitectureLayerTypeMatcher.Matches(layer, referenced, roleIndex))
+        {
+            return new ArchitectureNamespaceMatch(false, string.Empty, null);
+        }
+
+        return string.IsNullOrWhiteSpace(layer.Namespace)
             ? new ArchitectureNamespaceMatch(true, ArchitectureLayerResolver.DescribeLayer(layer), null)
-            : new ArchitectureNamespaceMatch(false, string.Empty, null);
+            : ArchitectureLayerResolver.MatchNamespace(
+                layer,
+                ArchitectureTypeNames.SafeNamespace(referenced));
     }
 
     private static string ExtractNormalizedKey(string reference)
