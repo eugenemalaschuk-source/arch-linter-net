@@ -28,6 +28,7 @@ public sealed class ArchitectureDiagnosticFormatterTests
     private static readonly ArchitectureCoverageSummaryEvidenceItem[] _staleCoverageItems = [new("b-stale", "b-evidence")];
     private static readonly ArchitectureCoverageSummaryEvidenceItem[] _unknownCoverageItems = [new("c-unknown", "c-evidence")];
     private static readonly ArchitectureCoverageSummaryEvidenceItem[] _coveredCoverageItems = [new("d-covered", "d-evidence")];
+    private static readonly string[] _expectedRoleSubjectsSorted = ["MyApp.Alpha", "MyApp.Zeta"];
     private static readonly string[] _firstPolicyId = ["first-id"];
     private static readonly string[] _policyContractNames = ["first", "second"];
     private static readonly string[] _policyLayers = ["Core"];
@@ -380,7 +381,7 @@ public sealed class ArchitectureDiagnosticFormatterTests
 
         JsonElement.ArrayEnumerator classificationRoles = json.RootElement.GetProperty("classification_roles").EnumerateArray();
         List<string?> subjects = classificationRoles.Select(r => r.GetProperty("subject").GetString()).ToList();
-        Assert.That(subjects, Is.EqualTo(new[] { "MyApp.Alpha", "MyApp.Zeta" }));
+        Assert.That(subjects, Is.EqualTo(_expectedRoleSubjectsSorted));
     }
 
     // Guards against the roles-overload silently resolving to IArchitectureDiagnosticFormatter's

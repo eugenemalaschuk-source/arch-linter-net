@@ -33,14 +33,16 @@ public interface IArchitectureDiagnosticFormatter
         IReadOnlyCollection<ArchitectureClassificationConflict>? classificationConflicts = null,
         IReadOnlyCollection<ArchitectureClassificationMetadataFailure>? classificationMetadataFailures = null);
 
-    // Additive overload (not a modification of the method above) so binaries already compiled
-    // against the original 10-parameter FormatResultForCiArtifacts keep resolving to it unchanged;
-    // classificationRoles is required here (no default) specifically so it stays unambiguous
-    // against the original overload for any call site, named or positional. Declared with a
-    // default interface implementation — delegating to the original overload and omitting
-    // classificationRoles — so third-party IArchitectureDiagnosticFormatter implementers that
-    // predate this member are not forced to implement it to keep compiling; only
-    // ArchitectureDiagnosticFormatter itself overrides it with real role serialization.
+    /// <summary>
+    /// Additive overload, not a modification of the member above: any caller already compiled
+    /// against the original ten-parameter overload keeps resolving to it, unaffected.
+    /// <c>classificationRoles</c> is required here, with no default value, specifically so this
+    /// overload stays unambiguous against the original for every call site, named or positional.
+    /// Declared with a default interface implementation that delegates to the original overload
+    /// and omits classification roles, so a third-party implementer that predates this member is
+    /// not forced to add it just to keep compiling — only <see cref="ArchitectureDiagnosticFormatter"/>
+    /// itself overrides it with real role serialization.
+    /// </summary>
     string FormatResultForCiArtifacts( // NOSONAR: each parameter represents a semantically distinct section of the CI artifact payload; grouping would obscure the data contract
         string mode,
         bool passed,

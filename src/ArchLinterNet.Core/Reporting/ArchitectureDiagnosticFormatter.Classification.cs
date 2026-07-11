@@ -17,15 +17,15 @@ public sealed partial class ArchitectureDiagnosticFormatter
         IReadOnlyCollection<ArchitectureClassificationConflict>? classificationConflicts = null,
         IReadOnlyCollection<ArchitectureClassificationMetadataFailure>? classificationMetadataFailures = null)
     {
-        return BuildCiArtifactsJson(
+        return BuildCiArtifactsJson(new CiArtifactsRequest(
             mode, passed, violations, cycles, null, coverageFindings, unmatched,
-            policyConsistencyFindings, coverageSummaries, classificationConflicts, classificationMetadataFailures);
+            policyConsistencyFindings, coverageSummaries, classificationConflicts, classificationMetadataFailures));
     }
 
-    // Additive overload (not a modification of the one above) so binaries already compiled against
-    // the original 10-parameter FormatResultForCiArtifacts keep resolving to it unchanged;
-    // classificationRoles is required here (no default) so it stays unambiguous against that
-    // overload for every call site, named or positional.
+    /// <summary>
+    /// Additive overload — see the matching declaration on <see cref="IArchitectureDiagnosticFormatter"/>
+    /// for why this exists alongside the original overload instead of extending it.
+    /// </summary>
     public string FormatResultForCiArtifacts(
         string mode,
         bool passed,
@@ -39,25 +39,30 @@ public sealed partial class ArchitectureDiagnosticFormatter
         IReadOnlyCollection<ArchitectureClassificationConflict>? classificationConflicts = null,
         IReadOnlyCollection<ArchitectureClassificationMetadataFailure>? classificationMetadataFailures = null)
     {
-        return BuildCiArtifactsJson(
+        return BuildCiArtifactsJson(new CiArtifactsRequest(
             mode, passed, violations, cycles, classificationRoles, coverageFindings, unmatched,
-            policyConsistencyFindings, coverageSummaries, classificationConflicts, classificationMetadataFailures);
+            policyConsistencyFindings, coverageSummaries, classificationConflicts, classificationMetadataFailures));
     }
 
-    private static string BuildCiArtifactsJson(
-        string mode,
-        bool passed,
-        IReadOnlyCollection<ArchitectureViolation> violations,
-        IReadOnlyCollection<string> cycles,
-        IReadOnlyCollection<ArchitectureClassificationRoleFact>? classificationRoles,
-        IReadOnlyCollection<ArchitectureViolation>? coverageFindings,
-        IReadOnlyCollection<ArchitectureUnmatchedIgnoredViolation>? unmatched,
-        IReadOnlyCollection<PolicyConsistencyDiagnostic>? policyConsistencyFindings,
-        IReadOnlyCollection<ArchitectureCoverageSummary>? coverageSummaries,
-        IReadOnlyCollection<ArchitectureClassificationConflict>? classificationConflicts,
-        IReadOnlyCollection<ArchitectureClassificationMetadataFailure>? classificationMetadataFailures)
+    // Bundles FormatResultForCiArtifacts's parameters into one value so the private builder below
+    // takes a single argument instead of eleven — the two public overloads above still expose each
+    // section as its own named parameter for callers.
+    private readonly record struct CiArtifactsRequest(
+        string Mode,
+        bool Passed,
+        IReadOnlyCollection<ArchitectureViolation> Violations,
+        IReadOnlyCollection<string> Cycles,
+        IReadOnlyCollection<ArchitectureClassificationRoleFact>? ClassificationRoles,
+        IReadOnlyCollection<ArchitectureViolation>? CoverageFindings,
+        IReadOnlyCollection<ArchitectureUnmatchedIgnoredViolation>? Unmatched,
+        IReadOnlyCollection<PolicyConsistencyDiagnostic>? PolicyConsistencyFindings,
+        IReadOnlyCollection<ArchitectureCoverageSummary>? CoverageSummaries,
+        IReadOnlyCollection<ArchitectureClassificationConflict>? ClassificationConflicts,
+        IReadOnlyCollection<ArchitectureClassificationMetadataFailure>? ClassificationMetadataFailures);
+
+    private static string BuildCiArtifactsJson(CiArtifactsRequest request)
     {
-        var unmatchedSerialized = (unmatched ?? Array.Empty<ArchitectureUnmatchedIgnoredViolation>())
+        var unmatchedSerialized = (request.Unmatched ?? Array.Empty<ArchitectureUnmatchedIgnoredViolation>())
             .Select(ArchitectureDiagnosticMapper.FromUnmatchedIgnore)
             .Select(u => new
             {
@@ -70,33 +75,33 @@ public sealed partial class ArchitectureDiagnosticFormatter
             })
             .ToArray();
 
-        var policyConsistencySerialized = (policyConsistencyFindings ?? Array.Empty<PolicyConsistencyDiagnostic>())
+        var policyConsistencySerialized = (request.PolicyConsistencyFindings ?? Array.Empty<PolicyConsistencyDiagnostic>())
             .Select(ToPolicyConsistencyJsonObject)
             .ToArray();
 
-        var classificationConflictsSerialized = BuildClassificationConflictsJson(classificationConflicts);
-        var classificationMetadataFailuresSerialized = BuildClassificationMetadataFailuresJson(classificationMetadataFailures);
-        var classificationRolesSerialized = BuildClassificationRolesJson(classificationRoles);
+        var classificationConflictsSerialized = BuildClassificationConflictsJson(request.ClassificationConflicts);
+        var classificationMetadataFailuresSerialized = BuildClassificationMetadataFailuresJson(request.ClassificationMetadataFailures);
+        var classificationRolesSerialized = BuildClassificationRolesJson(request.ClassificationRoles);
 
         var payload = new
         {
-            passed,
-            mode,
-            violations = violations
+            passed = request.Passed,
+            mode = request.Mode,
+            violations = request.Violations
                 .Select(ArchitectureDiagnosticMapper.FromViolation)
                 .Select(d => ToCiJsonObject(d, includeContract: true))
                 .ToArray(),
-            cycles = cycles
+            cycles = request.Cycles
                 .Select(cycle => ArchitectureDiagnosticMapper.FromCycle(cycle, contractName: string.Empty, contractId: null))
                 .Select(d => d.Path)
                 .ToArray(),
-            coverage_findings = (coverageFindings ?? Array.Empty<ArchitectureViolation>())
+            coverage_findings = (request.CoverageFindings ?? Array.Empty<ArchitectureViolation>())
                 .Select(ArchitectureDiagnosticMapper.FromViolation)
                 .Select(d => ToCiJsonObject(d, includeContract: true))
                 .ToArray(),
             unmatched_ignored_violations = unmatchedSerialized,
             policy_consistency_findings = policyConsistencySerialized,
-            coverage_summary = (coverageSummaries ?? Array.Empty<ArchitectureCoverageSummary>())
+            coverage_summary = (request.CoverageSummaries ?? Array.Empty<ArchitectureCoverageSummary>())
                 .OrderBy(s => s.ContractId ?? s.ContractName, StringComparer.Ordinal)
                 .Select(ToCoverageSummaryJsonObject)
                 .ToArray(),
