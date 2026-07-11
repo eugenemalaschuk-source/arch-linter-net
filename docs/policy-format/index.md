@@ -205,6 +205,15 @@ Use `ignored_violations` or a generated baseline only to freeze known existing d
 
 Read [Migration baselines](../guides/migration-baselines.md) for the full lifecycle.
 
+## Semantic classification (reserved)
+
+A `classification` section and `layers.<name>.selector` field are reserved by the
+YAML schema for a future semantic-role-discovery capability. They are
+schema-accepted today but have no effect on validation — no extraction or
+selector-matching engine exists yet. See
+[Semantic classification (reserved)](semantic-classification.md) before using
+either field.
+
 ## Supported capabilities and non-goals
 
 Before adding fields, check [Supported capabilities and non-goals](supported-capabilities.md). ArchLinterNet intentionally does not validate runtime dependency injection behavior, security/authorization correctness, code ownership, or semantic data flow.
