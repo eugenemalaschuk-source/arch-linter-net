@@ -245,7 +245,7 @@ concrete adoption need emerges. It is not the default path today.
 
 | Path | Dependency footprint | Setup cost | Versioning | Status |
 |---|---|---|---|---|
-| User-owned attribute | None — the attribute lives in the adopting project's own code | One small attribute class, written once | Fully owned by the adopting project; never breaks on an ArchLinterNet release | **Supported today** |
+| User-owned attribute | None — the attribute lives in the adopting project's own code | One small attribute class, written once | Fully owned by the adopting project; never breaks on an ArchLinterNet release | **Recommended adoption path** — schema/design reviewed; runtime extraction not yet implemented ([Current limits](#current-limits)) |
 | Source-only annotation package | No runtime assembly reference, but still a versioned artifact ArchLinterNet must design, ship, and support | Add a package reference; attribute ships pre-written | Coupled to ArchLinterNet's release/compatibility policy | Not shipped; possible future convenience |
 | Binary annotation package | Adds a compile-time (and possibly runtime/dependency-graph) reference to `ArchLinterNet.Annotations` in every consuming project | Add a package reference; attribute ships pre-written | Coupled to ArchLinterNet's release/compatibility policy | Not shipped; explicitly ruled out as a default or required path |
 
@@ -255,9 +255,11 @@ non-invasive positioning is meant to avoid. A source-only package was not
 shipped in this wave either, since no extraction engine exists yet
 ([Current limits](#current-limits)) and no consumer need has been
 demonstrated — adding one now would be speculative packaging work with no
-current user. User-owned attributes need neither: the mapping mechanism in
-[Reviewed shape](#reviewed-shape) already works against any attribute type,
-regardless of which assembly declares it.
+current user. User-owned attributes need neither: the reviewed mapping shape
+in [Reviewed shape](#reviewed-shape) accepts any full attribute type name,
+regardless of which assembly declares it — but until extraction ships, no
+YAML mapping is actually evaluated against scanned code; see
+[Current limits](#current-limits).
 
 ## Where to look next
 

@@ -7,7 +7,7 @@
 
 - [x] 2.1 Verify the `semantic-role-catalog` delta spec resolves the issue #108 placeholder without altering unrelated requirements.
 - [x] 2.2 Verify the `semantic-classification-model` delta spec resolves the no-package decision without altering unrelated requirements.
-- [ ] 2.3 Run `openspec validate --all` after archive to confirm both rebuilt specs pass.
+- [x] 2.3 Run `openspec validate --all` after archive to confirm both rebuilt specs pass. (`openspec validate --all --strict`: 80/80 passed.)
 
 ## 3. Compile fixtures
 
