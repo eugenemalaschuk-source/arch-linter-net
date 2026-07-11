@@ -138,6 +138,20 @@
       "auditGroup": "audit_composition",
       "fields": ["name", "id", "forbidden_apis", "allowed_only_in_layers", "allowed_only_in_namespaces", "allowed_only_in_projects", "allowed_only_in_assemblies", "ignored_violations", "reason"],
       "validates": "A type residing outside a declared composition boundary (allowed_only_in_layers/namespaces/projects/assemblies) does not call a forbidden composition-root/service-locator API (matched with the same call-pattern vocabulary as method-body contracts: exact member names, Type.Member names, fully qualified members, and namespace/type prefixes via forbidden_apis). Requires at least one forbidden_apis selector and at least one allowed_only_in_* composition boundary selector. Reflection/IL-based static detection of call sites only: does NOT validate runtime dependency-injection resolution and does not prove every service is registered correctly."
+    },
+    {
+      "kind": "context-dependency",
+      "strictGroup": "strict_context_dependencies",
+      "auditGroup": "audit_context_dependencies",
+      "fields": ["name", "id", "source", "forbidden", "exclude", "ignored_violations", "reason"],
+      "validates": "A type matching the source contextual selector (role + optional metadata, compared directly against discovered role/metadata rather than through a declared layers.<name>) does not reference a type matching any forbidden contextual selector, unless that target also matches an exclude selector. Metadata constraints use one of four operators: exact literal, in (list), any ('*'), or not-equal-to-source ('!{source.metadata.<key>}', compared against the current source type's own resolved metadata). Requires a source selector and a non-empty forbidden list."
+    },
+    {
+      "kind": "context-allow-only",
+      "strictGroup": "strict_context_allow_only",
+      "auditGroup": "audit_context_allow_only",
+      "fields": ["name", "id", "source", "allowed", "exclude", "ignored_violations", "reason"],
+      "validates": "A type matching the source contextual selector may reference only types matching an allowed contextual selector; any other role-classified reference (after exclude selectors are applied) is a violation. Same selector shape and metadata operator vocabulary (exact/in/any/not-equal-to-source) as context-dependency. Requires a source selector and a non-empty allowed list."
     }
   ],
   "exceptionMechanisms": {

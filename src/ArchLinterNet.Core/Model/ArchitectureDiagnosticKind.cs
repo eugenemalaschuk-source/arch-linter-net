@@ -15,5 +15,7 @@ public enum ArchitectureDiagnosticKind
     Inheritance,
     InterfaceImplementation,
     Composition,
-    ProjectMetadata
+    ProjectMetadata,
+    ContextDependency,
+    ContextAllowOnly
 }

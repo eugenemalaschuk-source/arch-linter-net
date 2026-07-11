@@ -23,6 +23,8 @@ public sealed partial class ArchitectureAnalysisSession
 
     private readonly List<ArchitectureBaselineCandidate> _baselineCandidates = new();
 
+    private readonly HashSet<ArchitectureContextualConsumerReference> _registeredContextualConsumers = new();
+
     private HashSet<string>? _ruleInputCoveredContractIdsForMode;
 
     public ArchitectureAnalysisSession(
@@ -115,6 +117,31 @@ public sealed partial class ArchitectureAnalysisSession
 
     public IReadOnlyList<ArchitectureBaselineCandidate> BaselineCandidates
         => _baselineCandidates;
+
+    // Coverage-participating consumption recorded by contextual dependency/allow-only contracts.
+    // See ArchitectureContextualConsumerReference and design.md Decision 7. Nothing consumes this
+    // collection yet — it exists so a future coverage change can query it.
+    public IReadOnlyCollection<ArchitectureContextualConsumerReference> RegisteredContextualConsumers
+        => _registeredContextualConsumers;
+
+    internal void RegisterContextualConsumer(ArchitectureContextSelector selector)
+    {
+        if (string.IsNullOrWhiteSpace(selector.Role))
+        {
+            return;
+        }
+
+        if (selector.Metadata.Count == 0)
+        {
+            _registeredContextualConsumers.Add(new ArchitectureContextualConsumerReference(selector.Role, string.Empty));
+            return;
+        }
+
+        foreach (string key in selector.Metadata.Keys)
+        {
+            _registeredContextualConsumers.Add(new ArchitectureContextualConsumerReference(selector.Role, key));
+        }
+    }
 
     // Cached per session so multiple future coverage contract handlers share one inventory instead of
     // each rebuilding it; an explicit projectDiscovery override bypasses the cache (test-only substitution).

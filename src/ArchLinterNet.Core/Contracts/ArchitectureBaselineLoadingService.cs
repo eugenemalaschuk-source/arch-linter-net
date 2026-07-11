@@ -229,6 +229,10 @@ public sealed class ArchitectureBaselineLoadingService : IArchitectureBaselineLo
                 "audit_composition" => _groups.AuditComposition.Select(c => (IArchitectureContract)c).ToList(),
                 "strict_coverage" => _groups.StrictCoverage.Select(c => (IArchitectureContract)c).ToList(),
                 "audit_coverage" => _groups.AuditCoverage.Select(c => (IArchitectureContract)c).ToList(),
+                "strict_context_dependencies" => _groups.StrictContextDependencies.Select(c => (IArchitectureContract)c).ToList(),
+                "audit_context_dependencies" => _groups.AuditContextDependencies.Select(c => (IArchitectureContract)c).ToList(),
+                "strict_context_allow_only" => _groups.StrictContextAllowOnly.Select(c => (IArchitectureContract)c).ToList(),
+                "audit_context_allow_only" => _groups.AuditContextAllowOnly.Select(c => (IArchitectureContract)c).ToList(),
                 _ => new List<IArchitectureContract>()
             };
         }
@@ -260,6 +264,8 @@ public sealed class ArchitectureBaselineLoadingService : IArchitectureBaselineLo
                 ArchitectureInterfaceImplementationContract c => c.IgnoredViolations,
                 ArchitectureCompositionContract c => c.IgnoredViolations,
                 ArchitectureCoverageContract c => c.IgnoredViolations,
+                ArchitectureContextDependencyContract c => c.IgnoredViolations,
+                ArchitectureContextAllowOnlyContract c => c.IgnoredViolations,
                 _ => null!
             };
         }

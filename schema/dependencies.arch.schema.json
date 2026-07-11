@@ -126,6 +126,40 @@
         }
       }
     },
+    "contextSelector": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["role"],
+      "properties": {
+        "role": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Exact-match role name assigned by classification, matched directly against a candidate type's resolved role rather than through a declared layers.<name>."
+        },
+        "metadata": {
+          "type": "object",
+          "additionalProperties": { "$ref": "#/$defs/contextMetadataValue" },
+          "default": {},
+          "description": "Optional metadata constraints, each evaluated by exactly one of four deterministic operators (checked in this order): a YAML sequence of literal scalars ('in' — matches any listed entry), the literal string '*' ('any' — matches any resolved value provided the key is present), a string matching '!{source.metadata.<key>}' ('not-equal-to-source' — matches when the candidate's value differs from the current source type's own resolved value for <key>; only meaningful on forbidden/allowed/exclude selectors), or any other scalar ('exact' literal match)."
+        }
+      }
+    },
+    "contextMetadataValue": {
+      "anyOf": [
+        { "$ref": "#/$defs/scalarValue" },
+        {
+          "type": "string",
+          "pattern": "^!\\{source\\.metadata\\.[A-Za-z0-9_]+\\}$",
+          "description": "not-equal-to-source reference to the current source type's own resolved metadata value for <key>."
+        },
+        {
+          "type": "array",
+          "items": { "$ref": "#/$defs/scalarValue" },
+          "minItems": 1,
+          "description": "in operator: matches if the candidate's resolved value equals any listed entry."
+        }
+      ]
+    },
     "externalDependencyGroup": {
       "type": "object",
       "additionalProperties": false,
@@ -763,6 +797,26 @@
           "type": "array",
           "items": { "$ref": "#/$defs/coverageContract" },
           "default": []
+        },
+        "strict_context_dependencies": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/contextDependencyContract" },
+          "default": []
+        },
+        "audit_context_dependencies": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/contextDependencyContract" },
+          "default": []
+        },
+        "strict_context_allow_only": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/contextAllowOnlyContract" },
+          "default": []
+        },
+        "audit_context_allow_only": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/contextAllowOnlyContract" },
+          "default": []
         }
       }
     },
@@ -851,6 +905,60 @@
         "ignored_violations": { "$ref": "#/$defs/ignoredViolations" },
         "reason": { "type": "string" }
       }
+    },
+    "contextDependencyContract": {
+      "allOf": [
+        { "$ref": "#/$defs/baseContractFields" },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["name", "source", "forbidden"],
+          "properties": {
+            "name": { "type": "string", "minLength": 1 },
+            "id": { "type": "string", "minLength": 1 },
+            "source": { "$ref": "#/$defs/contextSelector" },
+            "forbidden": {
+              "type": "array",
+              "items": { "$ref": "#/$defs/contextSelector" },
+              "minItems": 1
+            },
+            "exclude": {
+              "type": "array",
+              "items": { "$ref": "#/$defs/contextSelector" },
+              "default": []
+            },
+            "ignored_violations": { "$ref": "#/$defs/ignoredViolations" },
+            "reason": { "type": "string" }
+          }
+        }
+      ]
+    },
+    "contextAllowOnlyContract": {
+      "allOf": [
+        { "$ref": "#/$defs/baseContractFields" },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["name", "source", "allowed"],
+          "properties": {
+            "name": { "type": "string", "minLength": 1 },
+            "id": { "type": "string", "minLength": 1 },
+            "source": { "$ref": "#/$defs/contextSelector" },
+            "allowed": {
+              "type": "array",
+              "items": { "$ref": "#/$defs/contextSelector" },
+              "minItems": 1
+            },
+            "exclude": {
+              "type": "array",
+              "items": { "$ref": "#/$defs/contextSelector" },
+              "default": []
+            },
+            "ignored_violations": { "$ref": "#/$defs/ignoredViolations" },
+            "reason": { "type": "string" }
+          }
+        }
+      ]
     },
     "cycleContract": {
       "type": "object",

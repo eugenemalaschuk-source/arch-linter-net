@@ -248,6 +248,45 @@ AND-combined key/value constraints. A layer may declare only `selector`, only
 wildcard or regex value matching is supported. Declaring only `namespace` (as
 every layer did before this feature) remains unaffected.
 
+## Contextual selectors (`context_dependencies`, `context_allow_only`)
+
+The `strict_context_dependencies`/`audit_context_dependencies` and
+`strict_context_allow_only`/`audit_context_allow_only` contract families (see
+[Contextual dependency contracts](../contracts/context-dependency.md) and
+[Contextual allow-only contracts](../contracts/context-allow-only.md)) compare
+discovered role/metadata directly between a `source` selector and
+`forbidden`/`allowed`/`exclude` selectors, without an intermediate
+`layers.<name>` declaration. Their selector shape (`role` + `metadata`) looks
+like `layers.<name>.selector` but supports a broader, closed operator
+vocabulary instead of exact/AND-only matching:
+
+| Form | Operator | Meaning |
+|---|---|---|
+| YAML sequence | `in` | Matches if the type's resolved value equals any listed entry. |
+| `"*"` | `any` | Matches any resolved value, provided the key is present. |
+| `"!{source.metadata.<key>}"` | `not-equal-to-source` | Matches when the candidate's resolved value for `<key>` differs from the *current match's source type's own* resolved value for `<key>`. Only valid on `forbidden`/`allowed`/`exclude` — a `source` selector has no other source to reference. |
+| anything else | `exact` | Literal scalar match (same string/boolean/decimal cross-representation equality as `layers.<name>.selector`). |
+
+These four forms are checked in the fixed order above and are the only forms
+supported — no regex or open-ended expression syntax.
+
+### Comparison with `layers.<name>.selector`
+
+| | `layers.<name>.selector` | Contextual selector (`source`/`forbidden`/`allowed`/`exclude`) |
+|---|---|---|
+| Matching | Exact literal, AND-combined across declared keys. | Exact, `in`, `any`, or `not-equal-to-source`, per metadata key. |
+| Cross-referencing another type's own metadata | Not supported. | `not-equal-to-source` compares against the *current source type's* resolved metadata. |
+| Requires a declared `layers.<name>`? | Yes — a layer is the unit contracts reference. | No — selectors are declared inline on the contextual contract itself. |
+| Used by | Every existing contract family (`dependency`, `allow_only`, `layers`, `cycles`, etc.) via a named layer. | Only `context_dependencies`/`context_allow_only`, referenced inline. |
+| Coverage-participating consumption | Yes. | Yes — a contextual selector's `(role, metadata key)` reference is registered as coverage-participating consumption identically to a `layers.<name>.selector` match. |
+
+Use `layers.<name>.selector` when the boundary is a small, fixed, named set of
+layers referenced by many contracts. Use a contextual selector when the
+boundary is a business-context distinction (e.g. "no domain type in one
+bounded context may depend on a domain type in another") that would otherwise
+require enumerating every concrete layer pair, or when `not-equal-to-source`'s
+cross-referencing comparison is what the rule actually needs to express.
+
 ## Current limits
 
 - Extraction: **implemented** for `attributes`/`assembly_attributes` (type-level
