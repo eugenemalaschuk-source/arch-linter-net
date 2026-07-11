@@ -26,11 +26,7 @@ internal static class ArchitectureNamespaceViolationFinder
                     .Select(reference => new
                     {
                         Reference = reference,
-                        Match = roleIndex != null
-                            ? (ArchitectureLayerTypeMatcher.Matches(forbiddenLayer, reference, roleIndex)
-                                ? new ArchitectureNamespaceMatch(true, ArchitectureLayerResolver.DescribeLayer(forbiddenLayer), null)
-                                : new ArchitectureNamespaceMatch(false, string.Empty, null))
-                            : ArchitectureLayerResolver.MatchNamespace(forbiddenLayer, ArchitectureTypeNames.SafeNamespace(reference))
+                        Match = MatchReference(forbiddenLayer, reference, roleIndex)
                     })
                     .Where(x => x.Match.Matched)
                     .Select(x => new
@@ -157,11 +153,7 @@ internal static class ArchitectureNamespaceViolationFinder
             return;
         }
 
-        ArchitectureNamespaceMatch match = roleIndex != null
-            ? (ArchitectureLayerTypeMatcher.Matches(forbiddenLayer, referenced, roleIndex)
-                ? new ArchitectureNamespaceMatch(true, ArchitectureLayerResolver.DescribeLayer(forbiddenLayer), null)
-                : new ArchitectureNamespaceMatch(false, string.Empty, null))
-            : ArchitectureLayerResolver.MatchNamespace(forbiddenLayer, ArchitectureTypeNames.SafeNamespace(referenced));
+        ArchitectureNamespaceMatch match = MatchReference(forbiddenLayer, referenced, roleIndex);
         if (!match.Matched)
         {
             return;
@@ -248,6 +240,23 @@ internal static class ArchitectureNamespaceViolationFinder
     public static bool IsInAnyAllowedLayer(Type type, IReadOnlyList<ArchitectureLayer> allowedLayers, ArchitectureRoleIndex roleIndex)
     {
         return allowedLayers.Any(layer => ArchitectureLayerTypeMatcher.Matches(layer, type, roleIndex));
+    }
+
+    private static ArchitectureNamespaceMatch MatchReference(
+        ArchitectureLayer layer,
+        Type referenced,
+        ArchitectureRoleIndex? roleIndex)
+    {
+        if (roleIndex == null)
+        {
+            return ArchitectureLayerResolver.MatchNamespace(
+                layer,
+                ArchitectureTypeNames.SafeNamespace(referenced));
+        }
+
+        return ArchitectureLayerTypeMatcher.Matches(layer, referenced, roleIndex)
+            ? new ArchitectureNamespaceMatch(true, ArchitectureLayerResolver.DescribeLayer(layer), null)
+            : new ArchitectureNamespaceMatch(false, string.Empty, null);
     }
 
     private static string ExtractNormalizedKey(string reference)

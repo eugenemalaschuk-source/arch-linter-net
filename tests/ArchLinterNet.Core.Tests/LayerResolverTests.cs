@@ -10,6 +10,8 @@ namespace ArchLinterNet.Core.Tests;
 [TestFixture]
 public sealed class LayerResolverTests
 {
+    private static readonly string[] _candidateLayerNames = { "semantic", "core" };
+
     private static readonly string[] _testCoreTestWeb = { "Test.Core", "Test.Web" };
 
     private ArchitectureContractDocument _document = null!;
@@ -330,7 +332,7 @@ public sealed class LayerResolverTests
         string? layer = ArchitectureLayerResolver.ResolveContainingLayer(
             document,
             "Test.Core.Services",
-            new HashSet<string>(new[] { "semantic", "core" }, StringComparer.Ordinal));
+            new HashSet<string>(_candidateLayerNames, StringComparer.Ordinal));
 
         Assert.That(layer, Is.EqualTo("core"));
     }
