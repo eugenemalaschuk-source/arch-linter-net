@@ -254,6 +254,25 @@ public sealed class ArchitectureAttributeRoleExtractorTests
     }
 
     [Test]
+    public void Extract_ConstructorExpressionMissingClosingBracket_IsEvidenceExtractionFailure()
+    {
+        var configuration = new ArchitectureClassificationConfiguration
+        {
+            Attributes =
+            {
+                DomainMapping(metadata: new Dictionary<string, object> { ["domain"] = "constructor[0" })
+            }
+        };
+
+        ArchitectureTypeClassificationResult result = CreateExtractor(configuration).Extract(typeof(TypeWithConstructorDefault));
+
+        Assert.That(result.Role, Is.EqualTo("DomainLayer"));
+        Assert.That(result.Metadata.ContainsKey("domain"), Is.False);
+        Assert.That(result.Metadata.Values, Does.Not.Contain("constructor[0"));
+        Assert.That(result.MetadataFailures, Has.Count.EqualTo(1));
+    }
+
+    [Test]
     public void Extract_ConstReferenceWithoutFieldSeparator_IsEvidenceExtractionFailure()
     {
         var configuration = new ArchitectureClassificationConfiguration

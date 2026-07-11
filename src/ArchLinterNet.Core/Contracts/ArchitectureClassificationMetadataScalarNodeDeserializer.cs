@@ -41,6 +41,16 @@ internal sealed class ArchitectureClassificationMetadataScalarNodeDeserializer :
             return longValue;
         }
 
+        // Try decimal before double: decimal holds ~28-29 significant digits exactly, so a literal
+        // like `1.23456789012345678901` round-trips exactly here, whereas parsing it as a double
+        // first (double has ~15-17 significant digits) would silently lose precision before the
+        // extraction engine ever canonicalizes it into the decimal domain. double remains the
+        // fallback for magnitudes outside decimal's range (e.g. `1e300`) or non-finite literals.
+        if (decimal.TryParse(raw, NumberStyles.Float, CultureInfo.InvariantCulture, out decimal decimalValue))
+        {
+            return decimalValue;
+        }
+
         if (double.TryParse(raw, NumberStyles.Float, CultureInfo.InvariantCulture, out double doubleValue))
         {
             return doubleValue;

@@ -20,7 +20,7 @@ internal static class ArchitectureAttributeMetadataExtraction
     {
         if (rawYamlValue is string expression)
         {
-            if (expression.StartsWith(ConstructorPrefix, StringComparison.Ordinal) && expression.EndsWith(']'))
+            if (expression.StartsWith(ConstructorPrefix, StringComparison.Ordinal))
             {
                 return ExtractConstructorArgument(expression, attributeData);
             }
@@ -44,6 +44,11 @@ internal static class ArchitectureAttributeMetadataExtraction
     private static (object? Canonical, string? FailureReason) ExtractConstructorArgument(
         string expression, CustomAttributeData attributeData)
     {
+        if (!expression.EndsWith(']'))
+        {
+            return (null, $"'{expression}' is not a valid constructor index expression");
+        }
+
         string indexText = expression[ConstructorPrefix.Length..^1];
         if (!int.TryParse(indexText, NumberStyles.None, CultureInfo.InvariantCulture, out int index))
         {

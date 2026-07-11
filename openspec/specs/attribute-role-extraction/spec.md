@@ -102,6 +102,10 @@ The extraction engine SHALL interpret each `metadata.<key>` value using exactly 
 - **WHEN** a `classification.attributes` entry declares `metadata: { domain: constructor[0] }` and the matched attribute usage omits an optional constructor parameter with a default value
 - **THEN** the extracted value is the fully compiler-resolved positional argument, including the substituted default
 
+#### Scenario: Malformed constructor-index expression is an evidence-extraction failure, not a literal
+- **WHEN** a `metadata.<key>` value starts with `constructor[` but is otherwise malformed (e.g. missing the closing `]`)
+- **THEN** the extraction engine SHALL treat this as an attempted `constructor[<index>]` expression and resolve it as an evidence-extraction failure — it SHALL NOT fall through to the literal-scalar form merely because the expression is malformed
+
 #### Scenario: property extraction ignores type-declared defaults
 - **WHEN** a `classification.attributes` entry declares `metadata: { module: property:Module }` and the matched attribute usage does not explicitly supply `Module` as a named argument, even though the attribute type declares a settable `Module` property
 - **THEN** the `module` key is treated as an evidence-extraction failure, not resolved from the property's declared default
@@ -136,6 +140,10 @@ Every metadata value produced by extraction or supplied as a literal SHALL be ca
 #### Scenario: Cross-representation numeric values compare equal
 - **WHEN** one metadata value originates from a CLR numeric primitive and another originates from a YAML/JSON numeric literal representing the same number
 - **THEN** both canonicalize to the same decimal value and compare equal
+
+#### Scenario: High-precision YAML numeric literals do not lose precision before canonicalization
+- **WHEN** a literal `metadata.<key>` value is a YAML numeric scalar with more significant digits than a CLR `double` can represent exactly, but within `decimal`'s range and precision
+- **THEN** the canonical value SHALL equal the literal's exact decimal value — the literal SHALL NOT be parsed through `double` as an intermediate step when `decimal` can represent it exactly
 
 ### Requirement: Evidence-extraction failure never blocks role assignment
 Whenever `constructor[<index>]`, `property:<Name>`, `const:<Full.Type.NAME>`, or value canonicalization fails for a given `metadata.<key>`, the extraction engine SHALL omit that key from the assigned metadata (not fabricate or default it), proceed with the role assignment from the matching source unaffected, and record the failure as a fact.

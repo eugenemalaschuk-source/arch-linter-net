@@ -185,9 +185,55 @@ contracts:
 
         Assert.That(metadata["enabled"], Is.EqualTo(true));
         Assert.That(metadata["priority"], Is.EqualTo(1L));
-        Assert.That(metadata["ratio"], Is.EqualTo(1.5));
+        Assert.That(metadata["ratio"], Is.EqualTo(1.5m));
         Assert.That(metadata["owner"], Is.EqualTo("platform-team"));
         Assert.That(metadata["quotedNumber"], Is.EqualTo("42"));
+    }
+
+    [Test]
+    public void LoadFromPath_HighPrecisionDecimalLiteral_DoesNotLosePrecisionThroughDouble()
+    {
+        string contractDir = Path.Combine(_tempDir, "architecture");
+        Directory.CreateDirectory(contractDir);
+        string contractPath = Path.Combine(contractDir, "dependencies.arch.yml");
+
+        File.WriteAllText(contractPath, @"
+version: 1
+name: Test Contract
+layers:
+  core:
+    namespace: Test.Core
+analysis:
+  target_assemblies:
+    - Test.Core
+classification:
+  attributes:
+    - attribute: Acme.Architecture.DomainLayerAttribute
+      role: DomainLayer
+      metadata:
+        precise: 1.23456789012345678901234
+contracts:
+  strict: []
+  audit: []
+  strict_layers: []
+  audit_layers: []
+  strict_allow_only: []
+  audit_allow_only: []
+  strict_cycles: []
+  audit_cycles: []
+  strict_method_body: []
+  audit_method_body: []
+  strict_asmdef: []
+  audit_asmdef: []
+  strict_independence: []
+  audit_independence: []
+");
+
+        ArchitectureContractDocument document = new ArchitecturePolicyDocumentLoader().Load(contractPath);
+        Dictionary<string, object> metadata = document.Classification.Attributes[0].Metadata;
+
+        Assert.That(metadata["precise"], Is.TypeOf<decimal>());
+        Assert.That(metadata["precise"], Is.EqualTo(1.23456789012345678901234m));
     }
 
     [Test]
