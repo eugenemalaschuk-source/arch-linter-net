@@ -19,6 +19,11 @@
   "layerMatching": {
     "namespace": "Exact namespace or child namespace prefix match.",
     "namespace_suffix": "Optional suffix constraint applied after namespace prefix matching.",
+    "selector": {
+      "role": "Exact role name match against the per-run classification role index.",
+      "metadata": "Optional key/value exact-match AND constraints. Every declared metadata key/value must match the target type's classification metadata.",
+      "semantics": "A layer may declare only selector, only namespace, or both. When both are present, a type must satisfy both predicates."
+    },
     "unsupported": ["regular expressions", "wildcards in layer namespace definitions", "assembly-only layer definitions"]
   },
   "contractFamilies": [

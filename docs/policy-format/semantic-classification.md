@@ -5,22 +5,26 @@
 (see [issue #109](https://github.com/eugenemalaschuk-source/arch-linter-net/issues/109) and
 `openspec/specs/attribute-role-extraction`): type-level and assembly-level attributes
 mapped by full type name are extracted and canonicalized into role/metadata facts,
-with `type_attribute` precedence over `assembly_attribute`. **Every other part of
-this page — `precedence` beyond these two sources, `inheritance`, `namespace`, `path`,
-`overrides`, and `exclusions` — remain reserved by the
-YAML schema only.** A policy declaring those sections today is schema-valid, but
-they have **no effect** on validation — no role is assigned from them and no
-diagnostic is produced from them. This page documents the
-reviewed shape so policy authors and AI agents do not treat the unimplemented parts
-as a working feature before their own implementation issues land. See
-[Supported capabilities and non-goals](supported-capabilities.md) for the
+with `type_attribute` precedence over `assembly_attribute`. Selector-backed layers
+resolve types by exact role/metadata match and produce violations through existing
+contract families (dependency, layer-order, allow-only, etc.) exactly as
+namespace-based layers do. Empty non-external selector-only layers surface as
+configuration diagnostics. **Every other part of this page — `precedence` beyond
+`type_attribute`/`assembly_attribute`, `inheritance`, `namespace`, `path`,
+`overrides`, and `exclusions` — remain reserved by the YAML schema only.** A policy
+declaring those sections today is schema-valid, but they have **no effect** on
+validation — no role is assigned from them and no diagnostic is produced from them.
+This page documents the reviewed shape so policy authors and AI agents do not treat
+the unimplemented parts as a working feature before their own implementation issues
+land. See [Supported capabilities and non-goals](supported-capabilities.md) for the
 authoritative list of what is enforced today.
 
-**This capability produces facts, not contract results.** Extraction records role,
-metadata, and `conflict`/evidence-extraction-failure facts, and `validate` surfaces
-them in human, JSON, and CI-artifact output as informational "Classification
-findings" — but they are not wired into any `strict_*`/`audit_*` contract family's
-pass/fail evaluation or SARIF diagnostics, and never affect the command's exit code.
+**Attribute-based classification produces facts consumed by selector-backed
+layers.** Extraction records role, metadata, and `conflict`/evidence-extraction-failure
+facts. Selector-backed layers consume the role index to match types, and contract
+violations from those layers affect pass/fail evaluation and the command's exit code.
+`validate` also surfaces classification facts in human, JSON, and CI-artifact output
+as informational "Classification findings."
 
 **Discovered roles are indexed once per validation run** (see
 [issue #110](https://github.com/eugenemalaschuk-source/arch-linter-net/issues/110)
@@ -48,9 +52,9 @@ classified type:
 `AssemblyAttribute`); `evidence` names the specific attribute type whose
 mapping produced the role, so the two together answer both "how" and
 "which fact" a role assignment came from. `evidence` is `null` when no role
-was resolved. This index is purely informational output, like the conflict
-and metadata-failure facts above — it is not yet consumed by any selector or
-coverage check (see [Current limits](#current-limits)).
+was resolved. This index is consumed by selector-backed layer resolution;
+classification findings are also surfaced as informational output in
+human/JSON/CI-artifact formats.
 
 ## Why this section exists
 
@@ -254,24 +258,25 @@ every layer did before this feature) remains unaffected.
   the `classification.precedence` subset that enables/disables these two
   sources. No other source (`yaml_override`, `inheritance`, `namespace`,
   `path`) ever assigns a role yet.
-- Selector matching uses the per-run role index and exact role/metadata
-  predicates; empty non-external selector matches are surfaced as configuration
-  diagnostics.
-- Informational only: `conflict` and evidence-extraction-failure facts for the
-  implemented sources are surfaced by `validate`'s human/JSON/CI-artifact output
-  as a "Classification findings" section, but nothing wires them into SARIF or
-  any contract family's pass/fail evaluation. `stale selector` and `uncovered semantic fact` remain vocabulary only.
-- Role index: implemented as a per-run, lazily-computed cache
+- Selector matching: **implemented** — uses the per-run role index and exact
+  role/metadata predicates; a layer may declare only `selector`, only
+  `namespace`, or both. Empty non-external selector matches are surfaced as
+  configuration diagnostics. Selector-backed layers produce violations through
+  existing contract families exactly as namespace-based layers do.
+- Role index: **implemented** as a per-run, lazily-computed cache
   (`ArchitectureRoleIndex`) of every classified type's role/metadata/source/
   evidence, surfaced as `classification_roles` in JSON/CI-artifact output. It
-  is consumed by selector-backed layer resolution; coverage checks and
-  classification pass/fail remain outside this capability.
+  is consumed by selector-backed layer resolution. `stale selector` and
+  `uncovered semantic fact` remain vocabulary only.
+- Classification findings (roles, conflicts, metadata failures) are surfaced
+  as informational output in human, JSON, and CI-artifact formats. They are not
+  wired into SARIF diagnostics.
+- No coverage integration: the planned `scope: semantic_role` coverage variant
+  (tracked by a follow-up issue) does not exist yet.
 - No annotation package: this design does not ship, and does not require, a
   binary ArchLinterNet annotation assembly — see
   [Annotation strategy](#annotation-strategy) below for the full adoption
   decision.
-- No coverage integration: the planned `scope: semantic_role` coverage variant
-  (tracked by a follow-up issue) does not exist yet.
 
 ## Annotation strategy
 
