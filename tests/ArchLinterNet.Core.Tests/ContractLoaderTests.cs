@@ -622,4 +622,82 @@ contracts:
 
         Assert.That(ex.Message, Does.Contain("selector metadata key 'domain' must not be an empty string"));
     }
+
+    [Test]
+    public void LoadFromPath_SelectorUnknownProperty_ThrowsDeterministicValidationError()
+    {
+        string contractDir = Path.Combine(_tempDir, "architecture");
+        Directory.CreateDirectory(contractDir);
+        string contractPath = Path.Combine(contractDir, "dependencies.arch.yml");
+
+        File.WriteAllText(contractPath, """
+version: 1
+name: Unknown Selector Property
+layers:
+  semantic:
+    selector:
+      role: DomainLayer
+      metdata:
+        domain: Sales
+analysis:
+  target_assemblies: []
+contracts:
+  strict: []
+  audit: []
+  strict_layers: []
+  audit_layers: []
+  strict_allow_only: []
+  audit_allow_only: []
+  strict_cycles: []
+  audit_cycles: []
+  strict_method_body: []
+  audit_method_body: []
+  strict_asmdef: []
+  audit_asmdef: []
+  strict_independence: []
+  audit_independence: []
+""");
+
+        InvalidOperationException ex = Assert.Throws<InvalidOperationException>(() =>
+            new ArchitecturePolicyDocumentLoader().Load(contractPath))!;
+
+        Assert.That(ex.Message, Does.Contain("Layer 'semantic' selector contains unknown property 'metdata'"));
+    }
+
+    [Test]
+    public void LoadFromPath_QuotedNullNamespaceWithSuffix_LoadsWithoutThrowing()
+    {
+        string contractDir = Path.Combine(_tempDir, "architecture");
+        Directory.CreateDirectory(contractDir);
+        string contractPath = Path.Combine(contractDir, "dependencies.arch.yml");
+
+        File.WriteAllText(contractPath, """
+version: 1
+name: Quoted Null Namespace
+layers:
+  core:
+    namespace: "Null"
+    namespace_suffix: Generated
+analysis:
+  target_assemblies:
+    - Null.Generated
+contracts:
+  strict: []
+  audit: []
+  strict_layers: []
+  audit_layers: []
+  strict_allow_only: []
+  audit_allow_only: []
+  strict_cycles: []
+  audit_cycles: []
+  strict_method_body: []
+  audit_method_body: []
+  strict_asmdef: []
+  audit_asmdef: []
+  strict_independence: []
+  audit_independence: []
+""");
+
+        Assert.DoesNotThrow(() => new ArchitecturePolicyDocumentLoader().Load(contractPath));
+    }
 }

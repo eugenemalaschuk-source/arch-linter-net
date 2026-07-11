@@ -2,6 +2,7 @@ using System.Text.RegularExpressions;
 using ArchLinterNet.Core.Contracts.Abstractions;
 using ArchLinterNet.Core.Contracts.Validators;
 using ArchLinterNet.Core.IO;
+using YamlDotNet.Core;
 using YamlDotNet.RepresentationModel;
 using YamlDotNet.Serialization;
 using YamlDotNet.Serialization.NamingConventions;
@@ -103,6 +104,17 @@ public sealed partial class ArchitecturePolicyDocumentLoader : IArchitecturePoli
                 throw new InvalidOperationException(
                     $"Layer '{layerName}' selector metadata must be an object when declared.");
             }
+
+            foreach ((YamlNode selKeyNode, _) in selectorMapping.Children)
+            {
+                if (selKeyNode is YamlScalarNode selKeyScalar
+                    && !string.Equals(selKeyScalar.Value, "role", StringComparison.Ordinal)
+                    && !string.Equals(selKeyScalar.Value, "metadata", StringComparison.Ordinal))
+                {
+                    throw new InvalidOperationException(
+                        $"Layer '{layerName}' selector contains unknown property '{selKeyScalar.Value}'.");
+                }
+            }
         }
     }
 
@@ -144,8 +156,10 @@ public sealed partial class ArchitecturePolicyDocumentLoader : IArchitecturePoli
     {
         return node is YamlScalarNode scalar
             && (scalar.Value is null
-                || string.Equals(scalar.Value, "null", StringComparison.OrdinalIgnoreCase)
-                || string.Equals(scalar.Value, "~", StringComparison.Ordinal));
+                || (scalar.Style == ScalarStyle.Plain
+                    && string.Equals(scalar.Value, "null", StringComparison.OrdinalIgnoreCase))
+                || (scalar.Style == ScalarStyle.Plain
+                    && string.Equals(scalar.Value, "~", StringComparison.Ordinal)));
     }
 
     public static string NormalizeToContractId(string name)
