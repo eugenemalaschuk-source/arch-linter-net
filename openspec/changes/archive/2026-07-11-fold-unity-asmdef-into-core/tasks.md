@@ -25,5 +25,5 @@
 
 - [x] 4.1 Preserve existing asmdef-only public behavior through migrated tests
 - [x] 4.2 Verify the branch diff contains no active project, package, workflow, policy, or blueprint dependency on `ArchLinterNet.Unity`
-- [ ] 4.3 Confirm CI and CodeQL pass on the final review-fix commit
-- [ ] 4.4 Confirm package validation passes and produces exactly Core, CLI, and Testing NuGet artifacts
+- [x] 4.3 Confirm CI and CodeQL pass on the final review-fix commit
+- [x] 4.4 Confirm package validation passes and produces exactly Core, CLI, and Testing NuGet artifacts
