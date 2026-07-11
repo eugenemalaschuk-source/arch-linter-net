@@ -117,7 +117,7 @@ public sealed class ArchitectureContractSchemaTests
     }
 
     // Regression coverage for the semantic-classification-model design
-    // (openspec/changes/design-semantic-classification-model): schema acceptance only,
+    // (openspec/changes/archive/2026-07-10-design-semantic-classification-model): schema acceptance only,
     // no extraction/matching engine exists yet. See design.md for the reviewed shape.
     [Test]
     public void Schema_Root_DeclaresClassificationSection()

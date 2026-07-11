@@ -1,7 +1,7 @@
 # semantic-classification-model Specification
 
 ## Purpose
-TBD - created by archiving change design-semantic-classification-model. Update Purpose after archive.
+Define the semantic-classification vocabulary, the reserved `classification` YAML section, and the `layers.<name>.selector` shape that future role-discovery/extraction work (#108-#114) implements against. This capability is design-only: no attribute/inheritance/namespace/path extraction, role assignment, selector matching, or runtime binding is implemented by it.
 ## Requirements
 ### Requirement: Classification vocabulary is defined
 The semantic classification model SHALL define exactly ten classification terms with non-overlapping meanings: `role`, `metadata`, `source`, `evidence`, `confidence`/`precedence`, `conflict`, `override`, `exclusion`, `stale selector`, and `uncovered semantic fact`.
@@ -48,6 +48,17 @@ The reviewed schema SHALL fix the classification source precedence order as `yam
 - **WHEN** a `classification.attributes` entry declares `attribute: Acme.Architecture.DomainLayerAttribute`
 - **THEN** the model maps that attribute to the declared `role`/`metadata` regardless of which assembly defines `Acme.Architecture.DomainLayerAttribute`
 
+### Requirement: Repeated instances of one mapped attribute resolve by metadata order, not YAML order
+When a repeatable attribute mapped by a single `classification.attributes`/`classification.assembly_attributes` entry appears more than once on one declaration, the model SHALL resolve the resulting conflict using the attribute instances' `CustomAttributeData` metadata order (first instance wins), not YAML declaration order (there is only one mapping entry to order). Identical instances (same role and same metadata for every key the entry maps) SHALL NOT be treated as a conflict.
+
+#### Scenario: Differing repeated instances resolve by first-in-metadata-order
+- **WHEN** a type carries two instances of the same attribute mapped by one `classification.attributes` entry, and the instances' extracted metadata differs
+- **THEN** the model assigns the role/metadata of the first instance in `CustomAttributeData` metadata order and records the discarded instance as a `conflict` fact
+
+#### Scenario: Identical repeated instances are not a conflict
+- **WHEN** a type carries two instances of the same attribute mapped by one `classification.attributes` entry, and every instance resolves to the same role and the same metadata for every mapped key
+- **THEN** the model assigns that role/metadata without recording a `conflict` fact
+
 ### Requirement: Metadata extraction syntax is fixed and deterministic
 Each `metadata.<key>` value SHALL be interpreted using exactly one of four forms, checked in this fixed order: `constructor[<index>]` (positional constructor argument), `property:<Name>` (named property/field), `const:<Full.Type.NAME>` (compile-time `const` field only), or a literal YAML scalar for any value matching none of the three reserved prefixes. No regex or reflection-expression syntax beyond these four forms SHALL be introduced.
 
@@ -61,7 +72,22 @@ Each `metadata.<key>` value SHALL be interpreted using exactly one of four forms
 
 #### Scenario: const resolves only compile-time const fields, never static readonly
 - **WHEN** a `const:<Full.Type.NAME>` reference names a `static readonly` field, an instance field, a computed member, or any member whose value is not fixed at compile time
-- **THEN** the reviewed design classifies this as a deterministic unresolved-constant condition; extraction SHALL NOT execute, reflect over, or guess at the referenced member's runtime value, and SHALL report the failure explicitly rather than silently omitting the metadata key
+- **THEN** the reviewed design classifies this as a deterministic unresolved-constant condition; extraction SHALL NOT execute, reflect over, or guess at the referenced member's runtime value
+
+### Requirement: Evidence-extraction failure is uniform across forms and never blocks role assignment
+Each of `constructor[<index>]`, `property:<Name>`, and `const:<Full.Type.NAME>` SHALL resolve failure identically: the failed metadata key SHALL be omitted from the assigned metadata (not fabricated, not defaulted), the role assignment from the matching source SHALL still proceed unaffected, and the failure SHALL be recorded as an explainable fact for diagnostics.
+
+#### Scenario: Out-of-range constructor index omits the key without blocking the role
+- **WHEN** a `classification.attributes` entry declares `metadata: { domain: constructor[2] }` and the matched attribute instance's constructor invocation has fewer than 3 positional arguments
+- **THEN** the `domain` key is omitted from that type's assigned metadata, the type still receives the entry's declared `role`, and the failure is recorded as an explainable fact
+
+#### Scenario: Missing named property omits the key without blocking the role
+- **WHEN** a `classification.attributes` entry declares `metadata: { module: property:Module }` and the matched attribute instance has no public property or field named `Module`
+- **THEN** the `module` key is omitted from that type's assigned metadata, the type still receives the entry's declared `role`, and the failure is recorded as an explainable fact
+
+#### Scenario: Unresolved const reference omits the key without blocking the role
+- **WHEN** a `const:<Full.Type.NAME>` reference does not resolve to a compile-time `const` field
+- **THEN** that metadata key is omitted from the type's assigned metadata, the type still receives the entry's declared `role`, and the failure is recorded as an explainable fact
 
 ### Requirement: Selector syntax is additive to the existing layer shape
 `layers.<name>.selector` SHALL be a new optional field on the existing `layer` schema shape, sibling to `namespace`/`namespace_suffix`/`external`, requiring `role` and allowing an optional exact-match `metadata` object. A layer SHALL be permitted to declare `namespace`, `selector`, or both; `namespace`'s existing required-ness SHALL be relaxed to an alternative (`namespace` OR `selector`) without changing `namespace`'s own matching semantics.

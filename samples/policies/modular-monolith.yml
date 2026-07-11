@@ -4,7 +4,7 @@ version: 1
 name: Modular Monolith Policy Recipe
 
 # Reserved for the semantic-classification-model design (schema acceptance only;
-# see openspec/changes/design-semantic-classification-model). No extraction or
+# see openspec/changes/archive/2026-07-10-design-semantic-classification-model). No extraction or
 # selector-matching engine exists yet, so this section has no effect on the
 # contracts below - it illustrates the reviewed YAML shape for a
 # Sales/Inventory/SharedKernel modular-monolith policy.
@@ -18,7 +18,7 @@ classification:
     - namespace: MyCompany.Product.SharedKernel
       role: SharedKernel
   exclusions:
-    - namespace_suffix: .Generated
+    - namespace_suffix: Generated
       reason: Source-generated code is not hand-authored and is exempt from classification.
 
 layers:

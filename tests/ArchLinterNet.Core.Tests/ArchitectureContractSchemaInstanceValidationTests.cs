@@ -159,7 +159,7 @@ public sealed class ArchitectureContractSchemaInstanceValidationTests
     [Test]
     public void ClassificationExclusion_SingleScopeWithReason_IsValid()
     {
-        const string Yaml = "namespace_suffix: .Generated\nreason: Generated code is exempt.\n";
+        const string Yaml = "namespace_suffix: Generated\nreason: Generated code is exempt.\n";
 
         Assert.That(Validate(Yaml, "classificationExclusion"), Is.True);
     }
@@ -167,7 +167,7 @@ public sealed class ArchitectureContractSchemaInstanceValidationTests
     [Test]
     public void ClassificationExclusion_WithoutReason_IsRejected()
     {
-        const string Yaml = "namespace_suffix: .Generated\n";
+        const string Yaml = "namespace_suffix: Generated\n";
 
         Assert.That(Validate(Yaml, "classificationExclusion"), Is.False);
     }

@@ -184,7 +184,7 @@
     "classification": {
       "type": "object",
       "additionalProperties": false,
-      "description": "Reserved for the semantic-classification-model design (schema acceptance only; see openspec/changes/design-semantic-classification-model). No extraction, role-assignment, or matching engine exists yet; declaring this section has no runtime effect.",
+      "description": "Reserved for the semantic-classification-model design (schema acceptance only; see openspec/changes/archive/2026-07-10-design-semantic-classification-model). No extraction, role-assignment, or matching engine exists yet; declaring this section has no runtime effect.",
       "properties": {
         "precedence": {
           "type": "array",

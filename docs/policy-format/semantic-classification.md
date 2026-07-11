@@ -62,7 +62,7 @@ classification:
       role: DomainLayer
       metadata:
         domain: Sales
-    - namespace_suffix: .Repositories
+    - namespace_suffix: Repositories
       role: Repository
 
   path:
@@ -79,7 +79,7 @@ classification:
       reason: Legacy area predates attribute adoption; reviewed quarterly.
 
   exclusions:
-    - namespace_suffix: .Generated
+    - namespace_suffix: Generated
       reason: Source-generated code is not hand-authored and is exempt from classification.
 
 layers:
@@ -126,9 +126,24 @@ checked in this order:
 code — a method call, an environment-variable read, I/O, or any other
 runtime-computed expression — and evaluating it would require either executing
 that code (which a static-analysis-only tool must not do) or a much narrower
-literal-initializer detection that does not exist yet. A `const:` reference
-that does not resolve to an actual `const` field is a deterministic
-**unresolved-constant** condition, not a silent guess.
+literal-initializer detection that does not exist yet.
+
+**Evidence-extraction failure is uniform across all three evidence-referencing
+forms, and never blocks role assignment.** An out-of-range `constructor[N]`,
+a missing `property:Name`, or an unresolved `const:` reference all resolve the
+same way: that metadata key is **omitted** from the type's assigned
+metadata — not fabricated, not defaulted — and the type still receives its
+role from the matching source, since role assignment does not depend on every
+metadata key resolving. Every extraction failure is recorded as an explainable
+fact so a policy author can see why an expected metadata key is missing,
+rather than the omission looking like an unrelated authoring mistake.
+
+**Repeated instances of one mapped attribute** (a repeatable custom attribute
+applied more than once, e.g. `[Domain("Sales")] [Domain("Inventory")]`)
+resolve by the attributes' metadata order (first instance wins) rather than by
+YAML declaration order, since there is only one `classification.attributes`
+entry mapping `Domain` in that example, not two. Identical repeated instances
+(same role, same metadata) are not treated as a conflict.
 
 ## Overrides and exclusions
 
