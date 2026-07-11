@@ -5,6 +5,7 @@
 [![CI](https://github.com/eugenemalaschuk-source/arch-linter-net/actions/workflows/ci.yml/badge.svg)](https://github.com/eugenemalaschuk-source/arch-linter-net/actions/workflows/ci.yml)
 [![CodeQL](https://github.com/eugenemalaschuk-source/arch-linter-net/actions/workflows/codeql.yml/badge.svg)](https://github.com/eugenemalaschuk-source/arch-linter-net/actions/workflows/codeql.yml)
 [![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/eugenemalaschuk-source/arch-linter-net/badge)](https://scorecard.dev/viewer/?uri=github.com/eugenemalaschuk-source/arch-linter-net)
+[![OpenSSF Best Practices](https://www.bestpractices.dev/projects/13572/badge)](https://www.bestpractices.dev/en/projects/13572/passing)
 [![NuGet version](https://img.shields.io/nuget/v/ArchLinterNet.Cli.svg)](https://www.nuget.org/packages/ArchLinterNet.Cli/)
 [![NuGet downloads](https://img.shields.io/nuget/dt/ArchLinterNet.Cli)](https://www.nuget.org/packages/ArchLinterNet.Cli/)
 [![.NET tool](https://img.shields.io/badge/.NET-tool-512BD4)](https://www.nuget.org/packages/ArchLinterNet.Cli/)
