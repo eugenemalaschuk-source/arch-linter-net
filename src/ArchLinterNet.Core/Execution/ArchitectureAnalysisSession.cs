@@ -58,6 +58,56 @@ public sealed partial class ArchitectureAnalysisSession
 
     public ArchitectureRoleIndex RoleIndex { get; }
 
+    private Type[] FindTypesInLayer(ArchitectureLayer layer)
+    {
+        return TypeIndex.FindTypesInLayer(layer, RoleIndex);
+    }
+
+    private bool MatchesLayer(ArchitectureLayer layer, Type type)
+    {
+        return ArchitectureLayerTypeMatcher.Matches(layer, type, RoleIndex);
+    }
+
+    private bool IsInAnyDeclaredLayer(Type type)
+    {
+        return Document.Layers.Values.Any(layer => MatchesLayer(layer, type));
+    }
+
+    private string? ResolveContainingLayer(Type type, IReadOnlySet<string> candidateLayerNames)
+    {
+        return candidateLayerNames
+            .Select(layerName => new
+            {
+                LayerName = layerName,
+                Layer = ArchitectureLayerResolver.ResolveLayer(Document, "type-resolution", layerName)
+            })
+            .Where(entry => MatchesLayer(entry.Layer, type))
+            .Select(entry =>
+            {
+                bool hasNamespace = !string.IsNullOrWhiteSpace(entry.Layer.Namespace);
+                NamespaceGlobPattern? pattern = hasNamespace ? entry.Layer.GlobPattern : null;
+                return new
+                {
+                    entry.LayerName,
+                    HasSelector = entry.Layer.Selector != null,
+                    HasNamespace = hasNamespace,
+                    IsGlob = pattern?.IsGlob ?? false,
+                    LiteralCount = pattern?.LiteralCount ?? -1,
+                    HasSuffix = !string.IsNullOrEmpty(entry.Layer.NamespaceSuffix),
+                    WildcardCount = pattern?.WildcardCount ?? int.MaxValue
+                };
+            })
+            .OrderByDescending(entry => entry.HasSelector)
+            .ThenByDescending(entry => entry.HasNamespace)
+            .ThenByDescending(entry => entry.HasNamespace && !entry.IsGlob)
+            .ThenByDescending(entry => entry.LiteralCount)
+            .ThenByDescending(entry => entry.HasSuffix)
+            .ThenBy(entry => entry.WildcardCount)
+            .ThenBy(entry => entry.LayerName, StringComparer.Ordinal)
+            .Select(entry => entry.LayerName)
+            .FirstOrDefault();
+    }
+
     public ArchitectureReferenceGraph ReferenceGraph { get; } = new();
 
     public IReadOnlyList<ArchitectureUnmatchedIgnoredViolation> UnmatchedIgnoredViolations
@@ -340,7 +390,7 @@ public sealed partial class ArchitectureAnalysisSession
                 continue;
             }
 
-            Type[] types = ArchitectureTypeScanner.FindTypesInLayer(Context.TargetAssemblies, layer);
+            Type[] types = FindTypesInLayer(layer);
 
             if (types.Length == 0)
             {
@@ -354,12 +404,16 @@ public sealed partial class ArchitectureAnalysisSession
                     continue;
                 }
 
+                string matchDescription = layer.Selector == null
+                    ? $"namespace '{layer.Namespace}'"
+                    : $"semantic selector '{ArchitectureLayerResolver.DescribeLayer(layer)}'";
+
                 violations.Add(new ArchitectureViolation(
                     ConfigurationSource,
                     null,
                     ArchitectureLayerResolver.DescribeLayer(layer),
-                    "empty layer namespace",
-                    new[] { $"Layer '{layerName}' namespace '{layer.Namespace}' contains no types in loaded assemblies." }));
+                    layer.Selector == null ? "empty layer namespace" : "empty layer selector",
+                    new[] { $"Layer '{layerName}' {matchDescription} contains no matching types in loaded assemblies." }));
             }
         }
     }

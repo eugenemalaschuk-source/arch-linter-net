@@ -387,19 +387,13 @@ public sealed partial class ArchitectureAnalysisSession
             .ToList();
     }
 
-    private static List<PolicyConsistencyDiagnostic> FindLayerOverlapsForType(
+    private List<PolicyConsistencyDiagnostic> FindLayerOverlapsForType(
         Type type,
         List<KeyValuePair<string, ArchitectureLayer>> internalLayers,
         HashSet<(string, string)> reportedPairs)
     {
-        string ns = ArchitectureTypeNames.SafeNamespace(type);
-        if (string.IsNullOrEmpty(ns))
-        {
-            return new List<PolicyConsistencyDiagnostic>();
-        }
-
         List<string> matchedLayers = internalLayers
-            .Where(kvp => ArchitectureLayerResolver.MatchesNamespace(kvp.Value, ns))
+            .Where(kvp => MatchesLayer(kvp.Value, type))
             .Select(kvp => kvp.Key)
             .ToList();
 
@@ -537,7 +531,7 @@ public sealed partial class ArchitectureAnalysisSession
 
     private static bool IsStructurallyUnreachable(ArchitectureLayer layer)
     {
-        if (string.IsNullOrWhiteSpace(layer.Namespace))
+        if (string.IsNullOrWhiteSpace(layer.Namespace) && layer.Selector == null)
         {
             return true;
         }

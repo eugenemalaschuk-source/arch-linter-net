@@ -1,6 +1,7 @@
 using ArchLinterNet.Core.Contracts;
 using ArchLinterNet.Core.Execution;
 using ArchLinterNet.Core.Model;
+using AttributeRoleExtractionTestFixtures;
 using NUnit.Framework;
 
 namespace ArchLinterNet.Core.Tests;
@@ -9,6 +10,7 @@ namespace ArchLinterNet.Core.Tests;
 public sealed class PolicyConsistencyCheckTests
 {
     private static readonly string[] _domainApplication = { "domain", "application" };
+    private static readonly string[] _semanticLayers = { "semantic_a", "semantic_b" };
 
     private static ArchitectureAnalysisContext CreateContext()
     {
@@ -331,6 +333,108 @@ public sealed class PolicyConsistencyCheckTests
     }
 
     [Test]
+    public void LayerOverlap_DisjointCombinedSelectorsInSameNamespace_NotFlagged()
+    {
+        var document = BaseDocument();
+        document.Classification = new ArchitectureClassificationConfiguration
+        {
+            Attributes =
+            {
+                new ArchitectureAttributeClassificationMapping
+                {
+                    Attribute = "AttributeRoleExtractionTestFixtures.DomainMarkerAttribute",
+                    Role = "DomainLayer",
+                    Metadata = new Dictionary<string, object>
+                    {
+                        ["enabled"] = "property:Enabled",
+                        ["tier"] = "property:Tier"
+                    }
+                }
+            }
+        };
+        document.Layers["enabled_domain"] = new ArchitectureLayer
+        {
+            Namespace = "AttributeRoleExtractionTestFixtures",
+            Selector = new ArchitectureLayerSelector
+            {
+                Role = "DomainLayer",
+                Metadata = new Dictionary<string, object> { ["enabled"] = true }
+            }
+        };
+        document.Layers["tiered_domain"] = new ArchitectureLayer
+        {
+            Namespace = "AttributeRoleExtractionTestFixtures",
+            Selector = new ArchitectureLayerSelector
+            {
+                Role = "DomainLayer",
+                Metadata = new Dictionary<string, object> { ["tier"] = "Domain" }
+            }
+        };
+        document.Contracts.StrictLayers = new List<ArchitectureLayerContract>
+        {
+            new() { Name = "noop", Layers = new List<string> { "enabled_domain" } }
+        };
+
+        var runner = new ArchitectureContractRunner(
+            new ArchitectureAnalysisContext(
+                "/tmp",
+                new[] { typeof(TypeWithBooleanProperty).Assembly },
+                Array.Empty<string>(),
+                Array.Empty<string>()),
+            document);
+        var findings = runner.CheckPolicyConsistency();
+
+        Assert.That(findings.Any(f => f.CheckKind == "layer-overlap"), Is.False);
+    }
+
+    [Test]
+    public void LayerOverlap_SelectorOnlyLayersMatchingSameType_AreDetected()
+    {
+        var document = BaseDocument();
+        document.Classification = new ArchitectureClassificationConfiguration
+        {
+            Attributes =
+            {
+                new ArchitectureAttributeClassificationMapping
+                {
+                    Attribute = "AttributeRoleExtractionTestFixtures.DomainMarkerAttribute",
+                    Role = "DomainLayer",
+                    Metadata = new Dictionary<string, object> { ["domain"] = "constructor[0]" }
+                }
+            }
+        };
+        document.Layers["semantic_a"] = new ArchitectureLayer
+        {
+            Selector = new ArchitectureLayerSelector { Role = "DomainLayer" }
+        };
+        document.Layers["semantic_b"] = new ArchitectureLayer
+        {
+            Selector = new ArchitectureLayerSelector
+            {
+                Role = "DomainLayer",
+                Metadata = new Dictionary<string, object> { ["domain"] = "Sales" }
+            }
+        };
+        document.Contracts.StrictLayers = new List<ArchitectureLayerContract>
+        {
+            new() { Name = "noop", Layers = new List<string> { "semantic_a" } }
+        };
+
+        var runner = new ArchitectureContractRunner(
+            new ArchitectureAnalysisContext(
+                "/tmp",
+                new[] { typeof(TypeWithConstructorDefault).Assembly },
+                Array.Empty<string>(),
+                Array.Empty<string>()),
+            document);
+        var findings = runner.CheckPolicyConsistency();
+
+        var finding = findings.FirstOrDefault(f => f.CheckKind == "layer-overlap");
+        Assert.That(finding, Is.Not.Null);
+        Assert.That(finding!.Layers, Is.EquivalentTo(_semanticLayers));
+    }
+
+    [Test]
     public void UnreachableContract_StructurallyImpossibleLayer_Detected()
     {
         var document = BaseDocument();
@@ -346,6 +450,25 @@ public sealed class PolicyConsistencyCheckTests
         var finding = findings.FirstOrDefault(f => f.CheckKind == "unreachable-contract");
         Assert.That(finding, Is.Not.Null);
         Assert.That(finding!.Layers, Is.EquivalentTo(new[] { "impossible" }));
+    }
+
+    [Test]
+    public void UnreachableContract_SelectorOnlyLayer_IsNotFlagged()
+    {
+        var document = BaseDocument();
+        document.Layers["semantic"] = new ArchitectureLayer
+        {
+            Selector = new ArchitectureLayerSelector { Role = "DomainLayer" }
+        };
+        document.Contracts.Strict = new List<ArchitectureDependencyContract>
+        {
+            new() { Name = "uses-selector", Source = "semantic", Forbidden = new List<string> { "application" } }
+        };
+
+        var runner = new ArchitectureContractRunner(CreateContext(), document);
+        var findings = runner.CheckPolicyConsistency();
+
+        Assert.That(findings.Any(f => f.CheckKind == "unreachable-contract"), Is.False);
     }
 
     [Test]

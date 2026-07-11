@@ -100,6 +100,45 @@ public sealed class ConfigurationCheckTests
     }
 
     [Test]
+    public void CheckConfiguration_EmptySelectorLayer_ReturnsSelectorViolation()
+    {
+        var document = new ArchitectureContractDocument
+        {
+            Version = 1,
+            Name = "Test",
+            Layers = new Dictionary<string, ArchitectureLayer>
+            {
+                ["empty"] = new()
+                {
+                    Selector = new ArchitectureLayerSelector { Role = "MissingRole" }
+                }
+            },
+            Analysis = new ArchitectureAnalysisConfiguration
+            {
+                TargetAssemblies = new List<string> { "ArchLinterNet.Core" }
+            },
+            Contracts = new ArchitectureContractGroups
+            {
+                StrictLayers = new List<ArchitectureLayerContract>
+                {
+                    new() { Name = "test", Layers = new List<string> { "empty" } }
+                }
+            }
+        };
+
+        var context = new ArchitectureAnalysisContext(
+            _tempDir,
+            new[] { typeof(ArchitecturePolicyDocumentLoader).Assembly },
+            Array.Empty<string>(),
+            Array.Empty<string>());
+
+        var runner = new ArchitectureContractRunner(context, document);
+        var violations = runner.CheckConfiguration();
+
+        Assert.That(violations.Any(v => v.ForbiddenNamespace == "empty layer selector"), Is.True);
+    }
+
+    [Test]
     public void CheckConfiguration_AllAssembliesResolved_NoConfigurationViolations()
     {
         var document = new ArchitectureContractDocument

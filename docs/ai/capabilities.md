@@ -8,7 +8,7 @@ The policy file is usually `architecture/dependencies.arch.yml` and contains:
 
 - `version`: current value is `1`.
 - `name`: human-readable policy name.
-- `layers`: named namespace-prefix or constrained glob layer definitions.
+- `layers`: named namespace-prefix, constrained glob, or selector-backed layer definitions.
 - `external_dependencies`: named vendor/framework dependency groups.
 - `legacy_runtime_layers`: optional namespace prefixes used by dependency contracts.
 - `analysis`: target assemblies, assembly search paths, optional source roots, condition sets, and default condition set.
@@ -49,6 +49,8 @@ Layer `namespace` values match exact namespaces and child namespaces. For exampl
 Layer `namespace` also supports constrained glob patterns using `*` as a full namespace segment. For example, `MyCompany.Product.Features.*` matches `MyCompany.Product.Features.Audio` and descendants such as `MyCompany.Product.Features.Audio.Player`.
 
 `namespace_suffix` can narrow a layer to a suffix such as `Contracts` or `Models`. When `namespace` contains a glob, the suffix is position-fixed immediately after the resolved namespace pattern.
+
+A layer may declare a `selector` (`role` and optional `metadata` key/value constraints) instead of, or in addition to, `namespace`. Selector matching uses the per-run role index (types classified via `classification.attributes`/`classification.assembly_attributes`) and applies exact-match AND semantics: every metadata key/value constraint must match. When both `namespace` and `selector` are present, a type must satisfy both. Selector-only layers produce types resolved by role/metadata alone, with no namespace predicate.
 
 `external_dependencies.namespace_prefixes` match exact namespaces and child namespaces. `external_dependencies.type_prefixes` match full referenced type names by prefix.
 

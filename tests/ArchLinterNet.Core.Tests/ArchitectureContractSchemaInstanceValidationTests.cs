@@ -180,16 +180,12 @@ public sealed class ArchitectureContractSchemaInstanceValidationTests
         Assert.That(Validate(Yaml, "classificationExclusion"), Is.False);
     }
 
-    // 'namespace' remains mandatory: ArchitectureLayerResolver.IsProjectType iterates every declared
-    // layer unconditionally and accesses layer.GlobPattern, which throws InvalidNamespacePatternException
-    // for an empty Namespace. A selector-only layer would crash at real execution time, not just at
-    // schema-validation or YAML-load time. Selector-only layers are deferred to #111.
     [Test]
-    public void Layer_SelectorOnlyWithoutNamespace_IsRejected()
+    public void Layer_SelectorOnlyWithoutNamespace_IsValid()
     {
         const string Yaml = "selector:\n  role: DomainLayer\n";
 
-        Assert.That(Validate(Yaml, "layer"), Is.False);
+        Assert.That(Validate(Yaml, "layer"), Is.True);
     }
 
     [Test]
@@ -212,6 +208,38 @@ public sealed class ArchitectureContractSchemaInstanceValidationTests
     public void Layer_NeitherNamespaceNorSelector_IsRejected()
     {
         const string Yaml = "external: true\n";
+
+        Assert.That(Validate(Yaml, "layer"), Is.False);
+    }
+
+    [Test]
+    public void Layer_SelectorExplicitNull_IsRejected()
+    {
+        const string Yaml = "namespace: MyApp.Domain\nselector: null\n";
+
+        Assert.That(Validate(Yaml, "layer"), Is.False);
+    }
+
+    [Test]
+    public void Layer_SelectorMetadataExplicitNull_IsRejected()
+    {
+        const string Yaml = "selector:\n  role: DomainLayer\n  metadata: null\n";
+
+        Assert.That(Validate(Yaml, "layer"), Is.False);
+    }
+
+    [Test]
+    public void Layer_SelectorOnlyWithNamespaceSuffix_IsRejected()
+    {
+        const string Yaml = "namespace_suffix: Generated\nselector:\n  role: DomainLayer\n";
+
+        Assert.That(Validate(Yaml, "layer"), Is.False);
+    }
+
+    [Test]
+    public void Layer_SelectorMetadataEmptyString_IsRejected()
+    {
+        const string Yaml = "selector:\n  role: DomainLayer\n  metadata:\n    domain: \"\"\n";
 
         Assert.That(Validate(Yaml, "layer"), Is.False);
     }

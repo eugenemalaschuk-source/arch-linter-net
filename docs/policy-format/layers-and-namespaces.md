@@ -1,4 +1,4 @@
-# Layers and Namespace Patterns
+# Layers, Namespace Patterns, and Semantic Selectors
 
 Layers are named architecture surfaces used by contracts.
 
@@ -11,6 +11,30 @@ layers:
 ```
 
 Contract rules reference layer keys such as `application` and `domain`.
+
+## Semantic selectors
+
+Layers may select classified types by exact role and metadata. A selector-only
+layer is valid, and a layer that declares both `namespace` and `selector` uses
+both constraints (logical AND):
+
+```yaml
+layers:
+  sales_domain:
+    selector:
+      role: DomainLayer
+      metadata:
+        domain: Sales
+  domain:
+    namespace: MyApp.Domain
+    selector:
+      role: DomainLayer
+```
+
+Metadata keys and values are matched exactly; multiple metadata entries must all
+match. Selectors do not support wildcard or regular-expression values. A valid
+selector that matches no loaded types is reported as an empty selector unless
+the layer is marked `external: true`.
 
 ## Literal namespace prefixes
 

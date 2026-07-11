@@ -8,7 +8,7 @@ using NUnit.Framework;
 namespace ArchLinterNet.Core.Tests;
 
 [TestFixture]
-public sealed class AcyclicSiblingContractTests
+public sealed partial class AcyclicSiblingContractTests
 {
     private string _tempDir = null!;
 

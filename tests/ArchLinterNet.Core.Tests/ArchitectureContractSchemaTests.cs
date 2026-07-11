@@ -184,7 +184,7 @@ public sealed class ArchitectureContractSchemaTests
     }
 
     [Test]
-    public void Schema_Layer_AcceptsSelectorOnlyAsAdditiveToRequiredNamespace()
+    public void Schema_Layer_AcceptsSelectorOnlyOrNamespaceBackedSelectors()
     {
         JsonElement schema = LoadSchema();
         JsonElement layer = schema.GetProperty("$defs").GetProperty("layer");
@@ -192,14 +192,11 @@ public sealed class ArchitectureContractSchemaTests
         Assert.That(layer.GetProperty("properties").TryGetProperty("selector", out JsonElement selectorProperty), Is.True);
         Assert.That(selectorProperty.GetProperty("$ref").GetString(), Is.EqualTo("#/$defs/selector"));
 
-        // 'namespace' remains mandatory: a selector-only layer would carry an empty Namespace into
-        // ArchitectureLayerResolver.IsProjectType's unconditional GlobPattern access on every declared
-        // layer and crash with InvalidNamespacePatternException at real execution time. Selector-only
-        // layers are deferred to #111, which must implement the resolution changes that requires.
-        JsonElement required = layer.GetProperty("required");
-        Assert.That(required.EnumerateArray().Select(v => v.GetString()), Is.EquivalentTo(_namespaceOnlyRequired));
-        Assert.That(layer.TryGetProperty("anyOf", out _), Is.False,
-            "layer must not accept selector as a namespace alternative until #111 implements selector-only resolution.");
+        Assert.That(layer.TryGetProperty("anyOf", out JsonElement alternatives), Is.True);
+        Assert.That(alternatives.EnumerateArray().SelectMany(a => a.GetProperty("required").EnumerateArray())
+            .Select(v => v.GetString()), Does.Contain("namespace"));
+        Assert.That(alternatives.EnumerateArray().SelectMany(a => a.GetProperty("required").EnumerateArray())
+            .Select(v => v.GetString()), Does.Contain("selector"));
     }
 
     [Test]
