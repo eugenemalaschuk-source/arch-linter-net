@@ -10,6 +10,6 @@ public class AsmdefValidatorTests
     public void Validate_NonExistentFile_ThrowsFileNotFoundException()
     {
         Assert.Throws<FileNotFoundException>(() =>
-            AsmdefValidator.Validate("nonexistent.yml"));
+            AsmdefValidator.Validate(contractPath: "nonexistent.yml"));
     }
 }
