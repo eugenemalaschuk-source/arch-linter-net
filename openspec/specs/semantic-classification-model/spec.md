@@ -66,6 +66,10 @@ Each `metadata.<key>` value SHALL be interpreted using exactly one of four forms
 - **WHEN** a `classification.attributes` entry declares `metadata: { domain: constructor[0] }`
 - **THEN** the reviewed design specifies the value as the attribute's zero-indexed positional constructor argument
 
+#### Scenario: Constructor-argument indexing includes compiler-resolved defaults
+- **WHEN** a matched attribute's constructor invocation omits an optional parameter that has a default value (e.g. `[Domain("Sales")]` against `Domain(string name, string module = "Unknown")`)
+- **THEN** `constructor[<index>]` indexes the fully compiler-resolved argument list, including the substituted default value, not only the arguments visually written at the call site
+
 #### Scenario: Literal scalar fallback
 - **WHEN** a `metadata.<key>` value does not match `constructor[`, `property:`, or `const:`
 - **THEN** the reviewed design specifies the value is used verbatim as a literal YAML scalar
@@ -74,8 +78,34 @@ Each `metadata.<key>` value SHALL be interpreted using exactly one of four forms
 - **WHEN** a `const:<Full.Type.NAME>` reference names a `static readonly` field, an instance field, a computed member, or any member whose value is not fixed at compile time
 - **THEN** the reviewed design classifies this as a deterministic unresolved-constant condition; extraction SHALL NOT execute, reflect over, or guess at the referenced member's runtime value
 
+### Requirement: property:Name reads only explicitly supplied named arguments, never a type-declared default
+`property:<Name>` SHALL resolve successfully only when `<Name>` is a named argument explicitly present in the matched attribute usage's own recorded metadata (e.g. `System.Reflection.CustomAttributeData.NamedArguments`) — never merely because the attribute *type* declares a settable property or field named `<Name>`. A property/field that exists on the attribute type but was not supplied in that specific usage SHALL be treated identically to a property/field that does not exist at all.
+
+#### Scenario: Unsupplied-but-existing property is a failure identical to a nonexistent property
+- **WHEN** a `classification.attributes` entry declares `metadata: { module: property:Module }`, the matched attribute type declares a settable `Module` property, and the specific attribute usage (e.g. `[Domain("Sales")]`) does not explicitly supply `Module` as a named argument
+- **THEN** extraction SHALL NOT instantiate the attribute or read `Module`'s declared default/initializer value, and this resolves as the same evidence-extraction failure as a nonexistent property
+
+### Requirement: Metadata values are canonicalized into a fixed set of comparable domains
+Every metadata value — extracted or literal — SHALL be canonicalized into exactly one of three domains before comparison: **string** (CLR `string`; `System.Type` canonicalized to `Type.FullName`; enum values canonicalized to their declared member name), **boolean**, or **decimal** (every CLR numeric primitive and every YAML/JSON numeric literal canonicalized to `decimal`). A value with no representation in any of these three domains SHALL be treated as an evidence-extraction failure.
+
+#### Scenario: Enum values canonicalize to their declared member name, not the underlying integer
+- **WHEN** an extracted metadata value is an enum instance
+- **THEN** the canonical value SHALL be the enum's declared member name (a string), not its underlying numeric representation
+
+#### Scenario: System.Type values canonicalize to their full type name
+- **WHEN** an extracted metadata value is a `System.Type` instance
+- **THEN** the canonical value SHALL be `Type.FullName` (a string)
+
+#### Scenario: Cross-representation numeric values compare equal
+- **WHEN** one metadata value originates from a CLR numeric primitive (e.g. `int` `1`) and another originates from a YAML/JSON numeric literal (e.g. `1.0`)
+- **THEN** both SHALL canonicalize to the same `decimal` value and SHALL compare equal
+
+#### Scenario: Unsupported value shapes are an evidence-extraction failure
+- **WHEN** an extracted metadata value is an array, another attribute-typed value, `null`, an unmapped enum value, or a number with no `decimal` representation (e.g. `NaN`, `Infinity`)
+- **THEN** extraction SHALL NOT attempt to serialize or flatten it; this resolves as the same evidence-extraction failure as any other unresolvable metadata reference
+
 ### Requirement: Evidence-extraction failure is uniform across forms and never blocks role assignment
-Each of `constructor[<index>]`, `property:<Name>`, and `const:<Full.Type.NAME>` SHALL resolve failure identically: the failed metadata key SHALL be omitted from the assigned metadata (not fabricated, not defaulted), the role assignment from the matching source SHALL still proceed unaffected, and the failure SHALL be recorded as an explainable fact for diagnostics.
+Each of `constructor[<index>]`, `property:<Name>`, and `const:<Full.Type.NAME>` — including every canonical-value-domain failure above — SHALL resolve failure identically: the failed metadata key SHALL be omitted from the assigned metadata (not fabricated, not defaulted), the role assignment from the matching source SHALL still proceed unaffected, and the failure SHALL be recorded as an explainable fact for diagnostics.
 
 #### Scenario: Out-of-range constructor index omits the key without blocking the role
 - **WHEN** a `classification.attributes` entry declares `metadata: { domain: constructor[2] }` and the matched attribute instance's constructor invocation has fewer than 3 positional arguments

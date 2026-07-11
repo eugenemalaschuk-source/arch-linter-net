@@ -116,8 +116,8 @@ checked in this order:
 
 | Form | Meaning |
 |---|---|
-| `constructor[<index>]` | The attribute's zero-indexed positional constructor argument. Not applicable to `inheritance`/`namespace`/`path`, which carry no constructor evidence. |
-| `property:<Name>` | A named property or field on the attribute instance. `attributes`/`assembly_attributes` only. |
+| `constructor[<index>]` | The attribute's zero-indexed positional constructor argument, from the fully compiler-resolved argument list (including substituted defaults for omitted optional parameters). Not applicable to `inheritance`/`namespace`/`path`, which carry no constructor evidence. |
+| `property:<Name>` | A named argument called `<Name>` explicitly present in that specific attribute usage's own recorded metadata — never a property/field the attribute *type* merely declares. `attributes`/`assembly_attributes` only. |
 | `const:<Full.Type.NAME>` | The value of a **compile-time `const` field**, resolved statically by full type-qualified name. |
 | anything else | A literal YAML scalar, used verbatim. |
 
@@ -128,15 +128,37 @@ runtime-computed expression — and evaluating it would require either executing
 that code (which a static-analysis-only tool must not do) or a much narrower
 literal-initializer detection that does not exist yet.
 
+`property:<Name>` reads only what a specific attribute usage's own metadata
+records as an explicitly-supplied named argument — it never falls back to a
+property's declared default or initializer value. `[Domain("Sales")]` against
+`DomainAttribute { public string? Module { get; set; } }` records zero named
+arguments even though `Module` exists as a settable property: reading
+`Module`'s default would require instantiating the attribute and running its
+initializer, which the static-analysis-only boundary forbids. A property that
+exists on the type but was not supplied in that usage is therefore the same
+extraction failure as a property that does not exist at all.
+
+**Metadata values are canonicalized into exactly three comparable domains
+before matching**: **string** (CLR `string`; `System.Type` values as
+`Type.FullName`; enum values as their declared member name, not the
+underlying integer); **boolean**; and **decimal** (every CLR numeric
+primitive and every YAML/JSON numeric literal), so a CLR `int` `1` and a YAML
+`1.0` canonicalize to the same value and compare equal. Arrays, other
+attribute-typed values, `null`, unmapped enum values, and non-`decimal`-representable
+numbers (`NaN`, `Infinity`) have no representation in any of the three domains
+and are an extraction failure, the same as an unresolved reference.
+
 **Evidence-extraction failure is uniform across all three evidence-referencing
-forms, and never blocks role assignment.** An out-of-range `constructor[N]`,
-a missing `property:Name`, or an unresolved `const:` reference all resolve the
-same way: that metadata key is **omitted** from the type's assigned
-metadata — not fabricated, not defaulted — and the type still receives its
-role from the matching source, since role assignment does not depend on every
-metadata key resolving. Every extraction failure is recorded as an explainable
-fact so a policy author can see why an expected metadata key is missing,
-rather than the omission looking like an unrelated authoring mistake.
+forms and every canonicalization failure above, and never blocks role
+assignment.** An out-of-range `constructor[N]`, a missing or unsupplied
+`property:Name`, an unresolved `const:` reference, or an unsupported value
+shape all resolve the same way: that metadata key is **omitted** from the
+type's assigned metadata — not fabricated, not defaulted — and the type still
+receives its role from the matching source, since role assignment does not
+depend on every metadata key resolving. Every extraction failure is recorded
+as an explainable fact so a policy author can see why an expected metadata key
+is missing, rather than the omission looking like an unrelated authoring
+mistake.
 
 **Repeated instances of one mapped attribute** (a repeatable custom attribute
 applied more than once, e.g. `[Domain("Sales")] [Domain("Inventory")]`)
