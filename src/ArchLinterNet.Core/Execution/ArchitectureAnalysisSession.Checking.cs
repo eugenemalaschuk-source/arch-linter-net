@@ -17,7 +17,7 @@ public sealed partial class ArchitectureAnalysisSession
         }
 
         ArchitectureLayer sourceLayer = ArchitectureLayerResolver.ResolveLayer(Document, contract.Name, contract.Source);
-        Type[] sourceTypes = TypeIndex.FindTypesInLayer(sourceLayer);
+        Type[] sourceTypes = FindTypesInLayer(sourceLayer);
 
         List<ArchitectureViolation> violations = new();
         bool transitive = contract.DependencyDepth == DependencyDepthMode.Transitive;
@@ -30,12 +30,12 @@ public sealed partial class ArchitectureAnalysisSession
             if (transitive)
             {
                 violations.AddRange(ArchitectureNamespaceViolationFinder.FindTransitiveNamespaceViolations(sourceTypes,
-                    forbiddenLayer, contract.AllowedTypes, Context.TargetAssemblies, executionContext, ReferenceGraph));
+                    forbiddenLayer, contract.AllowedTypes, Context.TargetAssemblies, executionContext, ReferenceGraph, RoleIndex));
             }
             else
             {
                 violations.AddRange(ArchitectureNamespaceViolationFinder.FindNamespaceViolations(sourceTypes, forbiddenLayer,
-                    contract.AllowedTypes, executionContext, ReferenceGraph));
+                    contract.AllowedTypes, executionContext, ReferenceGraph, RoleIndex));
             }
         }
 
@@ -47,13 +47,13 @@ public sealed partial class ArchitectureAnalysisSession
                 {
                     violations.AddRange(ArchitectureNamespaceViolationFinder.FindTransitiveNamespaceViolations(sourceTypes,
                         new ArchitectureLayer { Namespace = forbiddenNamespace },
-                        contract.AllowedTypes, Context.TargetAssemblies, executionContext, ReferenceGraph));
+                    contract.AllowedTypes, Context.TargetAssemblies, executionContext, ReferenceGraph, RoleIndex));
                 }
                 else
                 {
                     violations.AddRange(ArchitectureNamespaceViolationFinder.FindNamespaceViolations(sourceTypes,
                         new ArchitectureLayer { Namespace = forbiddenNamespace },
-                        contract.AllowedTypes, executionContext, ReferenceGraph));
+                    contract.AllowedTypes, executionContext, ReferenceGraph, RoleIndex));
                 }
             }
         }
@@ -76,7 +76,7 @@ public sealed partial class ArchitectureAnalysisSession
         foreach (string layerEntry in contract.Layers)
         {
             ArchitectureLayer layer = ResolveLayerEntry(contract, layerEntry);
-            Type[] types = TypeIndex.FindTypesInLayer(layer);
+            Type[] types = FindTypesInLayer(layer);
 
             if (types.Length == 0)
             {
@@ -109,17 +109,21 @@ public sealed partial class ArchitectureAnalysisSession
     private static ArchitectureViolation? BuildEmptyLayerViolation(
         ArchitectureLayerContract contract, string layerEntry, ArchitectureLayer layer)
     {
-        if (contract.TemplateName == null)
+        if (layer.External || contract.TemplateName == null && layer.Selector == null)
         {
             return null;
         }
+
+        string matchDescription = layer.Selector == null
+            ? $"namespace '{layer.Namespace}'"
+            : $"semantic selector '{ArchitectureLayerResolver.DescribeLayer(layer)}'";
 
         return new ArchitectureViolation(
             contract.Name,
             contract.Id,
             ArchitectureLayerResolver.DescribeLayer(layer),
-            "empty layer namespace",
-            new[] { $"Required layer '{layerEntry}' namespace '{layer.Namespace}' contains no types in loaded assemblies." })
+            layer.Selector == null ? "empty layer namespace" : "empty layer selector",
+            new[] { $"Required layer '{layerEntry}' {matchDescription} contains no matching types in loaded assemblies." })
         {
             Payload = new ConfigurationPayload(
                 TemplateName: contract.TemplateName,
@@ -141,7 +145,7 @@ public sealed partial class ArchitectureAnalysisSession
             {
                 var (_, forbiddenLayer, _) = effectiveLayers[forbiddenIndex];
                 foreach (ArchitectureViolation v in ArchitectureNamespaceViolationFinder.FindNamespaceViolations(
-                    sourceTypes, forbiddenLayer, Array.Empty<string>(), executionContext, ReferenceGraph))
+                    sourceTypes, forbiddenLayer, Array.Empty<string>(), executionContext, ReferenceGraph, RoleIndex))
                 {
                     violations.Add(v with
                     {
@@ -215,7 +219,7 @@ public sealed partial class ArchitectureAnalysisSession
 
         ArchitectureLayer sourceLayer =
             ArchitectureLayerResolver.ResolveLayer(Document, contract.Name, contract.Source);
-        Type[] sourceTypes = ArchitectureTypeScanner.FindTypesInLayer(Context.TargetAssemblies, sourceLayer);
+        Type[] sourceTypes = FindTypesInLayer(sourceLayer);
 
         var allowedLayers = contract.Allowed
             .Select(layerName => ArchitectureLayerResolver.ResolveLayer(Document, contract.Name, layerName))
@@ -232,12 +236,15 @@ public sealed partial class ArchitectureAnalysisSession
                     .Select(refType => new
                     {
                         FullName = ArchitectureTypeNames.SafeFullName(refType),
-                        Namespace = ArchitectureTypeNames.SafeNamespace(refType)
+                        Namespace = ArchitectureTypeNames.SafeNamespace(refType),
+                        Type = refType
                     })
                     .Where(r => !string.IsNullOrEmpty(r.FullName))
                     .Where(r => !contract.AllowedTypes.Contains(r.FullName))
-                    .Where(r => ArchitectureLayerResolver.IsProjectType(Document, r.Namespace))
-                    .Where(r => !ArchitectureNamespaceViolationFinder.IsInAnyAllowedLayer(r.Namespace, allowedLayers))
+                    .Where(r => ArchitectureLayerResolver.IsProjectType(Document, r.Namespace)
+                        || r.Type != null && allowedLayers.Any(layer => layer.Selector != null))
+                    .Where(r => !ArchitectureNamespaceViolationFinder.IsInAnyAllowedLayer(
+                        r.Type!, allowedLayers, RoleIndex))
                     .Where(r => !executionContext.IsIgnored(sourceFullName, r.FullName))
                     .Select(r => r.FullName)
                     .Distinct()
@@ -286,7 +293,7 @@ public sealed partial class ArchitectureAnalysisSession
     {
         ArchitectureLayer sourceLayer =
             ArchitectureLayerResolver.ResolveLayer(Document, contract.Name, sourceLayerName);
-        Type[] sourceTypes = TypeIndex.FindTypesInLayer(sourceLayer);
+        Type[] sourceTypes = FindTypesInLayer(sourceLayer);
 
         foreach (Type sourceType in sourceTypes)
         {
@@ -605,7 +612,7 @@ public sealed partial class ArchitectureAnalysisSession
         {
             ArchitectureLayer sourceLayer =
                 ArchitectureLayerResolver.ResolveLayer(Document, contract.Name, sourceLayerName);
-            Type[] sourceTypes = ArchitectureTypeScanner.FindTypesInLayer(Context.TargetAssemblies, sourceLayer);
+            Type[] sourceTypes = FindTypesInLayer(sourceLayer);
 
             foreach (string forbiddenLayerName in contract.Layers)
             {
@@ -617,7 +624,7 @@ public sealed partial class ArchitectureAnalysisSession
                 ArchitectureLayer forbiddenLayer =
                     ArchitectureLayerResolver.ResolveLayer(Document, contract.Name, forbiddenLayerName);
                 violations.AddRange(ArchitectureNamespaceViolationFinder.FindNamespaceViolations(sourceTypes, forbiddenLayer,
-                    Array.Empty<string>(), executionContext));
+                    Array.Empty<string>(), executionContext, null, RoleIndex));
             }
         }
 
@@ -633,7 +640,7 @@ public sealed partial class ArchitectureAnalysisSession
         }
 
         ArchitectureLayer sourceLayer = ArchitectureLayerResolver.ResolveLayer(Document, contract.Name, contract.Source);
-        Type[] sourceTypes = ArchitectureTypeScanner.FindTypesInLayer(Context.TargetAssemblies, sourceLayer);
+        Type[] sourceTypes = FindTypesInLayer(sourceLayer);
         List<ArchitectureViolation> violations = new();
 
         ArchitectureContractExecutionContext executionContext = CreateExecutionContext(contract, contract.IgnoredViolations);
@@ -670,7 +677,7 @@ public sealed partial class ArchitectureAnalysisSession
         }
 
         ArchitectureLayer sourceLayer = ArchitectureLayerResolver.ResolveLayer(Document, contract.Name, contract.Source);
-        Type[] sourceTypes = ArchitectureTypeScanner.FindTypesInLayer(Context.TargetAssemblies, sourceLayer);
+        Type[] sourceTypes = FindTypesInLayer(sourceLayer);
         List<ArchitectureViolation> violations = new();
 
         ArchitectureContractExecutionContext executionContext = CreateExecutionContext(contract, contract.IgnoredViolations);

@@ -28,6 +28,13 @@ public sealed class ArchitectureTypeIndex
             .ToArray();
     }
 
+    public Type[] FindTypesInLayer(ArchitectureLayer layer, ArchitectureRoleIndex roleIndex)
+    {
+        return _allTypes.Value
+            .Where(type => ArchitectureLayerTypeMatcher.Matches(layer, type, roleIndex))
+            .ToArray();
+    }
+
     public Type[] FindTypesInNamespace(string namespacePrefix)
     {
         return _allTypes.Value

@@ -1,15 +1,16 @@
 # Semantic Classification (Partially Implemented)
 
-**`classification.attributes` and `classification.assembly_attributes` are implemented**
+**`classification.attributes`, `classification.assembly_attributes`, and
+`layers.<name>.selector` are implemented**
 (see [issue #109](https://github.com/eugenemalaschuk-source/arch-linter-net/issues/109) and
 `openspec/specs/attribute-role-extraction`): type-level and assembly-level attributes
 mapped by full type name are extracted and canonicalized into role/metadata facts,
 with `type_attribute` precedence over `assembly_attribute`. **Every other part of
 this page — `precedence` beyond these two sources, `inheritance`, `namespace`, `path`,
-`overrides`, `exclusions`, and `layers.<name>.selector` — remains reserved by the
+`overrides`, and `exclusions` — remain reserved by the
 YAML schema only.** A policy declaring those sections today is schema-valid, but
-they have **no effect** on validation — no role is assigned from them, no selector
-ever matches, and no diagnostic is produced from them. This page documents the
+they have **no effect** on validation — no role is assigned from them and no
+diagnostic is produced from them. This page documents the
 reviewed shape so policy authors and AI agents do not treat the unimplemented parts
 as a working feature before their own implementation issues land. See
 [Supported capabilities and non-goals](supported-capabilities.md) for the
@@ -124,7 +125,7 @@ classification:
 
 layers:
   domain:
-    namespace: MyApp.Sales.Domain   # required - selector is additive, not a substitute
+    namespace: MyApp.Sales.Domain   # optional when selector is present
     selector:
       role: DomainLayer
       metadata:
@@ -236,20 +237,12 @@ consideration entirely.
 
 ## `layers.<name>.selector`
 
-`namespace` remains **required** on every layer — `selector` is additive
-alongside it, never a substitute for it. A namespace-less, selector-only
-layer would carry an empty `Namespace` into
-`ArchitectureLayerResolver.IsProjectType`'s unconditional `GlobPattern` access
-on every declared layer and crash with `InvalidNamespacePatternException` at
-real execution time, not just at schema-validation or YAML-load time.
-Selector-only layers are deferred to #111, which must implement the resolver
-changes an empty-namespace layer requires. `selector.role` is an exact-match
-string against whatever role names `classification.attributes`/
-`inheritance`/`namespace`/`path`/`overrides` declare (there is no fixed role
-catalog enforced by the schema). `selector.metadata` is an optional set of
-exact-match, AND-combined key/value constraints — no wildcard or regex value
-matching. Declaring only `namespace` (as every layer did before this design)
-is unaffected.
+`selector` is an optional exact-match selector. `selector.role` matches the
+resolved role string and `selector.metadata` is an optional set of exact-match,
+AND-combined key/value constraints. A layer may declare only `selector`, only
+`namespace`, or both; when both are present, both constraints must match. No
+wildcard or regex value matching is supported. Declaring only `namespace` (as
+every layer did before this feature) remains unaffected.
 
 ## Current limits
 
@@ -261,9 +254,9 @@ is unaffected.
   the `classification.precedence` subset that enables/disables these two
   sources. No other source (`yaml_override`, `inheritance`, `namespace`,
   `path`) ever assigns a role yet.
-- No selector matching: `layers.<name>.selector` never selects any type, even
-  though `classification.attributes`/`assembly_attributes` now produce real
-  role/metadata facts a future selector-matching engine could consume.
+- Selector matching uses the per-run role index and exact role/metadata
+  predicates; empty non-external selector matches are surfaced as configuration
+  diagnostics.
 - Informational only: `conflict` and evidence-extraction-failure facts for the
   implemented sources are surfaced by `validate`'s human/JSON/CI-artifact output
   as a "Classification findings" section, but nothing wires them into SARIF or
@@ -271,8 +264,8 @@ is unaffected.
 - Role index: implemented as a per-run, lazily-computed cache
   (`ArchitectureRoleIndex`) of every classified type's role/metadata/source/
   evidence, surfaced as `classification_roles` in JSON/CI-artifact output. It
-  is a read-only lookup and diagnostic surface only — no selector, coverage
-  check, or contract handler consumes it yet.
+  is consumed by selector-backed layer resolution; coverage checks and
+  classification pass/fail remain outside this capability.
 - No annotation package: this design does not ship, and does not require, a
   binary ArchLinterNet annotation assembly — see
   [Annotation strategy](#annotation-strategy) below for the full adoption

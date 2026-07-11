@@ -13,7 +13,8 @@ internal static class ArchitectureNamespaceViolationFinder
         ArchitectureLayer forbiddenLayer,
         IReadOnlyCollection<string> allowedTypeFullNames,
         ArchitectureContractExecutionContext executionContext,
-        ArchitectureReferenceGraph? referenceGraph = null)
+        ArchitectureReferenceGraph? referenceGraph = null,
+        ArchitectureRoleIndex? roleIndex = null)
     {
         return sourceTypes
             .Select(type =>
@@ -25,8 +26,12 @@ internal static class ArchitectureNamespaceViolationFinder
                     .Select(reference => new
                     {
                         Reference = reference,
-                        Match = ArchitectureLayerResolver.MatchNamespace(forbiddenLayer,
-                            ArchitectureTypeNames.SafeNamespace(reference))
+                        Match = roleIndex != null
+                            ? (ArchitectureLayerResolver.MatchesNamespace(forbiddenLayer, ArchitectureTypeNames.SafeNamespace(reference))
+                                && ArchitectureLayerTypeMatcher.Matches(forbiddenLayer, reference, roleIndex)
+                                    ? new ArchitectureNamespaceMatch(true, ArchitectureLayerResolver.DescribeLayer(forbiddenLayer), null)
+                                    : new ArchitectureNamespaceMatch(false, string.Empty, null))
+                            : ArchitectureLayerResolver.MatchNamespace(forbiddenLayer, ArchitectureTypeNames.SafeNamespace(reference))
                     })
                     .Where(x => x.Match.Matched)
                     .Select(x => new
@@ -72,7 +77,8 @@ internal static class ArchitectureNamespaceViolationFinder
         IReadOnlyCollection<string> allowedTypeFullNames,
         IReadOnlyCollection<Assembly> targetAssemblies,
         ArchitectureContractExecutionContext executionContext,
-        ArchitectureReferenceGraph? referenceGraph = null)
+        ArchitectureReferenceGraph? referenceGraph = null,
+        ArchitectureRoleIndex? roleIndex = null)
     {
         HashSet<Assembly> assemblySet = targetAssemblies.ToHashSet();
         Func<Type, bool> traversePredicate = t => assemblySet.Contains(t.Assembly);
@@ -80,7 +86,7 @@ internal static class ArchitectureNamespaceViolationFinder
         return sourceTypes
             .OrderBy(type => ArchitectureTypeNames.SafeFullName(type), StringComparer.Ordinal)
             .Select(type => BuildTransitiveViolation(
-                type, forbiddenLayer, allowedTypeFullNames, executionContext, referenceGraph, traversePredicate))
+                type, forbiddenLayer, allowedTypeFullNames, executionContext, referenceGraph, traversePredicate, roleIndex))
             .Where(violation => violation != null)!;
     }
 
@@ -90,7 +96,8 @@ internal static class ArchitectureNamespaceViolationFinder
         IReadOnlyCollection<string> allowedTypeFullNames,
         ArchitectureContractExecutionContext executionContext,
         ArchitectureReferenceGraph? referenceGraph,
-        Func<Type, bool> traversePredicate)
+        Func<Type, bool> traversePredicate,
+        ArchitectureRoleIndex? roleIndex)
     {
         string sourceFullName = ArchitectureTypeNames.SafeFullName(type);
         List<string> forbiddenRefs = new();
@@ -105,7 +112,7 @@ internal static class ArchitectureNamespaceViolationFinder
         {
             CollectForbiddenTransitiveReference(
                 referenced, path, forbiddenLayer, allowedTypeFullNames, executionContext, sourceFullName,
-                forbiddenRefs, matchedPrefixes, paths);
+                forbiddenRefs, matchedPrefixes, paths, roleIndex);
         }
 
         if (forbiddenRefs.Count == 0)
@@ -142,7 +149,8 @@ internal static class ArchitectureNamespaceViolationFinder
         string sourceFullName,
         List<string> forbiddenRefs,
         HashSet<string> matchedPrefixes,
-        List<IReadOnlyCollection<string>> paths)
+        List<IReadOnlyCollection<string>> paths,
+        ArchitectureRoleIndex? roleIndex)
     {
         string refFullName = ArchitectureTypeNames.SafeFullName(referenced);
         if (string.IsNullOrEmpty(refFullName))
@@ -150,8 +158,11 @@ internal static class ArchitectureNamespaceViolationFinder
             return;
         }
 
-        ArchitectureNamespaceMatch match = ArchitectureLayerResolver.MatchNamespace(forbiddenLayer,
-            ArchitectureTypeNames.SafeNamespace(referenced));
+        ArchitectureNamespaceMatch match = roleIndex != null
+            ? (ArchitectureLayerTypeMatcher.Matches(forbiddenLayer, referenced, roleIndex)
+                ? new ArchitectureNamespaceMatch(true, ArchitectureLayerResolver.DescribeLayer(forbiddenLayer), null)
+                : new ArchitectureNamespaceMatch(false, string.Empty, null))
+            : ArchitectureLayerResolver.MatchNamespace(forbiddenLayer, ArchitectureTypeNames.SafeNamespace(referenced));
         if (!match.Matched)
         {
             return;
@@ -233,6 +244,11 @@ internal static class ArchitectureNamespaceViolationFinder
     public static bool IsInAnyAllowedLayer(string namespaceName, IReadOnlyList<ArchitectureLayer> allowedLayers)
     {
         return allowedLayers.Any(layer => ArchitectureLayerResolver.MatchesNamespace(layer, namespaceName));
+    }
+
+    public static bool IsInAnyAllowedLayer(Type type, IReadOnlyList<ArchitectureLayer> allowedLayers, ArchitectureRoleIndex roleIndex)
+    {
+        return allowedLayers.Any(layer => ArchitectureLayerTypeMatcher.Matches(layer, type, roleIndex));
     }
 
     private static string ExtractNormalizedKey(string reference)

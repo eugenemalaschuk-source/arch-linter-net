@@ -1,5 +1,7 @@
 using ArchLinterNet.Core.Contracts;
+using ArchLinterNet.Core.Execution;
 using ArchLinterNet.Core.Resolution;
+using AttributeRoleExtractionTestFixtures;
 using NUnit.Framework;
 
 namespace ArchLinterNet.Core.Tests;
@@ -162,5 +164,63 @@ public sealed class LayerResolverTests
             new[] { "Test.Core" });
 
         Assert.That(result, Is.False);
+    }
+
+    [Test]
+    public void FindTypesInLayer_SelectorOnlyMatchesRole()
+    {
+        var index = new ArchitectureRoleIndex(
+            new ArchitectureClassificationConfiguration
+            {
+                Attributes =
+                {
+                    new ArchitectureAttributeClassificationMapping
+                    {
+                        Attribute = "AttributeRoleExtractionTestFixtures.DomainMarkerAttribute",
+                        Role = "DomainLayer"
+                    }
+                }
+            },
+            new ArchitectureTypeIndex(new[] { typeof(TypeWithConstructorDefault).Assembly }));
+
+        ArchitectureLayer layer = new()
+        {
+            Selector = new ArchitectureLayerSelector { Role = "DomainLayer" }
+        };
+
+        Type[] matches = new ArchitectureTypeIndex(new[] { typeof(TypeWithConstructorDefault).Assembly })
+            .FindTypesInLayer(layer, index);
+
+        Assert.That(matches, Does.Contain(typeof(TypeWithConstructorDefault)));
+        Assert.That(matches, Does.Not.Contain(typeof(PlainType)));
+    }
+
+    [Test]
+    public void FindTypesInLayer_NamespaceAndSelectorRequireBoth()
+    {
+        var index = new ArchitectureRoleIndex(
+            new ArchitectureClassificationConfiguration
+            {
+                Attributes =
+                {
+                    new ArchitectureAttributeClassificationMapping
+                    {
+                        Attribute = "AttributeRoleExtractionTestFixtures.DomainMarkerAttribute",
+                        Role = "DomainLayer"
+                    }
+                }
+            },
+            new ArchitectureTypeIndex(new[] { typeof(TypeWithConstructorDefault).Assembly }));
+
+        ArchitectureLayer layer = new()
+        {
+            Namespace = "AttributeRoleExtractionTestFixtures",
+            Selector = new ArchitectureLayerSelector { Role = "OtherLayer" }
+        };
+
+        Type[] matches = new ArchitectureTypeIndex(new[] { typeof(TypeWithConstructorDefault).Assembly })
+            .FindTypesInLayer(layer, index);
+
+        Assert.That(matches, Is.Empty);
     }
 }

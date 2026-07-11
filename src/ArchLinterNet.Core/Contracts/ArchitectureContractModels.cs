@@ -98,11 +98,21 @@ public sealed class ArchitectureLayer
 
     [YamlMember(Alias = "external")] public bool External { get; set; }
 
+    [YamlMember(Alias = "selector")] public ArchitectureLayerSelector? Selector { get; set; }
+
     [YamlIgnore] private NamespaceGlobPattern? _cachedGlobPattern;
 
     [YamlIgnore]
     internal NamespaceGlobPattern GlobPattern =>
         _cachedGlobPattern ??= NamespaceGlobPattern.Parse(Namespace);
+}
+
+public sealed class ArchitectureLayerSelector
+{
+    [YamlMember(Alias = "role")] public string Role { get; set; } = string.Empty;
+
+    [YamlMember(Alias = "metadata")]
+    public Dictionary<string, object> Metadata { get; set; } = new(StringComparer.Ordinal);
 }
 
 public sealed class ArchitectureExternalDependencyGroup

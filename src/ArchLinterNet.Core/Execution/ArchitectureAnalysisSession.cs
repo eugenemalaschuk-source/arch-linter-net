@@ -58,6 +58,11 @@ public sealed partial class ArchitectureAnalysisSession
 
     public ArchitectureRoleIndex RoleIndex { get; }
 
+    private Type[] FindTypesInLayer(ArchitectureLayer layer)
+    {
+        return TypeIndex.FindTypesInLayer(layer, RoleIndex);
+    }
+
     public ArchitectureReferenceGraph ReferenceGraph { get; } = new();
 
     public IReadOnlyList<ArchitectureUnmatchedIgnoredViolation> UnmatchedIgnoredViolations
@@ -340,7 +345,7 @@ public sealed partial class ArchitectureAnalysisSession
                 continue;
             }
 
-            Type[] types = ArchitectureTypeScanner.FindTypesInLayer(Context.TargetAssemblies, layer);
+            Type[] types = FindTypesInLayer(layer);
 
             if (types.Length == 0)
             {
@@ -354,12 +359,16 @@ public sealed partial class ArchitectureAnalysisSession
                     continue;
                 }
 
+                string matchDescription = layer.Selector == null
+                    ? $"namespace '{layer.Namespace}'"
+                    : $"semantic selector '{ArchitectureLayerResolver.DescribeLayer(layer)}'";
+
                 violations.Add(new ArchitectureViolation(
                     ConfigurationSource,
                     null,
                     ArchitectureLayerResolver.DescribeLayer(layer),
-                    "empty layer namespace",
-                    new[] { $"Layer '{layerName}' namespace '{layer.Namespace}' contains no types in loaded assemblies." }));
+                    layer.Selector == null ? "empty layer namespace" : "empty layer selector",
+                    new[] { $"Layer '{layerName}' {matchDescription} contains no matching types in loaded assemblies." }));
             }
         }
     }
