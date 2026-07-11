@@ -236,6 +236,152 @@ public sealed class ArchitectureAttributeRoleExtractorTests
     }
 
     [Test]
+    public void Extract_InvalidConstructorIndexExpression_IsEvidenceExtractionFailure()
+    {
+        var configuration = new ArchitectureClassificationConfiguration
+        {
+            Attributes =
+            {
+                DomainMapping(metadata: new Dictionary<string, object> { ["domain"] = "constructor[x]" })
+            }
+        };
+
+        ArchitectureTypeClassificationResult result = CreateExtractor(configuration).Extract(typeof(TypeWithConstructorDefault));
+
+        Assert.That(result.Role, Is.EqualTo("DomainLayer"));
+        Assert.That(result.Metadata.ContainsKey("domain"), Is.False);
+        Assert.That(result.MetadataFailures, Has.Count.EqualTo(1));
+    }
+
+    [Test]
+    public void Extract_ConstReferenceWithoutFieldSeparator_IsEvidenceExtractionFailure()
+    {
+        var configuration = new ArchitectureClassificationConfiguration
+        {
+            Attributes =
+            {
+                DomainMapping(metadata: new Dictionary<string, object> { ["owner"] = "const:NoDotHere" })
+            }
+        };
+
+        ArchitectureTypeClassificationResult result = CreateExtractor(configuration).Extract(typeof(TypeWithConstructorDefault));
+
+        Assert.That(result.Metadata.ContainsKey("owner"), Is.False);
+        Assert.That(result.MetadataFailures, Has.Count.EqualTo(1));
+    }
+
+    [Test]
+    public void Extract_ConstReferenceToNonexistentField_IsEvidenceExtractionFailure()
+    {
+        var configuration = new ArchitectureClassificationConfiguration
+        {
+            Attributes =
+            {
+                DomainMapping(metadata: new Dictionary<string, object>
+                {
+                    ["owner"] = "const:AttributeRoleExtractionTestFixtures.Constants.DoesNotExist"
+                })
+            }
+        };
+
+        ArchitectureTypeClassificationResult result = CreateExtractor(configuration).Extract(typeof(TypeWithConstructorDefault));
+
+        Assert.That(result.Metadata.ContainsKey("owner"), Is.False);
+        Assert.That(result.MetadataFailures, Has.Count.EqualTo(1));
+    }
+
+    [Test]
+    public void Extract_ConstReferenceToNullValue_IsEvidenceExtractionFailure()
+    {
+        var configuration = new ArchitectureClassificationConfiguration
+        {
+            Attributes =
+            {
+                DomainMapping(metadata: new Dictionary<string, object>
+                {
+                    ["owner"] = "const:AttributeRoleExtractionTestFixtures.Constants.NullOwner"
+                })
+            }
+        };
+
+        ArchitectureTypeClassificationResult result = CreateExtractor(configuration).Extract(typeof(TypeWithConstructorDefault));
+
+        Assert.That(result.Role, Is.EqualTo("DomainLayer"));
+        Assert.That(result.Metadata.ContainsKey("owner"), Is.False);
+        Assert.That(result.MetadataFailures, Has.Count.EqualTo(1));
+    }
+
+    [Test]
+    public void Extract_TypeConstructorArgument_CanonicalizesToFullTypeName()
+    {
+        var configuration = new ArchitectureClassificationConfiguration
+        {
+            Attributes =
+            {
+                DomainMapping(metadata: new Dictionary<string, object> { ["moduleType"] = "constructor[0]" })
+            }
+        };
+
+        ArchitectureTypeClassificationResult result = CreateExtractor(configuration).Extract(typeof(TypeWithTypeConstructorArgument));
+
+        Assert.That(result.Metadata["moduleType"], Is.EqualTo("AttributeRoleExtractionTestFixtures.PlainType"));
+    }
+
+    [Test]
+    public void Extract_NonFiniteFloatProperty_IsEvidenceExtractionFailure()
+    {
+        var configuration = new ArchitectureClassificationConfiguration
+        {
+            Attributes =
+            {
+                DomainMapping(metadata: new Dictionary<string, object> { ["value"] = "property:FloatValue" })
+            }
+        };
+
+        ArchitectureTypeClassificationResult result = CreateExtractor(configuration).Extract(typeof(TypeWithNonFiniteFloatProperty));
+
+        Assert.That(result.Role, Is.EqualTo("DomainLayer"));
+        Assert.That(result.Metadata.ContainsKey("value"), Is.False);
+        Assert.That(result.MetadataFailures, Has.Count.EqualTo(1));
+    }
+
+    [Test]
+    public void Extract_FloatPropertyExceedingDecimalRange_IsEvidenceExtractionFailure()
+    {
+        var configuration = new ArchitectureClassificationConfiguration
+        {
+            Attributes =
+            {
+                DomainMapping(metadata: new Dictionary<string, object> { ["value"] = "property:FloatValue" })
+            }
+        };
+
+        ArchitectureTypeClassificationResult result = CreateExtractor(configuration).Extract(typeof(TypeWithOverflowingFloatProperty));
+
+        Assert.That(result.Role, Is.EqualTo("DomainLayer"));
+        Assert.That(result.Metadata.ContainsKey("value"), Is.False);
+        Assert.That(result.MetadataFailures, Has.Count.EqualTo(1));
+    }
+
+    [Test]
+    public void Extract_NonFiniteDoubleProperty_IsEvidenceExtractionFailure()
+    {
+        var configuration = new ArchitectureClassificationConfiguration
+        {
+            Attributes =
+            {
+                DomainMapping(metadata: new Dictionary<string, object> { ["value"] = "property:DoubleValue" })
+            }
+        };
+
+        ArchitectureTypeClassificationResult result = CreateExtractor(configuration).Extract(typeof(TypeWithNonFiniteDoubleProperty));
+
+        Assert.That(result.Role, Is.EqualTo("DomainLayer"));
+        Assert.That(result.Metadata.ContainsKey("value"), Is.False);
+        Assert.That(result.MetadataFailures, Has.Count.EqualTo(1));
+    }
+
+    [Test]
     public void Extract_LiteralScalarMetadata_UsedVerbatim()
     {
         var configuration = new ArchitectureClassificationConfiguration

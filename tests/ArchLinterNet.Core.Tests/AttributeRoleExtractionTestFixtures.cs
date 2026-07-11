@@ -6,11 +6,13 @@ namespace AttributeRoleExtractionTestFixtures
         Domain = 2
     }
 
+#pragma warning disable CA1069 // Intentional: exercises the extractor's aliased-enum evidence-extraction-failure path.
     public enum AliasedTier
     {
         First = 1,
         Second = 1
     }
+#pragma warning restore CA1069
 
     public enum UlongTier : ulong
     {
@@ -22,6 +24,7 @@ namespace AttributeRoleExtractionTestFixtures
         public const string Owner = "platform-team";
         public const int Priority = 5;
         public const decimal Ratio = 1.5m;
+        public const string? NullOwner = null;
         public static readonly string NotConst = "not-const";
     }
 
@@ -32,6 +35,13 @@ namespace AttributeRoleExtractionTestFixtures
         {
             Domain = domain;
             Module = module;
+        }
+
+        public DomainMarkerAttribute(Type moduleType)
+        {
+            Domain = string.Empty;
+            Module = string.Empty;
+            ModuleType = moduleType;
         }
 
         public string Domain { get; }
@@ -45,6 +55,12 @@ namespace AttributeRoleExtractionTestFixtures
         public AliasedTier AliasTier { get; set; }
 
         public UlongTier UlongValue { get; set; }
+
+        public Type? ModuleType { get; }
+
+        public float FloatValue { get; set; }
+
+        public double DoubleValue { get; set; }
     }
 
     [AttributeUsage(AttributeTargets.Class)]
@@ -81,6 +97,18 @@ namespace AttributeRoleExtractionTestFixtures
 
     [DomainMarker("Sales", UlongValue = UlongTier.Max)]
     public sealed class TypeWithUlongMaxEnumProperty;
+
+    [DomainMarker(typeof(PlainType))]
+    public sealed class TypeWithTypeConstructorArgument;
+
+    [DomainMarker("Sales", FloatValue = float.NaN)]
+    public sealed class TypeWithNonFiniteFloatProperty;
+
+    [DomainMarker("Sales", FloatValue = float.MaxValue)]
+    public sealed class TypeWithOverflowingFloatProperty;
+
+    [DomainMarker("Sales", DoubleValue = double.NaN)]
+    public sealed class TypeWithNonFiniteDoubleProperty;
 
     public sealed class PlainType;
 

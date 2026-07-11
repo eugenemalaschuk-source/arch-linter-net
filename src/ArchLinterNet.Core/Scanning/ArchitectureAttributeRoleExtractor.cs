@@ -127,7 +127,7 @@ public sealed class ArchitectureAttributeRoleExtractor
     }
 
     private (string Role, IReadOnlyDictionary<string, object> Metadata) ResolveEntryAcrossInstances(
-        IReadOnlyList<CustomAttributeData> matchedInstances,
+        List<CustomAttributeData> matchedInstances,
         ArchitectureAttributeClassificationMapping mapping,
         ArchitectureClassificationSource source,
         string subject,

@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Linq;
 using System.Reflection;
 using System.Runtime.CompilerServices;
 
@@ -19,7 +20,7 @@ internal static class ArchitectureAttributeMetadataExtraction
     {
         if (rawYamlValue is string expression)
         {
-            if (expression.StartsWith(ConstructorPrefix, StringComparison.Ordinal) && expression.EndsWith("]", StringComparison.Ordinal))
+            if (expression.StartsWith(ConstructorPrefix, StringComparison.Ordinal) && expression.EndsWith(']'))
             {
                 return ExtractConstructorArgument(expression, attributeData);
             }
@@ -63,12 +64,10 @@ internal static class ArchitectureAttributeMetadataExtraction
     {
         string name = expression[PropertyPrefix.Length..];
 
-        foreach (CustomAttributeNamedArgument namedArgument in attributeData.NamedArguments)
+        foreach (CustomAttributeNamedArgument namedArgument in
+                 attributeData.NamedArguments.Where(a => string.Equals(a.MemberName, name, StringComparison.Ordinal)))
         {
-            if (string.Equals(namedArgument.MemberName, name, StringComparison.Ordinal))
-            {
-                return CanonicalizeTypedArgument(namedArgument.TypedValue);
-            }
+            return CanonicalizeTypedArgument(namedArgument.TypedValue);
         }
 
         return (null, $"named argument '{name}' was not explicitly supplied on this attribute usage");
@@ -125,9 +124,9 @@ internal static class ArchitectureAttributeMetadataExtraction
         }
     }
 
-    // C# `const decimal` fields are not IL `literal` fields (decimal has no ECMA constant encoding);
-    // the compiler instead marks them `static initonly` and attaches [DecimalConstant]. Both shapes are
-    // "compile-time const" for this feature's purposes; `static readonly` (no DecimalConstantAttribute) is not.
+    // C# const decimal fields are not IL literal fields, since decimal has no ECMA constant encoding;
+    // the compiler instead marks them static initonly and attaches a DecimalConstantAttribute. Both
+    // shapes count as compile-time const here; static readonly without DecimalConstantAttribute does not.
     private static bool TryReadConstFieldValue(FieldInfo field, out object? raw)
     {
         if (field.IsLiteral && !field.IsInitOnly)

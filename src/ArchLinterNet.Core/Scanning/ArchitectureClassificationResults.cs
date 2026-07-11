@@ -4,11 +4,6 @@ namespace ArchLinterNet.Core.Scanning;
 
 public sealed class ArchitectureTypeClassificationResult
 {
-    public static readonly ArchitectureTypeClassificationResult Empty = new(
-        null, null, new Dictionary<string, object>(),
-        Array.Empty<ArchitectureClassificationConflict>(),
-        Array.Empty<ArchitectureClassificationMetadataFailure>());
-
     public ArchitectureTypeClassificationResult(
         string? role,
         ArchitectureClassificationSource? source,
