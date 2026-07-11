@@ -24,3 +24,12 @@ public sealed record ArchitectureClassificationMetadataFailure(
     ArchitectureClassificationSource Source,
     string MetadataKey,
     string Reason);
+
+// A discovered role descriptor for one type, surfaced by the validate command alongside conflicts
+// and metadata failures. Subject is the type's full name. Metadata mirrors the winning source's
+// canonicalized values (string/boolean/decimal), per attribute-role-extraction canonicalization.
+public sealed record ArchitectureClassificationRoleFact(
+    string Subject,
+    string Role,
+    ArchitectureClassificationSource Source,
+    IReadOnlyDictionary<string, object> Metadata);

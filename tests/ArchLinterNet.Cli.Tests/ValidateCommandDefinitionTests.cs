@@ -150,7 +150,8 @@ public sealed class ValidateCommandDefinitionTests
                 "off",
                 Array.Empty<ArchitectureCoverageSummary>(),
                 Array.Empty<ArchitectureClassificationConflict>(),
-                Array.Empty<ArchitectureClassificationMetadataFailure>());
+                Array.Empty<ArchitectureClassificationMetadataFailure>(),
+                Array.Empty<ArchitectureClassificationRoleFact>());
         }
 
         public string FormatResultForCiArtifacts(
@@ -163,7 +164,8 @@ public sealed class ValidateCommandDefinitionTests
             IReadOnlyCollection<PolicyConsistencyDiagnostic> policyConsistencyFindings,
             IReadOnlyCollection<ArchitectureCoverageSummary> coverageSummaries,
             IReadOnlyCollection<ArchitectureClassificationConflict> classificationConflicts,
-            IReadOnlyCollection<ArchitectureClassificationMetadataFailure> classificationMetadataFailures) => "formatted";
+            IReadOnlyCollection<ArchitectureClassificationMetadataFailure> classificationMetadataFailures,
+            IReadOnlyCollection<ArchitectureClassificationRoleFact> classificationRoles) => "formatted";
 
         public string FormatResultAsSarif(string mode, IReadOnlyCollection<ArchitectureViolation> violations, IReadOnlyCollection<string> cycles) => "formatted";
         public string FormatViolationsForHumans(IReadOnlyCollection<ArchitectureViolation> violations) => "formatted";

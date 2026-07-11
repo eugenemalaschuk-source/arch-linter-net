@@ -49,7 +49,8 @@ internal sealed class CliRuntime : ICliRuntime
         IReadOnlyCollection<PolicyConsistencyDiagnostic> policyConsistencyFindings,
         IReadOnlyCollection<ArchitectureCoverageSummary> coverageSummaries,
         IReadOnlyCollection<ArchitectureClassificationConflict> classificationConflicts,
-        IReadOnlyCollection<ArchitectureClassificationMetadataFailure> classificationMetadataFailures)
+        IReadOnlyCollection<ArchitectureClassificationMetadataFailure> classificationMetadataFailures,
+        IReadOnlyCollection<ArchitectureClassificationRoleFact> classificationRoles)
     {
         return _formatter.FormatResultForCiArtifacts(
             mode,
@@ -61,7 +62,8 @@ internal sealed class CliRuntime : ICliRuntime
             policyConsistencyFindings,
             coverageSummaries,
             classificationConflicts,
-            classificationMetadataFailures);
+            classificationMetadataFailures,
+            classificationRoles);
     }
 
     public string FormatResultAsSarif(

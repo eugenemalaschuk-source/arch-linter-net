@@ -15,4 +15,5 @@ public sealed record ValidationOutcome(
     string PolicyConsistencyConfig,
     IReadOnlyCollection<ArchitectureCoverageSummary> CoverageSummaries,
     IReadOnlyCollection<ArchitectureClassificationConflict> ClassificationConflicts,
-    IReadOnlyCollection<ArchitectureClassificationMetadataFailure> ClassificationMetadataFailures);
+    IReadOnlyCollection<ArchitectureClassificationMetadataFailure> ClassificationMetadataFailures,
+    IReadOnlyCollection<ArchitectureClassificationRoleFact> ClassificationRoles);

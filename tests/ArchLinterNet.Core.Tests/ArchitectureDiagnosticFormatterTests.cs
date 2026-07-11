@@ -333,6 +333,56 @@ public sealed class ArchitectureDiagnosticFormatterTests
     }
 
     [Test]
+    public void FormatResultForCiArtifacts_ClassificationRoles_IncludesRoleMetadataAndSource()
+    {
+        var roles = new[]
+        {
+            new Model.ArchitectureClassificationRoleFact(
+                "MyApp.Order", "DomainLayer", Model.ArchitectureClassificationSource.TypeAttribute,
+                new Dictionary<string, object> { ["domain"] = "Sales" })
+        };
+
+        using var json = JsonDocument.Parse(_formatter.FormatResultForCiArtifacts(
+            "strict", true, Array.Empty<ArchitectureViolation>(), Array.Empty<string>(),
+            classificationRoles: roles));
+
+        JsonElement role = json.RootElement.GetProperty("classification_roles")[0];
+        Assert.That(role.GetProperty("subject").GetString(), Is.EqualTo("MyApp.Order"));
+        Assert.That(role.GetProperty("role").GetString(), Is.EqualTo("DomainLayer"));
+        Assert.That(role.GetProperty("source").GetString(), Is.EqualTo("TypeAttribute"));
+        Assert.That(role.GetProperty("metadata").GetProperty("domain").GetString(), Is.EqualTo("Sales"));
+    }
+
+    [Test]
+    public void FormatResultForCiArtifacts_NoClassificationRoles_IncludesEmptyArray()
+    {
+        using var json = JsonDocument.Parse(_formatter.FormatResultForCiArtifacts(
+            "strict", true, Array.Empty<ArchitectureViolation>(), Array.Empty<string>()));
+
+        Assert.That(json.RootElement.GetProperty("classification_roles").GetArrayLength(), Is.EqualTo(0));
+    }
+
+    [Test]
+    public void FormatResultForCiArtifacts_MultipleClassificationRoles_OrdersBySubject()
+    {
+        var roles = new[]
+        {
+            new Model.ArchitectureClassificationRoleFact(
+                "MyApp.Zeta", "DomainLayer", Model.ArchitectureClassificationSource.TypeAttribute, new Dictionary<string, object>()),
+            new Model.ArchitectureClassificationRoleFact(
+                "MyApp.Alpha", "DomainLayer", Model.ArchitectureClassificationSource.TypeAttribute, new Dictionary<string, object>())
+        };
+
+        using var json = JsonDocument.Parse(_formatter.FormatResultForCiArtifacts(
+            "strict", true, Array.Empty<ArchitectureViolation>(), Array.Empty<string>(),
+            classificationRoles: roles));
+
+        JsonElement.ArrayEnumerator classificationRoles = json.RootElement.GetProperty("classification_roles").EnumerateArray();
+        List<string?> subjects = classificationRoles.Select(r => r.GetProperty("subject").GetString()).ToList();
+        Assert.That(subjects, Is.EqualTo(new[] { "MyApp.Alpha", "MyApp.Zeta" }));
+    }
+
+    [Test]
     public void FormatCyclesForHumans_MultipleCycles_SortedAlphabetically()
     {
         var cycles = new[] { "Z -> Y -> Z", "A -> B -> A" };
