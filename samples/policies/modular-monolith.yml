@@ -3,11 +3,14 @@
 version: 1
 name: Modular Monolith Policy Recipe
 
-# Reserved for the semantic-classification-model design (schema acceptance only;
-# see openspec/changes/archive/2026-07-10-design-semantic-classification-model). No extraction or
-# selector-matching engine exists yet, so this section has no effect on the
-# contracts below - it illustrates the reviewed YAML shape for a
-# Sales/Inventory/SharedKernel modular-monolith policy.
+# classification.attributes/assembly_attributes are implemented (see
+# openspec/specs/attribute-role-extraction) and produce real role/metadata facts for scanned
+# types. classification.namespace/exclusions/etc. below remain reserved for the
+# semantic-classification-model design (schema acceptance only; see
+# openspec/changes/archive/2026-07-10-design-semantic-classification-model) - no extraction or
+# selector-matching engine exists for them yet, so they have no effect on the contracts below.
+# Together they illustrate the reviewed YAML shape for a Sales/Inventory/SharedKernel
+# modular-monolith policy.
 classification:
   attributes:
     - attribute: MyCompany.Product.Architecture.DomainLayerAttribute
