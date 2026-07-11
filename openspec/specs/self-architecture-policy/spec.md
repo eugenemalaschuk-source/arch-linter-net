@@ -4,11 +4,11 @@
 Define and enforce ArchLinterNet's own internal validation-pipeline boundaries (application seam, contract execution, diagnostics, resolution, scanning) through the repository's architecture policy and acceptance gate, so the post-#69 split does not regress into central orchestration coupling.
 ## Requirements
 ### Requirement: Repository governs its own internal validation-pipeline boundaries
-The repository's architecture contract (`architecture/dependencies.arch.yml`) SHALL declare namespace layers for `ArchLinterNet.Core.Model`, `ArchLinterNet.Core.Reporting`, `ArchLinterNet.Core.Resolution`, `ArchLinterNet.Core.Contracts`, `ArchLinterNet.Core.Execution`, and `ArchLinterNet.Core.Validation`, in addition to the existing package-level layers (`core`, `core_scanning`, `cli`, `testing`, `unity`).
+The repository's architecture contract (`architecture/dependencies.arch.yml`) SHALL declare namespace layers for `ArchLinterNet.Core.Model`, `ArchLinterNet.Core.Reporting`, `ArchLinterNet.Core.Resolution`, `ArchLinterNet.Core.Contracts`, `ArchLinterNet.Core.Execution`, `ArchLinterNet.Core.Validation`, and `ArchLinterNet.Core.Asmdef`, in addition to the package-level layers (`core`, `core_scanning`, `cli`, `testing`).
 
 #### Scenario: Internal layers are declared
 - **WHEN** the policy file is loaded
-- **THEN** it defines a layer for each of `Core.Model`, `Core.Reporting`, `Core.Resolution`, `Core.Contracts`, `Core.Execution`, and `Core.Validation`
+- **THEN** it defines a layer for each of `Core.Model`, `Core.Reporting`, `Core.Resolution`, `Core.Contracts`, `Core.Execution`, `Core.Validation`, and `Core.Asmdef`
 
 ### Requirement: CLI must use the application seam
 `ArchLinterNet.Cli` SHALL NOT depend directly on `ArchLinterNet.Core.Execution`, `ArchLinterNet.Core.Contracts`, `ArchLinterNet.Core.Resolution`, or `ArchLinterNet.Core.Scanning`. It SHALL route validation and baseline-generation behavior through `ArchLinterNet.Core.Validation`.
@@ -18,11 +18,11 @@ The repository's architecture contract (`architecture/dependencies.arch.yml`) SH
 - **THEN** it references only `ArchLinterNet.Core.Model`, `ArchLinterNet.Core.Reporting`, and `ArchLinterNet.Core.Validation` from Core
 
 ### Requirement: Contract execution does not depend on hosts
-`ArchLinterNet.Core.Execution` (including contract handlers) SHALL NOT depend on `ArchLinterNet.Cli`, `ArchLinterNet.Testing`, or `ArchLinterNet.Unity`.
+`ArchLinterNet.Core.Execution` (including contract handlers) SHALL NOT depend on `ArchLinterNet.Cli` or `ArchLinterNet.Testing`.
 
 #### Scenario: Execution stays host-agnostic
 - **WHEN** `ArchLinterNet.Core.Execution` source is scanned for namespace references
-- **THEN** it does not reference `ArchLinterNet.Cli`, `ArchLinterNet.Testing`, or `ArchLinterNet.Unity`
+- **THEN** it does not reference `ArchLinterNet.Cli` or `ArchLinterNet.Testing`
 
 ### Requirement: Diagnostics and model layers stay leaves
 `ArchLinterNet.Core.Reporting` SHALL NOT depend on `ArchLinterNet.Core.Execution`, `ArchLinterNet.Core.Validation`, `ArchLinterNet.Core.Resolution`, `ArchLinterNet.Core.Scanning`, `ArchLinterNet.Core.Contracts`, or any host package. `ArchLinterNet.Core.Model` SHALL NOT depend on any other internal layer or host package.
@@ -40,36 +40,36 @@ The repository's architecture contract (`architecture/dependencies.arch.yml`) SH
 
 #### Scenario: Resolution and scanning stay below execution and validation
 - **WHEN** `ArchLinterNet.Core.Resolution` or `ArchLinterNet.Core.Scanning` source is scanned for namespace references
-- **THEN** neither references `ArchLinterNet.Core.Execution`, `ArchLinterNet.Core.Validation`, `ArchLinterNet.Cli`, `ArchLinterNet.Testing`, or `ArchLinterNet.Unity`
+- **THEN** neither references `ArchLinterNet.Core.Execution`, `ArchLinterNet.Core.Validation`, `ArchLinterNet.Cli`, or `ArchLinterNet.Testing`
 
 ### Requirement: The self-policy actually runs against the real repository
-The normal lint gate (`make lint-architecture`, part of `make lint` and `make acceptance`) SHALL execute the real `architecture/dependencies.arch.yml` policy in strict mode against the repository's own built assemblies (`Core`, `Cli`, `Testing`, `Unity`) and fail the build if it does not pass.
+The normal lint gate (`make lint-architecture`, part of `make lint` and `make acceptance`) SHALL execute the real `architecture/dependencies.arch.yml` policy in strict mode against the repository's own built assemblies (`Core`, `Cli`, `Testing`) and fail the build if it does not pass.
 
 #### Scenario: Self-validation runs in the lint gate
 - **WHEN** `make lint-architecture` runs
-- **THEN** it builds `ArchLinterNet.Cli` and `ArchLinterNet.Unity` if not already built, then runs a test that validates `architecture/dependencies.arch.yml` against the repository root in strict mode
+- **THEN** it builds `ArchLinterNet.Cli` and `ArchLinterNet.Testing` if not already built, then runs a test that validates `architecture/dependencies.arch.yml` against the repository root in strict mode
 - **AND** the test fails if the repository violates its own declared boundaries
 
 ### Requirement: Application seam does not bypass into scanning, discovery, or resolution internals
-`ArchLinterNet.Core.Validation` SHALL NOT depend directly on `ArchLinterNet.Core.Scanning`, `ArchLinterNet.Core.Discovery`, or `ArchLinterNet.Core.Resolution`. It SHALL reach their behavior only through `ArchLinterNet.Core.Execution` (or, for the Unity host, `ArchLinterNet.Core.Asmdef`).
+`ArchLinterNet.Core.Validation` SHALL NOT depend directly on `ArchLinterNet.Core.Scanning`, `ArchLinterNet.Core.Discovery`, or `ArchLinterNet.Core.Resolution`. It SHALL reach their behavior through `ArchLinterNet.Core.Execution`; the dedicated asmdef-only path SHALL remain in `ArchLinterNet.Core.Asmdef`.
 
 #### Scenario: Validation stays behind the execution seam
 - **WHEN** `ArchLinterNet.Core.Validation` source is scanned for namespace references
 - **THEN** it does not reference `ArchLinterNet.Core.Scanning`, `ArchLinterNet.Core.Discovery`, or `ArchLinterNet.Core.Resolution`
 
 ### Requirement: Discovery does not depend upward on execution or validation
-`ArchLinterNet.Core.Discovery` SHALL NOT depend on `ArchLinterNet.Core.Execution`, `ArchLinterNet.Core.Validation`, or any host package (`ArchLinterNet.Cli`, `ArchLinterNet.Testing`, `ArchLinterNet.Unity`), matching the existing constraint on `ArchLinterNet.Core.Resolution` and `ArchLinterNet.Core.Scanning`.
+`ArchLinterNet.Core.Discovery` SHALL NOT depend on `ArchLinterNet.Core.Execution`, `ArchLinterNet.Core.Validation`, or any host package (`ArchLinterNet.Cli`, `ArchLinterNet.Testing`), matching the existing constraint on `ArchLinterNet.Core.Resolution` and `ArchLinterNet.Core.Scanning`.
 
 #### Scenario: Discovery stays below execution and validation
 - **WHEN** `ArchLinterNet.Core.Discovery` source is scanned for namespace references
-- **THEN** it does not reference `ArchLinterNet.Core.Execution`, `ArchLinterNet.Core.Validation`, `ArchLinterNet.Cli`, `ArchLinterNet.Testing`, or `ArchLinterNet.Unity`
+- **THEN** it does not reference `ArchLinterNet.Core.Execution`, `ArchLinterNet.Core.Validation`, `ArchLinterNet.Cli`, or `ArchLinterNet.Testing`
 
 ### Requirement: Discovery and resolution internals are protected from adapters
 `ArchLinterNet.Core.Discovery` and `ArchLinterNet.Core.Resolution` SHALL only be referenced from within `ArchLinterNet.Core`, matching the existing protected-surface constraint on `ArchLinterNet.Core.Scanning`.
 
 #### Scenario: No adapter imports discovery or resolution directly
-- **WHEN** `ArchLinterNet.Cli`, `ArchLinterNet.Testing`, or `ArchLinterNet.Unity` source is scanned for namespace references
-- **THEN** none of them reference `ArchLinterNet.Core.Discovery` or `ArchLinterNet.Core.Resolution`
+- **WHEN** `ArchLinterNet.Cli` or `ArchLinterNet.Testing` source is scanned for namespace references
+- **THEN** neither references `ArchLinterNet.Core.Discovery` or `ArchLinterNet.Core.Resolution`
 
 ### Requirement: Seam and isolation rules stay matched against real code
 The repository's architecture contract SHALL declare a `scope: rule_input` coverage contract covering the seam, leaf-isolation, protected-surface, and Contracts host/execution-isolation rule IDs for the recovered Core architecture, so a rule referencing a renamed or deleted layer is caught as `unresolved`/`empty-input` rather than silently passing.
@@ -94,15 +94,23 @@ Any new ArchLinterNet contract family added to the engine (a new entry alongside
 - **AND** the family's checker, configuration contributor (if any), diagnostic payload, and YAML model live in `Execution.Checkers`, `Execution.Abstractions`, `Model`, and `Contracts.Families` respectively
 
 ### Requirement: Contracts stays host-agnostic and independent of execution internals
-`ArchLinterNet.Core.Contracts` (including `Contracts.Families` and `Contracts.Validators`) SHALL NOT depend on `ArchLinterNet.Cli`, `ArchLinterNet.Testing`, `ArchLinterNet.Unity`, or `ArchLinterNet.Core.Execution`. The contract-family metadata `Contracts` owns (`ArchitectureContractFamilyBinding`/`ArchitectureContractFamilyBindings`) SHALL remain a self-contained registry rather than depending on `Execution`'s runtime checker/registry (`ArchitectureContractFamilyDescriptor`/`ArchitectureContractFamilyRegistry`).
+`ArchLinterNet.Core.Contracts` (including `Contracts.Families` and `Contracts.Validators`) SHALL NOT depend on `ArchLinterNet.Cli`, `ArchLinterNet.Testing`, or `ArchLinterNet.Core.Execution`. The contract-family metadata `Contracts` owns (`ArchitectureContractFamilyBinding`/`ArchitectureContractFamilyBindings`) SHALL remain a self-contained registry rather than depending on `Execution`'s runtime checker/registry (`ArchitectureContractFamilyDescriptor`/`ArchitectureContractFamilyRegistry`).
 
 #### Scenario: Contracts stays free of host references
 - **WHEN** `ArchLinterNet.Core.Contracts` source is scanned for namespace references
-- **THEN** it does not reference `ArchLinterNet.Cli`, `ArchLinterNet.Testing`, or `ArchLinterNet.Unity`
+- **THEN** it does not reference `ArchLinterNet.Cli` or `ArchLinterNet.Testing`
 
 #### Scenario: Contracts stays independent of Execution
 - **WHEN** `ArchLinterNet.Core.Contracts` source is scanned for namespace references
 - **THEN** it does not reference `ArchLinterNet.Core.Execution`
+
+### Requirement: Unity asmdef validation is a Core capability
+The repository SHALL keep `.asmdef` validation in `ArchLinterNet.Core.Asmdef` and SHALL NOT maintain a separate `ArchLinterNet.Unity` production or test assembly solely for the asmdef convenience facade.
+
+#### Scenario: Repository package and assembly inventory is evaluated
+- **WHEN** the solution, self-policy, release workflow, and package documentation are inspected
+- **THEN** they contain only `ArchLinterNet.Core`, `ArchLinterNet.Cli`, and `ArchLinterNet.Testing` production packages
+- **AND** asmdef facade tests run from `ArchLinterNet.Core.Tests`
 
 ### Requirement: Central catalog and dispatch points grow through their extension mechanism, not inline branches
 Because ArchLinterNet has no contract family that inspects a file's internal structure, branch count, or dispatch shape (confirmed unsupported in `docs/policy-format/supported-capabilities.md`), the repository SHALL enforce the following extension-hotspot invariants introduced by the #208-#216 refactor chain through documented guardrail candidates in `docs/internal/core-architecture-blueprint.md`, reviewed at code-review time, rather than through a new architecture-policy YAML contract:
@@ -116,5 +124,4 @@ Because ArchLinterNet has no contract family that inspects a file's internal str
 #### Scenario: A new contract family is added to the engine
 - **WHEN** a contributor or reviewer adds a new contract family
 - **THEN** the family's descriptor/binding is appended to `ArchitectureContractFamilyRegistry`/`ArchitectureContractFamilyBindings` rather than an inline branch being added to those files, and its checker, configuration inspection, diagnostic payload, and YAML model each live in `Execution.Checkers`, `Execution.Abstractions`, `Model`, and `Contracts.Families` respectively
-- **AND** `docs/internal/core-architecture-blueprint.md`'s "Guardrail candidate for #215" paragraph is consulted during review to confirm none of the five regression patterns were reintroduced, including a checker/validator/contributor reaching into a CLI/reporting adapter instead of depending only on abstractions/context
-
+- **AND** `docs/internal/core-architecture-blueprint.md`'s guardrail paragraph is consulted during review to confirm none of the five regression patterns were reintroduced, including a checker/validator/contributor reaching into a CLI/reporting adapter instead of depending only on abstractions/context

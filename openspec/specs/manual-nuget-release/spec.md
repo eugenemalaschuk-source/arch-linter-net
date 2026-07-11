@@ -33,7 +33,8 @@ The release workflow SHALL restore, run the repository acceptance gate, build, p
 
 #### Scenario: Expected package projects are packed
 - **WHEN** the release workflow packs packages
-- **THEN** it creates package artifacts for `ArchLinterNet.Core`, `ArchLinterNet.Cli`, `ArchLinterNet.Testing`, and `ArchLinterNet.Unity`
+- **THEN** it creates package artifacts for `ArchLinterNet.Core`, `ArchLinterNet.Cli`, and `ArchLinterNet.Testing`
+- **AND** Unity `.asmdef` validation ships as part of `ArchLinterNet.Core`, not as a separate `ArchLinterNet.Unity` artifact
 
 ### Requirement: Controlled NuGet.org publication
 The release workflow SHALL publish packages to NuGet.org only when the manual run explicitly requests publication.
@@ -59,4 +60,4 @@ The release workflow SHALL publish the documentation site to GitHub Pages when p
 
 #### Scenario: Documentation does not deploy during dry-run
 - **WHEN** the release workflow runs with `publish=false`
-- **THEN** it does not deploy documentation to GitHub Pages
+- **THEN** it does not deploy documentation

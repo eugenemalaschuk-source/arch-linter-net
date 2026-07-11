@@ -1,7 +1,8 @@
+using ArchLinterNet.Core.Asmdef;
 using ArchLinterNet.Core.Model;
 using NUnit.Framework;
 
-namespace ArchLinterNet.Unity.Tests;
+namespace ArchLinterNet.Core.Tests;
 
 [TestFixture]
 public sealed class AsmdefValidatorDelegationTests
@@ -12,7 +13,7 @@ public sealed class AsmdefValidatorDelegationTests
     [SetUp]
     public void SetUp()
     {
-        _tempDir = Path.Combine(Path.GetTempPath(), $"arch-linter-unity-asmdef-test-{Guid.NewGuid():N}");
+        _tempDir = Path.Combine(Path.GetTempPath(), $"arch-linter-core-asmdef-test-{Guid.NewGuid():N}");
         Directory.CreateDirectory(Path.Combine(_tempDir, "architecture"));
         Directory.CreateDirectory(Path.Combine(_tempDir, "Assets", "Runtime"));
         Directory.CreateDirectory(Path.Combine(_tempDir, "Assets", "Editor"));
@@ -20,7 +21,7 @@ public sealed class AsmdefValidatorDelegationTests
         _policyPath = Path.Combine(_tempDir, "architecture", "dependencies.arch.yml");
         File.WriteAllText(_policyPath, """
             version: 1
-            name: Unity Asmdef Test
+            name: Core Asmdef Test
             contracts:
               strict_asmdef:
                 - name: runtime-must-not-reference-editor

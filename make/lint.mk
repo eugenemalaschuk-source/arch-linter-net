@@ -7,13 +7,12 @@ lint: lint-code-size lint-dotnet-format lint-architecture lint-docs  ## Run all 
 
 lint-architecture:  ## Run strict architecture contracts on self
 	@dotnet build "$(PROJECT_ROOT)/src/ArchLinterNet.Cli/ArchLinterNet.Cli.csproj" --nologo -v minimal
-	@dotnet build "$(PROJECT_ROOT)/src/ArchLinterNet.Unity/ArchLinterNet.Unity.csproj" --nologo -v minimal
+	@dotnet build "$(PROJECT_ROOT)/src/ArchLinterNet.Testing/ArchLinterNet.Testing.csproj" --nologo -v minimal
 	@dotnet test "$(TESTS_DIR)/ArchLinterNet.Core.Tests/ArchLinterNet.Core.Tests.csproj" --no-restore \
 		--filter "FullyQualifiedName=ArchLinterNet.Core.Tests.SelfArchitecturePolicyTests.RepositoryPolicy_ValidatesOwnInternalBoundaries"
 
 audit-architecture:  ## Run diagnostic architecture audit contracts
 	@dotnet build "$(PROJECT_ROOT)/src/ArchLinterNet.Testing/ArchLinterNet.Testing.csproj" --nologo -q 2>/dev/null
-	@dotnet build "$(PROJECT_ROOT)/src/ArchLinterNet.Unity/ArchLinterNet.Unity.csproj" --nologo -q 2>/dev/null; true
 	@dotnet run --project "$(PROJECT_ROOT)/src/ArchLinterNet.Cli" -- --policy "$(PROJECT_ROOT)/architecture/dependencies.arch.yml" --mode audit
 
 lint-code-size:  ## Size lint for C# and documentation files
@@ -78,7 +77,6 @@ architecture-coverage-ci:  ## CI entrypoint: strict+audit JSON + Markdown report
 architecture-coverage-report:  ## Show full-solution architecture coverage report locally (Markdown + JSON)
 	@dotnet build "$(PROJECT_ROOT)/src/ArchLinterNet.Cli/ArchLinterNet.Cli.csproj" --nologo -v minimal
 	@dotnet build "$(PROJECT_ROOT)/src/ArchLinterNet.Testing/ArchLinterNet.Testing.csproj" --nologo -v minimal
-	@dotnet build "$(PROJECT_ROOT)/src/ArchLinterNet.Unity/ArchLinterNet.Unity.csproj" --nologo -v minimal
 	@$(MAKE) architecture-strict-json
 	@$(MAKE) architecture-coverage-markdown
 	@echo ""

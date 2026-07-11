@@ -1,7 +1,7 @@
 # asmdef-validation-service Specification
 
 ## Purpose
-Defines the narrow Core application service that composes policy loading, repository-root resolution, and `strict_asmdef` contract scanning for asmdef-only callers (Unity), without pulling them into the full CLI/public-API/Testing validation seam.
+Defines the narrow Core application service and convenience API that compose policy loading, repository-root resolution, and `strict_asmdef` contract scanning for asmdef-only callers without requiring a separate Unity package or the full CLI/Testing validation seam.
 ## Requirements
 ### Requirement: Narrow asmdef application service composes loader, resolver, and scanner
 `ArchLinterNet.Core.Asmdef.Abstractions.IAsmdefValidationService` SHALL expose `AsmdefValidationOutcome Validate(AsmdefValidationRequest request)`. Its default implementation, `ArchLinterNet.Core.Asmdef.AsmdefValidationService`, SHALL load the policy document at `AsmdefValidationRequest.PolicyPath`, resolve the repository root from that path, and run `strict_asmdef` contract scanning against the resolved root through its constructor-injected `ArchLinterNet.Core.Scanning.Abstractions.IArchitectureAsmdefScanner` collaborator, returning the aggregated violations.
@@ -21,3 +21,10 @@ Defines the narrow Core application service that composes policy loading, reposi
 - **WHEN** `new ArchitectureEngineBuilder().AddArchLinterNetCore().Build()` is called and `ValidateAsmdef` is invoked on the result
 - **THEN** the returned `AsmdefValidationOutcome` SHALL equal what a directly-constructed `AsmdefValidationService` (given the same collaborators) returns for the same request
 
+### Requirement: Core exposes the asmdef convenience facade
+`ArchLinterNet.Core.Asmdef.AsmdefValidator` SHALL expose the existing `Validate(string policyPath)` and `Validate(string policyPath, out IReadOnlyCollection<ArchitectureViolation> violations)` convenience signatures and SHALL delegate to a lazily constructed default `ArchitectureEngine`. The facade SHALL live in `ArchLinterNet.Core`; callers SHALL NOT need an `ArchLinterNet.Unity` package or assembly.
+
+#### Scenario: Existing asmdef-only validation behavior is available from Core
+- **WHEN** a caller references `ArchLinterNet.Core` and invokes `AsmdefValidator.Validate` for a policy containing `strict_asmdef` contracts
+- **THEN** the return value and violations SHALL match `ArchitectureEngine.ValidateAsmdef` for the same policy
+- **AND** `audit_asmdef` contracts SHALL remain excluded from this asmdef-only facade

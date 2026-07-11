@@ -5,12 +5,11 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <PackageId>ArchLinterNet.Core</PackageId>
-    <Description>YAML-first architecture contract engine for .NET projects. Loads declarative architecture policies, resolves assemblies, and validates dependency rules.</Description>
+    <Description>YAML-first architecture contract engine for .NET projects. Loads declarative architecture policies, resolves assemblies, and validates dependency and Unity asmdef rules.</Description>
   </PropertyGroup>
 
   <ItemGroup>
     <InternalsVisibleTo Include="ArchLinterNet.Core.Tests" />
-    <InternalsVisibleTo Include="ArchLinterNet.Unity" />
     <InternalsVisibleTo Include="ArchLinterNet.Cli" />
   </ItemGroup>
 

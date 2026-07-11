@@ -132,9 +132,6 @@ jobs:
       - name: Pack Testing
         run: dotnet pack src/ArchLinterNet.Testing/ArchLinterNet.Testing.csproj --configuration Release --no-build --output "$PACKAGE_OUTPUT" -p:PackageVersion="$PACKAGE_VERSION" -p:Version="$PACKAGE_VERSION" -p:PackageReleaseNotes="$PACKAGE_RELEASE_NOTES"
 
-      - name: Pack Unity
-        run: dotnet pack src/ArchLinterNet.Unity/ArchLinterNet.Unity.csproj --configuration Release --no-build --output "$PACKAGE_OUTPUT" -p:PackageVersion="$PACKAGE_VERSION" -p:Version="$PACKAGE_VERSION" -p:PackageReleaseNotes="$PACKAGE_RELEASE_NOTES"
-
       - name: Upload package artifacts
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:

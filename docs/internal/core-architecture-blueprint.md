@@ -13,20 +13,21 @@ Core already has the right directory shape (`Contracts/`, `Discovery/`, `Executi
 - `ArchitectureValidator` is already a thin compatibility facade that delegates to `Validation.ArchitectureValidationService`.
 - `ArchitectureAnalysisSession`/`ArchitectureAnalysisContext` already separate per-run state (`TypeIndex`, `ReferenceGraph`, coverage inventory cache) from a runner.
 - Every contract family executes through a checker resolved from `ArchitectureContractFamilyRegistry.All` (see [Handler/checker extension model](#handlerchecker-extension-model)); there is no remaining family invoked as a direct `runner.CheckXxx()` call inline in `ArchitectureContractExecutor` (#211).
+- `ArchLinterNet.Core.Asmdef.AsmdefValidator` is the public asmdef-only convenience facade. `.asmdef` is a supported static input format inside Core, not a separate Unity integration assembly or package.
 
 What is not yet healthy:
 
 - `ArchitectureContractRunner` is a 2,428-line `sealed partial class` split across four files (`ArchitectureContractRunner.cs`, `.Checking.cs`, `.Coverage.cs`, `.PolicyConsistency.cs`). It owns per-run state *and* the checking logic for nearly every contract family — the "god object" this refactor must shrink.
 - Most orchestration classes (`ArchitectureRunnerFactory`, `ArchitectureContractExecutor`, `ArchitectureValidationService`, `ArchitectureBaselineService`) are static, and several I/O-touching classes (`ArchitectureRepositoryRootLocator`, `ArchitectureProjectDiscovery`/`ArchitectureSolutionParser`/`ArchitectureProjectFileParser`, `ArchitectureAssemblyResolver`, the `Scanning/` classes) are static too, so none of them can be substituted with fakes in tests.
-- `ArchLinterNet.Unity.AsmdefValidator` bypasses the application seam entirely (see [Unity-facing adapter seam](#unity-facing-adapter-seam)).
 
 ## Module graph and dependency direction
 
 ```text
-Adapters (Cli, public API, Testing, Unity)
+Adapters (Cli, public API, Testing)
   -> Application (ArchitectureValidationService, ArchitectureBaselineService,
-                   IAsmdefValidationService; ArchitectureValidator/
-                   ArchitectureBaselineService stay as compatibility facades)
+                   IAsmdefValidationService; ArchitectureValidator,
+                   ArchitectureBaselineService, and AsmdefValidator stay as
+                   compatibility facades)
       -> Execution (ArchitectureEngine/EngineBuilder, per-run session/context,
                      ArchitectureContractFamilyRegistry descriptors and their
                      Checker delegates, resolved through
@@ -57,7 +58,7 @@ Hard rule: no module may depend upward. `Discovery`, `Resolution`, and `Scanning
 | `Scanning` | `Contracts`, infrastructure seam interfaces | `Execution`, `Validation`, `Discovery`, `Resolution` |
 | `Reporting` | `Model`, `Contracts` | `Execution`, `Validation`, `Discovery`, `Resolution`, `Scanning` |
 | `ArchLinterNet.Cli` / public API / `ArchLinterNet.Testing` | `Validation` application services only | `Execution`, `Discovery`, `Resolution`, `Scanning` internals; container APIs |
-| `ArchLinterNet.Unity` | `IAsmdefValidationService` only | contract loaders, repository-root locators, scanners, container APIs |
+| `ArchLinterNet.Core.Asmdef` | Core composition facade and the narrow Contracts/Resolution/Scanning abstractions required by `IAsmdefValidationService` | host packages; container APIs outside `Composition` |
 
 ## Application seam
 
@@ -65,18 +66,19 @@ Hard rule: no module may depend upward. `Discovery`, `Resolution`, and `Scanning
 
 The evolution is: these currently-static orchestrators become thin instance services (`IValidationService`, `IBaselineService` or equivalent) built by the composition root, with the existing static entry points (`ArchitectureValidationService`, `ArchitectureBaselineService`, `ArchitectureValidator`) retained only as compatibility facades that resolve and call the composed services. CLI commands, exit codes, public API signatures, and Testing adapter behavior must not change.
 
-## Unity-facing adapter seam
+## Asmdef validation seam
 
-`ArchLinterNet.Unity.AsmdefValidator` currently bypasses the shared validation seam: it calls `ArchitectureContractLoader.LoadFromPath`, `ArchitectureRepositoryRootLocator.ResolveFrom`, and `ArchitectureAsmdefScanner.FindAsmdefViolations` directly, and only ever evaluates `StrictAsmdef` contracts — it has no concept of validation mode, baseline, selected contract IDs, or condition sets.
+`ArchLinterNet.Core.Asmdef.AsmdefValidator` is a Core-owned public convenience facade for asmdef-only validation. It delegates to `ArchitectureEngine.ValidateAsmdef` and preserves the original `Validate(string contractPath)` and `Validate(string contractPath, out IReadOnlyCollection<ArchitectureViolation>)` signatures, including the public parameter name used by named-argument callers.
 
-**Decision: target a narrow composed `IAsmdefValidationService` / `AsmdefValidationService`, not the full validation seam.** Folding Unity onto the full validation seam would require inventing mode/baseline/condition-set semantics that the Unity-facing tool has never needed and nobody has asked for.
+**Decision: keep a narrow composed `IAsmdefValidationService` / `AsmdefValidationService`, not the full validation seam.** Pulling asmdef-only validation into the full validation seam would require inventing mode/baseline/condition-set semantics that this entry point has never exposed.
 
-Target shape:
+Current shape:
 
 - `IAsmdefValidationService` owns contract loading, repository-root resolution, and asmdef scanning orchestration as one composed Core application service.
-- `ArchLinterNet.Unity.AsmdefValidator` becomes a thin compatibility facade over that service.
-- Unity adapter code must not call contract loaders, repository-root locators, scanners, runner setup, the executor, or any container API directly.
-- Full validation (mode, baseline, condition sets, full diagnostics) remains a separate application service for Cli/public API/Testing; this blueprint does not define those semantics for the asmdef-only Unity path (non-goal, matches #140's non-goal).
+- `AsmdefValidator` is a thin compatibility facade over `ArchitectureEngine.ValidateAsmdef`.
+- `.asmdef` validation is part of `ArchLinterNet.Core`; there is no `ArchLinterNet.Unity` production assembly, test assembly, or NuGet package.
+- Asmdef-facing code must not call contract loaders, repository-root locators, scanners, runner setup, the executor, or container APIs directly outside the composed Core service.
+- Full validation (mode, baseline, condition sets, full diagnostics) remains a separate application service for CLI/public API/Testing; the asmdef-only path intentionally evaluates `strict_asmdef` contracts only.
 
 ## Composition root
 
@@ -167,7 +169,7 @@ The following currently-static, I/O-touching classes become instance services be
 | Environment variable access | scattered `Environment.GetEnvironmentVariable` calls | `IEnvironment` |
 | Clock/time access (stale-output checks) | `DateTime.UtcNow`/`DateTime.Now` calls | `IClock` |
 
-These seams are consumed by `Discovery`, `Resolution`, and `Scanning` services (and, narrowly, by Core's own `Asmdef.AsmdefValidationService`, which serves the Unity host through `IAsmdefValidationService`) — not by `Execution` handlers directly, preserving the dependency direction above.
+These seams are consumed by `Discovery`, `Resolution`, and `Scanning` services (and, narrowly, by Core's own `Asmdef.AsmdefValidationService` through `IAsmdefValidationService`) — not by `Execution` handlers directly, preserving the dependency direction above.
 
 ## Static helper vs. static-service rule
 
@@ -250,7 +252,7 @@ That's it — `ArchitectureDiagnosticMapper.FromViolation` dispatches via `viola
 
 - This document does not implement any part of the refactor; #134–#142 do.
 - This document does not change YAML policy behavior or add new user-facing contract families.
-- This document does not define validation mode/baseline/condition-set semantics for the Unity-facing `IAsmdefValidationService` — it is intentionally narrower than full validation.
+- This document does not define validation mode/baseline/condition-set semantics for the asmdef-only `IAsmdefValidationService`; it is intentionally narrower than full validation.
 
 ## References
 

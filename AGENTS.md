@@ -77,21 +77,20 @@ Do not create isolated implementation tasks without an existing story or a newly
 File: `architecture/dependencies.arch.yml`. Enforced via `lint-architecture`.
 
 Direction rules:
-- CLI, Testing, and Unity depend **only** on Core.
+- CLI and Testing depend **only** on Core.
+- Unity `.asmdef` validation is a Core capability, not a separate adapter assembly.
 - No circular dependencies between packages.
 - `Core.Scanning` internals are protected — only Core itself may import them.
 
 ## Package layout
 ```
 src/
-  ArchLinterNet.Core/     — model, YAML loading, assembly resolution
+  ArchLinterNet.Core/     — model, YAML loading, assembly resolution, asmdef validation
   ArchLinterNet.Cli/      — .NET global/local tool CLI
   ArchLinterNet.Testing/  — test framework adapters
-  ArchLinterNet.Unity/    — Unity .asmdef validation (optional)
 tests/
   ArchLinterNet.Core.Tests/
   ArchLinterNet.Cli.Tests/
-  ArchLinterNet.Unity.Tests/
 ```
 
 ## Conventions
