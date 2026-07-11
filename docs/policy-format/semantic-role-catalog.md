@@ -174,8 +174,10 @@ are exact canonical values, not regexes or scripts.
 
 ## Optional annotations and YAML mappings
 
-Annotations are convenience syntax, not a required dependency. Projects may
-define their own attributes and map them by full type name:
+The first catalog wave approves no ArchLinterNet-provided annotation types or
+annotation package. Annotation names in this document are candidates/examples,
+not shipped product APIs or a binary dependency. Projects define their own
+attributes and map them by full type name:
 
 ```yaml
 classification:
@@ -200,9 +202,11 @@ public sealed class Order { }
 [assembly: SharedKernel("Billing")]
 ```
 
-These names are vocabulary examples, not types supplied by the current
-product. The defined extraction forms are `constructor[N]`, `property:Name`,
-`const:Full.Type.NAME`, and literal scalar values.
+These names are vocabulary candidates/examples, not types supplied by the
+current product. The defined extraction forms are `constructor[N]`,
+`property:Name`, `const:Full.Type.NAME`, and literal scalar values. Issue #108
+owns any future decision to provide an optional annotation package or source-
+only distribution, including its packaging strategy.
 
 A role-bearing assembly mapping is valid only when the assembly-attribute
 source wins for a type. The current model cannot use
