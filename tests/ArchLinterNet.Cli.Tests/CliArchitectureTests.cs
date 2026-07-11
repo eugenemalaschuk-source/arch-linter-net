@@ -110,7 +110,9 @@ public sealed class CliArchitectureTests
                 UnmatchedIgnoredViolationsConfig: "off",
                 PolicyConsistencyFindings: Array.Empty<PolicyConsistencyDiagnostic>(),
                 PolicyConsistencyConfig: "off",
-                CoverageSummaries: Array.Empty<ArchitectureCoverageSummary>());
+                CoverageSummaries: Array.Empty<ArchitectureCoverageSummary>(),
+                ClassificationConflicts: Array.Empty<ArchitectureClassificationConflict>(),
+                ClassificationMetadataFailures: Array.Empty<ArchitectureClassificationMetadataFailure>());
         }
 
         public string FormatResultForCiArtifacts(
@@ -121,7 +123,16 @@ public sealed class CliArchitectureTests
             IReadOnlyCollection<ArchitectureViolation> coverageFindings,
             IReadOnlyList<ArchitectureUnmatchedIgnoredViolation> unmatchedIgnoredViolations,
             IReadOnlyCollection<PolicyConsistencyDiagnostic> policyConsistencyFindings,
-            IReadOnlyCollection<ArchitectureCoverageSummary> coverageSummaries)
+            IReadOnlyCollection<ArchitectureCoverageSummary> coverageSummaries,
+            IReadOnlyCollection<ArchitectureClassificationConflict> classificationConflicts,
+            IReadOnlyCollection<ArchitectureClassificationMetadataFailure> classificationMetadataFailures)
+        {
+            throw new NotSupportedException();
+        }
+
+        public string FormatClassificationFactsForHumans(
+            IReadOnlyCollection<ArchitectureClassificationConflict> conflicts,
+            IReadOnlyCollection<ArchitectureClassificationMetadataFailure> metadataFailures)
         {
             throw new NotSupportedException();
         }

@@ -1,0 +1,1 @@
+[assembly: AttributeRoleExtractionTestFixtures.BoundedContextMarker("Retail")]

@@ -68,6 +68,172 @@ contracts:
         Assert.That(document.Layers, Has.Count.EqualTo(2));
         Assert.That(document.Layers["core"].Namespace, Is.EqualTo("Test.Core"));
         Assert.That(document.Analysis.TargetAssemblies, Has.Count.EqualTo(2));
+        Assert.That(document.Classification.Attributes, Is.Empty);
+        Assert.That(document.Classification.AssemblyAttributes, Is.Empty);
+    }
+
+    [Test]
+    public void LoadFromPath_ClassificationSection_BindsAttributeAndAssemblyAttributeMappings()
+    {
+        string contractDir = Path.Combine(_tempDir, "architecture");
+        Directory.CreateDirectory(contractDir);
+        string contractPath = Path.Combine(contractDir, "dependencies.arch.yml");
+
+        File.WriteAllText(contractPath, @"
+version: 1
+name: Test Contract
+layers:
+  core:
+    namespace: Test.Core
+analysis:
+  target_assemblies:
+    - Test.Core
+classification:
+  attributes:
+    - attribute: Acme.Architecture.DomainLayerAttribute
+      role: DomainLayer
+      metadata:
+        domain: constructor[0]
+        module: property:Module
+        tier: const:Acme.Architecture.Tiers.CORE
+        owner: platform-team
+  assembly_attributes:
+    - attribute: Acme.Architecture.BoundedContextAttribute
+      role: ApplicationLayer
+      metadata:
+        boundedContext: constructor[0]
+contracts:
+  strict: []
+  audit: []
+  strict_layers: []
+  audit_layers: []
+  strict_allow_only: []
+  audit_allow_only: []
+  strict_cycles: []
+  audit_cycles: []
+  strict_method_body: []
+  audit_method_body: []
+  strict_asmdef: []
+  audit_asmdef: []
+  strict_independence: []
+  audit_independence: []
+");
+
+        ArchitectureContractDocument document = new ArchitecturePolicyDocumentLoader().Load(contractPath);
+
+        Assert.That(document.Classification.Attributes, Has.Count.EqualTo(1));
+        ArchitectureAttributeClassificationMapping attributeMapping = document.Classification.Attributes[0];
+        Assert.That(attributeMapping.Attribute, Is.EqualTo("Acme.Architecture.DomainLayerAttribute"));
+        Assert.That(attributeMapping.Role, Is.EqualTo("DomainLayer"));
+        Assert.That(attributeMapping.Metadata["domain"], Is.EqualTo("constructor[0]"));
+        Assert.That(attributeMapping.Metadata["module"], Is.EqualTo("property:Module"));
+        Assert.That(attributeMapping.Metadata["tier"], Is.EqualTo("const:Acme.Architecture.Tiers.CORE"));
+        Assert.That(attributeMapping.Metadata["owner"], Is.EqualTo("platform-team"));
+
+        Assert.That(document.Classification.AssemblyAttributes, Has.Count.EqualTo(1));
+        ArchitectureAttributeClassificationMapping assemblyMapping = document.Classification.AssemblyAttributes[0];
+        Assert.That(assemblyMapping.Attribute, Is.EqualTo("Acme.Architecture.BoundedContextAttribute"));
+        Assert.That(assemblyMapping.Role, Is.EqualTo("ApplicationLayer"));
+        Assert.That(assemblyMapping.Metadata["boundedContext"], Is.EqualTo("constructor[0]"));
+    }
+
+    [Test]
+    public void LoadFromPath_LiteralMetadataScalars_PreserveTheirYamlType()
+    {
+        string contractDir = Path.Combine(_tempDir, "architecture");
+        Directory.CreateDirectory(contractDir);
+        string contractPath = Path.Combine(contractDir, "dependencies.arch.yml");
+
+        File.WriteAllText(contractPath, @"
+version: 1
+name: Test Contract
+layers:
+  core:
+    namespace: Test.Core
+analysis:
+  target_assemblies:
+    - Test.Core
+classification:
+  attributes:
+    - attribute: Acme.Architecture.DomainLayerAttribute
+      role: DomainLayer
+      metadata:
+        enabled: true
+        priority: 1
+        ratio: 1.5
+        owner: platform-team
+        quotedNumber: ""42""
+contracts:
+  strict: []
+  audit: []
+  strict_layers: []
+  audit_layers: []
+  strict_allow_only: []
+  audit_allow_only: []
+  strict_cycles: []
+  audit_cycles: []
+  strict_method_body: []
+  audit_method_body: []
+  strict_asmdef: []
+  audit_asmdef: []
+  strict_independence: []
+  audit_independence: []
+");
+
+        ArchitectureContractDocument document = new ArchitecturePolicyDocumentLoader().Load(contractPath);
+        Dictionary<string, object> metadata = document.Classification.Attributes[0].Metadata;
+
+        Assert.That(metadata["enabled"], Is.EqualTo(true));
+        Assert.That(metadata["priority"], Is.EqualTo(1L));
+        Assert.That(metadata["ratio"], Is.EqualTo(1.5m));
+        Assert.That(metadata["owner"], Is.EqualTo("platform-team"));
+        Assert.That(metadata["quotedNumber"], Is.EqualTo("42"));
+    }
+
+    [Test]
+    public void LoadFromPath_HighPrecisionDecimalLiteral_DoesNotLosePrecisionThroughDouble()
+    {
+        string contractDir = Path.Combine(_tempDir, "architecture");
+        Directory.CreateDirectory(contractDir);
+        string contractPath = Path.Combine(contractDir, "dependencies.arch.yml");
+
+        File.WriteAllText(contractPath, @"
+version: 1
+name: Test Contract
+layers:
+  core:
+    namespace: Test.Core
+analysis:
+  target_assemblies:
+    - Test.Core
+classification:
+  attributes:
+    - attribute: Acme.Architecture.DomainLayerAttribute
+      role: DomainLayer
+      metadata:
+        precise: 1.23456789012345678901234
+contracts:
+  strict: []
+  audit: []
+  strict_layers: []
+  audit_layers: []
+  strict_allow_only: []
+  audit_allow_only: []
+  strict_cycles: []
+  audit_cycles: []
+  strict_method_body: []
+  audit_method_body: []
+  strict_asmdef: []
+  audit_asmdef: []
+  strict_independence: []
+  audit_independence: []
+");
+
+        ArchitectureContractDocument document = new ArchitecturePolicyDocumentLoader().Load(contractPath);
+        Dictionary<string, object> metadata = document.Classification.Attributes[0].Metadata;
+
+        Assert.That(metadata["precise"], Is.TypeOf<decimal>());
+        Assert.That(metadata["precise"], Is.EqualTo(1.23456789012345678901234m));
     }
 
     [Test]

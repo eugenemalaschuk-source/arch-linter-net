@@ -75,9 +75,13 @@ public sealed class ArchitectureValidationApplicationService(
             bool passed = allViolations.Count == 0 && execution.Cycles.Count == 0
                 && !hasBlockingUnmatched && !hasBlockingPolicyConsistency && !hasBlockingCoverage;
 
+            (IReadOnlyList<ArchitectureClassificationConflict> classificationConflicts,
+                IReadOnlyList<ArchitectureClassificationMetadataFailure> classificationMetadataFailures) = runner.Session.CheckClassificationFacts();
+
             return new ValidationOutcome(
                 passed, allViolations, execution.Cycles, coverageFindings, coverageConfig, unmatched, unmatchedConfig,
-                policyConsistencyFindings, policyConsistencyConfig, execution.CoverageSummaries);
+                policyConsistencyFindings, policyConsistencyConfig, execution.CoverageSummaries,
+                classificationConflicts, classificationMetadataFailures);
         }
     }
 

@@ -29,6 +29,9 @@ public sealed class ArchitectureContractDocument
     [YamlMember(Alias = "analysis")] public ArchitectureAnalysisConfiguration Analysis { get; set; } = new();
 
     [YamlMember(Alias = "contracts")] public ArchitectureContractGroups Contracts { get; set; } = new();
+
+    [YamlMember(Alias = "classification")]
+    public ArchitectureClassificationConfiguration Classification { get; set; } = new();
 }
 
 public sealed class ArchitectureAnalysisConfiguration
