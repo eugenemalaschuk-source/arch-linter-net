@@ -151,11 +151,15 @@ Each of `constructor[<index>]`, `property:<Name>`, and `const:<Full.Type.NAME>` 
 - **WHEN** a `const:<Full.Type.NAME>` reference does not resolve to a compile-time `const` field
 - **THEN** that metadata key is omitted from the type's assigned metadata, the type still receives the entry's declared `role`, and the failure is recorded as an explainable fact
 
-### Requirement: Selector syntax is additive to the existing layer shape
-`layers.<name>.selector` SHALL be a new optional field on the existing `layer` schema shape, sibling to `namespace`/`namespace_suffix`/`external`, requiring `role` and allowing an optional exact-match `metadata` object. A layer SHALL be permitted to declare `namespace`, `selector`, or both; `namespace`'s existing required-ness SHALL be relaxed to an alternative (`namespace` OR `selector`) without changing `namespace`'s own matching semantics.
+### Requirement: Selector syntax is additive to the existing layer shape, and namespace remains required
+`layers.<name>.selector` SHALL be a new optional field on the existing `layer` schema shape, sibling to `namespace`/`namespace_suffix`/`external`, requiring `role` and allowing an optional exact-match `metadata` object. `namespace` SHALL remain a required field on every layer; `selector` is additive alongside it, never a substitute for it — a selector-only layer (no `namespace`) is schema-invalid, because `ArchitectureLayerResolver.IsProjectType` iterates every declared layer unconditionally and evaluates `layer.GlobPattern`, which throws for an empty `Namespace` at real execution time, not only at schema-validation or YAML-load time.
 
-#### Scenario: Selector-only layer is schema-valid
+#### Scenario: Selector-only layer is rejected
 - **WHEN** a layer declares `selector` with a `role` and no `namespace`
+- **THEN** the reviewed schema SHALL reject the layer definition as invalid
+
+#### Scenario: A layer may declare namespace and selector together
+- **WHEN** a layer declares both `namespace` and `selector`
 - **THEN** the reviewed schema SHALL accept the layer definition as valid
 
 #### Scenario: Existing namespace-only layers are unaffected

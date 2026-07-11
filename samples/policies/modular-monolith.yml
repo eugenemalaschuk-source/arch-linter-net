@@ -40,10 +40,13 @@ layers:
     namespace: MyCompany.Product.Modules.Inventory.Internal
   inventory_contracts:
     namespace: MyCompany.Product.Modules.Inventory.Contracts
-  # Reserved: a selector-based layer, additive alongside namespace-based layers
-  # above. Matches by discovered role/metadata instead of namespace once #109's
-  # extraction engine and #111's selector matching land.
+  # Reserved: 'selector' is additive alongside the required 'namespace' above,
+  # not a substitute for it - a namespace-less layer would crash
+  # ArchitectureLayerResolver.IsProjectType at real execution time (it
+  # iterates every declared layer's GlobPattern unconditionally). Selector
+  # matching itself has no extraction/matching engine yet (#109/#111).
   sales_domain_by_role:
+    namespace: MyCompany.Product.Modules.Sales.Internal
     selector:
       role: DomainLayer
       metadata:

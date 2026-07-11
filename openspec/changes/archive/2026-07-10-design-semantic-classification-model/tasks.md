@@ -18,7 +18,7 @@
 
 ## 3. Interaction with existing model
 
-- [x] 3.1 Confirm `layers.<name>.namespace` required-ness relaxes to `namespace` OR `selector` without changing `namespace`'s own meaning or matching behavior.
+- [x] 3.1 Confirm `layers.<name>.namespace` stays required and `selector` is purely additive alongside it — a selector-only layer was found during review to crash `ArchitectureLayerResolver.IsProjectType` at real execution time (unconditional `GlobPattern` access on an empty `Namespace`), so `namespace` is NOT relaxed to an alternative.
 - [x] 3.2 Distinguish this design from existing point-in-time constraint families (`AttributeUsageContractFamily`, `InheritanceContractFamily`, `InterfaceImplementationContractFamily`, `TypePlacementContractFamily`) and document why classification is a separate, reusable fact layer rather than a duplicate of them.
 - [x] 3.3 Explain the coverage-integration point: a future `scope: semantic_role` variant of the architecture-coverage-model contract, reusing its existing vocabulary, owned by #114.
 
@@ -30,15 +30,16 @@
 ## 5. Schema update
 
 - [x] 5.1 Add a `classification` `$def` and its sub-shape `$defs` (`attributeClassificationEntry`, `assemblyAttributeClassificationEntry`, `inheritanceClassificationEntry`, `namespaceClassificationEntry`, `pathClassificationEntry`, `classificationOverride`, `classificationExclusion`) to `schema/dependencies.arch.schema.json`, additive only.
-- [x] 5.2 Add a `selector` `$def` and reference it from the existing `layer` `$def`; relax `layer`'s `required` to accept `namespace` OR `selector`.
+- [x] 5.2 Add a `selector` `$def` and reference it from the existing `layer` `$def` as an additive optional field; `layer`'s `required` keeps `namespace` mandatory.
 - [x] 5.3 Add `classification` to the schema root's `properties` (root `additionalProperties` stays `false`, so this is required for the section to validate).
 - [x] 5.4 Confirm the schema change is additive only and does not alter validation of any existing field for policies that declare no `classification` section and no `selector`.
 
 ## 6. Schema regression tests
 
 - [x] 6.1 Add tests to `tests/ArchLinterNet.Core.Tests/ArchitectureContractSchemaTests.cs` asserting the new `$defs`/properties exist, following the existing lightweight schema-assertion pattern.
-- [x] 6.2 Add a test asserting `layer`'s `required` accepts a `selector`-only layer definition (no `namespace`) and still accepts a `namespace`-only layer definition unchanged.
+- [x] 6.2 Add a test asserting `layer`'s `required` rejects a `selector`-only layer definition (no `namespace`), accepts `namespace`+`selector` together, and still accepts a `namespace`-only layer definition unchanged.
 - [x] 6.3 Add a test asserting `classificationExclusion` requires `reason` and `classificationOverride` requires `reason` only for namespace-scoped entries.
+- [x] 6.4 Add an execution-level regression test (not just schema/load-time) that actually exercises namespace classification (`ArchitectureLayerResolver.IsProjectType`/full validation run) with a `namespace`+`selector` layer, since schema validation and `ArchitecturePolicyDocumentLoader.Load` alone did not catch the selector-only crash found during review.
 
 ## 7. Sample policy validation
 

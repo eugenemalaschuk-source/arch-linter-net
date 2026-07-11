@@ -23,6 +23,7 @@ public sealed class ArchitectureContractSchemaTests
     private static readonly string[] _typeScopedOverrideRequired = { "type" };
     private static readonly string[] _namespaceScopedOverrideRequired = { "namespace", "reason" };
     private static readonly string[] _namespaceSuffixScopedOverrideRequired = { "namespace_suffix", "reason" };
+    private static readonly string[] _namespaceOnlyRequired = { "namespace" };
 
     private static JsonElement LoadSchema()
     {
@@ -183,7 +184,7 @@ public sealed class ArchitectureContractSchemaTests
     }
 
     [Test]
-    public void Schema_Layer_AcceptsSelectorAsAlternativeToNamespace()
+    public void Schema_Layer_AcceptsSelectorOnlyAsAdditiveToRequiredNamespace()
     {
         JsonElement schema = LoadSchema();
         JsonElement layer = schema.GetProperty("$defs").GetProperty("layer");
@@ -191,9 +192,14 @@ public sealed class ArchitectureContractSchemaTests
         Assert.That(layer.GetProperty("properties").TryGetProperty("selector", out JsonElement selectorProperty), Is.True);
         Assert.That(selectorProperty.GetProperty("$ref").GetString(), Is.EqualTo("#/$defs/selector"));
 
-        JsonElement anyOf = layer.GetProperty("anyOf");
-        Assert.That(anyOf[0].GetProperty("required")[0].GetString(), Is.EqualTo("namespace"));
-        Assert.That(anyOf[1].GetProperty("required")[0].GetString(), Is.EqualTo("selector"));
+        // 'namespace' remains mandatory: a selector-only layer would carry an empty Namespace into
+        // ArchitectureLayerResolver.IsProjectType's unconditional GlobPattern access on every declared
+        // layer and crash with InvalidNamespacePatternException at real execution time. Selector-only
+        // layers are deferred to #111, which must implement the resolution changes that requires.
+        JsonElement required = layer.GetProperty("required");
+        Assert.That(required.EnumerateArray().Select(v => v.GetString()), Is.EquivalentTo(_namespaceOnlyRequired));
+        Assert.That(layer.TryGetProperty("anyOf", out _), Is.False,
+            "layer must not accept selector as a namespace alternative until #111 implements selector-only resolution.");
     }
 
     [Test]

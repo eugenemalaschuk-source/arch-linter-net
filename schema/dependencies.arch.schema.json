@@ -79,7 +79,7 @@
     "layer": {
       "type": "object",
       "additionalProperties": false,
-      "anyOf": [{ "required": ["namespace"] }, { "required": ["selector"] }],
+      "required": ["namespace"],
       "properties": {
         "namespace": {
           "type": "string",
@@ -97,7 +97,7 @@
         },
         "selector": {
           "$ref": "#/$defs/selector",
-          "description": "Reserved for the semantic-classification-model design (schema acceptance only; no extraction or matching engine exists yet). Matches types by discovered role/metadata instead of, or in addition to, namespace. May be combined with 'namespace'; combination-resolution semantics are owned by a future selector-matching implementation."
+          "description": "Reserved for the semantic-classification-model design (schema acceptance only; no extraction or matching engine exists yet). Matches types by discovered role/metadata in addition to namespace. 'namespace' remains required: a namespace-less, selector-only layer would carry an empty Namespace into ArchitectureLayerResolver.IsProjectType's unconditional GlobPattern access on every declared layer and crash with InvalidNamespacePatternException at real execution time, not just at load time. Selector-only layers are deferred to #111, which must also implement the resolution/execution changes an empty-namespace layer requires."
         }
       }
     },

@@ -6,7 +6,7 @@ ArchLinterNet's architecture model is entirely namespace-driven today: every lay
 
 - Define the semantic-classification vocabulary: `role`, `metadata`, `source`, `evidence`, `confidence`/`precedence`, `conflict`, `override`, `exclusion`, `stale selector`, and `uncovered semantic fact`.
 - Design a new top-level `classification` YAML section (sibling to `layers`/`analysis`/`contracts`) covering: source precedence, type-attribute mappings, assembly-attribute mappings, inheritance mappings, namespace/path convention mappings, explicit overrides, and exclusions.
-- Design `layers.<name>.selector` as a new optional field on the existing `layer` shape, additive alongside `namespace`/`namespace_suffix`/`external` — `namespace`'s own required-ness, meaning, and matching behavior are unchanged for any policy that keeps using it.
+- Design `layers.<name>.selector` as a new optional field on the existing `layer` shape, additive alongside `namespace`/`namespace_suffix`/`external` — `namespace` remains **required** (not merely unchanged in meaning): a namespace-less layer would carry an empty `Namespace` into `ArchitectureLayerResolver.IsProjectType`'s unconditional `GlobPattern` access on every declared layer and crash with `InvalidNamespacePatternException` at real execution time. Selector-only layers are deferred to #111, which must implement the resolution changes an empty-namespace layer requires.
 - Define a deterministic, fixed six-tier source precedence (`yaml_override > type_attribute > assembly_attribute > inheritance > namespace > path`) and same-tier conflict resolution (first-declared-wins).
 - Define a small, deterministic metadata-extraction syntax (`constructor[<index>]`, `property:<Name>`, `const:<Full.Type.NAME>`, or a literal scalar) — no reflection DSL, no regex.
 - Define selector syntax (`role` + optional exact-match `metadata`) reusing existing glob matchers for namespace/path sources — no new pattern language.
@@ -21,11 +21,11 @@ ArchLinterNet's architecture model is entirely namespace-driven today: every lay
 - `semantic-classification-model`: The classification vocabulary, `classification` YAML shape, `layers.<name>.selector` shape, precedence/conflict rules, metadata-extraction syntax, override/exclusion rules, and coverage-integration design that #108–#114 implement against. This change defines the *shape*, not the *engine* — no attribute is read, no role is ever assigned, and no selector ever matches at runtime as a result of this change.
 
 ### Modified Capabilities
-_None._ No existing capability's requirements change; `layers.<name>.namespace` keeps its current required-ness relaxed only to accommodate the new alternative (`selector`), not altered in meaning.
+_None._ No existing capability's requirements change; `layers.<name>.namespace` keeps its current required-ness unchanged — `selector` is additive alongside it, never a substitute for it.
 
 ## Impact
 
-- `schema/dependencies.arch.schema.json`: new `$defs` for the `classification` section and its sub-shapes, a new `selector` `$def`, a relaxed `required` on the existing `layer` `$def` (`namespace` OR `selector`, additive), and a new `classification` property on the schema root. Additive only — no existing field's shape or meaning changes.
+- `schema/dependencies.arch.schema.json`: new `$defs` for the `classification` section and its sub-shapes, and a new `selector` `$def` added as an optional, additive field on the existing `layer` `$def` (`namespace` remains required), plus a new `classification` property on the schema root. Additive only — no existing field's shape or meaning changes.
 - `tests/ArchLinterNet.Core.Tests/ArchitectureContractSchemaTests.cs`: new regression tests asserting the new `$defs`/properties exist, following the existing lightweight schema-assertion pattern (no engine, no binding).
 - No changes to `src/ArchLinterNet.Core/Contracts/ArchitectureContractModels.cs` or any runtime/validation code path — this change intentionally introduces no C# binding and no runtime guard (see design.md Decision on this deviation from the #96 coverage-model precedent).
 - `docs/`: new design reference for the classification model (vocabulary, YAML shape, worked examples).

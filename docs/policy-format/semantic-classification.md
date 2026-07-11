@@ -84,7 +84,8 @@ classification:
 
 layers:
   domain:
-    selector:                 # additive alternative/complement to namespace
+    namespace: MyApp.Sales.Domain   # required - selector is additive, not a substitute
+    selector:
       role: DomainLayer
       metadata:
         domain: Sales
@@ -142,8 +143,7 @@ extraction failure as a property that does not exist at all.
 before matching**: **string** (CLR `string`; `System.Type` values as
 `Type.FullName`; enum values as their declared member name, not the
 underlying integer — but only when the underlying value maps to exactly one
-declared member; an aliased enum value, e.g. `enum Tier { Core = 1, Domain =
-1 }`, has no single correct name to canonicalize to and is an extraction
+declared member; an aliased enum value, e.g. `enum Tier { Core = 1, Domain = 1 }`, has no single correct name to canonicalize to and is an extraction
 failure rather than a guess); **boolean**; and **decimal** (every CLR numeric
 primitive — `byte`/`sbyte`/`short`/`ushort`/`int`/`uint`/`long`/`ulong`/
 `float`/`double`/`decimal` — and every YAML/JSON numeric literal), so a CLR
@@ -196,8 +196,15 @@ consideration entirely.
 
 ## `layers.<name>.selector`
 
-A layer may declare `namespace`, `selector`, or both. `selector.role` is an
-exact-match string against whatever role names `classification.attributes`/
+`namespace` remains **required** on every layer — `selector` is additive
+alongside it, never a substitute for it. A namespace-less, selector-only
+layer would carry an empty `Namespace` into
+`ArchitectureLayerResolver.IsProjectType`'s unconditional `GlobPattern` access
+on every declared layer and crash with `InvalidNamespacePatternException` at
+real execution time, not just at schema-validation or YAML-load time.
+Selector-only layers are deferred to #111, which must implement the resolver
+changes an empty-namespace layer requires. `selector.role` is an exact-match
+string against whatever role names `classification.attributes`/
 `inheritance`/`namespace`/`path`/`overrides` declare (there is no fixed role
 catalog enforced by the schema). `selector.metadata` is an optional set of
 exact-match, AND-combined key/value constraints — no wildcard or regex value
