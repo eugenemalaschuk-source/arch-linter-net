@@ -3,6 +3,20 @@
 version: 1
 name: Unity asmdef Boundaries Policy Recipe
 
+# Reserved for the semantic-classification-model design (schema acceptance only;
+# see openspec/changes/archive/2026-07-10-design-semantic-classification-model). No extraction or
+# selector-matching engine exists yet, so this section has no effect on the
+# contracts below - it illustrates a Unity/client-style policy where attributes
+# are absent entirely and precedence falls through to namespace conventions.
+classification:
+  precedence:
+    - namespace
+  namespace:
+    - namespace: MyCompany.Game.Gameplay.Runtime
+      role: GameplaySystem
+    - namespace_suffix: ViewModels
+      role: ViewModel
+
 layers:
   bootstrap:
     namespace: MyCompany.Game.Bootstrap

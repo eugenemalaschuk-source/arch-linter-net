@@ -54,6 +54,11 @@ ArchLinterNet does not currently validate:
 Coverage support currently excludes `scope: dependency_edge`, which remains reserved
 and fails validation with an actionable error.
 
+The `classification` YAML section and `layers.<name>.selector` are **schema-accepted
+but not enforced** — no extraction, role-assignment, or selector-matching engine
+exists yet, and declaring either has no effect on validation. See
+[Semantic classification (reserved)](semantic-classification.md).
+
 Assembly independence contracts detect only **direct** assembly references; transitive
 reference paths between two listed assemblies are not resolved.
 

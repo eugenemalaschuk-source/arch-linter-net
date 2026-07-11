@@ -41,7 +41,8 @@
       "default": []
     },
     "analysis": { "$ref": "#/$defs/analysis" },
-    "contracts": { "$ref": "#/$defs/contracts" }
+    "contracts": { "$ref": "#/$defs/contracts" },
+    "classification": { "$ref": "#/$defs/classification" }
   },
   "$defs": {
     "stringList": {
@@ -93,6 +94,26 @@
           "type": "boolean",
           "default": false,
           "description": "When true, suppresses the empty-layer configuration diagnostic for this layer. Use for namespaces whose assemblies may not be available in the scan environment (external SDKs, engine types, platform-conditional namespaces)."
+        },
+        "selector": {
+          "$ref": "#/$defs/selector",
+          "description": "Reserved for the semantic-classification-model design (schema acceptance only; no extraction or matching engine exists yet). Matches types by discovered role/metadata in addition to namespace. 'namespace' remains required: a namespace-less, selector-only layer would carry an empty Namespace into ArchitectureLayerResolver.IsProjectType's unconditional GlobPattern access on every declared layer and crash with InvalidNamespacePatternException at real execution time, not just at load time. Selector-only layers are deferred to #111, which must also implement the resolution/execution changes an empty-namespace layer requires."
+        }
+      }
+    },
+    "selector": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["role"],
+      "properties": {
+        "role": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Exact-match role name assigned by classification. Role names are opaque strings; no fixed role catalog is enforced by this schema."
+        },
+        "metadata": {
+          "$ref": "#/$defs/scalarMap",
+          "description": "Optional exact-match, AND-combined metadata key/value constraints. All declared keys must match."
         }
       }
     },
@@ -157,6 +178,270 @@
         "package_prefixes": {
           "$ref": "#/$defs/nonBlankStringList",
           "description": "NuGet package ID prefixes matched with exact or dot-segment child semantics (case-insensitively) against declared PackageReference items."
+        }
+      }
+    },
+    "classification": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Reserved for the semantic-classification-model design (schema acceptance only; see openspec/changes/archive/2026-07-10-design-semantic-classification-model). No extraction, role-assignment, or matching engine exists yet; declaring this section has no runtime effect.",
+      "properties": {
+        "precedence": {
+          "type": "array",
+          "description": "Subsequence of the fixed source order [yaml_override, type_attribute, assembly_attribute, inheritance, namespace, path], preserving relative order with no duplicates. Sources omitted are disabled. Defaults to all six sources in the fixed order. Enumerated as an explicit oneOf of the 63 valid ordered, duplicate-free subsequences so reordering or repeating a source is rejected by the schema.",
+          "oneOf": [
+            { "const": ["yaml_override"] },
+            { "const": ["type_attribute"] },
+            { "const": ["assembly_attribute"] },
+            { "const": ["inheritance"] },
+            { "const": ["namespace"] },
+            { "const": ["path"] },
+            { "const": ["yaml_override", "type_attribute"] },
+            { "const": ["yaml_override", "assembly_attribute"] },
+            { "const": ["yaml_override", "inheritance"] },
+            { "const": ["yaml_override", "namespace"] },
+            { "const": ["yaml_override", "path"] },
+            { "const": ["type_attribute", "assembly_attribute"] },
+            { "const": ["type_attribute", "inheritance"] },
+            { "const": ["type_attribute", "namespace"] },
+            { "const": ["type_attribute", "path"] },
+            { "const": ["assembly_attribute", "inheritance"] },
+            { "const": ["assembly_attribute", "namespace"] },
+            { "const": ["assembly_attribute", "path"] },
+            { "const": ["inheritance", "namespace"] },
+            { "const": ["inheritance", "path"] },
+            { "const": ["namespace", "path"] },
+            { "const": ["yaml_override", "type_attribute", "assembly_attribute"] },
+            { "const": ["yaml_override", "type_attribute", "inheritance"] },
+            { "const": ["yaml_override", "type_attribute", "namespace"] },
+            { "const": ["yaml_override", "type_attribute", "path"] },
+            { "const": ["yaml_override", "assembly_attribute", "inheritance"] },
+            { "const": ["yaml_override", "assembly_attribute", "namespace"] },
+            { "const": ["yaml_override", "assembly_attribute", "path"] },
+            { "const": ["yaml_override", "inheritance", "namespace"] },
+            { "const": ["yaml_override", "inheritance", "path"] },
+            { "const": ["yaml_override", "namespace", "path"] },
+            { "const": ["type_attribute", "assembly_attribute", "inheritance"] },
+            { "const": ["type_attribute", "assembly_attribute", "namespace"] },
+            { "const": ["type_attribute", "assembly_attribute", "path"] },
+            { "const": ["type_attribute", "inheritance", "namespace"] },
+            { "const": ["type_attribute", "inheritance", "path"] },
+            { "const": ["type_attribute", "namespace", "path"] },
+            { "const": ["assembly_attribute", "inheritance", "namespace"] },
+            { "const": ["assembly_attribute", "inheritance", "path"] },
+            { "const": ["assembly_attribute", "namespace", "path"] },
+            { "const": ["inheritance", "namespace", "path"] },
+            { "const": ["yaml_override", "type_attribute", "assembly_attribute", "inheritance"] },
+            { "const": ["yaml_override", "type_attribute", "assembly_attribute", "namespace"] },
+            { "const": ["yaml_override", "type_attribute", "assembly_attribute", "path"] },
+            { "const": ["yaml_override", "type_attribute", "inheritance", "namespace"] },
+            { "const": ["yaml_override", "type_attribute", "inheritance", "path"] },
+            { "const": ["yaml_override", "type_attribute", "namespace", "path"] },
+            { "const": ["yaml_override", "assembly_attribute", "inheritance", "namespace"] },
+            { "const": ["yaml_override", "assembly_attribute", "inheritance", "path"] },
+            { "const": ["yaml_override", "assembly_attribute", "namespace", "path"] },
+            { "const": ["yaml_override", "inheritance", "namespace", "path"] },
+            { "const": ["type_attribute", "assembly_attribute", "inheritance", "namespace"] },
+            { "const": ["type_attribute", "assembly_attribute", "inheritance", "path"] },
+            { "const": ["type_attribute", "assembly_attribute", "namespace", "path"] },
+            { "const": ["type_attribute", "inheritance", "namespace", "path"] },
+            { "const": ["assembly_attribute", "inheritance", "namespace", "path"] },
+            { "const": ["yaml_override", "type_attribute", "assembly_attribute", "inheritance", "namespace"] },
+            { "const": ["yaml_override", "type_attribute", "assembly_attribute", "inheritance", "path"] },
+            { "const": ["yaml_override", "type_attribute", "assembly_attribute", "namespace", "path"] },
+            { "const": ["yaml_override", "type_attribute", "inheritance", "namespace", "path"] },
+            { "const": ["yaml_override", "assembly_attribute", "inheritance", "namespace", "path"] },
+            { "const": ["type_attribute", "assembly_attribute", "inheritance", "namespace", "path"] },
+            { "const": ["yaml_override", "type_attribute", "assembly_attribute", "inheritance", "namespace", "path"] }
+          ],
+          "default": ["yaml_override", "type_attribute", "assembly_attribute", "inheritance", "namespace", "path"]
+        },
+        "attributes": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/attributeClassificationEntry" },
+          "default": []
+        },
+        "assembly_attributes": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/assemblyAttributeClassificationEntry" },
+          "default": []
+        },
+        "inheritance": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/inheritanceClassificationEntry" },
+          "default": []
+        },
+        "namespace": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/namespaceClassificationEntry" },
+          "default": []
+        },
+        "path": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/pathClassificationEntry" },
+          "default": []
+        },
+        "overrides": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/classificationOverride" },
+          "default": []
+        },
+        "exclusions": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/classificationExclusion" },
+          "default": []
+        }
+      }
+    },
+    "attributeClassificationEntry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["attribute", "role"],
+      "properties": {
+        "attribute": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Full type name of the attribute, matched against attributes declared or referenced in scanned code. No binary ArchLinterNet annotation dependency is required."
+        },
+        "role": { "type": "string", "minLength": 1 },
+        "metadata": {
+          "$ref": "#/$defs/scalarMap",
+          "description": "Values use the metadata extraction syntax: constructor[<index>], property:<Name>, const:<Full.Type.NAME> (compile-time const field only, never static readonly), or a literal scalar."
+        }
+      }
+    },
+    "assemblyAttributeClassificationEntry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["attribute", "role"],
+      "properties": {
+        "attribute": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Full type name of the assembly-level attribute providing bulk defaults for a project or bounded context."
+        },
+        "role": { "type": "string", "minLength": 1 },
+        "metadata": { "$ref": "#/$defs/scalarMap" }
+      }
+    },
+    "inheritanceClassificationEntry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["base_type", "role"],
+      "properties": {
+        "base_type": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Full name of a base type or interface. Types deriving from or implementing this are assigned the declared role/metadata."
+        },
+        "role": { "type": "string", "minLength": 1 },
+        "metadata": {
+          "$ref": "#/$defs/scalarMap",
+          "description": "Inheritance evidence carries no constructor/property arguments; values must be literal scalars or const:<Full.Type.NAME> references to a compile-time const field (never static readonly)."
+        }
+      }
+    },
+    "namespaceClassificationEntry": {
+      "type": "object",
+      "additionalProperties": false,
+      "anyOf": [{ "required": ["namespace"] }, { "required": ["namespace_suffix"] }],
+      "required": ["role"],
+      "properties": {
+        "namespace": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Same namespace glob syntax already accepted by layers.<name>.namespace."
+        },
+        "namespace_suffix": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Same namespace-suffix syntax already accepted by layers.<name>.namespace_suffix."
+        },
+        "role": { "type": "string", "minLength": 1 },
+        "metadata": { "$ref": "#/$defs/scalarMap" }
+      }
+    },
+    "pathClassificationEntry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path_prefix", "role"],
+      "properties": {
+        "path_prefix": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Repository-relative source path prefix."
+        },
+        "role": { "type": "string", "minLength": 1 },
+        "metadata": { "$ref": "#/$defs/scalarMap" }
+      }
+    },
+    "classificationOverride": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["role"],
+      "description": "Exactly one of 'type', 'namespace', or 'namespace_suffix' must be declared - scopes are mutually exclusive, not combinable. 'reason' is required whenever 'namespace' or 'namespace_suffix' is the declared scope, and forbidden from substituting for a missing scope.",
+      "oneOf": [
+        {
+          "required": ["type"],
+          "not": { "anyOf": [{ "required": ["namespace"] }, { "required": ["namespace_suffix"] }] }
+        },
+        {
+          "required": ["namespace", "reason"],
+          "not": { "anyOf": [{ "required": ["type"] }, { "required": ["namespace_suffix"] }] }
+        },
+        {
+          "required": ["namespace_suffix", "reason"],
+          "not": { "anyOf": [{ "required": ["type"] }, { "required": ["namespace"] }] }
+        }
+      ],
+      "properties": {
+        "type": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Narrow, type-scoped override. Full type name. 'reason' is optional at this scope. Mutually exclusive with 'namespace'/'namespace_suffix'."
+        },
+        "namespace": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Broad, namespace-scoped override. 'reason' is required at this scope. Mutually exclusive with 'type'/'namespace_suffix'."
+        },
+        "namespace_suffix": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Broad, namespace-suffix-scoped override. 'reason' is required at this scope. Mutually exclusive with 'type'/'namespace'."
+        },
+        "role": { "type": "string", "minLength": 1 },
+        "metadata": { "$ref": "#/$defs/scalarMap" },
+        "reason": { "type": "string", "minLength": 1 }
+      }
+    },
+    "classificationExclusion": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["reason"],
+      "description": "Exactly one of 'type', 'namespace', or 'namespace_suffix' must be declared - scopes are mutually exclusive, not combinable.",
+      "oneOf": [
+        {
+          "required": ["type"],
+          "not": { "anyOf": [{ "required": ["namespace"] }, { "required": ["namespace_suffix"] }] }
+        },
+        {
+          "required": ["namespace"],
+          "not": { "anyOf": [{ "required": ["type"] }, { "required": ["namespace_suffix"] }] }
+        },
+        {
+          "required": ["namespace_suffix"],
+          "not": { "anyOf": [{ "required": ["type"] }, { "required": ["namespace"] }] }
+        }
+      ],
+      "properties": {
+        "type": { "type": "string", "minLength": 1 },
+        "namespace": { "type": "string", "minLength": 1 },
+        "namespace_suffix": { "type": "string", "minLength": 1 },
+        "reason": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Always required, regardless of scope."
         }
       }
     },

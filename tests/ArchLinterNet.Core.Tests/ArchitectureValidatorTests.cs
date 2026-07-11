@@ -63,6 +63,52 @@ contracts:
         Assert.That(cycles, Is.Empty);
     }
 
+    // Regression coverage for the semantic-classification-model design
+    // (openspec/changes/archive/2026-07-10-design-semantic-classification-model): a review round
+    // found that an earlier revision allowed a selector-only layer (no 'namespace'), which loaded
+    // successfully but crashed ArchitectureLayerResolver.IsProjectType at real execution time (it
+    // iterates every declared layer unconditionally and evaluates layer.GlobPattern, which throws
+    // for an empty Namespace). Schema-validation and ArchitecturePolicyDocumentLoader.Load alone did
+    // not catch this because IsProjectType is only reached via a real validation run. This test
+    // exercises that real path - not just Load() - with a layer declaring both 'namespace' and
+    // 'selector' (the only schema-valid combination now that 'namespace' is required again).
+    [Test]
+    public void Validate_LayerDeclaresNamespaceAndSelector_ValidatesWithoutThrowing()
+    {
+        string contractDir = Path.Combine(_tempDir, "architecture");
+        Directory.CreateDirectory(contractDir);
+        string contractPath = Path.Combine(contractDir, "dependencies.arch.yml");
+
+        File.WriteAllText(contractPath, @"
+version: 1
+name: Namespace And Selector Test
+classification:
+  attributes:
+    - attribute: Acme.DomainLayerAttribute
+      role: DomainLayer
+layers:
+  core:
+    namespace: ArchLinterNet.Core
+    selector:
+      role: DomainLayer
+analysis:
+  target_assemblies:
+    - ArchLinterNet.Core
+contracts:
+  strict: []
+  strict_layers: []
+  strict_allow_only: []
+  strict_cycles: []
+  strict_method_body: []
+  strict_asmdef: []
+  strict_independence: []
+");
+
+        bool result = false;
+        Assert.DoesNotThrow(() => result = ArchitectureValidator.Validate(contractPath, out _, out _));
+        Assert.That(result, Is.True);
+    }
+
     [Test]
     public void Validate_ThreeArgOverload_ReturnsViolationsAndCycles()
     {

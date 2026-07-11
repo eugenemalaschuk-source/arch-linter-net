@@ -156,6 +156,64 @@ contracts:
             new ArchitecturePolicyDocumentLoader().Load(contractPath));
     }
 
+    // Regression coverage for the semantic-classification-model design
+    // (openspec/changes/archive/2026-07-10-design-semantic-classification-model): the reviewed
+    // design requires that a policy declaring the reserved `classification` section or
+    // `layers.<name>.selector` field loads exactly as if the field were absent, since no C#
+    // binding exists yet and the loader's IgnoreUnmatchedProperties() drops unrecognized keys.
+    // This asserts that behavior against the real loader, not just the JSON schema.
+    [Test]
+    public void LoadFromPath_ReservedClassificationSectionAndSelectorField_LoadsWithoutThrowing()
+    {
+        string contractDir = Path.Combine(_tempDir, "architecture");
+        Directory.CreateDirectory(contractDir);
+        string contractPath = Path.Combine(contractDir, "dependencies.arch.yml");
+
+        File.WriteAllText(contractPath, @"
+version: 1
+name: Reserved Classification Fields
+classification:
+  attributes:
+    - attribute: Acme.DomainLayerAttribute
+      role: DomainLayer
+  overrides:
+    - namespace: Test.Legacy
+      role: Unclassified
+      reason: Predates attribute adoption.
+layers:
+  core:
+    namespace: Test.Core
+    selector:
+      role: DomainLayer
+      metadata:
+        domain: Sales
+analysis:
+  target_assemblies:
+    - Test.Core
+contracts:
+  strict: []
+  audit: []
+  strict_layers: []
+  audit_layers: []
+  strict_allow_only: []
+  audit_allow_only: []
+  strict_cycles: []
+  audit_cycles: []
+  strict_method_body: []
+  audit_method_body: []
+  strict_asmdef: []
+  audit_asmdef: []
+  strict_independence: []
+  audit_independence: []
+");
+
+        ArchitectureContractDocument? document = null;
+
+        Assert.DoesNotThrow(() => document = new ArchitecturePolicyDocumentLoader().Load(contractPath));
+        Assert.That(document!.Version, Is.EqualTo(1));
+        Assert.That(document.Layers["core"].Namespace, Is.EqualTo("Test.Core"));
+    }
+
     [Test]
     public void LoadFromPath_DuplicateIdsAndUnrelatedFamilyInvalid_ThrowsDuplicateIdErrorFirst()
     {
