@@ -447,6 +447,34 @@ public sealed class ArchitectureAttributeRoleExtractorTests
         Assert.That(result.Role, Is.EqualTo("DomainLayer"));
         Assert.That(result.Metadata["domain"], Is.EqualTo("Sales"));
         Assert.That(result.Conflicts, Has.Count.EqualTo(1));
+        Assert.That(result.Conflicts[0].WinningRole, Is.EqualTo("DomainLayer"));
+        Assert.That(result.Conflicts[0].DiscardedRole, Is.EqualTo("DomainLayer"));
+        Assert.That(result.Conflicts[0].MetadataDetail, Does.Contain("domain: 'Sales' vs 'Marketing'"));
+    }
+
+    [Test]
+    public void Extract_MultipleDistinctMetadataOnlyConflictsOnOneSubject_AllRecordedWithDistinctDetail()
+    {
+        var configuration = new ArchitectureClassificationConfiguration
+        {
+            Attributes =
+            {
+                DomainMapping(metadata: new Dictionary<string, object> { ["domain"] = "constructor[0]" })
+            }
+        };
+
+        ArchitectureTypeClassificationResult result = CreateExtractor(configuration).Extract(typeof(TypeWithThreeDifferingRepeatedInstances));
+
+        Assert.That(result.Conflicts, Has.Count.EqualTo(2));
+        List<string?> details = result.Conflicts.Select(c => c.MetadataDetail).ToList();
+        Assert.That(details, Does.Contain("domain: 'Sales' vs 'Marketing'"));
+        Assert.That(details, Does.Contain("domain: 'Sales' vs 'Engineering'"));
+
+        // Distinct MetadataDetail keeps otherwise-identical conflict facts (same subject/source/role)
+        // from collapsing when a downstream consumer deduplicates via a HashSet, e.g.
+        // ArchitectureAnalysisSession.CheckClassificationFacts.
+        var deduplicated = new HashSet<ArchitectureClassificationConflict>(result.Conflicts);
+        Assert.That(deduplicated, Has.Count.EqualTo(2));
     }
 
     [Test]

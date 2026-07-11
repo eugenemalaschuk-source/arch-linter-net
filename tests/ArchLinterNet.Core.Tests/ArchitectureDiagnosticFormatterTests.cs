@@ -265,7 +265,7 @@ public sealed class ArchitectureDiagnosticFormatterTests
         var conflicts = new[]
         {
             new Model.ArchitectureClassificationConflict(
-                "MyApp.Order", Model.ArchitectureClassificationSource.TypeAttribute, "DomainLayer", "InfrastructureLayer")
+                "MyApp.Order", Model.ArchitectureClassificationSource.TypeAttribute, "DomainLayer", "InfrastructureLayer", null)
         };
         var failures = new[]
         {
@@ -286,6 +286,50 @@ public sealed class ArchitectureDiagnosticFormatterTests
             classificationConflicts: conflicts, classificationMetadataFailures: failures));
         Assert.That(json.RootElement.GetProperty("classification_conflicts")[0].GetProperty("subject").GetString(), Is.EqualTo("MyApp.Order"));
         Assert.That(json.RootElement.GetProperty("classification_metadata_failures")[0].GetProperty("metadata_key").GetString(), Is.EqualTo("module"));
+    }
+
+    [Test]
+    public void FormatClassificationFactsForHumans_MetadataOnlyConflict_IncludesMetadataDetail()
+    {
+        var conflicts = new[]
+        {
+            new Model.ArchitectureClassificationConflict(
+                "MyApp.Order", Model.ArchitectureClassificationSource.TypeAttribute, "DomainLayer", "DomainLayer",
+                "domain: 'Sales' vs 'Marketing'")
+        };
+
+        string human = _formatter.FormatClassificationFactsForHumans(conflicts, Array.Empty<Model.ArchitectureClassificationMetadataFailure>());
+
+        Assert.That(human, Does.Contain("kept 'DomainLayer', discarded 'DomainLayer'"));
+        Assert.That(human, Does.Contain("domain: 'Sales' vs 'Marketing'"));
+
+        using var json = JsonDocument.Parse(_formatter.FormatResultForCiArtifacts(
+            "strict", true, Array.Empty<ArchitectureViolation>(), Array.Empty<string>(),
+            classificationConflicts: conflicts));
+        Assert.That(
+            json.RootElement.GetProperty("classification_conflicts")[0].GetProperty("metadata_detail").GetString(),
+            Is.EqualTo("domain: 'Sales' vs 'Marketing'"));
+    }
+
+    [Test]
+    public void FormatClassificationFactsForHumans_MultipleConflicts_OrdersDeterministically()
+    {
+        var conflicts = new[]
+        {
+            new Model.ArchitectureClassificationConflict(
+                "MyApp.Order", Model.ArchitectureClassificationSource.TypeAttribute, "DomainLayer", "DomainLayer",
+                "domain: 'Sales' vs 'Marketing'"),
+            new Model.ArchitectureClassificationConflict(
+                "MyApp.Order", Model.ArchitectureClassificationSource.TypeAttribute, "DomainLayer", "DomainLayer",
+                "domain: 'Sales' vs 'Engineering'")
+        };
+
+        string firstOrder = _formatter.FormatClassificationFactsForHumans(
+            conflicts, Array.Empty<Model.ArchitectureClassificationMetadataFailure>());
+        string reversedOrder = _formatter.FormatClassificationFactsForHumans(
+            conflicts.Reverse().ToArray(), Array.Empty<Model.ArchitectureClassificationMetadataFailure>());
+
+        Assert.That(firstOrder, Is.EqualTo(reversedOrder));
     }
 
     [Test]

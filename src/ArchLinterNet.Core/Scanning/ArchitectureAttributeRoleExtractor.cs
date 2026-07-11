@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Linq;
 using System.Reflection;
 using ArchLinterNet.Core.Contracts;
@@ -119,7 +120,8 @@ public sealed class ArchitectureAttributeRoleExtractor
             }
             else if (!RoleMetadataEqual(winningRole, winningMetadata, entryResult.Role, entryResult.Metadata))
             {
-                conflicts.Add(new ArchitectureClassificationConflict(subject, source, winningRole, entryResult.Role));
+                conflicts.Add(new ArchitectureClassificationConflict(
+                    subject, source, winningRole, entryResult.Role, DescribeMetadataDiff(winningMetadata, entryResult.Metadata)));
             }
         }
 
@@ -141,7 +143,8 @@ public sealed class ArchitectureAttributeRoleExtractor
             IReadOnlyDictionary<string, object> instanceMetadata = ExtractMetadata(matchedInstances[i], mapping, source, subject, failures);
             if (!RoleMetadataEqual(mapping.Role, firstMetadata, mapping.Role, instanceMetadata))
             {
-                conflicts.Add(new ArchitectureClassificationConflict(subject, source, mapping.Role, mapping.Role));
+                conflicts.Add(new ArchitectureClassificationConflict(
+                    subject, source, mapping.Role, mapping.Role, DescribeMetadataDiff(firstMetadata, instanceMetadata)));
             }
         }
 
@@ -228,6 +231,40 @@ public sealed class ArchitectureAttributeRoleExtractor
 
         return true;
     }
+
+    // Sorted so the description (and therefore the conflict record's equality/hash, used for
+    // dedup) is deterministic regardless of dictionary enumeration order.
+    private static string? DescribeMetadataDiff(
+        IReadOnlyDictionary<string, object> winning, IReadOnlyDictionary<string, object> discarded)
+    {
+        SortedSet<string> keys = new(StringComparer.Ordinal);
+        keys.UnionWith(winning.Keys);
+        keys.UnionWith(discarded.Keys);
+
+        List<string> differences = new();
+        foreach (string key in keys)
+        {
+            bool hasWinning = winning.TryGetValue(key, out object? winningValue);
+            bool hasDiscarded = discarded.TryGetValue(key, out object? discardedValue);
+            if (hasWinning && hasDiscarded && winningValue!.Equals(discardedValue))
+            {
+                continue;
+            }
+
+            string winningText = hasWinning ? FormatMetadataValue(winningValue!) : "<absent>";
+            string discardedText = hasDiscarded ? FormatMetadataValue(discardedValue!) : "<absent>";
+            differences.Add($"{key}: {winningText} vs {discardedText}");
+        }
+
+        return differences.Count == 0 ? null : string.Join("; ", differences);
+    }
+
+    private static string FormatMetadataValue(object value) => value switch
+    {
+        string s => $"'{s}'",
+        bool b => b ? "true" : "false",
+        _ => Convert.ToString(value, CultureInfo.InvariantCulture) ?? "<null>"
+    };
 
     private static bool MatchesAttributeType(CustomAttributeData data, string fullTypeName)
     {

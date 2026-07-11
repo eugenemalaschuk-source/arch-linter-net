@@ -124,6 +124,11 @@ namespace AttributeRoleExtractionTestFixtures
     [DomainMarker("Marketing")]
     public sealed class TypeWithDifferingRepeatedInstances;
 
+    [DomainMarker("Sales")]
+    [DomainMarker("Marketing")]
+    [DomainMarker("Engineering")]
+    public sealed class TypeWithThreeDifferingRepeatedInstances;
+
     public sealed class TypeRelyingOnAssemblyAttribute;
 
     [DomainMarker("Sales")]

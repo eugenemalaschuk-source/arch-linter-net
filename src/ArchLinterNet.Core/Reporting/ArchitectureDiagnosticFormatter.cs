@@ -174,7 +174,9 @@ public sealed class ArchitectureDiagnosticFormatter : IArchitectureDiagnosticFor
         var conflictLines = conflicts
             .OrderBy(c => c.Subject, StringComparer.Ordinal)
             .ThenBy(c => c.Source)
-            .Select(c => $"  conflict: [{c.Source}] {c.Subject}: kept '{c.WinningRole}', discarded '{c.DiscardedRole}'");
+            .ThenBy(c => c.MetadataDetail, StringComparer.Ordinal)
+            .Select(c => $"  conflict: [{c.Source}] {c.Subject}: kept '{c.WinningRole}', discarded '{c.DiscardedRole}'"
+                + (c.MetadataDetail != null ? $" ({c.MetadataDetail})" : string.Empty));
 
         var failureLines = metadataFailures
             .OrderBy(f => f.Subject, StringComparer.Ordinal)
@@ -216,12 +218,14 @@ public sealed class ArchitectureDiagnosticFormatter : IArchitectureDiagnosticFor
 
         var classificationConflictsSerialized = (classificationConflicts ?? Array.Empty<ArchitectureClassificationConflict>())
             .OrderBy(c => c.Subject, StringComparer.Ordinal)
+            .ThenBy(c => c.MetadataDetail, StringComparer.Ordinal)
             .Select(c => new
             {
                 subject = c.Subject,
                 source = c.Source.ToString(),
                 winning_role = c.WinningRole,
-                discarded_role = c.DiscardedRole
+                discarded_role = c.DiscardedRole,
+                metadata_detail = c.MetadataDetail
             })
             .ToArray();
 

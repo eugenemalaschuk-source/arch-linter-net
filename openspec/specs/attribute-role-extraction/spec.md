@@ -66,6 +66,17 @@ When a `const:<Full.Type.NAME>` reference's type-name portion matches more than 
 - **WHEN** two distinct types share the full name referenced by a `const:<Full.Type.NAME>` metadata expression
 - **THEN** the referenced metadata key is omitted, the failure is recorded as a fact, and the role assignment from the matching source still proceeds
 
+### Requirement: Conflict facts record which metadata differed, not only role names
+A recorded conflict fact SHALL include a description of every metadata key whose value differed between the winning and discarded candidates, in addition to the winning and discarded role names. When two candidates share the same role and differ only in metadata, the fact SHALL still convey that difference rather than reporting an uninformative role-only comparison.
+
+#### Scenario: Metadata-only conflict describes the differing key and values
+- **WHEN** two candidates for one subject/source resolve to the same role but differing metadata for one key
+- **THEN** the recorded conflict fact identifies that key and both competing values, not just the (identical) winning and discarded role names
+
+#### Scenario: Distinct metadata-only conflicts on one subject are not merged
+- **WHEN** more than one metadata-only conflict is recorded for the same subject, source, and role pair (e.g. from three or more repeated attribute instances), each with different competing metadata
+- **THEN** every distinct conflict SHALL be preserved as a separate fact, including through any downstream deduplication (e.g. deduplicating recurring assembly-level facts across scanned types) — deduplication SHALL only collapse facts describing the exact same conflict
+
 ### Requirement: Same-tier attribute mapping conflicts resolve by YAML declaration order
 When two or more entries within the same mapping list (`classification.attributes` or, separately, `classification.assembly_attributes`) match attributes present on one type or assembly with contradictory role/metadata, the extraction engine SHALL select the first-declared entry's role/metadata and SHALL record the discarded alternative as a conflict fact.
 

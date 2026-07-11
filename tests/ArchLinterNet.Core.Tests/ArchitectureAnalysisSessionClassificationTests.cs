@@ -81,6 +81,33 @@ public sealed class ArchitectureAnalysisSessionClassificationTests
     }
 
     [Test]
+    public void CheckClassificationFacts_DistinctMetadataOnlyConflictsOnOneType_SurviveDeduplication()
+    {
+        var classification = new ArchitectureClassificationConfiguration
+        {
+            Attributes =
+            {
+                new ArchitectureAttributeClassificationMapping
+                {
+                    Attribute = "AttributeRoleExtractionTestFixtures.DomainMarkerAttribute",
+                    Role = "DomainLayer",
+                    Metadata = new Dictionary<string, object> { ["domain"] = "constructor[0]" }
+                }
+            }
+        };
+
+        (IReadOnlyList<Model.ArchitectureClassificationConflict> conflicts, _) = CreateSession(classification).CheckClassificationFacts();
+
+        List<Model.ArchitectureClassificationConflict> subjectConflicts = conflicts
+            .Where(c => c.Subject == "AttributeRoleExtractionTestFixtures.TypeWithThreeDifferingRepeatedInstances")
+            .ToList();
+
+        Assert.That(subjectConflicts, Has.Count.EqualTo(2));
+        Assert.That(subjectConflicts.Select(c => c.MetadataDetail), Does.Contain("domain: 'Sales' vs 'Marketing'"));
+        Assert.That(subjectConflicts.Select(c => c.MetadataDetail), Does.Contain("domain: 'Sales' vs 'Engineering'"));
+    }
+
+    [Test]
     public void CheckClassificationFacts_NoClassificationConfigured_ReturnsEmpty()
     {
         (IReadOnlyList<Model.ArchitectureClassificationConflict> conflicts,
