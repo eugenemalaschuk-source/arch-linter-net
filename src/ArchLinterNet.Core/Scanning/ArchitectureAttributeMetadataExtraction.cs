@@ -64,13 +64,13 @@ internal static class ArchitectureAttributeMetadataExtraction
     {
         string name = expression[PropertyPrefix.Length..];
 
-        foreach (CustomAttributeNamedArgument namedArgument in
-                 attributeData.NamedArguments.Where(a => string.Equals(a.MemberName, name, StringComparison.Ordinal)))
-        {
-            return CanonicalizeTypedArgument(namedArgument.TypedValue);
-        }
+        CustomAttributeNamedArgument[] matches = attributeData.NamedArguments
+            .Where(a => string.Equals(a.MemberName, name, StringComparison.Ordinal))
+            .ToArray();
 
-        return (null, $"named argument '{name}' was not explicitly supplied on this attribute usage");
+        return matches.Length > 0
+            ? CanonicalizeTypedArgument(matches[0].TypedValue)
+            : (null, $"named argument '{name}' was not explicitly supplied on this attribute usage");
     }
 
     private static (object? Canonical, string? FailureReason) ExtractConstReference(
@@ -124,7 +124,7 @@ internal static class ArchitectureAttributeMetadataExtraction
         }
     }
 
-    // C# const decimal fields are not IL literal fields, since decimal has no ECMA constant encoding;
+    // C# const decimal fields are not IL literal fields, since decimal has no ECMA constant encoding; // NOSONAR: prose, not commented-out code
     // the compiler instead marks them static initonly and attaches a DecimalConstantAttribute. Both
     // shapes count as compile-time const here; static readonly without DecimalConstantAttribute does not.
     private static bool TryReadConstFieldValue(FieldInfo field, out object? raw)
