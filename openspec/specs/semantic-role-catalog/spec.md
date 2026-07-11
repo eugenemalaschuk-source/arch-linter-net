@@ -76,5 +76,5 @@ The semantic role catalog's first wave SHALL approve no ArchLinterNet-provided a
 
 #### Scenario: A reader looks for an annotation package
 - **WHEN** a reader searches the catalog or policy-format documentation for an installable ArchLinterNet annotation package
-- **THEN** the documentation states that no binary or source-only package exists in this wave, explains the trade-offs of user-owned attributes versus a future package, and confirms user-defined attributes mapped by full type name remain fully supported today
+- **THEN** the documentation states that no binary or source-only package exists in this wave, explains the trade-offs of user-owned attributes versus a future package, and confirms the reviewed YAML mapping shape supports user-defined attributes mapped by full type name today — while noting that runtime extraction against scanned code is not yet implemented (tracked by #109)
 

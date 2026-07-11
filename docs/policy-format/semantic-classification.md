@@ -245,7 +245,7 @@ concrete adoption need emerges. It is not the default path today.
 
 | Path | Dependency footprint | Setup cost | Versioning | Status |
 |---|---|---|---|---|
-| User-owned attribute | None — the attribute lives in the adopting project's own code | One small attribute class, written once | Fully owned by the adopting project; never breaks on an ArchLinterNet release | **Recommended adoption path** — schema/design reviewed; runtime extraction not yet implemented ([Current limits](#current-limits)) |
+| User-owned attribute | None — the attribute lives in the adopting project's own code | One small attribute class, written once | No annotation-package version coupling; YAML and extraction compatibility still follow ArchLinterNet's own compatibility policy | **Recommended adoption path** — schema/design reviewed; runtime extraction not yet implemented ([Current limits](#current-limits)) |
 | Source-only annotation package | No runtime assembly reference, but still a versioned artifact ArchLinterNet must design, ship, and support | Add a package reference; attribute ships pre-written | Coupled to ArchLinterNet's release/compatibility policy | Not shipped; possible future convenience |
 | Binary annotation package | Adds a compile-time (and possibly runtime/dependency-graph) reference to `ArchLinterNet.Annotations` in every consuming project | Add a package reference; attribute ships pre-written | Coupled to ArchLinterNet's release/compatibility policy | Not shipped; explicitly ruled out as a default or required path |
 
