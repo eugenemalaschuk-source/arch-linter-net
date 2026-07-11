@@ -1,11 +1,11 @@
-using ArchLinterNet.Core.Asmdef;
 using ArchLinterNet.Core.Composition;
+using ArchLinterNet.Core.Model;
 
-namespace ArchLinterNet.Unity;
+namespace ArchLinterNet.Core.Asmdef;
 
 public static class AsmdefValidator
 {
-    private static readonly Lazy<ArchitectureEngine> _engine =
+    private static readonly Lazy<ArchitectureEngine> _defaultEngine =
         new(() => new ArchitectureEngineBuilder().AddArchLinterNetCore().Build());
 
     public static bool Validate(string contractPath)
@@ -13,9 +13,11 @@ public static class AsmdefValidator
         return Validate(contractPath, out _);
     }
 
-    public static bool Validate(string contractPath, out IReadOnlyCollection<Core.Model.ArchitectureViolation> violations)
+    public static bool Validate(
+        string contractPath,
+        out IReadOnlyCollection<ArchitectureViolation> violations)
     {
-        AsmdefValidationOutcome outcome = _engine.Value.ValidateAsmdef(new AsmdefValidationRequest
+        AsmdefValidationOutcome outcome = _defaultEngine.Value.ValidateAsmdef(new AsmdefValidationRequest
         {
             PolicyPath = contractPath,
         });

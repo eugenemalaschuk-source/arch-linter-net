@@ -1,0 +1,64 @@
+name: Package Validation
+
+on:
+  pull_request:
+
+concurrency:
+  group: package-validation-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  validate_packages:
+    name: Validate NuGet Packages
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
+        with:
+          persist-credentials: false
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Restore
+        run: make restore
+
+      - name: Pack and verify package set
+        shell: bash
+        run: |
+          rm -rf nupkg
+          make pack
+
+          mapfile -t packages < <(find nupkg -maxdepth 1 -type f -name '*.nupkg' -printf '%f\n' | sort)
+          printf 'Produced packages:\n%s\n' "${packages[*]}"
+
+          if [ "${#packages[@]}" -ne 3 ]; then
+            echo "Expected exactly 3 NuGet packages, found ${#packages[@]}." >&2
+            exit 1
+          fi
+
+          for package_id in ArchLinterNet.Core ArchLinterNet.Cli ArchLinterNet.Testing; do
+            matches=0
+            for package in "${packages[@]}"; do
+              if [[ "$package" == "$package_id".*.nupkg ]]; then
+                matches=$((matches + 1))
+              fi
+            done
+
+            if [ "$matches" -ne 1 ]; then
+              echo "Expected exactly one package for $package_id, found $matches." >&2
+              exit 1
+            fi
+          done
+
+          if printf '%s\n' "${packages[@]}" | grep -q '^ArchLinterNet\.Unity\.'; then
+            echo 'ArchLinterNet.Unity package must not be produced.' >&2
+            exit 1
+          fi
