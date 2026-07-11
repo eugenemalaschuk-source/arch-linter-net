@@ -141,15 +141,18 @@ extraction failure as a property that does not exist at all.
 **Metadata values are canonicalized into exactly three comparable domains
 before matching**: **string** (CLR `string`; `System.Type` values as
 `Type.FullName`; enum values as their declared member name, not the
-underlying integer); **boolean**; and **decimal** (every CLR numeric
+underlying integer — but only when the underlying value maps to exactly one
+declared member; an aliased enum value, e.g. `enum Tier { Core = 1, Domain =
+1 }`, has no single correct name to canonicalize to and is an extraction
+failure rather than a guess); **boolean**; and **decimal** (every CLR numeric
 primitive — `byte`/`sbyte`/`short`/`ushort`/`int`/`uint`/`long`/`ulong`/
 `float`/`double`/`decimal` — and every YAML/JSON numeric literal), so a CLR
 `int` `1` and a YAML `1.0` canonicalize to the same value and compare equal.
 A `const decimal` field canonicalizes trivially, since `decimal` is already
 the canonical domain's own representation. Arrays, other attribute-typed
-values, `null`, unmapped enum values, and non-`decimal`-representable numbers
-(`NaN`, `Infinity`) have no representation in any of the three domains and are
-an extraction failure, the same as an unresolved reference.
+values, `null`, unmapped/aliased enum values, and non-`decimal`-representable
+numbers (`NaN`, `Infinity`) have no representation in any of the three
+domains and are an extraction failure, the same as an unresolved reference.
 
 **Evidence-extraction failure is uniform across all three evidence-referencing
 forms and every canonicalization failure above, and never blocks role

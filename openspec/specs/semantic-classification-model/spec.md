@@ -8,13 +8,17 @@ The semantic classification model SHALL define exactly ten classification terms 
 
 #### Scenario: Uncovered semantic fact is distinguished from an unclassified type
 - **WHEN** a type receives a role/metadata assignment from some classification source
-- **AND** no `layers.<name>.selector` matches that role/metadata and no `exclusion` names the type
+- **AND** no coverage-participating construct consumes that role/metadata and no `exclusion` names the type
 - **THEN** the model classifies this as an `uncovered semantic fact`, a status distinct from a type that received no role at all
 
 #### Scenario: An override-assigned role does not by itself exempt a type from coverage
 - **WHEN** a type's role/metadata was assigned by a `classification.overrides` entry
-- **AND** no `layers.<name>.selector` matches that role/metadata and no `exclusion` names the type
+- **AND** no coverage-participating construct consumes that role/metadata and no `exclusion` names the type
 - **THEN** the model SHALL still classify this as an `uncovered semantic fact` — `override` is a classification source, not a coverage-exemption mechanism, and only `exclusion` removes a type from coverage consideration
+
+#### Scenario: Consumption is not hard-coded to layers.<name>.selector alone
+- **WHEN** #111/#112 introduce a contextual contract construct that references a discovered role/metadata value directly, without that role/metadata also being matched by a `layers.<name>.selector`
+- **THEN** the reviewed design requires that construct to count as a coverage-participating consumer identically to a selector match — a type consumed only by such a direct reference SHALL NOT be classified as an `uncovered semantic fact`
 
 #### Scenario: Stale selector is distinguished from an unmatched namespace layer
 - **WHEN** a `layers.<name>.selector`'s `role`/`metadata` criteria match zero types classified by the model
@@ -106,11 +110,15 @@ Each `metadata.<key>` value SHALL be interpreted using exactly one of four forms
 - **THEN** extraction SHALL NOT instantiate the attribute or read `Module`'s declared default/initializer value, and this resolves as the same evidence-extraction failure as a nonexistent property
 
 ### Requirement: Metadata values are canonicalized into a fixed set of comparable domains
-Every metadata value — extracted or literal — SHALL be canonicalized into exactly one of three domains before comparison: **string** (CLR `string`; `System.Type` canonicalized to `Type.FullName`; enum values canonicalized to their declared member name), **boolean**, or **decimal** (every CLR numeric primitive — `byte`, `sbyte`, `short`, `ushort`, `int`, `uint`, `long`, `ulong`, `float`, `double`, and `decimal` itself — and every YAML/JSON numeric literal canonicalized to `decimal`). A value with no representation in any of these three domains SHALL be treated as an evidence-extraction failure.
+Every metadata value — extracted or literal — SHALL be canonicalized into exactly one of three domains before comparison: **string** (CLR `string`; `System.Type` canonicalized to `Type.FullName`; enum values canonicalized to their declared member name, but only when the underlying value maps to exactly one declared member — an ambiguous/aliased underlying value is an evidence-extraction failure, never a guessed name), **boolean**, or **decimal** (every CLR numeric primitive — `byte`, `sbyte`, `short`, `ushort`, `int`, `uint`, `long`, `ulong`, `float`, `double`, and `decimal` itself — and every YAML/JSON numeric literal canonicalized to `decimal`). A value with no representation in any of these three domains SHALL be treated as an evidence-extraction failure.
 
 #### Scenario: Enum values canonicalize to their declared member name, not the underlying integer
-- **WHEN** an extracted metadata value is an enum instance
-- **THEN** the canonical value SHALL be the enum's declared member name (a string), not its underlying numeric representation
+- **WHEN** an extracted metadata value is an enum instance whose underlying value maps to exactly one declared member
+- **THEN** the canonical value SHALL be that declared member's name (a string), not its underlying numeric representation
+
+#### Scenario: Aliased enum values are an evidence-extraction failure, never a guessed name
+- **WHEN** an extracted metadata value is an enum instance whose underlying value maps to two or more declared members (an aliased value, e.g. `enum Tier { Core = 1, Domain = 1 }`)
+- **THEN** extraction SHALL NOT pick one declared member name arbitrarily; this resolves as the same evidence-extraction failure as an unmapped enum value
 
 #### Scenario: System.Type values canonicalize to their full type name
 - **WHEN** an extracted metadata value is a `System.Type` instance
@@ -188,10 +196,10 @@ Every `classification.exclusions` entry SHALL require a non-empty `reason` field
 - **THEN** the reviewed schema SHALL reject the document as invalid
 
 ### Requirement: Classification interacts with coverage through an aligned, not parallel, vocabulary
-The design SHALL state that a future `scope: semantic_role` variant of the existing architecture-coverage-model contract (`covered`/`excluded`/`uncovered`/`unknown`/`stale`/`empty-input`, per the `architecture-coverage-model` capability) is the intended integration point for classification's `uncovered semantic fact` and `stale selector` concepts, rather than introducing a separate coverage-like diagnostic vocabulary.
+The design SHALL state that a future `scope: semantic_role` variant of the existing architecture-coverage-model contract (`covered`/`excluded`/`uncovered`/`unknown`/`stale`/`empty-input`, per the `architecture-coverage-model` capability) is the intended integration point for classification's `uncovered semantic fact` and `stale selector` concepts, rather than introducing a separate coverage-like diagnostic vocabulary. "Consumed" for this purpose SHALL NOT be hard-coded to `layers.<name>.selector` alone: any future contextual-contract construct (#111/#112) that references a discovered role/metadata value directly SHALL count as coverage-participating consumption identically to a selector match.
 
 #### Scenario: Uncovered semantic fact aligns with coverage's uncovered term
-- **WHEN** a role is discovered by classification but matched by no selector and named by no exclusion (including a role assigned by an `override`, which does not by itself exempt a type from coverage)
+- **WHEN** a role is discovered by classification but consumed by no coverage-participating construct and named by no exclusion (including a role assigned by an `override`, which does not by itself exempt a type from coverage)
 - **THEN** the reviewed design classifies this using the same conceptual status as the architecture-coverage-model's `uncovered`, for a future `scope: semantic_role` coverage variant to implement
 
 ### Requirement: No runtime behavior is introduced by this design
