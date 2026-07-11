@@ -29,15 +29,22 @@ RTK's Cargo fallbacks build the reviewed release commit. The Unix remote install
 Manual bootstrap pins must be upgraded in a dedicated pull request:
 
 1. Review the upstream release notes, repository changes, and any security advisories.
-2. For RTK, select a reviewed release tag and the exact upstream commit referenced by that release. Verify that the commit's `Cargo.toml` version matches the intended release.
-3. Update `RTK_VERSION`/`RtkVersion` and `RTK_COMMIT`/`RtkCommit` together in:
+
+1. For RTK, select a reviewed release tag and the exact upstream commit referenced by that release. Verify that the commit's `Cargo.toml` version matches the intended release.
+
+1. Update `RTK_VERSION`/`RtkVersion` and `RTK_COMMIT`/`RtkCommit` together in:
+
    - `tools/scripts/configure_rtk_unix.sh`;
    - `tools/scripts/configure_rtk_windows.ps1`.
-4. For OpenSpec, verify the published package version against the upstream `package.json`, then update the exact version in:
+
+1. For OpenSpec, verify the published package version against the upstream `package.json`, then update the exact version in:
+
    - `tools/scripts/install_unix_tools.sh`;
    - `tools/scripts/install_windows_tools.ps1`.
-5. Do not replace a pin with `latest`, a moving branch such as `main` or `develop`, or an unqualified Git install.
-6. Validate script syntax and the repository gates:
+
+1. Do not replace a pin with `latest`, a moving branch such as `main` or `develop`, or an unqualified Git install.
+
+1. Validate script syntax and the repository gates:
 
    ```bash
    sh -n tools/scripts/configure_rtk_unix.sh
@@ -46,7 +53,8 @@ Manual bootstrap pins must be upgraded in a dedicated pull request:
    ```
 
    On Windows, parse the two PowerShell scripts and run `rtk make acceptance` before merging.
-7. Confirm the diff changes only the intended dependency pins and any required compatibility updates.
+
+1. Confirm the diff changes only the intended dependency pins and any required compatibility updates.
 
 ## Workflow token permissions
 
