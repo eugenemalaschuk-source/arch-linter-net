@@ -2,17 +2,28 @@ using YamlDotNet.Serialization;
 
 namespace ArchLinterNet.Core.Contracts;
 
-// Binds only classification.attributes/classification.assembly_attributes — the attribute-role-extraction
-// capability's scope. Other classification.* fields (precedence, inheritance, namespace, path, overrides,
-// exclusions) are intentionally unbound: ArchitecturePolicyDocumentLoader's deserializer ignores unmatched
+// Binds classification.attributes/classification.assembly_attributes and the subset of
+// classification.precedence relevant to them — the attribute-role-extraction capability's scope.
+// Other classification.* fields (inheritance, namespace, path, overrides, exclusions) are
+// intentionally unbound: ArchitecturePolicyDocumentLoader's deserializer ignores unmatched
 // properties, so those sections remain schema-valid no-ops until their own implementation issues land.
 public sealed class ArchitectureClassificationConfiguration
 {
+    // Null means "not declared" (schema default: every source enabled). When declared, a source
+    // omitted from this list is disabled, per the reviewed schema's precedence semantics.
+    [YamlMember(Alias = "precedence")]
+    public List<string>? Precedence { get; set; }
+
     [YamlMember(Alias = "attributes")]
     public List<ArchitectureAttributeClassificationMapping> Attributes { get; set; } = new();
 
     [YamlMember(Alias = "assembly_attributes")]
     public List<ArchitectureAttributeClassificationMapping> AssemblyAttributes { get; set; } = new();
+
+    public bool IsSourceEnabled(string sourceName)
+    {
+        return Precedence == null || Precedence.Contains(sourceName, StringComparer.Ordinal);
+    }
 }
 
 public sealed class ArchitectureAttributeClassificationMapping

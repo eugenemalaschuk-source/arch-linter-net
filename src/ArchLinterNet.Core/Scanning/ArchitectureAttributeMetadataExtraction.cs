@@ -207,20 +207,19 @@ internal static class ArchitectureAttributeMetadataExtraction
     }
 
     // Aliased (two members share one underlying value) or unmapped (no declared member matches) both
-    // resolve as a failure — never an arbitrarily-picked name.
+    // resolve as a failure — never an arbitrarily-picked name. Compares via direct enum-value equality
+    // (not a widening Convert.ToInt64) since an unsigned 64-bit underlying value (e.g. ulong.MaxValue)
+    // overflows Int64 and would otherwise throw instead of resolving as a failure.
     private static object? CanonicalizeEnum(Enum value)
     {
         Type enumType = value.GetType();
-        long underlying = Convert.ToInt64(value, CultureInfo.InvariantCulture);
-
         string[] names = Enum.GetNames(enumType);
         Array values = Enum.GetValues(enumType);
 
         string? matchedName = null;
         for (int i = 0; i < names.Length; i++)
         {
-            long candidateUnderlying = Convert.ToInt64(values.GetValue(i), CultureInfo.InvariantCulture);
-            if (candidateUnderlying != underlying)
+            if (!value.Equals(values.GetValue(i)))
             {
                 continue;
             }

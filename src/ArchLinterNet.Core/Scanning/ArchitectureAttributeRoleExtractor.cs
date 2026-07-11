@@ -17,25 +17,32 @@ public sealed class ArchitectureAttributeRoleExtractor
 {
     private readonly ArchitectureClassificationConfiguration _configuration;
     private readonly Dictionary<Assembly, ArchitectureAttributeClassificationCandidate> _assemblyCandidateCache = new();
-    private readonly Lazy<Dictionary<string, Type>> _typesByFullName;
+    private readonly Lazy<Dictionary<string, Type?>> _typesByFullName;
 
     public ArchitectureAttributeRoleExtractor(
         ArchitectureClassificationConfiguration configuration, IEnumerable<Type> typeUniverse)
     {
         _configuration = configuration ?? throw new ArgumentNullException(nameof(configuration));
         ArgumentNullException.ThrowIfNull(typeUniverse);
-        _typesByFullName = new Lazy<Dictionary<string, Type>>(() => BuildTypeLookup(typeUniverse));
+        _typesByFullName = new Lazy<Dictionary<string, Type?>>(() => BuildTypeLookup(typeUniverse));
     }
+
+    private const string TypeAttributeSourceName = "type_attribute";
+    private const string AssemblyAttributeSourceName = "assembly_attribute";
 
     public ArchitectureTypeClassificationResult Extract(Type type)
     {
         ArgumentNullException.ThrowIfNull(type);
 
-        string subject = ArchitectureTypeNames.SafeFullName(type);
-        ArchitectureAttributeClassificationCandidate typeCandidate = ResolveCandidate(
-            SafeGetCustomAttributesData(type), _configuration.Attributes, ArchitectureClassificationSource.TypeAttribute, subject);
+        ArchitectureAttributeClassificationCandidate typeCandidate = _configuration.IsSourceEnabled(TypeAttributeSourceName)
+            ? ResolveCandidate(
+                SafeGetCustomAttributesData(type), _configuration.Attributes, ArchitectureClassificationSource.TypeAttribute,
+                ArchitectureTypeNames.SafeFullName(type))
+            : ArchitectureAttributeClassificationCandidate.Empty;
 
-        ArchitectureAttributeClassificationCandidate assemblyCandidate = ResolveAssemblyCandidate(type.Assembly);
+        ArchitectureAttributeClassificationCandidate assemblyCandidate = _configuration.IsSourceEnabled(AssemblyAttributeSourceName)
+            ? ResolveAssemblyCandidate(type.Assembly)
+            : ArchitectureAttributeClassificationCandidate.Empty;
 
         return Combine(typeCandidate, assemblyCandidate);
     }
@@ -166,20 +173,36 @@ public sealed class ArchitectureAttributeRoleExtractor
         return metadata;
     }
 
+    // A null value marks a full name reached by two or more distinct types in the type universe
+    // (e.g. the same namespace-qualified type compiled into more than one scanned assembly):
+    // resolving to an arbitrary one of them would make const: extraction depend on enumeration
+    // order, so an ambiguous full name resolves as "not found" rather than picking either.
     private Type? ResolveTypeByFullName(string fullName)
     {
         return _typesByFullName.Value.GetValueOrDefault(fullName);
     }
 
-    private static Dictionary<string, Type> BuildTypeLookup(IEnumerable<Type> typeUniverse)
+    private static Dictionary<string, Type?> BuildTypeLookup(IEnumerable<Type> typeUniverse)
     {
-        Dictionary<string, Type> lookup = new(StringComparer.Ordinal);
+        Dictionary<string, Type?> lookup = new(StringComparer.Ordinal);
         foreach (Type type in typeUniverse)
         {
             string fullName = ArchitectureTypeNames.SafeFullName(type);
-            if (fullName.Length > 0)
+            if (fullName.Length == 0)
             {
-                lookup.TryAdd(fullName, type);
+                continue;
+            }
+
+            if (lookup.TryGetValue(fullName, out Type? existing))
+            {
+                if (existing != null && !ReferenceEquals(existing, type))
+                {
+                    lookup[fullName] = null;
+                }
+            }
+            else
+            {
+                lookup[fullName] = type;
             }
         }
 

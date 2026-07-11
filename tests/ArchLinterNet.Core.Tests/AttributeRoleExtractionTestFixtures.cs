@@ -12,6 +12,11 @@ namespace AttributeRoleExtractionTestFixtures
         Second = 1
     }
 
+    public enum UlongTier : ulong
+    {
+        Max = ulong.MaxValue
+    }
+
     public static class Constants
     {
         public const string Owner = "platform-team";
@@ -38,6 +43,8 @@ namespace AttributeRoleExtractionTestFixtures
         public Tier Tier { get; set; }
 
         public AliasedTier AliasTier { get; set; }
+
+        public UlongTier UlongValue { get; set; }
     }
 
     [AttributeUsage(AttributeTargets.Class)]
@@ -71,6 +78,9 @@ namespace AttributeRoleExtractionTestFixtures
 
     [DomainMarker("Sales", AliasTier = AliasedTier.First)]
     public sealed class TypeWithAliasedEnumProperty;
+
+    [DomainMarker("Sales", UlongValue = UlongTier.Max)]
+    public sealed class TypeWithUlongMaxEnumProperty;
 
     public sealed class PlainType;
 

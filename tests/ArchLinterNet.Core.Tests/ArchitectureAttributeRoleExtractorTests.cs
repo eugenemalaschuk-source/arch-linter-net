@@ -1,3 +1,5 @@
+using System.Reflection;
+using System.Reflection.Emit;
 using ArchLinterNet.Core.Contracts;
 using ArchLinterNet.Core.Scanning;
 using AttributeRoleExtractionTestFixtures;
@@ -171,6 +173,24 @@ public sealed class ArchitectureAttributeRoleExtractorTests
     }
 
     [Test]
+    public void Extract_UnsignedSixtyFourBitEnumProperty_DoesNotOverflowAndCanonicalizesToDeclaredMemberName()
+    {
+        var configuration = new ArchitectureClassificationConfiguration
+        {
+            Attributes =
+            {
+                DomainMapping(metadata: new Dictionary<string, object> { ["ulongValue"] = "property:UlongValue" })
+            }
+        };
+
+        ArchitectureTypeClassificationResult result = CreateExtractor(configuration).Extract(typeof(TypeWithUlongMaxEnumProperty));
+
+        Assert.That(result.Role, Is.EqualTo("DomainLayer"));
+        Assert.That(result.Metadata["ulongValue"], Is.EqualTo("Max"));
+        Assert.That(result.MetadataFailures, Is.Empty);
+    }
+
+    [Test]
     public void Extract_ConstStringAndDecimalFields_ResolveSuccessfully()
     {
         var configuration = new ArchitectureClassificationConfiguration
@@ -325,5 +345,83 @@ public sealed class ArchitectureAttributeRoleExtractorTests
         Assert.That(result.Role, Is.Null);
         Assert.That(result.Conflicts, Is.Empty);
         Assert.That(result.MetadataFailures, Is.Empty);
+    }
+
+    [Test]
+    public void Extract_PrecedenceExcludingTypeAttribute_AssemblyAttributeWins()
+    {
+        var configuration = new ArchitectureClassificationConfiguration
+        {
+            Precedence = new List<string> { "assembly_attribute" },
+            Attributes = { DomainMapping("DomainLayer") },
+            AssemblyAttributes =
+            {
+                new ArchitectureAttributeClassificationMapping { Attribute = BoundedContextMarkerAttributeName, Role = "ApplicationLayer" }
+            }
+        };
+
+        ArchitectureTypeClassificationResult result = CreateExtractor(configuration).Extract(typeof(TypeOverridingAssemblyAttribute));
+
+        Assert.That(result.Role, Is.EqualTo("ApplicationLayer"));
+        Assert.That(result.Source, Is.EqualTo(ArchitectureClassificationSource.AssemblyAttribute));
+    }
+
+    [Test]
+    public void Extract_PrecedenceExcludingBothSources_NeverAssignsRole()
+    {
+        var configuration = new ArchitectureClassificationConfiguration
+        {
+            Precedence = new List<string> { "namespace" },
+            Attributes = { DomainMapping("DomainLayer") },
+            AssemblyAttributes =
+            {
+                new ArchitectureAttributeClassificationMapping { Attribute = BoundedContextMarkerAttributeName, Role = "ApplicationLayer" }
+            }
+        };
+
+        ArchitectureTypeClassificationResult result = CreateExtractor(configuration).Extract(typeof(TypeOverridingAssemblyAttribute));
+
+        Assert.That(result.Role, Is.Null);
+    }
+
+    [Test]
+    public void Extract_AmbiguousConstTypeAcrossAssemblies_IsEvidenceExtractionFailure()
+    {
+        Type duplicateType = DefineDuplicateFixtureConstantsType();
+        var typeUniverse = TypeUniverse.Append(duplicateType).ToArray();
+
+        var configuration = new ArchitectureClassificationConfiguration
+        {
+            Attributes =
+            {
+                DomainMapping(metadata: new Dictionary<string, object>
+                {
+                    ["owner"] = "const:AttributeRoleExtractionTestFixtures.Constants.Owner"
+                })
+            }
+        };
+
+        var extractor = new ArchitectureAttributeRoleExtractor(configuration, typeUniverse);
+        ArchitectureTypeClassificationResult result = extractor.Extract(typeof(TypeWithConstructorDefault));
+
+        Assert.That(result.Role, Is.EqualTo("DomainLayer"));
+        Assert.That(result.Metadata.ContainsKey("owner"), Is.False);
+        Assert.That(result.MetadataFailures, Has.Count.EqualTo(1));
+    }
+
+    // Builds a second, distinct Type whose FullName collides with the real
+    // AttributeRoleExtractionTestFixtures.Constants fixture, simulating the same full type name
+    // reachable from two different assemblies in the extractor's type universe.
+    private static Type DefineDuplicateFixtureConstantsType()
+    {
+        AssemblyBuilder assemblyBuilder = AssemblyBuilder.DefineDynamicAssembly(
+            new AssemblyName("ArchitectureAttributeRoleExtractorTests.DuplicateFixtures"), AssemblyBuilderAccess.Run);
+        ModuleBuilder moduleBuilder = assemblyBuilder.DefineDynamicModule("DuplicateFixturesModule");
+        TypeBuilder typeBuilder = moduleBuilder.DefineType(
+            "AttributeRoleExtractionTestFixtures.Constants", TypeAttributes.Public | TypeAttributes.Class);
+        FieldBuilder fieldBuilder = typeBuilder.DefineField(
+            "Owner", typeof(string), FieldAttributes.Public | FieldAttributes.Static | FieldAttributes.Literal);
+        fieldBuilder.SetConstant("duplicate-team");
+        return typeBuilder.CreateType();
     }
 }

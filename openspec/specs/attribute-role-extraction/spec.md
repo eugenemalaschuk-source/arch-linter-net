@@ -1,10 +1,15 @@
 # attribute-role-extraction Specification
 
 ## Purpose
-TBD - created by archiving change add-attribute-role-extraction. Update Purpose after archive.
+Extracts semantic architecture roles and metadata from type-level and assembly-level attributes,
+per the `type_attribute`/`assembly_attribute` sources of the semantic-classification-model design.
+Covers YAML binding for `classification.attributes`/`classification.assembly_attributes` and the
+subset of `classification.precedence` that enables/disables these two sources, `CustomAttributeData`-based
+extraction, the four fixed metadata-extraction forms, canonicalization into string/boolean/decimal,
+type-over-assembly precedence, and deterministic conflict/evidence-extraction-failure handling.
 ## Requirements
 ### Requirement: classification.attributes and classification.assembly_attributes bind to typed configuration
-`ArchitectureContractDocument` SHALL expose a `classification` section binding `classification.attributes` and `classification.assembly_attributes` as ordered lists of mapping entries, each with `attribute` (full type name string), `role` (string), and an optional `metadata` map of string extraction expressions. A policy declaring no `classification` section SHALL bind to an empty configuration and behave identically to a policy predating this capability.
+`ArchitectureContractDocument` SHALL expose a `classification` section binding `classification.attributes` and `classification.assembly_attributes` as ordered lists of mapping entries, each with `attribute` (full type name string), `role` (string), and an optional `metadata` map of keys to either extraction-expression strings or literal scalar values (string/boolean/number). A policy declaring no `classification` section SHALL bind to an empty configuration and behave identically to a policy predating this capability.
 
 #### Scenario: Policy without classification section is unaffected
 - **WHEN** a policy document declares no `classification` section
@@ -42,6 +47,24 @@ When both the `type_attribute` and `assembly_attribute` sources contribute a rol
 #### Scenario: Assembly attribute applies when no type attribute matches
 - **WHEN** a type's declaring assembly contributes a role via `assembly_attribute` and the type itself carries no attribute matching any `classification.attributes` entry
 - **THEN** the type's resolved role is the `assembly_attribute` source's role
+
+### Requirement: classification.precedence disables the type_attribute or assembly_attribute source
+When a policy declares `classification.precedence`, the extraction engine SHALL treat a source omitted from that list as disabled: an entry in `classification.attributes`/`classification.assembly_attributes` for a disabled source SHALL NOT contribute any role or metadata assignment. When `classification.precedence` is not declared, both sources are enabled, matching the fixed default order.
+
+#### Scenario: Declared precedence without type_attribute disables it
+- **WHEN** a policy declares `classification.precedence: [assembly_attribute]` and a type matches both a `classification.attributes` entry and a `classification.assembly_attributes` entry
+- **THEN** the extraction engine assigns the `assembly_attribute` source's role, ignoring the `type_attribute` match entirely
+
+#### Scenario: Declared precedence without either implemented source disables both
+- **WHEN** a policy declares `classification.precedence` naming only unimplemented sources (e.g. `[namespace]`)
+- **THEN** the extraction engine assigns no role from `classification.attributes` or `classification.assembly_attributes`, regardless of matching attributes
+
+### Requirement: const: type references ambiguous across the type universe resolve as a failure
+When a `const:<Full.Type.NAME>` reference's type-name portion matches more than one distinct `Type` in the extraction engine's type universe (e.g. the same full name compiled into two different scanned assemblies), the extraction engine SHALL NOT arbitrarily select one candidate; this resolves as an evidence-extraction failure identical to an unresolved type.
+
+#### Scenario: Ambiguous const type name is an evidence-extraction failure
+- **WHEN** two distinct types share the full name referenced by a `const:<Full.Type.NAME>` metadata expression
+- **THEN** the referenced metadata key is omitted, the failure is recorded as a fact, and the role assignment from the matching source still proceeds
 
 ### Requirement: Same-tier attribute mapping conflicts resolve by YAML declaration order
 When two or more entries within the same mapping list (`classification.attributes` or, separately, `classification.assembly_attributes`) match attributes present on one type or assembly with contradictory role/metadata, the extraction engine SHALL select the first-declared entry's role/metadata and SHALL record the discarded alternative as a conflict fact.
@@ -86,6 +109,10 @@ Every metadata value produced by extraction or supplied as a literal SHALL be ca
 #### Scenario: Enum values canonicalize to their declared member name
 - **WHEN** an extracted metadata value is an enum instance whose underlying value maps to exactly one declared member
 - **THEN** the canonical value is that declared member's name, not its underlying numeric representation
+
+#### Scenario: Enum canonicalization does not overflow for unsigned 64-bit underlying values
+- **WHEN** an extracted metadata value is an enum instance with an unsigned 64-bit underlying type and a value exceeding `Int64.MaxValue` (e.g. `ulong.MaxValue`)
+- **THEN** the extraction engine SHALL compare the value against declared members without a lossy numeric conversion and SHALL NOT throw
 
 #### Scenario: Aliased enum values are an evidence-extraction failure
 - **WHEN** an extracted metadata value is an enum instance whose underlying value maps to two or more declared members
