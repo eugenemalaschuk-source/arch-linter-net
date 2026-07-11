@@ -109,7 +109,7 @@ public sealed partial class ArchitectureAnalysisSession
     private static ArchitectureViolation? BuildEmptyLayerViolation(
         ArchitectureLayerContract contract, string layerEntry, ArchitectureLayer layer)
     {
-        if (layer.External || contract.TemplateName == null && layer.Selector == null)
+        if (layer.External || contract.TemplateName == null)
         {
             return null;
         }

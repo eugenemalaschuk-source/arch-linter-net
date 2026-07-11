@@ -421,6 +421,7 @@ contracts:
     [TestCase("        domains:\n          - Sales\n          - Billing", "domains")]
     [TestCase("        domains:\n          primary: Sales", "domains")]
     [TestCase("        domains: null", "domains")]
+    [TestCase("        domains: 1e300", "domains")]
     public void LoadFromPath_SelectorMetadataNonScalar_ThrowsDeterministicValidationError(string metadataYaml, string key)
     {
         string contractDir = Path.Combine(_tempDir, "architecture");

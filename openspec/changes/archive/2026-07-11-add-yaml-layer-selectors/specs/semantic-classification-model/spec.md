@@ -1,6 +1,6 @@
 ## MODIFIED Requirements
 
-### Requirement: Selector syntax is additive to the existing layer shape, and namespace remains required
+### Requirement: Selector syntax is additive to the existing layer shape, and selector-only layers are valid
 The policy schema and runtime SHALL support `layers.<name>.selector` as an optional exact-match selector sibling to `namespace`/`namespace_suffix`/`external`. A selector SHALL require a non-empty `role` and MAY declare scalar metadata constraints. A layer SHALL declare either a non-empty `namespace` or a selector; when both are present, both predicates SHALL match. Namespace-only layers SHALL retain their existing behavior.
 
 #### Scenario: Selector-only layer is accepted and resolves classified types

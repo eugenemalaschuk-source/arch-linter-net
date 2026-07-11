@@ -78,10 +78,23 @@ internal sealed class LayerNamespacesValidator : IArchitecturePolicyDocumentVali
         return value switch
         {
             byte or sbyte or short or ushort or int or uint or long or ulong or decimal => true,
-            float f => !float.IsNaN(f) && !float.IsInfinity(f),
-            double d => !double.IsNaN(d) && !double.IsInfinity(d),
+            float f => InDecimalRange(f),
+            double d => InDecimalRange(d),
             _ => TryConvertibleFiniteNumber(value)
         };
+    }
+
+    private static bool InDecimalRange(double value)
+    {
+        try
+        {
+            _ = Convert.ToDecimal(value, CultureInfo.InvariantCulture);
+            return true;
+        }
+        catch (OverflowException)
+        {
+            return false;
+        }
     }
 
     private static bool TryConvertibleFiniteNumber(object value)
