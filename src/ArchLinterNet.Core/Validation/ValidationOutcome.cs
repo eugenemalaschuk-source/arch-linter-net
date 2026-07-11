@@ -13,4 +13,6 @@ public sealed record ValidationOutcome(
     string UnmatchedIgnoredViolationsConfig,
     IReadOnlyCollection<PolicyConsistencyDiagnostic> PolicyConsistencyFindings,
     string PolicyConsistencyConfig,
-    IReadOnlyCollection<ArchitectureCoverageSummary> CoverageSummaries);
+    IReadOnlyCollection<ArchitectureCoverageSummary> CoverageSummaries,
+    IReadOnlyCollection<ArchitectureClassificationConflict> ClassificationConflicts,
+    IReadOnlyCollection<ArchitectureClassificationMetadataFailure> ClassificationMetadataFailures);

@@ -47,7 +47,9 @@ internal sealed class CliRuntime : ICliRuntime
         IReadOnlyCollection<ArchitectureViolation> coverageFindings,
         IReadOnlyList<ArchitectureUnmatchedIgnoredViolation> unmatchedIgnoredViolations,
         IReadOnlyCollection<PolicyConsistencyDiagnostic> policyConsistencyFindings,
-        IReadOnlyCollection<ArchitectureCoverageSummary> coverageSummaries)
+        IReadOnlyCollection<ArchitectureCoverageSummary> coverageSummaries,
+        IReadOnlyCollection<ArchitectureClassificationConflict> classificationConflicts,
+        IReadOnlyCollection<ArchitectureClassificationMetadataFailure> classificationMetadataFailures)
     {
         return _formatter.FormatResultForCiArtifacts(
             mode,
@@ -57,7 +59,9 @@ internal sealed class CliRuntime : ICliRuntime
             coverageFindings,
             unmatchedIgnoredViolations,
             policyConsistencyFindings,
-            coverageSummaries);
+            coverageSummaries,
+            classificationConflicts,
+            classificationMetadataFailures);
     }
 
     public string FormatResultAsSarif(
@@ -96,6 +100,13 @@ internal sealed class CliRuntime : ICliRuntime
     public string FormatCoverageSummaryForHumans(IReadOnlyCollection<ArchitectureCoverageSummary> coverageSummaries)
     {
         return _formatter.FormatCoverageSummaryForHumans(coverageSummaries);
+    }
+
+    public string FormatClassificationFactsForHumans(
+        IReadOnlyCollection<ArchitectureClassificationConflict> conflicts,
+        IReadOnlyCollection<ArchitectureClassificationMetadataFailure> metadataFailures)
+    {
+        return _formatter.FormatClassificationFactsForHumans(conflicts, metadataFailures);
     }
 
     public BaselineGenerationOutcome GenerateBaseline(BaselineGenerationRequest request)

@@ -31,6 +31,9 @@ public sealed partial class ArchitecturePolicyDocumentLoader : IArchitecturePoli
         IDeserializer deserializer = new DeserializerBuilder()
             .WithNamingConvention(UnderscoredNamingConvention.Instance)
             .IgnoreUnmatchedProperties()
+            .WithNodeDeserializer(
+                new ArchitectureClassificationMetadataScalarNodeDeserializer(),
+                syntax => syntax.Before<YamlDotNet.Serialization.NodeDeserializers.ScalarNodeDeserializer>())
             .Build();
 
         string yaml = _fileSystem.ReadAllText(policyPath);

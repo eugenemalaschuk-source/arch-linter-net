@@ -184,7 +184,7 @@
     "classification": {
       "type": "object",
       "additionalProperties": false,
-      "description": "Reserved for the semantic-classification-model design (schema acceptance only; see openspec/changes/archive/2026-07-10-design-semantic-classification-model). No extraction, role-assignment, or matching engine exists yet; declaring this section has no runtime effect.",
+      "description": "Semantic-classification-model design (see openspec/changes/archive/2026-07-10-design-semantic-classification-model). `attributes`/`assembly_attributes` extraction is implemented (see openspec/specs/attribute-role-extraction). `precedence`, `inheritance`, `namespace`, `path`, `overrides`, and `exclusions` remain schema-acceptance only; declaring them has no runtime effect yet.",
       "properties": {
         "precedence": {
           "type": "array",

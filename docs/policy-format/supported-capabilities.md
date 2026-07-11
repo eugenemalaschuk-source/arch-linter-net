@@ -54,10 +54,14 @@ ArchLinterNet does not currently validate:
 Coverage support currently excludes `scope: dependency_edge`, which remains reserved
 and fails validation with an actionable error.
 
-The `classification` YAML section and `layers.<name>.selector` are **schema-accepted
-but not enforced** — no extraction, role-assignment, or selector-matching engine
-exists yet, and declaring either has no effect on validation. See
-[Semantic classification (reserved)](semantic-classification.md).
+`classification.attributes`/`classification.assembly_attributes` are **implemented**:
+type-level and assembly-level attributes mapped by full type name are extracted into
+role/metadata facts, and `validate` surfaces resulting conflict/evidence-extraction-failure
+facts as informational output — though those facts are not wired into any contract
+family's pass/fail evaluation. Every other part of `classification` and
+`layers.<name>.selector` remains **schema-accepted but not enforced** — no extraction,
+role-assignment, or selector-matching engine exists yet for them, and declaring them
+has no effect on validation. See [Semantic classification](semantic-classification.md).
 
 Assembly independence contracts detect only **direct** assembly references; transitive
 reference paths between two listed assemblies are not resolved.

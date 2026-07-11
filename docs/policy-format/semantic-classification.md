@@ -1,15 +1,25 @@
-# Semantic Classification (Reserved)
+# Semantic Classification (Partially Implemented)
 
-**Schema-accepted, not yet enforced.** `classification` and
-`layers.<name>.selector` are **reserved by the YAML schema only**. No
-extraction, role-assignment, or selector-matching engine exists yet. A policy
-that declares `classification` or `selector` today is schema-valid, but the
-section has **no effect** on validation — no role is ever assigned, no
-selector ever matches, and no diagnostic is ever produced from it. This page
-documents the reviewed shape so policy authors and AI agents do not treat it as
-a working feature before implementation lands. See
+**`classification.attributes` and `classification.assembly_attributes` are implemented**
+(see [issue #109](https://github.com/eugenemalaschuk-source/arch-linter-net/issues/109) and
+`openspec/specs/attribute-role-extraction`): type-level and assembly-level attributes
+mapped by full type name are extracted and canonicalized into role/metadata facts,
+with `type_attribute` precedence over `assembly_attribute`. **Every other part of
+this page — `precedence` beyond these two sources, `inheritance`, `namespace`, `path`,
+`overrides`, `exclusions`, and `layers.<name>.selector` — remains reserved by the
+YAML schema only.** A policy declaring those sections today is schema-valid, but
+they have **no effect** on validation — no role is assigned from them, no selector
+ever matches, and no diagnostic is produced from them. This page documents the
+reviewed shape so policy authors and AI agents do not treat the unimplemented parts
+as a working feature before their own implementation issues land. See
 [Supported capabilities and non-goals](supported-capabilities.md) for the
 authoritative list of what is enforced today.
+
+**This capability produces facts, not contract results.** Extraction records role,
+metadata, and `conflict`/evidence-extraction-failure facts, and `validate` surfaces
+them in human, JSON, and CI-artifact output as informational "Classification
+findings" — but they are not wired into any `strict_*`/`audit_*` contract family's
+pass/fail evaluation or SARIF diagnostics, and never affect the command's exit code.
 
 ## Why this section exists
 
@@ -213,12 +223,21 @@ is unaffected.
 
 ## Current limits
 
-- No extraction: attributes, assembly attributes, inheritance facts, and
-  namespace/path conventions are never read from scanned code.
-- No role assignment: no type ever receives a role or metadata value.
-- No selector matching: `layers.<name>.selector` never selects any type.
-- No diagnostics: `conflict`, `stale selector`, and `uncovered semantic fact`
-  are vocabulary only — nothing is ever reported.
+- Extraction: **implemented** for `attributes`/`assembly_attributes` (type-level
+  and assembly-level attributes, matched by full type name). Inheritance facts
+  and namespace/path conventions are still never read from scanned code.
+- Role assignment: **implemented** for the `type_attribute`/`assembly_attribute`
+  sources, including `type_attribute` precedence over `assembly_attribute` and
+  the `classification.precedence` subset that enables/disables these two
+  sources. No other source (`yaml_override`, `inheritance`, `namespace`,
+  `path`) ever assigns a role yet.
+- No selector matching: `layers.<name>.selector` never selects any type, even
+  though `classification.attributes`/`assembly_attributes` now produce real
+  role/metadata facts a future selector-matching engine could consume.
+- Informational only: `conflict` and evidence-extraction-failure facts for the
+  implemented sources are surfaced by `validate`'s human/JSON/CI-artifact output
+  as a "Classification findings" section, but nothing wires them into SARIF or
+  any contract family's pass/fail evaluation. `stale selector` and `uncovered semantic fact` remain vocabulary only.
 - No annotation package: this design does not ship, and does not require, a
   binary ArchLinterNet annotation assembly — see
   [Annotation strategy](#annotation-strategy) below for the full adoption
@@ -245,21 +264,20 @@ concrete adoption need emerges. It is not the default path today.
 
 | Path | Dependency footprint | Setup cost | Versioning | Status |
 |---|---|---|---|---|
-| User-owned attribute | None — the attribute lives in the adopting project's own code | One small attribute class, written once | No annotation-package version coupling; YAML and extraction compatibility still follow ArchLinterNet's own compatibility policy | **Recommended adoption path** — schema/design reviewed; runtime extraction not yet implemented ([Current limits](#current-limits)) |
+| User-owned attribute | None — the attribute lives in the adopting project's own code | One small attribute class, written once | No annotation-package version coupling; YAML and extraction compatibility still follow ArchLinterNet's own compatibility policy | **Recommended adoption path** — runtime extraction implemented for `attributes`/`assembly_attributes` ([Current limits](#current-limits)) |
 | Source-only annotation package | No runtime assembly reference, but still a versioned artifact ArchLinterNet must design, ship, and support | Add a package reference; attribute ships pre-written | Coupled to ArchLinterNet's release/compatibility policy | Not shipped; possible future convenience |
 | Binary annotation package | Adds a compile-time (and possibly runtime/dependency-graph) reference to `ArchLinterNet.Annotations` in every consuming project | Add a package reference; attribute ships pre-written | Coupled to ArchLinterNet's release/compatibility policy | Not shipped; explicitly ruled out as a default or required path |
 
 A binary package was rejected as the default because it would add exactly the
 kind of mandatory runtime/dependency-graph reference ArchLinterNet's
-non-invasive positioning is meant to avoid. A source-only package was not
-shipped in this wave either, since no extraction engine exists yet
-([Current limits](#current-limits)) and no consumer need has been
-demonstrated — adding one now would be speculative packaging work with no
-current user. User-owned attributes need neither: the reviewed mapping shape
-in [Reviewed shape](#reviewed-shape) accepts any full attribute type name,
-regardless of which assembly declares it — but until extraction ships, no
-YAML mapping is actually evaluated against scanned code; see
-[Current limits](#current-limits).
+non-invasive positioning is meant to avoid. A source-only package has not been
+shipped, since no consumer need has been demonstrated — adding one now would
+be speculative packaging work with no current user. User-owned attributes need
+neither: the reviewed mapping shape in [Reviewed shape](#reviewed-shape)
+accepts any full attribute type name, regardless of which assembly declares
+it, and — for `attributes`/`assembly_attributes` — is now actually evaluated
+against scanned code; see [Current limits](#current-limits) for what remains
+unimplemented.
 
 ## Where to look next
 
