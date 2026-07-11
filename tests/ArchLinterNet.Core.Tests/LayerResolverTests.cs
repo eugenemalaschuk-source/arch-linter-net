@@ -223,4 +223,114 @@ public sealed class LayerResolverTests
 
         Assert.That(matches, Is.Empty);
     }
+
+    [Test]
+    public void FindTypesInLayer_SelectorMetadataUsesExactAndMatching()
+    {
+        var classification = new ArchitectureClassificationConfiguration
+        {
+            Attributes =
+            {
+                new ArchitectureAttributeClassificationMapping
+                {
+                    Attribute = "AttributeRoleExtractionTestFixtures.DomainMarkerAttribute",
+                    Role = "DomainLayer",
+                    Metadata = new Dictionary<string, object>
+                    {
+                        ["domain"] = "constructor[0]",
+                        ["enabled"] = "property:Enabled"
+                    }
+                }
+            }
+        };
+        var typeIndex = new ArchitectureTypeIndex(new[] { typeof(TypeWithBooleanProperty).Assembly });
+        var roleIndex = new ArchitectureRoleIndex(classification, typeIndex);
+        ArchitectureLayer layer = new()
+        {
+            Selector = new ArchitectureLayerSelector
+            {
+                Role = "DomainLayer",
+                Metadata = new Dictionary<string, object>
+                {
+                    ["domain"] = "Sales",
+                    ["enabled"] = true
+                }
+            }
+        };
+
+        Type[] matches = typeIndex.FindTypesInLayer(layer, roleIndex);
+
+        Assert.That(matches, Does.Contain(typeof(TypeWithBooleanProperty)));
+        Assert.That(matches, Does.Not.Contain(typeof(TypeWithConstructorDefault)));
+    }
+
+    [Test]
+    public void FindTypesInLayer_SelectorMetadataComparesNumericValuesByValue()
+    {
+        var classification = new ArchitectureClassificationConfiguration
+        {
+            Attributes =
+            {
+                new ArchitectureAttributeClassificationMapping
+                {
+                    Attribute = "AttributeRoleExtractionTestFixtures.DomainMarkerAttribute",
+                    Role = "DomainLayer",
+                    Metadata = new Dictionary<string, object> { ["priority"] = 5 }
+                }
+            }
+        };
+        var typeIndex = new ArchitectureTypeIndex(new[] { typeof(TypeWithConstructorDefault).Assembly });
+        var roleIndex = new ArchitectureRoleIndex(classification, typeIndex);
+        ArchitectureLayer layer = new()
+        {
+            Selector = new ArchitectureLayerSelector
+            {
+                Role = "DomainLayer",
+                Metadata = new Dictionary<string, object> { ["priority"] = 5.0 }
+            }
+        };
+
+        Type[] matches = typeIndex.FindTypesInLayer(layer, roleIndex);
+
+        Assert.That(matches, Does.Contain(typeof(TypeWithConstructorDefault)));
+    }
+
+    [Test]
+    public void DescribeLayer_SelectorOnlyLayer_UsesSelectorDescription()
+    {
+        ArchitectureLayer layer = new()
+        {
+            Selector = new ArchitectureLayerSelector
+            {
+                Role = "DomainLayer",
+                Metadata = new Dictionary<string, object> { ["domain"] = "Sales" }
+            }
+        };
+
+        Assert.That(ArchitectureLayerResolver.DescribeLayer(layer),
+            Is.EqualTo("selector(role: DomainLayer, metadata: domain=Sales)"));
+    }
+
+    [Test]
+    public void ResolveContainingLayer_SelectorOnlyLayer_IsIgnoredByNamespaceResolution()
+    {
+        ArchitectureContractDocument document = new()
+        {
+            Layers = new Dictionary<string, ArchitectureLayer>
+            {
+                ["semantic"] = new()
+                {
+                    Selector = new ArchitectureLayerSelector { Role = "DomainLayer" }
+                },
+                ["core"] = new() { Namespace = "Test.Core" }
+            }
+        };
+
+        string? layer = ArchitectureLayerResolver.ResolveContainingLayer(
+            document,
+            "Test.Core.Services",
+            new HashSet<string>(new[] { "semantic", "core" }, StringComparer.Ordinal));
+
+        Assert.That(layer, Is.EqualTo("core"));
+    }
 }

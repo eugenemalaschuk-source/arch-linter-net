@@ -27,10 +27,9 @@ internal static class ArchitectureNamespaceViolationFinder
                     {
                         Reference = reference,
                         Match = roleIndex != null
-                            ? (ArchitectureLayerResolver.MatchesNamespace(forbiddenLayer, ArchitectureTypeNames.SafeNamespace(reference))
-                                && ArchitectureLayerTypeMatcher.Matches(forbiddenLayer, reference, roleIndex)
-                                    ? new ArchitectureNamespaceMatch(true, ArchitectureLayerResolver.DescribeLayer(forbiddenLayer), null)
-                                    : new ArchitectureNamespaceMatch(false, string.Empty, null))
+                            ? (ArchitectureLayerTypeMatcher.Matches(forbiddenLayer, reference, roleIndex)
+                                ? new ArchitectureNamespaceMatch(true, ArchitectureLayerResolver.DescribeLayer(forbiddenLayer), null)
+                                : new ArchitectureNamespaceMatch(false, string.Empty, null))
                             : ArchitectureLayerResolver.MatchNamespace(forbiddenLayer, ArchitectureTypeNames.SafeNamespace(reference))
                     })
                     .Where(x => x.Match.Matched)

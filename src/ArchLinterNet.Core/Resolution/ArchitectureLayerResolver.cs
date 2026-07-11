@@ -97,6 +97,7 @@ internal static class ArchitectureLayerResolver
                 LayerName = layerName,
                 Layer = ResolveLayer(document, "cycle-resolution", layerName)
             })
+            .Where(layer => !string.IsNullOrWhiteSpace(layer.Layer.Namespace))
             .Select(layer => new
             {
                 layer.LayerName,
