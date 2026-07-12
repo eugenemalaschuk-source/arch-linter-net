@@ -16,10 +16,10 @@ namespace ArchLinterNet.Core.Execution;
 //   3. string matching ^!\{source\.metadata\.<key>\}$    -> not-equal-to-source (resolved against the
 //      current source type's own metadata; only meaningful on forbidden/allowed/exclude selectors)
 //   4. anything else                                     -> exact literal
-internal static class ArchitectureContextSelectorMatcher
+internal static partial class ArchitectureContextSelectorMatcher
 {
-    private static readonly Regex _notEqualToSourcePattern =
-        new(@"^!\{source\.metadata\.([A-Za-z0-9_]+)\}$", RegexOptions.Compiled | RegexOptions.CultureInvariant);
+    [GeneratedRegex(@"^!\{source\.metadata\.([A-Za-z0-9_]+)\}$", RegexOptions.CultureInvariant)]
+    private static partial Regex NotEqualToSourcePattern();
 
     // sourceDescriptor is the current contract evaluation's source type's own resolved role/metadata,
     // used to resolve not-equal-to-source constraints. Pass null when matching the contract's own
@@ -82,7 +82,7 @@ internal static class ArchitectureContextSelectorMatcher
                 return true;
             }
 
-            Match match = _notEqualToSourcePattern.Match(stringValue);
+            Match match = NotEqualToSourcePattern().Match(stringValue);
             if (match.Success)
             {
                 string sourceKey = match.Groups[1].Value;
