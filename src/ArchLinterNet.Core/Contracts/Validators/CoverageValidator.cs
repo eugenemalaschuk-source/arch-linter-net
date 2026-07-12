@@ -6,7 +6,7 @@ namespace ArchLinterNet.Core.Contracts.Validators;
 internal sealed class CoverageValidator : IArchitecturePolicyDocumentValidator
 {
     private static readonly string[] _implementedCoverageScopes =
-        { "namespace", "rule_input", "project", "assembly", "dependency_edge" };
+        { "namespace", "rule_input", "project", "assembly", "dependency_edge", "semantic_role" };
 
     public void Validate(ArchitectureContractDocument document)
     {
@@ -36,8 +36,47 @@ internal sealed class CoverageValidator : IArchitecturePolicyDocumentValidator
                 case "namespace":
                     ValidateNamespaceCoverageContract(contract);
                     continue;
+                case "semantic_role":
+                    ValidateSemanticRoleCoverageContract(contract);
+                    continue;
                 default:
                     continue;
+            }
+        }
+    }
+
+    private static void ValidateSemanticRoleCoverageContract(ArchitectureCoverageContract contract)
+    {
+        if (contract.Between.Count > 0 || contract.ContractIds.Count > 0)
+        {
+            throw new InvalidOperationException(
+                $"Semantic-role coverage contract '{contract.Name}' cannot declare 'between' or 'contract_ids'.");
+        }
+
+        for (int i = 0; i < contract.Exclude.Count; i++)
+        {
+            ArchitectureCoverageExclusion exclusion = contract.Exclude[i];
+            if (string.IsNullOrWhiteSpace(exclusion.Reason))
+            {
+                throw new InvalidOperationException(
+                    $"Semantic-role coverage contract '{contract.Name}' has an exclusion at index {i} without a non-empty reason.");
+            }
+
+            if (string.IsNullOrWhiteSpace(exclusion.Role))
+            {
+                throw new InvalidOperationException(
+                    $"Semantic-role coverage contract '{contract.Name}' has an exclusion at index {i} without a non-empty role matcher.");
+            }
+
+            if (!string.IsNullOrWhiteSpace(exclusion.Namespace)
+                || !string.IsNullOrWhiteSpace(exclusion.NamespaceSuffix)
+                || !string.IsNullOrWhiteSpace(exclusion.Project)
+                || !string.IsNullOrWhiteSpace(exclusion.Assembly)
+                || !string.IsNullOrWhiteSpace(exclusion.ContractId)
+                || exclusion.Between.Count > 0)
+            {
+                throw new InvalidOperationException(
+                    $"Semantic-role coverage contract '{contract.Name}' has an exclusion at index {i} using a non-semantic matcher.");
             }
         }
     }
@@ -348,8 +387,8 @@ internal sealed class CoverageValidator : IArchitecturePolicyDocumentValidator
 
         string details = string.Join(", ", unsupported.Select(contract => $"{contract.Name} ({contract.Scope})"));
         throw new InvalidOperationException(
-            "Only coverage contracts with scope 'namespace', 'rule_input', 'project', 'assembly', or " +
-            $"'dependency_edge' are implemented right now. Unsupported coverage contract scopes: {details}.");
+            "Only coverage contracts with scope 'namespace', 'rule_input', 'project', 'assembly', or 'dependency_edge' " +
+            $"are implemented right now; 'semantic_role' is also implemented. Unsupported coverage contract scopes: {details}.");
     }
 
     // Limited to the contract families ArchitectureContractRunner's GetReferencedLayerNames

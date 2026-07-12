@@ -526,6 +526,15 @@ they must still obey the dependency direction.
 Use `audit_layer_templates` for audit-mode templates. Templates coexist with
 direct `strict_layers` / `audit_layers` contracts.
 
+### Semantic coverage diagnostics
+
+When a policy uses semantic classification, add an opt-in `semantic_role`
+coverage contract to make role discovery auditable. Keep selector-backed layers
+narrow, remove stale selectors, and give every semantic exclusion a concrete
+reason. Coverage output distinguishes unclassified facts, uncovered roles, stale
+selectors, and classification conflicts from dependency violations, which makes
+the JSON/CI artifact suitable for policy review and AI-assisted authoring.
+
 ### Exhaustive container coverage
 
 When a template declares `exhaustive: true`, the runner verifies that every
