@@ -162,6 +162,51 @@ contracts:
 
   audit_assembly_allow_only: []
 
+  # context_dependencies/context_allow_only compare discovered role/metadata directly, without
+  # declaring a layers.<name> for each side - see docs/contracts/context-dependency.md and
+  # docs/contracts/context-allow-only.md. classification.attributes above is implemented (see
+  # the note at the top of this file), so these contracts are real, executable rules against
+  # any type carrying MyCompany.Product.Architecture.DomainLayerAttribute.
+  strict_context_dependencies:
+    - id: sales-no-inventory-by-role
+      name: sales-domain-must-not-depend-on-inventory-domain
+      source:
+        role: DomainLayer
+        metadata:
+          module: Sales
+      forbidden:
+        - role: DomainLayer
+          metadata:
+            module: "!{source.metadata.module}"
+      exclude:
+        - role: SharedKernel
+      reason: >-
+        Bounded-context domain types must not depend on another context's domain types, discovered
+        by role/metadata rather than enumerating every module pair as layers.
+  audit_context_dependencies: []
+
+  # context_allow_only restricts a source context's dependencies to an explicit allow-list of
+  # role/metadata selectors, rather than naming every forbidden context (context_dependencies above
+  # does the inverse: name what's forbidden). Here Sales may depend only on its own module or
+  # SharedKernel; anything else (e.g. Inventory) is a violation.
+  strict_context_allow_only:
+    - id: sales-allow-only-own-module-or-shared-kernel
+      name: sales-domain-may-depend-only-on-own-module-or-shared-kernel
+      source:
+        role: DomainLayer
+        metadata:
+          module: Sales
+      allowed:
+        - role: DomainLayer
+          metadata:
+            module: Sales
+        - role: SharedKernel
+      reason: >-
+        Sales domain types may depend only on their own module's domain types or the explicit
+        shared-kernel exception, discovered by role/metadata rather than enumerating every
+        allowed module pair as layers.
+  audit_context_allow_only: []
+
   strict_composition:
     - id: service-locator-confined-to-composition-root
       name: service-locator-confined-to-composition-root

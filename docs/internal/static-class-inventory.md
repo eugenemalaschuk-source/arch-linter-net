@@ -4,7 +4,7 @@ This is internal project documentation for maintaining the `arch-linter-net` rep
 
 Issue #154 asks for every production `static class` under `src/` to be classified so static code stays limited to intentional pure helpers, extension methods, constants, or compatibility facades, while services/orchestrators that own behavior, state, or collaborators become instance-based and composition-root managed. This document is that inventory. It also seeds guardrail candidates for #142's self-policy work.
 
-The original #154 audit tracked 35 production `static class` declarations before #158 converted `ArchitectureContractExecutor`. #159 then converted the remaining production service/orchestrator/scanner/resolver/parser/loader classes. Issue #301 moved the asmdef convenience facade from the deleted Unity adapter project into `Core/Asmdef/AsmdefValidator.cs`, where it is now classified alongside the other intentional facades below.
+The original #154 audit tracked 35 production `static class` declarations before #158 converted `ArchitectureContractExecutor`. #159 then converted the remaining production service/orchestrator/scanner/resolver/parser/loader classes. Issue #301 moved the asmdef convenience facade from the deleted Unity adapter project into `Core/Asmdef/AsmdefValidator.cs`, where it is now classified alongside the other intentional facades below. #112 added two more pure-helper `static class` declarations (`ArchitectureContextSelectorMatcher`, `ArchitectureMetadataValueComparer`), classified in section (a) below.
 
 ## (a) Pure helper / deterministic mapper — allowed static
 
@@ -27,6 +27,8 @@ No state, no I/O side effects beyond what's passed in as parameters (e.g. an inj
 | `Core/Execution/ArchitectureExternalDependencyViolationFinder.cs` | `ArchitectureExternalDependencyViolationFinder` | Builds violations for types referencing forbidden external dependencies |
 | `Core/Execution/ArchitectureNamespaceViolationFinder.cs` | `ArchitectureNamespaceViolationFinder` | Builds violations for types referencing forbidden namespaces |
 | `Core/Execution/LayerTemplateExpander.cs` | `LayerTemplateExpander` | Expands layer templates into concrete per-container layer contracts |
+| `Core/Execution/ArchitectureContextSelectorMatcher.cs` | `ArchitectureContextSelectorMatcher` | Matches a type against an `ArchitectureContextSelector`'s role/metadata-operator vocabulary (exact/any/in/not-equal-to-source) for the contextual dependency/allow-only contract families (#112) |
+| `Core/Execution/ArchitectureMetadataValueComparer.cs` | `ArchitectureMetadataValueComparer` | Cross-domain (string/bool/decimal) metadata value equality, shared by `ArchitectureLayerTypeMatcher` and `ArchitectureContextSelectorMatcher` (#112) |
 
 ## (b) Extension method container — allowed static
 

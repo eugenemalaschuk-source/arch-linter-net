@@ -332,6 +332,25 @@ internal static class ArchitectureContractFamilyRegistry
         {
             OwnedContractTypes = new[] { typeof(ArchitectureCoverageContract) },
         },
+        new(
+            "context_dependency", "strict_context_dependencies", "audit_context_dependencies", true,
+            g => g.StrictContextDependencies, g => g.AuditContextDependencies,
+            (session, contract) => ArchitectureHandlerResult.FromViolations(
+                session.CheckContextDependencyContract((ArchitectureContextDependencyContract)contract)))
+        {
+            OwnedContractTypes = new[] { typeof(ArchitectureContextDependencyContract) },
+            // No ConfigurationContributor: contextual contracts reference discovered role/metadata
+            // directly, not a declared layers.<name>, so there is nothing to add to the layer-name
+            // collector (see design.md Decision 5).
+        },
+        new(
+            "context_allow_only", "strict_context_allow_only", "audit_context_allow_only", true,
+            g => g.StrictContextAllowOnly, g => g.AuditContextAllowOnly,
+            (session, contract) => ArchitectureHandlerResult.FromViolations(
+                session.CheckContextAllowOnlyContract((ArchitectureContextAllowOnlyContract)contract)))
+        {
+            OwnedContractTypes = new[] { typeof(ArchitectureContextAllowOnlyContract) },
+        },
     };
 
     // Shared by "layer" and "layer_template": layer_template contracts are expanded into

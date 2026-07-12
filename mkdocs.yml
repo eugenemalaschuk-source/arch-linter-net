@@ -41,8 +41,10 @@ nav:
   - Contracts:
       - Overview: contracts/index.md
       - Dependency contracts: contracts/dependency.md
+      - Contextual dependency contracts: contracts/context-dependency.md
       - Layer contracts: contracts/layers.md
       - Allow-only contracts: contracts/allow-only.md
+      - Contextual allow-only contracts: contracts/context-allow-only.md
       - Cycle contracts: contracts/cycles.md
       - Acyclic sibling contracts: contracts/acyclic-siblings.md
       - Independence contracts: contracts/independence.md
