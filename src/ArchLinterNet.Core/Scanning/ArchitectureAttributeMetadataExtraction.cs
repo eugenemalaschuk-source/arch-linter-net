@@ -198,7 +198,7 @@ internal static class ArchitectureAttributeMetadataExtraction
     private static bool IsFinite(float value) => !float.IsNaN(value) && !float.IsInfinity(value);
     private static bool IsFinite(double value) => !double.IsNaN(value) && !double.IsInfinity(value);
 
-    private static object? TryToDecimal(object raw)
+    private static decimal? TryToDecimal(object raw)
     {
         try
         {
@@ -214,7 +214,7 @@ internal static class ArchitectureAttributeMetadataExtraction
     // resolve as a failure — never an arbitrarily-picked name. Compares via direct enum-value equality
     // (not a widening Convert.ToInt64) since an unsigned 64-bit underlying value (e.g. ulong.MaxValue)
     // overflows Int64 and would otherwise throw instead of resolving as a failure.
-    private static object? CanonicalizeEnum(Enum value)
+    private static string? CanonicalizeEnum(Enum value)
     {
         Type enumType = value.GetType();
         string[] names = Enum.GetNames(enumType);

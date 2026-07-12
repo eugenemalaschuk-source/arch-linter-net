@@ -5,6 +5,12 @@ namespace ArchLinterNet.Core.Discovery;
 
 internal static class ProjectPathGlob
 {
+    // pattern below is built dynamically from an author-supplied glob (via Regex.Escape plus
+    // substitution, not a compile-time literal), so it cannot use [GeneratedRegex]. An explicit
+    // timeout is this rule's (S6444) mitigation for a pathological pattern causing catastrophic
+    // backtracking.
+    private static readonly TimeSpan _matchTimeout = TimeSpan.FromSeconds(1);
+
     public static bool IsMatch(string relativePath, string pattern)
     {
         string normalizedPath = relativePath.Replace('\\', '/');
@@ -43,6 +49,6 @@ internal static class ProjectPathGlob
         }
 
         builder.Append('$');
-        return new Regex(builder.ToString(), RegexOptions.IgnoreCase);
+        return new Regex(builder.ToString(), RegexOptions.IgnoreCase, _matchTimeout);
     }
 }
