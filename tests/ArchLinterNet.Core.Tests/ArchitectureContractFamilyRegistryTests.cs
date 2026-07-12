@@ -1,5 +1,9 @@
+using System.Reflection;
 using ArchLinterNet.Core.Contracts;
 using ArchLinterNet.Core.Execution;
+using ArchLinterNet.Core.Execution.Abstractions;
+using ArchLinterNet.Core.Model;
+using ContextualContractTestFixtures;
 using NUnit.Framework;
 
 namespace ArchLinterNet.Core.Tests;
@@ -144,5 +148,43 @@ public sealed class ArchitectureContractFamilyRegistryTests
 
         Assert.That(actualStrict.Select(c => c.Id), Is.EqualTo(expectedStrict.Select(c => c.Id)));
         Assert.That(actualAudit.Select(c => c.Id), Is.EqualTo(expectedAudit.Select(c => c.Id)));
+    }
+
+    [Test]
+    public void PortBoundaryDescriptor_ChecksThroughRegisteredCheckerDelegate()
+    {
+        ArchitectureContractFamilyDescriptor descriptor = ArchitectureContractFamilyRegistry.All
+            .Single(d => d.FamilyId == "port_boundary");
+
+        Assembly assembly = typeof(SalesCheckout).Assembly;
+        var contract = new ArchitecturePortBoundaryContract
+        {
+            Name = "sales-to-inventory-through-port",
+            Source = new ArchitectureContextSelector { Role = "DomainLayer", Metadata = new Dictionary<string, object> { ["domain"] = "Sales" } },
+            TargetContext = new ArchitectureContextMetadataSelector { Metadata = new Dictionary<string, object> { ["domain"] = "Inventory" } },
+            AllowedSeams = new List<ArchitectureContextSelector> { new() { Role = "Port", Metadata = new Dictionary<string, object> { ["domain"] = "Inventory" } } },
+            Forbidden = new List<ArchitectureContextSelector> { new() { Role = "DomainLayer", Metadata = new Dictionary<string, object> { ["domain"] = "Inventory" } } },
+            Reason = "Use the reviewed port."
+        };
+        var document = new ArchitectureContractDocument
+        {
+            Version = 1,
+            Name = "ports",
+            Analysis = new ArchitectureAnalysisConfiguration { TargetAssemblies = new List<string> { assembly.GetName().Name! } },
+            Classification = new ArchitectureClassificationConfiguration
+            {
+                Attributes =
+                {
+                    new ArchitectureAttributeClassificationMapping { Attribute = "ContextualContractTestFixtures.ContextDomainMarkerAttribute", Role = "DomainLayer", Metadata = new Dictionary<string, object> { ["domain"] = "constructor[0]" } },
+                    new ArchitectureAttributeClassificationMapping { Attribute = "ContextualContractTestFixtures.ContextPortMarkerAttribute", Role = "Port", Metadata = new Dictionary<string, object> { ["domain"] = "constructor[0]" } },
+                },
+            },
+            Contracts = new ArchitectureContractGroups { StrictPortBoundaries = new List<ArchitecturePortBoundaryContract> { contract } },
+        };
+        var runner = new ArchitectureContractRunner(new ArchitectureAnalysisContext("/tmp", new[] { assembly }, Array.Empty<string>(), Array.Empty<string>()), document);
+
+        ArchitectureHandlerResult result = descriptor.Checker(runner.Session, contract);
+
+        Assert.That(result.Violations.Any(v => v.SourceType == typeof(SalesCheckout).FullName), Is.True);
     }
 }

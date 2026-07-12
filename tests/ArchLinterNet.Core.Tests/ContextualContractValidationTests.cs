@@ -427,6 +427,56 @@ public sealed class ContextualContractValidationTests
     }
 
     [Test]
+    public void PortBoundary_WellFormedContract_LoadsSuccessfully()
+    {
+        string policyPath = WritePolicy($$"""
+            version: 1
+            name: Test
+            analysis:
+              target_assemblies: [{{AssemblyName}}]
+            contracts:
+              strict_port_boundaries:
+                - name: port-boundary
+                  source: { role: ApplicationLayer }
+                  target_context: { metadata: { domain: Catalog } }
+                  allowed_seams: [{ role: Port }]
+                  forbidden: [{ role: DomainLayer }]
+                  exclude: [{ role: SharedKernel }]
+                  adapter_bindings:
+                    - adapter: { role: Adapter }
+                      expected_port: { role: Port }
+                      allowed_contexts: [{ role: Adapter }]
+                  reason: Well-formed port-boundary contract.
+            """);
+
+        Assert.DoesNotThrow(() => new ArchitecturePolicyDocumentLoader().Load(policyPath));
+    }
+
+    [Test]
+    public void PortBoundary_MissingTargetContextMetadata_ThrowsActionableError()
+    {
+        string policyPath = WritePolicy($$"""
+            version: 1
+            name: Test
+            analysis:
+              target_assemblies: [{{AssemblyName}}]
+            contracts:
+              strict_port_boundaries:
+                - name: port-boundary
+                  source: { role: ApplicationLayer }
+                  target_context: { metadata: {} }
+                  allowed_seams: [{ role: Port }]
+                  forbidden: [{ role: DomainLayer }]
+                  reason: Test.
+            """);
+
+        InvalidOperationException ex = Assert.Throws<InvalidOperationException>(() =>
+            new ArchitecturePolicyDocumentLoader().Load(policyPath))!;
+
+        Assert.That(ex.Message, Does.Contain("non-empty 'target_context.metadata'"));
+    }
+
+    [Test]
     public void PortBoundary_UnknownNestedAdapterBindingProperty_ThrowsActionableError()
     {
         string policyPath = WritePolicy($$"""

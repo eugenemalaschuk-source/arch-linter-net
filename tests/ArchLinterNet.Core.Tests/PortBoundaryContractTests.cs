@@ -201,6 +201,25 @@ public sealed class PortBoundaryContractTests
     }
 
     [Test]
+    public void PortBoundaryViolation_HumanReadableFormat_IncludesSeamEvidence()
+    {
+        var violation = new ArchitectureViolation("ports", "ports", "Sales.Checkout", "direct edge", new[] { "Catalog.Order" })
+        {
+            Payload = new PortBoundaryPayload("ApplicationLayer", new Dictionary<string, object> { ["domain"] = "Sales" },
+                "DomainLayer", new Dictionary<string, object> { ["domain"] = "Catalog" }, "direct_reference", "role:Port",
+                "Depend on the approved port abstraction.")
+        };
+        ArchitectureDiagnostic diagnostic = ArchitectureDiagnosticMapper.FromViolation(violation);
+        Assert.That(diagnostic.Kind, Is.EqualTo(ArchitectureDiagnosticKind.PortBoundary));
+
+        string text = new ArchitectureDiagnosticFormatter().FormatViolationsForHumans(new[] { violation });
+
+        Assert.That(text, Does.Contain("kind: port_boundary"));
+        Assert.That(text, Does.Contain("expected_seam: role:Port"));
+        Assert.That(text, Does.Contain("remediation: Depend on the approved port abstraction."));
+    }
+
+    [Test]
     public void CheckPortBoundaryContract_ForbiddenSelectorWinsOverAllowedSeam()
     {
         ArchitecturePortBoundaryContract contract = CreateInventoryContract();
@@ -224,6 +243,21 @@ public sealed class PortBoundaryContractTests
             Metadata = new Dictionary<string, object> { ["domain"] = "!{source.metadata.otherDomain}" }
         };
         var runner = CreateRunner(contract, new Dictionary<string, object> { ["domain"] = "constructor[0]", ["otherDomain"] = "Sales" });
+
+        List<ArchitectureViolation> violations = runner.Session.CheckPortBoundaryContract(contract);
+
+        Assert.That(violations.Any(v => v.SourceType == typeof(SalesCheckout).FullName), Is.True);
+    }
+
+    [Test]
+    public void CheckPortBoundaryContract_TargetContextMetadataList_MatchesAnyListedValue()
+    {
+        ArchitecturePortBoundaryContract contract = CreateInventoryContract();
+        contract.TargetContext = new ArchitectureContextMetadataSelector
+        {
+            Metadata = new Dictionary<string, object> { ["domain"] = new List<object> { "Inventory", "Warehouse" } }
+        };
+        var runner = CreateRunner(contract);
 
         List<ArchitectureViolation> violations = runner.Session.CheckPortBoundaryContract(contract);
 
