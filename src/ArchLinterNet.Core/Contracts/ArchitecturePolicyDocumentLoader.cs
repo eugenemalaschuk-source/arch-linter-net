@@ -16,8 +16,8 @@ public sealed partial class ArchitecturePolicyDocumentLoader : IArchitecturePoli
     private const string ForbiddenKey = "forbidden";
     private const string UnnamedContractName = "<unnamed>";
 
-    private static readonly string[] TargetContextAllowedKeys = { "metadata" };
-    private static readonly string[] AdapterBindingAllowedKeys = { "adapter", "expected_port", "allowed_contexts" };
+    private static readonly string[] _targetContextAllowedKeys = { "metadata" };
+    private static readonly string[] _adapterBindingAllowedKeys = { "adapter", "expected_port", "allowed_contexts" };
 
     private readonly IArchitectureFileSystem _fileSystem;
 
@@ -247,14 +247,14 @@ public sealed partial class ArchitecturePolicyDocumentLoader : IArchitecturePoli
     }
 
     private static void ValidateTargetContextNodeKeys(YamlMappingNode node, string contractName) =>
-        ValidateKnownKeys(node, contractName, "target_context", TargetContextAllowedKeys);
+        ValidateKnownKeys(node, contractName, "target_context", _targetContextAllowedKeys);
 
     private static void ValidateAdapterBindings(YamlMappingNode contractNode, string contractName)
     {
         if (!TryGetChild(contractNode, "adapter_bindings", out YamlNode? bindingsNode) || bindingsNode is not YamlSequenceNode bindings) return;
         foreach (YamlMappingNode binding in bindings.Children.OfType<YamlMappingNode>())
         {
-            ValidateKnownKeys(binding, contractName, "adapter_bindings entry", AdapterBindingAllowedKeys);
+            ValidateKnownKeys(binding, contractName, "adapter_bindings entry", _adapterBindingAllowedKeys);
             foreach (string field in new[] { "adapter", "expected_port" })
             {
                 if (TryGetChild(binding, field, out YamlNode? selector) && selector is YamlMappingNode mapping)
