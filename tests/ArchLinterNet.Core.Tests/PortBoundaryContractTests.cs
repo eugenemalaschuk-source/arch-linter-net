@@ -86,6 +86,14 @@ public sealed class PortBoundaryContractTests
 
         Assert.That(violations.Any(v => v.SourceType == typeof(MismatchedPaymentAdapter).FullName), Is.True);
         Assert.That(violations.Any(v => v.SourceType == typeof(StripePaymentAdapter).FullName), Is.False);
+        ArchitectureDiagnostic mapped = ArchitectureDiagnosticMapper.FromViolation(
+            violations.Single(v => v.SourceType == typeof(MismatchedPaymentAdapter).FullName));
+        Assert.That(mapped, Is.TypeOf<PortBoundaryDiagnostic>());
+        var diagnostic = (PortBoundaryDiagnostic)mapped;
+        Assert.That(diagnostic.TargetRole, Is.EqualTo("Port"));
+        Assert.That(diagnostic.TargetMetadata!["domain"], Is.EqualTo("Catalog"));
+        Assert.That(diagnostic.ForbiddenReferences, Does.Contain(typeof(ICatalogPort).FullName));
+        Assert.That(diagnostic.RemediationHint, Does.Contain("Implement the expected port"));
     }
 
     [Test]
@@ -94,12 +102,104 @@ public sealed class PortBoundaryContractTests
         var violation = new ArchitectureViolation("ports", "ports", "Sales.Checkout", "direct edge", new[] { "Catalog.Order" })
         {
             Payload = new PortBoundaryPayload("ApplicationLayer", new Dictionary<string, object> { ["domain"] = "Sales" },
-                "DomainLayer", new Dictionary<string, object> { ["domain"] = "Catalog" }, "direct_reference", "role:Port")
+                "DomainLayer", new Dictionary<string, object> { ["domain"] = "Catalog" }, "direct_reference", "role:Port",
+                "Depend on the approved port abstraction.")
         };
 
         string json = new ArchitectureDiagnosticFormatter().FormatViolationsForCiArtifacts("ports", "ports", new[] { violation });
 
         Assert.That(json, Does.Contain("\"evidence_kind\":\"direct_reference\""));
         Assert.That(json, Does.Contain("\"expected_seam\":\"role:Port\""));
+        Assert.That(json, Does.Contain("\"remediation_hint\":\"Depend on the approved port abstraction.\""));
+    }
+
+    [Test]
+    public void CheckPortBoundaryContract_ForbiddenSelectorWinsOverAllowedSeam()
+    {
+        ArchitecturePortBoundaryContract contract = CreateInventoryContract();
+        contract.Forbidden = new List<ArchitectureContextSelector>
+        {
+            new() { Role = "Port", Metadata = new Dictionary<string, object> { ["domain"] = "Inventory" } }
+        };
+        var runner = CreateRunner(contract);
+
+        List<ArchitectureViolation> violations = runner.Session.CheckPortBoundaryContract(contract);
+
+        Assert.That(violations.Any(v => v.SourceType == typeof(SalesUsesInventoryPort).FullName), Is.True);
+    }
+
+    [Test]
+    public void CheckPortBoundaryContract_TargetContextNotEqualOperator_UsesReferencedSourceKey()
+    {
+        ArchitecturePortBoundaryContract contract = CreateInventoryContract();
+        contract.TargetContext = new ArchitectureContextMetadataSelector
+        {
+            Metadata = new Dictionary<string, object> { ["domain"] = "!{source.metadata.otherDomain}" }
+        };
+        var runner = CreateRunner(contract, new Dictionary<string, object> { ["domain"] = "constructor[0]", ["otherDomain"] = "Sales" });
+
+        List<ArchitectureViolation> violations = runner.Session.CheckPortBoundaryContract(contract);
+
+        Assert.That(violations.Any(v => v.SourceType == typeof(SalesCheckout).FullName), Is.True);
+    }
+
+    [Test]
+    public void CheckPortBoundaryContract_ExcludeSuppressesForbiddenTarget()
+    {
+        ArchitecturePortBoundaryContract contract = CreateInventoryContract();
+        contract.Exclude = new List<ArchitectureContextSelector>
+        {
+            new() { Role = "DomainLayer", Metadata = new Dictionary<string, object> { ["domain"] = "Inventory" } }
+        };
+        var runner = CreateRunner(contract);
+
+        List<ArchitectureViolation> violations = runner.Session.CheckPortBoundaryContract(contract);
+
+        Assert.That(violations.Any(v => v.SourceType == typeof(SalesCheckout).FullName), Is.False);
+    }
+
+    private static ArchitecturePortBoundaryContract CreateInventoryContract() => new()
+    {
+        Name = "sales-to-inventory-through-port",
+        Source = new ArchitectureContextSelector { Role = "DomainLayer", Metadata = new Dictionary<string, object> { ["domain"] = "Sales" } },
+        TargetContext = new ArchitectureContextMetadataSelector { Metadata = new Dictionary<string, object> { ["domain"] = "Inventory" } },
+        AllowedSeams = new List<ArchitectureContextSelector> { new() { Role = "Port", Metadata = new Dictionary<string, object> { ["domain"] = "Inventory" } } },
+        Forbidden = new List<ArchitectureContextSelector> { new() { Role = "DomainLayer", Metadata = new Dictionary<string, object> { ["domain"] = "Inventory" } } },
+        Reason = "Use the reviewed port."
+    };
+
+    private static ArchitectureContractRunner CreateRunner(ArchitecturePortBoundaryContract contract,
+        Dictionary<string, object>? domainMetadata = null)
+    {
+        Assembly assembly = typeof(SalesCheckout).Assembly;
+        var document = new ArchitectureContractDocument
+        {
+            Version = 1,
+            Name = "ports",
+            Analysis = new ArchitectureAnalysisConfiguration
+            {
+                TargetAssemblies = new List<string> { assembly.GetName().Name! }
+            },
+            Classification = new ArchitectureClassificationConfiguration
+            {
+                Attributes =
+                {
+                    new ArchitectureAttributeClassificationMapping
+                    {
+                        Attribute = "ContextualContractTestFixtures.ContextDomainMarkerAttribute",
+                        Role = "DomainLayer",
+                        Metadata = domainMetadata ?? new Dictionary<string, object> { ["domain"] = "constructor[0]" }
+                    },
+                    new ArchitectureAttributeClassificationMapping
+                    {
+                        Attribute = "ContextualContractTestFixtures.ContextPortMarkerAttribute",
+                        Role = "Port",
+                        Metadata = new Dictionary<string, object> { ["domain"] = "constructor[0]" }
+                    },
+                }
+            }
+        };
+        document.Contracts.StrictPortBoundaries.Add(contract);
+        return new ArchitectureContractRunner(new ArchitectureAnalysisContext("/tmp", new[] { assembly }, Array.Empty<string>(), Array.Empty<string>()), document);
     }
 }

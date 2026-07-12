@@ -5,7 +5,7 @@ public sealed record PortBoundaryPayload(
     IReadOnlyDictionary<string, object>? SourceMetadata,
     string? TargetRole,
     IReadOnlyDictionary<string, object>? TargetMetadata,
-    string EvidenceKind, string ExpectedSeam) : IArchitectureDiagnosticPayload
+    string EvidenceKind, string ExpectedSeam, string RemediationHint) : IArchitectureDiagnosticPayload
 {
     public ArchitectureDiagnostic ToDiagnostic(ArchitectureViolation violation) =>
         new PortBoundaryDiagnostic(violation.ContractName, violation.ContractId, violation.SourceType,
@@ -16,6 +16,7 @@ public sealed record PortBoundaryPayload(
             TargetRole = TargetRole,
             TargetMetadata = TargetMetadata,
             EvidenceKind = EvidenceKind,
-            ExpectedSeam = ExpectedSeam
+            ExpectedSeam = ExpectedSeam,
+            RemediationHint = RemediationHint
         };
 }

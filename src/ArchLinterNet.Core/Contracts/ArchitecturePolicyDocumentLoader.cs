@@ -216,14 +216,52 @@ public sealed partial class ArchitecturePolicyDocumentLoader : IArchitecturePoli
         {
             string name = TryGetChild(entry, "name", out YamlNode? value) && value is YamlScalarNode scalar
                 ? scalar.Value ?? "<unnamed>" : "<unnamed>";
-            foreach (string field in new[] { "source", "target_context" })
+            ValidatePortBoundaryContractNodeKeys(entry, name);
+            if (TryGetChild(entry, "source", out YamlNode? source) && source is YamlMappingNode sourceMapping)
             {
-                if (TryGetChild(entry, field, out YamlNode? selector) && selector is YamlMappingNode mapping)
-                    ValidateContextualSelectorNodeKeys(mapping, name, field);
+                ValidateContextualSelectorNodeKeys(sourceMapping, name, "source");
+            }
+            if (TryGetChild(entry, "target_context", out YamlNode? targetContext) && targetContext is YamlMappingNode targetMapping)
+            {
+                ValidateTargetContextNodeKeys(targetMapping, name);
             }
             ValidateContextualSelectorListKeys(entry, name, "allowed_seams");
             ValidateContextualSelectorListKeys(entry, name, "forbidden");
             ValidateContextualSelectorListKeys(entry, name, "exclude");
+            ValidateAdapterBindings(entry, name);
+        }
+    }
+
+    private static void ValidatePortBoundaryContractNodeKeys(YamlMappingNode node, string contractName)
+    {
+        string[] allowed = { "name", "id", "source", "target_context", "allowed_seams", "forbidden", "adapter_bindings", "exclude", "ignored_violations", "reason" };
+        ValidateKnownKeys(node, contractName, "port-boundary contract", allowed);
+    }
+
+    private static void ValidateTargetContextNodeKeys(YamlMappingNode node, string contractName) =>
+        ValidateKnownKeys(node, contractName, "target_context", new[] { "metadata" });
+
+    private static void ValidateAdapterBindings(YamlMappingNode contractNode, string contractName)
+    {
+        if (!TryGetChild(contractNode, "adapter_bindings", out YamlNode? bindingsNode) || bindingsNode is not YamlSequenceNode bindings) return;
+        foreach (YamlMappingNode binding in bindings.Children.OfType<YamlMappingNode>())
+        {
+            ValidateKnownKeys(binding, contractName, "adapter_bindings entry", new[] { "adapter", "expected_port", "allowed_contexts" });
+            foreach (string field in new[] { "adapter", "expected_port" })
+            {
+                if (TryGetChild(binding, field, out YamlNode? selector) && selector is YamlMappingNode mapping)
+                    ValidateContextualSelectorNodeKeys(mapping, contractName, $"adapter_bindings.{field}");
+            }
+            ValidateContextualSelectorListKeys(binding, contractName, "allowed_contexts");
+        }
+    }
+
+    private static void ValidateKnownKeys(YamlMappingNode node, string contractName, string location, IEnumerable<string> allowed)
+    {
+        foreach ((YamlNode keyNode, _) in node.Children)
+        {
+            if (keyNode is YamlScalarNode scalar && !allowed.Contains(scalar.Value, StringComparer.Ordinal))
+                throw new InvalidOperationException($"Contextual contract '{contractName}' declares an unknown property '{scalar.Value}' on {location}.");
         }
     }
 

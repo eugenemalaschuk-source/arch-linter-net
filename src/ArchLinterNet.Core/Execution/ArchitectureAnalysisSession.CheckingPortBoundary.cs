@@ -20,9 +20,8 @@ public sealed partial class ArchitectureAnalysisSession
             {
                 if (!MatchesTargetContext(contract.TargetContext, target, sourceRole)
                     || IsExcludedFromContextMatch(target, contract.Exclude, sourceRole)) continue;
-                bool allowed = contract.AllowedSeams.Any(s => ArchitectureContextSelectorMatcher.Matches(s, target, RoleIndex, sourceRole));
                 ArchitectureContextSelector? forbidden = contract.Forbidden.FirstOrDefault(s => ArchitectureContextSelectorMatcher.Matches(s, target, RoleIndex, sourceRole));
-                if (allowed || forbidden is null) continue;
+                if (forbidden is null) continue;
                 string targetName = ArchitectureTypeNames.SafeFullName(target);
                 if (string.IsNullOrEmpty(targetName) || context.IsIgnored(sourceName, targetName)) continue;
                 RoleIndex.TryGetRole(target, out ArchitectureTypeClassificationResult targetRole);
@@ -30,7 +29,8 @@ public sealed partial class ArchitectureAnalysisSession
                     $"forbidden direct edge; expected seam: {string.Join(" or ", contract.AllowedSeams.Select(DescribeContextSelector))}", new[] { targetName })
                 {
                     Payload = new PortBoundaryPayload(sourceRole.Role, sourceRole.Metadata, targetRole.Role,
-                        targetRole.Metadata, "direct_reference", string.Join(" or ", contract.AllowedSeams.Select(DescribeContextSelector)))
+                        targetRole.Metadata, "direct_reference", string.Join(" or ", contract.AllowedSeams.Select(DescribeContextSelector)),
+                        "Depend on the approved port abstraction or add an explicit reviewed exception.")
                 });
             }
         }
@@ -48,30 +48,47 @@ public sealed partial class ArchitectureAnalysisSession
                 if (!RoleIndex.TryGetRole(adapter, out ArchitectureTypeClassificationResult adapterRole)) continue;
                 bool inAllowedContext = binding.AllowedContexts.Count == 0 || binding.AllowedContexts.Any(selector =>
                     ArchitectureContextSelectorMatcher.Matches(selector, adapter, RoleIndex, adapterRole));
-                bool implementsExpectedPort = adapter.GetInterfaces().Any(@interface =>
-                    ArchitectureContextSelectorMatcher.Matches(binding.ExpectedPort, @interface, RoleIndex, adapterRole));
+                Type? implementedExpectedPort = adapter.GetInterfaces()
+                    .OrderBy(ArchitectureTypeNames.SafeFullName, StringComparer.Ordinal)
+                    .FirstOrDefault(@interface => ArchitectureContextSelectorMatcher.Matches(
+                        binding.ExpectedPort, @interface, RoleIndex, adapterRole));
+                bool implementsExpectedPort = implementedExpectedPort != null;
                 if (inAllowedContext && implementsExpectedPort) continue;
                 string adapterName = ArchitectureTypeNames.SafeFullName(adapter);
                 if (context.IsIgnored(adapterName, DescribeContextSelector(binding.ExpectedPort))) continue;
+                Type? actualPort = implementedExpectedPort ?? adapter.GetInterfaces()
+                    .OrderBy(ArchitectureTypeNames.SafeFullName, StringComparer.Ordinal)
+                    .FirstOrDefault();
+                ArchitectureTypeClassificationResult actualPortRole = default!;
+                if (actualPort != null)
+                {
+                    RoleIndex.TryGetRole(actualPort, out actualPortRole);
+                }
+                string actualPortName = actualPort == null
+                    ? "no implemented interface"
+                    : ArchitectureTypeNames.SafeFullName(actualPort);
                 string kind = implementsExpectedPort ? "adapter_context" : "adapter_port_mismatch";
                 string detail = implementsExpectedPort
                     ? "adapter is outside approved adapter context"
-                    : $"adapter does not implement expected port {DescribeContextSelector(binding.ExpectedPort)}";
+                    : $"adapter implements {actualPortName}, not expected port {DescribeContextSelector(binding.ExpectedPort)}";
                 violations.Add(
                     new ArchitectureViolation(
                         contract.Name,
                         contract.Id,
                         adapterName,
                         detail,
-                        new[] { DescribeContextSelector(binding.ExpectedPort) })
+                        new[] { actualPortName })
                     {
                         Payload = new PortBoundaryPayload(
                             adapterRole.Role,
                             adapterRole.Metadata,
-                            null,
-                            null,
+                            actualPortRole.Role,
+                            actualPortRole.Metadata,
                             kind,
-                            DescribeContextSelector(binding.ExpectedPort))
+                            DescribeContextSelector(binding.ExpectedPort),
+                            implementsExpectedPort
+                                ? "Move the adapter to an approved adapter context or add an explicit reviewed exception."
+                                : "Implement the expected port or correct the adapter's reviewed port metadata.")
                     });
             }
     }
@@ -84,9 +101,10 @@ public sealed partial class ArchitectureAnalysisSession
         {
             if (!targetRole.Metadata.TryGetValue(key, out object? actual)) return false;
             if (expected is string text && text == "*") continue;
-            if (expected is string textValue && textValue == $"!{{source.metadata.{key}}}")
+            if (expected is string textValue && TryGetSourceMetadataKey(textValue, out string sourceKey))
             {
-                if (!source.Metadata.TryGetValue(key, out object? sourceValue) || Equals(actual, sourceValue)) return false;
+                if (!source.Metadata.TryGetValue(sourceKey, out object? sourceValue)
+                    || ArchitectureMetadataValueComparer.ValuesEqual(actual, sourceValue)) return false;
                 continue;
             }
             if (expected is System.Collections.IEnumerable values && expected is not string)
@@ -97,6 +115,17 @@ public sealed partial class ArchitectureAnalysisSession
             }
             if (!ArchitectureMetadataValueComparer.ValuesEqual(actual, expected)) return false;
         }
+        return true;
+    }
+
+    private static bool TryGetSourceMetadataKey(string value, out string key)
+    {
+        const string Prefix = "!{source.metadata.";
+        key = string.Empty;
+        if (!value.StartsWith(Prefix, StringComparison.Ordinal) || !value.EndsWith('}')) return false;
+        string candidate = value[Prefix.Length..^1];
+        if (candidate.Length == 0) return false;
+        key = candidate;
         return true;
     }
 }

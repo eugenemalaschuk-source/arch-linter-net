@@ -12,4 +12,5 @@ public sealed record PortBoundaryDiagnostic(
     public IReadOnlyDictionary<string, object>? TargetMetadata { get; init; }
     public string? EvidenceKind { get; init; }
     public string? ExpectedSeam { get; init; }
+    public string? RemediationHint { get; init; }
 }

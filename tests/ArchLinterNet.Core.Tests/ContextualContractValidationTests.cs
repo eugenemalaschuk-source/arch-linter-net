@@ -425,4 +425,32 @@ public sealed class ContextualContractValidationTests
 
         Assert.DoesNotThrow(() => new ArchitecturePolicyDocumentLoader().Load(policyPath));
     }
+
+    [Test]
+    public void PortBoundary_UnknownNestedAdapterBindingProperty_ThrowsActionableError()
+    {
+        string policyPath = WritePolicy($$"""
+            version: 1
+            name: Test
+            analysis:
+              target_assemblies: [{{AssemblyName}}]
+            contracts:
+              strict_port_boundaries:
+                - name: port-boundary
+                  source: { role: ApplicationLayer }
+                  target_context: { metadata: { domain: Catalog } }
+                  allowed_seams: [{ role: Port }]
+                  forbidden: [{ role: DomainLayer }]
+                  adapter_bindings:
+                    - adapter: { role: Adapter }
+                      expected_port: { role: Port }
+                      allowed_context: [{ role: Adapter }]
+                  reason: Test nested validation.
+            """);
+
+        InvalidOperationException ex = Assert.Throws<InvalidOperationException>(() =>
+            new ArchitecturePolicyDocumentLoader().Load(policyPath))!;
+
+        Assert.That(ex.Message, Does.Contain("unknown property 'allowed_context'"));
+    }
 }
