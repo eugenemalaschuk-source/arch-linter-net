@@ -40,15 +40,8 @@ internal static partial class ArchitectureContextSelectorMatcher
             return false;
         }
 
-        foreach (KeyValuePair<string, object> entry in selector.Metadata)
-        {
-            if (!MatchesMetadataConstraint(entry.Key, entry.Value, descriptor, sourceDescriptor))
-            {
-                return false;
-            }
-        }
-
-        return true;
+        return selector.Metadata.All(entry =>
+            MatchesMetadataConstraint(entry.Key, entry.Value, descriptor, sourceDescriptor));
     }
 
     private static bool MatchesMetadataConstraint(
@@ -64,38 +57,57 @@ internal static partial class ArchitectureContextSelectorMatcher
 
         if (constraintValue is IEnumerable sequence and not string)
         {
-            foreach (object item in sequence)
-            {
-                if (ArchitectureMetadataValueComparer.ValuesEqual(actual, item))
-                {
-                    return true;
-                }
-            }
-
-            return false;
+            return MatchesAnyListedValue(actual, sequence);
         }
 
         if (constraintValue is string stringValue)
         {
-            if (stringValue == "*")
+            bool? specialFormResult = MatchesStringOperator(actual, stringValue, sourceDescriptor);
+            if (specialFormResult.HasValue)
             {
-                return true;
-            }
-
-            Match match = NotEqualToSourcePattern().Match(stringValue);
-            if (match.Success)
-            {
-                string sourceKey = match.Groups[1].Value;
-                if (sourceDescriptor == null
-                    || !sourceDescriptor.Metadata.TryGetValue(sourceKey, out object? sourceValue))
-                {
-                    return false;
-                }
-
-                return !ArchitectureMetadataValueComparer.ValuesEqual(actual, sourceValue);
+                return specialFormResult.Value;
             }
         }
 
         return ArchitectureMetadataValueComparer.ValuesEqual(actual, constraintValue);
+    }
+
+    // The "in" operator: matches if the resolved value equals any listed candidate.
+    private static bool MatchesAnyListedValue(object actual, IEnumerable candidates)
+    {
+        foreach (object item in candidates)
+        {
+            if (ArchitectureMetadataValueComparer.ValuesEqual(actual, item))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    // Recognizes the "any" ("*") and "not-equal-to-source" string special forms. Returns null when
+    // stringValue is neither, so the caller falls through to plain exact-literal comparison.
+    private static bool? MatchesStringOperator(
+        object actual, string stringValue, ArchitectureTypeClassificationResult? sourceDescriptor)
+    {
+        if (stringValue == "*")
+        {
+            return true;
+        }
+
+        Match match = NotEqualToSourcePattern().Match(stringValue);
+        if (!match.Success)
+        {
+            return null;
+        }
+
+        string sourceKey = match.Groups[1].Value;
+        if (sourceDescriptor == null || !sourceDescriptor.Metadata.TryGetValue(sourceKey, out object? sourceValue))
+        {
+            return false;
+        }
+
+        return !ArchitectureMetadataValueComparer.ValuesEqual(actual, sourceValue);
     }
 }

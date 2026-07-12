@@ -17,6 +17,7 @@ namespace ArchLinterNet.Core.Tests;
 public sealed class ContextDependencyContractTests
 {
     private static readonly Assembly _fixturesAssembly = typeof(SalesOrder).Assembly;
+    private static readonly string[] _namespaceViolationForbiddenReferences = { "MyApp.Infrastructure.Gateway" };
     private readonly ArchitectureDiagnosticFormatter _formatter = new();
 
     private static ArchitectureClassificationConfiguration Classification()
@@ -400,7 +401,7 @@ public sealed class ContextDependencyContractTests
 
         var namespaceViolation = new ArchitectureViolation(
             "namespace-rule", "namespace-rule-id", "MyApp.Application.Service",
-            "MyApp.Infrastructure", new[] { "MyApp.Infrastructure.Gateway" })
+            "MyApp.Infrastructure", _namespaceViolationForbiddenReferences)
         {
             Payload = new DependencyPayload()
         };

@@ -15,6 +15,7 @@ namespace ArchLinterNet.Core.Tests;
 public sealed class ContextAllowOnlyContractTests
 {
     private static readonly Assembly _fixturesAssembly = typeof(SalesOrder).Assembly;
+    private static readonly string[] _namespaceViolationForbiddenReferences = { "MyApp.Infrastructure.Gateway" };
     private readonly ArchitectureDiagnosticFormatter _formatter = new();
 
     private static ArchitectureClassificationConfiguration Classification()
@@ -359,7 +360,7 @@ public sealed class ContextAllowOnlyContractTests
 
         var namespaceViolation = new ArchitectureViolation(
             "namespace-allow-only-rule", "namespace-allow-only-id", "MyApp.Domain.Order",
-            "outside allowed layers", new[] { "MyApp.Infrastructure.Gateway" });
+            "outside allowed layers", _namespaceViolationForbiddenReferences);
 
         string humanOutput = _formatter.FormatViolationsForHumans(new[] { contextViolation, namespaceViolation });
 
