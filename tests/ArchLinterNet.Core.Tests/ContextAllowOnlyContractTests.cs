@@ -122,6 +122,24 @@ public sealed class ContextAllowOnlyContractTests
     }
 
     [Test]
+    public void CheckContextAllowOnlyContract_TargetReferencedViaMultipleMembers_ReturnsExactlyOneViolation()
+    {
+        // SalesMultiMemberReferenceToInventory references InventoryStockItem through two distinct
+        // properties. ArchitectureReferenceScanner does not deduplicate its own output, so this
+        // proves the checker collapses repeated occurrences of the same target into one finding.
+        ArchitectureContextAllowOnlyContract contract = SalesAllowOnlyContract();
+        var runner = new ArchitectureContractRunner(CreateContext(), CreateDocument(contract));
+
+        List<ArchitectureViolation> violations = runner.Session.CheckContextAllowOnlyContract(contract);
+
+        Assert.That(
+            violations.Count(v =>
+                v.SourceType == typeof(SalesMultiMemberReferenceToInventory).FullName
+                && v.ForbiddenReferences.Contains(typeof(InventoryStockItem).FullName)),
+            Is.EqualTo(1));
+    }
+
+    [Test]
     public void CheckContextAllowOnlyContract_SharedKernelExcluded_UnaffectedByAllowedSharedKernelSelector()
     {
         var contract = new ArchitectureContextAllowOnlyContract

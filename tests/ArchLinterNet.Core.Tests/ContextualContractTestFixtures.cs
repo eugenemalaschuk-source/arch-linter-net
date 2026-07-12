@@ -96,6 +96,16 @@ namespace ContextualContractTestFixtures
         public DomainlessTargetType Target { get; } = null!;
     }
 
+    // References the same target type through two distinct members - used to prove a single
+    // source/target pair produces exactly one contextual violation, not one per reflection path
+    // ArchitectureReferenceScanner discovers the reference through.
+    [ContextDomainMarker("Sales")]
+    public sealed class SalesMultiMemberReferenceToInventory
+    {
+        public InventoryStockItem Primary { get; } = null!;
+        public InventoryStockItem Secondary { get; } = null!;
+    }
+
     // Not classified by any attribute mapping used in these tests - must never match any
     // contextual selector regardless of role/metadata declared on the selector.
     public sealed class PlainUnclassifiedType;

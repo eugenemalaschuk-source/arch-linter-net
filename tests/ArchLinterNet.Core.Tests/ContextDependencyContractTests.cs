@@ -131,6 +131,52 @@ public sealed class ContextDependencyContractTests
     }
 
     [Test]
+    public void CheckContextDependencyContract_TargetReferencedViaMultipleMembers_ReturnsExactlyOneViolation()
+    {
+        // SalesMultiMemberReferenceToInventory references InventoryStockItem through two distinct
+        // properties. ArchitectureReferenceScanner does not deduplicate its own output, so this
+        // proves the checker collapses repeated occurrences of the same target into one finding.
+        ArchitectureContextDependencyContract contract = CrossDomainContract();
+        var runner = new ArchitectureContractRunner(CreateContext(), CreateDocument(contract));
+
+        List<ArchitectureViolation> violations = runner.Session.CheckContextDependencyContract(contract);
+
+        Assert.That(
+            violations.Count(v =>
+                v.SourceType == typeof(SalesMultiMemberReferenceToInventory).FullName
+                && v.ForbiddenReferences.Contains(typeof(InventoryStockItem).FullName)),
+            Is.EqualTo(1));
+    }
+
+    [Test]
+    public void CheckContextDependencyContract_TargetMatchesMultipleForbiddenSelectors_ReturnsExactlyOneViolation()
+    {
+        // Two forbidden selectors both match InventoryStockItem (role DomainLayer): one via the
+        // cross-domain not-equal-to-source constraint, one via a broader same-role selector with no
+        // metadata constraint. A single source/target pair must still produce exactly one violation.
+        var contract = new ArchitectureContextDependencyContract
+        {
+            Id = "sales-multi-forbidden-selector",
+            Name = "sales-must-not-depend-on-inventory-overlapping-selectors",
+            Source = new ArchitectureContextSelector { Role = "DomainLayer", Metadata = new Dictionary<string, object> { ["domain"] = "Sales" } },
+            Forbidden = new List<ArchitectureContextSelector>
+            {
+                new() { Role = "DomainLayer", Metadata = new Dictionary<string, object> { ["domain"] = "!{source.metadata.domain}" } },
+                new() { Role = "DomainLayer" }
+            }
+        };
+        var runner = new ArchitectureContractRunner(CreateContext(), CreateDocument(contract));
+
+        List<ArchitectureViolation> violations = runner.Session.CheckContextDependencyContract(contract);
+
+        Assert.That(
+            violations.Count(v =>
+                v.SourceType == typeof(SalesCheckout).FullName
+                && v.ForbiddenReferences.Contains(typeof(InventoryStockItem).FullName)),
+            Is.EqualTo(1));
+    }
+
+    [Test]
     public void CheckContextDependencyContract_SharedKernelExcluded_NoViolationForExcludedTarget()
     {
         var contract = new ArchitectureContextDependencyContract
