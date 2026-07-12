@@ -1,7 +1,8 @@
 # contextual-allow-only-contracts Specification
 
 ## Purpose
-TBD - created by archiving change add-contextual-dependency-contracts. Update Purpose after archive.
+Evaluates strict and audit contextual allow-only contracts that restrict a source type's dependencies to an explicit allow-list of semantic role/metadata selectors, without requiring either side to be declared as a `layers.<name>`.
+
 ## Requirements
 ### Requirement: Contextual allow-only contract family exists with strict and audit variants
 The reviewed schema and runtime SHALL support `contracts.strict_context_allow_only` and `contracts.audit_context_allow_only` as a new contract family, registered identically to every other family in the contract-family registry. Each contract entry SHALL declare `name`, optional `id`, a `source` selector, an `allowed` list of selectors, an optional `exclude` list of selectors, optional `ignored_violations`, and `reason`.

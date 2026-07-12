@@ -1,7 +1,8 @@
 # contextual-dependency-contracts Specification
 
 ## Purpose
-TBD - created by archiving change add-contextual-dependency-contracts. Update Purpose after archive.
+Evaluates strict and audit contextual dependency contracts that forbid a source type from referencing a target type based on discovered semantic role/metadata selectors, without requiring either side to be declared as a `layers.<name>`.
+
 ## Requirements
 ### Requirement: Contextual dependency contract family exists with strict and audit variants
 The reviewed schema and runtime SHALL support `contracts.strict_context_dependencies` and `contracts.audit_context_dependencies` as a new contract family, registered identically to every other family in the contract-family registry (catalog metadata, checker delegate, owned contract type). Each contract entry SHALL declare `name`, optional `id`, a `source` selector, a `forbidden` list of selectors, an optional `exclude` list of selectors, optional `ignored_violations`, and `reason`.
