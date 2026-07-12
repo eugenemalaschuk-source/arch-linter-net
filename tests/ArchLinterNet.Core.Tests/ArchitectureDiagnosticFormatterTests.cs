@@ -488,6 +488,41 @@ public sealed class ArchitectureDiagnosticFormatterTests
         Assert.That(result, Is.EqualTo("pre-existing-implementation"));
     }
 
+    // A third-party implementer that predates the classificationPathDeferred overloads must still
+    // compile and function — proving those overloads' default interface implementations satisfy the
+    // interface contract without forcing every implementer to add them, chaining down through the
+    // roles overload's own default implementation to the original member (#307 review: patch coverage).
+    [Test]
+    public void FormatResultForCiArtifacts_PreExistingImplementerWithoutPathDeferredOverload_FallsBackThroughRolesOverload()
+    {
+        IArchitectureDiagnosticFormatter formatter = new PreExistingThirdPartyFormatter();
+        var roles = new[]
+        {
+            new Model.ArchitectureClassificationRoleFact(
+                "MyApp.Order", "DomainLayer", Model.ArchitectureClassificationSource.TypeAttribute, null, new Dictionary<string, object>())
+        };
+        var pathDeferred = new Model.ArchitectureClassificationPathDeferredNotice(1);
+
+        string result = formatter.FormatResultForCiArtifacts(
+            "strict", true, Array.Empty<ArchitectureViolation>(), Array.Empty<string>(), roles, pathDeferred);
+
+        Assert.That(result, Is.EqualTo("pre-existing-implementation"));
+    }
+
+    [Test]
+    public void FormatClassificationFactsForHumans_PreExistingImplementerWithoutPathDeferredOverload_FallsBackToOriginalMember()
+    {
+        IArchitectureDiagnosticFormatter formatter = new PreExistingThirdPartyFormatter();
+        var pathDeferred = new Model.ArchitectureClassificationPathDeferredNotice(1);
+
+        string result = formatter.FormatClassificationFactsForHumans(
+            Array.Empty<Model.ArchitectureClassificationConflict>(),
+            Array.Empty<Model.ArchitectureClassificationMetadataFailure>(),
+            pathDeferred);
+
+        Assert.That(result, Is.Empty);
+    }
+
     [Test]
     public void FormatCyclesForHumans_MultipleCycles_SortedAlphabetically()
     {

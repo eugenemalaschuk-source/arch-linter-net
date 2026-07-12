@@ -459,6 +459,28 @@ public sealed class ArchitectureRoleIndexTests
     }
 
     [Test]
+    public void TryGetRole_InheritanceLiteralMetadata_ExtractsValue()
+    {
+        var classification = new ArchitectureClassificationConfiguration
+        {
+            Inheritance =
+            {
+                new ArchitectureInheritanceClassificationMapping
+                {
+                    BaseType = "AttributeRoleExtractionTestFixtures.DomainEntityBase",
+                    Role = "DomainLayer",
+                    Metadata = new Dictionary<string, object> { ["domain"] = "Sales" }
+                }
+            }
+        };
+
+        ArchitectureRoleIndex index = CreateIndex(classification);
+
+        Assert.That(index.TryGetRole(typeof(DirectlyDerivedEntity), out ArchitectureTypeClassificationResult descriptor), Is.True);
+        Assert.That(descriptor.Metadata["domain"], Is.EqualTo("Sales"));
+    }
+
+    [Test]
     public void TryGetRole_InheritanceMetadataConstructorForm_RejectedAsExtractionFailure()
     {
         // Defense in depth: the schema forbids constructor[]/property: on inheritance/namespace
@@ -596,6 +618,27 @@ public sealed class ArchitectureRoleIndexTests
                 new ArchitectureNamespaceClassificationMapping
                 {
                     Namespace = "AttributeRoleExtractionTestFixtures.Domain",
+                    Role = "DomainLayer"
+                }
+            }
+        };
+
+        ArchitectureRoleIndex index = CreateIndex(classification);
+
+        Assert.That(index.TryGetRole(typeof(TypeInDefaultNamespace), out _), Is.False);
+    }
+
+    [Test]
+    public void TryGetRole_NamespaceEntryWithNeitherNamespaceNorSuffix_NeverMatches()
+    {
+        // Defense in depth: schema requires at least one of namespace/namespace_suffix, but a
+        // hand-constructed configuration (as here) can bypass that. Must not match anything.
+        var classification = new ArchitectureClassificationConfiguration
+        {
+            Namespace =
+            {
+                new ArchitectureNamespaceClassificationMapping
+                {
                     Role = "DomainLayer"
                 }
             }
