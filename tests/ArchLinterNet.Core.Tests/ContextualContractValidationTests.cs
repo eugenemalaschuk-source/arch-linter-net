@@ -299,6 +299,107 @@ public sealed class ContextualContractValidationTests
     }
 
     [Test]
+    public void ContextAllowOnly_TypoedMetadataKeyOnAllowedSelector_ThrowsActionableError()
+    {
+        // The exact failure mode from the code-review report: "metdata" (typo) is silently dropped
+        // by IgnoreUnmatchedProperties(), leaving the allowed selector's Metadata at its empty
+        // default - a structurally valid role-only shape indistinguishable from an intentional one
+        // after deserialization. Role-only silently broadens the allowed selector to match any
+        // DomainLayer type regardless of domain, turning a metadata-scoped allow-list into a
+        // false-negative that admits cross-context references. Only a raw-YAML pass (before
+        // deserialization discards the unknown key) can catch this.
+        string policyPath = WritePolicy($$"""
+            version: 1
+            name: Test
+            analysis:
+              target_assemblies: [{{AssemblyName}}]
+            contracts:
+              strict_context_allow_only:
+                - name: sales-allow-only
+                  source:
+                    role: DomainLayer
+                    metadata:
+                      domain: Sales
+                  allowed:
+                    - role: DomainLayer
+                      metdata:
+                        domain: Sales
+                  reason: Typo'd metadata key on allowed selector.
+            """);
+
+        InvalidOperationException ex = Assert.Throws<InvalidOperationException>(() =>
+            new ArchitecturePolicyDocumentLoader().Load(policyPath))!;
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(ex.Message, Does.Contain("sales-allow-only"));
+            Assert.That(ex.Message, Does.Contain("unknown property 'metdata'"));
+            Assert.That(ex.Message, Does.Contain("'allowed' selector"));
+        });
+    }
+
+    [Test]
+    public void ContextDependency_UnknownPropertyOnSourceSelector_ThrowsActionableError()
+    {
+        string policyPath = WritePolicy($$"""
+            version: 1
+            name: Test
+            analysis:
+              target_assemblies: [{{AssemblyName}}]
+            contracts:
+              strict_context_dependencies:
+                - name: domain-isolation
+                  source:
+                    role: DomainLayer
+                    metdata:
+                      domain: Sales
+                  forbidden:
+                    - role: DomainLayer
+                  reason: Typo'd metadata key on source selector.
+            """);
+
+        InvalidOperationException ex = Assert.Throws<InvalidOperationException>(() =>
+            new ArchitecturePolicyDocumentLoader().Load(policyPath))!;
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(ex.Message, Does.Contain("unknown property 'metdata'"));
+            Assert.That(ex.Message, Does.Contain("'source' selector"));
+        });
+    }
+
+    [Test]
+    public void ContextDependency_UnknownPropertyOnExcludeSelector_ThrowsActionableError()
+    {
+        string policyPath = WritePolicy($$"""
+            version: 1
+            name: Test
+            analysis:
+              target_assemblies: [{{AssemblyName}}]
+            contracts:
+              strict_context_dependencies:
+                - name: domain-isolation
+                  source:
+                    role: DomainLayer
+                  forbidden:
+                    - role: DomainLayer
+                  exclude:
+                    - role: SharedKernel
+                      unexpected: true
+                  reason: Unknown property on exclude selector.
+            """);
+
+        InvalidOperationException ex = Assert.Throws<InvalidOperationException>(() =>
+            new ArchitecturePolicyDocumentLoader().Load(policyPath))!;
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(ex.Message, Does.Contain("unknown property 'unexpected'"));
+            Assert.That(ex.Message, Does.Contain("'exclude' selector"));
+        });
+    }
+
+    [Test]
     public void ContextDependency_WellFormedContract_LoadsSuccessfully()
     {
         string policyPath = WritePolicy($$"""

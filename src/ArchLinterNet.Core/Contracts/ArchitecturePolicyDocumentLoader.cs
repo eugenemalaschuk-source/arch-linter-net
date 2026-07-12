@@ -40,6 +40,7 @@ public sealed partial class ArchitecturePolicyDocumentLoader : IArchitecturePoli
 
         string yaml = _fileSystem.ReadAllText(policyPath);
         ValidateRawLayerYaml(yaml);
+        ValidateRawContextualContractYaml(yaml);
         ArchitectureContractDocument? document = deserializer.Deserialize<ArchitectureContractDocument>(yaml);
 
         if (document == null)
@@ -145,6 +146,95 @@ public sealed partial class ArchitecturePolicyDocumentLoader : IArchitecturePoli
         {
             throw new InvalidOperationException(
                 $"Layer '{layerName}' namespace must be a non-empty string.");
+        }
+    }
+
+    // ContextualContractValidator (Validators/) runs after deserialization and can only see what
+    // IgnoreUnmatchedProperties() left behind - an unknown selector property (e.g. "metdata" typo'd
+    // for "metadata") is silently dropped by deserialization, leaving ArchitectureContextSelector's
+    // Metadata at its empty-dictionary default. That default is structurally valid (a role-only
+    // selector is a legitimate, intentional shape), so no post-deserialization check can distinguish
+    // "author wrote role-only on purpose" from "author's metadata typo silently vanished" - the
+    // dictionary looks identical either way. For context_allow_only in particular, an unintentionally
+    // role-only `allowed` selector silently broadens to match every type of that role (any metadata),
+    // turning a metadata-scoped allow-list into a false-negative that admits cross-context references.
+    // This raw-YAML pass, mirroring ValidateRawLayerYaml's selector-key check below, is the only place
+    // that can still see the rejected property name before deserialization discards it.
+    private static void ValidateRawContextualContractYaml(string yaml)
+    {
+        var stream = new YamlStream();
+        stream.Load(new StringReader(yaml));
+
+        if (stream.Documents.Count == 0
+            || stream.Documents[0].RootNode is not YamlMappingNode root
+            || !TryGetMappingChild(root, "contracts", out YamlMappingNode? contracts))
+        {
+            return;
+        }
+
+        ValidateContextualContractGroup(contracts!, "strict_context_dependencies", "forbidden");
+        ValidateContextualContractGroup(contracts!, "audit_context_dependencies", "forbidden");
+        ValidateContextualContractGroup(contracts!, "strict_context_allow_only", "allowed");
+        ValidateContextualContractGroup(contracts!, "audit_context_allow_only", "allowed");
+    }
+
+    private static void ValidateContextualContractGroup(YamlMappingNode contracts, string groupKey, string targetListKey)
+    {
+        if (!TryGetChild(contracts, groupKey, out YamlNode? groupNode) || groupNode is not YamlSequenceNode sequence)
+        {
+            return;
+        }
+
+        foreach (YamlNode entryNode in sequence.Children)
+        {
+            if (entryNode is not YamlMappingNode contractNode)
+            {
+                continue;
+            }
+
+            string contractName = TryGetChild(contractNode, "name", out YamlNode? nameNode)
+                && nameNode is YamlScalarNode nameScalar
+                    ? nameScalar.Value ?? "<unnamed>"
+                    : "<unnamed>";
+
+            if (TryGetChild(contractNode, "source", out YamlNode? sourceNode) && sourceNode is YamlMappingNode sourceMapping)
+            {
+                ValidateContextualSelectorNodeKeys(sourceMapping, contractName, "source");
+            }
+
+            ValidateContextualSelectorListKeys(contractNode, contractName, targetListKey);
+            ValidateContextualSelectorListKeys(contractNode, contractName, "exclude");
+        }
+    }
+
+    private static void ValidateContextualSelectorListKeys(YamlMappingNode contractNode, string contractName, string listKey)
+    {
+        if (!TryGetChild(contractNode, listKey, out YamlNode? listNode) || listNode is not YamlSequenceNode listSequence)
+        {
+            return;
+        }
+
+        foreach (YamlNode itemNode in listSequence.Children)
+        {
+            if (itemNode is YamlMappingNode itemMapping)
+            {
+                ValidateContextualSelectorNodeKeys(itemMapping, contractName, listKey);
+            }
+        }
+    }
+
+    private static void ValidateContextualSelectorNodeKeys(YamlMappingNode selectorNode, string contractName, string fieldName)
+    {
+        foreach ((YamlNode keyNode, _) in selectorNode.Children)
+        {
+            if (keyNode is YamlScalarNode scalar
+                && !string.Equals(scalar.Value, "role", StringComparison.Ordinal)
+                && !string.Equals(scalar.Value, "metadata", StringComparison.Ordinal))
+            {
+                throw new InvalidOperationException(
+                    $"Contextual contract '{contractName}' declares an unknown property '{scalar.Value}' on its '{fieldName}' selector. " +
+                    "A contextual selector supports only 'role' and 'metadata'.");
+            }
         }
     }
 
