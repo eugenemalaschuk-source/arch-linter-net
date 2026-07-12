@@ -4,6 +4,16 @@ namespace ArchLinterNet.Core.Scanning;
 
 internal static class ArchitectureReferenceScanner
 {
+    // Set by any Safe* helper below when it swallows a TypeLoadException/FileNotFoundException
+    // instead of returning real reflection data. GetReferencedTypes(Type) itself stays lazy and
+    // silent (used pervasively by every contract family, where that has always been acceptable),
+    // but TryGetReferencedTypes lets a caller that needs to fail closed (see port-boundary's
+    // "Unsupported evidence fails closed" spec requirement) detect that the scan it just fully
+    // enumerated may have silently missed a reference. GetReferencedTypes never recurses into
+    // itself within one top-level call, so a reset-before/read-after ThreadStatic is safe here.
+    [ThreadStatic]
+    private static bool _hadUnloadableMember;
+
     public static IEnumerable<Type> GetReferencedTypes(Type type)
     {
         foreach (Type expanded in InterfaceReferencedTypes(type))
@@ -35,6 +45,16 @@ internal static class ArchitectureReferenceScanner
         {
             yield return expanded;
         }
+    }
+
+    // Fully enumerates GetReferencedTypes(type) and reports whether every member's type was
+    // successfully read. Returns false when any Safe* helper below had to swallow a reflection
+    // failure, meaning the returned list may be missing a real reference.
+    internal static bool TryGetReferencedTypes(Type type, out List<Type> types)
+    {
+        _hadUnloadableMember = false;
+        types = GetReferencedTypes(type).ToList();
+        return !_hadUnloadableMember;
     }
 
     private static IEnumerable<Type> InterfaceReferencedTypes(Type type)
@@ -189,10 +209,12 @@ internal static class ArchitectureReferenceScanner
         }
         catch (FileNotFoundException)
         {
+            _hadUnloadableMember = true;
             return null;
         }
         catch (TypeLoadException)
         {
+            _hadUnloadableMember = true;
             return null;
         }
     }
@@ -205,10 +227,12 @@ internal static class ArchitectureReferenceScanner
         }
         catch (FileNotFoundException)
         {
+            _hadUnloadableMember = true;
             return Array.Empty<Type>();
         }
         catch (TypeLoadException)
         {
+            _hadUnloadableMember = true;
             return Array.Empty<Type>();
         }
     }
@@ -222,10 +246,12 @@ internal static class ArchitectureReferenceScanner
         }
         catch (FileNotFoundException)
         {
+            _hadUnloadableMember = true;
             return Array.Empty<FieldInfo>();
         }
         catch (TypeLoadException)
         {
+            _hadUnloadableMember = true;
             return Array.Empty<FieldInfo>();
         }
     }
@@ -239,10 +265,12 @@ internal static class ArchitectureReferenceScanner
         }
         catch (FileNotFoundException)
         {
+            _hadUnloadableMember = true;
             return Array.Empty<PropertyInfo>();
         }
         catch (TypeLoadException)
         {
+            _hadUnloadableMember = true;
             return Array.Empty<PropertyInfo>();
         }
     }
@@ -256,10 +284,12 @@ internal static class ArchitectureReferenceScanner
         }
         catch (FileNotFoundException)
         {
+            _hadUnloadableMember = true;
             return Array.Empty<MethodInfo>();
         }
         catch (TypeLoadException)
         {
+            _hadUnloadableMember = true;
             return Array.Empty<MethodInfo>();
         }
     }
@@ -273,10 +303,12 @@ internal static class ArchitectureReferenceScanner
         }
         catch (FileNotFoundException)
         {
+            _hadUnloadableMember = true;
             return Array.Empty<ConstructorInfo>();
         }
         catch (TypeLoadException)
         {
+            _hadUnloadableMember = true;
             return Array.Empty<ConstructorInfo>();
         }
     }
@@ -289,10 +321,12 @@ internal static class ArchitectureReferenceScanner
         }
         catch (FileNotFoundException)
         {
+            _hadUnloadableMember = true;
             return null;
         }
         catch (TypeLoadException)
         {
+            _hadUnloadableMember = true;
             return null;
         }
     }
@@ -305,10 +339,12 @@ internal static class ArchitectureReferenceScanner
         }
         catch (FileNotFoundException)
         {
+            _hadUnloadableMember = true;
             return null;
         }
         catch (TypeLoadException)
         {
+            _hadUnloadableMember = true;
             return null;
         }
     }
@@ -321,10 +357,12 @@ internal static class ArchitectureReferenceScanner
         }
         catch (FileNotFoundException)
         {
+            _hadUnloadableMember = true;
             return null;
         }
         catch (TypeLoadException)
         {
+            _hadUnloadableMember = true;
             return null;
         }
     }
@@ -337,10 +375,12 @@ internal static class ArchitectureReferenceScanner
         }
         catch (FileNotFoundException)
         {
+            _hadUnloadableMember = true;
             return Array.Empty<ParameterInfo>();
         }
         catch (TypeLoadException)
         {
+            _hadUnloadableMember = true;
             return Array.Empty<ParameterInfo>();
         }
     }
@@ -353,10 +393,12 @@ internal static class ArchitectureReferenceScanner
         }
         catch (FileNotFoundException)
         {
+            _hadUnloadableMember = true;
             return null;
         }
         catch (TypeLoadException)
         {
+            _hadUnloadableMember = true;
             return null;
         }
     }
@@ -384,10 +426,12 @@ internal static class ArchitectureReferenceScanner
         catch (FileNotFoundException)
         {
             // Swallow — defensive reflection may encounter missing assemblies
+            _hadUnloadableMember = true;
         }
         catch (TypeLoadException)
         {
             // Swallow — defensive reflection may encounter unloadable types
+            _hadUnloadableMember = true;
         }
 
         return type;
@@ -402,10 +446,12 @@ internal static class ArchitectureReferenceScanner
         }
         catch (FileNotFoundException)
         {
+            _hadUnloadableMember = true;
             yield break;
         }
         catch (TypeLoadException)
         {
+            _hadUnloadableMember = true;
             yield break;
         }
 

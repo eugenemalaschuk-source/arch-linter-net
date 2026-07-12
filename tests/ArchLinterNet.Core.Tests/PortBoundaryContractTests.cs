@@ -1,4 +1,5 @@
 using System.Reflection;
+using System.Reflection.Emit;
 using ArchLinterNet.Core.Contracts;
 using ArchLinterNet.Core.Contracts.Families;
 using ArchLinterNet.Core.Execution;
@@ -88,6 +89,95 @@ public sealed class PortBoundaryContractTests
         Assert.That(violations.Any(v =>
             v.SourceType == typeof(SalesReferencesInventoryAdapter).FullName
             && v.ForbiddenReferences.Contains(typeof(InventoryLegacyAdapter).FullName)), Is.True);
+    }
+
+    [Test]
+    public void CheckPortBoundaryContract_AclScenario_AllowsApprovedAclAndRejectsDirectDatabaseAdapter()
+    {
+        // End-to-end anti-corruption-layer scenario per spec.md "Anti-corruption boundaries use
+        // explicit selected seams": an approved ACL seam is permitted, a direct database/adapter
+        // reference is forbidden.
+        Assembly assembly = typeof(LegacyCrmUsesApprovedAcl).Assembly;
+        var document = new ArchitectureContractDocument
+        {
+            Version = 1,
+            Name = "acl",
+            Analysis = new ArchitectureAnalysisConfiguration { TargetAssemblies = new List<string> { assembly.GetName().Name! } },
+            Classification = new ArchitectureClassificationConfiguration
+            {
+                Attributes =
+                {
+                    new ArchitectureAttributeClassificationMapping { Attribute = "ContextualContractTestFixtures.ContextDomainMarkerAttribute", Role = "DomainLayer", Metadata = new Dictionary<string, object> { ["domain"] = "constructor[0]" } },
+                    new ArchitectureAttributeClassificationMapping { Attribute = "ContextualContractTestFixtures.ContextAclMarkerAttribute", Role = "AntiCorruptionLayer", Metadata = new Dictionary<string, object> { ["domain"] = "constructor[0]" } },
+                    new ArchitectureAttributeClassificationMapping { Attribute = "ContextualContractTestFixtures.ContextAdapterMarkerAttribute", Role = "Adapter", Metadata = new Dictionary<string, object> { ["domain"] = "constructor[0]" } },
+                }
+            }
+        };
+        var contract = new ArchitecturePortBoundaryContract
+        {
+            Name = "legacy-crm-through-acl",
+            Source = new ArchitectureContextSelector { Role = "DomainLayer", Metadata = new Dictionary<string, object> { ["domain"] = "LegacySales" } },
+            TargetContext = new ArchitectureContextMetadataSelector { Metadata = new Dictionary<string, object> { ["domain"] = "Legacy" } },
+            AllowedSeams = new List<ArchitectureContextSelector> { new() { Role = "AntiCorruptionLayer", Metadata = new Dictionary<string, object> { ["domain"] = "Legacy" } } },
+            Forbidden = new List<ArchitectureContextSelector> { new() { Role = "Adapter", Metadata = new Dictionary<string, object> { ["domain"] = "Legacy" } } },
+            Reason = "Legacy CRM must go through the reviewed ACL, not the raw database adapter."
+        };
+        document.Contracts.StrictPortBoundaries.Add(contract);
+        var runner = new ArchitectureContractRunner(new ArchitectureAnalysisContext("/tmp", new[] { assembly }, Array.Empty<string>(), Array.Empty<string>()), document);
+
+        List<ArchitectureViolation> violations = runner.Session.CheckPortBoundaryContract(contract);
+
+        Assert.That(violations.Any(v => v.SourceType == typeof(LegacyCrmUsesApprovedAcl).FullName), Is.False);
+        Assert.That(violations.Any(v =>
+            v.SourceType == typeof(LegacyCrmReferencesDatabaseAdapterDirectly).FullName
+            && v.ForbiddenReferences.Contains(typeof(LegacyCrmDatabaseAdapter).FullName)), Is.True);
+    }
+
+    [Test]
+    public void CheckPortBoundaryContract_UnloadableFieldReference_ReportsUnsupportedEvidenceAndFailsClosed()
+    {
+        // Regression (#306 review, Critical): a member whose type comes from a missing/unresolvable
+        // dependency assembly must not be silently dropped from the direct-edge scan - the source's
+        // real reference set may be incomplete, so a forbidden edge could vanish with no violation.
+        // The checker must report this explicitly (fail closed) instead of passing on partial evidence.
+        using UnloadableFieldFixture fixture = UnloadableFieldFixture.Create(typeBuilder =>
+        {
+            ConstructorInfo ctor = typeof(ContextAdapterMarkerAttribute).GetConstructor(new[] { typeof(string) })!;
+            typeBuilder.SetCustomAttribute(new CustomAttributeBuilder(ctor, new object[] { "Payment" }));
+        });
+
+        var document = new ArchitectureContractDocument
+        {
+            Version = 1,
+            Name = "ports",
+            Analysis = new ArchitectureAnalysisConfiguration { TargetAssemblies = new List<string> { fixture.ConsumerAssembly.GetName().Name! } },
+            Classification = new ArchitectureClassificationConfiguration
+            {
+                Attributes =
+                {
+                    new ArchitectureAttributeClassificationMapping { Attribute = "ContextualContractTestFixtures.ContextAdapterMarkerAttribute", Role = "Adapter", Metadata = new Dictionary<string, object> { ["domain"] = "constructor[0]" } },
+                }
+            }
+        };
+        var contract = new ArchitecturePortBoundaryContract
+        {
+            Name = "adapter-direct-edges",
+            Source = new ArchitectureContextSelector { Role = "Adapter" },
+            TargetContext = new ArchitectureContextMetadataSelector { Metadata = new Dictionary<string, object> { ["domain"] = "Payment" } },
+            AllowedSeams = new List<ArchitectureContextSelector> { new() { Role = "Port" } },
+            Forbidden = new List<ArchitectureContextSelector> { new() { Role = "DomainLayer" } },
+            Reason = "Test."
+        };
+        document.Contracts.StrictPortBoundaries.Add(contract);
+        var runner = new ArchitectureContractRunner(
+            new ArchitectureAnalysisContext("/tmp", new[] { fixture.ConsumerAssembly }, Array.Empty<string>(), Array.Empty<string>()), document);
+
+        List<ArchitectureViolation> violations = runner.Session.CheckPortBoundaryContract(contract);
+
+        ArchitectureViolation violation = violations.Single(v => v.SourceType == fixture.SourceType.FullName);
+        ArchitectureDiagnostic mapped = ArchitectureDiagnosticMapper.FromViolation(violation);
+        var diagnostic = (PortBoundaryDiagnostic)mapped;
+        Assert.That(diagnostic.EvidenceKind, Is.EqualTo("unsupported_evidence"));
     }
 
     [Test]

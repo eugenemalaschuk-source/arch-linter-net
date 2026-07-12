@@ -186,4 +186,25 @@ namespace ContextualContractTestFixtures
 
     [ContextDomainMarker("Sales")]
     public sealed class SalesUsesGenericInventoryPort { public IGenericInventoryPort<SalesOrder> Port { get; } = null!; }
+
+    // --- Anti-corruption-layer fixtures: approved ACL seam vs. direct database adapter reference. ---
+
+    [AttributeUsage(AttributeTargets.Class | AttributeTargets.Interface)]
+    public sealed class ContextAclMarkerAttribute : Attribute
+    {
+        public ContextAclMarkerAttribute(string domain) => Domain = domain;
+        public string Domain { get; }
+    }
+
+    [ContextAclMarker("Legacy")]
+    public interface ILegacyCrmAcl;
+
+    [ContextAdapterMarker("Legacy")]
+    public sealed class LegacyCrmDatabaseAdapter;
+
+    [ContextDomainMarker("LegacySales")]
+    public sealed class LegacyCrmUsesApprovedAcl { public ILegacyCrmAcl Acl { get; } = null!; }
+
+    [ContextDomainMarker("LegacySales")]
+    public sealed class LegacyCrmReferencesDatabaseAdapterDirectly { public LegacyCrmDatabaseAdapter Adapter { get; } = null!; }
 }
