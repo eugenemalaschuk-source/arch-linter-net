@@ -38,13 +38,25 @@ public sealed class ArchitectureAttributeRoleExtractor
     // resolved by the caller's compiler, not embedded in the callee), so a consumer compiled
     // against the original .ctor(ArchitectureClassificationConfiguration, IEnumerable<Type>)
     // would throw MissingMethodException at load time against a DLL that replaced it with a
-    // three-parameter overload. classification.namespace matching is simply unavailable through
-    // this constructor (no namespace mappings will ever match), exactly as before namespace/
-    // inheritance execution landed.
+    // three-parameter overload. classification.namespace matching requires the namespace-glob
+    // matcher only ArchitectureRoleIndex (Execution) can supply (see the internal constructor
+    // below) — this constructor cannot fulfill it. Rather than silently never matching any
+    // classification.namespace entry (indistinguishable from a genuinely non-matching policy), a
+    // direct consumer who populates classification.namespace through this constructor is told so
+    // explicitly, at construction time, so the failure surfaces immediately instead of as a
+    // confusing missing role assignment later.
     public ArchitectureAttributeRoleExtractor(
         ArchitectureClassificationConfiguration configuration, IEnumerable<Type> typeUniverse)
         : this(configuration, typeUniverse, null)
     {
+        if (_configuration.Namespace.Count > 0 && _configuration.IsSourceEnabled(NamespaceSourceName))
+        {
+            throw new InvalidOperationException(
+                "classification.namespace entries are declared and the 'namespace' source is enabled, "
+                + $"but {nameof(ArchitectureAttributeRoleExtractor)}(configuration, typeUniverse) has no namespace-glob "
+                + "matcher to evaluate them with. Construct classification through ArchitectureAnalysisSession/"
+                + "ArchitectureRoleIndex instead, which wires the namespace matcher automatically.");
+        }
     }
 
     // Internal: only ArchitectureRoleIndex (Execution) constructs the namespace-matching delegate,
@@ -161,7 +173,7 @@ public sealed class ArchitectureAttributeRoleExtractor
         {
             for (Type? current = type.BaseType; current != null; current = current.BaseType)
             {
-                if (string.Equals(ArchitectureTypeNames.SafeFullName(current), baseTypeFullName, StringComparison.Ordinal))
+                if (string.Equals(NormalizedFullName(current), baseTypeFullName, StringComparison.Ordinal))
                 {
                     return true;
                 }
@@ -169,7 +181,7 @@ public sealed class ArchitectureAttributeRoleExtractor
 
             foreach (Type iface in type.GetInterfaces())
             {
-                if (string.Equals(ArchitectureTypeNames.SafeFullName(iface), baseTypeFullName, StringComparison.Ordinal))
+                if (string.Equals(NormalizedFullName(iface), baseTypeFullName, StringComparison.Ordinal))
                 {
                     return true;
                 }
@@ -185,6 +197,18 @@ public sealed class ArchitectureAttributeRoleExtractor
         {
             return false;
         }
+    }
+
+    // A closed constructed generic ancestor/interface (e.g. IRepository<Order> implemented via
+    // `class OrderRepository : IRepository<Order>`) has a FullName that embeds the assembly-qualified
+    // closed type argument (e.g. "MyApp.IRepository`1[[MyApp.Order, MyApp, ...]]"), which never equals
+    // the open generic definition's FullName ("MyApp.IRepository`1") a base_type mapping declares.
+    // Normalizing to the generic type definition before comparing lets one mapping match every closed
+    // instantiation, mirroring ArchitectureRoleIndex.TryGetRole's existing open-generic-definition
+    // fallback for the classified type itself.
+    private static string NormalizedFullName(Type type)
+    {
+        return ArchitectureTypeNames.SafeFullName(type.IsGenericType ? type.GetGenericTypeDefinition() : type);
     }
 
     private ArchitectureAttributeClassificationCandidate ResolveNamespaceCandidate(Type type)

@@ -163,6 +163,17 @@ namespace AttributeRoleExtractionTestFixtures
 
     public sealed class UnrelatedType;
 
+    // Generic base_type matching fixtures: a base_type mapping declares the open generic
+    // definition's full name (e.g. "AttributeRoleExtractionTestFixtures.IGenericRepository`1"),
+    // which must match every closed instantiation, not just the open definition itself.
+    public interface IGenericRepository<T>;
+
+    public sealed class ClosedGenericRepository : IGenericRepository<PlainType>;
+
+    public abstract class GenericRepositoryBase<T>;
+
+    public sealed class ClosedGenericRepositoryDerivedType : GenericRepositoryBase<PlainType>;
+
     public sealed class TypeMatchedByTwoInheritanceEntries : DomainEntityBase, IRepositoryMarker;
 
     // Namespace-convention fixtures.

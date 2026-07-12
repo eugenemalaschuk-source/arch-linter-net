@@ -335,6 +335,16 @@ cross-referencing comparison is what the rule actually needs to express.
   as long as it's loadable. An unresolved `inheritance.base_type` (a full type
   name that matches none of a scanned type's base classes or interfaces, e.g.
   a typo) silently matches no type for that run, with no diagnostic recorded.
+- Generic base types/interfaces: a `base_type` naming an open generic
+  definition (e.g. `MyApp.IRepository\`1`) matches every closed instantiation a scanned type derives from or implements (e.g. `IRepository<Order>`) — each candidate ancestor/interface is normalized to its own generic type definition before comparing full names, since a closed instantiation's `FullName`embeds the assembly-qualified closed type argument and never equals the open definition's`FullName\` directly.
+- The public `ArchitectureAttributeRoleExtractor(configuration, typeUniverse)`
+  two-argument constructor has no namespace-glob matcher available — only
+  session/role-index construction (`ArchitectureAnalysisSession`/
+  `ArchitectureRoleIndex`) supplies one. Declaring a non-empty
+  `classification.namespace` with the `namespace` source enabled and
+  constructing the extractor directly through this constructor throws
+  `InvalidOperationException` at construction time, rather than silently
+  never matching any `classification.namespace` entry.
 - Selector matching: **implemented** — uses the per-run role index and exact
   role/metadata predicates; a layer may declare only `selector`, only
   `namespace`, or both. Empty non-external selector matches are surfaced as

@@ -331,6 +331,54 @@ public sealed class ArchitectureRoleIndexTests
     }
 
     [Test]
+    public void TryGetRole_GenericInterfaceBaseType_MatchesClosedInstantiation()
+    {
+        // Regression: base_type declares the open generic interface's full name
+        // ("...IGenericRepository`1"); the scanned type implements the closed instantiation
+        // IGenericRepository<PlainType>, whose own FullName embeds the assembly-qualified type
+        // argument and would never equal the open definition's FullName without normalization.
+        var classification = new ArchitectureClassificationConfiguration
+        {
+            Inheritance =
+            {
+                new ArchitectureInheritanceClassificationMapping
+                {
+                    BaseType = "AttributeRoleExtractionTestFixtures.IGenericRepository`1",
+                    Role = "InfrastructureLayer"
+                }
+            }
+        };
+
+        ArchitectureRoleIndex index = CreateIndex(classification);
+
+        Assert.That(index.TryGetRole(typeof(ClosedGenericRepository), out ArchitectureTypeClassificationResult descriptor), Is.True);
+        Assert.That(descriptor.Role, Is.EqualTo("InfrastructureLayer"));
+    }
+
+    [Test]
+    public void TryGetRole_GenericBaseClass_MatchesClosedInstantiation()
+    {
+        // Regression: same normalization requirement as the generic-interface case above, but for
+        // a generic base *class* reached via type.BaseType rather than type.GetInterfaces().
+        var classification = new ArchitectureClassificationConfiguration
+        {
+            Inheritance =
+            {
+                new ArchitectureInheritanceClassificationMapping
+                {
+                    BaseType = "AttributeRoleExtractionTestFixtures.GenericRepositoryBase`1",
+                    Role = "DomainLayer"
+                }
+            }
+        };
+
+        ArchitectureRoleIndex index = CreateIndex(classification);
+
+        Assert.That(index.TryGetRole(typeof(ClosedGenericRepositoryDerivedType), out ArchitectureTypeClassificationResult descriptor), Is.True);
+        Assert.That(descriptor.Role, Is.EqualTo("DomainLayer"));
+    }
+
+    [Test]
     public void TryGetRole_UnresolvedBaseType_SilentlyNoMatchesWithNoDiagnostic()
     {
         var classification = new ArchitectureClassificationConfiguration

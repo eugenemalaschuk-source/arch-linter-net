@@ -50,6 +50,51 @@ public sealed class ArchitectureAttributeRoleExtractorTests
     }
 
     [Test]
+    public void PublicConstructor_ClassificationNamespaceDeclared_ThrowsInsteadOfSilentlyNeverMatching()
+    {
+        // Regression (#307 review): the public two-argument constructor has no namespace-glob
+        // matcher available (only ArchitectureRoleIndex/Execution can supply one). Declaring
+        // classification.namespace entries through this constructor must fail loudly at
+        // construction time rather than silently never matching any of them.
+        var configuration = new ArchitectureClassificationConfiguration
+        {
+            Namespace =
+            {
+                new ArchitectureNamespaceClassificationMapping
+                {
+                    Namespace = "AttributeRoleExtractionTestFixtures",
+                    Role = "DomainLayer"
+                }
+            }
+        };
+
+        Assert.That(
+            () => new ArchitectureAttributeRoleExtractor(configuration, TypeUniverse),
+            Throws.InvalidOperationException);
+    }
+
+    [Test]
+    public void PublicConstructor_ClassificationNamespaceDisabledByPrecedence_DoesNotThrow()
+    {
+        var configuration = new ArchitectureClassificationConfiguration
+        {
+            Precedence = new List<string> { "type_attribute" },
+            Namespace =
+            {
+                new ArchitectureNamespaceClassificationMapping
+                {
+                    Namespace = "AttributeRoleExtractionTestFixtures",
+                    Role = "DomainLayer"
+                }
+            }
+        };
+
+        Assert.That(
+            () => new ArchitectureAttributeRoleExtractor(configuration, TypeUniverse),
+            Throws.Nothing);
+    }
+
+    [Test]
     public void Extract_TypeWithNoMatchingAttribute_HasNoRole()
     {
         var configuration = new ArchitectureClassificationConfiguration

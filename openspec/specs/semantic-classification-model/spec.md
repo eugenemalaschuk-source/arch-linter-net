@@ -246,6 +246,10 @@ The runtime SHALL execute `classification.attributes`, `classification.assembly_
 - **WHEN** a `classification.inheritance` entry's `base_type` names a type declared in an assembly that is not among the scanned target assemblies (e.g. a framework or package base type such as a web-framework controller base class, an ORM context base class, or a game-engine component base class)
 - **THEN** the model SHALL still match any scanned type deriving from or implementing that base type, by comparing `base_type`'s full name against the candidate type's own reflected base-class chain and transitive interface set — not by first resolving `base_type` to a `Type` through the scanned target-assembly type universe, which would systematically fail to match every such framework-derived type
 
+#### Scenario: Inheritance matching normalizes generic ancestors and interfaces to their open generic definition
+- **WHEN** a `classification.inheritance` entry's `base_type` names an open generic base class or interface (e.g. `MyApp.IRepository\`1`), and a scanned type derives from or implements a closed instantiation of it (e.g. `IRepository<Order>`)
+- **THEN** the model SHALL match, by normalizing each candidate ancestor/interface to its generic type definition before comparing full names — a closed instantiation's own `FullName` (which embeds the assembly-qualified closed type argument) SHALL NOT be compared directly against the open generic `base_type` string
+
 #### Scenario: Unresolved inheritance base_type produces no match and no diagnostic
 - **WHEN** a `classification.inheritance` entry's `base_type` names no type in the candidate type's own base-class chain or transitive interface set, for every scanned type
 - **THEN** that entry matches no type for the run, with no diagnostic recorded — a policy authoring mistake (e.g. a typo'd `base_type`) is indistinguishable from a legitimately unmatched convention
