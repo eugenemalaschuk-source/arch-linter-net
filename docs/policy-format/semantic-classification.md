@@ -278,7 +278,7 @@ supported — no regex or open-ended expression syntax.
 | Cross-referencing another type's own metadata | Not supported. | `not-equal-to-source` compares against the *current source type's* resolved metadata. |
 | Requires a declared `layers.<name>`? | Yes — a layer is the unit contracts reference. | No — selectors are declared inline on the contextual contract itself. |
 | Used by | Every existing contract family (`dependency`, `allow_only`, `layers`, `cycles`, etc.) via a named layer. | Only `context_dependencies`/`context_allow_only`, referenced inline. |
-| Coverage-participating consumption | Yes. | Yes — a contextual selector's `(role, metadata key)` reference is registered as coverage-participating consumption identically to a `layers.<name>.selector` match. |
+| Coverage-participating consumption | Registered as a marker; no coverage contract reads it yet (see [Current limits](#current-limits)). | Same: a contextual selector's `(role, metadata key)` reference is recorded in the same marker collection as a `layers.<name>.selector` match, for a future coverage variant to consume — it does not itself affect any coverage finding today. |
 
 Use `layers.<name>.selector` when the boundary is a small, fixed, named set of
 layers referenced by many contracts. Use a contextual selector when the

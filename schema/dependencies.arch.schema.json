@@ -174,7 +174,7 @@
           "type": "object",
           "additionalProperties": { "$ref": "#/$defs/contextSourceMetadataValue" },
           "default": {},
-          "description": "Optional metadata constraints for the contract's own `source` selector. Supports the 'exact' and 'in' operators only — not-equal-to-source ('!{source.metadata.<key>}') is rejected here because the source selector has no other source to compare against; it is valid only on forbidden/allowed/exclude selectors (see contextSelector)."
+          "description": "Optional metadata constraints for the contract's own `source` selector. Supports the 'exact', 'any' ('*'), and 'in' operators — not-equal-to-source ('!{source.metadata.<key>}') is rejected here because the source selector has no other source to compare against; it is valid only on forbidden/allowed/exclude selectors (see contextSelector)."
         }
       }
     },
