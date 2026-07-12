@@ -1,5 +1,7 @@
 using ArchLinterNet.Core.Contracts.Abstractions;
+using ArchLinterNet.Core.Contracts.Families;
 using ArchLinterNet.Core.IO;
+using ArchLinterNet.Core.IO.Abstractions;
 using YamlDotNet.Serialization;
 using YamlDotNet.Serialization.NamingConventions;
 
@@ -132,9 +134,9 @@ public sealed class ArchitectureBaselineLoadingService : IArchitectureBaselineLo
 
     private sealed class ContractGroupMerger
     {
-        private readonly ArchitectureContractGroups _groups;
+        private readonly Families.ArchitectureContractGroups _groups;
 
-        public ContractGroupMerger(ArchitectureContractGroups groups)
+        public ContractGroupMerger(Families.ArchitectureContractGroups groups)
         {
             _groups = groups;
         }

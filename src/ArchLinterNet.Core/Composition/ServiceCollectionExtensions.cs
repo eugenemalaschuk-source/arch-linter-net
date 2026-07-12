@@ -9,6 +9,7 @@ using ArchLinterNet.Core.Execution.Abstractions;
 using ArchLinterNet.Core.Graph;
 using ArchLinterNet.Core.Graph.Abstractions;
 using ArchLinterNet.Core.IO;
+using ArchLinterNet.Core.IO.Abstractions;
 using ArchLinterNet.Core.Reporting;
 using ArchLinterNet.Core.Resolution;
 using ArchLinterNet.Core.Resolution.Abstractions;

@@ -1,4 +1,5 @@
 using ArchLinterNet.Core.Contracts;
+using ArchitectureContractGroups = ArchLinterNet.Core.Contracts.Families.ArchitectureContractGroups;
 
 namespace ArchLinterNet.Core.Execution;
 

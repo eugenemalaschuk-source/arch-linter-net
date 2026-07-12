@@ -7,6 +7,6 @@ namespace ArchLinterNet.Core.Contracts;
 // accessors (not reflection) so a renamed Strict*/Audit* property fails to compile.
 internal sealed record ArchitectureContractFamilyBinding(
     string FamilyId,
-    Func<ArchitectureContractGroups, IEnumerable<IArchitectureContract>> Strict,
-    Func<ArchitectureContractGroups, IEnumerable<IArchitectureContract>> Audit,
+    Func<Families.ArchitectureContractGroups, IEnumerable<IArchitectureContract>> Strict,
+    Func<Families.ArchitectureContractGroups, IEnumerable<IArchitectureContract>> Audit,
     bool IncludeInContractEnumeration);

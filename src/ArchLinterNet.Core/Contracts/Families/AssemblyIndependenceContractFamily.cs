@@ -1,6 +1,6 @@
 using YamlDotNet.Serialization;
 
-namespace ArchLinterNet.Core.Contracts;
+namespace ArchLinterNet.Core.Contracts.Families;
 
 public sealed partial class ArchitectureContractGroups
 {

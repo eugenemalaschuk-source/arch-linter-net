@@ -1,5 +1,6 @@
 using ArchLinterNet.Core.Contracts;
 using NUnit.Framework;
+using ArchitectureContractGroups = ArchLinterNet.Core.Contracts.Families.ArchitectureContractGroups;
 
 namespace ArchLinterNet.Core.Tests;
 

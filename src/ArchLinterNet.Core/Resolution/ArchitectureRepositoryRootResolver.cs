@@ -1,4 +1,5 @@
 using ArchLinterNet.Core.IO;
+using ArchLinterNet.Core.IO.Abstractions;
 using ArchLinterNet.Core.Resolution.Abstractions;
 
 namespace ArchLinterNet.Core.Resolution;
