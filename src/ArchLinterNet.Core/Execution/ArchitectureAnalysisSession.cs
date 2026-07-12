@@ -42,6 +42,29 @@ public sealed partial class ArchitectureAnalysisSession
         Catalog = ArchitectureContractCatalog.Build(document);
         TypeIndex = new ArchitectureTypeIndex(context.TargetAssemblies);
         RoleIndex = new ArchitectureRoleIndex(document.Classification, TypeIndex);
+        RegisterAllContextualConsumersFromDocument();
+    }
+
+    // Registered eagerly at construction, before any contract-family checker (including a future
+    // coverage handler) executes — the registry currently runs "coverage" before either contextual
+    // family (see ArchitectureContractFamilyRegistry.All), so registering lazily inside
+    // CheckContextDependencyContract/CheckContextAllowOnlyContract would leave this collection empty
+    // by the time a #114 coverage checker reads it. Matches BuildConfigurationReferenceCollector's
+    // existing convention of collecting per-family configuration references (layer names, here
+    // role/metadata) independent of --contract-id selection, not gated by IsContractSelected.
+    private void RegisterAllContextualConsumersFromDocument()
+    {
+        foreach (ArchitectureContextDependencyContract contract in Document.Contracts.StrictContextDependencies
+                     .Concat(Document.Contracts.AuditContextDependencies))
+        {
+            RegisterContextualConsumers(contract.Source, contract.Forbidden, contract.Exclude);
+        }
+
+        foreach (ArchitectureContextAllowOnlyContract contract in Document.Contracts.StrictContextAllowOnly
+                     .Concat(Document.Contracts.AuditContextAllowOnly))
+        {
+            RegisterContextualConsumers(contract.Source, contract.Allowed, contract.Exclude);
+        }
     }
 
     public ArchitectureAnalysisContext Context { get; }

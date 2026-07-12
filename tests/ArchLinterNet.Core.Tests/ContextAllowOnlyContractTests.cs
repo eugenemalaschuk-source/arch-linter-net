@@ -316,6 +316,9 @@ public sealed class ContextAllowOnlyContractTests
             Assert.That(diagnostic.SourceMetadata!["domain"], Is.EqualTo("Sales"));
             Assert.That(diagnostic.TargetRole, Is.EqualTo("DomainLayer"));
             Assert.That(diagnostic.TargetMetadata!["domain"], Is.EqualTo("Inventory"));
+            // Stable, structured evidence that every allowed selector was checked and none matched -
+            // not a missing/omitted field, so downstream tooling can rely on its presence.
+            Assert.That(diagnostic.MatchedSelector, Is.EqualTo("none"));
         });
     }
 
@@ -346,6 +349,8 @@ public sealed class ContextAllowOnlyContractTests
             Assert.That(json, Does.Contain("\"target_role\""));
             Assert.That(json, Does.Contain("\"source_metadata\""));
             Assert.That(json, Does.Contain("\"target_metadata\""));
+            Assert.That(json, Does.Contain("\"matched_selector\""));
+            Assert.That(json, Does.Contain("\"none\""));
             Assert.That(json, Does.Contain("DomainLayer"));
         });
     }
@@ -369,6 +374,7 @@ public sealed class ContextAllowOnlyContractTests
             Assert.That(humanOutput, Does.Contain("kind: context_allow_only"),
                 "A contextual violation must be visibly tagged so it is distinguishable from a namespace/layer violation.");
             Assert.That(humanOutput, Does.Contain("source_role: DomainLayer"));
+            Assert.That(humanOutput, Does.Contain("matched_selector: none"));
 
             int namespaceLineStart = humanOutput.IndexOf("MyApp.Domain.Order", StringComparison.Ordinal);
             Assert.That(namespaceLineStart, Is.GreaterThanOrEqualTo(0));

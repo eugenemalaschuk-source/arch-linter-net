@@ -302,6 +302,39 @@ public sealed class ContextDependencyContractTests
     }
 
     [Test]
+    public void RegisteredContextualConsumers_PopulatedAtConstructionBeforeAnyCheckerRuns()
+    {
+        // Code-review regression: the coverage family executes before either contextual family in
+        // ArchitectureContractFamilyRegistry.All, so a future coverage checker reading this
+        // collection must see it already populated - registration cannot be deferred to
+        // CheckContextDependencyContract/CheckContextAllowOnlyContract's own execution.
+        ArchitectureContextDependencyContract contract = CrossDomainContract();
+        var runner = new ArchitectureContractRunner(CreateContext(), CreateDocument(contract));
+
+        IReadOnlyCollection<ArchitectureContextualConsumerReference> consumers = runner.Session.RegisteredContextualConsumers;
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(consumers, Does.Contain(new ArchitectureContextualConsumerReference("DomainLayer", "domain")));
+            Assert.That(consumers, Is.Not.Empty);
+        });
+    }
+
+    [Test]
+    public void RegisteredContextualConsumers_PopulatedRegardlessOfContractSelection()
+    {
+        // Layer-name reference collection (BuildConfigurationReferenceCollector) is not gated by
+        // --contract-id selection either - contextual consumer registration follows the same
+        // convention, since it describes what the document declares, not what a given run executes.
+        ArchitectureContextDependencyContract contract = CrossDomainContract("unselected-contract");
+        var runner = new ArchitectureContractRunner(
+            CreateContext(), CreateDocument(contract), selectedContractIds: new HashSet<string> { "some-other-contract" });
+
+        Assert.That(runner.Session.RegisteredContextualConsumers,
+            Does.Contain(new ArchitectureContextualConsumerReference("DomainLayer", "domain")));
+    }
+
+    [Test]
     public void ArchitectureContractFamilyRegistry_StrictContextDependencies_FailsBuildOnViolation()
     {
         ArchitectureContextDependencyContract contract = CrossDomainContract();

@@ -127,6 +127,43 @@ public sealed class ContextualContractSchemaTests
         Assert.That(Validate(yaml, "contextSelector"), Is.EqualTo(expectedValid));
     }
 
+    // --- contextSourceSelector: same shape as contextSelector, minus not-equal-to-source ---
+
+    [Test]
+    public void ContextSourceSelector_RoleOnly_IsValid()
+    {
+        const string Yaml = "role: DomainLayer\n";
+
+        Assert.That(Validate(Yaml, "contextSourceSelector"), Is.True);
+    }
+
+    [Test]
+    public void ContextSourceSelector_ExactMetadata_IsValid()
+    {
+        const string Yaml = "role: DomainLayer\nmetadata:\n  domain: Sales\n";
+
+        Assert.That(Validate(Yaml, "contextSourceSelector"), Is.True);
+    }
+
+    [Test]
+    public void ContextSourceSelector_InListMetadata_IsValid()
+    {
+        const string Yaml = "role: DomainLayer\nmetadata:\n  domain: [Sales, Inventory]\n";
+
+        Assert.That(Validate(Yaml, "contextSourceSelector"), Is.True);
+    }
+
+    [Test]
+    public void ContextSourceSelector_NotEqualToSourceMetadata_IsRejected()
+    {
+        // The critical fix: a contract's own `source` selector has no other source to compare
+        // against, so not-equal-to-source is a configuration error here (see
+        // ContextualSourceSelectorValidator for the corresponding load-time rejection).
+        const string Yaml = "role: DomainLayer\nmetadata:\n  domain: \"!{source.metadata.domain}\"\n";
+
+        Assert.That(Validate(Yaml, "contextSourceSelector"), Is.False);
+    }
+
     // --- contextDependencyContract ---
 
     [Test]
@@ -163,6 +200,22 @@ public sealed class ContextualContractSchemaTests
               - role: DomainLayer
                 metadata:
                   domain: Inventory
+            """;
+
+        Assert.That(Validate(Yaml, "contextDependencyContract"), Is.False);
+    }
+
+    [Test]
+    public void ContextDependencyContract_SourceSelectorWithNotEqualToSource_IsRejected()
+    {
+        const string Yaml = """
+            name: sales-must-not-depend-on-inventory
+            source:
+              role: DomainLayer
+              metadata:
+                domain: "!{source.metadata.domain}"
+            forbidden:
+              - role: DomainLayer
             """;
 
         Assert.That(Validate(Yaml, "contextDependencyContract"), Is.False);
@@ -255,6 +308,22 @@ public sealed class ContextualContractSchemaTests
             source:
               metadata:
                 domain: Sales
+            allowed:
+              - role: DomainLayer
+            """;
+
+        Assert.That(Validate(Yaml, "contextAllowOnlyContract"), Is.False);
+    }
+
+    [Test]
+    public void ContextAllowOnlyContract_SourceSelectorWithNotEqualToSource_IsRejected()
+    {
+        const string Yaml = """
+            name: sales-allow-only
+            source:
+              role: DomainLayer
+              metadata:
+                domain: "!{source.metadata.domain}"
             allowed:
               - role: DomainLayer
             """;

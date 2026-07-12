@@ -185,7 +185,26 @@ contracts:
         by role/metadata rather than enumerating every module pair as layers.
   audit_context_dependencies: []
 
-  strict_context_allow_only: []
+  # context_allow_only restricts a source context's dependencies to an explicit allow-list of
+  # role/metadata selectors, rather than naming every forbidden context (context_dependencies above
+  # does the inverse: name what's forbidden). Here Sales may depend only on its own module or
+  # SharedKernel; anything else (e.g. Inventory) is a violation.
+  strict_context_allow_only:
+    - id: sales-allow-only-own-module-or-shared-kernel
+      name: sales-domain-may-depend-only-on-own-module-or-shared-kernel
+      source:
+        role: DomainLayer
+        metadata:
+          module: Sales
+      allowed:
+        - role: DomainLayer
+          metadata:
+            module: Sales
+        - role: SharedKernel
+      reason: >-
+        Sales domain types may depend only on their own module's domain types or the explicit
+        shared-kernel exception, discovered by role/metadata rather than enumerating every
+        allowed module pair as layers.
   audit_context_allow_only: []
 
   strict_composition:

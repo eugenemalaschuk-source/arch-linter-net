@@ -26,7 +26,8 @@ public sealed partial class ArchitectureDiagnosticFormatter
         return $" (kind: context_allow_only, source_role: {diagnostic.SourceRole ?? "?"}, " +
                $"source_metadata: {FormatMetadataForHumans(diagnostic.SourceMetadata)}, " +
                $"target_role: {diagnostic.TargetRole ?? "?"}, " +
-               $"target_metadata: {FormatMetadataForHumans(diagnostic.TargetMetadata)})";
+               $"target_metadata: {FormatMetadataForHumans(diagnostic.TargetMetadata)}, " +
+               $"matched_selector: {diagnostic.MatchedSelector ?? "?"})";
     }
 
     private static string FormatMetadataForHumans(IReadOnlyDictionary<string, object>? metadata)
@@ -72,5 +73,8 @@ public sealed partial class ArchitectureDiagnosticFormatter
 
         if (diagnostic.TargetMetadata != null)
             obj["target_metadata"] = diagnostic.TargetMetadata;
+
+        if (diagnostic.MatchedSelector != null)
+            obj["matched_selector"] = diagnostic.MatchedSelector;
     }
 }

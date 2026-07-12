@@ -19,8 +19,6 @@ public sealed partial class ArchitectureAnalysisSession
             return new List<ArchitectureViolation>();
         }
 
-        RegisterContextualConsumers(contract.Source, contract.Forbidden, contract.Exclude);
-
         List<ArchitectureViolation> violations = new();
         ArchitectureContractExecutionContext executionContext = CreateExecutionContext(contract, contract.IgnoredViolations);
 
@@ -96,8 +94,6 @@ public sealed partial class ArchitectureAnalysisSession
             return new List<ArchitectureViolation>();
         }
 
-        RegisterContextualConsumers(contract.Source, contract.Allowed, contract.Exclude);
-
         List<ArchitectureViolation> violations = new();
         ArchitectureContractExecutionContext executionContext = CreateExecutionContext(contract, contract.IgnoredViolations);
 
@@ -148,7 +144,8 @@ public sealed partial class ArchitectureAnalysisSession
                     SourceRole: sourceDescriptor.Role,
                     SourceMetadata: sourceDescriptor.Metadata,
                     TargetRole: targetDescriptor.Role,
-                    TargetMetadata: targetDescriptor.Metadata)
+                    TargetMetadata: targetDescriptor.Metadata,
+                    MatchedSelector: "none")
             });
         }
     }
