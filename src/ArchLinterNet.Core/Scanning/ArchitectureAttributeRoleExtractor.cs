@@ -32,10 +32,27 @@ public sealed class ArchitectureAttributeRoleExtractor
     private readonly Dictionary<Assembly, ArchitectureAttributeClassificationCandidate> _assemblyCandidateCache = new();
     private readonly Lazy<Dictionary<string, Type?>> _typesByFullName;
 
+    // Preserves the original public two-argument constructor's exact signature for binary
+    // compatibility with already-compiled ArchLinterNet.Core NuGet consumers: an optional third
+    // parameter on a single constructor only helps source compatibility (a default argument is
+    // resolved by the caller's compiler, not embedded in the callee), so a consumer compiled
+    // against the original .ctor(ArchitectureClassificationConfiguration, IEnumerable<Type>)
+    // would throw MissingMethodException at load time against a DLL that replaced it with a
+    // three-parameter overload. classification.namespace matching is simply unavailable through
+    // this constructor (no namespace mappings will ever match), exactly as before namespace/
+    // inheritance execution landed.
     public ArchitectureAttributeRoleExtractor(
+        ArchitectureClassificationConfiguration configuration, IEnumerable<Type> typeUniverse)
+        : this(configuration, typeUniverse, null)
+    {
+    }
+
+    // Internal: only ArchitectureRoleIndex (Execution) constructs the namespace-matching delegate,
+    // since Scanning must not depend on Resolution (see docs/internal/core-architecture-blueprint.md).
+    internal ArchitectureAttributeRoleExtractor(
         ArchitectureClassificationConfiguration configuration,
         IEnumerable<Type> typeUniverse,
-        Func<ArchitectureNamespaceClassificationMapping, string, (bool Matched, string? MatchedPattern)>? matchNamespace = null)
+        Func<ArchitectureNamespaceClassificationMapping, string, (bool Matched, string? MatchedPattern)>? matchNamespace)
     {
         _configuration = configuration ?? throw new ArgumentNullException(nameof(configuration));
         ArgumentNullException.ThrowIfNull(typeUniverse);

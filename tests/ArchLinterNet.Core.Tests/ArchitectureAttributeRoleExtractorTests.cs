@@ -34,6 +34,22 @@ public sealed class ArchitectureAttributeRoleExtractorTests
     }
 
     [Test]
+    public void PublicConstructor_ExactTwoParameterOverload_ExistsForBinaryCompatibility()
+    {
+        // Regression (#307 review): a consumer already compiled against the original public
+        // .ctor(ArchitectureClassificationConfiguration, IEnumerable<Type>) resolves that exact
+        // constructor by parameter count/types at load time — an optional third parameter on a
+        // single constructor only helps source compatibility, not binary compatibility, so the
+        // original two-parameter public overload must keep existing verbatim, not just be callable
+        // by omitting a trailing optional argument.
+        ConstructorInfo? ctor = typeof(ArchitectureAttributeRoleExtractor).GetConstructor(
+            BindingFlags.Public | BindingFlags.Instance,
+            new[] { typeof(ArchitectureClassificationConfiguration), typeof(IEnumerable<Type>) });
+
+        Assert.That(ctor, Is.Not.Null);
+    }
+
+    [Test]
     public void Extract_TypeWithNoMatchingAttribute_HasNoRole()
     {
         var configuration = new ArchitectureClassificationConfiguration
