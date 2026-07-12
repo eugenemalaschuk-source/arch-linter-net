@@ -3,11 +3,9 @@
     <Project Path="src/ArchLinterNet.Cli/ArchLinterNet.Cli.csproj" />
     <Project Path="src/ArchLinterNet.Core/ArchLinterNet.Core.csproj" />
     <Project Path="src/ArchLinterNet.Testing/ArchLinterNet.Testing.csproj" />
-    <Project Path="src/ArchLinterNet.Unity/ArchLinterNet.Unity.csproj" />
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/ArchLinterNet.Cli.Tests/ArchLinterNet.Cli.Tests.csproj" />
     <Project Path="tests/ArchLinterNet.Core.Tests/ArchLinterNet.Core.Tests.csproj" />
-    <Project Path="tests/ArchLinterNet.Unity.Tests/ArchLinterNet.Unity.Tests.csproj" />
   </Folder>
 </Solution>

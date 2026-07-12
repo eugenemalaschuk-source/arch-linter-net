@@ -38,8 +38,6 @@ layers:
     namespace: ArchLinterNet.Cli.Commands
   testing:
     namespace: ArchLinterNet.Testing
-  unity:
-    namespace: ArchLinterNet.Unity
 
 external_dependencies:
   dependency_injection_container:
@@ -55,11 +53,9 @@ analysis:
     - ArchLinterNet.Core
     - ArchLinterNet.Cli
     - ArchLinterNet.Testing
-    - ArchLinterNet.Unity
   assembly_search_paths:
     - src/ArchLinterNet.Cli/bin/Debug/net10.0
     - src/ArchLinterNet.Testing/bin/Debug/net10.0
-    - src/ArchLinterNet.Unity/bin/Debug/net10.0
   coverage: error
 
 contracts:
@@ -67,20 +63,14 @@ contracts:
     - name: cli-must-not-depend-on-testing
       id: cli-must-not-depend-on-testing
       source: cli
-      forbidden: [testing, unity]
+      forbidden: [testing]
       reason: CLI should only depend on Core.
 
     - name: testing-must-not-depend-on-cli
       id: testing-must-not-depend-on-cli
       source: testing
-      forbidden: [cli, unity]
+      forbidden: [cli]
       reason: Testing adapter should only depend on Core.
-
-    - name: unity-must-not-depend-on-cli-or-testing
-      id: unity-must-not-depend-on-cli-or-testing
-      source: unity
-      forbidden: [cli, testing]
-      reason: Unity package should only depend on Core.
 
     - name: cli-must-use-validation-application-seam
       id: cli-must-use-validation-application-seam
@@ -91,7 +81,7 @@ contracts:
     - name: cli-abstractions-must-stay-separate-from-infrastructure-and-command-implementations
       id: cli-abstractions-must-stay-separate-from-infrastructure-and-command-implementations
       source: cli_abstractions
-      forbidden: [cli_infrastructure, cli_commands, testing, unity, core_execution, core_contracts, core_resolution, core_scanning, core_discovery]
+      forbidden: [cli_infrastructure, cli_commands, testing, core_execution, core_contracts, core_resolution, core_scanning, core_discovery]
       reason: CLI abstractions must remain a narrow contract boundary and must not drift into infrastructure details, command implementations, or Core internals below the application seam.
 
     - name: cli-commands-must-not-depend-on-cli-infrastructure
@@ -112,71 +102,65 @@ contracts:
       forbidden: [core_execution, core_contracts, core_resolution, core_scanning]
       reason: Testing adapter must call the composed validation seam instead of constructing contract runners, loading policies, resolving roots, or scanning directly.
 
-    - name: unity-must-use-asmdef-application-seam
-      id: unity-must-use-asmdef-application-seam
-      source: unity
-      forbidden: [core_execution, core_contracts, core_resolution, core_scanning]
-      reason: Unity must call the narrow Core.Asmdef application seam instead of loading contracts, resolving the repository root, or invoking the asmdef scanner directly.
-
     - name: core-execution-must-not-depend-on-hosts
       id: core-execution-must-not-depend-on-hosts
       source: core_execution
-      forbidden: [cli, testing, unity]
-      reason: Contract execution and handler internals must stay usable from any host and must not couple back to a specific CLI, testing, or Unity adapter.
+      forbidden: [cli, testing]
+      reason: Contract execution and handler internals must stay usable from any host and must not couple back to a specific CLI or testing adapter.
 
     - name: core-graph-must-not-depend-on-hosts
       id: core-graph-must-not-depend-on-hosts
       source: core_graph
-      forbidden: [cli, testing, unity]
-      reason: The dependency graph and explain application seam must stay usable from any host and must not couple back to a specific CLI, testing, or Unity adapter.
+      forbidden: [cli, testing]
+      reason: The dependency graph and explain application seam must stay usable from any host and must not couple back to a specific CLI or testing adapter.
 
     - name: core-reporting-stays-a-diagnostics-leaf
       id: core-reporting-stays-a-diagnostics-leaf
       source: core_reporting
-      forbidden: [cli, testing, unity, core_execution, core_validation, core_resolution, core_scanning, core_contracts]
+      forbidden: [cli, testing, core_execution, core_validation, core_resolution, core_scanning, core_contracts]
       reason: Diagnostics formatting is a leaf consumed by higher layers and must not depend back on business logic.
 
     - name: core-model-stays-independent
       id: core-model-stays-independent
       source: core_model
-      forbidden: [cli, testing, unity, core_execution, core_validation, core_resolution, core_scanning, core_contracts, core_reporting]
+      forbidden: [cli, testing, core_execution, core_validation, core_resolution, core_scanning, core_contracts, core_reporting]
       reason: Model types are the most fundamental layer and must not depend on anything else.
 
     - name: core-io-stays-independent
       id: core-io-stays-independent
       source: core_io
-      forbidden: [cli, testing, unity, core_execution, core_validation, core_resolution, core_scanning, core_contracts, core_reporting, core_discovery, core_composition]
+      forbidden: [cli, testing, core_execution, core_validation, core_resolution, core_scanning, core_contracts, core_reporting, core_discovery, core_composition]
       reason: Infrastructure seams (file system, environment, assembly loading, Roslyn compilation) are a fundamental replaceable boundary and must not depend on the business logic layers that consume them.
 
     - name: core-resolution-must-not-depend-on-execution-or-validation
       id: core-resolution-must-not-depend-on-execution-or-validation
       source: core_resolution
-      forbidden: [core_execution, core_validation, cli, testing, unity]
+      forbidden: [core_execution, core_validation, cli, testing]
       reason: Repository and assembly resolution must not depend upward on contract execution or the application seam.
 
     - name: core-scanning-must-not-depend-on-execution-or-validation
       id: core-scanning-must-not-depend-on-execution-or-validation
       source: core_scanning
-      forbidden: [core_execution, core_validation, cli, testing, unity]
+      forbidden: [core_execution, core_validation, cli, testing]
       reason: Scanning internals must not depend upward on contract execution or the application seam.
 
     - name: core-discovery-must-not-depend-on-execution-or-validation
       id: core-discovery-must-not-depend-on-execution-or-validation
       source: core_discovery
-      forbidden: [core_execution, core_validation, cli, testing, unity]
+      forbidden: [core_execution, core_validation, cli, testing]
       reason: Project/solution discovery internals must not depend upward on contract execution or the application seam.
 
     - name: core-validation-must-not-bypass-application-internals
       id: core-validation-must-not-bypass-application-internals
       source: core_validation
       forbidden: [core_scanning, core_discovery, core_resolution, core_io]
-      reason: The application seam must reach scanning, discovery, resolution, and infrastructure IO only through Core.Execution (or Core.Asmdef for Unity), not by depending on their internals directly.
+      reason: The validation application seam must reach scanning, discovery, resolution, and infrastructure IO only through Core.Execution, while asmdef-only validation remains in Core.Asmdef.
 
     - name: core-contracts-must-not-depend-on-hosts
       id: core-contracts-must-not-depend-on-hosts
       source: core_contracts
-      forbidden: [cli, testing, unity]
-      reason: Contract-family and validator internals must stay usable from any host and must not couple back to a specific CLI, testing, or Unity adapter.
+      forbidden: [cli, testing]
+      reason: Contract-family and validator internals must stay usable from any host and must not couple back to a specific CLI or testing adapter.
 
     - name: core-contracts-must-not-depend-on-execution
       id: core-contracts-must-not-depend-on-execution
@@ -238,7 +222,7 @@ contracts:
     - name: core-asmdef-must-not-depend-on-di-container
       source: core_asmdef
       forbidden: [dependency_injection_container]
-      reason: Application services consume the composition root's interfaces, not container APIs directly.
+      reason: The asmdef application service and convenience facade consume the composition root's public engine, not container APIs directly.
 
     - name: cli-must-not-depend-on-di-container
       source: cli
@@ -247,11 +231,6 @@ contracts:
 
     - name: testing-must-not-depend-on-di-container
       source: testing
-      forbidden: [dependency_injection_container]
-      reason: Adapters must consume the composition root's facade, not container APIs directly.
-
-    - name: unity-must-not-depend-on-di-container
-      source: unity
       forbidden: [dependency_injection_container]
       reason: Adapters must consume the composition root's facade, not container APIs directly.
 
@@ -320,18 +299,12 @@ contracts:
       forbidden: [msbuild_project_evaluation]
       reason: Adapters must consume the composition root's facade, not MSBuild/Buildalyzer APIs directly.
 
-    - name: unity-must-not-depend-on-msbuild
-      source: unity
-      forbidden: [msbuild_project_evaluation]
-      reason: Adapters must consume the composition root's facade, not MSBuild/Buildalyzer APIs directly.
-
   strict_layers:
     - name: core-layering
       id: core-layering
       layers:
         - cli
         - testing
-        - unity
         - core
       reason: Dependencies must point toward Core.
 
@@ -351,7 +324,6 @@ contracts:
         - core
         - cli
         - testing
-        - unity
       reason: Packages must not form dependency cycles.
 
   strict_protected:
@@ -386,7 +358,6 @@ contracts:
         - namespace: ArchLinterNet.Core
         - namespace: ArchLinterNet.Cli
         - namespace: ArchLinterNet.Testing
-        - namespace: ArchLinterNet.Unity
       reason: Every first-party root namespace must be mapped to a declared layer or explicitly excluded.
 
     - name: self-policy-rule-input-coverage
@@ -395,10 +366,8 @@ contracts:
       contract_ids:
         - cli-must-not-depend-on-testing
         - testing-must-not-depend-on-cli
-        - unity-must-not-depend-on-cli-or-testing
         - cli-must-use-validation-application-seam
         - testing-must-use-validation-application-seam
-        - unity-must-use-asmdef-application-seam
         - core-execution-must-not-depend-on-hosts
         - core-reporting-stays-a-diagnostics-leaf
         - core-model-stays-independent

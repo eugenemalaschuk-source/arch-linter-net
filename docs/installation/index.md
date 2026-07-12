@@ -61,16 +61,20 @@ Use the testing package when architecture validation should run from a test proj
 dotnet add package ArchLinterNet.Testing
 ```
 
-Use the core package only when building a custom host or adapter:
+Use the core package when building a custom host or calling the asmdef-only validation API:
 
 ```bash
 dotnet add package ArchLinterNet.Core
 ```
 
-Unity-specific `.asmdef` validation lives behind the optional Unity package:
+Unity `.asmdef` validation is part of `ArchLinterNet.Core`; no separate Unity package is required:
 
-```bash
-dotnet add package ArchLinterNet.Unity
+```csharp
+using ArchLinterNet.Core.Asmdef;
+
+bool passed = AsmdefValidator.Validate(
+    "architecture/dependencies.arch.yml",
+    out var violations);
 ```
 
 ## CI installation
