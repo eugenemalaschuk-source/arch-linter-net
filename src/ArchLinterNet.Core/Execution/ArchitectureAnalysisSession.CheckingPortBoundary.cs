@@ -40,11 +40,17 @@ public sealed partial class ArchitectureAnalysisSession
         if (string.IsNullOrEmpty(targetName) || context.IsIgnored(sourceName, targetName)) return null;
         RoleIndex.TryGetRole(target, out ArchitectureTypeClassificationResult targetRole);
         string expectedSeam = string.Join(" or ", contract.AllowedSeams.Select(DescribeContextSelector));
-        return new ArchitectureViolation(contract.Name, contract.Id, sourceName,
-            $"forbidden direct edge; expected seam: {expectedSeam}", new[] { targetName })
+        // matchesForbidden distinguishes an explicit forbidden-selector match from a target that
+        // simply never matched any allowed_seams selector - both are violations, but the evidence
+        // kind/message tell an operator which of the two authoring gaps to close.
+        string evidenceKind = matchesForbidden ? "forbidden_reference" : "missing_approved_seam";
+        string message = matchesForbidden
+            ? $"forbidden direct edge; expected seam: {expectedSeam}"
+            : $"direct edge matches no approved seam; expected seam: {expectedSeam}";
+        return new ArchitectureViolation(contract.Name, contract.Id, sourceName, message, new[] { targetName })
         {
             Payload = new PortBoundaryPayload(sourceRole.Role, sourceRole.Metadata, targetRole.Role,
-                targetRole.Metadata, "direct_reference", expectedSeam,
+                targetRole.Metadata, evidenceKind, expectedSeam,
                 "Depend on the approved port abstraction or add an explicit reviewed exception.")
         };
     }
@@ -73,10 +79,13 @@ public sealed partial class ArchitectureAnalysisSession
         bool implementsExpectedPort = implementedExpectedPort != null;
         if (inAllowedContext && implementsExpectedPort) return null;
         string adapterName = ArchitectureTypeNames.SafeFullName(adapter);
-        if (context.IsIgnored(adapterName, DescribeContextSelector(binding.ExpectedPort))) return null;
 
+        // Prefer an interface RoleIndex actually classifies (e.g. a wrong-but-known port) over an
+        // incidental unclassified one (e.g. IDisposable) so the reported mismatch evidence is
+        // meaningful rather than whichever interface happens to sort first alphabetically.
         Type? actualPort = implementedExpectedPort ?? adapter.GetInterfaces()
-            .OrderBy(ArchitectureTypeNames.SafeFullName, StringComparer.Ordinal)
+            .OrderByDescending(@interface => RoleIndex.TryGetRole(@interface, out ArchitectureTypeClassificationResult r) && r.Role != null)
+            .ThenBy(ArchitectureTypeNames.SafeFullName, StringComparer.Ordinal)
             .FirstOrDefault();
         ArchitectureTypeClassificationResult? actualPortRole = null;
         if (actualPort != null && RoleIndex.TryGetRole(actualPort, out ArchitectureTypeClassificationResult resolvedPortRole))
@@ -86,6 +95,13 @@ public sealed partial class ArchitectureAnalysisSession
         string actualPortName = actualPort == null
             ? "no implemented interface"
             : ArchitectureTypeNames.SafeFullName(actualPort);
+
+        // The suppression key must match what's reported below as ForbiddenReferences (actualPortName),
+        // not a static description of the expected port - otherwise a baseline entry keeps suppressing
+        // findings after the adapter's actual mismatched/missing interface changes, and a manual ignore
+        // copied from the reported forbidden_reference never matches (see PR #306 review).
+        if (context.IsIgnored(adapterName, actualPortName)) return null;
+
         string kind = implementsExpectedPort ? "adapter_context" : "adapter_port_mismatch";
         string detail = implementsExpectedPort
             ? "adapter is outside approved adapter context"

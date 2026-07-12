@@ -183,6 +183,100 @@ public sealed class PortBoundaryContractTests
         Assert.That(diagnostic.RemediationHint, Does.Contain("Implement the expected port"));
     }
 
+    [Test]
+    public void AdapterBindingIgnore_KeyedByActualMismatchEvidence_SuppressesViolation()
+    {
+        // Regression: the ignore/baseline suppression key must be the actual reported mismatch
+        // evidence (the implemented-or-missing interface), not a static description of the expected
+        // port - otherwise a baseline generated from a real violation could never re-match it.
+        Assembly assembly = typeof(StripePaymentAdapter).Assembly;
+        ArchitectureContractDocument document = CreateAdapterBindingDocument(assembly, out ArchitecturePortBoundaryContract contract);
+        contract.IgnoredViolations.Add(new ArchitectureIgnoredViolation
+        {
+            SourceType = typeof(MismatchedPaymentAdapter).FullName!,
+            ForbiddenReference = typeof(ICatalogPort).FullName!,
+            Reason = "baselined mismatch"
+        });
+        var runner = new ArchitectureContractRunner(new ArchitectureAnalysisContext("/tmp", new[] { assembly }, Array.Empty<string>(), Array.Empty<string>()), document);
+
+        List<ArchitectureViolation> violations = runner.Session.CheckPortBoundaryContract(contract);
+
+        Assert.That(violations.Any(v => v.SourceType == typeof(MismatchedPaymentAdapter).FullName), Is.False);
+    }
+
+    [Test]
+    public void AdapterBindingIgnore_KeyedByExpectedPortDescription_DoesNotSuppressViolation()
+    {
+        // Regression: an ignore entry written against the old (buggy) suppression key - a static
+        // description of the expected port selector, e.g. "role:Port (domain=Payment)" - must NOT
+        // suppress the violation. That key never changes when the adapter's actual implemented
+        // interface changes, so keying suppression on it would silently keep suppressing a *different*
+        // real mismatch than the one that was reviewed and baselined.
+        Assembly assembly = typeof(StripePaymentAdapter).Assembly;
+        ArchitectureContractDocument document = CreateAdapterBindingDocument(assembly, out ArchitecturePortBoundaryContract contract);
+        contract.IgnoredViolations.Add(new ArchitectureIgnoredViolation
+        {
+            SourceType = typeof(MismatchedPaymentAdapter).FullName!,
+            ForbiddenReference = "role:Port (domain=Payment)",
+            Reason = "stale ignore keyed by expected-port description"
+        });
+        var runner = new ArchitectureContractRunner(new ArchitectureAnalysisContext("/tmp", new[] { assembly }, Array.Empty<string>(), Array.Empty<string>()), document);
+
+        List<ArchitectureViolation> violations = runner.Session.CheckPortBoundaryContract(contract);
+
+        Assert.That(violations.Any(v => v.SourceType == typeof(MismatchedPaymentAdapter).FullName), Is.True);
+    }
+
+    [Test]
+    public void AdapterBindingMismatch_PrefersClassifiedInterfaceOverUnclassifiedOne_AsEvidence()
+    {
+        // Regression: when an adapter doesn't implement the expected port, the reported mismatch
+        // evidence should be a RoleIndex-classified interface (meaningful port evidence) rather than
+        // whichever implemented interface happens to sort first alphabetically.
+        Assembly assembly = typeof(AdapterWithUnclassifiedAndWrongPortInterfaces).Assembly;
+        ArchitectureContractDocument document = CreateAdapterBindingDocument(assembly, out ArchitecturePortBoundaryContract contract);
+        var runner = new ArchitectureContractRunner(new ArchitectureAnalysisContext("/tmp", new[] { assembly }, Array.Empty<string>(), Array.Empty<string>()), document);
+
+        List<ArchitectureViolation> violations = runner.Session.CheckPortBoundaryContract(contract);
+
+        ArchitectureViolation violation = violations.Single(v => v.SourceType == typeof(AdapterWithUnclassifiedAndWrongPortInterfaces).FullName);
+        Assert.That(violation.ForbiddenReferences, Does.Contain(typeof(ICatalogPort).FullName));
+        Assert.That(violation.ForbiddenReferences, Does.Not.Contain(typeof(IAardvarkUnclassifiedInterface).FullName));
+    }
+
+    private static ArchitectureContractDocument CreateAdapterBindingDocument(Assembly assembly, out ArchitecturePortBoundaryContract contract)
+    {
+        var document = new ArchitectureContractDocument
+        {
+            Version = 1,
+            Name = "adapter",
+            Analysis = new ArchitectureAnalysisConfiguration { TargetAssemblies = new List<string> { assembly.GetName().Name! } },
+            Classification = new ArchitectureClassificationConfiguration
+            {
+                Attributes =
+                {
+                    new ArchitectureAttributeClassificationMapping { Attribute = "ContextualContractTestFixtures.ContextPortMarkerAttribute", Role = "Port", Metadata = new Dictionary<string, object> { ["domain"] = "constructor[0]" } },
+                    new ArchitectureAttributeClassificationMapping { Attribute = "ContextualContractTestFixtures.ContextAdapterMarkerAttribute", Role = "Adapter", Metadata = new Dictionary<string, object> { ["domain"] = "constructor[0]" } },
+                }
+            }
+        };
+        contract = new ArchitecturePortBoundaryContract
+        {
+            Name = "payment-adapter",
+            Source = new ArchitectureContextSelector { Role = "Adapter" },
+            TargetContext = new ArchitectureContextMetadataSelector { Metadata = new Dictionary<string, object> { ["domain"] = "Payment" } },
+            AllowedSeams = new List<ArchitectureContextSelector> { new() { Role = "Port" } },
+            Forbidden = new List<ArchitectureContextSelector> { new() { Role = "Adapter" } },
+            Reason = "r",
+            AdapterBindings = new List<ArchitectureAdapterPortBinding>
+            {
+                new() { Adapter = new ArchitectureContextSelector { Role = "Adapter", Metadata = new Dictionary<string, object> { ["domain"] = "Payment" } }, ExpectedPort = new ArchitectureContextSelector { Role = "Port", Metadata = new Dictionary<string, object> { ["domain"] = "Payment" } } }
+            }
+        };
+        document.Contracts.StrictPortBoundaries.Add(contract);
+        return document;
+    }
+
     private static readonly string[] _catalogOrderReference = { "Catalog.Order" };
 
     private static ArchitectureViolation CreateDirectEdgeSeamEvidenceViolation() =>

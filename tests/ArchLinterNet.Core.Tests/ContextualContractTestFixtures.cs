@@ -155,4 +155,12 @@ namespace ContextualContractTestFixtures
     // there is no implemented interface to classify.
     [ContextAdapterMarker("Payment")]
     public sealed class InterfacelessPaymentAdapter;
+
+    // Unclassified interface that sorts alphabetically before ICatalogPort (by full name), so a
+    // naive "first interface, ordered alphabetically" pick would surface it as mismatch evidence
+    // instead of the classified-but-wrong ICatalogPort.
+    public interface IAardvarkUnclassifiedInterface;
+
+    [ContextAdapterMarker("Payment")]
+    public sealed class AdapterWithUnclassifiedAndWrongPortInterfaces : IAardvarkUnclassifiedInterface, ICatalogPort;
 }
