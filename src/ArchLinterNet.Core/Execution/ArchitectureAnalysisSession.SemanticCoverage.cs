@@ -43,7 +43,7 @@ public sealed partial class ArchitectureAnalysisSession
                 continue;
             }
 
-            List<ArchitectureCoverageSummaryEvidenceItem> target = IsSemanticFactGoverned(descriptor)
+            List<ArchitectureCoverageSummaryEvidenceItem> target = IsSemanticFactGoverned(type, descriptor)
                 ? coveredItems
                 : uncoveredItems;
             target.Add(new ArchitectureCoverageSummaryEvidenceItem(
@@ -81,6 +81,14 @@ public sealed partial class ArchitectureAnalysisSession
                 conflict.Subject, $"classification conflict: {conflict.WinningRole} vs {conflict.DiscardedRole}"));
         }
 
+        foreach (ArchitectureClassificationMetadataFailure failure in RoleIndex.MetadataFailures
+                     .OrderBy(failure => failure.Subject, StringComparer.Ordinal)
+                     .ThenBy(failure => failure.MetadataKey, StringComparer.Ordinal))
+        {
+            unknownItems.Add(new ArchitectureCoverageSummaryEvidenceItem(
+                failure.Subject, $"metadata failure: {failure.MetadataKey} ({failure.Reason})"));
+        }
+
         return new ArchitectureCoverageSummary(
             contract.Name, contract.Id, contract.Scope,
             new ArchitectureCoverageSummaryCounts(
@@ -115,7 +123,7 @@ public sealed partial class ArchitectureAnalysisSession
             }
 
             if (contract.Exclude.Any(exclusion => MatchesSemanticExclusion(exclusion, descriptor))
-                || IsSemanticFactGoverned(descriptor))
+                || IsSemanticFactGoverned(type, descriptor))
             {
                 continue;
             }
@@ -137,22 +145,12 @@ public sealed partial class ArchitectureAnalysisSession
             MatchesNamespaceRoot(root, ArchitectureTypeNames.SafeNamespace(type)));
     }
 
-    private bool IsSemanticFactGoverned(ArchitectureTypeClassificationResult descriptor)
+    private bool IsSemanticFactGoverned(Type type, ArchitectureTypeClassificationResult descriptor)
     {
-        return Document.Layers.Values.Any(layer => layer.Selector != null
-                                                   && MatchesSemanticSelector(layer.Selector, descriptor))
+        return Document.Layers.Values.Any(layer => layer.Selector != null && MatchesLayer(layer, type))
                || RegisteredContextualConsumers.Any(consumer =>
                    string.Equals(consumer.Role, descriptor.Role, StringComparison.Ordinal)
                    && (consumer.MetadataKey.Length == 0 || descriptor.Metadata.ContainsKey(consumer.MetadataKey)));
-    }
-
-    private static bool MatchesSemanticSelector(
-        ArchitectureLayerSelector selector,
-        ArchitectureTypeClassificationResult descriptor)
-    {
-        return string.Equals(selector.Role, descriptor.Role, StringComparison.Ordinal)
-               && selector.Metadata.All(entry => descriptor.Metadata.TryGetValue(entry.Key, out object? actual)
-                                                 && ArchitectureMetadataValueComparer.ValuesEqual(actual, entry.Value));
     }
 
     private static bool MatchesSemanticExclusion(

@@ -53,6 +53,8 @@ internal sealed class CoverageValidator : IArchitecturePolicyDocumentValidator
                 $"Semantic-role coverage contract '{contract.Name}' cannot declare 'between' or 'contract_ids'.");
         }
 
+        ValidateSemanticRoleCoverageRoots(contract);
+
         for (int i = 0; i < contract.Exclude.Count; i++)
         {
             ArchitectureCoverageExclusion exclusion = contract.Exclude[i];
@@ -78,6 +80,31 @@ internal sealed class CoverageValidator : IArchitecturePolicyDocumentValidator
                 throw new InvalidOperationException(
                     $"Semantic-role coverage contract '{contract.Name}' has an exclusion at index {i} using a non-semantic matcher.");
             }
+        }
+    }
+
+    private static void ValidateSemanticRoleCoverageRoots(ArchitectureCoverageContract contract)
+    {
+        for (int i = 0; i < contract.Roots.Count; i++)
+        {
+            ArchitectureCoverageRoot root = contract.Roots[i];
+            if (string.IsNullOrWhiteSpace(root.Namespace))
+            {
+                throw new InvalidOperationException(
+                    $"Semantic-role coverage contract '{contract.Name}' has a root at index {i} without a non-empty namespace.");
+            }
+
+            if (root.Include.Count > 0 || root.Exclude.Count > 0)
+            {
+                throw new InvalidOperationException(
+                    $"Semantic-role coverage contract '{contract.Name}' has a root at index {i} using include/exclude discovery fields.");
+            }
+
+            _ = new ArchitectureLayer
+            {
+                Namespace = root.Namespace,
+                NamespaceSuffix = root.NamespaceSuffix
+            }.GlobPattern;
         }
     }
 

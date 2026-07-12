@@ -153,6 +153,7 @@ strict_coverage:
 - id: semantic-role-coverage
   name: semantic-role-coverage
   scope: semantic_role
+  reason: Semantic classifications must be governed or explicitly excluded.
   exclude:
   - role: GeneratedRole
     reason: Generated types are governed outside this policy.
@@ -165,6 +166,10 @@ facts; classified facts with no governing selector are uncovered. Valid selector
 that match no current classified type are stale. These findings appear in the
 coverage output and remain separate from dependency violations. Semantic
 exclusions always require a documented `reason`.
+
+Semantic summaries also place classification conflicts and metadata extraction
+failures in `unknown_items`, with deterministic subject and failure evidence for
+human, JSON, and CI consumers.
 
 ## New-code coverage reporting and test projects
 
