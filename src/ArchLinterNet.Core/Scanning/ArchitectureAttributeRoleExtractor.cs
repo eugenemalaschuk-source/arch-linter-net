@@ -179,15 +179,7 @@ public sealed class ArchitectureAttributeRoleExtractor
                 }
             }
 
-            foreach (Type iface in type.GetInterfaces())
-            {
-                if (string.Equals(NormalizedFullName(iface), baseTypeFullName, StringComparison.Ordinal))
-                {
-                    return true;
-                }
-            }
-
-            return false;
+            return type.GetInterfaces().Any(iface => string.Equals(NormalizedFullName(iface), baseTypeFullName, StringComparison.Ordinal));
         }
         catch (TypeLoadException)
         {

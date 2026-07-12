@@ -176,16 +176,18 @@ public sealed partial class ArchitectureDiagnosticFormatter
             .ThenBy(f => f.MetadataKey, StringComparer.Ordinal)
             .Select(f => $"  metadata_failure: [{f.Source}] {f.Subject}.{f.MetadataKey}: {f.Reason}");
 
-        var pathDeferredLines = classificationPathDeferred == null
-            ? Enumerable.Empty<string>()
-            : new[]
+        IEnumerable<string> pathDeferredLines = Enumerable.Empty<string>();
+        if (classificationPathDeferred != null)
+        {
+            string entryNoun = classificationPathDeferred.DeclaredEntryCount == 1 ? "entry" : "entries";
+            pathDeferredLines = new[]
             {
-                $"  path_deferred: classification.path declares {classificationPathDeferred.DeclaredEntryCount} "
-                    + "entr" + (classificationPathDeferred.DeclaredEntryCount == 1 ? "y" : "ies")
-                    + ", but path-convention classification is not yet implemented — it depends on source/declared-type "
+                $"  path_deferred: classification.path declares {classificationPathDeferred.DeclaredEntryCount} {entryNoun}, "
+                    + "but path-convention classification is not yet implemented — it depends on source/declared-type "
                     + "fact discovery (see issue #171, currently open). This section is schema-accepted but produces "
                     + "no role assignment."
             };
+        }
 
         return "Classification findings:" + Environment.NewLine
             + string.Join(Environment.NewLine, conflictLines.Concat(failureLines).Concat(pathDeferredLines));
