@@ -98,7 +98,11 @@ public sealed class ArchitectureRoleIndex
         {
             var layer = new ArchitectureLayer { Namespace = mapping.Namespace, NamespaceSuffix = mapping.NamespaceSuffix };
             ArchitectureNamespaceMatch match = ArchitectureLayerResolver.MatchNamespace(layer, candidateNamespace);
-            return (match.Matched, match.Matched ? mapping.Namespace : null);
+            // DescribeLayer reduces to the namespace+suffix description here (Selector is always null
+            // on this throwaway layer), reusing the exact same suffix-aware formatting layers already
+            // use — e.g. "MyApp.*.Contracts" for a glob namespace + suffix, not just the bare namespace,
+            // so evidence reflects the actual match condition rather than dropping namespace_suffix.
+            return (match.Matched, match.Matched ? ArchitectureLayerResolver.DescribeLayer(layer) : null);
         }
 
         if (mapping.NamespaceSuffix.Length > 0)

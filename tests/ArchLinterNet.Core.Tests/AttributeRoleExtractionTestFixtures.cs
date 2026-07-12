@@ -145,6 +145,12 @@ namespace AttributeRoleExtractionTestFixtures
     // Inheritance-convention fixtures.
     public abstract class DomainEntityBase;
 
+    // Derives from a base type declared in a different (BCL) assembly than this fixture assembly's
+    // own target assembly — regression coverage for matching against an out-of-target-assembly base
+    // type, which must work by walking the type's own reflected base chain, not by resolving
+    // base_type through the scanned-assembly type universe.
+    public sealed class CustomFrameworkException : Exception;
+
     public sealed class DirectlyDerivedEntity : DomainEntityBase;
 
     public class IntermediateEntity : DomainEntityBase;

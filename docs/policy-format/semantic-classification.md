@@ -323,10 +323,18 @@ cross-referencing comparison is what the rule actually needs to express.
   instance to extract `constructor[]`/`property:` evidence from. Using either
   form on an `inheritance`/`namespace` entry resolves as an extraction failure,
   same as any other unresolved metadata reference.
-- An unresolved `inheritance.base_type` (a full type name that matches nothing
-  in the scanned type universe, e.g. a typo) silently matches no type for that
-  run — consistent with how an unresolved `const:` reference is silently
-  omitted rather than diagnosed.
+- `inheritance.base_type` matching compares against each scanned type's own
+  reflected base-class chain and transitive interface set — **not** by first
+  resolving `base_type` to a `Type` through the scanned target-assembly type
+  universe. This matters for the framework-base-type examples above
+  (`ControllerBase`, `DbContext`, `MonoBehaviour`): those base types are
+  declared in framework/package assemblies, not in the target assembly being
+  scanned, so a target-assembly-only lookup would never find them and every
+  framework-derived type would silently fail to match. Walking the candidate
+  type's own chain works regardless of which assembly declares the base type,
+  as long as it's loadable. An unresolved `inheritance.base_type` (a full type
+  name that matches none of a scanned type's base classes or interfaces, e.g.
+  a typo) silently matches no type for that run, with no diagnostic recorded.
 - Selector matching: **implemented** — uses the per-run role index and exact
   role/metadata predicates; a layer may declare only `selector`, only
   `namespace`, or both. Empty non-external selector matches are surfaced as

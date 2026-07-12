@@ -304,6 +304,33 @@ public sealed class ArchitectureRoleIndexTests
     }
 
     [Test]
+    public void TryGetRole_BaseTypeOutsideTargetAssembly_StillMatches()
+    {
+        // Regression: base_type here (System.Exception) is declared in the BCL, not in the scanned
+        // target assembly (_targetAssemblies is only the fixture assembly). Inheritance matching must
+        // walk the candidate type's own reflected base-class chain rather than resolving base_type
+        // through the target-assembly-only type universe, or every framework base type (ControllerBase,
+        // DbContext, MonoBehaviour, etc.) would silently never match.
+        var classification = new ArchitectureClassificationConfiguration
+        {
+            Inheritance =
+            {
+                new ArchitectureInheritanceClassificationMapping
+                {
+                    BaseType = "System.Exception",
+                    Role = "InfrastructureLayer"
+                }
+            }
+        };
+
+        ArchitectureRoleIndex index = CreateIndex(classification);
+
+        Assert.That(index.TryGetRole(typeof(CustomFrameworkException), out ArchitectureTypeClassificationResult descriptor), Is.True);
+        Assert.That(descriptor.Role, Is.EqualTo("InfrastructureLayer"));
+        Assert.That(descriptor.Evidence, Is.EqualTo("System.Exception"));
+    }
+
+    [Test]
     public void TryGetRole_UnresolvedBaseType_SilentlyNoMatchesWithNoDiagnostic()
     {
         var classification = new ArchitectureClassificationConfiguration
@@ -481,6 +508,34 @@ public sealed class ArchitectureRoleIndexTests
             Is.True);
         Assert.That(descriptor.Role, Is.EqualTo("PublicContract"));
         Assert.That(descriptor.Evidence, Is.EqualTo("*.Contracts"));
+    }
+
+    [Test]
+    public void TryGetRole_NamespaceEntryWithNamespaceAndSuffix_EvidenceIncludesSuffix()
+    {
+        // Regression: evidence for a combined namespace + namespace_suffix mapping must reflect both
+        // constraints, not just mapping.Namespace, or the diagnostic can't distinguish this entry from
+        // one that only declares the same namespace with no suffix constraint.
+        var classification = new ArchitectureClassificationConfiguration
+        {
+            Namespace =
+            {
+                new ArchitectureNamespaceClassificationMapping
+                {
+                    Namespace = "AttributeRoleExtractionTestFixtures.Feature",
+                    NamespaceSuffix = "Contracts",
+                    Role = "PublicContract"
+                }
+            }
+        };
+
+        ArchitectureRoleIndex index = CreateIndex(classification);
+
+        Assert.That(
+            index.TryGetRole(typeof(AttributeRoleExtractionTestFixtures.Feature.Contracts.TypeInContractsSuffixNamespace), out ArchitectureTypeClassificationResult descriptor),
+            Is.True);
+        Assert.That(descriptor.Role, Is.EqualTo("PublicContract"));
+        Assert.That(descriptor.Evidence, Is.EqualTo("AttributeRoleExtractionTestFixtures.Feature.*.Contracts"));
     }
 
     [Test]

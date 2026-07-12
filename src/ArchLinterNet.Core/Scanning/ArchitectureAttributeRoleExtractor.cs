@@ -105,8 +105,7 @@ public sealed class ArchitectureAttributeRoleExtractor
 
         foreach (ArchitectureInheritanceClassificationMapping mapping in _configuration.Inheritance)
         {
-            Type? baseType = ResolveTypeByFullName(mapping.BaseType);
-            if (baseType == null || !MatchesBaseType(baseType, type))
+            if (!MatchesBaseType(mapping.BaseType, type))
             {
                 continue;
             }
@@ -131,14 +130,35 @@ public sealed class ArchitectureAttributeRoleExtractor
         return new ArchitectureAttributeClassificationCandidate(winningRole, winningMetadata, winningEvidence, conflicts, failures);
     }
 
-    // A single expression covering both transitive class derivation and transitive interface
-    // implementation: Type.IsAssignableFrom already implements exactly this semantics. The self-match
-    // guard excludes a type matching its own base_type entry.
-    private static bool MatchesBaseType(Type baseType, Type type)
+    // Matches base_type by full-name comparison against type's own actual base-class chain and
+    // transitive interface set (Type.GetInterfaces() already returns every interface implemented,
+    // including inherited ones), NOT by resolving base_type through the typeUniverse-based lookup
+    // used for const: resolution. A framework/package base type (e.g. ControllerBase, DbContext)
+    // typically never appears in typeUniverse (which is built only from the scanned target
+    // assemblies), so resolving it there would silently fail to match every framework-derived type
+    // in the common case this feature exists for. Walking the type's own reflected chain works
+    // regardless of which assembly declares the base type or interface, as long as it's loadable.
+    private static bool MatchesBaseType(string baseTypeFullName, Type type)
     {
         try
         {
-            return baseType != type && baseType.IsAssignableFrom(type);
+            for (Type? current = type.BaseType; current != null; current = current.BaseType)
+            {
+                if (string.Equals(ArchitectureTypeNames.SafeFullName(current), baseTypeFullName, StringComparison.Ordinal))
+                {
+                    return true;
+                }
+            }
+
+            foreach (Type iface in type.GetInterfaces())
+            {
+                if (string.Equals(ArchitectureTypeNames.SafeFullName(iface), baseTypeFullName, StringComparison.Ordinal))
+                {
+                    return true;
+                }
+            }
+
+            return false;
         }
         catch (TypeLoadException)
         {

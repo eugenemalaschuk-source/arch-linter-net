@@ -234,13 +234,21 @@ The runtime SHALL execute `classification.attributes`, `classification.assembly_
 - **WHEN** a policy declares a `classification.namespace` entry whose `namespace`/`namespace_suffix` matches a scanned type's namespace, using the same glob semantics already accepted by `layers.<name>.namespace`
 - **THEN** the extraction engine assigns that entry's declared `role` (and any successfully extracted `metadata`) to the matching type, with `Evidence` set to the matched namespace pattern
 
+#### Scenario: Namespace evidence reflects a combined namespace and namespace_suffix condition
+- **WHEN** a `classification.namespace` entry declares both `namespace` and `namespace_suffix`, and a scanned type matches both constraints
+- **THEN** `Evidence` SHALL reflect both constraints (e.g. `MyApp.*.Contracts`, not just `MyApp.*`), so the diagnostic distinguishes this entry from one declaring the same `namespace` with no `namespace_suffix` constraint
+
 #### Scenario: Inheritance metadata extraction is restricted to literal and const forms
 - **WHEN** a `classification.inheritance` or `classification.namespace` entry declares a `metadata.<key>` value
 - **THEN** the value is interpreted only as a literal YAML scalar or a `const:<Full.Type.NAME>` reference — `constructor[<index>]` and `property:<Name>` forms are not valid for these sources, since neither has an attribute instance to extract from
 
+#### Scenario: Inheritance matching compares against the candidate type's own reflected base chain, not a scanned-assembly lookup
+- **WHEN** a `classification.inheritance` entry's `base_type` names a type declared in an assembly that is not among the scanned target assemblies (e.g. a framework or package base type such as a web-framework controller base class, an ORM context base class, or a game-engine component base class)
+- **THEN** the model SHALL still match any scanned type deriving from or implementing that base type, by comparing `base_type`'s full name against the candidate type's own reflected base-class chain and transitive interface set — not by first resolving `base_type` to a `Type` through the scanned target-assembly type universe, which would systematically fail to match every such framework-derived type
+
 #### Scenario: Unresolved inheritance base_type produces no match and no diagnostic
-- **WHEN** a `classification.inheritance` entry's `base_type` names no type in the scanned type universe
-- **THEN** that entry matches no type for the run, consistent with how an unresolved `const:` reference is silently omitted rather than diagnosed
+- **WHEN** a `classification.inheritance` entry's `base_type` names no type in the candidate type's own base-class chain or transitive interface set, for every scanned type
+- **THEN** that entry matches no type for the run, with no diagnostic recorded — a policy authoring mistake (e.g. a typo'd `base_type`) is indistinguishable from a legitimately unmatched convention
 
 #### Scenario: Declaring classification.path produces a deferred-support diagnostic
 - **WHEN** a policy declares a non-empty `classification.path` section
