@@ -23,6 +23,8 @@ public sealed partial class ArchitectureAnalysisSession
 
     private readonly List<ArchitectureBaselineCandidate> _baselineCandidates = new();
 
+    private readonly HashSet<ArchitectureContextualConsumerReference> _registeredContextualConsumers = new();
+
     private HashSet<string>? _ruleInputCoveredContractIdsForMode;
 
     public ArchitectureAnalysisSession(
@@ -40,6 +42,29 @@ public sealed partial class ArchitectureAnalysisSession
         Catalog = ArchitectureContractCatalog.Build(document);
         TypeIndex = new ArchitectureTypeIndex(context.TargetAssemblies);
         RoleIndex = new ArchitectureRoleIndex(document.Classification, TypeIndex);
+        RegisterAllContextualConsumersFromDocument();
+    }
+
+    // Registered eagerly at construction, before any contract-family checker (including a future
+    // coverage handler) executes — the registry currently runs "coverage" before either contextual
+    // family (see ArchitectureContractFamilyRegistry.All), so registering lazily inside
+    // CheckContextDependencyContract/CheckContextAllowOnlyContract would leave this collection empty
+    // by the time a #114 coverage checker reads it. Matches BuildConfigurationReferenceCollector's
+    // existing convention of collecting per-family configuration references (layer names, here
+    // role/metadata) independent of --contract-id selection, not gated by IsContractSelected.
+    private void RegisterAllContextualConsumersFromDocument()
+    {
+        foreach (ArchitectureContextDependencyContract contract in Document.Contracts.StrictContextDependencies
+                     .Concat(Document.Contracts.AuditContextDependencies))
+        {
+            RegisterContextualConsumers(contract.Source, contract.Forbidden, contract.Exclude);
+        }
+
+        foreach (ArchitectureContextAllowOnlyContract contract in Document.Contracts.StrictContextAllowOnly
+                     .Concat(Document.Contracts.AuditContextAllowOnly))
+        {
+            RegisterContextualConsumers(contract.Source, contract.Allowed, contract.Exclude);
+        }
     }
 
     public ArchitectureAnalysisContext Context { get; }
@@ -115,6 +140,31 @@ public sealed partial class ArchitectureAnalysisSession
 
     public IReadOnlyList<ArchitectureBaselineCandidate> BaselineCandidates
         => _baselineCandidates;
+
+    // Coverage-participating consumption recorded by contextual dependency/allow-only contracts.
+    // See ArchitectureContextualConsumerReference and design.md Decision 7. Nothing consumes this
+    // collection yet — it exists so a future coverage change can query it.
+    public IReadOnlyCollection<ArchitectureContextualConsumerReference> RegisteredContextualConsumers
+        => _registeredContextualConsumers;
+
+    internal void RegisterContextualConsumer(ArchitectureContextSelector selector)
+    {
+        if (string.IsNullOrWhiteSpace(selector.Role))
+        {
+            return;
+        }
+
+        if (selector.Metadata.Count == 0)
+        {
+            _registeredContextualConsumers.Add(new ArchitectureContextualConsumerReference(selector.Role, string.Empty));
+            return;
+        }
+
+        foreach (string key in selector.Metadata.Keys)
+        {
+            _registeredContextualConsumers.Add(new ArchitectureContextualConsumerReference(selector.Role, key));
+        }
+    }
 
     // Cached per session so multiple future coverage contract handlers share one inventory instead of
     // each rebuilding it; an explicit projectDiscovery override bypasses the cache (test-only substitution).

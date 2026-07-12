@@ -16,9 +16,9 @@ The semantic classification model SHALL define exactly ten classification terms 
 - **AND** no coverage-participating construct consumes that role/metadata and no `exclusion` names the type
 - **THEN** the model SHALL still classify this as an `uncovered semantic fact` — `override` is a classification source, not a coverage-exemption mechanism, and only `exclusion` removes a type from coverage consideration
 
-#### Scenario: Consumption is not hard-coded to layers.<name>.selector alone
-- **WHEN** #111/#112 introduce a contextual contract construct that references a discovered role/metadata value directly, without that role/metadata also being matched by a `layers.<name>.selector`
-- **THEN** the reviewed design requires that construct to count as a coverage-participating consumer identically to a selector match — a type consumed only by such a direct reference SHALL NOT be classified as an `uncovered semantic fact`
+#### Scenario: Contextual dependency and allow-only contracts are coverage-participating consumers
+- **WHEN** a `strict_context_dependencies`/`audit_context_dependencies`/`strict_context_allow_only`/`audit_context_allow_only` contract's `source`, `forbidden`, `allowed`, or `exclude` selector references a discovered role/metadata value directly, without that role/metadata also being matched by a `layers.<name>.selector`
+- **THEN** the model registers that selector's `(role, metadata key)` reference as coverage-participating consumption identically to a `layers.<name>.selector` match — a type consumed only by such a direct contextual-contract reference SHALL NOT be classified as an `uncovered semantic fact`
 
 #### Scenario: Stale selector is distinguished from an unmatched namespace layer
 - **WHEN** a `layers.<name>.selector`'s `role`/`metadata` criteria match zero types classified by the model
@@ -251,3 +251,4 @@ The system SHALL reject invalid selector definitions with deterministic configur
 #### Scenario: Match diagnostics identify the matching mechanism
 - **WHEN** a type is resolved into a selector-backed layer
 - **THEN** layer descriptions or diagnostics can distinguish namespace matching, semantic selector matching, and their combination
+

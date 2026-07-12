@@ -69,6 +69,10 @@ public sealed class ArchitectureBaselineContractGroups
     [YamlMember(Alias = "audit_composition")] public List<ArchitectureBaselineContractEntry> AuditComposition { get; set; } = new();
     [YamlMember(Alias = "strict_coverage")] public List<ArchitectureBaselineContractEntry> StrictCoverage { get; set; } = new();
     [YamlMember(Alias = "audit_coverage")] public List<ArchitectureBaselineContractEntry> AuditCoverage { get; set; } = new();
+    [YamlMember(Alias = "strict_context_dependencies")] public List<ArchitectureBaselineContractEntry> StrictContextDependencies { get; set; } = new();
+    [YamlMember(Alias = "audit_context_dependencies")] public List<ArchitectureBaselineContractEntry> AuditContextDependencies { get; set; } = new();
+    [YamlMember(Alias = "strict_context_allow_only")] public List<ArchitectureBaselineContractEntry> StrictContextAllowOnly { get; set; } = new();
+    [YamlMember(Alias = "audit_context_allow_only")] public List<ArchitectureBaselineContractEntry> AuditContextAllowOnly { get; set; } = new();
 
     // Canonical, ordered set of every baseline-capable group name. The baseline comparer iterates
     // this list; keeping it aligned with the properties above (and with the catalog's resolvable
@@ -99,6 +103,8 @@ public sealed class ArchitectureBaselineContractGroups
         "strict_interface_implementation", "audit_interface_implementation",
         "strict_composition", "audit_composition",
         "strict_coverage", "audit_coverage",
+        "strict_context_dependencies", "audit_context_dependencies",
+        "strict_context_allow_only", "audit_context_allow_only",
     };
 
     public List<ArchitectureBaselineContractEntry> GetGroup(string groupName)
@@ -151,6 +157,10 @@ public sealed class ArchitectureBaselineContractGroups
             "audit_composition" => AuditComposition,
             "strict_coverage" => StrictCoverage,
             "audit_coverage" => AuditCoverage,
+            "strict_context_dependencies" => StrictContextDependencies,
+            "audit_context_dependencies" => AuditContextDependencies,
+            "strict_context_allow_only" => StrictContextAllowOnly,
+            "audit_context_allow_only" => AuditContextAllowOnly,
             _ => throw new ArgumentOutOfRangeException(
                 nameof(groupName), groupName, "Unknown baseline group. Add it to ArchitectureBaselineContractGroups."),
         };
@@ -206,6 +216,10 @@ public sealed class ArchitectureBaselineContractGroups
             case "audit_composition": AuditComposition = entries; break;
             case "strict_coverage": StrictCoverage = entries; break;
             case "audit_coverage": AuditCoverage = entries; break;
+            case "strict_context_dependencies": StrictContextDependencies = entries; break;
+            case "audit_context_dependencies": AuditContextDependencies = entries; break;
+            case "strict_context_allow_only": StrictContextAllowOnly = entries; break;
+            case "audit_context_allow_only": AuditContextAllowOnly = entries; break;
             default:
                 throw new ArgumentOutOfRangeException(
                     nameof(groupName), groupName, "Unknown baseline group. Add it to ArchitectureBaselineContractGroups.");

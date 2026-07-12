@@ -50,5 +50,9 @@ internal static class ArchitectureContractFamilyBindings
             g => g.AuditInterfaceImplementation, true),
         new ArchitectureContractFamilyBinding("composition", g => g.StrictComposition, g => g.AuditComposition, true),
         new ArchitectureContractFamilyBinding("coverage", g => g.StrictCoverage, g => g.AuditCoverage, true),
+        new ArchitectureContractFamilyBinding("context_dependency", g => g.StrictContextDependencies,
+            g => g.AuditContextDependencies, true),
+        new ArchitectureContractFamilyBinding("context_allow_only", g => g.StrictContextAllowOnly,
+            g => g.AuditContextAllowOnly, true),
     };
 }

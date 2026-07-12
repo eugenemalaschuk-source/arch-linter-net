@@ -231,6 +231,8 @@ public sealed partial class ArchitectureDiagnosticFormatter : IArchitectureDiagn
         InterfaceImplementationDiagnostic d => d.SourceType,
         CompositionDiagnostic d => d.SourceType,
         ProjectMetadataDiagnostic d => d.SourceType,
+        ContextDependencyDiagnostic d => d.SourceType,
+        ContextAllowOnlyDiagnostic d => d.SourceType,
         _ => string.Empty
     };
 
@@ -246,6 +248,8 @@ public sealed partial class ArchitectureDiagnosticFormatter : IArchitectureDiagn
         InterfaceImplementationDiagnostic d => d.ForbiddenNamespace,
         CompositionDiagnostic d => d.ForbiddenNamespace,
         ProjectMetadataDiagnostic d => d.ForbiddenNamespace,
+        ContextDependencyDiagnostic d => d.ForbiddenNamespace,
+        ContextAllowOnlyDiagnostic d => d.ForbiddenNamespace,
         _ => string.Empty
     };
 
@@ -261,6 +265,8 @@ public sealed partial class ArchitectureDiagnosticFormatter : IArchitectureDiagn
         InterfaceImplementationDiagnostic d => d.ForbiddenReferences,
         CompositionDiagnostic d => d.ForbiddenReferences,
         ProjectMetadataDiagnostic d => d.ForbiddenReferences,
+        ContextDependencyDiagnostic d => d.ForbiddenReferences,
+        ContextAllowOnlyDiagnostic d => d.ForbiddenReferences,
         _ => Array.Empty<string>()
     };
 
@@ -325,6 +331,16 @@ public sealed partial class ArchitectureDiagnosticFormatter : IArchitectureDiagn
         if (diagnostic is ProjectMetadataDiagnostic projectMetadata)
         {
             context += FormatProjectMetadataContextForHumans(projectMetadata);
+        }
+
+        if (diagnostic is ContextDependencyDiagnostic contextDependency)
+        {
+            context += FormatContextDependencyContextForHumans(contextDependency);
+        }
+
+        if (diagnostic is ContextAllowOnlyDiagnostic contextAllowOnly)
+        {
+            context += FormatContextAllowOnlyContextForHumans(contextAllowOnly);
         }
 
         return context;
@@ -583,6 +599,16 @@ public sealed partial class ArchitectureDiagnosticFormatter : IArchitectureDiagn
         if (diagnostic is ConfigurationDiagnostic configuration)
         {
             ApplyConfigurationCiFields(configuration, obj);
+        }
+
+        if (diagnostic is ContextDependencyDiagnostic contextDependency)
+        {
+            ApplyContextDependencyCiFields(contextDependency, obj);
+        }
+
+        if (diagnostic is ContextAllowOnlyDiagnostic contextAllowOnly)
+        {
+            ApplyContextAllowOnlyCiFields(contextAllowOnly, obj);
         }
     }
 
