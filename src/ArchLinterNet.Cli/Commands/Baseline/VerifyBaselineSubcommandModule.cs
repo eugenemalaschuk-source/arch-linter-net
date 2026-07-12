@@ -1,5 +1,6 @@
 using System.CommandLine;
 using ArchLinterNet.Cli.Abstractions;
+using ArchLinterNet.Cli.Commands.Baseline.Abstractions;
 
 namespace ArchLinterNet.Cli.Commands.Baseline;
 

@@ -1,6 +1,6 @@
 using System.Reflection;
 
-namespace ArchLinterNet.Core.IO;
+namespace ArchLinterNet.Core.IO.Abstractions;
 
 public interface IArchitectureAssemblyLoader
 {

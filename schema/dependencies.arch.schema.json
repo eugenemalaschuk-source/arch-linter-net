@@ -856,6 +856,16 @@
           "type": "array",
           "items": { "$ref": "#/$defs/contextAllowOnlyContract" },
           "default": []
+        },
+        "strict_port_boundaries": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/portBoundaryContract" },
+          "default": []
+        },
+        "audit_port_boundaries": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/portBoundaryContract" },
+          "default": []
         }
       }
     },
@@ -998,6 +1008,50 @@
           }
         }
       ]
+    },
+    "contextMetadataSelector": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["metadata"],
+      "properties": {
+        "metadata": {
+          "type": "object",
+          "minProperties": 1,
+          "additionalProperties": { "$ref": "#/$defs/contextMetadataValue" }
+        }
+      }
+    },
+    "portBoundaryContract": {
+      "allOf": [
+        { "$ref": "#/$defs/baseContractFields" },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["name", "source", "target_context", "allowed_seams", "forbidden", "reason"],
+          "properties": {
+            "name": { "type": "string", "minLength": 1 },
+            "id": { "type": "string", "minLength": 1 },
+            "source": { "$ref": "#/$defs/contextSourceSelector" },
+            "target_context": { "$ref": "#/$defs/contextMetadataSelector" },
+            "allowed_seams": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/contextSelector" } },
+            "forbidden": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/contextSelector" } },
+            "adapter_bindings": { "type": "array", "items": { "$ref": "#/$defs/adapterPortBinding" }, "default": [] },
+            "exclude": { "type": "array", "items": { "$ref": "#/$defs/contextSelector" } },
+            "ignored_violations": { "$ref": "#/$defs/ignoredViolations" },
+            "reason": { "type": "string", "minLength": 1 }
+          }
+        }
+      ]
+    },
+    "adapterPortBinding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["adapter", "expected_port"],
+      "properties": {
+        "adapter": { "$ref": "#/$defs/contextSourceSelector" },
+        "expected_port": { "$ref": "#/$defs/contextSourceSelector" },
+        "allowed_contexts": { "type": "array", "items": { "$ref": "#/$defs/contextSelector" }, "default": [] }
+      }
     },
     "cycleContract": {
       "type": "object",

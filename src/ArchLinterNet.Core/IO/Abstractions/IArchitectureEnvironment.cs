@@ -1,4 +1,4 @@
-namespace ArchLinterNet.Core.IO;
+namespace ArchLinterNet.Core.IO.Abstractions;
 
 public interface IArchitectureEnvironment
 {

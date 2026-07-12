@@ -54,5 +54,7 @@ internal static class ArchitectureContractFamilyBindings
             g => g.AuditContextDependencies, true),
         new ArchitectureContractFamilyBinding("context_allow_only", g => g.StrictContextAllowOnly,
             g => g.AuditContextAllowOnly, true),
+        new ArchitectureContractFamilyBinding("port_boundary", g => g.StrictPortBoundaries,
+            g => g.AuditPortBoundaries, true),
     };
 }

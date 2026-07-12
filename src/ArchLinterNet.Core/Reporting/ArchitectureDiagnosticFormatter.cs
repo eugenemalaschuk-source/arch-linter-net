@@ -233,6 +233,7 @@ public sealed partial class ArchitectureDiagnosticFormatter : IArchitectureDiagn
         ProjectMetadataDiagnostic d => d.SourceType,
         ContextDependencyDiagnostic d => d.SourceType,
         ContextAllowOnlyDiagnostic d => d.SourceType,
+        PortBoundaryDiagnostic d => d.SourceType,
         _ => string.Empty
     };
 
@@ -250,6 +251,7 @@ public sealed partial class ArchitectureDiagnosticFormatter : IArchitectureDiagn
         ProjectMetadataDiagnostic d => d.ForbiddenNamespace,
         ContextDependencyDiagnostic d => d.ForbiddenNamespace,
         ContextAllowOnlyDiagnostic d => d.ForbiddenNamespace,
+        PortBoundaryDiagnostic d => d.ForbiddenNamespace,
         _ => string.Empty
     };
 
@@ -267,6 +269,7 @@ public sealed partial class ArchitectureDiagnosticFormatter : IArchitectureDiagn
         ProjectMetadataDiagnostic d => d.ForbiddenReferences,
         ContextDependencyDiagnostic d => d.ForbiddenReferences,
         ContextAllowOnlyDiagnostic d => d.ForbiddenReferences,
+        PortBoundaryDiagnostic d => d.ForbiddenReferences,
         _ => Array.Empty<string>()
     };
 
@@ -341,6 +344,11 @@ public sealed partial class ArchitectureDiagnosticFormatter : IArchitectureDiagn
         if (diagnostic is ContextAllowOnlyDiagnostic contextAllowOnly)
         {
             context += FormatContextAllowOnlyContextForHumans(contextAllowOnly);
+        }
+
+        if (diagnostic is PortBoundaryDiagnostic portBoundary)
+        {
+            context += FormatPortBoundaryContextForHumans(portBoundary);
         }
 
         return context;
@@ -609,6 +617,11 @@ public sealed partial class ArchitectureDiagnosticFormatter : IArchitectureDiagn
         if (diagnostic is ContextAllowOnlyDiagnostic contextAllowOnly)
         {
             ApplyContextAllowOnlyCiFields(contextAllowOnly, obj);
+        }
+
+        if (diagnostic is PortBoundaryDiagnostic portBoundary)
+        {
+            ApplyPortBoundaryCiFields(portBoundary, obj);
         }
     }
 

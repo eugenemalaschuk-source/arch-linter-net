@@ -425,4 +425,251 @@ public sealed class ContextualContractValidationTests
 
         Assert.DoesNotThrow(() => new ArchitecturePolicyDocumentLoader().Load(policyPath));
     }
+
+    [Test]
+    public void PortBoundary_WellFormedContract_LoadsSuccessfully()
+    {
+        string policyPath = WritePolicy($$"""
+            version: 1
+            name: Test
+            analysis:
+              target_assemblies: [{{AssemblyName}}]
+            contracts:
+              strict_port_boundaries:
+                - name: port-boundary
+                  source: { role: ApplicationLayer }
+                  target_context: { metadata: { domain: Catalog } }
+                  allowed_seams: [{ role: Port }]
+                  forbidden: [{ role: DomainLayer }]
+                  exclude: [{ role: SharedKernel }]
+                  adapter_bindings:
+                    - adapter: { role: Adapter }
+                      expected_port: { role: Port }
+                      allowed_contexts: [{ role: Adapter }]
+                  reason: Well-formed port-boundary contract.
+            """);
+
+        Assert.DoesNotThrow(() => new ArchitecturePolicyDocumentLoader().Load(policyPath));
+    }
+
+    [Test]
+    public void PortBoundary_MissingTargetContextMetadata_ThrowsActionableError()
+    {
+        string policyPath = WritePolicy($$"""
+            version: 1
+            name: Test
+            analysis:
+              target_assemblies: [{{AssemblyName}}]
+            contracts:
+              strict_port_boundaries:
+                - name: port-boundary
+                  source: { role: ApplicationLayer }
+                  target_context: { metadata: {} }
+                  allowed_seams: [{ role: Port }]
+                  forbidden: [{ role: DomainLayer }]
+                  reason: Test.
+            """);
+
+        InvalidOperationException ex = Assert.Throws<InvalidOperationException>(() =>
+            new ArchitecturePolicyDocumentLoader().Load(policyPath))!;
+
+        Assert.That(ex.Message, Does.Contain("non-empty 'target_context.metadata'"));
+    }
+
+    [Test]
+    public void PortBoundary_UnknownNestedAdapterBindingProperty_ThrowsActionableError()
+    {
+        string policyPath = WritePolicy($$"""
+            version: 1
+            name: Test
+            analysis:
+              target_assemblies: [{{AssemblyName}}]
+            contracts:
+              strict_port_boundaries:
+                - name: port-boundary
+                  source: { role: ApplicationLayer }
+                  target_context: { metadata: { domain: Catalog } }
+                  allowed_seams: [{ role: Port }]
+                  forbidden: [{ role: DomainLayer }]
+                  adapter_bindings:
+                    - adapter: { role: Adapter }
+                      expected_port: { role: Port }
+                      allowed_context: [{ role: Adapter }]
+                  reason: Test nested validation.
+            """);
+
+        InvalidOperationException ex = Assert.Throws<InvalidOperationException>(() =>
+            new ArchitecturePolicyDocumentLoader().Load(policyPath))!;
+
+        Assert.That(ex.Message, Does.Contain("unknown property 'allowed_context'"));
+    }
+
+    [Test]
+    public void PortBoundary_MissingReason_ThrowsActionableError()
+    {
+        string policyPath = WritePolicy($$"""
+            version: 1
+            name: Test
+            analysis:
+              target_assemblies: [{{AssemblyName}}]
+            contracts:
+              strict_port_boundaries:
+                - name: port-boundary
+                  source: { role: ApplicationLayer }
+                  target_context: { metadata: { domain: Catalog } }
+                  allowed_seams: [{ role: Port }]
+                  forbidden: [{ role: DomainLayer }]
+            """);
+
+        InvalidOperationException ex = Assert.Throws<InvalidOperationException>(() =>
+            new ArchitecturePolicyDocumentLoader().Load(policyPath))!;
+
+        Assert.That(ex.Message, Does.Contain("non-empty 'reason'"));
+    }
+
+    [Test]
+    public void PortBoundary_EmptyReason_ThrowsActionableError()
+    {
+        string policyPath = WritePolicy($$"""
+            version: 1
+            name: Test
+            analysis:
+              target_assemblies: [{{AssemblyName}}]
+            contracts:
+              strict_port_boundaries:
+                - name: port-boundary
+                  source: { role: ApplicationLayer }
+                  target_context: { metadata: { domain: Catalog } }
+                  allowed_seams: [{ role: Port }]
+                  forbidden: [{ role: DomainLayer }]
+                  reason: "   "
+            """);
+
+        InvalidOperationException ex = Assert.Throws<InvalidOperationException>(() =>
+            new ArchitecturePolicyDocumentLoader().Load(policyPath))!;
+
+        Assert.That(ex.Message, Does.Contain("non-empty 'reason'"));
+    }
+
+    [Test]
+    public void PortBoundary_EmptyMetadataListValue_ThrowsActionableError()
+    {
+        // Regression (#306 review 3.3): the public JSON schema requires the 'in' operator's list to
+        // be non-empty (minItems: 1), but the production loader never runs that schema. An empty
+        // list deserializes cleanly and the evaluator's Any() over it is unconditionally false for
+        // every candidate, so a strict contract would silently match nothing instead of failing to
+        // load.
+        string policyPath = WritePolicy($$"""
+            version: 1
+            name: Test
+            analysis:
+              target_assemblies: [{{AssemblyName}}]
+            contracts:
+              strict_port_boundaries:
+                - name: port-boundary
+                  source: { role: ApplicationLayer }
+                  target_context: { metadata: { domain: [] } }
+                  allowed_seams: [{ role: Port }]
+                  forbidden: [{ role: DomainLayer }]
+                  reason: Test.
+            """);
+
+        InvalidOperationException ex = Assert.Throws<InvalidOperationException>(() =>
+            new ArchitecturePolicyDocumentLoader().Load(policyPath))!;
+
+        Assert.That(ex.Message, Does.Contain("empty list"));
+    }
+
+    [Test]
+    public void PortBoundary_EmptyStringMetadataValue_ThrowsActionableError()
+    {
+        string policyPath = WritePolicy($$"""
+            version: 1
+            name: Test
+            analysis:
+              target_assemblies: [{{AssemblyName}}]
+            contracts:
+              strict_port_boundaries:
+                - name: port-boundary
+                  source: { role: ApplicationLayer }
+                  target_context: { metadata: { domain: "" } }
+                  allowed_seams: [{ role: Port }]
+                  forbidden: [{ role: DomainLayer }]
+                  reason: Test.
+            """);
+
+        InvalidOperationException ex = Assert.Throws<InvalidOperationException>(() =>
+            new ArchitecturePolicyDocumentLoader().Load(policyPath))!;
+
+        Assert.That(ex.Message, Does.Contain("empty string value"));
+    }
+
+    [Test]
+    public void PortBoundary_NestedMappingMetadataValue_ThrowsActionableError()
+    {
+        string policyPath = WritePolicy($$"""
+            version: 1
+            name: Test
+            analysis:
+              target_assemblies: [{{AssemblyName}}]
+            contracts:
+              strict_port_boundaries:
+                - name: port-boundary
+                  source: { role: ApplicationLayer }
+                  target_context: { metadata: { domain: { nested: value } } }
+                  allowed_seams: [{ role: Port }]
+                  forbidden: [{ role: DomainLayer }]
+                  reason: Test.
+            """);
+
+        InvalidOperationException ex = Assert.Throws<InvalidOperationException>(() =>
+            new ArchitecturePolicyDocumentLoader().Load(policyPath))!;
+
+        Assert.That(ex.Message, Does.Contain("unsupported value"));
+    }
+
+    [Test]
+    public void PortBoundary_MetadataListWithNonScalarEntry_ThrowsActionableError()
+    {
+        string policyPath = WritePolicy($$"""
+            version: 1
+            name: Test
+            analysis:
+              target_assemblies: [{{AssemblyName}}]
+            contracts:
+              strict_port_boundaries:
+                - name: port-boundary
+                  source: { role: ApplicationLayer }
+                  target_context: { metadata: { domain: [Catalog, [nested]] } }
+                  allowed_seams: [{ role: Port }]
+                  forbidden: [{ role: DomainLayer }]
+                  reason: Test.
+            """);
+
+        InvalidOperationException ex = Assert.Throws<InvalidOperationException>(() =>
+            new ArchitecturePolicyDocumentLoader().Load(policyPath))!;
+
+        Assert.That(ex.Message, Does.Contain("non-scalar entry"));
+    }
+
+    [Test]
+    public void PortBoundary_NonEmptyMetadataListValue_LoadsSuccessfully()
+    {
+        string policyPath = WritePolicy($$"""
+            version: 1
+            name: Test
+            analysis:
+              target_assemblies: [{{AssemblyName}}]
+            contracts:
+              strict_port_boundaries:
+                - name: port-boundary
+                  source: { role: ApplicationLayer }
+                  target_context: { metadata: { domain: [Catalog, Inventory] } }
+                  allowed_seams: [{ role: Port }]
+                  forbidden: [{ role: DomainLayer }]
+                  reason: Well-formed list-valued metadata.
+            """);
+
+        Assert.DoesNotThrow(() => new ArchitecturePolicyDocumentLoader().Load(policyPath));
+    }
 }

@@ -17,5 +17,6 @@ public enum ArchitectureDiagnosticKind
     Composition,
     ProjectMetadata,
     ContextDependency,
-    ContextAllowOnly
+    ContextAllowOnly,
+    PortBoundary
 }
