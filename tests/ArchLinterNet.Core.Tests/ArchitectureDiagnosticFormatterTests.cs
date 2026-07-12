@@ -261,6 +261,38 @@ public sealed class ArchitectureDiagnosticFormatterTests
     }
 
     [Test]
+    public void FormatClassificationFactsForHumans_PathDeferredNotice_IncludesEntryCountAndIssueReference()
+    {
+        var notice = new Model.ArchitectureClassificationPathDeferredNotice(3);
+
+        string human = _formatter.FormatClassificationFactsForHumans(
+            Array.Empty<Model.ArchitectureClassificationConflict>(),
+            Array.Empty<Model.ArchitectureClassificationMetadataFailure>(),
+            notice);
+
+        Assert.That(human, Does.StartWith("Classification findings:"));
+        Assert.That(human, Does.Contain("classification.path declares 3 entries"));
+        Assert.That(human, Does.Contain("#171"));
+
+        using var json = JsonDocument.Parse(_formatter.FormatResultForCiArtifacts(
+            "strict", true, Array.Empty<ArchitectureViolation>(), Array.Empty<string>(),
+            classificationRoles: Array.Empty<Model.ArchitectureClassificationRoleFact>(),
+            classificationPathDeferred: notice));
+        Assert.That(
+            json.RootElement.GetProperty("classification_path_deferred").GetProperty("declared_entry_count").GetInt32(),
+            Is.EqualTo(3));
+    }
+
+    [Test]
+    public void FormatResultForCiArtifacts_NoPathDeferredNotice_OmitsClassificationPathDeferred()
+    {
+        using var json = JsonDocument.Parse(_formatter.FormatResultForCiArtifacts(
+            "strict", true, Array.Empty<ArchitectureViolation>(), Array.Empty<string>()));
+
+        Assert.That(json.RootElement.GetProperty("classification_path_deferred").ValueKind, Is.EqualTo(JsonValueKind.Null));
+    }
+
+    [Test]
     public void FormatClassificationFactsForHumans_ConflictsAndFailures_IncludesDetails()
     {
         var conflicts = new[]
@@ -454,6 +486,41 @@ public sealed class ArchitectureDiagnosticFormatterTests
             "strict", true, Array.Empty<ArchitectureViolation>(), Array.Empty<string>(), roles);
 
         Assert.That(result, Is.EqualTo("pre-existing-implementation"));
+    }
+
+    // A third-party implementer that predates the classificationPathDeferred overloads must still
+    // compile and function — proving those overloads' default interface implementations satisfy the
+    // interface contract without forcing every implementer to add them, chaining down through the
+    // roles overload's own default implementation to the original member (#307 review: patch coverage).
+    [Test]
+    public void FormatResultForCiArtifacts_PreExistingImplementerWithoutPathDeferredOverload_FallsBackThroughRolesOverload()
+    {
+        IArchitectureDiagnosticFormatter formatter = new PreExistingThirdPartyFormatter();
+        var roles = new[]
+        {
+            new Model.ArchitectureClassificationRoleFact(
+                "MyApp.Order", "DomainLayer", Model.ArchitectureClassificationSource.TypeAttribute, null, new Dictionary<string, object>())
+        };
+        var pathDeferred = new Model.ArchitectureClassificationPathDeferredNotice(1);
+
+        string result = formatter.FormatResultForCiArtifacts(
+            "strict", true, Array.Empty<ArchitectureViolation>(), Array.Empty<string>(), roles, pathDeferred);
+
+        Assert.That(result, Is.EqualTo("pre-existing-implementation"));
+    }
+
+    [Test]
+    public void FormatClassificationFactsForHumans_PreExistingImplementerWithoutPathDeferredOverload_FallsBackToOriginalMember()
+    {
+        IArchitectureDiagnosticFormatter formatter = new PreExistingThirdPartyFormatter();
+        var pathDeferred = new Model.ArchitectureClassificationPathDeferredNotice(1);
+
+        string result = formatter.FormatClassificationFactsForHumans(
+            Array.Empty<Model.ArchitectureClassificationConflict>(),
+            Array.Empty<Model.ArchitectureClassificationMetadataFailure>(),
+            pathDeferred);
+
+        Assert.That(result, Is.Empty);
     }
 
     [Test]

@@ -1,7 +1,7 @@
 # semantic-classification-model Specification
 
 ## Purpose
-Define the semantic-classification vocabulary, the `classification` YAML section, and the executable `layers.<name>.selector` behavior across runtime layer matching and diagnostics. Attribute-based role assignment is implemented, and selector-backed layers participate in runtime binding; remaining classification sources and semantic coverage follow-up work stay in their own capabilities.
+Define the semantic-classification vocabulary, the `classification` YAML section, and the executable `layers.<name>.selector` behavior across runtime layer matching and diagnostics. Attribute-based, inheritance-based, and namespace-based role assignment are implemented, and selector-backed layers participate in runtime binding; remaining classification sources (`path`, `overrides`, `exclusions`, `yaml_override`) and semantic coverage follow-up work stay in their own capabilities.
 ## Requirements
 ### Requirement: Classification vocabulary is defined
 The semantic classification model SHALL define exactly ten classification terms with non-overlapping meanings: `role`, `metadata`, `source`, `evidence`, `confidence`/`precedence`, `conflict`, `override`, `exclusion`, `stale selector`, and `uncovered semantic fact`.
@@ -75,6 +75,10 @@ When two or more entries *within the same source list* (`classification.attribut
 #### Scenario: Within-source conflict resolution does not override source precedence
 - **WHEN** a `classification.namespace` entry and a `classification.overrides` entry both match one type
 - **THEN** the fixed source precedence (`yaml_override` before `namespace`) decides the winner, not declaration order — declaration-order tie-breaking applies only among entries within the same source
+
+#### Scenario: Two inheritance mapping entries matching one type via different base types resolve by declaration order
+- **WHEN** two `classification.inheritance` entries both match one type (e.g. one matching a base class, another matching an interface the type also implements) and assign different roles
+- **THEN** the model assigns the first-declared entry's role and records the discarded entry's role as a `conflict` fact
 
 ### Requirement: Repeated instances of one mapped attribute resolve by metadata order, not YAML order
 When a repeatable attribute mapped by a single `classification.attributes`/`classification.assembly_attributes` entry appears more than once on one declaration, the model SHALL resolve the resulting conflict using the attribute instances' `CustomAttributeData` metadata order (first instance wins), not YAML declaration order (there is only one mapping entry to order). Identical instances (same role and same metadata for every key the entry maps) SHALL NOT be treated as a conflict.
@@ -212,26 +216,58 @@ The design SHALL state that a future `scope: semantic_role` variant of the exist
 - **THEN** the reviewed design classifies this using the same conceptual status as the architecture-coverage-model's `uncovered`, for a future `scope: semantic_role` coverage variant to implement
 
 ### Requirement: Runtime behavior is introduced only for implemented classification sources and layer selectors
-The runtime SHALL execute `classification.attributes`, `classification.assembly_attributes`, and `layers.<name>.selector` matching/binding according to their implemented capabilities. `classification.inheritance`, `classification.namespace`, `classification.path`, `classification.overrides`, and `classification.exclusions` remain schema-valid reserved constructs until their own execution capabilities land.
+The runtime SHALL execute `classification.attributes`, `classification.assembly_attributes`, `classification.inheritance`, `classification.namespace`, and `layers.<name>.selector` matching/binding according to their implemented capabilities. `classification.path`, `classification.overrides`, and `classification.exclusions` remain schema-valid reserved constructs until their own execution capabilities land; `classification.path` additionally produces a deterministic deferred-support diagnostic when declared (see the diagnostic scenario below), distinguishing it from the fully silent `overrides`/`exclusions` reserved sections.
 
 #### Scenario: Declaring reserved unimplemented classification constructs does not throw
-- **WHEN** a policy declares `classification.overrides`, `classification.exclusions`, `classification.inheritance`, `classification.namespace`, or `classification.path` before their implementation lands
+- **WHEN** a policy declares `classification.overrides`, `classification.exclusions`, or `classification.path` before their implementation lands
 - **THEN** policy loading and validation SHALL proceed without exception and those reserved constructs SHALL produce no role assignment yet
-
-#### Scenario: Declaring implemented selector-backed layers now affects runtime layer matching
-- **WHEN** a policy declares a `layers.<name>.selector` field matching a classified type
-- **THEN** the runtime uses that selector during layer membership, dependency checking, cycle detection, protected-layer checks, and related selector-aware diagnostics
 
 #### Scenario: Declaring classification.attributes or classification.assembly_attributes now produces role or metadata assignments
 - **WHEN** a policy declares `classification.attributes` or `classification.assembly_attributes` entries matching attributes present in scanned code
 - **THEN** the extraction engine assigns role or metadata per the `attribute-role-extraction` capability, rather than treating the declaration as an inert no-op
 
+#### Scenario: Declaring classification.inheritance now produces role or metadata assignments
+- **WHEN** a policy declares a `classification.inheritance` entry whose `base_type` names a type that a scanned type derives from or implements, transitively
+- **THEN** the extraction engine assigns that entry's declared `role` (and any successfully extracted `metadata`) to the matching type, with `Evidence` set to the matched `base_type` full name
+
+#### Scenario: Declaring classification.namespace now produces role or metadata assignments
+- **WHEN** a policy declares a `classification.namespace` entry whose `namespace`/`namespace_suffix` matches a scanned type's namespace, using the same glob semantics already accepted by `layers.<name>.namespace`
+- **THEN** the extraction engine assigns that entry's declared `role` (and any successfully extracted `metadata`) to the matching type, with `Evidence` set to the matched namespace pattern
+
+#### Scenario: Namespace evidence reflects a combined namespace and namespace_suffix condition
+- **WHEN** a `classification.namespace` entry declares both `namespace` and `namespace_suffix`, and a scanned type matches both constraints
+- **THEN** `Evidence` SHALL reflect both constraints (e.g. `MyApp.*.Contracts`, not just `MyApp.*`), so the diagnostic distinguishes this entry from one declaring the same `namespace` with no `namespace_suffix` constraint
+
+#### Scenario: Inheritance metadata extraction is restricted to literal and const forms
+- **WHEN** a `classification.inheritance` or `classification.namespace` entry declares a `metadata.<key>` value
+- **THEN** the value is interpreted only as a literal YAML scalar or a `const:<Full.Type.NAME>` reference — `constructor[<index>]` and `property:<Name>` forms are not valid for these sources, since neither has an attribute instance to extract from
+
+#### Scenario: Inheritance matching compares against the candidate type's own reflected base chain, not a scanned-assembly lookup
+- **WHEN** a `classification.inheritance` entry's `base_type` names a type declared in an assembly that is not among the scanned target assemblies (e.g. a framework or package base type such as a web-framework controller base class, an ORM context base class, or a game-engine component base class)
+- **THEN** the model SHALL still match any scanned type deriving from or implementing that base type, by comparing `base_type`'s full name against the candidate type's own reflected base-class chain and transitive interface set — not by first resolving `base_type` to a `Type` through the scanned target-assembly type universe, which would systematically fail to match every such framework-derived type
+
+#### Scenario: Inheritance matching normalizes generic ancestors and interfaces to their open generic definition
+- **WHEN** a `classification.inheritance` entry's `base_type` names an open generic base class or interface (e.g. `MyApp.IRepository\`1`), and a scanned type derives from or implements a closed instantiation of it (e.g. `IRepository<Order>`)
+- **THEN** the model SHALL match, by normalizing each candidate ancestor/interface to its generic type definition before comparing full names — a closed instantiation's own `FullName` (which embeds the assembly-qualified closed type argument) SHALL NOT be compared directly against the open generic `base_type` string
+
+#### Scenario: Unresolved inheritance base_type produces no match and no diagnostic
+- **WHEN** a `classification.inheritance` entry's `base_type` names no type in the candidate type's own base-class chain or transitive interface set, for every scanned type
+- **THEN** that entry matches no type for the run, with no diagnostic recorded — a policy authoring mistake (e.g. a typo'd `base_type`) is indistinguishable from a legitimately unmatched convention
+
+#### Scenario: Declaring classification.path produces a deferred-support diagnostic
+- **WHEN** a policy declares a non-empty `classification.path` section
+- **THEN** policy loading SHALL proceed without exception, no role assignment SHALL result from `path` entries, and the model SHALL surface a non-blocking, informational diagnostic explaining that path-convention classification is not yet implemented pending source/declared-type fact discovery, visible even when the scanned type universe is empty
+
 ### Requirement: Existing policies remain unaffected
-A policy with no `classification` section and no `layers.<name>.selector` field SHALL behave identically to its behavior before the classification model existed.
+A policy with no `classification` section and no `layers.<name>.selector` field SHALL behave identically to its behavior before the classification model existed. A policy declaring only `classification.attributes`/`classification.assembly_attributes` (no `inheritance`/`namespace`/`path`) SHALL behave identically to its behavior before `inheritance`/`namespace` execution landed.
 
 #### Scenario: Policy without classification is unaffected
 - **WHEN** a policy declares no `classification` section and no layer uses `selector`
 - **THEN** no classification-related schema field constrains that policy beyond what already applied before this change
+
+#### Scenario: Policy using only attribute-based sources is unaffected by inheritance/namespace execution
+- **WHEN** a policy declares `classification.attributes`/`classification.assembly_attributes` but no `classification.inheritance`/`classification.namespace` entries
+- **THEN** role/metadata assignment for that policy is identical to its behavior before `classification.inheritance`/`classification.namespace` execution landed
 
 ### Requirement: Layer selector diagnostics are deterministic and explainable
 The system SHALL reject invalid selector definitions with deterministic configuration diagnostics, and SHALL expose a deterministic empty-match diagnostic for a valid selector that matches no classified type unless the layer is external. Layer descriptions and relevant diagnostics SHALL identify semantic selection when a selector participates.

@@ -69,7 +69,8 @@ internal sealed class ValidateCommandHandler(ICliRuntime runtime, ICliConsole co
                     outcome.CoverageSummaries,
                     outcome.ClassificationConflicts,
                     outcome.ClassificationMetadataFailures,
-                    outcome.ClassificationRoles));
+                    outcome.ClassificationRoles,
+                    outcome.ClassificationPathDeferred));
             }
             else if (options.Format == "sarif")
             {
@@ -126,8 +127,10 @@ internal sealed class ValidateCommandHandler(ICliRuntime runtime, ICliConsole co
             () => runtime.FormatCoverageSummaryForHumans(outcome.CoverageSummaries));
 
         WriteOptionalSection(
-            outcome.ClassificationConflicts.Count > 0 || outcome.ClassificationMetadataFailures.Count > 0,
-            () => runtime.FormatClassificationFactsForHumans(outcome.ClassificationConflicts, outcome.ClassificationMetadataFailures));
+            outcome.ClassificationConflicts.Count > 0 || outcome.ClassificationMetadataFailures.Count > 0
+                || outcome.ClassificationPathDeferred != null,
+            () => runtime.FormatClassificationFactsForHumans(
+                outcome.ClassificationConflicts, outcome.ClassificationMetadataFailures, outcome.ClassificationPathDeferred));
     }
 
     private void WriteOptionalSection(bool shouldWrite, Func<string> contentFactory)

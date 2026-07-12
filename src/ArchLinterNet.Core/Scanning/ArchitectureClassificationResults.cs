@@ -36,8 +36,9 @@ public sealed class ArchitectureTypeClassificationResult
     public IReadOnlyList<ArchitectureClassificationMetadataFailure> MetadataFailures { get; }
 }
 
-// Per-source (type_attribute or assembly_attribute) resolved candidate, before the two sources are
-// combined by precedence. Kept internal: callers only ever see the combined ArchitectureTypeClassificationResult.
+// Per-source (type_attribute, assembly_attribute, inheritance, or namespace) resolved candidate,
+// before sources are combined by precedence. Kept internal: callers only ever see the combined
+// ArchitectureTypeClassificationResult.
 internal sealed record ArchitectureAttributeClassificationCandidate(
     string? Role,
     IReadOnlyDictionary<string, object> Metadata,

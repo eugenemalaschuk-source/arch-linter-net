@@ -34,6 +34,67 @@ public sealed class ArchitectureAttributeRoleExtractorTests
     }
 
     [Test]
+    public void PublicConstructor_ExactTwoParameterOverload_ExistsForBinaryCompatibility()
+    {
+        // Regression (#307 review): a consumer already compiled against the original public
+        // .ctor(ArchitectureClassificationConfiguration, IEnumerable<Type>) resolves that exact
+        // constructor by parameter count/types at load time — an optional third parameter on a
+        // single constructor only helps source compatibility, not binary compatibility, so the
+        // original two-parameter public overload must keep existing verbatim, not just be callable
+        // by omitting a trailing optional argument.
+        ConstructorInfo? ctor = typeof(ArchitectureAttributeRoleExtractor).GetConstructor(
+            BindingFlags.Public | BindingFlags.Instance,
+            new[] { typeof(ArchitectureClassificationConfiguration), typeof(IEnumerable<Type>) });
+
+        Assert.That(ctor, Is.Not.Null);
+    }
+
+    [Test]
+    public void PublicConstructor_ClassificationNamespaceDeclared_ThrowsInsteadOfSilentlyNeverMatching()
+    {
+        // Regression (#307 review): the public two-argument constructor has no namespace-glob
+        // matcher available (only ArchitectureRoleIndex/Execution can supply one). Declaring
+        // classification.namespace entries through this constructor must fail loudly at
+        // construction time rather than silently never matching any of them.
+        var configuration = new ArchitectureClassificationConfiguration
+        {
+            Namespace =
+            {
+                new ArchitectureNamespaceClassificationMapping
+                {
+                    Namespace = "AttributeRoleExtractionTestFixtures",
+                    Role = "DomainLayer"
+                }
+            }
+        };
+
+        Assert.That(
+            () => new ArchitectureAttributeRoleExtractor(configuration, TypeUniverse),
+            Throws.InvalidOperationException);
+    }
+
+    [Test]
+    public void PublicConstructor_ClassificationNamespaceDisabledByPrecedence_DoesNotThrow()
+    {
+        var configuration = new ArchitectureClassificationConfiguration
+        {
+            Precedence = new List<string> { "type_attribute" },
+            Namespace =
+            {
+                new ArchitectureNamespaceClassificationMapping
+                {
+                    Namespace = "AttributeRoleExtractionTestFixtures",
+                    Role = "DomainLayer"
+                }
+            }
+        };
+
+        Assert.That(
+            () => new ArchitectureAttributeRoleExtractor(configuration, TypeUniverse),
+            Throws.Nothing);
+    }
+
+    [Test]
     public void Extract_TypeWithNoMatchingAttribute_HasNoRole()
     {
         var configuration = new ArchitectureClassificationConfiguration

@@ -21,6 +21,22 @@ public interface IArchitectureDiagnosticFormatter
         IReadOnlyCollection<ArchitectureClassificationConflict> conflicts,
         IReadOnlyCollection<ArchitectureClassificationMetadataFailure> metadataFailures);
 
+    /// <summary>
+    /// Additive overload, not a modification of the member above: any caller already compiled
+    /// against the original two-parameter overload keeps resolving to it, unaffected.
+    /// <c>classificationPathDeferred</c> is required here, with no default value, so this overload
+    /// stays unambiguous against the original for every call site, named or positional. Declared
+    /// with a default interface implementation that delegates to the original overload and omits
+    /// the path-deferred notice, so a third-party implementer that predates this member is not
+    /// forced to add it just to keep compiling — only <see cref="ArchitectureDiagnosticFormatter"/>
+    /// itself overrides it with real path-deferred formatting.
+    /// </summary>
+    string FormatClassificationFactsForHumans(
+        IReadOnlyCollection<ArchitectureClassificationConflict> conflicts,
+        IReadOnlyCollection<ArchitectureClassificationMetadataFailure> metadataFailures,
+        ArchitectureClassificationPathDeferredNotice? classificationPathDeferred)
+        => FormatClassificationFactsForHumans(conflicts, metadataFailures);
+
     string FormatResultForCiArtifacts( // NOSONAR: each parameter represents a semantically distinct section of the CI artifact payload; grouping would obscure the data contract
         string mode,
         bool passed,
@@ -57,6 +73,32 @@ public interface IArchitectureDiagnosticFormatter
         IReadOnlyCollection<ArchitectureClassificationMetadataFailure>? classificationMetadataFailures = null)
         => FormatResultForCiArtifacts(
             mode, passed, violations, cycles, coverageFindings, unmatched,
+            policyConsistencyFindings, coverageSummaries, classificationConflicts, classificationMetadataFailures);
+
+    /// <summary>
+    /// Additive overload, not a modification of the member above: any caller already compiled
+    /// against the eleven-parameter roles overload keeps resolving to it, unaffected.
+    /// <c>classificationPathDeferred</c> is required here, with no default value, for the same
+    /// unambiguous-arity reason as <c>classificationRoles</c> above. Declared with a default
+    /// interface implementation that delegates to the roles overload and omits the path-deferred
+    /// notice, so a third-party implementer that predates this member is not forced to add it —
+    /// only <see cref="ArchitectureDiagnosticFormatter"/> itself overrides it with real serialization.
+    /// </summary>
+    string FormatResultForCiArtifacts( // NOSONAR: each parameter represents a semantically distinct section of the CI artifact payload; grouping would obscure the data contract
+        string mode,
+        bool passed,
+        IReadOnlyCollection<ArchitectureViolation> violations,
+        IReadOnlyCollection<string> cycles,
+        IReadOnlyCollection<ArchitectureClassificationRoleFact> classificationRoles,
+        ArchitectureClassificationPathDeferredNotice? classificationPathDeferred,
+        IReadOnlyCollection<ArchitectureViolation>? coverageFindings = null,
+        IReadOnlyCollection<ArchitectureUnmatchedIgnoredViolation>? unmatched = null,
+        IReadOnlyCollection<PolicyConsistencyDiagnostic>? policyConsistencyFindings = null,
+        IReadOnlyCollection<ArchitectureCoverageSummary>? coverageSummaries = null,
+        IReadOnlyCollection<ArchitectureClassificationConflict>? classificationConflicts = null,
+        IReadOnlyCollection<ArchitectureClassificationMetadataFailure>? classificationMetadataFailures = null)
+        => FormatResultForCiArtifacts(
+            mode, passed, violations, cycles, classificationRoles, coverageFindings, unmatched,
             policyConsistencyFindings, coverageSummaries, classificationConflicts, classificationMetadataFailures);
 
     string FormatViolationsForCiArtifacts(string contractName, string? contractId,
