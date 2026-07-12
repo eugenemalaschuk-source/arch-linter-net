@@ -46,6 +46,8 @@ internal sealed partial class ContextualContractValidator : IArchitecturePolicyD
             ValidateSource(contract.Name, contract.Source);
             if (contract.TargetContext.Metadata.Count == 0)
                 throw new InvalidOperationException($"Port-boundary contract '{contract.Name}' must declare non-empty 'target_context.metadata'.");
+            if (string.IsNullOrWhiteSpace(contract.Reason))
+                throw new InvalidOperationException($"Port-boundary contract '{contract.Name}' must declare a non-empty 'reason'.");
             ValidateNonEmptySelectorList(contract.Name, "allowed_seams", contract.AllowedSeams);
             ValidateNonEmptySelectorList(contract.Name, "forbidden", contract.Forbidden);
             ValidateTargetSelectors(contract.Name, "allowed_seams", contract.AllowedSeams);

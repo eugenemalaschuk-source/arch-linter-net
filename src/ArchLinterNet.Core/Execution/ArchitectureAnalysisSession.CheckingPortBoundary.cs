@@ -20,8 +20,9 @@ public sealed partial class ArchitectureAnalysisSession
             {
                 if (!MatchesTargetContext(contract.TargetContext, target, sourceRole)
                     || IsExcludedFromContextMatch(target, contract.Exclude, sourceRole)) continue;
-                ArchitectureContextSelector? forbidden = contract.Forbidden.FirstOrDefault(s => ArchitectureContextSelectorMatcher.Matches(s, target, RoleIndex, sourceRole));
-                if (forbidden is null) continue;
+                bool matchesForbidden = contract.Forbidden.Any(s => ArchitectureContextSelectorMatcher.Matches(s, target, RoleIndex, sourceRole));
+                bool matchesAllowedSeam = contract.AllowedSeams.Any(s => ArchitectureContextSelectorMatcher.Matches(s, target, RoleIndex, sourceRole));
+                if (matchesAllowedSeam && !matchesForbidden) continue;
                 string targetName = ArchitectureTypeNames.SafeFullName(target);
                 if (string.IsNullOrEmpty(targetName) || context.IsIgnored(sourceName, targetName)) continue;
                 RoleIndex.TryGetRole(target, out ArchitectureTypeClassificationResult targetRole);
@@ -59,10 +60,10 @@ public sealed partial class ArchitectureAnalysisSession
                 Type? actualPort = implementedExpectedPort ?? adapter.GetInterfaces()
                     .OrderBy(ArchitectureTypeNames.SafeFullName, StringComparer.Ordinal)
                     .FirstOrDefault();
-                ArchitectureTypeClassificationResult actualPortRole = default!;
-                if (actualPort != null)
+                ArchitectureTypeClassificationResult? actualPortRole = null;
+                if (actualPort != null && RoleIndex.TryGetRole(actualPort, out ArchitectureTypeClassificationResult resolvedPortRole))
                 {
-                    RoleIndex.TryGetRole(actualPort, out actualPortRole);
+                    actualPortRole = resolvedPortRole;
                 }
                 string actualPortName = actualPort == null
                     ? "no implemented interface"
@@ -82,8 +83,8 @@ public sealed partial class ArchitectureAnalysisSession
                         Payload = new PortBoundaryPayload(
                             adapterRole.Role,
                             adapterRole.Metadata,
-                            actualPortRole.Role,
-                            actualPortRole.Metadata,
+                            actualPortRole?.Role,
+                            actualPortRole?.Metadata,
                             kind,
                             DescribeContextSelector(binding.ExpectedPort),
                             implementsExpectedPort

@@ -49,6 +49,93 @@ public sealed class PortBoundaryContractTests
     }
 
     [Test]
+    public void CheckPortBoundaryContract_TargetMatchingNeitherAllowedSeamNorForbidden_IsReported()
+    {
+        // Regression: a target in the selected target_context that matches neither `allowed_seams`
+        // nor `forbidden` must still be reported - permitting it silently would turn the allow-list
+        // rule into a deny-list (only `forbidden` targets flagged).
+        Assembly assembly = typeof(SalesCheckout).Assembly;
+        var document = new ArchitectureContractDocument
+        {
+            Version = 1,
+            Name = "ports",
+            Analysis = new ArchitectureAnalysisConfiguration { TargetAssemblies = new List<string> { assembly.GetName().Name! } },
+            Classification = new ArchitectureClassificationConfiguration
+            {
+                Attributes =
+                {
+                    new ArchitectureAttributeClassificationMapping { Attribute = "ContextualContractTestFixtures.ContextDomainMarkerAttribute", Role = "DomainLayer", Metadata = new Dictionary<string, object> { ["domain"] = "constructor[0]" } },
+                    new ArchitectureAttributeClassificationMapping { Attribute = "ContextualContractTestFixtures.ContextPortMarkerAttribute", Role = "Port", Metadata = new Dictionary<string, object> { ["domain"] = "constructor[0]" } },
+                    new ArchitectureAttributeClassificationMapping { Attribute = "ContextualContractTestFixtures.ContextAdapterMarkerAttribute", Role = "Adapter", Metadata = new Dictionary<string, object> { ["domain"] = "constructor[0]" } },
+                }
+            }
+        };
+        var contract = new ArchitecturePortBoundaryContract
+        {
+            Name = "sales-to-inventory-through-port",
+            Source = new ArchitectureContextSelector { Role = "DomainLayer", Metadata = new Dictionary<string, object> { ["domain"] = "Sales" } },
+            TargetContext = new ArchitectureContextMetadataSelector { Metadata = new Dictionary<string, object> { ["domain"] = "Inventory" } },
+            AllowedSeams = new List<ArchitectureContextSelector> { new() { Role = "Port", Metadata = new Dictionary<string, object> { ["domain"] = "Inventory" } } },
+            Forbidden = new List<ArchitectureContextSelector> { new() { Role = "DomainLayer", Metadata = new Dictionary<string, object> { ["domain"] = "Inventory" } } },
+            Reason = "Use the reviewed port."
+        };
+        document.Contracts.StrictPortBoundaries.Add(contract);
+        var runner = new ArchitectureContractRunner(new ArchitectureAnalysisContext("/tmp", new[] { assembly }, Array.Empty<string>(), Array.Empty<string>()), document);
+
+        List<ArchitectureViolation> violations = runner.Session.CheckPortBoundaryContract(contract);
+
+        Assert.That(violations.Any(v =>
+            v.SourceType == typeof(SalesReferencesInventoryAdapter).FullName
+            && v.ForbiddenReferences.Contains(typeof(InventoryLegacyAdapter).FullName)), Is.True);
+    }
+
+    [Test]
+    public void CheckPortBoundaryContract_AdapterWithNoInterfaces_DoesNotThrowAndReportsMismatch()
+    {
+        // Regression: an adapter with zero implemented interfaces must not throw a
+        // NullReferenceException when the mismatch violation payload is built.
+        Assembly assembly = typeof(InterfacelessPaymentAdapter).Assembly;
+        var document = new ArchitectureContractDocument
+        {
+            Version = 1,
+            Name = "adapter",
+            Analysis = new ArchitectureAnalysisConfiguration { TargetAssemblies = new List<string> { assembly.GetName().Name! } },
+            Classification = new ArchitectureClassificationConfiguration
+            {
+                Attributes =
+            {
+                new ArchitectureAttributeClassificationMapping { Attribute = "ContextualContractTestFixtures.ContextPortMarkerAttribute", Role = "Port", Metadata = new Dictionary<string, object> { ["domain"] = "constructor[0]" } },
+                new ArchitectureAttributeClassificationMapping { Attribute = "ContextualContractTestFixtures.ContextAdapterMarkerAttribute", Role = "Adapter", Metadata = new Dictionary<string, object> { ["domain"] = "constructor[0]" } },
+            }
+            }
+        };
+        var contract = new ArchitecturePortBoundaryContract
+        {
+            Name = "payment-adapter",
+            Source = new ArchitectureContextSelector { Role = "Adapter" },
+            TargetContext = new ArchitectureContextMetadataSelector { Metadata = new Dictionary<string, object> { ["domain"] = "Payment" } },
+            AllowedSeams = new List<ArchitectureContextSelector> { new() { Role = "Port" } },
+            Forbidden = new List<ArchitectureContextSelector> { new() { Role = "Adapter" } },
+            Reason = "r",
+            AdapterBindings = new List<ArchitectureAdapterPortBinding>
+            {
+                new() { Adapter = new ArchitectureContextSelector { Role = "Adapter", Metadata = new Dictionary<string, object> { ["domain"] = "Payment" } }, ExpectedPort = new ArchitectureContextSelector { Role = "Port", Metadata = new Dictionary<string, object> { ["domain"] = "Payment" } } }
+            }
+        };
+        document.Contracts.StrictPortBoundaries.Add(contract);
+        var runner = new ArchitectureContractRunner(new ArchitectureAnalysisContext("/tmp", new[] { assembly }, Array.Empty<string>(), Array.Empty<string>()), document);
+
+        List<ArchitectureViolation> violations = null!;
+        Assert.DoesNotThrow(() => violations = runner.Session.CheckPortBoundaryContract(contract));
+
+        ArchitectureViolation violation = violations.Single(v => v.SourceType == typeof(InterfacelessPaymentAdapter).FullName);
+        ArchitectureDiagnostic mapped = ArchitectureDiagnosticMapper.FromViolation(violation);
+        var diagnostic = (PortBoundaryDiagnostic)mapped;
+        Assert.That(diagnostic.TargetRole, Is.Null);
+        Assert.That(diagnostic.ForbiddenReferences, Does.Contain("no implemented interface"));
+    }
+
+    [Test]
     public void CheckPortBoundaryContract_ReportsAdapterPortMismatch()
     {
         Assembly assembly = typeof(StripePaymentAdapter).Assembly;

@@ -141,4 +141,18 @@ namespace ContextualContractTestFixtures
 
     [ContextDomainMarker("Sales")]
     public sealed class SalesUsesInventoryPort { public IInventoryPort Port { get; } = null!; }
+
+    // Inventory-domain type classified as Adapter (neither DomainLayer nor Port) - used to prove a
+    // target that matches target_context but matches neither `forbidden` nor `allowed_seams` is
+    // still reported as a violation (allow-list gap regression coverage).
+    [ContextAdapterMarker("Inventory")]
+    public sealed class InventoryLegacyAdapter;
+
+    [ContextDomainMarker("Sales")]
+    public sealed class SalesReferencesInventoryAdapter { public InventoryLegacyAdapter Adapter { get; } = null!; }
+
+    // Adapter with zero interfaces - used to prove the adapter-binding check does not throw when
+    // there is no implemented interface to classify.
+    [ContextAdapterMarker("Payment")]
+    public sealed class InterfacelessPaymentAdapter;
 }

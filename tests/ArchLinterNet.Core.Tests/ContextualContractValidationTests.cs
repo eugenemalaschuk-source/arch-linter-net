@@ -453,4 +453,51 @@ public sealed class ContextualContractValidationTests
 
         Assert.That(ex.Message, Does.Contain("unknown property 'allowed_context'"));
     }
+
+    [Test]
+    public void PortBoundary_MissingReason_ThrowsActionableError()
+    {
+        string policyPath = WritePolicy($$"""
+            version: 1
+            name: Test
+            analysis:
+              target_assemblies: [{{AssemblyName}}]
+            contracts:
+              strict_port_boundaries:
+                - name: port-boundary
+                  source: { role: ApplicationLayer }
+                  target_context: { metadata: { domain: Catalog } }
+                  allowed_seams: [{ role: Port }]
+                  forbidden: [{ role: DomainLayer }]
+            """);
+
+        InvalidOperationException ex = Assert.Throws<InvalidOperationException>(() =>
+            new ArchitecturePolicyDocumentLoader().Load(policyPath))!;
+
+        Assert.That(ex.Message, Does.Contain("non-empty 'reason'"));
+    }
+
+    [Test]
+    public void PortBoundary_EmptyReason_ThrowsActionableError()
+    {
+        string policyPath = WritePolicy($$"""
+            version: 1
+            name: Test
+            analysis:
+              target_assemblies: [{{AssemblyName}}]
+            contracts:
+              strict_port_boundaries:
+                - name: port-boundary
+                  source: { role: ApplicationLayer }
+                  target_context: { metadata: { domain: Catalog } }
+                  allowed_seams: [{ role: Port }]
+                  forbidden: [{ role: DomainLayer }]
+                  reason: "   "
+            """);
+
+        InvalidOperationException ex = Assert.Throws<InvalidOperationException>(() =>
+            new ArchitecturePolicyDocumentLoader().Load(policyPath))!;
+
+        Assert.That(ex.Message, Does.Contain("non-empty 'reason'"));
+    }
 }
