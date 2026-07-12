@@ -28,6 +28,20 @@ namespace ContextualContractTestFixtures
     [AttributeUsage(AttributeTargets.Class)]
     public sealed class ContextSharedKernelMarkerAttribute : Attribute;
 
+    [AttributeUsage(AttributeTargets.Class | AttributeTargets.Interface)]
+    public sealed class ContextPortMarkerAttribute : Attribute
+    {
+        public ContextPortMarkerAttribute(string domain) => Domain = domain;
+        public string Domain { get; }
+    }
+
+    [AttributeUsage(AttributeTargets.Class)]
+    public sealed class ContextAdapterMarkerAttribute : Attribute
+    {
+        public ContextAdapterMarkerAttribute(string domain) => Domain = domain;
+        public string Domain { get; }
+    }
+
     // --- Sales domain (role DomainLayer, metadata domain=Sales) ---
 
     [ContextDomainMarker("Sales")]
@@ -109,4 +123,22 @@ namespace ContextualContractTestFixtures
     // Not classified by any attribute mapping used in these tests - must never match any
     // contextual selector regardless of role/metadata declared on the selector.
     public sealed class PlainUnclassifiedType;
+
+    [ContextPortMarker("Inventory")]
+    public interface IInventoryPort;
+
+    [ContextPortMarker("Payment")]
+    public interface IPaymentPort;
+
+    [ContextPortMarker("Catalog")]
+    public interface ICatalogPort;
+
+    [ContextAdapterMarker("Payment")]
+    public sealed class StripePaymentAdapter : IPaymentPort;
+
+    [ContextAdapterMarker("Payment")]
+    public sealed class MismatchedPaymentAdapter : ICatalogPort;
+
+    [ContextDomainMarker("Sales")]
+    public sealed class SalesUsesInventoryPort { public IInventoryPort Port { get; } = null!; }
 }

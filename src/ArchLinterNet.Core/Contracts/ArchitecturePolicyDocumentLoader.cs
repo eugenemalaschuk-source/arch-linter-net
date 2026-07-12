@@ -176,6 +176,8 @@ public sealed partial class ArchitecturePolicyDocumentLoader : IArchitecturePoli
         ValidateContextualContractGroup(contracts!, "audit_context_dependencies", "forbidden");
         ValidateContextualContractGroup(contracts!, "strict_context_allow_only", "allowed");
         ValidateContextualContractGroup(contracts!, "audit_context_allow_only", "allowed");
+        ValidatePortBoundaryContractGroup(contracts!, "strict_port_boundaries");
+        ValidatePortBoundaryContractGroup(contracts!, "audit_port_boundaries");
     }
 
     private static void ValidateContextualContractGroup(YamlMappingNode contracts, string groupKey, string targetListKey)
@@ -204,6 +206,24 @@ public sealed partial class ArchitecturePolicyDocumentLoader : IArchitecturePoli
 
             ValidateContextualSelectorListKeys(contractNode, contractName, targetListKey);
             ValidateContextualSelectorListKeys(contractNode, contractName, "exclude");
+        }
+    }
+
+    private static void ValidatePortBoundaryContractGroup(YamlMappingNode contracts, string groupKey)
+    {
+        if (!TryGetChild(contracts, groupKey, out YamlNode? groupNode) || groupNode is not YamlSequenceNode sequence) return;
+        foreach (YamlMappingNode entry in sequence.Children.OfType<YamlMappingNode>())
+        {
+            string name = TryGetChild(entry, "name", out YamlNode? value) && value is YamlScalarNode scalar
+                ? scalar.Value ?? "<unnamed>" : "<unnamed>";
+            foreach (string field in new[] { "source", "target_context" })
+            {
+                if (TryGetChild(entry, field, out YamlNode? selector) && selector is YamlMappingNode mapping)
+                    ValidateContextualSelectorNodeKeys(mapping, name, field);
+            }
+            ValidateContextualSelectorListKeys(entry, name, "allowed_seams");
+            ValidateContextualSelectorListKeys(entry, name, "forbidden");
+            ValidateContextualSelectorListKeys(entry, name, "exclude");
         }
     }
 

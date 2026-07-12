@@ -13,12 +13,12 @@ namespace ArchLinterNet.Core.Tests;
 public sealed class ArchitectureContractFamilyBindingsTests
 {
     [Test]
-    public void All_HasTwentySevenUniqueFamilyIds()
+    public void All_HasTwentyEightUniqueFamilyIds()
     {
         var familyIds = ArchitectureContractFamilyBindings.All.Select(b => b.FamilyId).ToList();
 
-        Assert.That(familyIds, Has.Count.EqualTo(27));
-        Assert.That(familyIds.Distinct(StringComparer.Ordinal).Count(), Is.EqualTo(27));
+        Assert.That(familyIds, Has.Count.EqualTo(28));
+        Assert.That(familyIds.Distinct(StringComparer.Ordinal).Count(), Is.EqualTo(28));
     }
 
     [Test]
@@ -67,6 +67,7 @@ public sealed class ArchitectureContractFamilyBindingsTests
             { new ArchitectureInterfaceImplementationContract { Name = "n", Id = "interface_implementation" } },
         StrictComposition = { new ArchitectureCompositionContract { Name = "n", Id = "composition" } },
         StrictCoverage = { new ArchitectureCoverageContract { Name = "n", Id = "coverage" } },
+        StrictPortBoundaries = { new ArchitecturePortBoundaryContract { Name = "n", Id = "port_boundary" } },
     };
 
     [Test]
@@ -76,7 +77,7 @@ public sealed class ArchitectureContractFamilyBindingsTests
 
         var strictIds = groups.AllStrict.Select(c => c.Id).ToList();
 
-        Assert.That(strictIds, Has.Count.EqualTo(24));
+        Assert.That(strictIds, Has.Count.EqualTo(25));
         Assert.That(strictIds, Does.Not.Contain("layer_template"));
     }
 

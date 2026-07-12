@@ -39,6 +39,25 @@ internal sealed partial class ContextualContractValidator : IArchitecturePolicyD
             ValidateTargetSelectors(contract.Name, "allowed", contract.Allowed);
             ValidateTargetSelectors(contract.Name, "exclude", contract.Exclude);
         }
+
+        foreach (ArchitecturePortBoundaryContract contract in document.Contracts.StrictPortBoundaries
+                     .Concat(document.Contracts.AuditPortBoundaries))
+        {
+            ValidateSource(contract.Name, contract.Source);
+            if (contract.TargetContext.Metadata.Count == 0)
+                throw new InvalidOperationException($"Port-boundary contract '{contract.Name}' must declare non-empty 'target_context.metadata'.");
+            ValidateNonEmptySelectorList(contract.Name, "allowed_seams", contract.AllowedSeams);
+            ValidateNonEmptySelectorList(contract.Name, "forbidden", contract.Forbidden);
+            ValidateTargetSelectors(contract.Name, "allowed_seams", contract.AllowedSeams);
+            ValidateTargetSelectors(contract.Name, "forbidden", contract.Forbidden);
+            ValidateTargetSelectors(contract.Name, "exclude", contract.Exclude);
+            foreach (ArchitectureAdapterPortBinding binding in contract.AdapterBindings)
+            {
+                ValidateSource(contract.Name, binding.Adapter);
+                ValidateSource(contract.Name, binding.ExpectedPort);
+                ValidateTargetSelectors(contract.Name, "adapter_bindings.allowed_contexts", binding.AllowedContexts);
+            }
+        }
     }
 
     private static void ValidateSource(string contractName, ArchitectureContextSelector? source)

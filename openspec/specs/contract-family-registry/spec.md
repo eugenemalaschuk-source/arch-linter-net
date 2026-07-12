@@ -61,3 +61,14 @@ Defines, per architecture contract family, its YAML group names, dispatch order,
 - **WHEN** `ArchitectureAnalysisSession.CheckConfiguration(strict)` runs and the document contains contracts belonging to a family whose descriptor has a non-null `ConfigurationContributor`
 - **THEN** that delegate SHALL be invoked once per contract instance returned by the descriptor's `StrictContracts`/`AuditContracts` accessor for the requested mode, with the session, a shared `ArchitectureConfigurationReferenceCollector`, and that contract instance
 
+### Requirement: The contract-family registry includes port boundaries
+The ordered contract-family registry SHALL expose the `port_boundary` family,
+its strict and audit YAML group names, checker, owned contract types, and
+baseline capability. The catalog and executor SHALL dispatch it using the same
+descriptor-driven flow as other baseline-capable families.
+
+#### Scenario: A selected port-boundary contract is executable
+- **WHEN** a policy declares a strict or audit port-boundary contract and it is
+  selected for execution
+- **THEN** the registry SHALL resolve and invoke that family's checker
+

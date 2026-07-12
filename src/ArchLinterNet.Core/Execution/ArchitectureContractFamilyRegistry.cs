@@ -351,6 +351,14 @@ internal static class ArchitectureContractFamilyRegistry
         {
             OwnedContractTypes = new[] { typeof(ArchitectureContextAllowOnlyContract) },
         },
+        new(
+            "port_boundary", "strict_port_boundaries", "audit_port_boundaries", true,
+            g => g.StrictPortBoundaries, g => g.AuditPortBoundaries,
+            (session, contract) => ArchitectureHandlerResult.FromViolations(
+                session.CheckPortBoundaryContract((ArchitecturePortBoundaryContract)contract)))
+        {
+            OwnedContractTypes = new[] { typeof(ArchitecturePortBoundaryContract) },
+        },
     };
 
     // Shared by "layer" and "layer_template": layer_template contracts are expanded into

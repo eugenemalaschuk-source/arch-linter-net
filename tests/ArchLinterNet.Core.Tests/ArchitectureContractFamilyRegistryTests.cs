@@ -17,13 +17,13 @@ public sealed class ArchitectureContractFamilyRegistryTests
         "package_dependency", "package_allow_only", "project_metadata",
         "protected", "external", "external_allow_only", "acyclic_sibling", "type_placement",
         "public_api_surface", "attribute_usage", "inheritance", "interface_implementation", "composition", "coverage",
-        "context_dependency", "context_allow_only",
+        "context_dependency", "context_allow_only", "port_boundary",
     };
 
     [Test]
     public void All_ContainsExactlyTheHistoricalFamilyCount()
     {
-        Assert.That(ArchitectureContractFamilyRegistry.All, Has.Count.EqualTo(27));
+        Assert.That(ArchitectureContractFamilyRegistry.All, Has.Count.EqualTo(28));
     }
 
     [Test]

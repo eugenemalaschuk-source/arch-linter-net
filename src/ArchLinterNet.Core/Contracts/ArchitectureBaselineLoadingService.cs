@@ -233,6 +233,8 @@ public sealed class ArchitectureBaselineLoadingService : IArchitectureBaselineLo
                 "audit_context_dependencies" => _groups.AuditContextDependencies.Select(c => (IArchitectureContract)c).ToList(),
                 "strict_context_allow_only" => _groups.StrictContextAllowOnly.Select(c => (IArchitectureContract)c).ToList(),
                 "audit_context_allow_only" => _groups.AuditContextAllowOnly.Select(c => (IArchitectureContract)c).ToList(),
+                "strict_port_boundaries" => _groups.StrictPortBoundaries.Select(c => (IArchitectureContract)c).ToList(),
+                "audit_port_boundaries" => _groups.AuditPortBoundaries.Select(c => (IArchitectureContract)c).ToList(),
                 _ => new List<IArchitectureContract>()
             };
         }
@@ -266,6 +268,7 @@ public sealed class ArchitectureBaselineLoadingService : IArchitectureBaselineLo
                 ArchitectureCoverageContract c => c.IgnoredViolations,
                 ArchitectureContextDependencyContract c => c.IgnoredViolations,
                 ArchitectureContextAllowOnlyContract c => c.IgnoredViolations,
+                ArchitecturePortBoundaryContract c => c.IgnoredViolations,
                 _ => null!
             };
         }
