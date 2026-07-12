@@ -416,4 +416,75 @@ contracts:
         Assert.That(ex.Message, Does.Contain("Duplicate contract IDs found"));
         Assert.That(ex.Message, Does.Not.Contain("attributes' or 'attribute_prefixes'"));
     }
+
+    [Test]
+    public void Load_ClassificationPathDeclared_SetsDeferredNoticeWithoutException()
+    {
+        string contractDir = Path.Combine(_tempDir, "architecture");
+        Directory.CreateDirectory(contractDir);
+        string contractPath = Path.Combine(contractDir, "dependencies.arch.yml");
+
+        File.WriteAllText(contractPath, """
+            version: 1
+            name: Test Contract
+            classification:
+              path:
+                - path_prefix: src/Sales/Domain
+                  role: DomainLayer
+                - path_prefix: src/Sales/Infrastructure
+                  role: InfrastructureLayer
+            contracts:
+              strict: []
+              audit: []
+              strict_layers: []
+              audit_layers: []
+              strict_allow_only: []
+              audit_allow_only: []
+              strict_cycles: []
+              audit_cycles: []
+              strict_method_body: []
+              audit_method_body: []
+              strict_asmdef: []
+              audit_asmdef: []
+              strict_independence: []
+              audit_independence: []
+            """);
+
+        ArchitectureContractDocument document = new ArchitecturePolicyDocumentLoader().Load(contractPath);
+
+        Assert.That(document.ClassificationPathDeferred, Is.Not.Null);
+        Assert.That(document.ClassificationPathDeferred!.DeclaredEntryCount, Is.EqualTo(2));
+    }
+
+    [Test]
+    public void Load_ClassificationPathNotDeclared_DeferredNoticeIsNull()
+    {
+        string contractDir = Path.Combine(_tempDir, "architecture");
+        Directory.CreateDirectory(contractDir);
+        string contractPath = Path.Combine(contractDir, "dependencies.arch.yml");
+
+        File.WriteAllText(contractPath, """
+            version: 1
+            name: Test Contract
+            contracts:
+              strict: []
+              audit: []
+              strict_layers: []
+              audit_layers: []
+              strict_allow_only: []
+              audit_allow_only: []
+              strict_cycles: []
+              audit_cycles: []
+              strict_method_body: []
+              audit_method_body: []
+              strict_asmdef: []
+              audit_asmdef: []
+              strict_independence: []
+              audit_independence: []
+            """);
+
+        ArchitectureContractDocument document = new ArchitecturePolicyDocumentLoader().Load(contractPath);
+
+        Assert.That(document.ClassificationPathDeferred, Is.Null);
+    }
 }

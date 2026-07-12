@@ -33,4 +33,11 @@ public sealed partial class ArchitectureAnalysisSession
         roles.Sort((a, b) => string.CompareOrdinal(a.Subject, b.Subject));
         return roles;
     }
+
+    // Non-null when the loaded policy declared a non-empty classification.path section — path-convention
+    // classification is deferred pending issue #171, see ArchitecturePolicyDocumentLoader.
+    public ArchitectureClassificationPathDeferredNotice? CheckClassificationPathDeferred()
+    {
+        return Document.ClassificationPathDeferred;
+    }
 }

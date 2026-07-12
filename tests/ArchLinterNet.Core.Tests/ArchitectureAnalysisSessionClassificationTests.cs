@@ -175,4 +175,38 @@ public sealed class ArchitectureAnalysisSessionClassificationTests
 
         Assert.That(roles, Is.Empty);
     }
+
+    [Test]
+    public void CheckClassificationPathDeferred_NoticeSetOnDocument_ReturnsIt()
+    {
+        var document = new ArchitectureContractDocument
+        {
+            Version = 1,
+            Name = "Test",
+            Classification = new ArchitectureClassificationConfiguration(),
+            ClassificationPathDeferred = new Model.ArchitectureClassificationPathDeferredNotice(2)
+        };
+
+        var context = new ArchitectureAnalysisContext(
+            "/tmp",
+            new[] { typeof(PlainType).Assembly },
+            Array.Empty<string>(),
+            Array.Empty<string>());
+
+        var session = new ArchitectureAnalysisSession(context, document, null, false, null);
+
+        Model.ArchitectureClassificationPathDeferredNotice? notice = session.CheckClassificationPathDeferred();
+
+        Assert.That(notice, Is.Not.Null);
+        Assert.That(notice!.DeclaredEntryCount, Is.EqualTo(2));
+    }
+
+    [Test]
+    public void CheckClassificationPathDeferred_NoNoticeOnDocument_ReturnsNull()
+    {
+        Model.ArchitectureClassificationPathDeferredNotice? notice =
+            CreateSession(new ArchitectureClassificationConfiguration()).CheckClassificationPathDeferred();
+
+        Assert.That(notice, Is.Null);
+    }
 }

@@ -141,4 +141,46 @@ namespace AttributeRoleExtractionTestFixtures
 
     [DomainMarker("Sales")]
     public sealed class TypeOverridingAssemblyAttribute;
+
+    // Inheritance-convention fixtures.
+    public abstract class DomainEntityBase;
+
+    public sealed class DirectlyDerivedEntity : DomainEntityBase;
+
+    public class IntermediateEntity : DomainEntityBase;
+
+    public sealed class TransitivelyDerivedEntity : IntermediateEntity;
+
+    public interface IRepositoryMarker;
+
+    public sealed class RepositoryImplementation : IRepositoryMarker;
+
+    public sealed class UnrelatedType;
+
+    public sealed class TypeMatchedByTwoInheritanceEntries : DomainEntityBase, IRepositoryMarker;
+
+    // Namespace-convention fixtures.
+    public sealed class TypeInDefaultNamespace;
+}
+
+namespace AttributeRoleExtractionTestFixtures.Domain
+{
+    public sealed class TypeInDomainNamespace;
+}
+
+namespace AttributeRoleExtractionTestFixtures.Domain.Nested
+{
+    public sealed class TypeInNestedDomainNamespace;
+}
+
+namespace AttributeRoleExtractionTestFixtures.Feature.Contracts
+{
+    public sealed class TypeInContractsSuffixNamespace;
+}
+
+namespace AttributeRoleExtractionTestFixtures.PrecedenceCases
+{
+    using AttributeRoleExtractionTestFixtures;
+
+    public sealed class TypeMatchedByInheritanceAndNamespace : DomainEntityBase;
 }

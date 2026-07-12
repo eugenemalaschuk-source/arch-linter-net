@@ -1,22 +1,30 @@
 # Semantic Classification (Partially Implemented)
 
-**`classification.attributes`, `classification.assembly_attributes`, and
+**`classification.attributes`, `classification.assembly_attributes`,
+`classification.inheritance`, `classification.namespace`, and
 `layers.<name>.selector` are implemented**
-(see [issue #109](https://github.com/eugenemalaschuk-source/arch-linter-net/issues/109) and
-`openspec/specs/attribute-role-extraction`): type-level and assembly-level attributes
-mapped by full type name are extracted and canonicalized into role/metadata facts,
-with `type_attribute` precedence over `assembly_attribute`. Selector-backed layers
-resolve types by exact role/metadata match and produce violations through existing
-contract families (dependency, layer-order, allow-only, etc.) exactly as
+(see [issue #109](https://github.com/eugenemalaschuk-source/arch-linter-net/issues/109),
+[issue #113](https://github.com/eugenemalaschuk-source/arch-linter-net/issues/113),
+`openspec/specs/attribute-role-extraction`, and
+`openspec/specs/semantic-classification-model`): type-level and assembly-level
+attributes mapped by full type name, base-type/interface inheritance mappings, and
+namespace glob/suffix mappings are all extracted and canonicalized into
+role/metadata facts, combined by the fixed precedence order
+`type_attribute > assembly_attribute > inheritance > namespace`. Selector-backed
+layers resolve types by exact role/metadata match and produce violations through
+existing contract families (dependency, layer-order, allow-only, etc.) exactly as
 namespace-based layers do. Empty non-external selector-only layers surface as
-configuration diagnostics. **Every other part of this page — `precedence` beyond
-`type_attribute`/`assembly_attribute`, `inheritance`, `namespace`, `path`,
-`overrides`, and `exclusions` — remain reserved by the YAML schema only.** A policy
-declaring those sections today is schema-valid, but they have **no effect** on
-validation — no role is assigned from them and no diagnostic is produced from them.
-This page documents the reviewed shape so policy authors and AI agents do not treat
-the unimplemented parts as a working feature before their own implementation issues
-land. See [Supported capabilities and non-goals](supported-capabilities.md) for the
+configuration diagnostics. **`precedence` beyond the four implemented sources,
+`path`, `overrides`, and `exclusions` remain reserved by the YAML schema only.**
+A policy declaring `overrides`/`exclusions` today is schema-valid, but they have
+**no effect** on validation — no role is assigned from them and no diagnostic is
+produced from them. Declaring `classification.path`, however, produces a visible,
+non-blocking diagnostic explaining that path-convention classification is deferred
+pending [issue #171](https://github.com/eugenemalaschuk-source/arch-linter-net/issues/171)
+— see [Current limits](#current-limits). This page documents the reviewed shape so
+policy authors and AI agents do not treat the unimplemented parts as a working
+feature before their own implementation issues land. See
+[Supported capabilities and non-goals](supported-capabilities.md) for the
 authoritative list of what is enforced today.
 
 **Attribute-based classification produces facts consumed by selector-backed
@@ -96,13 +104,13 @@ classification:
       metadata:
         boundedContext: constructor[0]
 
-  inheritance:
+  inheritance:                        # implemented — matches transitively (base class or interface)
     - base_type: Acme.Domain.AggregateRootBase
       role: DomainLayer
       metadata:
-        domain: Sales                 # literal only - no ctor/property evidence
+        domain: Sales                 # literal or const: only - no ctor/property evidence
 
-  namespace:
+  namespace:                          # implemented — reuses layers.<name>.namespace glob syntax
     - namespace: MyApp.Sales.Domain
       role: DomainLayer
       metadata:
@@ -110,7 +118,8 @@ classification:
     - namespace_suffix: Repositories
       role: Repository
 
-  path:
+  path:                               # reserved — declaring this produces a deferred-support
+                                       # diagnostic, not a role assignment (see #171)
     - path_prefix: src/Sales/Domain
       role: DomainLayer
       metadata:
@@ -142,18 +151,19 @@ layers:
 
 Source precedence is fixed, highest first:
 
-1. `yaml_override`
-1. `type_attribute`
-1. `assembly_attribute`
-1. `inheritance`
-1. `namespace`
-1. `path`
+1. `yaml_override` — reserved, no runtime effect yet
+1. `type_attribute` — implemented
+1. `assembly_attribute` — implemented
+1. `inheritance` — implemented
+1. `namespace` — implemented
+1. `path` — reserved, no runtime effect yet (deferred-support diagnostic only)
 
 `classification.precedence`, when declared, must be a subsequence of this
 order — the schema rejects a reordered list (e.g. `[namespace, type_attribute]`),
 a repeated entry (e.g. `[namespace, namespace]`), and an empty list. Sources the
 list omits are disabled; omit `precedence` entirely to use all six sources in
-the fixed order.
+the fixed order. Disabling an unimplemented source (`yaml_override`, `path`) has
+no observable effect, since neither contributes a role assignment regardless.
 
 ## Metadata extraction syntax
 
@@ -162,8 +172,8 @@ checked in this order:
 
 | Form | Meaning |
 |---|---|
-| `constructor[<index>]` | The attribute's zero-indexed positional constructor argument, from the fully compiler-resolved argument list (including substituted defaults for omitted optional parameters). Not applicable to `inheritance`/`namespace`/`path`, which carry no constructor evidence. |
-| `property:<Name>` | A named argument called `<Name>` explicitly present in that specific attribute usage's own recorded metadata — never a property/field the attribute *type* merely declares. `attributes`/`assembly_attributes` only. |
+| `constructor[<index>]` | The attribute's zero-indexed positional constructor argument, from the fully compiler-resolved argument list (including substituted defaults for omitted optional parameters). Not applicable to `inheritance`/`namespace`/`path`, which carry no constructor evidence — using this form on those sources is an extraction failure. |
+| `property:<Name>` | A named argument called `<Name>` explicitly present in that specific attribute usage's own recorded metadata — never a property/field the attribute *type* merely declares. `attributes`/`assembly_attributes` only; an extraction failure on `inheritance`/`namespace`/`path`. |
 | `const:<Full.Type.NAME>` | The value of a **compile-time `const` field**, resolved statically by full type-qualified name. |
 | anything else | A literal YAML scalar, used verbatim. |
 
@@ -290,13 +300,33 @@ cross-referencing comparison is what the rule actually needs to express.
 ## Current limits
 
 - Extraction: **implemented** for `attributes`/`assembly_attributes` (type-level
-  and assembly-level attributes, matched by full type name). Inheritance facts
-  and namespace/path conventions are still never read from scanned code.
-- Role assignment: **implemented** for the `type_attribute`/`assembly_attribute`
-  sources, including `type_attribute` precedence over `assembly_attribute` and
-  the `classification.precedence` subset that enables/disables these two
-  sources. No other source (`yaml_override`, `inheritance`, `namespace`,
-  `path`) ever assigns a role yet.
+  and assembly-level attributes, matched by full type name), `inheritance`
+  (transitive base-class/interface matching by full type name), and `namespace`
+  (glob/suffix matching, reusing `layers.<name>.namespace` syntax). Path
+  conventions are still never read from scanned code — `classification.path`
+  requires deterministic source-file and declared-type facts that do not exist
+  yet ([issue #171](https://github.com/eugenemalaschuk-source/arch-linter-net/issues/171)).
+- Role assignment: **implemented** for `type_attribute`/`assembly_attribute`/
+  `inheritance`/`namespace`, combined by the fixed precedence order
+  `type_attribute > assembly_attribute > inheritance > namespace`, and the
+  `classification.precedence` subset that enables/disables these four sources.
+  `yaml_override` and `path` never assign a role yet.
+- `classification.path`: declaring a non-empty `path` section does **not**
+  throw and does **not** assign any role, but produces a non-blocking,
+  informational diagnostic (surfaced alongside classification conflicts/
+  metadata failures in human, JSON, and CI-artifact `validate` output) stating
+  that path-convention classification is deferred pending #171. This is
+  visibility only — it does not fail `validate`'s exit code, and it is
+  distinct from the fully silent `overrides`/`exclusions` reserved sections.
+- Inheritance/namespace metadata: restricted to literal scalars and
+  `const:<Full.Type.NAME>` references only — neither source has an attribute
+  instance to extract `constructor[]`/`property:` evidence from. Using either
+  form on an `inheritance`/`namespace` entry resolves as an extraction failure,
+  same as any other unresolved metadata reference.
+- An unresolved `inheritance.base_type` (a full type name that matches nothing
+  in the scanned type universe, e.g. a typo) silently matches no type for that
+  run — consistent with how an unresolved `const:` reference is silently
+  omitted rather than diagnosed.
 - Selector matching: **implemented** — uses the per-run role index and exact
   role/metadata predicates; a layer may declare only `selector`, only
   `namespace`, or both. Empty non-external selector matches are surfaced as
@@ -350,6 +380,76 @@ accepts any full attribute type name, regardless of which assembly declares
 it, and — for `attributes`/`assembly_attributes` — is now actually evaluated
 against scanned code; see [Current limits](#current-limits) for what remains
 unimplemented.
+
+## Convention examples by project style
+
+`inheritance` and `namespace` conventions let a policy infer role/metadata from
+code that already exists, before adding any explicit attribute. A few common
+shapes:
+
+**Clean architecture / modular monolith** — infer `DomainLayer` from a shared
+domain base type, and mark a module's public surface by namespace suffix:
+
+```yaml
+classification:
+  inheritance:
+    - base_type: MyApp.Domain.Entity
+      role: DomainLayer
+  namespace:
+    - namespace_suffix: Contracts
+      role: PublicContract
+```
+
+**ASP.NET-like** — infer `PresentationLayer` from the framework's own
+controller base type, with no ArchLinterNet-specific attribute required:
+
+```yaml
+classification:
+  inheritance:
+    - base_type: Microsoft.AspNetCore.Mvc.ControllerBase
+      role: PresentationLayer
+```
+
+**EF-like** — infer `PersistenceLayer` from the framework's `DbContext` base
+type:
+
+```yaml
+classification:
+  inheritance:
+    - base_type: Microsoft.EntityFrameworkCore.DbContext
+      role: PersistenceLayer
+```
+
+**Unity/client-like** — infer `PresentationLayer` from `MonoBehaviour`:
+
+```yaml
+classification:
+  inheritance:
+    - base_type: UnityEngine.MonoBehaviour
+      role: PresentationLayer
+```
+
+**Legacy gradual adoption** — start with one broad `namespace` convention
+covering an entire legacy area, then let per-type `type_attribute` entries
+override it as individual types are migrated. `type_attribute` outranks
+`namespace` in the fixed precedence order, so an attribute on a specific type
+always wins over the broad namespace default without editing the namespace
+rule itself:
+
+```yaml
+classification:
+  attributes:
+    - attribute: Acme.Architecture.DomainLayerAttribute
+      role: DomainLayer
+  namespace:
+    - namespace: MyApp.Legacy
+      role: Unclassified   # gradually narrowed as types are migrated and attributed
+```
+
+None of these examples require an ArchLinterNet-provided annotation package —
+`base_type`/`namespace` conventions match code that already exists, and
+`type_attribute` mappings work against any user-owned attribute (see
+[Annotation strategy](#annotation-strategy)).
 
 ## Where to look next
 

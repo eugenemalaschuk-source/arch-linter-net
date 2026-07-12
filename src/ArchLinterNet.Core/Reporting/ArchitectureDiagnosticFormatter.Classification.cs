@@ -19,7 +19,8 @@ public sealed partial class ArchitectureDiagnosticFormatter
     {
         return BuildCiArtifactsJson(new CiArtifactsRequest(
             mode, passed, violations, cycles, null, coverageFindings, unmatched,
-            policyConsistencyFindings, coverageSummaries, classificationConflicts, classificationMetadataFailures));
+            policyConsistencyFindings, coverageSummaries, classificationConflicts, classificationMetadataFailures,
+            null));
     }
 
     /// <summary>
@@ -41,11 +42,36 @@ public sealed partial class ArchitectureDiagnosticFormatter
     {
         return BuildCiArtifactsJson(new CiArtifactsRequest(
             mode, passed, violations, cycles, classificationRoles, coverageFindings, unmatched,
-            policyConsistencyFindings, coverageSummaries, classificationConflicts, classificationMetadataFailures));
+            policyConsistencyFindings, coverageSummaries, classificationConflicts, classificationMetadataFailures,
+            null));
+    }
+
+    /// <summary>
+    /// Additive overload — see the matching declaration on <see cref="IArchitectureDiagnosticFormatter"/>
+    /// for why this exists alongside the roles overload instead of extending it.
+    /// </summary>
+    public string FormatResultForCiArtifacts(
+        string mode,
+        bool passed,
+        IReadOnlyCollection<ArchitectureViolation> violations,
+        IReadOnlyCollection<string> cycles,
+        IReadOnlyCollection<ArchitectureClassificationRoleFact> classificationRoles,
+        ArchitectureClassificationPathDeferredNotice? classificationPathDeferred,
+        IReadOnlyCollection<ArchitectureViolation>? coverageFindings = null,
+        IReadOnlyCollection<ArchitectureUnmatchedIgnoredViolation>? unmatched = null,
+        IReadOnlyCollection<PolicyConsistencyDiagnostic>? policyConsistencyFindings = null,
+        IReadOnlyCollection<ArchitectureCoverageSummary>? coverageSummaries = null,
+        IReadOnlyCollection<ArchitectureClassificationConflict>? classificationConflicts = null,
+        IReadOnlyCollection<ArchitectureClassificationMetadataFailure>? classificationMetadataFailures = null)
+    {
+        return BuildCiArtifactsJson(new CiArtifactsRequest(
+            mode, passed, violations, cycles, classificationRoles, coverageFindings, unmatched,
+            policyConsistencyFindings, coverageSummaries, classificationConflicts, classificationMetadataFailures,
+            classificationPathDeferred));
     }
 
     // Bundles FormatResultForCiArtifacts's parameters into one value so the private builder below
-    // takes a single argument instead of eleven — the two public overloads above still expose each
+    // takes a single argument instead of eleven — the public overloads above still expose each
     // section as its own named parameter for callers.
     private readonly record struct CiArtifactsRequest(
         string Mode,
@@ -58,7 +84,8 @@ public sealed partial class ArchitectureDiagnosticFormatter
         IReadOnlyCollection<PolicyConsistencyDiagnostic>? PolicyConsistencyFindings,
         IReadOnlyCollection<ArchitectureCoverageSummary>? CoverageSummaries,
         IReadOnlyCollection<ArchitectureClassificationConflict>? ClassificationConflicts,
-        IReadOnlyCollection<ArchitectureClassificationMetadataFailure>? ClassificationMetadataFailures);
+        IReadOnlyCollection<ArchitectureClassificationMetadataFailure>? ClassificationMetadataFailures,
+        ArchitectureClassificationPathDeferredNotice? ClassificationPathDeferred);
 
     private static string BuildCiArtifactsJson(CiArtifactsRequest request)
     {
@@ -107,7 +134,10 @@ public sealed partial class ArchitectureDiagnosticFormatter
                 .ToArray(),
             classification_conflicts = classificationConflictsSerialized,
             classification_metadata_failures = classificationMetadataFailuresSerialized,
-            classification_roles = classificationRolesSerialized
+            classification_roles = classificationRolesSerialized,
+            classification_path_deferred = request.ClassificationPathDeferred == null
+                ? null
+                : new { declared_entry_count = request.ClassificationPathDeferred.DeclaredEntryCount }
         };
 
         return JsonSerializer.Serialize(payload);
@@ -117,7 +147,19 @@ public sealed partial class ArchitectureDiagnosticFormatter
         IReadOnlyCollection<ArchitectureClassificationConflict> conflicts,
         IReadOnlyCollection<ArchitectureClassificationMetadataFailure> metadataFailures)
     {
-        if (conflicts.Count == 0 && metadataFailures.Count == 0)
+        return FormatClassificationFactsForHumans(conflicts, metadataFailures, null);
+    }
+
+    /// <summary>
+    /// Additive overload — see the matching declaration on <see cref="IArchitectureDiagnosticFormatter"/>
+    /// for why this exists alongside the original overload instead of extending it.
+    /// </summary>
+    public string FormatClassificationFactsForHumans(
+        IReadOnlyCollection<ArchitectureClassificationConflict> conflicts,
+        IReadOnlyCollection<ArchitectureClassificationMetadataFailure> metadataFailures,
+        ArchitectureClassificationPathDeferredNotice? classificationPathDeferred)
+    {
+        if (conflicts.Count == 0 && metadataFailures.Count == 0 && classificationPathDeferred == null)
         {
             return string.Empty;
         }
@@ -134,8 +176,19 @@ public sealed partial class ArchitectureDiagnosticFormatter
             .ThenBy(f => f.MetadataKey, StringComparer.Ordinal)
             .Select(f => $"  metadata_failure: [{f.Source}] {f.Subject}.{f.MetadataKey}: {f.Reason}");
 
+        var pathDeferredLines = classificationPathDeferred == null
+            ? Enumerable.Empty<string>()
+            : new[]
+            {
+                $"  path_deferred: classification.path declares {classificationPathDeferred.DeclaredEntryCount} "
+                    + "entr" + (classificationPathDeferred.DeclaredEntryCount == 1 ? "y" : "ies")
+                    + ", but path-convention classification is not yet implemented — it depends on source/declared-type "
+                    + "fact discovery (see issue #171, currently open). This section is schema-accepted but produces "
+                    + "no role assignment."
+            };
+
         return "Classification findings:" + Environment.NewLine
-            + string.Join(Environment.NewLine, conflictLines.Concat(failureLines));
+            + string.Join(Environment.NewLine, conflictLines.Concat(failureLines).Concat(pathDeferredLines));
     }
 
     private static object[] BuildClassificationConflictsJson(

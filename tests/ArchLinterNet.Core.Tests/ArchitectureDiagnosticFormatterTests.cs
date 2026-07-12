@@ -261,6 +261,38 @@ public sealed class ArchitectureDiagnosticFormatterTests
     }
 
     [Test]
+    public void FormatClassificationFactsForHumans_PathDeferredNotice_IncludesEntryCountAndIssueReference()
+    {
+        var notice = new Model.ArchitectureClassificationPathDeferredNotice(3);
+
+        string human = _formatter.FormatClassificationFactsForHumans(
+            Array.Empty<Model.ArchitectureClassificationConflict>(),
+            Array.Empty<Model.ArchitectureClassificationMetadataFailure>(),
+            notice);
+
+        Assert.That(human, Does.StartWith("Classification findings:"));
+        Assert.That(human, Does.Contain("classification.path declares 3 entries"));
+        Assert.That(human, Does.Contain("#171"));
+
+        using var json = JsonDocument.Parse(_formatter.FormatResultForCiArtifacts(
+            "strict", true, Array.Empty<ArchitectureViolation>(), Array.Empty<string>(),
+            classificationRoles: Array.Empty<Model.ArchitectureClassificationRoleFact>(),
+            classificationPathDeferred: notice));
+        Assert.That(
+            json.RootElement.GetProperty("classification_path_deferred").GetProperty("declared_entry_count").GetInt32(),
+            Is.EqualTo(3));
+    }
+
+    [Test]
+    public void FormatResultForCiArtifacts_NoPathDeferredNotice_OmitsClassificationPathDeferred()
+    {
+        using var json = JsonDocument.Parse(_formatter.FormatResultForCiArtifacts(
+            "strict", true, Array.Empty<ArchitectureViolation>(), Array.Empty<string>()));
+
+        Assert.That(json.RootElement.GetProperty("classification_path_deferred").ValueKind, Is.EqualTo(JsonValueKind.Null));
+    }
+
+    [Test]
     public void FormatClassificationFactsForHumans_ConflictsAndFailures_IncludesDetails()
     {
         var conflicts = new[]

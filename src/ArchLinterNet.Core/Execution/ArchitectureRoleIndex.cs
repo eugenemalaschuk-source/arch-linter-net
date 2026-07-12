@@ -1,5 +1,6 @@
 using ArchLinterNet.Core.Contracts;
 using ArchLinterNet.Core.Model;
+using ArchLinterNet.Core.Resolution;
 using ArchLinterNet.Core.Scanning;
 
 namespace ArchLinterNet.Core.Execution;
@@ -55,13 +56,14 @@ public sealed class ArchitectureRoleIndex
 
     private RoleIndexData BuildData()
     {
-        if (_configuration.Attributes.Count == 0 && _configuration.AssemblyAttributes.Count == 0)
+        if (_configuration.Attributes.Count == 0 && _configuration.AssemblyAttributes.Count == 0
+            && _configuration.Inheritance.Count == 0 && _configuration.Namespace.Count == 0)
         {
             return RoleIndexData.Empty;
         }
 
         Type[] types = _typeIndex.AllTypes();
-        var extractor = new ArchitectureAttributeRoleExtractor(_configuration, types);
+        var extractor = new ArchitectureAttributeRoleExtractor(_configuration, types, MatchNamespaceMapping);
 
         Dictionary<Type, ArchitectureTypeClassificationResult> rolesByType = new();
         HashSet<ArchitectureClassificationConflict> conflicts = new();
@@ -80,6 +82,33 @@ public sealed class ArchitectureRoleIndex
         }
 
         return new RoleIndexData(rolesByType, conflicts.ToList(), metadataFailures.ToList());
+    }
+
+    // Reuses ArchitectureLayerResolver's namespace-glob matching (the same mechanism layers.<name>.namespace
+    // already uses) instead of duplicating glob logic in Scanning, which must not depend on Resolution
+    // (see docs/internal/core-architecture-blueprint.md). Returns a plain tuple, not the Resolution-typed
+    // ArchitectureNamespaceMatch, so Scanning never needs a reference to Resolution types, even in a
+    // delegate signature. A mapping declaring only namespace_suffix (valid per schema, unlike layers,
+    // which require namespace whenever namespace_suffix is present) is matched directly here since
+    // ArchitectureLayerResolver.MatchNamespace short-circuits on an empty Namespace.
+    private static (bool Matched, string? MatchedPattern) MatchNamespaceMapping(
+        ArchitectureNamespaceClassificationMapping mapping, string candidateNamespace)
+    {
+        if (mapping.Namespace.Length > 0)
+        {
+            var layer = new ArchitectureLayer { Namespace = mapping.Namespace, NamespaceSuffix = mapping.NamespaceSuffix };
+            ArchitectureNamespaceMatch match = ArchitectureLayerResolver.MatchNamespace(layer, candidateNamespace);
+            return (match.Matched, match.Matched ? mapping.Namespace : null);
+        }
+
+        if (mapping.NamespaceSuffix.Length > 0)
+        {
+            bool matched = candidateNamespace == mapping.NamespaceSuffix
+                || candidateNamespace.EndsWith("." + mapping.NamespaceSuffix, StringComparison.Ordinal);
+            return (matched, matched ? $"*.{mapping.NamespaceSuffix}" : null);
+        }
+
+        return (false, null);
     }
 
     private sealed record RoleIndexData(

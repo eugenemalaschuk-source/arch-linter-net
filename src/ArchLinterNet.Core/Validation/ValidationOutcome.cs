@@ -23,4 +23,8 @@ public sealed record ValidationOutcome(
     // want discovered roles opt in via an object initializer.
     public IReadOnlyCollection<ArchitectureClassificationRoleFact> ClassificationRoles { get; init; } =
         Array.Empty<ArchitectureClassificationRoleFact>();
+
+    // Non-null when the loaded policy declared a non-empty classification.path section — see
+    // ArchitectureAnalysisSession.CheckClassificationPathDeferred.
+    public ArchitectureClassificationPathDeferredNotice? ClassificationPathDeferred { get; init; }
 }
