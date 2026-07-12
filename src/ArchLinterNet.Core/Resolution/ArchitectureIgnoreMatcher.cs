@@ -5,6 +5,12 @@ namespace ArchLinterNet.Core.Resolution;
 
 internal static class ArchitectureIgnoreMatcher
 {
+    // regexPattern below is built dynamically from an author-supplied glob (via Regex.Escape plus
+    // substitution, not a compile-time literal), so it cannot use [GeneratedRegex]. An explicit
+    // timeout on the static IsMatch call is this rule's (S6444) mitigation for a pathological
+    // pattern causing catastrophic backtracking.
+    private static readonly TimeSpan _matchTimeout = TimeSpan.FromSeconds(1);
+
     public static bool IsIgnored(
         string sourceType,
         string forbiddenReference,
@@ -71,7 +77,7 @@ internal static class ArchitectureIgnoreMatcher
         }
 
         string regexPattern = "^" + GlobToRegex(normalizedPattern) + "$";
-        return Regex.IsMatch(normalizedValue, regexPattern, RegexOptions.CultureInvariant);
+        return Regex.IsMatch(normalizedValue, regexPattern, RegexOptions.CultureInvariant, _matchTimeout);
     }
 
     private static bool ContainsGlobSyntax(string pattern)
