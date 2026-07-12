@@ -58,6 +58,33 @@ public sealed class ArchitectureRoleIndexTests
     }
 
     [Test]
+    public void TryGetRole_ClosedConstructedGeneric_FallsBackToGenericTypeDefinition()
+    {
+        // Regression (#306 review 3.2): the index is built from assembly.GetTypes(), which only ever
+        // yields the open generic type definition (OpenGenericDomainType<>). Reflection on a concrete
+        // reference/adapter reports the closed constructed type (OpenGenericDomainType<PlainType>)
+        // instead, which is a distinct Type object that never equals the open definition as a
+        // dictionary key without an explicit fallback.
+        ArchitectureRoleIndex index = CreateIndex(DomainAttributeConfiguration());
+
+        bool found = index.TryGetRole(typeof(OpenGenericDomainType<PlainType>), out ArchitectureTypeClassificationResult descriptor);
+
+        Assert.That(found, Is.True);
+        Assert.That(descriptor.Role, Is.EqualTo("DomainLayer"));
+        Assert.That(descriptor.Metadata["domain"], Is.EqualTo("Sales"));
+    }
+
+    [Test]
+    public void TryGetRole_UnclassifiedClosedConstructedGeneric_ReturnsFalse()
+    {
+        ArchitectureRoleIndex index = CreateIndex(DomainAttributeConfiguration());
+
+        bool found = index.TryGetRole(typeof(PlainOpenGenericType<PlainType>), out _);
+
+        Assert.That(found, Is.False);
+    }
+
+    [Test]
     public void TryGetRole_TypeAttributeOverridesAssemblyAttribute_DescriptorNamesWinningSource()
     {
         var classification = new ArchitectureClassificationConfiguration

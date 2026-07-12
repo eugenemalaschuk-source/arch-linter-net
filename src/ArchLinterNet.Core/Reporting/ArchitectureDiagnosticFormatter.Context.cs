@@ -77,4 +77,21 @@ public sealed partial class ArchitectureDiagnosticFormatter
         if (diagnostic.MatchedSelector != null)
             obj["matched_selector"] = diagnostic.MatchedSelector;
     }
+
+    private static string FormatPortBoundaryContextForHumans(PortBoundaryDiagnostic diagnostic) =>
+        $" (kind: port_boundary, evidence_kind: {diagnostic.EvidenceKind ?? "?"}, " +
+        $"expected_seam: {diagnostic.ExpectedSeam ?? "?"}, source_role: {diagnostic.SourceRole ?? "?"}, " +
+        $"source_metadata: {FormatMetadataForHumans(diagnostic.SourceMetadata)}, target_role: {diagnostic.TargetRole ?? "?"}, " +
+        $"target_metadata: {FormatMetadataForHumans(diagnostic.TargetMetadata)}, remediation: {diagnostic.RemediationHint ?? "?"})";
+
+    private static void ApplyPortBoundaryCiFields(PortBoundaryDiagnostic diagnostic, Dictionary<string, object?> obj)
+    {
+        obj["evidence_kind"] = diagnostic.EvidenceKind;
+        obj["expected_seam"] = diagnostic.ExpectedSeam;
+        obj["source_role"] = diagnostic.SourceRole;
+        obj["source_metadata"] = diagnostic.SourceMetadata;
+        obj["target_role"] = diagnostic.TargetRole;
+        obj["target_metadata"] = diagnostic.TargetMetadata;
+        obj["remediation_hint"] = diagnostic.RemediationHint;
+    }
 }

@@ -1,4 +1,5 @@
 using ArchLinterNet.Core.IO;
+using ArchLinterNet.Core.IO.Abstractions;
 
 namespace ArchLinterNet.Core.Tests;
 

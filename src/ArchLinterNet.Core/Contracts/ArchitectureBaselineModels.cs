@@ -73,6 +73,8 @@ public sealed class ArchitectureBaselineContractGroups
     [YamlMember(Alias = "audit_context_dependencies")] public List<ArchitectureBaselineContractEntry> AuditContextDependencies { get; set; } = new();
     [YamlMember(Alias = "strict_context_allow_only")] public List<ArchitectureBaselineContractEntry> StrictContextAllowOnly { get; set; } = new();
     [YamlMember(Alias = "audit_context_allow_only")] public List<ArchitectureBaselineContractEntry> AuditContextAllowOnly { get; set; } = new();
+    [YamlMember(Alias = "strict_port_boundaries")] public List<ArchitectureBaselineContractEntry> StrictPortBoundaries { get; set; } = new();
+    [YamlMember(Alias = "audit_port_boundaries")] public List<ArchitectureBaselineContractEntry> AuditPortBoundaries { get; set; } = new();
 
     // Canonical, ordered set of every baseline-capable group name. The baseline comparer iterates
     // this list; keeping it aligned with the properties above (and with the catalog's resolvable
@@ -105,6 +107,7 @@ public sealed class ArchitectureBaselineContractGroups
         "strict_coverage", "audit_coverage",
         "strict_context_dependencies", "audit_context_dependencies",
         "strict_context_allow_only", "audit_context_allow_only",
+        "strict_port_boundaries", "audit_port_boundaries",
     };
 
     public List<ArchitectureBaselineContractEntry> GetGroup(string groupName)
@@ -161,6 +164,8 @@ public sealed class ArchitectureBaselineContractGroups
             "audit_context_dependencies" => AuditContextDependencies,
             "strict_context_allow_only" => StrictContextAllowOnly,
             "audit_context_allow_only" => AuditContextAllowOnly,
+            "strict_port_boundaries" => StrictPortBoundaries,
+            "audit_port_boundaries" => AuditPortBoundaries,
             _ => throw new ArgumentOutOfRangeException(
                 nameof(groupName), groupName, "Unknown baseline group. Add it to ArchitectureBaselineContractGroups."),
         };
@@ -220,6 +225,8 @@ public sealed class ArchitectureBaselineContractGroups
             case "audit_context_dependencies": AuditContextDependencies = entries; break;
             case "strict_context_allow_only": StrictContextAllowOnly = entries; break;
             case "audit_context_allow_only": AuditContextAllowOnly = entries; break;
+            case "strict_port_boundaries": StrictPortBoundaries = entries; break;
+            case "audit_port_boundaries": AuditPortBoundaries = entries; break;
             default:
                 throw new ArgumentOutOfRangeException(
                     nameof(groupName), groupName, "Unknown baseline group. Add it to ArchitectureBaselineContractGroups.");

@@ -1,4 +1,5 @@
 using ArchLinterNet.Core.Contracts;
+using ArchLinterNet.Core.Contracts.Families;
 using ArchLinterNet.Core.Execution.Abstractions;
 
 namespace ArchLinterNet.Core.Execution;
@@ -350,6 +351,14 @@ internal static class ArchitectureContractFamilyRegistry
                 session.CheckContextAllowOnlyContract((ArchitectureContextAllowOnlyContract)contract)))
         {
             OwnedContractTypes = new[] { typeof(ArchitectureContextAllowOnlyContract) },
+        },
+        new(
+            "port_boundary", "strict_port_boundaries", "audit_port_boundaries", true,
+            g => g.StrictPortBoundaries, g => g.AuditPortBoundaries,
+            (session, contract) => ArchitectureHandlerResult.FromViolations(
+                session.CheckPortBoundaryContract((ArchitecturePortBoundaryContract)contract)))
+        {
+            OwnedContractTypes = new[] { typeof(ArchitecturePortBoundaryContract) },
         },
     };
 

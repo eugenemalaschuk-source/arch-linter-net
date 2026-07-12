@@ -1,7 +1,7 @@
 using System.CommandLine;
 using ArchLinterNet.Cli.Abstractions;
 
-namespace ArchLinterNet.Cli.Commands.Baseline;
+namespace ArchLinterNet.Cli.Commands.Baseline.Abstractions;
 
 internal interface IBaselineSubcommandModule : ICliSubcommandModule
 {

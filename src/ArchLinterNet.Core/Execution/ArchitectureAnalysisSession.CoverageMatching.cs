@@ -1,5 +1,6 @@
 using System.Reflection;
 using ArchLinterNet.Core.Contracts;
+using ArchLinterNet.Core.Contracts.Families;
 using ArchLinterNet.Core.Discovery;
 using ArchLinterNet.Core.Model;
 using ArchLinterNet.Core.Resolution;

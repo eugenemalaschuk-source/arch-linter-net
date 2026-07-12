@@ -112,6 +112,14 @@ namespace AttributeRoleExtractionTestFixtures
 
     public sealed class PlainType;
 
+    // assembly.GetTypes() only ever yields this open generic type definition - reflection on a
+    // concrete reference reports a closed constructed type (e.g. OpenGenericDomainType<PlainType>)
+    // instead, which never equals this open definition as a dictionary key.
+    [DomainMarker("Sales")]
+    public sealed class OpenGenericDomainType<T>;
+
+    public sealed class PlainOpenGenericType<T>;
+
     [DomainMarker("Sales")]
     [SecondMarker]
     public sealed class TypeWithConflictingEntries;

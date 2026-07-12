@@ -1,10 +1,12 @@
 using System.Reflection;
 using ArchLinterNet.Core.Contracts;
+using ArchLinterNet.Core.Contracts.Families;
 using ArchLinterNet.Core.Execution;
 using ArchLinterNet.Core.Model;
 using ArchLinterNet.Core.Reporting;
 using ContextualContractTestFixtures;
 using NUnit.Framework;
+using ArchitectureContractGroups = ArchLinterNet.Core.Contracts.Families.ArchitectureContractGroups;
 
 namespace ArchLinterNet.Core.Tests;
 

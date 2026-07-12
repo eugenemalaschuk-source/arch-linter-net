@@ -131,6 +131,15 @@ dependent. Prefer explicit mappings for them.
 
 | Role | Definition; evidence; metadata; example | Tier |
 | --- | --- | --- |
+| `Port` | Explicit inbound/outbound abstraction; Attr/interface/Ns; `domain`, `name`, `direction`; payment port. | Canonical |
+| `Adapter` | Concrete port implementation or boundary translator; Attr/interface/Ns; `domain`, `name`, `port`; Stripe adapter. | Canonical |
+| `PrimaryPort` | Inbound use-case boundary; Attr/interface/Ns; `domain`, `name`; command API. | Optional annotation candidate |
+| `SecondaryPort` | Outbound dependency boundary; Attr/interface/Ns; `domain`, `name`; payment gateway port. | Optional annotation candidate |
+| `AntiCorruptionLayer` | Explicit legacy/modern translation seam; Attr/Ns; `domain`, `adapter`; CRM translator. | Canonical |
+| `ExternalSystem`, `IntegrationAdapter`, `PersistenceAdapter` | Project-specific external and persistence boundary terminology; explicit YAML mapping; `domain`, `adapter`; ERP client. | Custom-mapping expected |
+
+| Role | Definition; evidence; metadata; example | Tier |
+| --- | --- | --- |
 | `DbContext` | Database session boundary; Base/Ns/Attr; `subsystem`, `adapter`; EF context. | Optional annotation candidate |
 | `RepositoryImplementation` | Repository port implementation; interface/Ns/Attr; `adapter`, `boundedContext`; SQL repo. | Canonical |
 | `ExternalClient` | External service/SDK client; Base/Ns/Attr; `adapter`, `direction`; payment client. | Canonical |

@@ -146,7 +146,7 @@ public static class ArchitectureBaselineComparer
         }
     }
 
-    private static Dictionary<string, Dictionary<string, string>> BuildCanonicalIdsByGroup(ArchitectureContractGroups groups)
+    private static Dictionary<string, Dictionary<string, string>> BuildCanonicalIdsByGroup(Families.ArchitectureContractGroups groups)
     {
         Dictionary<string, Dictionary<string, string>> result = new(StringComparer.Ordinal);
 
@@ -164,7 +164,7 @@ public static class ArchitectureBaselineComparer
         return result;
     }
 
-    private static HashSet<string> GetKnownContractIds(ArchitectureContractGroups groups, string groupName)
+    private static HashSet<string> GetKnownContractIds(Families.ArchitectureContractGroups groups, string groupName)
     {
         IEnumerable<string?> ids = groupName switch
         {

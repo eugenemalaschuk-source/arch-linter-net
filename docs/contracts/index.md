@@ -34,6 +34,7 @@ Most contract families have two variants:
 | [Interface implementation](interface-implementation.md) | `strict_interface_implementation` | `audit_interface_implementation` | Implementations of declared interfaces must reside only in (or never in) declared layers/namespaces/projects/assemblies. |
 | [Composition](composition.md) | `strict_composition` | `audit_composition` | Composition-root/service-locator API calls must be confined to a declared composition boundary. |
 | [Coverage contracts](coverage.md) | `strict_coverage` | `audit_coverage` | First-party namespaces, discovered projects, and resolved assemblies must be modeled by layers, templates, or explicit exclusions. |
+| [Semantic port boundary](port-boundary.md) | `strict_port_boundaries` | `audit_port_boundaries` | Cross-context dependencies must use an approved port or anti-corruption seam. |
 
 ## Strict or audit?
 

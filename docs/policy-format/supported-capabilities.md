@@ -31,6 +31,7 @@ ArchLinterNet supports static architecture validation through documented YAML po
 - coverage contracts (`scope: namespace`, `scope: rule_input`, `scope: project`, `scope: assembly`);
 - contextual dependency contracts (`strict_context_dependencies`/`audit_context_dependencies`: a source `(role, metadata)` selector's type must not reference a target matching a `forbidden` selector, compared directly against discovered role/metadata without an intermediate declared layer; `exact`/`in`/`any`/`not-equal-to-source` metadata operators; `exclude` selector pre-filtering);
 - contextual allow-only contracts (`strict_context_allow_only`/`audit_context_allow_only`: a source `(role, metadata)` selector's type may reference only targets matching an `allowed` selector, using the same selector shape and operator vocabulary as contextual dependency contracts);
+- semantic port-boundary contracts (`strict_port_boundaries`/`audit_port_boundaries`: direct compiled references into a metadata-selected target context must use an explicit port or anti-corruption seam; optional adapter bindings compare compiled interface implementation facts only);
 - strict and audit contract groups;
 - constrained namespace glob patterns;
 - external dependency groups;

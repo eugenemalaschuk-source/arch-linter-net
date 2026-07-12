@@ -43,6 +43,7 @@ The policy file is usually `architecture/dependencies.arch.yml` and contains:
 | Coverage | `strict_coverage` | `audit_coverage` | First-party namespaces, discovered projects, and resolved assemblies are covered by a layer, template expansion, or explicit exclusion. |
 | Contextual dependency | `strict_context_dependencies` | `audit_context_dependencies` | A source `(role, metadata)` selector's type must not reference a target matching a `forbidden` selector, compared directly against discovered role/metadata (no `layers.<name>` involved). |
 | Contextual allow-only | `strict_context_allow_only` | `audit_context_allow_only` | A source `(role, metadata)` selector's type may reference only targets matching an `allowed` selector; same selector shape and operator vocabulary as contextual dependency. |
+| Semantic port boundary | `strict_port_boundaries` | `audit_port_boundaries` | A selected source may reach a target context only through an explicit port or ACL seam; compiled adapter interface bindings can be checked. |
 
 ## Matching semantics
 

@@ -1,6 +1,8 @@
 using System.Text.Json;
 using ArchLinterNet.Core.Contracts;
+using ArchLinterNet.Core.Contracts.Families;
 using ArchLinterNet.Core.IO;
+using ArchLinterNet.Core.IO.Abstractions;
 using ArchLinterNet.Core.Model;
 using ArchLinterNet.Core.Scanning.Abstractions;
 

@@ -2,10 +2,12 @@ using System.Linq;
 using System.Reflection;
 using System.Reflection.Emit;
 using ArchLinterNet.Core.Contracts;
+using ArchLinterNet.Core.Contracts.Families;
 using ArchLinterNet.Core.Execution;
 using ArchLinterNet.Core.Model;
 using AttributeRoleExtractionTestFixtures;
 using NUnit.Framework;
+using ArchitectureContractGroups = ArchLinterNet.Core.Contracts.Families.ArchitectureContractGroups;
 
 namespace ArchLinterNet.Core.Tests;
 

@@ -28,6 +28,20 @@ namespace ContextualContractTestFixtures
     [AttributeUsage(AttributeTargets.Class)]
     public sealed class ContextSharedKernelMarkerAttribute : Attribute;
 
+    [AttributeUsage(AttributeTargets.Class | AttributeTargets.Interface)]
+    public sealed class ContextPortMarkerAttribute : Attribute
+    {
+        public ContextPortMarkerAttribute(string domain) => Domain = domain;
+        public string Domain { get; }
+    }
+
+    [AttributeUsage(AttributeTargets.Class)]
+    public sealed class ContextAdapterMarkerAttribute : Attribute
+    {
+        public ContextAdapterMarkerAttribute(string domain) => Domain = domain;
+        public string Domain { get; }
+    }
+
     // --- Sales domain (role DomainLayer, metadata domain=Sales) ---
 
     [ContextDomainMarker("Sales")]
@@ -109,4 +123,88 @@ namespace ContextualContractTestFixtures
     // Not classified by any attribute mapping used in these tests - must never match any
     // contextual selector regardless of role/metadata declared on the selector.
     public sealed class PlainUnclassifiedType;
+
+    [ContextPortMarker("Inventory")]
+    public interface IInventoryPort;
+
+    [ContextPortMarker("Payment")]
+    public interface IPaymentPort;
+
+    [ContextPortMarker("Catalog")]
+    public interface ICatalogPort;
+
+    [ContextAdapterMarker("Payment")]
+    public sealed class StripePaymentAdapter : IPaymentPort;
+
+    [ContextAdapterMarker("Payment")]
+    public sealed class MismatchedPaymentAdapter : ICatalogPort;
+
+    [ContextDomainMarker("Sales")]
+    public sealed class SalesUsesInventoryPort { public IInventoryPort Port { get; } = null!; }
+
+    // Inventory-domain type classified as Adapter (neither DomainLayer nor Port) - used to prove a
+    // target that matches target_context but matches neither `forbidden` nor `allowed_seams` is
+    // still reported as a violation (allow-list gap regression coverage).
+    [ContextAdapterMarker("Inventory")]
+    public sealed class InventoryLegacyAdapter;
+
+    [ContextDomainMarker("Sales")]
+    public sealed class SalesReferencesInventoryAdapter { public InventoryLegacyAdapter Adapter { get; } = null!; }
+
+    // Adapter with zero interfaces - used to prove the adapter-binding check does not throw when
+    // there is no implemented interface to classify.
+    [ContextAdapterMarker("Payment")]
+    public sealed class InterfacelessPaymentAdapter;
+
+    // Unclassified interface that sorts alphabetically before ICatalogPort (by full name), so a
+    // naive "first interface, ordered alphabetically" pick would surface it as mismatch evidence
+    // instead of the classified-but-wrong ICatalogPort.
+    public interface IAardvarkUnclassifiedInterface;
+
+    [ContextAdapterMarker("Payment")]
+    public sealed class AdapterWithUnclassifiedAndWrongPortInterfaces : IAardvarkUnclassifiedInterface, ICatalogPort;
+
+    // --- Generic port/domain fixtures (#306 review 3.2): RoleIndex is built from
+    // assembly.GetTypes(), which only ever yields open generic type definitions
+    // (e.g. IGenericPaymentPort<>), while reflection on a concrete reference/adapter reports the
+    // closed constructed type (e.g. IGenericPaymentPort<SalesOrder>) instead. ---
+
+    [ContextPortMarker("Payment")]
+    public interface IGenericPaymentPort<T>;
+
+    [ContextAdapterMarker("Payment")]
+    public sealed class GenericPaymentAdapter : IGenericPaymentPort<SalesOrder>;
+
+    [ContextDomainMarker("Inventory")]
+    public sealed class GenericInventoryItem<T>;
+
+    [ContextDomainMarker("Sales")]
+    public sealed class SalesReferencesGenericInventoryItem { public GenericInventoryItem<SalesOrder> Item { get; } = null!; }
+
+    [ContextPortMarker("Inventory")]
+    public interface IGenericInventoryPort<T>;
+
+    [ContextDomainMarker("Sales")]
+    public sealed class SalesUsesGenericInventoryPort { public IGenericInventoryPort<SalesOrder> Port { get; } = null!; }
+
+    // --- Anti-corruption-layer fixtures: approved ACL seam vs. direct database adapter reference. ---
+
+    [AttributeUsage(AttributeTargets.Class | AttributeTargets.Interface)]
+    public sealed class ContextAclMarkerAttribute : Attribute
+    {
+        public ContextAclMarkerAttribute(string domain) => Domain = domain;
+        public string Domain { get; }
+    }
+
+    [ContextAclMarker("Legacy")]
+    public interface ILegacyCrmAcl;
+
+    [ContextAdapterMarker("Legacy")]
+    public sealed class LegacyCrmDatabaseAdapter;
+
+    [ContextDomainMarker("LegacySales")]
+    public sealed class LegacyCrmUsesApprovedAcl { public ILegacyCrmAcl Acl { get; } = null!; }
+
+    [ContextDomainMarker("LegacySales")]
+    public sealed class LegacyCrmReferencesDatabaseAdapterDirectly { public LegacyCrmDatabaseAdapter Adapter { get; } = null!; }
 }

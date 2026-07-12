@@ -1,9 +1,11 @@
 using System.Reflection;
 using ArchLinterNet.Core.Contracts;
+using ArchLinterNet.Core.Contracts.Families;
 using ArchLinterNet.Core.Execution;
 using ArchLinterNet.Core.IO;
 using ContextualContractTestFixtures;
 using NUnit.Framework;
+using ArchitectureContractGroups = ArchLinterNet.Core.Contracts.Families.ArchitectureContractGroups;
 
 namespace ArchLinterNet.Core.Tests;
 
@@ -175,6 +177,62 @@ public sealed class ContextualContractBaselineTests
             // re-run with the merged baseline must report no violations for the same condition.
             Assert.That(violations, Is.Empty,
                 "Baselined contextual violations must be suppressed after merge, mirroring the existing dependency family's baseline behavior.");
+        }
+        finally
+        {
+            if (Directory.Exists(tempDir))
+            {
+                Directory.Delete(tempDir, true);
+            }
+        }
+    }
+
+    [Test]
+    public void FullFlow_GenerateMergeValidate_PortBoundary_NewViolationsStillFail()
+    {
+        var contract = new ArchitecturePortBoundaryContract
+        {
+            Id = "sales-to-inventory-through-port",
+            Name = "sales-to-inventory-through-port",
+            Source = new ArchitectureContextSelector { Role = "DomainLayer", Metadata = new Dictionary<string, object> { ["domain"] = "Sales" } },
+            TargetContext = new ArchitectureContextMetadataSelector { Metadata = new Dictionary<string, object> { ["domain"] = "Inventory" } },
+            AllowedSeams = new List<ArchitectureContextSelector> { new() { Role = "Port", Metadata = new Dictionary<string, object> { ["domain"] = "Inventory" } } },
+            Forbidden = new List<ArchitectureContextSelector> { new() { Role = "DomainLayer", Metadata = new Dictionary<string, object> { ["domain"] = "Inventory" } } },
+            Reason = "Use the reviewed port."
+        };
+        var document = new ArchitectureContractDocument
+        {
+            Version = 1,
+            Name = "Test",
+            Classification = Classification(),
+            Layers = new Dictionary<string, ArchitectureLayer>(),
+            Analysis = new ArchitectureAnalysisConfiguration { TargetAssemblies = new List<string> { _fixturesAssembly.GetName().Name! } },
+            Contracts = new ArchitectureContractGroups { StrictPortBoundaries = new List<ArchitecturePortBoundaryContract> { contract } }
+        };
+
+        var context = CreateContext();
+        var generateRunner = new ArchitectureContractRunner(context, document);
+        generateRunner.Session.CheckPortBoundaryContract(contract);
+
+        ArchitectureBaselineDocument baseline = _generator.Generate(document, generateRunner.BaselineCandidates, "auto-baseline");
+        string yaml = _generator.Serialize(baseline);
+
+        string tempDir = Path.Combine(Path.GetTempPath(), $"arch-linter-test-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(tempDir);
+        try
+        {
+            string baselinePath = Path.Combine(tempDir, "baseline.yml");
+            File.WriteAllText(baselinePath, yaml);
+
+            var loadedBaseline = _loadingService.LoadFromPath(baselinePath);
+            ArchitectureBaselineLoadingService.MergeAndValidate(document, loadedBaseline);
+
+            var finalRunner = new ArchitectureContractRunner(context, document);
+            List<ArchLinterNet.Core.Model.ArchitectureViolation> violations =
+                finalRunner.Session.CheckPortBoundaryContract(document.Contracts.StrictPortBoundaries[0]);
+
+            Assert.That(violations, Is.Empty,
+                "Baselined port-boundary violations must be suppressed after merge, mirroring the existing dependency family's baseline behavior.");
         }
         finally
         {

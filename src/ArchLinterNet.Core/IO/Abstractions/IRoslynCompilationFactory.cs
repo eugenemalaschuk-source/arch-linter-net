@@ -1,6 +1,6 @@
 using Microsoft.CodeAnalysis.CSharp;
 
-namespace ArchLinterNet.Core.IO;
+namespace ArchLinterNet.Core.IO.Abstractions;
 
 public interface IRoslynCompilationFactory
 {

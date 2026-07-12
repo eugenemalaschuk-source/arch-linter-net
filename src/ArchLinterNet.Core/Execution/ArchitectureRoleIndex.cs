@@ -30,7 +30,22 @@ public sealed class ArchitectureRoleIndex
     public bool TryGetRole(Type type, out ArchitectureTypeClassificationResult descriptor)
     {
         ArgumentNullException.ThrowIfNull(type);
-        return _data.Value.RolesByType.TryGetValue(type, out descriptor!);
+        if (_data.Value.RolesByType.TryGetValue(type, out descriptor!))
+        {
+            return true;
+        }
+
+        // The index is built from assembly.GetTypes(), which only ever yields open generic type
+        // definitions (e.g. IPaymentPort<>) - reflection on a concrete adapter/reference reports the
+        // closed constructed type (e.g. IPaymentPort<Order>) instead, which never equals the open
+        // definition as a dictionary key. Falling back to the generic type definition lets a
+        // classification attribute declared on the open type apply to every closed instantiation.
+        if (type.IsConstructedGenericType)
+        {
+            return _data.Value.RolesByType.TryGetValue(type.GetGenericTypeDefinition(), out descriptor!);
+        }
+
+        return false;
     }
 
     public IReadOnlyCollection<Type> ClassifiedTypes()

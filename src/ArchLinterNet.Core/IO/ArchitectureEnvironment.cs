@@ -1,3 +1,5 @@
+using ArchLinterNet.Core.IO.Abstractions;
+
 namespace ArchLinterNet.Core.IO;
 
 public sealed class ArchitectureEnvironment : IArchitectureEnvironment

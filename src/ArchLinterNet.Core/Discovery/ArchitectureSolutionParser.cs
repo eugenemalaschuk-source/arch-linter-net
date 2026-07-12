@@ -1,6 +1,7 @@
 using System.Text.RegularExpressions;
 using System.Xml.Linq;
 using ArchLinterNet.Core.IO;
+using ArchLinterNet.Core.IO.Abstractions;
 
 namespace ArchLinterNet.Core.Discovery;
 

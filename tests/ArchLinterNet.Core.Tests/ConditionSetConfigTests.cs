@@ -3,6 +3,7 @@ using ArchLinterNet.Core.Model;
 using ArchLinterNet.Core.Resolution;
 using ArchLinterNet.Core.Scanning;
 using NUnit.Framework;
+using ArchitectureContractGroups = ArchLinterNet.Core.Contracts.Families.ArchitectureContractGroups;
 
 namespace ArchLinterNet.Core.Tests;
 
