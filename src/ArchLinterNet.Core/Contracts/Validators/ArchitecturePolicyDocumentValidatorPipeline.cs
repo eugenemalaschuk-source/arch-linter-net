@@ -29,6 +29,6 @@ internal static class ArchitecturePolicyDocumentValidatorPipeline
         new InheritanceValidator(),
         new InterfaceImplementationValidator(),
         new CompositionValidator(),
-        new ContextualSourceSelectorValidator(),
+        new ContextualContractValidator(),
     ];
 }
