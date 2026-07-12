@@ -183,8 +183,10 @@ public sealed class PortBoundaryContractTests
         Assert.That(diagnostic.RemediationHint, Does.Contain("Implement the expected port"));
     }
 
+    private static readonly string[] _catalogOrderReference = { "Catalog.Order" };
+
     private static ArchitectureViolation CreateDirectEdgeSeamEvidenceViolation() =>
-        new("ports", "ports", "Sales.Checkout", "direct edge", new[] { "Catalog.Order" })
+        new("ports", "ports", "Sales.Checkout", "direct edge", _catalogOrderReference)
         {
             Payload = new PortBoundaryPayload("ApplicationLayer", new Dictionary<string, object> { ["domain"] = "Sales" },
                 "DomainLayer", new Dictionary<string, object> { ["domain"] = "Catalog" }, "direct_reference", "role:Port",
