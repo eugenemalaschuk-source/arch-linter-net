@@ -74,7 +74,7 @@ internal sealed partial class ContextualContractValidator : IArchitecturePolicyD
     }
 
     private static void ValidateNonEmptySelectorList(
-        string contractName, string fieldName, IReadOnlyCollection<ArchitectureContextSelector>? selectors)
+        string contractName, string fieldName, List<ArchitectureContextSelector>? selectors)
     {
         if (selectors == null || selectors.Count == 0)
         {
@@ -84,7 +84,7 @@ internal sealed partial class ContextualContractValidator : IArchitecturePolicyD
     }
 
     private static void ValidateTargetSelectors(
-        string contractName, string fieldName, IReadOnlyCollection<ArchitectureContextSelector>? selectors)
+        string contractName, string fieldName, List<ArchitectureContextSelector>? selectors)
     {
         if (selectors == null)
         {
