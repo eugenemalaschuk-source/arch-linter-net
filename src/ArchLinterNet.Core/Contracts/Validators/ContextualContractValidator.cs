@@ -1,3 +1,4 @@
+using System.Collections;
 using System.Text.RegularExpressions;
 
 namespace ArchLinterNet.Core.Contracts.Validators;
@@ -48,6 +49,7 @@ internal sealed partial class ContextualContractValidator : IArchitecturePolicyD
             ValidateSource(contract.Name, contract.Source);
             if (contract.TargetContext.Metadata.Count == 0)
                 throw new InvalidOperationException($"Port-boundary contract '{contract.Name}' must declare non-empty 'target_context.metadata'.");
+            ValidateMetadataValues(contract.Name, "target_context", contract.TargetContext.Metadata);
             if (string.IsNullOrWhiteSpace(contract.Reason))
                 throw new InvalidOperationException($"Port-boundary contract '{contract.Name}' must declare a non-empty 'reason'.");
             ValidateNonEmptySelectorList(contract.Name, "allowed_seams", contract.AllowedSeams);
@@ -139,5 +141,85 @@ internal sealed partial class ContextualContractValidator : IArchitecturePolicyD
             throw new InvalidOperationException(
                 $"Contextual contract '{contractName}' declares a '{fieldName}' selector whose 'metadata' must be an object when declared.");
         }
+
+        ValidateMetadataValues(contractName, fieldName, selector.Metadata);
     }
+
+    // The public JSON schema's contextMetadataValue union requires each metadata value to be either
+    // a non-empty scalar or a non-empty list of scalars (schema/dependencies.arch.schema.json's
+    // scalarValue + contextMetadataValue $defs), but the production loader never runs that schema and
+    // Dictionary<string, object> deserializes a YAML `domain: []` or `domain: {}` cleanly. The
+    // evaluator's "in" operator (MatchesTargetContext/ArchitectureContextSelectorMatcher) then calls
+    // Any() over an empty/malformed sequence, which is unconditionally false for every candidate - so
+    // an empty list or a nested mapping silently makes a strict selector match nothing rather than
+    // failing to load.
+    private static void ValidateMetadataValues(string contractName, string fieldName, IDictionary<string, object> metadata)
+    {
+        foreach (KeyValuePair<string, object> entry in metadata)
+        {
+            ValidateMetadataValue(contractName, fieldName, entry.Key, entry.Value);
+        }
+    }
+
+    private static void ValidateMetadataValue(string contractName, string fieldName, string key, object? value)
+    {
+        // String is checked ahead of the generic IEnumerable branch below - string implements
+        // IEnumerable<char>, so an empty string would otherwise be miscategorized as an "empty list"
+        // instead of reported as an empty scalar.
+        if (value is string text)
+        {
+            if (text.Length == 0)
+            {
+                throw new InvalidOperationException(
+                    $"Contextual contract '{contractName}' declares a '{fieldName}' selector whose metadata key " +
+                    $"'{key}' has an empty string value; metadata values must be a non-empty scalar, or a " +
+                    "non-empty list of scalars.");
+            }
+
+            return;
+        }
+
+        if (IsScalarMetadataValue(value))
+        {
+            return;
+        }
+
+        if (value is IEnumerable sequence and not IDictionary)
+        {
+            List<object?> items = sequence.Cast<object?>().ToList();
+            if (items.Count == 0)
+            {
+                throw new InvalidOperationException(
+                    $"Contextual contract '{contractName}' declares a '{fieldName}' selector whose metadata key " +
+                    $"'{key}' is an empty list. An empty list never matches any candidate, silently turning the " +
+                    "contract into a no-op.");
+            }
+
+            if (items.Any(item => !(item is string s ? s.Length > 0 : IsScalarMetadataValue(item))))
+            {
+                throw new InvalidOperationException(
+                    $"Contextual contract '{contractName}' declares a '{fieldName}' selector whose metadata key " +
+                    $"'{key}' list contains a non-scalar entry (null, list, or mapping); list entries must be " +
+                    "non-empty scalar values.");
+            }
+
+            return;
+        }
+
+        throw new InvalidOperationException(
+            $"Contextual contract '{contractName}' declares a '{fieldName}' selector whose metadata key '{key}' " +
+            "has an unsupported value (null or a nested mapping); metadata values must be a non-empty scalar, " +
+            "or a non-empty list of scalars.");
+    }
+
+    private static bool IsScalarMetadataValue(object? value) =>
+        value switch
+        {
+            bool => true,
+            long => true,
+            int => true,
+            decimal => true,
+            double => true,
+            _ => false
+        };
 }

@@ -72,7 +72,14 @@ public sealed partial class ArchitectureAnalysisSession
         if (!RoleIndex.TryGetRole(adapter, out ArchitectureTypeClassificationResult adapterRole)) return null;
         bool inAllowedContext = binding.AllowedContexts.Count == 0 || binding.AllowedContexts.Any(selector =>
             ArchitectureContextSelectorMatcher.Matches(selector, adapter, RoleIndex, adapterRole));
-        Type? implementedExpectedPort = adapter.GetInterfaces()
+
+        // ArchitectureReferenceScanner already wraps type.GetInterfaces() to swallow
+        // TypeLoadException/FileNotFoundException from a partially-loadable dependency graph, since a
+        // missing optional/transitive assembly is an expected scenario here, not a reason to crash the
+        // whole strict/audit run. Reuse that same safe helper and compute the interface set once for
+        // both lookups below instead of calling the unguarded GetInterfaces() twice.
+        Type[] implementedInterfaces = ArchitectureReferenceScanner.SafeGetInterfaces(adapter);
+        Type? implementedExpectedPort = implementedInterfaces
             .OrderBy(ArchitectureTypeNames.SafeFullName, StringComparer.Ordinal)
             .FirstOrDefault(@interface => ArchitectureContextSelectorMatcher.Matches(
                 binding.ExpectedPort, @interface, RoleIndex, adapterRole));
@@ -83,7 +90,7 @@ public sealed partial class ArchitectureAnalysisSession
         // Prefer an interface RoleIndex actually classifies (e.g. a wrong-but-known port) over an
         // incidental unclassified one (e.g. IDisposable) so the reported mismatch evidence is
         // meaningful rather than whichever interface happens to sort first alphabetically.
-        Type? actualPort = implementedExpectedPort ?? adapter.GetInterfaces()
+        Type? actualPort = implementedExpectedPort ?? implementedInterfaces
             .OrderByDescending(@interface => RoleIndex.TryGetRole(@interface, out ArchitectureTypeClassificationResult r) && r.Role != null)
             .ThenBy(ArchitectureTypeNames.SafeFullName, StringComparer.Ordinal)
             .FirstOrDefault();

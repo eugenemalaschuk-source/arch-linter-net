@@ -197,7 +197,7 @@ internal static class ArchitectureReferenceScanner
         }
     }
 
-    private static Type[] SafeGetInterfaces(Type type)
+    internal static Type[] SafeGetInterfaces(Type type)
     {
         try
         {

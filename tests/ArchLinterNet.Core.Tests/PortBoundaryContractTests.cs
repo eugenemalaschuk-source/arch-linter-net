@@ -373,6 +373,36 @@ public sealed class PortBoundaryContractTests
         Assert.That(violations.Any(v => v.SourceType == typeof(SalesCheckout).FullName), Is.False);
     }
 
+    [Test]
+    public void CheckPortBoundaryContract_ClosedGenericDomainTargetIsForbidden()
+    {
+        // Regression: a direct reference to a closed constructed generic domain type (forbidden by
+        // role) must still be recognized and reported, not silently pass because the closed type
+        // never equals the open generic type definition RoleIndex actually classified.
+        ArchitecturePortBoundaryContract contract = CreateInventoryContract();
+        var runner = CreateRunner(contract);
+
+        List<ArchitectureViolation> violations = runner.Session.CheckPortBoundaryContract(contract);
+
+        Assert.That(violations.Any(v =>
+            v.SourceType == typeof(SalesReferencesGenericInventoryItem).FullName
+            && v.ForbiddenReferences.Contains(typeof(GenericInventoryItem<SalesOrder>).FullName)), Is.True);
+    }
+
+    [Test]
+    public void CheckPortBoundaryContract_AdapterImplementingClosedGenericExpectedPort_NoMismatch()
+    {
+        // Regression: an adapter binding's ExpectedPort selector must match against a closed
+        // constructed generic interface the same way any other selector match does.
+        Assembly assembly = typeof(GenericPaymentAdapter).Assembly;
+        ArchitectureContractDocument document = CreateAdapterBindingDocument(assembly, out ArchitecturePortBoundaryContract contract);
+        var runner = new ArchitectureContractRunner(new ArchitectureAnalysisContext("/tmp", new[] { assembly }, Array.Empty<string>(), Array.Empty<string>()), document);
+
+        List<ArchitectureViolation> violations = runner.Session.CheckPortBoundaryContract(contract);
+
+        Assert.That(violations.Any(v => v.SourceType == typeof(GenericPaymentAdapter).FullName), Is.False);
+    }
+
     private static ArchitecturePortBoundaryContract CreateInventoryContract() => new()
     {
         Name = "sales-to-inventory-through-port",

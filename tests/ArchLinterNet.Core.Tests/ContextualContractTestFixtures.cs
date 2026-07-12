@@ -163,4 +163,27 @@ namespace ContextualContractTestFixtures
 
     [ContextAdapterMarker("Payment")]
     public sealed class AdapterWithUnclassifiedAndWrongPortInterfaces : IAardvarkUnclassifiedInterface, ICatalogPort;
+
+    // --- Generic port/domain fixtures (#306 review 3.2): RoleIndex is built from
+    // assembly.GetTypes(), which only ever yields open generic type definitions
+    // (e.g. IGenericPaymentPort<>), while reflection on a concrete reference/adapter reports the
+    // closed constructed type (e.g. IGenericPaymentPort<SalesOrder>) instead. ---
+
+    [ContextPortMarker("Payment")]
+    public interface IGenericPaymentPort<T>;
+
+    [ContextAdapterMarker("Payment")]
+    public sealed class GenericPaymentAdapter : IGenericPaymentPort<SalesOrder>;
+
+    [ContextDomainMarker("Inventory")]
+    public sealed class GenericInventoryItem<T>;
+
+    [ContextDomainMarker("Sales")]
+    public sealed class SalesReferencesGenericInventoryItem { public GenericInventoryItem<SalesOrder> Item { get; } = null!; }
+
+    [ContextPortMarker("Inventory")]
+    public interface IGenericInventoryPort<T>;
+
+    [ContextDomainMarker("Sales")]
+    public sealed class SalesUsesGenericInventoryPort { public IGenericInventoryPort<SalesOrder> Port { get; } = null!; }
 }
