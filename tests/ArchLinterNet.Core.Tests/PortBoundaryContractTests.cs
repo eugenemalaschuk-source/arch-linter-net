@@ -183,15 +183,18 @@ public sealed class PortBoundaryContractTests
         Assert.That(diagnostic.RemediationHint, Does.Contain("Implement the expected port"));
     }
 
-    [Test]
-    public void PortBoundaryViolation_EmitsStructuredSeamEvidence()
-    {
-        var violation = new ArchitectureViolation("ports", "ports", "Sales.Checkout", "direct edge", new[] { "Catalog.Order" })
+    private static ArchitectureViolation CreateDirectEdgeSeamEvidenceViolation() =>
+        new("ports", "ports", "Sales.Checkout", "direct edge", new[] { "Catalog.Order" })
         {
             Payload = new PortBoundaryPayload("ApplicationLayer", new Dictionary<string, object> { ["domain"] = "Sales" },
                 "DomainLayer", new Dictionary<string, object> { ["domain"] = "Catalog" }, "direct_reference", "role:Port",
                 "Depend on the approved port abstraction.")
         };
+
+    [Test]
+    public void PortBoundaryViolation_EmitsStructuredSeamEvidence()
+    {
+        ArchitectureViolation violation = CreateDirectEdgeSeamEvidenceViolation();
 
         string json = new ArchitectureDiagnosticFormatter().FormatViolationsForCiArtifacts("ports", "ports", new[] { violation });
 
@@ -203,12 +206,7 @@ public sealed class PortBoundaryContractTests
     [Test]
     public void PortBoundaryViolation_HumanReadableFormat_IncludesSeamEvidence()
     {
-        var violation = new ArchitectureViolation("ports", "ports", "Sales.Checkout", "direct edge", new[] { "Catalog.Order" })
-        {
-            Payload = new PortBoundaryPayload("ApplicationLayer", new Dictionary<string, object> { ["domain"] = "Sales" },
-                "DomainLayer", new Dictionary<string, object> { ["domain"] = "Catalog" }, "direct_reference", "role:Port",
-                "Depend on the approved port abstraction.")
-        };
+        ArchitectureViolation violation = CreateDirectEdgeSeamEvidenceViolation();
         ArchitectureDiagnostic diagnostic = ArchitectureDiagnosticMapper.FromViolation(violation);
         Assert.That(diagnostic.Kind, Is.EqualTo(ArchitectureDiagnosticKind.PortBoundary));
 

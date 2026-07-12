@@ -11,6 +11,14 @@ namespace ArchLinterNet.Core.Contracts;
 
 public sealed partial class ArchitecturePolicyDocumentLoader : IArchitecturePolicyDocumentLoader
 {
+    private const string MetadataKey = "metadata";
+    private const string SourceKey = "source";
+    private const string ForbiddenKey = "forbidden";
+    private const string UnnamedContractName = "<unnamed>";
+
+    private static readonly string[] TargetContextAllowedKeys = { "metadata" };
+    private static readonly string[] AdapterBindingAllowedKeys = { "adapter", "expected_port", "allowed_contexts" };
+
     private readonly IArchitectureFileSystem _fileSystem;
 
     public ArchitecturePolicyDocumentLoader()
@@ -103,7 +111,7 @@ public sealed partial class ArchitecturePolicyDocumentLoader : IArchitecturePoli
                 continue;
             }
 
-            if (TryGetChild(selectorMapping, "metadata", out YamlNode? metadataNode) && IsExplicitNull(metadataNode))
+            if (TryGetChild(selectorMapping, MetadataKey, out YamlNode? metadataNode) && IsExplicitNull(metadataNode))
             {
                 throw new InvalidOperationException(
                     $"Layer '{layerName}' selector metadata must be an object when declared.");
@@ -113,7 +121,7 @@ public sealed partial class ArchitecturePolicyDocumentLoader : IArchitecturePoli
             {
                 if (selKeyNode is YamlScalarNode selKeyScalar
                     && !string.Equals(selKeyScalar.Value, "role", StringComparison.Ordinal)
-                    && !string.Equals(selKeyScalar.Value, "metadata", StringComparison.Ordinal))
+                    && !string.Equals(selKeyScalar.Value, MetadataKey, StringComparison.Ordinal))
                 {
                     throw new InvalidOperationException(
                         $"Layer '{layerName}' selector contains unknown property '{selKeyScalar.Value}'.");
@@ -172,8 +180,8 @@ public sealed partial class ArchitecturePolicyDocumentLoader : IArchitecturePoli
             return;
         }
 
-        ValidateContextualContractGroup(contracts!, "strict_context_dependencies", "forbidden");
-        ValidateContextualContractGroup(contracts!, "audit_context_dependencies", "forbidden");
+        ValidateContextualContractGroup(contracts!, "strict_context_dependencies", ForbiddenKey);
+        ValidateContextualContractGroup(contracts!, "audit_context_dependencies", ForbiddenKey);
         ValidateContextualContractGroup(contracts!, "strict_context_allow_only", "allowed");
         ValidateContextualContractGroup(contracts!, "audit_context_allow_only", "allowed");
         ValidatePortBoundaryContractGroup(contracts!, "strict_port_boundaries");
@@ -196,12 +204,12 @@ public sealed partial class ArchitecturePolicyDocumentLoader : IArchitecturePoli
 
             string contractName = TryGetChild(contractNode, "name", out YamlNode? nameNode)
                 && nameNode is YamlScalarNode nameScalar
-                    ? nameScalar.Value ?? "<unnamed>"
-                    : "<unnamed>";
+                    ? nameScalar.Value ?? UnnamedContractName
+                    : UnnamedContractName;
 
-            if (TryGetChild(contractNode, "source", out YamlNode? sourceNode) && sourceNode is YamlMappingNode sourceMapping)
+            if (TryGetChild(contractNode, SourceKey, out YamlNode? sourceNode) && sourceNode is YamlMappingNode sourceMapping)
             {
-                ValidateContextualSelectorNodeKeys(sourceMapping, contractName, "source");
+                ValidateContextualSelectorNodeKeys(sourceMapping, contractName, SourceKey);
             }
 
             ValidateContextualSelectorListKeys(contractNode, contractName, targetListKey);
@@ -215,11 +223,11 @@ public sealed partial class ArchitecturePolicyDocumentLoader : IArchitecturePoli
         foreach (YamlMappingNode entry in sequence.Children.OfType<YamlMappingNode>())
         {
             string name = TryGetChild(entry, "name", out YamlNode? value) && value is YamlScalarNode scalar
-                ? scalar.Value ?? "<unnamed>" : "<unnamed>";
+                ? scalar.Value ?? UnnamedContractName : UnnamedContractName;
             ValidatePortBoundaryContractNodeKeys(entry, name);
-            if (TryGetChild(entry, "source", out YamlNode? source) && source is YamlMappingNode sourceMapping)
+            if (TryGetChild(entry, SourceKey, out YamlNode? source) && source is YamlMappingNode sourceMapping)
             {
-                ValidateContextualSelectorNodeKeys(sourceMapping, name, "source");
+                ValidateContextualSelectorNodeKeys(sourceMapping, name, SourceKey);
             }
             if (TryGetChild(entry, "target_context", out YamlNode? targetContext) && targetContext is YamlMappingNode targetMapping)
             {
@@ -239,14 +247,14 @@ public sealed partial class ArchitecturePolicyDocumentLoader : IArchitecturePoli
     }
 
     private static void ValidateTargetContextNodeKeys(YamlMappingNode node, string contractName) =>
-        ValidateKnownKeys(node, contractName, "target_context", new[] { "metadata" });
+        ValidateKnownKeys(node, contractName, "target_context", TargetContextAllowedKeys);
 
     private static void ValidateAdapterBindings(YamlMappingNode contractNode, string contractName)
     {
         if (!TryGetChild(contractNode, "adapter_bindings", out YamlNode? bindingsNode) || bindingsNode is not YamlSequenceNode bindings) return;
         foreach (YamlMappingNode binding in bindings.Children.OfType<YamlMappingNode>())
         {
-            ValidateKnownKeys(binding, contractName, "adapter_bindings entry", new[] { "adapter", "expected_port", "allowed_contexts" });
+            ValidateKnownKeys(binding, contractName, "adapter_bindings entry", AdapterBindingAllowedKeys);
             foreach (string field in new[] { "adapter", "expected_port" })
             {
                 if (TryGetChild(binding, field, out YamlNode? selector) && selector is YamlMappingNode mapping)

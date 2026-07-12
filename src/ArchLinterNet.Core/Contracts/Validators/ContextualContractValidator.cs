@@ -17,6 +17,8 @@ namespace ArchLinterNet.Core.Contracts.Validators;
 // ArchitecturePolicyDocumentValidatorPipeline's note on the dependency direction).
 internal sealed partial class ContextualContractValidator : IArchitecturePolicyDocumentValidator
 {
+    private const string ForbiddenFieldName = "forbidden";
+
     [GeneratedRegex(@"^!\{source\.metadata\.[A-Za-z0-9_]+\}$", RegexOptions.CultureInvariant)]
     private static partial Regex NotEqualToSourcePattern();
 
@@ -26,8 +28,8 @@ internal sealed partial class ContextualContractValidator : IArchitecturePolicyD
                      .Concat(document.Contracts.AuditContextDependencies))
         {
             ValidateSource(contract.Name, contract.Source);
-            ValidateNonEmptySelectorList(contract.Name, "forbidden", contract.Forbidden);
-            ValidateTargetSelectors(contract.Name, "forbidden", contract.Forbidden);
+            ValidateNonEmptySelectorList(contract.Name, ForbiddenFieldName, contract.Forbidden);
+            ValidateTargetSelectors(contract.Name, ForbiddenFieldName, contract.Forbidden);
             ValidateTargetSelectors(contract.Name, "exclude", contract.Exclude);
         }
 
@@ -49,9 +51,9 @@ internal sealed partial class ContextualContractValidator : IArchitecturePolicyD
             if (string.IsNullOrWhiteSpace(contract.Reason))
                 throw new InvalidOperationException($"Port-boundary contract '{contract.Name}' must declare a non-empty 'reason'.");
             ValidateNonEmptySelectorList(contract.Name, "allowed_seams", contract.AllowedSeams);
-            ValidateNonEmptySelectorList(contract.Name, "forbidden", contract.Forbidden);
+            ValidateNonEmptySelectorList(contract.Name, ForbiddenFieldName, contract.Forbidden);
             ValidateTargetSelectors(contract.Name, "allowed_seams", contract.AllowedSeams);
-            ValidateTargetSelectors(contract.Name, "forbidden", contract.Forbidden);
+            ValidateTargetSelectors(contract.Name, ForbiddenFieldName, contract.Forbidden);
             ValidateTargetSelectors(contract.Name, "exclude", contract.Exclude);
             foreach (ArchitectureAdapterPortBinding binding in contract.AdapterBindings)
             {
