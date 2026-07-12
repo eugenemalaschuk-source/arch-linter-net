@@ -57,18 +57,22 @@ ArchLinterNet does not currently validate:
 Coverage support currently excludes `scope: dependency_edge`, which remains reserved
 and fails validation with an actionable error.
 
-`classification.attributes`/`classification.assembly_attributes` are **implemented**:
-type-level and assembly-level attributes mapped by full type name are extracted into
-role/metadata facts, cached per validation run in a role index, and `validate` surfaces
-resulting role/conflict/evidence-extraction-failure facts as informational output.
+`classification.attributes`/`classification.assembly_attributes`/`classification.inheritance`/
+`classification.namespace` are **implemented**: type-level and assembly-level attributes
+mapped by full type name, transitive base-type/interface inheritance mappings, and
+namespace glob/suffix mappings are all extracted into role/metadata facts, combined by the
+fixed precedence order `type_attribute > assembly_attribute > inheritance > namespace`,
+cached per validation run in a role index, and `validate` surfaces resulting
+role/conflict/evidence-extraction-failure facts as informational output.
 Selector-backed layers (`layers.<name>.selector`) consume the role index to resolve types
 by exact role/metadata match; those layers produce violations through existing contract
 families exactly as namespace-based layers do. Empty non-external selector-only layers are
-surfaced as configuration diagnostics. Every other part of `classification` and
-`layers.<name>.selector` remains unimplemented — `precedence` beyond
-`type_attribute`/`assembly_attribute`, `inheritance`, `namespace`, `path`, `overrides`,
-and `exclusions` are schema-accepted but have no effect on validation. See
-[Semantic classification](semantic-classification.md).
+surfaced as configuration diagnostics. `classification.path` remains unimplemented but
+declaring a non-empty `path` section produces a non-blocking, informational diagnostic
+(does not fail `validate`) explaining that path-convention classification is deferred
+pending [issue #171](https://github.com/eugenemalaschuk-source/arch-linter-net/issues/171).
+`yaml_override`, `overrides`, and `exclusions` remain schema-accepted no-ops with no runtime
+effect and no diagnostic. See [Semantic classification](semantic-classification.md).
 
 Assembly independence contracts detect only **direct** assembly references; transitive
 reference paths between two listed assemblies are not resolved.

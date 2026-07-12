@@ -36,6 +36,35 @@ internal static class ArchitectureAttributeMetadataExtraction
             }
         }
 
+        return ExtractLiteral(rawYamlValue);
+    }
+
+    // Inheritance/namespace sources have no attribute instance to extract constructor[]/property:
+    // arguments from — the schema restricts their metadata to literal scalar or const: only. A
+    // constructor[]/property: value reaching here is a schema-bypass (e.g. a hand-constructed
+    // configuration in a test): it resolves as an extraction failure, never a crash or a guess.
+    public static (object? Canonical, string? FailureReason) ExtractWithoutAttributeInstance(
+        object rawYamlValue, Func<string, Type?> resolveType)
+    {
+        if (rawYamlValue is string expression)
+        {
+            if (expression.StartsWith(ConstructorPrefix, StringComparison.Ordinal)
+                || expression.StartsWith(PropertyPrefix, StringComparison.Ordinal))
+            {
+                return (null, $"'{expression}' is not valid here — constructor[]/property: forms require an attribute instance, which this classification source does not have");
+            }
+
+            if (expression.StartsWith(ConstPrefix, StringComparison.Ordinal))
+            {
+                return ExtractConstReference(expression, resolveType);
+            }
+        }
+
+        return ExtractLiteral(rawYamlValue);
+    }
+
+    private static (object? Canonical, string? FailureReason) ExtractLiteral(object rawYamlValue)
+    {
         return TryCanonicalize(rawYamlValue, null) is { } canonical
             ? (canonical, null)
             : (null, $"literal value '{rawYamlValue}' has no representation in the string/boolean/decimal domains");

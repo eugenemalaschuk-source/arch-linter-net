@@ -141,4 +141,63 @@ namespace AttributeRoleExtractionTestFixtures
 
     [DomainMarker("Sales")]
     public sealed class TypeOverridingAssemblyAttribute;
+
+    // Inheritance-convention fixtures.
+    public abstract class DomainEntityBase;
+
+    // Derives from a base type declared in a different (BCL) assembly than this fixture assembly's
+    // own target assembly — regression coverage for matching against an out-of-target-assembly base
+    // type, which must work by walking the type's own reflected base chain, not by resolving
+    // base_type through the scanned-assembly type universe.
+    public sealed class CustomFrameworkException : Exception;
+
+    public sealed class DirectlyDerivedEntity : DomainEntityBase;
+
+    public class IntermediateEntity : DomainEntityBase;
+
+    public sealed class TransitivelyDerivedEntity : IntermediateEntity;
+
+    public interface IRepositoryMarker;
+
+    public sealed class RepositoryImplementation : IRepositoryMarker;
+
+    public sealed class UnrelatedType;
+
+    // Generic base_type matching fixtures: a base_type mapping declares the open generic
+    // definition's full name (e.g. "AttributeRoleExtractionTestFixtures.IGenericRepository`1"),
+    // which must match every closed instantiation, not just the open definition itself.
+    public interface IGenericRepository<T>;
+
+    public sealed class ClosedGenericRepository : IGenericRepository<PlainType>;
+
+    public abstract class GenericRepositoryBase<T>;
+
+    public sealed class ClosedGenericRepositoryDerivedType : GenericRepositoryBase<PlainType>;
+
+    public sealed class TypeMatchedByTwoInheritanceEntries : DomainEntityBase, IRepositoryMarker;
+
+    // Namespace-convention fixtures.
+    public sealed class TypeInDefaultNamespace;
+}
+
+namespace AttributeRoleExtractionTestFixtures.Domain
+{
+    public sealed class TypeInDomainNamespace;
+}
+
+namespace AttributeRoleExtractionTestFixtures.Domain.Nested
+{
+    public sealed class TypeInNestedDomainNamespace;
+}
+
+namespace AttributeRoleExtractionTestFixtures.Feature.Contracts
+{
+    public sealed class TypeInContractsSuffixNamespace;
+}
+
+namespace AttributeRoleExtractionTestFixtures.PrecedenceCases
+{
+    using AttributeRoleExtractionTestFixtures;
+
+    public sealed class TypeMatchedByInheritanceAndNamespace : DomainEntityBase;
 }

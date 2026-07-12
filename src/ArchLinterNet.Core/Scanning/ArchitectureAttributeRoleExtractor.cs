@@ -17,36 +17,95 @@ namespace ArchLinterNet.Core.Scanning;
 // attribute's own type or its declaring assembly.
 public sealed class ArchitectureAttributeRoleExtractor
 {
+    // Fixed tier order for the four sources this extractor implements — a prefix of the reviewed
+    // schema's full six-source precedence (yaml_override/path are not implemented here).
+    private static readonly ArchitectureClassificationSource[] _tierOrder =
+    {
+        ArchitectureClassificationSource.TypeAttribute,
+        ArchitectureClassificationSource.AssemblyAttribute,
+        ArchitectureClassificationSource.Inheritance,
+        ArchitectureClassificationSource.Namespace
+    };
+
     private readonly ArchitectureClassificationConfiguration _configuration;
+    private readonly Func<ArchitectureNamespaceClassificationMapping, string, (bool Matched, string? MatchedPattern)> _matchNamespace;
     private readonly Dictionary<Assembly, ArchitectureAttributeClassificationCandidate> _assemblyCandidateCache = new();
     private readonly Lazy<Dictionary<string, Type?>> _typesByFullName;
 
+    // Preserves the original public two-argument constructor's exact signature for binary
+    // compatibility with already-compiled ArchLinterNet.Core NuGet consumers: an optional third
+    // parameter on a single constructor only helps source compatibility (a default argument is
+    // resolved by the caller's compiler, not embedded in the callee), so a consumer compiled
+    // against the original .ctor(ArchitectureClassificationConfiguration, IEnumerable<Type>)
+    // would throw MissingMethodException at load time against a DLL that replaced it with a
+    // three-parameter overload. classification.namespace matching requires the namespace-glob
+    // matcher only ArchitectureRoleIndex (Execution) can supply (see the internal constructor
+    // below) — this constructor cannot fulfill it. Rather than silently never matching any
+    // classification.namespace entry (indistinguishable from a genuinely non-matching policy), a
+    // direct consumer who populates classification.namespace through this constructor is told so
+    // explicitly, at construction time, so the failure surfaces immediately instead of as a
+    // confusing missing role assignment later.
     public ArchitectureAttributeRoleExtractor(
         ArchitectureClassificationConfiguration configuration, IEnumerable<Type> typeUniverse)
+        : this(configuration, typeUniverse, null)
+    {
+        if (_configuration.Namespace.Count > 0 && _configuration.IsSourceEnabled(NamespaceSourceName))
+        {
+            throw new InvalidOperationException(
+                "classification.namespace entries are declared and the 'namespace' source is enabled, "
+                + $"but {nameof(ArchitectureAttributeRoleExtractor)}(configuration, typeUniverse) has no namespace-glob "
+                + "matcher to evaluate them with. Construct classification through ArchitectureAnalysisSession/"
+                + "ArchitectureRoleIndex instead, which wires the namespace matcher automatically.");
+        }
+    }
+
+    // Internal: only ArchitectureRoleIndex (Execution) constructs the namespace-matching delegate,
+    // since Scanning must not depend on Resolution (see docs/internal/core-architecture-blueprint.md).
+    internal ArchitectureAttributeRoleExtractor(
+        ArchitectureClassificationConfiguration configuration,
+        IEnumerable<Type> typeUniverse,
+        Func<ArchitectureNamespaceClassificationMapping, string, (bool Matched, string? MatchedPattern)>? matchNamespace)
     {
         _configuration = configuration ?? throw new ArgumentNullException(nameof(configuration));
         ArgumentNullException.ThrowIfNull(typeUniverse);
         _typesByFullName = new Lazy<Dictionary<string, Type?>>(() => BuildTypeLookup(typeUniverse));
+        _matchNamespace = matchNamespace ?? ((_, _) => (false, null));
     }
 
     private const string TypeAttributeSourceName = "type_attribute";
     private const string AssemblyAttributeSourceName = "assembly_attribute";
+    private const string InheritanceSourceName = "inheritance";
+    private const string NamespaceSourceName = "namespace";
 
     public ArchitectureTypeClassificationResult Extract(Type type)
     {
         ArgumentNullException.ThrowIfNull(type);
 
-        ArchitectureAttributeClassificationCandidate typeCandidate = _configuration.IsSourceEnabled(TypeAttributeSourceName)
-            ? ResolveCandidate(
+        var candidates = new Dictionary<ArchitectureClassificationSource, ArchitectureAttributeClassificationCandidate>();
+
+        if (_configuration.IsSourceEnabled(TypeAttributeSourceName))
+        {
+            candidates[ArchitectureClassificationSource.TypeAttribute] = ResolveCandidate(
                 SafeGetCustomAttributesData(type), _configuration.Attributes, ArchitectureClassificationSource.TypeAttribute,
-                ArchitectureTypeNames.SafeFullName(type))
-            : ArchitectureAttributeClassificationCandidate.Empty;
+                ArchitectureTypeNames.SafeFullName(type));
+        }
 
-        ArchitectureAttributeClassificationCandidate assemblyCandidate = _configuration.IsSourceEnabled(AssemblyAttributeSourceName)
-            ? ResolveAssemblyCandidate(type.Assembly)
-            : ArchitectureAttributeClassificationCandidate.Empty;
+        if (_configuration.IsSourceEnabled(AssemblyAttributeSourceName))
+        {
+            candidates[ArchitectureClassificationSource.AssemblyAttribute] = ResolveAssemblyCandidate(type.Assembly);
+        }
 
-        return Combine(typeCandidate, assemblyCandidate);
+        if (_configuration.IsSourceEnabled(InheritanceSourceName))
+        {
+            candidates[ArchitectureClassificationSource.Inheritance] = ResolveInheritanceCandidate(type);
+        }
+
+        if (_configuration.IsSourceEnabled(NamespaceSourceName))
+        {
+            candidates[ArchitectureClassificationSource.Namespace] = ResolveNamespaceCandidate(type);
+        }
+
+        return Combine(candidates);
     }
 
     private ArchitectureAttributeClassificationCandidate ResolveAssemblyCandidate(Assembly assembly)
@@ -64,27 +123,173 @@ public sealed class ArchitectureAttributeRoleExtractor
         return candidate;
     }
 
-    private static ArchitectureTypeClassificationResult Combine(
-        ArchitectureAttributeClassificationCandidate typeCandidate, ArchitectureAttributeClassificationCandidate assemblyCandidate)
+    private ArchitectureAttributeClassificationCandidate ResolveInheritanceCandidate(Type type)
     {
-        List<ArchitectureClassificationConflict> conflicts = new(typeCandidate.Conflicts);
-        conflicts.AddRange(assemblyCandidate.Conflicts);
+        List<ArchitectureClassificationConflict> conflicts = new();
+        List<ArchitectureClassificationMetadataFailure> failures = new();
+        string? winningRole = null;
+        string? winningEvidence = null;
+        IReadOnlyDictionary<string, object> winningMetadata = new Dictionary<string, object>();
+        string subject = ArchitectureTypeNames.SafeFullName(type);
 
-        List<ArchitectureClassificationMetadataFailure> failures = new(typeCandidate.MetadataFailures);
-        failures.AddRange(assemblyCandidate.MetadataFailures);
-
-        if (typeCandidate.Role != null)
+        foreach (ArchitectureInheritanceClassificationMapping mapping in _configuration.Inheritance)
         {
-            return new ArchitectureTypeClassificationResult(
-                typeCandidate.Role, ArchitectureClassificationSource.TypeAttribute, typeCandidate.Metadata,
-                typeCandidate.Evidence, conflicts, failures);
+            if (!MatchesBaseType(mapping.BaseType, type))
+            {
+                continue;
+            }
+
+            IReadOnlyDictionary<string, object> metadata = ExtractMetadataWithoutAttributeInstance(
+                mapping.Metadata, ArchitectureClassificationSource.Inheritance, subject, failures);
+
+            if (winningRole == null)
+            {
+                winningRole = mapping.Role;
+                winningMetadata = metadata;
+                winningEvidence = mapping.BaseType;
+            }
+            else if (!RoleMetadataEqual(winningRole, winningMetadata, mapping.Role, metadata))
+            {
+                conflicts.Add(new ArchitectureClassificationConflict(
+                    subject, ArchitectureClassificationSource.Inheritance, winningRole, mapping.Role,
+                    DescribeMetadataDiff(winningMetadata, metadata)));
+            }
         }
 
-        if (assemblyCandidate.Role != null)
+        return new ArchitectureAttributeClassificationCandidate(winningRole, winningMetadata, winningEvidence, conflicts, failures);
+    }
+
+    // Matches base_type by full-name comparison against type's own actual base-class chain and
+    // transitive interface set (Type.GetInterfaces() already returns every interface implemented,
+    // including inherited ones), NOT by resolving base_type through the typeUniverse-based lookup
+    // used for const: resolution. A framework/package base type (e.g. ControllerBase, DbContext)
+    // typically never appears in typeUniverse (which is built only from the scanned target
+    // assemblies), so resolving it there would silently fail to match every framework-derived type
+    // in the common case this feature exists for. Walking the type's own reflected chain works
+    // regardless of which assembly declares the base type or interface, as long as it's loadable.
+    private static bool MatchesBaseType(string baseTypeFullName, Type type)
+    {
+        try
         {
-            return new ArchitectureTypeClassificationResult(
-                assemblyCandidate.Role, ArchitectureClassificationSource.AssemblyAttribute, assemblyCandidate.Metadata,
-                assemblyCandidate.Evidence, conflicts, failures);
+            for (Type? current = type.BaseType; current != null; current = current.BaseType)
+            {
+                if (string.Equals(NormalizedFullName(current), baseTypeFullName, StringComparison.Ordinal))
+                {
+                    return true;
+                }
+            }
+
+            return type.GetInterfaces().Any(iface => string.Equals(NormalizedFullName(iface), baseTypeFullName, StringComparison.Ordinal));
+        }
+        catch (TypeLoadException)
+        {
+            return false;
+        }
+        catch (FileNotFoundException)
+        {
+            return false;
+        }
+    }
+
+    // A closed constructed generic ancestor/interface (e.g. IRepository<Order> implemented via
+    // `class OrderRepository : IRepository<Order>`) has a FullName that embeds the assembly-qualified
+    // closed type argument (e.g. "MyApp.IRepository`1[[MyApp.Order, MyApp, ...]]"), which never equals
+    // the open generic definition's FullName ("MyApp.IRepository`1") a base_type mapping declares.
+    // Normalizing to the generic type definition before comparing lets one mapping match every closed
+    // instantiation, mirroring ArchitectureRoleIndex.TryGetRole's existing open-generic-definition
+    // fallback for the classified type itself.
+    private static string NormalizedFullName(Type type)
+    {
+        return ArchitectureTypeNames.SafeFullName(type.IsGenericType ? type.GetGenericTypeDefinition() : type);
+    }
+
+    private ArchitectureAttributeClassificationCandidate ResolveNamespaceCandidate(Type type)
+    {
+        List<ArchitectureClassificationConflict> conflicts = new();
+        List<ArchitectureClassificationMetadataFailure> failures = new();
+        string? winningRole = null;
+        string? winningEvidence = null;
+        IReadOnlyDictionary<string, object> winningMetadata = new Dictionary<string, object>();
+        string subject = ArchitectureTypeNames.SafeFullName(type);
+        string candidateNamespace = ArchitectureTypeNames.SafeNamespace(type);
+
+        foreach (ArchitectureNamespaceClassificationMapping mapping in _configuration.Namespace)
+        {
+            (bool matched, string? matchedPattern) = _matchNamespace(mapping, candidateNamespace);
+            if (!matched)
+            {
+                continue;
+            }
+
+            IReadOnlyDictionary<string, object> metadata = ExtractMetadataWithoutAttributeInstance(
+                mapping.Metadata, ArchitectureClassificationSource.Namespace, subject, failures);
+
+            if (winningRole == null)
+            {
+                winningRole = mapping.Role;
+                winningMetadata = metadata;
+                winningEvidence = matchedPattern;
+            }
+            else if (!RoleMetadataEqual(winningRole, winningMetadata, mapping.Role, metadata))
+            {
+                conflicts.Add(new ArchitectureClassificationConflict(
+                    subject, ArchitectureClassificationSource.Namespace, winningRole, mapping.Role,
+                    DescribeMetadataDiff(winningMetadata, metadata)));
+            }
+        }
+
+        return new ArchitectureAttributeClassificationCandidate(winningRole, winningMetadata, winningEvidence, conflicts, failures);
+    }
+
+    private Dictionary<string, object> ExtractMetadataWithoutAttributeInstance(
+        Dictionary<string, object> metadataMappings,
+        ArchitectureClassificationSource source,
+        string subject,
+        List<ArchitectureClassificationMetadataFailure> failures)
+    {
+        Dictionary<string, object> metadata = new(StringComparer.Ordinal);
+
+        foreach (KeyValuePair<string, object> entry in metadataMappings)
+        {
+            (object? canonical, string? failureReason) = ArchitectureAttributeMetadataExtraction.ExtractWithoutAttributeInstance(
+                entry.Value, ResolveTypeByFullName);
+
+            if (failureReason != null)
+            {
+                failures.Add(new ArchitectureClassificationMetadataFailure(subject, source, entry.Key, failureReason));
+                continue;
+            }
+
+            metadata[entry.Key] = canonical!;
+        }
+
+        return metadata;
+    }
+
+    // Walks the fixed tier order, first tier with a non-null Role wins. Conflicts/metadata failures
+    // from every enabled tier are unioned into the result regardless of which tier's role wins —
+    // cross-tier precedence itself is never recorded as a conflict fact (only same-tier disagreement
+    // within one source's mapping list is), matching the spec's existing distinction.
+    private static ArchitectureTypeClassificationResult Combine(
+        Dictionary<ArchitectureClassificationSource, ArchitectureAttributeClassificationCandidate> candidates)
+    {
+        List<ArchitectureClassificationConflict> conflicts = new();
+        List<ArchitectureClassificationMetadataFailure> failures = new();
+
+        foreach (ArchitectureAttributeClassificationCandidate candidate in candidates.Values)
+        {
+            conflicts.AddRange(candidate.Conflicts);
+            failures.AddRange(candidate.MetadataFailures);
+        }
+
+        foreach (ArchitectureClassificationSource source in _tierOrder)
+        {
+            if (candidates.TryGetValue(source, out ArchitectureAttributeClassificationCandidate? candidate)
+                && candidate.Role != null)
+            {
+                return new ArchitectureTypeClassificationResult(
+                    candidate.Role, source, candidate.Metadata, candidate.Evidence, conflicts, failures);
+            }
         }
 
         return new ArchitectureTypeClassificationResult(null, null, new Dictionary<string, object>(), null, conflicts, failures);

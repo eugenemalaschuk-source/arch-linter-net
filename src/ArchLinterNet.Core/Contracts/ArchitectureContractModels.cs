@@ -1,3 +1,4 @@
+using ArchLinterNet.Core.Model;
 using ArchLinterNet.Core.Resolution;
 using YamlDotNet.Serialization;
 
@@ -32,6 +33,12 @@ public sealed class ArchitectureContractDocument
 
     [YamlMember(Alias = "classification")]
     public ArchitectureClassificationConfiguration Classification { get; set; } = new();
+
+    // Not YAML-bound (deliberately: classification.path itself stays unbound/inert, see
+    // ArchitectureClassificationConfiguration) — set post-deserialization by ArchitecturePolicyDocumentLoader
+    // from a raw-YAML presence check when classification.path declares at least one entry.
+    [YamlIgnore]
+    public ArchitectureClassificationPathDeferredNotice? ClassificationPathDeferred { get; set; }
 }
 
 public sealed class ArchitectureAnalysisConfiguration

@@ -266,7 +266,7 @@
     "classification": {
       "type": "object",
       "additionalProperties": false,
-      "description": "Semantic-classification-model design (see openspec/changes/archive/2026-07-10-design-semantic-classification-model). `attributes`/`assembly_attributes` extraction is implemented (see openspec/specs/attribute-role-extraction). `precedence`, `inheritance`, `namespace`, `path`, `overrides`, and `exclusions` remain schema-acceptance only; declaring them has no runtime effect yet.",
+      "description": "Semantic-classification-model design (see openspec/changes/archive/2026-07-10-design-semantic-classification-model). `attributes`/`assembly_attributes`/`inheritance`/`namespace` extraction is implemented (see openspec/specs/attribute-role-extraction and openspec/specs/semantic-classification-model). `precedence` is enforced at runtime for these four implemented sources (a source it omits is disabled; its `yaml_override`/`path` entries have no effect either way, since those two sources are not yet implemented). `path`, `overrides`, and `exclusions` remain schema-acceptance only; declaring `overrides`/`exclusions` has no runtime effect, and declaring `path` produces a deferred-support diagnostic but no role assignment yet.",
       "properties": {
         "precedence": {
           "type": "array",

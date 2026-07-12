@@ -50,7 +50,8 @@ internal sealed class CliRuntime : ICliRuntime
         IReadOnlyCollection<ArchitectureCoverageSummary> coverageSummaries,
         IReadOnlyCollection<ArchitectureClassificationConflict> classificationConflicts,
         IReadOnlyCollection<ArchitectureClassificationMetadataFailure> classificationMetadataFailures,
-        IReadOnlyCollection<ArchitectureClassificationRoleFact> classificationRoles)
+        IReadOnlyCollection<ArchitectureClassificationRoleFact> classificationRoles,
+        ArchitectureClassificationPathDeferredNotice? classificationPathDeferred)
     {
         return _formatter.FormatResultForCiArtifacts(
             mode,
@@ -58,6 +59,7 @@ internal sealed class CliRuntime : ICliRuntime
             violations,
             cycles,
             classificationRoles,
+            classificationPathDeferred,
             coverageFindings,
             unmatchedIgnoredViolations,
             policyConsistencyFindings,
@@ -106,9 +108,10 @@ internal sealed class CliRuntime : ICliRuntime
 
     public string FormatClassificationFactsForHumans(
         IReadOnlyCollection<ArchitectureClassificationConflict> conflicts,
-        IReadOnlyCollection<ArchitectureClassificationMetadataFailure> metadataFailures)
+        IReadOnlyCollection<ArchitectureClassificationMetadataFailure> metadataFailures,
+        ArchitectureClassificationPathDeferredNotice? classificationPathDeferred)
     {
-        return _formatter.FormatClassificationFactsForHumans(conflicts, metadataFailures);
+        return _formatter.FormatClassificationFactsForHumans(conflicts, metadataFailures, classificationPathDeferred);
     }
 
     public BaselineGenerationOutcome GenerateBaseline(BaselineGenerationRequest request)

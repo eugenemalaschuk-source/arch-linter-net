@@ -217,6 +217,529 @@ public sealed class ArchitectureRoleIndexTests
             Throws.ArgumentNullException);
     }
 
+    [Test]
+    public void TryGetRole_DirectInheritanceMatch_AssignsRoleWithBaseTypeEvidence()
+    {
+        var classification = new ArchitectureClassificationConfiguration
+        {
+            Inheritance =
+            {
+                new ArchitectureInheritanceClassificationMapping
+                {
+                    BaseType = "AttributeRoleExtractionTestFixtures.DomainEntityBase",
+                    Role = "DomainLayer"
+                }
+            }
+        };
+
+        ArchitectureRoleIndex index = CreateIndex(classification);
+
+        Assert.That(index.TryGetRole(typeof(DirectlyDerivedEntity), out ArchitectureTypeClassificationResult descriptor), Is.True);
+        Assert.That(descriptor.Role, Is.EqualTo("DomainLayer"));
+        Assert.That(descriptor.Source, Is.EqualTo(ArchitectureClassificationSource.Inheritance));
+        Assert.That(descriptor.Evidence, Is.EqualTo("AttributeRoleExtractionTestFixtures.DomainEntityBase"));
+    }
+
+    [Test]
+    public void TryGetRole_TransitiveInheritanceMatch_AssignsRole()
+    {
+        var classification = new ArchitectureClassificationConfiguration
+        {
+            Inheritance =
+            {
+                new ArchitectureInheritanceClassificationMapping
+                {
+                    BaseType = "AttributeRoleExtractionTestFixtures.DomainEntityBase",
+                    Role = "DomainLayer"
+                }
+            }
+        };
+
+        ArchitectureRoleIndex index = CreateIndex(classification);
+
+        Assert.That(index.TryGetRole(typeof(TransitivelyDerivedEntity), out ArchitectureTypeClassificationResult descriptor), Is.True);
+        Assert.That(descriptor.Role, Is.EqualTo("DomainLayer"));
+    }
+
+    [Test]
+    public void TryGetRole_InterfaceImplementationMatch_AssignsRole()
+    {
+        var classification = new ArchitectureClassificationConfiguration
+        {
+            Inheritance =
+            {
+                new ArchitectureInheritanceClassificationMapping
+                {
+                    BaseType = "AttributeRoleExtractionTestFixtures.IRepositoryMarker",
+                    Role = "InfrastructureLayer"
+                }
+            }
+        };
+
+        ArchitectureRoleIndex index = CreateIndex(classification);
+
+        Assert.That(index.TryGetRole(typeof(RepositoryImplementation), out ArchitectureTypeClassificationResult descriptor), Is.True);
+        Assert.That(descriptor.Role, Is.EqualTo("InfrastructureLayer"));
+        Assert.That(descriptor.Source, Is.EqualTo(ArchitectureClassificationSource.Inheritance));
+    }
+
+    [Test]
+    public void TryGetRole_UnrelatedTypeAgainstInheritanceEntry_ReturnsFalse()
+    {
+        var classification = new ArchitectureClassificationConfiguration
+        {
+            Inheritance =
+            {
+                new ArchitectureInheritanceClassificationMapping
+                {
+                    BaseType = "AttributeRoleExtractionTestFixtures.DomainEntityBase",
+                    Role = "DomainLayer"
+                }
+            }
+        };
+
+        ArchitectureRoleIndex index = CreateIndex(classification);
+
+        Assert.That(index.TryGetRole(typeof(UnrelatedType), out _), Is.False);
+    }
+
+    [Test]
+    public void TryGetRole_BaseTypeOutsideTargetAssembly_StillMatches()
+    {
+        // Regression: base_type here (System.Exception) is declared in the BCL, not in the scanned
+        // target assembly (_targetAssemblies is only the fixture assembly). Inheritance matching must
+        // walk the candidate type's own reflected base-class chain rather than resolving base_type
+        // through the target-assembly-only type universe, or every framework base type (ControllerBase,
+        // DbContext, MonoBehaviour, etc.) would silently never match.
+        var classification = new ArchitectureClassificationConfiguration
+        {
+            Inheritance =
+            {
+                new ArchitectureInheritanceClassificationMapping
+                {
+                    BaseType = "System.Exception",
+                    Role = "InfrastructureLayer"
+                }
+            }
+        };
+
+        ArchitectureRoleIndex index = CreateIndex(classification);
+
+        Assert.That(index.TryGetRole(typeof(CustomFrameworkException), out ArchitectureTypeClassificationResult descriptor), Is.True);
+        Assert.That(descriptor.Role, Is.EqualTo("InfrastructureLayer"));
+        Assert.That(descriptor.Evidence, Is.EqualTo("System.Exception"));
+    }
+
+    [Test]
+    public void TryGetRole_GenericInterfaceBaseType_MatchesClosedInstantiation()
+    {
+        // Regression: base_type declares the open generic interface's full name
+        // ("...IGenericRepository`1"); the scanned type implements the closed instantiation
+        // IGenericRepository<PlainType>, whose own FullName embeds the assembly-qualified type
+        // argument and would never equal the open definition's FullName without normalization.
+        var classification = new ArchitectureClassificationConfiguration
+        {
+            Inheritance =
+            {
+                new ArchitectureInheritanceClassificationMapping
+                {
+                    BaseType = "AttributeRoleExtractionTestFixtures.IGenericRepository`1",
+                    Role = "InfrastructureLayer"
+                }
+            }
+        };
+
+        ArchitectureRoleIndex index = CreateIndex(classification);
+
+        Assert.That(index.TryGetRole(typeof(ClosedGenericRepository), out ArchitectureTypeClassificationResult descriptor), Is.True);
+        Assert.That(descriptor.Role, Is.EqualTo("InfrastructureLayer"));
+    }
+
+    [Test]
+    public void TryGetRole_GenericBaseClass_MatchesClosedInstantiation()
+    {
+        // Regression: same normalization requirement as the generic-interface case above, but for
+        // a generic base *class* reached via type.BaseType rather than type.GetInterfaces().
+        var classification = new ArchitectureClassificationConfiguration
+        {
+            Inheritance =
+            {
+                new ArchitectureInheritanceClassificationMapping
+                {
+                    BaseType = "AttributeRoleExtractionTestFixtures.GenericRepositoryBase`1",
+                    Role = "DomainLayer"
+                }
+            }
+        };
+
+        ArchitectureRoleIndex index = CreateIndex(classification);
+
+        Assert.That(index.TryGetRole(typeof(ClosedGenericRepositoryDerivedType), out ArchitectureTypeClassificationResult descriptor), Is.True);
+        Assert.That(descriptor.Role, Is.EqualTo("DomainLayer"));
+    }
+
+    [Test]
+    public void TryGetRole_UnresolvedBaseType_SilentlyNoMatchesWithNoDiagnostic()
+    {
+        var classification = new ArchitectureClassificationConfiguration
+        {
+            Inheritance =
+            {
+                new ArchitectureInheritanceClassificationMapping
+                {
+                    BaseType = "AttributeRoleExtractionTestFixtures.DoesNotExist",
+                    Role = "DomainLayer"
+                }
+            }
+        };
+
+        ArchitectureRoleIndex index = CreateIndex(classification);
+
+        Assert.That(index.TryGetRole(typeof(DirectlyDerivedEntity), out _), Is.False);
+        Assert.That(index.Conflicts, Is.Empty);
+        Assert.That(index.MetadataFailures, Is.Empty);
+    }
+
+    [Test]
+    public void TryGetRole_TwoInheritanceEntriesMatchOneType_FirstDeclaredWinsAndConflictRecorded()
+    {
+        var classification = new ArchitectureClassificationConfiguration
+        {
+            Inheritance =
+            {
+                new ArchitectureInheritanceClassificationMapping
+                {
+                    BaseType = "AttributeRoleExtractionTestFixtures.DomainEntityBase",
+                    Role = "DomainLayer"
+                },
+                new ArchitectureInheritanceClassificationMapping
+                {
+                    BaseType = "AttributeRoleExtractionTestFixtures.IRepositoryMarker",
+                    Role = "InfrastructureLayer"
+                }
+            }
+        };
+
+        ArchitectureRoleIndex index = CreateIndex(classification);
+
+        Assert.That(index.TryGetRole(typeof(TypeMatchedByTwoInheritanceEntries), out ArchitectureTypeClassificationResult descriptor), Is.True);
+        Assert.That(descriptor.Role, Is.EqualTo("DomainLayer"));
+        Assert.That(
+            index.Conflicts.Any(c =>
+                c.Subject == "AttributeRoleExtractionTestFixtures.TypeMatchedByTwoInheritanceEntries"
+                && c.Source == ArchitectureClassificationSource.Inheritance
+                && c.WinningRole == "DomainLayer"
+                && c.DiscardedRole == "InfrastructureLayer"),
+            Is.True);
+    }
+
+    [Test]
+    public void TryGetRole_InheritanceConstMetadata_ExtractsValue()
+    {
+        var classification = new ArchitectureClassificationConfiguration
+        {
+            Inheritance =
+            {
+                new ArchitectureInheritanceClassificationMapping
+                {
+                    BaseType = "AttributeRoleExtractionTestFixtures.DomainEntityBase",
+                    Role = "DomainLayer",
+                    Metadata = new Dictionary<string, object>
+                    {
+                        ["owner"] = "const:AttributeRoleExtractionTestFixtures.Constants.Owner"
+                    }
+                }
+            }
+        };
+
+        ArchitectureRoleIndex index = CreateIndex(classification);
+
+        Assert.That(index.TryGetRole(typeof(DirectlyDerivedEntity), out ArchitectureTypeClassificationResult descriptor), Is.True);
+        Assert.That(descriptor.Metadata["owner"], Is.EqualTo("platform-team"));
+    }
+
+    [Test]
+    public void TryGetRole_InheritanceLiteralMetadata_ExtractsValue()
+    {
+        var classification = new ArchitectureClassificationConfiguration
+        {
+            Inheritance =
+            {
+                new ArchitectureInheritanceClassificationMapping
+                {
+                    BaseType = "AttributeRoleExtractionTestFixtures.DomainEntityBase",
+                    Role = "DomainLayer",
+                    Metadata = new Dictionary<string, object> { ["domain"] = "Sales" }
+                }
+            }
+        };
+
+        ArchitectureRoleIndex index = CreateIndex(classification);
+
+        Assert.That(index.TryGetRole(typeof(DirectlyDerivedEntity), out ArchitectureTypeClassificationResult descriptor), Is.True);
+        Assert.That(descriptor.Metadata["domain"], Is.EqualTo("Sales"));
+    }
+
+    [Test]
+    public void TryGetRole_InheritanceMetadataConstructorForm_RejectedAsExtractionFailure()
+    {
+        // Defense in depth: the schema forbids constructor[]/property: on inheritance/namespace
+        // entries, but a hand-constructed configuration (as here) can bypass that.
+        var classification = new ArchitectureClassificationConfiguration
+        {
+            Inheritance =
+            {
+                new ArchitectureInheritanceClassificationMapping
+                {
+                    BaseType = "AttributeRoleExtractionTestFixtures.DomainEntityBase",
+                    Role = "DomainLayer",
+                    Metadata = new Dictionary<string, object> { ["domain"] = "constructor[0]" }
+                }
+            }
+        };
+
+        ArchitectureRoleIndex index = CreateIndex(classification);
+
+        Assert.That(index.TryGetRole(typeof(DirectlyDerivedEntity), out ArchitectureTypeClassificationResult descriptor), Is.True);
+        Assert.That(descriptor.Metadata.ContainsKey("domain"), Is.False);
+        Assert.That(
+            index.MetadataFailures.Any(f =>
+                f.Subject == "AttributeRoleExtractionTestFixtures.DirectlyDerivedEntity" && f.MetadataKey == "domain"),
+            Is.True);
+    }
+
+    [Test]
+    public void TryGetRole_NamespaceGlobMatch_AssignsRoleWithNamespaceEvidence()
+    {
+        var classification = new ArchitectureClassificationConfiguration
+        {
+            Namespace =
+            {
+                new ArchitectureNamespaceClassificationMapping
+                {
+                    Namespace = "AttributeRoleExtractionTestFixtures.Domain",
+                    Role = "DomainLayer"
+                }
+            }
+        };
+
+        ArchitectureRoleIndex index = CreateIndex(classification);
+
+        Assert.That(
+            index.TryGetRole(typeof(AttributeRoleExtractionTestFixtures.Domain.TypeInDomainNamespace), out ArchitectureTypeClassificationResult descriptor),
+            Is.True);
+        Assert.That(descriptor.Role, Is.EqualTo("DomainLayer"));
+        Assert.That(descriptor.Source, Is.EqualTo(ArchitectureClassificationSource.Namespace));
+        Assert.That(descriptor.Evidence, Is.EqualTo("AttributeRoleExtractionTestFixtures.Domain"));
+    }
+
+    [Test]
+    public void TryGetRole_NamespaceGlobMatch_MatchesNestedNamespace()
+    {
+        var classification = new ArchitectureClassificationConfiguration
+        {
+            Namespace =
+            {
+                new ArchitectureNamespaceClassificationMapping
+                {
+                    Namespace = "AttributeRoleExtractionTestFixtures.Domain",
+                    Role = "DomainLayer"
+                }
+            }
+        };
+
+        ArchitectureRoleIndex index = CreateIndex(classification);
+
+        Assert.That(
+            index.TryGetRole(typeof(AttributeRoleExtractionTestFixtures.Domain.Nested.TypeInNestedDomainNamespace), out ArchitectureTypeClassificationResult descriptor),
+            Is.True);
+        Assert.That(descriptor.Role, Is.EqualTo("DomainLayer"));
+    }
+
+    [Test]
+    public void TryGetRole_NamespaceSuffixOnlyEntry_MatchesSuffix()
+    {
+        var classification = new ArchitectureClassificationConfiguration
+        {
+            Namespace =
+            {
+                new ArchitectureNamespaceClassificationMapping
+                {
+                    NamespaceSuffix = "Contracts",
+                    Role = "PublicContract"
+                }
+            }
+        };
+
+        ArchitectureRoleIndex index = CreateIndex(classification);
+
+        Assert.That(
+            index.TryGetRole(typeof(AttributeRoleExtractionTestFixtures.Feature.Contracts.TypeInContractsSuffixNamespace), out ArchitectureTypeClassificationResult descriptor),
+            Is.True);
+        Assert.That(descriptor.Role, Is.EqualTo("PublicContract"));
+        Assert.That(descriptor.Evidence, Is.EqualTo("*.Contracts"));
+    }
+
+    [Test]
+    public void TryGetRole_NamespaceEntryWithNamespaceAndSuffix_EvidenceIncludesSuffix()
+    {
+        // Regression: evidence for a combined namespace + namespace_suffix mapping must reflect both
+        // constraints, not just mapping.Namespace, or the diagnostic can't distinguish this entry from
+        // one that only declares the same namespace with no suffix constraint.
+        var classification = new ArchitectureClassificationConfiguration
+        {
+            Namespace =
+            {
+                new ArchitectureNamespaceClassificationMapping
+                {
+                    Namespace = "AttributeRoleExtractionTestFixtures.Feature",
+                    NamespaceSuffix = "Contracts",
+                    Role = "PublicContract"
+                }
+            }
+        };
+
+        ArchitectureRoleIndex index = CreateIndex(classification);
+
+        Assert.That(
+            index.TryGetRole(typeof(AttributeRoleExtractionTestFixtures.Feature.Contracts.TypeInContractsSuffixNamespace), out ArchitectureTypeClassificationResult descriptor),
+            Is.True);
+        Assert.That(descriptor.Role, Is.EqualTo("PublicContract"));
+        Assert.That(descriptor.Evidence, Is.EqualTo("AttributeRoleExtractionTestFixtures.Feature.*.Contracts"));
+    }
+
+    [Test]
+    public void TryGetRole_NamespaceEntry_UnmatchedNamespace_ReturnsFalse()
+    {
+        var classification = new ArchitectureClassificationConfiguration
+        {
+            Namespace =
+            {
+                new ArchitectureNamespaceClassificationMapping
+                {
+                    Namespace = "AttributeRoleExtractionTestFixtures.Domain",
+                    Role = "DomainLayer"
+                }
+            }
+        };
+
+        ArchitectureRoleIndex index = CreateIndex(classification);
+
+        Assert.That(index.TryGetRole(typeof(TypeInDefaultNamespace), out _), Is.False);
+    }
+
+    [Test]
+    public void TryGetRole_NamespaceEntryWithNeitherNamespaceNorSuffix_NeverMatches()
+    {
+        // Defense in depth: schema requires at least one of namespace/namespace_suffix, but a
+        // hand-constructed configuration (as here) can bypass that. Must not match anything.
+        var classification = new ArchitectureClassificationConfiguration
+        {
+            Namespace =
+            {
+                new ArchitectureNamespaceClassificationMapping
+                {
+                    Role = "DomainLayer"
+                }
+            }
+        };
+
+        ArchitectureRoleIndex index = CreateIndex(classification);
+
+        Assert.That(index.TryGetRole(typeof(TypeInDefaultNamespace), out _), Is.False);
+    }
+
+    [Test]
+    public void TryGetRole_TwoNamespaceEntriesMatchOneNamespace_FirstDeclaredWinsAndConflictRecorded()
+    {
+        var classification = new ArchitectureClassificationConfiguration
+        {
+            Namespace =
+            {
+                new ArchitectureNamespaceClassificationMapping
+                {
+                    Namespace = "AttributeRoleExtractionTestFixtures.Domain",
+                    Role = "DomainLayer"
+                },
+                new ArchitectureNamespaceClassificationMapping
+                {
+                    NamespaceSuffix = "Domain",
+                    Role = "OtherLayer"
+                }
+            }
+        };
+
+        ArchitectureRoleIndex index = CreateIndex(classification);
+
+        Assert.That(
+            index.TryGetRole(typeof(AttributeRoleExtractionTestFixtures.Domain.TypeInDomainNamespace), out ArchitectureTypeClassificationResult descriptor),
+            Is.True);
+        Assert.That(descriptor.Role, Is.EqualTo("DomainLayer"));
+        Assert.That(
+            index.Conflicts.Any(c =>
+                c.Source == ArchitectureClassificationSource.Namespace
+                && c.WinningRole == "DomainLayer"
+                && c.DiscardedRole == "OtherLayer"),
+            Is.True);
+    }
+
+    [Test]
+    public void TryGetRole_InheritanceBeatsNamespace_WhenBothMatch()
+    {
+        var classification = new ArchitectureClassificationConfiguration
+        {
+            Inheritance =
+            {
+                new ArchitectureInheritanceClassificationMapping
+                {
+                    BaseType = "AttributeRoleExtractionTestFixtures.DomainEntityBase",
+                    Role = "DomainLayer"
+                }
+            },
+            Namespace =
+            {
+                new ArchitectureNamespaceClassificationMapping
+                {
+                    Namespace = "AttributeRoleExtractionTestFixtures.PrecedenceCases",
+                    Role = "OtherLayer"
+                }
+            }
+        };
+
+        ArchitectureRoleIndex index = CreateIndex(classification);
+
+        Assert.That(
+            index.TryGetRole(
+                typeof(AttributeRoleExtractionTestFixtures.PrecedenceCases.TypeMatchedByInheritanceAndNamespace),
+                out ArchitectureTypeClassificationResult descriptor),
+            Is.True);
+        Assert.That(descriptor.Role, Is.EqualTo("DomainLayer"));
+        Assert.That(descriptor.Source, Is.EqualTo(ArchitectureClassificationSource.Inheritance));
+    }
+
+    [Test]
+    public void TryGetRole_NamespaceDisabledByPrecedence_DoesNotMatch()
+    {
+        var classification = new ArchitectureClassificationConfiguration
+        {
+            Precedence = new List<string> { "inheritance" },
+            Namespace =
+            {
+                new ArchitectureNamespaceClassificationMapping
+                {
+                    Namespace = "AttributeRoleExtractionTestFixtures.Domain",
+                    Role = "DomainLayer"
+                }
+            }
+        };
+
+        ArchitectureRoleIndex index = CreateIndex(classification);
+
+        Assert.That(
+            index.TryGetRole(typeof(AttributeRoleExtractionTestFixtures.Domain.TypeInDomainNamespace), out _),
+            Is.False);
+    }
+
     private sealed class EnumerationCountingCollection : IReadOnlyCollection<System.Reflection.Assembly>
     {
         private readonly System.Reflection.Assembly[] _items;

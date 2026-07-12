@@ -78,13 +78,15 @@ public sealed class ArchitectureValidationApplicationService(
             (IReadOnlyList<ArchitectureClassificationConflict> classificationConflicts,
                 IReadOnlyList<ArchitectureClassificationMetadataFailure> classificationMetadataFailures) = runner.Session.CheckClassificationFacts();
             IReadOnlyList<ArchitectureClassificationRoleFact> classificationRoles = runner.Session.CheckClassificationRoles();
+            ArchitectureClassificationPathDeferredNotice? classificationPathDeferred = runner.Session.CheckClassificationPathDeferred();
 
             return new ValidationOutcome(
                 passed, allViolations, execution.Cycles, coverageFindings, coverageConfig, unmatched, unmatchedConfig,
                 policyConsistencyFindings, policyConsistencyConfig, execution.CoverageSummaries,
                 classificationConflicts, classificationMetadataFailures)
             {
-                ClassificationRoles = classificationRoles
+                ClassificationRoles = classificationRoles,
+                ClassificationPathDeferred = classificationPathDeferred
             };
         }
     }

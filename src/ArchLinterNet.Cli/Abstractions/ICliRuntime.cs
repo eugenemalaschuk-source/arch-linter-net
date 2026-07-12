@@ -24,7 +24,8 @@ internal interface ICliRuntime
         IReadOnlyCollection<ArchitectureCoverageSummary> coverageSummaries,
         IReadOnlyCollection<ArchitectureClassificationConflict> classificationConflicts,
         IReadOnlyCollection<ArchitectureClassificationMetadataFailure> classificationMetadataFailures,
-        IReadOnlyCollection<ArchitectureClassificationRoleFact> classificationRoles);
+        IReadOnlyCollection<ArchitectureClassificationRoleFact> classificationRoles,
+        ArchitectureClassificationPathDeferredNotice? classificationPathDeferred);
 
     string FormatResultAsSarif(
         string mode,
@@ -45,7 +46,8 @@ internal interface ICliRuntime
 
     string FormatClassificationFactsForHumans(
         IReadOnlyCollection<ArchitectureClassificationConflict> conflicts,
-        IReadOnlyCollection<ArchitectureClassificationMetadataFailure> metadataFailures);
+        IReadOnlyCollection<ArchitectureClassificationMetadataFailure> metadataFailures,
+        ArchitectureClassificationPathDeferredNotice? classificationPathDeferred);
 
     BaselineGenerationOutcome GenerateBaseline(BaselineGenerationRequest request);
 

@@ -126,14 +126,16 @@ public sealed class CliArchitectureTests
             IReadOnlyCollection<ArchitectureCoverageSummary> coverageSummaries,
             IReadOnlyCollection<ArchitectureClassificationConflict> classificationConflicts,
             IReadOnlyCollection<ArchitectureClassificationMetadataFailure> classificationMetadataFailures,
-            IReadOnlyCollection<ArchitectureClassificationRoleFact> classificationRoles)
+            IReadOnlyCollection<ArchitectureClassificationRoleFact> classificationRoles,
+            ArchitectureClassificationPathDeferredNotice? classificationPathDeferred)
         {
             throw new NotSupportedException();
         }
 
         public string FormatClassificationFactsForHumans(
             IReadOnlyCollection<ArchitectureClassificationConflict> conflicts,
-            IReadOnlyCollection<ArchitectureClassificationMetadataFailure> metadataFailures)
+            IReadOnlyCollection<ArchitectureClassificationMetadataFailure> metadataFailures,
+            ArchitectureClassificationPathDeferredNotice? classificationPathDeferred)
         {
             throw new NotSupportedException();
         }

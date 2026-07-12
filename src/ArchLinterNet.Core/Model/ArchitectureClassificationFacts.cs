@@ -3,7 +3,9 @@ namespace ArchLinterNet.Core.Model;
 public enum ArchitectureClassificationSource
 {
     TypeAttribute,
-    AssemblyAttribute
+    AssemblyAttribute,
+    Inheritance,
+    Namespace
 }
 
 // Subject is the type full name for a type_attribute fact, or the assembly's simple name for an
@@ -36,3 +38,9 @@ public sealed record ArchitectureClassificationRoleFact(
     ArchitectureClassificationSource Source,
     string? Evidence,
     IReadOnlyDictionary<string, object> Metadata);
+
+// Recorded once per policy load when classification.path declares at least one entry - path-convention
+// classification depends on source/declared-type fact discovery (issue #171) and produces no role
+// assignment yet. Distinct from the fully silent overrides/exclusions reserved sections: declaring
+// path is visible, not just schema-accepted.
+public sealed record ArchitectureClassificationPathDeferredNotice(int DeclaredEntryCount);

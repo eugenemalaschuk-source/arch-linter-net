@@ -3,6 +3,7 @@ using ArchLinterNet.Core.Contracts.Abstractions;
 using ArchLinterNet.Core.Contracts.Validators;
 using ArchLinterNet.Core.IO;
 using ArchLinterNet.Core.IO.Abstractions;
+using ArchLinterNet.Core.Model;
 using YamlDotNet.Core;
 using YamlDotNet.RepresentationModel;
 using YamlDotNet.Serialization;
@@ -58,6 +59,7 @@ public sealed partial class ArchitecturePolicyDocumentLoader : IArchitecturePoli
         }
 
         AssignFallbackIds(document);
+        document.ClassificationPathDeferred = DetectClassificationPathDeferred(yaml);
 
         foreach (IArchitecturePolicyDocumentValidator validator in ArchitecturePolicyDocumentValidatorPipeline.All)
         {
@@ -65,6 +67,29 @@ public sealed partial class ArchitecturePolicyDocumentLoader : IArchitecturePoli
         }
 
         return document;
+    }
+
+    // classification.path is schema-accepted but unimplemented (path-convention classification
+    // depends on issue #171's source/declared-type fact discovery). Detected here, from the raw node
+    // tree rather than the deliberately unbound C# model, so declaring it produces a visible,
+    // deterministic diagnostic instead of pure silence — fires once per policy load, independent of
+    // scanned types, so it shows up even for a policy with zero scanned types.
+    private static ArchitectureClassificationPathDeferredNotice? DetectClassificationPathDeferred(string yaml)
+    {
+        var stream = new YamlStream();
+        stream.Load(new StringReader(yaml));
+
+        if (stream.Documents.Count == 0
+            || stream.Documents[0].RootNode is not YamlMappingNode root
+            || !TryGetMappingChild(root, "classification", out YamlMappingNode? classification)
+            || !TryGetChild(classification!, "path", out YamlNode? pathNode)
+            || pathNode is not YamlSequenceNode pathSequence
+            || pathSequence.Children.Count == 0)
+        {
+            return null;
+        }
+
+        return new ArchitectureClassificationPathDeferredNotice(pathSequence.Children.Count);
     }
 
     private static void ValidateRawLayerYaml(string yaml)
