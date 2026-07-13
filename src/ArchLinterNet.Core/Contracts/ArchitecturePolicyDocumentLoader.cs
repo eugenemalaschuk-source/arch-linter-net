@@ -1,5 +1,6 @@
 using System.Text.RegularExpressions;
 using ArchLinterNet.Core.Contracts.Abstractions;
+using ArchLinterNet.Core.Contracts.PolicyImports;
 using ArchLinterNet.Core.Contracts.Validators;
 using ArchLinterNet.Core.IO;
 using ArchLinterNet.Core.IO.Abstractions;
@@ -22,6 +23,8 @@ public sealed partial class ArchitecturePolicyDocumentLoader : IArchitecturePoli
     private static readonly string[] _adapterBindingAllowedKeys = { "adapter", "expected_port", "allowed_contexts" };
 
     private readonly IArchitectureFileSystem _fileSystem;
+    private readonly ArchitecturePolicyImportGraphResolver _importResolver;
+    private readonly ArchitecturePolicySourceParser _sourceParser;
 
     public ArchitecturePolicyDocumentLoader()
         : this(ArchitectureFileSystem.Real)
@@ -29,8 +32,17 @@ public sealed partial class ArchitecturePolicyDocumentLoader : IArchitecturePoli
     }
 
     public ArchitecturePolicyDocumentLoader(IArchitectureFileSystem fileSystem)
+        : this(fileSystem, new ArchitecturePolicyPathResolver())
+    {
+    }
+
+    internal ArchitecturePolicyDocumentLoader(
+        IArchitectureFileSystem fileSystem,
+        IArchitecturePolicyPathResolver pathResolver)
     {
         _fileSystem = fileSystem;
+        _sourceParser = new ArchitecturePolicySourceParser();
+        _importResolver = new ArchitecturePolicyImportGraphResolver(fileSystem, pathResolver, _sourceParser);
     }
 
     public ArchitectureContractDocument Load(string policyPath)
@@ -49,6 +61,13 @@ public sealed partial class ArchitecturePolicyDocumentLoader : IArchitecturePoli
             .Build();
 
         string yaml = _fileSystem.ReadAllText(policyPath);
+        if (_sourceParser.ContainsImports(yaml))
+        {
+            IReadOnlyList<ArchitecturePolicySource> sources = _importResolver.Resolve(policyPath, yaml);
+            yaml = new ArchitecturePolicyDocumentComposer().Compose(sources);
+            ArchitecturePolicyEffectiveSchemaValidator.Validate(yaml);
+        }
+
         ValidateRawLayerYaml(yaml);
         ValidateRawContextualContractYaml(yaml);
         ValidateRawSemanticCoverageYaml(yaml);

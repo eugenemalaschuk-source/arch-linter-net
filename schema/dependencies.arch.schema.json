@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://archlinternet.dev/schema/dependencies.arch.schema.json",
   "title": "ArchLinterNet dependency architecture policy",
-  "description": "Schema for architecture/dependencies.arch.yml policy files.",
+  "description": "Schema for one explicitly selected ArchLinterNet root policy, regardless of filename.",
   "type": "object",
   "additionalProperties": false,
   "required": ["version", "name", "layers", "analysis", "contracts"],
@@ -16,6 +16,9 @@
       "type": "string",
       "minLength": 1,
       "description": "Human-readable policy name."
+    },
+    "imports": {
+      "$ref": "#/$defs/imports"
     },
     "layers": {
       "type": "object",
@@ -45,6 +48,16 @@
     "classification": { "$ref": "#/$defs/classification" }
   },
   "$defs": {
+    "imports": {
+      "type": "array",
+      "description": "Ordered explicit local policy fragments, resolved relative to this document.",
+      "minItems": 1,
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "pattern": "^(?![~/])(?!.*\\\\)(?!.*[<>:\"|?*])[^/]+(?:/[^/]+)*$"
+      }
+    },
     "stringList": {
       "type": "array",
       "items": { "type": "string", "minLength": 1 },
