@@ -1,5 +1,6 @@
 using System.Runtime.InteropServices;
 using ArchLinterNet.Core.Contracts;
+using ArchLinterNet.Core.Contracts.PolicyImports;
 using ArchLinterNet.Core.Resolution;
 using NUnit.Framework;
 
@@ -240,20 +241,37 @@ public sealed class ArchitecturePolicyImportTests
     [Test]
     public void Load_HardLinkedImportAlias_ExposesDuplicateImportCategory()
     {
-        if (!OperatingSystem.IsWindows())
-        {
-            Assert.Ignore("The hard-link regression test uses the Windows file identity implementation.");
-        }
-
         string root = Write("architecture/root.yml", RootYaml("a.yml", importsSuffix: "  - alias.yml\n"));
         string original = Write("architecture/a.yml", LayersFragment());
         string alias = Path.Combine(Path.GetDirectoryName(original)!, "alias.yml");
-        Assert.That(CreateHardLink(alias, original, IntPtr.Zero), Is.True);
+        if (OperatingSystem.IsWindows())
+        {
+            Assert.That(CreateHardLinkWindows(alias, original, IntPtr.Zero), Is.True);
+        }
+        else
+        {
+            Assert.That(CreateHardLinkUnix(original, alias), Is.EqualTo(0));
+        }
 
         ArchitecturePolicyImportException exception = Assert.Throws<ArchitecturePolicyImportException>(
             () => new ArchitecturePolicyDocumentLoader().Load(root))!;
 
         Assert.That(exception.Category, Is.EqualTo(ArchitecturePolicyImportErrorCategory.DuplicateImport));
+    }
+
+    [Test]
+    public void PathResolver_DeclaresDistinctLinuxStatLayoutsForX64AndArm64()
+    {
+        int x64ModeOffset = Marshal.OffsetOf<ArchitecturePolicyPathResolver.LinuxX64Stat>(
+            nameof(ArchitecturePolicyPathResolver.LinuxX64Stat.Mode)).ToInt32();
+        int arm64ModeOffset = Marshal.OffsetOf<ArchitecturePolicyPathResolver.LinuxArm64Stat>(
+            nameof(ArchitecturePolicyPathResolver.LinuxArm64Stat.Mode)).ToInt32();
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(x64ModeOffset, Is.EqualTo(24));
+            Assert.That(arm64ModeOffset, Is.EqualTo(16));
+        });
     }
 
     [TestCase("layers")]
@@ -406,6 +424,9 @@ public sealed class ArchitecturePolicyImportTests
         return $"{imports}contracts:\n  strict:\n    - name: {name}\n      source: application\n      forbidden: [domain]\n";
     }
 
-    [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
-    private static extern bool CreateHardLink(string fileName, string existingFileName, IntPtr securityAttributes);
+    [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true, EntryPoint = "CreateHardLinkW")]
+    private static extern bool CreateHardLinkWindows(string fileName, string existingFileName, IntPtr securityAttributes);
+
+    [DllImport("libc", SetLastError = true, EntryPoint = "link")]
+    private static extern int CreateHardLinkUnix(string existingFileName, string fileName);
 }

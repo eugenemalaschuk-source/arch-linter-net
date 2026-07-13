@@ -180,45 +180,55 @@ internal sealed class ArchitecturePolicyPathResolver : IArchitecturePolicyPathRe
 
     private static string GetUnixFileIdentity(string path, string authoredPath)
     {
-        IntPtr buffer = Marshal.AllocHGlobal(256);
-        try
+        if (OperatingSystem.IsMacOS())
         {
-            for (int index = 0; index < 256; index++)
-            {
-                Marshal.WriteByte(buffer, index, 0);
-            }
-            if (Stat(path, buffer) != 0)
+            if (StatDarwin(path, out DarwinStat stat) != 0
+                || !IsRegularFile(stat.Mode))
             {
                 throw NotRegularFile(authoredPath);
             }
 
-            if (OperatingSystem.IsMacOS())
-            {
-                ushort mode = unchecked((ushort)Marshal.ReadInt16(buffer, 4));
-                if ((mode & FileTypeMask) != RegularFile)
-                {
-                    throw NotRegularFile(authoredPath);
-                }
-
-                uint device = unchecked((uint)Marshal.ReadInt32(buffer));
-                ulong inode = unchecked((ulong)Marshal.ReadInt64(buffer, 8));
-                return $"unix:{device:X8}:{inode:X16}";
-            }
-
-            uint linuxMode = unchecked((uint)Marshal.ReadInt32(buffer, 24));
-            if ((linuxMode & FileTypeMask) != RegularFile)
-            {
-                throw NotRegularFile(authoredPath);
-            }
-
-            ulong linuxDevice = unchecked((ulong)Marshal.ReadInt64(buffer));
-            ulong linuxInode = unchecked((ulong)Marshal.ReadInt64(buffer, 8));
-            return $"unix:{linuxDevice:X16}:{linuxInode:X16}";
+            return $"unix:{stat.Device:X8}:{stat.Inode:X16}";
         }
-        finally
+
+        return RuntimeInformation.ProcessArchitecture switch
         {
-            Marshal.FreeHGlobal(buffer);
+            Architecture.X64 => GetLinuxX64FileIdentity(path, authoredPath),
+            Architecture.Arm64 => GetLinuxArm64FileIdentity(path, authoredPath),
+            _ => throw NotRegularFile(authoredPath)
+        };
+    }
+
+    private static string GetLinuxX64FileIdentity(string path, string authoredPath)
+    {
+        if (StatLinuxX64(path, out LinuxX64Stat stat) != 0
+            || !IsRegularFile(stat.Mode))
+        {
+            throw NotRegularFile(authoredPath);
         }
+
+        return $"unix:{stat.Device:X16}:{stat.Inode:X16}";
+    }
+
+    private static string GetLinuxArm64FileIdentity(string path, string authoredPath)
+    {
+        if (StatLinuxArm64(path, out LinuxArm64Stat stat) != 0
+            || !IsRegularFile(stat.Mode))
+        {
+            throw NotRegularFile(authoredPath);
+        }
+
+        return $"unix:{stat.Device:X16}:{stat.Inode:X16}";
+    }
+
+    private static bool IsRegularFile(uint mode)
+    {
+        return (mode & FileTypeMask) == RegularFile;
+    }
+
+    private static bool IsRegularFile(ushort mode)
+    {
+        return (mode & (ushort)FileTypeMask) == (ushort)RegularFile;
     }
 
     private static ArchitecturePolicyImportException Missing(string authoredPath)
@@ -242,8 +252,8 @@ internal sealed class ArchitecturePolicyPathResolver : IArchitecturePolicyPathRe
     private const uint OpenExisting = 3;
     private const uint FileAttributeNormal = 0x00000080;
     private const uint FileTypeDisk = 0x00000001;
-    private const int FileTypeMask = 0xF000;
-    private const int RegularFile = 0x8000;
+    private const uint FileTypeMask = 0xF000;
+    private const uint RegularFile = 0x8000;
 
     [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
     private static extern SafeFileHandle CreateFile(
@@ -264,7 +274,45 @@ internal sealed class ArchitecturePolicyPathResolver : IArchitecturePolicyPathRe
     private static extern uint GetFileType(SafeFileHandle file);
 
     [DllImport("libc", SetLastError = true, EntryPoint = "stat")]
-    private static extern int Stat(string path, IntPtr buffer);
+    private static extern int StatLinuxX64(string path, out LinuxX64Stat stat);
+
+    [DllImport("libc", SetLastError = true, EntryPoint = "stat")]
+    private static extern int StatLinuxArm64(string path, out LinuxArm64Stat stat);
+
+    [DllImport("libc", SetLastError = true, EntryPoint = "stat")]
+    private static extern int StatDarwin(string path, out DarwinStat stat);
+
+    [StructLayout(LayoutKind.Sequential)]
+    internal struct LinuxX64Stat
+    {
+        public ulong Device;
+        public ulong Inode;
+        public ulong LinkCount;
+        public uint Mode;
+        [MarshalAs(UnmanagedType.ByValArray, SizeConst = 256)]
+        public byte[] RemainingFields;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    internal struct LinuxArm64Stat
+    {
+        public ulong Device;
+        public ulong Inode;
+        public uint Mode;
+        [MarshalAs(UnmanagedType.ByValArray, SizeConst = 256)]
+        public byte[] RemainingFields;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct DarwinStat
+    {
+        public uint Device;
+        public ushort Mode;
+        public ushort LinkCount;
+        public ulong Inode;
+        [MarshalAs(UnmanagedType.ByValArray, SizeConst = 256)]
+        public byte[] RemainingFields;
+    }
 
     [StructLayout(LayoutKind.Sequential)]
     private struct ByHandleFileInformation
