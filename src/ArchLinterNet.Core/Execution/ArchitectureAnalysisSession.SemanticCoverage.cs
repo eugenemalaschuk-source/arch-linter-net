@@ -51,7 +51,7 @@ public sealed partial class ArchitectureAnalysisSession
         }
 
         foreach (ArchitectureLayer layer in Document.Layers.Values
-                     .Where(layer => layer.Selector != null)
+                     .Where(layer => layer.Selector != null && !layer.External)
                      .OrderBy(layer => ArchitectureLayerResolver.DescribeLayer(layer), StringComparer.Ordinal))
         {
             if (!types.Any(type => RoleIndex.TryGetRole(type, out _) && MatchesLayer(layer, type)))
@@ -63,11 +63,9 @@ public sealed partial class ArchitectureAnalysisSession
 
         foreach (ArchitectureContextualConsumerReference consumer in RegisteredContextualConsumers
                      .OrderBy(consumer => consumer.Role, StringComparer.Ordinal)
-                     .ThenBy(consumer => consumer.MetadataKey, StringComparer.Ordinal))
+                     .ThenBy(consumer => consumer.Description, StringComparer.Ordinal))
         {
-            if (!types.Any(type => RoleIndex.TryGetRole(type, out ArchitectureTypeClassificationResult descriptor)
-                                   && string.Equals(descriptor.Role, consumer.Role, StringComparison.Ordinal)
-                                   && (consumer.MetadataKey.Length == 0 || descriptor.Metadata.ContainsKey(consumer.MetadataKey))))
+            if (!types.Any(type => MatchesContextualConsumer(consumer, type)))
             {
                 staleItems.Add(new ArchitectureCoverageSummaryEvidenceItem(
                     DescribeConsumer(consumer), "contextual semantic selector matched no classified type"));
@@ -148,9 +146,20 @@ public sealed partial class ArchitectureAnalysisSession
     private bool IsSemanticFactGoverned(Type type, ArchitectureTypeClassificationResult descriptor)
     {
         return Document.Layers.Values.Any(layer => layer.Selector != null && MatchesLayer(layer, type))
-               || RegisteredContextualConsumers.Any(consumer =>
-                   string.Equals(consumer.Role, descriptor.Role, StringComparison.Ordinal)
-                   && (consumer.MetadataKey.Length == 0 || descriptor.Metadata.ContainsKey(consumer.MetadataKey)));
+               || RegisteredContextualConsumers.Any(consumer => MatchesContextualConsumer(consumer, type));
+    }
+
+    private bool MatchesContextualConsumer(ArchitectureContextualConsumerReference consumer, Type type)
+    {
+        return ArchitectureContextSelectorMatcher.Matches(
+            new ArchitectureContextSelector
+            {
+                Role = consumer.Role,
+                Metadata = new Dictionary<string, object>(consumer.Metadata, StringComparer.Ordinal)
+            },
+            type,
+            RoleIndex,
+            sourceDescriptor: null);
     }
 
     private static bool MatchesSemanticExclusion(
@@ -172,8 +181,6 @@ public sealed partial class ArchitectureAnalysisSession
 
     private static string DescribeConsumer(ArchitectureContextualConsumerReference consumer)
     {
-        return consumer.MetadataKey.Length == 0
-            ? $"role:{consumer.Role}"
-            : $"role:{consumer.Role} metadata:{consumer.MetadataKey}";
+        return consumer.Description;
     }
 }

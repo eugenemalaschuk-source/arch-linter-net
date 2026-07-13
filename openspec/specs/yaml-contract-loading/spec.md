@@ -95,3 +95,11 @@ The published JSON Schema SHALL accept `scope: semantic_role`, semantic exclusio
 - **WHEN** a policy author validates a semantic-role coverage contract against the published JSON Schema
 - **THEN** the contract and its reasoned semantic exclusion are accepted
 
+### Requirement: Semantic coverage exclusions reject unknown keys
+Before permissive YAML deserialization, the loader SHALL reject an unknown field in a semantic-role coverage exclusion mapping.
+
+#### Scenario: Misspelled semantic exclusion metadata key
+- **WHEN** a semantic-role coverage exclusion contains `metdata` instead of `metadata`
+- **THEN** policy loading fails with a diagnostic naming the unknown key
+- **AND** the exclusion is not interpreted as a role-wide exclusion
+

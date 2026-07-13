@@ -51,6 +51,7 @@ public sealed partial class ArchitecturePolicyDocumentLoader : IArchitecturePoli
         string yaml = _fileSystem.ReadAllText(policyPath);
         ValidateRawLayerYaml(yaml);
         ValidateRawContextualContractYaml(yaml);
+        ValidateRawSemanticCoverageYaml(yaml);
         ArchitectureContractDocument? document = deserializer.Deserialize<ArchitectureContractDocument>(yaml);
 
         if (document == null)
@@ -212,6 +213,56 @@ public sealed partial class ArchitecturePolicyDocumentLoader : IArchitecturePoli
         ValidateContextualContractGroup(contracts!, "audit_context_allow_only", "allowed");
         ValidatePortBoundaryContractGroup(contracts!, "strict_port_boundaries");
         ValidatePortBoundaryContractGroup(contracts!, "audit_port_boundaries");
+    }
+
+    private static void ValidateRawSemanticCoverageYaml(string yaml)
+    {
+        var stream = new YamlStream();
+        stream.Load(new StringReader(yaml));
+
+        if (stream.Documents.Count == 0
+            || stream.Documents[0].RootNode is not YamlMappingNode root
+            || !TryGetMappingChild(root, "contracts", out YamlMappingNode? contracts))
+        {
+            return;
+        }
+
+        ValidateSemanticCoverageContractGroup(contracts!, "strict_coverage");
+        ValidateSemanticCoverageContractGroup(contracts!, "audit_coverage");
+    }
+
+    private static void ValidateSemanticCoverageContractGroup(YamlMappingNode contracts, string groupKey)
+    {
+        if (!TryGetChild(contracts, groupKey, out YamlNode? groupNode) || groupNode is not YamlSequenceNode contractsList)
+        {
+            return;
+        }
+
+        foreach (YamlMappingNode contract in contractsList.Children.OfType<YamlMappingNode>())
+        {
+            if (!TryGetChild(contract, "scope", out YamlNode? scopeNode)
+                || scopeNode is not YamlScalarNode scope
+                || !string.Equals(scope.Value, "semantic_role", StringComparison.Ordinal)
+                || !TryGetChild(contract, "exclude", out YamlNode? excludeNode)
+                || excludeNode is not YamlSequenceNode exclusions)
+            {
+                continue;
+            }
+
+            string contractName = TryGetChild(contract, "name", out YamlNode? nameNode)
+                                  && nameNode is YamlScalarNode name
+                ? name.Value ?? UnnamedContractName
+                : UnnamedContractName;
+            foreach (YamlMappingNode exclusion in exclusions.Children.OfType<YamlMappingNode>())
+            {
+                ValidateKnownKeys(exclusion, contractName, "semantic coverage exclusion",
+                    new[]
+                    {
+                        "namespace", "namespace_suffix", "project", "assembly", "contract_id", "between",
+                        "role", "metadata", "reason"
+                    });
+            }
+        }
     }
 
     private static void ValidateContextualContractGroup(YamlMappingNode contracts, string groupKey, string targetListKey)

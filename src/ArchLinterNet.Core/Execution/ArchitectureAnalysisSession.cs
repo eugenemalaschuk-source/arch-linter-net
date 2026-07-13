@@ -24,7 +24,8 @@ public sealed partial class ArchitectureAnalysisSession
 
     private readonly List<ArchitectureBaselineCandidate> _baselineCandidates = new();
 
-    private readonly HashSet<ArchitectureContextualConsumerReference> _registeredContextualConsumers = new();
+    private readonly Dictionary<string, ArchitectureContextualConsumerReference> _registeredContextualConsumers =
+        new(StringComparer.Ordinal);
 
     private HashSet<string>? _ruleInputCoveredContractIdsForMode;
 
@@ -146,7 +147,7 @@ public sealed partial class ArchitectureAnalysisSession
     // See ArchitectureContextualConsumerReference and design.md Decision 7. Nothing consumes this
     // collection yet — it exists so a future coverage change can query it.
     public IReadOnlyCollection<ArchitectureContextualConsumerReference> RegisteredContextualConsumers
-        => _registeredContextualConsumers;
+        => _registeredContextualConsumers.Values;
 
     internal void RegisterContextualConsumer(ArchitectureContextSelector selector)
     {
@@ -155,16 +156,23 @@ public sealed partial class ArchitectureAnalysisSession
             return;
         }
 
-        if (selector.Metadata.Count == 0)
+        Dictionary<string, object> metadata = selector.Metadata
+            .OrderBy(entry => entry.Key, StringComparer.Ordinal)
+            .ToDictionary(entry => entry.Key, entry => entry.Value, StringComparer.Ordinal);
+        string description = DescribeContextualConsumer(selector.Role, metadata);
+        _registeredContextualConsumers.TryAdd(description,
+            new ArchitectureContextualConsumerReference(selector.Role, metadata, description));
+    }
+
+    private static string DescribeContextualConsumer(string role, IReadOnlyDictionary<string, object> metadata)
+    {
+        if (metadata.Count == 0)
         {
-            _registeredContextualConsumers.Add(new ArchitectureContextualConsumerReference(selector.Role, string.Empty));
-            return;
+            return $"role:{role}";
         }
 
-        foreach (string key in selector.Metadata.Keys)
-        {
-            _registeredContextualConsumers.Add(new ArchitectureContextualConsumerReference(selector.Role, key));
-        }
+        return $"role:{role} metadata:{string.Join(",", metadata.OrderBy(entry => entry.Key, StringComparer.Ordinal)
+            .Select(entry => $"{entry.Key}={entry.Value}"))}";
     }
 
     // Cached per session so multiple future coverage contract handlers share one inventory instead of

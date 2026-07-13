@@ -484,6 +484,94 @@ public sealed class ArchitectureCoverageSummaryTests
     }
 
     [Test]
+    public void BuildCoverageSummary_SemanticRoleScope_ContextualConsumerRequiresMatchingMetadataValue()
+    {
+        ArchitectureContractDocument document = CreateDomainClassificationDocument();
+        document.Contracts.StrictContextDependencies.Add(new ArchitectureContextDependencyContract
+        {
+            Name = "sales-context",
+            Source = new ArchitectureContextSelector
+            {
+                Role = "DomainLayer",
+                Metadata = new Dictionary<string, object> { ["domain"] = "Sales" }
+            },
+            Forbidden = { new ArchitectureContextSelector { Role = "OtherRole" } },
+            Reason = "Sales-only contextual governance."
+        });
+
+        ArchitectureCoverageSummary summary = BuildSampleSemanticSummary(document);
+
+        Assert.That(summary.CoveredItems.Select(item => item.Item), Does.Contain(
+            "SemanticCoverageSampleFixtures.Sales.Order"));
+        Assert.That(summary.UncoveredItems.Select(item => item.Item), Does.Contain(
+            "SemanticCoverageSampleFixtures.Inventory.StockItem"));
+    }
+
+    [Test]
+    public void BuildCoverageSummary_SemanticRoleScope_ContextualConsumerSupportsMetadataInOperator()
+    {
+        ArchitectureContractDocument document = CreateDomainClassificationDocument();
+        document.Contracts.StrictContextDependencies.Add(new ArchitectureContextDependencyContract
+        {
+            Name = "domain-context",
+            Source = new ArchitectureContextSelector
+            {
+                Role = "DomainLayer",
+                Metadata = new Dictionary<string, object>
+                {
+                    ["domain"] = new List<object> { "Sales", "Inventory" }
+                }
+            },
+            Forbidden = { new ArchitectureContextSelector { Role = "OtherRole" } },
+            Reason = "Multi-domain contextual governance."
+        });
+
+        ArchitectureCoverageSummary summary = BuildSampleSemanticSummary(document);
+
+        Assert.That(summary.CoveredItems.Select(item => item.Item), Does.Contain(
+            "SemanticCoverageSampleFixtures.Sales.Order"));
+        Assert.That(summary.CoveredItems.Select(item => item.Item), Does.Contain(
+            "SemanticCoverageSampleFixtures.Inventory.StockItem"));
+    }
+
+    [Test]
+    public void BuildCoverageSummary_SemanticRoleScope_ReportsStaleContextualConsumerWithMetadataValue()
+    {
+        ArchitectureContractDocument document = CreateDomainClassificationDocument();
+        document.Contracts.StrictContextDependencies.Add(new ArchitectureContextDependencyContract
+        {
+            Name = "missing-context",
+            Source = new ArchitectureContextSelector
+            {
+                Role = "DomainLayer",
+                Metadata = new Dictionary<string, object> { ["domain"] = "NeverDiscovered" }
+            },
+            Forbidden = { new ArchitectureContextSelector { Role = "OtherRole" } },
+            Reason = "Missing contextual governance."
+        });
+
+        ArchitectureCoverageSummary summary = BuildSampleSemanticSummary(document);
+
+        Assert.That(summary.StaleItems, Has.Some.Matches<ArchitectureCoverageSummaryEvidenceItem>(item =>
+            item.Item == "role:DomainLayer metadata:domain=NeverDiscovered"));
+    }
+
+    [Test]
+    public void BuildCoverageSummary_SemanticRoleScope_DoesNotReportExternalSelectorLayerAsStale()
+    {
+        ArchitectureContractDocument document = CreateDomainClassificationDocument();
+        document.Layers["external"] = new ArchitectureLayer
+        {
+            External = true,
+            Selector = new ArchitectureLayerSelector { Role = "NeverDiscovered" }
+        };
+
+        ArchitectureCoverageSummary summary = BuildSampleSemanticSummary(document);
+
+        Assert.That(summary.StaleItems, Is.Empty);
+    }
+
+    [Test]
     public void BuildCoverageSummary_SemanticRoleScope_ReportsConflictAndMetadataFailureAsUnknownEvidence()
     {
         ArchitectureContractDocument document = CreateDomainClassificationDocument();

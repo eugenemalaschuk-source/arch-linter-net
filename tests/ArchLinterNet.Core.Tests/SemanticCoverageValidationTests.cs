@@ -54,6 +54,20 @@ public sealed class SemanticCoverageValidationTests
         Assert.That(exception.Message, Does.Contain(expectedMessage));
     }
 
+    [Test]
+    public void SemanticRoleCoverage_UnknownExclusionKey_IsRejectedBeforeDeserialization()
+    {
+        InvalidOperationException exception = Assert.Throws<InvalidOperationException>(() => Load("""
+            exclude:
+              - role: DomainLayer
+                metdata:
+                  domain: Sales
+                reason: Typo must not broaden this exclusion.
+            """))!;
+
+        Assert.That(exception.Message, Does.Contain("unknown property 'metdata'"));
+    }
+
     private ArchitectureContractDocument Load(string contractFragment)
     {
         string path = Path.Combine(_tempDirectory, "dependencies.arch.yml");
