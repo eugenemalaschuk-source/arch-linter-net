@@ -1,0 +1,6 @@
+version: 1
+name: Cycle failure
+imports: [cycle-a.yml]
+layers: {}
+analysis: {}
+contracts: {}

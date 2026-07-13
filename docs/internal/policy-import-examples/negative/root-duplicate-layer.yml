@@ -1,0 +1,6 @@
+version: 1
+name: Duplicate layer failure
+imports: [duplicate-layer-a.yml, duplicate-layer-b.yml]
+layers: {}
+analysis: {}
+contracts: {}

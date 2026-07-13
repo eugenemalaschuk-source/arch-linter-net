@@ -1,0 +1,6 @@
+contracts:
+  strict_dependencies:
+    - id: APPLICATION-BOUNDARY
+      name: application-boundary-b
+      source: application
+      forbidden: [legacy]

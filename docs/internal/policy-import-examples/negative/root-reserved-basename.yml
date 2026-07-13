@@ -1,0 +1,10 @@
+version: 1
+name: Reserved basename failure
+imports:
+  - fragments/NUL.yml
+  - fragments/COM1.arch.yml
+  - fragments/LPT¹.yaml
+  - fragments/NUL.tar.gz
+layers: {}
+analysis: {}
+contracts: {}

@@ -1,0 +1,21 @@
+version: 1
+name: Recommended modular policy
+
+imports:
+  - policy/layers.arch.yml
+  - policy/contracts/application.arch.yml
+
+layers:
+  application:
+    namespace: Example.Application
+
+analysis:
+  target_assemblies:
+    - Example.Application
+    - Example.Domain
+
+contracts:
+  strict_cycles:
+    - id: no-layer-cycles
+      name: no-layer-cycles
+      layers: [application, domain]

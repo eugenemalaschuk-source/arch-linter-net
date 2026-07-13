@@ -1,0 +1,12 @@
+version: 1
+name: Arbitrary-name modular policy
+
+imports:
+  - pieces/boundaries.data
+
+analysis:
+  target_assemblies:
+    - Example.Application
+    - Example.Domain
+
+contracts: {}

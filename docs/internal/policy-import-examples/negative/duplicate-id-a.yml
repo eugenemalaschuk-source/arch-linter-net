@@ -1,0 +1,6 @@
+contracts:
+  strict_dependencies:
+    - id: application-boundary
+      name: application-boundary-a
+      source: application
+      forbidden: [infrastructure]

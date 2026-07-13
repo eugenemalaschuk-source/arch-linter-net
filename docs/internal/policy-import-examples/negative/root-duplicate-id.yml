@@ -1,0 +1,6 @@
+version: 1
+name: Duplicate contract ID failure
+imports: [duplicate-id-a.yml, duplicate-id-b.yml]
+layers: {}
+analysis: {}
+contracts: {}

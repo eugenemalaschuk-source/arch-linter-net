@@ -1,0 +1,3 @@
+version: 1
+name: Two-stage validation policy
+imports: [effective-sections.yml]

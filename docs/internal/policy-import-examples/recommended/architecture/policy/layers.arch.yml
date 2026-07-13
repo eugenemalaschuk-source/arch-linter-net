@@ -1,0 +1,8 @@
+imports:
+  - shared/external.arch.yml
+
+layers:
+  domain:
+    namespace: Example.Domain
+  infrastructure:
+    namespace: Example.Infrastructure

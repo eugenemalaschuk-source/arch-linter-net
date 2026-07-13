@@ -1,0 +1,7 @@
+version: 1
+name: Fragment shape failure
+imports:
+  - fragment-with-root-field.yml
+layers: {}
+analysis: {}
+contracts: {}
