@@ -7,25 +7,15 @@ public sealed record ArchitectureCoverageSummaryCounts(
     int Stale,
     int Unknown);
 
-public sealed record ArchitectureCoverageSummaryExcludedItem
+public sealed record ArchitectureCoverageSummaryExcludedItem(string Item, string Reason)
 {
-    public ArchitectureCoverageSummaryExcludedItem(string item, string reason)
-        : this(item, reason, string.Empty)
-    {
-    }
-
     public ArchitectureCoverageSummaryExcludedItem(string item, string reason, string evidence)
+        : this(item, reason)
     {
-        Item = item;
-        Reason = reason;
         Evidence = evidence;
     }
 
-    public string Item { get; }
-
-    public string Reason { get; }
-
-    public string Evidence { get; }
+    public string Evidence { get; init; } = string.Empty;
 }
 
 public sealed record ArchitectureCoverageSummaryEvidenceItem(string Item, string Evidence);

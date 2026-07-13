@@ -51,7 +51,7 @@ public sealed partial class ArchitectureAnalysisSession
         }
 
         staleItems.AddRange(GetSemanticStaleItems(types));
-        unknownItems.AddRange(GetSemanticUnknownItems());
+        unknownItems.AddRange(GetSemanticUnknownItems(contract));
 
         return new ArchitectureCoverageSummary(
             contract.Name, contract.Id, contract.Scope,
@@ -104,7 +104,7 @@ public sealed partial class ArchitectureAnalysisSession
             AddSemanticDiagnosticFinding(findings, executionContext, contract, stale, "stale semantic selector");
         }
 
-        foreach (ArchitectureCoverageSummaryEvidenceItem unknown in GetSemanticUnknownItems())
+        foreach (ArchitectureCoverageSummaryEvidenceItem unknown in GetSemanticUnknownItems(contract))
         {
             string violation = unknown.Evidence.StartsWith("classification conflict:", StringComparison.Ordinal)
                 ? "classification conflict"
@@ -172,10 +172,11 @@ public sealed partial class ArchitectureAnalysisSession
         return items;
     }
 
-    private List<ArchitectureCoverageSummaryEvidenceItem> GetSemanticUnknownItems()
+    private List<ArchitectureCoverageSummaryEvidenceItem> GetSemanticUnknownItems(ArchitectureCoverageContract contract)
     {
         List<ArchitectureCoverageSummaryEvidenceItem> items = new();
         items.AddRange(RoleIndex.Conflicts
+            .Where(conflict => IsSemanticDiagnosticInScope(contract, conflict.Subject))
             .OrderBy(conflict => conflict.Subject, StringComparer.Ordinal)
             .ThenBy(conflict => conflict.Source)
             .ThenBy(conflict => conflict.WinningRole, StringComparer.Ordinal)
@@ -184,6 +185,7 @@ public sealed partial class ArchitectureAnalysisSession
             .Select(conflict => new ArchitectureCoverageSummaryEvidenceItem(conflict.Subject,
                 $"classification conflict: source={conflict.Source}; winning={conflict.WinningRole}; discarded={conflict.DiscardedRole}; metadata={conflict.MetadataDetail ?? "<none>"}")));
         items.AddRange(RoleIndex.MetadataFailures
+            .Where(failure => IsSemanticDiagnosticInScope(contract, failure.Subject))
             .OrderBy(failure => failure.Subject, StringComparer.Ordinal)
             .ThenBy(failure => failure.Source)
             .ThenBy(failure => failure.MetadataKey, StringComparer.Ordinal)
@@ -191,6 +193,14 @@ public sealed partial class ArchitectureAnalysisSession
             .Select(failure => new ArchitectureCoverageSummaryEvidenceItem(failure.Subject,
                 $"metadata failure: source={failure.Source}; key={failure.MetadataKey}; reason={failure.Reason}")));
         return items;
+    }
+
+    private bool IsSemanticDiagnosticInScope(ArchitectureCoverageContract contract, string subject)
+    {
+        return TypeIndex.AllTypes().Any(type =>
+            (string.Equals(ArchitectureTypeNames.SafeFullName(type), subject, StringComparison.Ordinal)
+             || string.Equals(type.Assembly.GetName().Name, subject, StringComparison.Ordinal))
+            && IsSemanticCoverageTypeInScope(contract, type));
     }
 
     private bool MatchesContextualConsumer(ArchitectureContextualConsumerReference consumer, Type type)
