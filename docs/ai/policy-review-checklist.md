@@ -34,6 +34,8 @@ Use this checklist before opening or approving an AI-generated policy change.
 - [ ] No unsupported fields such as `regex`, `severity`, `from`, `to`, `owner`, custom groups, or unsupported namespace pattern syntax were invented.
 - [ ] Any layer `namespace` using `*` uses it as a full segment and still maps to real repeated namespaces in the repository.
 - [ ] Documentation and sample policy snippets match executable YAML.
+- [ ] Semantic-role changes identify role, metadata, source, evidence, coverage deltas, and new cross-context edges for AI and human review.
+- [ ] Ambiguous or uncovered roles remain visible until classified or explicitly excluded with a narrow reason.
 
 ## Public documentation boundary
 
@@ -47,3 +49,4 @@ Use this checklist before opening or approving an AI-generated policy change.
 - [ ] Strict validation was run locally.
 - [ ] Audit validation was run locally if audit rules changed.
 - [ ] Any failures are explained in the PR instead of hidden by broad ignores.
+- [ ] Review confirms the change makes no runtime DI, runtime behavior, security, or semantic data-flow claims.

@@ -535,6 +535,12 @@ reason. Coverage output distinguishes unclassified facts, uncovered roles, stale
 selectors, and classification conflicts from dependency violations, which makes
 the JSON/CI artifact suitable for policy review and AI-assisted authoring.
 
+For the complete inspect-classify-validate-review workflow, including bounded
+contexts, SharedKernel exceptions, legacy migration, and Unity/client layouts,
+see [AI-first semantic-role governance](semantic-role-governance.md). Treat
+diagnostic suggestions as review input: they must not automatically broaden a
+selector, add a blanket ignore, or claim runtime behavior proof.
+
 ### Exhaustive container coverage
 
 When a template declares `exhaustive: true`, the runner verifies that every

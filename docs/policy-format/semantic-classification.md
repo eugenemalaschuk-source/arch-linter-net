@@ -360,13 +360,13 @@ cross-referencing comparison is what the rule actually needs to express.
 - Role index: **implemented** as a per-run, lazily-computed cache
   (`ArchitectureRoleIndex`) of every classified type's role/metadata/source/
   evidence, surfaced as `classification_roles` in JSON/CI-artifact output. It
-  is consumed by selector-backed layer resolution. `stale selector` and
-  `uncovered semantic fact` remain vocabulary only.
+  is consumed by selector-backed layers, contextual selectors, and
+  `scope: semantic_role` coverage. Semantic coverage reports unclassified
+  types, uncovered semantic facts, stale selectors, and classification
+  conflicts as coverage evidence.
 - Classification findings (roles, conflicts, metadata failures) are surfaced
   as informational output in human, JSON, and CI-artifact formats. They are not
   wired into SARIF diagnostics.
-- No coverage integration: the planned `scope: semantic_role` coverage variant
-  (tracked by a follow-up issue) does not exist yet.
 - No annotation package: this design does not ship, and does not require, a
   binary ArchLinterNet annotation assembly — see
   [Annotation strategy](#annotation-strategy) below for the full adoption
