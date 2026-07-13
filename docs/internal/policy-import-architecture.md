@@ -218,7 +218,8 @@ fixtures after runtime support exists.
 | #281 | Fragment shape | `version`, `name`, baseline key, unknown key | Rejected with role, field, and source. |
 | #281 | Import syntax | Empty, null, mapping, absolute, URI, glob, environment expression | Rejected before target read. |
 | #281 | Import grammar | `/`-separated NFC relative path | Has the same segments on Windows, Linux, and macOS. |
-| #281 | Import grammar | Backslash, drive, UNC/device, leading slash, empty segment, reserved name, invalid character, or interpolation token | Rejected before host path APIs resolve it. |
+| #281 | Import grammar | Backslash, drive, UNC/device, leading slash, empty segment, invalid character, or interpolation token | Rejected before host path APIs resolve it. |
+| #281 | Import grammar | `NUL.yml`, `COM1.arch.yml`, `LPT¹.yaml`, and `NUL.tar.gz` | Each is rejected as a reserved basename before filesystem resolution on Windows, Linux, and macOS. |
 | #281 | Resolution | Import relative to root | Resolves from root directory. |
 | #281 | Resolution | Nested import relative to fragment | Resolves from fragment directory, not root directory. |
 | #281 | Ordering | Root imports A/B and A imports C/D | Source order is root, A, C, D, B. |
@@ -232,7 +233,7 @@ fixtures after runtime support exists.
 | #281 | Contracts | A newly registered test family | Composer requires no family-specific branch. |
 | #281 | Contracts | Ignored violations in imported contract | Nested list remains attached and ordered. |
 | #281 | Contract IDs | Fallback IDs across fragments | IDs are assigned after composition. |
-| #281 | Contract IDs | Same case-insensitive ID in one family/mode | Rejected with both sources. |
+| #281 | Contract IDs | Same case-insensitive ID in one family/mode | Rejected after composition in that family/mode group. |
 | #281 | Contract IDs | Same ID in different family or mode | Accepted for compatibility. |
 | #281 | Singletons | One explicit scalar in any source | Value is retained. |
 | #281 | Singletons | Equal or different repeated scalar | Rejected with both sources. |

@@ -23,13 +23,14 @@ relative to the document that declares it. An import string SHALL be Unicode
 NFC and contain one or more non-empty `/`-separated segments. A segment SHALL
 be `.` or `..`, or a portable file-name segment that contains no control
 character or `<`, `>`, `:`, `"`, `/`, `\\`, `|`, `?`, or `*`; does not end in dot
-or space; and is not a Windows reserved device name (`CON`, `PRN`, `AUX`,
-`NUL`, `COM1`–`COM9`, or `LPT1`–`LPT9`, case-insensitively). Backslashes,
-leading slashes, empty segments, drive/URI colons, non-NFC strings, and
-interpolation tokens (`${`, `$(`, `%...%`, or a leading `~`) SHALL be rejected.
-The grammar SHALL be validated before any host filesystem resolution. Absolute
-paths, UNC/device paths, URI-like values, globs, environment interpolation,
-and non-scalar entries SHALL be rejected.
+or space; and whose case-insensitive basename before its first `.` is not a
+Windows reserved device name: `CON`, `PRN`, `AUX`, `NUL`, `COM1`–`COM9`,
+`LPT1`–`LPT9`, `COM¹`–`COM³`, or `LPT¹`–`LPT³`. Backslashes, leading slashes,
+empty segments, drive/URI colons, non-NFC strings, and interpolation tokens
+(`${`, `$(`, `%...%`, or a leading `~`) SHALL be rejected. The grammar SHALL be
+validated before any host filesystem resolution. Absolute paths, UNC/device
+paths, URI-like values, globs, environment interpolation, and non-scalar
+entries SHALL be rejected.
 
 #### Scenario: Root combines inline content with imports
 - **WHEN** a root defines ordinary `layers`, `analysis`, or `contracts` content
@@ -48,6 +49,12 @@ and non-scalar entries SHALL be rejected.
   an interpolation token
 - **THEN** policy loading fails before the target is read with a portable-path
   grammar diagnostic
+
+#### Scenario: Reserved basename has an extension
+- **WHEN** an import segment is `NUL.yml`, `COM1.arch.yml`, `LPT¹.yaml`, or
+  `NUL.tar.gz`
+- **THEN** policy loading rejects the segment before filesystem resolution on
+  every supported host
 
 ### Requirement: Fragment role and shape come from the import graph
 Every document reached through `imports` SHALL be validated as a fragment

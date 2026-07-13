@@ -62,8 +62,11 @@ the host filesystem sees them:
 - `.` and `..` are allowed relative segments, then remain subject to physical
   canonicalization and the repository-boundary check;
 - normal segments cannot contain control characters or `<`, `>`, `:`, `"`,
-  `/`, `\`, `|`, `?`, or `*`, cannot end in dot or space, and cannot be a
-  Windows reserved device name such as `CON` or `LPT1`;
+  `/`, `\`, `|`, `?`, or `*`, cannot end in dot or space, and their
+  case-insensitive basename before the first `.` cannot be a Windows reserved
+  device name: `CON`, `PRN`, `AUX`, `NUL`, `COM1`–`COM9`, `LPT1`–`LPT9`,
+  `COM¹`–`COM³`, or `LPT¹`–`LPT³`. Thus `NUL.yml`, `COM1.arch.yml`,
+  `LPT¹.yaml`, and `NUL.tar.gz` are invalid portable imports;
 - backslashes, leading slashes, empty segments, drive/URI colons, non-NFC
   strings, `${...}`, `$(...)`, `%...%`, and leading `~` are invalid.
 

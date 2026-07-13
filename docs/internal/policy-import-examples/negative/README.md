@@ -13,6 +13,7 @@ named root; individual fragment filenames have no semantic role.
 | Unsupported expression | `root-glob.yml` | A glob entry is rejected before filesystem expansion. |
 | Backslash separator | `root-backslash.yml` | Windows-style separator is rejected before host path resolution. |
 | Drive/UNC/device form | `root-platform-native.yml` | Drive, UNC, and device forms are rejected by portable grammar. |
+| Reserved basename with extension | `root-reserved-basename.yml` | `NUL.yml`, `COM1.arch.yml`, `LPT¹.yaml`, and `NUL.tar.gz` are rejected before filesystem resolution on every host. |
 | Absolute path | `root-absolute.yml` | Unix absolute path is rejected by portable grammar. |
 | Depth limit | generated fixture | A 17-edge chain fails before reading the depth-17 target. |
 | File-count limit | generated fixture | Root plus 256 completed files fails before reading file 257. |
