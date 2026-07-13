@@ -297,12 +297,13 @@ public sealed class ArchitectureContractSchemaInstanceValidationTests
     // blocks had drifted from the schema (a selector-only layer slipped past several earlier review
     // rounds because only the schema-validated sample-policy files above were tested, never the
     // Markdown prose itself). These tests extract every ```yaml fenced block from the design record
-    // and the public docs page and validate their 'classification' and 'layers' fragments against
-    // the corresponding schema $defs, so Markdown snippets can't silently diverge from the schema
-    // again. Blocks are partial policy fragments (no 'version'/'analysis'/'contracts'), so each
-    // fragment is validated against its own $def rather than the full root schema.
+    // and the public docs pages and validate their classification, layer, and contextual-contract
+    // fragments against the corresponding schema $defs, so Markdown snippets can't silently diverge
+    // from the schema again. Blocks are partial policy fragments, so each fragment is validated
+    // against its own $def rather than the full root schema.
     [TestCase("openspec/changes/archive/2026-07-10-design-semantic-classification-model/design.md")]
     [TestCase("docs/policy-format/semantic-classification.md")]
+    [TestCase("docs/ai/semantic-role-governance.md")]
     public void MarkdownYamlBlocks_ClassificationAndLayerFragmentsValidateAgainstSchema(string relativePath)
     {
         string repositoryRoot = new ArchitectureRepositoryRootResolver().Resolve();
@@ -337,9 +338,38 @@ public sealed class ArchitectureContractSchemaInstanceValidationTests
                     }
                 }
             }
+
+            if (root.TryGetPropertyValue("contracts", out JsonNode? contracts) && contracts is JsonObject contractGroups)
+            {
+                ValidateContractGroup(contractGroups, "strict_context_dependencies", "contextDependencyContract", $"block {blockIndex}", failures);
+                ValidateContractGroup(contractGroups, "audit_context_dependencies", "contextDependencyContract", $"block {blockIndex}", failures);
+                ValidateContractGroup(contractGroups, "strict_context_allow_only", "contextAllowOnlyContract", $"block {blockIndex}", failures);
+                ValidateContractGroup(contractGroups, "audit_context_allow_only", "contextAllowOnlyContract", $"block {blockIndex}", failures);
+            }
         }
 
         Assert.That(failures, Is.Empty, string.Join(Environment.NewLine, failures));
+    }
+
+    private static void ValidateContractGroup(
+        JsonObject contractGroups,
+        string groupName,
+        string definitionName,
+        string location,
+        List<string> failures)
+    {
+        if (contractGroups[groupName] is not JsonArray contracts)
+        {
+            return;
+        }
+
+        for (int contractIndex = 0; contractIndex < contracts.Count; contractIndex++)
+        {
+            if (contracts[contractIndex] is JsonNode contract)
+            {
+                CollectFailures(contract, definitionName, $"{location}, contracts.{groupName}[{contractIndex}]", failures);
+            }
+        }
     }
 
     private static void CollectFailures(JsonNode instance, string defName, string location, List<string> failures)

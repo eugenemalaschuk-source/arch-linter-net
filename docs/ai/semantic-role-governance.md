@@ -101,8 +101,8 @@ contracts:
         role: DomainLayer
         metadata: { boundedContext: Sales }
       forbidden:
-        role: DomainLayer
-        metadata: { boundedContext: Inventory }
+        - role: DomainLayer
+          metadata: { boundedContext: Inventory }
       reason: Sales and Inventory communicate through reviewed contracts.
 ```
 
@@ -126,11 +126,26 @@ layers:
   shared-kernel:
     namespace: Acme.SharedKernel
     selector: { role: SharedKernel }
+
+contracts:
+  strict_context_allow_only:
+    - id: sales-domain-own-context-or-shared-kernel
+      name: sales-domain-may-depend-only-on-own-context-or-shared-kernel
+      source:
+        role: DomainLayer
+        metadata: { boundedContext: Sales }
+      allowed:
+        - role: DomainLayer
+          metadata: { boundedContext: Sales }
+        - role: SharedKernel
+      reason: Sales may use its own domain and the explicitly governed SharedKernel only.
 ```
 
-The surrounding policy should identify owners, responsibility, and stability.
-Do not turn `SharedKernel` into an unrestricted target or use it to hide a new
-helper with unclear ownership.
+The allow-list is the safe exception: it permits only the source context and
+the explicitly governed `SharedKernel`, with a reason that identifies the
+architectural intent. The surrounding policy should also identify owners,
+responsibility, and stability. Do not turn `SharedKernel` into an unrestricted
+target or use it to hide a new helper with unclear ownership.
 
 ### Legacy migration
 
