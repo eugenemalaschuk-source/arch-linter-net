@@ -3,7 +3,7 @@
   "isRoot": true,
   "tools": {
     "archlinternet.cli": {
-      "version": "0.4.1",
+      "version": "0.4.2",
       "commands": [
         "arch-linter-net"
       ],
