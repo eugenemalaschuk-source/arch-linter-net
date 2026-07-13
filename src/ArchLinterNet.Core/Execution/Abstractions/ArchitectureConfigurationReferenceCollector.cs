@@ -66,7 +66,7 @@ internal sealed class ArchitectureConfigurationReferenceCollector
     }
 
     private static void AddReference(
-        IDictionary<string, List<IArchitectureContract>> references,
+        Dictionary<string, List<IArchitectureContract>> references,
         string name,
         IArchitectureContract contract)
     {

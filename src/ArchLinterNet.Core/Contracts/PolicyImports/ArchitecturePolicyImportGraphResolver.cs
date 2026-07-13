@@ -55,100 +55,151 @@ internal sealed class ArchitecturePolicyImportGraphResolver
 
         for (int importIndex = 0; importIndex < source.Imports.Count; importIndex++)
         {
-            string importPath = source.Imports[importIndex];
-            ArchitecturePolicySourceLocation importLocation =
-                ArchitecturePolicyDiagnosticFactory.ImportLocation(source, importIndex);
-            _parser.ValidatePortableImport(importPath, source, importIndex);
-            if (depth == MaximumDepth)
-            {
-                string[] chain = state.Stack.Append(importPath).ToArray();
-                throw Limit(
-                    $"Import depth exceeds {MaximumDepth}: {FormatChain(state.Stack, importPath)}",
-                    importLocation,
-                    chain);
-            }
-
-            if (state.Sources.Count == MaximumFileCount)
-            {
-                string[] chain = state.Stack.Append(importPath).ToArray();
-                throw Limit(
-                    $"Policy import graph exceeds {MaximumFileCount} files: {FormatChain(state.Stack, importPath)}",
-                    importLocation,
-                    chain);
-            }
-
-            ArchitecturePolicyResolvedPath resolved;
-            try
-            {
-                resolved = _pathResolver.ResolveImport(state.Root, source.FullPath, importPath);
-            }
-            catch (ArchitecturePolicyImportException exception)
-            {
-                throw ArchitecturePolicyDiagnosticFactory.Enrich(
-                    exception,
-                    importLocation,
-                    state.Stack.Append(importPath));
-            }
-
-            if (state.Active.Contains(resolved.FileIdentity))
-            {
-                ArchitecturePolicySource? activeSource = state.Sources
-                    .FirstOrDefault(candidate => candidate.FileIdentity == resolved.FileIdentity);
-                ArchitecturePolicySourceLocation[] related = activeSource is null
-                    ? Array.Empty<ArchitecturePolicySourceLocation>()
-                    : new[] { ArchitecturePolicyDiagnosticFactory.Location(activeSource, "$") };
-                string[] chain = state.Stack.Append(resolved.PortableIdentity).ToArray();
-                throw ArchitecturePolicyDiagnosticFactory.Exception(
-                    ArchitecturePolicyImportErrorCategory.Cycle,
-                    $"Policy import cycle detected: {FormatChain(state.Stack, resolved.PortableIdentity)}",
-                    importLocation,
-                    related,
-                    chain);
-            }
-
-            if (state.Completed.Contains(resolved.FileIdentity)
-                || state.PortableIdentities.Contains(resolved.PortableIdentity))
-            {
-                string first = state.FirstImports.GetValueOrDefault(resolved.FileIdentity, resolved.PortableIdentity);
-                ArchitecturePolicySource? firstSource = state.Sources.FirstOrDefault(candidate =>
-                    candidate.FileIdentity == resolved.FileIdentity
-                    || string.Equals(candidate.PortableIdentity, resolved.PortableIdentity,
-                        StringComparison.OrdinalIgnoreCase));
-                ArchitecturePolicySourceLocation[] related = firstSource is null
-                    ? Array.Empty<ArchitecturePolicySourceLocation>()
-                    : new[] { ArchitecturePolicyDiagnosticFactory.Location(firstSource, "$") };
-                throw ArchitecturePolicyDiagnosticFactory.Exception(
-                    ArchitecturePolicyImportErrorCategory.DuplicateImport,
-                    $"Duplicate policy import '{importPath}' resolves to '{resolved.PortableIdentity}'; first reached as '{first}'.",
-                    importLocation,
-                    related,
-                    state.Stack.Append(resolved.PortableIdentity));
-            }
-
-            string yaml = _fileSystem.ReadAllText(resolved.FullPath);
-            string[] importChain = state.Stack.Append(resolved.PortableIdentity).ToArray();
-            var descriptor = new ArchitecturePolicySourceDescriptor(
-                state.RootSource.Descriptor.RootPath,
-                resolved.PortableIdentity,
-                ArchitecturePolicyDocumentRole.Fragment,
-                state.Sources.Count,
-                source.PortableIdentity,
-                importPath,
-                importChain);
-            ArchitecturePolicySource child = _parser.Parse(
-                descriptor,
-                resolved.FullPath,
-                resolved.PhysicalPath,
-                resolved.FileIdentity,
-                yaml);
-            state.PortableIdentities.Add(resolved.PortableIdentity);
-            state.FirstImports[resolved.FileIdentity] = importPath;
-            Visit(child, depth + 1, state);
+            VisitImport(source, importIndex, depth, state);
         }
 
         state.Stack.RemoveAt(state.Stack.Count - 1);
         state.Active.Remove(source.FileIdentity);
         state.Completed.Add(source.FileIdentity);
+    }
+
+    private void VisitImport(
+        ArchitecturePolicySource source,
+        int importIndex,
+        int depth,
+        ResolutionState state)
+    {
+        string importPath = source.Imports[importIndex];
+        ArchitecturePolicySourceLocation importLocation =
+            ArchitecturePolicyDiagnosticFactory.ImportLocation(source, importIndex);
+        ArchitecturePolicySourceParser.ValidatePortableImport(importPath, source, importIndex);
+        EnsureWithinLimits(depth, state, importPath, importLocation);
+
+        ArchitecturePolicyResolvedPath resolved = ResolveImport(source, state, importPath, importLocation);
+        EnsureNotActive(state, resolved, importLocation);
+        EnsureNotDuplicate(state, resolved, importPath, importLocation);
+        ParseAndVisitImport(source, depth, state, importPath, resolved);
+    }
+
+    private static void EnsureWithinLimits(
+        int depth,
+        ResolutionState state,
+        string importPath,
+        ArchitecturePolicySourceLocation importLocation)
+    {
+        if (depth == MaximumDepth)
+        {
+            throw Limit(
+                $"Import depth exceeds {MaximumDepth}: {FormatChain(state.Stack, importPath)}",
+                importLocation,
+                state.Stack.Append(importPath).ToArray());
+        }
+
+        if (state.Sources.Count == MaximumFileCount)
+        {
+            throw Limit(
+                $"Policy import graph exceeds {MaximumFileCount} files: {FormatChain(state.Stack, importPath)}",
+                importLocation,
+                state.Stack.Append(importPath).ToArray());
+        }
+    }
+
+    private ArchitecturePolicyResolvedPath ResolveImport(
+        ArchitecturePolicySource source,
+        ResolutionState state,
+        string importPath,
+        ArchitecturePolicySourceLocation importLocation)
+    {
+        try
+        {
+            return _pathResolver.ResolveImport(state.Root, source.FullPath, importPath);
+        }
+        catch (ArchitecturePolicyImportException exception)
+        {
+            throw ArchitecturePolicyDiagnosticFactory.Enrich(
+                exception,
+                importLocation,
+                state.Stack.Append(importPath));
+        }
+    }
+
+    private static void EnsureNotActive(
+        ResolutionState state,
+        ArchitecturePolicyResolvedPath resolved,
+        ArchitecturePolicySourceLocation importLocation)
+    {
+        if (!state.Active.Contains(resolved.FileIdentity))
+        {
+            return;
+        }
+
+        throw ArchitecturePolicyDiagnosticFactory.Exception(
+            ArchitecturePolicyImportErrorCategory.Cycle,
+            $"Policy import cycle detected: {FormatChain(state.Stack, resolved.PortableIdentity)}",
+            importLocation,
+            RelatedLocationFor(state.Sources, source => source.FileIdentity == resolved.FileIdentity),
+            state.Stack.Append(resolved.PortableIdentity).ToArray());
+    }
+
+    private static void EnsureNotDuplicate(
+        ResolutionState state,
+        ArchitecturePolicyResolvedPath resolved,
+        string importPath,
+        ArchitecturePolicySourceLocation importLocation)
+    {
+        if (!state.Completed.Contains(resolved.FileIdentity)
+            && !state.PortableIdentities.Contains(resolved.PortableIdentity))
+        {
+            return;
+        }
+
+        string first = state.FirstImports.GetValueOrDefault(resolved.FileIdentity, resolved.PortableIdentity);
+        throw ArchitecturePolicyDiagnosticFactory.Exception(
+            ArchitecturePolicyImportErrorCategory.DuplicateImport,
+            $"Duplicate policy import '{importPath}' resolves to '{resolved.PortableIdentity}'; first reached as '{first}'.",
+            importLocation,
+            RelatedLocationFor(
+                state.Sources,
+                source => source.FileIdentity == resolved.FileIdentity
+                    || string.Equals(source.PortableIdentity, resolved.PortableIdentity, StringComparison.OrdinalIgnoreCase)),
+            state.Stack.Append(resolved.PortableIdentity));
+    }
+
+    private void ParseAndVisitImport(
+        ArchitecturePolicySource source,
+        int depth,
+        ResolutionState state,
+        string importPath,
+        ArchitecturePolicyResolvedPath resolved)
+    {
+        string[] importChain = state.Stack.Append(resolved.PortableIdentity).ToArray();
+        var descriptor = new ArchitecturePolicySourceDescriptor(
+            state.RootSource.Descriptor.RootPath,
+            resolved.PortableIdentity,
+            ArchitecturePolicyDocumentRole.Fragment,
+            state.Sources.Count,
+            source.PortableIdentity,
+            importPath,
+            importChain);
+        ArchitecturePolicySource child = _parser.Parse(
+            descriptor,
+            resolved.FullPath,
+            resolved.PhysicalPath,
+            resolved.FileIdentity,
+            _fileSystem.ReadAllText(resolved.FullPath));
+        state.PortableIdentities.Add(resolved.PortableIdentity);
+        state.FirstImports[resolved.FileIdentity] = importPath;
+        Visit(child, depth + 1, state);
+    }
+
+    private static ArchitecturePolicySourceLocation[] RelatedLocationFor(
+        IEnumerable<ArchitecturePolicySource> sources,
+        Func<ArchitecturePolicySource, bool> predicate)
+    {
+        ArchitecturePolicySource? source = sources.FirstOrDefault(predicate);
+        return source is null
+            ? Array.Empty<ArchitecturePolicySourceLocation>()
+            : new[] { ArchitecturePolicyDiagnosticFactory.Location(source, "$") };
     }
 
     private static string FormatChain(IEnumerable<string> stack, string next)

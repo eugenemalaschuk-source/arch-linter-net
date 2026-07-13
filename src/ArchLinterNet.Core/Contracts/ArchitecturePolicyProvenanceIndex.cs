@@ -149,13 +149,6 @@ public sealed class ArchitecturePolicyProvenanceIndex
             : violation with { PolicyLocation = location, RelatedPolicyLocations = related };
     }
 
-    internal ArchitectureViolation EnrichAtPath(ArchitectureViolation violation, string effectiveYamlPath)
-    {
-        return _nodes.TryGetValue(effectiveYamlPath, out ArchitecturePolicySourceLocation? location)
-            ? violation with { PolicyLocation = location }
-            : violation;
-    }
-
     internal PolicyConsistencyDiagnostic Enrich(PolicyConsistencyDiagnostic diagnostic)
     {
         List<ArchitecturePolicySourceLocation> locations = FindDiagnosticLocations(diagnostic);
@@ -185,6 +178,13 @@ public sealed class ArchitecturePolicyProvenanceIndex
         ArchitecturePolicySourceLocation? location = _nodes.GetValueOrDefault(path)
             ?? LocationFor(entry.Contract);
         return location is null ? unmatched : unmatched with { PolicyLocation = location };
+    }
+
+    internal ArchitectureViolation EnrichAtPath(ArchitectureViolation violation, string effectiveYamlPath)
+    {
+        return _nodes.TryGetValue(effectiveYamlPath, out ArchitecturePolicySourceLocation? location)
+            ? violation with { PolicyLocation = location }
+            : violation;
     }
 
     internal ArchitecturePolicySourceLocation? LocationFor(object owner)
@@ -311,15 +311,15 @@ public sealed class ArchitecturePolicyProvenanceIndex
         PolicyConsistencyDiagnostic diagnostic)
     {
         var locations = new List<ArchitecturePolicySourceLocation>();
-        foreach (ContractEntry entry in _contracts)
+        foreach (ContractEntry entry in _contracts.Where(entry =>
+                     ContractMatches(entry.Contract, diagnostic.ContractName, diagnostic.ContractId)
+                     || diagnostic.ConflictingContractNames.Contains(entry.Contract.Name, StringComparer.Ordinal)
+                     || entry.Contract.Id is not null
+                     && diagnostic.ConflictingContractIds.Contains(
+                         entry.Contract.Id,
+                         StringComparer.OrdinalIgnoreCase)))
         {
-            if (ContractMatches(entry.Contract, diagnostic.ContractName, diagnostic.ContractId)
-                || diagnostic.ConflictingContractNames.Contains(entry.Contract.Name, StringComparer.Ordinal)
-                || entry.Contract.Id is not null
-                && diagnostic.ConflictingContractIds.Contains(entry.Contract.Id, StringComparer.OrdinalIgnoreCase))
-            {
-                AddLocation(locations, LocationFor(entry.Contract));
-            }
+            AddLocation(locations, LocationFor(entry.Contract));
         }
 
         if (locations.Count == 0)
@@ -344,7 +344,7 @@ public sealed class ArchitecturePolicyProvenanceIndex
     }
 
     private static void AddLocation(
-        ICollection<ArchitecturePolicySourceLocation> locations,
+        List<ArchitecturePolicySourceLocation> locations,
         ArchitecturePolicySourceLocation? location)
     {
         if (location is not null && !locations.Contains(location))
@@ -353,7 +353,7 @@ public sealed class ArchitecturePolicyProvenanceIndex
         }
     }
 
-    private IReadOnlyList<ArchitecturePolicySourceLocation> LocationsFor(IEnumerable<object>? owners)
+    private ArchitecturePolicySourceLocation[] LocationsFor(IEnumerable<object>? owners)
     {
         if (owners is null)
         {

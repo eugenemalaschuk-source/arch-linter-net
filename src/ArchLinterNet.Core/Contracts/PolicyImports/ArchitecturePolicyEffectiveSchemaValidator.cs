@@ -1,4 +1,5 @@
 using System.Reflection;
+using System.Text;
 using System.Text.Json.Nodes;
 using ArchLinterNet.Core.Model;
 using Json.Schema;
@@ -139,22 +140,27 @@ internal static class ArchitecturePolicyEffectiveSchemaValidator
             return "$";
         }
 
-        string path = string.Empty;
+        var path = new StringBuilder();
         foreach (string encodedSegment in pointer.TrimStart('/').Split('/'))
         {
             string segment = encodedSegment.Replace("~1", "/", StringComparison.Ordinal)
                 .Replace("~0", "~", StringComparison.Ordinal);
             if (int.TryParse(segment, out int index))
             {
-                path += $"[{index}]";
+                path.Append('[').Append(index).Append(']');
             }
             else
             {
-                path = path.Length == 0 ? segment : $"{path}.{segment}";
+                if (path.Length > 0)
+                {
+                    path.Append('.');
+                }
+
+                path.Append(segment);
             }
         }
 
-        return path;
+        return path.ToString();
     }
 
     private static JsonNode? ConvertNode(YamlNode node)

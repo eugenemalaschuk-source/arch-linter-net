@@ -8,6 +8,9 @@ namespace ArchLinterNet.Core.Tests;
 [TestFixture]
 public sealed class ArchitecturePolicyProvenanceFormattingTests
 {
+    private static readonly string[] _forbiddenReferences = { "App.Domain.Entity" };
+    private static readonly string[] _fragmentImportChain =
+        { "architecture/root.yml", "architecture/policy/domain.yml" };
     private static readonly ArchitectureDiagnosticFormatter _formatter = new();
     private static readonly ArchitectureSarifFormatter _sarifFormatter = new();
 
@@ -51,7 +54,7 @@ public sealed class ArchitecturePolicyProvenanceFormattingTests
     public void CiJson_ViolationWithoutProvenance_PreservesExistingShape()
     {
         var violation = new ArchitectureViolation(
-            "no domain", "no-domain", "App.Application.Service", "App.Domain", new[] { "App.Domain.Entity" });
+            "no domain", "no-domain", "App.Application.Service", "App.Domain", _forbiddenReferences);
 
         string json = _formatter.FormatViolationsForCiArtifacts("no domain", "no-domain", new[] { violation });
         using JsonDocument document = JsonDocument.Parse(json);
@@ -95,7 +98,7 @@ public sealed class ArchitecturePolicyProvenanceFormattingTests
             1,
             "architecture/root.yml",
             "policy/domain.yml",
-            new[] { "architecture/root.yml", "architecture/policy/domain.yml" });
+            _fragmentImportChain);
         var location = new ArchitecturePolicySourceLocation(
             source,
             "contracts.strict[0]",
@@ -109,7 +112,7 @@ public sealed class ArchitecturePolicyProvenanceFormattingTests
             "no-domain",
             "App.Application.Service",
             "App.Domain",
-            new[] { "App.Domain.Entity" })
+            _forbiddenReferences)
         {
             PolicyLocation = location
         };

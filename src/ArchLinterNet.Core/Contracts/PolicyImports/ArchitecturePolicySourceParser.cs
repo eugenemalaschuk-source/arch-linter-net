@@ -21,9 +21,11 @@ internal sealed record ArchitecturePolicySource(
 
 internal sealed partial class ArchitecturePolicySourceParser
 {
+    private const string ImportsField = "imports";
+
     private static readonly HashSet<string> _allowedRootFields = new(StringComparer.Ordinal)
     {
-        "version", "name", "imports", "layers", "external_dependencies", "packages",
+        "version", "name", ImportsField, "layers", "external_dependencies", "packages",
         "legacy_runtime_layers", "analysis", "contracts", "classification"
     };
 
@@ -36,7 +38,7 @@ internal sealed partial class ArchitecturePolicySourceParser
     public bool ContainsImports(string yaml)
     {
         YamlMappingNode? root = ParseMapping(yaml, "root policy", requireMapping: false);
-        return root is not null && TryGetChild(root, "imports", out _);
+        return root is not null && TryGetChild(root, ImportsField, out _);
     }
 
     public ArchitecturePolicySource Parse(
@@ -84,7 +86,7 @@ internal sealed partial class ArchitecturePolicySourceParser
         return new ArchitecturePolicySource(descriptor, fullPath, physicalPath, fileIdentity, root, imports);
     }
 
-    public void ValidatePortableImport(
+    public static void ValidatePortableImport(
         string importPath,
         ArchitecturePolicySource declaringSource,
         int importIndex)
@@ -191,7 +193,7 @@ internal sealed partial class ArchitecturePolicySourceParser
         YamlMappingNode root,
         ArchitecturePolicySourceDescriptor descriptor)
     {
-        if (!TryGetChild(root, "imports", out YamlNode? node))
+        if (!TryGetChild(root, ImportsField, out YamlNode? node))
         {
             return Array.Empty<string>();
         }
@@ -199,9 +201,9 @@ internal sealed partial class ArchitecturePolicySourceParser
         if (node is not YamlSequenceNode { Children.Count: > 0 } sequence)
         {
             throw Shape(
-                $"Policy source '{descriptor.SourcePath}' field 'imports' must be a non-empty sequence.",
+                $"Policy source '{descriptor.SourcePath}' field '{ImportsField}' must be a non-empty sequence.",
                 descriptor,
-                "imports",
+                ImportsField,
                 node!);
         }
 
@@ -214,7 +216,7 @@ internal sealed partial class ArchitecturePolicySourceParser
                 throw Shape(
                     $"Policy source '{descriptor.SourcePath}' contains a non-scalar or empty import entry.",
                     descriptor,
-                    $"imports[{index}]",
+                    $"{ImportsField}[{index}]",
                     child);
             }
 

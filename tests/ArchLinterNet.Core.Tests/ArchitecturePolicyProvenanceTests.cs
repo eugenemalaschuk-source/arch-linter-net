@@ -9,6 +9,16 @@ namespace ArchLinterNet.Core.Tests;
 [TestFixture]
 public sealed class ArchitecturePolicyProvenanceTests
 {
+    private static readonly string[] _allowForbidPaths = { "architecture/allow.yml", "architecture/forbid.yml" };
+    private static readonly string[] _cycleImportChain =
+        { "architecture/root.yml", "architecture/a.yml", "architecture/nested/b.yml", "architecture/a.yml" };
+    private static readonly string[] _cycleRelatedSourcePaths = { "architecture/a.yml" };
+    private static readonly string[] _duplicateContractPaths = { "architecture/root.yml", "architecture/fragment.yml" };
+    private static readonly string[] _fragmentContractImportChain =
+        { "architecture/company-policy.yaml", "architecture/parts/domain.data" };
+    private static readonly string[] _nestedMissingImportChain =
+        { "architecture/root.yml", "architecture/a.yml", "nested/missing.yml" };
+
     private string _temporaryDirectory = null!;
 
     [SetUp]
@@ -52,7 +62,7 @@ public sealed class ArchitecturePolicyProvenanceTests
             Assert.That(fragmentLocation.ContractFamily, Is.EqualTo("dependency"));
             Assert.That(fragmentLocation.ContractId, Is.EqualTo("fragment-contract"));
             Assert.That(fragmentLocation.Source.ImportChain,
-                Is.EqualTo(new[] { "architecture/company-policy.yaml", "architecture/parts/domain.data" }));
+                Is.EqualTo(_fragmentContractImportChain));
         });
     }
 
@@ -93,10 +103,7 @@ public sealed class ArchitecturePolicyProvenanceTests
             Assert.That(exception.Category, Is.EqualTo(ArchitecturePolicyImportErrorCategory.MissingFile));
             Assert.That(exception.Diagnostic!.Location!.SourcePath, Is.EqualTo("architecture/a.yml"));
             Assert.That(exception.Diagnostic.Location.YamlPath, Is.EqualTo("imports[0]"));
-            Assert.That(exception.Diagnostic.ImportChain, Is.EqualTo(new[]
-            {
-                "architecture/root.yml", "architecture/a.yml", "nested/missing.yml"
-            }));
+            Assert.That(exception.Diagnostic.ImportChain, Is.EqualTo(_nestedMissingImportChain));
         });
     }
 
@@ -116,11 +123,8 @@ public sealed class ArchitecturePolicyProvenanceTests
             Assert.That(exception.Diagnostic!.Location!.SourcePath, Is.EqualTo("architecture/nested/b.yml"));
             Assert.That(exception.Diagnostic.Location.YamlPath, Is.EqualTo("imports[0]"));
             Assert.That(exception.Diagnostic.RelatedLocations.Select(location => location.SourcePath),
-                Is.EqualTo(new[] { "architecture/a.yml" }));
-            Assert.That(exception.Diagnostic.ImportChain, Is.EqualTo(new[]
-            {
-                "architecture/root.yml", "architecture/a.yml", "architecture/nested/b.yml", "architecture/a.yml"
-            }));
+                Is.EqualTo(_cycleRelatedSourcePaths));
+            Assert.That(exception.Diagnostic.ImportChain, Is.EqualTo(_cycleImportChain));
         });
     }
 
@@ -154,7 +158,7 @@ public sealed class ArchitecturePolicyProvenanceTests
             .Select(location => location.SourcePath)
             .ToArray();
 
-        Assert.That(paths, Is.EqualTo(new[] { "architecture/root.yml", "architecture/fragment.yml" }));
+        Assert.That(paths, Is.EqualTo(_duplicateContractPaths));
     }
 
     [Test]
@@ -273,7 +277,7 @@ public sealed class ArchitecturePolicyProvenanceTests
             .Select(location => location.SourcePath)
             .ToArray();
 
-        Assert.That(paths, Is.EqualTo(new[] { "architecture/allow.yml", "architecture/forbid.yml" }));
+        Assert.That(paths, Is.EqualTo(_allowForbidPaths));
     }
 
     [Test]

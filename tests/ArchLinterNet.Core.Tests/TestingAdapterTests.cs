@@ -6,6 +6,8 @@ namespace ArchLinterNet.Core.Tests;
 [TestFixture]
 public sealed class TestingAdapterTests
 {
+    private static readonly string[] _rulesFragmentPaths = { "architecture/rules.yml" };
+    private static readonly string[] _selfForbiddenIds = { "self-forbidden" };
     private string _tempDir = null!;
 
     [SetUp]
@@ -224,9 +226,9 @@ contracts:
         {
             Assert.That(result.Violations.All(violation => violation.PolicyLocation is not null), Is.True);
             Assert.That(result.Violations.Select(violation => violation.PolicyLocation!.SourcePath).Distinct(),
-                Is.EqualTo(new[] { "architecture/rules.yml" }));
+                Is.EqualTo(_rulesFragmentPaths));
             Assert.That(result.Violations.Select(violation => violation.PolicyLocation!.ContractId).Distinct(),
-                Is.EqualTo(new[] { "self-forbidden" }));
+                Is.EqualTo(_selfForbiddenIds));
         });
     }
 

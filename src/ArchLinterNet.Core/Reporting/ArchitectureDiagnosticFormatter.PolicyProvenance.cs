@@ -6,7 +6,7 @@ public sealed partial class ArchitectureDiagnosticFormatter
 {
     private static void ApplyPolicyLocationFields(
         ArchitectureDiagnostic diagnostic,
-        IDictionary<string, object?> target)
+        Dictionary<string, object?> target)
     {
         if (diagnostic.PolicyLocation is not null)
         {
