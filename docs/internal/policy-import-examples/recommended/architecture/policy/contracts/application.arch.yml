@@ -1,7 +1,6 @@
 contracts:
-  strict_dependencies:
-    - id: application-does-not-use-infrastructure
-      name: application-does-not-use-infrastructure
+  strict:
+    - name: application-does-not-use-infrastructure
       source: application
       forbidden: [infrastructure]
       ignored_violations:

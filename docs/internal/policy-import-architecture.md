@@ -1,8 +1,9 @@
-# Policy Import Architecture and Implementation Handoff
+# Policy Import Architecture and Implementation Reference
 
 This note translates issue #280 and the `policy-import-composition` OpenSpec
-capability into implementation boundaries for #281 and #282. It is internal
-design material, not a statement that runtime imports are currently available.
+capability into implementation boundaries for #281 and #282. Runtime graph
+resolution, composition, and schemas are implemented by #281; provenance-rich
+downstream diagnostics remain assigned to #282.
 
 ## Scope
 
@@ -63,7 +64,7 @@ owns only filesystem and graph concerns:
 
 The current `IArchitectureFileSystem` supports reads and existence checks but
 does not expose exact directory entry casing, regular-file identity, link
-resolution, or physical canonicalization. #281 needs a minimal fakeable seam
+resolution, or physical canonicalization. #281 adds a minimal fakeable seam
 for those concrete safety requirements. Extending the existing filesystem seam
 or adding a focused path-identity collaborator is justified only by those four
 missing operations; it must not become a general virtual filesystem or import
@@ -157,7 +158,7 @@ source ordinal and existing within-family order.
 
 ## Schema boundary
 
-#281 should publish a root schema and a fragment schema from shared definitions:
+#281 publishes a root schema and a fragment schema from shared definitions:
 
 - root source: required identity and optional policy sections plus `imports`;
 - fragment: only mergeable sections plus `imports`, with at least one useful
@@ -173,8 +174,8 @@ Runtime chooses the schema from graph role. Editor documentation may show an
 inline YAML language-server schema directive. Filename associations are optional
 convenience only and must not be used by runtime tests.
 
-The production schema remains unchanged in #280 because the runtime cannot yet
-consume imports. Activating only the schema would advertise unsupported YAML.
+The production root schema now accepts `imports`, and the fragment schema is
+published separately for explicit editor selection.
 
 ## Validation order
 

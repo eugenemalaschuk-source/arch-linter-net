@@ -1,9 +1,8 @@
 # Policy Import Format Draft
 
-> Design status: approved format draft for issue #280. ArchLinterNet does not
-> implement `imports` yet. Runtime and public schema support belong to #281 and
-> provenance support belongs to #282. Publish end-user guidance only after
-> those changes ship.
+> Design status: approved format from issue #280, implemented by #281. Rich
+> provenance in downstream diagnostics belongs to #282; public end-user
+> guidance remains assigned to #283.
 
 ArchLinterNet policy imports split one policy into focused local YAML fragments
 without creating additional roots. A run still receives exactly one policy
