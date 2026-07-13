@@ -22,12 +22,21 @@ public sealed partial class ArchitectureCoverageSummaryTests
         };
         ArchitectureCoverageContract contract = new()
         {
-            Name = "semantic-role-coverage", Id = "semantic-role-coverage", Scope = "semantic_role",
-            Roots = { new ArchitectureCoverageRoot { Namespace = "SemanticCoverageSampleFixtures" } }
+            Name = "semantic-role-coverage",
+            Id = "semantic-role-coverage",
+            Scope = "semantic_role",
+            Roots =
+            {
+                new ArchitectureCoverageRoot { Namespace = "SemanticCoverageSampleFixtures" }
+            }
         };
         contract.Exclude.Add(new ArchitectureCoverageExclusion
         {
-            Role = "DomainLayer", Metadata = new Dictionary<string, object> { ["domain"] = "Inventory" },
+            Role = "DomainLayer",
+            Metadata = new Dictionary<string, object>
+            {
+                ["domain"] = "Inventory"
+            },
             Reason = "Inventory is exempted."
         });
 
