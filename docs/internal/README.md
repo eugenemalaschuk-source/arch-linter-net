@@ -12,9 +12,9 @@ It is intentionally excluded from the public MkDocs/GitHub Pages product site.
 
 - [Core architecture blueprint](core-architecture-blueprint.md) — target Core module graph, application/composition seams, and state-ownership rules for the architecture-health refactor (#132/#133).
 
-- [Policy import format draft](policy-import-format-draft.md) - pre-runtime, public-facing format decisions for issue #280.
+- [Policy import format draft](policy-import-format-draft.md) - approved format decisions implemented by issue #281.
 
-- [Policy import architecture and implementation handoff](policy-import-architecture.md) - resolver/composer/provenance boundaries and the #281/#282 test matrix.
+- [Policy import architecture and implementation reference](policy-import-architecture.md) - resolver/composer/provenance boundaries and the #281/#282 test matrix.
 
 - [Policy import design examples](policy-import-examples/README.md) - fixture-ready positive and negative YAML examples.
 

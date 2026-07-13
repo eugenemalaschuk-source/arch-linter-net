@@ -1,5 +1,5 @@
 contracts:
-  strict_dependencies:
+  strict:
     - id: APPLICATION-BOUNDARY
       name: application-boundary-b
       source: application

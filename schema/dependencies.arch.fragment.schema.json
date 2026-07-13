@@ -1,0 +1,53 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://archlinternet.dev/schema/dependencies.arch.fragment.schema.json",
+  "title": "ArchLinterNet dependency architecture policy fragment",
+  "description": "Schema for an imported partial policy document. Fragment role is selected by the import graph, not the filename.",
+  "type": "object",
+  "additionalProperties": false,
+  "anyOf": [
+    { "required": ["imports"] },
+    { "required": ["layers"] },
+    { "required": ["external_dependencies"] },
+    { "required": ["packages"] },
+    { "required": ["legacy_runtime_layers"] },
+    { "required": ["analysis"] },
+    { "required": ["contracts"] },
+    { "required": ["classification"] }
+  ],
+  "properties": {
+    "imports": {
+      "$ref": "https://archlinternet.dev/schema/dependencies.arch.schema.json#/$defs/imports"
+    },
+    "layers": {
+      "type": "object",
+      "additionalProperties": {
+        "$ref": "https://archlinternet.dev/schema/dependencies.arch.schema.json#/$defs/layer"
+      }
+    },
+    "external_dependencies": {
+      "type": "object",
+      "additionalProperties": {
+        "$ref": "https://archlinternet.dev/schema/dependencies.arch.schema.json#/$defs/externalDependencyGroup"
+      }
+    },
+    "packages": {
+      "type": "object",
+      "additionalProperties": {
+        "$ref": "https://archlinternet.dev/schema/dependencies.arch.schema.json#/$defs/packageGroup"
+      }
+    },
+    "legacy_runtime_layers": {
+      "$ref": "https://archlinternet.dev/schema/dependencies.arch.schema.json#/$defs/stringList"
+    },
+    "analysis": {
+      "$ref": "https://archlinternet.dev/schema/dependencies.arch.schema.json#/$defs/analysis"
+    },
+    "contracts": {
+      "$ref": "https://archlinternet.dev/schema/dependencies.arch.schema.json#/$defs/contracts"
+    },
+    "classification": {
+      "$ref": "https://archlinternet.dev/schema/dependencies.arch.schema.json#/$defs/classification"
+    }
+  }
+}

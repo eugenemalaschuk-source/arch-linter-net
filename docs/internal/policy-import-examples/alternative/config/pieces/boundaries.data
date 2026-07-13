@@ -5,8 +5,7 @@ layers:
     namespace: Example.Domain
 
 contracts:
-  strict_dependencies:
-    - id: application-does-not-use-domain-internals
-      name: application-does-not-use-domain-internals
+  strict:
+    - name: application-does-not-use-domain-internals
       source: application
       forbidden: [domain]

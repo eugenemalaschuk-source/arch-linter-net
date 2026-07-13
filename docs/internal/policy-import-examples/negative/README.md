@@ -7,7 +7,7 @@ named root; individual fragment filenames have no semantic role.
 | --- | --- | --- |
 | Root-only fragment field | `root-fragment-shape.yml` | `fragment-with-root-field.yml` declares forbidden `version`. |
 | Duplicate layer | `root-duplicate-layer.yml` | Both fragments own `layers.domain`; the diagnostic names both sources. |
-| Duplicate contract ID | `root-duplicate-id.yml` | Both fragments add case-insensitively equal IDs to `strict_dependencies`. |
+| Duplicate contract ID | `root-duplicate-id.yml` | Both fragments add case-insensitively equal IDs to `strict`. |
 | Cycle | `root-cycle.yml` | The chain is `root-cycle.yml`, `cycle-a.yml`, `cycle-b.yml`, `cycle-a.yml`. |
 | Boundary escape | `root-boundary.yml` | The relative target resolves outside the repository boundary. |
 | Unsupported expression | `root-glob.yml` | A glob entry is rejected before filesystem expansion. |
