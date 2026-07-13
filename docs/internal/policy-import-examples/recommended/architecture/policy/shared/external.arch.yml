@@ -1,0 +1,4 @@
+external_dependencies:
+  logging:
+    namespace_prefixes:
+      - Serilog

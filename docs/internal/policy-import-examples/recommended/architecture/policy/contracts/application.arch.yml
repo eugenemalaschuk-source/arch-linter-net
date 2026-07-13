@@ -1,0 +1,10 @@
+contracts:
+  strict_dependencies:
+    - id: application-does-not-use-infrastructure
+      name: application-does-not-use-infrastructure
+      source: application
+      forbidden: [infrastructure]
+      ignored_violations:
+        - source_type: Example.Application.LegacyAdapter
+          forbidden_reference: Example.Infrastructure.LegacyGateway
+          reason: Remove after the migration completes.
