@@ -1,4 +1,3 @@
-using System.Globalization;
 using System.Reflection;
 using System.Text.Json.Nodes;
 using Json.Schema;
@@ -105,19 +104,90 @@ internal static class ArchitecturePolicyEffectiveSchemaValidator
     private static JsonNode? ConvertScalar(YamlScalarNode scalar)
     {
         string? value = scalar.Value;
-        if (scalar.Style != ScalarStyle.Plain || value is null)
+        if (value is null)
         {
             return value;
         }
 
-        return value switch
+        bool explicitlyTyped = !scalar.Tag.IsEmpty
+            && !scalar.Tag.IsNonSpecific
+            && scalar.Tag.Value.StartsWith("tag:yaml.org,2002:", StringComparison.Ordinal);
+        if (scalar.Style != ScalarStyle.Plain && !explicitlyTyped)
         {
-            "null" or "~" or "" => null,
-            "true" => true,
-            "false" => false,
-            _ when int.TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture, out int integer) => integer,
-            _ when double.TryParse(value, NumberStyles.Float, CultureInfo.InvariantCulture, out double number) => number,
-            _ => value
-        };
+            return value;
+        }
+
+        if (string.Equals(value, "null", StringComparison.OrdinalIgnoreCase) || value == "~")
+        {
+            return null;
+        }
+
+        if (bool.TryParse(value, out bool boolean))
+        {
+            return boolean;
+        }
+
+        string normalized = value.Replace("_", string.Empty, StringComparison.Ordinal);
+        if (TryParseInteger(normalized, out long integer))
+        {
+            return integer is >= int.MinValue and <= int.MaxValue ? (int)integer : integer;
+        }
+
+        if (double.TryParse(normalized, System.Globalization.NumberStyles.Float,
+                System.Globalization.CultureInfo.InvariantCulture, out double number))
+        {
+            return number;
+        }
+
+        return value;
+    }
+
+    private static bool TryParseInteger(string value, out long result)
+    {
+        const System.Globalization.NumberStyles Decimal = System.Globalization.NumberStyles.Integer;
+        if (long.TryParse(value, Decimal, System.Globalization.CultureInfo.InvariantCulture, out result))
+        {
+            return true;
+        }
+
+        bool negative = value.StartsWith("-", StringComparison.Ordinal);
+        string unsignedValue = negative ? value[1..] : value;
+        int radix = unsignedValue.StartsWith("0x", StringComparison.OrdinalIgnoreCase) ? 16
+            : unsignedValue.StartsWith("0o", StringComparison.OrdinalIgnoreCase) ? 8
+            : unsignedValue.StartsWith("0b", StringComparison.OrdinalIgnoreCase) ? 2
+            : 0;
+        if (radix == 0)
+        {
+            result = default;
+            return false;
+        }
+
+        string digits = unsignedValue[2..];
+        if (digits.Length == 0)
+        {
+            result = default;
+            return false;
+        }
+
+        try
+        {
+            result = Convert.ToInt64(digits, radix);
+            if (negative)
+            {
+                result = -result;
+            }
+
+            return true;
+        }
+        catch (FormatException)
+        {
+            result = default;
+            return false;
+        }
+        catch (OverflowException)
+        {
+            result = default;
+            return false;
+        }
     }
 }

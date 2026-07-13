@@ -81,7 +81,7 @@ internal sealed class ArchitecturePolicyDocumentComposer
         ArchitecturePolicySource source)
     {
         YamlMappingNode sourceMap = RequireMapping(sourceValue, source, section);
-        YamlMappingNode target = GetOrAddMapping(effective, section);
+        YamlMappingNode target = GetOrAddMapping(effective, section, source, section);
         foreach ((YamlNode keyNode, YamlNode value) in sourceMap.Children)
         {
             string key = ScalarKey(keyNode, source, section, "definition key");
@@ -94,7 +94,7 @@ internal sealed class ArchitecturePolicyDocumentComposer
     private void MergeAnalysis(YamlMappingNode effective, YamlNode value, ArchitecturePolicySource source)
     {
         YamlMappingNode sourceMap = RequireMapping(value, source, "analysis");
-        YamlMappingNode target = GetOrAddMapping(effective, "analysis");
+        YamlMappingNode target = GetOrAddMapping(effective, "analysis", source, "analysis");
         foreach ((YamlNode keyNode, YamlNode child) in sourceMap.Children)
         {
             string key = ScalarKey(keyNode, source, "analysis", "analysis field");
@@ -117,13 +117,13 @@ internal sealed class ArchitecturePolicyDocumentComposer
     private void MergeContracts(YamlMappingNode effective, YamlNode value, ArchitecturePolicySource source)
     {
         YamlMappingNode sourceMap = RequireMapping(value, source, "contracts");
-        YamlMappingNode target = GetOrAddMapping(effective, "contracts");
+        YamlMappingNode target = GetOrAddMapping(effective, "contracts", source, "contracts");
         foreach ((YamlNode keyNode, YamlNode child) in sourceMap.Children)
         {
             string group = ScalarKey(keyNode, source, "contracts", "contract group");
             string path = $"contracts.{group}";
             YamlSequenceNode sourceSequence = RequireSequence(child, source, path);
-            YamlSequenceNode targetSequence = GetOrAddSequence(target, group);
+            YamlSequenceNode targetSequence = GetOrAddSequence(target, group, source, path);
             int firstIndex = targetSequence.Children.Count;
             foreach (YamlNode contract in sourceSequence.Children)
             {
@@ -136,7 +136,7 @@ internal sealed class ArchitecturePolicyDocumentComposer
     private void MergeClassification(YamlMappingNode effective, YamlNode value, ArchitecturePolicySource source)
     {
         YamlMappingNode sourceMap = RequireMapping(value, source, "classification");
-        YamlMappingNode target = GetOrAddMapping(effective, "classification");
+        YamlMappingNode target = GetOrAddMapping(effective, "classification", source, "classification");
         foreach ((YamlNode keyNode, YamlNode child) in sourceMap.Children)
         {
             string key = ScalarKey(keyNode, source, "classification", "classification field");
@@ -160,7 +160,7 @@ internal sealed class ArchitecturePolicyDocumentComposer
         string path)
     {
         YamlMappingNode sourceMap = RequireMapping(value, source, path);
-        YamlMappingNode target = GetOrAddMapping(parent, key);
+        YamlMappingNode target = GetOrAddMapping(parent, key, source, path);
         foreach ((YamlNode childKeyNode, YamlNode childValue) in sourceMap.Children)
         {
             string childKey = ScalarKey(childKeyNode, source, path, "definition key");
@@ -178,7 +178,7 @@ internal sealed class ArchitecturePolicyDocumentComposer
         string path)
     {
         YamlSequenceNode sourceSequence = RequireSequence(value, source, path);
-        YamlSequenceNode target = GetOrAddSequence(parent, key);
+        YamlSequenceNode target = GetOrAddSequence(parent, key, source, path);
         foreach (YamlNode child in sourceSequence.Children)
         {
             target.Add(child);
@@ -243,11 +243,15 @@ internal sealed class ArchitecturePolicyDocumentComposer
         _declarations.Add(key, declaration);
     }
 
-    private static YamlMappingNode GetOrAddMapping(YamlMappingNode parent, string key)
+    private static YamlMappingNode GetOrAddMapping(
+        YamlMappingNode parent,
+        string key,
+        ArchitecturePolicySource source,
+        string path)
     {
         if (ArchitecturePolicySourceParser.TryGetChild(parent, key, out YamlNode? value))
         {
-            return (YamlMappingNode)value!;
+            return RequireMapping(value!, source, path);
         }
 
         var mapping = new YamlMappingNode();
@@ -255,11 +259,15 @@ internal sealed class ArchitecturePolicyDocumentComposer
         return mapping;
     }
 
-    private static YamlSequenceNode GetOrAddSequence(YamlMappingNode parent, string key)
+    private static YamlSequenceNode GetOrAddSequence(
+        YamlMappingNode parent,
+        string key,
+        ArchitecturePolicySource source,
+        string path)
     {
         if (ArchitecturePolicySourceParser.TryGetChild(parent, key, out YamlNode? value))
         {
-            return (YamlSequenceNode)value!;
+            return RequireSequence(value!, source, path);
         }
 
         var sequence = new YamlSequenceNode();

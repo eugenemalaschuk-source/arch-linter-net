@@ -31,6 +31,7 @@ internal sealed class ArchitecturePolicyImportGraphResolver
             root.FullPath,
             root.PhysicalPath,
             rootIdentity,
+            root.FileIdentity,
             rootYaml);
         var state = new ResolutionState(root, rootSource);
 
@@ -40,7 +41,7 @@ internal sealed class ArchitecturePolicyImportGraphResolver
 
     private void Visit(ArchitecturePolicySource source, int depth, ResolutionState state)
     {
-        state.Active.Add(source.PhysicalPath);
+        state.Active.Add(source.FileIdentity);
         state.Stack.Add(source.PortableIdentity);
         state.Sources.Add(source);
 
@@ -61,17 +62,17 @@ internal sealed class ArchitecturePolicyImportGraphResolver
                 state.Root,
                 source.FullPath,
                 importPath);
-            if (state.Active.Contains(resolved.PhysicalPath))
+            if (state.Active.Contains(resolved.FileIdentity))
             {
                 throw new ArchitecturePolicyImportException(
                     ArchitecturePolicyImportErrorCategory.Cycle,
                     $"Policy import cycle detected: {FormatChain(state.Stack, resolved.PortableIdentity)}");
             }
 
-            if (state.Completed.Contains(resolved.PhysicalPath)
+            if (state.Completed.Contains(resolved.FileIdentity)
                 || state.PortableIdentities.Contains(resolved.PortableIdentity))
             {
-                string first = state.FirstImports.GetValueOrDefault(resolved.PhysicalPath, resolved.PortableIdentity);
+                string first = state.FirstImports.GetValueOrDefault(resolved.FileIdentity, resolved.PortableIdentity);
                 throw new ArchitecturePolicyImportException(
                     ArchitecturePolicyImportErrorCategory.DuplicateImport,
                     $"Duplicate policy import '{importPath}' resolves to '{resolved.PortableIdentity}'; first reached as '{first}'.");
@@ -83,15 +84,16 @@ internal sealed class ArchitecturePolicyImportGraphResolver
                 resolved.FullPath,
                 resolved.PhysicalPath,
                 resolved.PortableIdentity,
+                resolved.FileIdentity,
                 yaml);
             state.PortableIdentities.Add(resolved.PortableIdentity);
-            state.FirstImports[resolved.PhysicalPath] = importPath;
+            state.FirstImports[resolved.FileIdentity] = importPath;
             Visit(child, depth + 1, state);
         }
 
         state.Stack.RemoveAt(state.Stack.Count - 1);
-        state.Active.Remove(source.PhysicalPath);
-        state.Completed.Add(source.PhysicalPath);
+        state.Active.Remove(source.FileIdentity);
+        state.Completed.Add(source.FileIdentity);
     }
 
     private static string FormatChain(IEnumerable<string> stack, string next)
@@ -110,7 +112,7 @@ internal sealed class ArchitecturePolicyImportGraphResolver
         {
             Root = root;
             PortableIdentities.Add(rootSource.PortableIdentity);
-            FirstImports[rootSource.PhysicalPath] = rootSource.PortableIdentity;
+            FirstImports[rootSource.FileIdentity] = rootSource.PortableIdentity;
         }
 
         public ArchitecturePolicyRootPath Root { get; }

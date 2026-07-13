@@ -12,6 +12,11 @@ internal sealed record ArchitecturePolicyRootPath(
     string FullPath,
     string PhysicalPath,
     string BoundaryPath,
-    string PhysicalBoundaryPath);
+    string PhysicalBoundaryPath,
+    string FileIdentity);
 
-internal sealed record ArchitecturePolicyResolvedPath(string FullPath, string PhysicalPath, string PortableIdentity);
+internal sealed record ArchitecturePolicyResolvedPath(
+    string FullPath,
+    string PhysicalPath,
+    string PortableIdentity,
+    string FileIdentity);

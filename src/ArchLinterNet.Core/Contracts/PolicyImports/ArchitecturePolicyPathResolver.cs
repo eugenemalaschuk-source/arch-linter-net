@@ -1,3 +1,6 @@
+using System.Runtime.InteropServices;
+using Microsoft.Win32.SafeHandles;
+
 namespace ArchLinterNet.Core.Contracts.PolicyImports;
 
 internal sealed class ArchitecturePolicyPathResolver : IArchitecturePolicyPathResolver
@@ -19,8 +22,9 @@ internal sealed class ArchitecturePolicyPathResolver : IArchitecturePolicyPathRe
         string physicalBoundary = ResolvePhysicalPath(boundary, boundary);
         string physicalRoot = ResolvePhysicalPath(boundary, exactRoot);
         EnsureWithinBoundary(physicalBoundary, physicalRoot, rootPath);
+        string fileIdentity = GetRegularFileIdentity(physicalRoot, rootPath);
 
-        return new ArchitecturePolicyRootPath(rootPath, exactRoot, physicalRoot, boundary, physicalBoundary);
+        return new ArchitecturePolicyRootPath(rootPath, exactRoot, physicalRoot, boundary, physicalBoundary, fileIdentity);
     }
 
     public ArchitecturePolicyResolvedPath ResolveImport(
@@ -35,10 +39,11 @@ internal sealed class ArchitecturePolicyPathResolver : IArchitecturePolicyPathRe
         string exactPath = ResolveExactPath(root.BoundaryPath, candidate, importPath);
         string physicalPath = ResolvePhysicalPath(root.BoundaryPath, exactPath);
         EnsureWithinBoundary(root.PhysicalBoundaryPath, physicalPath, importPath);
+        string fileIdentity = GetRegularFileIdentity(physicalPath, importPath);
 
         string portableIdentity = Path.GetRelativePath(root.BoundaryPath, exactPath)
             .Replace(Path.DirectorySeparatorChar, '/');
-        return new ArchitecturePolicyResolvedPath(exactPath, physicalPath, portableIdentity);
+        return new ArchitecturePolicyResolvedPath(exactPath, physicalPath, portableIdentity, fileIdentity);
     }
 
     private static string ResolveExactPath(string boundary, string candidate, string authoredPath)
@@ -142,10 +147,137 @@ internal sealed class ArchitecturePolicyPathResolver : IArchitecturePolicyPathRe
         }
     }
 
+    private static string GetRegularFileIdentity(string path, string authoredPath)
+    {
+        if (OperatingSystem.IsWindows())
+        {
+            return GetWindowsFileIdentity(path, authoredPath);
+        }
+
+        return GetUnixFileIdentity(path, authoredPath);
+    }
+
+    private static string GetWindowsFileIdentity(string path, string authoredPath)
+    {
+        using SafeFileHandle handle = CreateFile(
+            path,
+            GenericRead,
+            FileShareRead | FileShareWrite | FileShareDelete,
+            IntPtr.Zero,
+            OpenExisting,
+            FileAttributeNormal,
+            IntPtr.Zero);
+        if (handle.IsInvalid
+            || GetFileType(handle) != FileTypeDisk
+            || !GetFileInformationByHandle(handle, out ByHandleFileInformation information))
+        {
+            throw NotRegularFile(authoredPath);
+        }
+
+        ulong index = ((ulong)information.FileIndexHigh << 32) | information.FileIndexLow;
+        return $"windows:{information.VolumeSerialNumber:X8}:{index:X16}";
+    }
+
+    private static string GetUnixFileIdentity(string path, string authoredPath)
+    {
+        IntPtr buffer = Marshal.AllocHGlobal(256);
+        try
+        {
+            for (int index = 0; index < 256; index++)
+            {
+                Marshal.WriteByte(buffer, index, 0);
+            }
+            if (Stat(path, buffer) != 0)
+            {
+                throw NotRegularFile(authoredPath);
+            }
+
+            if (OperatingSystem.IsMacOS())
+            {
+                ushort mode = unchecked((ushort)Marshal.ReadInt16(buffer, 4));
+                if ((mode & FileTypeMask) != RegularFile)
+                {
+                    throw NotRegularFile(authoredPath);
+                }
+
+                uint device = unchecked((uint)Marshal.ReadInt32(buffer));
+                ulong inode = unchecked((ulong)Marshal.ReadInt64(buffer, 8));
+                return $"unix:{device:X8}:{inode:X16}";
+            }
+
+            uint linuxMode = unchecked((uint)Marshal.ReadInt32(buffer, 24));
+            if ((linuxMode & FileTypeMask) != RegularFile)
+            {
+                throw NotRegularFile(authoredPath);
+            }
+
+            ulong linuxDevice = unchecked((ulong)Marshal.ReadInt64(buffer));
+            ulong linuxInode = unchecked((ulong)Marshal.ReadInt64(buffer, 8));
+            return $"unix:{linuxDevice:X16}:{linuxInode:X16}";
+        }
+        finally
+        {
+            Marshal.FreeHGlobal(buffer);
+        }
+    }
+
     private static ArchitecturePolicyImportException Missing(string authoredPath)
     {
         return new ArchitecturePolicyImportException(
             ArchitecturePolicyImportErrorCategory.MissingFile,
             $"Policy import file not found: {authoredPath}");
+    }
+
+    private static ArchitecturePolicyImportException NotRegularFile(string authoredPath)
+    {
+        return new ArchitecturePolicyImportException(
+            ArchitecturePolicyImportErrorCategory.SourceShape,
+            $"Policy import '{authoredPath}' must resolve to a readable regular file.");
+    }
+
+    private const uint GenericRead = 0x80000000;
+    private const uint FileShareRead = 0x00000001;
+    private const uint FileShareWrite = 0x00000002;
+    private const uint FileShareDelete = 0x00000004;
+    private const uint OpenExisting = 3;
+    private const uint FileAttributeNormal = 0x00000080;
+    private const uint FileTypeDisk = 0x00000001;
+    private const int FileTypeMask = 0xF000;
+    private const int RegularFile = 0x8000;
+
+    [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+    private static extern SafeFileHandle CreateFile(
+        string fileName,
+        uint desiredAccess,
+        uint shareMode,
+        IntPtr securityAttributes,
+        uint creationDisposition,
+        uint flagsAndAttributes,
+        IntPtr templateFile);
+
+    [DllImport("kernel32.dll", SetLastError = true)]
+    private static extern bool GetFileInformationByHandle(
+        SafeFileHandle file,
+        out ByHandleFileInformation fileInformation);
+
+    [DllImport("kernel32.dll", SetLastError = true)]
+    private static extern uint GetFileType(SafeFileHandle file);
+
+    [DllImport("libc", SetLastError = true, EntryPoint = "stat")]
+    private static extern int Stat(string path, IntPtr buffer);
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct ByHandleFileInformation
+    {
+        public uint FileAttributes;
+        public System.Runtime.InteropServices.ComTypes.FILETIME CreationTime;
+        public System.Runtime.InteropServices.ComTypes.FILETIME LastAccessTime;
+        public System.Runtime.InteropServices.ComTypes.FILETIME LastWriteTime;
+        public uint VolumeSerialNumber;
+        public uint FileSizeHigh;
+        public uint FileSizeLow;
+        public uint NumberOfLinks;
+        public uint FileIndexHigh;
+        public uint FileIndexLow;
     }
 }

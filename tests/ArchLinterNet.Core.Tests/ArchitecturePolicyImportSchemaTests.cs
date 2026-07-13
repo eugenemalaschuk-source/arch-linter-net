@@ -25,6 +25,19 @@ public sealed class ArchitecturePolicyImportSchemaTests
         });
     }
 
+    [TestCase("${POLICY}.yml")]
+    [TestCase("%POLICY%.yml")]
+    [TestCase("NUL.yml")]
+    [TestCase("nested/trailing-dot.yml.")]
+    [TestCase("nested/trailing-space.yml ")]
+    public void RootSchema_RejectsImportsRejectedByRuntime(string importPath)
+    {
+        JsonSchema schema = LoadSelfContainedImportsSchema();
+        var instance = new JsonArray(importPath);
+
+        Assert.That(schema.Evaluate(instance).IsValid, Is.False);
+    }
+
     [Test]
     public void FragmentSchema_ExcludesRootIdentityAndAllowsEveryMergeableSection()
     {
@@ -83,6 +96,17 @@ public sealed class ArchitecturePolicyImportSchemaTests
         fragment["$defs"] = JsonNode.Parse(rootDocument.RootElement.GetProperty("$defs").GetRawText());
         RewriteRootReferences(fragment);
         return JsonSchema.FromText(fragment.ToJsonString());
+    }
+
+    private static JsonSchema LoadSelfContainedImportsSchema()
+    {
+        using JsonDocument rootDocument = Load("dependencies.arch.schema.json");
+        var schema = new JsonObject
+        {
+            ["$defs"] = JsonNode.Parse(rootDocument.RootElement.GetProperty("$defs").GetRawText()),
+            ["$ref"] = "#/$defs/imports"
+        };
+        return JsonSchema.FromText(schema.ToJsonString());
     }
 
     private static void RewriteRootReferences(JsonNode? node)

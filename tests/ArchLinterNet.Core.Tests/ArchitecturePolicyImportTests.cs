@@ -1,3 +1,4 @@
+using System.Runtime.InteropServices;
 using ArchLinterNet.Core.Contracts;
 using ArchLinterNet.Core.Resolution;
 using NUnit.Framework;
@@ -117,11 +118,14 @@ public sealed class ArchitecturePolicyImportTests
     [TestCase("parts\\layer.yml")]
     [TestCase("parts/*.yml")]
     [TestCase("${POLICY}.yml")]
+    [TestCase("%POLICY%.yml")]
     [TestCase("NUL.yml")]
+    [TestCase("parts/trailing-dot.yml.")]
+    [TestCase("parts/trailing-space.yml ")]
     [TestCase("parts//layer.yml")]
     public void Load_NonPortableImport_ExposesPortablePathCategory(string importPath)
     {
-        string root = Write("architecture/root.yml", RootYaml(importPath));
+        string root = Write("architecture/root.yml", RootYaml($"'{importPath}'"));
 
         ArchitecturePolicyImportException exception = Assert.Throws<ArchitecturePolicyImportException>(
             () => new ArchitecturePolicyDocumentLoader().Load(root))!;
@@ -206,6 +210,50 @@ public sealed class ArchitecturePolicyImportTests
             () => new ArchitecturePolicyDocumentLoader().Load(root))!;
 
         Assert.That(exception.Category, Is.EqualTo(ArchitecturePolicyImportErrorCategory.SourceShape));
+    }
+
+    [Test]
+    public void Load_ComposedNestedShapeMismatch_ExposesSourceShapeCategory()
+    {
+        string root = Write(
+            "architecture/root.yml",
+            RootYaml("fragment.yml", "analysis:\n  target_assemblies: App\n"));
+        Write("architecture/fragment.yml", "analysis:\n  target_assemblies: [Other]\n");
+
+        ArchitecturePolicyImportException exception = Assert.Throws<ArchitecturePolicyImportException>(
+            () => new ArchitecturePolicyDocumentLoader().Load(root))!;
+
+        Assert.That(exception.Category, Is.EqualTo(ArchitecturePolicyImportErrorCategory.SourceShape));
+    }
+
+    [Test]
+    public void Load_ImportedPolicy_PreservesYamlBooleanScalarSemantics()
+    {
+        string root = Write("architecture/root.yml", RootYaml("fragment.yml"));
+        Write(
+            "architecture/fragment.yml",
+            "layers:\n  sdk:\n    namespace: External.Sdk\n    external: True\n");
+
+        Assert.DoesNotThrow(() => new ArchitecturePolicyDocumentLoader().Load(root));
+    }
+
+    [Test]
+    public void Load_HardLinkedImportAlias_ExposesDuplicateImportCategory()
+    {
+        if (!OperatingSystem.IsWindows())
+        {
+            Assert.Ignore("The hard-link regression test uses the Windows file identity implementation.");
+        }
+
+        string root = Write("architecture/root.yml", RootYaml("a.yml", importsSuffix: "  - alias.yml\n"));
+        string original = Write("architecture/a.yml", LayersFragment());
+        string alias = Path.Combine(Path.GetDirectoryName(original)!, "alias.yml");
+        Assert.That(CreateHardLink(alias, original, IntPtr.Zero), Is.True);
+
+        ArchitecturePolicyImportException exception = Assert.Throws<ArchitecturePolicyImportException>(
+            () => new ArchitecturePolicyDocumentLoader().Load(root))!;
+
+        Assert.That(exception.Category, Is.EqualTo(ArchitecturePolicyImportErrorCategory.DuplicateImport));
     }
 
     [TestCase("layers")]
@@ -357,4 +405,7 @@ public sealed class ArchitecturePolicyImportTests
         string imports = nestedImport is null ? string.Empty : $"imports: [{nestedImport}]\n";
         return $"{imports}contracts:\n  strict:\n    - name: {name}\n      source: application\n      forbidden: [domain]\n";
     }
+
+    [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+    private static extern bool CreateHardLink(string fileName, string existingFileName, IntPtr securityAttributes);
 }

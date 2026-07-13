@@ -16,6 +16,7 @@ internal sealed record ArchitecturePolicySource(
     string FullPath,
     string PhysicalPath,
     string PortableIdentity,
+    string FileIdentity,
     YamlMappingNode Root,
     IReadOnlyList<string> Imports);
 
@@ -44,6 +45,7 @@ internal sealed partial class ArchitecturePolicySourceParser
         string fullPath,
         string physicalPath,
         string portableIdentity,
+        string fileIdentity,
         string yaml)
     {
         YamlMappingNode root = ParseMapping(yaml, portableIdentity, requireMapping: true)!;
@@ -66,7 +68,7 @@ internal sealed partial class ArchitecturePolicySourceParser
             }
         }
 
-        return new ArchitecturePolicySource(role, fullPath, physicalPath, portableIdentity, root, imports);
+        return new ArchitecturePolicySource(role, fullPath, physicalPath, portableIdentity, fileIdentity, root, imports);
     }
 
     public void ValidatePortableImport(string importPath, string declaringSource)
@@ -226,6 +228,6 @@ internal sealed partial class ArchitecturePolicySourceParser
     [GeneratedRegex("%[^%]+%", RegexOptions.CultureInvariant)]
     private static partial Regex WindowsInterpolationPattern();
 
-    [GeneratedRegex("^(CON|PRN|AUX|NUL|COM[1-9¹²³]|LPT[1-9¹²³])$", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
+    [GeneratedRegex("^(CON|PRN|AUX|NUL|COM[1-9\\x00B9\\x00B2\\x00B3]|LPT[1-9\\x00B9\\x00B2\\x00B3])$", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
     private static partial Regex ReservedBasenamePattern();
 }
