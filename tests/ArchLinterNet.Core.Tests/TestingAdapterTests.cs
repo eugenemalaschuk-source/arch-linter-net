@@ -192,6 +192,45 @@ contracts:
     }
 
     [Test]
+    public void ValidateStrict_ImportedContract_ExposesTheSharedFragmentProvenance()
+    {
+        string contractDir = Path.Combine(_tempDir, "architecture");
+        Directory.CreateDirectory(contractDir);
+        string contractPath = Path.Combine(contractDir, "dependencies.arch.yml");
+        File.WriteAllText(contractPath, """
+            version: 1
+            name: Testing provenance
+            imports: [rules.yml]
+            layers:
+              core:
+                namespace: ArchLinterNet.Core
+            analysis:
+              target_assemblies: [ArchLinterNet.Core]
+            contracts: {}
+            """);
+        File.WriteAllText(Path.Combine(contractDir, "rules.yml"), """
+            contracts:
+              strict:
+                - id: self-forbidden
+                  name: core-must-not-depend-on-itself
+                  source: core
+                  forbidden: [core]
+            """);
+
+        var result = ArchitectureAssertions.FromPolicy(contractPath).ValidateStrict();
+
+        Assert.That(result.Violations, Is.Not.Empty);
+        Assert.Multiple(() =>
+        {
+            Assert.That(result.Violations.All(violation => violation.PolicyLocation is not null), Is.True);
+            Assert.That(result.Violations.Select(violation => violation.PolicyLocation!.SourcePath).Distinct(),
+                Is.EqualTo(new[] { "architecture/rules.yml" }));
+            Assert.That(result.Violations.Select(violation => violation.PolicyLocation!.ContractId).Distinct(),
+                Is.EqualTo(new[] { "self-forbidden" }));
+        });
+    }
+
+    [Test]
     public void ShouldPass_PolicyConsistencyOnlyFailure_ThrowsWithCheckKindAndReason()
     {
         string contractDir = Path.Combine(_tempDir, "architecture");

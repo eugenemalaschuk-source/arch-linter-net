@@ -9,8 +9,8 @@ internal sealed class PackageAllowOnlyValidator : IArchitecturePolicyDocumentVal
     {
         HashSet<string> targetAssemblies = new(document.Analysis.TargetAssemblies, StringComparer.Ordinal);
 
-        foreach (ArchitecturePackageAllowOnlyContract contract in document.Contracts.StrictPackageAllowOnly
-                     .Concat(document.Contracts.AuditPackageAllowOnly))
+        foreach (ArchitecturePackageAllowOnlyContract contract in document.Provenance.Track(
+                     document.Contracts.StrictPackageAllowOnly.Concat(document.Contracts.AuditPackageAllowOnly)))
         {
             if (contract.DependencyDepth != DependencyDepthMode.Direct)
             {

@@ -43,4 +43,8 @@ public sealed record ArchitectureClassificationRoleFact(
 // classification depends on source/declared-type fact discovery (issue #171) and produces no role
 // assignment yet. Distinct from the fully silent overrides/exclusions reserved sections: declaring
 // path is visible, not just schema-accepted.
-public sealed record ArchitectureClassificationPathDeferredNotice(int DeclaredEntryCount);
+public sealed record ArchitectureClassificationPathDeferredNotice(int DeclaredEntryCount)
+{
+    public IReadOnlyCollection<ArchitecturePolicySourceLocation> PolicyLocations { get; init; } =
+        Array.Empty<ArchitecturePolicySourceLocation>();
+}

@@ -1,3 +1,5 @@
+using ArchLinterNet.Core.Model;
+
 namespace ArchLinterNet.Core.Contracts;
 
 public enum ArchitecturePolicyImportErrorCategory
@@ -15,11 +17,17 @@ public enum ArchitecturePolicyImportErrorCategory
 
 public sealed class ArchitecturePolicyImportException : InvalidOperationException
 {
-    public ArchitecturePolicyImportException(ArchitecturePolicyImportErrorCategory category, string message)
+    public ArchitecturePolicyImportException(
+        ArchitecturePolicyImportErrorCategory category,
+        string message,
+        ArchitecturePolicyDiagnostic? diagnostic = null)
         : base(message)
     {
         Category = category;
+        Diagnostic = diagnostic;
     }
 
     public ArchitecturePolicyImportErrorCategory Category { get; }
+
+    public ArchitecturePolicyDiagnostic? Diagnostic { get; }
 }

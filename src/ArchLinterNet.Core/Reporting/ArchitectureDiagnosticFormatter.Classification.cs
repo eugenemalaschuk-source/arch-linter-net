@@ -91,15 +91,7 @@ public sealed partial class ArchitectureDiagnosticFormatter
     {
         var unmatchedSerialized = (request.Unmatched ?? Array.Empty<ArchitectureUnmatchedIgnoredViolation>())
             .Select(ArchitectureDiagnosticMapper.FromUnmatchedIgnore)
-            .Select(u => new
-            {
-                contract = u.ContractName,
-                contract_id = u.ContractId,
-                ignore_index = u.IgnoreIndex,
-                source_type = u.SourceType,
-                forbidden_reference = u.ForbiddenReference,
-                reason = u.Reason
-            })
+            .Select(ToUnmatchedJsonObject)
             .ToArray();
 
         var policyConsistencySerialized = (request.PolicyConsistencyFindings ?? Array.Empty<PolicyConsistencyDiagnostic>())
@@ -137,7 +129,13 @@ public sealed partial class ArchitectureDiagnosticFormatter
             classification_roles = classificationRolesSerialized,
             classification_path_deferred = request.ClassificationPathDeferred == null
                 ? null
-                : new { declared_entry_count = request.ClassificationPathDeferred.DeclaredEntryCount }
+                : new
+                {
+                    declared_entry_count = request.ClassificationPathDeferred.DeclaredEntryCount,
+                    policy_locations = request.ClassificationPathDeferred.PolicyLocations
+                        .Select(ToPolicyLocationJsonObject)
+                        .ToArray()
+                }
         };
 
         return JsonSerializer.Serialize(payload);
@@ -186,6 +184,10 @@ public sealed partial class ArchitectureDiagnosticFormatter
                     + "but path-convention classification is not yet implemented — it depends on source/declared-type "
                     + "fact discovery (see issue #171, currently open). This section is schema-accepted but produces "
                     + "no role assignment."
+                    + (classificationPathDeferred.PolicyLocations.Count == 0
+                        ? string.Empty
+                        : " (policy: " + string.Join(", ", classificationPathDeferred.PolicyLocations
+                            .Select(location => $"{location.SourcePath}:{location.YamlPath}")) + ")")
             };
         }
 

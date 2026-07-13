@@ -1,7 +1,7 @@
 # Policy Import Format Draft
 
 > Design status: approved format from issue #280, implemented by #281. Rich
-> provenance in downstream diagnostics belongs to #282; public end-user
+> provenance in downstream diagnostics is implemented by #282; public end-user
 > guidance remains assigned to #283.
 
 ArchLinterNet policy imports split one policy into focused local YAML fragments
@@ -171,11 +171,19 @@ Every composed node retains:
 
 - the explicit root identity;
 - its canonical repository-relative source path;
-- its YAML path.
+- its graph-derived root or fragment role and composed source ordinal;
+- its YAML path and source line/column;
+- its declaring source, authored import edge, and root-based import chain when
+  imported;
+- its contract family and effective contract ID when the node belongs to a
+  contract.
 
 Conflict diagnostics identify both declarations. Shape and semantic validation
 diagnostics identify the fragment and YAML path that introduced the invalid
-node. Diagnostic and machine-readable ordering follows composed source order.
+node. Human output appends a compact policy/root suffix, CI JSON exposes typed
+policy-location objects, and SARIF adds policy related locations without
+replacing code locations. Diagnostic and machine-readable ordering follows
+composed source order.
 
 Baselines remain separate inputs and are not imported. Future CEL fields are
 ordinary scalar values carried by their owning nodes; CEL cannot inspect the

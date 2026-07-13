@@ -147,7 +147,7 @@ public sealed partial class ArchitectureDiagnosticFormatter : IArchitectureDiagn
                         return $"  {idPrefix}[{u.ContractName}] ignored_violations[{u.IgnoreIndex}] no longer matches any current violation:{Environment.NewLine}" +
                                $"    source_type: {u.SourceType}{Environment.NewLine}" +
                                $"    forbidden_reference: {u.ForbiddenReference}{Environment.NewLine}" +
-                               $"    reason: {u.Reason}";
+                               $"    reason: {u.Reason}" + FormatPolicyLocationSuffix(u);
                     }));
     }
 
@@ -170,7 +170,8 @@ public sealed partial class ArchitectureDiagnosticFormatter : IArchitectureDiagn
                         string idPrefix = f.ContractId != null ? $"[{f.ContractId}] " : string.Empty;
                         string names = string.Join(", ", f.ConflictingContractNames);
                         return $"  {idPrefix}[{f.CheckKind}] {f.Reason}" +
-                               (names.Length > 0 ? $" (contracts: {names})" : string.Empty);
+                               (names.Length > 0 ? $" (contracts: {names})" : string.Empty) +
+                               FormatPolicyLocationSuffix(f);
                     }));
     }
 
@@ -328,7 +329,8 @@ public sealed partial class ArchitectureDiagnosticFormatter : IArchitectureDiagn
         string refs = string.Join(", ", ForbiddenReferencesOf(diagnostic));
         string pathSuffix = FormatConfigurationPathSuffixForHumans(diagnostic);
 
-        return $"- {idPrefix}[{diagnostic.ContractName}] {SourceTypeOf(diagnostic)} -> {nsDisplay}{context}: {refs}{pathSuffix}";
+        return $"- {idPrefix}[{diagnostic.ContractName}] {SourceTypeOf(diagnostic)} -> {nsDisplay}{context}: " +
+               $"{refs}{pathSuffix}{FormatPolicyLocationSuffix(diagnostic)}";
     }
 
     private static string BuildHumanContext(ArchitectureDiagnostic diagnostic)
@@ -537,6 +539,8 @@ public sealed partial class ArchitectureDiagnosticFormatter : IArchitectureDiagn
             obj["representative_type"] = finding.RepresentativeType;
         }
 
+        ApplyPolicyLocationFields(finding, obj);
+
         return obj;
     }
 
@@ -563,6 +567,23 @@ public sealed partial class ArchitectureDiagnosticFormatter : IArchitectureDiagn
                 obj["matched_namespace_prefix"] = diagnostic.MatchedNamespacePrefixes.First();
         }
 
+        ApplyPolicyLocationFields(diagnostic, obj);
+
+        return obj;
+    }
+
+    private static Dictionary<string, object?> ToUnmatchedJsonObject(UnmatchedIgnoreDiagnostic unmatched)
+    {
+        var obj = new Dictionary<string, object?>
+        {
+            ["contract"] = unmatched.ContractName,
+            ["contract_id"] = unmatched.ContractId,
+            ["ignore_index"] = unmatched.IgnoreIndex,
+            ["source_type"] = unmatched.SourceType,
+            ["forbidden_reference"] = unmatched.ForbiddenReference,
+            ["reason"] = unmatched.Reason
+        };
+        ApplyPolicyLocationFields(unmatched, obj);
         return obj;
     }
 

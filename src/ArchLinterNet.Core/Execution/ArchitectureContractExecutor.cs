@@ -68,7 +68,8 @@ internal sealed class ArchitectureContractExecutor : IArchitectureContractExecut
             foreach (IArchitectureContract contract in session.Catalog.ContractsFor(mode, CoverageFamily))
             {
                 coverageCount++;
-                coverageViolations.AddRange(handlerRegistry.Execute(CoverageFamily, session, contract).Violations);
+                coverageViolations.AddRange(handlerRegistry.Execute(CoverageFamily, session, contract).Violations
+                    .Select(violation => session.Document.Provenance.Enrich(violation, contract)));
 
                 ArchitectureCoverageSummary? summary =
                     session.BuildCoverageSummary((ArchitectureCoverageContract)contract);
@@ -96,7 +97,8 @@ internal sealed class ArchitectureContractExecutor : IArchitectureContractExecut
             {
                 count++;
                 ArchitectureHandlerResult result = handlerRegistry.Execute(family, session, contract);
-                violations.AddRange(result.Violations);
+                violations.AddRange(result.Violations
+                    .Select(violation => session.Document.Provenance.Enrich(violation, contract)));
                 cycles.AddRange(result.Cycles);
             }
         }

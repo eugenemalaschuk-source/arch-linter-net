@@ -1,3 +1,5 @@
+using ArchLinterNet.Core.Contracts;
+
 namespace ArchLinterNet.Core.Execution.Abstractions;
 
 // Aggregation sink for family `ConfigurationContributor` delegates. Replaces the mutable locals
@@ -5,62 +7,78 @@ namespace ArchLinterNet.Core.Execution.Abstractions;
 // family's contribution logic can live on its own descriptor instead of a central switchboard.
 internal sealed class ArchitectureConfigurationReferenceCollector
 {
-    private readonly Dictionary<string, HashSet<string>> _layerReferencingContractIds = new(StringComparer.Ordinal);
-    private readonly HashSet<string> _referencedExternalGroups = new(StringComparer.Ordinal);
-    private readonly HashSet<string> _referencedPackageGroups = new(StringComparer.Ordinal);
-    private readonly List<(string ContractName, string? ContractId, string Source)> _packageContractSources = new();
-    private readonly List<(string ContractName, string? ContractId, string ProjectPath)> _projectMetadataContractProjects = new();
+    private readonly Dictionary<string, List<IArchitectureContract>> _layerReferencingContracts =
+        new(StringComparer.Ordinal);
+    private readonly Dictionary<string, List<IArchitectureContract>> _referencedExternalGroups =
+        new(StringComparer.Ordinal);
+    private readonly Dictionary<string, List<IArchitectureContract>> _referencedPackageGroups =
+        new(StringComparer.Ordinal);
+    private readonly List<(IArchitectureContract Contract, string Source)> _packageContractSources = new();
+    private readonly List<(IArchitectureContract Contract, string ProjectPath)> _projectMetadataContractProjects = new();
 
-    public IReadOnlyDictionary<string, HashSet<string>> LayerReferencingContractIds => _layerReferencingContractIds;
+    public IReadOnlyDictionary<string, List<IArchitectureContract>> LayerReferencingContracts =>
+        _layerReferencingContracts;
 
-    public IReadOnlyCollection<string> ReferencedExternalGroups => _referencedExternalGroups;
+    public IReadOnlyDictionary<string, List<IArchitectureContract>> ReferencedExternalGroups =>
+        _referencedExternalGroups;
 
-    public IReadOnlyCollection<string> ReferencedPackageGroups => _referencedPackageGroups;
+    public IReadOnlyDictionary<string, List<IArchitectureContract>> ReferencedPackageGroups =>
+        _referencedPackageGroups;
 
-    public IReadOnlyList<(string ContractName, string? ContractId, string Source)> PackageContractSources => _packageContractSources;
+    public IReadOnlyList<(IArchitectureContract Contract, string Source)> PackageContractSources =>
+        _packageContractSources;
 
-    public IReadOnlyList<(string ContractName, string? ContractId, string ProjectPath)> ProjectMetadataContractProjects => _projectMetadataContractProjects;
+    public IReadOnlyList<(IArchitectureContract Contract, string ProjectPath)> ProjectMetadataContractProjects =>
+        _projectMetadataContractProjects;
 
-    public void AddLayerNames(string? contractId, IEnumerable<string> names)
+    public void AddLayerNames(IArchitectureContract contract, IEnumerable<string> names)
     {
         foreach (string name in names)
         {
-            if (!_layerReferencingContractIds.TryGetValue(name, out HashSet<string>? contractIds))
-            {
-                contractIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-                _layerReferencingContractIds[name] = contractIds;
-            }
-
-            if (contractId != null)
-            {
-                contractIds.Add(contractId);
-            }
+            AddReference(_layerReferencingContracts, name, contract);
         }
     }
 
-    public void AddExternalGroupNames(IEnumerable<string> names)
+    public void AddExternalGroupNames(IArchitectureContract contract, IEnumerable<string> names)
     {
         foreach (string name in names)
         {
-            _referencedExternalGroups.Add(name);
+            AddReference(_referencedExternalGroups, name, contract);
         }
     }
 
-    public void AddPackageGroupNames(IEnumerable<string> names)
+    public void AddPackageGroupNames(IArchitectureContract contract, IEnumerable<string> names)
     {
         foreach (string name in names)
         {
-            _referencedPackageGroups.Add(name);
+            AddReference(_referencedPackageGroups, name, contract);
         }
     }
 
-    public void AddPackageContractSource(string contractName, string? contractId, string source)
+    public void AddPackageContractSource(IArchitectureContract contract, string source)
     {
-        _packageContractSources.Add((contractName, contractId, source));
+        _packageContractSources.Add((contract, source));
     }
 
-    public void AddProjectMetadataProject(string contractName, string? contractId, string projectPath)
+    public void AddProjectMetadataProject(IArchitectureContract contract, string projectPath)
     {
-        _projectMetadataContractProjects.Add((contractName, contractId, projectPath));
+        _projectMetadataContractProjects.Add((contract, projectPath));
+    }
+
+    private static void AddReference(
+        IDictionary<string, List<IArchitectureContract>> references,
+        string name,
+        IArchitectureContract contract)
+    {
+        if (!references.TryGetValue(name, out List<IArchitectureContract>? contracts))
+        {
+            contracts = new List<IArchitectureContract>();
+            references[name] = contracts;
+        }
+
+        if (!contracts.Any(candidate => ReferenceEquals(candidate, contract)))
+        {
+            contracts.Add(contract);
+        }
     }
 }

@@ -7,8 +7,8 @@ internal sealed class AcyclicSiblingValidator : IArchitecturePolicyDocumentValid
 {
     public void Validate(ArchitectureContractDocument document)
     {
-        foreach (ArchitectureAcyclicSiblingContract contract in document.Contracts.StrictAcyclicSiblings
-                     .Concat(document.Contracts.AuditAcyclicSiblings))
+        foreach (ArchitectureAcyclicSiblingContract contract in document.Provenance.Track(
+                     document.Contracts.StrictAcyclicSiblings.Concat(document.Contracts.AuditAcyclicSiblings)))
         {
             if (contract.Ancestors.Count == 0)
             {

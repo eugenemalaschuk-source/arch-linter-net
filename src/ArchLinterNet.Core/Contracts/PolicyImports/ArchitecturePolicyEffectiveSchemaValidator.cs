@@ -1,5 +1,6 @@
 using System.Reflection;
 using System.Text.Json.Nodes;
+using ArchLinterNet.Core.Model;
 using Json.Schema;
 using YamlDotNet.Core;
 using YamlDotNet.RepresentationModel;
@@ -12,12 +13,12 @@ internal static class ArchitecturePolicyEffectiveSchemaValidator
 
     private static readonly Lazy<JsonSchema> _schema = new(LoadSchema);
 
-    public static void Validate(string yaml)
+    public static void Validate(string yaml, ArchitecturePolicyProvenanceIndex provenance)
     {
         var stream = new YamlStream();
         stream.Load(new StringReader(yaml));
         JsonNode? instance = ConvertNode(stream.Documents[0].RootNode);
-        RemoveValidatedContractIds(instance);
+        RemoveValidatedContractIds(instance, provenance);
         EvaluationResults results = _schema.Value.Evaluate(
             instance,
             new EvaluationOptions { OutputFormat = OutputFormat.List });
@@ -33,9 +34,15 @@ internal static class ArchitecturePolicyEffectiveSchemaValidator
                 .SelectMany(detail => detail.Errors?.Select(error => $"{detail.InstanceLocation}: {error.Value}")
                     ?? Array.Empty<string>())
                 .TakeLast(12));
-        throw new ArchitecturePolicyImportException(
+        ArchitecturePolicySourceLocation? location = results.Details
+            .Where(detail => !detail.IsValid && detail.Errors is not null)
+            .OrderByDescending(detail => InstanceDepth(detail.InstanceLocation.ToString()))
+            .Select(detail => FindLocation(provenance, detail.InstanceLocation.ToString()))
+            .FirstOrDefault(candidate => candidate is not null);
+        throw ArchitecturePolicyDiagnosticFactory.Exception(
             ArchitecturePolicyImportErrorCategory.SourceShape,
-            $"Composed policy does not satisfy the effective policy schema: {details}");
+            $"Composed policy does not satisfy the effective policy schema: {details}",
+            location);
     }
 
     private static JsonSchema LoadSchema()
@@ -47,7 +54,9 @@ internal static class ArchitecturePolicyEffectiveSchemaValidator
         return JsonSchema.FromText(reader.ReadToEnd());
     }
 
-    private static void RemoveValidatedContractIds(JsonNode? instance)
+    private static void RemoveValidatedContractIds(
+        JsonNode? instance,
+        ArchitecturePolicyProvenanceIndex provenance)
     {
         if (instance is not JsonObject root
             || root["contracts"] is not JsonObject contracts)
@@ -55,15 +64,20 @@ internal static class ArchitecturePolicyEffectiveSchemaValidator
             return;
         }
 
-        foreach ((_, JsonNode? group) in contracts)
+        foreach ((string groupName, JsonNode? group) in contracts)
         {
             if (group is not JsonArray entries)
             {
                 continue;
             }
 
-            foreach (JsonObject contract in entries.OfType<JsonObject>())
+            for (int index = 0; index < entries.Count; index++)
             {
+                if (entries[index] is not JsonObject contract)
+                {
+                    continue;
+                }
+
                 if (!contract.TryGetPropertyValue("id", out JsonNode? idNode))
                 {
                     continue;
@@ -73,9 +87,13 @@ internal static class ArchitecturePolicyEffectiveSchemaValidator
                     || !idValue.TryGetValue(out string? id)
                     || string.IsNullOrEmpty(id))
                 {
-                    throw new ArchitecturePolicyImportException(
+                    provenance.TryGetLocation(
+                        $"contracts.{groupName}[{index}].id",
+                        out ArchitecturePolicySourceLocation? location);
+                    throw ArchitecturePolicyDiagnosticFactory.Exception(
                         ArchitecturePolicyImportErrorCategory.SourceShape,
-                        "A composed contract id must be a non-empty string when declared.");
+                        "A composed contract id must be a non-empty string when declared.",
+                        location);
                 }
 
                 // The published schema exposes id through baseContractFields. Json Schema's
@@ -85,6 +103,58 @@ internal static class ArchitecturePolicyEffectiveSchemaValidator
                 contract.Remove("id");
             }
         }
+    }
+
+    private static ArchitecturePolicySourceLocation? FindLocation(
+        ArchitecturePolicyProvenanceIndex provenance,
+        string instanceLocation)
+    {
+        string yamlPath = JsonPointerToYamlPath(instanceLocation);
+        ArchitecturePolicySourceLocation? location;
+        while (!provenance.TryGetLocation(yamlPath, out location))
+        {
+            int dot = yamlPath.LastIndexOf('.');
+            int bracket = yamlPath.LastIndexOf('[');
+            int boundary = Math.Max(dot, bracket);
+            if (boundary < 0)
+            {
+                return null;
+            }
+
+            yamlPath = yamlPath[..boundary];
+        }
+
+        return location;
+    }
+
+    private static int InstanceDepth(string instanceLocation)
+    {
+        return instanceLocation.Count(character => character == '/');
+    }
+
+    private static string JsonPointerToYamlPath(string pointer)
+    {
+        if (string.IsNullOrEmpty(pointer) || pointer == "/")
+        {
+            return "$";
+        }
+
+        string path = string.Empty;
+        foreach (string encodedSegment in pointer.TrimStart('/').Split('/'))
+        {
+            string segment = encodedSegment.Replace("~1", "/", StringComparison.Ordinal)
+                .Replace("~0", "~", StringComparison.Ordinal);
+            if (int.TryParse(segment, out int index))
+            {
+                path += $"[{index}]";
+            }
+            else
+            {
+                path = path.Length == 0 ? segment : $"{path}.{segment}";
+            }
+        }
+
+        return path;
     }
 
     private static JsonNode? ConvertNode(YamlNode node)

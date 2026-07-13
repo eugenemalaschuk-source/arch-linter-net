@@ -1,24 +1,23 @@
 using System.Text;
 using System.Text.RegularExpressions;
+using ArchLinterNet.Core.Model;
 using YamlDotNet.Core;
 using YamlDotNet.RepresentationModel;
 
 namespace ArchLinterNet.Core.Contracts.PolicyImports;
 
-internal enum ArchitecturePolicySourceRole
-{
-    Root,
-    Fragment
-}
-
 internal sealed record ArchitecturePolicySource(
-    ArchitecturePolicySourceRole Role,
+    ArchitecturePolicySourceDescriptor Descriptor,
     string FullPath,
     string PhysicalPath,
-    string PortableIdentity,
     string FileIdentity,
     YamlMappingNode Root,
-    IReadOnlyList<string> Imports);
+    IReadOnlyList<string> Imports)
+{
+    public ArchitecturePolicyDocumentRole Role => Descriptor.Role;
+
+    public string PortableIdentity => Descriptor.SourcePath;
+}
 
 internal sealed partial class ArchitecturePolicySourceParser
 {
@@ -41,21 +40,31 @@ internal sealed partial class ArchitecturePolicySourceParser
     }
 
     public ArchitecturePolicySource Parse(
-        ArchitecturePolicySourceRole role,
+        ArchitecturePolicySourceDescriptor descriptor,
         string fullPath,
         string physicalPath,
-        string portableIdentity,
         string fileIdentity,
         string yaml)
     {
-        YamlMappingNode root = ParseMapping(yaml, portableIdentity, requireMapping: true)!;
-        ValidateTopLevelFields(root, role, portableIdentity);
-        IReadOnlyList<string> imports = ReadImports(root, portableIdentity);
-
-        if (role == ArchitecturePolicySourceRole.Root)
+        YamlMappingNode root;
+        try
         {
-            RequireField(root, "version", portableIdentity);
-            RequireField(root, "name", portableIdentity);
+            root = ParseMapping(yaml, descriptor.SourcePath, requireMapping: true)!;
+        }
+        catch (ArchitecturePolicyImportException exception)
+        {
+            throw ArchitecturePolicyDiagnosticFactory.Enrich(
+                exception,
+                ArchitecturePolicyDiagnosticFactory.Location(descriptor));
+        }
+
+        ValidateTopLevelFields(root, descriptor);
+        IReadOnlyList<string> imports = ReadImports(root, descriptor);
+
+        if (descriptor.Role == ArchitecturePolicyDocumentRole.Root)
+        {
+            RequireField(root, "version", descriptor);
+            RequireField(root, "name", descriptor);
         }
         else
         {
@@ -64,14 +73,21 @@ internal sealed partial class ArchitecturePolicySourceParser
                 .Any(key => key.Value is not null && _mergeableFields.Contains(key.Value));
             if (!hasContribution && imports.Count == 0)
             {
-                throw Shape($"Policy fragment '{portableIdentity}' must contain a mergeable section or imports.");
+                throw Shape(
+                    $"Policy fragment '{descriptor.SourcePath}' must contain a mergeable section or imports.",
+                    descriptor,
+                    "$",
+                    root);
             }
         }
 
-        return new ArchitecturePolicySource(role, fullPath, physicalPath, portableIdentity, fileIdentity, root, imports);
+        return new ArchitecturePolicySource(descriptor, fullPath, physicalPath, fileIdentity, root, imports);
     }
 
-    public void ValidatePortableImport(string importPath, string declaringSource)
+    public void ValidatePortableImport(
+        string importPath,
+        ArchitecturePolicySource declaringSource,
+        int importIndex)
     {
         if (string.IsNullOrWhiteSpace(importPath)
             || !importPath.IsNormalized(NormalizationForm.FormC)
@@ -82,13 +98,13 @@ internal sealed partial class ArchitecturePolicySourceParser
             || importPath.Contains("$(", StringComparison.Ordinal)
             || WindowsInterpolationPattern().IsMatch(importPath))
         {
-            throw Portable(importPath, declaringSource);
+            throw Portable(importPath, declaringSource, importIndex);
         }
 
         string[] segments = importPath.Split('/');
         if (segments.Length == 0 || segments.Any(string.IsNullOrEmpty))
         {
-            throw Portable(importPath, declaringSource);
+            throw Portable(importPath, declaringSource, importIndex);
         }
 
         foreach (string segment in segments)
@@ -102,13 +118,13 @@ internal sealed partial class ArchitecturePolicySourceParser
                 || segment.EndsWith(' ')
                 || segment.Any(character => char.IsControl(character) || "<>:\"/\\|?*".Contains(character)))
             {
-                throw Portable(importPath, declaringSource);
+                throw Portable(importPath, declaringSource, importIndex);
             }
 
             string basename = segment.Split('.', 2)[0];
             if (ReservedBasenamePattern().IsMatch(basename))
             {
-                throw Portable(importPath, declaringSource);
+                throw Portable(importPath, declaringSource, importIndex);
             }
         }
     }
@@ -146,25 +162,34 @@ internal sealed partial class ArchitecturePolicySourceParser
 
     private static void ValidateTopLevelFields(
         YamlMappingNode root,
-        ArchitecturePolicySourceRole role,
-        string source)
+        ArchitecturePolicySourceDescriptor descriptor)
     {
         foreach (YamlNode keyNode in root.Children.Keys)
         {
             if (keyNode is not YamlScalarNode { Value: { } key } || !_allowedRootFields.Contains(key))
             {
                 string rendered = keyNode is YamlScalarNode scalar ? scalar.Value ?? "<null>" : "<non-scalar>";
-                throw Shape($"Policy source '{source}' contains unknown top-level field '{rendered}'.");
+                throw Shape(
+                    $"Policy source '{descriptor.SourcePath}' contains unknown top-level field '{rendered}'.",
+                    descriptor,
+                    rendered,
+                    keyNode);
             }
 
-            if (role == ArchitecturePolicySourceRole.Fragment && key is "version" or "name")
+            if (descriptor.Role == ArchitecturePolicyDocumentRole.Fragment && key is "version" or "name")
             {
-                throw Shape($"Policy fragment '{source}' cannot declare root-only field '{key}'.");
+                throw Shape(
+                    $"Policy fragment '{descriptor.SourcePath}' cannot declare root-only field '{key}'.",
+                    descriptor,
+                    key,
+                    keyNode);
             }
         }
     }
 
-    private static IReadOnlyList<string> ReadImports(YamlMappingNode root, string source)
+    private static IReadOnlyList<string> ReadImports(
+        YamlMappingNode root,
+        ArchitecturePolicySourceDescriptor descriptor)
     {
         if (!TryGetChild(root, "imports", out YamlNode? node))
         {
@@ -173,15 +198,24 @@ internal sealed partial class ArchitecturePolicySourceParser
 
         if (node is not YamlSequenceNode { Children.Count: > 0 } sequence)
         {
-            throw Shape($"Policy source '{source}' field 'imports' must be a non-empty sequence.");
+            throw Shape(
+                $"Policy source '{descriptor.SourcePath}' field 'imports' must be a non-empty sequence.",
+                descriptor,
+                "imports",
+                node!);
         }
 
         var imports = new List<string>(sequence.Children.Count);
-        foreach (YamlNode child in sequence.Children)
+        for (int index = 0; index < sequence.Children.Count; index++)
         {
+            YamlNode child = sequence.Children[index];
             if (child is not YamlScalarNode { Value: { } value } || string.IsNullOrWhiteSpace(value))
             {
-                throw Shape($"Policy source '{source}' contains a non-scalar or empty import entry.");
+                throw Shape(
+                    $"Policy source '{descriptor.SourcePath}' contains a non-scalar or empty import entry.",
+                    descriptor,
+                    $"imports[{index}]",
+                    child);
             }
 
             imports.Add(value);
@@ -190,11 +224,18 @@ internal sealed partial class ArchitecturePolicySourceParser
         return imports;
     }
 
-    private static void RequireField(YamlMappingNode root, string field, string source)
+    private static void RequireField(
+        YamlMappingNode root,
+        string field,
+        ArchitecturePolicySourceDescriptor descriptor)
     {
         if (!TryGetChild(root, field, out _))
         {
-            throw Shape($"Root policy '{source}' must declare '{field}'.");
+            throw Shape(
+                $"Root policy '{descriptor.SourcePath}' must declare '{field}'.",
+                descriptor,
+                "$",
+                root);
         }
     }
 
@@ -213,16 +254,33 @@ internal sealed partial class ArchitecturePolicySourceParser
         return false;
     }
 
-    private static ArchitecturePolicyImportException Portable(string importPath, string declaringSource)
+    private static ArchitecturePolicyImportException Portable(
+        string importPath,
+        ArchitecturePolicySource declaringSource,
+        int importIndex)
     {
-        return new ArchitecturePolicyImportException(
+        return ArchitecturePolicyDiagnosticFactory.Exception(
             ArchitecturePolicyImportErrorCategory.PortablePath,
-            $"Policy import '{importPath}' declared by '{declaringSource}' is not a portable relative path.");
+            $"Policy import '{importPath}' declared by '{declaringSource.PortableIdentity}' is not a portable relative path.",
+            ArchitecturePolicyDiagnosticFactory.ImportLocation(declaringSource, importIndex),
+            importChain: declaringSource.Descriptor.ImportChain.Append(importPath));
     }
 
     private static ArchitecturePolicyImportException Shape(string message)
     {
         return new ArchitecturePolicyImportException(ArchitecturePolicyImportErrorCategory.SourceShape, message);
+    }
+
+    private static ArchitecturePolicyImportException Shape(
+        string message,
+        ArchitecturePolicySourceDescriptor descriptor,
+        string yamlPath,
+        YamlNode node)
+    {
+        return ArchitecturePolicyDiagnosticFactory.Exception(
+            ArchitecturePolicyImportErrorCategory.SourceShape,
+            message,
+            ArchitecturePolicyDiagnosticFactory.Location(descriptor, yamlPath, node));
     }
 
     [GeneratedRegex("%[^%]+%", RegexOptions.CultureInvariant)]

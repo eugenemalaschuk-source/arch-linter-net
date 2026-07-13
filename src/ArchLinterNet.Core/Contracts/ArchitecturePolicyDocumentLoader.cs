@@ -23,6 +23,7 @@ public sealed partial class ArchitecturePolicyDocumentLoader : IArchitecturePoli
     private static readonly string[] _adapterBindingAllowedKeys = { "adapter", "expected_port", "allowed_contexts" };
 
     private readonly IArchitectureFileSystem _fileSystem;
+    private readonly IArchitecturePolicyPathResolver _pathResolver;
     private readonly ArchitecturePolicyImportGraphResolver _importResolver;
     private readonly ArchitecturePolicySourceParser _sourceParser;
 
@@ -41,6 +42,7 @@ public sealed partial class ArchitecturePolicyDocumentLoader : IArchitecturePoli
         IArchitecturePolicyPathResolver pathResolver)
     {
         _fileSystem = fileSystem;
+        _pathResolver = pathResolver;
         _sourceParser = new ArchitecturePolicySourceParser();
         _importResolver = new ArchitecturePolicyImportGraphResolver(fileSystem, pathResolver, _sourceParser);
     }
@@ -61,11 +63,19 @@ public sealed partial class ArchitecturePolicyDocumentLoader : IArchitecturePoli
             .Build();
 
         string yaml = _fileSystem.ReadAllText(policyPath);
+        ArchitecturePolicyProvenanceIndex provenance;
         if (_sourceParser.ContainsImports(yaml))
         {
             IReadOnlyList<ArchitecturePolicySource> sources = _importResolver.Resolve(policyPath, yaml);
-            yaml = new ArchitecturePolicyDocumentComposer().Compose(sources);
-            ArchitecturePolicyEffectiveSchemaValidator.Validate(yaml);
+            ArchitecturePolicyCompositionResult composition =
+                new ArchitecturePolicyDocumentComposer().Compose(sources);
+            yaml = composition.Yaml;
+            provenance = composition.Provenance;
+            ArchitecturePolicyEffectiveSchemaValidator.Validate(yaml, provenance);
+        }
+        else
+        {
+            provenance = ArchitecturePolicyProvenanceFactory.CreateMonolithic(_pathResolver, policyPath, yaml);
         }
 
         ValidateRawLayerYaml(yaml);
@@ -79,11 +89,27 @@ public sealed partial class ArchitecturePolicyDocumentLoader : IArchitecturePoli
         }
 
         AssignFallbackIds(document);
-        document.ClassificationPathDeferred = DetectClassificationPathDeferred(yaml);
+        document.Provenance = provenance;
+        provenance.Bind(document);
+        document.ClassificationPathDeferred = DetectClassificationPathDeferred(yaml, provenance);
 
         foreach (IArchitecturePolicyDocumentValidator validator in ArchitecturePolicyDocumentValidatorPipeline.All)
         {
-            validator.Validate(document);
+            provenance.ResetValidationSubject();
+            try
+            {
+                validator.Validate(document);
+            }
+            catch (InvalidOperationException exception)
+            {
+                Exception enriched = provenance.EnrichValidationException(exception);
+                if (ReferenceEquals(enriched, exception))
+                {
+                    throw;
+                }
+
+                throw enriched;
+            }
         }
 
         return document;
@@ -94,7 +120,9 @@ public sealed partial class ArchitecturePolicyDocumentLoader : IArchitecturePoli
     // tree rather than the deliberately unbound C# model, so declaring it produces a visible,
     // deterministic diagnostic instead of pure silence — fires once per policy load, independent of
     // scanned types, so it shows up even for a policy with zero scanned types.
-    private static ArchitectureClassificationPathDeferredNotice? DetectClassificationPathDeferred(string yaml)
+    private static ArchitectureClassificationPathDeferredNotice? DetectClassificationPathDeferred(
+        string yaml,
+        ArchitecturePolicyProvenanceIndex provenance)
     {
         var stream = new YamlStream();
         stream.Load(new StringReader(yaml));
@@ -109,7 +137,18 @@ public sealed partial class ArchitecturePolicyDocumentLoader : IArchitecturePoli
             return null;
         }
 
-        return new ArchitectureClassificationPathDeferredNotice(pathSequence.Children.Count);
+        ArchitecturePolicySourceLocation[] locations = provenance.Nodes
+            .Where(entry => entry.Key.StartsWith("classification.path[", StringComparison.Ordinal)
+                && entry.Key.Count(character => character == '[') == 1
+                && entry.Key.IndexOf('.', "classification.path".Length) < 0)
+            .Select(entry => entry.Value)
+            .OrderBy(location => location.SourceOrdinal)
+            .ThenBy(location => location.YamlPath, StringComparer.Ordinal)
+            .ToArray();
+        return new ArchitectureClassificationPathDeferredNotice(pathSequence.Children.Count)
+        {
+            PolicyLocations = locations
+        };
     }
 
     private static void ValidateRawLayerYaml(string yaml)

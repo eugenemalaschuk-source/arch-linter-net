@@ -107,7 +107,44 @@ public sealed partial class ArchitectureSarifFormatter : IArchitectureSarifForma
             json["logicalLocations"] = BuildLogicalLocations(sourceType, LogicalLocationKindFor(diagnostic, forbiddenNamespace));
         }
 
+        object[] relatedPolicyLocations = BuildRelatedPolicyLocations(diagnostic);
+        if (relatedPolicyLocations.Length > 0)
+        {
+            json["relatedLocations"] = relatedPolicyLocations;
+        }
+
         return new ResultEntry(ruleId, diagnostic.ContractName, sourceType, forbiddenNamespace, json);
+    }
+
+    private static object[] BuildRelatedPolicyLocations(ArchitectureDiagnostic diagnostic)
+    {
+        IEnumerable<ArchitecturePolicySourceLocation> locations =
+            diagnostic.PolicyLocation is null
+                ? diagnostic.RelatedPolicyLocations
+                : new[] { diagnostic.PolicyLocation }.Concat(diagnostic.RelatedPolicyLocations);
+
+        return locations
+            .Distinct()
+            .OrderBy(location => location.SourceOrdinal)
+            .ThenBy(location => location.YamlPath, StringComparer.Ordinal)
+            .Select((location, index) => (object)new Dictionary<string, object?>
+            {
+                ["id"] = index + 1,
+                ["message"] = new Dictionary<string, object?>
+                {
+                    ["text"] = $"Policy {location.Role.ToString().ToLowerInvariant()} definition at {location.YamlPath}"
+                },
+                ["physicalLocation"] = new Dictionary<string, object?>
+                {
+                    ["artifactLocation"] = new Dictionary<string, object?> { ["uri"] = location.SourcePath },
+                    ["region"] = new Dictionary<string, object?>
+                    {
+                        ["startLine"] = location.Line,
+                        ["startColumn"] = location.Column
+                    }
+                }
+            })
+            .ToArray();
     }
 
     private static ResultEntry BuildCycleEntry(string cycle, string level)
