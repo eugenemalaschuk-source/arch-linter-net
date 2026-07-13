@@ -16,9 +16,10 @@ The semantic classification model SHALL define exactly ten classification terms 
 - **AND** no coverage-participating construct consumes that role/metadata and no `exclusion` names the type
 - **THEN** the model SHALL still classify this as an `uncovered semantic fact` — `override` is a classification source, not a coverage-exemption mechanism, and only `exclusion` removes a type from coverage consideration
 
-#### Scenario: Contextual dependency and allow-only contracts register coverage-participating consumption for a future coverage variant
-- **WHEN** a `strict_context_dependencies`/`audit_context_dependencies`/`strict_context_allow_only`/`audit_context_allow_only` contract's `source`, `forbidden`, `allowed`, or `exclude` selector references a discovered role/metadata value directly, without that role/metadata also being matched by a `layers.<name>.selector`
-- **THEN** the model records that selector's `(role, metadata key)` reference as coverage-participating consumption, in a form a future coverage variant (see Requirement "Classification interacts with coverage through an aligned, not parallel, vocabulary" below) is designed to treat identically to a `layers.<name>.selector` match — no coverage contract currently reads this record, so no type is actually classified as `covered`/`uncovered` by it yet; this scenario fixes only the recorded shape a future coverage variant must consume, not a live coverage classification produced today
+#### Scenario: Contextual dependency and allow-only contracts register executable coverage consumption
+- **WHEN** a contextual dependency or allow-only contract declares a source, target, or exclusion selector
+- **THEN** the model records the selector's complete role, metadata values, operators, and source-target relationship as coverage-participating consumption
+- **AND** semantic coverage evaluates that record with the same matching semantics as the contextual contract
 
 #### Scenario: Stale selector is distinguished from an unmatched namespace layer
 - **WHEN** a `layers.<name>.selector`'s `role`/`metadata` criteria match zero types classified by the model

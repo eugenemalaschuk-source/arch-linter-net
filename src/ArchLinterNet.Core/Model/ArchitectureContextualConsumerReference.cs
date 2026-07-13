@@ -13,4 +13,6 @@ namespace ArchLinterNet.Core.Model;
 public sealed record ArchitectureContextualConsumerReference(
     string Role,
     IReadOnlyDictionary<string, object> Metadata,
-    string Description);
+    string Description,
+    string? SourceRole = null,
+    IReadOnlyDictionary<string, object>? SourceMetadata = null);

@@ -151,15 +151,30 @@ public sealed partial class ArchitectureAnalysisSession
 
     private bool MatchesContextualConsumer(ArchitectureContextualConsumerReference consumer, Type type)
     {
-        return ArchitectureContextSelectorMatcher.Matches(
-            new ArchitectureContextSelector
-            {
-                Role = consumer.Role,
-                Metadata = new Dictionary<string, object>(consumer.Metadata, StringComparer.Ordinal)
-            },
-            type,
-            RoleIndex,
-            sourceDescriptor: null);
+        ArchitectureContextSelector selector = CreateContextualSelector(consumer.Role, consumer.Metadata);
+        if (consumer.SourceRole == null)
+        {
+            return ArchitectureContextSelectorMatcher.Matches(selector, type, RoleIndex, sourceDescriptor: null);
+        }
+
+        ArchitectureContextSelector sourceSelector = CreateContextualSelector(
+            consumer.SourceRole,
+            consumer.SourceMetadata!);
+        return RoleIndex.ClassifiedTypes().Any(sourceType =>
+            RoleIndex.TryGetRole(sourceType, out ArchitectureTypeClassificationResult sourceDescriptor)
+            && ArchitectureContextSelectorMatcher.Matches(sourceSelector, sourceType, RoleIndex, sourceDescriptor: null)
+            && ArchitectureContextSelectorMatcher.Matches(selector, type, RoleIndex, sourceDescriptor));
+    }
+
+    private static ArchitectureContextSelector CreateContextualSelector(
+        string role,
+        IReadOnlyDictionary<string, object> metadata)
+    {
+        return new ArchitectureContextSelector
+        {
+            Role = role,
+            Metadata = new Dictionary<string, object>(metadata, StringComparer.Ordinal)
+        };
     }
 
     private static bool MatchesSemanticExclusion(
