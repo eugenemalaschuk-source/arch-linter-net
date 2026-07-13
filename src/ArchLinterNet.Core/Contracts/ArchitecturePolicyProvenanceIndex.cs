@@ -1,5 +1,7 @@
 using System.Collections;
 using System.Reflection;
+using ArchLinterNet.Core.Contracts.Families;
+using ArchLinterNet.Core.Execution;
 using ArchLinterNet.Core.Model;
 using YamlDotNet.Serialization;
 
@@ -72,6 +74,8 @@ public sealed class ArchitecturePolicyProvenanceIndex
         }
 
         BindContracts(document);
+        BindExpandedLayerTemplates(document.Contracts.StrictLayerTemplates, "strict_layer_templates");
+        BindExpandedLayerTemplates(document.Contracts.AuditLayerTemplates, "audit_layer_templates");
     }
 
     internal IEnumerable<T> Track<T>(IEnumerable<T> values)
@@ -200,7 +204,6 @@ public sealed class ArchitecturePolicyProvenanceIndex
             .OfType<ArchitecturePolicySourceLocation>()
             .Distinct()
             .OrderBy(location => location.SourceOrdinal)
-            .ThenBy(location => location.YamlPath, StringComparer.Ordinal)
             .ToArray();
     }
 
@@ -281,6 +284,22 @@ public sealed class ArchitecturePolicyProvenanceIndex
         }
     }
 
+    private void BindExpandedLayerTemplates(
+        IReadOnlyList<ArchitectureLayerTemplateContract> templates,
+        string group)
+    {
+        for (int index = 0; index < templates.Count; index++)
+        {
+            ArchitectureLayerTemplateContract template = templates[index];
+            string path = $"contracts.{group}[{index}]";
+            foreach (ArchitectureLayerContract expanded in LayerTemplateExpander.Expand(new[] { template }))
+            {
+                BindOwner(expanded, path, "layer_template", template.Id);
+                _contracts.Add(new ContractEntry(group, path, expanded));
+            }
+        }
+    }
+
     private void BindOwner(object owner, string effectivePath, string? family, string? contractId)
     {
         if (!_nodes.TryGetValue(effectivePath, out ArchitecturePolicySourceLocation? location))
@@ -332,7 +351,6 @@ public sealed class ArchitecturePolicyProvenanceIndex
 
         return locations
             .OrderBy(location => location.SourceOrdinal)
-            .ThenBy(location => location.YamlPath, StringComparer.Ordinal)
             .ToList();
     }
 
@@ -365,7 +383,6 @@ public sealed class ArchitecturePolicyProvenanceIndex
             .OfType<ArchitecturePolicySourceLocation>()
             .Distinct()
             .OrderBy(location => location.SourceOrdinal)
-            .ThenBy(location => location.YamlPath, StringComparer.Ordinal)
             .ToArray();
     }
 

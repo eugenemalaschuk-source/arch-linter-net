@@ -81,10 +81,10 @@ public sealed class ArchitecturePolicyProvenanceTests
         {
             Assert.That(exception.Category, Is.EqualTo(ArchitecturePolicyImportErrorCategory.CompositionConflict));
             Assert.That(exception.Diagnostic, Is.Not.Null);
-            Assert.That(exception.Diagnostic!.Location!.SourcePath, Is.EqualTo("architecture/fragment.yml"));
+            Assert.That(exception.Diagnostic!.Location!.SourcePath, Is.EqualTo("architecture/root.yml"));
             Assert.That(exception.Diagnostic.Location.YamlPath, Is.EqualTo("layers.domain"));
             Assert.That(exception.Diagnostic.RelatedLocations.Single().SourcePath,
-                Is.EqualTo("architecture/root.yml"));
+                Is.EqualTo("architecture/fragment.yml"));
             Assert.That(exception.Diagnostic.RelatedLocations.Single().YamlPath, Is.EqualTo("layers.domain"));
         });
     }

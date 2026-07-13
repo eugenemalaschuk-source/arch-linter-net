@@ -126,7 +126,6 @@ public sealed partial class ArchitectureSarifFormatter : IArchitectureSarifForma
         return locations
             .Distinct()
             .OrderBy(location => location.SourceOrdinal)
-            .ThenBy(location => location.YamlPath, StringComparer.Ordinal)
             .Select((location, index) => (object)new Dictionary<string, object?>
             {
                 ["id"] = index + 1,

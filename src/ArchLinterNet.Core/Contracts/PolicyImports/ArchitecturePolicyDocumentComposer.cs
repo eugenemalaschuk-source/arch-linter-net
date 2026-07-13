@@ -378,9 +378,9 @@ internal sealed class ArchitecturePolicyDocumentComposer
         return ArchitecturePolicyDiagnosticFactory.Exception(
             ArchitecturePolicyImportErrorCategory.CompositionConflict,
             message,
-            conflicting,
-            new[] { original },
-            conflicting.Source.ImportChain);
+            original,
+            new[] { conflicting },
+            original.Source.ImportChain);
     }
 
     private sealed record Declaration(ArchitecturePolicySourceLocation Location);

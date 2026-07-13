@@ -6,6 +6,7 @@ using ArchLinterNet.Cli.Commands.Explain;
 using ArchLinterNet.Cli.Commands.Graph;
 using ArchLinterNet.Cli.Commands.Validate;
 using ArchLinterNet.Cli.Infrastructure;
+using ArchLinterNet.Core.Contracts;
 using ArchLinterNet.Core.Graph;
 using ArchLinterNet.Core.Model;
 using ArchLinterNet.Core.Reporting;
@@ -85,11 +86,42 @@ public sealed class CliArchitectureTests
         });
     }
 
+    [Test]
+    public void ValidateHandler_WritesTypedPolicyFailureAsJson()
+    {
+        ArchitecturePolicySourceDescriptor source = new(
+            "architecture/root.yml", "architecture/parts/domain.yml", ArchitecturePolicyDocumentRole.Fragment,
+            1, "architecture/root.yml", "parts/domain.yml", ["architecture/root.yml", "architecture/parts/domain.yml"]);
+        ArchitecturePolicySourceLocation location = new(source, "layers.domain.namespace", 8, 5, null, null);
+        FakeCliRuntime runtime = new()
+        {
+            ExceptionToThrow = new ArchitecturePolicyImportException(
+                ArchitecturePolicyImportErrorCategory.SourceShape,
+                "Invalid namespace.",
+                new ArchitecturePolicyDiagnostic(ArchitecturePolicyDiagnosticKind.SourceShape, location, [], source.ImportChain))
+        };
+        FakeCliConsole console = new();
+        ValidateCommandHandler handler = new(runtime, console, new FakeFileSystem(exists: true));
+
+        int exitCode = handler.Execute(new ValidateCommandOptions(
+            "policy.yml", "strict", "json", [], null, false, null, false, false));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(exitCode, Is.EqualTo(CliExitCodes.InvalidArgumentsOrRuntimeError));
+            Assert.That(console.StdOut, Does.Contain("architecture_policy_error"));
+            Assert.That(console.StdOut, Does.Contain("architecture/parts/domain.yml"));
+            Assert.That(console.StdErr, Is.Empty);
+        });
+    }
+
     private sealed class FakeCliRuntime : ICliRuntime
     {
         public string Version => "1.2.3";
 
         public ValidationRequest? LastValidationRequest { get; private set; }
+
+        public Exception? ExceptionToThrow { get; init; }
 
         public bool TryParseGraphLevel(string value, out ArchitectureGraphLevel level)
         {
@@ -100,6 +132,11 @@ public sealed class CliArchitectureTests
         public ValidationOutcome Validate(ValidationRequest request, ValidationTiming? timing)
         {
             LastValidationRequest = request;
+            if (ExceptionToThrow is not null)
+            {
+                throw ExceptionToThrow;
+            }
+
             return new ValidationOutcome(
                 Passed: true,
                 Violations: Array.Empty<ArchitectureViolation>(),

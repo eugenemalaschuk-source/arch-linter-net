@@ -1,4 +1,6 @@
+using System.Text.Json;
 using ArchLinterNet.Cli.Abstractions;
+using ArchLinterNet.Core.Contracts;
 using ArchLinterNet.Core.Model;
 using ArchLinterNet.Core.Reporting;
 using ArchLinterNet.Core.Validation;
@@ -84,11 +86,83 @@ internal sealed class ValidateCommandHandler(ICliRuntime runtime, ICliConsole co
             timing?.WriteReport(console.Error);
             return outcome.Passed ? CliExitCodes.Success : CliExitCodes.ValidationFailure;
         }
+        catch (Exception ex) when (TryGetPolicyDiagnostic(ex, out ArchitecturePolicyDiagnostic? diagnostic))
+        {
+            WritePolicyDiagnostic(options.Format, ex.Message, diagnostic!);
+            return CliExitCodes.InvalidArgumentsOrRuntimeError;
+        }
         catch (Exception ex)
         {
             console.Error.WriteLine($"Architecture validation error: {ex.Message}");
             return CliExitCodes.InvalidArgumentsOrRuntimeError;
         }
+    }
+
+    private static bool TryGetPolicyDiagnostic(Exception exception, out ArchitecturePolicyDiagnostic? diagnostic)
+    {
+        diagnostic = exception switch
+        {
+            ArchitecturePolicyImportException importException => importException.Diagnostic,
+            ArchitecturePolicyValidationException validationException => validationException.Diagnostic,
+            _ => null,
+        };
+        return diagnostic is not null;
+    }
+
+    private void WritePolicyDiagnostic(string format, string message, ArchitecturePolicyDiagnostic diagnostic)
+    {
+        if (format == "json")
+        {
+            console.Out.WriteLine(JsonSerializer.Serialize(new
+            {
+                kind = "architecture_policy_error",
+                message,
+                policy_location = diagnostic.Location,
+                related_policy_locations = diagnostic.RelatedLocations,
+                import_chain = diagnostic.ImportChain,
+            }));
+            return;
+        }
+
+        if (format == "sarif")
+        {
+            console.Out.WriteLine(JsonSerializer.Serialize(new
+            {
+                version = "2.1.0",
+                runs = new[]
+                {
+                    new
+                    {
+                        tool = new { driver = new { name = "arch-linter-net" } },
+                        results = new[]
+                        {
+                            new
+                            {
+                                ruleId = "architecture-policy",
+                                message = new { text = message },
+                                locations = diagnostic.Location is null ? Array.Empty<object>() : new object[]
+                                {
+                                    new
+                                    {
+                                        physicalLocation = new
+                                        {
+                                            artifactLocation = new { uri = diagnostic.Location.SourcePath },
+                                            region = new { startLine = diagnostic.Location.Line, startColumn = diagnostic.Location.Column },
+                                        },
+                                    },
+                                },
+                            },
+                        },
+                    },
+                },
+            }));
+            return;
+        }
+
+        string location = diagnostic.Location is null
+            ? string.Empty
+            : $" (policy: {diagnostic.Location.SourcePath}:{diagnostic.Location.YamlPath}; root: {diagnostic.Location.RootPath})";
+        console.Error.WriteLine($"Architecture validation error: {message}{location}");
     }
 
     private void WriteHumanOutput(ValidationOutcome outcome)
