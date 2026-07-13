@@ -144,7 +144,9 @@ contracts:
       name: sales-inventory-shared-kernel-semantic-coverage
       scope: semantic_role
       roots:
-        - namespace: Acme
+        - namespace: Acme.Sales
+        - namespace: Acme.Inventory
+        - namespace: Acme.SharedKernel
       reason: Every discovered Sales, Inventory, or SharedKernel role must be governed or explicitly excluded.
 ```
 

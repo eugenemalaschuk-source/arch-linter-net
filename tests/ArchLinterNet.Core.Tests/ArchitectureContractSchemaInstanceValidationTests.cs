@@ -360,8 +360,14 @@ public sealed class ArchitectureContractSchemaInstanceValidationTests
         string location,
         List<string> failures)
     {
-        if (contractGroups[groupName] is not JsonArray contracts)
+        if (!contractGroups.TryGetPropertyValue(groupName, out JsonNode? group))
         {
+            return;
+        }
+
+        if (group is not JsonArray contracts)
+        {
+            failures.Add($"{location}, contracts.{groupName}: expected an array of contract definitions.");
             return;
         }
 
@@ -372,6 +378,25 @@ public sealed class ArchitectureContractSchemaInstanceValidationTests
                 CollectFailures(contract, definitionName, $"{location}, contracts.{groupName}[{contractIndex}]", failures);
             }
         }
+    }
+
+    [Test]
+    public void MarkdownYamlBlocks_ReportsContextualContractGroupWithNonArrayValue()
+    {
+        JsonObject contracts = (JsonObject)ToJsonNode("""
+            strict_context_dependencies:
+              name: invalid-contract-container
+            """)!;
+        var failures = new List<string>();
+
+        ValidateContractGroup(
+            contracts,
+            "strict_context_dependencies",
+            "contextDependencyContract",
+            "test block",
+            failures);
+
+        Assert.That(failures, Has.One.Contains("expected an array of contract definitions"));
     }
 
     private static void CollectFailures(JsonNode instance, string defName, string location, List<string> failures)
