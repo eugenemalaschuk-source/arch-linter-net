@@ -139,13 +139,22 @@ contracts:
           metadata: { boundedContext: Sales }
         - role: SharedKernel
       reason: Sales may use its own domain and the explicitly governed SharedKernel only.
+  strict_coverage:
+    - id: sales-inventory-shared-kernel-semantic-coverage
+      name: sales-inventory-shared-kernel-semantic-coverage
+      scope: semantic_role
+      roots:
+        - namespace: Acme
+      reason: Every discovered Sales, Inventory, or SharedKernel role must be governed or explicitly excluded.
 ```
 
 The allow-list is the safe exception: it permits only the source context and
 the explicitly governed `SharedKernel`, with a reason that identifies the
 architectural intent. The surrounding policy should also identify owners,
 responsibility, and stability. Do not turn `SharedKernel` into an unrestricted
-target or use it to hide a new helper with unclear ownership.
+target or use it to hide a new helper with unclear ownership. The semantic-role
+coverage contract makes a newly discovered Sales, Inventory, or SharedKernel
+fact visible until a selector or contextual contract governs it.
 
 ### Legacy migration
 
@@ -177,9 +186,15 @@ Use namespace, inheritance, and metadata facts for a fast-growing client layout:
 ```yaml
 classification:
   namespace:
+    - namespace: Game.Gameplay
+      role: Feature
+      metadata: { feature: Gameplay, platform: Unity, runtime: player }
     - namespace: Game.Gameplay.Systems
       role: System
-      metadata: { platform: Unity, runtime: player }
+      metadata: { feature: Gameplay, platform: Unity, runtime: player }
+    - namespace: Game.Editor
+      role: UnityEditor
+      metadata: { platform: Unity, runtime: editor }
     - namespace_suffix: ViewModels
       role: ViewModel
       metadata: { platform: Unity }
@@ -188,16 +203,39 @@ classification:
       metadata: { platform: Unity }
 
 layers:
+  gameplay-feature:
+    namespace: Game.Gameplay
+    selector:
+      role: Feature
+      metadata: { feature: Gameplay, platform: Unity, runtime: player }
   gameplay-systems:
     namespace: Game.Gameplay.Systems
     selector:
       role: System
-      metadata: { platform: Unity }
+      metadata: { feature: Gameplay, platform: Unity, runtime: player }
+  editor-tooling:
+    namespace: Game.Editor
+    selector:
+      role: UnityEditor
+      metadata: { platform: Unity, runtime: editor }
+
+contracts:
+  strict_context_dependencies:
+    - id: unity-player-no-editor-tooling
+      name: unity-player-must-not-reference-editor-tooling
+      source:
+        role: System
+        metadata: { platform: Unity, runtime: player }
+      forbidden:
+        - role: UnityEditor
+          metadata: { platform: Unity, runtime: editor }
+      reason: Player systems must not reference editor-only tooling.
 ```
 
 `.asmdef` contracts can validate assembly-definition references, while semantic
-roles explain the namespace/context boundary. Neither inspects scenes, runtime
-composition, gameplay behavior, DI resolution, or security correctness.
+roles explain the feature and runtime/editor context boundaries. Neither
+inspects scenes, runtime composition, gameplay behavior, DI resolution, or
+security correctness.
 
 ## Review guardrails
 

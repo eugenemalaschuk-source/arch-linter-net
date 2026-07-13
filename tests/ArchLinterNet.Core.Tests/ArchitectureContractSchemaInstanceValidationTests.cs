@@ -297,10 +297,10 @@ public sealed class ArchitectureContractSchemaInstanceValidationTests
     // blocks had drifted from the schema (a selector-only layer slipped past several earlier review
     // rounds because only the schema-validated sample-policy files above were tested, never the
     // Markdown prose itself). These tests extract every ```yaml fenced block from the design record
-    // and the public docs pages and validate their classification, layer, and contextual-contract
-    // fragments against the corresponding schema $defs, so Markdown snippets can't silently diverge
-    // from the schema again. Blocks are partial policy fragments, so each fragment is validated
-    // against its own $def rather than the full root schema.
+    // and the public docs pages and validate their classification, layer, coverage, and contextual-
+    // contract fragments against the corresponding schema $defs, so Markdown snippets can't silently
+    // diverge from the schema again. Blocks are partial policy fragments, so each fragment is
+    // validated against its own $def rather than the full root schema.
     [TestCase("openspec/changes/archive/2026-07-10-design-semantic-classification-model/design.md")]
     [TestCase("docs/policy-format/semantic-classification.md")]
     [TestCase("docs/ai/semantic-role-governance.md")]
@@ -345,6 +345,8 @@ public sealed class ArchitectureContractSchemaInstanceValidationTests
                 ValidateContractGroup(contractGroups, "audit_context_dependencies", "contextDependencyContract", $"block {blockIndex}", failures);
                 ValidateContractGroup(contractGroups, "strict_context_allow_only", "contextAllowOnlyContract", $"block {blockIndex}", failures);
                 ValidateContractGroup(contractGroups, "audit_context_allow_only", "contextAllowOnlyContract", $"block {blockIndex}", failures);
+                ValidateContractGroup(contractGroups, "strict_coverage", "coverageContract", $"block {blockIndex}", failures);
+                ValidateContractGroup(contractGroups, "audit_coverage", "coverageContract", $"block {blockIndex}", failures);
             }
         }
 
