@@ -1,0 +1,6 @@
+version: 1
+name: Platform-native path failure
+imports: ["C:\\policy.yml", "\\\\server\\share\\policy.yml", "\\\\?\\C:\\policy.yml"]
+layers: {}
+analysis: {}
+contracts: {}

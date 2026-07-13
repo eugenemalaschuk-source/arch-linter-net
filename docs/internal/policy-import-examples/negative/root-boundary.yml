@@ -1,0 +1,7 @@
+version: 1
+name: Boundary escape failure
+imports:
+  - ../../../../outside.yml
+layers: {}
+analysis: {}
+contracts: {}
