@@ -1566,6 +1566,20 @@
         }
       }
     },
+    "coverageSemanticRoleExclusion": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["role", "reason"],
+      "properties": {
+        "role": { "type": "string", "minLength": 1 },
+        "metadata": { "$ref": "#/$defs/scalarMap" },
+        "reason": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Required justification for excluding this semantic role fact from coverage."
+        }
+      }
+    },
     "coverageContract": {
       "allOf": [
         {
@@ -1577,7 +1591,7 @@
             "id": { "type": "string", "minLength": 1, "description": "Stable contract identifier for CLI selection and cross-referencing." },
             "scope": {
               "type": "string",
-              "enum": ["namespace", "project", "assembly", "dependency_edge", "rule_input"],
+              "enum": ["namespace", "project", "assembly", "dependency_edge", "rule_input", "semantic_role"],
               "description": "Which kind of first-party unit this coverage contract classifies."
             },
             "roots": {
@@ -1660,6 +1674,16 @@
               "exclude": { "items": { "$ref": "#/$defs/coverageContractIdExclusion" }, "default": [] }
             },
             "not": { "anyOf": [{ "required": ["roots"] }, { "required": ["between"] }] }
+          }
+        },
+        {
+          "if": { "properties": { "scope": { "const": "semantic_role" } }, "required": ["scope"] },
+          "then": {
+            "properties": {
+              "roots": { "items": { "$ref": "#/$defs/coverageNamespaceRoot" } },
+              "exclude": { "items": { "$ref": "#/$defs/coverageSemanticRoleExclusion" }, "default": [] }
+            },
+            "not": { "anyOf": [{ "required": ["between"] }, { "required": ["contract_ids"] }] }
           }
         }
       ]

@@ -144,6 +144,33 @@ In JSON output, the summary appears as a top-level `coverage_summary` array, add
 
 A coverage contract only appears in the summary when it is actually selected to run. If `validate --contract <id>` is used to run only specific contracts and a coverage contract's ID isn't among them, that coverage contract is omitted from `coverage_summary` entirely — it never appears as a zero-count row.
 
+## Semantic-role coverage
+
+Semantic coverage is opt-in through the existing coverage family:
+
+```yaml
+strict_coverage:
+- id: semantic-role-coverage
+  name: semantic-role-coverage
+  scope: semantic_role
+  reason: Semantic classifications must be governed or explicitly excluded.
+  exclude:
+  - role: GeneratedRole
+    reason: Generated types are governed outside this policy.
+```
+
+When classification is enabled, resolved role/metadata facts are covered by a
+matching `layers.<name>.selector` or by an implemented contextual contract
+selector. First-party types without a role are reported as unclassified semantic
+facts; classified facts with no governing selector are uncovered. Valid selectors
+that match no current classified type are stale. These findings appear in the
+coverage output and remain separate from dependency violations. Semantic
+exclusions always require a documented `reason`.
+
+Semantic summaries also place classification conflicts and metadata extraction
+failures in `unknown_items`, with deterministic subject and failure evidence for
+human, JSON, and CI consumers.
+
 ## New-code coverage reporting and test projects
 
 Test assemblies (typically named `*.Tests`) are usually never listed in `analysis.target_assemblies`, so their namespaces/projects/assemblies never enter the coverage inventory and can never appear in any contract's `covered_items`/`uncovered_items`/`stale_items`/`unknown_items`. Downstream tooling that maps a pull request's changed files onto coverage buckets to build a "new-code coverage" report should treat a file inside a `*.Tests` project as out of scope entirely, rather than reporting it as `unknown`/"requiring policy update" — there is no coverage evidence to check it against by construction, so flagging it would be tooling noise, not a real policy gap.

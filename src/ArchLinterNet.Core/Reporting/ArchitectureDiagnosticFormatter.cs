@@ -211,7 +211,9 @@ public sealed partial class ArchitectureDiagnosticFormatter : IArchitectureDiagn
 
         var excludedLines = summary.ExcludedItems
             .OrderBy(item => item.Item, StringComparer.Ordinal)
-            .Select(item => $"    excluded: {item.Item} ({item.Reason})");
+            .Select(item => string.IsNullOrEmpty(item.Evidence)
+                ? $"    excluded: {item.Item} ({item.Reason})"
+                : $"    excluded: {item.Item} ({item.Reason}; {item.Evidence})");
 
         var uncoveredLines = summary.UncoveredItems
             .OrderBy(item => item.Item, StringComparer.Ordinal)
@@ -536,41 +538,6 @@ public sealed partial class ArchitectureDiagnosticFormatter : IArchitectureDiagn
         }
 
         return obj;
-    }
-
-    private static Dictionary<string, object?> ToCoverageSummaryJsonObject(ArchitectureCoverageSummary summary)
-    {
-        return new Dictionary<string, object?>
-        {
-            ["contract"] = summary.ContractName,
-            ["contract_id"] = summary.ContractId,
-            ["scope"] = summary.Scope,
-            ["counts"] = new Dictionary<string, object?>
-            {
-                ["covered"] = summary.Counts.Covered,
-                ["excluded"] = summary.Counts.Excluded,
-                ["uncovered"] = summary.Counts.Uncovered,
-                ["stale"] = summary.Counts.Stale,
-                ["unknown"] = summary.Counts.Unknown
-            },
-            ["excluded_items"] = summary.ExcludedItems
-                .OrderBy(item => item.Item, StringComparer.Ordinal)
-                .Select(item => new Dictionary<string, object?> { ["item"] = item.Item, ["reason"] = item.Reason })
-                .ToArray(),
-            ["uncovered_items"] = ToEvidenceItemsJson(summary.UncoveredItems),
-            ["stale_items"] = ToEvidenceItemsJson(summary.StaleItems),
-            ["unknown_items"] = ToEvidenceItemsJson(summary.UnknownItems),
-            ["covered_items"] = ToEvidenceItemsJson(summary.CoveredItems)
-        };
-    }
-
-    private static Dictionary<string, object?>[] ToEvidenceItemsJson(
-        IReadOnlyCollection<ArchitectureCoverageSummaryEvidenceItem> items)
-    {
-        return items
-            .OrderBy(item => item.Item, StringComparer.Ordinal)
-            .Select(item => new Dictionary<string, object?> { ["item"] = item.Item, ["evidence"] = item.Evidence })
-            .ToArray();
     }
 
     private static Dictionary<string, object?> ToCiJsonObject(ArchitectureDiagnostic diagnostic, bool includeContract)

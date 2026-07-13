@@ -1,13 +1,15 @@
 using ArchLinterNet.Core.Contracts;
 using ArchLinterNet.Core.Contracts.Families;
 using ArchLinterNet.Core.Execution;
+using ArchLinterNet.Core.Model;
 using ArchLinterNet.Core.Reporting;
+using AttributeRoleExtractionTestFixtures;
 using NUnit.Framework;
 
 namespace ArchLinterNet.Core.Tests;
 
 [TestFixture]
-public sealed class ArchitectureCoverageSummaryTests
+public sealed partial class ArchitectureCoverageSummaryTests
 {
     private const string FeatureRoot = "ArchLinterNet.Core.Tests.NamespaceCoverageFixtures.Features";
     private const string RuleInputFixtureRoot = "ArchLinterNet.Core.Tests.RuleInputCoverageFixtures";
@@ -307,5 +309,461 @@ public sealed class ArchitectureCoverageSummaryTests
         Assert.That(first.Counts, Is.EqualTo(second.Counts));
         Assert.That(first.ExcludedItems, Is.EqualTo(second.ExcludedItems));
         Assert.That(first.UncoveredItems, Is.EqualTo(second.UncoveredItems));
+    }
+
+    [Test]
+    public void BuildCoverageSummary_SemanticRoleScope_ReportsGovernedUnclassifiedExcludedAndStaleFacts()
+    {
+        const string FixtureRoot = "AttributeRoleExtractionTestFixtures";
+        ArchitectureContractDocument document = new()
+        {
+            Classification = new ArchitectureClassificationConfiguration
+            {
+                Attributes =
+                {
+                    new ArchitectureAttributeClassificationMapping
+                    {
+                        Attribute = "AttributeRoleExtractionTestFixtures.DomainMarkerAttribute",
+                        Role = "DomainLayer",
+                        Metadata = new Dictionary<string, object> { ["domain"] = "constructor[0]" }
+                    }
+                }
+            }
+        };
+        document.Layers["domain"] = new ArchitectureLayer
+        {
+            Selector = new ArchitectureLayerSelector
+            {
+                Role = "DomainLayer",
+                Metadata = new Dictionary<string, object> { ["domain"] = "Sales" }
+            }
+        };
+        document.Layers["stale"] = new ArchitectureLayer
+        {
+            Selector = new ArchitectureLayerSelector { Role = "NeverDiscovered" }
+        };
+
+        ArchitectureCoverageContract contract = new()
+        {
+            Name = "semantic-role-coverage",
+            Id = "semantic-role-coverage",
+            Scope = "semantic_role",
+            Roots = { new ArchitectureCoverageRoot { Namespace = FixtureRoot } }
+        };
+        contract.Exclude.Add(new ArchitectureCoverageExclusion
+        {
+            Role = "DomainLayer",
+            Metadata = new Dictionary<string, object> { ["domain"] = "Sales" },
+            Reason = "Fixture domain is intentionally exempted."
+        });
+
+        ArchitectureContractRunner runner = new(CreateContext(typeof(ArchitectureCoverageSummaryTests)), document);
+
+        ArchitectureCoverageSummary summary = RequireSummary(runner.BuildCoverageSummary(contract));
+
+        Assert.That(summary.Scope, Is.EqualTo("semantic_role"));
+        Assert.That(summary.Counts.Excluded, Is.GreaterThan(0));
+        Assert.That(summary.Counts.Uncovered, Is.GreaterThan(0));
+        Assert.That(summary.Counts.Stale, Is.EqualTo(1));
+        Assert.That(summary.ExcludedItems, Has.Some.Matches<ArchitectureCoverageSummaryExcludedItem>(item =>
+            item.Reason == "Fixture domain is intentionally exempted."));
+        Assert.That(summary.StaleItems.Single().Item, Does.Contain("NeverDiscovered"));
+    }
+
+    [Test]
+    public void CheckCoverageContract_SemanticRoleScope_DistinguishesUnclassifiedFact()
+    {
+        ArchitectureContractDocument document = new()
+        {
+            Classification = new ArchitectureClassificationConfiguration
+            {
+                Attributes =
+                {
+                    new ArchitectureAttributeClassificationMapping
+                    {
+                        Attribute = "AttributeRoleExtractionTestFixtures.DomainMarkerAttribute",
+                        Role = "DomainLayer"
+                    }
+                }
+            }
+        };
+        ArchitectureCoverageContract contract = new()
+        {
+            Name = "semantic-role-coverage",
+            Id = "semantic-role-coverage",
+            Scope = "semantic_role",
+            Roots = { new ArchitectureCoverageRoot { Namespace = "AttributeRoleExtractionTestFixtures" } }
+        };
+
+        ArchitectureContractRunner runner = new(CreateContext(typeof(ArchitectureCoverageSummaryTests)), document);
+        List<ArchitectureViolation> findings = runner.CheckCoverageContract(contract);
+
+        Assert.That(findings, Has.Some.Matches<ArchitectureViolation>(finding =>
+            finding.ForbiddenNamespace == "unclassified semantic fact"));
+    }
+
+    [Test]
+    public void BuildCoverageSummary_SemanticRoleScope_CoversSalesAndInventoryAndReportsSharedKernelAndUnityConventionGaps()
+    {
+        ArchitectureContractDocument document = new()
+        {
+            Classification = new ArchitectureClassificationConfiguration
+            {
+                Attributes =
+                {
+                    new ArchitectureAttributeClassificationMapping
+                    {
+                        Attribute = "AttributeRoleExtractionTestFixtures.DomainMarkerAttribute",
+                        Role = "DomainLayer",
+                        Metadata = new Dictionary<string, object> { ["domain"] = "constructor[0]" }
+                    }
+                }
+            }
+        };
+        document.Layers["domain"] = new ArchitectureLayer
+        {
+            Selector = new ArchitectureLayerSelector { Role = "DomainLayer" }
+        };
+
+        ArchitectureCoverageContract contract = new()
+        {
+            Name = "sample-semantic-coverage",
+            Id = "sample-semantic-coverage",
+            Scope = "semantic_role",
+            Roots = { new ArchitectureCoverageRoot { Namespace = "SemanticCoverageSampleFixtures" } }
+        };
+
+        ArchitectureCoverageSummary summary = RequireSummary(
+            new ArchitectureContractRunner(CreateContext(typeof(ArchitectureCoverageSummaryTests)), document)
+                .BuildCoverageSummary(contract));
+
+        Assert.That(summary.CoveredItems.Select(item => item.Item), Does.Contain(
+            "SemanticCoverageSampleFixtures.Sales.Order"));
+        Assert.That(summary.CoveredItems.Select(item => item.Item), Does.Contain(
+            "SemanticCoverageSampleFixtures.Inventory.StockItem"));
+        Assert.That(summary.UncoveredItems.Select(item => item.Item), Does.Contain(
+            "SemanticCoverageSampleFixtures.SharedKernel.Clock"));
+        Assert.That(summary.UncoveredItems.Select(item => item.Item), Does.Contain(
+            "SemanticCoverageSampleFixtures.Unity.Client.ClientBehaviour"));
+    }
+
+    [Test]
+    public void BuildCoverageSummary_SemanticRoleScope_CombinedLayerRequiresNamespaceAndSelector()
+    {
+        ArchitectureContractDocument document = CreateDomainClassificationDocument();
+        document.Layers["sales-domain"] = new ArchitectureLayer
+        {
+            Namespace = "SemanticCoverageSampleFixtures.Sales",
+            Selector = new ArchitectureLayerSelector { Role = "DomainLayer" }
+        };
+
+        ArchitectureCoverageSummary summary = BuildSampleSemanticSummary(document);
+
+        Assert.That(summary.CoveredItems.Select(item => item.Item), Does.Contain(
+            "SemanticCoverageSampleFixtures.Sales.Order"));
+        Assert.That(summary.UncoveredItems.Select(item => item.Item), Does.Contain(
+            "SemanticCoverageSampleFixtures.Inventory.StockItem"));
+    }
+
+    [Test]
+    public void BuildCoverageSummary_SemanticRoleScope_ContextualConsumerGovernsMatchingRole()
+    {
+        ArchitectureContractDocument document = CreateDomainClassificationDocument();
+        document.Contracts.StrictContextDependencies.Add(new ArchitectureContextDependencyContract
+        {
+            Name = "domain-context",
+            Source = new ArchitectureContextSelector { Role = "DomainLayer" },
+            Forbidden = { new ArchitectureContextSelector { Role = "OtherRole" } },
+            Reason = "Fixture contextual governance."
+        });
+
+        ArchitectureCoverageSummary summary = BuildSampleSemanticSummary(document);
+
+        Assert.That(summary.CoveredItems.Select(item => item.Item), Does.Contain(
+            "SemanticCoverageSampleFixtures.Inventory.StockItem"));
+    }
+
+    [Test]
+    public void BuildCoverageSummary_SemanticRoleScope_ContextualConsumerRequiresMatchingMetadataValue()
+    {
+        ArchitectureContractDocument document = CreateDomainClassificationDocument();
+        document.Contracts.StrictContextDependencies.Add(new ArchitectureContextDependencyContract
+        {
+            Name = "sales-context",
+            Source = new ArchitectureContextSelector
+            {
+                Role = "DomainLayer",
+                Metadata = new Dictionary<string, object> { ["domain"] = "Sales" }
+            },
+            Forbidden = { new ArchitectureContextSelector { Role = "OtherRole" } },
+            Reason = "Sales-only contextual governance."
+        });
+
+        ArchitectureCoverageSummary summary = BuildSampleSemanticSummary(document);
+
+        Assert.That(summary.CoveredItems.Select(item => item.Item), Does.Contain(
+            "SemanticCoverageSampleFixtures.Sales.Order"));
+        Assert.That(summary.UncoveredItems.Select(item => item.Item), Does.Contain(
+            "SemanticCoverageSampleFixtures.Inventory.StockItem"));
+    }
+
+    [Test]
+    public void BuildCoverageSummary_SemanticRoleScope_ContextualConsumerSupportsMetadataInOperator()
+    {
+        ArchitectureContractDocument document = CreateDomainClassificationDocument();
+        document.Contracts.StrictContextDependencies.Add(new ArchitectureContextDependencyContract
+        {
+            Name = "domain-context",
+            Source = new ArchitectureContextSelector
+            {
+                Role = "DomainLayer",
+                Metadata = new Dictionary<string, object>
+                {
+                    ["domain"] = new List<object> { "Sales", "Inventory" }
+                }
+            },
+            Forbidden = { new ArchitectureContextSelector { Role = "OtherRole" } },
+            Reason = "Multi-domain contextual governance."
+        });
+
+        ArchitectureCoverageSummary summary = BuildSampleSemanticSummary(document);
+
+        Assert.That(summary.CoveredItems.Select(item => item.Item), Does.Contain(
+            "SemanticCoverageSampleFixtures.Sales.Order"));
+        Assert.That(summary.CoveredItems.Select(item => item.Item), Does.Contain(
+            "SemanticCoverageSampleFixtures.Inventory.StockItem"));
+    }
+
+    [Test]
+    public void BuildCoverageSummary_SemanticRoleScope_ContextualConsumerSupportsSourceRelativeNotEqualOperator()
+    {
+        ArchitectureContractDocument document = CreateDomainClassificationDocument();
+        document.Contracts.StrictContextDependencies.Add(new ArchitectureContextDependencyContract
+        {
+            Name = "cross-domain-context",
+            Source = new ArchitectureContextSelector
+            {
+                Role = "DomainLayer",
+                Metadata = new Dictionary<string, object> { ["domain"] = "Sales" }
+            },
+            Forbidden =
+            {
+                new ArchitectureContextSelector
+                {
+                    Role = "DomainLayer",
+                    Metadata = new Dictionary<string, object> { ["domain"] = "!{source.metadata.domain}" }
+                }
+            },
+            Reason = "Cross-domain contextual governance."
+        });
+
+        ArchitectureCoverageSummary summary = BuildSampleSemanticSummary(document);
+
+        Assert.That(summary.CoveredItems.Select(item => item.Item), Does.Contain(
+            "SemanticCoverageSampleFixtures.Inventory.StockItem"));
+        Assert.That(summary.StaleItems, Has.None.Matches<ArchitectureCoverageSummaryEvidenceItem>(item =>
+            item.Item.Contains("!{source.metadata.domain}", StringComparison.Ordinal)));
+    }
+
+    [Test]
+    public void BuildCoverageSummary_SemanticRoleScope_ReportsStaleSourceRelativeConsumerWithoutCompatibleSource()
+    {
+        ArchitectureContractDocument document = CreateDomainClassificationDocument();
+        document.Contracts.StrictContextDependencies.Add(new ArchitectureContextDependencyContract
+        {
+            Name = "missing-cross-domain-context",
+            Source = new ArchitectureContextSelector
+            {
+                Role = "DomainLayer",
+                Metadata = new Dictionary<string, object> { ["domain"] = "NeverDiscovered" }
+            },
+            Forbidden =
+            {
+                new ArchitectureContextSelector
+                {
+                    Role = "DomainLayer",
+                    Metadata = new Dictionary<string, object> { ["domain"] = "!{source.metadata.domain}" }
+                }
+            },
+            Reason = "Missing source contextual governance."
+        });
+
+        ArchitectureCoverageSummary summary = BuildSampleSemanticSummary(document);
+
+        Assert.That(summary.StaleItems, Has.Some.Matches<ArchitectureCoverageSummaryEvidenceItem>(item =>
+            item.Item.Contains("!{source.metadata.domain}", StringComparison.Ordinal)));
+    }
+
+    [Test]
+    public void BuildCoverageSummary_SemanticRoleScope_KeepsDistinctMetadataInConsumers()
+    {
+        ArchitectureContractDocument document = CreateDomainClassificationDocument();
+        document.Contracts.StrictContextDependencies.Add(CreateInConsumer("sales-context", "Sales"));
+        document.Contracts.StrictContextDependencies.Add(CreateInConsumer("inventory-context", "Inventory"));
+
+        ArchitectureCoverageSummary summary = BuildSampleSemanticSummary(document);
+
+        Assert.That(summary.CoveredItems.Select(item => item.Item), Does.Contain(
+            "SemanticCoverageSampleFixtures.Sales.Order"));
+        Assert.That(summary.CoveredItems.Select(item => item.Item), Does.Contain(
+            "SemanticCoverageSampleFixtures.Inventory.StockItem"));
+    }
+
+    [Test]
+    public void RegisteredContextualConsumers_DescribeSequenceMetadataWithValues()
+    {
+        ArchitectureContractDocument document = CreateDomainClassificationDocument();
+        document.Contracts.StrictContextDependencies.Add(CreateInConsumer("domains", "Sales"));
+
+        ArchitectureContractRunner runner = new(CreateContext(typeof(ArchitectureCoverageSummaryTests)), document);
+
+        Assert.That(runner.Session.RegisteredContextualConsumers.Select(consumer => consumer.Description),
+            Has.Some.EqualTo("role:DomainLayer metadata:domain=[Sales]"));
+    }
+
+    [Test]
+    public void BuildCoverageSummary_SemanticRoleScope_ReportsStaleContextualConsumerWithMetadataValue()
+    {
+        ArchitectureContractDocument document = CreateDomainClassificationDocument();
+        document.Contracts.StrictContextDependencies.Add(new ArchitectureContextDependencyContract
+        {
+            Name = "missing-context",
+            Source = new ArchitectureContextSelector
+            {
+                Role = "DomainLayer",
+                Metadata = new Dictionary<string, object> { ["domain"] = "NeverDiscovered" }
+            },
+            Forbidden = { new ArchitectureContextSelector { Role = "OtherRole" } },
+            Reason = "Missing contextual governance."
+        });
+
+        ArchitectureCoverageSummary summary = BuildSampleSemanticSummary(document);
+
+        Assert.That(summary.StaleItems, Has.Some.Matches<ArchitectureCoverageSummaryEvidenceItem>(item =>
+            item.Item == "role:DomainLayer metadata:domain=NeverDiscovered"));
+    }
+
+    [Test]
+    public void BuildCoverageSummary_SemanticRoleScope_DoesNotReportExternalSelectorLayerAsStale()
+    {
+        ArchitectureContractDocument document = CreateDomainClassificationDocument();
+        document.Layers["external"] = new ArchitectureLayer
+        {
+            External = true,
+            Selector = new ArchitectureLayerSelector { Role = "NeverDiscovered" }
+        };
+
+        ArchitectureCoverageSummary summary = BuildSampleSemanticSummary(document);
+
+        Assert.That(summary.StaleItems, Is.Empty);
+    }
+
+    [Test]
+    public void BuildCoverageSummary_SemanticRoleScope_ReportsConflictAndMetadataFailureAsUnknownEvidence()
+    {
+        ArchitectureContractDocument document = CreateDomainClassificationDocument();
+        document.Classification.Attributes[0].Metadata["missing"] = "property:Missing";
+        document.Classification.Attributes.Add(new ArchitectureAttributeClassificationMapping
+        {
+            Attribute = "AttributeRoleExtractionTestFixtures.SecondMarkerAttribute",
+            Role = "InfrastructureLayer"
+        });
+
+        ArchitectureCoverageContract contract = new()
+        {
+            Name = "semantic-role-coverage",
+            Id = "semantic-role-coverage",
+            Scope = "semantic_role",
+            Roots = { new ArchitectureCoverageRoot { Namespace = "AttributeRoleExtractionTestFixtures" } }
+        };
+        ArchitectureCoverageSummary summary = RequireSummary(
+            new ArchitectureContractRunner(CreateContext(typeof(ArchitectureCoverageSummaryTests)), document)
+                .BuildCoverageSummary(contract));
+
+        Assert.That(summary.UnknownItems, Has.Some.Matches<ArchitectureCoverageSummaryEvidenceItem>(item =>
+            item.Evidence.StartsWith("classification conflict:", StringComparison.Ordinal)));
+        Assert.That(summary.UnknownItems, Has.Some.Matches<ArchitectureCoverageSummaryEvidenceItem>(item =>
+            item.Evidence.StartsWith("metadata failure: source=", StringComparison.Ordinal)
+            && item.Evidence.Contains("key=missing", StringComparison.Ordinal)));
+    }
+
+    [Test]
+    public void CheckCoverageContract_SemanticRoleScope_ReportsStaleConflictAndMetadataFailure()
+    {
+        ArchitectureContractDocument document = CreateDomainClassificationDocument();
+        document.Layers["stale"] = new ArchitectureLayer
+        {
+            Selector = new ArchitectureLayerSelector { Role = "NeverDiscovered" }
+        };
+        document.Classification.Attributes[0].Metadata["missing"] = "property:Missing";
+        document.Classification.Attributes.Add(new ArchitectureAttributeClassificationMapping
+        {
+            Attribute = "AttributeRoleExtractionTestFixtures.SecondMarkerAttribute",
+            Role = "InfrastructureLayer"
+        });
+
+        ArchitectureCoverageContract contract = new()
+        {
+            Name = "semantic-role-coverage",
+            Id = "semantic-role-coverage",
+            Scope = "semantic_role",
+            Roots = { new ArchitectureCoverageRoot { Namespace = "AttributeRoleExtractionTestFixtures" } }
+        };
+
+        List<ArchitectureViolation> findings = new ArchitectureContractRunner(
+            CreateContext(typeof(ArchitectureCoverageSummaryTests)), document).CheckCoverageContract(contract);
+
+        Assert.That(findings.Select(finding => finding.ForbiddenNamespace), Does.Contain("stale semantic selector"));
+        Assert.That(findings.Select(finding => finding.ForbiddenNamespace), Does.Contain("classification conflict"));
+        Assert.That(findings.Select(finding => finding.ForbiddenNamespace), Does.Contain("classification metadata failure"));
+    }
+
+    private static ArchitectureContractDocument CreateDomainClassificationDocument()
+    {
+        return new ArchitectureContractDocument
+        {
+            Classification = new ArchitectureClassificationConfiguration
+            {
+                Attributes =
+                {
+                    new ArchitectureAttributeClassificationMapping
+                    {
+                        Attribute = "AttributeRoleExtractionTestFixtures.DomainMarkerAttribute",
+                        Role = "DomainLayer",
+                        Metadata = new Dictionary<string, object> { ["domain"] = "constructor[0]" }
+                    }
+                }
+            }
+        };
+    }
+
+    private static ArchitectureContextDependencyContract CreateInConsumer(string name, string domain)
+    {
+        return new ArchitectureContextDependencyContract
+        {
+            Name = name,
+            Source = new ArchitectureContextSelector
+            {
+                Role = "DomainLayer",
+                Metadata = new Dictionary<string, object> { ["domain"] = new List<object> { domain } }
+            },
+            Forbidden = { new ArchitectureContextSelector { Role = "OtherRole" } },
+            Reason = "Single-domain contextual governance."
+        };
+    }
+
+    private static ArchitectureCoverageSummary BuildSampleSemanticSummary(ArchitectureContractDocument document)
+    {
+        ArchitectureCoverageContract contract = new()
+        {
+            Name = "sample-semantic-coverage",
+            Id = "sample-semantic-coverage",
+            Scope = "semantic_role",
+            Roots = { new ArchitectureCoverageRoot { Namespace = "SemanticCoverageSampleFixtures" } }
+        };
+
+        return RequireSummary(
+            new ArchitectureContractRunner(CreateContext(typeof(ArchitectureCoverageSummaryTests)), document)
+                .BuildCoverageSummary(contract));
     }
 }

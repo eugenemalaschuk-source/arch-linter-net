@@ -16,9 +16,10 @@ The semantic classification model SHALL define exactly ten classification terms 
 - **AND** no coverage-participating construct consumes that role/metadata and no `exclusion` names the type
 - **THEN** the model SHALL still classify this as an `uncovered semantic fact` — `override` is a classification source, not a coverage-exemption mechanism, and only `exclusion` removes a type from coverage consideration
 
-#### Scenario: Contextual dependency and allow-only contracts register coverage-participating consumption for a future coverage variant
-- **WHEN** a `strict_context_dependencies`/`audit_context_dependencies`/`strict_context_allow_only`/`audit_context_allow_only` contract's `source`, `forbidden`, `allowed`, or `exclude` selector references a discovered role/metadata value directly, without that role/metadata also being matched by a `layers.<name>.selector`
-- **THEN** the model records that selector's `(role, metadata key)` reference as coverage-participating consumption, in a form a future coverage variant (see Requirement "Classification interacts with coverage through an aligned, not parallel, vocabulary" below) is designed to treat identically to a `layers.<name>.selector` match — no coverage contract currently reads this record, so no type is actually classified as `covered`/`uncovered` by it yet; this scenario fixes only the recorded shape a future coverage variant must consume, not a live coverage classification produced today
+#### Scenario: Contextual dependency and allow-only contracts register executable coverage consumption
+- **WHEN** a contextual dependency or allow-only contract declares a source, target, or exclusion selector
+- **THEN** the model records the selector's complete role, metadata values, operators, and source-target relationship as coverage-participating consumption
+- **AND** semantic coverage evaluates that record with the same matching semantics as the contextual contract
 
 #### Scenario: Stale selector is distinguished from an unmatched namespace layer
 - **WHEN** a `layers.<name>.selector`'s `role`/`metadata` criteria match zero types classified by the model
@@ -209,11 +210,19 @@ Every `classification.exclusions` entry SHALL require a non-empty `reason` field
 - **THEN** the reviewed schema SHALL reject the document as invalid
 
 ### Requirement: Classification interacts with coverage through an aligned, not parallel, vocabulary
-The design SHALL state that a future `scope: semantic_role` variant of the existing architecture-coverage-model contract (`covered`/`excluded`/`uncovered`/`unknown`/`stale`/`empty-input`, per the `architecture-coverage-model` capability) is the intended integration point for classification's `uncovered semantic fact` and `stale selector` concepts, rather than introducing a separate coverage-like diagnostic vocabulary. "Consumed" for this purpose SHALL NOT be hard-coded to `layers.<name>.selector` alone: any future contextual-contract construct (#111/#112) that references a discovered role/metadata value directly SHALL count as coverage-participating consumption identically to a selector match.
+The runtime SHALL integrate implemented semantic classification with the existing architecture-coverage-model through `scope: semantic_role`, using the shared `covered`/`excluded`/`uncovered`/`unknown`/`stale`/`empty-input` vocabulary rather than introducing a separate coverage-like diagnostic vocabulary. A discovered role/metadata fact SHALL count as consumed when matched by a `layers.<name>.selector` or referenced directly by an implemented contextual-contract selector; a role assigned by an override does not by itself exempt a type from coverage. Conflicts and metadata failures SHALL remain explainable classification evidence consumed by semantic coverage diagnostics.
 
-#### Scenario: Uncovered semantic fact aligns with coverage's uncovered term
-- **WHEN** a role is discovered by classification but consumed by no coverage-participating construct and named by no exclusion (including a role assigned by an `override`, which does not by itself exempt a type from coverage)
-- **THEN** the reviewed design classifies this using the same conceptual status as the architecture-coverage-model's `uncovered`, for a future `scope: semantic_role` coverage variant to implement
+#### Scenario: Uncovered semantic fact aligns with coverage output
+- **WHEN** a role is discovered but consumed by no selector or contextual contract and named by no exclusion
+- **THEN** a selected semantic-role coverage contract reports the fact as `uncovered`
+
+#### Scenario: Contextual consumption counts as governance
+- **WHEN** an implemented contextual contract references a discovered role/metadata value directly
+- **THEN** semantic-role coverage treats the matching fact as covered in the same way as a layer selector match
+
+#### Scenario: Classification conflicts remain distinct
+- **WHEN** the role index reports conflicting classification sources for a fact
+- **THEN** semantic coverage exposes conflict evidence separately from dependency violations and does not silently count the fact as governed
 
 ### Requirement: Runtime behavior is introduced only for implemented classification sources and layer selectors
 The runtime SHALL execute `classification.attributes`, `classification.assembly_attributes`, `classification.inheritance`, `classification.namespace`, and `layers.<name>.selector` matching/binding according to their implemented capabilities. `classification.path`, `classification.overrides`, and `classification.exclusions` remain schema-valid reserved constructs until their own execution capabilities land; `classification.path` additionally produces a deterministic deferred-support diagnostic when declared (see the diagnostic scenario below), distinguishing it from the fully silent `overrides`/`exclusions` reserved sections.
