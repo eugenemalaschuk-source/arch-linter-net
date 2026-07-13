@@ -38,6 +38,10 @@ public sealed class ArchitectureCoverageExclusion
 
     [YamlMember(Alias = "contract_id")] public string ContractId { get; set; } = string.Empty;
 
+    [YamlMember(Alias = "role")] public string Role { get; set; } = string.Empty;
+
+    [YamlMember(Alias = "metadata")] public Dictionary<string, object> Metadata { get; set; } = new();
+
     [YamlMember(Alias = "between")] public List<string> Between { get; set; } = new();
 
     [YamlMember(Alias = "reason")] public string Reason { get; set; } = string.Empty;

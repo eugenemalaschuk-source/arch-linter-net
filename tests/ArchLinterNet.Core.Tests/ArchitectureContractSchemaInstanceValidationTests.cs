@@ -114,6 +114,39 @@ public sealed class ArchitectureContractSchemaInstanceValidationTests
     }
 
     [Test]
+    public void CoverageContract_SemanticRole_AcceptsReasonedRoleExclusion()
+    {
+        const string Yaml = """
+            name: semantic-role-coverage
+            scope: semantic_role
+            reason: Semantic facts must be governed.
+            roots:
+              - namespace: MyApp
+            exclude:
+              - role: GeneratedRole
+                metadata:
+                  kind: generated
+                reason: Generated code is governed elsewhere.
+            """;
+
+        Assert.That(Validate(Yaml, "coverageContract"), Is.True);
+    }
+
+    [Test]
+    public void CoverageContract_SemanticRole_RejectsExclusionWithoutRole()
+    {
+        const string Yaml = """
+            name: semantic-role-coverage
+            scope: semantic_role
+            reason: Semantic facts must be governed.
+            exclude:
+              - reason: Missing role.
+            """;
+
+        Assert.That(Validate(Yaml, "coverageContract"), Is.False);
+    }
+
+    [Test]
     public void ClassificationOverride_NamespaceScopedWithReason_IsValid()
     {
         const string Yaml = "namespace: MyApp.Legacy\nrole: Unclassified\nreason: Reviewed quarterly.\n";

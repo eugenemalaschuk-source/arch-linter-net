@@ -38,6 +38,11 @@ public sealed partial class ArchitectureAnalysisSession
             return BuildDependencyEdgeCoverageSummary(contract);
         }
 
+        if (string.Equals(contract.Scope, "semantic_role", StringComparison.Ordinal))
+        {
+            return BuildSemanticRoleCoverageSummary(contract);
+        }
+
         return BuildNamespaceCoverageSummary(contract);
     }
 
@@ -330,6 +335,11 @@ public sealed partial class ArchitectureAnalysisSession
         if (string.Equals(contract.Scope, "dependency_edge", StringComparison.Ordinal))
         {
             return CheckDependencyEdgeCoverageContract(contract);
+        }
+
+        if (string.Equals(contract.Scope, "semantic_role", StringComparison.Ordinal))
+        {
+            return CheckSemanticRoleCoverageContract(contract);
         }
 
         if (!string.Equals(contract.Scope, "namespace", StringComparison.Ordinal))

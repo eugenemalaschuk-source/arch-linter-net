@@ -34,6 +34,13 @@ violations from those layers affect pass/fail evaluation and the command's exit 
 `validate` also surfaces classification facts in human, JSON, and CI-artifact output
 as informational "Classification findings."
 
+To audit semantic blind spots, declare a coverage contract with
+`scope: semantic_role`. It reuses the role index produced for the validation run:
+selector-backed layers and contextual selectors govern discovered facts, while
+unclassified types, ungoverned roles, and stale selectors are reported as
+coverage evidence. This is additive to namespace/project/assembly/dependency
+coverage and does not change policies that do not declare semantic coverage.
+
 **Discovered roles are indexed once per validation run** (see
 [issue #110](https://github.com/eugenemalaschuk-source/arch-linter-net/issues/110)
 and `openspec/specs/semantic-role-index`): every scanned type's resolved role,

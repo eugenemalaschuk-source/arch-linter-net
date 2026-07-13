@@ -248,6 +248,8 @@ public sealed class ArchitectureDiagnosticFormatterTests
             Is.EqualTo("Core.Representative"));
         Assert.That(json.RootElement.GetProperty("coverage_summary")[0].GetProperty("covered_items")[0].GetProperty("item").GetString(),
             Is.EqualTo("d-covered"));
+        Assert.That(json.RootElement.GetProperty("coverage_summary")[0].GetProperty("excluded_items")[0]
+            .TryGetProperty("evidence", out _), Is.False);
     }
 
     [Test]

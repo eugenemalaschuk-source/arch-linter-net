@@ -203,12 +203,12 @@ public sealed partial class ArchitectureAnalysisSession
 
         foreach (ArchitectureContextSelector selector in targetSelectors)
         {
-            RegisterContextualConsumer(selector);
+            RegisterContextualConsumer(source, selector);
         }
 
         foreach (ArchitectureContextSelector selector in excludeSelectors)
         {
-            RegisterContextualConsumer(selector);
+            RegisterContextualConsumer(source, selector);
         }
     }
 

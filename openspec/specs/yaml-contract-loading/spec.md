@@ -88,3 +88,25 @@ The system SHALL expose a `Contracts`-local contract family binding registry tha
 - **WHEN** the contract family binding registry is defined
 - **THEN** it does not reference or depend on any type in `ArchLinterNet.Core.Execution`, preserving the constraint that `Contracts` depends on nothing else in `Core`
 
+### Requirement: Public schema supports semantic coverage contracts
+The published JSON Schema SHALL accept `scope: semantic_role`, semantic exclusion `role` and `metadata` fields, and the documented coverage contract-level fields.
+
+#### Scenario: Schema-aware authoring accepts semantic coverage
+- **WHEN** a policy author validates a semantic-role coverage contract against the published JSON Schema
+- **THEN** the contract and its reasoned semantic exclusion are accepted
+
+### Requirement: Semantic coverage exclusions reject unknown keys
+Before permissive YAML deserialization, the loader SHALL reject an unknown field in a semantic-role coverage exclusion mapping.
+
+#### Scenario: Misspelled semantic exclusion metadata key
+- **WHEN** a semantic-role coverage exclusion contains `metdata` instead of `metadata`
+- **THEN** policy loading fails with a diagnostic naming the unknown key
+- **AND** the exclusion is not interpreted as a role-wide exclusion
+
+### Requirement: Semantic exclusion metadata must be an object
+The loader SHALL reject `metadata: null` in a semantic-role coverage exclusion before execution.
+
+#### Scenario: Null exclusion metadata is rejected
+- **WHEN** a semantic-role coverage exclusion declares `metadata: null`
+- **THEN** loading fails with a null-metadata diagnostic
+

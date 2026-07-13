@@ -317,7 +317,8 @@ public sealed class ContextDependencyContractTests
 
         Assert.Multiple(() =>
         {
-            Assert.That(consumers, Does.Contain(new ArchitectureContextualConsumerReference("DomainLayer", "domain")));
+            Assert.That(consumers, Has.Some.Matches<ArchitectureContextualConsumerReference>(consumer =>
+                consumer.Role == "DomainLayer" && consumer.Metadata.ContainsKey("domain")));
             Assert.That(consumers, Is.Not.Empty);
         });
     }
@@ -333,7 +334,8 @@ public sealed class ContextDependencyContractTests
             CreateContext(), CreateDocument(contract), selectedContractIds: new HashSet<string> { "some-other-contract" });
 
         Assert.That(runner.Session.RegisteredContextualConsumers,
-            Does.Contain(new ArchitectureContextualConsumerReference("DomainLayer", "domain")));
+            Has.Some.Matches<ArchitectureContextualConsumerReference>(consumer =>
+                consumer.Role == "DomainLayer" && consumer.Metadata.ContainsKey("domain")));
     }
 
     [Test]
