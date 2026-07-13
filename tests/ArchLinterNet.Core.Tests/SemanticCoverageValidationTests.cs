@@ -68,6 +68,19 @@ public sealed class SemanticCoverageValidationTests
         Assert.That(exception.Message, Does.Contain("unknown property 'metdata'"));
     }
 
+    [Test]
+    public void SemanticRoleCoverage_NullExclusionMetadata_IsRejected()
+    {
+        InvalidOperationException exception = Assert.Throws<InvalidOperationException>(() => Load("""
+            exclude:
+              - role: DomainLayer
+                metadata: null
+                reason: Null metadata must not reach execution.
+            """))!;
+
+        Assert.That(exception.Message, Does.Contain("null metadata"));
+    }
+
     private ArchitectureContractDocument Load(string contractFragment)
     {
         string path = Path.Combine(_tempDirectory, "dependencies.arch.yml");

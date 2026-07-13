@@ -103,3 +103,10 @@ Before permissive YAML deserialization, the loader SHALL reject an unknown field
 - **THEN** policy loading fails with a diagnostic naming the unknown key
 - **AND** the exclusion is not interpreted as a role-wide exclusion
 
+### Requirement: Semantic exclusion metadata must be an object
+The loader SHALL reject `metadata: null` in a semantic-role coverage exclusion before execution.
+
+#### Scenario: Null exclusion metadata is rejected
+- **WHEN** a semantic-role coverage exclusion declares `metadata: null`
+- **THEN** loading fails with a null-metadata diagnostic
+

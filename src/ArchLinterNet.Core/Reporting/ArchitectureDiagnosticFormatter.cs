@@ -211,7 +211,7 @@ public sealed partial class ArchitectureDiagnosticFormatter : IArchitectureDiagn
 
         var excludedLines = summary.ExcludedItems
             .OrderBy(item => item.Item, StringComparer.Ordinal)
-            .Select(item => $"    excluded: {item.Item} ({item.Reason})");
+            .Select(item => $"    excluded: {item.Item} ({item.Reason}; {item.Evidence})");
 
         var uncoveredLines = summary.UncoveredItems
             .OrderBy(item => item.Item, StringComparer.Ordinal)
@@ -555,7 +555,12 @@ public sealed partial class ArchitectureDiagnosticFormatter : IArchitectureDiagn
             },
             ["excluded_items"] = summary.ExcludedItems
                 .OrderBy(item => item.Item, StringComparer.Ordinal)
-                .Select(item => new Dictionary<string, object?> { ["item"] = item.Item, ["reason"] = item.Reason })
+                .Select(item => new Dictionary<string, object?>
+                {
+                    ["item"] = item.Item,
+                    ["reason"] = item.Reason,
+                    ["evidence"] = item.Evidence
+                })
                 .ToArray(),
             ["uncovered_items"] = ToEvidenceItemsJson(summary.UncoveredItems),
             ["stale_items"] = ToEvidenceItemsJson(summary.StaleItems),

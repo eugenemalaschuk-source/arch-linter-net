@@ -70,6 +70,12 @@ internal sealed class CoverageValidator : IArchitecturePolicyDocumentValidator
                     $"Semantic-role coverage contract '{contract.Name}' has an exclusion at index {i} without a non-empty role matcher.");
             }
 
+            if (exclusion.Metadata is null)
+            {
+                throw new InvalidOperationException(
+                    $"Semantic-role coverage contract '{contract.Name}' has an exclusion at index {i} with null metadata.");
+            }
+
             if (!string.IsNullOrWhiteSpace(exclusion.Namespace)
                 || !string.IsNullOrWhiteSpace(exclusion.NamespaceSuffix)
                 || !string.IsNullOrWhiteSpace(exclusion.Project)

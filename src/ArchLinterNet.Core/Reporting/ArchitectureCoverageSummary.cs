@@ -7,7 +7,7 @@ public sealed record ArchitectureCoverageSummaryCounts(
     int Stale,
     int Unknown);
 
-public sealed record ArchitectureCoverageSummaryExcludedItem(string Item, string Reason);
+public sealed record ArchitectureCoverageSummaryExcludedItem(string Item, string Reason, string Evidence = "");
 
 public sealed record ArchitectureCoverageSummaryEvidenceItem(string Item, string Evidence);
 

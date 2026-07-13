@@ -671,7 +671,75 @@ public sealed class ArchitectureCoverageSummaryTests
         Assert.That(summary.UnknownItems, Has.Some.Matches<ArchitectureCoverageSummaryEvidenceItem>(item =>
             item.Evidence.StartsWith("classification conflict:", StringComparison.Ordinal)));
         Assert.That(summary.UnknownItems, Has.Some.Matches<ArchitectureCoverageSummaryEvidenceItem>(item =>
-            item.Evidence.StartsWith("metadata failure: missing", StringComparison.Ordinal)));
+            item.Evidence.StartsWith("metadata failure: source=", StringComparison.Ordinal)
+            && item.Evidence.Contains("key=missing", StringComparison.Ordinal)));
+    }
+
+    [Test]
+    public void CheckCoverageContract_SemanticRoleScope_ReportsStaleConflictAndMetadataFailure()
+    {
+        ArchitectureContractDocument document = CreateDomainClassificationDocument();
+        document.Layers["stale"] = new ArchitectureLayer
+        {
+            Selector = new ArchitectureLayerSelector { Role = "NeverDiscovered" }
+        };
+        document.Classification.Attributes[0].Metadata["missing"] = "property:Missing";
+        document.Classification.Attributes.Add(new ArchitectureAttributeClassificationMapping
+        {
+            Attribute = "AttributeRoleExtractionTestFixtures.SecondMarkerAttribute",
+            Role = "InfrastructureLayer"
+        });
+
+        ArchitectureCoverageContract contract = new()
+        {
+            Name = "semantic-role-coverage",
+            Id = "semantic-role-coverage",
+            Scope = "semantic_role",
+            Roots = { new ArchitectureCoverageRoot { Namespace = "AttributeRoleExtractionTestFixtures" } }
+        };
+
+        List<ArchitectureViolation> findings = new ArchitectureContractRunner(
+            CreateContext(typeof(ArchitectureCoverageSummaryTests)), document).CheckCoverageContract(contract);
+
+        Assert.That(findings.Select(finding => finding.ForbiddenNamespace), Does.Contain("stale semantic selector"));
+        Assert.That(findings.Select(finding => finding.ForbiddenNamespace), Does.Contain("classification conflict"));
+        Assert.That(findings.Select(finding => finding.ForbiddenNamespace), Does.Contain("classification metadata failure"));
+    }
+
+    [Test]
+    public void BuildCoverageSummary_SemanticRoleScope_ExplainsGovernanceAndExclusionFacts()
+    {
+        ArchitectureContractDocument document = CreateDomainClassificationDocument();
+        document.Layers["sales"] = new ArchitectureLayer
+        {
+            Selector = new ArchitectureLayerSelector
+            {
+                Role = "DomainLayer",
+                Metadata = new Dictionary<string, object> { ["domain"] = "Sales" }
+            }
+        };
+        ArchitectureCoverageContract contract = new()
+        {
+            Name = "semantic-role-coverage",
+            Id = "semantic-role-coverage",
+            Scope = "semantic_role",
+            Roots = { new ArchitectureCoverageRoot { Namespace = "SemanticCoverageSampleFixtures" } }
+        };
+        contract.Exclude.Add(new ArchitectureCoverageExclusion
+        {
+            Role = "DomainLayer",
+            Metadata = new Dictionary<string, object> { ["domain"] = "Inventory" },
+            Reason = "Inventory is exempted."
+        });
+
+        ArchitectureCoverageSummary summary = RequireSummary(new ArchitectureContractRunner(
+            CreateContext(typeof(ArchitectureCoverageSummaryTests)), document).BuildCoverageSummary(contract));
+
+        Assert.That(summary.CoveredItems, Has.Some.Matches<ArchitectureCoverageSummaryEvidenceItem>(item =>
+            item.Evidence.Contains("governed by layer", StringComparison.Ordinal)));
+        Assert.That(summary.ExcludedItems, Has.Some.Matches<ArchitectureCoverageSummaryExcludedItem>(item =>
+            item.Evidence.Contains("role=DomainLayer", StringComparison.Ordinal)
+            && item.Evidence.Contains("domain=Inventory", StringComparison.Ordinal)));
     }
 
     private static ArchitectureContractDocument CreateDomainClassificationDocument()
