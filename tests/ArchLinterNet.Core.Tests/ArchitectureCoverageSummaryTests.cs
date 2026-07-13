@@ -610,6 +610,18 @@ public sealed class ArchitectureCoverageSummaryTests
     }
 
     [Test]
+    public void RegisteredContextualConsumers_DescribeSequenceMetadataWithValues()
+    {
+        ArchitectureContractDocument document = CreateDomainClassificationDocument();
+        document.Contracts.StrictContextDependencies.Add(CreateInConsumer("domains", "Sales"));
+
+        ArchitectureContractRunner runner = new(CreateContext(typeof(ArchitectureCoverageSummaryTests)), document);
+
+        Assert.That(runner.Session.RegisteredContextualConsumers.Select(consumer => consumer.Description),
+            Has.Some.EqualTo("role:DomainLayer metadata:domain=[Sales]"));
+    }
+
+    [Test]
     public void BuildCoverageSummary_SemanticRoleScope_ReportsStaleContextualConsumerWithMetadataValue()
     {
         ArchitectureContractDocument document = CreateDomainClassificationDocument();

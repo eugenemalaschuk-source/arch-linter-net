@@ -211,7 +211,9 @@ public sealed partial class ArchitectureDiagnosticFormatter : IArchitectureDiagn
 
         var excludedLines = summary.ExcludedItems
             .OrderBy(item => item.Item, StringComparer.Ordinal)
-            .Select(item => $"    excluded: {item.Item} ({item.Reason}; {item.Evidence})");
+            .Select(item => string.IsNullOrEmpty(item.Evidence)
+                ? $"    excluded: {item.Item} ({item.Reason})"
+                : $"    excluded: {item.Item} ({item.Reason}; {item.Evidence})");
 
         var uncoveredLines = summary.UncoveredItems
             .OrderBy(item => item.Item, StringComparer.Ordinal)
@@ -555,12 +557,7 @@ public sealed partial class ArchitectureDiagnosticFormatter : IArchitectureDiagn
             },
             ["excluded_items"] = summary.ExcludedItems
                 .OrderBy(item => item.Item, StringComparer.Ordinal)
-                .Select(item => new Dictionary<string, object?>
-                {
-                    ["item"] = item.Item,
-                    ["reason"] = item.Reason,
-                    ["evidence"] = item.Evidence
-                })
+                .Select(item => ToExcludedItemJson(item))
                 .ToArray(),
             ["uncovered_items"] = ToEvidenceItemsJson(summary.UncoveredItems),
             ["stale_items"] = ToEvidenceItemsJson(summary.StaleItems),
@@ -576,6 +573,17 @@ public sealed partial class ArchitectureDiagnosticFormatter : IArchitectureDiagn
             .OrderBy(item => item.Item, StringComparer.Ordinal)
             .Select(item => new Dictionary<string, object?> { ["item"] = item.Item, ["evidence"] = item.Evidence })
             .ToArray();
+    }
+
+    private static Dictionary<string, object?> ToExcludedItemJson(ArchitectureCoverageSummaryExcludedItem item)
+    {
+        var result = new Dictionary<string, object?> { ["item"] = item.Item, ["reason"] = item.Reason };
+        if (!string.IsNullOrEmpty(item.Evidence))
+        {
+            result["evidence"] = item.Evidence;
+        }
+
+        return result;
     }
 
     private static Dictionary<string, object?> ToCiJsonObject(ArchitectureDiagnostic diagnostic, bool includeContract)

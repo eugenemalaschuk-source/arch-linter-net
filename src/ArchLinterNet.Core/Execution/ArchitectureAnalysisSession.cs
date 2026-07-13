@@ -215,7 +215,7 @@ public sealed partial class ArchitectureAnalysisSession
         }
 
         return $"role:{role} metadata:{string.Join(",", metadata.OrderBy(entry => entry.Key, StringComparer.Ordinal)
-            .Select(entry => $"{entry.Key}={entry.Value}"))}";
+            .Select(entry => $"{entry.Key}={FormatContextualMetadataDisplayValue(entry.Value)}"))}";
     }
 
     private static string CreateContextualSelectorIdentity(string role, IReadOnlyDictionary<string, object> metadata)
@@ -238,6 +238,21 @@ public sealed partial class ArchitectureAnalysisSession
             string text => $"string:{text.Length}:{text}",
             IFormattable formattable => $"{value.GetType().FullName}:{formattable.ToString(null, System.Globalization.CultureInfo.InvariantCulture)}",
             _ => $"{value.GetType().FullName}:{value}"
+        };
+    }
+
+    private static string FormatContextualMetadataDisplayValue(object? value)
+    {
+        if (value is System.Collections.IEnumerable sequence and not string)
+        {
+            return $"[{string.Join(",", sequence.Cast<object?>().Select(FormatContextualMetadataDisplayValue))}]";
+        }
+
+        return value switch
+        {
+            null => "null",
+            IFormattable formattable => formattable.ToString(null, System.Globalization.CultureInfo.InvariantCulture),
+            _ => value.ToString() ?? string.Empty
         };
     }
 
