@@ -1,0 +1,12 @@
+version: 1
+name: Classification deferred aggregation
+imports: [path-fragment.yml]
+layers: {}
+analysis: {}
+contracts: {}
+classification:
+  path:
+    - path_prefix: src/Application
+      role: Application
+    - path_prefix: src/Domain
+      role: Domain

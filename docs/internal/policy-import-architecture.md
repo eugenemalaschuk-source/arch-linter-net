@@ -37,7 +37,7 @@ composer ------------ maps / lists / singletons / family registry
 ArchitectureContractDocument + provenance index
         |
         v
-fallback IDs -> existing ordered validator pipeline -> execution
+effective-policy schema -> fallback IDs -> validator pipeline -> execution
 ```
 
 `IArchitecturePolicyDocumentLoader.Load(string policyPath)` remains the
@@ -88,9 +88,15 @@ filesystem properties to every contract DTO and works with the loader's current
 raw-YAML validation approach.
 
 Shape validation runs before composition. The root schema requires identity;
-the fragment schema rejects root-only and unknown fields. Family-specific
-semantic validators do not run per fragment because they need the complete
-definition graph.
+it records whether each field was explicit but does not require sections a
+fragment can contribute. The fragment schema rejects root-only and unknown
+fields. Family-specific semantic validators do not run per fragment because
+they need the complete definition graph.
+
+The parser also retains raw `classification.path`, `classification.overrides`,
+and `classification.exclusions` nodes. These fields are intentionally absent
+from the bound C# classification model, so ordinary DTO deserialization alone
+would lose `path`'s current deferred-support signal.
 
 ## Composer boundary
 
@@ -103,6 +109,12 @@ The composer receives the ordered parsed sources and creates one
   are applied;
 - copy each contract and its nested ignored violations as one atomic node;
 - assign defaults only after all explicit values are composed.
+
+For classification, append the model-bound lists and singleton-check
+`precedence`. Retain raw `path`, `overrides`, and `exclusions` entries with
+provenance and source order. Aggregate all raw `path` entries into the one
+`ClassificationPathDeferred` notice; preserve `overrides` and `exclusions` as
+deferred no-ops rather than silently dropping them.
 
 Contract family composition must enumerate
 `ArchitectureContractFamilyBindings.All`. A new contract family already adds
@@ -147,10 +159,15 @@ source ordinal and existing within-family order.
 
 #281 should publish a root schema and a fragment schema from shared definitions:
 
-- root: current required identity and policy sections plus `imports`;
+- root source: required identity and optional policy sections plus `imports`;
 - fragment: only mergeable sections plus `imports`, with at least one useful
   contribution;
 - both: closed top-level property sets and the same contract-family definitions.
+
+After composition, #281 validates against the full effective-policy schema,
+which requires `version`, `name`, `layers`, `analysis`, and `contracts` exactly
+as the current production schema does. The effective schema is not substituted
+for either source-role schema.
 
 Runtime chooses the schema from graph role. Editor documentation may show an
 inline YAML language-server schema directive. Filename associations are optional
@@ -163,11 +180,13 @@ consume imports. Activating only the schema would advertise unsupported YAML.
 
 The implementation should preserve this observable order:
 
-1. Validate an import entry before resolving its target.
+1. Validate an import entry against the portable grammar before resolving its
+   target.
 1. Validate canonical identity, boundary, duplicate/cycle state, and graph
    limits before reading the next file.
 1. Parse and validate the source role/shape.
 1. Compose in depth-first pre-order and fail on the first composition conflict.
+1. Validate the composed effective document against the full policy schema.
 1. Assign fallback contract IDs.
 1. Run the existing `ArchitecturePolicyDocumentValidatorPipeline` once in its
    current fixed order.
@@ -192,10 +211,14 @@ fixtures after runtime support exists.
 | #281 | Naming | `arch.yml` plus `*.arch.yml` | Recommended names work without special behavior. |
 | #281 | Naming | Arbitrary root, fragment name, and extension | Results equal the recommended-name graph. |
 | #281 | Root | Root with inline sections and imports | Both contribute to one document. |
+| #281 | Validation phases | Root omits sections supplied by fragments | Source shape passes; full effective schema passes before IDs/validators. |
+| #281 | Validation phases | Entire graph omits layers, analysis, or contracts | Full effective schema fails before IDs/validators. |
 | #281 | Fragment shape | Every allowed top-level section | Each is accepted independently in a fragment. |
 | #281 | Fragment shape | Empty fragment | Rejected unless `imports` is non-empty. |
 | #281 | Fragment shape | `version`, `name`, baseline key, unknown key | Rejected with role, field, and source. |
 | #281 | Import syntax | Empty, null, mapping, absolute, URI, glob, environment expression | Rejected before target read. |
+| #281 | Import grammar | `/`-separated NFC relative path | Has the same segments on Windows, Linux, and macOS. |
+| #281 | Import grammar | Backslash, drive, UNC/device, leading slash, empty segment, reserved name, invalid character, or interpolation token | Rejected before host path APIs resolve it. |
 | #281 | Resolution | Import relative to root | Resolves from root directory. |
 | #281 | Resolution | Nested import relative to fragment | Resolves from fragment directory, not root directory. |
 | #281 | Ordering | Root imports A/B and A imports C/D | Source order is root, A, C, D, B. |
@@ -234,6 +257,8 @@ fixtures after runtime support exists.
 | #282 | Provenance | Map or singleton conflict | Diagnostic includes both source descriptors. |
 | #282 | Provenance | Existing family validator rejects imported node | Final diagnostic identifies fragment and YAML path. |
 | #282 | Provenance | Duplicate contract ID across fragments | Diagnostic identifies both contracts. |
+| #282 | Classification raw metadata | Root plus fragments declare `classification.path` | Deferred notice count is aggregated and sources remain available. |
+| #282 | Classification raw metadata | Fragments declare `overrides` or `exclusions` | Entries retain provenance/order and remain deferred no-ops. |
 | #282 | Output | Human, JSON, and SARIF where applicable | Paths are canonical repository-relative values. |
 | #282 | Output | Same graph on Windows and Linux | Diagnostic ordering and portable paths are identical. |
 | #282 | Integration | CLI and Testing adapter imported-policy failure | Both expose the same origin details and effective behavior. |

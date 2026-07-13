@@ -1,0 +1,10 @@
+classification:
+  path:
+    - path_prefix: src/Infrastructure
+      role: Infrastructure
+  overrides:
+    - namespace: Example.Legacy
+      role: Legacy
+  exclusions:
+    - namespace: Example.Generated
+      reason: Generated source is deferred.

@@ -1,0 +1,6 @@
+version: 1
+name: Backslash separator failure
+imports: ["policy\\layers.yml"]
+layers: {}
+analysis: {}
+contracts: {}

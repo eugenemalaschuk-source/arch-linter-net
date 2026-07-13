@@ -1,0 +1,6 @@
+layers:
+  application:
+    namespace: Example.Application
+analysis:
+  target_assemblies: [Example.Application]
+contracts: {}

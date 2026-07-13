@@ -11,6 +11,9 @@ named root; individual fragment filenames have no semantic role.
 | Cycle | `root-cycle.yml` | The chain is `root-cycle.yml`, `cycle-a.yml`, `cycle-b.yml`, `cycle-a.yml`. |
 | Boundary escape | `root-boundary.yml` | The relative target resolves outside the repository boundary. |
 | Unsupported expression | `root-glob.yml` | A glob entry is rejected before filesystem expansion. |
+| Backslash separator | `root-backslash.yml` | Windows-style separator is rejected before host path resolution. |
+| Drive/UNC/device form | `root-platform-native.yml` | Drive, UNC, and device forms are rejected by portable grammar. |
+| Absolute path | `root-absolute.yml` | Unix absolute path is rejected by portable grammar. |
 | Depth limit | generated fixture | A 17-edge chain fails before reading the depth-17 target. |
 | File-count limit | generated fixture | Root plus 256 completed files fails before reading file 257. |
 
