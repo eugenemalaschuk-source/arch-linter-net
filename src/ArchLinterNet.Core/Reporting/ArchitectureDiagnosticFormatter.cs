@@ -120,12 +120,6 @@ public sealed partial class ArchitectureDiagnosticFormatter : IArchitectureDiagn
                 .Select(FormatForHumans));
     }
 
-    public string FormatCyclesForHumans(IReadOnlyCollection<string> cycles)
-    {
-        var diagnostics = cycles.Select(cycle => ArchitectureDiagnosticMapper.FromCycle(cycle, contractName: string.Empty, contractId: null));
-        return string.Join(Environment.NewLine, diagnostics.OrderBy(d => d.Path).Select(d => $"- {d.Path}"));
-    }
-
     public string FormatUnmatchedForHumans(IReadOnlyCollection<ArchitectureUnmatchedIgnoredViolation> unmatched)
     {
         if (unmatched.Count == 0)
@@ -147,7 +141,7 @@ public sealed partial class ArchitectureDiagnosticFormatter : IArchitectureDiagn
                         return $"  {idPrefix}[{u.ContractName}] ignored_violations[{u.IgnoreIndex}] no longer matches any current violation:{Environment.NewLine}" +
                                $"    source_type: {u.SourceType}{Environment.NewLine}" +
                                $"    forbidden_reference: {u.ForbiddenReference}{Environment.NewLine}" +
-                               $"    reason: {u.Reason}";
+                               $"    reason: {u.Reason}" + FormatPolicyLocationSuffix(u);
                     }));
     }
 
@@ -170,7 +164,8 @@ public sealed partial class ArchitectureDiagnosticFormatter : IArchitectureDiagn
                         string idPrefix = f.ContractId != null ? $"[{f.ContractId}] " : string.Empty;
                         string names = string.Join(", ", f.ConflictingContractNames);
                         return $"  {idPrefix}[{f.CheckKind}] {f.Reason}" +
-                               (names.Length > 0 ? $" (contracts: {names})" : string.Empty);
+                               (names.Length > 0 ? $" (contracts: {names})" : string.Empty) +
+                               FormatPolicyLocationSuffix(f);
                     }));
     }
 
@@ -248,21 +243,6 @@ public sealed partial class ArchitectureDiagnosticFormatter : IArchitectureDiagn
         return JsonSerializer.Serialize(payload);
     }
 
-    public string FormatCyclesForCiArtifacts(string contractName, string? contractId, IReadOnlyCollection<string> cycles)
-    {
-        var diagnostics = cycles.Select(cycle => ArchitectureDiagnosticMapper.FromCycle(cycle, contractName, contractId));
-
-        var payload = new
-        {
-            kind = "architecture_cycles",
-            contract = contractName,
-            contract_id = contractId,
-            cycles = diagnostics.Select(d => d.Path).ToArray()
-        };
-
-        return JsonSerializer.Serialize(payload);
-    }
-
     private static string SourceTypeOf(ArchitectureDiagnostic diagnostic) => diagnostic switch
     {
         DependencyDiagnostic d => d.SourceType,
@@ -328,7 +308,8 @@ public sealed partial class ArchitectureDiagnosticFormatter : IArchitectureDiagn
         string refs = string.Join(", ", ForbiddenReferencesOf(diagnostic));
         string pathSuffix = FormatConfigurationPathSuffixForHumans(diagnostic);
 
-        return $"- {idPrefix}[{diagnostic.ContractName}] {SourceTypeOf(diagnostic)} -> {nsDisplay}{context}: {refs}{pathSuffix}";
+        return $"- {idPrefix}[{diagnostic.ContractName}] {SourceTypeOf(diagnostic)} -> {nsDisplay}{context}: " +
+               $"{refs}{pathSuffix}{FormatPolicyLocationSuffix(diagnostic)}";
     }
 
     private static string BuildHumanContext(ArchitectureDiagnostic diagnostic)
@@ -537,6 +518,8 @@ public sealed partial class ArchitectureDiagnosticFormatter : IArchitectureDiagn
             obj["representative_type"] = finding.RepresentativeType;
         }
 
+        ApplyPolicyLocationFields(finding, obj);
+
         return obj;
     }
 
@@ -563,6 +546,23 @@ public sealed partial class ArchitectureDiagnosticFormatter : IArchitectureDiagn
                 obj["matched_namespace_prefix"] = diagnostic.MatchedNamespacePrefixes.First();
         }
 
+        ApplyPolicyLocationFields(diagnostic, obj);
+
+        return obj;
+    }
+
+    private static Dictionary<string, object?> ToUnmatchedJsonObject(UnmatchedIgnoreDiagnostic unmatched)
+    {
+        var obj = new Dictionary<string, object?>
+        {
+            ["contract"] = unmatched.ContractName,
+            ["contract_id"] = unmatched.ContractId,
+            ["ignore_index"] = unmatched.IgnoreIndex,
+            ["source_type"] = unmatched.SourceType,
+            ["forbidden_reference"] = unmatched.ForbiddenReference,
+            ["reason"] = unmatched.Reason
+        };
+        ApplyPolicyLocationFields(unmatched, obj);
         return obj;
     }
 

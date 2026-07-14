@@ -39,6 +39,10 @@ public sealed class ArchitectureContractDocument
     // from a raw-YAML presence check when classification.path declares at least one entry.
     [YamlIgnore]
     public ArchitectureClassificationPathDeferredNotice? ClassificationPathDeferred { get; set; }
+
+    [YamlIgnore]
+    public ArchitecturePolicyProvenanceIndex Provenance { get; internal set; } =
+        ArchitecturePolicyProvenanceIndex.Empty;
 }
 
 public sealed class ArchitectureAnalysisConfiguration

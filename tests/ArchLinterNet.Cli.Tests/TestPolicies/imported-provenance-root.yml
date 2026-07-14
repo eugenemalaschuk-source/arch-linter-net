@@ -1,0 +1,10 @@
+version: 1
+name: Imported provenance CLI fixture
+imports:
+  - imported-provenance-fragment.yml
+
+layers:
+  core:
+    namespace: ArchLinterNet.Core
+
+contracts: {}

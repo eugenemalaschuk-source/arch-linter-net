@@ -1,20 +1,8 @@
 version: 1
 name: Test Graph Policy
-
-layers:
-  execution:
-    namespace: ArchLinterNet.Core.Execution
-  contracts:
-    namespace: ArchLinterNet.Core.Contracts
+imports:
+  - graph-policy-fragment.yml
 
 analysis:
   target_assemblies:
     - ArchLinterNet.Core
-
-contracts:
-  strict:
-    - id: no-execution-to-contracts
-      name: execution-must-not-depend-on-contracts
-      source: execution
-      forbidden: [contracts]
-      reason: Used by graph/explain CLI integration tests.

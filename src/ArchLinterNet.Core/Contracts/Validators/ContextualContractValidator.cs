@@ -26,8 +26,8 @@ internal sealed partial class ContextualContractValidator : IArchitecturePolicyD
 
     public void Validate(ArchitectureContractDocument document)
     {
-        foreach (ArchitectureContextDependencyContract contract in document.Contracts.StrictContextDependencies
-                     .Concat(document.Contracts.AuditContextDependencies))
+        foreach (ArchitectureContextDependencyContract contract in document.Provenance.Track(
+                     document.Contracts.StrictContextDependencies.Concat(document.Contracts.AuditContextDependencies)))
         {
             ValidateSource(contract.Name, contract.Source);
             ValidateNonEmptySelectorList(contract.Name, ForbiddenFieldName, contract.Forbidden);
@@ -35,8 +35,8 @@ internal sealed partial class ContextualContractValidator : IArchitecturePolicyD
             ValidateTargetSelectors(contract.Name, "exclude", contract.Exclude);
         }
 
-        foreach (ArchitectureContextAllowOnlyContract contract in document.Contracts.StrictContextAllowOnly
-                     .Concat(document.Contracts.AuditContextAllowOnly))
+        foreach (ArchitectureContextAllowOnlyContract contract in document.Provenance.Track(
+                     document.Contracts.StrictContextAllowOnly.Concat(document.Contracts.AuditContextAllowOnly)))
         {
             ValidateSource(contract.Name, contract.Source);
             ValidateNonEmptySelectorList(contract.Name, "allowed", contract.Allowed);
@@ -44,8 +44,8 @@ internal sealed partial class ContextualContractValidator : IArchitecturePolicyD
             ValidateTargetSelectors(contract.Name, "exclude", contract.Exclude);
         }
 
-        foreach (ArchitecturePortBoundaryContract contract in document.Contracts.StrictPortBoundaries
-                     .Concat(document.Contracts.AuditPortBoundaries))
+        foreach (ArchitecturePortBoundaryContract contract in document.Provenance.Track(
+                     document.Contracts.StrictPortBoundaries.Concat(document.Contracts.AuditPortBoundaries)))
         {
             ValidateSource(contract.Name, contract.Source);
             if (contract.TargetContext.Metadata.Count == 0)

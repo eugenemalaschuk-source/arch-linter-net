@@ -3,7 +3,7 @@
 This note translates issue #280 and the `policy-import-composition` OpenSpec
 capability into implementation boundaries for #281 and #282. Runtime graph
 resolution, composition, and schemas are implemented by #281; provenance-rich
-downstream diagnostics remain assigned to #282.
+downstream diagnostics are implemented by #282.
 
 ## Scope
 
@@ -140,21 +140,37 @@ Each source descriptor contains:
 - YAML path;
 - composed source ordinal.
 
-#282 should attach provenance through a side index or focused composition
-wrapper, not new filesystem fields on every family POCO. Object identity can
-address mapping/list nodes; explicit owner-plus-field or composed YAML paths
-can address scalar settings. The chosen model must survive fallback ID
-assignment and validator execution.
+The implementation attaches provenance through a typed side index on the
+effective document rather than adding filesystem fields to every family POCO.
+The composer maps effective YAML paths back to original source locations, and
+the loader binds deserialized layers, groups, contracts, and ignored entries by
+object identity after fallback IDs are assigned. Scalar settings remain
+addressable through their effective YAML paths.
 
-Conflict errors are produced by the composer and include both descriptors.
-Existing family validators continue to own semantic validation; their thrown
-configuration errors need a provenance-aware mapping boundary so the final
-diagnostic includes the invalid node's source. Checkers still produce structured
-violations only and must not call filesystem or formatter adapters.
+`ArchitecturePolicySourceDescriptor` records the root and source paths,
+graph-derived root/fragment role, source ordinal, declaring source, authored
+import edge, and root-based import chain. `ArchitecturePolicySourceLocation`
+adds the original YAML path, line and column, plus contract family and effective
+contract ID when applicable. These model types are shared by Core diagnostics
+and the Testing adapter; graph and explain continue to use the same resolved
+document without learning about import traversal.
+
+Conflict errors are produced by the composer and include primary and related
+locations. Existing family validators continue to own semantic validation;
+the loader maps imported failures through the currently validated owner while
+preserving monolithic exception compatibility. Configuration, contract,
+policy-consistency, coverage, classification, and unmatched-ignore diagnostics
+are enriched from the same index. Checkers still produce structured violations
+only and do not call filesystem or formatter adapters.
 
 Machine-readable provenance should use canonical repository-relative paths,
 not host-absolute paths, to keep output reproducible. Ordering follows composed
 source ordinal and existing within-family order.
+
+Human output appends a compact `policy: <source>:<yaml-path>; root: <root>`
+suffix. CI JSON adds structured `policy_location` and
+`related_policy_locations` fields. SARIF adds deterministic policy
+`relatedLocations` while retaining existing code physical or logical locations.
 
 ## Schema boundary
 

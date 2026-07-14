@@ -18,6 +18,7 @@ internal interface ICliRuntime
         bool passed,
         IReadOnlyCollection<ArchitectureViolation> violations,
         IReadOnlyCollection<string> cycles,
+        IReadOnlyCollection<ArchitectureCycleFinding> cycleFindings,
         IReadOnlyCollection<ArchitectureViolation> coverageFindings,
         IReadOnlyList<ArchitectureUnmatchedIgnoredViolation> unmatchedIgnoredViolations,
         IReadOnlyCollection<PolicyConsistencyDiagnostic> policyConsistencyFindings,
@@ -30,11 +31,14 @@ internal interface ICliRuntime
     string FormatResultAsSarif(
         string mode,
         IReadOnlyCollection<ArchitectureViolation> violations,
-        IReadOnlyCollection<string> cycles);
+        IReadOnlyCollection<string> cycles,
+        IReadOnlyCollection<ArchitectureCycleFinding> cycleFindings);
 
     string FormatViolationsForHumans(IReadOnlyCollection<ArchitectureViolation> violations);
 
-    string FormatCyclesForHumans(IReadOnlyCollection<string> cycles);
+    string FormatCyclesForHumans(
+        IReadOnlyCollection<string> cycles,
+        IReadOnlyCollection<ArchitectureCycleFinding> cycleFindings);
 
     string FormatPolicyConsistencyForHumans(IReadOnlyCollection<PolicyConsistencyDiagnostic> diagnostics);
 

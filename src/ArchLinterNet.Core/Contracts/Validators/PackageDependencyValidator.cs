@@ -9,8 +9,8 @@ internal sealed class PackageDependencyValidator : IArchitecturePolicyDocumentVa
     {
         HashSet<string> targetAssemblies = new(document.Analysis.TargetAssemblies, StringComparer.Ordinal);
 
-        foreach (ArchitecturePackageDependencyContract contract in document.Contracts.StrictPackageDependency
-                     .Concat(document.Contracts.AuditPackageDependency))
+        foreach (ArchitecturePackageDependencyContract contract in document.Provenance.Track(
+                     document.Contracts.StrictPackageDependency.Concat(document.Contracts.AuditPackageDependency)))
         {
             if (contract.DependencyDepth != DependencyDepthMode.Direct)
             {

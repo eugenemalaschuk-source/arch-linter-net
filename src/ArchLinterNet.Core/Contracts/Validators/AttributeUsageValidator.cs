@@ -7,8 +7,8 @@ internal sealed class AttributeUsageValidator : IArchitecturePolicyDocumentValid
 {
     public void Validate(ArchitectureContractDocument document)
     {
-        foreach (ArchitectureAttributeUsageContract contract in document.Contracts.StrictAttributeUsage
-                     .Concat(document.Contracts.AuditAttributeUsage))
+        foreach (ArchitectureAttributeUsageContract contract in document.Provenance.Track(
+                     document.Contracts.StrictAttributeUsage.Concat(document.Contracts.AuditAttributeUsage)))
         {
             if (contract.Attributes.Count == 0 && contract.AttributePrefixes.Count == 0)
             {

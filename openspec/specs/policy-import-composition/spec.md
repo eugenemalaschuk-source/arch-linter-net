@@ -166,15 +166,49 @@ Fallback contract IDs SHALL be assigned after composition. IDs SHALL be compared
 - **THEN** loading succeeds with respect to duplicate-ID validation
 
 ### Requirement: Composed nodes retain source provenance
-Every composed node SHALL retain the explicit root identity, its canonical repository-relative source path, and its YAML path. Conflict diagnostics SHALL identify both the original and conflicting declarations. Shape, semantic, and contract validation diagnostics SHALL identify the source and YAML path that introduced the invalid node. Diagnostic and machine-readable ordering SHALL follow composed order.
+Every root-inline and imported composed node SHALL retain typed provenance containing
+the explicit root identity, canonical repository-relative source path using `/`,
+graph-derived document role, YAML/logical property path, and composed source ordinal.
+Imported nodes SHALL additionally retain their authored import edge and concise import
+chain from the explicit root. Contract nodes and nested ignored violations SHALL retain
+their contract family and effective contract ID where applicable. Provenance SHALL
+survive composition, deserialization, fallback ID assignment, semantic validation,
+configuration checking, policy-consistency checking, graph/explain setup, and Testing
+adapter loading without storing machine-specific absolute paths in public output.
+
+Conflict diagnostics SHALL carry both the original and conflicting typed locations.
+Shape, effective-schema, semantic, missing-reference, consistency, and contract-family
+diagnostics SHALL carry the typed location of the node that introduced the invalid
+value. Human diagnostics SHALL retain root-policy context while identifying fragment
+locations, and machine-readable ordering SHALL follow composed source order.
 
 #### Scenario: Conflicting definitions name both sources
-- **WHEN** two files declare the same keyed definition
-- **THEN** the diagnostic reports both canonical source paths and YAML paths
+- **WHEN** two files declare the same keyed definition, singleton setting, or contract ID
+- **THEN** the diagnostic carries both canonical source paths and YAML paths in original-then-conflicting order
 
 #### Scenario: Invalid imported contract retains origin
-- **WHEN** an imported contract fails existing family validation after composition
-- **THEN** the diagnostic identifies the fragment and contract YAML path rather than only the root
+- **WHEN** an imported contract fails an existing family validator after composition
+- **THEN** the diagnostic carries the fragment role, portable fragment path, contract YAML path, family, and effective ID rather than only the root path
+
+#### Scenario: Invalid inline root value retains arbitrary root identity
+- **WHEN** the explicitly selected root has an arbitrary filename and an inline value fails validation
+- **THEN** the diagnostic identifies that path as a root-role location without consulting its filename pattern
+
+#### Scenario: Nested resolution failure retains import chain
+- **WHEN** a nested import is missing, outside the boundary, cyclic, duplicated, or over a graph limit
+- **THEN** the typed diagnostic carries a concise ordered import chain beginning with the explicit root identity
+
+#### Scenario: Monolithic policy gains compatible provenance
+- **WHEN** an existing policy contains no imports
+- **THEN** its validation behavior and existing diagnostic fields remain compatible and its resolved nodes expose equivalent root-role typed provenance
+
+#### Scenario: Renaming sources changes only displayed paths
+- **WHEN** root or fragment files are renamed without changing content or graph relationships
+- **THEN** diagnostic categories, contract behavior, YAML paths, and ordering are unchanged while portable source paths reflect the new names
+
+#### Scenario: Every entry point consumes one provenance model
+- **WHEN** the same imported policy is loaded through CLI validation, the Testing adapter, graph, or explain
+- **THEN** each flow consumes the same graph-derived resolved provenance without reclassifying documents from filenames
 
 ### Requirement: Root and fragment schemas do not depend on filenames
 The system SHALL publish a root-policy schema and a fragment schema that share policy definitions. Runtime schema selection SHALL use graph role. Editor support SHALL allow explicit schema selection, including an inline YAML language-server schema directive, without requiring root or fragment filename patterns.
@@ -254,3 +288,153 @@ Policy loading SHALL expose a stable programmatic category for failures caused b
 #### Scenario: Composition conflict is categorized
 - **WHEN** two composed sources declare the same keyed definition or singleton setting
 - **THEN** policy loading fails with the composition-conflict category and identifies both declarations
+
+### Requirement: Typed policy diagnostics reach every reporting boundary
+Import and policy-validation exceptions carrying typed diagnostics SHALL retain
+their policy location, related locations, and import chain through the CLI
+boundary. Human output SHALL identify the policy source and explicit root;
+JSON and SARIF output SHALL expose machine-readable location data rather than
+only an exception string.
+
+#### Scenario: Imported effective-schema value is invalid
+- **WHEN** an imported fragment with an arbitrary filename contributes an
+  effective-policy value with an invalid type or shape
+- **THEN** the CLI human output identifies the fragment and root, and JSON and
+  SARIF output contain the typed fragment policy location and import chain
+
+### Requirement: Expanded layer templates retain source-template provenance
+The system SHALL retain source-template typed provenance for every strict or
+audit layer template expanded for execution or policy-consistency checking.
+The retained provenance SHALL include source path, YAML path, family, effective
+ID, and root context.
+
+#### Scenario: Imported strict template produces a violation
+- **WHEN** an imported strict layer template expands into a contract that
+  produces a runtime violation
+- **THEN** human, JSON, SARIF, and Testing adapter outputs identify the source
+  template location from the fragment
+
+#### Scenario: Imported audit template participates in consistency checking
+- **WHEN** an imported audit layer template expands into a policy-consistency
+  finding
+- **THEN** the finding identifies the source template location from the
+  fragment
+
+### Requirement: Provenance location order reflects composition encounter order
+Primary and related policy locations SHALL be ordered by their composed
+encounter ordinal, not lexicographic YAML path. For composition conflicts, the
+original declaration SHALL be primary and the conflicting declaration SHALL be
+related.
+
+#### Scenario: Double-digit contract index participates in a conflict
+- **WHEN** related locations include composed nodes whose display YAML paths
+  contain indices 2 and 10
+- **THEN** their order follows composed encounter order, and the original
+  declaration remains the primary location
+
+### Requirement: Catalog-expanded templates retain their source owner
+The system SHALL bind provenance to the exact layer-template contract instances
+materialized by the contract catalog. Runtime and consistency diagnostics for
+imported strict and audit templates SHALL identify their source template.
+
+#### Scenario: Catalog re-expands an imported template
+- **WHEN** catalog construction expands an imported layer template after policy
+  provenance binding
+- **THEN** a violation from the catalog instance retains the fragment template
+  location
+
+### Requirement: Provenance order follows effective encounter order
+The system SHALL order primary and related policy locations by effective-node encounter order, including nodes from the same source document.
+
+#### Scenario: Double-digit sequence indices
+- **WHEN** locations from one source include sequence indices 2 and 10
+- **THEN** the output preserves their composed order rather than lexical path order
+
+### Requirement: Template expansion failures are typed policy diagnostics
+The system SHALL enrich invalid imported exhaustive layer-template expansion failures with the source template provenance before CLI reporting.
+
+#### Scenario: Dotted exhaustive template layer
+- **WHEN** an imported exhaustive template declares a dotted layer name
+- **THEN** JSON and SARIF report the typed fragment template location
+
+### Requirement: Specialized provenance diagnostics preserve encounter order
+The system SHALL order classification path and every other specialized provenance location by source ordinal and encounter ordinal.
+
+#### Scenario: Classification path has double-digit indices
+- **WHEN** one source has entries at indices 2 and 10
+- **THEN** human and JSON diagnostics retain authored order
+
+### Requirement: Expanded template provenance uses exact source identity
+The system SHALL bind each generated layer-template contract to the authored template identified by its stable owner identity.
+
+#### Scenario: Same-name templates have distinct IDs
+- **WHEN** root and fragment templates share a name but have distinct explicit IDs
+- **THEN** each generated contract reports its own authored source
+
+### Requirement: Root parsing failures retain typed source provenance
+The selected root SHALL receive a root source descriptor before YAML parsing
+decides whether it contains imports. A malformed, multi-document, or non-mapping
+root SHALL fail with a typed source-shape diagnostic whose location identifies
+that root path and root role.
+
+#### Scenario: Malformed selected root
+- **WHEN** the explicitly selected root YAML is syntactically malformed
+- **THEN** loading fails with a typed source-shape diagnostic for the root
+
+#### Scenario: Root is not one mapping document
+- **WHEN** the explicitly selected root contains multiple documents or a
+  non-mapping document
+- **THEN** loading fails with a typed source-shape diagnostic for the root
+
+### Requirement: Raw composed YAML validation retains source provenance
+Raw YAML validation that must run before DTO deserialization SHALL execute with
+the composed node's provenance as its active validation subject. An imported
+raw layer, contextual-contract, port-boundary, or semantic-coverage validation
+failure SHALL produce a typed semantic-validation diagnostic for the fragment
+node that introduced it.
+
+#### Scenario: Imported blank layer namespace
+- **WHEN** an imported fragment declares a layer namespace containing only
+  whitespace
+- **THEN** loading fails with a typed semantic-validation diagnostic identifying
+  that fragment layer
+
+#### Scenario: Imported raw selector field is invalid
+- **WHEN** an imported contextual or port-boundary contract contains a raw
+  selector field rejected before DTO deserialization
+- **THEN** loading fails with a typed semantic-validation diagnostic identifying
+  that fragment contract
+
+### Requirement: Internal provenance identity is collision-safe
+The provenance index SHALL use escaped JSON Pointer identity for effective
+nodes. Display-oriented dot/index YAML paths SHALL be retained only in
+`ArchitecturePolicySourceLocation.YamlPath` and SHALL NOT be used for lookup or
+ownership binding. Legal mapping keys containing dots, brackets, numeric text,
+`~`, or `/` SHALL not overwrite another node's provenance.
+
+#### Scenario: Dot-containing layer key does not collide with nested path
+- **WHEN** a root contributes layer key `a.namespace` and a fragment contributes
+  layer `a` with a `namespace` property
+- **THEN** an effective-schema error for `a.namespace` identifies the root
+  declaration rather than the fragment property
+
+#### Scenario: Escaped mapping key retains its source
+- **WHEN** a legal composed mapping key contains `~` or `/`
+- **THEN** its provenance lookup resolves to the source that declared that key
+
+### Requirement: Consistency provenance selects identified contracts
+
+The policy provenance index SHALL select only contract declarations whose IDs
+participate in a policy-consistency diagnostic when that diagnostic supplies a
+primary contract ID or one or more conflicting contract IDs. It SHALL NOT
+select a contract solely because its display name matches. Name-based selection
+MAY be used only when the diagnostic supplies no participating contract IDs.
+
+#### Scenario: Same display name appears in a different contract family
+
+- **WHEN** a consistency conflict identifies two dependency contracts by ID
+- **AND WHEN** an unrelated contract in another family has the same display
+  name as one of those contracts
+- **THEN** the diagnostic's primary and related policy locations identify only
+  the two participating dependency contracts
+

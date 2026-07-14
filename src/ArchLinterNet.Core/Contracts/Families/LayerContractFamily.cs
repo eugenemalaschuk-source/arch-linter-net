@@ -21,6 +21,8 @@ public sealed class ArchitectureLayerContract : IArchitectureContract
 
     [YamlIgnore] public string? TemplateName { get; init; }
 
+    [YamlIgnore] public string? TemplateOwnerId { get; init; }
+
     [YamlIgnore] public string? ContainerNamespace { get; init; }
 
     [YamlIgnore] public bool Exhaustive { get; init; }

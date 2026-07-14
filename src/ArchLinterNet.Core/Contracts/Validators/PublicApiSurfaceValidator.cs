@@ -9,8 +9,8 @@ internal sealed class PublicApiSurfaceValidator : IArchitecturePolicyDocumentVal
     {
         HashSet<string> targetAssemblies = new(document.Analysis.TargetAssemblies, StringComparer.Ordinal);
 
-        foreach (ArchitecturePublicApiSurfaceContract contract in document.Contracts.StrictPublicApiSurface
-                     .Concat(document.Contracts.AuditPublicApiSurface))
+        foreach (ArchitecturePublicApiSurfaceContract contract in document.Provenance.Track(
+                     document.Contracts.StrictPublicApiSurface.Concat(document.Contracts.AuditPublicApiSurface)))
         {
             if (contract.Assemblies.Count == 0)
             {

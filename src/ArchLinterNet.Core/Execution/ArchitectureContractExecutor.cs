@@ -25,8 +25,7 @@ internal sealed class ArchitectureContractExecutor : IArchitectureContractExecut
 
         session.PrepareRuleInputCoverageDeferral(mode);
 
-        List<ArchitectureViolation> violations = new();
-        List<string> cycles = new();
+        var standardFamilyFindings = new StandardFamilyFindings();
         List<ArchitectureViolation> coverageViolations = new();
         List<ArchitectureCoverageSummary> coverageSummaries = new();
 
@@ -48,10 +47,17 @@ internal sealed class ArchitectureContractExecutor : IArchitectureContractExecut
                 continue;
             }
 
-            ExecuteStandardFamily(session, mode, family, handlerRegistry, timing, violations, cycles);
+            ExecuteStandardFamily(session, mode, family, handlerRegistry, timing, standardFamilyFindings);
         }
 
-        return new ArchitectureContractExecutionResult(violations, cycles, coverageViolations, coverageSummaries);
+        return new ArchitectureContractExecutionResult(
+            standardFamilyFindings.Violations,
+            standardFamilyFindings.Cycles,
+            coverageViolations,
+            coverageSummaries)
+        {
+            CycleFindings = standardFamilyFindings.CycleFindings
+        };
     }
 
     private static void ExecuteCoverageFamily(
@@ -68,7 +74,8 @@ internal sealed class ArchitectureContractExecutor : IArchitectureContractExecut
             foreach (IArchitectureContract contract in session.Catalog.ContractsFor(mode, CoverageFamily))
             {
                 coverageCount++;
-                coverageViolations.AddRange(handlerRegistry.Execute(CoverageFamily, session, contract).Violations);
+                coverageViolations.AddRange(handlerRegistry.Execute(CoverageFamily, session, contract).Violations
+                    .Select(violation => session.Document.Provenance.Enrich(violation, contract)));
 
                 ArchitectureCoverageSummary? summary =
                     session.BuildCoverageSummary((ArchitectureCoverageContract)contract);
@@ -86,8 +93,7 @@ internal sealed class ArchitectureContractExecutor : IArchitectureContractExecut
         string family,
         IArchitectureContractHandlerRegistry handlerRegistry,
         ValidationTiming? timing,
-        List<ArchitectureViolation> violations,
-        List<string> cycles)
+        StandardFamilyFindings findings)
     {
         int count = 0;
         using (timing?.MeasureContractFamily(family, () => count))
@@ -96,9 +102,29 @@ internal sealed class ArchitectureContractExecutor : IArchitectureContractExecut
             {
                 count++;
                 ArchitectureHandlerResult result = handlerRegistry.Execute(family, session, contract);
-                violations.AddRange(result.Violations);
-                cycles.AddRange(result.Cycles);
+                findings.Violations.AddRange(result.Violations
+                    .Select(violation => session.Document.Provenance.Enrich(violation, contract)));
+                string cycleIdPrefix = contract.Id is null ? string.Empty : $"[{contract.Id}] ";
+                foreach (string cycle in result.Cycles)
+                {
+                    findings.Cycles.Add(cycle);
+                    string normalizedPath = cycleIdPrefix.Length > 0 && cycle.StartsWith(cycleIdPrefix, StringComparison.Ordinal)
+                        ? cycle[cycleIdPrefix.Length..]
+                        : cycle;
+                    findings.CycleFindings.Add(session.Document.Provenance.Enrich(
+                        new ArchitectureCycleFinding(contract.Name, contract.Id, normalizedPath),
+                        contract));
+                }
             }
         }
+    }
+
+    private sealed class StandardFamilyFindings
+    {
+        public List<ArchitectureViolation> Violations { get; } = new();
+
+        public List<string> Cycles { get; } = new();
+
+        public List<ArchitectureCycleFinding> CycleFindings { get; } = new();
     }
 }

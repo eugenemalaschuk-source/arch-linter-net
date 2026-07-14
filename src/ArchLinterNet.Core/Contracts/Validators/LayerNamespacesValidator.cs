@@ -9,6 +9,7 @@ internal sealed class LayerNamespacesValidator : IArchitecturePolicyDocumentVali
     {
         foreach ((string name, ArchitectureLayer layer) in document.Layers)
         {
+            document.Provenance.SetValidationSubject(layer);
             if (string.IsNullOrWhiteSpace(layer.Namespace) && layer.Selector == null)
             {
                 throw new InvalidOperationException(

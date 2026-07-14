@@ -31,6 +31,7 @@ public sealed partial class ArchitectureAnalysisSession
             .ThenBy(f => f.ContractId ?? string.Empty, StringComparer.Ordinal)
             .ThenBy(f => string.Join(",", f.Layers), StringComparer.Ordinal)
             .ThenBy(f => f.RepresentativeType ?? string.Empty, StringComparer.Ordinal)
+            .Select(Document.Provenance.Enrich)
             .ToList();
     }
 

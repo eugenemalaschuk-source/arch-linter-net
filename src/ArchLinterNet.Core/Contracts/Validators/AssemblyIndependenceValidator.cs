@@ -9,8 +9,8 @@ internal sealed class AssemblyIndependenceValidator : IArchitecturePolicyDocumen
     {
         HashSet<string> targetAssemblies = new(document.Analysis.TargetAssemblies, StringComparer.Ordinal);
 
-        foreach (ArchitectureAssemblyIndependenceContract contract in document.Contracts.StrictAssemblyIndependence
-                     .Concat(document.Contracts.AuditAssemblyIndependence))
+        foreach (ArchitectureAssemblyIndependenceContract contract in document.Provenance.Track(
+                     document.Contracts.StrictAssemblyIndependence.Concat(document.Contracts.AuditAssemblyIndependence)))
         {
             string? invalidAssembly = contract.Assemblies.FirstOrDefault(a => !targetAssemblies.Contains(a));
             if (invalidAssembly != null)

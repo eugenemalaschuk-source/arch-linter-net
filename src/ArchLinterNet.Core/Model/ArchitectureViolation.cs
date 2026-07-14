@@ -10,4 +10,9 @@ public sealed record ArchitectureViolation(
     public IReadOnlyCollection<string>? MatchedNamespacePrefixes { get; init; }
 
     public IArchitectureDiagnosticPayload? Payload { get; init; }
+
+    public ArchitecturePolicySourceLocation? PolicyLocation { get; init; }
+
+    public IReadOnlyCollection<ArchitecturePolicySourceLocation> RelatedPolicyLocations { get; init; } =
+        Array.Empty<ArchitecturePolicySourceLocation>();
 }

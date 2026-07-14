@@ -324,6 +324,51 @@ public sealed class ArchitectureDiagnosticFormatterTests
     }
 
     [Test]
+    public void FormatClassificationFactsForHumans_ImportedMappings_IncludePolicyLocations()
+    {
+        ArchitecturePolicySourceLocation primary = CreatePolicyLocation(
+            "architecture/classification.yml", "classification.namespace[0]", sourceOrdinal: 1, encounterOrdinal: 3);
+        ArchitecturePolicySourceLocation related = CreatePolicyLocation(
+            "architecture/classification.yml", "classification.namespace[1]", sourceOrdinal: 1, encounterOrdinal: 4);
+        var conflicts = new[]
+        {
+            new Model.ArchitectureClassificationConflict(
+                "MyApp.Order", Model.ArchitectureClassificationSource.Namespace, "DomainLayer", "InfrastructureLayer", null)
+            {
+                PolicyLocation = primary,
+                RelatedPolicyLocations = [related]
+            }
+        };
+        var failures = new[]
+        {
+            new Model.ArchitectureClassificationMetadataFailure(
+                "MyApp.Order", Model.ArchitectureClassificationSource.Namespace, "module", "unknown const")
+            {
+                PolicyLocation = CreatePolicyLocation(
+                    "architecture/classification.yml", "classification.namespace[0].metadata.module", 1, 5)
+            }
+        };
+
+        string human = _formatter.FormatClassificationFactsForHumans(conflicts, failures);
+
+        Assert.That(human, Does.Contain("policy: architecture/classification.yml:classification.namespace[0]"));
+        Assert.That(human, Does.Contain("related: architecture/classification.yml:classification.namespace[1]"));
+        Assert.That(human, Does.Contain("classification.namespace[0].metadata.module"));
+
+        using var json = JsonDocument.Parse(_formatter.FormatResultForCiArtifacts(
+            "strict", true, Array.Empty<ArchitectureViolation>(), Array.Empty<string>(),
+            classificationConflicts: conflicts, classificationMetadataFailures: failures));
+        Assert.That(
+            json.RootElement.GetProperty("classification_conflicts")[0]
+                .GetProperty("policy_location").GetProperty("yaml_path").GetString(),
+            Is.EqualTo("classification.namespace[0]"));
+        Assert.That(
+            json.RootElement.GetProperty("classification_metadata_failures")[0]
+                .GetProperty("policy_location").GetProperty("yaml_path").GetString(),
+            Is.EqualTo("classification.namespace[0].metadata.module"));
+    }
+
+    [Test]
     public void FormatClassificationFactsForHumans_MetadataOnlyConflict_IncludesMetadataDetail()
     {
         var conflicts = new[]
@@ -569,5 +614,84 @@ public sealed class ArchitectureDiagnosticFormatterTests
         Assert.That(output, Does.Contain("source_type: Source.Type"));
         Assert.That(output, Does.Contain("forbidden_reference: Forbidden.Ref"));
         Assert.That(output, Does.Contain("reason: stale ignore"));
+    }
+
+    [Test]
+    public void PolicyProvenance_IsIncludedInHumanAndCiDiagnostics()
+    {
+        ArchitecturePolicySourceLocation primary = CreatePolicyLocation(
+            "architecture/fragments/policy.yml", "contracts.strict[10]", sourceOrdinal: 1, encounterOrdinal: 10);
+        ArchitecturePolicySourceLocation related = CreatePolicyLocation(
+            "architecture/fragments/policy.yml", "contracts.strict[2]", sourceOrdinal: 1, encounterOrdinal: 2);
+        var violation = new ArchitectureViolation("contract", "contract-id", "Source.Type", "Forbidden.Namespace", _reference1)
+        {
+            PolicyLocation = primary,
+            RelatedPolicyLocations = [related]
+        };
+        var unmatched = new ArchitectureUnmatchedIgnoredViolation(
+            "contract", "contract-id", 0, "Source.Type", "Forbidden.Ref", "stale ignore")
+        {
+            PolicyLocation = primary
+        };
+        var consistency = new PolicyConsistencyDiagnostic(
+            "contract", "contract-id", "duplicate", "conflicting rules", [], [], [])
+        {
+            PolicyLocation = primary,
+            RelatedPolicyLocations = [related]
+        };
+        var cycle = new ArchitectureCycleFinding("cycle contract", "cycle-id", "A -> B -> A")
+        {
+            PolicyLocation = primary
+        };
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(_formatter.FormatViolationsForHumans([violation]), Does.Contain(
+                "policy: architecture/fragments/policy.yml:contracts.strict[10]"));
+            Assert.That(_formatter.FormatViolationsForHumans([violation]), Does.Contain(
+                "related: architecture/fragments/policy.yml:contracts.strict[2]"));
+            Assert.That(_formatter.FormatUnmatchedForHumans([unmatched]), Does.Contain(
+                "policy: architecture/fragments/policy.yml:contracts.strict[10]"));
+            Assert.That(_formatter.FormatPolicyConsistencyForHumans([consistency]), Does.Contain(
+                "policy: architecture/fragments/policy.yml:contracts.strict[10]"));
+            Assert.That(ArchitectureDiagnosticFormatter.FormatCyclesForHumans([cycle]), Does.Contain(
+                "policy: architecture/fragments/policy.yml:contracts.strict[10]"));
+        });
+
+        using JsonDocument document = JsonDocument.Parse(ArchitectureDiagnosticFormatter.FormatResultForCiArtifacts(
+            "strict", false, [violation], Array.Empty<string>(), [cycle], unmatched: [unmatched],
+            policyConsistencyFindings: [consistency]));
+        JsonElement policyLocation = document.RootElement.GetProperty("violations")[0].GetProperty("policy_location");
+        JsonElement relatedLocation = document.RootElement.GetProperty("policy_consistency_findings")[0]
+            .GetProperty("related_policy_locations")[0];
+        JsonElement cycleLocation = document.RootElement.GetProperty("cycle_diagnostics")[0]
+            .GetProperty("policy_location");
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(policyLocation.GetProperty("source_path").GetString(),
+                Is.EqualTo("architecture/fragments/policy.yml"));
+            Assert.That(policyLocation.GetProperty("contract_family").GetString(), Is.EqualTo("dependency"));
+            Assert.That(policyLocation.GetProperty("contract_id").GetString(), Is.EqualTo("contract-id"));
+            Assert.That(policyLocation.GetProperty("import_chain")[1].GetString(),
+                Is.EqualTo("architecture/fragments/policy.yml"));
+            Assert.That(relatedLocation.GetProperty("yaml_path").GetString(), Is.EqualTo("contracts.strict[2]"));
+            Assert.That(document.RootElement.GetProperty("unmatched_ignored_violations")[0]
+                .GetProperty("policy_location").GetProperty("source_ordinal").GetInt32(), Is.EqualTo(1));
+            Assert.That(cycleLocation.GetProperty("yaml_path").GetString(), Is.EqualTo("contracts.strict[10]"));
+        });
+    }
+
+    private static ArchitecturePolicySourceLocation CreatePolicyLocation(
+        string sourcePath,
+        string yamlPath,
+        int sourceOrdinal,
+        int encounterOrdinal)
+    {
+        var source = new ArchitecturePolicySourceDescriptor(
+            "architecture/root.yml", sourcePath, ArchitecturePolicyDocumentRole.Fragment, sourceOrdinal,
+            "architecture/root.yml", sourcePath, ["architecture/root.yml", sourcePath]);
+        return new ArchitecturePolicySourceLocation(
+            source, yamlPath, 3, 5, "dependency", "contract-id", encounterOrdinal);
     }
 }

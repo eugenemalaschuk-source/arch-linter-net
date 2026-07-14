@@ -20,6 +20,9 @@ public sealed partial class ArchitectureSarifFormatter : IArchitectureSarifForma
         "https://raw.githubusercontent.com/oasis-tcs/sarif-spec/master/Schemata/sarif-schema-2.1.0.json";
 
     private const string ToolName = "arch-linter-net";
+    private const string SarifVersion = "2.1.0";
+    private const string VersionPropertyName = "version";
+    private const string MessagePropertyName = "message";
     private const string MethodBodyCategory = "method-body";
     private const string MethodBodyIlCategory = "method-body-il";
     private const string CycleRuleFallback = "dependency-cycle";
@@ -35,12 +38,39 @@ public sealed partial class ArchitectureSarifFormatter : IArchitectureSarifForma
         IReadOnlyCollection<string> cycles,
         string toolVersion)
     {
+        return FormatResultAsSarifCore(
+            mode,
+            violations,
+            cycles.Select(cycle => (Func<string, ResultEntry>)(level => BuildCycleEntry(cycle, level))),
+            toolVersion);
+    }
+
+    public static string FormatResultAsSarif(
+        string mode,
+        IReadOnlyCollection<ArchitectureViolation> violations,
+        IReadOnlyCollection<ArchitectureCycleFinding> cycles,
+        string toolVersion)
+    {
+        return FormatResultAsSarifCore(
+            mode,
+            violations,
+            cycles.Select(cycle => (Func<string, ResultEntry>)(level =>
+                BuildCycleEntry(ArchitectureDiagnosticMapper.FromCycle(cycle), level))),
+            toolVersion);
+    }
+
+    private static string FormatResultAsSarifCore(
+        string mode,
+        IReadOnlyCollection<ArchitectureViolation> violations,
+        IEnumerable<Func<string, ResultEntry>> cycleEntryFactories,
+        string toolVersion)
+    {
         string level = mode == "strict" ? "error" : "warning";
 
         List<ResultEntry> entries = violations
             .Select(ArchitectureDiagnosticMapper.FromViolation)
             .Select(diagnostic => BuildViolationEntry(diagnostic, level))
-            .Concat(cycles.Select(cycle => BuildCycleEntry(cycle, level)))
+            .Concat(cycleEntryFactories.Select(factory => factory(level)))
             .OrderBy(e => e.RuleId, StringComparer.Ordinal)
             .ThenBy(e => e.SourceIdentifier, StringComparer.Ordinal)
             .ThenBy(e => e.Category, StringComparer.Ordinal)
@@ -61,7 +91,7 @@ public sealed partial class ArchitectureSarifFormatter : IArchitectureSarifForma
         var payload = new Dictionary<string, object?>
         {
             ["$schema"] = SchemaUri,
-            ["version"] = "2.1.0",
+            [VersionPropertyName] = SarifVersion,
             ["runs"] = new object[]
             {
                 new Dictionary<string, object?>
@@ -92,7 +122,7 @@ public sealed partial class ArchitectureSarifFormatter : IArchitectureSarifForma
         {
             ["ruleId"] = ruleId,
             ["level"] = level,
-            ["message"] = new Dictionary<string, object?>
+            [MessagePropertyName] = new Dictionary<string, object?>
             {
                 ["text"] = $"[{diagnostic.ContractName}] {sourceType} -> {forbiddenNamespace}: {string.Join(", ", references)}",
             },
@@ -107,7 +137,48 @@ public sealed partial class ArchitectureSarifFormatter : IArchitectureSarifForma
             json["logicalLocations"] = BuildLogicalLocations(sourceType, LogicalLocationKindFor(diagnostic, forbiddenNamespace));
         }
 
+        object[] relatedPolicyLocations = FormatPolicyLocationsForSarif(
+            diagnostic.PolicyLocation,
+            diagnostic.RelatedPolicyLocations);
+        if (relatedPolicyLocations.Length > 0)
+        {
+            json["relatedLocations"] = relatedPolicyLocations;
+        }
+
         return new ResultEntry(ruleId, diagnostic.ContractName, sourceType, forbiddenNamespace, json);
+    }
+
+    public static object[] FormatPolicyLocationsForSarif(
+        ArchitecturePolicySourceLocation? primaryLocation,
+        IEnumerable<ArchitecturePolicySourceLocation> relatedLocations)
+    {
+        IEnumerable<ArchitecturePolicySourceLocation> locations =
+            primaryLocation is null
+                ? relatedLocations
+                : new[] { primaryLocation }.Concat(relatedLocations);
+
+        return locations
+            .Distinct()
+            .OrderBy(location => location.SourceOrdinal)
+            .ThenBy(location => location.EncounterOrdinal)
+            .Select((location, index) => (object)new Dictionary<string, object?>
+            {
+                ["id"] = index + 1,
+                [MessagePropertyName] = new Dictionary<string, object?>
+                {
+                    ["text"] = $"Policy {location.Role.ToString().ToLowerInvariant()} definition at {location.YamlPath}"
+                },
+                ["physicalLocation"] = new Dictionary<string, object?>
+                {
+                    ["artifactLocation"] = new Dictionary<string, object?> { ["uri"] = location.SourcePath },
+                    ["region"] = new Dictionary<string, object?>
+                    {
+                        ["startLine"] = location.Line,
+                        ["startColumn"] = location.Column
+                    }
+                }
+            })
+            .ToArray();
     }
 
     private static ResultEntry BuildCycleEntry(string cycle, string level)
@@ -120,11 +191,34 @@ public sealed partial class ArchitectureSarifFormatter : IArchitectureSarifForma
         {
             ["ruleId"] = ruleId,
             ["level"] = level,
-            ["message"] = new Dictionary<string, object?> { ["text"] = $"Dependency cycle detected: {path}" },
+            [MessagePropertyName] = new Dictionary<string, object?> { ["text"] = $"Dependency cycle detected: {path}" },
             ["logicalLocations"] = BuildLogicalLocations(path, "namespace"),
         };
 
         return new ResultEntry(ruleId, ruleId, path, "cycle", json);
+    }
+
+    private static ResultEntry BuildCycleEntry(CycleDiagnostic diagnostic, string level)
+    {
+        string ruleId = diagnostic.ContractId ?? CycleRuleFallback;
+
+        var json = new Dictionary<string, object?>
+        {
+            ["ruleId"] = ruleId,
+            ["level"] = level,
+            [MessagePropertyName] = new Dictionary<string, object?> { ["text"] = $"Dependency cycle detected: {diagnostic.Path}" },
+            ["logicalLocations"] = BuildLogicalLocations(diagnostic.Path, "namespace"),
+        };
+
+        object[] relatedPolicyLocations = FormatPolicyLocationsForSarif(
+            diagnostic.PolicyLocation,
+            diagnostic.RelatedPolicyLocations);
+        if (relatedPolicyLocations.Length > 0)
+        {
+            json["relatedLocations"] = relatedPolicyLocations;
+        }
+
+        return new ResultEntry(ruleId, diagnostic.ContractName, diagnostic.Path, "cycle", json);
     }
 
     private static object[] BuildPhysicalLocations(string filePath, IReadOnlyCollection<string> references)

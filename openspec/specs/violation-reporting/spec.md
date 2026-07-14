@@ -87,3 +87,80 @@ preserve this information in deterministic form.
 - **THEN** each finding SHALL identify its evidence kind and expected seam so
   an AI consumer can distinguish the remediation
 
+### Requirement: Policy loading failures have format-aware output
+The CLI SHALL format typed policy import and validation failures according to
+the selected output format. Human output SHALL include policy source and root
+context; JSON output SHALL emit an `architecture_policy_error` object with
+`policy_location`, `related_policy_locations`, and `import_chain`; SARIF output
+SHALL emit a result with policy physical and related locations when available.
+
+#### Scenario: JSON policy validation failure
+- **WHEN** the CLI is invoked with JSON output and an imported effective-policy
+  value fails validation
+- **THEN** stdout contains an `architecture_policy_error` object with the
+  fragment policy location and ordered import chain
+
+#### Scenario: SARIF policy import failure
+- **WHEN** the CLI is invoked with SARIF output and a typed import failure has
+  a source location
+- **THEN** stdout contains a SARIF result whose physical location identifies
+  that policy source
+
+### Requirement: Policy exception locations use established machine schemas
+The CLI SHALL serialize policy-exception JSON locations with the same
+snake_case fields as ordinary CI diagnostics. SARIF policy exceptions SHALL
+include typed related policy locations in addition to the primary location.
+
+#### Scenario: Conflict has two policy declarations
+- **WHEN** a typed policy conflict has root and fragment locations
+- **THEN** JSON uses normalized location fields and SARIF contains the fragment
+  as a related physical location
+
+### Requirement: Policy exception location metadata matches CI diagnostics
+The CLI SHALL include source ordinal and per-location import chain in every policy-exception JSON location using the established snake_case schema.
+
+#### Scenario: Imported policy exception
+- **WHEN** an imported policy exception is rendered as JSON
+- **THEN** its location includes source_ordinal and import_chain
+
+### Requirement: Policy location JSON has one optional-field shape
+The system SHALL omit optional policy location fields when values are absent in both ordinary and exception JSON output.
+
+#### Scenario: Root policy exception has no import metadata
+- **WHEN** a root policy exception has no contract or import fields
+- **THEN** its JSON location omits those fields rather than serializing null
+
+### Requirement: Root and raw policy failures use format-aware typed output
+CLI JSON and SARIF output SHALL recognize typed root parsing and raw composed
+YAML validation failures as policy diagnostics. These failures SHALL not fall
+through to the generic runtime-error output path.
+
+#### Scenario: Malformed root renders as JSON policy error
+- **WHEN** JSON validation loads a malformed selected root
+- **THEN** stdout contains an `architecture_policy_error` with a root-role
+  `policy_location`
+
+#### Scenario: Imported raw failure renders as SARIF policy error
+- **WHEN** SARIF validation loads an imported raw YAML value rejected before
+  deserialization
+- **THEN** the SARIF result identifies the fragment policy location
+
+### Requirement: Policy-exception SARIF contains complete declaration evidence
+
+The CLI SHALL emit every available primary and related policy definition in the
+SARIF result's `relatedLocations` when a typed policy exception has source
+locations. Each related location SHALL contain a portable policy source URI,
+the authored source region, and a message identifying the policy role and YAML
+path. The locations SHALL follow composition encounter order; for a conflict
+this preserves original-then-conflicting order.
+
+#### Scenario: Root definition conflicts with an imported fragment
+
+- **WHEN** a typed policy composition conflict identifies a root declaration
+  and a conflicting imported-fragment declaration
+- **THEN** the SARIF result `locations` identifies the primary declaration
+- **AND THEN** `relatedLocations` contains the root declaration followed by the
+  fragment declaration
+- **AND THEN** each related-location message identifies its authored YAML path
+  and each physical location contains a portable policy source URI
+

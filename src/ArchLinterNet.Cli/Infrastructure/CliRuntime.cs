@@ -44,6 +44,7 @@ internal sealed class CliRuntime : ICliRuntime
         bool passed,
         IReadOnlyCollection<ArchitectureViolation> violations,
         IReadOnlyCollection<string> cycles,
+        IReadOnlyCollection<ArchitectureCycleFinding> cycleFindings,
         IReadOnlyCollection<ArchitectureViolation> coverageFindings,
         IReadOnlyList<ArchitectureUnmatchedIgnoredViolation> unmatchedIgnoredViolations,
         IReadOnlyCollection<PolicyConsistencyDiagnostic> policyConsistencyFindings,
@@ -53,11 +54,12 @@ internal sealed class CliRuntime : ICliRuntime
         IReadOnlyCollection<ArchitectureClassificationRoleFact> classificationRoles,
         ArchitectureClassificationPathDeferredNotice? classificationPathDeferred)
     {
-        return _formatter.FormatResultForCiArtifacts(
+        return ArchitectureDiagnosticFormatter.FormatResultForCiArtifacts(
             mode,
             passed,
             violations,
             cycles,
+            cycleFindings,
             classificationRoles,
             classificationPathDeferred,
             coverageFindings,
@@ -71,9 +73,12 @@ internal sealed class CliRuntime : ICliRuntime
     public string FormatResultAsSarif(
         string mode,
         IReadOnlyCollection<ArchitectureViolation> violations,
-        IReadOnlyCollection<string> cycles)
+        IReadOnlyCollection<string> cycles,
+        IReadOnlyCollection<ArchitectureCycleFinding> cycleFindings)
     {
-        return _sarifFormatter.FormatResultAsSarif(mode, violations, cycles, Version);
+        return cycleFindings.Count > 0
+            ? ArchitectureSarifFormatter.FormatResultAsSarif(mode, violations, cycleFindings, Version)
+            : _sarifFormatter.FormatResultAsSarif(mode, violations, cycles, Version);
     }
 
     public string FormatViolationsForHumans(IReadOnlyCollection<ArchitectureViolation> violations)
@@ -81,9 +86,13 @@ internal sealed class CliRuntime : ICliRuntime
         return _formatter.FormatViolationsForHumans(violations);
     }
 
-    public string FormatCyclesForHumans(IReadOnlyCollection<string> cycles)
+    public string FormatCyclesForHumans(
+        IReadOnlyCollection<string> cycles,
+        IReadOnlyCollection<ArchitectureCycleFinding> cycleFindings)
     {
-        return _formatter.FormatCyclesForHumans(cycles);
+        return cycleFindings.Count > 0
+            ? ArchitectureDiagnosticFormatter.FormatCyclesForHumans(cycleFindings)
+            : _formatter.FormatCyclesForHumans(cycles);
     }
 
     public string FormatPolicyConsistencyForHumans(IReadOnlyCollection<PolicyConsistencyDiagnostic> diagnostics)

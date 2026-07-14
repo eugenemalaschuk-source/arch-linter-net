@@ -9,4 +9,6 @@ public sealed record ArchitectureUnmatchedIgnoredViolation(
     string Reason)
 {
     public string? ContractGroup { get; init; }
+
+    public ArchitecturePolicySourceLocation? PolicyLocation { get; init; }
 }

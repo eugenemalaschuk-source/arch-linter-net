@@ -7,8 +7,8 @@ internal sealed class ProjectMetadataValidator : IArchitecturePolicyDocumentVali
 {
     public void Validate(ArchitectureContractDocument document)
     {
-        foreach (ArchitectureProjectMetadataContract contract in document.Contracts.StrictProjectMetadata
-                     .Concat(document.Contracts.AuditProjectMetadata))
+        foreach (ArchitectureProjectMetadataContract contract in document.Provenance.Track(
+                     document.Contracts.StrictProjectMetadata.Concat(document.Contracts.AuditProjectMetadata)))
         {
             if (contract.Projects.Count == 0 || contract.Projects.All(string.IsNullOrWhiteSpace))
             {

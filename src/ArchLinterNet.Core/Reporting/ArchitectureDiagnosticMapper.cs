@@ -6,16 +6,25 @@ public static class ArchitectureDiagnosticMapper
 {
     public static ArchitectureDiagnostic FromViolation(ArchitectureViolation violation)
     {
+        ArchitectureDiagnostic diagnostic;
         if (violation.Payload != null)
         {
-            return violation.Payload.ToDiagnostic(violation);
+            diagnostic = violation.Payload.ToDiagnostic(violation);
+        }
+        else
+        {
+            diagnostic = new DependencyDiagnostic(
+                violation.ContractName, violation.ContractId, violation.SourceType,
+                violation.ForbiddenNamespace, violation.ForbiddenReferences)
+            {
+                MatchedNamespacePrefixes = violation.MatchedNamespacePrefixes
+            };
         }
 
-        return new DependencyDiagnostic(
-            violation.ContractName, violation.ContractId, violation.SourceType,
-            violation.ForbiddenNamespace, violation.ForbiddenReferences)
+        return diagnostic with
         {
-            MatchedNamespacePrefixes = violation.MatchedNamespacePrefixes
+            PolicyLocation = violation.PolicyLocation,
+            RelatedPolicyLocations = violation.RelatedPolicyLocations
         };
     }
 
@@ -24,10 +33,22 @@ public static class ArchitectureDiagnosticMapper
         return new CycleDiagnostic(contractName, contractId, path);
     }
 
+    public static CycleDiagnostic FromCycle(ArchitectureCycleFinding cycle)
+    {
+        return new CycleDiagnostic(cycle.ContractName, cycle.ContractId, cycle.Path)
+        {
+            PolicyLocation = cycle.PolicyLocation,
+            RelatedPolicyLocations = cycle.RelatedPolicyLocations
+        };
+    }
+
     public static UnmatchedIgnoreDiagnostic FromUnmatchedIgnore(ArchitectureUnmatchedIgnoredViolation unmatched)
     {
         return new UnmatchedIgnoreDiagnostic(
             unmatched.ContractName, unmatched.ContractId, unmatched.IgnoreIndex,
-            unmatched.SourceType, unmatched.ForbiddenReference, unmatched.Reason);
+            unmatched.SourceType, unmatched.ForbiddenReference, unmatched.Reason)
+        {
+            PolicyLocation = unmatched.PolicyLocation
+        };
     }
 }

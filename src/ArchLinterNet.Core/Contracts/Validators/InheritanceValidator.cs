@@ -7,8 +7,8 @@ internal sealed class InheritanceValidator : IArchitecturePolicyDocumentValidato
 {
     public void Validate(ArchitectureContractDocument document)
     {
-        foreach (ArchitectureInheritanceContract contract in document.Contracts.StrictInheritance
-                     .Concat(document.Contracts.AuditInheritance))
+        foreach (ArchitectureInheritanceContract contract in document.Provenance.Track(
+                     document.Contracts.StrictInheritance.Concat(document.Contracts.AuditInheritance)))
         {
             if (contract.SourceLayers.Count == 0 && contract.SourceNamespaces.Count == 0)
             {
