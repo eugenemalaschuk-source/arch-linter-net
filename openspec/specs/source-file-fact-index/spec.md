@@ -41,6 +41,10 @@ The system SHALL enrich each declared type fact with source file path data only 
 - **WHEN** a discovered project file is at the repository root and a configured source root contains files below it such as `src/`
 - **THEN** those files are still correlated to that root-level project's assembly
 
+#### Scenario: Equal-specificity project ownership conflict leaves source enrichment unavailable
+- **WHEN** two discovered target projects map to the same-most-specific project directory for a scanned file
+- **THEN** the file is treated as unowned for source correlation and no assembly is chosen by discovery order
+
 #### Scenario: Record type kind is detected from source
 - **WHEN** a source file declares `public record MyRecord { }` or `public record class MyRecord { }` or `public record struct MyRecord { }`
 - **THEN** the fact for that type has TypeKind equal to Record

@@ -536,6 +536,58 @@ public sealed partial class ArchitectureSourceFileFactIndexTests
         Assert.That(fact.SourceFilePath, Is.EqualTo("src/App/Domain/SingleTypeFixture.cs"));
     }
 
+    [Test]
+    public void TryGetFact_TwoProjectsInSameDirectory_DoesNotChooseOwnerByDiscoveryOrder()
+    {
+        const string Source = """
+            namespace ArchLinterNet.Core.Tests.SourceFactFixtures {
+                public sealed class SingleTypeFixture { }
+            }
+            """;
+
+        string absoluteRepoRoot = FakePaths.Root("/fake/repo");
+        var fs = new FakeArchitectureFileSystem();
+        string srcRoot = absoluteRepoRoot + "/src";
+        fs.AddDirectory(srcRoot);
+        fs.AddFile(srcRoot + "/SingleTypeFixture.cs", Source, DateTime.UtcNow);
+
+        ProjectDiscoveryResult discovery = new(
+            _coreAndTestAssemblyNames,
+            Array.Empty<string>(),
+            _singleSourceRoot,
+            Array.Empty<ArchitectureProjectDiscoveryDiagnostic>())
+        {
+            DiscoveredProjects =
+            [
+                new ArchitectureDiscoveredProject("src/AppA.csproj", "ArchLinterNet.Core.Tests", _net10),
+                new ArchitectureDiscoveredProject("src/AppB.csproj", "ArchLinterNet.Core", _net10)
+            ]
+        };
+
+        var index = new ArchitectureSourceFileFactIndex(
+            _testAndCoreAssemblies,
+            absoluteRepoRoot,
+            _singleSourceRoot,
+            null,
+            fs,
+            discovery,
+            sourceRootAssemblyOwnership: null);
+
+        bool foundTest = index.TryGetFact(
+            "ArchLinterNet.Core.Tests",
+            "ArchLinterNet.Core.Tests.SourceFactFixtures.SingleTypeFixture",
+            out ArchitectureDeclaredTypeFact testFact);
+        bool foundCore = index.TryGetFact(
+            "ArchLinterNet.Core",
+            "ArchLinterNet.Core.Tests.SourceFactFixtures.SingleTypeFixture",
+            out _);
+
+        Assert.That(foundTest, Is.True);
+        Assert.That(testFact.SourceFilePath, Is.Null,
+            "When two assemblies own the same-most-specific project subtree, source enrichment must stay unavailable");
+        Assert.That(foundCore, Is.False);
+    }
+
     // ── Helpers shared across partial files ───────────────────────────────────────────
 
     private static ArchitectureSourceFileFactIndex BuildIndexWithPreprocessorSymbols(

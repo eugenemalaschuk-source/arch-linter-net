@@ -38,7 +38,7 @@ public sealed class ArchitectureSourceFileFactIndex
     private readonly IReadOnlyList<string> _sourceRoots;
     private readonly IReadOnlyList<string>? _preprocessorSymbols;
     private readonly IArchitectureFileSystem _fileSystem;
-    private readonly IReadOnlyDictionary<string, string> _sourcePathAssemblyOwnership;
+    private readonly IReadOnlyList<(string SourcePath, string AssemblyName)> _sourcePathAssemblyOwnership;
     private readonly Lazy<FactIndexData> _data;
 
     public ArchitectureSourceFileFactIndex(
@@ -273,8 +273,8 @@ public sealed class ArchitectureSourceFileFactIndex
     private Dictionary<SourceFactKey, List<(string FilePath, ArchitectureTypeKind Kind)>> RunSourceScan()
     {
         Dictionary<SourceFactKey, List<(string FilePath, ArchitectureTypeKind Kind)>> sourceMap = [];
-        List<(string SourceRoot, string AssemblyName)> ownershipEntries = _sourcePathAssemblyOwnership
-            .Select(static kvp => (kvp.Key, kvp.Value))
+        IReadOnlyList<(string SourceRoot, string AssemblyName)> ownershipEntries = _sourcePathAssemblyOwnership
+            .Select(static entry => (entry.SourcePath, entry.AssemblyName))
             .ToList();
 
         foreach (string sourceRoot in _sourceRoots)
@@ -420,13 +420,13 @@ public sealed class ArchitectureSourceFileFactIndex
         }
     }
 
-    private static Dictionary<string, string> BuildSourcePathAssemblyOwnership(
+    private static List<(string SourcePath, string AssemblyName)> BuildSourcePathAssemblyOwnership(
         IReadOnlyCollection<Assembly> targetAssemblies,
         IReadOnlyList<string> sourceRoots,
         ProjectDiscoveryResult? projectDiscovery,
         IReadOnlyDictionary<string, string>? explicitOwnership)
     {
-        Dictionary<string, string> ownership = new(_ordinal);
+        List<(string SourcePath, string AssemblyName)> ownership = [];
         HashSet<string> targetAssemblyNames = targetAssemblies
             .Select(assembly => assembly.GetName().Name ?? string.Empty)
             .ToHashSet(_ordinal);
@@ -440,7 +440,7 @@ public sealed class ArchitectureSourceFileFactIndex
                     continue;
                 }
 
-                ownership[NormalizeRelativePath(sourcePath)] = assemblyName;
+                ownership.Add((NormalizeRelativePath(sourcePath), assemblyName));
             }
 
             return ownership;
@@ -455,7 +455,7 @@ public sealed class ArchitectureSourceFileFactIndex
                              .Select(NormalizeRelativePath)
                              .Distinct(_ordinal))
                 {
-                    ownership[sourceRoot] = soleAssemblyName;
+                    ownership.Add((sourceRoot, soleAssemblyName));
                 }
             }
 
@@ -474,7 +474,7 @@ public sealed class ArchitectureSourceFileFactIndex
                 .Distinct(_ordinal)
                 .Any(configuredRoot => PathsOverlap(discoveredRoot, configuredRoot)))
             {
-                ownership[discoveredRoot] = assemblyName;
+                ownership.Add((discoveredRoot, assemblyName));
             }
         }
 
