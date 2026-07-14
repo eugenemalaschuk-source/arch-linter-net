@@ -10,6 +10,7 @@ namespace ArchLinterNet.Core.Tests;
 public sealed partial class ArchitectureSourceFileFactIndexTests
 {
     private static readonly Assembly _testAssembly = typeof(ArchitectureSourceFileFactIndexTests).Assembly;
+    private static readonly Assembly[] _testAssemblyOnly = [_testAssembly];
     private const string TestAssemblyName = "ArchLinterNet.Core.Tests";
 
     private static readonly string[] _srcDomain = ["src", "Domain"];
@@ -113,9 +114,9 @@ public sealed partial class ArchitectureSourceFileFactIndexTests
         fs.AddFile(absoluteRoot + "/Domain/SingleTypeFixture.cs", Source, DateTime.UtcNow);
 
         var index = new ArchitectureSourceFileFactIndex(
-            new[] { _testAssembly },
+            _testAssemblyOnly,
             absoluteRepoRoot,
-            new[] { "src" },
+            _singleSourceRoot,
             preprocessorSymbols: null,
             fs);
 

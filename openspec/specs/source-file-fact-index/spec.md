@@ -33,6 +33,14 @@ The system SHALL enrich each declared type fact with source file path data only 
 - **WHEN** one configured source root such as `src` contains multiple discovered target projects like `src/App` and `src/Domain`
 - **THEN** each scanned file is correlated to the owning assembly of the most specific discovered project directory that contains that file, rather than dropping the whole root as ambiguous
 
+#### Scenario: Configured source root may be narrower than the owning project directory
+- **WHEN** a discovered project lives at `src/App/App.csproj` and the configured source root is a nested subtree such as `src/App/Domain`
+- **THEN** files under that configured subtree are still correlated to the owning project assembly
+
+#### Scenario: Root-level project owns files under configured source roots
+- **WHEN** a discovered project file is at the repository root and a configured source root contains files below it such as `src/`
+- **THEN** those files are still correlated to that root-level project's assembly
+
 #### Scenario: Record type kind is detected from source
 - **WHEN** a source file declares `public record MyRecord { }` or `public record class MyRecord { }` or `public record struct MyRecord { }`
 - **THEN** the fact for that type has TypeKind equal to Record

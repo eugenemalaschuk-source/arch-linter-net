@@ -31,6 +31,8 @@ namespace ArchLinterNet.Core.Execution;
 // - All public collections are returned in deterministic (ordinal-sorted) order.
 public sealed class ArchitectureSourceFileFactIndex
 {
+    private static readonly StringComparer _ordinal = StringComparer.Ordinal;
+
     private readonly IReadOnlyCollection<Assembly> _targetAssemblies;
     private readonly string _repositoryRoot;
     private readonly IReadOnlyList<string> _sourceRoots;
@@ -122,7 +124,7 @@ public sealed class ArchitectureSourceFileFactIndex
     {
         List<Assembly> sortedAssemblies = _targetAssemblies
             .Distinct()
-            .OrderBy(a => a.GetName().Name ?? string.Empty, StringComparer.Ordinal)
+            .OrderBy(a => a.GetName().Name ?? string.Empty, _ordinal)
             .ToList();
 
         Dictionary<string, List<BaseFact>> reflectionFacts = RunReflectionPass(sortedAssemblies);
@@ -135,21 +137,33 @@ public sealed class ArchitectureSourceFileFactIndex
                 ResolveSourceInfo(sourceMap);
 
         List<ArchitectureDeclaredTypeFact> allFacts = BuildFacts(reflectionFacts, resolvedSourceInfo);
+        SortFactsAndAmbiguities(allFacts, ambiguities);
+        return BuildFactIndexData(allFacts, ambiguities);
+    }
 
+    private static void SortFactsAndAmbiguities(
+        List<ArchitectureDeclaredTypeFact> allFacts,
+        List<ArchitectureDeclaredTypeSourceAmbiguity> ambiguities)
+    {
         allFacts.Sort((a, b) =>
         {
-            int c = StringComparer.Ordinal.Compare(a.FullTypeName, b.FullTypeName);
-            return c != 0 ? c : StringComparer.Ordinal.Compare(a.AssemblyName, b.AssemblyName);
+            int c = _ordinal.Compare(a.FullTypeName, b.FullTypeName);
+            return c != 0 ? c : _ordinal.Compare(a.AssemblyName, b.AssemblyName);
         });
         ambiguities.Sort((a, b) =>
         {
-            int c = StringComparer.Ordinal.Compare(a.FullTypeName, b.FullTypeName);
-            return c != 0 ? c : StringComparer.Ordinal.Compare(a.AssemblyName, b.AssemblyName);
+            int c = _ordinal.Compare(a.FullTypeName, b.FullTypeName);
+            return c != 0 ? c : _ordinal.Compare(a.AssemblyName, b.AssemblyName);
         });
+    }
 
-        Dictionary<string, ArchitectureDeclaredTypeFact> uniqueFactsByName = new(StringComparer.Ordinal);
+    private static FactIndexData BuildFactIndexData(
+        List<ArchitectureDeclaredTypeFact> allFacts,
+        List<ArchitectureDeclaredTypeSourceAmbiguity> ambiguities)
+    {
+        Dictionary<string, ArchitectureDeclaredTypeFact> uniqueFactsByName = new(_ordinal);
         Dictionary<SourceFactKey, ArchitectureDeclaredTypeFact> factsByAssemblyAndName = new();
-        HashSet<string> ambiguousFullTypeNames = new(StringComparer.Ordinal);
+        HashSet<string> ambiguousFullTypeNames = new(_ordinal);
 
         foreach (ArchitectureDeclaredTypeFact fact in allFacts)
         {
@@ -166,8 +180,26 @@ public sealed class ArchitectureSourceFileFactIndex
             uniqueFactsByName.Remove(ambiguousFullTypeName);
         }
 
-        Dictionary<string, List<ArchitectureDeclaredTypeFact>> byFile = new(StringComparer.Ordinal);
-        Dictionary<string, List<ArchitectureDeclaredTypeFact>> byNamespace = new(StringComparer.Ordinal);
+        (Dictionary<string, IReadOnlyList<ArchitectureDeclaredTypeFact>> byFile,
+            Dictionary<string, IReadOnlyList<ArchitectureDeclaredTypeFact>> byNamespace) =
+                BuildFileAndNamespaceIndexes(allFacts);
+
+        return new FactIndexData(
+            uniqueFactsByName,
+            factsByAssemblyAndName,
+            allFacts,
+            ambiguities,
+            byFile,
+            byNamespace);
+    }
+
+    private static (
+        Dictionary<string, IReadOnlyList<ArchitectureDeclaredTypeFact>> ByFile,
+        Dictionary<string, IReadOnlyList<ArchitectureDeclaredTypeFact>> ByNamespace)
+        BuildFileAndNamespaceIndexes(IReadOnlyList<ArchitectureDeclaredTypeFact> allFacts)
+    {
+        Dictionary<string, List<ArchitectureDeclaredTypeFact>> byFile = new(_ordinal);
+        Dictionary<string, List<ArchitectureDeclaredTypeFact>> byNamespace = new(_ordinal);
 
         foreach (ArchitectureDeclaredTypeFact fact in allFacts)
         {
@@ -191,26 +223,22 @@ public sealed class ArchitectureSourceFileFactIndex
             nl.Add(fact);
         }
 
-        return new FactIndexData(
-            uniqueFactsByName,
-            factsByAssemblyAndName,
-            allFacts,
-            ambiguities,
+        return (
             byFile.ToDictionary(
                 kvp => kvp.Key,
                 kvp => (IReadOnlyList<ArchitectureDeclaredTypeFact>)kvp.Value,
-                StringComparer.Ordinal),
+                _ordinal),
             byNamespace.ToDictionary(
                 kvp => kvp.Key,
                 kvp => (IReadOnlyList<ArchitectureDeclaredTypeFact>)kvp.Value,
-                StringComparer.Ordinal));
+                _ordinal));
     }
 
     // Step 1: walk every loadable type in each assembly and collect one BaseFact per
     // (assemblyName, fullTypeName). Assemblies are already sorted alphabetically before this call.
     private static Dictionary<string, List<BaseFact>> RunReflectionPass(List<Assembly> sortedAssemblies)
     {
-        Dictionary<string, List<BaseFact>> factsByName = new(StringComparer.Ordinal);
+        Dictionary<string, List<BaseFact>> factsByName = new(_ordinal);
         foreach (Assembly assembly in sortedAssemblies)
         {
             string assemblyName = assembly.GetName().Name ?? string.Empty;
@@ -292,8 +320,8 @@ public sealed class ArchitectureSourceFileFactIndex
             // Deduplicate by path: overlapping roots or multiple declarations in one file are NOT ambiguous.
             List<string> uniquePaths = entry.Value
                 .Select(e => e.FilePath)
-                .Distinct(StringComparer.Ordinal)
-                .OrderBy(p => p, StringComparer.Ordinal)
+                .Distinct(_ordinal)
+                .OrderBy(p => p, _ordinal)
                 .ToList();
 
             if (uniquePaths.Count == 1)
@@ -392,16 +420,16 @@ public sealed class ArchitectureSourceFileFactIndex
         }
     }
 
-    private static IReadOnlyDictionary<string, string> BuildSourcePathAssemblyOwnership(
+    private static Dictionary<string, string> BuildSourcePathAssemblyOwnership(
         IReadOnlyCollection<Assembly> targetAssemblies,
         IReadOnlyList<string> sourceRoots,
         ProjectDiscoveryResult? projectDiscovery,
         IReadOnlyDictionary<string, string>? explicitOwnership)
     {
-        Dictionary<string, string> ownership = new(StringComparer.Ordinal);
+        Dictionary<string, string> ownership = new(_ordinal);
         HashSet<string> targetAssemblyNames = targetAssemblies
             .Select(assembly => assembly.GetName().Name ?? string.Empty)
-            .ToHashSet(StringComparer.Ordinal);
+            .ToHashSet(_ordinal);
 
         if (explicitOwnership != null)
         {
@@ -425,7 +453,7 @@ public sealed class ArchitectureSourceFileFactIndex
                 string soleAssemblyName = targetAssemblyNames.First();
                 foreach (string sourceRoot in sourceRoots
                              .Select(NormalizeRelativePath)
-                             .Distinct(StringComparer.Ordinal))
+                             .Distinct(_ordinal))
                 {
                     ownership[sourceRoot] = soleAssemblyName;
                 }
@@ -443,8 +471,8 @@ public sealed class ArchitectureSourceFileFactIndex
         {
             if (sourceRoots
                 .Select(NormalizeRelativePath)
-                .Distinct(StringComparer.Ordinal)
-                .Any(configuredRoot => IsSameOrDescendantPath(discoveredRoot, configuredRoot)))
+                .Distinct(_ordinal)
+                .Any(configuredRoot => PathsOverlap(discoveredRoot, configuredRoot)))
             {
                 ownership[discoveredRoot] = assemblyName;
             }
@@ -458,7 +486,7 @@ public sealed class ArchitectureSourceFileFactIndex
         IReadOnlyList<(string SourceRoot, string AssemblyName)> discoveredRoots)
     {
         List<(string SourceRoot, string AssemblyName)> exactMatches = discoveredRoots
-            .Where(entry => string.Equals(entry.SourceRoot, sourceRoot, StringComparison.Ordinal))
+            .Where(entry => _ordinal.Equals(entry.SourceRoot, sourceRoot))
             .ToList();
 
         if (exactMatches.Count == 1)
@@ -485,7 +513,7 @@ public sealed class ArchitectureSourceFileFactIndex
         List<string> mostSpecificAssemblies = ancestorMatches
             .Where(entry => entry.SourceRoot.Length == longestLength)
             .Select(entry => entry.AssemblyName)
-            .Distinct(StringComparer.Ordinal)
+            .Distinct(_ordinal)
             .ToList();
 
         return mostSpecificAssemblies.Count == 1 ? mostSpecificAssemblies[0] : null;
@@ -493,10 +521,20 @@ public sealed class ArchitectureSourceFileFactIndex
 
     private static bool IsSameOrDescendantPath(string path, string ancestor)
     {
-        return string.Equals(path, ancestor, StringComparison.Ordinal)
+        if (ancestor == ".")
+        {
+            return true;
+        }
+
+        return _ordinal.Equals(path, ancestor)
             || (path.Length > ancestor.Length
                 && path.StartsWith(ancestor, StringComparison.Ordinal)
                 && path[ancestor.Length] == '/');
+    }
+
+    private static bool PathsOverlap(string left, string right)
+    {
+        return IsSameOrDescendantPath(left, right) || IsSameOrDescendantPath(right, left);
     }
 
     private static string GetProjectDirectory(string projectPath)
