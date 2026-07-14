@@ -212,6 +212,7 @@ public sealed partial class ArchitectureSourceFileFactIndexTests
 
     private static readonly Assembly _coreAssembly = typeof(ArchitectureDeclaredTypeFact).Assembly;
     private static readonly string[] _featureXSymbols = ["FEATURE_X"];
+    private static readonly string[] _singleSourceRoot = ["src"];
 
     [Test]
     public void TryGetFact_AssemblyAndName_ReturnsCorrectFactForSpecifiedAssembly()
@@ -297,7 +298,7 @@ public sealed partial class ArchitectureSourceFileFactIndexTests
         var index = new ArchitectureSourceFileFactIndex(
             new[] { _testAssembly, _coreAssembly },
             absoluteRepoRoot,
-            new[] { "src" },
+            _singleSourceRoot,
             null,
             fs);
 

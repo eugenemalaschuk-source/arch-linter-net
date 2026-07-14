@@ -169,7 +169,7 @@ public sealed class ArchitectureSourceFileFactIndex
 
     // Step 1: walk every loadable type in each assembly and collect one BaseFact per
     // (assemblyName, fullTypeName). Assemblies are already sorted alphabetically before this call.
-    private Dictionary<string, List<BaseFact>> RunReflectionPass(List<Assembly> sortedAssemblies)
+    private static Dictionary<string, List<BaseFact>> RunReflectionPass(List<Assembly> sortedAssemblies)
     {
         Dictionary<string, List<BaseFact>> factsByName = new(StringComparer.Ordinal);
         foreach (Assembly assembly in sortedAssemblies)
@@ -208,30 +208,7 @@ public sealed class ArchitectureSourceFileFactIndex
             foreach (string absoluteFile in _fileSystem.EnumerateFiles(
                 absoluteRoot, "*.cs", SearchOption.AllDirectories))
             {
-                // Relative to the scanned root so ancestor directory names outside the repo
-                // can never be mistaken for excluded segments.
-                string relativeToRoot = Path.GetRelativePath(absoluteRoot, absoluteFile)
-                    .Replace('\\', '/');
-
-                if (ArchitectureGeneratedFileFilter.IsExcluded(relativeToRoot)) continue;
-
-                string sourceText;
-                try { sourceText = _fileSystem.ReadAllText(absoluteFile); }
-                catch (IOException) { continue; }
-
-                string normalizedFilePath = NormalizePath(_repositoryRoot, absoluteFile);
-
-                foreach (ArchitectureDeclaredTypeParser.ParsedTypeInfo parsed in
-                    ArchitectureDeclaredTypeParser.ParseSourceText(sourceText, _preprocessorSymbols))
-                {
-                    if (!sourceMap.TryGetValue(parsed.FullTypeName,
-                        out List<(string, ArchitectureTypeKind)>? entries))
-                    {
-                        entries = [];
-                        sourceMap[parsed.FullTypeName] = entries;
-                    }
-                    entries.Add((normalizedFilePath, parsed.TypeKind));
-                }
+                ProcessSourceFile(sourceMap, absoluteRoot, absoluteFile);
             }
         }
 
@@ -296,24 +273,108 @@ public sealed class ArchitectureSourceFileFactIndex
 
             foreach (BaseFact bf in entry.Value)
             {
-                allFacts.Add(si is { IsAmbiguous: true }
-                    ? new ArchitectureDeclaredTypeFact(
-                        bf.AssemblyName, bf.Namespace, fullName, bf.SimpleTypeName,
-                        bf.TypeKind, null, null, [], GetNamespaceSegments(bf.Namespace))
-                    : si?.FilePath != null
-                        ? new ArchitectureDeclaredTypeFact(
-                            bf.AssemblyName, bf.Namespace, fullName, bf.SimpleTypeName,
-                            si.KindFromSource, si.FilePath,
-                            GetFileNameWithoutExtension(si.FilePath),
-                            GetFolderSegments(si.FilePath),
-                            GetNamespaceSegments(bf.Namespace))
-                        : new ArchitectureDeclaredTypeFact(
-                            bf.AssemblyName, bf.Namespace, fullName, bf.SimpleTypeName,
-                            bf.TypeKind, null, null, [], GetNamespaceSegments(bf.Namespace)));
+                allFacts.Add(CreateFact(bf, fullName, si));
             }
         }
 
         return allFacts;
+    }
+
+    private void ProcessSourceFile(
+        Dictionary<string, List<(string FilePath, ArchitectureTypeKind Kind)>> sourceMap,
+        string absoluteRoot,
+        string absoluteFile)
+    {
+        // Relative to the scanned root so ancestor directory names outside the repo
+        // can never be mistaken for excluded segments.
+        string relativeToRoot = Path.GetRelativePath(absoluteRoot, absoluteFile)
+            .Replace('\\', '/');
+
+        if (ArchitectureGeneratedFileFilter.IsExcluded(relativeToRoot)) return;
+        if (!TryReadSourceText(absoluteFile, out string sourceText)) return;
+
+        string normalizedFilePath = NormalizePath(_repositoryRoot, absoluteFile);
+        AddParsedTypes(sourceMap, normalizedFilePath, sourceText);
+    }
+
+    private bool TryReadSourceText(string absoluteFile, out string sourceText)
+    {
+        try
+        {
+            sourceText = _fileSystem.ReadAllText(absoluteFile);
+            return true;
+        }
+        catch (IOException)
+        {
+            sourceText = string.Empty;
+            return false;
+        }
+    }
+
+    private void AddParsedTypes(
+        Dictionary<string, List<(string FilePath, ArchitectureTypeKind Kind)>> sourceMap,
+        string normalizedFilePath,
+        string sourceText)
+    {
+        foreach (ArchitectureDeclaredTypeParser.ParsedTypeInfo parsed in
+            ArchitectureDeclaredTypeParser.ParseSourceText(sourceText, _preprocessorSymbols))
+        {
+            if (!sourceMap.TryGetValue(parsed.FullTypeName,
+                out List<(string, ArchitectureTypeKind)>? entries))
+            {
+                entries = [];
+                sourceMap[parsed.FullTypeName] = entries;
+            }
+
+            entries.Add((normalizedFilePath, parsed.TypeKind));
+        }
+    }
+
+    private static ArchitectureDeclaredTypeFact CreateFact(
+        BaseFact baseFact,
+        string fullName,
+        SourceInfo? sourceInfo)
+    {
+        string[] namespaceSegments = GetNamespaceSegments(baseFact.Namespace);
+
+        if (sourceInfo is { IsAmbiguous: true })
+        {
+            return new ArchitectureDeclaredTypeFact(
+                baseFact.AssemblyName,
+                baseFact.Namespace,
+                fullName,
+                baseFact.SimpleTypeName,
+                baseFact.TypeKind,
+                null,
+                null,
+                [],
+                namespaceSegments);
+        }
+
+        if (sourceInfo?.FilePath != null)
+        {
+            return new ArchitectureDeclaredTypeFact(
+                baseFact.AssemblyName,
+                baseFact.Namespace,
+                fullName,
+                baseFact.SimpleTypeName,
+                sourceInfo.KindFromSource,
+                sourceInfo.FilePath,
+                GetFileNameWithoutExtension(sourceInfo.FilePath),
+                GetFolderSegments(sourceInfo.FilePath),
+                namespaceSegments);
+        }
+
+        return new ArchitectureDeclaredTypeFact(
+            baseFact.AssemblyName,
+            baseFact.Namespace,
+            fullName,
+            baseFact.SimpleTypeName,
+            baseFact.TypeKind,
+            null,
+            null,
+            [],
+            namespaceSegments);
     }
 
     private static string NormalizePath(string repositoryRoot, string absoluteFilePath)
