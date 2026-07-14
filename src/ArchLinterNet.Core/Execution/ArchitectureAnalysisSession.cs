@@ -1,5 +1,6 @@
 using ArchLinterNet.Core.Contracts;
 using ArchLinterNet.Core.Contracts.Families;
+using ArchLinterNet.Core.Contracts.PolicyImports;
 using ArchLinterNet.Core.Discovery;
 using ArchLinterNet.Core.Execution.Abstractions;
 using ArchLinterNet.Core.Model;
@@ -466,7 +467,12 @@ public sealed partial class ArchitectureAnalysisSession
             int index = Document.Analysis.TargetAssemblies.IndexOf(missingAssembly);
             violations.Add(index < 0
                 ? violation
-                : Document.Provenance.EnrichAtPath(violation, $"analysis.target_assemblies[{index}]"));
+                : Document.Provenance.EnrichAtPath(
+                    violation,
+                    ArchitecturePolicyProvenancePath.AppendIndex(
+                        ArchitecturePolicyProvenancePath.AppendProperty(
+                            ArchitecturePolicyProvenancePath.Property("analysis"), "target_assemblies"),
+                        index)));
         }
     }
 
@@ -579,7 +585,10 @@ public sealed partial class ArchitectureAnalysisSession
                     ArchitectureLayerResolver.DescribeLayer(layer),
                     layer.Selector == null ? "empty layer namespace" : "empty layer selector",
                     new[] { $"Layer '{layerName}' {matchDescription} contains no matching types in loaded assemblies." });
-                violations.Add(Document.Provenance.EnrichAtPath(violation, $"layers.{layerName}"));
+                violations.Add(Document.Provenance.EnrichAtPath(
+                    violation,
+                    ArchitecturePolicyProvenancePath.AppendProperty(
+                        ArchitecturePolicyProvenancePath.Property("layers"), layerName)));
             }
         }
     }
@@ -631,7 +640,8 @@ public sealed partial class ArchitectureAnalysisSession
             };
             violations.Add(Document.Provenance.EnrichAtPath(
                 invalidGroup,
-                $"external_dependencies.{groupName}"));
+                ArchitecturePolicyProvenancePath.AppendProperty(
+                    ArchitecturePolicyProvenancePath.Property("external_dependencies"), groupName)));
         }
     }
 
@@ -680,7 +690,10 @@ public sealed partial class ArchitectureAnalysisSession
             {
                 Payload = new PackageDependencyPayload(groupName)
             };
-            violations.Add(Document.Provenance.EnrichAtPath(invalidGroup, $"packages.{groupName}"));
+            violations.Add(Document.Provenance.EnrichAtPath(
+                invalidGroup,
+                ArchitecturePolicyProvenancePath.AppendProperty(
+                    ArchitecturePolicyProvenancePath.Property("packages"), groupName)));
         }
     }
 

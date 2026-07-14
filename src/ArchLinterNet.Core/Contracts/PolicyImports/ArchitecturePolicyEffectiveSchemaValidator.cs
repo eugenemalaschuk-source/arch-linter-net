@@ -1,5 +1,4 @@
 using System.Reflection;
-using System.Text;
 using System.Text.Json.Nodes;
 using ArchLinterNet.Core.Model;
 using Json.Schema;
@@ -89,7 +88,12 @@ internal static class ArchitecturePolicyEffectiveSchemaValidator
                     || string.IsNullOrEmpty(id))
                 {
                     provenance.TryGetLocation(
-                        $"contracts.{groupName}[{index}].id",
+                        ArchitecturePolicyProvenancePath.AppendProperty(
+                            ArchitecturePolicyProvenancePath.AppendIndex(
+                                ArchitecturePolicyProvenancePath.AppendProperty(
+                                    ArchitecturePolicyProvenancePath.Property("contracts"), groupName),
+                                index),
+                            "id"),
                         out ArchitecturePolicySourceLocation? location);
                     throw ArchitecturePolicyDiagnosticFactory.Exception(
                         ArchitecturePolicyImportErrorCategory.SourceShape,
@@ -110,57 +114,26 @@ internal static class ArchitecturePolicyEffectiveSchemaValidator
         ArchitecturePolicyProvenanceIndex provenance,
         string instanceLocation)
     {
-        string yamlPath = JsonPointerToYamlPath(instanceLocation);
-        ArchitecturePolicySourceLocation? location;
-        while (!provenance.TryGetLocation(yamlPath, out location))
+        string path = ArchitecturePolicyProvenancePath.Normalize(instanceLocation);
+        while (true)
         {
-            int dot = yamlPath.LastIndexOf('.');
-            int bracket = yamlPath.LastIndexOf('[');
-            int boundary = Math.Max(dot, bracket);
-            if (boundary < 0)
+            if (provenance.TryGetLocation(path, out ArchitecturePolicySourceLocation? location))
+            {
+                return location;
+            }
+
+            if (path == ArchitecturePolicyProvenancePath.Root)
             {
                 return null;
             }
 
-            yamlPath = yamlPath[..boundary];
+            path = ArchitecturePolicyProvenancePath.Parent(path);
         }
-
-        return location;
     }
 
     private static int InstanceDepth(string instanceLocation)
     {
         return instanceLocation.Count(character => character == '/');
-    }
-
-    private static string JsonPointerToYamlPath(string pointer)
-    {
-        if (string.IsNullOrEmpty(pointer) || pointer == "/")
-        {
-            return "$";
-        }
-
-        var path = new StringBuilder();
-        foreach (string encodedSegment in pointer.TrimStart('/').Split('/'))
-        {
-            string segment = encodedSegment.Replace("~1", "/", StringComparison.Ordinal)
-                .Replace("~0", "~", StringComparison.Ordinal);
-            if (int.TryParse(segment, out int index))
-            {
-                path.Append('[').Append(index).Append(']');
-            }
-            else
-            {
-                if (path.Length > 0)
-                {
-                    path.Append('.');
-                }
-
-                path.Append(segment);
-            }
-        }
-
-        return path.ToString();
     }
 
     private static JsonNode? ConvertNode(YamlNode node)

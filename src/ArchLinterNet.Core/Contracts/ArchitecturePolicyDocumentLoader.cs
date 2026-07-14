@@ -64,7 +64,9 @@ public sealed partial class ArchitecturePolicyDocumentLoader : IArchitecturePoli
 
         string yaml = _fileSystem.ReadAllText(policyPath);
         ArchitecturePolicyProvenanceIndex provenance;
-        if (_sourceParser.ContainsImports(yaml))
+        ArchitecturePolicySourceDescriptor rootDescriptor =
+            ArchitecturePolicyProvenanceFactory.CreateRootDescriptor(_pathResolver, policyPath);
+        if (_sourceParser.ContainsImports(yaml, rootDescriptor))
         {
             IReadOnlyList<ArchitecturePolicySource> sources = _importResolver.Resolve(policyPath, yaml);
             ArchitecturePolicyCompositionResult composition =
@@ -78,9 +80,27 @@ public sealed partial class ArchitecturePolicyDocumentLoader : IArchitecturePoli
             provenance = ArchitecturePolicyProvenanceFactory.CreateMonolithic(_pathResolver, policyPath, yaml);
         }
 
-        ValidateRawLayerYaml(yaml);
-        ValidateRawContextualContractYaml(yaml);
-        ValidateRawSemanticCoverageYaml(yaml);
+        try
+        {
+            ValidateRawLayerYaml(yaml, provenance);
+            ValidateRawContextualContractYaml(yaml, provenance);
+            ValidateRawSemanticCoverageYaml(yaml, provenance);
+        }
+        catch (InvalidOperationException exception)
+        {
+            Exception enriched = provenance.EnrichValidationException(exception);
+            if (ReferenceEquals(enriched, exception))
+            {
+                throw;
+            }
+
+            throw enriched;
+        }
+        finally
+        {
+            provenance.ResetValidationSubject();
+        }
+
         ArchitectureContractDocument? document = deserializer.Deserialize<ArchitectureContractDocument>(yaml);
 
         if (document == null)
@@ -137,10 +157,10 @@ public sealed partial class ArchitecturePolicyDocumentLoader : IArchitecturePoli
             return null;
         }
 
+        string classificationPath = ArchitecturePolicyProvenancePath.AppendProperty(
+            ArchitecturePolicyProvenancePath.Property("classification"), "path");
         ArchitecturePolicySourceLocation[] locations = provenance.Nodes
-            .Where(entry => entry.Key.StartsWith("classification.path[", StringComparison.Ordinal)
-                && entry.Key.Count(character => character == '[') == 1
-                && entry.Key.IndexOf('.', "classification.path".Length) < 0)
+            .Where(entry => ArchitecturePolicyProvenancePath.IsDirectSequenceItem(entry.Key, classificationPath))
             .Select(entry => entry.Value)
             .OrderBy(location => location.SourceOrdinal)
             .ThenBy(location => location.EncounterOrdinal)
@@ -151,7 +171,7 @@ public sealed partial class ArchitecturePolicyDocumentLoader : IArchitecturePoli
         };
     }
 
-    private static void ValidateRawLayerYaml(string yaml)
+    private static void ValidateRawLayerYaml(string yaml, ArchitecturePolicyProvenanceIndex provenance)
     {
         var stream = new YamlStream();
         stream.Load(new StringReader(yaml));
@@ -166,6 +186,8 @@ public sealed partial class ArchitecturePolicyDocumentLoader : IArchitecturePoli
         foreach ((YamlNode keyNode, YamlNode valueNode) in layers!.Children)
         {
             string layerName = ((YamlScalarNode)keyNode).Value ?? string.Empty;
+            provenance.SetValidationSubject(ArchitecturePolicyProvenancePath.AppendProperty(
+                ArchitecturePolicyProvenancePath.Property("layers"), layerName));
             if (valueNode is not YamlMappingNode layerNode)
             {
                 continue;
@@ -253,7 +275,7 @@ public sealed partial class ArchitecturePolicyDocumentLoader : IArchitecturePoli
     // turning a metadata-scoped allow-list into a false-negative that admits cross-context references.
     // This raw-YAML pass, mirroring ValidateRawLayerYaml's selector-key check below, is the only place
     // that can still see the rejected property name before deserialization discards it.
-    private static void ValidateRawContextualContractYaml(string yaml)
+    private static void ValidateRawContextualContractYaml(string yaml, ArchitecturePolicyProvenanceIndex provenance)
     {
         var stream = new YamlStream();
         stream.Load(new StringReader(yaml));
@@ -265,15 +287,15 @@ public sealed partial class ArchitecturePolicyDocumentLoader : IArchitecturePoli
             return;
         }
 
-        ValidateContextualContractGroup(contracts!, "strict_context_dependencies", ForbiddenKey);
-        ValidateContextualContractGroup(contracts!, "audit_context_dependencies", ForbiddenKey);
-        ValidateContextualContractGroup(contracts!, "strict_context_allow_only", "allowed");
-        ValidateContextualContractGroup(contracts!, "audit_context_allow_only", "allowed");
-        ValidatePortBoundaryContractGroup(contracts!, "strict_port_boundaries");
-        ValidatePortBoundaryContractGroup(contracts!, "audit_port_boundaries");
+        ValidateContextualContractGroup(contracts!, "strict_context_dependencies", ForbiddenKey, provenance);
+        ValidateContextualContractGroup(contracts!, "audit_context_dependencies", ForbiddenKey, provenance);
+        ValidateContextualContractGroup(contracts!, "strict_context_allow_only", "allowed", provenance);
+        ValidateContextualContractGroup(contracts!, "audit_context_allow_only", "allowed", provenance);
+        ValidatePortBoundaryContractGroup(contracts!, "strict_port_boundaries", provenance);
+        ValidatePortBoundaryContractGroup(contracts!, "audit_port_boundaries", provenance);
     }
 
-    private static void ValidateRawSemanticCoverageYaml(string yaml)
+    private static void ValidateRawSemanticCoverageYaml(string yaml, ArchitecturePolicyProvenanceIndex provenance)
     {
         var stream = new YamlStream();
         stream.Load(new StringReader(yaml));
@@ -285,19 +307,28 @@ public sealed partial class ArchitecturePolicyDocumentLoader : IArchitecturePoli
             return;
         }
 
-        ValidateSemanticCoverageContractGroup(contracts!, "strict_coverage");
-        ValidateSemanticCoverageContractGroup(contracts!, "audit_coverage");
+        ValidateSemanticCoverageContractGroup(contracts!, "strict_coverage", provenance);
+        ValidateSemanticCoverageContractGroup(contracts!, "audit_coverage", provenance);
     }
 
-    private static void ValidateSemanticCoverageContractGroup(YamlMappingNode contracts, string groupKey)
+    private static void ValidateSemanticCoverageContractGroup(
+        YamlMappingNode contracts,
+        string groupKey,
+        ArchitecturePolicyProvenanceIndex provenance)
     {
         if (!TryGetChild(contracts, groupKey, out YamlNode? groupNode) || groupNode is not YamlSequenceNode contractsList)
         {
             return;
         }
 
-        foreach (YamlMappingNode contract in contractsList.Children.OfType<YamlMappingNode>())
+        for (int index = 0; index < contractsList.Children.Count; index++)
         {
+            if (contractsList.Children[index] is not YamlMappingNode contract)
+            {
+                continue;
+            }
+
+            provenance.SetValidationSubject(ContractPath(groupKey, index));
             if (!TryGetChild(contract, "scope", out YamlNode? scopeNode)
                 || scopeNode is not YamlScalarNode scope
                 || !string.Equals(scope.Value, "semantic_role", StringComparison.Ordinal)
@@ -323,20 +354,26 @@ public sealed partial class ArchitecturePolicyDocumentLoader : IArchitecturePoli
         }
     }
 
-    private static void ValidateContextualContractGroup(YamlMappingNode contracts, string groupKey, string targetListKey)
+    private static void ValidateContextualContractGroup(
+        YamlMappingNode contracts,
+        string groupKey,
+        string targetListKey,
+        ArchitecturePolicyProvenanceIndex provenance)
     {
         if (!TryGetChild(contracts, groupKey, out YamlNode? groupNode) || groupNode is not YamlSequenceNode sequence)
         {
             return;
         }
 
-        foreach (YamlNode entryNode in sequence.Children)
+        for (int index = 0; index < sequence.Children.Count; index++)
         {
+            YamlNode entryNode = sequence.Children[index];
             if (entryNode is not YamlMappingNode contractNode)
             {
                 continue;
             }
 
+            provenance.SetValidationSubject(ContractPath(groupKey, index));
             string contractName = TryGetChild(contractNode, "name", out YamlNode? nameNode)
                 && nameNode is YamlScalarNode nameScalar
                     ? nameScalar.Value ?? UnnamedContractName
@@ -352,11 +389,20 @@ public sealed partial class ArchitecturePolicyDocumentLoader : IArchitecturePoli
         }
     }
 
-    private static void ValidatePortBoundaryContractGroup(YamlMappingNode contracts, string groupKey)
+    private static void ValidatePortBoundaryContractGroup(
+        YamlMappingNode contracts,
+        string groupKey,
+        ArchitecturePolicyProvenanceIndex provenance)
     {
         if (!TryGetChild(contracts, groupKey, out YamlNode? groupNode) || groupNode is not YamlSequenceNode sequence) return;
-        foreach (YamlMappingNode entry in sequence.Children.OfType<YamlMappingNode>())
+        for (int index = 0; index < sequence.Children.Count; index++)
         {
+            if (sequence.Children[index] is not YamlMappingNode entry)
+            {
+                continue;
+            }
+
+            provenance.SetValidationSubject(ContractPath(groupKey, index));
             string name = TryGetChild(entry, "name", out YamlNode? value) && value is YamlScalarNode scalar
                 ? scalar.Value ?? UnnamedContractName : UnnamedContractName;
             ValidatePortBoundaryContractNodeKeys(entry, name);
@@ -449,6 +495,14 @@ public sealed partial class ArchitecturePolicyDocumentLoader : IArchitecturePoli
 
         child = mapping;
         return true;
+    }
+
+    private static string ContractPath(string groupKey, int index)
+    {
+        return ArchitecturePolicyProvenancePath.AppendIndex(
+            ArchitecturePolicyProvenancePath.AppendProperty(
+                ArchitecturePolicyProvenancePath.Property("contracts"), groupKey),
+            index);
     }
 
     private static bool TryGetNonNullChild(YamlMappingNode parent, string key, out YamlNode? child)

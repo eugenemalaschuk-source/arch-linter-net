@@ -261,6 +261,66 @@ public sealed class ArchitecturePolicyImportTests
         Assert.That(exception.Category, Is.EqualTo(ArchitecturePolicyImportErrorCategory.SourceShape));
     }
 
+    [TestCase("layers: [unterminated")]
+    [TestCase("---\nversion: 1\nname: First\n---\nversion: 1\nname: Second\n")]
+    [TestCase("- not-a-mapping\n")]
+    public void Load_MalformedRootYaml_ExposesTypedRootSourceShapeDiagnostic(string yaml)
+    {
+        string root = Write("architecture/root.yml", yaml);
+
+        ArchitecturePolicyImportException exception = Assert.Throws<ArchitecturePolicyImportException>(
+            () => new ArchitecturePolicyDocumentLoader().Load(root))!;
+        ArchitecturePolicySourceLocation location = exception.Diagnostic!.Location!;
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(exception.Category, Is.EqualTo(ArchitecturePolicyImportErrorCategory.SourceShape));
+            Assert.That(exception.Diagnostic.Kind, Is.EqualTo(ArchitecturePolicyDiagnosticKind.SourceShape));
+            Assert.That(location.Source.Role, Is.EqualTo(ArchitecturePolicyDocumentRole.Root));
+            Assert.That(location.SourcePath, Is.EqualTo("architecture/root.yml"));
+            Assert.That(location.YamlPath, Is.EqualTo("$"));
+        });
+    }
+
+    [Test]
+    public void Load_ImportedWhitespaceLayerNamespace_EnrichesRawValidationWithFragmentLocation()
+    {
+        string root = Write("architecture/root.yml", RootYaml("fragment.yml"));
+        Write("architecture/fragment.yml", "layers:\n  domain:\n    namespace: \"   \"\n");
+
+        ArchitecturePolicyValidationException exception = Assert.Throws<ArchitecturePolicyValidationException>(
+            () => new ArchitecturePolicyDocumentLoader().Load(root))!;
+        ArchitecturePolicySourceLocation location = exception.Diagnostic.Location!;
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(exception.Diagnostic.Kind, Is.EqualTo(ArchitecturePolicyDiagnosticKind.SemanticValidation));
+            Assert.That(location.SourcePath, Is.EqualTo("architecture/fragment.yml"));
+            Assert.That(location.YamlPath, Is.EqualTo("layers.domain"));
+        });
+    }
+
+    [Test]
+    public void Load_DottedLayerKey_DoesNotOverwriteNestedProvenance()
+    {
+        string root = Write(
+            "architecture/root.yml",
+            RootYaml("first.yml", importsSuffix: "  - second.yml\n"));
+        Write("architecture/first.yml", "layers:\n  a:\n    namespace: \"\"\n");
+        Write("architecture/second.yml", "layers:\n  a.namespace:\n    namespace: App.Dotted\n");
+
+        ArchitecturePolicyImportException exception = Assert.Throws<ArchitecturePolicyImportException>(
+            () => new ArchitecturePolicyDocumentLoader().Load(root))!;
+        ArchitecturePolicySourceLocation location = exception.Diagnostic!.Location!;
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(exception.Category, Is.EqualTo(ArchitecturePolicyImportErrorCategory.SourceShape));
+            Assert.That(location.SourcePath, Is.EqualTo("architecture/first.yml"));
+            Assert.That(location.YamlPath, Is.EqualTo("layers.a.namespace"));
+        });
+    }
+
     [Test]
     public void Load_ComposedNestedShapeMismatch_ExposesSourceShapeCategory()
     {

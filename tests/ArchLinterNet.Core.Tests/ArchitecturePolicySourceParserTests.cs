@@ -101,14 +101,14 @@ public sealed class ArchitecturePolicySourceParserTests
     }
 
     [Test]
-    public void ContainsImports_DistinguishesEmptyAndImportedDocuments()
+    public void ContainsImports_DistinguishesDocumentsWithAndWithoutImports()
     {
         var parser = new ArchitecturePolicySourceParser();
 
         Assert.Multiple(() =>
         {
-            Assert.That(parser.ContainsImports(string.Empty), Is.False);
-            Assert.That(parser.ContainsImports("imports: []\n"), Is.True);
+            Assert.That(parser.ContainsImports("version: 1\nname: Example\n", Descriptor(ArchitecturePolicyDocumentRole.Root)), Is.False);
+            Assert.That(parser.ContainsImports("imports: [fragment.yml]\n", Descriptor(ArchitecturePolicyDocumentRole.Root)), Is.True);
         });
     }
 

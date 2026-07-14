@@ -37,8 +37,8 @@ internal sealed class ArchitecturePolicyProvenanceMapBuilder
                 AddTree(
                     valueNode,
                     source,
-                    AppendProperty(originalPath, key),
-                    AppendProperty(effectivePath, key),
+                    AppendYamlProperty(originalPath, key),
+                    ArchitecturePolicyProvenancePath.AppendProperty(effectivePath, key),
                     family,
                     id);
             }
@@ -51,7 +51,7 @@ internal sealed class ArchitecturePolicyProvenanceMapBuilder
                     sequence.Children[index],
                     source,
                     $"{originalPath}[{index}]",
-                    $"{effectivePath}[{index}]",
+                    ArchitecturePolicyProvenancePath.AppendIndex(effectivePath, index),
                     family,
                     id);
             }
@@ -74,7 +74,7 @@ internal sealed class ArchitecturePolicyProvenanceMapBuilder
                 child,
                 source,
                 $"{originalPath}[{index}]",
-                $"{effectivePath}[{effectiveStartIndex + index}]",
+                ArchitecturePolicyProvenancePath.AppendIndex(effectivePath, effectiveStartIndex + index),
                 contractFamily,
                 contractId);
         }
@@ -115,19 +115,11 @@ internal sealed class ArchitecturePolicyProvenanceMapBuilder
             return (currentFamily, currentId);
         }
 
-        const string ContractPrefix = "contracts.";
-        if (!effectivePath.StartsWith(ContractPrefix, StringComparison.Ordinal))
+        if (!ArchitecturePolicyProvenancePath.TryGetContractGroup(effectivePath, out string family))
         {
             return (null, null);
         }
 
-        int bracket = effectivePath.IndexOf('[', ContractPrefix.Length);
-        if (bracket < 0)
-        {
-            return (null, null);
-        }
-
-        string family = effectivePath[ContractPrefix.Length..bracket];
         return (family, ReadContractId(node));
     }
 
@@ -158,7 +150,7 @@ internal sealed class ArchitecturePolicyProvenanceMapBuilder
                 : null;
     }
 
-    private static string AppendProperty(string parent, string property)
+    private static string AppendYamlProperty(string parent, string property)
     {
         return parent == "$" ? property : $"{parent}.{property}";
     }
@@ -189,11 +181,11 @@ internal static class ArchitecturePolicyProvenanceFactory
             root,
             Array.Empty<string>());
         var builder = new ArchitecturePolicyProvenanceMapBuilder();
-        builder.AddTree(root, source, "$", "$");
+        builder.AddTree(root, source, "$", ArchitecturePolicyProvenancePath.Root);
         return builder.Build(new[] { source });
     }
 
-    private static ArchitecturePolicySourceDescriptor CreateRootDescriptor(
+    internal static ArchitecturePolicySourceDescriptor CreateRootDescriptor(
         IArchitecturePolicyPathResolver pathResolver,
         string policyPath)
     {

@@ -1,6 +1,7 @@
 using System.Collections;
 using System.Reflection;
 using ArchLinterNet.Core.Contracts.Families;
+using ArchLinterNet.Core.Contracts.PolicyImports;
 using ArchLinterNet.Core.Model;
 using YamlDotNet.Serialization;
 
@@ -48,13 +49,14 @@ public sealed class ArchitecturePolicyProvenanceIndex
         _contracts.Clear();
         _layers.Clear();
 
-        BindOwner(document, "$", null, null);
-        BindOwner(document.Analysis, "analysis", null, null);
-        BindOwner(document.Classification, "classification", null, null);
+        BindOwner(document, ArchitecturePolicyProvenancePath.Root, null, null);
+        BindOwner(document.Analysis, ArchitecturePolicyProvenancePath.Property("analysis"), null, null);
+        BindOwner(document.Classification, ArchitecturePolicyProvenancePath.Property("classification"), null, null);
 
         foreach ((string name, ArchitectureLayer layer) in document.Layers)
         {
-            string path = $"layers.{name}";
+            string path = ArchitecturePolicyProvenancePath.AppendProperty(
+                ArchitecturePolicyProvenancePath.Property("layers"), name);
             BindOwner(layer, path, null, null);
             if (_nodes.TryGetValue(path, out ArchitecturePolicySourceLocation? location))
             {
@@ -64,12 +66,14 @@ public sealed class ArchitecturePolicyProvenanceIndex
 
         foreach ((string name, ArchitectureExternalDependencyGroup group) in document.ExternalDependencies)
         {
-            BindOwner(group, $"external_dependencies.{name}", null, null);
+            BindOwner(group, ArchitecturePolicyProvenancePath.AppendProperty(
+                ArchitecturePolicyProvenancePath.Property("external_dependencies"), name), null, null);
         }
 
         foreach ((string name, ArchitecturePackageGroup group) in document.Packages)
         {
-            BindOwner(group, $"packages.{name}", null, null);
+            BindOwner(group, ArchitecturePolicyProvenancePath.AppendProperty(
+                ArchitecturePolicyProvenancePath.Property("packages"), name), null, null);
         }
 
         BindContracts(document);
@@ -93,6 +97,11 @@ public sealed class ArchitecturePolicyProvenanceIndex
     internal void SetValidationSubject(object owner)
     {
         _currentValidationLocation = LocationFor(owner);
+    }
+
+    internal void SetValidationSubject(string effectivePath)
+    {
+        _currentValidationLocation = _nodes.GetValueOrDefault(effectivePath);
     }
 
     internal Exception EnrichValidationException(InvalidOperationException exception)
@@ -175,7 +184,9 @@ public sealed class ArchitecturePolicyProvenanceIndex
             return unmatched;
         }
 
-        string path = $"{entry.EffectivePath}.ignored_violations[{unmatched.IgnoreIndex}]";
+        string path = ArchitecturePolicyProvenancePath.AppendIndex(
+            ArchitecturePolicyProvenancePath.AppendProperty(entry.EffectivePath, "ignored_violations"),
+            unmatched.IgnoreIndex);
         ArchitecturePolicySourceLocation? location = _nodes.GetValueOrDefault(path)
             ?? LocationFor(entry.Contract);
         return location is null ? unmatched : unmatched with { PolicyLocation = location };
@@ -232,7 +243,10 @@ public sealed class ArchitecturePolicyProvenanceIndex
                     continue;
                 }
 
-                string effectivePath = $"contracts.{group}[{index}]";
+                string effectivePath = ArchitecturePolicyProvenancePath.AppendIndex(
+                    ArchitecturePolicyProvenancePath.AppendProperty(
+                        ArchitecturePolicyProvenancePath.Property("contracts"), group),
+                    index);
                 string family = families.GetValueOrDefault(contract, group);
                 BindOwner(contract, effectivePath, family, contract.Id);
                 UpdateContractMetadata(effectivePath, family, contract.Id);
@@ -275,7 +289,9 @@ public sealed class ArchitecturePolicyProvenanceIndex
         {
             if (value is not null)
             {
-                BindOwner(value, $"{effectivePath}.ignored_violations[{index}]", family, contractId);
+                BindOwner(value, ArchitecturePolicyProvenancePath.AppendIndex(
+                    ArchitecturePolicyProvenancePath.AppendProperty(effectivePath, "ignored_violations"),
+                    index), family, contractId);
             }
 
             index++;
@@ -340,7 +356,7 @@ public sealed class ArchitecturePolicyProvenanceIndex
     private void UpdateContractMetadata(string prefix, string family, string? contractId)
     {
         string[] paths = _nodes.Keys
-            .Where(path => path == prefix || path.StartsWith(prefix + ".", StringComparison.Ordinal))
+            .Where(path => ArchitecturePolicyProvenancePath.IsSameOrDescendant(path, prefix))
             .ToArray();
         foreach (string path in paths)
         {

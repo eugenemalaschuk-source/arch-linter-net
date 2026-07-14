@@ -24,7 +24,7 @@ public sealed class ArchitecturePolicyEffectiveSchemaValidatorTests
                 - source: domain
                   forbidden: [application]
             """;
-        ArchitecturePolicyProvenanceIndex provenance = CreateProvenance("contracts.strict");
+        ArchitecturePolicyProvenanceIndex provenance = CreateProvenance(("/contracts/strict", "contracts.strict"));
 
         ArchitecturePolicyImportException exception = Assert.Throws<ArchitecturePolicyImportException>(
             () => ArchitecturePolicyEffectiveSchemaValidator.Validate(Yaml, provenance))!;
@@ -56,7 +56,7 @@ public sealed class ArchitecturePolicyEffectiveSchemaValidatorTests
                   source: domain
                   forbidden: [application]
             """;
-        ArchitecturePolicyProvenanceIndex provenance = CreateProvenance("contracts.strict[0].id");
+        ArchitecturePolicyProvenanceIndex provenance = CreateProvenance(("/contracts/strict/0/id", "contracts.strict[0].id"));
 
         ArchitecturePolicyImportException exception = Assert.Throws<ArchitecturePolicyImportException>(
             () => ArchitecturePolicyEffectiveSchemaValidator.Validate(Yaml, provenance))!;
@@ -90,19 +90,22 @@ public sealed class ArchitecturePolicyEffectiveSchemaValidatorTests
             """;
 
         Assert.DoesNotThrow(() =>
-            ArchitecturePolicyEffectiveSchemaValidator.Validate(Yaml, CreateProvenance("contracts.strict[0].id")));
+            ArchitecturePolicyEffectiveSchemaValidator.Validate(
+                Yaml,
+                CreateProvenance(("/contracts/strict/0/id", "contracts.strict[0].id"))));
     }
 
-    private static ArchitecturePolicyProvenanceIndex CreateProvenance(params string[] paths)
+    private static ArchitecturePolicyProvenanceIndex CreateProvenance(
+        params (string EffectivePath, string YamlPath)[] paths)
     {
         var source = new ArchitecturePolicySourceDescriptor(
             "architecture/root.yml", "architecture/fragments/contracts.yml", ArchitecturePolicyDocumentRole.Fragment,
             1, "architecture/root.yml", "fragments/contracts.yml",
             ["architecture/root.yml", "architecture/fragments/contracts.yml"]);
         var nodes = new Dictionary<string, ArchitecturePolicySourceLocation>(StringComparer.Ordinal);
-        foreach (string path in paths)
+        foreach ((string effectivePath, string yamlPath) in paths)
         {
-            nodes[path] = new ArchitecturePolicySourceLocation(source, path, 4, 3, null, null);
+            nodes[effectivePath] = new ArchitecturePolicySourceLocation(source, yamlPath, 4, 3, null, null);
         }
 
         return new ArchitecturePolicyProvenanceIndex([source], nodes);

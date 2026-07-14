@@ -90,9 +90,9 @@ public sealed class CliArchitectureTests
     public void ValidateHandler_WritesTypedPolicyFailureAsJson()
     {
         ArchitecturePolicySourceDescriptor source = new(
-            "architecture/root.yml", "architecture/parts/domain.yml", ArchitecturePolicyDocumentRole.Fragment,
-            1, "architecture/root.yml", "parts/domain.yml", ["architecture/root.yml", "architecture/parts/domain.yml"]);
-        ArchitecturePolicySourceLocation location = new(source, "layers.domain.namespace", 8, 5, null, null);
+            "architecture/root.yml", "architecture/root.yml", ArchitecturePolicyDocumentRole.Root,
+            0, null, null, ["architecture/root.yml"]);
+        ArchitecturePolicySourceLocation location = new(source, "$", 1, 1, null, null);
         FakeCliRuntime runtime = new()
         {
             ExceptionToThrow = new ArchitecturePolicyImportException(
@@ -110,12 +110,41 @@ public sealed class CliArchitectureTests
         {
             Assert.That(exitCode, Is.EqualTo(CliExitCodes.InvalidArgumentsOrRuntimeError));
             Assert.That(console.StdOut, Does.Contain("architecture_policy_error"));
-            Assert.That(console.StdOut, Does.Contain("architecture/parts/domain.yml"));
+            Assert.That(console.StdOut, Does.Contain("architecture/root.yml"));
             Assert.That(console.StdOut, Does.Contain("policy_location"));
             Assert.That(console.StdOut, Does.Contain("source_path"));
             Assert.That(console.StdOut, Does.Contain("source_ordinal"));
             Assert.That(console.StdOut, Does.Contain("import_chain"));
             Assert.That(console.StdOut, Does.Not.Contain("SourcePath"));
+            Assert.That(console.StdErr, Is.Empty);
+        });
+    }
+
+    [Test]
+    public void ValidateHandler_WritesTypedRootPolicyFailureAsSarif()
+    {
+        ArchitecturePolicySourceDescriptor source = new(
+            "architecture/root.yml", "architecture/root.yml", ArchitecturePolicyDocumentRole.Root,
+            0, null, null, ["architecture/root.yml"]);
+        ArchitecturePolicySourceLocation location = new(source, "$", 1, 1, null, null);
+        FakeCliRuntime runtime = new()
+        {
+            ExceptionToThrow = new ArchitecturePolicyImportException(
+                ArchitecturePolicyImportErrorCategory.SourceShape,
+                "Root policy is not a valid mapping document.",
+                new ArchitecturePolicyDiagnostic(ArchitecturePolicyDiagnosticKind.SourceShape, location, [], source.ImportChain))
+        };
+        FakeCliConsole console = new();
+        ValidateCommandHandler handler = new(runtime, console, new FakeFileSystem(exists: true));
+
+        int exitCode = handler.Execute(new ValidateCommandOptions(
+            "policy.yml", "strict", "sarif", [], null, false, null, false, false));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(exitCode, Is.EqualTo(CliExitCodes.InvalidArgumentsOrRuntimeError));
+            Assert.That(console.StdOut, Does.Contain("architecture-policy"));
+            Assert.That(console.StdOut, Does.Contain("architecture/root.yml"));
             Assert.That(console.StdErr, Is.Empty);
         });
     }

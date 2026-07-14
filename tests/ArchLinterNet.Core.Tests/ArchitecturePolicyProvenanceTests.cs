@@ -49,8 +49,8 @@ public sealed class ArchitecturePolicyProvenanceTests
 
         ArchitectureContractDocument document = new ArchitecturePolicyDocumentLoader().Load(root);
 
-        ArchitecturePolicySourceLocation rootLocation = document.Provenance.Nodes["contracts.strict[0]"];
-        ArchitecturePolicySourceLocation fragmentLocation = document.Provenance.Nodes["contracts.strict[1]"];
+        ArchitecturePolicySourceLocation rootLocation = document.Provenance.Nodes["/contracts/strict/0"];
+        ArchitecturePolicySourceLocation fragmentLocation = document.Provenance.Nodes["/contracts/strict/1"];
         Assert.Multiple(() =>
         {
             Assert.That(rootLocation.Role, Is.EqualTo(ArchitecturePolicyDocumentRole.Root));
@@ -342,7 +342,7 @@ public sealed class ArchitecturePolicyProvenanceTests
         {
             Assert.That(document.Provenance.Sources, Has.Count.EqualTo(1));
             Assert.That(document.Provenance.RootSource!.Role, Is.EqualTo(ArchitecturePolicyDocumentRole.Root));
-            Assert.That(document.Provenance.Nodes["layers.domain"].Role,
+            Assert.That(document.Provenance.Nodes["/layers/domain"].Role,
                 Is.EqualTo(ArchitecturePolicyDocumentRole.Root));
             Assert.That(document.Contracts.Strict, Is.Empty);
         });
@@ -354,8 +354,8 @@ public sealed class ArchitecturePolicyProvenanceTests
         ArchitectureContractDocument first = LoadEquivalent("first/architecture/root.yml", "part.yml");
         ArchitectureContractDocument second = LoadEquivalent("second/architecture/custom.policy", "arbitrary.data");
 
-        ArchitecturePolicySourceLocation firstLocation = first.Provenance.Nodes["contracts.strict[0]"];
-        ArchitecturePolicySourceLocation secondLocation = second.Provenance.Nodes["contracts.strict[0]"];
+        ArchitecturePolicySourceLocation firstLocation = first.Provenance.Nodes["/contracts/strict/0"];
+        ArchitecturePolicySourceLocation secondLocation = second.Provenance.Nodes["/contracts/strict/0"];
         Assert.Multiple(() =>
         {
             Assert.That(secondLocation.SourcePath, Is.Not.EqualTo(firstLocation.SourcePath));

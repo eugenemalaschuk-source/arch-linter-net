@@ -57,7 +57,7 @@ internal sealed class ArchitecturePolicyDocumentComposer
 
             if (key is "version" or "name")
             {
-                AddSingleton(effective, key, value, source, key);
+                AddSingleton(effective, key, value, source, key, ArchitecturePolicyProvenancePath.Property(key));
             }
             else if (_keyedSections.Contains(key))
             {
@@ -65,7 +65,7 @@ internal sealed class ArchitecturePolicyDocumentComposer
             }
             else if (key == "legacy_runtime_layers")
             {
-                AppendSequence(effective, key, value, source, key);
+                AppendSequence(effective, key, value, source, key, ArchitecturePolicyProvenancePath.Property(key));
             }
             else if (key == "analysis")
             {
@@ -94,8 +94,10 @@ internal sealed class ArchitecturePolicyDocumentComposer
         {
             string key = ScalarKey(keyNode, source, section, "definition key");
             string yamlPath = $"{section}.{key}";
+            string effectivePath = ArchitecturePolicyProvenancePath.AppendProperty(
+                ArchitecturePolicyProvenancePath.Property(section), key);
             Register($"map:{yamlPath}", source, yamlPath, value);
-            _provenance.AddTree(value, source, yamlPath, yamlPath);
+            _provenance.AddTree(value, source, yamlPath, effectivePath);
             target.Add(new YamlScalarNode(key), value);
         }
     }
@@ -107,18 +109,20 @@ internal sealed class ArchitecturePolicyDocumentComposer
         foreach ((YamlNode keyNode, YamlNode child) in sourceMap.Children)
         {
             string key = ScalarKey(keyNode, source, "analysis", "analysis field");
-            string path = $"analysis.{key}";
+            string yamlPath = $"analysis.{key}";
+            string effectivePath = ArchitecturePolicyProvenancePath.AppendProperty(
+                ArchitecturePolicyProvenancePath.Property("analysis"), key);
             if (key == "condition_sets")
             {
-                MergeNestedMap(target, key, child, source, path);
+                MergeNestedMap(target, key, child, source, yamlPath, effectivePath);
             }
             else if (child is YamlSequenceNode)
             {
-                AppendSequence(target, key, child, source, path);
+                AppendSequence(target, key, child, source, yamlPath, effectivePath);
             }
             else
             {
-                AddSingleton(target, key, child, source, path);
+                AddSingleton(target, key, child, source, yamlPath, effectivePath);
             }
         }
     }
@@ -130,15 +134,17 @@ internal sealed class ArchitecturePolicyDocumentComposer
         foreach ((YamlNode keyNode, YamlNode child) in sourceMap.Children)
         {
             string group = ScalarKey(keyNode, source, "contracts", "contract group");
-            string path = $"contracts.{group}";
-            YamlSequenceNode sourceSequence = RequireSequence(child, source, path);
-            YamlSequenceNode targetSequence = GetOrAddSequence(target, group, source, path);
+            string yamlPath = $"contracts.{group}";
+            string effectivePath = ArchitecturePolicyProvenancePath.AppendProperty(
+                ArchitecturePolicyProvenancePath.Property("contracts"), group);
+            YamlSequenceNode sourceSequence = RequireSequence(child, source, yamlPath);
+            YamlSequenceNode targetSequence = GetOrAddSequence(target, group, source, yamlPath);
             int firstIndex = targetSequence.Children.Count;
             _provenance.AddSequenceItems(
                 sourceSequence,
                 source,
-                path,
-                path,
+                yamlPath,
+                effectivePath,
                 firstIndex,
                 group);
             for (int sourceIndex = 0; sourceIndex < sourceSequence.Children.Count; sourceIndex++)
@@ -158,14 +164,16 @@ internal sealed class ArchitecturePolicyDocumentComposer
         foreach ((YamlNode keyNode, YamlNode child) in sourceMap.Children)
         {
             string key = ScalarKey(keyNode, source, "classification", "classification field");
-            string path = $"classification.{key}";
+            string yamlPath = $"classification.{key}";
+            string effectivePath = ArchitecturePolicyProvenancePath.AppendProperty(
+                ArchitecturePolicyProvenancePath.Property("classification"), key);
             if (key == "precedence")
             {
-                AddSingleton(target, key, child, source, path);
+                AddSingleton(target, key, child, source, yamlPath, effectivePath);
             }
             else
             {
-                AppendSequence(target, key, child, source, path);
+                AppendSequence(target, key, child, source, yamlPath, effectivePath);
             }
         }
     }
@@ -175,16 +183,18 @@ internal sealed class ArchitecturePolicyDocumentComposer
         string key,
         YamlNode value,
         ArchitecturePolicySource source,
-        string path)
+        string yamlPath,
+        string effectivePath)
     {
-        YamlMappingNode sourceMap = RequireMapping(value, source, path);
-        YamlMappingNode target = GetOrAddMapping(parent, key, source, path);
+        YamlMappingNode sourceMap = RequireMapping(value, source, yamlPath);
+        YamlMappingNode target = GetOrAddMapping(parent, key, source, yamlPath);
         foreach ((YamlNode childKeyNode, YamlNode childValue) in sourceMap.Children)
         {
-            string childKey = ScalarKey(childKeyNode, source, path, "definition key");
-            string childPath = $"{path}.{childKey}";
-            Register($"map:{childPath}", source, childPath, childValue);
-            _provenance.AddTree(childValue, source, childPath, childPath);
+            string childKey = ScalarKey(childKeyNode, source, yamlPath, "definition key");
+            string childYamlPath = $"{yamlPath}.{childKey}";
+            string childEffectivePath = ArchitecturePolicyProvenancePath.AppendProperty(effectivePath, childKey);
+            Register($"map:{childYamlPath}", source, childYamlPath, childValue);
+            _provenance.AddTree(childValue, source, childYamlPath, childEffectivePath);
             target.Add(new YamlScalarNode(childKey), childValue);
         }
     }
@@ -194,15 +204,16 @@ internal sealed class ArchitecturePolicyDocumentComposer
         string key,
         YamlNode value,
         ArchitecturePolicySource source,
-        string path)
+        string yamlPath,
+        string effectivePath)
     {
-        YamlSequenceNode sourceSequence = RequireSequence(value, source, path);
-        YamlSequenceNode target = GetOrAddSequence(parent, key, source, path);
+        YamlSequenceNode sourceSequence = RequireSequence(value, source, yamlPath);
+        YamlSequenceNode target = GetOrAddSequence(parent, key, source, yamlPath);
         _provenance.AddSequenceItems(
             sourceSequence,
             source,
-            path,
-            path,
+            yamlPath,
+            effectivePath,
             target.Children.Count);
         foreach (YamlNode child in sourceSequence.Children)
         {
@@ -215,10 +226,11 @@ internal sealed class ArchitecturePolicyDocumentComposer
         string key,
         YamlNode value,
         ArchitecturePolicySource source,
-        string path)
+        string yamlPath,
+        string effectivePath)
     {
-        Register($"singleton:{path}", source, path, value);
-        _provenance.AddTree(value, source, path, path);
+        Register($"singleton:{yamlPath}", source, yamlPath, value);
+        _provenance.AddTree(value, source, yamlPath, effectivePath);
         parent.Add(new YamlScalarNode(key), value);
     }
 

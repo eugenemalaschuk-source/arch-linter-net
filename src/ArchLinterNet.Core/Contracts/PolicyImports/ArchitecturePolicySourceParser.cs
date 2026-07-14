@@ -35,10 +35,21 @@ internal sealed partial class ArchitecturePolicySourceParser
         "analysis", "contracts", "classification"
     };
 
-    public bool ContainsImports(string yaml)
+    public bool ContainsImports(string yaml, ArchitecturePolicySourceDescriptor descriptor)
     {
-        YamlMappingNode? root = ParseMapping(yaml, "root policy", requireMapping: false);
-        return root is not null && TryGetChild(root, ImportsField, out _);
+        YamlMappingNode root;
+        try
+        {
+            root = ParseMapping(yaml, descriptor.SourcePath, requireMapping: true)!;
+        }
+        catch (ArchitecturePolicyImportException exception)
+        {
+            throw ArchitecturePolicyDiagnosticFactory.Enrich(
+                exception,
+                ArchitecturePolicyDiagnosticFactory.Location(descriptor));
+        }
+
+        return TryGetChild(root, ImportsField, out _);
     }
 
     public ArchitecturePolicySource Parse(
