@@ -1,6 +1,8 @@
 # Agent Guide
 
-Use this guide before editing `architecture/dependencies.arch.yml`.
+Use this guide before editing the repository's selected root policy or any
+fragment it imports. `architecture/arch.yml` is the recommended concise root
+convention, but the filename does not determine policy role.
 
 ArchLinterNet policies are repository contracts, not aspirational diagrams. A
 good AI-authored policy starts from code that exists and then chooses the
@@ -8,12 +10,12 @@ smallest enforceable rules.
 
 ## Investigation Flow
 
-1. Find the existing policy file, usually `architecture/dependencies.arch.yml`.
+1. Find the one selected root policy and follow its complete `imports` graph.
 1. List real projects and assemblies from the solution and project files.
 1. Inspect namespaces in source files and compiled target assemblies.
 1. Identify existing architectural seams: packages, modules, bounded contexts, UI, application, domain, infrastructure, testing, Unity runtime, and Unity editor code.
 1. Check current references before deciding whether a rule belongs in `strict` or `audit`.
-1. Read `schema/dependencies.arch.schema.json` before adding fields.
+1. Read `schema/dependencies.arch.schema.json` for the root and `schema/dependencies.arch.fragment.schema.json` for imported partial documents before adding fields.
 1. Read `archlinternet.capabilities.json` before proposing a contract family.
 1. If the project uses conditional compilation (`#if UNITY_EDITOR`, `#if DEBUG`), check whether method-body contracts need a condition set to avoid false positives or missed violations. Define `analysis.condition_sets` when the same source should be validated under different symbol configurations.
 

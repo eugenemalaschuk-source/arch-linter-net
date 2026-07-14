@@ -1,0 +1,16 @@
+version: 1
+name: Filename-independent policy
+imports:
+  - policy/domain.arch.yml
+layers:
+  application:
+    namespace: Example.Application
+analysis:
+  target_assemblies: [Example.Application]
+contracts:
+  strict:
+    - id: application-does-not-depend-on-domain
+      name: application-does-not-depend-on-domain
+      source: application
+      forbidden: [domain]
+

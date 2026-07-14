@@ -1,0 +1,27 @@
+# yaml-language-server: $schema=../../../../../../../schema/dependencies.arch.fragment.schema.json
+layers:
+  sales_domain:
+    namespace: MyCompany.Product.Modules.Sales.Domain
+  sales_contracts:
+    namespace: MyCompany.Product.Modules.Sales.Contracts
+
+contracts:
+  strict_allow_only:
+    - id: sales-contracts-use-shared-kernel
+      name: sales-contracts-use-shared-kernel
+      source: sales_contracts
+      allowed: [shared_kernel]
+      reason: Sales public contracts expose only stable shared-kernel types.
+
+  strict_context_dependencies:
+    - id: sales-domain-does-not-use-other-domains
+      name: sales-domain-does-not-use-other-domains
+      source:
+        role: DomainLayer
+        metadata:
+          module: Sales
+      forbidden:
+        - role: DomainLayer
+          metadata:
+            module: "!{source.metadata.module}"
+      reason: Semantic module metadata prevents direct cross-context domain dependencies.

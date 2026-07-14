@@ -1,0 +1,12 @@
+version: 1
+name: Root versus fragment conflict
+imports: [policy/domain.arch.yml]
+layers:
+  application:
+    namespace: Example.Application
+  domain:
+    namespace: Example.Root.Domain
+analysis:
+  target_assemblies: [Example.Application]
+contracts: {}
+

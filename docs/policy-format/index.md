@@ -1,12 +1,16 @@
 # Policy Format
 
-The architecture policy file usually lives at:
+ArchLinterNet executes one selected root policy. The recommended concise root
+convention is:
 
 ```text
-architecture/dependencies.arch.yml
+architecture/arch.yml
 ```
 
-The CLI path is configurable with `--policy <path>`.
+The CLI path is configurable with `--policy <path>`. The filename has no runtime
+semantics: existing `architecture/dependencies.arch.yml` files and arbitrary
+names remain valid. Large policies can use ordered local fragments; see
+[Policy imports](imports.md).
 
 ## Top-level structure
 
@@ -25,6 +29,7 @@ contracts: {}
 |---------|---------|
 | `version` | Policy schema version. Current value is `1`. |
 | `name` | Human-readable policy name. |
+| `imports` | Optional ordered local fragments composed into this root policy. |
 | `layers` | Named first-party or external namespace surfaces used by contracts. |
 | `external_dependencies` | Named vendor/framework dependency groups. |
 | `legacy_runtime_layers` | Optional compatibility namespace groups for runtime-only assemblies. |
@@ -61,6 +66,22 @@ contracts:
 ```
 
 See [First policy](../getting-started/first-policy.md) for a walkthrough.
+
+## Policy imports
+
+Use `imports` to split one selected root into focused local fragments while
+keeping inline root sections:
+
+```yaml
+imports:
+  - policy/layers.arch.yml
+  - policy/sales-domain.arch.yml
+```
+
+`arch.yml` and `*.arch.yml` are recommended naming conventions only. Runtime
+roles come from the selected root path and import graph. Read
+[Policy imports](imports.md) for fragment shape, deterministic ordering,
+composition conflicts, path boundaries, schemas, migration, and examples.
 
 ## Layers
 

@@ -7,20 +7,23 @@ This guide shows the shortest path from a .NET repository to an executable archi
 During ArchLinterNet development, run the CLI from source:
 
 ```bash
-dotnet run --project src/ArchLinterNet.Cli -- --policy architecture/dependencies.arch.yml --mode strict
+dotnet run --project src/ArchLinterNet.Cli -- --policy architecture/arch.yml --mode strict
 ```
 
 After the .NET tool is installed from NuGet.org, run:
 
 ```bash
-arch-linter-net --policy architecture/dependencies.arch.yml --mode strict
+arch-linter-net --policy architecture/arch.yml --mode strict
 ```
 
 See [Installation](../installation/index.md) for global tool, local tool, and package usage.
 
 ## 2. Create a policy
 
-Create `architecture/dependencies.arch.yml` at the repository root. Start with a small rule that maps to real namespaces and passes or fails for a known reason.
+Create one root policy. This guide uses the recommended concise path
+`architecture/arch.yml`, but the selected filename is configurable and has no
+runtime semantics. Start with a small rule that maps to real namespaces and
+passes or fails for a known reason.
 
 ```yaml
 version: 1

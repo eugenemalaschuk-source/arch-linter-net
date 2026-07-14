@@ -1,0 +1,14 @@
+# yaml-language-server: $schema=../../../../../../../schema/dependencies.arch.fragment.schema.json
+layers:
+  inventory_domain:
+    namespace: MyCompany.Product.Modules.Inventory.Domain
+  inventory_contracts:
+    namespace: MyCompany.Product.Modules.Inventory.Contracts
+
+contracts:
+  strict_allow_only:
+    - id: inventory-contracts-use-shared-kernel
+      name: inventory-contracts-use-shared-kernel
+      source: inventory_contracts
+      allowed: [shared_kernel]
+      reason: Inventory public contracts expose only stable shared-kernel types.

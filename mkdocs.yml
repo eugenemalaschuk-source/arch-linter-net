@@ -29,6 +29,7 @@ nav:
       - Timings: usage/timings.md
   - Policy Authoring:
       - Policy format: policy-format/index.md
+      - Policy imports: policy-format/imports.md
       - Layers and namespace patterns: policy-format/layers-and-namespaces.md
       - External dependencies: policy-format/external-dependencies.md
       - Package dependencies: policy-format/package-dependencies.md

@@ -1,0 +1,12 @@
+# yaml-language-server: $schema=../../../../../../../schema/dependencies.arch.fragment.schema.json
+layers:
+  combat_feature:
+    namespace: MyCompany.Game.Features.Combat
+
+contracts:
+  strict:
+    - id: combat-does-not-depend-on-editor
+      name: combat-does-not-depend-on-editor
+      source: combat_feature
+      forbidden: [gameplay_editor]
+      reason: Runtime features cannot depend on editor-only namespaces.

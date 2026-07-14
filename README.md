@@ -26,7 +26,7 @@ Architecture rules often start as diagrams, ADRs, review comments, handwritten t
 ArchLinterNet uses a repository-owned YAML policy file as the source of truth:
 
 ```text
-architecture/dependencies.arch.yml
+architecture/arch.yml (recommended; any selected filename works)
         ↓
 ArchLinterNet CLI / test adapter
         ↓
@@ -39,7 +39,9 @@ Use it when you want architecture rules to be declarative, reviewable, CI-friend
 
 ## Quick start
 
-Create `architecture/dependencies.arch.yml`:
+Create a root policy. This quick start uses the recommended concise path
+`architecture/arch.yml`; the filename is configurable and has no runtime
+semantics:
 
 ```yaml
 version: 1
@@ -77,20 +79,20 @@ contracts:
 Run from this repository during development:
 
 ```bash
-dotnet run --project src/ArchLinterNet.Cli -- --policy architecture/dependencies.arch.yml --mode strict
+dotnet run --project src/ArchLinterNet.Cli -- --policy architecture/arch.yml --mode strict
 ```
 
 After installing the .NET tool from NuGet.org:
 
 ```bash
-arch-linter-net --policy architecture/dependencies.arch.yml --mode strict
+arch-linter-net --policy architecture/arch.yml --mode strict
 ```
 
 ## Main capabilities
 
 ArchLinterNet focuses on static architecture guardrails:
 
-- YAML policy loading and schema-backed contract authoring.
+- YAML policy loading, deterministic local fragments, and schema-backed root/fragment authoring.
 - Namespace/layer dependency contracts and allow-only contracts.
 - Ordered layer contracts and reusable layer templates.
 - Dependency cycle, acyclic sibling, independence, and assembly independence checks.
@@ -115,6 +117,7 @@ Public product documentation is published through MkDocs and GitHub Pages:
 - [Installation](https://eugenemalaschuk-source.github.io/arch-linter-net/installation/)
 - [CLI usage](https://eugenemalaschuk-source.github.io/arch-linter-net/cli/)
 - [Policy format](https://eugenemalaschuk-source.github.io/arch-linter-net/policy-format/)
+- [Policy imports](https://eugenemalaschuk-source.github.io/arch-linter-net/policy-format/imports/)
 - [Contract families](https://eugenemalaschuk-source.github.io/arch-linter-net/contracts/)
 - [Coverage contracts](https://eugenemalaschuk-source.github.io/arch-linter-net/contracts/coverage/)
 - [CI integration](https://eugenemalaschuk-source.github.io/arch-linter-net/guides/ci-integration/)

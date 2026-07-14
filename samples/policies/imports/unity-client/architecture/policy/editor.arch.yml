@@ -1,0 +1,28 @@
+# yaml-language-server: $schema=../../../../../../schema/dependencies.arch.fragment.schema.json
+layers:
+  gameplay_editor:
+    namespace: MyCompany.Game.Gameplay.Editor
+
+external_dependencies:
+  unity_editor_api:
+    namespace_prefixes: [UnityEditor]
+    type_prefixes: []
+
+contracts:
+  strict_external:
+    - id: runtime-does-not-use-unity-editor-api
+      name: runtime-does-not-use-unity-editor-api
+      source: gameplay_runtime
+      forbidden: [unity_editor_api]
+      reason: Player runtime code cannot reference UnityEditor APIs.
+
+  strict_asmdef:
+    - id: runtime-asmdefs-do-not-reference-editor
+      name: runtime-asmdefs-do-not-reference-editor
+      source_assemblies:
+        - MyCompany.Game.Core
+        - MyCompany.Game.Gameplay.Runtime
+        - MyCompany.Game.Features.Combat
+      forbidden_editor_refs: true
+      forbidden_asmdef_prefixes: [MyCompany.Game.Editor]
+      reason: Runtime assembly definitions cannot reference editor assemblies.

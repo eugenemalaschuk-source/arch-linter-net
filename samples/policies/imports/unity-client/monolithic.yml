@@ -1,0 +1,78 @@
+version: 1
+name: Unity Client Imported Policy
+
+layers:
+  bootstrap:
+    namespace: MyCompany.Game.Bootstrap
+  game_core:
+    namespace: MyCompany.Game.Core
+  gameplay_runtime:
+    namespace: MyCompany.Game.Gameplay.Runtime
+  unity_adapters:
+    namespace: MyCompany.Game.UnityAdapters
+  gameplay_editor:
+    namespace: MyCompany.Game.Gameplay.Editor
+  combat_feature:
+    namespace: MyCompany.Game.Features.Combat
+
+external_dependencies:
+  unity_runtime:
+    namespace_prefixes: [UnityEngine]
+    type_prefixes: []
+  unity_editor_api:
+    namespace_prefixes: [UnityEditor]
+    type_prefixes: []
+
+analysis:
+  target_assemblies:
+    - MyCompany.Game.Core
+    - MyCompany.Game.Gameplay.Runtime
+    - MyCompany.Game.Gameplay.Editor
+    - MyCompany.Game.Features.Combat
+    - MyCompany.Game.UnityAdapters
+  source_roots: [Assets]
+
+contracts:
+  strict_composition:
+    - id: container-confined-to-bootstrap
+      name: container-confined-to-bootstrap
+      allowed_only_in_layers: [bootstrap]
+      forbidden_apis: [Resolve, Register]
+      reason: Container access belongs only in scene and lifetime-scope bootstrap code.
+
+  strict_cycles:
+    - id: unity-runtime-cycles
+      name: unity-runtime-cycles
+      layers: [game_core, gameplay_runtime, unity_adapters, combat_feature]
+      reason: Runtime Unity layers and features must remain acyclic.
+
+  strict:
+    - id: core-does-not-depend-on-unity-adapters
+      name: core-does-not-depend-on-unity-adapters
+      source: game_core
+      forbidden: [unity_adapters, gameplay_editor]
+      reason: Pure game core remains independent of Unity-specific adapters and editor code.
+    - id: combat-does-not-depend-on-editor
+      name: combat-does-not-depend-on-editor
+      source: combat_feature
+      forbidden: [gameplay_editor]
+      reason: Runtime features cannot depend on editor-only namespaces.
+
+  strict_external:
+    - id: runtime-does-not-use-unity-editor-api
+      name: runtime-does-not-use-unity-editor-api
+      source: gameplay_runtime
+      forbidden: [unity_editor_api]
+      reason: Player runtime code cannot reference UnityEditor APIs.
+
+  strict_asmdef:
+    - id: runtime-asmdefs-do-not-reference-editor
+      name: runtime-asmdefs-do-not-reference-editor
+      source_assemblies:
+        - MyCompany.Game.Core
+        - MyCompany.Game.Gameplay.Runtime
+        - MyCompany.Game.Features.Combat
+      forbidden_editor_refs: true
+      forbidden_asmdef_prefixes: [MyCompany.Game.Editor]
+      reason: Runtime assembly definitions cannot reference editor assemblies.
+
