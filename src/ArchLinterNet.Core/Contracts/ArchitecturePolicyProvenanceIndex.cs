@@ -122,8 +122,8 @@ public sealed class ArchitecturePolicyProvenanceIndex
             return exception;
         }
 
-        IReadOnlyList<ArchitecturePolicySourceLocation> locations = LocationsFor(owners);
-        if (locations.Count == 0)
+        ArchitecturePolicySourceLocation[] locations = LocationsFor(owners);
+        if (locations.Length == 0)
         {
             return exception;
         }
@@ -144,8 +144,8 @@ public sealed class ArchitecturePolicyProvenanceIndex
         IEnumerable<object>? relatedOwners = null)
     {
         ArchitecturePolicySourceLocation? location = owner is null ? null : LocationFor(owner);
-        IReadOnlyList<ArchitecturePolicySourceLocation> related = LocationsFor(relatedOwners);
-        return location is null && related.Count == 0
+        ArchitecturePolicySourceLocation[] related = LocationsFor(relatedOwners);
+        return location is null && related.Length == 0
             ? violation
             : violation with { PolicyLocation = location, RelatedPolicyLocations = related };
     }

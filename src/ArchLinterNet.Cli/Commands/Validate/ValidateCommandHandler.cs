@@ -11,6 +11,30 @@ internal sealed class ValidateCommandHandler(ICliRuntime runtime, ICliConsole co
 {
     public int Execute(ValidateCommandOptions options)
     {
+        int? immediateResult = TryWriteImmediateResponse(options);
+        if (immediateResult is not null)
+        {
+            return immediateResult.Value;
+        }
+
+        try
+        {
+            return ExecuteValidation(options);
+        }
+        catch (Exception ex) when (TryGetPolicyDiagnostic(ex, out ArchitecturePolicyDiagnostic? diagnostic))
+        {
+            WritePolicyDiagnostic(options.Format, ex.Message, diagnostic!);
+            return CliExitCodes.InvalidArgumentsOrRuntimeError;
+        }
+        catch (Exception ex)
+        {
+            console.Error.WriteLine($"Architecture validation error: {ex.Message}");
+            return CliExitCodes.InvalidArgumentsOrRuntimeError;
+        }
+    }
+
+    private int? TryWriteImmediateResponse(ValidateCommandOptions options)
+    {
         if (options.ShowHelp)
         {
             console.Out.WriteLine(ValidateCommandDefinition.HelpText);
@@ -41,61 +65,48 @@ internal sealed class ValidateCommandHandler(ICliRuntime runtime, ICliConsole co
             return CliExitCodes.InvalidArgumentsOrRuntimeError;
         }
 
-        try
-        {
-            ValidationTiming? timing = options.TimingsEnabled ? new ValidationTiming() : null;
-            ValidationRequest request = new()
-            {
-                PolicyPath = options.PolicyPath,
-                Mode = options.Mode,
-                ConditionSetName = options.ConditionSetName,
-                ContractIds = options.ContractIds.ToList(),
-                BaselinePath = options.BaselinePath,
-                EnforceUnmatchedIgnoredViolationsPolicy = true,
-            };
+        return null;
+    }
 
-            ValidationOutcome outcome = runtime.Validate(request, timing);
-
-            if (options.Format == "json")
-            {
-                console.Out.WriteLine(runtime.FormatResultForCiArtifacts(
-                    options.Mode,
-                    outcome.Passed,
-                    outcome.Violations,
-                    outcome.Cycles,
-                    outcome.CoverageFindings,
-                    outcome.UnmatchedIgnoredViolations,
-                    outcome.PolicyConsistencyConfig == "off"
-                        ? Array.Empty<PolicyConsistencyDiagnostic>()
-                        : outcome.PolicyConsistencyFindings,
-                    outcome.CoverageSummaries,
-                    outcome.ClassificationConflicts,
-                    outcome.ClassificationMetadataFailures,
-                    outcome.ClassificationRoles,
-                    outcome.ClassificationPathDeferred));
-            }
-            else if (options.Format == "sarif")
-            {
-                console.Out.WriteLine(runtime.FormatResultAsSarif(options.Mode, outcome.Violations, outcome.Cycles));
-            }
-            else
-            {
-                WriteHumanOutput(outcome);
-            }
-
-            timing?.WriteReport(console.Error);
-            return outcome.Passed ? CliExitCodes.Success : CliExitCodes.ValidationFailure;
-        }
-        catch (Exception ex) when (TryGetPolicyDiagnostic(ex, out ArchitecturePolicyDiagnostic? diagnostic))
+    private int ExecuteValidation(ValidateCommandOptions options)
+    {
+        ValidationTiming? timing = options.TimingsEnabled ? new ValidationTiming() : null;
+        ValidationRequest request = new()
         {
-            WritePolicyDiagnostic(options.Format, ex.Message, diagnostic!);
-            return CliExitCodes.InvalidArgumentsOrRuntimeError;
-        }
-        catch (Exception ex)
+            PolicyPath = options.PolicyPath,
+            Mode = options.Mode,
+            ConditionSetName = options.ConditionSetName,
+            ContractIds = options.ContractIds.ToList(),
+            BaselinePath = options.BaselinePath,
+            EnforceUnmatchedIgnoredViolationsPolicy = true,
+        };
+
+        ValidationOutcome outcome = runtime.Validate(request, timing);
+        WriteOutcome(options, outcome);
+        timing?.WriteReport(console.Error);
+        return outcome.Passed ? CliExitCodes.Success : CliExitCodes.ValidationFailure;
+    }
+
+    private void WriteOutcome(ValidateCommandOptions options, ValidationOutcome outcome)
+    {
+        if (options.Format == "json")
         {
-            console.Error.WriteLine($"Architecture validation error: {ex.Message}");
-            return CliExitCodes.InvalidArgumentsOrRuntimeError;
+            console.Out.WriteLine(runtime.FormatResultForCiArtifacts(
+                options.Mode, outcome.Passed, outcome.Violations, outcome.Cycles, outcome.CoverageFindings,
+                outcome.UnmatchedIgnoredViolations,
+                outcome.PolicyConsistencyConfig == "off" ? Array.Empty<PolicyConsistencyDiagnostic>() : outcome.PolicyConsistencyFindings,
+                outcome.CoverageSummaries, outcome.ClassificationConflicts, outcome.ClassificationMetadataFailures,
+                outcome.ClassificationRoles, outcome.ClassificationPathDeferred));
+            return;
         }
+
+        if (options.Format == "sarif")
+        {
+            console.Out.WriteLine(runtime.FormatResultAsSarif(options.Mode, outcome.Violations, outcome.Cycles));
+            return;
+        }
+
+        WriteHumanOutput(outcome);
     }
 
     private static bool TryGetPolicyDiagnostic(Exception exception, out ArchitecturePolicyDiagnostic? diagnostic)
