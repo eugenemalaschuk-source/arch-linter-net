@@ -39,12 +39,12 @@ jobs:
           mapfile -t packages < <(find nupkg -maxdepth 1 -type f -name '*.nupkg' -printf '%f\n' | sort)
           printf 'Produced packages:\n%s\n' "${packages[*]}"
 
-          if [ "${#packages[@]}" -ne 3 ]; then
-            echo "Expected exactly 3 NuGet packages, found ${#packages[@]}." >&2
+          if [ "${#packages[@]}" -ne 4 ]; then
+            echo "Expected exactly 4 NuGet packages, found ${#packages[@]}." >&2
             exit 1
           fi
 
-          for package_id in ArchLinterNet.Core ArchLinterNet.Cli ArchLinterNet.Testing; do
+          for package_id in ArchLinterNet.CEL ArchLinterNet.Core ArchLinterNet.Cli ArchLinterNet.Testing; do
             matches=0
             for package in "${packages[@]}"; do
               if [[ "$package" == "$package_id".*.nupkg ]]; then
