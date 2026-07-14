@@ -46,7 +46,8 @@ public sealed partial class ArchitectureAnalysisSession
         TypeIndex = new ArchitectureTypeIndex(context.TargetAssemblies);
         RoleIndex = new ArchitectureRoleIndex(document.Classification, TypeIndex);
         SourceFileFactIndex = new ArchitectureSourceFileFactIndex(
-            context.TargetAssemblies, context.RepositoryRoot, document.Analysis.SourceRoots);
+            context.TargetAssemblies, context.RepositoryRoot, document.Analysis.SourceRoots,
+            preprocessorSymbols);
         RegisterAllContextualConsumersFromDocument();
     }
 

@@ -17,9 +17,15 @@ internal static class ArchitectureDeclaredTypeParser
         string Namespace,
         ArchitectureTypeKind TypeKind);
 
-    public static IReadOnlyList<ParsedTypeInfo> ParseSourceText(string sourceText)
+    public static IReadOnlyList<ParsedTypeInfo> ParseSourceText(
+        string sourceText,
+        IReadOnlyList<string>? preprocessorSymbols = null)
     {
-        SyntaxTree tree = CSharpSyntaxTree.ParseText(sourceText);
+        CSharpParseOptions options = preprocessorSymbols?.Count > 0
+            ? CSharpParseOptions.Default.WithPreprocessorSymbols(preprocessorSymbols)
+            : CSharpParseOptions.Default;
+
+        SyntaxTree tree = CSharpSyntaxTree.ParseText(sourceText, options);
         CompilationUnitSyntax root = tree.GetCompilationUnitRoot();
         List<ParsedTypeInfo> results = new();
         CollectMembers(root.Members, ns: string.Empty, outerClrPrefix: null, results);
@@ -37,17 +43,18 @@ internal static class ArchitectureDeclaredTypeParser
             switch (member)
             {
                 case NamespaceDeclarationSyntax nsDecl:
-                    string childNs = BuildNamespace(ns, nsDecl.Name.ToString());
+                    string childNs = BuildNamespace(ns, DecodeNameSyntax(nsDecl.Name));
                     CollectMembers(nsDecl.Members, childNs, outerClrPrefix: null, results);
                     break;
 
                 case FileScopedNamespaceDeclarationSyntax fsNs:
-                    string fileScopedNs = BuildNamespace(ns, fsNs.Name.ToString());
+                    string fileScopedNs = BuildNamespace(ns, DecodeNameSyntax(fsNs.Name));
                     CollectMembers(fsNs.Members, fileScopedNs, outerClrPrefix: null, results);
                     break;
 
                 case TypeDeclarationSyntax typeDecl:
-                    string typeName = typeDecl.Identifier.Text;
+                    // ValueText decodes escaped identifiers (@class → class) to match CLR names.
+                    string typeName = typeDecl.Identifier.ValueText;
                     int arity = typeDecl.TypeParameterList?.Parameters.Count ?? 0;
                     string clrSimple = arity > 0 ? $"{typeName}`{arity}" : typeName;
                     string clrFull = BuildClrFull(ns, outerClrPrefix, clrSimple);
@@ -60,13 +67,13 @@ internal static class ArchitectureDeclaredTypeParser
                     break;
 
                 case EnumDeclarationSyntax enumDecl:
-                    string enumName = enumDecl.Identifier.Text;
+                    string enumName = enumDecl.Identifier.ValueText;
                     string enumFull = BuildClrFull(ns, outerClrPrefix, enumName);
                     results.Add(new ParsedTypeInfo(enumFull, enumName, ns, ArchitectureTypeKind.Enum));
                     break;
 
                 case DelegateDeclarationSyntax delegateDecl:
-                    string delName = delegateDecl.Identifier.Text;
+                    string delName = delegateDecl.Identifier.ValueText;
                     int delArity = delegateDecl.TypeParameterList?.Parameters.Count ?? 0;
                     string delClrSimple = delArity > 0 ? $"{delName}`{delArity}" : delName;
                     string delFull = BuildClrFull(ns, outerClrPrefix, delClrSimple);
@@ -75,6 +82,17 @@ internal static class ArchitectureDeclaredTypeParser
             }
         }
     }
+
+    // Decodes a NameSyntax to its CLR-compatible string, using ValueText on each component
+    // identifier so that escaped keywords (@class, @namespace) produce their unescaped forms.
+    private static string DecodeNameSyntax(NameSyntax name) =>
+        name switch
+        {
+            QualifiedNameSyntax qualified =>
+                $"{DecodeNameSyntax(qualified.Left)}.{qualified.Right.Identifier.ValueText}",
+            SimpleNameSyntax simple => simple.Identifier.ValueText,
+            _ => name.ToString()
+        };
 
     private static string BuildNamespace(string existing, string declared) =>
         string.IsNullOrEmpty(existing) ? declared : $"{existing}.{declared}";

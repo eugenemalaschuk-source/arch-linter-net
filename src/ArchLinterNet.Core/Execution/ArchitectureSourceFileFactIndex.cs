@@ -13,16 +13,25 @@ namespace ArchLinterNet.Core.Execution;
 //
 // Key design decisions (see design.md for full rationale):
 // - Reflection-first: every loadable type gets a fact; source enriches path/kind when available.
+// - Assembly-aware identity: one fact per (assemblyName, fullTypeName) pair; the same CLR full
+//   name appearing in multiple assemblies produces separate facts — all in AllFacts, and the
+//   first alphabetically by assembly name wins the TryGetFact(string) lookup.
+// - Source correlation is best-effort when multiple assemblies share a CLR name, since source
+//   roots are global (not per-project); the limitation is documented in design.md.
 // - CLR-format full names (dots, +, `N) used as index keys throughout.
 // - Empty sourceRoots → reflection-only facts (null SourceFilePath) with no filesystem access.
+// - Ambiguity: same CLR name declared in more than one distinct file (partial class across files).
+//   A single file referenced twice (e.g. via overlapping source roots) is NOT an ambiguity.
 // - Partial classes across files → ArchitectureDeclaredTypeSourceAmbiguity + null SourceFilePath.
 // - Record detection requires Roslyn source analysis; reflection falls back to Class/Struct.
 // - Paths normalized to forward slashes, relative to repositoryRoot.
+// - All public collections are returned in deterministic (ordinal-sorted) order.
 public sealed class ArchitectureSourceFileFactIndex
 {
     private readonly IReadOnlyCollection<Assembly> _targetAssemblies;
     private readonly string _repositoryRoot;
     private readonly IReadOnlyList<string> _sourceRoots;
+    private readonly IReadOnlyList<string>? _preprocessorSymbols;
     private readonly IArchitectureFileSystem _fileSystem;
     private readonly Lazy<FactIndexData> _data;
 
@@ -30,11 +39,13 @@ public sealed class ArchitectureSourceFileFactIndex
         IReadOnlyCollection<Assembly> targetAssemblies,
         string repositoryRoot,
         IReadOnlyList<string> sourceRoots,
+        IReadOnlyList<string>? preprocessorSymbols = null,
         IArchitectureFileSystem? fileSystem = null)
     {
         _targetAssemblies = targetAssemblies ?? throw new ArgumentNullException(nameof(targetAssemblies));
         _repositoryRoot = repositoryRoot ?? throw new ArgumentNullException(nameof(repositoryRoot));
         _sourceRoots = sourceRoots ?? throw new ArgumentNullException(nameof(sourceRoots));
+        _preprocessorSymbols = preprocessorSymbols;
         _fileSystem = fileSystem ?? ArchitectureFileSystem.Real;
         _data = new Lazy<FactIndexData>(BuildData);
     }
@@ -68,11 +79,20 @@ public sealed class ArchitectureSourceFileFactIndex
 
     private FactIndexData BuildData()
     {
-        // Step 1 — reflection pass: build a base fact for every loadable type.
-        Dictionary<string, BaseFact> reflectionFacts =
+        // Sort assemblies alphabetically so output order is deterministic regardless of
+        // the order in which assemblies were passed to the constructor.
+        List<Assembly> sortedAssemblies = _targetAssemblies
+            .Distinct()
+            .OrderBy(a => a.GetName().Name ?? string.Empty, StringComparer.Ordinal)
+            .ToList();
+
+        // Step 1 — reflection pass: accumulate one BaseFact per (assemblyName, fullTypeName).
+        // Using List<BaseFact> per CLR fullName so cross-assembly name collisions keep ALL facts
+        // rather than the last writer winning. AllFacts will contain one entry per pair.
+        Dictionary<string, List<BaseFact>> reflectionFactsByName =
             new(StringComparer.Ordinal);
 
-        foreach (Assembly assembly in _targetAssemblies.Distinct())
+        foreach (Assembly assembly in sortedAssemblies)
         {
             string assemblyName = assembly.GetName().Name ?? string.Empty;
             foreach (Type type in ArchitectureTypeScanner.GetLoadableTypes(assembly))
@@ -81,14 +101,19 @@ public sealed class ArchitectureSourceFileFactIndex
                 if (string.IsNullOrEmpty(fullName)) continue;
 
                 string ns = SafeNamespace(type);
-                reflectionFacts[fullName] = new BaseFact(
-                    assemblyName, ns, fullName,
-                    GetSimpleTypeName(type),
-                    GetTypeKindFromReflection(type));
+                if (!reflectionFactsByName.TryGetValue(fullName, out List<BaseFact>? list))
+                {
+                    list = new List<BaseFact>();
+                    reflectionFactsByName[fullName] = list;
+                }
+
+                list.Add(new BaseFact(assemblyName, ns, fullName,
+                    GetSimpleTypeName(type), GetTypeKindFromReflection(type)));
             }
         }
 
         // Step 2 — source scan: parse each .cs file and collect FullName → file+kind entries.
+        // Preprocessor symbols are forwarded so conditional declarations match the compiled assembly.
         Dictionary<string, List<(string FilePath, ArchitectureTypeKind Kind)>> sourceMap =
             new(StringComparer.Ordinal);
 
@@ -116,7 +141,7 @@ public sealed class ArchitectureSourceFileFactIndex
                     string normalizedFilePath = NormalizePath(_repositoryRoot, absoluteFile);
 
                     foreach (ArchitectureDeclaredTypeParser.ParsedTypeInfo parsed in
-                        ArchitectureDeclaredTypeParser.ParseSourceText(sourceText))
+                        ArchitectureDeclaredTypeParser.ParseSourceText(sourceText, _preprocessorSymbols))
                     {
                         if (!sourceMap.TryGetValue(parsed.FullTypeName, out List<(string, ArchitectureTypeKind)>? entries))
                         {
@@ -131,62 +156,117 @@ public sealed class ArchitectureSourceFileFactIndex
         }
 
         // Step 3 — merge: produce the final fact for every reflection-discovered type.
-        Dictionary<string, ArchitectureDeclaredTypeFact> factsByName =
-            new(StringComparer.Ordinal);
+        //
+        // Source information (file path, TypeKind) is resolved per CLR fullTypeName, not per
+        // (assemblyName, fullTypeName). When multiple assemblies declare the same CLR name, they
+        // all share the same source association — this is a known limitation when source roots are
+        // global rather than per-project.
+        //
+        // Ambiguity is determined by the count of DISTINCT normalized file paths, not raw entries.
+        // This correctly handles: (a) overlapping source roots that yield the same file twice, and
+        // (b) multiple syntactic declarations of the same type within one file (valid for partial
+        // classes/structs within a single file, which should not create an ambiguity).
+        List<ArchitectureDeclaredTypeFact> allFacts = new();
         List<ArchitectureDeclaredTypeSourceAmbiguity> ambiguities = new();
 
-        foreach (KeyValuePair<string, BaseFact> entry in reflectionFacts)
+        // Pre-resolve source info per fullTypeName so it is shared across all assemblies.
+        Dictionary<string, SourceInfo> resolvedSourceInfo = new(StringComparer.Ordinal);
+        foreach (KeyValuePair<string, List<(string FilePath, ArchitectureTypeKind Kind)>> entry in sourceMap)
         {
             string fullName = entry.Key;
-            BaseFact baseFact = entry.Value;
+            List<(string FilePath, ArchitectureTypeKind Kind)> sourceEntries = entry.Value;
 
-            if (sourceMap.TryGetValue(fullName, out List<(string FilePath, ArchitectureTypeKind Kind)>? sourceEntries))
+            // Deduplicate by normalized path — one file appearing multiple times (overlapping roots
+            // or multiple declarations in same file) is not an ambiguity.
+            List<string> uniquePaths = sourceEntries
+                .Select(e => e.FilePath)
+                .Distinct(StringComparer.Ordinal)
+                .OrderBy(p => p, StringComparer.Ordinal)
+                .ToList();
+
+            if (uniquePaths.Count == 1)
             {
-                if (sourceEntries.Count == 1)
-                {
-                    string relPath = sourceEntries[0].FilePath;
-                    ArchitectureTypeKind kindFromSource = sourceEntries[0].Kind;
+                string relPath = uniquePaths[0];
+                ArchitectureTypeKind kindFromSource = sourceEntries.First(e => e.FilePath == relPath).Kind;
+                resolvedSourceInfo[fullName] = new SourceInfo(relPath, kindFromSource, IsAmbiguous: false);
+            }
+            else if (uniquePaths.Count > 1)
+            {
+                ambiguities.Add(new ArchitectureDeclaredTypeSourceAmbiguity(fullName, uniquePaths));
+                resolvedSourceInfo[fullName] = new SourceInfo(null, ArchitectureTypeKind.Unknown, IsAmbiguous: true);
+            }
+        }
 
-                    factsByName[fullName] = new ArchitectureDeclaredTypeFact(
-                        baseFact.AssemblyName, baseFact.Namespace, fullName, baseFact.SimpleTypeName,
-                        kindFromSource,
-                        relPath,
-                        GetFileNameWithoutExtension(relPath),
-                        GetFolderSegments(relPath),
-                        GetNamespaceSegments(baseFact.Namespace));
-                }
-                else
-                {
-                    // Partial class across multiple files — ambiguous; null source path.
-                    ambiguities.Add(new ArchitectureDeclaredTypeSourceAmbiguity(
-                        fullName,
-                        sourceEntries.Select(e => e.FilePath).ToList()));
+        // Produce one fact per (assemblyName, fullTypeName) pair.
+        foreach (KeyValuePair<string, List<BaseFact>> entry in reflectionFactsByName
+            .OrderBy(e => e.Key, StringComparer.Ordinal))
+        {
+            string fullName = entry.Key;
+            List<BaseFact> baseFacts = entry.Value; // already sorted by assembly name (assemblies sorted above)
 
-                    factsByName[fullName] = new ArchitectureDeclaredTypeFact(
+            resolvedSourceInfo.TryGetValue(fullName, out SourceInfo? si);
+
+            foreach (BaseFact baseFact in baseFacts)
+            {
+                ArchitectureDeclaredTypeFact fact;
+
+                if (si is { IsAmbiguous: true })
+                {
+                    fact = new ArchitectureDeclaredTypeFact(
                         baseFact.AssemblyName, baseFact.Namespace, fullName, baseFact.SimpleTypeName,
                         baseFact.TypeKind,
                         null, null, Array.Empty<string>(),
                         GetNamespaceSegments(baseFact.Namespace));
                 }
-            }
-            else
-            {
-                // No matching source file — reflection-only fact.
-                factsByName[fullName] = new ArchitectureDeclaredTypeFact(
-                    baseFact.AssemblyName, baseFact.Namespace, fullName, baseFact.SimpleTypeName,
-                    baseFact.TypeKind,
-                    null, null, Array.Empty<string>(),
-                    GetNamespaceSegments(baseFact.Namespace));
+                else if (si?.FilePath != null)
+                {
+                    fact = new ArchitectureDeclaredTypeFact(
+                        baseFact.AssemblyName, baseFact.Namespace, fullName, baseFact.SimpleTypeName,
+                        si.KindFromSource,
+                        si.FilePath,
+                        GetFileNameWithoutExtension(si.FilePath),
+                        GetFolderSegments(si.FilePath),
+                        GetNamespaceSegments(baseFact.Namespace));
+                }
+                else
+                {
+                    fact = new ArchitectureDeclaredTypeFact(
+                        baseFact.AssemblyName, baseFact.Namespace, fullName, baseFact.SimpleTypeName,
+                        baseFact.TypeKind,
+                        null, null, Array.Empty<string>(),
+                        GetNamespaceSegments(baseFact.Namespace));
+                }
+
+                allFacts.Add(fact);
             }
         }
 
-        // Build secondary indexes (file and namespace lookups).
+        // Sort deterministically. Primary key: FullTypeName (ordinal); secondary: AssemblyName (ordinal).
+        allFacts.Sort((a, b) =>
+        {
+            int c = StringComparer.Ordinal.Compare(a.FullTypeName, b.FullTypeName);
+            return c != 0 ? c : StringComparer.Ordinal.Compare(a.AssemblyName, b.AssemblyName);
+        });
+
+        // Ambiguities are already deduplicated per fullTypeName; sort for determinism.
+        ambiguities.Sort((a, b) => StringComparer.Ordinal.Compare(a.FullTypeName, b.FullTypeName));
+
+        // TryGetFact(string) primary lookup: when the same fullTypeName appears in multiple
+        // assemblies, the first alphabetically (guaranteed by allFacts sort) wins.
+        Dictionary<string, ArchitectureDeclaredTypeFact> factsByName =
+            new(StringComparer.Ordinal);
+        foreach (ArchitectureDeclaredTypeFact fact in allFacts)
+        {
+            factsByName.TryAdd(fact.FullTypeName, fact);
+        }
+
+        // Build secondary indexes (file and namespace lookups), sorting each list for determinism.
         Dictionary<string, List<ArchitectureDeclaredTypeFact>> byFile =
             new(StringComparer.Ordinal);
         Dictionary<string, List<ArchitectureDeclaredTypeFact>> byNamespace =
             new(StringComparer.Ordinal);
 
-        foreach (ArchitectureDeclaredTypeFact fact in factsByName.Values)
+        foreach (ArchitectureDeclaredTypeFact fact in allFacts)
         {
             if (fact.SourceFilePath != null)
             {
@@ -210,7 +290,7 @@ public sealed class ArchitectureSourceFileFactIndex
 
         return new FactIndexData(
             factsByName,
-            factsByName.Values.ToList(),
+            allFacts,
             ambiguities,
             byFile.ToDictionary(
                 kvp => kvp.Key,
@@ -307,6 +387,11 @@ public sealed class ArchitectureSourceFileFactIndex
         string FullTypeName,
         string SimpleTypeName,
         ArchitectureTypeKind TypeKind);
+
+    private sealed record SourceInfo(
+        string? FilePath,
+        ArchitectureTypeKind KindFromSource,
+        bool IsAmbiguous);
 
     private sealed record FactIndexData(
         Dictionary<string, ArchitectureDeclaredTypeFact> FactsByName,

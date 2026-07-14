@@ -7,7 +7,7 @@ using NUnit.Framework;
 namespace ArchLinterNet.Core.Tests;
 
 [TestFixture]
-public sealed class ArchitectureSourceFileFactIndexTests
+public sealed partial class ArchitectureSourceFileFactIndexTests
 {
     private static readonly Assembly _testAssembly = typeof(ArchitectureSourceFileFactIndexTests).Assembly;
 
@@ -44,6 +44,7 @@ public sealed class ArchitectureSourceFileFactIndexTests
             new[] { _testAssembly },
             absoluteRepoRoot,
             new[] { sourceRoot },
+            preprocessorSymbols: null,
             fs);
     }
 
@@ -116,6 +117,7 @@ public sealed class ArchitectureSourceFileFactIndexTests
             new[] { _testAssembly },
             FakePaths.Root("/fake/repo"),
             Array.Empty<string>(),
+            preprocessorSymbols: null,
             new FakeArchitectureFileSystem());
 
         bool found = index.TryGetFact(
@@ -321,6 +323,7 @@ public sealed class ArchitectureSourceFileFactIndexTests
             new[] { _testAssembly },
             FakePaths.Root("/fake/repo"),
             Array.Empty<string>(),
+            preprocessorSymbols: null,
             new FakeArchitectureFileSystem());
 
         index.TryGetFact(
@@ -505,6 +508,7 @@ public sealed class ArchitectureSourceFileFactIndexTests
                 new[] { _testAssembly },
                 FakePaths.Root("/fake/repo"),
                 new[] { "src" },
+                preprocessorSymbols: null,
                 fs);
 
             Assert.That(index.AllFacts, Is.Not.Empty);

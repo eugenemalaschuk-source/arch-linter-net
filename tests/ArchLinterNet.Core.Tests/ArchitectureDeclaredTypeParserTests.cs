@@ -237,4 +237,95 @@ public sealed class ArchitectureDeclaredTypeParserTests
 
         Assert.That(types, Is.Empty);
     }
+
+    // ── Preprocessor symbols (3.2) ────────────────────────────────────────────────────
+
+    [Test]
+    public void ParseSourceText_WithPreprocessorSymbol_IncludesConditionalType()
+    {
+        const string Source = """
+            namespace MyApp {
+            #if FEATURE_X
+                public class ConditionalType { }
+            #endif
+            }
+            """;
+
+        IReadOnlyList<ArchitectureDeclaredTypeParser.ParsedTypeInfo> types =
+            ArchitectureDeclaredTypeParser.ParseSourceText(Source, new[] { "FEATURE_X" });
+
+        Assert.That(types, Has.Count.EqualTo(1));
+        Assert.That(types[0].FullTypeName, Is.EqualTo("MyApp.ConditionalType"));
+    }
+
+    [Test]
+    public void ParseSourceText_WithoutPreprocessorSymbol_ExcludesConditionalType()
+    {
+        const string Source = """
+            namespace MyApp {
+            #if FEATURE_X
+                public class ConditionalType { }
+            #endif
+                public class AlwaysPresent { }
+            }
+            """;
+
+        IReadOnlyList<ArchitectureDeclaredTypeParser.ParsedTypeInfo> types =
+            ArchitectureDeclaredTypeParser.ParseSourceText(Source);
+
+        Assert.That(types, Has.Count.EqualTo(1));
+        Assert.That(types[0].FullTypeName, Is.EqualTo("MyApp.AlwaysPresent"));
+    }
+
+    [Test]
+    public void ParseSourceText_MutuallyExclusiveConditionals_OnlyActiveSymbolTypeIncluded()
+    {
+        const string Source = """
+            namespace MyApp {
+            #if LEGACY
+                public class LegacyImpl { }
+            #else
+                public class ModernImpl { }
+            #endif
+            }
+            """;
+
+        IReadOnlyList<ArchitectureDeclaredTypeParser.ParsedTypeInfo> withLegacy =
+            ArchitectureDeclaredTypeParser.ParseSourceText(Source, new[] { "LEGACY" });
+        IReadOnlyList<ArchitectureDeclaredTypeParser.ParsedTypeInfo> withoutLegacy =
+            ArchitectureDeclaredTypeParser.ParseSourceText(Source);
+
+        Assert.That(withLegacy.Select(t => t.FullTypeName), Is.EquivalentTo(new[] { "MyApp.LegacyImpl" }));
+        Assert.That(withoutLegacy.Select(t => t.FullTypeName), Is.EquivalentTo(new[] { "MyApp.ModernImpl" }));
+    }
+
+    // ── Escaped identifiers (4.3) ─────────────────────────────────────────────────────
+
+    [Test]
+    public void ParseSourceText_EscapedKeywordIdentifier_DecodesWithoutAtSign()
+    {
+        // @class is a valid C# identifier that escapes the keyword "class".
+        // Reflection uses the decoded name (without @), so the parser must match.
+        const string Source = "namespace MyApp { public class @class { } }";
+
+        IReadOnlyList<ArchitectureDeclaredTypeParser.ParsedTypeInfo> types =
+            ArchitectureDeclaredTypeParser.ParseSourceText(Source);
+
+        Assert.That(types, Has.Count.EqualTo(1));
+        Assert.That(types[0].FullTypeName, Is.EqualTo("MyApp.class"));
+        Assert.That(types[0].SimpleTypeName, Is.EqualTo("class"));
+    }
+
+    [Test]
+    public void ParseSourceText_EscapedKeywordNamespace_DecodesWithoutAtSign()
+    {
+        const string Source = "namespace @namespace { public class Foo { } }";
+
+        IReadOnlyList<ArchitectureDeclaredTypeParser.ParsedTypeInfo> types =
+            ArchitectureDeclaredTypeParser.ParseSourceText(Source);
+
+        Assert.That(types, Has.Count.EqualTo(1));
+        Assert.That(types[0].FullTypeName, Is.EqualTo("namespace.Foo"));
+        Assert.That(types[0].Namespace, Is.EqualTo("namespace"));
+    }
 }
