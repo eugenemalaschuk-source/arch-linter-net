@@ -18,6 +18,8 @@ It is intentionally excluded from the public MkDocs/GitHub Pages product site.
 
 - [Policy import design examples](policy-import-examples/README.md) - fixture-ready positive and negative YAML examples.
 
+- [CEL implementation strategy](cel-implementation-strategy.md) - selected .NET CEL library, rejected alternatives, CEL subset assumptions, and implications for #162 and #163 (#166).
+
 ## Publishing rule
 
 Only public product documentation should appear in `mkdocs.yml` navigation and GitHub Pages output.
