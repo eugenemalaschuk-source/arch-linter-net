@@ -42,9 +42,14 @@ Contracts   -- pure schema/data models; depended on by every layer above,
 Reporting   -- leaf; formats results produced by Execution; consumed by
                Application and Adapters; never depended on by Execution/
                Discovery/Resolution/Scanning.
+
+ArchLinterNet.CEL  -- host-agnostic CEL evaluation engine; sits below Core in
+                      the package graph (Core → CEL). No dependency on Core,
+                      Cli, Testing, or any ArchLinterNet infrastructure package.
+                      Language behavior is added in follow-up tasks (#322).
 ```
 
-Hard rule: no module may depend upward. `Discovery`, `Resolution`, and `Scanning` never depend on `Execution` or `Validation`. `Execution` never depends on `Reporting` for behavior (only to produce data `Reporting` later formats). `Contracts` depends on nothing else in Core.
+Hard rule: no module may depend upward. `Discovery`, `Resolution`, and `Scanning` never depend on `Execution` or `Validation`. `Execution` never depends on `Reporting` for behavior (only to produce data `Reporting` later formats). `Contracts` depends on nothing else in Core. `ArchLinterNet.CEL` depends on nothing in this graph — Core depends on CEL, never the reverse.
 
 ### Dependency-direction summary table
 

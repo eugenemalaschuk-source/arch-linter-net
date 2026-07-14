@@ -123,6 +123,9 @@ jobs:
         shell: bash
         run: echo "PACKAGE_RELEASE_NOTES=See GitHub release notes for $TARGET_TAG." >> "$GITHUB_ENV"
 
+      - name: Pack CEL
+        run: dotnet pack src/ArchLinterNet.CEL/ArchLinterNet.CEL.csproj --configuration Release --no-build --output "$PACKAGE_OUTPUT" -p:PackageVersion="$PACKAGE_VERSION" -p:Version="$PACKAGE_VERSION" -p:PackageReleaseNotes="$PACKAGE_RELEASE_NOTES"
+
       - name: Pack Core
         run: dotnet pack src/ArchLinterNet.Core/ArchLinterNet.Core.csproj --configuration Release --no-build --output "$PACKAGE_OUTPUT" -p:PackageVersion="$PACKAGE_VERSION" -p:Version="$PACKAGE_VERSION" -p:PackageReleaseNotes="$PACKAGE_RELEASE_NOTES"
 
