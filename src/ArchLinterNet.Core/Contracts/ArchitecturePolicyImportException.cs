@@ -19,6 +19,13 @@ public sealed class ArchitecturePolicyImportException : InvalidOperationExceptio
 {
     public ArchitecturePolicyImportException(
         ArchitecturePolicyImportErrorCategory category,
+        string message)
+        : this(category, message, diagnostic: null)
+    {
+    }
+
+    public ArchitecturePolicyImportException(
+        ArchitecturePolicyImportErrorCategory category,
         string message,
         ArchitecturePolicyDiagnostic? diagnostic = null)
         : base(message)

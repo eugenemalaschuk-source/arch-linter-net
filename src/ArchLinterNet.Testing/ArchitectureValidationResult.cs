@@ -96,7 +96,6 @@ public sealed record ArchitectureValidationResultParams(
     bool Passed,
     IReadOnlyCollection<ArchitectureViolation> Violations,
     IReadOnlyCollection<string> Cycles,
-    IReadOnlyCollection<ArchitectureCycleFinding>? CycleFindings = null,
     IReadOnlyCollection<PolicyConsistencyDiagnostic>? PolicyConsistencyFindings = null,
     string PolicyConsistencyConfig = "error",
     IReadOnlyCollection<ArchitectureViolation>? CoverageFindings = null,
@@ -104,4 +103,7 @@ public sealed record ArchitectureValidationResultParams(
     IReadOnlyCollection<ArchitectureUnmatchedIgnoredViolation>? UnmatchedIgnoredViolations = null,
     string UnmatchedIgnoredViolationsConfig = "off",
     IReadOnlyCollection<ArchitectureCoverageSummary>? CoverageSummaries = null,
-    ValidationTiming? Timing = null);
+    ValidationTiming? Timing = null)
+{
+    public IReadOnlyCollection<ArchitectureCycleFinding>? CycleFindings { get; init; }
+}

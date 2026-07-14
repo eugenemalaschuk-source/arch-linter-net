@@ -85,7 +85,6 @@ public sealed class ArchitectureValidationBuilder
             outcome.Passed,
             outcome.Violations,
             outcome.Cycles,
-            outcome.CycleFindings,
             outcome.PolicyConsistencyFindings,
             outcome.PolicyConsistencyConfig,
             outcome.CoverageFindings,
@@ -93,6 +92,9 @@ public sealed class ArchitectureValidationBuilder
             outcome.UnmatchedIgnoredViolations,
             outcome.UnmatchedIgnoredViolationsConfig,
             outcome.CoverageSummaries,
-            timing));
+            timing)
+        {
+            CycleFindings = outcome.CycleFindings
+        });
     }
 }
