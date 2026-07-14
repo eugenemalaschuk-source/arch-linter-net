@@ -9,6 +9,10 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\ArchLinterNet.CEL\ArchLinterNet.CEL.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
     <InternalsVisibleTo Include="ArchLinterNet.Core.Tests" />
     <InternalsVisibleTo Include="ArchLinterNet.Cli" />
   </ItemGroup>

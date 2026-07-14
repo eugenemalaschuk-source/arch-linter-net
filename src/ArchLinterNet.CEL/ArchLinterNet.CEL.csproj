@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <PackageId>ArchLinterNet.CEL</PackageId>
+    <Description>Common Expression Language (CEL) evaluation engine for ArchLinterNet. Provides a reusable, host-agnostic expression evaluator for use by ArchLinterNet.Core.</Description>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="ArchLinterNet.CEL.Tests" />
+  </ItemGroup>
+
+</Project>
