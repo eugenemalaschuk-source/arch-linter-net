@@ -1,0 +1,12 @@
+# yaml-language-server: $schema=../../../../../../../schema/dependencies.arch.fragment.schema.json
+layers:
+  shared_kernel:
+    namespace: MyCompany.Product.SharedKernel
+
+contracts:
+  strict:
+    - id: shared-kernel-does-not-depend-on-modules
+      name: shared-kernel-does-not-depend-on-modules
+      source: shared_kernel
+      forbidden: [sales_domain, inventory_domain]
+      reason: Shared kernel code must remain reusable by every bounded context.

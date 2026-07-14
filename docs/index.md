@@ -13,7 +13,7 @@ Internal project documentation such as backlog governance, OpenSpec archives, im
 ## Core workflow
 
 ```text
-architecture/dependencies.arch.yml
+one selected root policy (architecture/arch.yml is recommended)
         ↓
 ArchLinterNet validation
         ↓
@@ -32,6 +32,7 @@ CI result, JSON artifact, or test failure
 ## Author policies
 
 - [Policy format](policy-format/index.md) — top-level YAML structure.
+- [Policy imports](policy-format/imports.md) — compose focused local fragments under one root.
 - [Layers and namespace patterns](policy-format/layers-and-namespaces.md) — literal prefixes, constrained globs, suffixes, and external layers.
 - [External dependencies](policy-format/external-dependencies.md) — vendor/framework leakage modeling.
 - [Condition sets](policy-format/condition-sets.md) — conditional compilation for source/method-body analysis.

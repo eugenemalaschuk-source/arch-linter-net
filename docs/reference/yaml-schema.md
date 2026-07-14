@@ -1,12 +1,48 @@
 # YAML Schema Reference
 
-The machine-readable JSON Schema lives at
-`schema/dependencies.arch.schema.json`. Use it when authoring policies with
-schema-aware editors or AI agents.
+The machine-readable root/effective-policy JSON Schema lives at
+`schema/dependencies.arch.schema.json`. Imported partial documents use
+`schema/dependencies.arch.fragment.schema.json`. Use them when authoring
+policies with schema-aware editors or AI agents.
 
 > Note: the current runtime YAML loader ignores unmatched properties while
 > deserializing. Validate against the JSON Schema before opening policy PRs if
 > you need unsupported fields to fail fast.
+
+## Root and fragment schemas
+
+Schema choice is based on document role, not filename:
+
+| Document | Repository schema | Role |
+| --- | --- | --- |
+| Selected root/effective policy | `schema/dependencies.arch.schema.json` | The one path supplied to the CLI, Testing adapter, or application API. |
+| Imported fragment | `schema/dependencies.arch.fragment.schema.json` | Any document reached through the root's ordered `imports` graph. |
+
+The root/effective schema requires `version`, `name`, `layers`, `analysis`, and
+`contracts`. A root that delegates all content for a required section can keep
+an empty container such as `layers: {}` or `contracts: {}` for standalone editor
+validation; imported fragments then contribute distinct entries during runtime
+composition. The fragment schema rejects root-only identity and accepts only
+mergeable policy sections.
+
+Schema-aware editors can select either schema explicitly with any filename. Use
+`schema/dependencies.arch.schema.json` for the selected root and the fragment
+schema directive for imported partial documents:
+
+```yaml
+# Imported fragment, even if this file is named domain.data
+# yaml-language-server: $schema=../../../schema/dependencies.arch.fragment.schema.json
+layers:
+  domain:
+    namespace: Company.Domain
+```
+
+For VS Code with Red Hat YAML, `yaml.schemas` associations affect editor
+feedback only; ArchLinterNet still derives roles from the selected path and
+import graph.
+
+Read [Policy imports](../policy-format/imports.md) for syntax, composition,
+migration, path safety, and troubleshooting.
 
 ## `version`
 

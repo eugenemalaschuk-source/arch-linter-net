@@ -16,6 +16,29 @@ Check:
 - missing target assemblies;
 - baseline entries that reference deleted contract IDs.
 
+## Policy import failures
+
+Import diagnostics include the selected root, the source that declared the
+edge or conflicting value, its YAML path, and a concise import chain when
+applicable.
+
+- **Missing file or path-case mismatch:** resolve the path from the declaring
+  document, use `/`, and match the on-disk casing exactly.
+- **Cycle or duplicate import:** remove the reported back-edge or repeated
+  canonical path. ArchLinterNet does not silently de-duplicate imports.
+- **Composition conflict:** keep only one declaration of the keyed definition,
+  singleton setting, or family/mode contract ID. Import order never provides
+  override precedence.
+- **Repository-boundary violation:** keep fragments inside the repository and
+  avoid symlink or junction escapes.
+- **Invalid fragment shape:** remove root-only `version`/`name`, baseline or
+  unknown fields, and provide a mergeable section or non-empty nested import.
+- **Editor reports root fields missing:** associate the imported file with
+  `schema/dependencies.arch.fragment.schema.json`, regardless of its name.
+
+See [Policy imports](../policy-format/imports.md#troubleshooting) for the full
+path, schema, migration, and unsupported-behavior guide.
+
 ## Empty layer diagnostics
 
 A layer with no matching project types may indicate:

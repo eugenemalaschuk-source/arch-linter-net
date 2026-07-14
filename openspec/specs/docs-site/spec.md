@@ -2,9 +2,7 @@
 
 ## Purpose
 Sets up the MkDocs-based documentation site tooling, including a gitignored Python virtual environment.
-
 ## Requirements
-
 ### Requirement: Documentation tooling setup
 The repository SHALL contain a Python tooling project at `tools/pyproject.toml` that defines MkDocs and mkdocs-material as dependencies, managed via `uv` with a committed `tools/uv.lock` file.
 
@@ -82,3 +80,11 @@ The documentation site SHALL build successfully with zero warnings or errors.
 #### Scenario: Clean build succeeds
 - **WHEN** running `make docs-build`
 - **THEN** the command exits with code 0
+
+### Requirement: Policy import documentation is publicly discoverable
+The MkDocs navigation and core public entry pages SHALL link to the policy-import guide, and the README capability summary SHALL identify deterministic local policy imports without linking users to internal design documents.
+
+#### Scenario: User looks for policy imports
+- **WHEN** a user starts from the README, policy-format overview, YAML schema reference, troubleshooting page, or Policy Authoring navigation
+- **THEN** the public policy-import guide is reachable without consulting `docs/internal`
+

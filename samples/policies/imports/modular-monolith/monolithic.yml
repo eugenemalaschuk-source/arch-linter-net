@@ -1,0 +1,77 @@
+version: 1
+name: Modular Monolith Imported Policy
+
+classification:
+  attributes:
+    - attribute: MyCompany.Product.Architecture.DomainLayerAttribute
+      role: DomainLayer
+      metadata:
+        module: constructor[0]
+
+layers:
+  composition_root:
+    namespace: MyCompany.Product.Host.Composition
+  shared_kernel:
+    namespace: MyCompany.Product.SharedKernel
+  sales_domain:
+    namespace: MyCompany.Product.Modules.Sales.Domain
+  sales_contracts:
+    namespace: MyCompany.Product.Modules.Sales.Contracts
+  inventory_domain:
+    namespace: MyCompany.Product.Modules.Inventory.Domain
+  inventory_contracts:
+    namespace: MyCompany.Product.Modules.Inventory.Contracts
+
+analysis:
+  target_assemblies:
+    - MyCompany.Product.Host
+    - MyCompany.Product.Modules.Sales
+    - MyCompany.Product.Modules.Inventory
+    - MyCompany.Product.SharedKernel
+
+contracts:
+  strict_composition:
+    - id: service-locator-confined-to-host
+      name: service-locator-confined-to-host
+      allowed_only_in_layers: [composition_root]
+      forbidden_apis: [System.IServiceProvider.GetService]
+      reason: Service resolution belongs only in the host composition root.
+
+  strict_independence:
+    - id: bounded-context-domains-independent
+      name: bounded-context-domains-independent
+      layers: [sales_domain, inventory_domain]
+      reason: Bounded-context domains communicate through contracts, not direct implementation references.
+
+  strict:
+    - id: shared-kernel-does-not-depend-on-modules
+      name: shared-kernel-does-not-depend-on-modules
+      source: shared_kernel
+      forbidden: [sales_domain, inventory_domain]
+      reason: Shared kernel code must remain reusable by every bounded context.
+
+  strict_allow_only:
+    - id: sales-contracts-use-shared-kernel
+      name: sales-contracts-use-shared-kernel
+      source: sales_contracts
+      allowed: [shared_kernel]
+      reason: Sales public contracts expose only stable shared-kernel types.
+    - id: inventory-contracts-use-shared-kernel
+      name: inventory-contracts-use-shared-kernel
+      source: inventory_contracts
+      allowed: [shared_kernel]
+      reason: Inventory public contracts expose only stable shared-kernel types.
+
+  strict_context_dependencies:
+    - id: sales-domain-does-not-use-other-domains
+      name: sales-domain-does-not-use-other-domains
+      source:
+        role: DomainLayer
+        metadata:
+          module: Sales
+      forbidden:
+        - role: DomainLayer
+          metadata:
+            module: "!{source.metadata.module}"
+      reason: Semantic module metadata prevents direct cross-context domain dependencies.
+

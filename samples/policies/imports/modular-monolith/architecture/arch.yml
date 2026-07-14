@@ -1,0 +1,40 @@
+version: 1
+name: Modular Monolith Imported Policy
+
+imports:
+  - policy/shared/layers.arch.yml
+  - policy/bounded-contexts/sales.arch.yml
+  - policy/bounded-contexts/inventory.arch.yml
+
+classification:
+  attributes:
+    - attribute: MyCompany.Product.Architecture.DomainLayerAttribute
+      role: DomainLayer
+      metadata:
+        module: constructor[0]
+
+layers:
+  composition_root:
+    namespace: MyCompany.Product.Host.Composition
+
+analysis:
+  target_assemblies:
+    - MyCompany.Product.Host
+    - MyCompany.Product.Modules.Sales
+    - MyCompany.Product.Modules.Inventory
+    - MyCompany.Product.SharedKernel
+
+contracts:
+  strict_composition:
+    - id: service-locator-confined-to-host
+      name: service-locator-confined-to-host
+      allowed_only_in_layers: [composition_root]
+      forbidden_apis: [System.IServiceProvider.GetService]
+      reason: Service resolution belongs only in the host composition root.
+
+  strict_independence:
+    - id: bounded-context-domains-independent
+      name: bounded-context-domains-independent
+      layers: [sales_domain, inventory_domain]
+      reason: Bounded-context domains communicate through contracts, not direct implementation references.
+
