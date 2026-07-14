@@ -83,10 +83,10 @@ public class CelImplementationSpikeTests
     public void Compiled_delegate_returns_same_result_as_direct_program_call()
     {
         var variables = new Dictionary<string, object?> { ["role"] = "Domain" };
-        const string expr = "role == 'Domain'";
+        const string Expression = "role == 'Domain'";
 
-        var direct = _env.Program(expr, variables);
-        var compiled = _env.Compile(expr);
+        var direct = _env.Program(Expression, variables);
+        var compiled = _env.Compile(Expression);
         var cached = compiled(variables);
 
         Assert.That(cached, Is.EqualTo(direct));
