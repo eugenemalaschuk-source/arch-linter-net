@@ -38,6 +38,8 @@ layers:
     namespace: ArchLinterNet.Cli.Commands
   testing:
     namespace: ArchLinterNet.Testing
+  cel:
+    namespace: ArchLinterNet.CEL
 
 external_dependencies:
   dependency_injection_container:
@@ -53,9 +55,11 @@ analysis:
     - ArchLinterNet.Core
     - ArchLinterNet.Cli
     - ArchLinterNet.Testing
+    - ArchLinterNet.CEL
   assembly_search_paths:
     - src/ArchLinterNet.Cli/bin/Debug/net10.0
     - src/ArchLinterNet.Testing/bin/Debug/net10.0
+    - src/ArchLinterNet.CEL/bin/Debug/net10.0
   coverage: error
 
 contracts:
@@ -167,6 +171,24 @@ contracts:
       source: core_contracts
       forbidden: [core_execution]
       reason: Contracts must stay independent of Execution's runtime checker/registry internals; the deliberately-duplicated ArchitectureContractFamilyBindings/ArchitectureContractFamilyBinding registry depends on this separation holding.
+
+    - name: cel-must-not-depend-on-core
+      id: cel-must-not-depend-on-core
+      source: cel
+      forbidden: [core]
+      reason: CEL is an independently buildable engine; it must not depend on Core to remain host-agnostic and usable in isolation.
+
+    - name: cel-must-not-depend-on-cli
+      id: cel-must-not-depend-on-cli
+      source: cel
+      forbidden: [cli]
+      reason: CEL must not depend on the CLI adapter.
+
+    - name: cel-must-not-depend-on-testing
+      id: cel-must-not-depend-on-testing
+      source: cel
+      forbidden: [testing]
+      reason: CEL must not depend on the testing adapter.
 
   strict_external:
     - name: core-model-must-not-depend-on-di-container
@@ -306,7 +328,8 @@ contracts:
         - cli
         - testing
         - core
-      reason: Dependencies must point toward Core.
+        - cel
+      reason: Dependencies must point toward Core and CEL; CEL sits below Core and must not depend upward.
 
     - name: core-application-seam-layering
       id: core-application-seam-layering
@@ -321,6 +344,7 @@ contracts:
     - name: package-cycles
       id: package-cycles
       layers:
+        - cel
         - core
         - cli
         - testing
@@ -358,6 +382,7 @@ contracts:
         - namespace: ArchLinterNet.Core
         - namespace: ArchLinterNet.Cli
         - namespace: ArchLinterNet.Testing
+        - namespace: ArchLinterNet.CEL
       reason: Every first-party root namespace must be mapped to a declared layer or explicitly excluded.
 
     - name: self-policy-rule-input-coverage
@@ -384,4 +409,7 @@ contracts:
         - package-cycles
         - core-contracts-must-not-depend-on-hosts
         - core-contracts-must-not-depend-on-execution
+        - cel-must-not-depend-on-core
+        - cel-must-not-depend-on-cli
+        - cel-must-not-depend-on-testing
       reason: The recovered Core architecture's base package rules, seam, leaf-isolation, and protected-surface rules must keep matching real code so a renamed or deleted layer cannot silently stop being enforced.

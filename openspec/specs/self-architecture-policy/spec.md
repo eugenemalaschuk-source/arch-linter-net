@@ -109,7 +109,7 @@ The repository SHALL keep `.asmdef` validation in `ArchLinterNet.Core.Asmdef` an
 
 #### Scenario: Repository package and assembly inventory is evaluated
 - **WHEN** the solution, self-policy, release workflow, and package documentation are inspected
-- **THEN** they contain only `ArchLinterNet.Core`, `ArchLinterNet.Cli`, and `ArchLinterNet.Testing` production packages
+- **THEN** they contain `ArchLinterNet.Core`, `ArchLinterNet.Cli`, `ArchLinterNet.Testing`, and `ArchLinterNet.CEL` production packages
 - **AND** asmdef facade tests run from `ArchLinterNet.Core.Tests`
 
 ### Requirement: Central catalog and dispatch points grow through their extension mechanism, not inline branches
@@ -125,3 +125,4 @@ Because ArchLinterNet has no contract family that inspects a file's internal str
 - **WHEN** a contributor or reviewer adds a new contract family
 - **THEN** the family's descriptor/binding is appended to `ArchitectureContractFamilyRegistry`/`ArchitectureContractFamilyBindings` rather than an inline branch being added to those files, and its checker, configuration inspection, diagnostic payload, and YAML model each live in `Execution.Checkers`, `Execution.Abstractions`, `Model`, and `Contracts.Families` respectively
 - **AND** `docs/internal/core-architecture-blueprint.md`'s guardrail paragraph is consulted during review to confirm none of the five regression patterns were reintroduced, including a checker/validator/contributor reaching into a CLI/reporting adapter instead of depending only on abstractions/context
+

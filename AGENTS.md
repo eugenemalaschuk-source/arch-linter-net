@@ -94,10 +94,12 @@ Direction rules:
 ## Package layout
 ```
 src/
-  ArchLinterNet.Core/     — model, YAML loading, assembly resolution, asmdef validation
+  ArchLinterNet.CEL/      — host-agnostic CEL evaluation engine (no deps on other ArchLinterNet assemblies)
+  ArchLinterNet.Core/     — model, YAML loading, assembly resolution, asmdef validation (depends on CEL)
   ArchLinterNet.Cli/      — .NET global/local tool CLI
   ArchLinterNet.Testing/  — test framework adapters
 tests/
+  ArchLinterNet.CEL.Tests/
   ArchLinterNet.Core.Tests/
   ArchLinterNet.Cli.Tests/
 ```

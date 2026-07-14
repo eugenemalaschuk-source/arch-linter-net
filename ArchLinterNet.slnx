@@ -1,10 +1,12 @@
 <Solution>
   <Folder Name="/src/">
+    <Project Path="src/ArchLinterNet.CEL/ArchLinterNet.CEL.csproj" />
     <Project Path="src/ArchLinterNet.Cli/ArchLinterNet.Cli.csproj" />
     <Project Path="src/ArchLinterNet.Core/ArchLinterNet.Core.csproj" />
     <Project Path="src/ArchLinterNet.Testing/ArchLinterNet.Testing.csproj" />
   </Folder>
   <Folder Name="/tests/">
+    <Project Path="tests/ArchLinterNet.CEL.Tests/ArchLinterNet.CEL.Tests.csproj" />
     <Project Path="tests/ArchLinterNet.Cli.Tests/ArchLinterNet.Cli.Tests.csproj" />
     <Project Path="tests/ArchLinterNet.Core.Tests/ArchLinterNet.Core.Tests.csproj" />
   </Folder>
