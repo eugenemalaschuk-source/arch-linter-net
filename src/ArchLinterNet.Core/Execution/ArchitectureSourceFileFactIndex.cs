@@ -17,10 +17,10 @@ namespace ArchLinterNet.Core.Execution;
 // - Assembly-aware identity: one fact per (assemblyName, fullTypeName) pair. The same CLR full
 //   name in multiple assemblies produces separate facts (all in AllFacts). TryGetFact(string)
 //   returns false for ambiguous names; TryGetFact(assemblyName, fullTypeName) is exact.
-// - Source correlation is assembly-aware too: a source root contributes declarations only when its
-//   owning assembly can be determined. For standalone single-target runs without project discovery,
-//   all configured source roots are owned by that sole target assembly; otherwise unowned roots are
-//   ignored rather than guessed.
+// - Source correlation is assembly-aware too: each scanned file contributes declarations only when
+//   its owning assembly can be determined. For standalone single-target runs without project
+//   discovery, all configured source roots are owned by that sole target assembly; otherwise
+//   unowned files are ignored rather than guessed.
 // - CLR-format full names (dots, +, `N) used as index keys throughout.
 // - Empty sourceRoots → reflection-only facts (null SourceFilePath) with no filesystem access.
 // - Ambiguity: same owned CLR name declared in more than one distinct file (partial class across
@@ -36,7 +36,7 @@ public sealed class ArchitectureSourceFileFactIndex
     private readonly IReadOnlyList<string> _sourceRoots;
     private readonly IReadOnlyList<string>? _preprocessorSymbols;
     private readonly IArchitectureFileSystem _fileSystem;
-    private readonly IReadOnlyDictionary<string, string> _sourceRootAssemblyOwnership;
+    private readonly IReadOnlyDictionary<string, string> _sourcePathAssemblyOwnership;
     private readonly Lazy<FactIndexData> _data;
 
     public ArchitectureSourceFileFactIndex(
@@ -70,7 +70,7 @@ public sealed class ArchitectureSourceFileFactIndex
         _sourceRoots = sourceRoots ?? throw new ArgumentNullException(nameof(sourceRoots));
         _preprocessorSymbols = preprocessorSymbols;
         _fileSystem = fileSystem ?? ArchitectureFileSystem.Real;
-        _sourceRootAssemblyOwnership = BuildSourceRootAssemblyOwnership(
+        _sourcePathAssemblyOwnership = BuildSourcePathAssemblyOwnership(
             _targetAssemblies,
             _sourceRoots,
             projectDiscovery,
@@ -238,21 +238,20 @@ public sealed class ArchitectureSourceFileFactIndex
         return factsByName;
     }
 
-    // Step 2: parse every *.cs file under each owned source root and map
+    // Step 2: parse every *.cs file under each configured source root and map
     // (assemblyName, fullTypeName) → [(file, kind)]. Preprocessor symbols are forwarded so
-    // conditional declarations match the compiled assembly.
+    // conditional declarations match the compiled assembly. Each file is correlated only when its
+    // owning assembly can be determined from the most specific known project subtree.
     private Dictionary<SourceFactKey, List<(string FilePath, ArchitectureTypeKind Kind)>> RunSourceScan()
     {
         Dictionary<SourceFactKey, List<(string FilePath, ArchitectureTypeKind Kind)>> sourceMap = [];
+        List<(string SourceRoot, string AssemblyName)> ownershipEntries = _sourcePathAssemblyOwnership
+            .Select(static kvp => (kvp.Key, kvp.Value))
+            .ToList();
 
         foreach (string sourceRoot in _sourceRoots)
         {
             string normalizedSourceRoot = NormalizeRelativePath(sourceRoot);
-            if (!_sourceRootAssemblyOwnership.TryGetValue(normalizedSourceRoot, out string? assemblyName))
-            {
-                continue;
-            }
-
             string absoluteRoot = Path.Combine(_repositoryRoot, normalizedSourceRoot);
             if (!_fileSystem.DirectoryExists(absoluteRoot)) continue;
 
@@ -261,6 +260,13 @@ public sealed class ArchitectureSourceFileFactIndex
                 "*.cs",
                 SearchOption.AllDirectories))
             {
+                string normalizedFilePath = NormalizePath(_repositoryRoot, absoluteFile);
+                string? assemblyName = ResolveOwnedAssemblyName(normalizedFilePath, ownershipEntries);
+                if (assemblyName == null)
+                {
+                    continue;
+                }
+
                 ProcessSourceFile(sourceMap, assemblyName, absoluteRoot, absoluteFile);
             }
         }
@@ -386,7 +392,7 @@ public sealed class ArchitectureSourceFileFactIndex
         }
     }
 
-    private static IReadOnlyDictionary<string, string> BuildSourceRootAssemblyOwnership(
+    private static IReadOnlyDictionary<string, string> BuildSourcePathAssemblyOwnership(
         IReadOnlyCollection<Assembly> targetAssemblies,
         IReadOnlyList<string> sourceRoots,
         ProjectDiscoveryResult? projectDiscovery,
@@ -399,14 +405,14 @@ public sealed class ArchitectureSourceFileFactIndex
 
         if (explicitOwnership != null)
         {
-            foreach ((string sourceRoot, string assemblyName) in explicitOwnership)
+            foreach ((string sourcePath, string assemblyName) in explicitOwnership)
             {
                 if (!targetAssemblyNames.Contains(assemblyName))
                 {
                     continue;
                 }
 
-                ownership[NormalizeRelativePath(sourceRoot)] = assemblyName;
+                ownership[NormalizeRelativePath(sourcePath)] = assemblyName;
             }
 
             return ownership;
@@ -433,14 +439,14 @@ public sealed class ArchitectureSourceFileFactIndex
             .Select(project => (NormalizeRelativePath(GetProjectDirectory(project.Path)), project.AssemblyName))
             .ToList();
 
-        foreach (string sourceRoot in sourceRoots
-                     .Select(NormalizeRelativePath)
-                     .Distinct(StringComparer.Ordinal))
+        foreach ((string discoveredRoot, string assemblyName) in discoveredRoots)
         {
-            string? assemblyName = ResolveOwnedAssemblyName(sourceRoot, discoveredRoots);
-            if (assemblyName != null)
+            if (sourceRoots
+                .Select(NormalizeRelativePath)
+                .Distinct(StringComparer.Ordinal)
+                .Any(configuredRoot => IsSameOrDescendantPath(discoveredRoot, configuredRoot)))
             {
-                ownership[sourceRoot] = assemblyName;
+                ownership[discoveredRoot] = assemblyName;
             }
         }
 

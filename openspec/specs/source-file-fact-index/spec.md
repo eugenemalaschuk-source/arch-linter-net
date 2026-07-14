@@ -29,6 +29,10 @@ The system SHALL enrich each declared type fact with source file path data only 
 - **WHEN** the index is built directly with one target assembly and explicit `source_roots`, without project discovery metadata
 - **THEN** those configured source roots are treated as belonging to that sole target assembly and can enrich matching facts
 
+#### Scenario: Common source root resolves ownership by discovered project subtree
+- **WHEN** one configured source root such as `src` contains multiple discovered target projects like `src/App` and `src/Domain`
+- **THEN** each scanned file is correlated to the owning assembly of the most specific discovered project directory that contains that file, rather than dropping the whole root as ambiguous
+
 #### Scenario: Record type kind is detected from source
 - **WHEN** a source file declares `public record MyRecord { }` or `public record class MyRecord { }` or `public record struct MyRecord { }`
 - **THEN** the fact for that type has TypeKind equal to Record

@@ -1,5 +1,6 @@
 using System.Reflection;
 using System.Reflection.Emit;
+using ArchLinterNet.Core.Discovery;
 using ArchLinterNet.Core.Execution;
 using ArchLinterNet.Core.Model;
 using NUnit.Framework;
@@ -373,6 +374,67 @@ public sealed partial class ArchitectureSourceFileFactIndexTests
         Assert.That(foundInB, Is.True);
         Assert.That(factA.AssemblyName, Is.EqualTo(nameA));
         Assert.That(factB.AssemblyName, Is.EqualTo(nameB));
+    }
+
+    [Test]
+    public void TryGetFact_CommonSourceRootWithMultipleDiscoveredProjects_ResolvesOwnershipPerProjectSubtree()
+    {
+        const string TestSource = """
+            namespace ArchLinterNet.Core.Tests.SourceFactFixtures {
+                public sealed class SingleTypeFixture { }
+            }
+            """;
+        const string CoreSource = """
+            namespace ArchLinterNet.Core.Execution {
+                public sealed class ArchitectureSourceFileFactIndex { }
+            }
+            """;
+
+        string absoluteRepoRoot = FakePaths.Root("/fake/repo");
+        var fs = new FakeArchitectureFileSystem();
+        string appRoot = absoluteRepoRoot + "/src/App";
+        string coreRoot = absoluteRepoRoot + "/src/Core";
+        fs.AddDirectory(absoluteRepoRoot + "/src");
+        fs.AddDirectory(appRoot);
+        fs.AddDirectory(coreRoot);
+        fs.AddFile(appRoot + "/SingleTypeFixture.cs", TestSource, DateTime.UtcNow);
+        fs.AddFile(coreRoot + "/ArchitectureSourceFileFactIndex.cs", CoreSource, DateTime.UtcNow);
+
+        ProjectDiscoveryResult discovery = new(
+            new[] { "ArchLinterNet.Core.Tests", "ArchLinterNet.Core" },
+            Array.Empty<string>(),
+            new[] { "src/App", "src/Core" },
+            Array.Empty<ArchitectureProjectDiscoveryDiagnostic>())
+        {
+            DiscoveredProjects =
+            [
+                new ArchitectureDiscoveredProject("src/App/App.csproj", "ArchLinterNet.Core.Tests", ["net10.0"]),
+                new ArchitectureDiscoveredProject("src/Core/Core.csproj", "ArchLinterNet.Core", ["net10.0"])
+            ]
+        };
+
+        var index = new ArchitectureSourceFileFactIndex(
+            new[] { _testAssembly, _coreAssembly },
+            absoluteRepoRoot,
+            new[] { "src" },
+            null,
+            fs,
+            discovery,
+            sourceRootAssemblyOwnership: null);
+
+        bool foundTest = index.TryGetFact(
+            "ArchLinterNet.Core.Tests",
+            "ArchLinterNet.Core.Tests.SourceFactFixtures.SingleTypeFixture",
+            out ArchitectureDeclaredTypeFact testFact);
+        bool foundCore = index.TryGetFact(
+            "ArchLinterNet.Core",
+            "ArchLinterNet.Core.Execution.ArchitectureSourceFileFactIndex",
+            out ArchitectureDeclaredTypeFact coreFact);
+
+        Assert.That(foundTest, Is.True);
+        Assert.That(foundCore, Is.True);
+        Assert.That(testFact.SourceFilePath, Is.EqualTo("src/App/SingleTypeFixture.cs"));
+        Assert.That(coreFact.SourceFilePath, Is.EqualTo("src/Core/ArchitectureSourceFileFactIndex.cs"));
     }
 
     // ── Helpers shared across partial files ───────────────────────────────────────────
