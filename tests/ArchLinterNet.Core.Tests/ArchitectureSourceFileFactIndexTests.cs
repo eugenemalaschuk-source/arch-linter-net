@@ -11,11 +11,11 @@ public sealed partial class ArchitectureSourceFileFactIndexTests
 {
     private static readonly Assembly _testAssembly = typeof(ArchitectureSourceFileFactIndexTests).Assembly;
 
-    private static readonly string[] s_srcDomain = ["src", "Domain"];
-    private static readonly string[] s_srcMyProjectDomain = ["src", "MyProject", "Domain"];
-    private static readonly string[] s_srcRoot = ["src"];
-    private static readonly string[] s_nsSegments = ["ArchLinterNet", "Core", "Tests", "SourceFactFixtures"];
-    private static readonly string[] s_fileTypeNames =
+    private static readonly string[] _srcDomain = ["src", "Domain"];
+    private static readonly string[] _srcMyProjectDomain = ["src", "MyProject", "Domain"];
+    private static readonly string[] _srcRoot = ["src"];
+    private static readonly string[] _nsSegments = ["ArchLinterNet", "Core", "Tests", "SourceFactFixtures"];
+    private static readonly string[] _fileTypeNames =
     [
         "ArchLinterNet.Core.Tests.SourceFactFixtures.FileTypeA",
         "ArchLinterNet.Core.Tests.SourceFactFixtures.FileTypeB"
@@ -83,7 +83,7 @@ public sealed partial class ArchitectureSourceFileFactIndexTests
         Assert.That(found, Is.True);
         Assert.That(fact.SourceFilePath, Is.EqualTo("src/Domain/SingleTypeFixture.cs"));
         Assert.That(fact.FileNameWithoutExtension, Is.EqualTo("SingleTypeFixture"));
-        Assert.That(fact.FolderSegments, Is.EqualTo(s_srcDomain));
+        Assert.That(fact.FolderSegments, Is.EqualTo(_srcDomain));
         Assert.That(fact.TypeKind, Is.EqualTo(ArchitectureTypeKind.Class));
         Assert.That(fact.AssemblyName, Is.EqualTo("ArchLinterNet.Core.Tests"));
         Assert.That(fact.Namespace, Is.EqualTo("ArchLinterNet.Core.Tests.SourceFactFixtures"));
@@ -189,7 +189,7 @@ public sealed partial class ArchitectureSourceFileFactIndexTests
             "ArchLinterNet.Core.Tests.SourceFactFixtures.SingleTypeFixture",
             out ArchitectureDeclaredTypeFact fact);
 
-        Assert.That(fact.FolderSegments, Is.EqualTo(s_srcMyProjectDomain));
+        Assert.That(fact.FolderSegments, Is.EqualTo(_srcMyProjectDomain));
     }
 
     [Test]
@@ -212,7 +212,7 @@ public sealed partial class ArchitectureSourceFileFactIndexTests
             "ArchLinterNet.Core.Tests.SourceFactFixtures.SingleTypeFixture",
             out ArchitectureDeclaredTypeFact fact);
 
-        Assert.That(fact.FolderSegments, Is.EqualTo(s_srcRoot));
+        Assert.That(fact.FolderSegments, Is.EqualTo(_srcRoot));
     }
 
     // ── Namespace segments ────────────────────────────────────────────────────────────
@@ -237,7 +237,7 @@ public sealed partial class ArchitectureSourceFileFactIndexTests
             "ArchLinterNet.Core.Tests.SourceFactFixtures.SingleTypeFixture",
             out ArchitectureDeclaredTypeFact fact);
 
-        Assert.That(fact.NamespaceSegments, Is.EqualTo(s_nsSegments));
+        Assert.That(fact.NamespaceSegments, Is.EqualTo(_nsSegments));
     }
 
     // ── Nested type ───────────────────────────────────────────────────────────────────
@@ -429,7 +429,7 @@ public sealed partial class ArchitectureSourceFileFactIndexTests
         IReadOnlyList<ArchitectureDeclaredTypeFact> facts =
             index.GetFactsForFile("src/FileTypes.cs");
 
-        Assert.That(facts.Select(f => f.FullTypeName), Is.EquivalentTo(s_fileTypeNames));
+        Assert.That(facts.Select(f => f.FullTypeName), Is.EquivalentTo(_fileTypeNames));
     }
 
     [Test]
@@ -510,7 +510,7 @@ public sealed partial class ArchitectureSourceFileFactIndexTests
             var index = new ArchitectureSourceFileFactIndex(
                 new[] { _testAssembly },
                 FakePaths.Root("/fake/repo"),
-                s_srcRoot,
+                _srcRoot,
                 preprocessorSymbols: null,
                 fs);
 

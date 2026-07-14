@@ -167,7 +167,7 @@ public sealed partial class ArchitectureSourceFileFactIndexTests
         ArchitectureSourceFileFactIndex index = BuildIndexWithPreprocessorSymbols(
             "/fake/repo", "src",
             files: new Dictionary<string, string> { ["SingleTypeFixture.cs"] = Source },
-            preprocessorSymbols: s_featureXSymbols);
+            preprocessorSymbols: _featureXSymbols);
 
         index.TryGetFact(
             "ArchLinterNet.Core.Tests.SourceFactFixtures.SingleTypeFixture",
@@ -211,7 +211,7 @@ public sealed partial class ArchitectureSourceFileFactIndexTests
     // itself is covered by the implementation unit-reading the reflectionFactsByName list count.
 
     private static readonly Assembly _coreAssembly = typeof(ArchitectureDeclaredTypeFact).Assembly;
-    private static readonly string[] s_featureXSymbols = ["FEATURE_X"];
+    private static readonly string[] _featureXSymbols = ["FEATURE_X"];
 
     [Test]
     public void TryGetFact_AssemblyAndName_ReturnsCorrectFactForSpecifiedAssembly()

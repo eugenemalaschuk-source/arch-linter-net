@@ -7,13 +7,13 @@ namespace ArchLinterNet.Core.Tests;
 [TestFixture]
 public sealed class ArchitectureDeclaredTypeParserTests
 {
-    private static readonly string[] s_featureXSymbols = ["FEATURE_X"];
-    private static readonly string[] s_legacySymbols = ["LEGACY"];
-    private static readonly string[] s_nestedTypeNames = ["MyApp.Domain.Order", "MyApp.Domain.Order+LineItem"];
-    private static readonly string[] s_multipleTypeNames = ["MyApp.Domain.Order", "MyApp.Domain.IOrderService", "MyApp.Domain.OrderStatus"];
-    private static readonly string[] s_nestedGenericNames = ["MyApp.Outer`1", "MyApp.Outer`1+Inner`1"];
-    private static readonly string[] s_legacyImplNames = ["MyApp.LegacyImpl"];
-    private static readonly string[] s_modernImplNames = ["MyApp.ModernImpl"];
+    private static readonly string[] _featureXSymbols = ["FEATURE_X"];
+    private static readonly string[] _legacySymbols = ["LEGACY"];
+    private static readonly string[] _nestedTypeNames = ["MyApp.Domain.Order", "MyApp.Domain.Order+LineItem"];
+    private static readonly string[] _multipleTypeNames = ["MyApp.Domain.Order", "MyApp.Domain.IOrderService", "MyApp.Domain.OrderStatus"];
+    private static readonly string[] _nestedGenericNames = ["MyApp.Outer`1", "MyApp.Outer`1+Inner`1"];
+    private static readonly string[] _legacyImplNames = ["MyApp.LegacyImpl"];
+    private static readonly string[] _modernImplNames = ["MyApp.ModernImpl"];
     [Test]
     public void ParseSourceText_SingleClass_ReturnsClassFact()
     {
@@ -134,7 +134,7 @@ public sealed class ArchitectureDeclaredTypeParserTests
                 }
                 """);
 
-        Assert.That(types.Select(t => t.FullTypeName), Is.EquivalentTo(s_nestedTypeNames));
+        Assert.That(types.Select(t => t.FullTypeName), Is.EquivalentTo(_nestedTypeNames));
 
         ArchitectureDeclaredTypeParser.ParsedTypeInfo innerFact =
             types.Single(t => t.SimpleTypeName == "LineItem");
@@ -181,7 +181,7 @@ public sealed class ArchitectureDeclaredTypeParserTests
                 """);
 
         Assert.That(types, Has.Count.EqualTo(3));
-        Assert.That(types.Select(t => t.FullTypeName), Is.EquivalentTo(s_multipleTypeNames));
+        Assert.That(types.Select(t => t.FullTypeName), Is.EquivalentTo(_multipleTypeNames));
     }
 
     [Test]
@@ -209,7 +209,7 @@ public sealed class ArchitectureDeclaredTypeParserTests
                 }
                 """);
 
-        Assert.That(types.Select(t => t.FullTypeName), Is.EquivalentTo(s_nestedGenericNames));
+        Assert.That(types.Select(t => t.FullTypeName), Is.EquivalentTo(_nestedGenericNames));
     }
 
     [Test]
@@ -246,7 +246,7 @@ public sealed class ArchitectureDeclaredTypeParserTests
             """;
 
         IReadOnlyList<ArchitectureDeclaredTypeParser.ParsedTypeInfo> types =
-            ArchitectureDeclaredTypeParser.ParseSourceText(Source, s_featureXSymbols);
+            ArchitectureDeclaredTypeParser.ParseSourceText(Source, _featureXSymbols);
 
         Assert.That(types, Has.Count.EqualTo(1));
         Assert.That(types[0].FullTypeName, Is.EqualTo("MyApp.ConditionalType"));
@@ -285,12 +285,12 @@ public sealed class ArchitectureDeclaredTypeParserTests
             """;
 
         IReadOnlyList<ArchitectureDeclaredTypeParser.ParsedTypeInfo> withLegacy =
-            ArchitectureDeclaredTypeParser.ParseSourceText(Source, s_legacySymbols);
+            ArchitectureDeclaredTypeParser.ParseSourceText(Source, _legacySymbols);
         IReadOnlyList<ArchitectureDeclaredTypeParser.ParsedTypeInfo> withoutLegacy =
             ArchitectureDeclaredTypeParser.ParseSourceText(Source);
 
-        Assert.That(withLegacy.Select(t => t.FullTypeName), Is.EquivalentTo(s_legacyImplNames));
-        Assert.That(withoutLegacy.Select(t => t.FullTypeName), Is.EquivalentTo(s_modernImplNames));
+        Assert.That(withLegacy.Select(t => t.FullTypeName), Is.EquivalentTo(_legacyImplNames));
+        Assert.That(withoutLegacy.Select(t => t.FullTypeName), Is.EquivalentTo(_modernImplNames));
     }
 
     // ── Escaped identifiers (4.3) ─────────────────────────────────────────────────────
