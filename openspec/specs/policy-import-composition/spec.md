@@ -468,7 +468,7 @@ ArchLinterNet SHALL publish public guidance that explains one explicitly selecte
 - **THEN** the public guidance identifies each behavior as unsupported
 
 ### Requirement: Public schema, migration, and troubleshooting guidance covers both roles
-ArchLinterNet SHALL document explicit root and fragment schema selection for common schema-aware editors without requiring filename associations. It SHALL provide a behavior-preserving migration from a monolithic policy to one root plus focused fragments and troubleshooting for missing imports, cycles, duplicate paths or IDs, composition conflicts, path-boundary violations, invalid fragment shapes, and editor schema association.
+ArchLinterNet SHALL document explicit root and fragment schema selection for common schema-aware editors without requiring filename associations. It SHALL provide a migration from a monolithic policy to one root plus focused fragments that preserves behavior for keyed sections, singleton settings, unordered concerns, and ordered collections moved as a suffix or moved entirely into ordered fragments. The guidance SHALL explain that imported ordered entries are appended after all root-inline content, so imports cannot reinsert entries between remaining root-inline items. It SHALL also provide troubleshooting for missing imports, cycles, duplicate paths or IDs, composition conflicts, path-boundary violations, invalid fragment shapes, and editor schema association.
 
 #### Scenario: Editor validates an arbitrary fragment filename
 - **WHEN** an author assigns `schema/dependencies.arch.fragment.schema.json` explicitly to an arbitrary imported file
@@ -476,7 +476,8 @@ ArchLinterNet SHALL document explicit root and fragment schema selection for com
 
 #### Scenario: Monolithic policy is migrated incrementally
 - **WHEN** an author moves one concern at a time from a valid monolithic policy into imported fragments
-- **THEN** the guide preserves one root, global contract identity, composition order, and equivalent validation behavior at each checked step
+- **THEN** the guide preserves one root, global contract identity, and composition order
+- **AND THEN** it preserves equivalent validation behavior only when each ordered collection move keeps a root-inline suffix or moves the whole collection into ordered fragments
 
 ### Requirement: Committed acceptance fixtures prove public import behavior
 The repository SHALL contain executable NUnit-backed fixtures that prove equivalent monolithic and imported policies produce equivalent validation outcomes, recommended and arbitrary filenames produce equivalent outcomes, and root-versus-fragment plus fragment-versus-fragment conflicts fail without silent precedence.

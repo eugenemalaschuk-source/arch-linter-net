@@ -226,16 +226,23 @@ Migration does not require a rename and should not change effective behavior:
 1. Keep the existing policy as the only selected root.
 1. Choose one coherent concern, such as shared layers, coverage, or one bounded
    context. Do not split by line count alone.
-1. Move that concern with its existing keys, contract IDs, and list order into
-   one fragment. Do not copy root-only `version` or `name`.
-1. Add the fragment's explicit relative path to root `imports` at the position
-   that preserves the original ordered-contract behavior.
+1. Move that concern with its existing keys and contract IDs into one fragment.
+   Do not copy root-only `version` or `name`.
+1. For ordered collections such as contract lists, preserve behavior only by
+   moving a suffix of the root-inline list into a fragment or by moving the
+   whole collection into one or more ordered fragments. Imports are appended
+   after all root-inline content, so they cannot reinsert entries between
+   remaining root-inline items.
+1. Add the fragment's explicit relative path to root `imports` where it keeps
+   the intended order between fragments.
 1. Validate the selected root in strict and audit modes.
 1. Repeat one concern at a time.
 
 Keep small shared settings inline when that is clearer. Contract IDs remain
 global within their family/mode, and keyed definitions cannot be repeated
-between root and fragments.
+between root and fragments. If you need to preserve relative order inside one
+contract family, do not leave earlier and later entries inline while moving a
+middle entry to a fragment.
 
 To roll back, inline fragment sections at their composed positions and remove
 the corresponding imports. A valid monolithic policy needs no migration merely

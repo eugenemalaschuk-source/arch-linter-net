@@ -74,6 +74,47 @@ public sealed class ArchitecturePolicyImportTests
     }
 
     [Test]
+    public void Load_SplittingOneContractFamilyAcrossRootAndFragment_AppendsFragmentContractsAfterRootInlineContracts()
+    {
+        string root = Write(
+            "architecture/root.yml",
+            """
+            version: 1
+            name: Example
+            imports:
+              - contracts.yml
+            layers:
+              domain:
+                namespace: App.Domain
+              application:
+                namespace: App.Application
+            analysis:
+              target_assemblies: [App]
+            contracts:
+              strict:
+                - name: A
+                  source: application
+                  forbidden: [domain]
+                - name: C
+                  source: application
+                  forbidden: [domain]
+            """);
+        Write(
+            "architecture/contracts.yml",
+            """
+            contracts:
+              strict:
+                - name: B
+                  source: application
+                  forbidden: [domain]
+            """);
+
+        ArchitectureContractDocument document = new ArchitecturePolicyDocumentLoader().Load(root);
+
+        Assert.That(document.Contracts.Strict.Select(contract => contract.Name), Is.EqualTo(new[] { "A", "C", "B" }));
+    }
+
+    [Test]
     public void Load_FragmentRoleComesFromReachability_NotFilename()
     {
         string root = Write("architecture/not-arch.txt", RootYaml("fragment.yaml"));
