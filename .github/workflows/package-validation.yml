@@ -62,3 +62,7 @@ jobs:
             echo 'ArchLinterNet.Unity package must not be produced.' >&2
             exit 1
           fi
+
+          core_nupkg=$(printf '%s\n' "${packages[@]}" | grep '^ArchLinterNet\.Core\.')
+          unzip -p "nupkg/$core_nupkg" '*.nuspec' | grep -q '<dependency id="ArchLinterNet.CEL"' \
+            || { echo "Core .nuspec does not declare ArchLinterNet.CEL as a dependency." >&2; exit 1; }

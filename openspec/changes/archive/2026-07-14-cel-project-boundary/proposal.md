@@ -9,7 +9,7 @@ The CEL (Common Expression Language) engine will eventually power rule evaluatio
 - Register both projects in `ArchLinterNet.slnx`
 - Add `ProjectReference` from `ArchLinterNet.Core` to `ArchLinterNet.CEL`
 - Extend `architecture/dependencies.arch.yml` with a `cel` layer, `ArchLinterNet.CEL` in `target_assemblies` and `assembly_search_paths`, namespace-coverage root, and reverse-dependency prohibition contracts
-- Add architecture tests in `ArchLinterNet.CEL.Tests` that verify the boundary and prove that a reverse dependency fails the policy
+- Add architecture tests in `ArchLinterNet.Core.Tests` that verify the boundary and prove that a reverse dependency fails the policy (placed in `Core.Tests` rather than `CEL.Tests` because the tests need `ArchitectureValidationService` from Core, which `CEL.Tests` must not reference)
 - Validate that `rtk make pack` produces both packages and that Core's `.nuspec` declares CEL as a dependency
 
 ## Capabilities

@@ -12,7 +12,7 @@ This change establishes only the physical boundary — no CEL language behavior 
 - `ArchLinterNet.Core` references CEL via `ProjectReference`; the dependency direction is governed and enforced
 - The architecture policy knows about the CEL assembly (layer declared, in target_assemblies, in namespace-coverage roots)
 - Reverse-dependency contracts (`cel-must-not-depend-on-core/cli/testing`) are declared and passing
-- An architecture test in `CEL.Tests` proves that a synthetic reverse dependency trips the contract
+- Architecture tests in `Core.Tests` prove that a synthetic reverse dependency trips the contract (placed in `Core.Tests` because they require `ArchitectureValidationService`, which `CEL.Tests` must not reference to preserve the single-dependency invariant)
 
 **Non-Goals:**
 
