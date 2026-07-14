@@ -1,4 +1,6 @@
+using System.Text;
 using ArchLinterNet.CEL.Compilation;
+using ArchLinterNet.CEL.Evaluation;
 using ArchLinterNet.CEL.Profile;
 using ArchLinterNet.CEL.Schema;
 
@@ -31,11 +33,22 @@ public sealed class CelEnvironment
     /// <summary>Gets the compilation limits active in this environment.</summary>
     public CelCompilationLimits CompilationLimits { get; }
 
-    internal CelEnvironment(CelProfile profile, CelContextSchema schema, CelCompilationLimits limits)
+    /// <summary>
+    /// Gets the registered object type schemas, keyed by <see cref="CelObjectSchema.ObjectTypeId"/>.
+    /// The binder uses these to resolve and type-check member access expressions.
+    /// </summary>
+    public IReadOnlyDictionary<string, CelObjectSchema> ObjectSchemas { get; }
+
+    internal CelEnvironment(
+        CelProfile profile,
+        CelContextSchema schema,
+        CelCompilationLimits limits,
+        IReadOnlyDictionary<string, CelObjectSchema> objectSchemas)
     {
         Profile = profile;
         Schema = schema;
         CompilationLimits = limits;
+        ObjectSchemas = objectSchemas;
     }
 
     /// <summary>
@@ -48,16 +61,26 @@ public sealed class CelEnvironment
     }
 
     /// <summary>
+    /// Creates an evaluation context builder pre-loaded with this environment's object schema
+    /// catalog for full composite-type and member-type validation.
+    /// </summary>
+    public CelEvaluationContextBuilder CreateEvaluationContextBuilder() =>
+        Schema.CreateEvaluationContextBuilder(ObjectSchemas);
+
+    /// <summary>
     /// Compiles the given expression source as a boolean predicate, returning a structured result.
     /// </summary>
     /// <remarks>
     /// Invalid user expressions produce structured diagnostics — no exception is thrown.
     /// Programmer misuse (null source) throws immediately.
+    /// <see cref="CelCompilationLimits.MaxExpressionLength"/> is enforced before any tokenization.
     /// </remarks>
     public CelCompilationResult<CelCompiledPredicate> CompilePredicate(string source)
     {
         ArgumentNullException.ThrowIfNull(source);
         var key = BuildKey(source, CelRequiredResultType.Predicate);
+        if (source.Length > CompilationLimits.MaxExpressionLength)
+            return CelCompilationResult<CelCompiledPredicate>.BudgetExceeded(key);
         return CelCompilationResult<CelCompiledPredicate>.NotYetImplemented(key);
     }
 
@@ -67,25 +90,35 @@ public sealed class CelEnvironment
     /// <remarks>
     /// Invalid user expressions produce structured diagnostics — no exception is thrown.
     /// Programmer misuse (null source) throws immediately.
+    /// <see cref="CelCompilationLimits.MaxExpressionLength"/> is enforced before any tokenization.
     /// </remarks>
     public CelCompilationResult<CelCompiledExpression> Compile(string source)
     {
         ArgumentNullException.ThrowIfNull(source);
         var key = BuildKey(source, CelRequiredResultType.General);
+        if (source.Length > CompilationLimits.MaxExpressionLength)
+            return CelCompilationResult<CelCompiledExpression>.BudgetExceeded(key);
         return CelCompilationResult<CelCompiledExpression>.NotYetImplemented(key);
     }
 
-    private CelCompilationKey BuildKey(string source, CelRequiredResultType resultType)
-    {
-        var normalized = NormalizeSource(source);
-        return new CelCompilationKey(
-            normalizedSource: normalized,
+    private CelCompilationKey BuildKey(string source, CelRequiredResultType resultType) =>
+        new(
+            normalizedSource: source,
             profileId: Profile.Id,
-            schemaIdentity: Schema.Identity,
+            schemaIdentity: ComputeSchemaIdentity(),
             requiredResultType: resultType,
             compilationLimitsIdentity: CompilationLimits.ComputeIdentity());
-    }
 
-    private static string NormalizeSource(string source) =>
-        string.Join(' ', source.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries));
+    private string ComputeSchemaIdentity()
+    {
+        if (ObjectSchemas.Count == 0)
+            return Schema.Identity;
+        var sb = new StringBuilder(Schema.Identity);
+        foreach (var kv in ObjectSchemas.OrderBy(k => k.Key, StringComparer.Ordinal))
+        {
+            sb.Append('\0');
+            sb.Append(kv.Value.Identity);
+        }
+        return sb.ToString();
+    }
 }

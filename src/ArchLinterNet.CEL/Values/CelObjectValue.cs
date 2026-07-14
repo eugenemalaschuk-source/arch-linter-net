@@ -20,6 +20,7 @@ public sealed class CelObjectValue
 
     /// <summary>
     /// Creates a new <see cref="CelObjectValue"/> with the given type identifier and members.
+    /// Defensively copies <paramref name="members"/> so the caller cannot mutate the value after construction.
     /// </summary>
     public CelObjectValue(string objectTypeId, IReadOnlyDictionary<string, CelValue> members)
     {
@@ -27,7 +28,7 @@ public sealed class CelObjectValue
             throw new ArgumentException("Object type ID must not be null or whitespace.", nameof(objectTypeId));
         ArgumentNullException.ThrowIfNull(members);
         ObjectTypeId = objectTypeId;
-        Members = members;
+        Members = new Dictionary<string, CelValue>(members, StringComparer.Ordinal).AsReadOnly();
     }
 
     /// <inheritdoc/>

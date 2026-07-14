@@ -24,8 +24,9 @@ public sealed class CelContextSchema
     public IReadOnlyList<CelVariable> Variables { get; }
 
     /// <summary>
-    /// Gets a deterministic structural identity string derived from <see cref="SchemaId"/>,
-    /// variable names, and their type kinds. Suitable for use in <see cref="CelCompilationKey"/>.
+    /// Gets a deterministic, collision-safe structural identity string derived from
+    /// <see cref="SchemaId"/>, variable names, and their type descriptors.
+    /// Suitable for use in <see cref="CelCompilationKey"/>.
     /// </summary>
     public string Identity { get; }
 
@@ -38,11 +39,25 @@ public sealed class CelContextSchema
 
     private static string ComputeIdentity(string schemaId, IReadOnlyList<CelVariable> variables)
     {
+        // Length-prefixed, null-byte-separated encoding prevents delimiter-collision between
+        // a schemaId containing separator chars and a schemaId with variables that spell the same
+        // string when naively concatenated.  Example collision the old "|"-only format allowed:
+        //   SchemaId="x|a:string", 0 vars  →  old: "x|a:string"
+        //   SchemaId="x",  var a:string    →  old: "x|a:string"  (same!)
+        // New format:
+        //   SchemaId="x|a:string", 0 vars  →  "10:x|a:string\00"
+        //   SchemaId="x",  var a:string    →  "1:x\01\01:a:string"
         var sb = new StringBuilder();
+        sb.Append(schemaId.Length);
+        sb.Append(':');
         sb.Append(schemaId);
+        sb.Append('\0');
+        sb.Append(variables.Count);
         foreach (var v in variables)
         {
-            sb.Append('|');
+            sb.Append('\0');
+            sb.Append(v.Name.Length);
+            sb.Append(':');
             sb.Append(v.Name);
             sb.Append(':');
             sb.Append(v.Type);
@@ -64,7 +79,15 @@ public sealed class CelContextSchema
     /// Creates a new <see cref="CelEvaluationContextBuilder"/> bound to this schema.
     /// </summary>
     public CelEvaluationContextBuilder CreateEvaluationContextBuilder() =>
-        new(this);
+        new(this, null);
+
+    /// <summary>
+    /// Creates a new <see cref="CelEvaluationContextBuilder"/> bound to this schema, with access
+    /// to the given object schema catalog for full composite-type and member-type validation.
+    /// </summary>
+    internal CelEvaluationContextBuilder CreateEvaluationContextBuilder(
+        IReadOnlyDictionary<string, CelObjectSchema> objectSchemas) =>
+        new(this, objectSchemas);
 
     /// <inheritdoc/>
     public override string ToString() => SchemaId;

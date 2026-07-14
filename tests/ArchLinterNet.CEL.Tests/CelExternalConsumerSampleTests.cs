@@ -30,16 +30,28 @@ public sealed class CelExternalConsumerSampleTests
         var target = schemaBuilder.AddVariable("target", CelType.ObjectOf("assembly"));
         var schema = schemaBuilder.Build();
 
-        // ── 2. Build an immutable CEL environment ─────────────────────────────
+        // ── 2. Define the object type schema ──────────────────────────────────
+        // Declare the shape of the "assembly" object type so the binder can
+        // type-check member-access expressions like `source.role` and
+        // `target.namespace` without CLR reflection.
+        var assemblyObjBuilder = CelObjectSchema.CreateBuilder("assembly");
+        assemblyObjBuilder.AddMember("role", CelType.String);
+        assemblyObjBuilder.AddMember("namespace", CelType.String);
+        var assemblySchema = assemblyObjBuilder.Build();
+
+        // ── 3. Build an immutable CEL environment ─────────────────────────────
         var environment = CelEnvironment.CreateBuilder(CelProfile.V1)
             .WithContextSchema(schema)
             .WithCompilationLimits(CelCompilationLimits.SafeDefaults)
+            .WithObjectSchema(assemblySchema)
             .Build();
 
-        // Verify environment captures profile, schema, and limits.
+        // Verify environment captures profile, schema, limits, and object catalog.
         Assert.That(environment.Profile, Is.SameAs(CelProfile.V1));
         Assert.That(environment.Schema, Is.SameAs(schema));
         Assert.That(environment.CompilationLimits, Is.Not.Null);
+        Assert.That(environment.ObjectSchemas, Contains.Key("assembly"));
+        Assert.That(environment.ObjectSchemas["assembly"], Is.SameAs(assemblySchema));
 
         // ── 3. Compile a predicate expression ─────────────────────────────────
         // The normal compile path parses, binds, and type-checks the whole expression.
@@ -68,7 +80,9 @@ public sealed class CelExternalConsumerSampleTests
         var key = compilation.CompilationKey;
         Assert.That(key.ProfileId, Is.EqualTo(CelProfile.V1.Id));
         Assert.That(key.RequiredResultType, Is.EqualTo(CelRequiredResultType.Predicate));
-        Assert.That(key.SchemaIdentity, Is.EqualTo(schema.Identity));
+        // Schema identity incorporates the context schema AND registered object schemas.
+        Assert.That(key.SchemaIdentity, Is.Not.Null.And.Not.Empty);
+        Assert.That(key.SchemaIdentity, Does.StartWith(schema.Identity));
         Assert.That(key.NormalizedSource, Is.Not.Null.And.Not.Empty);
 
         // ── 5. Build an evaluation context ────────────────────────────────────
@@ -84,7 +98,9 @@ public sealed class CelExternalConsumerSampleTests
             ["namespace"] = CelValue.String("Example.Domain"),
         };
 
-        var context = schema.CreateEvaluationContextBuilder()
+        // Use env.CreateEvaluationContextBuilder() so the builder has the full
+        // object schema catalog and can validate member types on Set().
+        var context = environment.CreateEvaluationContextBuilder()
             .Set(source, CelValue.Object(new CelObjectValue("assembly", sourceMembers)))
             .Set(target, CelValue.Object(new CelObjectValue("assembly", targetMembers)))
             .Build();

@@ -41,6 +41,21 @@ public sealed class CelCompilationResult<T> where T : class
         CompilationKey = key;
     }
 
+    internal static CelCompilationResult<T> BudgetExceeded(CelCompilationKey key) =>
+        new(
+            isSuccess: false,
+            program: null,
+            diagnostics:
+            [
+                new CelDiagnostic(
+                    CelDiagnosticCode.BudgetExceeded,
+                    "limits",
+                    CelDiagnosticSeverity.Error,
+                    span: null,
+                    $"Expression length {key.NormalizedSource.Length} exceeds MaxExpressionLength limit."),
+            ],
+            key: key);
+
     internal static CelCompilationResult<T> NotYetImplemented(CelCompilationKey key) =>
         new(
             isSuccess: false,

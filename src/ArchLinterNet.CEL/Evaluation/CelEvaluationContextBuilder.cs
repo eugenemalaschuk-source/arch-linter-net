@@ -9,29 +9,45 @@ namespace ArchLinterNet.CEL.Evaluation;
 public sealed class CelEvaluationContextBuilder
 {
     private readonly CelContextSchema _schema;
+    private readonly IReadOnlyDictionary<string, CelObjectSchema>? _objectSchemas;
     private readonly Dictionary<CelVariable, CelValue> _assignments = new(ReferenceEqualityComparer.Instance);
 
-    internal CelEvaluationContextBuilder(CelContextSchema schema)
+    internal CelEvaluationContextBuilder(
+        CelContextSchema schema,
+        IReadOnlyDictionary<string, CelObjectSchema>? objectSchemas)
     {
         _schema = schema;
+        _objectSchemas = objectSchemas;
     }
 
     /// <summary>
     /// Sets a variable's value using its typed handle.
     /// </summary>
     /// <exception cref="ArgumentNullException"><paramref name="variable"/> or <paramref name="value"/> is null.</exception>
-    /// <exception cref="ArgumentException">The variable has already been set, or the value kind does not match the variable's declared type kind.</exception>
+    /// <exception cref="ArgumentException">
+    /// The variable handle does not belong to this schema; the variable has already been set; or
+    /// the value kind does not structurally match the variable's declared type.
+    /// </exception>
     public CelEvaluationContextBuilder Set(CelVariable variable, CelValue value)
     {
         ArgumentNullException.ThrowIfNull(variable);
         ArgumentNullException.ThrowIfNull(value);
 
-        if (_assignments.ContainsKey(variable))
-            throw new ArgumentException($"Variable '{variable.Name}' has already been set in this context.", nameof(variable));
-
-        if (!KindsCompatible(variable.Type.Kind, value.Kind))
+        if (!_schema.Variables.Any(v => ReferenceEquals(v, variable)))
             throw new ArgumentException(
-                $"Value kind {value.Kind} is not compatible with variable '{variable.Name}' declared as {variable.Type.Kind}.",
+                $"Variable '{variable.Name}' is not declared in schema '{_schema.SchemaId}'. " +
+                "Only handles returned by this schema's builder are valid.",
+                nameof(variable));
+
+        if (_assignments.ContainsKey(variable))
+            throw new ArgumentException(
+                $"Variable '{variable.Name}' has already been set in this context.",
+                nameof(variable));
+
+        if (!ValueMatchesType(variable.Type, value))
+            throw new ArgumentException(
+                $"Value kind {value.Kind} is not structurally compatible with variable " +
+                $"'{variable.Name}' declared as {variable.Type}.",
                 nameof(value));
 
         _assignments[variable] = value;
@@ -56,16 +72,54 @@ public sealed class CelEvaluationContextBuilder
         return new CelEvaluationContext(_schema, assignments);
     }
 
-    private static bool KindsCompatible(CelTypeKind declared, CelValueKind actual) =>
-        (declared, actual) switch
+    private bool ValueMatchesType(CelType declared, CelValue actual) =>
+        (declared.Kind, actual.Kind) switch
         {
             (CelTypeKind.Bool, CelValueKind.Bool) => true,
             (CelTypeKind.String, CelValueKind.String) => true,
             (CelTypeKind.Int, CelValueKind.Int) => true,
             (CelTypeKind.Float, CelValueKind.Float) => true,
-            (CelTypeKind.List, CelValueKind.List) => true,
-            (CelTypeKind.Map, CelValueKind.Map) => true,
-            (CelTypeKind.Object, CelValueKind.Object) => true,
+            (CelTypeKind.List, CelValueKind.List) => ValidateListElements(declared, actual),
+            (CelTypeKind.Map, CelValueKind.Map) => ValidateMapValues(declared, actual),
+            (CelTypeKind.Object, CelValueKind.Object) => ValidateObjectValue(declared, actual.AsObject()),
             _ => false,
         };
+
+    private bool ValidateListElements(CelType declared, CelValue listValue)
+    {
+        if (declared.ElementType is null) return true;
+        foreach (var el in listValue.AsList())
+        {
+            if (!ValueMatchesType(declared.ElementType, el))
+                return false;
+        }
+        return true;
+    }
+
+    private bool ValidateMapValues(CelType declared, CelValue mapValue)
+    {
+        if (declared.ValueType is null) return true;
+        foreach (var v in mapValue.AsMap().Values)
+        {
+            if (!ValueMatchesType(declared.ValueType, v))
+                return false;
+        }
+        return true;
+    }
+
+    private bool ValidateObjectValue(CelType declared, CelObjectValue obj)
+    {
+        if (obj.ObjectTypeId != declared.SchemaId) return false;
+
+        if (_objectSchemas is null || !_objectSchemas.TryGetValue(obj.ObjectTypeId, out var objSchema))
+            return true;
+
+        foreach (var (memberName, memberValue) in obj.Members)
+        {
+            var memberDef = objSchema.Members.FirstOrDefault(m => m.Name == memberName);
+            if (memberDef is null) return false;
+            if (!ValueMatchesType(memberDef.Type, memberValue)) return false;
+        }
+        return true;
+    }
 }

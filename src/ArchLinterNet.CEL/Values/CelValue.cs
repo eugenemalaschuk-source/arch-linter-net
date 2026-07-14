@@ -63,18 +63,19 @@ public sealed class CelValue
     public static CelValue Float(double value) =>
         new(CelValueKind.Float, floatValue: value);
 
-    /// <summary>Creates an immutable CEL list value.</summary>
+    /// <summary>Creates an immutable CEL list value. Defensively copies the input.</summary>
     public static CelValue List(IReadOnlyList<CelValue> value)
     {
         ArgumentNullException.ThrowIfNull(value);
-        return new CelValue(CelValueKind.List, listValue: value);
+        return new CelValue(CelValueKind.List, listValue: new List<CelValue>(value).AsReadOnly());
     }
 
-    /// <summary>Creates an immutable, string-keyed CEL map value.</summary>
+    /// <summary>Creates an immutable, string-keyed CEL map value. Defensively copies the input.</summary>
     public static CelValue Map(IReadOnlyDictionary<string, CelValue> value)
     {
         ArgumentNullException.ThrowIfNull(value);
-        return new CelValue(CelValueKind.Map, mapValue: value);
+        return new CelValue(CelValueKind.Map, mapValue:
+            new Dictionary<string, CelValue>(value, StringComparer.Ordinal).AsReadOnly());
     }
 
     /// <summary>Creates a schema-defined CEL object value.</summary>

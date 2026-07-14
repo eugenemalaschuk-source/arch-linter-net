@@ -28,13 +28,29 @@ The CEL language has a normative specification at `https://github.com/cel-expr/c
 
 ## Decisions
 
-### D1: Flat public namespace — `ArchLinterNet.CEL`
+### D1: Logical file subdirectories with public sub-namespaces
 
-All public types live directly in `ArchLinterNet.CEL`. Sub-namespaces are reserved for internal implementation (e.g., `ArchLinterNet.CEL.Internal`).
+Source files are organized into themed subdirectories (`Profile/`, `Schema/`, `Values/`,
+`Compilation/`, `Evaluation/`, `Diagnostics/`) with matching public sub-namespaces
+(`ArchLinterNet.CEL.Schema`, `ArchLinterNet.CEL.Compilation`, etc.).
+`CelEnvironment` and `CelEnvironmentBuilder` remain in the root `ArchLinterNet.CEL` namespace
+as the primary consumer entry points.
 
-**Why**: A single namespace is the discovery surface consumers scan. Scattering types into `ArchLinterNet.CEL.Diagnostics`, `ArchLinterNet.CEL.Evaluation`, etc. adds import friction without benefit at this stage, and makes the API feel heavier than the 5-function language subset it covers. Sub-namespace promotion can happen in a later profile if the type count genuinely warrants it.
+**Why**: The original decision (flat `ArchLinterNet.CEL`) was made before implementation. After
+creating all 22 types, a flat root with no grouping was untenable: types from unrelated concerns
+(diagnostics, compilation limits, schema builders) lived side-by-side with no navigational
+structure. The code review for PR #334 identified that the design and the implemented namespace
+structure were divergent. The sub-namespace organization was accepted as the correct trade-off
+after the full type set was known.
 
-**Alternative considered**: Mirror the layered internal structure publicly (e.g., `.Values`, `.Schema`, `.Diagnostics`). Rejected: premature. The issue explicitly says to keep the happy path concise — flat namespacing supports that.
+**Impact on consumers**: Consumers using auto-import or IDE tooling are unaffected. Those writing
+explicit `using` directives need `using ArchLinterNet.CEL.Schema;` etc. in addition to
+`using ArchLinterNet.CEL;`. The `CelEnvironment.CreateBuilder` entry point stays in the
+root namespace, so the primary happy-path builder chain requires only `using ArchLinterNet.CEL;`.
+
+**Alternative considered**: Keep flat `ArchLinterNet.CEL` with all 22 types at root.
+Rejected post-implementation: the root directory becomes hard to navigate, and grouping into
+sub-namespaces matches how similar APIs (e.g., `Microsoft.CodeAnalysis`) are organized.
 
 ### D2: `CelEngine` demoted to `internal`
 

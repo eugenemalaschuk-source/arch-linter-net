@@ -324,6 +324,412 @@ public sealed class CelApiShapeTests
             Throws.InvalidOperationException);
     }
 
+    // ── Object schema model ───────────────────────────────────────────────────
+
+    [Test]
+    public void CelObjectSchema_CreateBuilder_ReturnsBuilder()
+    {
+        var builder = CelObjectSchema.CreateBuilder("widget");
+        Assert.That(builder, Is.Not.Null);
+    }
+
+    [Test]
+    public void CelObjectSchemaBuilder_AddMember_ReturnsHandle()
+    {
+        var builder = CelObjectSchema.CreateBuilder("widget");
+        var member = builder.AddMember("label", CelType.String);
+        Assert.That(member, Is.Not.Null);
+        Assert.That(member.Name, Is.EqualTo("label"));
+        Assert.That(member.Type, Is.SameAs(CelType.String));
+    }
+
+    [Test]
+    public void CelObjectSchemaBuilder_DuplicateMemberName_ThrowsArgumentException()
+    {
+        var builder = CelObjectSchema.CreateBuilder("widget");
+        builder.AddMember("x", CelType.Int);
+        Assert.That(() => builder.AddMember("x", CelType.String), Throws.ArgumentException);
+    }
+
+    [Test]
+    public void CelObjectSchemaBuilder_Build_ReturnsImmutableSchema()
+    {
+        var builder = CelObjectSchema.CreateBuilder("widget");
+        builder.AddMember("id", CelType.Int);
+        builder.AddMember("name", CelType.String);
+        var schema = builder.Build();
+
+        Assert.That(schema, Is.Not.Null);
+        Assert.That(schema.ObjectTypeId, Is.EqualTo("widget"));
+        Assert.That(schema.Members, Has.Count.EqualTo(2));
+        Assert.That(schema.Members[0].Name, Is.EqualTo("id"));
+        Assert.That(schema.Members[1].Name, Is.EqualTo("name"));
+    }
+
+    [Test]
+    public void CelObjectSchema_IdentityIsDeterministic()
+    {
+        var builderA = CelObjectSchema.CreateBuilder("item");
+        builderA.AddMember("n", CelType.String);
+        var schemaA = builderA.Build();
+
+        var builderB = CelObjectSchema.CreateBuilder("item");
+        builderB.AddMember("n", CelType.String);
+        var schemaB = builderB.Build();
+
+        Assert.That(schemaA.ObjectTypeId, Is.EqualTo(schemaB.ObjectTypeId));
+        Assert.That(schemaA.Members.Count, Is.EqualTo(schemaB.Members.Count));
+    }
+
+    // ── Environment with object schema ────────────────────────────────────────
+
+    [Test]
+    public void CelEnvironmentBuilder_WithObjectSchema_PopulatesObjectSchemas()
+    {
+        var objSchemaBuilder = CelObjectSchema.CreateBuilder("point");
+        objSchemaBuilder.AddMember("x", CelType.Float);
+        var objSchema = objSchemaBuilder.Build();
+
+        var env = CelEnvironment.CreateBuilder(CelProfile.V1)
+            .WithContextSchema(BuildSimpleSchema())
+            .WithObjectSchema(objSchema)
+            .Build();
+
+        Assert.That(env.ObjectSchemas, Contains.Key("point"));
+        Assert.That(env.ObjectSchemas["point"], Is.SameAs(objSchema));
+    }
+
+    [Test]
+    public void CelEnvironmentBuilder_WithDuplicateObjectSchema_ThrowsArgumentException()
+    {
+        var objSchemaBuilder = CelObjectSchema.CreateBuilder("point");
+        var objSchema = objSchemaBuilder.Build();
+
+        Assert.That(
+            () => CelEnvironment.CreateBuilder(CelProfile.V1)
+                .WithContextSchema(BuildSimpleSchema())
+                .WithObjectSchema(objSchema)
+                .WithObjectSchema(objSchema),
+            Throws.ArgumentException);
+    }
+
+    [Test]
+    public void CelEnvironment_WithoutObjectSchemas_HasEmptyObjectSchemas()
+    {
+        var env = BuildSimpleEnvironment();
+        Assert.That(env.ObjectSchemas, Is.Empty);
+    }
+
+    // ── Compile (non-predicate) overload ──────────────────────────────────────
+
+    [Test]
+    public void CelEnvironment_Compile_ReturnsNotYetImplemented()
+    {
+        var env = BuildSimpleEnvironment();
+        var result = env.Compile("source + '_suffix'");
+
+        Assert.That(result, Is.Not.Null);
+        Assert.That(result.IsSuccess, Is.False);
+        Assert.That(result.Diagnostics[0].Code, Is.EqualTo(CelDiagnosticCode.NotYetImplemented));
+        Assert.That(result.CompilationKey.RequiredResultType, Is.EqualTo(CelRequiredResultType.General));
+    }
+
+    // ── BudgetExceeded diagnostic ─────────────────────────────────────────────
+
+    [Test]
+    public void CelEnvironment_CompilePredicate_ExceedsMaxLength_ReturnsBudgetExceeded()
+    {
+        var tightLimits = new CelCompilationLimits(maxExpressionLength: 5, maxNestingDepth: 4, maxIdentifierCount: 4);
+        var env = CelEnvironment.CreateBuilder(CelProfile.V1)
+            .WithContextSchema(BuildSimpleSchema())
+            .WithCompilationLimits(tightLimits)
+            .Build();
+
+        var result = env.CompilePredicate("source == 'too_long_value'");
+
+        Assert.That(result.IsSuccess, Is.False);
+        Assert.That(result.Diagnostics[0].Code, Is.EqualTo(CelDiagnosticCode.BudgetExceeded));
+    }
+
+    [Test]
+    public void CelEnvironment_Compile_ExceedsMaxLength_ReturnsBudgetExceeded()
+    {
+        var tightLimits = new CelCompilationLimits(maxExpressionLength: 3, maxNestingDepth: 4, maxIdentifierCount: 4);
+        var env = CelEnvironment.CreateBuilder(CelProfile.V1)
+            .WithContextSchema(BuildSimpleSchema())
+            .WithCompilationLimits(tightLimits)
+            .Build();
+
+        var result = env.Compile("1 + 2");
+
+        Assert.That(result.IsSuccess, Is.False);
+        Assert.That(result.Diagnostics[0].Code, Is.EqualTo(CelDiagnosticCode.BudgetExceeded));
+    }
+
+    [Test]
+    public void CelCompilationLimits_ZeroOrNegativeArgs_ThrowArgumentOutOfRange()
+    {
+        Assert.That(() => new CelCompilationLimits(0, 4, 4), Throws.TypeOf<ArgumentOutOfRangeException>());
+        Assert.That(() => new CelCompilationLimits(4, 0, 4), Throws.TypeOf<ArgumentOutOfRangeException>());
+        Assert.That(() => new CelCompilationLimits(4, 4, 0), Throws.TypeOf<ArgumentOutOfRangeException>());
+    }
+
+    // ── CelValue: object factory and accessor ─────────────────────────────────
+
+    [Test]
+    public void CelValue_ObjectFactory_ProducesCorrectKind()
+    {
+        var obj = new CelObjectValue("widget", new Dictionary<string, CelValue>());
+        var v = CelValue.Object(obj);
+        Assert.That(v.Kind, Is.EqualTo(CelValueKind.Object));
+        Assert.That(v.AsObject(), Is.SameAs(obj));
+    }
+
+    [Test]
+    public void CelValue_AsObject_WrongKind_ThrowsInvalidOperationException()
+    {
+        Assert.That(() => CelValue.String("x").AsObject(), Throws.InvalidOperationException);
+    }
+
+    [Test]
+    public void CelValue_AsList_WrongKind_ThrowsInvalidOperationException()
+    {
+        Assert.That(() => CelValue.Int(1).AsList(), Throws.InvalidOperationException);
+    }
+
+    [Test]
+    public void CelValue_AsMap_WrongKind_ThrowsInvalidOperationException()
+    {
+        Assert.That(() => CelValue.Bool(false).AsMap(), Throws.InvalidOperationException);
+    }
+
+    [Test]
+    public void CelValue_AsInt_WrongKind_ThrowsInvalidOperationException()
+    {
+        Assert.That(() => CelValue.Float(1.0).AsInt(), Throws.InvalidOperationException);
+    }
+
+    [Test]
+    public void CelValue_AsFloat_WrongKind_ThrowsInvalidOperationException()
+    {
+        Assert.That(() => CelValue.Int(1L).AsFloat(), Throws.InvalidOperationException);
+    }
+
+    // ── CelValue immutability after construction ──────────────────────────────
+
+    [Test]
+    public void CelValue_List_ImmutableAfterConstruction()
+    {
+        var source = new List<CelValue> { CelValue.Int(1) };
+        var v = CelValue.List(source);
+        source.Add(CelValue.Int(2));
+        Assert.That(v.AsList(), Has.Count.EqualTo(1));
+    }
+
+    [Test]
+    public void CelValue_Map_ImmutableAfterConstruction()
+    {
+        var source = new Dictionary<string, CelValue> { ["a"] = CelValue.Int(1) };
+        var v = CelValue.Map(source);
+        source["b"] = CelValue.Int(2);
+        Assert.That(v.AsMap(), Has.Count.EqualTo(1));
+    }
+
+    // ── CelObjectValue ────────────────────────────────────────────────────────
+
+    [Test]
+    public void CelObjectValue_ConstructionAndMembers()
+    {
+        var members = new Dictionary<string, CelValue> { ["role"] = CelValue.String("svc") };
+        var obj = new CelObjectValue("assembly", members);
+        Assert.That(obj.ObjectTypeId, Is.EqualTo("assembly"));
+        Assert.That(obj.Members, Contains.Key("role"));
+        Assert.That(obj.Members["role"].AsString(), Is.EqualTo("svc"));
+    }
+
+    [Test]
+    public void CelObjectValue_ImmutableAfterConstruction()
+    {
+        var source = new Dictionary<string, CelValue> { ["x"] = CelValue.Int(1) };
+        var obj = new CelObjectValue("t", source);
+        source["y"] = CelValue.Int(2);
+        Assert.That(obj.Members, Has.Count.EqualTo(1));
+    }
+
+    // ── Context builder: foreign handle and type mismatch ────────────────────
+
+    [Test]
+    public void CelEvaluationContextBuilder_Set_ForeignHandle_ThrowsArgumentException()
+    {
+        var builderA = CelContextSchema.CreateBuilder("a");
+        builderA.AddVariable("x", CelType.String);
+        var schemaA = builderA.Build();
+
+        var builderB = CelContextSchema.CreateBuilder("b");
+        var handleFromB = builderB.AddVariable("x", CelType.String);
+        builderB.Build();
+
+        Assert.That(
+            () => schemaA.CreateEvaluationContextBuilder().Set(handleFromB, CelValue.String("v")),
+            Throws.ArgumentException);
+    }
+
+    [Test]
+    public void CelEvaluationContextBuilder_Set_ListElementTypeMismatch_ThrowsArgumentException()
+    {
+        var schemaBuilder = CelContextSchema.CreateBuilder("ctx");
+        var handle = schemaBuilder.AddVariable("nums", CelType.ListOf(CelType.Int));
+        var schema = schemaBuilder.Build();
+
+        var wrongList = CelValue.List([CelValue.String("not_an_int")]);
+        Assert.That(
+            () => schema.CreateEvaluationContextBuilder().Set(handle, wrongList),
+            Throws.ArgumentException);
+    }
+
+    [Test]
+    public void CelEvaluationContextBuilder_Set_ObjectTypeIdMismatch_ThrowsArgumentException()
+    {
+        var schemaBuilder = CelContextSchema.CreateBuilder("ctx");
+        var handle = schemaBuilder.AddVariable("obj", CelType.ObjectOf("widget"));
+        var schema = schemaBuilder.Build();
+
+        var wrongObj = CelValue.Object(new CelObjectValue("gadget", new Dictionary<string, CelValue>()));
+        Assert.That(
+            () => schema.CreateEvaluationContextBuilder().Set(handle, wrongObj),
+            Throws.ArgumentException);
+    }
+
+    [Test]
+    public void CelEnvironment_CreateEvaluationContextBuilder_ValidatesObjectMembers()
+    {
+        var objSchemaBuilder = CelObjectSchema.CreateBuilder("widget");
+        objSchemaBuilder.AddMember("count", CelType.Int);
+        var objSchema = objSchemaBuilder.Build();
+
+        var ctxSchemaBuilder = CelContextSchema.CreateBuilder("ctx");
+        var handle = ctxSchemaBuilder.AddVariable("w", CelType.ObjectOf("widget"));
+        var ctxSchema = ctxSchemaBuilder.Build();
+
+        var env = CelEnvironment.CreateBuilder(CelProfile.V1)
+            .WithContextSchema(ctxSchema)
+            .WithObjectSchema(objSchema)
+            .Build();
+
+        // member "count" is declared as Int, so String value must fail
+        var wrongMembers = new Dictionary<string, CelValue> { ["count"] = CelValue.String("bad") };
+        var wrongObj = CelValue.Object(new CelObjectValue("widget", wrongMembers));
+        Assert.That(
+            () => env.CreateEvaluationContextBuilder().Set(handle, wrongObj),
+            Throws.ArgumentException);
+    }
+
+    // ── Cache identity regressions ────────────────────────────────────────────
+
+    [Test]
+    public void CelCompilationKey_SameSource_ProducesEqualKeys()
+    {
+        var env = BuildSimpleEnvironment();
+        var r1 = env.CompilePredicate("source == 'x'");
+        var r2 = env.CompilePredicate("source == 'x'");
+        Assert.That(r1.CompilationKey, Is.EqualTo(r2.CompilationKey));
+        Assert.That(r1.CompilationKey.GetHashCode(), Is.EqualTo(r2.CompilationKey.GetHashCode()));
+    }
+
+    [Test]
+    public void CelCompilationKey_DifferentSource_ProducesDifferentKeys()
+    {
+        var env = BuildSimpleEnvironment();
+        var r1 = env.CompilePredicate("source == 'x'");
+        var r2 = env.CompilePredicate("source == 'y'");
+        Assert.That(r1.CompilationKey, Is.Not.EqualTo(r2.CompilationKey));
+    }
+
+    [Test]
+    public void CelCompilationKey_WhitespaceInStringLiteral_ProducesDifferentKeys()
+    {
+        // Regression: "source == 'x'" and "source == ' x'" must be distinct keys.
+        // Earlier code normalized whitespace inside string literals, which was wrong.
+        var env = BuildSimpleEnvironment();
+        var r1 = env.CompilePredicate("source == 'x'");
+        var r2 = env.CompilePredicate("source == ' x'");
+        Assert.That(r1.CompilationKey, Is.Not.EqualTo(r2.CompilationKey));
+    }
+
+    [Test]
+    public void CelContextSchema_Identity_CollisionSafe()
+    {
+        // Regression: schemas that produce the same string under naive delimiter encoding
+        // must produce distinct identities under the length-prefixed encoding.
+        // SchemaId = "x|a:string" with 0 vars  vs  SchemaId = "x" with var "a:string".
+        // Old "|"-only format: both produce "x|a:string". New format: distinct.
+        var builderA = CelContextSchema.CreateBuilder("x|a:string");
+        var schemaA = builderA.Build();
+
+        var builderB = CelContextSchema.CreateBuilder("x");
+        builderB.AddVariable("a:string", CelType.String);
+        var schemaB = builderB.Build();
+
+        Assert.That(schemaA.Identity, Is.Not.EqualTo(schemaB.Identity));
+    }
+
+    // ── CelProfileId operators ────────────────────────────────────────────────
+
+    [Test]
+    public void CelProfileId_EqualityOperators()
+    {
+        var a = new CelProfileId("arch-linter/cel/v1");
+        var b = new CelProfileId("arch-linter/cel/v1");
+        var c = new CelProfileId("other");
+        Assert.That(a == b, Is.True);
+        Assert.That(a != c, Is.True);
+    }
+
+    [Test]
+    public void CelProfileId_ImplicitConversionFromString()
+    {
+        CelProfileId id = "arch-linter/cel/v1";
+        Assert.That(id.Value, Is.EqualTo("arch-linter/cel/v1"));
+    }
+
+    [Test]
+    public void CelProfileId_ToString_ReturnsValue()
+    {
+        Assert.That(CelProfile.V1.Id.ToString(), Is.EqualTo("arch-linter/cel/v1"));
+    }
+
+    // ── CelSourceSpan ────────────────────────────────────────────────────────
+
+    [Test]
+    public void CelSourceSpan_ValidSpan_ProducesCorrectProperties()
+    {
+        var span = new CelSourceSpan(start: 3, end: 10);
+        Assert.That(span.Start, Is.EqualTo(3));
+        Assert.That(span.End, Is.EqualTo(10));
+    }
+
+    [Test]
+    public void CelSourceSpan_NegativeStart_ThrowsArgumentOutOfRange()
+    {
+        Assert.That(() => new CelSourceSpan(-1, 5), Throws.TypeOf<ArgumentOutOfRangeException>());
+    }
+
+    [Test]
+    public void CelSourceSpan_EndLessThanStart_ThrowsArgumentOutOfRange()
+    {
+        Assert.That(() => new CelSourceSpan(5, 3), Throws.TypeOf<ArgumentOutOfRangeException>());
+    }
+
+    [Test]
+    public void CelSourceSpan_Equality()
+    {
+        var a = new CelSourceSpan(1, 5);
+        var b = new CelSourceSpan(1, 5);
+        var c = new CelSourceSpan(2, 5);
+        Assert.That(a, Is.EqualTo(b));
+        Assert.That(a, Is.Not.EqualTo(c));
+    }
+
     // ── Helpers ──────────────────────────────────────────────────────────────
 
     private static CelContextSchema BuildSimpleSchema()

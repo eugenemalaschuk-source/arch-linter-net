@@ -1,11 +1,15 @@
 # cel-profile-v1 Specification
 
 ## Purpose
-TBD - created by archiving change cel-profile-v1-api. Update Purpose after archive.
+
+Defines the normative ArchLinter CEL Profile v1 (`arch-linter/cel/v1`): the bounded CEL language
+subset, public API surface, immutability and thread-safety contracts, structured diagnostic model,
+compilation/evaluation limits, and cache identity design for `ArchLinterNet.CEL`. This spec is
+the source of truth that implementation tasks #325–#329 must satisfy.
 ## Requirements
 ### Requirement: Profile identity and CEL baseline are pinned
 
-ArchLinter CEL Profile v1 (`CelProfileId = "arch-linter/cel/v1"`) SHALL pin the normative CEL language specification at `https://github.com/cel-expr/cel-spec/blob/master/doc/langdef.md` (commit pinned per release). The profile identifier SHALL be a stable, versioned string that appears in `CelCompilationKey` and diagnostic messages. The profile SHALL NOT claim full CEL conformance; it defines a deliberate subset.
+ArchLinter CEL Profile v1 (`CelProfileId = "arch-linter/cel/v1"`) SHALL pin the normative CEL language specification at commit `59505c14f3187e6eb9684fbd3d07146f614c6148` of `https://github.com/google/cel-spec` (`doc/langdef.md` at that commit). The repository is `google/cel-spec`, not `cel-expr/cel-spec`. The profile identifier SHALL be a stable, versioned string that appears in `CelCompilationKey` and diagnostic messages. The profile SHALL NOT claim full CEL conformance; it defines a deliberate subset.
 
 #### Scenario: Profile identity is accessible from public API
 
