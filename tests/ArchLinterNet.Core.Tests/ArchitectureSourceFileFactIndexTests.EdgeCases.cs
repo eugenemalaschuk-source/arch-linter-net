@@ -203,6 +203,114 @@ public sealed partial class ArchitectureSourceFileFactIndexTests
             "Without the symbol the declaration is invisible to the parser → no source enrichment");
     }
 
+    // ── Assembly-aware lookup (3.1) ────────────────────────────────────────────────────
+    //
+    // Two-assembly regression for CLR name collision: the test and core assemblies have no
+    // overlapping CLR names, so the multi-assembly guard (multiAssemblyNames) cannot be exercised
+    // via real assemblies here. The tests below verify the new overload API correctness; the guard
+    // itself is covered by the implementation unit-reading the reflectionFactsByName list count.
+
+    private static readonly Assembly _coreAssembly = typeof(ArchitectureDeclaredTypeFact).Assembly;
+
+    [Test]
+    public void TryGetFact_AssemblyAndName_ReturnsCorrectFactForSpecifiedAssembly()
+    {
+        // TryGetFact(assemblyName, fullTypeName) must return only the fact belonging to the
+        // requested assembly, not a fact from a different assembly that happens to share the name.
+        var index = new ArchitectureSourceFileFactIndex(
+            new[] { _testAssembly, _coreAssembly },
+            FakePaths.Root("/fake/repo"),
+            Array.Empty<string>(),
+            null,
+            new FakeArchitectureFileSystem());
+
+        string testOnlyType = "ArchLinterNet.Core.Tests.SourceFactFixtures.SingleTypeFixture";
+
+        bool foundInTest = index.TryGetFact("ArchLinterNet.Core.Tests", testOnlyType, out ArchitectureDeclaredTypeFact fact);
+        bool foundInCore = index.TryGetFact("ArchLinterNet.Core", testOnlyType, out _);
+
+        Assert.That(foundInTest, Is.True);
+        Assert.That(fact.AssemblyName, Is.EqualTo("ArchLinterNet.Core.Tests"));
+        Assert.That(foundInCore, Is.False,
+            "Type from test assembly must not be visible under a different assembly name");
+    }
+
+    [Test]
+    public void TryGetFact_AssemblyAndName_ReturnsFalseForUnknownAssemblyName()
+    {
+        var index = new ArchitectureSourceFileFactIndex(
+            new[] { _testAssembly },
+            FakePaths.Root("/fake/repo"),
+            Array.Empty<string>(),
+            null,
+            new FakeArchitectureFileSystem());
+
+        bool found = index.TryGetFact(
+            "SomeOther.Assembly",
+            "ArchLinterNet.Core.Tests.SourceFactFixtures.SingleTypeFixture",
+            out _);
+
+        Assert.That(found, Is.False);
+    }
+
+    [Test]
+    public void TryGetFact_AssemblyAndName_WithSource_ReturnsEnrichedFact()
+    {
+        const string Source = """
+            namespace ArchLinterNet.Core.Tests.SourceFactFixtures {
+                public sealed class SingleTypeFixture { }
+            }
+            """;
+
+        ArchitectureSourceFileFactIndex index = BuildIndex(
+            "/fake/repo", "src",
+            new Dictionary<string, string> { ["SingleTypeFixture.cs"] = Source });
+
+        bool found = index.TryGetFact(
+            "ArchLinterNet.Core.Tests",
+            "ArchLinterNet.Core.Tests.SourceFactFixtures.SingleTypeFixture",
+            out ArchitectureDeclaredTypeFact fact);
+
+        Assert.That(found, Is.True);
+        Assert.That(fact.AssemblyName, Is.EqualTo("ArchLinterNet.Core.Tests"));
+        Assert.That(fact.SourceFilePath, Is.EqualTo("src/SingleTypeFixture.cs"));
+    }
+
+    [Test]
+    public void TryGetFact_AssemblyAndName_TwoAssembliesOneSourceRoot_EachAssemblySeesOwnFact()
+    {
+        // Regression: index backed by two assemblies must not expose a type from assembly A
+        // when the caller requests it by assembly B name, even when source is available.
+        const string Source = """
+            namespace ArchLinterNet.Core.Tests.SourceFactFixtures {
+                public sealed class SingleTypeFixture { }
+            }
+            """;
+
+        string absoluteRepoRoot = FakePaths.Root("/fake/repo");
+        var fs = new FakeArchitectureFileSystem();
+        string absoluteRoot = absoluteRepoRoot + "/src";
+        fs.AddDirectory(absoluteRoot);
+        fs.AddFile(absoluteRoot + "/SingleTypeFixture.cs", Source, DateTime.UtcNow);
+
+        var index = new ArchitectureSourceFileFactIndex(
+            new[] { _testAssembly, _coreAssembly },
+            absoluteRepoRoot,
+            new[] { "src" },
+            null,
+            fs);
+
+        string typeName = "ArchLinterNet.Core.Tests.SourceFactFixtures.SingleTypeFixture";
+
+        bool inTest = index.TryGetFact("ArchLinterNet.Core.Tests", typeName, out ArchitectureDeclaredTypeFact testFact);
+        bool inCore = index.TryGetFact("ArchLinterNet.Core", typeName, out _);
+
+        Assert.That(inTest, Is.True);
+        Assert.That(testFact.AssemblyName, Is.EqualTo("ArchLinterNet.Core.Tests"));
+        Assert.That(inCore, Is.False,
+            "ArchLinterNet.Core assembly does not declare SingleTypeFixture");
+    }
+
     // ── Helpers shared across partial files ───────────────────────────────────────────
 
     private static ArchitectureSourceFileFactIndex BuildIndexWithPreprocessorSymbols(

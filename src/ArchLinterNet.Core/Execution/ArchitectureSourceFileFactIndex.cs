@@ -13,11 +13,12 @@ namespace ArchLinterNet.Core.Execution;
 //
 // Key design decisions (see design.md for full rationale):
 // - Reflection-first: every loadable type gets a fact; source enriches path/kind when available.
-// - Assembly-aware identity: one fact per (assemblyName, fullTypeName) pair; the same CLR full
-//   name appearing in multiple assemblies produces separate facts — all in AllFacts, and the
-//   first alphabetically by assembly name wins the TryGetFact(string) lookup.
-// - Source correlation is best-effort when multiple assemblies share a CLR name, since source
-//   roots are global (not per-project); the limitation is documented in design.md.
+// - Assembly-aware identity: one fact per (assemblyName, fullTypeName) pair. The same CLR full
+//   name in multiple assemblies produces separate facts (all in AllFacts). TryGetFact(string)
+//   returns the first-alphabetically assembly; TryGetFact(assemblyName, fullTypeName) is exact.
+// - Source correlation is skipped when a CLR name appears in multiple assemblies: without
+//   per-project source roots the index cannot determine which file belongs to which assembly,
+//   so all affected facts get null SourceFilePath rather than a potentially wrong path.
 // - CLR-format full names (dots, +, `N) used as index keys throughout.
 // - Empty sourceRoots → reflection-only facts (null SourceFilePath) with no filesystem access.
 // - Ambiguity: same CLR name declared in more than one distinct file (partial class across files).
@@ -58,6 +59,18 @@ public sealed class ArchitectureSourceFileFactIndex
     {
         ArgumentNullException.ThrowIfNull(fullTypeName);
         return _data.Value.FactsByName.TryGetValue(fullTypeName, out fact!);
+    }
+
+    // Assembly-aware overload: returns the fact for exactly (assemblyName, fullTypeName).
+    // Use this when the caller already knows which assembly it cares about — e.g. a path/layout
+    // rule that receives a Type instance and can supply Type.Assembly.GetName().Name directly.
+    // Returns false when no type with that name was found in that assembly.
+    public bool TryGetFact(string assemblyName, string fullTypeName, out ArchitectureDeclaredTypeFact fact)
+    {
+        ArgumentNullException.ThrowIfNull(assemblyName);
+        ArgumentNullException.ThrowIfNull(fullTypeName);
+        return _data.Value.FactsByAssemblyAndName.TryGetValue(
+            (assemblyName, fullTypeName), out fact!);
     }
 
     public IReadOnlyList<ArchitectureDeclaredTypeFact> GetFactsForFile(string relativeFilePath)
@@ -112,6 +125,17 @@ public sealed class ArchitectureSourceFileFactIndex
             }
         }
 
+        // Identify CLR names that appear in more than one assembly. For these types, source
+        // ownership is indeterminate (source roots are global, not per-project), so we must not
+        // propagate a source path from one assembly to another, and multiple distinct source files
+        // for such a name are NOT a partial-class ambiguity — they may simply be the separate
+        // implementations in each project.
+        HashSet<string> multiAssemblyNames = new(StringComparer.Ordinal);
+        foreach (KeyValuePair<string, List<BaseFact>> kvp in reflectionFactsByName)
+        {
+            if (kvp.Value.Count > 1) multiAssemblyNames.Add(kvp.Key);
+        }
+
         // Step 2 — source scan: parse each .cs file and collect FullName → file+kind entries.
         // Preprocessor symbols are forwarded so conditional declarations match the compiled assembly.
         Dictionary<string, List<(string FilePath, ArchitectureTypeKind Kind)>> sourceMap =
@@ -157,23 +181,32 @@ public sealed class ArchitectureSourceFileFactIndex
 
         // Step 3 — merge: produce the final fact for every reflection-discovered type.
         //
-        // Source information (file path, TypeKind) is resolved per CLR fullTypeName, not per
-        // (assemblyName, fullTypeName). When multiple assemblies declare the same CLR name, they
-        // all share the same source association — this is a known limitation when source roots are
-        // global rather than per-project.
+        // Source information is absent for CLR names that appear in multiple assemblies (see the
+        // multiAssemblyNames guard above). For all other names, resolvedSourceInfo carries either
+        // a single file path (enriched fact) or an ambiguity marker (partial class across files).
         //
-        // Ambiguity is determined by the count of DISTINCT normalized file paths, not raw entries.
-        // This correctly handles: (a) overlapping source roots that yield the same file twice, and
-        // (b) multiple syntactic declarations of the same type within one file (valid for partial
-        // classes/structs within a single file, which should not create an ambiguity).
+        // Ambiguity is determined by the count of DISTINCT normalized file paths (not raw entries)
+        // for single-assembly CLR names only. This correctly handles: (a) overlapping source roots
+        // that yield the same file twice, and (b) multiple declarations of the same type within
+        // one file, both of which should not create an ambiguity.
         List<ArchitectureDeclaredTypeFact> allFacts = new();
         List<ArchitectureDeclaredTypeSourceAmbiguity> ambiguities = new();
 
-        // Pre-resolve source info per fullTypeName so it is shared across all assemblies.
+        // Pre-resolve source info per fullTypeName — only for single-assembly CLR names.
+        // When the same CLR name is declared in multiple assemblies (multiAssemblyNames) we cannot
+        // determine which source file belongs to which assembly without per-project source roots,
+        // so we leave those entries absent (→ null SourceFilePath for every affected fact) rather
+        // than silently assigning the wrong project's path to the wrong assembly's fact.
+        // Multiple distinct source files for a multi-assembly CLR name are also NOT recorded as a
+        // partial-class ambiguity — they are likely the separate implementations in each project.
         Dictionary<string, SourceInfo> resolvedSourceInfo = new(StringComparer.Ordinal);
         foreach (KeyValuePair<string, List<(string FilePath, ArchitectureTypeKind Kind)>> entry in sourceMap)
         {
             string fullName = entry.Key;
+
+            // Skip source association for CLR names shared across assemblies.
+            if (multiAssemblyNames.Contains(fullName)) continue;
+
             List<(string FilePath, ArchitectureTypeKind Kind)> sourceEntries = entry.Value;
 
             // Deduplicate by normalized path — one file appearing multiple times (overlapping roots
@@ -251,13 +284,20 @@ public sealed class ArchitectureSourceFileFactIndex
         // Ambiguities are already deduplicated per fullTypeName; sort for determinism.
         ambiguities.Sort((a, b) => StringComparer.Ordinal.Compare(a.FullTypeName, b.FullTypeName));
 
-        // TryGetFact(string) primary lookup: when the same fullTypeName appears in multiple
-        // assemblies, the first alphabetically (guaranteed by allFacts sort) wins.
+        // Primary lookup by FullTypeName only: when the same fullTypeName appears in multiple
+        // assemblies, the first alphabetically (guaranteed by allFacts sort) wins. Callers that
+        // know the assembly should use TryGetFact(assemblyName, fullTypeName) instead.
         Dictionary<string, ArchitectureDeclaredTypeFact> factsByName =
             new(StringComparer.Ordinal);
+
+        // Assembly-aware lookup: exact (assemblyName, fullTypeName) → fact.
+        Dictionary<(string AssemblyName, string FullTypeName), ArchitectureDeclaredTypeFact>
+            factsByAssemblyAndName = new();
+
         foreach (ArchitectureDeclaredTypeFact fact in allFacts)
         {
             factsByName.TryAdd(fact.FullTypeName, fact);
+            factsByAssemblyAndName[(fact.AssemblyName, fact.FullTypeName)] = fact;
         }
 
         // Build secondary indexes (file and namespace lookups), sorting each list for determinism.
@@ -290,6 +330,7 @@ public sealed class ArchitectureSourceFileFactIndex
 
         return new FactIndexData(
             factsByName,
+            factsByAssemblyAndName,
             allFacts,
             ambiguities,
             byFile.ToDictionary(
@@ -395,6 +436,7 @@ public sealed class ArchitectureSourceFileFactIndex
 
     private sealed record FactIndexData(
         Dictionary<string, ArchitectureDeclaredTypeFact> FactsByName,
+        Dictionary<(string AssemblyName, string FullTypeName), ArchitectureDeclaredTypeFact> FactsByAssemblyAndName,
         IReadOnlyList<ArchitectureDeclaredTypeFact> AllFacts,
         IReadOnlyList<ArchitectureDeclaredTypeSourceAmbiguity> Ambiguities,
         Dictionary<string, IReadOnlyList<ArchitectureDeclaredTypeFact>> ByFile,
