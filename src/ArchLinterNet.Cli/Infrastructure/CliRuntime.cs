@@ -54,7 +54,7 @@ internal sealed class CliRuntime : ICliRuntime
         IReadOnlyCollection<ArchitectureClassificationRoleFact> classificationRoles,
         ArchitectureClassificationPathDeferredNotice? classificationPathDeferred)
     {
-        return _formatter.FormatResultForCiArtifacts(
+        return ArchitectureDiagnosticFormatter.FormatResultForCiArtifacts(
             mode,
             passed,
             violations,
@@ -77,7 +77,7 @@ internal sealed class CliRuntime : ICliRuntime
         IReadOnlyCollection<ArchitectureCycleFinding> cycleFindings)
     {
         return cycleFindings.Count > 0
-            ? _sarifFormatter.FormatResultAsSarif(mode, violations, cycleFindings, Version)
+            ? ArchitectureSarifFormatter.FormatResultAsSarif(mode, violations, cycleFindings, Version)
             : _sarifFormatter.FormatResultAsSarif(mode, violations, cycles, Version);
     }
 
@@ -91,7 +91,7 @@ internal sealed class CliRuntime : ICliRuntime
         IReadOnlyCollection<ArchitectureCycleFinding> cycleFindings)
     {
         return cycleFindings.Count > 0
-            ? _formatter.FormatCyclesForHumans(cycleFindings)
+            ? ArchitectureDiagnosticFormatter.FormatCyclesForHumans(cycleFindings)
             : _formatter.FormatCyclesForHumans(cycles);
     }
 

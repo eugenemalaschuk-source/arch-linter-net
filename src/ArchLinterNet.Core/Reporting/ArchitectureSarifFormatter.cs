@@ -20,6 +20,9 @@ public sealed partial class ArchitectureSarifFormatter : IArchitectureSarifForma
         "https://raw.githubusercontent.com/oasis-tcs/sarif-spec/master/Schemata/sarif-schema-2.1.0.json";
 
     private const string ToolName = "arch-linter-net";
+    private const string SarifVersion = "2.1.0";
+    private const string VersionPropertyName = "version";
+    private const string MessagePropertyName = "message";
     private const string MethodBodyCategory = "method-body";
     private const string MethodBodyIlCategory = "method-body-il";
     private const string CycleRuleFallback = "dependency-cycle";
@@ -35,58 +38,31 @@ public sealed partial class ArchitectureSarifFormatter : IArchitectureSarifForma
         IReadOnlyCollection<string> cycles,
         string toolVersion)
     {
-        string level = mode == "strict" ? "error" : "warning";
-
-        List<ResultEntry> entries = violations
-            .Select(ArchitectureDiagnosticMapper.FromViolation)
-            .Select(diagnostic => BuildViolationEntry(diagnostic, level))
-            .Concat(cycles.Select(cycle => BuildCycleEntry(cycle, level)))
-            .OrderBy(e => e.RuleId, StringComparer.Ordinal)
-            .ThenBy(e => e.SourceIdentifier, StringComparer.Ordinal)
-            .ThenBy(e => e.Category, StringComparer.Ordinal)
-            .ToList();
-
-        object[] rules = entries
-            .GroupBy(e => e.RuleId, StringComparer.Ordinal)
-            .OrderBy(g => g.Key, StringComparer.Ordinal)
-            .Select(g => (object)new Dictionary<string, object?>
-            {
-                ["id"] = g.Key,
-                ["shortDescription"] = new Dictionary<string, object?> { ["text"] = g.First().ContractName },
-            })
-            .ToArray();
-
-        object[] results = entries.Select(e => (object)e.Json).ToArray();
-
-        var payload = new Dictionary<string, object?>
-        {
-            ["$schema"] = SchemaUri,
-            ["version"] = "2.1.0",
-            ["runs"] = new object[]
-            {
-                new Dictionary<string, object?>
-                {
-                    ["tool"] = new Dictionary<string, object?>
-                    {
-                        ["driver"] = new Dictionary<string, object?>
-                        {
-                            ["name"] = ToolName,
-                            ["version"] = toolVersion,
-                            ["rules"] = rules,
-                        },
-                    },
-                    ["results"] = results,
-                },
-            },
-        };
-
-        return JsonSerializer.Serialize(payload);
+        return FormatResultAsSarifCore(
+            mode,
+            violations,
+            cycles.Select(cycle => (Func<string, ResultEntry>)(level => BuildCycleEntry(cycle, level))),
+            toolVersion);
     }
 
-    public string FormatResultAsSarif(
+    public static string FormatResultAsSarif(
         string mode,
         IReadOnlyCollection<ArchitectureViolation> violations,
         IReadOnlyCollection<ArchitectureCycleFinding> cycles,
+        string toolVersion)
+    {
+        return FormatResultAsSarifCore(
+            mode,
+            violations,
+            cycles.Select(cycle => (Func<string, ResultEntry>)(level =>
+                BuildCycleEntry(ArchitectureDiagnosticMapper.FromCycle(cycle), level))),
+            toolVersion);
+    }
+
+    private static string FormatResultAsSarifCore(
+        string mode,
+        IReadOnlyCollection<ArchitectureViolation> violations,
+        IEnumerable<Func<string, ResultEntry>> cycleEntryFactories,
         string toolVersion)
     {
         string level = mode == "strict" ? "error" : "warning";
@@ -94,7 +70,7 @@ public sealed partial class ArchitectureSarifFormatter : IArchitectureSarifForma
         List<ResultEntry> entries = violations
             .Select(ArchitectureDiagnosticMapper.FromViolation)
             .Select(diagnostic => BuildViolationEntry(diagnostic, level))
-            .Concat(cycles.Select(cycle => BuildCycleEntry(ArchitectureDiagnosticMapper.FromCycle(cycle), level)))
+            .Concat(cycleEntryFactories.Select(factory => factory(level)))
             .OrderBy(e => e.RuleId, StringComparer.Ordinal)
             .ThenBy(e => e.SourceIdentifier, StringComparer.Ordinal)
             .ThenBy(e => e.Category, StringComparer.Ordinal)
@@ -115,7 +91,7 @@ public sealed partial class ArchitectureSarifFormatter : IArchitectureSarifForma
         var payload = new Dictionary<string, object?>
         {
             ["$schema"] = SchemaUri,
-            ["version"] = "2.1.0",
+            [VersionPropertyName] = SarifVersion,
             ["runs"] = new object[]
             {
                 new Dictionary<string, object?>
@@ -146,7 +122,7 @@ public sealed partial class ArchitectureSarifFormatter : IArchitectureSarifForma
         {
             ["ruleId"] = ruleId,
             ["level"] = level,
-            ["message"] = new Dictionary<string, object?>
+            [MessagePropertyName] = new Dictionary<string, object?>
             {
                 ["text"] = $"[{diagnostic.ContractName}] {sourceType} -> {forbiddenNamespace}: {string.Join(", ", references)}",
             },
@@ -188,7 +164,7 @@ public sealed partial class ArchitectureSarifFormatter : IArchitectureSarifForma
             .Select((location, index) => (object)new Dictionary<string, object?>
             {
                 ["id"] = index + 1,
-                ["message"] = new Dictionary<string, object?>
+                [MessagePropertyName] = new Dictionary<string, object?>
                 {
                     ["text"] = $"Policy {location.Role.ToString().ToLowerInvariant()} definition at {location.YamlPath}"
                 },
@@ -215,7 +191,7 @@ public sealed partial class ArchitectureSarifFormatter : IArchitectureSarifForma
         {
             ["ruleId"] = ruleId,
             ["level"] = level,
-            ["message"] = new Dictionary<string, object?> { ["text"] = $"Dependency cycle detected: {path}" },
+            [MessagePropertyName] = new Dictionary<string, object?> { ["text"] = $"Dependency cycle detected: {path}" },
             ["logicalLocations"] = BuildLogicalLocations(path, "namespace"),
         };
 
@@ -230,7 +206,7 @@ public sealed partial class ArchitectureSarifFormatter : IArchitectureSarifForma
         {
             ["ruleId"] = ruleId,
             ["level"] = level,
-            ["message"] = new Dictionary<string, object?> { ["text"] = $"Dependency cycle detected: {diagnostic.Path}" },
+            [MessagePropertyName] = new Dictionary<string, object?> { ["text"] = $"Dependency cycle detected: {diagnostic.Path}" },
             ["logicalLocations"] = BuildLogicalLocations(diagnostic.Path, "namespace"),
         };
 

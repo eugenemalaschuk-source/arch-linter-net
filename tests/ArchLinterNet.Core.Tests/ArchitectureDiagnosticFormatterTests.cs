@@ -654,11 +654,11 @@ public sealed class ArchitectureDiagnosticFormatterTests
                 "policy: architecture/fragments/policy.yml:contracts.strict[10]"));
             Assert.That(_formatter.FormatPolicyConsistencyForHumans([consistency]), Does.Contain(
                 "policy: architecture/fragments/policy.yml:contracts.strict[10]"));
-            Assert.That(_formatter.FormatCyclesForHumans([cycle]), Does.Contain(
+            Assert.That(ArchitectureDiagnosticFormatter.FormatCyclesForHumans([cycle]), Does.Contain(
                 "policy: architecture/fragments/policy.yml:contracts.strict[10]"));
         });
 
-        using JsonDocument document = JsonDocument.Parse(_formatter.FormatResultForCiArtifacts(
+        using JsonDocument document = JsonDocument.Parse(ArchitectureDiagnosticFormatter.FormatResultForCiArtifacts(
             "strict", false, [violation], Array.Empty<string>(), [cycle], unmatched: [unmatched],
             policyConsistencyFindings: [consistency]));
         JsonElement policyLocation = document.RootElement.GetProperty("violations")[0].GetProperty("policy_location");

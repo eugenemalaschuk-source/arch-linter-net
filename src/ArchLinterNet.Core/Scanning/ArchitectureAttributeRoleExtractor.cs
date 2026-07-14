@@ -319,7 +319,7 @@ public sealed class ArchitectureAttributeRoleExtractor
 
     private ArchitectureAttributeClassificationCandidate ResolveCandidate(
         IReadOnlyList<CustomAttributeData> attributeData,
-        IReadOnlyList<ArchitectureAttributeClassificationMapping> mappings,
+        List<ArchitectureAttributeClassificationMapping> mappings,
         ArchitectureClassificationSource source,
         string subject)
     {

@@ -25,9 +25,7 @@ internal sealed class ArchitectureContractExecutor : IArchitectureContractExecut
 
         session.PrepareRuleInputCoverageDeferral(mode);
 
-        List<ArchitectureViolation> violations = new();
-        List<string> cycles = new();
-        List<ArchitectureCycleFinding> cycleFindings = new();
+        var standardFamilyFindings = new StandardFamilyFindings();
         List<ArchitectureViolation> coverageViolations = new();
         List<ArchitectureCoverageSummary> coverageSummaries = new();
 
@@ -49,12 +47,16 @@ internal sealed class ArchitectureContractExecutor : IArchitectureContractExecut
                 continue;
             }
 
-            ExecuteStandardFamily(session, mode, family, handlerRegistry, timing, violations, cycles, cycleFindings);
+            ExecuteStandardFamily(session, mode, family, handlerRegistry, timing, standardFamilyFindings);
         }
 
-        return new ArchitectureContractExecutionResult(violations, cycles, coverageViolations, coverageSummaries)
+        return new ArchitectureContractExecutionResult(
+            standardFamilyFindings.Violations,
+            standardFamilyFindings.Cycles,
+            coverageViolations,
+            coverageSummaries)
         {
-            CycleFindings = cycleFindings
+            CycleFindings = standardFamilyFindings.CycleFindings
         };
     }
 
@@ -91,9 +93,7 @@ internal sealed class ArchitectureContractExecutor : IArchitectureContractExecut
         string family,
         IArchitectureContractHandlerRegistry handlerRegistry,
         ValidationTiming? timing,
-        List<ArchitectureViolation> violations,
-        List<string> cycles,
-        List<ArchitectureCycleFinding> cycleFindings)
+        StandardFamilyFindings findings)
     {
         int count = 0;
         using (timing?.MeasureContractFamily(family, () => count))
@@ -102,20 +102,29 @@ internal sealed class ArchitectureContractExecutor : IArchitectureContractExecut
             {
                 count++;
                 ArchitectureHandlerResult result = handlerRegistry.Execute(family, session, contract);
-                violations.AddRange(result.Violations
+                findings.Violations.AddRange(result.Violations
                     .Select(violation => session.Document.Provenance.Enrich(violation, contract)));
                 string cycleIdPrefix = contract.Id is null ? string.Empty : $"[{contract.Id}] ";
                 foreach (string cycle in result.Cycles)
                 {
-                    cycles.Add(cycle);
+                    findings.Cycles.Add(cycle);
                     string normalizedPath = cycleIdPrefix.Length > 0 && cycle.StartsWith(cycleIdPrefix, StringComparison.Ordinal)
                         ? cycle[cycleIdPrefix.Length..]
                         : cycle;
-                    cycleFindings.Add(session.Document.Provenance.Enrich(
+                    findings.CycleFindings.Add(session.Document.Provenance.Enrich(
                         new ArchitectureCycleFinding(contract.Name, contract.Id, normalizedPath),
                         contract));
                 }
             }
         }
+    }
+
+    private sealed class StandardFamilyFindings
+    {
+        public List<ArchitectureViolation> Violations { get; } = new();
+
+        public List<string> Cycles { get; } = new();
+
+        public List<ArchitectureCycleFinding> CycleFindings { get; } = new();
     }
 }

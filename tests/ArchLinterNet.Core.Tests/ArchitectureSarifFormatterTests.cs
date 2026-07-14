@@ -299,7 +299,7 @@ public sealed class ArchitectureSarifFormatterTests
                 source, "contracts.strict_cycles[0]", 7, 3, "cycle", "cycle-check", 9)
         };
 
-        string json = _formatter.FormatResultAsSarif(
+        string json = ArchitectureSarifFormatter.FormatResultAsSarif(
             "strict", Array.Empty<ArchitectureViolation>(), [cycle], "1.2.3");
         using JsonDocument document = JsonDocument.Parse(json);
         JsonElement result = document.RootElement.GetProperty("runs")[0].GetProperty("results")[0];

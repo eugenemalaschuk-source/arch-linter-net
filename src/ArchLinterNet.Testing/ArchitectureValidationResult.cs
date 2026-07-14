@@ -55,11 +55,7 @@ public sealed class ArchitectureValidationResult
 
         message += FormatFailureSection(
             "Cycles:",
-            CycleFindings.Count > 0
-                ? _formatter.FormatCyclesForHumans(CycleFindings)
-                : Cycles.Count > 0
-                    ? _formatter.FormatCyclesForHumans(Cycles)
-                    : string.Empty);
+            BuildCycleFailureDetails());
 
         message += FormatFailureSection(
             null,
@@ -89,6 +85,16 @@ public sealed class ArchitectureValidationResult
         return label is null
             ? $"{details}{Environment.NewLine}"
             : $"{label}{Environment.NewLine}{details}{Environment.NewLine}";
+    }
+
+    private string BuildCycleFailureDetails()
+    {
+        if (CycleFindings.Count > 0)
+        {
+            return ArchitectureDiagnosticFormatter.FormatCyclesForHumans(CycleFindings);
+        }
+
+        return Cycles.Count > 0 ? _formatter.FormatCyclesForHumans(Cycles) : string.Empty;
     }
 }
 

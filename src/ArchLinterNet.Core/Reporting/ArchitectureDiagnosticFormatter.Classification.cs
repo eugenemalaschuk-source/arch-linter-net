@@ -23,7 +23,7 @@ public sealed partial class ArchitectureDiagnosticFormatter
             null));
     }
 
-    public string FormatResultForCiArtifacts(
+    public static string FormatResultForCiArtifacts( // NOSONAR: additive cycle-diagnostics overload intentionally mirrors the public CI payload surface
         string mode,
         bool passed,
         IReadOnlyCollection<ArchitectureViolation> violations,
@@ -65,7 +65,7 @@ public sealed partial class ArchitectureDiagnosticFormatter
             null));
     }
 
-    public string FormatResultForCiArtifacts(
+    public static string FormatResultForCiArtifacts( // NOSONAR: additive cycle-diagnostics overload intentionally mirrors the public CI payload surface
         string mode,
         bool passed,
         IReadOnlyCollection<ArchitectureViolation> violations,
@@ -109,7 +109,7 @@ public sealed partial class ArchitectureDiagnosticFormatter
             classificationPathDeferred));
     }
 
-    public string FormatResultForCiArtifacts(
+    public static string FormatResultForCiArtifacts( // NOSONAR: additive cycle-diagnostics overload intentionally mirrors the public CI payload surface
         string mode,
         bool passed,
         IReadOnlyCollection<ArchitectureViolation> violations,

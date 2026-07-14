@@ -11,7 +11,7 @@ public sealed partial class ArchitectureDiagnosticFormatter
         return string.Join(Environment.NewLine, diagnostics.OrderBy(d => d.Path).Select(d => $"- {d.Path}"));
     }
 
-    public string FormatCyclesForHumans(IReadOnlyCollection<ArchitectureCycleFinding> cycles)
+    public static string FormatCyclesForHumans(IReadOnlyCollection<ArchitectureCycleFinding> cycles)
     {
         var diagnostics = cycles.Select(ArchitectureDiagnosticMapper.FromCycle);
         return string.Join(
@@ -41,7 +41,7 @@ public sealed partial class ArchitectureDiagnosticFormatter
         return JsonSerializer.Serialize(payload);
     }
 
-    public string FormatCyclesForCiArtifacts(
+    public static string FormatCyclesForCiArtifacts(
         string contractName,
         string? contractId,
         IReadOnlyCollection<ArchitectureCycleFinding> cycles)
