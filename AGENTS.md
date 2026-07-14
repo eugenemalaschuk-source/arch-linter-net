@@ -121,5 +121,16 @@ tests/
   `openspec/changes/archive/YYYY-MM-DD-<name>/`.
 - Run `openspec validate --all` after archiving or any manual spec edit.
 
+## GitHub feature implementation routing
+When the current user message contains exactly one GitHub issue URL matching:
+
+```text
+https://github.com/<owner>/<repository>/issues/<number>
+```
+
+load and follow the `feature-implementation` skill. Treat the URL as the workflow input and implement the issue completely.
+
+Do not ask the user to repeat the workflow or confirm that implementation should begin. This routing rule does not apply to pull request URLs. Do not merge the resulting pull request unless explicitly requested.
+
 ## State of the repo
 - Early extraction / preview. Docs under `docs/` built with MkDocs. CI in `.github/workflows/`.
