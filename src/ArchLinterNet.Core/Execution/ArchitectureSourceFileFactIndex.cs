@@ -18,7 +18,9 @@ namespace ArchLinterNet.Core.Execution;
 //   name in multiple assemblies produces separate facts (all in AllFacts). TryGetFact(string)
 //   returns false for ambiguous names; TryGetFact(assemblyName, fullTypeName) is exact.
 // - Source correlation is assembly-aware too: a source root contributes declarations only when its
-//   owning assembly can be determined. Unowned roots are ignored rather than guessed.
+//   owning assembly can be determined. For standalone single-target runs without project discovery,
+//   all configured source roots are owned by that sole target assembly; otherwise unowned roots are
+//   ignored rather than guessed.
 // - CLR-format full names (dots, +, `N) used as index keys throughout.
 // - Empty sourceRoots → reflection-only facts (null SourceFilePath) with no filesystem access.
 // - Ambiguity: same owned CLR name declared in more than one distinct file (partial class across
@@ -412,6 +414,17 @@ public sealed class ArchitectureSourceFileFactIndex
 
         if (projectDiscovery == null)
         {
+            if (targetAssemblyNames.Count == 1)
+            {
+                string soleAssemblyName = targetAssemblyNames.First();
+                foreach (string sourceRoot in sourceRoots
+                             .Select(NormalizeRelativePath)
+                             .Distinct(StringComparer.Ordinal))
+                {
+                    ownership[sourceRoot] = soleAssemblyName;
+                }
+            }
+
             return ownership;
         }
 

@@ -96,6 +96,38 @@ public sealed partial class ArchitectureSourceFileFactIndexTests
         Assert.That(fact.SimpleTypeName, Is.EqualTo("SingleTypeFixture"));
     }
 
+    [Test]
+    public void TryGetFact_PublicConstructorSingleTargetAssembly_UsesConfiguredSourceRoots()
+    {
+        const string Source = """
+            namespace ArchLinterNet.Core.Tests.SourceFactFixtures {
+                public sealed class SingleTypeFixture { }
+            }
+            """;
+
+        string absoluteRepoRoot = FakePaths.Root("/fake/repo");
+        var fs = new FakeArchitectureFileSystem();
+        string absoluteRoot = absoluteRepoRoot + "/src";
+        fs.AddDirectory(absoluteRoot);
+        fs.AddDirectory(absoluteRoot + "/Domain");
+        fs.AddFile(absoluteRoot + "/Domain/SingleTypeFixture.cs", Source, DateTime.UtcNow);
+
+        var index = new ArchitectureSourceFileFactIndex(
+            new[] { _testAssembly },
+            absoluteRepoRoot,
+            new[] { "src" },
+            preprocessorSymbols: null,
+            fs);
+
+        bool found = index.TryGetFact(
+            "ArchLinterNet.Core.Tests.SourceFactFixtures.SingleTypeFixture",
+            out ArchitectureDeclaredTypeFact fact);
+
+        Assert.That(found, Is.True);
+        Assert.That(fact.SourceFilePath, Is.EqualTo("src/Domain/SingleTypeFixture.cs"));
+        Assert.That(fact.FileNameWithoutExtension, Is.EqualTo("SingleTypeFixture"));
+    }
+
     // ── Multiple types per file ───────────────────────────────────────────────────────
 
     [Test]

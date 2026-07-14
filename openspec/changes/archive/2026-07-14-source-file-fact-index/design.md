@@ -47,9 +47,9 @@ Existing source-scanning infrastructure (`ArchitectureSourceScanner`, `Architect
 
 **Alternative considered**: Project-relative folder segments. Rejected: requires per-file project ownership resolution; complex when files sit at project root; inconsistent with existing path normalization.
 
-### Decision 5: Unowned or absent source roots → reflection-only facts, no error
+### Decision 5: Unowned or absent source roots → reflection-only facts, except standalone single-target roots
 
-**Rationale**: When `Document.Analysis.SourceRoots` is empty, or when a configured source root cannot be tied to exactly one target assembly, the index still returns useful facts from reflection: assembly, namespace, type name, and reflection-derived type kind. Callers that need source paths will get `null` and can decide how to handle it. Producing an error would break all existing policies that do not use source facts, while guessing ownership would publish incorrect source evidence.
+**Rationale**: When `Document.Analysis.SourceRoots` is empty, or when a configured source root cannot be tied to exactly one target assembly, the index still returns useful facts from reflection: assembly, namespace, type name, and reflection-derived type kind. Callers that need source paths will get `null` and can decide how to handle it. Producing an error would break all existing policies that do not use source facts, while guessing ownership would publish incorrect source evidence. The one safe standalone fallback is the single-target case: when the index is built directly with exactly one target assembly and explicit source roots, all configured roots are owned by that sole assembly, preserving the documented standalone `target_assemblies` + `source_roots` workflow.
 
 ### Decision 6: Ambiguity is tracked per owned assembly/type pair
 

@@ -154,7 +154,7 @@ public sealed partial class ArchitectureSourceFileFactIndexTests
     }
 
     [Test]
-    public void TryGetFact_UnownedSourceRoot_DoesNotAttachForeignDeclaration()
+    public void TryGetFact_UnownedSourceRoot_WithMultipleTargetAssemblies_DoesNotAttachForeignDeclaration()
     {
         const string ForeignSource = """
             namespace ArchLinterNet.Core.Tests.SourceFactFixtures {
@@ -169,7 +169,7 @@ public sealed partial class ArchitectureSourceFileFactIndexTests
         fs.AddFile(absoluteRoot + "/SingleTypeFixture.cs", ForeignSource, DateTime.UtcNow);
 
         var index = new ArchitectureSourceFileFactIndex(
-            new[] { _testAssembly },
+            new[] { _testAssembly, _coreAssembly },
             absoluteRepoRoot,
             new[] { "foreign" },
             null,

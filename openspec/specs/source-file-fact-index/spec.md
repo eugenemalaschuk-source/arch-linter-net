@@ -25,6 +25,10 @@ The system SHALL enrich each declared type fact with source file path data only 
 - **WHEN** a configured source root contains a declaration whose CLR full name matches a type in a target assembly but the root's owning assembly cannot be determined
 - **THEN** the fact remains reflection-only with null SourceFilePath and the declaration does not create an ambiguity record
 
+#### Scenario: Standalone single-target configuration treats configured source roots as owned
+- **WHEN** the index is built directly with one target assembly and explicit `source_roots`, without project discovery metadata
+- **THEN** those configured source roots are treated as belonging to that sole target assembly and can enrich matching facts
+
 #### Scenario: Record type kind is detected from source
 - **WHEN** a source file declares `public record MyRecord { }` or `public record class MyRecord { }` or `public record struct MyRecord { }`
 - **THEN** the fact for that type has TypeKind equal to Record
