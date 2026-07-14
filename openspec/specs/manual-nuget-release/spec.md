@@ -33,7 +33,8 @@ The release workflow SHALL restore, run the repository acceptance gate, build, p
 
 #### Scenario: Expected package projects are packed
 - **WHEN** the release workflow packs packages
-- **THEN** it creates package artifacts for `ArchLinterNet.Core`, `ArchLinterNet.Cli`, and `ArchLinterNet.Testing`
+- **THEN** it creates package artifacts for `ArchLinterNet.CEL`, `ArchLinterNet.Core`, `ArchLinterNet.Cli`, and `ArchLinterNet.Testing`
+- **AND** `ArchLinterNet.CEL` is packed before `ArchLinterNet.Core` so the dependency is resolvable
 - **AND** Unity `.asmdef` validation ships as part of `ArchLinterNet.Core`, not as a separate `ArchLinterNet.Unity` artifact
 
 ### Requirement: Controlled NuGet.org publication
