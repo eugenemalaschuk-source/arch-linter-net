@@ -16,8 +16,8 @@ internal sealed class CoverageValidator : IArchitecturePolicyDocumentValidator
 
     private static void ValidateCoverageNamespaces(ArchitectureContractDocument document)
     {
-        foreach (ArchitectureCoverageContract contract in document.Contracts.StrictCoverage
-                     .Concat(document.Contracts.AuditCoverage))
+        foreach (ArchitectureCoverageContract contract in document.Provenance.Track(
+                     document.Contracts.StrictCoverage.Concat(document.Contracts.AuditCoverage)))
         {
             switch (contract.Scope)
             {

@@ -9,7 +9,11 @@ public sealed record ArchitectureContractExecutionResult(
     IReadOnlyCollection<ArchitectureViolation> Violations,
     IReadOnlyCollection<string> Cycles,
     IReadOnlyCollection<ArchitectureViolation> CoverageViolations,
-    IReadOnlyCollection<ArchitectureCoverageSummary> CoverageSummaries);
+    IReadOnlyCollection<ArchitectureCoverageSummary> CoverageSummaries)
+{
+    public IReadOnlyCollection<ArchitectureCycleFinding> CycleFindings { get; init; } =
+        Array.Empty<ArchitectureCycleFinding>();
+}
 
 public interface IArchitectureContractExecutor
 {

@@ -63,6 +63,7 @@ public sealed class ArchitectureValidationApplicationService(
             }
 
             unmatched = FilterUnmatchedForDisabledCoverage(unmatched, coverageConfig);
+            unmatched = unmatched.Select(loadAndSetup.Document.Provenance.Enrich).ToList();
 
             bool hasBlockingUnmatched = request.EnforceUnmatchedIgnoredViolationsPolicy
                 && unmatchedConfig == ErrorSeverity && unmatched.Count > 0;
@@ -85,6 +86,7 @@ public sealed class ArchitectureValidationApplicationService(
                 policyConsistencyFindings, policyConsistencyConfig, execution.CoverageSummaries,
                 classificationConflicts, classificationMetadataFailures)
             {
+                CycleFindings = execution.CycleFindings,
                 ClassificationRoles = classificationRoles,
                 ClassificationPathDeferred = classificationPathDeferred
             };

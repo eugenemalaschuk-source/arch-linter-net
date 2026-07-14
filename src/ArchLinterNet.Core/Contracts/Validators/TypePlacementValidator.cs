@@ -7,8 +7,8 @@ internal sealed class TypePlacementValidator : IArchitecturePolicyDocumentValida
 {
     public void Validate(ArchitectureContractDocument document)
     {
-        foreach (ArchitectureTypePlacementContract contract in document.Contracts.StrictTypePlacement
-                     .Concat(document.Contracts.AuditTypePlacement))
+        foreach (ArchitectureTypePlacementContract contract in document.Provenance.Track(
+                     document.Contracts.StrictTypePlacement.Concat(document.Contracts.AuditTypePlacement)))
         {
             ArchitectureTypeMatcher matcher = contract.TypesMatching;
             bool hasSelectorField = !string.IsNullOrEmpty(matcher.NameSuffix)

@@ -7,8 +7,8 @@ internal sealed class CompositionValidator : IArchitecturePolicyDocumentValidato
 {
     public void Validate(ArchitectureContractDocument document)
     {
-        foreach (ArchitectureCompositionContract contract in document.Contracts.StrictComposition
-                     .Concat(document.Contracts.AuditComposition))
+        foreach (ArchitectureCompositionContract contract in document.Provenance.Track(
+                     document.Contracts.StrictComposition.Concat(document.Contracts.AuditComposition)))
         {
             if (!PolicyDocumentValidatorSupport.HasNonBlankEntry(contract.ForbiddenApis))
             {

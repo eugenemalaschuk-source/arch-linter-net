@@ -1,4 +1,5 @@
 using ArchLinterNet.Core.Contracts;
+using ArchLinterNet.Core.Contracts.Families;
 using ArchitectureContractGroups = ArchLinterNet.Core.Contracts.Families.ArchitectureContractGroups;
 
 namespace ArchLinterNet.Core.Execution;
@@ -46,6 +47,7 @@ public sealed class ArchitectureContractCatalog
             foreach (T contract in contracts)
             {
                 descriptors.Add(new ArchitectureContractDescriptor(group, mode, family, contract.Name, contract.Id, contract));
+                document.Provenance.BindCatalogContract(group, family, contract);
             }
         }
 
@@ -57,8 +59,16 @@ public sealed class ArchitectureContractCatalog
         // output.
         foreach (ArchitectureContractFamilyDescriptor family in ArchitectureContractFamilyRegistry.All)
         {
-            AddGroup(family.StrictGroupName, "strict", family.FamilyId, family.StrictContracts(groups));
-            AddGroup(family.AuditGroupName, "audit", family.FamilyId, family.AuditContracts(groups));
+            try
+            {
+                AddGroup(family.StrictGroupName, "strict", family.FamilyId, family.StrictContracts(groups));
+                AddGroup(family.AuditGroupName, "audit", family.FamilyId, family.AuditContracts(groups));
+            }
+            catch (ArgumentException exception) when (
+                exception.Data[LayerTemplateExpander.TemplateOwnerDataKey] is ArchitectureLayerTemplateContract template)
+            {
+                throw document.Provenance.EnrichLayerTemplateExpansionException(exception, template);
+            }
         }
 
         return new ArchitectureContractCatalog(descriptors, familiesInOrder);

@@ -6,6 +6,8 @@ namespace ArchLinterNet.Core.Tests;
 [TestFixture]
 public sealed class TestingAdapterTests
 {
+    private static readonly string[] _rulesFragmentPaths = { "architecture/rules.yml" };
+    private static readonly string[] _selfForbiddenIds = { "self-forbidden" };
     private string _tempDir = null!;
 
     [SetUp]
@@ -189,6 +191,83 @@ contracts:
         var result = ArchitectureAssertions.FromPolicy(contractPath).ValidateStrict();
 
         Assert.That(result.Passed, Is.False);
+    }
+
+    [Test]
+    public void ValidateStrict_ImportedContract_ExposesTheSharedFragmentProvenance()
+    {
+        string contractDir = Path.Combine(_tempDir, "architecture");
+        Directory.CreateDirectory(contractDir);
+        string contractPath = Path.Combine(contractDir, "dependencies.arch.yml");
+        File.WriteAllText(contractPath, """
+            version: 1
+            name: Testing provenance
+            imports: [rules.yml]
+            layers:
+              core:
+                namespace: ArchLinterNet.Core
+            analysis:
+              target_assemblies: [ArchLinterNet.Core]
+            contracts: {}
+            """);
+        File.WriteAllText(Path.Combine(contractDir, "rules.yml"), """
+            contracts:
+              strict:
+                - id: self-forbidden
+                  name: core-must-not-depend-on-itself
+                  source: core
+                  forbidden: [core]
+            """);
+
+        var result = ArchitectureAssertions.FromPolicy(contractPath).ValidateStrict();
+
+        Assert.That(result.Violations, Is.Not.Empty);
+        Assert.Multiple(() =>
+        {
+            Assert.That(result.Violations.All(violation => violation.PolicyLocation is not null), Is.True);
+            Assert.That(result.Violations.Select(violation => violation.PolicyLocation!.SourcePath).Distinct(),
+                Is.EqualTo(_rulesFragmentPaths));
+            Assert.That(result.Violations.Select(violation => violation.PolicyLocation!.ContractId).Distinct(),
+                Is.EqualTo(_selfForbiddenIds));
+        });
+    }
+
+    [Test]
+    public void ValidateStrict_ImportedCycleContract_ExposesFragmentProvenanceInTestingOutput()
+    {
+        string assemblyName = typeof(HandlerRegistryCycleFixtures.LayerA.ServiceA).Assembly.GetName().Name!;
+        string contractDir = Path.Combine(_tempDir, "architecture");
+        Directory.CreateDirectory(contractDir);
+        string contractPath = Path.Combine(contractDir, "dependencies.arch.yml");
+        File.WriteAllText(contractPath, $@"
+version: 1
+name: Testing cycle provenance
+imports: [rules.yml]
+layers:
+  layerA:
+    namespace: HandlerRegistryCycleFixtures.LayerA
+  layerB:
+    namespace: HandlerRegistryCycleFixtures.LayerB
+analysis:
+  target_assemblies: [{assemblyName}]
+contracts: {{}}
+");
+        File.WriteAllText(Path.Combine(contractDir, "rules.yml"), """
+            contracts:
+              strict_cycles:
+                - id: cycle-check
+                  name: imported-cycle
+                  layers: [layerA, layerB]
+            """);
+
+        var result = ArchitectureAssertions.FromPolicy(contractPath).ValidateStrict();
+
+        Assert.That(result.CycleFindings, Is.Not.Empty);
+        Assert.That(result.CycleFindings.Select(finding => finding.PolicyLocation!.SourcePath).Distinct(),
+            Is.EqualTo(_rulesFragmentPaths));
+
+        InvalidOperationException exception = Assert.Throws<InvalidOperationException>(() => result.ShouldPass())!;
+        Assert.That(exception.Message, Does.Contain("policy: architecture/rules.yml:contracts.strict_cycles[0]"));
     }
 
     [Test]

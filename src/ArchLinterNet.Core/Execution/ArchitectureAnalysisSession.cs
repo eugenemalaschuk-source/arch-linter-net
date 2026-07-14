@@ -1,5 +1,6 @@
 using ArchLinterNet.Core.Contracts;
 using ArchLinterNet.Core.Contracts.Families;
+using ArchLinterNet.Core.Contracts.PolicyImports;
 using ArchLinterNet.Core.Discovery;
 using ArchLinterNet.Core.Execution.Abstractions;
 using ArchLinterNet.Core.Model;
@@ -457,12 +458,21 @@ public sealed partial class ArchitectureAnalysisSession
                 ? $" Probing paths: {string.Join("; ", Context.AssemblyProbingPaths)}"
                 : string.Empty;
 
-            violations.Add(new ArchitectureViolation(
+            var violation = new ArchitectureViolation(
                 ConfigurationSource,
                 null,
                 missingAssembly,
                 "missing target assembly",
-                new[] { $"Assembly '{missingAssembly}' is declared in analysis.target_assemblies but could not be resolved.{probeInfo}" }));
+                new[] { $"Assembly '{missingAssembly}' is declared in analysis.target_assemblies but could not be resolved.{probeInfo}" });
+            int index = Document.Analysis.TargetAssemblies.IndexOf(missingAssembly);
+            violations.Add(index < 0
+                ? violation
+                : Document.Provenance.EnrichAtPath(
+                    violation,
+                    ArchitecturePolicyProvenancePath.AppendIndex(
+                        ArchitecturePolicyProvenancePath.AppendProperty(
+                            ArchitecturePolicyProvenancePath.Property("analysis"), "target_assemblies"),
+                        index)));
         }
     }
 
@@ -508,8 +518,13 @@ public sealed partial class ArchitectureAnalysisSession
         ArchitectureConfigurationReferenceCollector collector,
         HashSet<string> ruleInputCoveredContractIds)
     {
-        foreach ((string layerName, HashSet<string> referencingContractIds) in collector.LayerReferencingContractIds)
+        foreach ((string layerName, List<IArchitectureContract> referencingContracts) in
+                 collector.LayerReferencingContracts)
         {
+            HashSet<string> referencingContractIds = referencingContracts
+                .Select(contract => contract.Id)
+                .OfType<string>()
+                .ToHashSet(StringComparer.OrdinalIgnoreCase);
             bool isFullyOwnedByRuleInputCoverage = referencingContractIds.Count > 0
                 && referencingContractIds.All(ruleInputCoveredContractIds.Contains);
 
@@ -523,7 +538,23 @@ public sealed partial class ArchitectureAnalysisSession
                 continue;
             }
 
-            ArchitectureLayer layer = ArchitectureLayerResolver.ResolveLayer(Document, ConfigurationSource, layerName);
+            ArchitectureLayer layer;
+            try
+            {
+                layer = ArchitectureLayerResolver.ResolveLayer(Document, ConfigurationSource, layerName);
+            }
+            catch (InvalidOperationException exception)
+            {
+                Exception enriched = Document.Provenance.EnrichValidationException(
+                    exception,
+                    referencingContracts.Cast<object>());
+                if (ReferenceEquals(enriched, exception))
+                {
+                    throw;
+                }
+
+                throw enriched;
+            }
 
             if (layer.External)
             {
@@ -548,12 +579,16 @@ public sealed partial class ArchitectureAnalysisSession
                     ? $"namespace '{layer.Namespace}'"
                     : $"semantic selector '{ArchitectureLayerResolver.DescribeLayer(layer)}'";
 
-                violations.Add(new ArchitectureViolation(
+                var violation = new ArchitectureViolation(
                     ConfigurationSource,
                     null,
                     ArchitectureLayerResolver.DescribeLayer(layer),
                     layer.Selector == null ? "empty layer namespace" : "empty layer selector",
-                    new[] { $"Layer '{layerName}' {matchDescription} contains no matching types in loaded assemblies." }));
+                    new[] { $"Layer '{layerName}' {matchDescription} contains no matching types in loaded assemblies." });
+                violations.Add(Document.Provenance.EnrichAtPath(
+                    violation,
+                    ArchitecturePolicyProvenancePath.AppendProperty(
+                        ArchitecturePolicyProvenancePath.Property("layers"), layerName)));
             }
         }
     }
@@ -561,11 +596,12 @@ public sealed partial class ArchitectureAnalysisSession
     private void AddExternalDependencyGroupViolations(
         List<ArchitectureViolation> violations, ArchitectureConfigurationReferenceCollector collector)
     {
-        foreach (string groupName in collector.ReferencedExternalGroups)
+        foreach ((string groupName, List<IArchitectureContract> referencingContracts) in
+                 collector.ReferencedExternalGroups)
         {
             if (!Document.ExternalDependencies.TryGetValue(groupName, out ArchitectureExternalDependencyGroup? group))
             {
-                violations.Add(new ArchitectureViolation(
+                var violation = new ArchitectureViolation(
                     ConfigurationSource,
                     null,
                     groupName,
@@ -576,7 +612,11 @@ public sealed partial class ArchitectureAnalysisSession
                     })
                 {
                     Payload = new ExternalDependencyPayload(groupName)
-                });
+                };
+                violations.Add(Document.Provenance.Enrich(
+                    violation,
+                    referencingContracts.FirstOrDefault(),
+                    referencingContracts.Skip(1).Cast<object>()));
 
                 continue;
             }
@@ -586,7 +626,7 @@ public sealed partial class ArchitectureAnalysisSession
                 continue;
             }
 
-            violations.Add(new ArchitectureViolation(
+            var invalidGroup = new ArchitectureViolation(
                 ConfigurationSource,
                 null,
                 groupName,
@@ -597,18 +637,23 @@ public sealed partial class ArchitectureAnalysisSession
                 })
             {
                 Payload = new ExternalDependencyPayload(groupName)
-            });
+            };
+            violations.Add(Document.Provenance.EnrichAtPath(
+                invalidGroup,
+                ArchitecturePolicyProvenancePath.AppendProperty(
+                    ArchitecturePolicyProvenancePath.Property("external_dependencies"), groupName)));
         }
     }
 
     private void AddPackageGroupViolations(
         List<ArchitectureViolation> violations, ArchitectureConfigurationReferenceCollector collector)
     {
-        foreach (string groupName in collector.ReferencedPackageGroups)
+        foreach ((string groupName, List<IArchitectureContract> referencingContracts) in
+                 collector.ReferencedPackageGroups)
         {
             if (!Document.Packages.TryGetValue(groupName, out ArchitecturePackageGroup? group))
             {
-                violations.Add(new ArchitectureViolation(
+                var violation = new ArchitectureViolation(
                     ConfigurationSource,
                     null,
                     groupName,
@@ -619,7 +664,11 @@ public sealed partial class ArchitectureAnalysisSession
                     })
                 {
                     Payload = new PackageDependencyPayload(groupName)
-                });
+                };
+                violations.Add(Document.Provenance.Enrich(
+                    violation,
+                    referencingContracts.FirstOrDefault(),
+                    referencingContracts.Skip(1).Cast<object>()));
 
                 continue;
             }
@@ -629,7 +678,7 @@ public sealed partial class ArchitectureAnalysisSession
                 continue;
             }
 
-            violations.Add(new ArchitectureViolation(
+            var invalidGroup = new ArchitectureViolation(
                 ConfigurationSource,
                 null,
                 groupName,
@@ -640,7 +689,11 @@ public sealed partial class ArchitectureAnalysisSession
                 })
             {
                 Payload = new PackageDependencyPayload(groupName)
-            });
+            };
+            violations.Add(Document.Provenance.EnrichAtPath(
+                invalidGroup,
+                ArchitecturePolicyProvenancePath.AppendProperty(
+                    ArchitecturePolicyProvenancePath.Property("packages"), groupName)));
         }
     }
 
@@ -656,25 +709,26 @@ public sealed partial class ArchitectureAnalysisSession
             Context.ProjectDiscovery?.DiscoveredProjects.Select(project => project.AssemblyName) ?? Enumerable.Empty<string>(),
             StringComparer.Ordinal);
 
-        foreach ((string contractName, string? contractId, string source) in collector.PackageContractSources
-                     .DistinctBy(entry => (entry.ContractName, entry.ContractId, entry.Source)))
+        foreach ((IArchitectureContract contract, string source) in collector.PackageContractSources
+                     .DistinctBy(entry => (entry.Contract, entry.Source)))
         {
             if (projectsWithPackageData.Contains(source))
             {
                 continue;
             }
 
-            violations.Add(new ArchitectureViolation(
-                contractName,
-                contractId,
+            var violation = new ArchitectureViolation(
+                contract.Name,
+                contract.Id,
                 source,
                 "no package metadata discovered",
                 new[]
                 {
-                    $"Contract '{contractName}' declares source '{source}', but no discovered project with that assembly name has package reference metadata available. " +
+                    $"Contract '{contract.Name}' declares source '{source}', but no discovered project with that assembly name has package reference metadata available. " +
                     "Package dependency/allow-only contracts require analysis.solution or analysis.projects to be configured so project discovery can parse PackageReference items; " +
                     "without it, this contract will never report a violation."
-                }));
+                });
+            violations.Add(Document.Provenance.Enrich(violation, contract));
         }
     }
 
@@ -691,27 +745,28 @@ public sealed partial class ArchitectureAnalysisSession
             ?? Enumerable.Empty<string>(),
             StringComparer.OrdinalIgnoreCase);
 
-        foreach ((string contractName, string? contractId, string projectPath) in collector.ProjectMetadataContractProjects
-                     .DistinctBy(entry => (entry.ContractName, entry.ContractId, entry.ProjectPath)))
+        foreach ((IArchitectureContract contract, string projectPath) in collector.ProjectMetadataContractProjects
+                     .DistinctBy(entry => (entry.Contract, entry.ProjectPath)))
         {
             if (discoveredProjectPaths.Contains(projectPath))
             {
                 continue;
             }
 
-            violations.Add(new ArchitectureViolation(
-                contractName,
-                contractId,
+            var violation = new ArchitectureViolation(
+                contract.Name,
+                contract.Id,
                 projectPath,
                 "no project metadata discovered",
                 new[]
                 {
-                    $"Contract '{contractName}' targets project '{projectPath}', but project discovery did not expose metadata for that path. " +
+                    $"Contract '{contract.Name}' targets project '{projectPath}', but project discovery did not expose metadata for that path. " +
                     "Project metadata contracts require analysis.solution or analysis.projects to discover and parse the matching .csproj file."
                 })
             {
                 Payload = new ProjectMetadataPayload(ProjectMetadataKind: "missing_project")
-            });
+            };
+            violations.Add(Document.Provenance.Enrich(violation, contract));
         }
     }
 

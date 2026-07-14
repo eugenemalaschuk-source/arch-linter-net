@@ -7,8 +7,8 @@ internal sealed class InterfaceImplementationValidator : IArchitecturePolicyDocu
 {
     public void Validate(ArchitectureContractDocument document)
     {
-        foreach (ArchitectureInterfaceImplementationContract contract in document.Contracts.StrictInterfaceImplementation
-                     .Concat(document.Contracts.AuditInterfaceImplementation))
+        foreach (ArchitectureInterfaceImplementationContract contract in document.Provenance.Track(
+                     document.Contracts.StrictInterfaceImplementation.Concat(document.Contracts.AuditInterfaceImplementation)))
         {
             if (contract.Interfaces.Count == 0 && contract.InterfacePrefixes.Count == 0)
             {

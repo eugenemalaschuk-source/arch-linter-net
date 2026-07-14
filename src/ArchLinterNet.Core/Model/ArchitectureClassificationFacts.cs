@@ -19,13 +19,28 @@ public sealed record ArchitectureClassificationConflict(
     ArchitectureClassificationSource Source,
     string WinningRole,
     string DiscardedRole,
-    string? MetadataDetail);
+    string? MetadataDetail)
+{
+    public ArchitecturePolicySourceLocation? PolicyLocation { get; init; }
+
+    public IReadOnlyCollection<ArchitecturePolicySourceLocation> RelatedPolicyLocations { get; init; } =
+        Array.Empty<ArchitecturePolicySourceLocation>();
+
+    internal string? PolicyPath { get; init; }
+
+    internal IReadOnlyCollection<string> RelatedPolicyPaths { get; init; } = Array.Empty<string>();
+}
 
 public sealed record ArchitectureClassificationMetadataFailure(
     string Subject,
     ArchitectureClassificationSource Source,
     string MetadataKey,
-    string Reason);
+    string Reason)
+{
+    public ArchitecturePolicySourceLocation? PolicyLocation { get; init; }
+
+    internal string? PolicyPath { get; init; }
+}
 
 // A discovered role descriptor for one type, surfaced by the validate command alongside conflicts
 // and metadata failures. Subject is the type's full name. Metadata mirrors the winning source's
@@ -43,4 +58,8 @@ public sealed record ArchitectureClassificationRoleFact(
 // classification depends on source/declared-type fact discovery (issue #171) and produces no role
 // assignment yet. Distinct from the fully silent overrides/exclusions reserved sections: declaring
 // path is visible, not just schema-accepted.
-public sealed record ArchitectureClassificationPathDeferredNotice(int DeclaredEntryCount);
+public sealed record ArchitectureClassificationPathDeferredNotice(int DeclaredEntryCount)
+{
+    public IReadOnlyCollection<ArchitecturePolicySourceLocation> PolicyLocations { get; init; } =
+        Array.Empty<ArchitecturePolicySourceLocation>();
+}

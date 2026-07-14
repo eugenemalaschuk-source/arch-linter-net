@@ -1,3 +1,4 @@
+using ArchLinterNet.Core.Model;
 using YamlDotNet.RepresentationModel;
 
 namespace ArchLinterNet.Core.Contracts.PolicyImports;
@@ -11,11 +12,13 @@ internal sealed class ArchitecturePolicyDocumentComposer
 
     private readonly Dictionary<string, Declaration> _declarations = new(StringComparer.Ordinal);
     private readonly Dictionary<string, Declaration> _contractIds = new(StringComparer.OrdinalIgnoreCase);
+    private ArchitecturePolicyProvenanceMapBuilder _provenance = new();
 
-    public string Compose(IReadOnlyList<ArchitecturePolicySource> sources)
+    public ArchitecturePolicyCompositionResult Compose(IReadOnlyList<ArchitecturePolicySource> sources)
     {
         _declarations.Clear();
         _contractIds.Clear();
+        _provenance = new ArchitecturePolicyProvenanceMapBuilder();
         var effective = new YamlMappingNode();
 
         foreach (ArchitecturePolicySource source in sources)
@@ -27,14 +30,19 @@ internal sealed class ArchitecturePolicyDocumentComposer
         {
             if (!ArchitecturePolicySourceParser.TryGetChild(effective, required, out _))
             {
-                throw Shape($"Composed policy is missing required section '{required}'.");
+                ArchitecturePolicySource rootSource = sources[0];
+                throw Shape(
+                    $"Composed policy is missing required section '{required}'.",
+                    rootSource,
+                    "$",
+                    rootSource.Root);
             }
         }
 
         var stream = new YamlStream(new YamlDocument(effective));
         using var writer = new StringWriter();
         stream.Save(writer, assignAnchors: false);
-        return writer.ToString();
+        return new ArchitecturePolicyCompositionResult(writer.ToString(), _provenance.Build(sources));
     }
 
     private void ComposeSource(YamlMappingNode effective, ArchitecturePolicySource source)
@@ -49,7 +57,7 @@ internal sealed class ArchitecturePolicyDocumentComposer
 
             if (key is "version" or "name")
             {
-                AddSingleton(effective, key, value, source, key);
+                AddSingleton(effective, key, value, source, key, ArchitecturePolicyProvenancePath.Property(key));
             }
             else if (_keyedSections.Contains(key))
             {
@@ -57,7 +65,7 @@ internal sealed class ArchitecturePolicyDocumentComposer
             }
             else if (key == "legacy_runtime_layers")
             {
-                AppendSequence(effective, key, value, source, key);
+                AppendSequence(effective, key, value, source, key, ArchitecturePolicyProvenancePath.Property(key));
             }
             else if (key == "analysis")
             {
@@ -86,7 +94,10 @@ internal sealed class ArchitecturePolicyDocumentComposer
         {
             string key = ScalarKey(keyNode, source, section, "definition key");
             string yamlPath = $"{section}.{key}";
-            Register($"map:{yamlPath}", source, yamlPath);
+            string effectivePath = ArchitecturePolicyProvenancePath.AppendProperty(
+                ArchitecturePolicyProvenancePath.Property(section), key);
+            Register($"map:{yamlPath}", source, yamlPath, value);
+            _provenance.AddTree(value, source, yamlPath, effectivePath);
             target.Add(new YamlScalarNode(key), value);
         }
     }
@@ -98,18 +109,20 @@ internal sealed class ArchitecturePolicyDocumentComposer
         foreach ((YamlNode keyNode, YamlNode child) in sourceMap.Children)
         {
             string key = ScalarKey(keyNode, source, "analysis", "analysis field");
-            string path = $"analysis.{key}";
+            string yamlPath = $"analysis.{key}";
+            string effectivePath = ArchitecturePolicyProvenancePath.AppendProperty(
+                ArchitecturePolicyProvenancePath.Property("analysis"), key);
             if (key == "condition_sets")
             {
-                MergeNestedMap(target, key, child, source, path);
+                MergeNestedMap(target, key, child, source, yamlPath, effectivePath);
             }
             else if (child is YamlSequenceNode)
             {
-                AppendSequence(target, key, child, source, path);
+                AppendSequence(target, key, child, source, yamlPath, effectivePath);
             }
             else
             {
-                AddSingleton(target, key, child, source, path);
+                AddSingleton(target, key, child, source, yamlPath, effectivePath);
             }
         }
     }
@@ -121,13 +134,24 @@ internal sealed class ArchitecturePolicyDocumentComposer
         foreach ((YamlNode keyNode, YamlNode child) in sourceMap.Children)
         {
             string group = ScalarKey(keyNode, source, "contracts", "contract group");
-            string path = $"contracts.{group}";
-            YamlSequenceNode sourceSequence = RequireSequence(child, source, path);
-            YamlSequenceNode targetSequence = GetOrAddSequence(target, group, source, path);
+            string yamlPath = $"contracts.{group}";
+            string effectivePath = ArchitecturePolicyProvenancePath.AppendProperty(
+                ArchitecturePolicyProvenancePath.Property("contracts"), group);
+            YamlSequenceNode sourceSequence = RequireSequence(child, source, yamlPath);
+            YamlSequenceNode targetSequence = GetOrAddSequence(target, group, source, yamlPath);
             int firstIndex = targetSequence.Children.Count;
-            foreach (YamlNode contract in sourceSequence.Children)
+            _provenance.AddSequenceItems(
+                sourceSequence,
+                source,
+                yamlPath,
+                effectivePath,
+                firstIndex,
+                group);
+            for (int sourceIndex = 0; sourceIndex < sourceSequence.Children.Count; sourceIndex++)
             {
-                RegisterContractId(group, contract, source, firstIndex++);
+                YamlNode contract = sourceSequence.Children[sourceIndex];
+                RegisterContractId(group, contract, source, sourceIndex);
+                firstIndex++;
                 targetSequence.Add(contract);
             }
         }
@@ -140,14 +164,16 @@ internal sealed class ArchitecturePolicyDocumentComposer
         foreach ((YamlNode keyNode, YamlNode child) in sourceMap.Children)
         {
             string key = ScalarKey(keyNode, source, "classification", "classification field");
-            string path = $"classification.{key}";
+            string yamlPath = $"classification.{key}";
+            string effectivePath = ArchitecturePolicyProvenancePath.AppendProperty(
+                ArchitecturePolicyProvenancePath.Property("classification"), key);
             if (key == "precedence")
             {
-                AddSingleton(target, key, child, source, path);
+                AddSingleton(target, key, child, source, yamlPath, effectivePath);
             }
             else
             {
-                AppendSequence(target, key, child, source, path);
+                AppendSequence(target, key, child, source, yamlPath, effectivePath);
             }
         }
     }
@@ -157,15 +183,18 @@ internal sealed class ArchitecturePolicyDocumentComposer
         string key,
         YamlNode value,
         ArchitecturePolicySource source,
-        string path)
+        string yamlPath,
+        string effectivePath)
     {
-        YamlMappingNode sourceMap = RequireMapping(value, source, path);
-        YamlMappingNode target = GetOrAddMapping(parent, key, source, path);
+        YamlMappingNode sourceMap = RequireMapping(value, source, yamlPath);
+        YamlMappingNode target = GetOrAddMapping(parent, key, source, yamlPath);
         foreach ((YamlNode childKeyNode, YamlNode childValue) in sourceMap.Children)
         {
-            string childKey = ScalarKey(childKeyNode, source, path, "definition key");
-            string childPath = $"{path}.{childKey}";
-            Register($"map:{childPath}", source, childPath);
+            string childKey = ScalarKey(childKeyNode, source, yamlPath, "definition key");
+            string childYamlPath = $"{yamlPath}.{childKey}";
+            string childEffectivePath = ArchitecturePolicyProvenancePath.AppendProperty(effectivePath, childKey);
+            Register($"map:{childYamlPath}", source, childYamlPath, childValue);
+            _provenance.AddTree(childValue, source, childYamlPath, childEffectivePath);
             target.Add(new YamlScalarNode(childKey), childValue);
         }
     }
@@ -175,10 +204,17 @@ internal sealed class ArchitecturePolicyDocumentComposer
         string key,
         YamlNode value,
         ArchitecturePolicySource source,
-        string path)
+        string yamlPath,
+        string effectivePath)
     {
-        YamlSequenceNode sourceSequence = RequireSequence(value, source, path);
-        YamlSequenceNode target = GetOrAddSequence(parent, key, source, path);
+        YamlSequenceNode sourceSequence = RequireSequence(value, source, yamlPath);
+        YamlSequenceNode target = GetOrAddSequence(parent, key, source, yamlPath);
+        _provenance.AddSequenceItems(
+            sourceSequence,
+            source,
+            yamlPath,
+            effectivePath,
+            target.Children.Count);
         foreach (YamlNode child in sourceSequence.Children)
         {
             target.Add(child);
@@ -190,9 +226,11 @@ internal sealed class ArchitecturePolicyDocumentComposer
         string key,
         YamlNode value,
         ArchitecturePolicySource source,
-        string path)
+        string yamlPath,
+        string effectivePath)
     {
-        Register($"singleton:{path}", source, path);
+        Register($"singleton:{yamlPath}", source, yamlPath, value);
+        _provenance.AddTree(value, source, yamlPath, effectivePath);
         parent.Add(new YamlScalarNode(key), value);
     }
 
@@ -200,7 +238,7 @@ internal sealed class ArchitecturePolicyDocumentComposer
         string group,
         YamlNode node,
         ArchitecturePolicySource source,
-        int index)
+        int sourceIndex)
     {
         if (node is not YamlMappingNode contract)
         {
@@ -219,25 +257,39 @@ internal sealed class ArchitecturePolicyDocumentComposer
             id = ArchitecturePolicyDocumentLoader.NormalizeToContractId(name);
         }
 
-        string path = $"contracts.{group}[{index}]";
+        string path = $"contracts.{group}[{sourceIndex}]";
         string declarationKey = $"{group}\0{id}";
-        var declaration = new Declaration(source.PortableIdentity, path);
+        ArchitecturePolicySourceLocation location = ArchitecturePolicyDiagnosticFactory.Location(
+            source,
+            path,
+            node,
+            group,
+            id);
+        var declaration = new Declaration(location);
         if (_contractIds.TryGetValue(declarationKey, out Declaration? first))
         {
             throw Conflict(
-                $"Duplicate contract id '{id}' in '{group}' at {first.Source}:{first.Path} and {declaration.Source}:{declaration.Path}.");
+                $"Duplicate contract id '{id}' in '{group}' at " +
+                $"{first.Location.SourcePath}:{first.Location.YamlPath} and " +
+                $"{declaration.Location.SourcePath}:{declaration.Location.YamlPath}.",
+                first.Location,
+                declaration.Location);
         }
 
         _contractIds.Add(declarationKey, declaration);
     }
 
-    private void Register(string key, ArchitecturePolicySource source, string path)
+    private void Register(string key, ArchitecturePolicySource source, string path, YamlNode node)
     {
-        var declaration = new Declaration(source.PortableIdentity, path);
+        var declaration = new Declaration(ArchitecturePolicyDiagnosticFactory.Location(source, path, node));
         if (_declarations.TryGetValue(key, out Declaration? first))
         {
             throw Conflict(
-                $"Policy composition conflict at '{path}' between {first.Source}:{first.Path} and {declaration.Source}:{declaration.Path}.");
+                $"Policy composition conflict at '{path}' between " +
+                $"{first.Location.SourcePath}:{first.Location.YamlPath} and " +
+                $"{declaration.Location.SourcePath}:{declaration.Location.YamlPath}.",
+                first.Location,
+                declaration.Location);
         }
 
         _declarations.Add(key, declaration);
@@ -278,13 +330,21 @@ internal sealed class ArchitecturePolicyDocumentComposer
     private static YamlMappingNode RequireMapping(YamlNode node, ArchitecturePolicySource source, string path)
     {
         return node as YamlMappingNode
-            ?? throw Shape($"Policy source '{source.PortableIdentity}' field '{path}' must be a mapping.");
+            ?? throw Shape(
+                $"Policy source '{source.PortableIdentity}' field '{path}' must be a mapping.",
+                source,
+                path,
+                node);
     }
 
     private static YamlSequenceNode RequireSequence(YamlNode node, ArchitecturePolicySource source, string path)
     {
         return node as YamlSequenceNode
-            ?? throw Shape($"Policy source '{source.PortableIdentity}' field '{path}' must be a sequence.");
+            ?? throw Shape(
+                $"Policy source '{source.PortableIdentity}' field '{path}' must be a sequence.",
+                source,
+                path,
+                node);
     }
 
     private static string ScalarKey(
@@ -295,7 +355,11 @@ internal sealed class ArchitecturePolicyDocumentComposer
     {
         return node is YamlScalarNode { Value: { } value }
             ? value
-            : throw Shape($"Policy source '{source.PortableIdentity}' has a non-scalar {description} at '{path}'.");
+            : throw Shape(
+                $"Policy source '{source.PortableIdentity}' has a non-scalar {description} at '{path}'.",
+                source,
+                path,
+                node);
     }
 
     private static string? ScalarValue(YamlMappingNode mapping, string key)
@@ -306,17 +370,30 @@ internal sealed class ArchitecturePolicyDocumentComposer
                 : null;
     }
 
-    private static ArchitecturePolicyImportException Shape(string message)
+    private static ArchitecturePolicyImportException Shape(
+        string message,
+        ArchitecturePolicySource source,
+        string path,
+        YamlNode node)
     {
-        return new ArchitecturePolicyImportException(ArchitecturePolicyImportErrorCategory.SourceShape, message);
+        return ArchitecturePolicyDiagnosticFactory.Exception(
+            ArchitecturePolicyImportErrorCategory.SourceShape,
+            message,
+            ArchitecturePolicyDiagnosticFactory.Location(source, path, node));
     }
 
-    private static ArchitecturePolicyImportException Conflict(string message)
+    private static ArchitecturePolicyImportException Conflict(
+        string message,
+        ArchitecturePolicySourceLocation original,
+        ArchitecturePolicySourceLocation conflicting)
     {
-        return new ArchitecturePolicyImportException(
+        return ArchitecturePolicyDiagnosticFactory.Exception(
             ArchitecturePolicyImportErrorCategory.CompositionConflict,
-            message);
+            message,
+            original,
+            new[] { conflicting },
+            original.Source.ImportChain);
     }
 
-    private sealed record Declaration(string Source, string Path);
+    private sealed record Declaration(ArchitecturePolicySourceLocation Location);
 }

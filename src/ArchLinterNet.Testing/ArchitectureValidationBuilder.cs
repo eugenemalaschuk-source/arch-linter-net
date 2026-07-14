@@ -92,6 +92,9 @@ public sealed class ArchitectureValidationBuilder
             outcome.UnmatchedIgnoredViolations,
             outcome.UnmatchedIgnoredViolationsConfig,
             outcome.CoverageSummaries,
-            timing));
+            timing)
+        {
+            CycleFindings = outcome.CycleFindings
+        });
     }
 }

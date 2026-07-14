@@ -2,6 +2,7 @@ using System.Globalization;
 using System.Linq;
 using System.Reflection;
 using ArchLinterNet.Core.Contracts;
+using ArchLinterNet.Core.Contracts.PolicyImports;
 using ArchLinterNet.Core.Model;
 
 namespace ArchLinterNet.Core.Scanning;
@@ -76,6 +77,7 @@ public sealed class ArchitectureAttributeRoleExtractor
     private const string AssemblyAttributeSourceName = "assembly_attribute";
     private const string InheritanceSourceName = "inheritance";
     private const string NamespaceSourceName = "namespace";
+    private const string ClassificationRootPath = "/classification";
 
     public ArchitectureTypeClassificationResult Extract(Type type)
     {
@@ -130,29 +132,37 @@ public sealed class ArchitectureAttributeRoleExtractor
         string? winningRole = null;
         string? winningEvidence = null;
         IReadOnlyDictionary<string, object> winningMetadata = new Dictionary<string, object>();
+        string? winningPath = null;
         string subject = ArchitectureTypeNames.SafeFullName(type);
 
-        foreach (ArchitectureInheritanceClassificationMapping mapping in _configuration.Inheritance)
+        for (int index = 0; index < _configuration.Inheritance.Count; index++)
         {
+            ArchitectureInheritanceClassificationMapping mapping = _configuration.Inheritance[index];
             if (!MatchesBaseType(mapping.BaseType, type))
             {
                 continue;
             }
 
+            string mappingPath = ClassificationMappingPath("inheritance", index);
             IReadOnlyDictionary<string, object> metadata = ExtractMetadataWithoutAttributeInstance(
-                mapping.Metadata, ArchitectureClassificationSource.Inheritance, subject, failures);
+                mapping.Metadata, ArchitectureClassificationSource.Inheritance, subject, failures, mappingPath);
 
             if (winningRole == null)
             {
                 winningRole = mapping.Role;
                 winningMetadata = metadata;
                 winningEvidence = mapping.BaseType;
+                winningPath = mappingPath;
             }
             else if (!RoleMetadataEqual(winningRole, winningMetadata, mapping.Role, metadata))
             {
                 conflicts.Add(new ArchitectureClassificationConflict(
                     subject, ArchitectureClassificationSource.Inheritance, winningRole, mapping.Role,
-                    DescribeMetadataDiff(winningMetadata, metadata)));
+                    DescribeMetadataDiff(winningMetadata, metadata))
+                {
+                    PolicyPath = winningPath,
+                    RelatedPolicyPaths = [mappingPath]
+                });
             }
         }
 
@@ -210,31 +220,39 @@ public sealed class ArchitectureAttributeRoleExtractor
         string? winningRole = null;
         string? winningEvidence = null;
         IReadOnlyDictionary<string, object> winningMetadata = new Dictionary<string, object>();
+        string? winningPath = null;
         string subject = ArchitectureTypeNames.SafeFullName(type);
         string candidateNamespace = ArchitectureTypeNames.SafeNamespace(type);
 
-        foreach (ArchitectureNamespaceClassificationMapping mapping in _configuration.Namespace)
+        for (int index = 0; index < _configuration.Namespace.Count; index++)
         {
+            ArchitectureNamespaceClassificationMapping mapping = _configuration.Namespace[index];
             (bool matched, string? matchedPattern) = _matchNamespace(mapping, candidateNamespace);
             if (!matched)
             {
                 continue;
             }
 
+            string mappingPath = ClassificationMappingPath("namespace", index);
             IReadOnlyDictionary<string, object> metadata = ExtractMetadataWithoutAttributeInstance(
-                mapping.Metadata, ArchitectureClassificationSource.Namespace, subject, failures);
+                mapping.Metadata, ArchitectureClassificationSource.Namespace, subject, failures, mappingPath);
 
             if (winningRole == null)
             {
                 winningRole = mapping.Role;
                 winningMetadata = metadata;
                 winningEvidence = matchedPattern;
+                winningPath = mappingPath;
             }
             else if (!RoleMetadataEqual(winningRole, winningMetadata, mapping.Role, metadata))
             {
                 conflicts.Add(new ArchitectureClassificationConflict(
                     subject, ArchitectureClassificationSource.Namespace, winningRole, mapping.Role,
-                    DescribeMetadataDiff(winningMetadata, metadata)));
+                    DescribeMetadataDiff(winningMetadata, metadata))
+                {
+                    PolicyPath = winningPath,
+                    RelatedPolicyPaths = [mappingPath]
+                });
             }
         }
 
@@ -245,7 +263,8 @@ public sealed class ArchitectureAttributeRoleExtractor
         Dictionary<string, object> metadataMappings,
         ArchitectureClassificationSource source,
         string subject,
-        List<ArchitectureClassificationMetadataFailure> failures)
+        List<ArchitectureClassificationMetadataFailure> failures,
+        string? mappingPath = null)
     {
         Dictionary<string, object> metadata = new(StringComparer.Ordinal);
 
@@ -256,7 +275,10 @@ public sealed class ArchitectureAttributeRoleExtractor
 
             if (failureReason != null)
             {
-                failures.Add(new ArchitectureClassificationMetadataFailure(subject, source, entry.Key, failureReason));
+                failures.Add(new ArchitectureClassificationMetadataFailure(subject, source, entry.Key, failureReason)
+                {
+                    PolicyPath = ClassificationMetadataPath(mappingPath, entry.Key)
+                });
                 continue;
             }
 
@@ -297,7 +319,7 @@ public sealed class ArchitectureAttributeRoleExtractor
 
     private ArchitectureAttributeClassificationCandidate ResolveCandidate(
         IReadOnlyList<CustomAttributeData> attributeData,
-        IReadOnlyList<ArchitectureAttributeClassificationMapping> mappings,
+        List<ArchitectureAttributeClassificationMapping> mappings,
         ArchitectureClassificationSource source,
         string subject)
     {
@@ -306,9 +328,11 @@ public sealed class ArchitectureAttributeRoleExtractor
         string? winningRole = null;
         string? winningEvidence = null;
         IReadOnlyDictionary<string, object> winningMetadata = new Dictionary<string, object>();
+        string? winningPath = null;
 
-        foreach (ArchitectureAttributeClassificationMapping mapping in mappings)
+        for (int index = 0; index < mappings.Count; index++)
         {
+            ArchitectureAttributeClassificationMapping mapping = mappings[index];
             List<CustomAttributeData> matchedInstances = attributeData
                 .Where(data => MatchesAttributeType(data, mapping.Attribute))
                 .ToList();
@@ -318,19 +342,25 @@ public sealed class ArchitectureAttributeRoleExtractor
                 continue;
             }
 
+            string mappingPath = ClassificationMappingPath(SourceCollectionName(source), index);
             (string Role, IReadOnlyDictionary<string, object> Metadata) entryResult = ResolveEntryAcrossInstances(
-                matchedInstances, mapping, source, subject, conflicts, failures);
+                matchedInstances, mapping, source, subject, conflicts, failures, mappingPath);
 
             if (winningRole == null)
             {
                 winningRole = entryResult.Role;
                 winningMetadata = entryResult.Metadata;
                 winningEvidence = mapping.Attribute;
+                winningPath = mappingPath;
             }
             else if (!RoleMetadataEqual(winningRole, winningMetadata, entryResult.Role, entryResult.Metadata))
             {
                 conflicts.Add(new ArchitectureClassificationConflict(
-                    subject, source, winningRole, entryResult.Role, DescribeMetadataDiff(winningMetadata, entryResult.Metadata)));
+                    subject, source, winningRole, entryResult.Role, DescribeMetadataDiff(winningMetadata, entryResult.Metadata))
+                {
+                    PolicyPath = winningPath,
+                    RelatedPolicyPaths = [mappingPath]
+                });
             }
         }
 
@@ -343,17 +373,23 @@ public sealed class ArchitectureAttributeRoleExtractor
         ArchitectureClassificationSource source,
         string subject,
         List<ArchitectureClassificationConflict> conflicts,
-        List<ArchitectureClassificationMetadataFailure> failures)
+        List<ArchitectureClassificationMetadataFailure> failures,
+        string mappingPath)
     {
-        IReadOnlyDictionary<string, object> firstMetadata = ExtractMetadata(matchedInstances[0], mapping, source, subject, failures);
+        IReadOnlyDictionary<string, object> firstMetadata = ExtractMetadata(
+            matchedInstances[0], mapping, source, subject, failures, mappingPath);
 
         for (int i = 1; i < matchedInstances.Count; i++)
         {
-            IReadOnlyDictionary<string, object> instanceMetadata = ExtractMetadata(matchedInstances[i], mapping, source, subject, failures);
+            IReadOnlyDictionary<string, object> instanceMetadata = ExtractMetadata(
+                matchedInstances[i], mapping, source, subject, failures, mappingPath);
             if (!RoleMetadataEqual(mapping.Role, firstMetadata, mapping.Role, instanceMetadata))
             {
                 conflicts.Add(new ArchitectureClassificationConflict(
-                    subject, source, mapping.Role, mapping.Role, DescribeMetadataDiff(firstMetadata, instanceMetadata)));
+                    subject, source, mapping.Role, mapping.Role, DescribeMetadataDiff(firstMetadata, instanceMetadata))
+                {
+                    PolicyPath = mappingPath
+                });
             }
         }
 
@@ -365,7 +401,8 @@ public sealed class ArchitectureAttributeRoleExtractor
         ArchitectureAttributeClassificationMapping mapping,
         ArchitectureClassificationSource source,
         string subject,
-        List<ArchitectureClassificationMetadataFailure> failures)
+        List<ArchitectureClassificationMetadataFailure> failures,
+        string? mappingPath = null)
     {
         Dictionary<string, object> metadata = new(StringComparer.Ordinal);
 
@@ -376,7 +413,10 @@ public sealed class ArchitectureAttributeRoleExtractor
 
             if (failureReason != null)
             {
-                failures.Add(new ArchitectureClassificationMetadataFailure(subject, source, entry.Key, failureReason));
+                failures.Add(new ArchitectureClassificationMetadataFailure(subject, source, entry.Key, failureReason)
+                {
+                    PolicyPath = ClassificationMetadataPath(mappingPath, entry.Key)
+                });
                 continue;
             }
 
@@ -466,6 +506,37 @@ public sealed class ArchitectureAttributeRoleExtractor
         }
 
         return differences.Count == 0 ? null : string.Join("; ", differences);
+    }
+
+    private static string SourceCollectionName(ArchitectureClassificationSource source)
+    {
+        return source switch
+        {
+            ArchitectureClassificationSource.TypeAttribute => "attributes",
+            ArchitectureClassificationSource.AssemblyAttribute => "assembly_attributes",
+            ArchitectureClassificationSource.Inheritance => "inheritance",
+            ArchitectureClassificationSource.Namespace => "namespace",
+            _ => throw new ArgumentOutOfRangeException(nameof(source), source, null)
+        };
+    }
+
+    private static string ClassificationMappingPath(string collectionName, int index)
+    {
+        return ArchitecturePolicyProvenancePath.AppendIndex(
+            ArchitecturePolicyProvenancePath.AppendProperty(ClassificationRootPath, collectionName),
+            index);
+    }
+
+    private static string? ClassificationMetadataPath(string? mappingPath, string metadataKey)
+    {
+        if (mappingPath is null)
+        {
+            return null;
+        }
+
+        return ArchitecturePolicyProvenancePath.AppendProperty(
+            ArchitecturePolicyProvenancePath.AppendProperty(mappingPath, "metadata"),
+            metadataKey);
     }
 
     private static string FormatMetadataValue(object value) => value switch

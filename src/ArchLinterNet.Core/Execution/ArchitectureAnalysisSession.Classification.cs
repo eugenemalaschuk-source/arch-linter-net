@@ -5,13 +5,25 @@ namespace ArchLinterNet.Core.Execution;
 
 public sealed partial class ArchitectureAnalysisSession
 {
+    private (IReadOnlyList<ArchitectureClassificationConflict> Conflicts, IReadOnlyList<ArchitectureClassificationMetadataFailure> MetadataFailures)?
+        _cachedClassificationFacts;
+
     // Reads the deduplicated conflict/evidence-extraction-failure facts from RoleIndex's single
     // cached extraction pass, for CLI/CI surfacing. RoleIndex computes these lazily on first access
     // and reuses them for the life of the session, so repeated calls no longer re-run extraction.
     public (IReadOnlyList<ArchitectureClassificationConflict> Conflicts, IReadOnlyList<ArchitectureClassificationMetadataFailure> MetadataFailures)
         CheckClassificationFacts()
     {
-        return (RoleIndex.Conflicts, RoleIndex.MetadataFailures);
+        if (_cachedClassificationFacts is { } cached)
+        {
+            return cached;
+        }
+
+        cached = (
+            RoleIndex.Conflicts.Select(Document.Provenance.Enrich).ToList(),
+            RoleIndex.MetadataFailures.Select(Document.Provenance.Enrich).ToList());
+        _cachedClassificationFacts = cached;
+        return cached;
     }
 
     // Every classified type's discovered role, sorted by subject for deterministic CLI/CI output.

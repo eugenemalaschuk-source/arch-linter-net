@@ -9,8 +9,8 @@ internal sealed class AssemblyAllowOnlyValidator : IArchitecturePolicyDocumentVa
     {
         HashSet<string> targetAssemblies = new(document.Analysis.TargetAssemblies, StringComparer.Ordinal);
 
-        foreach (ArchitectureAssemblyAllowOnlyContract contract in document.Contracts.StrictAssemblyAllowOnly
-                     .Concat(document.Contracts.AuditAssemblyAllowOnly))
+        foreach (ArchitectureAssemblyAllowOnlyContract contract in document.Provenance.Track(
+                     document.Contracts.StrictAssemblyAllowOnly.Concat(document.Contracts.AuditAssemblyAllowOnly)))
         {
             if (contract.DependencyDepth != DependencyDepthMode.Direct)
             {

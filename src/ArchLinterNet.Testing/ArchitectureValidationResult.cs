@@ -10,6 +10,7 @@ public sealed class ArchitectureValidationResult
     public bool Passed { get; }
     public IReadOnlyCollection<ArchitectureViolation> Violations { get; }
     public IReadOnlyCollection<string> Cycles { get; }
+    public IReadOnlyCollection<ArchitectureCycleFinding> CycleFindings { get; }
     public IReadOnlyCollection<PolicyConsistencyDiagnostic> PolicyConsistencyFindings { get; }
     public string PolicyConsistencyConfig { get; }
     public IReadOnlyCollection<ArchitectureViolation> CoverageFindings { get; }
@@ -24,6 +25,7 @@ public sealed class ArchitectureValidationResult
         Passed = @params.Passed;
         Violations = @params.Violations;
         Cycles = @params.Cycles;
+        CycleFindings = @params.CycleFindings ?? Array.Empty<ArchitectureCycleFinding>();
         PolicyConsistencyFindings = @params.PolicyConsistencyFindings ?? Array.Empty<PolicyConsistencyDiagnostic>();
         PolicyConsistencyConfig = @params.PolicyConsistencyConfig;
         CoverageFindings = @params.CoverageFindings ?? Array.Empty<ArchitectureViolation>();
@@ -52,7 +54,8 @@ public sealed class ArchitectureValidationResult
             "Violations:", Violations.Count > 0 ? _formatter.FormatViolationsForHumans(Violations) : string.Empty);
 
         message += FormatFailureSection(
-            "Cycles:", Cycles.Count > 0 ? _formatter.FormatCyclesForHumans(Cycles) : string.Empty);
+            "Cycles:",
+            BuildCycleFailureDetails());
 
         message += FormatFailureSection(
             null,
@@ -83,6 +86,16 @@ public sealed class ArchitectureValidationResult
             ? $"{details}{Environment.NewLine}"
             : $"{label}{Environment.NewLine}{details}{Environment.NewLine}";
     }
+
+    private string BuildCycleFailureDetails()
+    {
+        if (CycleFindings.Count > 0)
+        {
+            return ArchitectureDiagnosticFormatter.FormatCyclesForHumans(CycleFindings);
+        }
+
+        return Cycles.Count > 0 ? _formatter.FormatCyclesForHumans(Cycles) : string.Empty;
+    }
 }
 
 public sealed record ArchitectureValidationResultParams(
@@ -96,4 +109,7 @@ public sealed record ArchitectureValidationResultParams(
     IReadOnlyCollection<ArchitectureUnmatchedIgnoredViolation>? UnmatchedIgnoredViolations = null,
     string UnmatchedIgnoredViolationsConfig = "off",
     IReadOnlyCollection<ArchitectureCoverageSummary>? CoverageSummaries = null,
-    ValidationTiming? Timing = null);
+    ValidationTiming? Timing = null)
+{
+    public IReadOnlyCollection<ArchitectureCycleFinding>? CycleFindings { get; init; }
+}
