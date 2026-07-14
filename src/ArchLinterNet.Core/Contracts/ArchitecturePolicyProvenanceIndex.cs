@@ -159,6 +159,18 @@ public sealed class ArchitecturePolicyProvenanceIndex
             : violation with { PolicyLocation = location, RelatedPolicyLocations = related };
     }
 
+    internal ArchitectureCycleFinding Enrich(
+        ArchitectureCycleFinding cycle,
+        object? owner,
+        IEnumerable<object>? relatedOwners = null)
+    {
+        ArchitecturePolicySourceLocation? location = owner is null ? null : LocationFor(owner);
+        ArchitecturePolicySourceLocation[] related = LocationsFor(relatedOwners);
+        return location is null && related.Length == 0
+            ? cycle
+            : cycle with { PolicyLocation = location, RelatedPolicyLocations = related };
+    }
+
     internal PolicyConsistencyDiagnostic Enrich(PolicyConsistencyDiagnostic diagnostic)
     {
         List<ArchitecturePolicySourceLocation> locations = FindDiagnosticLocations(diagnostic);
@@ -172,6 +184,21 @@ public sealed class ArchitecturePolicyProvenanceIndex
             PolicyLocation = locations[0],
             RelatedPolicyLocations = locations.Skip(1).ToArray()
         };
+    }
+
+    internal ArchitectureClassificationConflict Enrich(ArchitectureClassificationConflict conflict)
+    {
+        ArchitecturePolicySourceLocation? location = LocationForPath(conflict.PolicyPath);
+        ArchitecturePolicySourceLocation[] related = LocationsForPaths(conflict.RelatedPolicyPaths);
+        return location is null && related.Length == 0
+            ? conflict
+            : conflict with { PolicyLocation = location, RelatedPolicyLocations = related };
+    }
+
+    internal ArchitectureClassificationMetadataFailure Enrich(ArchitectureClassificationMetadataFailure failure)
+    {
+        ArchitecturePolicySourceLocation? location = LocationForPath(failure.PolicyPath);
+        return location is null ? failure : failure with { PolicyLocation = location };
     }
 
     internal ArchitectureUnmatchedIgnoredViolation Enrich(ArchitectureUnmatchedIgnoredViolation unmatched)
@@ -433,6 +460,27 @@ public sealed class ArchitecturePolicyProvenanceIndex
 
         return owners
             .Select(LocationFor)
+            .OfType<ArchitecturePolicySourceLocation>()
+            .Distinct()
+            .OrderBy(location => location.SourceOrdinal)
+            .ThenBy(location => location.EncounterOrdinal)
+            .ToArray();
+    }
+
+    private ArchitecturePolicySourceLocation? LocationForPath(string? effectivePath)
+    {
+        return effectivePath is null ? null : _nodes.GetValueOrDefault(effectivePath);
+    }
+
+    private ArchitecturePolicySourceLocation[] LocationsForPaths(IEnumerable<string>? effectivePaths)
+    {
+        if (effectivePaths is null)
+        {
+            return Array.Empty<ArchitecturePolicySourceLocation>();
+        }
+
+        return effectivePaths
+            .Select(LocationForPath)
             .OfType<ArchitecturePolicySourceLocation>()
             .Distinct()
             .OrderBy(location => location.SourceOrdinal)

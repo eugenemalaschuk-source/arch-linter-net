@@ -2,6 +2,7 @@ using ArchLinterNet.Core.Contracts;
 using ArchLinterNet.Core.Execution;
 using ArchLinterNet.Core.Model;
 using ArchLinterNet.Core.Reporting;
+using AttributeRoleExtractionTestFixtures;
 using NUnit.Framework;
 
 namespace ArchLinterNet.Core.Tests;
@@ -18,6 +19,8 @@ public sealed class ArchitecturePolicyProvenanceTests
         { "architecture/company-policy.yaml", "architecture/parts/domain.data" };
     private static readonly string[] _nestedMissingImportChain =
         { "architecture/root.yml", "architecture/a.yml", "nested/missing.yml" };
+    private static readonly string[] _classificationConflictPaths =
+        { "classification.namespace[0]", "classification.namespace[1]" };
     private static readonly string[] _sameNameConsistencyPaths =
         { "contracts.strict_allow_only[0]", "contracts.strict[0]" };
 
@@ -336,6 +339,71 @@ public sealed class ArchitecturePolicyProvenanceTests
             .ToArray();
 
         Assert.That(paths, Is.EquivalentTo(_sameNameConsistencyPaths));
+    }
+
+    [Test]
+    public void CheckClassificationFacts_ImportedNamespaceConflict_CarriesBothMappingLocations()
+    {
+        string assemblyName = typeof(PlainType).Assembly.GetName().Name!;
+        string root = Write("architecture/root.yml", RootYaml("classification.yml",
+            $"analysis:\n  target_assemblies: [{assemblyName}]\ncontracts:\n  strict: []\n"));
+        Write(
+            "architecture/classification.yml",
+            LayersFragment() + """
+                classification:
+                  namespace:
+                    - namespace: AttributeRoleExtractionTestFixtures
+                      role: DomainLayer
+                    - namespace: AttributeRoleExtractionTestFixtures
+                      role: InfrastructureLayer
+                """);
+        ArchitectureContractDocument document = new ArchitecturePolicyDocumentLoader().Load(root);
+        var session = new ArchitectureAnalysisSession(
+            new ArchitectureAnalysisContext(_temporaryDirectory, [typeof(PlainType).Assembly], Array.Empty<string>(), Array.Empty<string>()),
+            document,
+            null,
+            false,
+            null);
+
+        ArchitectureClassificationConflict conflict = session.CheckClassificationFacts().Conflicts
+            .First(candidate => candidate.Source == ArchitectureClassificationSource.Namespace);
+        string[] paths = new[] { conflict.PolicyLocation! }
+            .Concat(conflict.RelatedPolicyLocations)
+            .Select(location => location.YamlPath)
+            .ToArray();
+
+        Assert.That(paths, Is.EqualTo(_classificationConflictPaths));
+    }
+
+    [Test]
+    public void CheckClassificationFacts_ImportedMetadataFailure_CarriesMetadataNodeLocation()
+    {
+        string assemblyName = typeof(PlainType).Assembly.GetName().Name!;
+        string root = Write("architecture/root.yml", RootYaml("classification.yml",
+            $"analysis:\n  target_assemblies: [{assemblyName}]\ncontracts:\n  strict: []\n"));
+        Write(
+            "architecture/classification.yml",
+            LayersFragment() + """
+                classification:
+                  inheritance:
+                    - base_type: System.Object
+                      role: DomainLayer
+                      metadata:
+                        module: const:Missing.Type.VALUE
+                """);
+        ArchitectureContractDocument document = new ArchitecturePolicyDocumentLoader().Load(root);
+        var session = new ArchitectureAnalysisSession(
+            new ArchitectureAnalysisContext(_temporaryDirectory, [typeof(PlainType).Assembly], Array.Empty<string>(), Array.Empty<string>()),
+            document,
+            null,
+            false,
+            null);
+
+        ArchitectureClassificationMetadataFailure failure = session.CheckClassificationFacts().MetadataFailures
+            .First(candidate => candidate.Source == ArchitectureClassificationSource.Inheritance);
+
+        Assert.That(failure.PolicyLocation!.SourcePath, Is.EqualTo("architecture/classification.yml"));
+        Assert.That(failure.PolicyLocation.YamlPath, Is.EqualTo("classification.inheritance[0].metadata.module"));
     }
 
     [Test]

@@ -86,6 +86,7 @@ public sealed class ArchitectureValidationApplicationService(
                 policyConsistencyFindings, policyConsistencyConfig, execution.CoverageSummaries,
                 classificationConflicts, classificationMetadataFailures)
             {
+                CycleFindings = execution.CycleFindings,
                 ClassificationRoles = classificationRoles,
                 ClassificationPathDeferred = classificationPathDeferred
             };

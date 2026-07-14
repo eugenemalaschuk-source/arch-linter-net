@@ -27,4 +27,7 @@ public sealed record ValidationOutcome(
     // Non-null when the loaded policy declared a non-empty classification.path section — see
     // ArchitectureAnalysisSession.CheckClassificationPathDeferred.
     public ArchitectureClassificationPathDeferredNotice? ClassificationPathDeferred { get; init; }
+
+    public IReadOnlyCollection<ArchitectureCycleFinding> CycleFindings { get; init; } =
+        Array.Empty<ArchitectureCycleFinding>();
 }

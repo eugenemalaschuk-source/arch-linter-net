@@ -33,6 +33,15 @@ public static class ArchitectureDiagnosticMapper
         return new CycleDiagnostic(contractName, contractId, path);
     }
 
+    public static CycleDiagnostic FromCycle(ArchitectureCycleFinding cycle)
+    {
+        return new CycleDiagnostic(cycle.ContractName, cycle.ContractId, cycle.Path)
+        {
+            PolicyLocation = cycle.PolicyLocation,
+            RelatedPolicyLocations = cycle.RelatedPolicyLocations
+        };
+    }
+
     public static UnmatchedIgnoreDiagnostic FromUnmatchedIgnore(ArchitectureUnmatchedIgnoredViolation unmatched)
     {
         return new UnmatchedIgnoreDiagnostic(

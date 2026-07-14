@@ -233,6 +233,44 @@ contracts:
     }
 
     [Test]
+    public void ValidateStrict_ImportedCycleContract_ExposesFragmentProvenanceInTestingOutput()
+    {
+        string assemblyName = typeof(HandlerRegistryCycleFixtures.LayerA.ServiceA).Assembly.GetName().Name!;
+        string contractDir = Path.Combine(_tempDir, "architecture");
+        Directory.CreateDirectory(contractDir);
+        string contractPath = Path.Combine(contractDir, "dependencies.arch.yml");
+        File.WriteAllText(contractPath, $@"
+version: 1
+name: Testing cycle provenance
+imports: [rules.yml]
+layers:
+  layerA:
+    namespace: HandlerRegistryCycleFixtures.LayerA
+  layerB:
+    namespace: HandlerRegistryCycleFixtures.LayerB
+analysis:
+  target_assemblies: [{assemblyName}]
+contracts: {{}}
+");
+        File.WriteAllText(Path.Combine(contractDir, "rules.yml"), """
+            contracts:
+              strict_cycles:
+                - id: cycle-check
+                  name: imported-cycle
+                  layers: [layerA, layerB]
+            """);
+
+        var result = ArchitectureAssertions.FromPolicy(contractPath).ValidateStrict();
+
+        Assert.That(result.CycleFindings, Is.Not.Empty);
+        Assert.That(result.CycleFindings.Select(finding => finding.PolicyLocation!.SourcePath).Distinct(),
+            Is.EqualTo(_rulesFragmentPaths));
+
+        InvalidOperationException exception = Assert.Throws<InvalidOperationException>(() => result.ShouldPass())!;
+        Assert.That(exception.Message, Does.Contain("policy: architecture/rules.yml:contracts.strict_cycles[0]"));
+    }
+
+    [Test]
     public void ShouldPass_PolicyConsistencyOnlyFailure_ThrowsWithCheckKindAndReason()
     {
         string contractDir = Path.Combine(_tempDir, "architecture");

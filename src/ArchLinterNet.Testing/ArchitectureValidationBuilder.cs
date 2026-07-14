@@ -85,6 +85,7 @@ public sealed class ArchitectureValidationBuilder
             outcome.Passed,
             outcome.Violations,
             outcome.Cycles,
+            outcome.CycleFindings,
             outcome.PolicyConsistencyFindings,
             outcome.PolicyConsistencyConfig,
             outcome.CoverageFindings,

@@ -39,6 +39,7 @@ public sealed class CliRuntimeTests
             true,
             Array.Empty<ArchitectureViolation>(),
             Array.Empty<string>(),
+            Array.Empty<ArchitectureCycleFinding>(),
             Array.Empty<ArchitectureViolation>(),
             Array.Empty<ArchitectureUnmatchedIgnoredViolation>(),
             Array.Empty<PolicyConsistencyDiagnostic>(),

@@ -237,6 +237,7 @@ public sealed class CliArchitectureTests
             bool passed,
             IReadOnlyCollection<ArchitectureViolation> violations,
             IReadOnlyCollection<string> cycles,
+            IReadOnlyCollection<ArchitectureCycleFinding> cycleFindings,
             IReadOnlyCollection<ArchitectureViolation> coverageFindings,
             IReadOnlyList<ArchitectureUnmatchedIgnoredViolation> unmatchedIgnoredViolations,
             IReadOnlyCollection<PolicyConsistencyDiagnostic> policyConsistencyFindings,
@@ -260,7 +261,8 @@ public sealed class CliArchitectureTests
         public string FormatResultAsSarif(
             string mode,
             IReadOnlyCollection<ArchitectureViolation> violations,
-            IReadOnlyCollection<string> cycles)
+            IReadOnlyCollection<string> cycles,
+            IReadOnlyCollection<ArchitectureCycleFinding> cycleFindings)
         {
             throw new NotSupportedException();
         }
@@ -270,7 +272,9 @@ public sealed class CliArchitectureTests
             throw new NotSupportedException();
         }
 
-        public string FormatCyclesForHumans(IReadOnlyCollection<string> cycles)
+        public string FormatCyclesForHumans(
+            IReadOnlyCollection<string> cycles,
+            IReadOnlyCollection<ArchitectureCycleFinding> cycleFindings)
         {
             throw new NotSupportedException();
         }

@@ -92,7 +92,7 @@ internal sealed class ValidateCommandHandler(ICliRuntime runtime, ICliConsole co
         if (options.Format == "json")
         {
             console.Out.WriteLine(runtime.FormatResultForCiArtifacts(
-                options.Mode, outcome.Passed, outcome.Violations, outcome.Cycles, outcome.CoverageFindings,
+                options.Mode, outcome.Passed, outcome.Violations, outcome.Cycles, outcome.CycleFindings, outcome.CoverageFindings,
                 outcome.UnmatchedIgnoredViolations,
                 outcome.PolicyConsistencyConfig == "off" ? Array.Empty<PolicyConsistencyDiagnostic>() : outcome.PolicyConsistencyFindings,
                 outcome.CoverageSummaries, outcome.ClassificationConflicts, outcome.ClassificationMetadataFailures,
@@ -102,7 +102,7 @@ internal sealed class ValidateCommandHandler(ICliRuntime runtime, ICliConsole co
 
         if (options.Format == "sarif")
         {
-            console.Out.WriteLine(runtime.FormatResultAsSarif(options.Mode, outcome.Violations, outcome.Cycles));
+            console.Out.WriteLine(runtime.FormatResultAsSarif(options.Mode, outcome.Violations, outcome.Cycles, outcome.CycleFindings));
             return;
         }
 
@@ -195,7 +195,7 @@ internal sealed class ValidateCommandHandler(ICliRuntime runtime, ICliConsole co
 
             if (outcome.Cycles.Count > 0)
             {
-                console.Out.WriteLine(runtime.FormatCyclesForHumans(outcome.Cycles));
+                console.Out.WriteLine(runtime.FormatCyclesForHumans(outcome.Cycles, outcome.CycleFindings));
             }
         }
 

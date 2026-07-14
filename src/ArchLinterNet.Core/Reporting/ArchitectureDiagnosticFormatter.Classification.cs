@@ -19,8 +19,27 @@ public sealed partial class ArchitectureDiagnosticFormatter
     {
         return BuildCiArtifactsJson(new CiArtifactsRequest(
             mode, passed, violations, cycles, null, coverageFindings, unmatched,
-            policyConsistencyFindings, coverageSummaries, classificationConflicts, classificationMetadataFailures,
+            policyConsistencyFindings, coverageSummaries, null, classificationConflicts, classificationMetadataFailures,
             null));
+    }
+
+    public string FormatResultForCiArtifacts(
+        string mode,
+        bool passed,
+        IReadOnlyCollection<ArchitectureViolation> violations,
+        IReadOnlyCollection<string> cycles,
+        IReadOnlyCollection<ArchitectureCycleFinding> cycleFindings,
+        IReadOnlyCollection<ArchitectureViolation>? coverageFindings = null,
+        IReadOnlyCollection<ArchitectureUnmatchedIgnoredViolation>? unmatched = null,
+        IReadOnlyCollection<PolicyConsistencyDiagnostic>? policyConsistencyFindings = null,
+        IReadOnlyCollection<ArchitectureCoverageSummary>? coverageSummaries = null,
+        IReadOnlyCollection<ArchitectureClassificationConflict>? classificationConflicts = null,
+        IReadOnlyCollection<ArchitectureClassificationMetadataFailure>? classificationMetadataFailures = null)
+    {
+        return BuildCiArtifactsJson(new CiArtifactsRequest(
+            mode, passed, violations, cycles, null, coverageFindings, unmatched,
+            policyConsistencyFindings, coverageSummaries, cycleFindings, classificationConflicts,
+            classificationMetadataFailures, null));
     }
 
     /// <summary>
@@ -42,8 +61,28 @@ public sealed partial class ArchitectureDiagnosticFormatter
     {
         return BuildCiArtifactsJson(new CiArtifactsRequest(
             mode, passed, violations, cycles, classificationRoles, coverageFindings, unmatched,
-            policyConsistencyFindings, coverageSummaries, classificationConflicts, classificationMetadataFailures,
+            policyConsistencyFindings, coverageSummaries, null, classificationConflicts, classificationMetadataFailures,
             null));
+    }
+
+    public string FormatResultForCiArtifacts(
+        string mode,
+        bool passed,
+        IReadOnlyCollection<ArchitectureViolation> violations,
+        IReadOnlyCollection<string> cycles,
+        IReadOnlyCollection<ArchitectureCycleFinding> cycleFindings,
+        IReadOnlyCollection<ArchitectureClassificationRoleFact> classificationRoles,
+        IReadOnlyCollection<ArchitectureViolation>? coverageFindings = null,
+        IReadOnlyCollection<ArchitectureUnmatchedIgnoredViolation>? unmatched = null,
+        IReadOnlyCollection<PolicyConsistencyDiagnostic>? policyConsistencyFindings = null,
+        IReadOnlyCollection<ArchitectureCoverageSummary>? coverageSummaries = null,
+        IReadOnlyCollection<ArchitectureClassificationConflict>? classificationConflicts = null,
+        IReadOnlyCollection<ArchitectureClassificationMetadataFailure>? classificationMetadataFailures = null)
+    {
+        return BuildCiArtifactsJson(new CiArtifactsRequest(
+            mode, passed, violations, cycles, classificationRoles, coverageFindings, unmatched,
+            policyConsistencyFindings, coverageSummaries, cycleFindings, classificationConflicts,
+            classificationMetadataFailures, null));
     }
 
     /// <summary>
@@ -66,8 +105,29 @@ public sealed partial class ArchitectureDiagnosticFormatter
     {
         return BuildCiArtifactsJson(new CiArtifactsRequest(
             mode, passed, violations, cycles, classificationRoles, coverageFindings, unmatched,
-            policyConsistencyFindings, coverageSummaries, classificationConflicts, classificationMetadataFailures,
+            policyConsistencyFindings, coverageSummaries, null, classificationConflicts, classificationMetadataFailures,
             classificationPathDeferred));
+    }
+
+    public string FormatResultForCiArtifacts(
+        string mode,
+        bool passed,
+        IReadOnlyCollection<ArchitectureViolation> violations,
+        IReadOnlyCollection<string> cycles,
+        IReadOnlyCollection<ArchitectureCycleFinding> cycleFindings,
+        IReadOnlyCollection<ArchitectureClassificationRoleFact> classificationRoles,
+        ArchitectureClassificationPathDeferredNotice? classificationPathDeferred,
+        IReadOnlyCollection<ArchitectureViolation>? coverageFindings = null,
+        IReadOnlyCollection<ArchitectureUnmatchedIgnoredViolation>? unmatched = null,
+        IReadOnlyCollection<PolicyConsistencyDiagnostic>? policyConsistencyFindings = null,
+        IReadOnlyCollection<ArchitectureCoverageSummary>? coverageSummaries = null,
+        IReadOnlyCollection<ArchitectureClassificationConflict>? classificationConflicts = null,
+        IReadOnlyCollection<ArchitectureClassificationMetadataFailure>? classificationMetadataFailures = null)
+    {
+        return BuildCiArtifactsJson(new CiArtifactsRequest(
+            mode, passed, violations, cycles, classificationRoles, coverageFindings, unmatched,
+            policyConsistencyFindings, coverageSummaries, cycleFindings, classificationConflicts,
+            classificationMetadataFailures, classificationPathDeferred));
     }
 
     // Bundles FormatResultForCiArtifacts's parameters into one value so the private builder below
@@ -83,6 +143,7 @@ public sealed partial class ArchitectureDiagnosticFormatter
         IReadOnlyCollection<ArchitectureUnmatchedIgnoredViolation>? Unmatched,
         IReadOnlyCollection<PolicyConsistencyDiagnostic>? PolicyConsistencyFindings,
         IReadOnlyCollection<ArchitectureCoverageSummary>? CoverageSummaries,
+        IReadOnlyCollection<ArchitectureCycleFinding>? CycleFindings,
         IReadOnlyCollection<ArchitectureClassificationConflict>? ClassificationConflicts,
         IReadOnlyCollection<ArchitectureClassificationMetadataFailure>? ClassificationMetadataFailures,
         ArchitectureClassificationPathDeferredNotice? ClassificationPathDeferred);
@@ -101,6 +162,9 @@ public sealed partial class ArchitectureDiagnosticFormatter
         var classificationConflictsSerialized = BuildClassificationConflictsJson(request.ClassificationConflicts);
         var classificationMetadataFailuresSerialized = BuildClassificationMetadataFailuresJson(request.ClassificationMetadataFailures);
         var classificationRolesSerialized = BuildClassificationRolesJson(request.ClassificationRoles);
+        var cycleDiagnosticsSerialized = (request.CycleFindings ?? Array.Empty<ArchitectureCycleFinding>())
+            .Select(ToCycleJsonObject)
+            .ToArray();
 
         var payload = new
         {
@@ -114,6 +178,7 @@ public sealed partial class ArchitectureDiagnosticFormatter
                 .Select(cycle => ArchitectureDiagnosticMapper.FromCycle(cycle, contractName: string.Empty, contractId: null))
                 .Select(d => d.Path)
                 .ToArray(),
+            cycle_diagnostics = cycleDiagnosticsSerialized,
             coverage_findings = (request.CoverageFindings ?? Array.Empty<ArchitectureViolation>())
                 .Select(ArchitectureDiagnosticMapper.FromViolation)
                 .Select(d => ToCiJsonObject(d, includeContract: true))
@@ -167,12 +232,14 @@ public sealed partial class ArchitectureDiagnosticFormatter
             .ThenBy(c => c.Source)
             .ThenBy(c => c.MetadataDetail, StringComparer.Ordinal)
             .Select(c => $"  conflict: [{c.Source}] {c.Subject}: kept '{c.WinningRole}', discarded '{c.DiscardedRole}'"
-                + (c.MetadataDetail != null ? $" ({c.MetadataDetail})" : string.Empty));
+                + (c.MetadataDetail != null ? $" ({c.MetadataDetail})" : string.Empty)
+                + FormatClassificationPolicyLocationSuffix(c.PolicyLocation, c.RelatedPolicyLocations));
 
         var failureLines = metadataFailures
             .OrderBy(f => f.Subject, StringComparer.Ordinal)
             .ThenBy(f => f.MetadataKey, StringComparer.Ordinal)
-            .Select(f => $"  metadata_failure: [{f.Source}] {f.Subject}.{f.MetadataKey}: {f.Reason}");
+            .Select(f => $"  metadata_failure: [{f.Source}] {f.Subject}.{f.MetadataKey}: {f.Reason}"
+                + FormatClassificationPolicyLocationSuffix(f.PolicyLocation));
 
         IEnumerable<string> pathDeferredLines = Enumerable.Empty<string>();
         if (classificationPathDeferred != null)
@@ -207,7 +274,13 @@ public sealed partial class ArchitectureDiagnosticFormatter
                 source = c.Source.ToString(),
                 winning_role = c.WinningRole,
                 discarded_role = c.DiscardedRole,
-                metadata_detail = c.MetadataDetail
+                metadata_detail = c.MetadataDetail,
+                policy_location = c.PolicyLocation is null ? null : FormatPolicyLocationForJson(c.PolicyLocation),
+                related_policy_locations = c.RelatedPolicyLocations
+                    .OrderBy(location => location.SourceOrdinal)
+                    .ThenBy(location => location.EncounterOrdinal)
+                    .Select(FormatPolicyLocationForJson)
+                    .ToArray()
             })
             .ToArray();
     }
@@ -223,7 +296,8 @@ public sealed partial class ArchitectureDiagnosticFormatter
                 subject = f.Subject,
                 source = f.Source.ToString(),
                 metadata_key = f.MetadataKey,
-                reason = f.Reason
+                reason = f.Reason,
+                policy_location = f.PolicyLocation is null ? null : FormatPolicyLocationForJson(f.PolicyLocation)
             })
             .ToArray();
     }
@@ -242,5 +316,23 @@ public sealed partial class ArchitectureDiagnosticFormatter
                 metadata = r.Metadata
             })
             .ToArray();
+    }
+
+    private static string FormatClassificationPolicyLocationSuffix(
+        ArchitecturePolicySourceLocation? primaryLocation,
+        IReadOnlyCollection<ArchitecturePolicySourceLocation>? relatedLocations = null)
+    {
+        if (primaryLocation is null)
+        {
+            return string.Empty;
+        }
+
+        string related = relatedLocations is not { Count: > 0 }
+            ? string.Empty
+            : "; related: " + string.Join(", ", relatedLocations
+                .OrderBy(location => location.SourceOrdinal)
+                .ThenBy(location => location.EncounterOrdinal)
+                .Select(location => $"{location.SourcePath}:{location.YamlPath}"));
+        return $" (policy: {primaryLocation.SourcePath}:{primaryLocation.YamlPath}; root: {primaryLocation.RootPath}{related})";
     }
 }

@@ -120,12 +120,6 @@ public sealed partial class ArchitectureDiagnosticFormatter : IArchitectureDiagn
                 .Select(FormatForHumans));
     }
 
-    public string FormatCyclesForHumans(IReadOnlyCollection<string> cycles)
-    {
-        var diagnostics = cycles.Select(cycle => ArchitectureDiagnosticMapper.FromCycle(cycle, contractName: string.Empty, contractId: null));
-        return string.Join(Environment.NewLine, diagnostics.OrderBy(d => d.Path).Select(d => $"- {d.Path}"));
-    }
-
     public string FormatUnmatchedForHumans(IReadOnlyCollection<ArchitectureUnmatchedIgnoredViolation> unmatched)
     {
         if (unmatched.Count == 0)
@@ -244,21 +238,6 @@ public sealed partial class ArchitectureDiagnosticFormatter : IArchitectureDiagn
             violations = violations
                 .Select(ArchitectureDiagnosticMapper.FromViolation)
                 .Select(d => ToCiJsonObject(d, includeContract: false))
-        };
-
-        return JsonSerializer.Serialize(payload);
-    }
-
-    public string FormatCyclesForCiArtifacts(string contractName, string? contractId, IReadOnlyCollection<string> cycles)
-    {
-        var diagnostics = cycles.Select(cycle => ArchitectureDiagnosticMapper.FromCycle(cycle, contractName, contractId));
-
-        var payload = new
-        {
-            kind = "architecture_cycles",
-            contract = contractName,
-            contract_id = contractId,
-            cycles = diagnostics.Select(d => d.Path).ToArray()
         };
 
         return JsonSerializer.Serialize(payload);

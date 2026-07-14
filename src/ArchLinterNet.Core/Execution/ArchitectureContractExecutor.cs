@@ -27,6 +27,7 @@ internal sealed class ArchitectureContractExecutor : IArchitectureContractExecut
 
         List<ArchitectureViolation> violations = new();
         List<string> cycles = new();
+        List<ArchitectureCycleFinding> cycleFindings = new();
         List<ArchitectureViolation> coverageViolations = new();
         List<ArchitectureCoverageSummary> coverageSummaries = new();
 
@@ -48,10 +49,13 @@ internal sealed class ArchitectureContractExecutor : IArchitectureContractExecut
                 continue;
             }
 
-            ExecuteStandardFamily(session, mode, family, handlerRegistry, timing, violations, cycles);
+            ExecuteStandardFamily(session, mode, family, handlerRegistry, timing, violations, cycles, cycleFindings);
         }
 
-        return new ArchitectureContractExecutionResult(violations, cycles, coverageViolations, coverageSummaries);
+        return new ArchitectureContractExecutionResult(violations, cycles, coverageViolations, coverageSummaries)
+        {
+            CycleFindings = cycleFindings
+        };
     }
 
     private static void ExecuteCoverageFamily(
@@ -88,7 +92,8 @@ internal sealed class ArchitectureContractExecutor : IArchitectureContractExecut
         IArchitectureContractHandlerRegistry handlerRegistry,
         ValidationTiming? timing,
         List<ArchitectureViolation> violations,
-        List<string> cycles)
+        List<string> cycles,
+        List<ArchitectureCycleFinding> cycleFindings)
     {
         int count = 0;
         using (timing?.MeasureContractFamily(family, () => count))
@@ -99,7 +104,17 @@ internal sealed class ArchitectureContractExecutor : IArchitectureContractExecut
                 ArchitectureHandlerResult result = handlerRegistry.Execute(family, session, contract);
                 violations.AddRange(result.Violations
                     .Select(violation => session.Document.Provenance.Enrich(violation, contract)));
-                cycles.AddRange(result.Cycles);
+                string cycleIdPrefix = contract.Id is null ? string.Empty : $"[{contract.Id}] ";
+                foreach (string cycle in result.Cycles)
+                {
+                    cycles.Add(cycle);
+                    string normalizedPath = cycleIdPrefix.Length > 0 && cycle.StartsWith(cycleIdPrefix, StringComparison.Ordinal)
+                        ? cycle[cycleIdPrefix.Length..]
+                        : cycle;
+                    cycleFindings.Add(session.Document.Provenance.Enrich(
+                        new ArchitectureCycleFinding(contract.Name, contract.Id, normalizedPath),
+                        contract));
+                }
             }
         }
     }

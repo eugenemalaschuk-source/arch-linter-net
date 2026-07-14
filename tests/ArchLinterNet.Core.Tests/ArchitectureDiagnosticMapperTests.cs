@@ -245,6 +245,22 @@ public sealed class ArchitectureDiagnosticMapperTests
     }
 
     [Test]
+    public void FromCycle_TypedFinding_PreservesPolicyLocation()
+    {
+        ArchitecturePolicySourceDescriptor source = new(
+            "architecture/root.yml", "architecture/rules.yml", ArchitecturePolicyDocumentRole.Fragment,
+            1, "architecture/root.yml", "rules.yml", ["architecture/root.yml", "architecture/rules.yml"]);
+        var cycle = new ArchitectureCycleFinding("cycle-contract", "cycle-check", "A -> B -> A")
+        {
+            PolicyLocation = new ArchitecturePolicySourceLocation(source, "contracts.strict_cycles[0]", 4, 2, "cycle", "cycle-check", 3)
+        };
+
+        var diagnostic = ArchitectureDiagnosticMapper.FromCycle(cycle);
+
+        Assert.That(diagnostic.PolicyLocation?.YamlPath, Is.EqualTo("contracts.strict_cycles[0]"));
+    }
+
+    [Test]
     public void FromUnmatchedIgnore_ReturnsUnmatchedIgnoreDiagnostic()
     {
         var unmatched = new ArchitectureUnmatchedIgnoredViolation(

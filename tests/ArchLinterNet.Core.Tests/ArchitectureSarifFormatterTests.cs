@@ -288,6 +288,28 @@ public sealed class ArchitectureSarifFormatterTests
     }
 
     [Test]
+    public void FormatResultAsSarif_TypedCycle_IncludesPolicyLocationEvidence()
+    {
+        var source = new ArchitecturePolicySourceDescriptor(
+            "architecture/root.yml", "architecture/rules.yml", ArchitecturePolicyDocumentRole.Fragment,
+            1, "architecture/root.yml", "rules.yml", ["architecture/root.yml", "architecture/rules.yml"]);
+        var cycle = new ArchitectureCycleFinding("Cycle Rule", "cycle-check", "LayerA -> LayerB -> LayerA")
+        {
+            PolicyLocation = new ArchitecturePolicySourceLocation(
+                source, "contracts.strict_cycles[0]", 7, 3, "cycle", "cycle-check", 9)
+        };
+
+        string json = _formatter.FormatResultAsSarif(
+            "strict", Array.Empty<ArchitectureViolation>(), [cycle], "1.2.3");
+        using JsonDocument document = JsonDocument.Parse(json);
+        JsonElement result = document.RootElement.GetProperty("runs")[0].GetProperty("results")[0];
+
+        Assert.That(result.GetProperty("ruleId").GetString(), Is.EqualTo("cycle-check"));
+        Assert.That(result.GetProperty("relatedLocations")[0].GetProperty("physicalLocation")
+            .GetProperty("artifactLocation").GetProperty("uri").GetString(), Is.EqualTo("architecture/rules.yml"));
+    }
+
+    [Test]
     public void FormatResultAsSarif_MixedViolationKindsAndCycles_OutputIsIndependentOfInputOrder()
     {
         var violationA = new ArchitectureViolation("a-contract", "a-rule", "Source.A", "Forbidden.A", new[] { "ref-a" })

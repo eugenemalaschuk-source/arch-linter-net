@@ -10,6 +10,7 @@ public sealed class ArchitectureValidationResult
     public bool Passed { get; }
     public IReadOnlyCollection<ArchitectureViolation> Violations { get; }
     public IReadOnlyCollection<string> Cycles { get; }
+    public IReadOnlyCollection<ArchitectureCycleFinding> CycleFindings { get; }
     public IReadOnlyCollection<PolicyConsistencyDiagnostic> PolicyConsistencyFindings { get; }
     public string PolicyConsistencyConfig { get; }
     public IReadOnlyCollection<ArchitectureViolation> CoverageFindings { get; }
@@ -24,6 +25,7 @@ public sealed class ArchitectureValidationResult
         Passed = @params.Passed;
         Violations = @params.Violations;
         Cycles = @params.Cycles;
+        CycleFindings = @params.CycleFindings ?? Array.Empty<ArchitectureCycleFinding>();
         PolicyConsistencyFindings = @params.PolicyConsistencyFindings ?? Array.Empty<PolicyConsistencyDiagnostic>();
         PolicyConsistencyConfig = @params.PolicyConsistencyConfig;
         CoverageFindings = @params.CoverageFindings ?? Array.Empty<ArchitectureViolation>();
@@ -52,7 +54,12 @@ public sealed class ArchitectureValidationResult
             "Violations:", Violations.Count > 0 ? _formatter.FormatViolationsForHumans(Violations) : string.Empty);
 
         message += FormatFailureSection(
-            "Cycles:", Cycles.Count > 0 ? _formatter.FormatCyclesForHumans(Cycles) : string.Empty);
+            "Cycles:",
+            CycleFindings.Count > 0
+                ? _formatter.FormatCyclesForHumans(CycleFindings)
+                : Cycles.Count > 0
+                    ? _formatter.FormatCyclesForHumans(Cycles)
+                    : string.Empty);
 
         message += FormatFailureSection(
             null,
@@ -89,6 +96,7 @@ public sealed record ArchitectureValidationResultParams(
     bool Passed,
     IReadOnlyCollection<ArchitectureViolation> Violations,
     IReadOnlyCollection<string> Cycles,
+    IReadOnlyCollection<ArchitectureCycleFinding>? CycleFindings = null,
     IReadOnlyCollection<PolicyConsistencyDiagnostic>? PolicyConsistencyFindings = null,
     string PolicyConsistencyConfig = "error",
     IReadOnlyCollection<ArchitectureViolation>? CoverageFindings = null,

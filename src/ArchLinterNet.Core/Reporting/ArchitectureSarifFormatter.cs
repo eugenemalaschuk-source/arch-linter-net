@@ -83,6 +83,60 @@ public sealed partial class ArchitectureSarifFormatter : IArchitectureSarifForma
         return JsonSerializer.Serialize(payload);
     }
 
+    public string FormatResultAsSarif(
+        string mode,
+        IReadOnlyCollection<ArchitectureViolation> violations,
+        IReadOnlyCollection<ArchitectureCycleFinding> cycles,
+        string toolVersion)
+    {
+        string level = mode == "strict" ? "error" : "warning";
+
+        List<ResultEntry> entries = violations
+            .Select(ArchitectureDiagnosticMapper.FromViolation)
+            .Select(diagnostic => BuildViolationEntry(diagnostic, level))
+            .Concat(cycles.Select(cycle => BuildCycleEntry(ArchitectureDiagnosticMapper.FromCycle(cycle), level)))
+            .OrderBy(e => e.RuleId, StringComparer.Ordinal)
+            .ThenBy(e => e.SourceIdentifier, StringComparer.Ordinal)
+            .ThenBy(e => e.Category, StringComparer.Ordinal)
+            .ToList();
+
+        object[] rules = entries
+            .GroupBy(e => e.RuleId, StringComparer.Ordinal)
+            .OrderBy(g => g.Key, StringComparer.Ordinal)
+            .Select(g => (object)new Dictionary<string, object?>
+            {
+                ["id"] = g.Key,
+                ["shortDescription"] = new Dictionary<string, object?> { ["text"] = g.First().ContractName },
+            })
+            .ToArray();
+
+        object[] results = entries.Select(e => (object)e.Json).ToArray();
+
+        var payload = new Dictionary<string, object?>
+        {
+            ["$schema"] = SchemaUri,
+            ["version"] = "2.1.0",
+            ["runs"] = new object[]
+            {
+                new Dictionary<string, object?>
+                {
+                    ["tool"] = new Dictionary<string, object?>
+                    {
+                        ["driver"] = new Dictionary<string, object?>
+                        {
+                            ["name"] = ToolName,
+                            ["version"] = toolVersion,
+                            ["rules"] = rules,
+                        },
+                    },
+                    ["results"] = results,
+                },
+            },
+        };
+
+        return JsonSerializer.Serialize(payload);
+    }
+
     private static ResultEntry BuildViolationEntry(ArchitectureDiagnostic diagnostic, string level)
     {
         (string sourceType, string forbiddenNamespace, IReadOnlyCollection<string> references) = ExtractFields(diagnostic);
@@ -166,6 +220,29 @@ public sealed partial class ArchitectureSarifFormatter : IArchitectureSarifForma
         };
 
         return new ResultEntry(ruleId, ruleId, path, "cycle", json);
+    }
+
+    private static ResultEntry BuildCycleEntry(CycleDiagnostic diagnostic, string level)
+    {
+        string ruleId = diagnostic.ContractId ?? CycleRuleFallback;
+
+        var json = new Dictionary<string, object?>
+        {
+            ["ruleId"] = ruleId,
+            ["level"] = level,
+            ["message"] = new Dictionary<string, object?> { ["text"] = $"Dependency cycle detected: {diagnostic.Path}" },
+            ["logicalLocations"] = BuildLogicalLocations(diagnostic.Path, "namespace"),
+        };
+
+        object[] relatedPolicyLocations = FormatPolicyLocationsForSarif(
+            diagnostic.PolicyLocation,
+            diagnostic.RelatedPolicyLocations);
+        if (relatedPolicyLocations.Length > 0)
+        {
+            json["relatedLocations"] = relatedPolicyLocations;
+        }
+
+        return new ResultEntry(ruleId, diagnostic.ContractName, diagnostic.Path, "cycle", json);
     }
 
     private static object[] BuildPhysicalLocations(string filePath, IReadOnlyCollection<string> references)

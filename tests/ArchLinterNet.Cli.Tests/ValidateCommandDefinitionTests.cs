@@ -158,6 +158,7 @@ public sealed class ValidateCommandDefinitionTests
             bool passed,
             IReadOnlyCollection<ArchitectureViolation> violations,
             IReadOnlyCollection<string> cycles,
+            IReadOnlyCollection<ArchitectureCycleFinding> cycleFindings,
             IReadOnlyCollection<ArchitectureViolation> coverageFindings,
             IReadOnlyList<ArchitectureUnmatchedIgnoredViolation> unmatchedIgnoredViolations,
             IReadOnlyCollection<PolicyConsistencyDiagnostic> policyConsistencyFindings,
@@ -167,9 +168,9 @@ public sealed class ValidateCommandDefinitionTests
             IReadOnlyCollection<ArchitectureClassificationRoleFact> classificationRoles,
             ArchitectureClassificationPathDeferredNotice? classificationPathDeferred) => "formatted";
 
-        public string FormatResultAsSarif(string mode, IReadOnlyCollection<ArchitectureViolation> violations, IReadOnlyCollection<string> cycles) => "formatted";
+        public string FormatResultAsSarif(string mode, IReadOnlyCollection<ArchitectureViolation> violations, IReadOnlyCollection<string> cycles, IReadOnlyCollection<ArchitectureCycleFinding> cycleFindings) => "formatted";
         public string FormatViolationsForHumans(IReadOnlyCollection<ArchitectureViolation> violations) => "formatted";
-        public string FormatCyclesForHumans(IReadOnlyCollection<string> cycles) => "formatted";
+        public string FormatCyclesForHumans(IReadOnlyCollection<string> cycles, IReadOnlyCollection<ArchitectureCycleFinding> cycleFindings) => "formatted";
         public string FormatPolicyConsistencyForHumans(IReadOnlyCollection<PolicyConsistencyDiagnostic> diagnostics) => "formatted";
         public string FormatUnmatchedForHumans(IReadOnlyList<ArchitectureUnmatchedIgnoredViolation> unmatchedViolations) => "formatted";
         public string FormatCoverageForHumans(IReadOnlyCollection<ArchitectureViolation> coverageFindings) => "formatted";
