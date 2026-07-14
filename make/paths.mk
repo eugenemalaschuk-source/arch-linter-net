@@ -25,14 +25,20 @@ BUNDLE_OS := windows
 # for this project, so pin SHELL explicitly to a discovered Git Bash install — the recipes
 # throughout make/*.mk are plain POSIX shell that Git Bash (installed with Git for Windows,
 # already required to clone this repo) runs natively.
-# Override with `make GIT_BASH=<path to bash.exe>` for a non-default Git for Windows install.
+# Override with `rtk make GIT_BASH=<path to bash.exe>` for a non-default Git for Windows install.
+_empty :=
+_space := $(_empty) $(_empty)
+
 ifeq ($(origin GIT_BASH),undefined)
 GIT_BASH := $(strip $(wildcard C:/Program\ Files/Git/bin/bash.exe))
 ifeq ($(GIT_BASH),)
 GIT_BASH := $(strip $(wildcard C:/Program\ Files\ (x86)/Git/bin/bash.exe))
 endif
 ifeq ($(GIT_BASH),)
-GIT_BASH := $(strip $(wildcard $(LOCALAPPDATA)/Programs/Git/bin/bash.exe))
+# LOCALAPPDATA can contain spaces (e.g. "C:\Users\John Doe\AppData\Local"); escape them so
+# $(wildcard …) treats the path as a single argument rather than a whitespace-delimited list.
+_LOCALAPPDATA_ESC := $(subst $(_space),\ ,$(LOCALAPPDATA))
+GIT_BASH := $(strip $(wildcard $(_LOCALAPPDATA_ESC)/Programs/Git/bin/bash.exe))
 endif
 endif
 

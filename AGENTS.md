@@ -65,7 +65,7 @@ All `make` targets run natively on Windows via **Git Bash** — WSL is not requi
 
 - Prerequisite: [Git for Windows](https://git-scm.com/download/win) (already required to clone this repo), which installs Git Bash.
 - `make/paths.mk` pins `SHELL` to a discovered `bash.exe` from a standard Git for Windows install location, overriding whatever GNU Make would otherwise resolve from `PATH` (which can pick up the unrelated WSL `bash.exe` shim at `C:\Windows\System32\bash.exe` and fail if no WSL distro is registered).
-- If Git is installed in a non-default location, point at it explicitly: `make GIT_BASH="D:/Git/bin/bash.exe" fmt`.
+- If Git is installed in a non-default location, point at it explicitly: `rtk make GIT_BASH="D:/Git/bin/bash.exe" fmt`.
 - If `bash.exe` cannot be found at all, `make` fails immediately with an actionable error naming the fix, instead of failing deep inside a recipe with a WSL error.
 - macOS/Linux targets are unaffected — this Windows-only `SHELL` override only applies when `$(OS)` is `Windows_NT`; `BUNDLE_OS`/`bundle-unix`/the `Brewfile` flow are unchanged.
 
