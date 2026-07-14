@@ -570,4 +570,74 @@ public sealed class ArchitectureDiagnosticFormatterTests
         Assert.That(output, Does.Contain("forbidden_reference: Forbidden.Ref"));
         Assert.That(output, Does.Contain("reason: stale ignore"));
     }
+
+    [Test]
+    public void PolicyProvenance_IsIncludedInHumanAndCiDiagnostics()
+    {
+        ArchitecturePolicySourceLocation primary = CreatePolicyLocation(
+            "architecture/fragments/policy.yml", "contracts.strict[10]", sourceOrdinal: 1, encounterOrdinal: 10);
+        ArchitecturePolicySourceLocation related = CreatePolicyLocation(
+            "architecture/fragments/policy.yml", "contracts.strict[2]", sourceOrdinal: 1, encounterOrdinal: 2);
+        var violation = new ArchitectureViolation("contract", "contract-id", "Source.Type", "Forbidden.Namespace", _reference1)
+        {
+            PolicyLocation = primary,
+            RelatedPolicyLocations = [related]
+        };
+        var unmatched = new ArchitectureUnmatchedIgnoredViolation(
+            "contract", "contract-id", 0, "Source.Type", "Forbidden.Ref", "stale ignore")
+        {
+            PolicyLocation = primary
+        };
+        var consistency = new PolicyConsistencyDiagnostic(
+            "contract", "contract-id", "duplicate", "conflicting rules", [], [], [])
+        {
+            PolicyLocation = primary,
+            RelatedPolicyLocations = [related]
+        };
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(_formatter.FormatViolationsForHumans([violation]), Does.Contain(
+                "policy: architecture/fragments/policy.yml:contracts.strict[10]"));
+            Assert.That(_formatter.FormatViolationsForHumans([violation]), Does.Contain(
+                "related: architecture/fragments/policy.yml:contracts.strict[2]"));
+            Assert.That(_formatter.FormatUnmatchedForHumans([unmatched]), Does.Contain(
+                "policy: architecture/fragments/policy.yml:contracts.strict[10]"));
+            Assert.That(_formatter.FormatPolicyConsistencyForHumans([consistency]), Does.Contain(
+                "policy: architecture/fragments/policy.yml:contracts.strict[10]"));
+        });
+
+        using JsonDocument document = JsonDocument.Parse(_formatter.FormatResultForCiArtifacts(
+            "strict", false, [violation], Array.Empty<string>(), unmatched: [unmatched],
+            policyConsistencyFindings: [consistency]));
+        JsonElement policyLocation = document.RootElement.GetProperty("violations")[0].GetProperty("policy_location");
+        JsonElement relatedLocation = document.RootElement.GetProperty("policy_consistency_findings")[0]
+            .GetProperty("related_policy_locations")[0];
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(policyLocation.GetProperty("source_path").GetString(),
+                Is.EqualTo("architecture/fragments/policy.yml"));
+            Assert.That(policyLocation.GetProperty("contract_family").GetString(), Is.EqualTo("dependency"));
+            Assert.That(policyLocation.GetProperty("contract_id").GetString(), Is.EqualTo("contract-id"));
+            Assert.That(policyLocation.GetProperty("import_chain")[1].GetString(),
+                Is.EqualTo("architecture/fragments/policy.yml"));
+            Assert.That(relatedLocation.GetProperty("yaml_path").GetString(), Is.EqualTo("contracts.strict[2]"));
+            Assert.That(document.RootElement.GetProperty("unmatched_ignored_violations")[0]
+                .GetProperty("policy_location").GetProperty("source_ordinal").GetInt32(), Is.EqualTo(1));
+        });
+    }
+
+    private static ArchitecturePolicySourceLocation CreatePolicyLocation(
+        string sourcePath,
+        string yamlPath,
+        int sourceOrdinal,
+        int encounterOrdinal)
+    {
+        var source = new ArchitecturePolicySourceDescriptor(
+            "architecture/root.yml", sourcePath, ArchitecturePolicyDocumentRole.Fragment, sourceOrdinal,
+            "architecture/root.yml", sourcePath, ["architecture/root.yml", sourcePath]);
+        return new ArchitecturePolicySourceLocation(
+            source, yamlPath, 3, 5, "dependency", "contract-id", encounterOrdinal);
+    }
 }
