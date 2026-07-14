@@ -2,6 +2,49 @@
 
 This guide describes how AI agents should author ArchLinterNet policies safely.
 
+## Decompose Large Policies By Concern
+
+ArchLinterNet executes one selected root policy. For a large policy, prefer
+focused imported fragments organized by architecture concern or bounded
+context:
+
+```yaml
+# architecture/arch.yml — recommended root convention, not a required name
+version: 1
+name: Product Architecture
+imports:
+  - policy/shared/layers.arch.yml
+  - policy/bounded-contexts/sales.arch.yml
+layers: {}
+analysis: {}
+contracts: {}
+```
+
+The selected path makes this file the root. Import reachability makes the other
+files fragments; filenames never assign runtime roles. Read
+[Policy imports](../policy-format/imports.md) before changing a composed policy.
+
+Agent rules:
+
+- Inspect the selected root and its import graph before editing. Do not inspect
+  a fragment as though it were an independently executable policy.
+- Edit the smallest fragment that owns the concern. A Sales rule belongs in a
+  Sales fragment; do not touch Inventory or shared-layer fragments merely to
+  reduce file count or make formatting uniform.
+- Add or reorder a root import only when the owning fragment is new or composed
+  order must intentionally change. Avoid broad unrelated root rewrites.
+- Keep small shared settings inline when that is clearer. Split by concern or
+  bounded context, not arbitrary line count.
+- Treat layer/package/external-dependency/condition-set keys as global across
+  the graph. A duplicate is a conflict, not an override.
+- Keep contract IDs unique across the whole graph within each contract family
+  and strict/audit mode. Fragment boundaries do not create ID namespaces.
+- Validate fragments with
+  `schema/dependencies.arch.fragment.schema.json`, then run strict and relevant
+  audit validation through the one selected root.
+- Preserve existing list and import order unless the task explicitly changes
+  diagnostic or contract evaluation order.
+
 ## Start With Layers
 
 Define layers from real namespace prefixes:

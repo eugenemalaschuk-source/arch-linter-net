@@ -95,12 +95,26 @@ The system SHALL compose root inline content first, then expand imports using de
 - **WHEN** resolving the next import would exceed depth 16 or 256 total files
 - **THEN** loading fails before reading the over-limit file with the limit and import chain in the diagnostic
 
-### Requirement: Imports remain within one repository boundary
-The system SHALL resolve the allowed repository boundary once from the explicit root policy. Each import SHALL be made absolute, physically canonicalized, and verified to remain within that boundary before being read. Authored path casing SHALL exactly match the filesystem entry, and canonical repository-relative portability identities SHALL be compared case-insensitively.
+### Requirement: Imports remain within one resolved root boundary
+The system SHALL resolve the allowed import boundary once from the explicit
+root policy. If the selected root lives directly under a directory named
+`architecture`, the boundary SHALL be that directory's parent. Otherwise, the
+boundary SHALL be the selected root's own directory. Each import SHALL be made
+absolute, physically canonicalized, and verified to remain within that
+boundary before being read. Authored path casing SHALL exactly match the
+filesystem entry, and canonical boundary-relative portability identities SHALL
+be compared case-insensitively.
 
-#### Scenario: Relative in-bound import
-- **WHEN** a fragment imports `../shared/layers.yml` and its physically canonical target remains inside the resolved repository root
-- **THEN** the system reads that target using its canonical repository-relative identity
+#### Scenario: Relative in-bound import for an architecture root
+- **WHEN** the selected root is `architecture/arch.yml`
+- **AND WHEN** a fragment imports `../shared/layers.yml`
+- **AND WHEN** its physically canonical target remains inside the parent of `architecture/`
+- **THEN** the system reads that target using its canonical boundary-relative identity
+
+#### Scenario: Relative import escapes a non-architecture root directory
+- **WHEN** the selected root is `config/company-policy.yaml`
+- **AND WHEN** it imports `../shared/layers.yml`
+- **THEN** loading fails because the import resolves outside that root directory's boundary
 
 #### Scenario: Link escapes repository
 - **WHEN** an apparently in-bound import traverses a symbolic link or junction to a file outside the repository boundary
@@ -438,3 +452,40 @@ MAY be used only when the diagnostic supplies no participating contract IDs.
 - **THEN** the diagnostic's primary and related policy locations identify only
   the two participating dependency contracts
 
+### Requirement: Public import authoring guidance is complete and filename-neutral
+ArchLinterNet SHALL publish public guidance that explains one explicitly selected root, ordered local `imports`, graph-derived fragment roles, allowed fragment sections, root-inline composition, deterministic nested order, merge and conflict rules, repository path boundaries, graph limits, diagnostics, unsupported behavior, and the distinction between naming conventions and runtime requirements. The guidance SHALL recommend `architecture/arch.yml` for a concise stable root and concern-specific `*.arch.yml` fragment names without describing those names or `architecture/dependencies.arch.yml` as mandatory.
+
+#### Scenario: Author chooses recommended names
+- **WHEN** an author follows the recommended root and fragment naming conventions
+- **THEN** the documentation explains that behavior comes from the selected root path and import edges rather than those names
+
+#### Scenario: Author chooses arbitrary names
+- **WHEN** an author selects `config/company-policy.yaml` and imports `pieces/domain.data`
+- **THEN** the documentation and examples describe behavior equivalent to a recommended-name graph
+
+#### Scenario: Author checks unsupported behavior
+- **WHEN** an author considers multiple roots, remote imports, globs, silent overrides, environment interpolation, arbitrary YAML tags, or cross-file anchors
+- **THEN** the public guidance identifies each behavior as unsupported
+
+### Requirement: Public schema, migration, and troubleshooting guidance covers both roles
+ArchLinterNet SHALL document explicit root and fragment schema selection for common schema-aware editors without requiring filename associations. It SHALL provide a migration from a monolithic policy to one root plus focused fragments that preserves behavior for keyed sections, singleton settings, unordered concerns, and ordered collections moved as a suffix or moved entirely into ordered fragments. The guidance SHALL explain that imported ordered entries are appended after all root-inline content, so imports cannot reinsert entries between remaining root-inline items. It SHALL also provide troubleshooting for missing imports, cycles, duplicate paths or IDs, composition conflicts, path-boundary violations, invalid fragment shapes, and editor schema association.
+
+#### Scenario: Editor validates an arbitrary fragment filename
+- **WHEN** an author assigns `schema/dependencies.arch.fragment.schema.json` explicitly to an arbitrary imported file
+- **THEN** editor validation uses fragment shape without relying on a filename pattern
+
+#### Scenario: Monolithic policy is migrated incrementally
+- **WHEN** an author moves one concern at a time from a valid monolithic policy into imported fragments
+- **THEN** the guide preserves one root, global contract identity, and composition order
+- **AND THEN** it preserves equivalent validation behavior only when each ordered collection move keeps a root-inline suffix or moves the whole collection into ordered fragments
+
+### Requirement: Committed acceptance fixtures prove public import behavior
+The repository SHALL contain executable NUnit-backed fixtures that prove equivalent monolithic and imported policies produce equivalent validation outcomes, recommended and arbitrary filenames produce equivalent outcomes, and root-versus-fragment plus fragment-versus-fragment conflicts fail without silent precedence.
+
+#### Scenario: Equivalent public fixtures load
+- **WHEN** the acceptance suite loads the monolithic, recommended-name imported, and arbitrary-name imported fixtures
+- **THEN** their behaviorally relevant resolved models and validation outcomes are equivalent
+
+#### Scenario: Conflicting public fixtures load
+- **WHEN** the acceptance suite loads root-versus-fragment or fragment-versus-fragment duplicate definitions
+- **THEN** loading fails with a composition-conflict category identifying both participating sources

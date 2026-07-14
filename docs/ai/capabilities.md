@@ -4,10 +4,13 @@ This page summarizes what ArchLinterNet can and cannot validate for AI policy au
 
 ## Supported policy structure
 
-The policy file is usually `architecture/dependencies.arch.yml` and contains:
+Each run uses one selected root policy; `architecture/arch.yml` is the
+recommended concise convention, not a required filename. A root may import
+focused local fragments and contains:
 
 - `version`: current value is `1`.
 - `name`: human-readable policy name.
+- `imports`: optional ordered relative paths to partial policy fragments.
 - `layers`: named namespace-prefix, constrained glob, or selector-backed layer definitions.
 - `external_dependencies`: named vendor/framework dependency groups.
 - `legacy_runtime_layers`: optional namespace prefixes used by dependency contracts.

@@ -2,9 +2,7 @@
 
 ## Purpose
 Provides a sample YAML policy and documents sample CLI usage for new adopters.
-
 ## Requirements
-
 ### Requirement: Sample YAML policy exists
 The repository SHALL contain a sample YAML architecture contract file in `samples/BasicCleanArchitecture/architecture/dependencies.arch.yml` that demonstrates a realistic clean-architecture policy with strict contracts, layer contracts, cycle contracts, independence contracts, and audit-mode contracts.
 
@@ -36,3 +34,18 @@ The README SHALL contain a code snippet showing how to use `ArchitectureAssertio
 #### Scenario: README contains NUnit example
 - **WHEN** the README is read
 - **THEN** it SHALL contain a code block showing `ArchitectureAssertions.FromPolicy(...)` usage with NUnit
+
+### Requirement: Modular-monolith import example is realistic and executable
+The repository SHALL provide a modular-monolith example with one root policy that keeps appropriate shared settings inline and imports focused shared-layer and bounded-context fragments. The example SHALL use documented, executable fields and SHALL be loadable by the production policy loader.
+
+#### Scenario: Modular-monolith example is loaded
+- **WHEN** the sample root and its fragments are loaded through `ArchitecturePolicyDocumentLoader`
+- **THEN** shared layers, bounded-context definitions, and ordered contracts compose into one valid effective policy
+
+### Requirement: Unity client import example is realistic and executable
+The repository SHALL provide a Unity/client example with one root policy that imports focused runtime, editor, and feature fragments while retaining a single execution entry point. The example SHALL use documented, executable fields and SHALL be loadable by the production policy loader.
+
+#### Scenario: Unity client example is loaded
+- **WHEN** the sample root and its fragments are loaded through `ArchitecturePolicyDocumentLoader`
+- **THEN** runtime, editor, feature, external dependency, and asmdef concerns compose into one valid effective policy
+

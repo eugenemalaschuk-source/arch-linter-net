@@ -1,0 +1,42 @@
+version: 1
+name: Unity Client Imported Policy
+
+imports:
+  - policy/runtime.arch.yml
+  - policy/editor.arch.yml
+  - policy/features/combat.arch.yml
+
+layers:
+  bootstrap:
+    namespace: MyCompany.Game.Bootstrap
+  game_core:
+    namespace: MyCompany.Game.Core
+
+external_dependencies:
+  unity_runtime:
+    namespace_prefixes: [UnityEngine]
+    type_prefixes: []
+
+analysis:
+  target_assemblies:
+    - MyCompany.Game.Core
+    - MyCompany.Game.Gameplay.Runtime
+    - MyCompany.Game.Gameplay.Editor
+    - MyCompany.Game.Features.Combat
+    - MyCompany.Game.UnityAdapters
+  source_roots: [Assets]
+
+contracts:
+  strict_composition:
+    - id: container-confined-to-bootstrap
+      name: container-confined-to-bootstrap
+      allowed_only_in_layers: [bootstrap]
+      forbidden_apis: [Resolve, Register]
+      reason: Container access belongs only in scene and lifetime-scope bootstrap code.
+
+  strict_cycles:
+    - id: unity-runtime-cycles
+      name: unity-runtime-cycles
+      layers: [game_core, gameplay_runtime, unity_adapters, combat_feature]
+      reason: Runtime Unity layers and features must remain acyclic.
+

@@ -1,0 +1,14 @@
+# yaml-language-server: $schema=../../../../../../schema/dependencies.arch.fragment.schema.json
+layers:
+  gameplay_runtime:
+    namespace: MyCompany.Game.Gameplay.Runtime
+  unity_adapters:
+    namespace: MyCompany.Game.UnityAdapters
+
+contracts:
+  strict:
+    - id: core-does-not-depend-on-unity-adapters
+      name: core-does-not-depend-on-unity-adapters
+      source: game_core
+      forbidden: [unity_adapters, gameplay_editor]
+      reason: Pure game core remains independent of Unity-specific adapters and editor code.
