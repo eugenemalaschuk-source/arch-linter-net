@@ -1,4 +1,7 @@
-namespace ArchLinterNet.CEL;
+using ArchLinterNet.CEL.Schema;
+using ArchLinterNet.CEL.Values;
+
+namespace ArchLinterNet.CEL.Evaluation;
 
 /// <summary>
 /// An immutable activation that binds <see cref="CelVariable"/> handles to <see cref="CelValue"/>

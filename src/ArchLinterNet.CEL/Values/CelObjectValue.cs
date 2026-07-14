@@ -1,4 +1,4 @@
-namespace ArchLinterNet.CEL;
+namespace ArchLinterNet.CEL.Values;
 
 /// <summary>
 /// An immutable, schema-defined CEL object value with named, typed members.

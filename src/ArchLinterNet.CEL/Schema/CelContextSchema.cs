@@ -1,6 +1,8 @@
 using System.Text;
+using ArchLinterNet.CEL.Compilation;
+using ArchLinterNet.CEL.Evaluation;
 
-namespace ArchLinterNet.CEL;
+namespace ArchLinterNet.CEL.Schema;
 
 /// <summary>
 /// An immutable, structurally-identified schema that declares the variables available in a

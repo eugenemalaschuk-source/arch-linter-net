@@ -1,3 +1,7 @@
+using ArchLinterNet.CEL.Compilation;
+using ArchLinterNet.CEL.Profile;
+using ArchLinterNet.CEL.Schema;
+
 namespace ArchLinterNet.CEL;
 
 /// <summary>

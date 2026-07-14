@@ -1,4 +1,7 @@
-namespace ArchLinterNet.CEL;
+using ArchLinterNet.CEL.Schema;
+using ArchLinterNet.CEL.Values;
+
+namespace ArchLinterNet.CEL.Evaluation;
 
 /// <summary>
 /// Fluent builder for constructing an immutable <see cref="CelEvaluationContext"/>.

@@ -1,4 +1,4 @@
-namespace ArchLinterNet.CEL;
+namespace ArchLinterNet.CEL.Schema;
 
 /// <summary>
 /// Describes a CEL type used to declare variables and schema members in ArchLinter CEL Profile v1.

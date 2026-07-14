@@ -1,4 +1,4 @@
-namespace ArchLinterNet.CEL;
+namespace ArchLinterNet.CEL.Values;
 
 /// <summary>
 /// Identifies the runtime kind of a <see cref="CelValue"/> instance.

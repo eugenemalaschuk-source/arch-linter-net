@@ -1,4 +1,10 @@
 using ArchLinterNet.CEL;
+using ArchLinterNet.CEL.Compilation;
+using ArchLinterNet.CEL.Diagnostics;
+using ArchLinterNet.CEL.Evaluation;
+using ArchLinterNet.CEL.Profile;
+using ArchLinterNet.CEL.Schema;
+using ArchLinterNet.CEL.Values;
 using NUnit.Framework;
 
 namespace ArchLinterNet.CEL.Tests;

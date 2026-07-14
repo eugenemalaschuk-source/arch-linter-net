@@ -1,4 +1,6 @@
-namespace ArchLinterNet.CEL;
+using ArchLinterNet.CEL.Compilation;
+
+namespace ArchLinterNet.CEL.Evaluation;
 
 /// <summary>
 /// Immutable evaluation budget limits applied per <see cref="CelCompiledPredicate.Evaluate"/>

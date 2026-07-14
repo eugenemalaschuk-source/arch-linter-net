@@ -1,4 +1,7 @@
-namespace ArchLinterNet.CEL;
+using ArchLinterNet.CEL.Diagnostics;
+using ArchLinterNet.CEL.Values;
+
+namespace ArchLinterNet.CEL.Evaluation;
 
 /// <summary>
 /// The structured result of evaluating a compiled CEL expression against an

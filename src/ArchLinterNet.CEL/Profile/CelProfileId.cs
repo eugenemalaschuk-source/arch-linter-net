@@ -1,4 +1,4 @@
-namespace ArchLinterNet.CEL;
+namespace ArchLinterNet.CEL.Profile;
 
 /// <summary>
 /// Immutable identifier for an ArchLinter CEL language profile.

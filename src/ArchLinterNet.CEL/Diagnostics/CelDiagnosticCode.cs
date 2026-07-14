@@ -1,4 +1,4 @@
-namespace ArchLinterNet.CEL;
+namespace ArchLinterNet.CEL.Diagnostics;
 
 /// <summary>
 /// Stable, machine-readable code identifying the category of a <see cref="CelDiagnostic"/>.

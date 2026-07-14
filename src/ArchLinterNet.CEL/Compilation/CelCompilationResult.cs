@@ -1,4 +1,6 @@
-namespace ArchLinterNet.CEL;
+using ArchLinterNet.CEL.Diagnostics;
+
+namespace ArchLinterNet.CEL.Compilation;
 
 /// <summary>
 /// The structured result of compiling a CEL expression via <see cref="CelEnvironment"/>.

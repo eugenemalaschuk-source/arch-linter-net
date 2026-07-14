@@ -1,4 +1,4 @@
-namespace ArchLinterNet.CEL;
+namespace ArchLinterNet.CEL.Schema;
 
 /// <summary>
 /// Identifies the kind of a <see cref="CelType"/> in ArchLinter CEL Profile v1.

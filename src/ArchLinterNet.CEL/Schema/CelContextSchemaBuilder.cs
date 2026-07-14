@@ -1,4 +1,4 @@
-namespace ArchLinterNet.CEL;
+namespace ArchLinterNet.CEL.Schema;
 
 /// <summary>
 /// Fluent builder for constructing an immutable <see cref="CelContextSchema"/>.

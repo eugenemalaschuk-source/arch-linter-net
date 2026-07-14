@@ -1,4 +1,4 @@
-namespace ArchLinterNet.CEL;
+namespace ArchLinterNet.CEL.Diagnostics;
 
 /// <summary>
 /// Identifies a character-offset range within an expression source string.

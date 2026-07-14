@@ -1,4 +1,4 @@
-namespace ArchLinterNet.CEL;
+namespace ArchLinterNet.CEL.Diagnostics;
 
 /// <summary>
 /// A structured diagnostic produced during CEL compilation or evaluation.

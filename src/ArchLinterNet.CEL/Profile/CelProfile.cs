@@ -1,4 +1,4 @@
-namespace ArchLinterNet.CEL;
+namespace ArchLinterNet.CEL.Profile;
 
 /// <summary>
 /// Represents a versioned ArchLinter CEL language profile that pins the supported language subset,

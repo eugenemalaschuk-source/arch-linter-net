@@ -1,32 +1,36 @@
-namespace ArchLinterNet.CEL;
+using ArchLinterNet.CEL.Evaluation;
+using ArchLinterNet.CEL.Profile;
+using ArchLinterNet.CEL.Schema;
+using ArchLinterNet.CEL.Values;
+
+namespace ArchLinterNet.CEL.Compilation;
 
 /// <summary>
-/// An immutable, thread-safe, concurrently reusable compiled CEL predicate that evaluates to
-/// a <c>bool</c> value.
+/// An immutable, thread-safe, concurrently reusable compiled CEL expression that evaluates to
+/// any <see cref="CelValue"/>.
 /// </summary>
 /// <remarks>
 /// <para>
-/// The predicate path enforces a <c>bool</c> result type at compile time. Repeated evaluation
-/// performs no parsing, binding, or type-checking. The expression is not convertible to a
-/// delegate or expression tree.
+/// Repeated evaluation performs no parsing, binding, or type-checking.
+/// The expression is not convertible to a delegate or expression tree.
 /// </para>
 /// <para>This class is immutable and thread-safe.</para>
 /// </remarks>
-public sealed class CelCompiledPredicate
+public sealed class CelCompiledExpression
 {
-    /// <summary>Gets the language profile this predicate was compiled under.</summary>
+    /// <summary>Gets the language profile this expression was compiled under.</summary>
     public CelProfile Profile { get; }
 
-    /// <summary>Gets the context schema this predicate is bound to.</summary>
+    /// <summary>Gets the context schema this expression is bound to.</summary>
     public CelContextSchema Schema { get; }
 
-    /// <summary>Gets the cache-identity key for this compiled predicate.</summary>
+    /// <summary>Gets the cache-identity key for this compiled expression.</summary>
     public CelCompilationKey CompilationKey { get; }
 
-    /// <summary>Gets the compilation limits that were active when this predicate was compiled.</summary>
+    /// <summary>Gets the compilation limits that were active when this expression was compiled.</summary>
     public CelCompilationLimits CompilationLimits { get; }
 
-    internal CelCompiledPredicate(
+    internal CelCompiledExpression(
         CelProfile profile,
         CelContextSchema schema,
         CelCompilationKey compilationKey,
@@ -39,9 +43,8 @@ public sealed class CelCompiledPredicate
     }
 
     /// <summary>
-    /// Evaluates this predicate against the given context and limits, returning a structured
-    /// <see cref="CelEvaluationResult"/> whose <see cref="CelEvaluationResult.AsBool"/> returns
-    /// the boolean result.
+    /// Evaluates this expression against the given context and limits,
+    /// returning a structured <see cref="CelEvaluationResult"/>.
     /// </summary>
     /// <exception cref="NotImplementedException">
     /// The evaluator is not yet implemented. This will be replaced by the real evaluator in task #327.

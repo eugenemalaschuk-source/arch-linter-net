@@ -1,4 +1,6 @@
-namespace ArchLinterNet.CEL;
+using ArchLinterNet.CEL.Profile;
+
+namespace ArchLinterNet.CEL.Compilation;
 
 /// <summary>
 /// An immutable, structurally-equal cache identity value for a compiled CEL expression.

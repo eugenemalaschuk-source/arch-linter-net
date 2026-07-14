@@ -1,4 +1,4 @@
-namespace ArchLinterNet.CEL;
+namespace ArchLinterNet.CEL.Values;
 
 /// <summary>
 /// An immutable CEL value produced by evaluating an expression or supplied as context input.

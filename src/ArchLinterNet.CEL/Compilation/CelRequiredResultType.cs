@@ -1,4 +1,4 @@
-namespace ArchLinterNet.CEL;
+namespace ArchLinterNet.CEL.Compilation;
 
 /// <summary>
 /// Identifies the required CEL result type for a compilation, used as part of

@@ -1,4 +1,6 @@
-namespace ArchLinterNet.CEL;
+using ArchLinterNet.CEL.Evaluation;
+
+namespace ArchLinterNet.CEL.Schema;
 
 /// <summary>
 /// An immutable, typed handle for a variable declared in a <see cref="CelContextSchema"/>.

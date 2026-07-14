@@ -1,4 +1,4 @@
-namespace ArchLinterNet.CEL;
+namespace ArchLinterNet.CEL.Diagnostics;
 
 /// <summary>
 /// Indicates the severity of a <see cref="CelDiagnostic"/>.

@@ -1,4 +1,4 @@
-namespace ArchLinterNet.CEL;
+namespace ArchLinterNet.CEL.Compilation;
 
 /// <summary>
 /// Immutable compilation budget limits applied to a <see cref="CelEnvironment"/>.
