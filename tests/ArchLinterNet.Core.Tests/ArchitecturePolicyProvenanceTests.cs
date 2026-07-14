@@ -297,6 +297,50 @@ public sealed class ArchitecturePolicyProvenanceTests
     }
 
     [Test]
+    public void CheckPolicyConsistency_SameNameInDifferentFamily_UsesOnlyParticipantIds()
+    {
+        string root = Write(
+            "architecture/root.yml",
+            RootYaml("forbid.yml", LayersFragment() + """
+                contracts:
+                  strict_allow_only:
+                    - id: allow-id
+                      name: shared-name
+                      source: domain
+                      allowed: [application]
+                  strict_layers:
+                    - id: unrelated-layer-id
+                      name: shared-name
+                      layers: [domain, application]
+                """ + "\n"));
+        Write(
+            "architecture/forbid.yml",
+            """
+            contracts:
+              strict:
+                - id: forbid-id
+                  name: forbid-name
+                  source: domain
+                  forbidden: [application]
+            """);
+        ArchitectureContractDocument document = new ArchitecturePolicyDocumentLoader().Load(root);
+        var runner = new ArchitectureContractRunner(CreateContext(), document);
+
+        PolicyConsistencyDiagnostic finding = runner.CheckPolicyConsistency()
+            .Single(candidate => candidate.CheckKind == "allow-forbid-conflict");
+        string[] paths = new[] { finding.PolicyLocation! }
+            .Concat(finding.RelatedPolicyLocations)
+            .Select(location => location.YamlPath)
+            .ToArray();
+
+        Assert.That(paths, Is.EquivalentTo(new[]
+        {
+            "contracts.strict_allow_only[0]",
+            "contracts.strict[0]",
+        }));
+    }
+
+    [Test]
     public void UnmatchedIgnore_ResolvesNestedFragmentYamlPath()
     {
         string root = Write("architecture/root.yml", RootYaml("fragment.yml"));

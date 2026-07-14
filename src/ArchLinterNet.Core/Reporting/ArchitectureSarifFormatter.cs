@@ -107,7 +107,9 @@ public sealed partial class ArchitectureSarifFormatter : IArchitectureSarifForma
             json["logicalLocations"] = BuildLogicalLocations(sourceType, LogicalLocationKindFor(diagnostic, forbiddenNamespace));
         }
 
-        object[] relatedPolicyLocations = BuildRelatedPolicyLocations(diagnostic);
+        object[] relatedPolicyLocations = FormatPolicyLocationsForSarif(
+            diagnostic.PolicyLocation,
+            diagnostic.RelatedPolicyLocations);
         if (relatedPolicyLocations.Length > 0)
         {
             json["relatedLocations"] = relatedPolicyLocations;
@@ -116,12 +118,14 @@ public sealed partial class ArchitectureSarifFormatter : IArchitectureSarifForma
         return new ResultEntry(ruleId, diagnostic.ContractName, sourceType, forbiddenNamespace, json);
     }
 
-    private static object[] BuildRelatedPolicyLocations(ArchitectureDiagnostic diagnostic)
+    public static object[] FormatPolicyLocationsForSarif(
+        ArchitecturePolicySourceLocation? primaryLocation,
+        IEnumerable<ArchitecturePolicySourceLocation> relatedLocations)
     {
         IEnumerable<ArchitecturePolicySourceLocation> locations =
-            diagnostic.PolicyLocation is null
-                ? diagnostic.RelatedPolicyLocations
-                : new[] { diagnostic.PolicyLocation }.Concat(diagnostic.RelatedPolicyLocations);
+            primaryLocation is null
+                ? relatedLocations
+                : new[] { primaryLocation }.Concat(relatedLocations);
 
         return locations
             .Distinct()

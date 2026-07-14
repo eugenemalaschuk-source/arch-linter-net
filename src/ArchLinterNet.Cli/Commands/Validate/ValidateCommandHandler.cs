@@ -137,6 +137,9 @@ internal sealed class ValidateCommandHandler(ICliRuntime runtime, ICliConsole co
 
         if (format == "sarif")
         {
+            object[] relatedLocations = ArchitectureSarifFormatter.FormatPolicyLocationsForSarif(
+                diagnostic.Location,
+                diagnostic.RelatedLocations);
             console.Out.WriteLine(JsonSerializer.Serialize(new
             {
                 version = "2.1.0",
@@ -162,15 +165,7 @@ internal sealed class ValidateCommandHandler(ICliRuntime runtime, ICliConsole co
                                         },
                                     },
                                 },
-                                relatedLocations = diagnostic.RelatedLocations.Select((location, index) => new
-                                {
-                                    id = index + 1,
-                                    physicalLocation = new
-                                    {
-                                        artifactLocation = new { uri = location.SourcePath },
-                                        region = new { startLine = location.Line, startColumn = location.Column },
-                                    },
-                                }),
+                                relatedLocations,
                             },
                         },
                     },

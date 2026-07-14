@@ -1,4 +1,5 @@
 using System.Text;
+using System.Text.Json;
 using ArchLinterNet.Cli;
 using ArchLinterNet.Cli.Abstractions;
 using ArchLinterNet.Cli.Commands.Baseline;
@@ -172,8 +173,26 @@ public sealed class CliArchitectureTests
 
         handler.Execute(new ValidateCommandOptions("policy.yml", "strict", "sarif", [], null, false, null, false, false));
 
-        Assert.That(console.StdOut, Does.Contain("relatedLocations"));
-        Assert.That(console.StdOut, Does.Contain("architecture/parts/domain.yml"));
+        using JsonDocument document = JsonDocument.Parse(console.StdOut);
+        JsonElement result = document.RootElement.GetProperty("runs")[0].GetProperty("results")[0];
+        JsonElement relatedLocations = result.GetProperty("relatedLocations");
+        JsonElement rootLocation = relatedLocations[0];
+        JsonElement fragmentLocation = relatedLocations[1];
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(result.GetProperty("locations")[0].GetProperty("physicalLocation")
+                .GetProperty("artifactLocation").GetProperty("uri").GetString(), Is.EqualTo("architecture/root.yml"));
+            Assert.That(relatedLocations.GetArrayLength(), Is.EqualTo(2));
+            Assert.That(rootLocation.GetProperty("message").GetProperty("text").GetString(),
+                Is.EqualTo("Policy root definition at layers.domain"));
+            Assert.That(rootLocation.GetProperty("physicalLocation").GetProperty("artifactLocation")
+                .GetProperty("uri").GetString(), Is.EqualTo("architecture/root.yml"));
+            Assert.That(fragmentLocation.GetProperty("message").GetProperty("text").GetString(),
+                Is.EqualTo("Policy fragment definition at layers.domain"));
+            Assert.That(fragmentLocation.GetProperty("physicalLocation").GetProperty("artifactLocation")
+                .GetProperty("uri").GetString(), Is.EqualTo("architecture/parts/domain.yml"));
+        });
     }
 
     private sealed class FakeCliRuntime : ICliRuntime

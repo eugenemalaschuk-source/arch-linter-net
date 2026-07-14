@@ -369,13 +369,10 @@ public sealed class ArchitecturePolicyProvenanceIndex
         PolicyConsistencyDiagnostic diagnostic)
     {
         var locations = new List<ArchitecturePolicySourceLocation>();
+        bool hasParticipantIds = diagnostic.ContractId is not null
+            || diagnostic.ConflictingContractIds.Count > 0;
         foreach (ContractEntry entry in _contracts.Where(entry =>
-                     ContractMatches(entry.Contract, diagnostic.ContractName, diagnostic.ContractId)
-                     || diagnostic.ConflictingContractNames.Contains(entry.Contract.Name, StringComparer.Ordinal)
-                     || entry.Contract.Id is not null
-                     && diagnostic.ConflictingContractIds.Contains(
-                         entry.Contract.Id,
-                         StringComparer.OrdinalIgnoreCase)))
+                     IsDiagnosticParticipant(entry.Contract, diagnostic, hasParticipantIds)))
         {
             AddLocation(locations, LocationFor(entry.Contract));
         }
@@ -392,6 +389,22 @@ public sealed class ArchitecturePolicyProvenanceIndex
             .OrderBy(location => location.SourceOrdinal)
             .ThenBy(location => location.EncounterOrdinal)
             .ToList();
+    }
+
+    private static bool IsDiagnosticParticipant(
+        IArchitectureContract contract,
+        PolicyConsistencyDiagnostic diagnostic,
+        bool hasParticipantIds)
+    {
+        if (hasParticipantIds)
+        {
+            return contract.Id is not null
+                && (string.Equals(contract.Id, diagnostic.ContractId, StringComparison.OrdinalIgnoreCase)
+                    || diagnostic.ConflictingContractIds.Contains(contract.Id, StringComparer.OrdinalIgnoreCase));
+        }
+
+        return string.Equals(contract.Name, diagnostic.ContractName, StringComparison.Ordinal)
+            || diagnostic.ConflictingContractNames.Contains(contract.Name, StringComparer.Ordinal);
     }
 
     private static bool ContractMatches(IArchitectureContract contract, string name, string? id)
