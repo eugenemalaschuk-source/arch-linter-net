@@ -31,5 +31,6 @@ public sealed record ArchitectureDeclaredTypeFact(
 // making a deterministic primary source path unavailable. The corresponding ArchitectureDeclaredTypeFact
 // will have null SourceFilePath; path-based rules cannot evaluate ambiguous types.
 public sealed record ArchitectureDeclaredTypeSourceAmbiguity(
+    string AssemblyName,
     string FullTypeName,
     IReadOnlyList<string> SourceFilePaths);

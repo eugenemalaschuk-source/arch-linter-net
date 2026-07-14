@@ -1,4 +1,5 @@
 using System.Reflection;
+using System.Reflection.Emit;
 using ArchLinterNet.Core.Execution;
 using ArchLinterNet.Core.Model;
 using NUnit.Framework;
@@ -63,6 +64,7 @@ public sealed partial class ArchitectureSourceFileFactIndexTests
             });
 
         Assert.That(index.Ambiguities, Has.Count.EqualTo(1));
+        Assert.That(index.Ambiguities[0].AssemblyName, Is.EqualTo(TestAssemblyName));
         Assert.That(index.Ambiguities[0].SourceFilePaths, Has.Count.EqualTo(2));
     }
 
@@ -149,6 +151,40 @@ public sealed partial class ArchitectureSourceFileFactIndexTests
         IReadOnlyList<string> paths = index.Ambiguities[0].SourceFilePaths;
         List<string> sorted = paths.OrderBy(p => p, StringComparer.Ordinal).ToList();
         Assert.That(paths, Is.EqualTo(sorted));
+    }
+
+    [Test]
+    public void TryGetFact_UnownedSourceRoot_DoesNotAttachForeignDeclaration()
+    {
+        const string ForeignSource = """
+            namespace ArchLinterNet.Core.Tests.SourceFactFixtures {
+                public sealed class SingleTypeFixture { }
+            }
+            """;
+
+        string absoluteRepoRoot = FakePaths.Root("/fake/repo");
+        var fs = new FakeArchitectureFileSystem();
+        string absoluteRoot = absoluteRepoRoot + "/foreign";
+        fs.AddDirectory(absoluteRoot);
+        fs.AddFile(absoluteRoot + "/SingleTypeFixture.cs", ForeignSource, DateTime.UtcNow);
+
+        var index = new ArchitectureSourceFileFactIndex(
+            new[] { _testAssembly },
+            absoluteRepoRoot,
+            new[] { "foreign" },
+            null,
+            fs,
+            projectDiscovery: null,
+            sourceRootAssemblyOwnership: null);
+
+        bool found = index.TryGetFact(
+            "ArchLinterNet.Core.Tests.SourceFactFixtures.SingleTypeFixture",
+            out ArchitectureDeclaredTypeFact fact);
+
+        Assert.That(found, Is.True);
+        Assert.That(fact.SourceFilePath, Is.Null,
+            "Source declarations from an unowned root must not be attached by CLR-name coincidence alone");
+        Assert.That(index.Ambiguities, Is.Empty);
     }
 
     // ── Preprocessor symbols through the index (3.2) ─────────────────────────────────
@@ -313,6 +349,32 @@ public sealed partial class ArchitectureSourceFileFactIndexTests
             "ArchLinterNet.Core assembly does not declare SingleTypeFixture");
     }
 
+    [Test]
+    public void TryGetFact_FullNameCollisionAcrossAssemblies_ReturnsFalseForAmbiguousLookup()
+    {
+        const string CollidingFullTypeName = "Collision.Namespace.SharedType";
+        (Assembly assemblyA, string nameA) = CreateDynamicAssemblyWithType("CollisionFixtureA", CollidingFullTypeName);
+        (Assembly assemblyB, string nameB) = CreateDynamicAssemblyWithType("CollisionFixtureB", CollidingFullTypeName);
+
+        var index = new ArchitectureSourceFileFactIndex(
+            new[] { assemblyA, assemblyB },
+            FakePaths.Root("/fake/repo"),
+            Array.Empty<string>(),
+            null,
+            new FakeArchitectureFileSystem());
+
+        bool foundByName = index.TryGetFact(CollidingFullTypeName, out _);
+        bool foundInA = index.TryGetFact(nameA, CollidingFullTypeName, out ArchitectureDeclaredTypeFact factA);
+        bool foundInB = index.TryGetFact(nameB, CollidingFullTypeName, out ArchitectureDeclaredTypeFact factB);
+
+        Assert.That(foundByName, Is.False,
+            "Single-argument lookup must not silently choose one assembly when the CLR name is ambiguous");
+        Assert.That(foundInA, Is.True);
+        Assert.That(foundInB, Is.True);
+        Assert.That(factA.AssemblyName, Is.EqualTo(nameA));
+        Assert.That(factB.AssemblyName, Is.EqualTo(nameB));
+    }
+
     // ── Helpers shared across partial files ───────────────────────────────────────────
 
     private static ArchitectureSourceFileFactIndex BuildIndexWithPreprocessorSymbols(
@@ -347,7 +409,12 @@ public sealed partial class ArchitectureSourceFileFactIndexTests
             absoluteRepoRoot,
             new[] { sourceRoot },
             preprocessorSymbols,
-            fs);
+            fs,
+            projectDiscovery: null,
+            sourceRootAssemblyOwnership: new Dictionary<string, string>(StringComparer.Ordinal)
+            {
+                [sourceRoot] = TestAssemblyName
+            });
     }
 
     private static ArchitectureSourceFileFactIndex BuildIndexWithTwoRoots(
@@ -387,6 +454,32 @@ public sealed partial class ArchitectureSourceFileFactIndexTests
             absoluteRepoRoot,
             new[] { sourceRoot1, sourceRoot2 },
             null,
-            fs);
+            fs,
+            projectDiscovery: null,
+            sourceRootAssemblyOwnership: new Dictionary<string, string>(StringComparer.Ordinal)
+            {
+                [sourceRoot1] = TestAssemblyName,
+                [sourceRoot2] = TestAssemblyName
+            });
+    }
+
+    private static (Assembly Assembly, string AssemblyName) CreateDynamicAssemblyWithType(
+        string assemblyName,
+        string fullTypeName)
+    {
+        AssemblyBuilder assemblyBuilder = AssemblyBuilder.DefineDynamicAssembly(
+            new AssemblyName(assemblyName),
+            AssemblyBuilderAccess.Run);
+        ModuleBuilder moduleBuilder = assemblyBuilder.DefineDynamicModule(assemblyName);
+
+        int lastDot = fullTypeName.LastIndexOf('.');
+        string namespaceName = fullTypeName[..lastDot];
+        string typeName = fullTypeName[(lastDot + 1)..];
+        TypeBuilder typeBuilder = moduleBuilder.DefineType(
+            $"{namespaceName}.{typeName}",
+            TypeAttributes.Public | TypeAttributes.Class);
+        _ = typeBuilder.CreateType();
+
+        return (assemblyBuilder, assemblyName);
     }
 }

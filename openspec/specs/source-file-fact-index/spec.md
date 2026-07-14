@@ -14,12 +14,16 @@ The system SHALL provide a per-run `ArchitectureSourceFileFactIndex` that return
 - **WHEN** the index is built with empty source roots
 - **THEN** each fact's TypeKind reflects the CLR kind: Interface for interfaces, Struct for value types, Enum for enumerations, Delegate for delegate types, Class for reference types that are none of the above, and Unknown otherwise
 
-### Requirement: Source file path facts are available when deterministic
-The system SHALL enrich each declared type fact with source file path data when exactly one source file declares that type — the normalized relative path, the file name without extension, folder segments relative to the repository root, and the Roslyn-accurate type kind (including Record).
+### Requirement: Source file path facts are available when deterministic and ownership-aware
+The system SHALL enrich each declared type fact with source file path data only when the declaration can be tied to the same target assembly as the reflected type and exactly one owned source file declares that type — the normalized relative path, the file name without extension, folder segments relative to the repository root, and the Roslyn-accurate type kind (including Record).
 
 #### Scenario: Single-declaration type gets source path data
-- **WHEN** a type is declared in exactly one source file within the configured source roots
+- **WHEN** a type is declared in exactly one owned source file within the configured source roots
 - **THEN** the fact for that type contains a non-null SourceFilePath (forward-slash normalized, relative to repository root), a non-null FileNameWithoutExtension, a non-empty FolderSegments list, and a TypeKind that accurately reflects the Roslyn syntax (including Record for record types)
+
+#### Scenario: Unowned source roots do not enrich by CLR-name coincidence
+- **WHEN** a configured source root contains a declaration whose CLR full name matches a type in a target assembly but the root's owning assembly cannot be determined
+- **THEN** the fact remains reflection-only with null SourceFilePath and the declaration does not create an ambiguity record
 
 #### Scenario: Record type kind is detected from source
 - **WHEN** a source file declares `public record MyRecord { }` or `public record class MyRecord { }` or `public record struct MyRecord { }`
@@ -32,6 +36,10 @@ The system SHALL enrich each declared type fact with source file path data when 
 #### Scenario: Nested type gets CLR-format full name and source path
 - **WHEN** a type is declared as a nested type inside another type
 - **THEN** the fact's FullTypeName uses the `+` separator between outer and inner names (CLR format), and the fact carries the same SourceFilePath as its declaring file
+
+#### Scenario: Effective preprocessor symbols control source enrichment
+- **WHEN** a declaration is behind `#if` and the active preprocessor symbol set excludes it
+- **THEN** the fact remains reflection-only with null SourceFilePath
 
 ### Requirement: Folder and namespace segments are stable and normalized
 The system SHALL expose folder segments as a normalized, ordered list of path components relative to the repository root, and namespace segments as an ordered list of dot-separated components of the type's namespace.
@@ -48,12 +56,12 @@ The system SHALL expose folder segments as a normalized, ordered list of path co
 - **WHEN** the underlying filesystem returns backslash-separated paths
 - **THEN** SourceFilePath and all path values in the fact use forward slashes
 
-### Requirement: Ambiguous source data is reported deterministically
-The system SHALL record an `ArchitectureDeclaredTypeSourceAmbiguity` for any type declared in more than one source file (partial class across files), set that type's fact's SourceFilePath and FileNameWithoutExtension to null, and set its FolderSegments to an empty list.
+### Requirement: Ambiguous source data is reported deterministically per assembly-owned type
+The system SHALL record an `ArchitectureDeclaredTypeSourceAmbiguity` for any owned `(AssemblyName, FullTypeName)` pair declared in more than one source file (partial class across files), set that type's fact's SourceFilePath and FileNameWithoutExtension to null, and set its FolderSegments to an empty list.
 
 #### Scenario: Partial class across two files produces an ambiguity record
 - **WHEN** two source files each declare the same type (partial class across files)
-- **THEN** the index contains one `ArchitectureDeclaredTypeSourceAmbiguity` for that type listing both file paths, and the corresponding fact has null SourceFilePath
+- **THEN** the index contains one `ArchitectureDeclaredTypeSourceAmbiguity` for that assembly/type pair listing both file paths, and the corresponding fact has null SourceFilePath
 
 #### Scenario: Ambiguous type fact still carries reflection-derived fields
 - **WHEN** a type has an ambiguity record
@@ -71,15 +79,23 @@ The system SHALL NOT execute the source file scan or reflection pass until a cal
 - **THEN** the underlying build pass executes exactly once per index instance
 
 ### Requirement: Index supports lookup by full type name, file, and namespace
-The system SHALL expose `TryGetFact` (by CLR full type name), `GetFactsForFile` (by normalized relative file path), and `GetFactsForNamespace` (by exact namespace string).
+The system SHALL expose `TryGetFact` (by CLR full type name), `TryGetFact` (by assembly name plus CLR full type name), `GetFactsForFile` (by normalized relative file path), and `GetFactsForNamespace` (by exact namespace string).
 
 #### Scenario: TryGetFact returns the correct fact for a known type
-- **WHEN** `TryGetFact` is called with the CLR FullName of a type that is in the index
+- **WHEN** `TryGetFact` is called with the CLR FullName of a type that is in the index and that CLR FullName is unique across target assemblies
 - **THEN** it returns true and the out parameter contains the fact for that type
 
 #### Scenario: TryGetFact returns false for an unknown type name
 - **WHEN** `TryGetFact` is called with a name that matches no type in the target assemblies
 - **THEN** it returns false
+
+#### Scenario: TryGetFact returns false for an ambiguous full type name
+- **WHEN** two target assemblies both declare the same CLR FullName
+- **THEN** `TryGetFact(fullTypeName)` returns false instead of picking one assembly implicitly
+
+#### Scenario: Assembly-aware lookup disambiguates colliding CLR names
+- **WHEN** two target assemblies both declare the same CLR FullName
+- **THEN** `TryGetFact(assemblyName, fullTypeName)` returns the fact for the exact owning assembly
 
 #### Scenario: GetFactsForFile returns all types declared in that file
 - **WHEN** two types are declared in the same source file
@@ -88,4 +104,3 @@ The system SHALL expose `TryGetFact` (by CLR full type name), `GetFactsForFile` 
 #### Scenario: GetFactsForNamespace returns all types in that namespace
 - **WHEN** multiple types share the same namespace
 - **THEN** `GetFactsForNamespace` called with that namespace string returns all of them
-

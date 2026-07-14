@@ -10,6 +10,7 @@ namespace ArchLinterNet.Core.Tests;
 public sealed partial class ArchitectureSourceFileFactIndexTests
 {
     private static readonly Assembly _testAssembly = typeof(ArchitectureSourceFileFactIndexTests).Assembly;
+    private const string TestAssemblyName = "ArchLinterNet.Core.Tests";
 
     private static readonly string[] _srcDomain = ["src", "Domain"];
     private static readonly string[] _srcMyProjectDomain = ["src", "MyProject", "Domain"];
@@ -55,7 +56,12 @@ public sealed partial class ArchitectureSourceFileFactIndexTests
             absoluteRepoRoot,
             new[] { sourceRoot },
             preprocessorSymbols: null,
-            fs);
+            fs,
+            projectDiscovery: null,
+            sourceRootAssemblyOwnership: new Dictionary<string, string>(StringComparer.Ordinal)
+            {
+                [sourceRoot] = TestAssemblyName
+            });
     }
 
     // ── Single type per file ──────────────────────────────────────────────────────────
@@ -369,6 +375,7 @@ public sealed partial class ArchitectureSourceFileFactIndexTests
         IReadOnlyList<ArchitectureDeclaredTypeSourceAmbiguity> ambiguities = index.Ambiguities;
 
         Assert.That(ambiguities, Has.Count.EqualTo(1));
+        Assert.That(ambiguities[0].AssemblyName, Is.EqualTo(TestAssemblyName));
         Assert.That(ambiguities[0].FullTypeName,
             Is.EqualTo("ArchLinterNet.Core.Tests.SourceFactFixtures.PartialFixture"));
         Assert.That(ambiguities[0].SourceFilePaths, Has.Count.EqualTo(2));
