@@ -111,8 +111,38 @@ public sealed class CliArchitectureTests
             Assert.That(exitCode, Is.EqualTo(CliExitCodes.InvalidArgumentsOrRuntimeError));
             Assert.That(console.StdOut, Does.Contain("architecture_policy_error"));
             Assert.That(console.StdOut, Does.Contain("architecture/parts/domain.yml"));
+            Assert.That(console.StdOut, Does.Contain("policy_location"));
+            Assert.That(console.StdOut, Does.Contain("source_path"));
+            Assert.That(console.StdOut, Does.Not.Contain("SourcePath"));
             Assert.That(console.StdErr, Is.Empty);
         });
+    }
+
+    [Test]
+    public void ValidateHandler_WritesRelatedPolicyLocationsAsSarif()
+    {
+        ArchitecturePolicySourceDescriptor root = new(
+            "architecture/root.yml", "architecture/root.yml", ArchitecturePolicyDocumentRole.Root,
+            0, null, null, ["architecture/root.yml"]);
+        ArchitecturePolicySourceDescriptor fragment = new(
+            "architecture/root.yml", "architecture/parts/domain.yml", ArchitecturePolicyDocumentRole.Fragment,
+            1, "architecture/root.yml", "parts/domain.yml", ["architecture/root.yml", "architecture/parts/domain.yml"]);
+        ArchitecturePolicySourceLocation primary = new(root, "layers.domain", 2, 1, null, null);
+        ArchitecturePolicySourceLocation related = new(fragment, "layers.domain", 4, 1, null, null);
+        FakeCliRuntime runtime = new()
+        {
+            ExceptionToThrow = new ArchitecturePolicyImportException(
+                ArchitecturePolicyImportErrorCategory.CompositionConflict,
+                "Duplicate layer.",
+                new ArchitecturePolicyDiagnostic(ArchitecturePolicyDiagnosticKind.CompositionConflict, primary, [related], root.ImportChain))
+        };
+        FakeCliConsole console = new();
+        ValidateCommandHandler handler = new(runtime, console, new FakeFileSystem(exists: true));
+
+        handler.Execute(new ValidateCommandOptions("policy.yml", "strict", "sarif", [], null, false, null, false, false));
+
+        Assert.That(console.StdOut, Does.Contain("relatedLocations"));
+        Assert.That(console.StdOut, Does.Contain("architecture/parts/domain.yml"));
     }
 
     private sealed class FakeCliRuntime : ICliRuntime

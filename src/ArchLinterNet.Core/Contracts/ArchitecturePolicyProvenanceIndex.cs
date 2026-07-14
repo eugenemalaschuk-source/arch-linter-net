@@ -1,7 +1,6 @@
 using System.Collections;
 using System.Reflection;
 using ArchLinterNet.Core.Contracts.Families;
-using ArchLinterNet.Core.Execution;
 using ArchLinterNet.Core.Model;
 using YamlDotNet.Serialization;
 
@@ -74,8 +73,6 @@ public sealed class ArchitecturePolicyProvenanceIndex
         }
 
         BindContracts(document);
-        BindExpandedLayerTemplates(document.Contracts.StrictLayerTemplates, "strict_layer_templates");
-        BindExpandedLayerTemplates(document.Contracts.AuditLayerTemplates, "audit_layer_templates");
     }
 
     internal IEnumerable<T> Track<T>(IEnumerable<T> values)
@@ -284,20 +281,24 @@ public sealed class ArchitecturePolicyProvenanceIndex
         }
     }
 
-    private void BindExpandedLayerTemplates(
-        IReadOnlyList<ArchitectureLayerTemplateContract> templates,
-        string group)
+    internal void BindCatalogContract(string group, string family, IArchitectureContract contract)
     {
-        for (int index = 0; index < templates.Count; index++)
+        if (family != "layer_template" || contract is not ArchitectureLayerContract { TemplateName: { } templateName })
         {
-            ArchitectureLayerTemplateContract template = templates[index];
-            string path = $"contracts.{group}[{index}]";
-            foreach (ArchitectureLayerContract expanded in LayerTemplateExpander.Expand(new[] { template }))
-            {
-                BindOwner(expanded, path, "layer_template", template.Id);
-                _contracts.Add(new ContractEntry(group, path, expanded));
-            }
+            return;
         }
+
+        ContractEntry? template = _contracts.FirstOrDefault(entry =>
+            entry.Group == group
+            && entry.Contract is ArchitectureLayerTemplateContract
+            && string.Equals(entry.Contract.Name, templateName, StringComparison.Ordinal));
+        if (template is null)
+        {
+            return;
+        }
+
+        BindOwner(contract, template.EffectivePath, family, template.Contract.Id);
+        _contracts.Add(new ContractEntry(group, template.EffectivePath, contract));
     }
 
     private void BindOwner(object owner, string effectivePath, string? family, string? contractId)

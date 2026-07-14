@@ -46,6 +46,7 @@ public sealed class ArchitectureContractCatalog
             foreach (T contract in contracts)
             {
                 descriptors.Add(new ArchitectureContractDescriptor(group, mode, family, contract.Name, contract.Id, contract));
+                document.Provenance.BindCatalogContract(group, family, contract);
             }
         }
 

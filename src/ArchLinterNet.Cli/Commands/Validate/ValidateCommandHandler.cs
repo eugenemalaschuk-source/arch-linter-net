@@ -117,8 +117,8 @@ internal sealed class ValidateCommandHandler(ICliRuntime runtime, ICliConsole co
             {
                 kind = "architecture_policy_error",
                 message,
-                policy_location = diagnostic.Location,
-                related_policy_locations = diagnostic.RelatedLocations,
+                policy_location = ToPolicyLocationJsonObject(diagnostic.Location),
+                related_policy_locations = diagnostic.RelatedLocations.Select(ToPolicyLocationJsonObject),
                 import_chain = diagnostic.ImportChain,
             }));
             return;
@@ -151,6 +151,15 @@ internal sealed class ValidateCommandHandler(ICliRuntime runtime, ICliConsole co
                                         },
                                     },
                                 },
+                                relatedLocations = diagnostic.RelatedLocations.Select((location, index) => new
+                                {
+                                    id = index + 1,
+                                    physicalLocation = new
+                                    {
+                                        artifactLocation = new { uri = location.SourcePath },
+                                        region = new { startLine = location.Line, startColumn = location.Column },
+                                    },
+                                }),
                             },
                         },
                     },
@@ -163,6 +172,28 @@ internal sealed class ValidateCommandHandler(ICliRuntime runtime, ICliConsole co
             ? string.Empty
             : $" (policy: {diagnostic.Location.SourcePath}:{diagnostic.Location.YamlPath}; root: {diagnostic.Location.RootPath})";
         console.Error.WriteLine($"Architecture validation error: {message}{location}");
+    }
+
+    private static object? ToPolicyLocationJsonObject(ArchitecturePolicySourceLocation? location)
+    {
+        if (location is null)
+        {
+            return null;
+        }
+
+        return new
+        {
+            root_path = location.RootPath,
+            source_path = location.SourcePath,
+            role = location.Role.ToString().ToLowerInvariant(),
+            yaml_path = location.YamlPath,
+            line = location.Line,
+            column = location.Column,
+            contract_family = location.ContractFamily,
+            contract_id = location.ContractId,
+            declaring_source_path = location.Source.DeclaringSourcePath,
+            authored_import_path = location.Source.AuthoredImportPath,
+        };
     }
 
     private void WriteHumanOutput(ValidationOutcome outcome)
