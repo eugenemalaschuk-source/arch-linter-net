@@ -1,0 +1,91 @@
+# source-file-fact-index Specification
+
+## Purpose
+TBD - created by archiving change source-file-fact-index. Update Purpose after archive.
+## Requirements
+### Requirement: Declared type facts are available per run
+The system SHALL provide a per-run `ArchitectureSourceFileFactIndex` that returns a fact record for every loadable declared type across the session's target assemblies, including assembly name, namespace, full CLR type name, simple type name, and type kind.
+
+#### Scenario: Fact includes assembly and namespace for every type
+- **WHEN** the index is queried for a type present in a target assembly
+- **THEN** the returned fact contains the correct assembly name, namespace, full type name, and simple type name matching the CLR reflection metadata for that type
+
+#### Scenario: Type kind is correct from reflection when source is unavailable
+- **WHEN** the index is built with empty source roots
+- **THEN** each fact's TypeKind reflects the CLR kind: Interface for interfaces, Struct for value types, Enum for enumerations, Delegate for delegate types, Class for reference types that are none of the above, and Unknown otherwise
+
+### Requirement: Source file path facts are available when deterministic
+The system SHALL enrich each declared type fact with source file path data when exactly one source file declares that type — the normalized relative path, the file name without extension, folder segments relative to the repository root, and the Roslyn-accurate type kind (including Record).
+
+#### Scenario: Single-declaration type gets source path data
+- **WHEN** a type is declared in exactly one source file within the configured source roots
+- **THEN** the fact for that type contains a non-null SourceFilePath (forward-slash normalized, relative to repository root), a non-null FileNameWithoutExtension, a non-empty FolderSegments list, and a TypeKind that accurately reflects the Roslyn syntax (including Record for record types)
+
+#### Scenario: Record type kind is detected from source
+- **WHEN** a source file declares `public record MyRecord { }` or `public record class MyRecord { }` or `public record struct MyRecord { }`
+- **THEN** the fact for that type has TypeKind equal to Record
+
+#### Scenario: Multiple types in one file each get source path data
+- **WHEN** a source file declares two or more types in the same namespace
+- **THEN** each type gets its own fact with the same SourceFilePath, FileNameWithoutExtension, and FolderSegments
+
+#### Scenario: Nested type gets CLR-format full name and source path
+- **WHEN** a type is declared as a nested type inside another type
+- **THEN** the fact's FullTypeName uses the `+` separator between outer and inner names (CLR format), and the fact carries the same SourceFilePath as its declaring file
+
+### Requirement: Folder and namespace segments are stable and normalized
+The system SHALL expose folder segments as a normalized, ordered list of path components relative to the repository root, and namespace segments as an ordered list of dot-separated components of the type's namespace.
+
+#### Scenario: Folder segments match the file's directory hierarchy
+- **WHEN** a type's source file is at `src/MyProject/Domain/Order.cs` relative to the repository root
+- **THEN** FolderSegments equals `["src", "MyProject", "Domain"]`
+
+#### Scenario: Namespace segments split on dot
+- **WHEN** a type's namespace is `MyApp.Domain.Orders`
+- **THEN** NamespaceSegments equals `["MyApp", "Domain", "Orders"]`
+
+#### Scenario: Path normalization uses forward slashes on all platforms
+- **WHEN** the underlying filesystem returns backslash-separated paths
+- **THEN** SourceFilePath and all path values in the fact use forward slashes
+
+### Requirement: Ambiguous source data is reported deterministically
+The system SHALL record an `ArchitectureDeclaredTypeSourceAmbiguity` for any type declared in more than one source file (partial class across files), set that type's fact's SourceFilePath and FileNameWithoutExtension to null, and set its FolderSegments to an empty list.
+
+#### Scenario: Partial class across two files produces an ambiguity record
+- **WHEN** two source files each declare the same type (partial class across files)
+- **THEN** the index contains one `ArchitectureDeclaredTypeSourceAmbiguity` for that type listing both file paths, and the corresponding fact has null SourceFilePath
+
+#### Scenario: Ambiguous type fact still carries reflection-derived fields
+- **WHEN** a type has an ambiguity record
+- **THEN** the fact for that type still contains the correct AssemblyName, Namespace, FullTypeName, SimpleTypeName, and a TypeKind derived from reflection
+
+### Requirement: Index computation is lazy and zero-overhead when unused
+The system SHALL NOT execute the source file scan or reflection pass until a caller first accesses the index's data — ensuring that runs with no source-fact-dependent rules pay no overhead.
+
+#### Scenario: Index builds lazily on first access
+- **WHEN** `ArchitectureSourceFileFactIndex` is constructed but no property or method is called
+- **THEN** no file system enumeration and no type reflection has occurred
+
+#### Scenario: Repeated lookups reuse cached data
+- **WHEN** any fact-lookup method is called more than once on the same index instance
+- **THEN** the underlying build pass executes exactly once per index instance
+
+### Requirement: Index supports lookup by full type name, file, and namespace
+The system SHALL expose `TryGetFact` (by CLR full type name), `GetFactsForFile` (by normalized relative file path), and `GetFactsForNamespace` (by exact namespace string).
+
+#### Scenario: TryGetFact returns the correct fact for a known type
+- **WHEN** `TryGetFact` is called with the CLR FullName of a type that is in the index
+- **THEN** it returns true and the out parameter contains the fact for that type
+
+#### Scenario: TryGetFact returns false for an unknown type name
+- **WHEN** `TryGetFact` is called with a name that matches no type in the target assemblies
+- **THEN** it returns false
+
+#### Scenario: GetFactsForFile returns all types declared in that file
+- **WHEN** two types are declared in the same source file
+- **THEN** `GetFactsForFile` called with that file's normalized path returns both facts
+
+#### Scenario: GetFactsForNamespace returns all types in that namespace
+- **WHEN** multiple types share the same namespace
+- **THEN** `GetFactsForNamespace` called with that namespace string returns all of them
+
