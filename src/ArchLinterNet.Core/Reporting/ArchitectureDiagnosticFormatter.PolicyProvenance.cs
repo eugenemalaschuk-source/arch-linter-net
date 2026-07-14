@@ -10,7 +10,7 @@ public sealed partial class ArchitectureDiagnosticFormatter
     {
         if (diagnostic.PolicyLocation is not null)
         {
-            target["policy_location"] = ToPolicyLocationJsonObject(diagnostic.PolicyLocation);
+            target["policy_location"] = FormatPolicyLocationForJson(diagnostic.PolicyLocation);
         }
 
         if (diagnostic.RelatedPolicyLocations.Count > 0)
@@ -18,12 +18,12 @@ public sealed partial class ArchitectureDiagnosticFormatter
             target["related_policy_locations"] = diagnostic.RelatedPolicyLocations
                 .OrderBy(location => location.SourceOrdinal)
                 .ThenBy(location => location.EncounterOrdinal)
-                .Select(ToPolicyLocationJsonObject)
+                .Select(FormatPolicyLocationForJson)
                 .ToArray();
         }
     }
 
-    private static Dictionary<string, object?> ToPolicyLocationJsonObject(
+    public static Dictionary<string, object?> FormatPolicyLocationForJson(
         ArchitecturePolicySourceLocation location)
     {
         var result = new Dictionary<string, object?>

@@ -133,7 +133,7 @@ public sealed partial class ArchitectureDiagnosticFormatter
                 {
                     declared_entry_count = request.ClassificationPathDeferred.DeclaredEntryCount,
                     policy_locations = request.ClassificationPathDeferred.PolicyLocations
-                        .Select(ToPolicyLocationJsonObject)
+                        .Select(FormatPolicyLocationForJson)
                         .ToArray()
                 }
         };

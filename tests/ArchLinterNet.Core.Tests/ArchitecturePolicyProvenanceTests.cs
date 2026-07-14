@@ -90,6 +90,22 @@ public sealed class ArchitecturePolicyProvenanceTests
     }
 
     [Test]
+    public void Load_ClassificationPathLocations_PreserveEncounterOrderForDoubleDigitIndices()
+    {
+        string root = Write("architecture/root.yml", RootYaml("classification.yml"));
+        string entries = string.Join("\n", Enumerable.Range(0, 11)
+            .Select(index => $"    - path_prefix: src/Area{index}\n      role: Layer{index}"));
+        Write("architecture/classification.yml", LayersFragment() + $"classification:\n  path:\n{entries}\n");
+
+        ArchitectureContractDocument document = new ArchitecturePolicyDocumentLoader().Load(root);
+        string[] paths = document.ClassificationPathDeferred!.PolicyLocations
+            .Select(location => location.YamlPath)
+            .ToArray();
+
+        Assert.That(Array.IndexOf(paths, "classification.path[2]"), Is.LessThan(Array.IndexOf(paths, "classification.path[10]")));
+    }
+
+    [Test]
     public void Load_NestedMissingImport_CarriesRootBasedImportChain()
     {
         string root = Write("architecture/root.yml", RootYaml("a.yml"));

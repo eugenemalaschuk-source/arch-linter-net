@@ -49,6 +49,7 @@ public static class LayerTemplateExpander
                     Layers = layers,
                     OptionalLayers = optionalLayers,
                     TemplateName = template.Name,
+                    TemplateOwnerId = template.Id,
                     ContainerNamespace = container,
                     Exhaustive = template.Exhaustive,
                     Reason = template.Reason

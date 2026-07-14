@@ -143,7 +143,7 @@ public sealed partial class ArchitecturePolicyDocumentLoader : IArchitecturePoli
                 && entry.Key.IndexOf('.', "classification.path".Length) < 0)
             .Select(entry => entry.Value)
             .OrderBy(location => location.SourceOrdinal)
-            .ThenBy(location => location.YamlPath, StringComparer.Ordinal)
+            .ThenBy(location => location.EncounterOrdinal)
             .ToArray();
         return new ArchitectureClassificationPathDeferredNotice(pathSequence.Children.Count)
         {

@@ -284,7 +284,7 @@ public sealed class ArchitecturePolicyProvenanceIndex
 
     internal void BindCatalogContract(string group, string family, IArchitectureContract contract)
     {
-        if (family != "layer_template" || contract is not ArchitectureLayerContract { TemplateName: { } templateName })
+        if (family != "layer_template" || contract is not ArchitectureLayerContract { TemplateOwnerId: { } templateId })
         {
             return;
         }
@@ -292,7 +292,7 @@ public sealed class ArchitecturePolicyProvenanceIndex
         ContractEntry? template = _contracts.FirstOrDefault(entry =>
             entry.Group == group
             && entry.Contract is ArchitectureLayerTemplateContract
-            && string.Equals(entry.Contract.Name, templateName, StringComparison.Ordinal));
+            && string.Equals(entry.Contract.Id, templateId, StringComparison.OrdinalIgnoreCase));
         if (template is null)
         {
             return;

@@ -128,8 +128,8 @@ internal sealed class ValidateCommandHandler(ICliRuntime runtime, ICliConsole co
             {
                 kind = "architecture_policy_error",
                 message,
-                policy_location = ToPolicyLocationJsonObject(diagnostic.Location),
-                related_policy_locations = diagnostic.RelatedLocations.Select(ToPolicyLocationJsonObject),
+                policy_location = diagnostic.Location is null ? null : ArchitectureDiagnosticFormatter.FormatPolicyLocationForJson(diagnostic.Location),
+                related_policy_locations = diagnostic.RelatedLocations.Select(ArchitectureDiagnosticFormatter.FormatPolicyLocationForJson),
                 import_chain = diagnostic.ImportChain,
             }));
             return;
@@ -183,30 +183,6 @@ internal sealed class ValidateCommandHandler(ICliRuntime runtime, ICliConsole co
             ? string.Empty
             : $" (policy: {diagnostic.Location.SourcePath}:{diagnostic.Location.YamlPath}; root: {diagnostic.Location.RootPath})";
         console.Error.WriteLine($"Architecture validation error: {message}{location}");
-    }
-
-    private static object? ToPolicyLocationJsonObject(ArchitecturePolicySourceLocation? location)
-    {
-        if (location is null)
-        {
-            return null;
-        }
-
-        return new
-        {
-            root_path = location.RootPath,
-            source_path = location.SourcePath,
-            role = location.Role.ToString().ToLowerInvariant(),
-            yaml_path = location.YamlPath,
-            line = location.Line,
-            column = location.Column,
-            contract_family = location.ContractFamily,
-            contract_id = location.ContractId,
-            declaring_source_path = location.Source.DeclaringSourcePath,
-            authored_import_path = location.Source.AuthoredImportPath,
-            source_ordinal = location.SourceOrdinal,
-            import_chain = location.Source.ImportChain,
-        };
     }
 
     private void WriteHumanOutput(ValidationOutcome outcome)
