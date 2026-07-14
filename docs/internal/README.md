@@ -12,6 +12,8 @@ It is intentionally excluded from the public MkDocs/GitHub Pages product site.
 
 - [Core architecture blueprint](core-architecture-blueprint.md) — target Core module graph, application/composition seams, and state-ownership rules for the architecture-health refactor (#132/#133).
 
+- [CEL engine architecture blueprint](cel-engine-architecture.md) — processing pipeline, component ownership, extension-direction matrix, and prohibited shortcuts for the `ArchLinterNet.CEL` engine (#322/#324).
+
 - [Policy import format draft](policy-import-format-draft.md) - approved format decisions implemented by issue #281.
 
 - [Policy import architecture and implementation reference](policy-import-architecture.md) - resolver/composer/provenance boundaries and the #281/#282 test matrix.
