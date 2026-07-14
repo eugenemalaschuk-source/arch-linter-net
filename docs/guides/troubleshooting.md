@@ -29,8 +29,10 @@ applicable.
 - **Composition conflict:** keep only one declaration of the keyed definition,
   singleton setting, or family/mode contract ID. Import order never provides
   override precedence.
-- **Repository-boundary violation:** keep fragments inside the repository and
-  avoid symlink or junction escapes.
+- **Import-boundary violation:** keep fragments inside the selected root's
+  allowed boundary. A root selected directly from `architecture/` may import
+  within that directory's parent; any other root may import only within its own
+  directory tree. Avoid symlink or junction escapes.
 - **Invalid fragment shape:** remove root-only `version`/`name`, baseline or
   unknown fields, and provide a mergeable section or non-empty nested import.
 - **Editor reports root fields missing:** associate the imported file with

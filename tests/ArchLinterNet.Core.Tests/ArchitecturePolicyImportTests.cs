@@ -1,4 +1,5 @@
 using System.Runtime.InteropServices;
+using System.Text.Json;
 using ArchLinterNet.Core.Contracts;
 using ArchLinterNet.Core.Contracts.PolicyImports;
 using ArchLinterNet.Core.Execution;
@@ -69,14 +70,7 @@ public sealed class ArchitecturePolicyImportTests
         ArchitectureContractDocument composed = new ArchitecturePolicyDocumentLoader().Load(imported);
         ArchitectureContractDocument single = new ArchitecturePolicyDocumentLoader().Load(monolithic);
 
-        Assert.Multiple(() =>
-        {
-            Assert.That(composed.Name, Is.EqualTo(single.Name));
-            Assert.That(composed.Layers.Keys, Is.EqualTo(single.Layers.Keys));
-            Assert.That(composed.Analysis.TargetAssemblies, Is.EqualTo(single.Analysis.TargetAssemblies));
-            Assert.That(composed.Contracts.AllStrict.Select(contract => contract.Name),
-                Is.EqualTo(single.Contracts.AllStrict.Select(contract => contract.Name)));
-        });
+        Assert.That(NormalizeBehavior(composed), Is.EqualTo(NormalizeBehavior(single)));
     }
 
     [Test]
@@ -215,6 +209,24 @@ public sealed class ArchitecturePolicyImportTests
             () => new ArchitecturePolicyDocumentLoader().Load(root))!;
 
         Assert.That(exception.Category, Is.EqualTo(ArchitecturePolicyImportErrorCategory.OutOfBoundary));
+    }
+
+    [Test]
+    public void Load_BoundaryDependsOnSelectedRootDirectory()
+    {
+        string architectureRoot = Write("repo/architecture/root.yml", RootYaml("../shared/layers.yml"));
+        Write("repo/shared/layers.yml", LayersFragment());
+        string configRoot = Write("repo/config/root.yml", RootYaml("../shared/layers.yml"));
+
+        ArchitectureContractDocument architectureDocument = new ArchitecturePolicyDocumentLoader().Load(architectureRoot);
+        ArchitecturePolicyImportException configException = Assert.Throws<ArchitecturePolicyImportException>(
+            () => new ArchitecturePolicyDocumentLoader().Load(configRoot))!;
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(architectureDocument.Layers, Contains.Key("domain"));
+            Assert.That(configException.Category, Is.EqualTo(ArchitecturePolicyImportErrorCategory.OutOfBoundary));
+        });
     }
 
     [Test]
@@ -508,6 +520,25 @@ public sealed class ArchitecturePolicyImportTests
             contracts:
               strict: []
             """;
+    }
+
+    private static string NormalizeBehavior(ArchitectureContractDocument document)
+    {
+        var model = new
+        {
+            document.Version,
+            document.Name,
+            document.Layers,
+            document.ExternalDependencies,
+            document.Packages,
+            document.LegacyRuntimeLayers,
+            document.Analysis,
+            document.Contracts,
+            document.Classification,
+            ClassificationPathDeferredEntryCount = document.ClassificationPathDeferred?.DeclaredEntryCount
+        };
+
+        return JsonSerializer.Serialize(model);
     }
 
     private static string LayersFragment()

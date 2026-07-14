@@ -71,34 +71,16 @@ public sealed class ArchitecturePolicyImportAcceptanceTests
         {
             document.Version,
             document.Name,
-            Layers = document.Layers.Select(pair => new
-            {
-                pair.Key,
-                pair.Value.Namespace,
-                pair.Value.NamespaceSuffix,
-                pair.Value.External
-            }),
-            ExternalDependencies = document.ExternalDependencies.Select(pair => new
-            {
-                pair.Key,
-                pair.Value.NamespacePrefixes,
-                pair.Value.TypePrefixes
-            }),
+            document.Layers,
+            document.ExternalDependencies,
+            document.Packages,
             document.LegacyRuntimeLayers,
-            document.Analysis.TargetAssemblies,
-            document.Analysis.AssemblySearchPaths,
-            document.Analysis.SourceRoots,
-            document.Analysis.Configuration,
-            StrictContracts = document.Contracts.AllStrict.Select(ContractIdentity),
-            AuditContracts = document.Contracts.AllAudit.Select(ContractIdentity)
+            document.Analysis,
+            document.Contracts,
+            document.Classification,
+            ClassificationPathDeferredEntryCount = document.ClassificationPathDeferred?.DeclaredEntryCount
         };
 
         return JsonSerializer.Serialize(model);
     }
-
-    private static string ContractIdentity(IArchitectureContract contract)
-    {
-        return $"{contract.GetType().Name}:{contract.Id}:{contract.Name}";
-    }
 }
-

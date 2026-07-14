@@ -95,12 +95,26 @@ The system SHALL compose root inline content first, then expand imports using de
 - **WHEN** resolving the next import would exceed depth 16 or 256 total files
 - **THEN** loading fails before reading the over-limit file with the limit and import chain in the diagnostic
 
-### Requirement: Imports remain within one repository boundary
-The system SHALL resolve the allowed repository boundary once from the explicit root policy. Each import SHALL be made absolute, physically canonicalized, and verified to remain within that boundary before being read. Authored path casing SHALL exactly match the filesystem entry, and canonical repository-relative portability identities SHALL be compared case-insensitively.
+### Requirement: Imports remain within one resolved root boundary
+The system SHALL resolve the allowed import boundary once from the explicit
+root policy. If the selected root lives directly under a directory named
+`architecture`, the boundary SHALL be that directory's parent. Otherwise, the
+boundary SHALL be the selected root's own directory. Each import SHALL be made
+absolute, physically canonicalized, and verified to remain within that
+boundary before being read. Authored path casing SHALL exactly match the
+filesystem entry, and canonical boundary-relative portability identities SHALL
+be compared case-insensitively.
 
-#### Scenario: Relative in-bound import
-- **WHEN** a fragment imports `../shared/layers.yml` and its physically canonical target remains inside the resolved repository root
-- **THEN** the system reads that target using its canonical repository-relative identity
+#### Scenario: Relative in-bound import for an architecture root
+- **WHEN** the selected root is `architecture/arch.yml`
+- **AND WHEN** a fragment imports `../shared/layers.yml`
+- **AND WHEN** its physically canonical target remains inside the parent of `architecture/`
+- **THEN** the system reads that target using its canonical boundary-relative identity
+
+#### Scenario: Relative import escapes a non-architecture root directory
+- **WHEN** the selected root is `config/company-policy.yaml`
+- **AND WHEN** it imports `../shared/layers.yml`
+- **THEN** loading fails because the import resolves outside that root directory's boundary
 
 #### Scenario: Link escapes repository
 - **WHEN** an apparently in-bound import traverses a symbolic link or junction to a file outside the repository boundary
@@ -474,4 +488,3 @@ The repository SHALL contain executable NUnit-backed fixtures that prove equival
 #### Scenario: Conflicting public fixtures load
 - **WHEN** the acceptance suite loads root-versus-fragment or fragment-versus-fragment duplicate definitions
 - **THEN** loading fails with a composition-conflict category identifying both participating sources
-

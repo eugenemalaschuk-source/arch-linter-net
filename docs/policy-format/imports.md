@@ -132,13 +132,20 @@ not rely on file or import order to select a winner.
 ## Local path rules and limits
 
 Each import is an explicit, non-empty, Unicode NFC relative path using `/`.
-`.` and `..` segments are allowed only when the physically resolved file remains
-inside the repository boundary. Authored casing must match the on-disk path.
+Authored casing must match the on-disk path.
 
-ArchLinterNet validates path grammar before filesystem resolution, then checks
-the physical target, repository boundary, active cycle stack, and completed
-canonical identities before reading it. Symlink or junction escapes are
-rejected.
+ArchLinterNet resolves one import boundary from the selected root before it
+reads any fragment:
+
+- if the selected root lives directly under a directory named `architecture`,
+  that directory's parent is the boundary;
+- otherwise, the selected root's own directory is the boundary.
+
+Relative imports, including `.` and `..`, are allowed only when their
+physically resolved target stays inside that resolved boundary. ArchLinterNet
+validates path grammar before filesystem resolution, then checks the physical
+target, boundary, active cycle stack, and completed canonical identities before
+reading it. Symlink or junction escapes are rejected.
 
 Supported graphs are bounded:
 
@@ -242,7 +249,7 @@ to keep working.
 | Import cycle | Follow the reported root-based import chain and remove the back-edge. |
 | Duplicate import | One canonical file was reached twice, possibly through `.`/`..`, casing, a link, or two parents. Keep one edge. |
 | Composition conflict | The root or two fragments repeat a keyed definition, singleton, or family/mode contract ID. Keep one declaration; order does not provide precedence. |
-| Outside repository boundary | Move the fragment inside the selected root's repository or stop importing through an escaping link. |
+| Outside import boundary | Keep the fragment inside the selected root's allowed boundary: the parent of `architecture/` for roots selected from that directory, otherwise the selected root's own directory. Avoid escaping symlinks or junctions. |
 | Invalid fragment shape | Remove `version`, `name`, baseline/unknown fields, or add a mergeable section/non-empty nested import. |
 | Editor marks a fragment as a broken root | Associate the fragment schema explicitly instead of relying on the root schema or filename inference. |
 | Editor accepts a file but runtime rejects it | Editor association does not assign runtime role; confirm the file is reached by an import and validate the selected root. |
