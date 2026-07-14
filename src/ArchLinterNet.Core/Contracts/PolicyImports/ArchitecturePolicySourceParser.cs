@@ -35,7 +35,7 @@ internal sealed partial class ArchitecturePolicySourceParser
         "analysis", "contracts", "classification"
     };
 
-    public bool ContainsImports(string yaml, ArchitecturePolicySourceDescriptor descriptor)
+    public static bool ContainsImports(string yaml, ArchitecturePolicySourceDescriptor descriptor)
     {
         YamlMappingNode root;
         try

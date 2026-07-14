@@ -8,6 +8,10 @@ namespace ArchLinterNet.Core.Tests;
 [TestFixture]
 public sealed class ArchitecturePolicySourceParserTests
 {
+    private static readonly string[] _nestedImportNames = { "nested.yml" };
+    private static readonly string[] _portablePathImportChain =
+        { "architecture/root.yml", "architecture/fragments/policy.yml", "nested\\policy.yml" };
+
     [Test]
     public void Parse_FragmentWithNestedImport_PreservesDescriptorAndImports()
     {
@@ -19,7 +23,7 @@ public sealed class ArchitecturePolicySourceParserTests
         {
             Assert.That(source.Role, Is.EqualTo(ArchitecturePolicyDocumentRole.Fragment));
             Assert.That(source.PortableIdentity, Is.EqualTo("architecture/fragments/policy.yml"));
-            Assert.That(source.Imports, Is.EqualTo(new[] { "nested.yml" }));
+            Assert.That(source.Imports, Is.EqualTo(_nestedImportNames));
         });
     }
 
@@ -93,22 +97,19 @@ public sealed class ArchitecturePolicySourceParserTests
         {
             Assert.That(exception.Category, Is.EqualTo(ArchitecturePolicyImportErrorCategory.PortablePath));
             Assert.That(exception.Diagnostic!.Location!.YamlPath, Is.EqualTo("imports[2]"));
-            Assert.That(exception.Diagnostic.ImportChain, Is.EqualTo(new[]
-            {
-                "architecture/root.yml", "architecture/fragments/policy.yml", "nested\\policy.yml"
-            }));
+            Assert.That(exception.Diagnostic.ImportChain, Is.EqualTo(_portablePathImportChain));
         });
     }
 
     [Test]
     public void ContainsImports_DistinguishesDocumentsWithAndWithoutImports()
     {
-        var parser = new ArchitecturePolicySourceParser();
-
         Assert.Multiple(() =>
         {
-            Assert.That(parser.ContainsImports("version: 1\nname: Example\n", Descriptor(ArchitecturePolicyDocumentRole.Root)), Is.False);
-            Assert.That(parser.ContainsImports("imports: [fragment.yml]\n", Descriptor(ArchitecturePolicyDocumentRole.Root)), Is.True);
+            Assert.That(ArchitecturePolicySourceParser.ContainsImports(
+                "version: 1\nname: Example\n", Descriptor(ArchitecturePolicyDocumentRole.Root)), Is.False);
+            Assert.That(ArchitecturePolicySourceParser.ContainsImports(
+                "imports: [fragment.yml]\n", Descriptor(ArchitecturePolicyDocumentRole.Root)), Is.True);
         });
     }
 

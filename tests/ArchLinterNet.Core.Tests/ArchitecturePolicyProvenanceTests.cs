@@ -18,6 +18,8 @@ public sealed class ArchitecturePolicyProvenanceTests
         { "architecture/company-policy.yaml", "architecture/parts/domain.data" };
     private static readonly string[] _nestedMissingImportChain =
         { "architecture/root.yml", "architecture/a.yml", "nested/missing.yml" };
+    private static readonly string[] _sameNameConsistencyPaths =
+        { "contracts.strict_allow_only[0]", "contracts.strict[0]" };
 
     private string _temporaryDirectory = null!;
 
@@ -333,11 +335,7 @@ public sealed class ArchitecturePolicyProvenanceTests
             .Select(location => location.YamlPath)
             .ToArray();
 
-        Assert.That(paths, Is.EquivalentTo(new[]
-        {
-            "contracts.strict_allow_only[0]",
-            "contracts.strict[0]",
-        }));
+        Assert.That(paths, Is.EquivalentTo(_sameNameConsistencyPaths));
     }
 
     [Test]

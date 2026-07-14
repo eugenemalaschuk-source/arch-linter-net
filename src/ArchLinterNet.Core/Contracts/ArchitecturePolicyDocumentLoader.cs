@@ -66,7 +66,7 @@ public sealed partial class ArchitecturePolicyDocumentLoader : IArchitecturePoli
         ArchitecturePolicyProvenanceIndex provenance;
         ArchitecturePolicySourceDescriptor rootDescriptor =
             ArchitecturePolicyProvenanceFactory.CreateRootDescriptor(_pathResolver, policyPath);
-        if (_sourceParser.ContainsImports(yaml, rootDescriptor))
+        if (ArchitecturePolicySourceParser.ContainsImports(yaml, rootDescriptor))
         {
             IReadOnlyList<ArchitecturePolicySource> sources = _importResolver.Resolve(policyPath, yaml);
             ArchitecturePolicyCompositionResult composition =
