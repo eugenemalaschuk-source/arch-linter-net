@@ -7,6 +7,13 @@ namespace ArchLinterNet.Core.Tests;
 [TestFixture]
 public sealed class ArchitectureDeclaredTypeParserTests
 {
+    private static readonly string[] s_featureXSymbols = ["FEATURE_X"];
+    private static readonly string[] s_legacySymbols = ["LEGACY"];
+    private static readonly string[] s_nestedTypeNames = ["MyApp.Domain.Order", "MyApp.Domain.Order+LineItem"];
+    private static readonly string[] s_multipleTypeNames = ["MyApp.Domain.Order", "MyApp.Domain.IOrderService", "MyApp.Domain.OrderStatus"];
+    private static readonly string[] s_nestedGenericNames = ["MyApp.Outer`1", "MyApp.Outer`1+Inner`1"];
+    private static readonly string[] s_legacyImplNames = ["MyApp.LegacyImpl"];
+    private static readonly string[] s_modernImplNames = ["MyApp.ModernImpl"];
     [Test]
     public void ParseSourceText_SingleClass_ReturnsClassFact()
     {
@@ -127,11 +134,7 @@ public sealed class ArchitectureDeclaredTypeParserTests
                 }
                 """);
 
-        Assert.That(types.Select(t => t.FullTypeName), Is.EquivalentTo(new[]
-        {
-            "MyApp.Domain.Order",
-            "MyApp.Domain.Order+LineItem"
-        }));
+        Assert.That(types.Select(t => t.FullTypeName), Is.EquivalentTo(s_nestedTypeNames));
 
         ArchitectureDeclaredTypeParser.ParsedTypeInfo innerFact =
             types.Single(t => t.SimpleTypeName == "LineItem");
@@ -178,12 +181,7 @@ public sealed class ArchitectureDeclaredTypeParserTests
                 """);
 
         Assert.That(types, Has.Count.EqualTo(3));
-        Assert.That(types.Select(t => t.FullTypeName), Is.EquivalentTo(new[]
-        {
-            "MyApp.Domain.Order",
-            "MyApp.Domain.IOrderService",
-            "MyApp.Domain.OrderStatus"
-        }));
+        Assert.That(types.Select(t => t.FullTypeName), Is.EquivalentTo(s_multipleTypeNames));
     }
 
     [Test]
@@ -211,11 +209,7 @@ public sealed class ArchitectureDeclaredTypeParserTests
                 }
                 """);
 
-        Assert.That(types.Select(t => t.FullTypeName), Is.EquivalentTo(new[]
-        {
-            "MyApp.Outer`1",
-            "MyApp.Outer`1+Inner`1"
-        }));
+        Assert.That(types.Select(t => t.FullTypeName), Is.EquivalentTo(s_nestedGenericNames));
     }
 
     [Test]
@@ -252,7 +246,7 @@ public sealed class ArchitectureDeclaredTypeParserTests
             """;
 
         IReadOnlyList<ArchitectureDeclaredTypeParser.ParsedTypeInfo> types =
-            ArchitectureDeclaredTypeParser.ParseSourceText(Source, new[] { "FEATURE_X" });
+            ArchitectureDeclaredTypeParser.ParseSourceText(Source, s_featureXSymbols);
 
         Assert.That(types, Has.Count.EqualTo(1));
         Assert.That(types[0].FullTypeName, Is.EqualTo("MyApp.ConditionalType"));
@@ -291,12 +285,12 @@ public sealed class ArchitectureDeclaredTypeParserTests
             """;
 
         IReadOnlyList<ArchitectureDeclaredTypeParser.ParsedTypeInfo> withLegacy =
-            ArchitectureDeclaredTypeParser.ParseSourceText(Source, new[] { "LEGACY" });
+            ArchitectureDeclaredTypeParser.ParseSourceText(Source, s_legacySymbols);
         IReadOnlyList<ArchitectureDeclaredTypeParser.ParsedTypeInfo> withoutLegacy =
             ArchitectureDeclaredTypeParser.ParseSourceText(Source);
 
-        Assert.That(withLegacy.Select(t => t.FullTypeName), Is.EquivalentTo(new[] { "MyApp.LegacyImpl" }));
-        Assert.That(withoutLegacy.Select(t => t.FullTypeName), Is.EquivalentTo(new[] { "MyApp.ModernImpl" }));
+        Assert.That(withLegacy.Select(t => t.FullTypeName), Is.EquivalentTo(s_legacyImplNames));
+        Assert.That(withoutLegacy.Select(t => t.FullTypeName), Is.EquivalentTo(s_modernImplNames));
     }
 
     // ── Escaped identifiers (4.3) ─────────────────────────────────────────────────────
