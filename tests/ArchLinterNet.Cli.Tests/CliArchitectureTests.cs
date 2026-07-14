@@ -113,6 +113,8 @@ public sealed class CliArchitectureTests
             Assert.That(console.StdOut, Does.Contain("architecture/parts/domain.yml"));
             Assert.That(console.StdOut, Does.Contain("policy_location"));
             Assert.That(console.StdOut, Does.Contain("source_path"));
+            Assert.That(console.StdOut, Does.Contain("source_ordinal"));
+            Assert.That(console.StdOut, Does.Contain("import_chain"));
             Assert.That(console.StdOut, Does.Not.Contain("SourcePath"));
             Assert.That(console.StdErr, Is.Empty);
         });

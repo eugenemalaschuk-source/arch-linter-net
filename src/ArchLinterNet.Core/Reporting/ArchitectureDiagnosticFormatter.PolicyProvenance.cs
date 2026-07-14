@@ -17,7 +17,7 @@ public sealed partial class ArchitectureDiagnosticFormatter
         {
             target["related_policy_locations"] = diagnostic.RelatedPolicyLocations
                 .OrderBy(location => location.SourceOrdinal)
-                .ThenBy(location => location.YamlPath, StringComparer.Ordinal)
+                .ThenBy(location => location.EncounterOrdinal)
                 .Select(ToPolicyLocationJsonObject)
                 .ToArray();
         }
@@ -75,7 +75,7 @@ public sealed partial class ArchitectureDiagnosticFormatter
             ? string.Empty
             : "; related: " + string.Join(", ", diagnostic.RelatedPolicyLocations
                 .OrderBy(item => item.SourceOrdinal)
-                .ThenBy(item => item.YamlPath, StringComparer.Ordinal)
+                .ThenBy(item => item.EncounterOrdinal)
                 .Select(item => $"{item.SourcePath}:{item.YamlPath}"));
         return $" (policy: {location.SourcePath}:{location.YamlPath}{root}{related})";
     }

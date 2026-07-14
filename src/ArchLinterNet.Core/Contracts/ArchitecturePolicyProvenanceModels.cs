@@ -21,7 +21,8 @@ public sealed record ArchitecturePolicySourceLocation(
     int Line,
     int Column,
     string? ContractFamily,
-    string? ContractId)
+    string? ContractId,
+    int EncounterOrdinal = 0)
 {
     public string RootPath => Source.RootPath;
 

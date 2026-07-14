@@ -11,6 +11,7 @@ internal sealed class ArchitecturePolicyProvenanceMapBuilder
 {
     private readonly Dictionary<string, ArchitecturePolicySourceLocation> _nodes =
         new(StringComparer.Ordinal);
+    private int _nextEncounterOrdinal;
 
     public void AddTree(
         YamlNode node,
@@ -86,7 +87,7 @@ internal sealed class ArchitecturePolicyProvenanceMapBuilder
             _nodes);
     }
 
-    private static ArchitecturePolicySourceLocation CreateLocation(
+    private ArchitecturePolicySourceLocation CreateLocation(
         ArchitecturePolicySource source,
         string yamlPath,
         YamlNode node,
@@ -99,7 +100,8 @@ internal sealed class ArchitecturePolicyProvenanceMapBuilder
             checked((int)Math.Max(1, node.Start.Line + 1)),
             checked((int)Math.Max(1, node.Start.Column + 1)),
             contractFamily,
-            contractId);
+            contractId,
+            _nextEncounterOrdinal++);
     }
 
     private static (string? Family, string? Id) ResolveContractContext(

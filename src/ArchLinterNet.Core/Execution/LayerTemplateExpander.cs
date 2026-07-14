@@ -5,6 +5,8 @@ namespace ArchLinterNet.Core.Execution;
 
 public static class LayerTemplateExpander
 {
+    internal const string TemplateOwnerDataKey = "ArchLinterNet.LayerTemplateOwner";
+
     public static List<ArchitectureLayerContract> Expand(
         IEnumerable<ArchitectureLayerTemplateContract> templates)
     {
@@ -24,10 +26,12 @@ public static class LayerTemplateExpander
                 {
                     if (template.Exhaustive && templateLayer.Name.Contains('.', StringComparison.Ordinal))
                     {
-                        throw new ArgumentException(
+                        var exception = new ArgumentException(
                             $"Dotted template layer name '{templateLayer.Name}' is not supported when exhaustive is true " +
                             $"in template '{template.Name}'. Template layer names must be single namespace segments " +
                             $"(e.g. 'Contracts', not 'Core.Execution').");
+                        exception.Data[TemplateOwnerDataKey] = template;
+                        throw exception;
                     }
 
                     string ns = $"{container}.{templateLayer.Name}";

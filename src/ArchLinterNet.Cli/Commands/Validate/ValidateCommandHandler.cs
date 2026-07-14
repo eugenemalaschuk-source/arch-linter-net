@@ -204,6 +204,8 @@ internal sealed class ValidateCommandHandler(ICliRuntime runtime, ICliConsole co
             contract_id = location.ContractId,
             declaring_source_path = location.Source.DeclaringSourcePath,
             authored_import_path = location.Source.AuthoredImportPath,
+            source_ordinal = location.SourceOrdinal,
+            import_chain = location.Source.ImportChain,
         };
     }
 

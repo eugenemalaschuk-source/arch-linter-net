@@ -201,6 +201,7 @@ public sealed class ArchitecturePolicyProvenanceIndex
             .OfType<ArchitecturePolicySourceLocation>()
             .Distinct()
             .OrderBy(location => location.SourceOrdinal)
+            .ThenBy(location => location.EncounterOrdinal)
             .ToArray();
     }
 
@@ -301,6 +302,27 @@ public sealed class ArchitecturePolicyProvenanceIndex
         _contracts.Add(new ContractEntry(group, template.EffectivePath, contract));
     }
 
+    internal Exception EnrichLayerTemplateExpansionException(
+        ArgumentException exception,
+        ArchitectureLayerTemplateContract template)
+    {
+        ArchitecturePolicySourceLocation? location = LocationFor(template);
+        if (!HasImports || location is null)
+        {
+            return exception;
+        }
+
+        var diagnostic = new ArchitecturePolicyDiagnostic(
+            ArchitecturePolicyDiagnosticKind.SemanticValidation,
+            location,
+            Array.Empty<ArchitecturePolicySourceLocation>(),
+            location.Source.ImportChain);
+        return new ArchitecturePolicyValidationException(
+            $"{exception.Message} (policy: {Format(location)}; root: {location.RootPath})",
+            diagnostic,
+            exception);
+    }
+
     private void BindOwner(object owner, string effectivePath, string? family, string? contractId)
     {
         if (!_nodes.TryGetValue(effectivePath, out ArchitecturePolicySourceLocation? location))
@@ -352,6 +374,7 @@ public sealed class ArchitecturePolicyProvenanceIndex
 
         return locations
             .OrderBy(location => location.SourceOrdinal)
+            .ThenBy(location => location.EncounterOrdinal)
             .ToList();
     }
 
@@ -384,6 +407,7 @@ public sealed class ArchitecturePolicyProvenanceIndex
             .OfType<ArchitecturePolicySourceLocation>()
             .Distinct()
             .OrderBy(location => location.SourceOrdinal)
+            .ThenBy(location => location.EncounterOrdinal)
             .ToArray();
     }
 
