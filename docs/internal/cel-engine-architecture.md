@@ -16,17 +16,27 @@ expression source (string)
         │
         ▼
   ┌─────────────────┐
-  │   Tokenizer     │  (task #325 — parser)
+  │   Tokenizer     │  (task #325 — shipped: ArchLinterNet.CEL.Parsing.CelTokenizer)
   │                 │  Converts source bytes to a token stream.
-  │  Limits:        │  Enforces MaxExpressionLength before tokenizing.
+  │  Limits:        │  Enforces MaxExpressionLength (CelEnvironment, before tokenizing),
+  │                 │  MaxTokenCount and MaxLiteralSize (tokenizer itself).
   └────────┬────────┘
            │  token stream
            ▼
   ┌─────────────────┐
-  │  Parser / AST   │  (task #325)
-  │  (internal)     │  Builds an internal syntax representation.
-  │                 │  MaxNestingDepth enforced here.
-  │  NOT public.    │  AST nodes are never exposed.
+  │  Parser / AST   │  (task #325 — shipped: ArchLinterNet.CEL.Parsing.CelParser +
+  │  (internal)     │  CelSyntaxNode hierarchy). Precedence-climbing (Pratt) parser;
+  │                 │  MaxNestingDepth and MaxAstNodeCount enforced here. Distinguishes
+  │                 │  SyntaxError (invented/malformed syntax) from UnsupportedFeature
+  │                 │  (valid CEL excluded from v1: arithmetic, `? :`, null/uint/bytes
+  │                 │  literals, list/map/message literals). Fails fast — one diagnostic
+  │                 │  per attempt, no error recovery. Full input consumption required.
+  │  NOT public.    │  AST nodes are never exposed. Binder (#326) consumes CelSyntaxNode
+  │                 │  internally; CelEnvironment.CompilePredicate/Compile call the
+  │                 │  tokenizer+parser after the MaxExpressionLength gate — a syntax/
+  │                 │  unsupported-feature/structural-limit diagnostic short-circuits
+  │                 │  compilation with a real span; syntactically valid Profile v1
+  │                 │  input still returns NotYetImplemented pending #326.
   └────────┬────────┘
            │  internal syntax tree
            ▼
@@ -69,7 +79,7 @@ ______________________________________________________________________
 | Component | Owner | Notes |
 |---|---|---|
 | Profile identity (`CelProfile`, `CelProfileId`) | `ArchLinterNet.CEL` public | Stable across versions; v1 ID is `arch-linter/cel/v1` |
-| Grammar gates (token set, operator set) | `CelEngine` internal | Controlled per-profile; no public API |
+| Grammar gates (token set, operator set) | `ArchLinterNet.CEL.Parsing` internal (`CelTokenizer`, `CelParser`) | Controlled per-profile; no public API. Deviation from the original design: the gate lives in the tokenizer/parser themselves (deferred tokens are lexed, then rejected by the parser with `UnsupportedFeature`), not in `CelEngine` — `CelEngine` remains an unused placeholder pending #326/#327 |
 | Value model (`CelValue`, `CelObjectValue`, `CelValueKind`) | `ArchLinterNet.CEL` public | No CLR reflection; all factories are typed |
 | Type descriptors (`CelType`, `CelTypeKind`) | `ArchLinterNet.CEL` public | Static factories only |
 | Context schema (`CelContextSchema`, `CelVariable`) | `ArchLinterNet.CEL` public | Structural identity is deterministic |

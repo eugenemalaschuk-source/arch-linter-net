@@ -1,6 +1,8 @@
 using System.Text;
 using ArchLinterNet.CEL.Compilation;
+using ArchLinterNet.CEL.Diagnostics;
 using ArchLinterNet.CEL.Evaluation;
+using ArchLinterNet.CEL.Parsing;
 using ArchLinterNet.CEL.Profile;
 using ArchLinterNet.CEL.Schema;
 
@@ -89,6 +91,9 @@ public sealed class CelEnvironment
         var key = BuildKey(source, CelRequiredResultType.Predicate);
         if (source.Length > CompilationLimits.MaxExpressionLength)
             return CelCompilationResult<CelCompiledPredicate>.BudgetExceeded(key);
+        var parseError = TryParse(source);
+        if (parseError is not null)
+            return new CelCompilationResult<CelCompiledPredicate>(false, null, [parseError], key);
         return CelCompilationResult<CelCompiledPredicate>.NotYetImplemented(key);
     }
 
@@ -106,7 +111,25 @@ public sealed class CelEnvironment
         var key = BuildKey(source, CelRequiredResultType.General);
         if (source.Length > CompilationLimits.MaxExpressionLength)
             return CelCompilationResult<CelCompiledExpression>.BudgetExceeded(key);
+        var parseError = TryParse(source);
+        if (parseError is not null)
+            return new CelCompilationResult<CelCompiledExpression>(false, null, [parseError], key);
         return CelCompilationResult<CelCompiledExpression>.NotYetImplemented(key);
+    }
+
+    /// <summary>
+    /// Runs the tokenizer and parser over <paramref name="source"/>. Returns <c>null</c> when the
+    /// expression is syntactically valid Profile v1 CEL (binding/type-checking is #326's scope);
+    /// otherwise returns the single diagnostic explaining the syntax error, unsupported-feature
+    /// condition, or structural-limit violation encountered.
+    /// </summary>
+    private CelDiagnostic? TryParse(string source)
+    {
+        var tokenizeResult = CelTokenizer.Tokenize(source, CompilationLimits, Profile.Id);
+        if (!tokenizeResult.IsSuccess)
+            return tokenizeResult.Diagnostic;
+        var parseResult = CelParser.Parse(tokenizeResult.Tokens, CompilationLimits, Profile.Id);
+        return parseResult.IsSuccess ? null : parseResult.Diagnostic;
     }
 
     private CelCompilationKey BuildKey(string source, CelRequiredResultType resultType) =>
