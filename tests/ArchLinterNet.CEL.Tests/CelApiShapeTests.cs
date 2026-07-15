@@ -439,7 +439,9 @@ public sealed class CelApiShapeTests
     [Test]
     public void CelEnvironment_CompilePredicate_ExceedsMaxLength_ReturnsBudgetExceeded()
     {
-        var tightLimits = new CelCompilationLimits(maxExpressionLength: 5, maxNestingDepth: 4, maxIdentifierCount: 4);
+        var tightLimits = new CelCompilationLimits(
+            maxExpressionLength: 5, maxNestingDepth: 4, maxIdentifierCount: 4,
+            maxTokenCount: 64, maxAstNodeCount: 64, maxLiteralSize: 64);
         var env = CelEnvironment.CreateBuilder(CelProfile.V1)
             .WithContextSchema(BuildSimpleSchema())
             .WithCompilationLimits(tightLimits)
@@ -454,7 +456,9 @@ public sealed class CelApiShapeTests
     [Test]
     public void CelEnvironment_Compile_ExceedsMaxLength_ReturnsBudgetExceeded()
     {
-        var tightLimits = new CelCompilationLimits(maxExpressionLength: 3, maxNestingDepth: 4, maxIdentifierCount: 4);
+        var tightLimits = new CelCompilationLimits(
+            maxExpressionLength: 3, maxNestingDepth: 4, maxIdentifierCount: 4,
+            maxTokenCount: 64, maxAstNodeCount: 64, maxLiteralSize: 64);
         var env = CelEnvironment.CreateBuilder(CelProfile.V1)
             .WithContextSchema(BuildSimpleSchema())
             .WithCompilationLimits(tightLimits)
@@ -469,9 +473,12 @@ public sealed class CelApiShapeTests
     [Test]
     public void CelCompilationLimits_ZeroOrNegativeArgs_ThrowArgumentOutOfRange()
     {
-        Assert.That(() => new CelCompilationLimits(0, 4, 4), Throws.TypeOf<ArgumentOutOfRangeException>());
-        Assert.That(() => new CelCompilationLimits(4, 0, 4), Throws.TypeOf<ArgumentOutOfRangeException>());
-        Assert.That(() => new CelCompilationLimits(4, 4, 0), Throws.TypeOf<ArgumentOutOfRangeException>());
+        Assert.That(() => new CelCompilationLimits(0, 4, 4, 4, 4, 4), Throws.TypeOf<ArgumentOutOfRangeException>());
+        Assert.That(() => new CelCompilationLimits(4, 0, 4, 4, 4, 4), Throws.TypeOf<ArgumentOutOfRangeException>());
+        Assert.That(() => new CelCompilationLimits(4, 4, 0, 4, 4, 4), Throws.TypeOf<ArgumentOutOfRangeException>());
+        Assert.That(() => new CelCompilationLimits(4, 4, 4, 0, 4, 4), Throws.TypeOf<ArgumentOutOfRangeException>());
+        Assert.That(() => new CelCompilationLimits(4, 4, 4, 4, 0, 4), Throws.TypeOf<ArgumentOutOfRangeException>());
+        Assert.That(() => new CelCompilationLimits(4, 4, 4, 4, 4, 0), Throws.TypeOf<ArgumentOutOfRangeException>());
     }
 
     // ── CelValue: object factory and accessor ─────────────────────────────────
