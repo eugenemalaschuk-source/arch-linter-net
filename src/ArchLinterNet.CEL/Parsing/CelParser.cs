@@ -301,9 +301,21 @@ internal sealed class CelParser
         }
     }
 
+    /// <summary>
+    /// <paramref name="isQualifiedNameChain"/> tracks whether <c>expr</c> is currently eligible to
+    /// be a message-literal receiver — true only for a bare identifier / root-qualified-name chain
+    /// built purely from <c>.selector</c> steps, with no intervening call, index, or
+    /// parenthesization. This is deliberately tracked as explicit parse state rather than inferred
+    /// from the resulting <see cref="CelSyntaxNode"/>'s shape: a parenthesized qualified name (e.g.
+    /// <c>(Type)</c>) produces the exact same <see cref="CelIdentifierSyntax"/> node a bare
+    /// <c>Type</c> would, but per the pinned grammar a message literal's <c>IDENT ("." IDENT)*</c>
+    /// prefix is a primary-level production, not a generic postfix step usable after any
+    /// expression that happens to evaluate to an identifier shape — so <c>(Type){field: 1}</c> must
+    /// be <c>SyntaxError</c> even though <c>Type{field: 1}</c> is <c>UnsupportedFeature</c>.
+    /// </summary>
     private CelSyntaxNode ParsePostfix()
     {
-        var expr = ParsePrimary();
+        var expr = ParsePrimary(out var isQualifiedNameChain);
         var chainDepth = 0;
         try
         {
@@ -321,6 +333,7 @@ internal sealed class CelParser
                         var args = ParseArguments();
                         var closeParen = Expect(CelTokenKind.RParen, "')'");
                         expr = Track(new CelCallSyntax(Merge(expr.Span, closeParen.Span), expr, nameToken.Text, args));
+                        isQualifiedNameChain = false; // a call result is never a qualified name
                     }
                     else
                     {
@@ -334,8 +347,9 @@ internal sealed class CelParser
                     var index = ParseExpression();
                     var closeBracket = Expect(CelTokenKind.RBracket, "']'");
                     expr = Track(new CelIndexSyntax(Merge(expr.Span, closeBracket.Span), expr, index));
+                    isQualifiedNameChain = false; // an index result is never a qualified name
                 }
-                else if (Check(CelTokenKind.LBrace) && IsQualifiedNameCandidate(expr))
+                else if (Check(CelTokenKind.LBrace) && isQualifiedNameChain)
                 {
                     // Message literal construction (a qualified name followed by a brace body) is
                     // valid CEL syntax per the pinned grammar, but only after a qualified-name-shaped
@@ -345,6 +359,7 @@ internal sealed class CelParser
                     var span = Merge(expr.Span, closeBrace.Span);
                     MarkDeferred(span, "Message literal syntax is deferred in Profile v1.", "message-literal");
                     expr = Track(new CelDeferredSyntax(span));
+                    isQualifiedNameChain = false;
                 }
                 else
                 {
@@ -372,23 +387,6 @@ internal sealed class CelParser
         if (_depth > _limits.MaxNestingDepth)
             throw FailBudget(Current.Span, "MaxNestingDepth", _depth);
     }
-
-    /// <summary>
-    /// A message-literal receiver must itself be a qualified-name shape (an identifier, or a
-    /// chain of pure member accesses rooted in one) — a call result, index result, or literal is
-    /// never a valid message-literal receiver under the pinned grammar. A root-qualified name
-    /// (<see cref="ParsePrimary"/>'s <c>Dot</c> case) is built from the same
-    /// <see cref="CelIdentifierSyntax"/>/<see cref="CelMemberAccessSyntax"/> node shapes as an
-    /// ordinary reference specifically so it also qualifies here — <c>.pkg.Type{field: 1}</c>
-    /// must get the same bare-identifier-field-key validation as <c>Type{field: 1}</c>, not skip
-    /// it by returning a generic placeholder before ever reaching the `{`.
-    /// </summary>
-    private static bool IsQualifiedNameCandidate(CelSyntaxNode node) => node switch
-    {
-        CelIdentifierSyntax => true,
-        CelMemberAccessSyntax member => IsQualifiedNameCandidate(member.Receiver),
-        _ => false,
-    };
 
     /// <summary>
     /// Validates a <c>"{" [entry ("," entry)*] "}"</c> body and returns the closing brace token.
@@ -465,8 +463,10 @@ internal sealed class CelParser
         return args;
     }
 
-    private CelSyntaxNode ParsePrimary()
+    /// <summary>See the <see cref="ParsePostfix"/> doc for what <paramref name="isQualifiedNameChain"/> means.</summary>
+    private CelSyntaxNode ParsePrimary(out bool isQualifiedNameChain)
     {
+        isQualifiedNameChain = false;
         var token = Current;
         switch (token.Kind)
         {
@@ -499,9 +499,15 @@ internal sealed class CelParser
             case CelTokenKind.LBracket:
                 return ParseListLiteralPrimary(token);
             case CelTokenKind.Dot:
-                return ParseRootQualifiedNamePrimary();
+                return ParseRootQualifiedNamePrimary(out isQualifiedNameChain);
             case CelTokenKind.LParen:
                 {
+                    // isQualifiedNameChain stays false regardless of what the parenthesized
+                    // sub-expression contains — per the pinned grammar, a message literal's
+                    // qualified-name prefix is a primary-level production, not a generic postfix
+                    // step usable after any parenthesized expression that happens to evaluate to
+                    // an identifier shape. "(Type){field: 1}" must be SyntaxError even though
+                    // "Type{field: 1}" is UnsupportedFeature.
                     Advance();
                     var inner = ParseExpression();
                     Expect(CelTokenKind.RParen, "')'");
@@ -509,7 +515,7 @@ internal sealed class CelParser
                 }
 
             case CelTokenKind.Identifier:
-                return ParseIdentifierPrimary(token);
+                return ParseIdentifierPrimary(token, out isQualifiedNameChain);
             case CelTokenKind.Eof:
                 throw Fail(token.Span, "Expected an expression but reached the end of input.");
             default:
@@ -560,33 +566,40 @@ internal sealed class CelParser
     }
 
     /// <summary>
-    /// A leading dot followed by a dotted identifier chain is root/absolute-qualified name
-    /// syntax. Built using the same node shapes as an ordinary identifier/member-access chain
-    /// (rather than an opaque placeholder) so a trailing <c>{</c> is still recognized by
-    /// <see cref="IsQualifiedNameCandidate"/> and gets full message-literal field-key validation.
+    /// A leading dot followed by exactly one identifier is root/absolute-qualified name syntax —
+    /// deferred in v1. Only the leading <c>"." IDENT</c> is consumed here (plus an immediately
+    /// following call, e.g. <c>.f(...)</c>, mirroring <see cref="ParseIdentifierPrimary"/>); any
+    /// further <c>.member</c>/<c>.call()</c>/<c>[index]</c>/message-literal steps are left to the
+    /// caller's normal <see cref="ParsePostfix"/> loop, exactly like a non-root-qualified
+    /// identifier chain, so e.g. <c>.pkg.f()</c> and <c>.pkg.Type{field: 1}</c> get identical
+    /// call/message-literal/<c>MaxNestingDepth</c> handling to <c>pkg.f()</c> /
+    /// <c>pkg.Type{field: 1}</c> instead of a bespoke (and previously incomplete) parallel path.
     /// A bare <c>.</c> with no following identifier is a syntax error, not deferred syntax.
     /// </summary>
-    private CelSyntaxNode ParseRootQualifiedNamePrimary()
+    private CelSyntaxNode ParseRootQualifiedNamePrimary(out bool isQualifiedNameChain)
     {
         var dotToken = Advance();
         var nameToken = ExpectSelectorName();
         TrackIdentifier(nameToken.Span);
-        CelSyntaxNode node = Track(new CelIdentifierSyntax(Merge(dotToken.Span, nameToken.Span), nameToken.Text));
-        while (Check(CelTokenKind.Dot))
+        var span = Merge(dotToken.Span, nameToken.Span);
+        MarkDeferred(span, "Root-qualified ('.'-prefixed) name syntax is deferred in Profile v1.", "root-qualified-name");
+
+        if (Check(CelTokenKind.LParen))
         {
+            // Root-qualified free function call, e.g. ".f(...)" — the result is a call, not a
+            // qualified name (mirrors ParseIdentifierPrimary's own call handling).
+            isQualifiedNameChain = false;
             Advance();
-            var next = ExpectSelectorName();
-            TrackIdentifier(next.Span);
-            node = Track(new CelMemberAccessSyntax(Merge(node.Span, next.Span), node, next.Text));
+            var args = ParseArguments();
+            var closeParen = Expect(CelTokenKind.RParen, "')'");
+            return Track(new CelCallSyntax(Merge(span, closeParen.Span), null, nameToken.Text, args));
         }
 
-        MarkDeferred(
-            Merge(dotToken.Span, node.Span),
-            "Root-qualified ('.'-prefixed) name syntax is deferred in Profile v1.", "root-qualified-name");
-        return node;
+        isQualifiedNameChain = true;
+        return Track(new CelIdentifierSyntax(span, nameToken.Text));
     }
 
-    private CelSyntaxNode ParseIdentifierPrimary(CelToken token)
+    private CelSyntaxNode ParseIdentifierPrimary(CelToken token, out bool isQualifiedNameChain)
     {
         if (token.IsReserved)
             throw Fail(token.Span, $"'{token.Text}' is a reserved identifier and cannot be used as a value.");
@@ -594,12 +607,14 @@ internal sealed class CelParser
         TrackIdentifier(token.Span);
         if (Check(CelTokenKind.LParen))
         {
+            isQualifiedNameChain = false; // a free-function call result is never a qualified name
             Advance();
             var args = ParseArguments();
             var closeParen = Expect(CelTokenKind.RParen, "')'");
             return Track(new CelCallSyntax(Merge(token.Span, closeParen.Span), null, token.Text, args));
         }
 
+        isQualifiedNameChain = true;
         return Track(new CelIdentifierSyntax(token.Span, token.Text));
     }
 

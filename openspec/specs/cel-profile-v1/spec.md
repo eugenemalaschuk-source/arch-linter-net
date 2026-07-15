@@ -589,7 +589,23 @@ this spec:
   and remains `UnsupportedFeature`; this bare-identifier-field-key requirement SHALL apply
   identically when the message-literal receiver is a root-qualified name (e.g.
   `.pkg.Type{1: 2}` SHALL be `SyntaxError` for the same reason `Type{1: 2}` is, not bypass field
-  validation by virtue of being root-qualified).
+  validation by virtue of being root-qualified). Message-literal-receiver eligibility SHALL be
+  determined by parse state (whether the immediately preceding syntax was a qualified-name
+  chain with no intervening call, index, or parenthesization), not by the shape of the resulting
+  internal syntax node alone — a parenthesized qualified name (e.g. `(Type)`, `(pkg.Type)`) is
+  syntactically indistinguishable in shape from an unparenthesized one once parsed, but per the
+  pinned grammar the qualified-name prefix of a message literal is a primary-level production,
+  not a generic postfix step usable after any expression that happens to evaluate to an
+  identifier shape; `(Type){field: 1}` SHALL therefore be `SyntaxError`, even though
+  `Type{field: 1}` is `UnsupportedFeature`.
+- A root-qualified name (a leading `.` before an identifier) SHALL only consume its own leading
+  `"." IDENT` (plus an immediately following call, e.g. `.f(...)`, mirroring a non-root-qualified
+  free function call); any further `.member`, `.call(...)`, `[index]`, or message-literal step
+  SHALL be handled by the same parsing path used for a non-root-qualified identifier chain, not a
+  separate bespoke path — so `.pkg.f()` (root-qualified receiver call) and `.pkg.Type{field: 1}`
+  (root-qualified message literal) parse completely instead of leaving a trailing `(`/`{`
+  unconsumed, and every `.member`/`[index]` step in a root-qualified chain after the leading one
+  is bounded by `MaxNestingDepth` through the same mechanism a non-root-qualified chain uses.
 - The decision to classify an expression as `UnsupportedFeature` (as opposed to allowing parsing
   to continue toward a normal result) SHALL be deferred until the entire top-level expression has
   finished parsing successfully — every enclosing `(`/`[`/`{` matched with its closing
@@ -812,6 +828,35 @@ this spec:
 
 - **WHEN** the expression `.pkg.Type{1: 2}` is parsed
 - **THEN** compilation fails with a `SyntaxError` diagnostic, not `UnsupportedFeature`
+
+#### Scenario: A parenthesized qualified name is not a message-literal receiver
+
+- **WHEN** the expression `(Type){field: 1}` is parsed
+- **THEN** compilation fails with a `SyntaxError` diagnostic, not `UnsupportedFeature`
+
+#### Scenario: A parenthesized member-access chain is not a message-literal receiver
+
+- **WHEN** the expression `(pkg.Type){field: 1}` is parsed
+- **THEN** compilation fails with a `SyntaxError` diagnostic, not `UnsupportedFeature`
+
+#### Scenario: A root-qualified free function call parses completely
+
+- **WHEN** the expression `.f()` is parsed
+- **THEN** compilation fails with an `UnsupportedFeature` diagnostic (not a `SyntaxError` about
+  trailing input), since the call is fully consumed
+
+#### Scenario: A root-qualified receiver call parses completely
+
+- **WHEN** the expression `.pkg.f()` is parsed
+- **THEN** compilation fails with an `UnsupportedFeature` diagnostic (not a `SyntaxError` about
+  trailing input)
+
+#### Scenario: MaxNestingDepth bounds a root-qualified member-access chain
+
+- **WHEN** `CelCompilationLimits.MaxNestingDepth` is exceeded by the length of a root-qualified
+  member-access chain (e.g. `.a.b.c.d.e`)
+- **THEN** compilation fails with a `BudgetExceeded` diagnostic carrying
+  `limitName = "MaxNestingDepth"`
 
 #### Scenario: A message literal field key must be a bare identifier
 

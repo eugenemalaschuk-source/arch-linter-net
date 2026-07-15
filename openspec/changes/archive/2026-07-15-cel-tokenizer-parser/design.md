@@ -351,6 +351,66 @@ needed. `.pkg.Type{1: 2}` is now `SyntaxError` (bad field key) exactly like `Typ
 `.pkg.Type{field: 1}` remains `UnsupportedFeature` (root-qualified name is deferred regardless of
 what follows it).
 
+**Superseded by decisions 20 and 21 below** — a later review round found two further gaps in this
+`IsQualifiedNameCandidate`-based mechanism itself (not specific to root-qualified names), which
+required replacing the structural node-shape check with explicit parse state.
+
+### 20. Message-literal-receiver eligibility is explicit parse state, not an AST-shape check
+
+`IsQualifiedNameCandidate` (decision 10, refined by decision 19) inferred message-literal-receiver
+eligibility from the *shape* of the already-built `CelSyntaxNode` — true for a
+`CelIdentifierSyntax`/`CelMemberAccessSyntax` chain, false otherwise. This has a fundamental gap:
+a parenthesized qualified name (`(Type)`, `(pkg.Type)`) produces the *exact same node shape* a
+bare `Type`/`pkg.Type` would, since `ParsePrimary`'s `LParen` case just returns the inner
+expression's node directly — so `IsQualifiedNameCandidate` could not distinguish them, and
+`(Type){field: 1}` was wrongly accepted as a well-formed (if deferred) message literal (caught in
+review). Per the pinned grammar, a message literal's qualified-name prefix
+(`IDENT ("." IDENT)*`) is a primary-level production, not a generic postfix step usable after any
+expression that merely *evaluates to* an identifier shape — parenthesization removes eligibility
+even though it doesn't change the resulting node's type.
+
+The fix replaces the structural check with an explicit `bool isQualifiedNameChain` threaded
+through `ParsePrimary`/`ParsePostfix` as parse *state*, not derived from the node afterward:
+`ParsePrimary` sets it `true` only for a bare identifier or root-qualified name that wasn't
+immediately called, and `false` for every other primary form (literals, list/map-literal
+placeholders, and critically the `LParen` case, unconditionally, regardless of what the
+parenthesized sub-expression contains). `ParsePostfix` clears it the moment a call or index step
+occurs (a call/index result is never a qualified name) and otherwise carries it forward unchanged
+across `.member` steps. `Check(LBrace) && isQualifiedNameChain` (state) replaces
+`Check(LBrace) && IsQualifiedNameCandidate(expr)` (shape) as the message-literal trigger
+condition — `IsQualifiedNameCandidate` is removed entirely, since the state it approximated is now
+tracked precisely.
+
+### 21. Root-qualified names consume only their leading `. IDENT`, reusing the ordinary postfix path for everything after
+
+The original root-qualified-name implementation (decisions 10 and 19) parsed the *entire*
+`"." IDENT ("." IDENT)*` chain inside `ParsePrimary`'s `Dot` case in one dedicated loop, then
+returned control to `ParsePostfix`. Two gaps followed from this, both caught in review. First,
+that dedicated loop never checked for a trailing `(args)` to recognize a call — so `.f()` and
+`.pkg.f()` left the `(` as unconsumed trailing input, an unconditional `SyntaxError` regardless of
+how well-formed the call was, even though `f()` and `pkg.f()` (no leading dot) parse correctly via
+`ParseIdentifierPrimary`/`ParsePostfix`'s own call handling. Second, the loop's `.member` steps
+never called `EnterChainStep` (unlike `ParsePostfix`'s own `.member`/`[index]` loop, which does),
+so a root-qualified chain's `MaxNestingDepth` was completely unenforced past the leading link —
+`.a.b.c.d.e...` could grow without bound while a structurally identical non-root-qualified
+`a.b.c.d.e...` was correctly bounded.
+
+Rather than duplicating call-recognition and depth-tracking inside the dedicated loop, the fix
+eliminates the loop: `ParseRootQualifiedNamePrimary` now consumes only the leading `"." IDENT`
+(mirroring `ParseIdentifierPrimary` exactly, including checking for an immediately-following
+`(args)` to produce a root-qualified free-function-call node) and returns — leaving every
+subsequent `.member`, `.call(...)`, `[index]`, or message-literal step to `ParsePostfix`'s
+existing loop, the *same* loop a non-root-qualified chain uses, `EnterChainStep` and all. This is
+not a parallel fix but a deletion of the parallel path: a root-qualified chain's tail is now
+*identical code* to a non-root-qualified chain's tail, so any future fix to call/index/
+message-literal/depth handling in `ParsePostfix` automatically applies to both, and the two can no
+longer drift apart the way they just did. The leading link itself (the `"." IDENT` consumed inside
+`ParseRootQualifiedNamePrimary`) is not separately depth-tracked — a deliberate, narrower gap than
+the one being fixed (a single fixed-cost link per root-qualified name, not an unboundable loop),
+recorded as a residual trade-off below rather than closed, since closing it would require passing
+a depth contribution out of `ParsePrimary` through every other case, for one link's worth of
+budget.
+
 ## Risks / Trade-offs
 
 - Omitting triple-quoted strings and octal escapes is a real (if currently unreachable) grammar
@@ -363,6 +423,12 @@ what follows it).
   intentionally not matched — it falls through to being lexed as an ordinary (malformed)
   identifier-then-string sequence, which is correct per the grammar but may surprise a reader
   expecting prefix-order symmetry.
+- A root-qualified name's leading `"." IDENT` link is not individually bounded by
+  `MaxNestingDepth` (see decision 21) — only the second and later links are, via the shared
+  `ParsePostfix` mechanism. This is a single fixed-cost gap (one link, not a loop), not an
+  unbounded one; closing it fully would require threading a depth contribution out of
+  `ParsePrimary` through every case for one link's worth of budget, judged not worth the
+  signature churn.
 
 ## Migration Plan
 

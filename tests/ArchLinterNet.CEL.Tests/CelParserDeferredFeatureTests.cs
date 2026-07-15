@@ -129,6 +129,69 @@ public sealed class CelParserDeferredFeatureTests
         Assert.That(diag.Code, Is.EqualTo(CelDiagnosticCode.SyntaxError));
     }
 
+    // ── Parenthesized qualified names are never message-literal receivers ────
+
+    [Test]
+    public void ParenthesizedIdentifier_FollowedByBrace_IsSyntaxError()
+    {
+        // Per the pinned grammar, a message literal's qualified-name prefix is a primary-level
+        // production, not a generic postfix step usable after any parenthesized expression that
+        // happens to evaluate to an identifier shape.
+        var diag = ParseFail("(Type){field: 1}");
+        Assert.That(diag.Code, Is.EqualTo(CelDiagnosticCode.SyntaxError));
+    }
+
+    [Test]
+    public void ParenthesizedMemberAccessChain_FollowedByBrace_IsSyntaxError()
+    {
+        var diag = ParseFail("(pkg.Type){field: 1}");
+        Assert.That(diag.Code, Is.EqualTo(CelDiagnosticCode.SyntaxError));
+    }
+
+    [Test]
+    public void ParenthesizedRootQualifiedName_FollowedByBrace_IsSyntaxError()
+    {
+        var diag = ParseFail("(.pkg.Type){field: 1}");
+        Assert.That(diag.Code, Is.EqualTo(CelDiagnosticCode.SyntaxError));
+    }
+
+    // ── Root-qualified calls use the same postfix machinery as non-root-qualified ones ─
+
+    [Test]
+    public void RootQualifiedFreeFunctionCall_IsUnsupportedFeature()
+    {
+        var diag = ParseFail(".f()");
+        Assert.That(diag.Code, Is.EqualTo(CelDiagnosticCode.UnsupportedFeature));
+    }
+
+    [Test]
+    public void RootQualifiedReceiverCall_IsUnsupportedFeature()
+    {
+        var diag = ParseFail(".pkg.f()");
+        Assert.That(diag.Code, Is.EqualTo(CelDiagnosticCode.UnsupportedFeature));
+    }
+
+    [Test]
+    public void RootQualifiedFreeFunctionCallWithArguments_IsUnsupportedFeature()
+    {
+        var diag = ParseFail(".f(a, b)");
+        Assert.That(diag.Code, Is.EqualTo(CelDiagnosticCode.UnsupportedFeature));
+    }
+
+    [Test]
+    public void MaxNestingDepth_ExceededByRootQualifiedMemberChain_ReturnsBudgetExceeded()
+    {
+        // The links after the leading ".pkg" flow through the same EnterChainStep-tracked
+        // ParsePostfix loop a non-root-qualified chain uses, so they must be bounded too.
+        var limits = new CelCompilationLimits(
+            maxExpressionLength: 4096, maxNestingDepth: 3, maxIdentifierCount: 64,
+            maxTokenCount: 2048, maxAstNodeCount: 1024, maxLiteralSize: 1024);
+
+        var diag = ParseFail(".a.b.c.d.e", limits);
+        Assert.That(diag.Code, Is.EqualTo(CelDiagnosticCode.BudgetExceeded));
+        Assert.That(diag.Parameters["limitName"], Is.EqualTo("MaxNestingDepth"));
+    }
+
     [Test]
     public void ConditionalOperator_WithArithmeticInFalseBranch_IsUnsupportedFeature()
     {
