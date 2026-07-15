@@ -121,18 +121,48 @@ public sealed class CelValue
         new(CelValueKind.Float, value);
 
     /// <summary>Creates an immutable CEL list value. Defensively copies the input.</summary>
+    /// <exception cref="ArgumentException">
+    /// <paramref name="value"/> contains a null element. Profile v1 defines no null CEL value.
+    /// </exception>
     public static CelValue List(IReadOnlyList<CelValue> value)
     {
         ArgumentNullException.ThrowIfNull(value);
-        return new CelValue(CelValueKind.List, new List<CelValue>(value).AsReadOnly());
+        var copy = new List<CelValue>(value.Count);
+        foreach (var element in value)
+        {
+            if (element is null)
+                throw new ArgumentException(
+                    "List elements must not be null. Profile v1 defines no null CEL value.",
+                    nameof(value));
+            copy.Add(element);
+        }
+        return new CelValue(CelValueKind.List, copy.AsReadOnly());
     }
 
     /// <summary>Creates an immutable, string-keyed CEL map value. Defensively copies the input.</summary>
+    /// <exception cref="ArgumentException">
+    /// <paramref name="value"/> contains a null value, or a key that contains an unpaired UTF-16
+    /// surrogate. Profile v1 defines no null CEL value, and map keys are CEL strings and are
+    /// therefore held to the same Unicode well-formedness requirement as <see cref="String"/>.
+    /// </exception>
     public static CelValue Map(IReadOnlyDictionary<string, CelValue> value)
     {
         ArgumentNullException.ThrowIfNull(value);
-        return new CelValue(CelValueKind.Map,
-            new Dictionary<string, CelValue>(value, StringComparer.Ordinal).AsReadOnly());
+        var copy = new Dictionary<string, CelValue>(value.Count, StringComparer.Ordinal);
+        foreach (var (key, mapValue) in value)
+        {
+            if (mapValue is null)
+                throw new ArgumentException(
+                    "Map values must not be null. Profile v1 defines no null CEL value.",
+                    nameof(value));
+            if (!IsWellFormedUtf16(key))
+                throw new ArgumentException(
+                    "Map key contains an unpaired UTF-16 surrogate and does not represent a valid " +
+                    "sequence of Unicode code points.",
+                    nameof(value));
+            copy[key] = mapValue;
+        }
+        return new CelValue(CelValueKind.Map, copy.AsReadOnly());
     }
 
     /// <summary>Creates a schema-defined CEL object value.</summary>

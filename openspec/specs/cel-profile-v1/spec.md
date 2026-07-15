@@ -383,7 +383,7 @@ The evaluation-limits enforcement model is: `CelCompiledPredicate` and `CelCompi
 
 The complete compilation-time budget surface that #325 (tokenizer/parser) and #326 (binder/checker) SHALL enforce comprises, at minimum: maximum expression source length in UTF-16 characters (`MaxExpressionLength`, already present); maximum token count produced by the tokenizer (`MaxTokenCount`); maximum AST node count produced by parsing (`MaxAstNodeCount`); maximum sub-expression nesting depth (`MaxNestingDepth`, already present); maximum literal size — the longest string/collection literal accepted in source (`MaxLiteralSize`); maximum distinct identifier references (`MaxIdentifierCount`, already present). Each of these limits SHALL be a positive-only field on `CelCompilationLimits`, SHALL be included as a named component of `CelCompilationLimits.ComputeIdentity()`, and a source exceeding any one of them SHALL produce a `BudgetExceeded` diagnostic before further processing of that phase. `MaxExpressionLength` remains the cheapest, first-checked gate (rejecting oversized source before tokenization even begins); the token/AST/literal limits are checked as each corresponding phase runs. Fields for limits not yet enforced by a landed phase (#325/#326 pending) SHALL still exist on `CelCompilationLimits` so the API shape does not change once those phases ship — an unenforced field SHALL be documented as "reserved, not yet enforced" in its XML doc until the enforcing phase lands.
 
-The complete evaluation-time budget surface that #327 (evaluator) SHALL enforce comprises, at minimum: maximum evaluation steps (`MaxIterations`, already present); maximum accumulated abstract cost units (`MaxCostUnits`, already present); maximum input-value structural depth accepted by `CelEvaluationContextBuilder.Set()` (already enforced pre-evaluator via `MaxValidationDepth`, an internal constant — not yet a public per-environment field); maximum input collection size (element/entry count) accepted by `Set()` for `List`/`Map`/`Object` values (already enforced pre-evaluator via `MaxValidationCollectionSize`, an internal constant — not yet a public per-environment field). Exceeding any evaluation-time limit SHALL produce a failed `CelEvaluationResult` with a `BudgetExceeded` diagnostic, not a CLR exception, except where the limit is enforced synchronously inside `Set()` (structural depth, collection size) — those SHALL continue to be reported as `ArgumentException` per the "Immutable context schema and schema-bound activation" requirement, since `Set()` is a builder-time programmer-facing call, not an evaluation call.
+The complete evaluation-time budget surface that #327 (evaluator) SHALL enforce comprises, at minimum: maximum evaluation steps (`MaxIterations`, already present); maximum accumulated abstract cost units (`MaxCostUnits`, already present); maximum input-value structural depth accepted by `CelEvaluationContextBuilder.Set()` (already enforced pre-evaluator via `MaxValidationDepth`, an internal constant — not yet a public per-environment field); maximum input collection size (element/entry count) accepted by `Set()` for `List`/`Map`/`Object` values (already enforced pre-evaluator via `MaxValidationCollectionSize`, an internal constant — not yet a public per-environment field); maximum cumulative input-value node count visited across one `Set()` call's recursive structural traversal (already enforced pre-evaluator via `MaxValidationNodeCount`, an internal constant — not yet a public per-environment field). The per-collection cap alone does not bound total validation work: a shallow structure such as a 1024-element list of 1024-element lists keeps every individual collection within `MaxValidationCollectionSize` while still visiting over one million value nodes, so `MaxValidationNodeCount` is a single counter shared across the entire recursive traversal of one `Set()` call, and validation stops immediately once it is exceeded. Exceeding any evaluation-time limit SHALL produce a failed `CelEvaluationResult` with a `BudgetExceeded` diagnostic, not a CLR exception, except where the limit is enforced synchronously inside `Set()` (structural depth, collection size, cumulative node count) — those SHALL continue to be reported as `ArgumentException` per the "Immutable context schema and schema-bound activation" requirement, since `Set()` is a builder-time programmer-facing call, not an evaluation call. Like `MaxValidationDepth` and `MaxValidationCollectionSize`, `MaxValidationNodeCount` is deliberately an immutable Profile v1 constant rather than a `CelEvaluationLimits` field in v1; if a future profile version makes it caller-configurable, it SHALL move onto `CelEvaluationLimits` and become a named component of `CelEvaluationLimits.ComputeIdentity()` / `CelCompilationKey.EvaluationLimitsIdentity`.
 
 #### Scenario: SafeDefaults factories are accessible
 
@@ -426,6 +426,40 @@ The complete evaluation-time budget surface that #327 (evaluator) SHALL enforce 
 #### Scenario: Set() rejects a map exceeding the collection-size limit
 
 - **WHEN** `CelEvaluationContextBuilder.Set()` is called with a `Map` value whose entry count exceeds the internal collection-size limit
+- **THEN** an `ArgumentException` is thrown
+
+#### Scenario: Set() rejects a structure exceeding the cumulative node budget despite every collection being within the size limit
+
+- **WHEN** `CelEvaluationContextBuilder.Set()` is called with a value whose every individual `List`/`Map` collection is within `MaxValidationCollectionSize`, but the total number of value nodes visited across the full recursive structure exceeds the internal cumulative node budget
+- **THEN** an `ArgumentException` is thrown
+
+#### Scenario: Set() accepts a structure within the cumulative node budget
+
+- **WHEN** `CelEvaluationContextBuilder.Set()` is called with a structurally-matching value whose total visited node count is within the internal cumulative node budget
+- **THEN** the value is accepted
+
+### Requirement: CEL value model rejects null and malformed structural inputs
+
+`CelValue.List`, `CelValue.Map`, and the `CelObjectValue` constructor SHALL reject null elements/values at construction: Profile v1 defines no null CEL value, so a null could never be validly nested inside a `List`, `Map`, or object member. `CelValue.Map` SHALL additionally validate every key against the same UTF-16 well-formedness rule that `CelValue.String` enforces, since map keys are CEL strings. `CelEvaluationContextBuilder`'s internal structural-match validation SHALL treat a null `CelValue` node as a defensive validation failure (not a CLR exception), as a fail-closed guard in case this invariant is ever violated upstream of `Set()`.
+
+#### Scenario: CelValue.List rejects a null element
+
+- **WHEN** `CelValue.List` is called with a list containing a null element
+- **THEN** an `ArgumentException` is thrown
+
+#### Scenario: CelValue.Map rejects a null value
+
+- **WHEN** `CelValue.Map` is called with a dictionary containing a null value
+- **THEN** an `ArgumentException` is thrown
+
+#### Scenario: CelValue.Map rejects a malformed UTF-16 key
+
+- **WHEN** `CelValue.Map` is called with a dictionary whose key contains an unpaired UTF-16 surrogate
+- **THEN** an `ArgumentException` is thrown
+
+#### Scenario: CelObjectValue rejects a null member value
+
+- **WHEN** the `CelObjectValue` constructor is called with a members dictionary containing a null value
 - **THEN** an `ArgumentException` is thrown
 
 ### Requirement: Cache identity is deterministic and caller-owned

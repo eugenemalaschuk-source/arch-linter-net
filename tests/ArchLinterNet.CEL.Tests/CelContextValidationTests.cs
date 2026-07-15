@@ -301,6 +301,55 @@ public sealed class CelContextValidationTests
             Throws.Nothing);
     }
 
+    // ── Cumulative node budget: per-collection caps alone do not bound total ──
+    //    validation work (a wide-but-shallow structure can stay under
+    //    MaxValidationCollectionSize at every level while still visiting far
+    //    more nodes than MaxValidationNodeCount permits) ──────────────────────
+
+    private static CelValue BuildNestedIntLists(int outerCount, int innerCount) =>
+        CelValue.List(Enumerable.Range(0, outerCount)
+            .Select(_ => CelValue.List(Enumerable.Range(0, innerCount).Select(i => CelValue.Int(i)).ToList()))
+            .ToList());
+
+    [Test]
+    public void CelEvaluationContextBuilder_WideShallowStructure_ExceedsCumulativeNodeBudget_FailsValidation()
+    {
+        // 100 outer elements x 100 inner ints = 1 + 100*(1 + 100) = 10,101 visited nodes,
+        // exceeding MaxValidationNodeCount (10,000), while every individual list (100 elements)
+        // stays far below MaxValidationCollectionSize (1024) and nesting depth (2) stays far
+        // below MaxValidationDepth (16) — isolating the cumulative node budget as the only
+        // possible rejection reason.
+        var value = BuildNestedIntLists(outerCount: 100, innerCount: 100);
+
+        var schemaBuilder = CelContextSchema.CreateBuilder("ctx");
+        var handle = schemaBuilder.AddVariable("v", CelType.ListOf(CelType.ListOf(CelType.Int)));
+        var schema = schemaBuilder.Build();
+
+        Assert.That(
+            () => schema.CreateEvaluationContextBuilder().Set(handle, value),
+            Throws.ArgumentException,
+            "Set() must reject values whose total visited node count exceeds the cumulative " +
+            "validation node budget, even when every individual collection is within the " +
+            "per-collection size limit.");
+    }
+
+    [Test]
+    public void CelEvaluationContextBuilder_WideShallowStructure_JustUnderCumulativeNodeBudget_PassesValidation()
+    {
+        // 100 outer elements x 98 inner ints = 1 + 100*(1 + 98) = 9,901 visited nodes, within
+        // MaxValidationNodeCount (10,000), proving the previous test fails on the cumulative
+        // budget alone rather than on collection size, depth, or an ordinary type mismatch.
+        var value = BuildNestedIntLists(outerCount: 100, innerCount: 98);
+
+        var schemaBuilder = CelContextSchema.CreateBuilder("ctx");
+        var handle = schemaBuilder.AddVariable("v", CelType.ListOf(CelType.ListOf(CelType.Int)));
+        var schema = schemaBuilder.Build();
+
+        Assert.That(
+            () => schema.CreateEvaluationContextBuilder().Set(handle, value),
+            Throws.Nothing);
+    }
+
     // ── CelValue.String: Unicode well-formedness (CEL strings = code points) ──
 
     [Test]
@@ -332,6 +381,43 @@ public sealed class CelContextValidationTests
         var v = CelValue.String("é");
         Assert.That(v.AsString(), Is.EqualTo("é"));
         Assert.That(v.AsString().Length, Is.EqualTo(2));
+    }
+
+    // ── Aggregate value factories reject null and malformed structural input ─
+    //    (Profile v1 defines no null CEL value; map keys are CEL strings and
+    //    are therefore held to the same UTF-16 well-formedness rule as
+    //    CelValue.String)
+
+    [Test]
+    public void CelValue_List_NullElement_ThrowsArgumentException()
+    {
+        Assert.That(
+            () => CelValue.List(new CelValue[] { null! }),
+            Throws.ArgumentException);
+    }
+
+    [Test]
+    public void CelValue_Map_NullValue_ThrowsArgumentException()
+    {
+        Assert.That(
+            () => CelValue.Map(new Dictionary<string, CelValue> { ["key"] = null! }),
+            Throws.ArgumentException);
+    }
+
+    [Test]
+    public void CelValue_Map_MalformedUtf16Key_ThrowsArgumentException()
+    {
+        Assert.That(
+            () => CelValue.Map(new Dictionary<string, CelValue> { ["\ud83d"] = CelValue.Int(1) }),
+            Throws.ArgumentException);
+    }
+
+    [Test]
+    public void CelObjectValue_NullMemberValue_ThrowsArgumentException()
+    {
+        Assert.That(
+            () => new CelObjectValue("thing", new Dictionary<string, CelValue> { ["member"] = null! }),
+            Throws.ArgumentException);
     }
 
     // ── CEL identifier validation on schema-declared names ───────────────────

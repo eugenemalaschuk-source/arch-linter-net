@@ -18,6 +18,19 @@ public sealed class CelEvaluationContextBuilder
     private const int MaxValidationDepth = 16;
     private const int MaxValidationCollectionSize = 1024;
 
+    // Per-collection caps alone do not bound total work: a shallow structure such as
+    // List[1024] of List[1024] of Int keeps every individual collection within
+    // MaxValidationCollectionSize while still visiting 1M+ value nodes. This is a separate,
+    // cumulative budget on the total number of CelValue nodes visited across one Set() call's
+    // recursive traversal, threaded through as a ref counter so every nested call shares it.
+    // Deliberately an internal Profile v1 constant (not a CelEvaluationLimits field): like
+    // MaxValidationDepth/MaxValidationCollectionSize above, this bounds the synchronous,
+    // programmer-facing Set() validation path that runs before any compiled program exists,
+    // not the per-call evaluation budget that CelEvaluationLimits governs. If a future profile
+    // version makes this caller-configurable, it must become part of CelEvaluationLimits and be
+    // folded into CelEvaluationLimits.ComputeIdentity() / CelCompilationKey.EvaluationLimitsIdentity.
+    private const int MaxValidationNodeCount = 10_000;
+
     internal CelEvaluationContextBuilder(
         CelContextSchema schema,
         IReadOnlyDictionary<string, CelObjectSchema>? objectSchemas)
@@ -50,10 +63,12 @@ public sealed class CelEvaluationContextBuilder
                 $"Variable '{variable.Name}' has already been set in this context.",
                 nameof(variable));
 
-        if (!ValueMatchesType(variable.Type, value, depth: 0))
+        var nodeCount = 0;
+        if (!ValueMatchesType(variable.Type, value, depth: 0, ref nodeCount))
             throw new ArgumentException(
                 $"Value kind {value.Kind} is not structurally compatible with variable " +
-                $"'{variable.Name}' declared as {variable.Type}.",
+                $"'{variable.Name}' declared as {variable.Type}, or the value exceeds the maximum " +
+                "structural validation depth, collection size, or total node budget.",
                 nameof(value));
 
         _assignments[variable] = value;
@@ -102,39 +117,59 @@ public sealed class CelEvaluationContextBuilder
         return new CelEvaluationContext(_schema, assignments);
     }
 
-    private bool ValueMatchesType(CelType declared, CelValue actual, int depth)
+    private bool ValueMatchesType(CelType declared, CelValue actual, int depth, ref int nodeCount)
     {
+        // Defensive guard: every public factory (CelValue.List/Map, CelObjectValue) already
+        // rejects null members at construction, but a null here must fail closed rather than
+        // throw NullReferenceException if that invariant is ever violated upstream.
+        if (actual is null) return false;
         if (depth > MaxValidationDepth) return false;
+
+        nodeCount++;
+        if (nodeCount > MaxValidationNodeCount) return false;
+
         return (declared.Kind, actual.Kind) switch
         {
             (CelTypeKind.Bool, CelValueKind.Bool) => true,
             (CelTypeKind.String, CelValueKind.String) => true,
             (CelTypeKind.Int, CelValueKind.Int) => true,
             (CelTypeKind.Float, CelValueKind.Float) => true,
-            (CelTypeKind.List, CelValueKind.List) => ValidateListElements(declared, actual, depth + 1),
-            (CelTypeKind.Map, CelValueKind.Map) => ValidateMapValues(declared, actual, depth + 1),
-            (CelTypeKind.Object, CelValueKind.Object) => ValidateObjectValue(declared, actual.AsObject(), depth + 1),
+            (CelTypeKind.List, CelValueKind.List) => ValidateListElements(declared, actual, depth + 1, ref nodeCount),
+            (CelTypeKind.Map, CelValueKind.Map) => ValidateMapValues(declared, actual, depth + 1, ref nodeCount),
+            (CelTypeKind.Object, CelValueKind.Object) => ValidateObjectValue(declared, actual.AsObject(), depth + 1, ref nodeCount),
             _ => false,
         };
     }
 
-    private bool ValidateListElements(CelType declared, CelValue listValue, int depth)
+    private bool ValidateListElements(CelType declared, CelValue listValue, int depth, ref int nodeCount)
     {
         var elements = listValue.AsList();
         if (elements.Count > MaxValidationCollectionSize) return false;
         if (declared.ElementType is null) return true;
-        return elements.All(el => ValueMatchesType(declared.ElementType, el, depth));
+
+        // A plain loop (not LINQ .All) is required here: nodeCount is threaded by ref through the
+        // entire recursive traversal, and ref locals cannot be captured by a lambda closure.
+        foreach (var el in elements)
+        {
+            if (!ValueMatchesType(declared.ElementType, el, depth, ref nodeCount)) return false;
+        }
+        return true;
     }
 
-    private bool ValidateMapValues(CelType declared, CelValue mapValue, int depth)
+    private bool ValidateMapValues(CelType declared, CelValue mapValue, int depth, ref int nodeCount)
     {
         var map = mapValue.AsMap();
         if (map.Count > MaxValidationCollectionSize) return false;
         if (declared.ValueType is null) return true;
-        return map.Values.All(v => ValueMatchesType(declared.ValueType, v, depth));
+
+        foreach (var v in map.Values)
+        {
+            if (!ValueMatchesType(declared.ValueType, v, depth, ref nodeCount)) return false;
+        }
+        return true;
     }
 
-    private bool ValidateObjectValue(CelType declared, CelObjectValue obj, int depth)
+    private bool ValidateObjectValue(CelType declared, CelObjectValue obj, int depth, ref int nodeCount)
     {
         if (obj.ObjectTypeId != declared.SchemaId) return false;
         if (obj.Members.Count > MaxValidationCollectionSize) return false;
@@ -160,7 +195,7 @@ public sealed class CelEvaluationContextBuilder
         foreach (var memberDef in objSchema.Members)
         {
             if (!obj.Members.TryGetValue(memberDef.Name, out var memberValue)) return false;
-            if (!ValueMatchesType(memberDef.Type, memberValue, depth)) return false;
+            if (!ValueMatchesType(memberDef.Type, memberValue, depth, ref nodeCount)) return false;
         }
         return true;
     }

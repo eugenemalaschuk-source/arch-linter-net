@@ -22,13 +22,27 @@ public sealed class CelObjectValue
     /// Creates a new <see cref="CelObjectValue"/> with the given type identifier and members.
     /// Defensively copies <paramref name="members"/> so the caller cannot mutate the value after construction.
     /// </summary>
+    /// <exception cref="ArgumentException">
+    /// <paramref name="members"/> contains a null value. Profile v1 defines no null CEL value.
+    /// </exception>
     public CelObjectValue(string objectTypeId, IReadOnlyDictionary<string, CelValue> members)
     {
         if (string.IsNullOrWhiteSpace(objectTypeId))
             throw new ArgumentException("Object type ID must not be null or whitespace.", nameof(objectTypeId));
         ArgumentNullException.ThrowIfNull(members);
+
+        var copy = new Dictionary<string, CelValue>(members.Count, StringComparer.Ordinal);
+        foreach (var (key, memberValue) in members)
+        {
+            if (memberValue is null)
+                throw new ArgumentException(
+                    "Object member values must not be null. Profile v1 defines no null CEL value.",
+                    nameof(members));
+            copy[key] = memberValue;
+        }
+
         ObjectTypeId = objectTypeId;
-        Members = new Dictionary<string, CelValue>(members, StringComparer.Ordinal).AsReadOnly();
+        Members = copy.AsReadOnly();
     }
 
     /// <inheritdoc/>
