@@ -91,17 +91,22 @@ public sealed class CelValue
 
     private static bool IsWellFormedUtf16(string value)
     {
-        for (var i = 0; i < value.Length; i++)
+        var i = 0;
+        while (i < value.Length)
         {
             var c = value[i];
             if (char.IsHighSurrogate(c))
             {
                 if (i + 1 >= value.Length || !char.IsLowSurrogate(value[i + 1])) return false;
-                i++;
+                i += 2;
             }
             else if (char.IsLowSurrogate(c))
             {
                 return false;
+            }
+            else
+            {
+                i++;
             }
         }
         return true;
