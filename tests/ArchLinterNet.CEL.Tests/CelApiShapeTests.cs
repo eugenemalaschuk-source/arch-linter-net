@@ -426,7 +426,7 @@ public sealed class CelApiShapeTests
     public void CelEnvironment_Compile_ReturnsNotYetImplemented()
     {
         var env = BuildSimpleEnvironment();
-        var result = env.Compile("source + '_suffix'");
+        var result = env.Compile("source == '_suffix'");
 
         Assert.That(result, Is.Not.Null);
         Assert.That(result.IsSuccess, Is.False);

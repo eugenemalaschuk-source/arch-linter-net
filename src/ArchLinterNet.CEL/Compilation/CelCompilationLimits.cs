@@ -42,20 +42,19 @@ public sealed class CelCompilationLimits
 
     /// <summary>
     /// Gets the maximum number of tokens the tokenizer may produce for a single expression.
-    /// Reserved: not yet enforced until the tokenizer (#325) lands.
     /// </summary>
     public int MaxTokenCount { get; }
 
     /// <summary>
     /// Gets the maximum number of AST nodes the parser may produce for a single expression.
-    /// Reserved: not yet enforced until the parser (#325) lands.
     /// </summary>
     public int MaxAstNodeCount { get; }
 
     /// <summary>
-    /// Gets the maximum size (in UTF-16 characters, for string literals; in element count, for
-    /// list/map literals) of any single literal accepted in source. Reserved: not yet enforced
-    /// until the parser (#325) lands.
+    /// Gets the maximum size (in UTF-16 characters, for string/byte-string literals; in element
+    /// count, for list/map/message literals — the latter deferred by Profile v1, but their
+    /// syntax is still validated and element-count-bounded before being reported as
+    /// <c>UnsupportedFeature</c>) of any single literal accepted in source.
     /// </summary>
     public int MaxLiteralSize { get; }
 
