@@ -233,7 +233,7 @@ Profile v1 SHALL support the following string and map receiver functions: `start
 
 The complete compilation-time budget surface that #325 (tokenizer/parser) and #326 (binder/checker) SHALL enforce comprises, at minimum: maximum expression source length in UTF-16 characters (`MaxExpressionLength`, already present); maximum token count produced by the tokenizer (`MaxTokenCount`); maximum AST node count produced by parsing (`MaxAstNodeCount`); maximum sub-expression nesting depth (`MaxNestingDepth`, already present); maximum literal size — the longest string/collection literal accepted in source (`MaxLiteralSize`); maximum distinct identifier references (`MaxIdentifierCount`, already present). Each of these limits SHALL be a positive-only field on `CelCompilationLimits`, SHALL be included as a named component of `CelCompilationLimits.ComputeIdentity()`, and a source exceeding any one of them SHALL produce a `BudgetExceeded` diagnostic before further processing of that phase. `MaxExpressionLength` remains the cheapest, first-checked gate (rejecting oversized source before tokenization even begins); the token/AST/literal limits are checked as each corresponding phase runs. Fields for limits not yet enforced by a landed phase (#325/#326 pending) SHALL still exist on `CelCompilationLimits` so the API shape does not change once those phases ship — an unenforced field SHALL be documented as "reserved, not yet enforced" in its XML doc until the enforcing phase lands.
 
-The complete evaluation-time budget surface that #327 (evaluator) SHALL enforce comprises, at minimum: maximum evaluation steps (`MaxIterations`, already present); maximum accumulated abstract cost units (`MaxCostUnits`, already present); maximum input-value structural depth accepted by `CelEvaluationContextBuilder.Set()` (already enforced pre-evaluator via `MaxValidationDepth`, an internal constant — not yet a public per-environment field); maximum input collection size (element/entry count) accepted by `Set()` for `List`/`Map` values. Exceeding any evaluation-time limit SHALL produce a failed `CelEvaluationResult` with a `BudgetExceeded` diagnostic, not a CLR exception, except where the limit is enforced synchronously inside `Set()` (structural depth, collection size) — those SHALL continue to be reported as `ArgumentException` per the "Immutable context schema and schema-bound activation" requirement, since `Set()` is a builder-time programmer-facing call, not an evaluation call.
+The complete evaluation-time budget surface that #327 (evaluator) SHALL enforce comprises, at minimum: maximum evaluation steps (`MaxIterations`, already present); maximum accumulated abstract cost units (`MaxCostUnits`, already present); maximum input-value structural depth accepted by `CelEvaluationContextBuilder.Set()` (already enforced pre-evaluator via `MaxValidationDepth`, an internal constant — not yet a public per-environment field); maximum input collection size (element/entry count) accepted by `Set()` for `List`/`Map`/`Object` values (already enforced pre-evaluator via `MaxValidationCollectionSize`, an internal constant — not yet a public per-environment field). Exceeding any evaluation-time limit SHALL produce a failed `CelEvaluationResult` with a `BudgetExceeded` diagnostic, not a CLR exception, except where the limit is enforced synchronously inside `Set()` (structural depth, collection size) — those SHALL continue to be reported as `ArgumentException` per the "Immutable context schema and schema-bound activation" requirement, since `Set()` is a builder-time programmer-facing call, not an evaluation call.
 
 #### Scenario: SafeDefaults factories are accessible
 
@@ -250,6 +250,17 @@ The complete evaluation-time budget surface that #327 (evaluator) SHALL enforce 
 - **WHEN** `CelCompilationLimits.ComputeIdentity()` is called
 - **THEN** the returned string changes if any field on `CelCompilationLimits` changes
 - **AND** two `CelCompilationLimits` instances with identical field values produce identical identity strings
+
+#### Scenario: Set() rejects a list exceeding the collection-size limit
+
+- **WHEN** `CelEvaluationContextBuilder.Set()` is called with a `List` value whose element count exceeds the internal collection-size limit
+- **THEN** an `ArgumentException` is thrown
+- **AND** no CPU time is spent validating individual elements beyond the size check
+
+#### Scenario: Set() rejects a map exceeding the collection-size limit
+
+- **WHEN** `CelEvaluationContextBuilder.Set()` is called with a `Map` value whose entry count exceeds the internal collection-size limit
+- **THEN** an `ArgumentException` is thrown
 
 ### Requirement: Cache identity is deterministic and caller-owned
 

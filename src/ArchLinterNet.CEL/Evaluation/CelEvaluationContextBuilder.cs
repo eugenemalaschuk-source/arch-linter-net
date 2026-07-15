@@ -12,9 +12,11 @@ public sealed class CelEvaluationContextBuilder
     private readonly IReadOnlyDictionary<string, CelObjectSchema>? _objectSchemas;
     private readonly Dictionary<CelVariable, CelValue> _assignments = new(ReferenceEqualityComparer.Instance);
 
-    // Cap structural validation depth so deeply-nested CelValues cannot cause stack overflow
-    // or unbounded CPU use via the public Set() path before any evaluation limits apply.
+    // Cap structural validation depth and collection size so deeply-nested or extremely large
+    // CelValues cannot cause stack overflow or unbounded CPU use via the public Set() path
+    // before any evaluation limits apply.
     private const int MaxValidationDepth = 16;
+    private const int MaxValidationCollectionSize = 1024;
 
     internal CelEvaluationContextBuilder(
         CelContextSchema schema,
@@ -94,19 +96,24 @@ public sealed class CelEvaluationContextBuilder
 
     private bool ValidateListElements(CelType declared, CelValue listValue, int depth)
     {
+        var elements = listValue.AsList();
+        if (elements.Count > MaxValidationCollectionSize) return false;
         if (declared.ElementType is null) return true;
-        return listValue.AsList().All(el => ValueMatchesType(declared.ElementType, el, depth));
+        return elements.All(el => ValueMatchesType(declared.ElementType, el, depth));
     }
 
     private bool ValidateMapValues(CelType declared, CelValue mapValue, int depth)
     {
+        var map = mapValue.AsMap();
+        if (map.Count > MaxValidationCollectionSize) return false;
         if (declared.ValueType is null) return true;
-        return mapValue.AsMap().Values.All(v => ValueMatchesType(declared.ValueType, v, depth));
+        return map.Values.All(v => ValueMatchesType(declared.ValueType, v, depth));
     }
 
     private bool ValidateObjectValue(CelType declared, CelObjectValue obj, int depth)
     {
         if (obj.ObjectTypeId != declared.SchemaId) return false;
+        if (obj.Members.Count > MaxValidationCollectionSize) return false;
 
         if (_objectSchemas is null || !_objectSchemas.TryGetValue(obj.ObjectTypeId, out var objSchema))
             return true;

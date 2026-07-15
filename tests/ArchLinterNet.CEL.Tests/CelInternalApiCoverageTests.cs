@@ -292,6 +292,57 @@ public sealed class CelInternalApiCoverageTests
             "Set() must reject values that exceed the maximum structural validation depth.");
     }
 
+    // ── Collection-size limit prevents unbounded CPU use via public Set() ────
+
+    [Test]
+    public void CelEvaluationContextBuilder_OversizedList_FailsValidation()
+    {
+        // 1025 elements exceeds MaxValidationCollectionSize (1024).
+        var oversized = CelValue.List(Enumerable.Range(0, 1025).Select(i => CelValue.Int(i)).ToList());
+
+        var schemaBuilder = CelContextSchema.CreateBuilder("ctx");
+        var handle = schemaBuilder.AddVariable("v", CelType.ListOf(CelType.Int));
+        var schema = schemaBuilder.Build();
+
+        Assert.That(
+            () => schema.CreateEvaluationContextBuilder().Set(handle, oversized),
+            Throws.ArgumentException,
+            "Set() must reject list values that exceed the maximum collection size.");
+    }
+
+    [Test]
+    public void CelEvaluationContextBuilder_OversizedMap_FailsValidation()
+    {
+        // 1025 entries exceeds MaxValidationCollectionSize (1024).
+        var entries = Enumerable.Range(0, 1025)
+            .ToDictionary(i => i.ToString(), i => CelValue.Int(i));
+        var oversized = CelValue.Map(entries);
+
+        var schemaBuilder = CelContextSchema.CreateBuilder("ctx");
+        var handle = schemaBuilder.AddVariable("v", CelType.MapOf(CelType.Int));
+        var schema = schemaBuilder.Build();
+
+        Assert.That(
+            () => schema.CreateEvaluationContextBuilder().Set(handle, oversized),
+            Throws.ArgumentException,
+            "Set() must reject map values that exceed the maximum collection size.");
+    }
+
+    [Test]
+    public void CelEvaluationContextBuilder_ListAtSizeLimit_PassesValidation()
+    {
+        // Exactly 1024 elements is within MaxValidationCollectionSize.
+        var atLimit = CelValue.List(Enumerable.Range(0, 1024).Select(i => CelValue.Int(i)).ToList());
+
+        var schemaBuilder = CelContextSchema.CreateBuilder("ctx");
+        var handle = schemaBuilder.AddVariable("v", CelType.ListOf(CelType.Int));
+        var schema = schemaBuilder.Build();
+
+        Assert.That(
+            () => schema.CreateEvaluationContextBuilder().Set(handle, atLimit),
+            Throws.Nothing);
+    }
+
     // ── Helpers ──────────────────────────────────────────────────────────────
 
     private static CelContextSchema BuildSimpleSchema()
