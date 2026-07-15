@@ -38,55 +38,57 @@ internal static class CelTokenizer
                 break;
             }
 
-            var start = pos;
-            var c = source[pos];
-            CelToken? token;
-            CelDiagnostic? error;
-
-            if (TryMatchStringPrefix(source, pos, out var prefixIsRaw, out var prefixIsBytes, out var prefixLength))
-            {
-                pos += prefixLength;
-                (token, error) = LexString(source, ref pos, start, isRaw: prefixIsRaw, isBytes: prefixIsBytes, profileId);
-            }
-            else if (c is '\'' or '"')
-            {
-                (token, error) = LexString(source, ref pos, start, isRaw: false, isBytes: false, profileId);
-            }
-            else if (IsAsciiDigit(c) || (c == '.' && pos + 1 < source.Length && IsAsciiDigit(source[pos + 1])))
-            {
-                (token, error) = LexNumber(source, ref pos, profileId);
-            }
-            else if (IsIdentifierStart(c))
-            {
-                (token, error) = LexIdentifierOrKeyword(source, ref pos);
-            }
-            else
-            {
-                (token, error) = LexPunctuation(source, ref pos, profileId);
-            }
-
+            var (token, error) = LexNextToken(source, ref pos, profileId);
             if (error is not null)
                 return CelTokenizeResult.Failed(error);
-            if (token is null)
-                return CelTokenizeResult.Failed(CelParseDiagnostics.SyntaxError(
-                    new CelSourceSpan(start, start + 1), $"Unexpected character '{c}'.", profileId));
 
-            if (token.Kind is CelTokenKind.StringLiteral or CelTokenKind.BytesLiteral
-                && token.StringValue is not null && token.StringValue.Length > limits.MaxLiteralSize)
-            {
-                return CelTokenizeResult.Failed(CelParseDiagnostics.BudgetExceeded(
-                    token.Span, "MaxLiteralSize", token.StringValue.Length, profileId));
-            }
+            var budgetError = CheckTokenBudgets(token!, tokens.Count, limits, profileId);
+            if (budgetError is not null)
+                return CelTokenizeResult.Failed(budgetError);
 
-            tokens.Add(token);
-            if (tokens.Count > limits.MaxTokenCount)
-            {
-                return CelTokenizeResult.Failed(CelParseDiagnostics.BudgetExceeded(
-                    token.Span, "MaxTokenCount", tokens.Count, profileId));
-            }
+            tokens.Add(token!);
         }
 
         return CelTokenizeResult.Success(tokens);
+    }
+
+    /// <summary>Dispatches to the right lexer for the token starting at <paramref name="pos"/>. Every branch returns exactly one of token/error non-null.</summary>
+    private static (CelToken?, CelDiagnostic?) LexNextToken(string source, ref int pos, CelProfileId profileId)
+    {
+        var start = pos;
+        var c = source[pos];
+
+        if (TryMatchStringPrefix(source, pos, out var prefixIsRaw, out var prefixIsBytes, out var prefixLength))
+        {
+            pos += prefixLength;
+            return LexString(source, ref pos, start, isRaw: prefixIsRaw, isBytes: prefixIsBytes, profileId);
+        }
+
+        if (c is '\'' or '"')
+            return LexString(source, ref pos, start, isRaw: false, isBytes: false, profileId);
+
+        if (IsAsciiDigit(c) || (c == '.' && pos + 1 < source.Length && IsAsciiDigit(source[pos + 1])))
+            return LexNumber(source, ref pos, profileId);
+
+        if (IsIdentifierStart(c))
+            return LexIdentifierOrKeyword(source, ref pos);
+
+        return LexPunctuation(source, ref pos, profileId);
+    }
+
+    private static CelDiagnostic? CheckTokenBudgets(CelToken token, int tokenCountBeforeThis, CelCompilationLimits limits, CelProfileId profileId)
+    {
+        if (token.Kind is CelTokenKind.StringLiteral or CelTokenKind.BytesLiteral
+            && token.StringValue is not null && token.StringValue.Length > limits.MaxLiteralSize)
+        {
+            return CelParseDiagnostics.BudgetExceeded(token.Span, "MaxLiteralSize", token.StringValue.Length, profileId);
+        }
+
+        var newCount = tokenCountBeforeThis + 1;
+        if (newCount > limits.MaxTokenCount)
+            return CelParseDiagnostics.BudgetExceeded(token.Span, "MaxTokenCount", newCount, profileId);
+
+        return null;
     }
 
     private static void SkipWhitespaceAndComments(string source, ref int pos)
@@ -193,9 +195,21 @@ internal static class CelTokenizer
         if (source[pos] == '0' && pos + 1 < source.Length && source[pos + 1] is 'x' or 'X')
             return LexHexInteger(source, ref pos, start, profileId);
 
-        var sawDot = false;
-        var sawExp = false;
+        var sawDot = ConsumeDecimalDigitsAndOptionalDot(source, ref pos);
+        var sawExp = TryConsumeExponent(source, ref pos);
 
+        var span = new CelSourceSpan(start, pos);
+        var text = source[start..pos];
+
+        return sawDot || sawExp
+            ? BuildFloatToken(text, span, profileId)
+            : BuildIntOrUintToken(source, ref pos, start, text, span, profileId);
+    }
+
+    /// <summary>Consumes the integer part and, if present, a well-formed decimal point + fractional digits. Returns whether a decimal point was consumed.</summary>
+    private static bool ConsumeDecimalDigitsAndOptionalDot(string source, ref int pos)
+    {
+        var sawDot = false;
         if (source[pos] == '.')
         {
             sawDot = true;
@@ -207,40 +221,46 @@ internal static class CelTokenizer
 
         // The pinned grammar requires at least one digit after the decimal point
         // (DIGIT+ "." DIGIT+ | DIGIT* "." DIGIT+) — "3." alone is not a valid FLOAT_LIT.
-        if (!sawDot && pos < source.Length && source[pos] == '.'
-            && pos + 1 < source.Length && IsAsciiDigit(source[pos + 1]))
-        {
-            sawDot = true;
+        if (sawDot || pos >= source.Length || source[pos] != '.' || pos + 1 >= source.Length || !IsAsciiDigit(source[pos + 1]))
+            return sawDot;
+
+        pos++;
+        while (pos < source.Length && IsAsciiDigit(source[pos]))
             pos++;
-            while (pos < source.Length && IsAsciiDigit(source[pos]))
-                pos++;
-        }
+        return true;
+    }
 
-        if (pos < source.Length && source[pos] is 'e' or 'E')
-        {
-            var save = pos;
+    /// <summary>Consumes a well-formed exponent suffix (<c>[eE][+-]?DIGIT+</c>), backtracking if malformed. Returns whether one was consumed.</summary>
+    private static bool TryConsumeExponent(string source, ref int pos)
+    {
+        if (pos >= source.Length || source[pos] is not ('e' or 'E'))
+            return false;
+
+        var save = pos;
+        pos++;
+        if (pos < source.Length && source[pos] is '+' or '-')
             pos++;
-            if (pos < source.Length && source[pos] is '+' or '-')
-                pos++;
-            var digitsStart = pos;
-            while (pos < source.Length && IsAsciiDigit(source[pos]))
-                pos++;
-            if (pos > digitsStart)
-                sawExp = true;
-            else
-                pos = save;
-        }
+        var digitsStart = pos;
+        while (pos < source.Length && IsAsciiDigit(source[pos]))
+            pos++;
 
-        var span = new CelSourceSpan(start, pos);
-        var text = source[start..pos];
+        if (pos > digitsStart)
+            return true;
 
-        if (sawDot || sawExp)
-        {
-            if (!double.TryParse(text, NumberStyles.Float, CultureInfo.InvariantCulture, out var dval))
-                return (null, CelParseDiagnostics.SyntaxError(span, "Malformed floating-point literal.", profileId));
-            return (new CelToken(CelTokenKind.FloatLiteral, span, text, floatValue: dval), null);
-        }
+        pos = save;
+        return false;
+    }
 
+    private static (CelToken?, CelDiagnostic?) BuildFloatToken(string text, CelSourceSpan span, CelProfileId profileId)
+    {
+        if (!double.TryParse(text, NumberStyles.Float, CultureInfo.InvariantCulture, out var dval))
+            return (null, CelParseDiagnostics.SyntaxError(span, "Malformed floating-point literal.", profileId));
+        return (new CelToken(CelTokenKind.FloatLiteral, span, text, floatValue: dval), null);
+    }
+
+    private static (CelToken?, CelDiagnostic?) BuildIntOrUintToken(
+        string source, ref int pos, int start, string text, CelSourceSpan span, CelProfileId profileId)
+    {
         var isUnsigned = false;
         if (pos < source.Length && source[pos] is 'u' or 'U')
         {
@@ -460,57 +480,41 @@ internal static class CelTokenizer
             case '*': return (Simple(CelTokenKind.Star, start, pos, "*"), null);
             case '/': return (Simple(CelTokenKind.Slash, start, pos, "/"), null);
             case '%': return (Simple(CelTokenKind.Percent, start, pos, "%"), null);
-            case '!':
-                if (pos < source.Length && source[pos] == '=')
-                {
-                    pos++;
-                    return (Simple(CelTokenKind.NotEq, start, pos, "!="), null);
-                }
-
-                return (Simple(CelTokenKind.Bang, start, pos, "!"), null);
-            case '=':
-                if (pos < source.Length && source[pos] == '=')
-                {
-                    pos++;
-                    return (Simple(CelTokenKind.EqEq, start, pos, "=="), null);
-                }
-
-                return (null, CelParseDiagnostics.SyntaxError(new CelSourceSpan(start, pos), "Unexpected character '='.", profileId));
-            case '<':
-                if (pos < source.Length && source[pos] == '=')
-                {
-                    pos++;
-                    return (Simple(CelTokenKind.LtEq, start, pos, "<="), null);
-                }
-
-                return (Simple(CelTokenKind.Lt, start, pos, "<"), null);
-            case '>':
-                if (pos < source.Length && source[pos] == '=')
-                {
-                    pos++;
-                    return (Simple(CelTokenKind.GtEq, start, pos, ">="), null);
-                }
-
-                return (Simple(CelTokenKind.Gt, start, pos, ">"), null);
-            case '&':
-                if (pos < source.Length && source[pos] == '&')
-                {
-                    pos++;
-                    return (Simple(CelTokenKind.AmpAmp, start, pos, "&&"), null);
-                }
-
-                return (null, CelParseDiagnostics.SyntaxError(new CelSourceSpan(start, pos), "Unexpected character '&'.", profileId));
-            case '|':
-                if (pos < source.Length && source[pos] == '|')
-                {
-                    pos++;
-                    return (Simple(CelTokenKind.PipePipe, start, pos, "||"), null);
-                }
-
-                return (null, CelParseDiagnostics.SyntaxError(new CelSourceSpan(start, pos), "Unexpected character '|'.", profileId));
+            case '!': return MatchOptionalEquals(source, ref pos, start, CelTokenKind.NotEq, "!=", CelTokenKind.Bang, "!");
+            case '=': return MatchRequiredSecondChar(source, ref pos, start, '=', CelTokenKind.EqEq, "==", profileId);
+            case '<': return MatchOptionalEquals(source, ref pos, start, CelTokenKind.LtEq, "<=", CelTokenKind.Lt, "<");
+            case '>': return MatchOptionalEquals(source, ref pos, start, CelTokenKind.GtEq, ">=", CelTokenKind.Gt, ">");
+            case '&': return MatchRequiredSecondChar(source, ref pos, start, '&', CelTokenKind.AmpAmp, "&&", profileId);
+            case '|': return MatchRequiredSecondChar(source, ref pos, start, '|', CelTokenKind.PipePipe, "||", profileId);
             default:
                 return (null, CelParseDiagnostics.SyntaxError(new CelSourceSpan(start, pos), $"Unexpected character '{c}'.", profileId));
         }
+    }
+
+    /// <summary>Matches <c>&lt;op&gt;=</c> as <paramref name="withEqualsKind"/>, falling back to the single-character <paramref name="aloneKind"/> (e.g. <c>!</c>/<c>!=</c>, <c>&lt;</c>/<c>&lt;=</c>).</summary>
+    private static (CelToken?, CelDiagnostic?) MatchOptionalEquals(
+        string source, ref int pos, int start, CelTokenKind withEqualsKind, string withEqualsText, CelTokenKind aloneKind, string aloneText)
+    {
+        if (pos < source.Length && source[pos] == '=')
+        {
+            pos++;
+            return (Simple(withEqualsKind, start, pos, withEqualsText), null);
+        }
+
+        return (Simple(aloneKind, start, pos, aloneText), null);
+    }
+
+    /// <summary>Matches a required two-character operator (e.g. <c>==</c>, <c>&amp;&amp;</c>, <c>||</c>) with no valid single-character meaning.</summary>
+    private static (CelToken?, CelDiagnostic?) MatchRequiredSecondChar(
+        string source, ref int pos, int start, char second, CelTokenKind kind, string text, CelProfileId profileId)
+    {
+        if (pos < source.Length && source[pos] == second)
+        {
+            pos++;
+            return (Simple(kind, start, pos, text), null);
+        }
+
+        return (null, CelParseDiagnostics.SyntaxError(new CelSourceSpan(start, pos), $"Unexpected character '{source[start]}'.", profileId));
     }
 
     private static CelToken Simple(CelTokenKind kind, int start, int end, string text) =>

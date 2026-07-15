@@ -337,9 +337,9 @@ internal sealed class CelParser
                 }
                 else if (Check(CelTokenKind.LBrace) && IsQualifiedNameCandidate(expr))
                 {
-                    // `IDENT ("." IDENT)* "{" ... "}"` — message literal construction. Valid CEL
-                    // syntax per the pinned grammar (only after a qualified-name-shaped receiver;
-                    // e.g. `1{}` has no such receiver and is genuinely invalid, not deferred).
+                    // Message literal construction (a qualified name followed by a brace body) is
+                    // valid CEL syntax per the pinned grammar, but only after a qualified-name-shaped
+                    // receiver — e.g. `1{}` has no such receiver and is genuinely invalid, not deferred.
                     var openBrace = Current;
                     var closeBrace = ParseBraceBody(openBrace.Span, isMessageLiteral: true);
                     var span = Merge(expr.Span, closeBrace.Span);
@@ -449,7 +449,7 @@ internal sealed class CelParser
         return Advance();
     }
 
-    private IReadOnlyList<CelSyntaxNode> ParseArguments()
+    private List<CelSyntaxNode> ParseArguments()
     {
         var args = new List<CelSyntaxNode>();
         if (Check(CelTokenKind.RParen))
@@ -495,69 +495,11 @@ internal sealed class CelParser
                 MarkDeferred(token.Span, "Byte-string literals are deferred in Profile v1.", "bytes");
                 return Track(new CelDeferredSyntax(token.Span));
             case CelTokenKind.LBrace:
-                {
-                    // Validate the brace contents before classifying as deferred — a malformed
-                    // or unterminated `{...}` is a syntax error, not deferred syntax. Standalone
-                    // "{" (no preceding qualified name) is a map literal — arbitrary-expression keys.
-                    var closeBrace = ParseBraceBody(token.Span, isMessageLiteral: false);
-                    var span = Merge(token.Span, closeBrace.Span);
-                    MarkDeferred(span, "Map/message literal syntax is deferred in Profile v1.", "map-literal");
-                    return Track(new CelDeferredSyntax(span));
-                }
-
+                return ParseMapLiteralPrimary(token);
             case CelTokenKind.LBracket:
-                {
-                    // Validate the bracket contents before classifying as deferred — a bare "["
-                    // with no valid contents (e.g. "[" alone) is a syntax error, not deferred.
-                    // Element count is bounded by MaxLiteralSize.
-                    Advance();
-                    var elementCount = 0;
-                    if (!Check(CelTokenKind.RBracket))
-                    {
-                        ParseExpression();
-                        TrackLiteralElement(token.Span, ++elementCount);
-                        while (Check(CelTokenKind.Comma))
-                        {
-                            Advance();
-                            if (Check(CelTokenKind.RBracket))
-                                break;
-                            ParseExpression();
-                            TrackLiteralElement(token.Span, ++elementCount);
-                        }
-                    }
-
-                    var closeBracket = Expect(CelTokenKind.RBracket, "']'");
-                    var span = Merge(token.Span, closeBracket.Span);
-                    MarkDeferred(span, "List literal syntax is deferred in Profile v1.", "list-literal");
-                    return Track(new CelDeferredSyntax(span));
-                }
-
+                return ParseListLiteralPrimary(token);
             case CelTokenKind.Dot:
-                {
-                    // `"." IDENT ("." IDENT)*` — root/absolute-qualified name syntax. Built using
-                    // the same node shapes as an ordinary identifier/member-access chain (rather
-                    // than an opaque placeholder) so a trailing "{" is still recognized by
-                    // IsQualifiedNameCandidate and gets full message-literal field-key validation
-                    // — see the IsQualifiedNameCandidate doc. A bare "." with no following
-                    // identifier is a syntax error, not deferred syntax.
-                    var dotToken = Advance();
-                    var nameToken = ExpectSelectorName();
-                    TrackIdentifier(nameToken.Span);
-                    CelSyntaxNode node = Track(new CelIdentifierSyntax(Merge(dotToken.Span, nameToken.Span), nameToken.Text));
-                    while (Check(CelTokenKind.Dot))
-                    {
-                        Advance();
-                        var next = ExpectSelectorName();
-                        TrackIdentifier(next.Span);
-                        node = Track(new CelMemberAccessSyntax(Merge(node.Span, next.Span), node, next.Text));
-                    }
-
-                    MarkDeferred(
-                        Merge(dotToken.Span, node.Span),
-                        "Root-qualified ('.'-prefixed) name syntax is deferred in Profile v1.", "root-qualified-name");
-                    return node;
-                }
-
+                return ParseRootQualifiedNamePrimary();
             case CelTokenKind.LParen:
                 {
                     Advance();
@@ -567,27 +509,98 @@ internal sealed class CelParser
                 }
 
             case CelTokenKind.Identifier:
-                {
-                    if (token.IsReserved)
-                        throw Fail(token.Span, $"'{token.Text}' is a reserved identifier and cannot be used as a value.");
-                    Advance();
-                    TrackIdentifier(token.Span);
-                    if (Check(CelTokenKind.LParen))
-                    {
-                        Advance();
-                        var args = ParseArguments();
-                        var closeParen = Expect(CelTokenKind.RParen, "')'");
-                        return Track(new CelCallSyntax(Merge(token.Span, closeParen.Span), null, token.Text, args));
-                    }
-
-                    return Track(new CelIdentifierSyntax(token.Span, token.Text));
-                }
-
+                return ParseIdentifierPrimary(token);
             case CelTokenKind.Eof:
                 throw Fail(token.Span, "Expected an expression but reached the end of input.");
             default:
                 throw Fail(token.Span, $"Unexpected token '{token.Text}'.");
         }
+    }
+
+    /// <summary>
+    /// Standalone <c>{</c> (no preceding qualified name) is a map literal — arbitrary-expression
+    /// keys. Validates the brace contents before classifying as deferred — a malformed or
+    /// unterminated <c>{...}</c> is a syntax error, not deferred syntax.
+    /// </summary>
+    private CelSyntaxNode ParseMapLiteralPrimary(CelToken token)
+    {
+        var closeBrace = ParseBraceBody(token.Span, isMessageLiteral: false);
+        var span = Merge(token.Span, closeBrace.Span);
+        MarkDeferred(span, "Map/message literal syntax is deferred in Profile v1.", "map-literal");
+        return Track(new CelDeferredSyntax(span));
+    }
+
+    /// <summary>
+    /// Validates the bracket contents before classifying as deferred — a bare <c>[</c> with no
+    /// valid contents (e.g. <c>[</c> alone) is a syntax error, not deferred. Element count is
+    /// bounded by <c>MaxLiteralSize</c>.
+    /// </summary>
+    private CelSyntaxNode ParseListLiteralPrimary(CelToken token)
+    {
+        Advance();
+        var elementCount = 0;
+        if (!Check(CelTokenKind.RBracket))
+        {
+            ParseExpression();
+            TrackLiteralElement(token.Span, ++elementCount);
+            while (Check(CelTokenKind.Comma))
+            {
+                Advance();
+                if (Check(CelTokenKind.RBracket))
+                    break;
+                ParseExpression();
+                TrackLiteralElement(token.Span, ++elementCount);
+            }
+        }
+
+        var closeBracket = Expect(CelTokenKind.RBracket, "']'");
+        var span = Merge(token.Span, closeBracket.Span);
+        MarkDeferred(span, "List literal syntax is deferred in Profile v1.", "list-literal");
+        return Track(new CelDeferredSyntax(span));
+    }
+
+    /// <summary>
+    /// A leading dot followed by a dotted identifier chain is root/absolute-qualified name
+    /// syntax. Built using the same node shapes as an ordinary identifier/member-access chain
+    /// (rather than an opaque placeholder) so a trailing <c>{</c> is still recognized by
+    /// <see cref="IsQualifiedNameCandidate"/> and gets full message-literal field-key validation.
+    /// A bare <c>.</c> with no following identifier is a syntax error, not deferred syntax.
+    /// </summary>
+    private CelSyntaxNode ParseRootQualifiedNamePrimary()
+    {
+        var dotToken = Advance();
+        var nameToken = ExpectSelectorName();
+        TrackIdentifier(nameToken.Span);
+        CelSyntaxNode node = Track(new CelIdentifierSyntax(Merge(dotToken.Span, nameToken.Span), nameToken.Text));
+        while (Check(CelTokenKind.Dot))
+        {
+            Advance();
+            var next = ExpectSelectorName();
+            TrackIdentifier(next.Span);
+            node = Track(new CelMemberAccessSyntax(Merge(node.Span, next.Span), node, next.Text));
+        }
+
+        MarkDeferred(
+            Merge(dotToken.Span, node.Span),
+            "Root-qualified ('.'-prefixed) name syntax is deferred in Profile v1.", "root-qualified-name");
+        return node;
+    }
+
+    private CelSyntaxNode ParseIdentifierPrimary(CelToken token)
+    {
+        if (token.IsReserved)
+            throw Fail(token.Span, $"'{token.Text}' is a reserved identifier and cannot be used as a value.");
+        Advance();
+        TrackIdentifier(token.Span);
+        if (Check(CelTokenKind.LParen))
+        {
+            Advance();
+            var args = ParseArguments();
+            var closeParen = Expect(CelTokenKind.RParen, "')'");
+            return Track(new CelCallSyntax(Merge(token.Span, closeParen.Span), null, token.Text, args));
+        }
+
+        return Track(new CelIdentifierSyntax(token.Span, token.Text));
     }
 
     private T Track<T>(T node) where T : CelSyntaxNode
@@ -630,6 +643,12 @@ internal sealed class CelParser
     private CelParseException FailBudget(CelSourceSpan span, string limitName, long observedValue) =>
         new(CelParseDiagnostics.BudgetExceeded(span, limitName, observedValue, _profileId));
 
+    [System.Diagnostics.CodeAnalysis.SuppressMessage(
+        "Design",
+        "S3871:Exception types should be \"public\"",
+        Justification = "Internal control-flow signal local to CelParser's recursive-descent " +
+            "parse; never crosses the assembly boundary and is always caught inside Parse() " +
+            "before a result is returned.")]
     private sealed class CelParseException : Exception
     {
         public CelDiagnostic Diagnostic { get; }

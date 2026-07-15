@@ -37,6 +37,14 @@ internal sealed class CelToken
     /// </summary>
     public bool IsReserved { get; }
 
+    [System.Diagnostics.CodeAnalysis.SuppressMessage(
+        "Design",
+        "S107:Methods should not have too many parameters",
+        Justification = "Lightweight internal DTO representing every lexed token kind's payload " +
+            "(int/float/bool/string value plus the reserved-identifier flag); only the fields " +
+            "relevant to Kind are ever set by a given call site, and splitting the payload into a " +
+            "separate value type would add indirection with no behavior change for a type that " +
+            "never leaves this assembly.")]
     public CelToken(
         CelTokenKind kind,
         CelSourceSpan span,
