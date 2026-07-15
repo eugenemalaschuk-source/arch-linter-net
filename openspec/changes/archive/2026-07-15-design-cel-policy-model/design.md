@@ -232,9 +232,10 @@ Why:
 ## Risks / Trade-offs
 
 - [Risk] The fact catalog is too broad for the first Core integration.
-  → Mitigation: keep the allowed locations narrow and treat the internal
-  blueprint as the source for trimming facts during #163 if any prove too
-  expensive or unavailable.
+  → Mitigation: keep the allowed locations narrow. If a fact proves too
+  expensive or unavailable during #163, implementation must stop and update
+  `cel-policy-model` through a reviewed spec change; #163 must not silently
+  trim the closed schema.
 
 - [Risk] Typed metadata bags add authoring complexity.
   → Mitigation: keep literal `metadata` selectors as the primary authoring
