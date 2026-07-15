@@ -34,6 +34,12 @@ public sealed class CelEnvironment
     public CelCompilationLimits CompilationLimits { get; }
 
     /// <summary>
+    /// Gets the environment-level evaluation limits. Per-call limits passed to
+    /// <c>Evaluate()</c> may tighten but must not exceed these maximums.
+    /// </summary>
+    public CelEvaluationLimits EvaluationLimits { get; }
+
+    /// <summary>
     /// Gets the registered object type schemas, keyed by <see cref="CelObjectSchema.ObjectTypeId"/>.
     /// The binder uses these to resolve and type-check member access expressions.
     /// </summary>
@@ -43,11 +49,13 @@ public sealed class CelEnvironment
         CelProfile profile,
         CelContextSchema schema,
         CelCompilationLimits limits,
+        CelEvaluationLimits evaluationLimits,
         IReadOnlyDictionary<string, CelObjectSchema> objectSchemas)
     {
         Profile = profile;
         Schema = schema;
         CompilationLimits = limits;
+        EvaluationLimits = evaluationLimits;
         ObjectSchemas = objectSchemas;
     }
 

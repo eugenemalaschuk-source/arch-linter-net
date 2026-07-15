@@ -12,6 +12,10 @@ public sealed class CelEvaluationContextBuilder
     private readonly IReadOnlyDictionary<string, CelObjectSchema>? _objectSchemas;
     private readonly Dictionary<CelVariable, CelValue> _assignments = new(ReferenceEqualityComparer.Instance);
 
+    // Cap structural validation depth so deeply-nested CelValues cannot cause stack overflow
+    // or unbounded CPU use via the public Set() path before any evaluation limits apply.
+    private const int MaxValidationDepth = 16;
+
     internal CelEvaluationContextBuilder(
         CelContextSchema schema,
         IReadOnlyDictionary<string, CelObjectSchema>? objectSchemas)
@@ -44,7 +48,7 @@ public sealed class CelEvaluationContextBuilder
                 $"Variable '{variable.Name}' has already been set in this context.",
                 nameof(variable));
 
-        if (!ValueMatchesType(variable.Type, value))
+        if (!ValueMatchesType(variable.Type, value, depth: 0))
             throw new ArgumentException(
                 $"Value kind {value.Kind} is not structurally compatible with variable " +
                 $"'{variable.Name}' declared as {variable.Type}.",
@@ -72,42 +76,45 @@ public sealed class CelEvaluationContextBuilder
         return new CelEvaluationContext(_schema, assignments);
     }
 
-    private bool ValueMatchesType(CelType declared, CelValue actual) =>
-        (declared.Kind, actual.Kind) switch
+    private bool ValueMatchesType(CelType declared, CelValue actual, int depth)
+    {
+        if (depth > MaxValidationDepth) return false;
+        return (declared.Kind, actual.Kind) switch
         {
             (CelTypeKind.Bool, CelValueKind.Bool) => true,
             (CelTypeKind.String, CelValueKind.String) => true,
             (CelTypeKind.Int, CelValueKind.Int) => true,
             (CelTypeKind.Float, CelValueKind.Float) => true,
-            (CelTypeKind.List, CelValueKind.List) => ValidateListElements(declared, actual),
-            (CelTypeKind.Map, CelValueKind.Map) => ValidateMapValues(declared, actual),
-            (CelTypeKind.Object, CelValueKind.Object) => ValidateObjectValue(declared, actual.AsObject()),
+            (CelTypeKind.List, CelValueKind.List) => ValidateListElements(declared, actual, depth + 1),
+            (CelTypeKind.Map, CelValueKind.Map) => ValidateMapValues(declared, actual, depth + 1),
+            (CelTypeKind.Object, CelValueKind.Object) => ValidateObjectValue(declared, actual.AsObject(), depth + 1),
             _ => false,
         };
+    }
 
-    private bool ValidateListElements(CelType declared, CelValue listValue)
+    private bool ValidateListElements(CelType declared, CelValue listValue, int depth)
     {
         if (declared.ElementType is null) return true;
         foreach (var el in listValue.AsList())
         {
-            if (!ValueMatchesType(declared.ElementType, el))
+            if (!ValueMatchesType(declared.ElementType, el, depth))
                 return false;
         }
         return true;
     }
 
-    private bool ValidateMapValues(CelType declared, CelValue mapValue)
+    private bool ValidateMapValues(CelType declared, CelValue mapValue, int depth)
     {
         if (declared.ValueType is null) return true;
         foreach (var v in mapValue.AsMap().Values)
         {
-            if (!ValueMatchesType(declared.ValueType, v))
+            if (!ValueMatchesType(declared.ValueType, v, depth))
                 return false;
         }
         return true;
     }
 
-    private bool ValidateObjectValue(CelType declared, CelObjectValue obj)
+    private bool ValidateObjectValue(CelType declared, CelObjectValue obj, int depth)
     {
         if (obj.ObjectTypeId != declared.SchemaId) return false;
 
@@ -118,7 +125,7 @@ public sealed class CelEvaluationContextBuilder
         {
             var memberDef = objSchema.Members.FirstOrDefault(m => m.Name == memberName);
             if (memberDef is null) return false;
-            if (!ValueMatchesType(memberDef.Type, memberValue)) return false;
+            if (!ValueMatchesType(memberDef.Type, memberValue, depth)) return false;
         }
         return true;
     }

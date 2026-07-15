@@ -26,6 +26,7 @@ public sealed class CelEvaluationContext
     internal CelEvaluationContext(CelContextSchema schema, IReadOnlyList<(CelVariable, CelValue)> assignments)
     {
         Schema = schema;
-        Assignments = assignments;
+        // Copy to a truly frozen list so callers cannot cast Assignments back to List<> and mutate it.
+        Assignments = new List<(CelVariable, CelValue)>(assignments).AsReadOnly();
     }
 }

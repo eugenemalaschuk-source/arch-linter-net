@@ -1,4 +1,5 @@
 using ArchLinterNet.CEL.Compilation;
+using ArchLinterNet.CEL.Evaluation;
 using ArchLinterNet.CEL.Profile;
 using ArchLinterNet.CEL.Schema;
 
@@ -12,6 +13,7 @@ public sealed class CelEnvironmentBuilder
     private readonly CelProfile _profile;
     private CelContextSchema? _schema;
     private CelCompilationLimits _limits = CelCompilationLimits.SafeDefaults;
+    private CelEvaluationLimits _evaluationLimits = CelEvaluationLimits.SafeDefaults;
     private readonly Dictionary<string, CelObjectSchema> _objectSchemas = new(StringComparer.Ordinal);
 
     internal CelEnvironmentBuilder(CelProfile profile)
@@ -32,6 +34,17 @@ public sealed class CelEnvironmentBuilder
     {
         ArgumentNullException.ThrowIfNull(limits);
         _limits = limits;
+        return this;
+    }
+
+    /// <summary>
+    /// Sets the environment-level evaluation limits (default: <see cref="CelEvaluationLimits.SafeDefaults"/>).
+    /// Per-call evaluation limits passed to <c>Evaluate()</c> may not exceed these.
+    /// </summary>
+    public CelEnvironmentBuilder WithEvaluationLimits(CelEvaluationLimits limits)
+    {
+        ArgumentNullException.ThrowIfNull(limits);
+        _evaluationLimits = limits;
         return this;
     }
 
@@ -60,7 +73,10 @@ public sealed class CelEnvironmentBuilder
         if (_schema is null)
             throw new InvalidOperationException(
                 "A context schema is required. Call WithContextSchema before Build.");
-        return new CelEnvironment(_profile, _schema, _limits,
-            new System.Collections.ObjectModel.ReadOnlyDictionary<string, CelObjectSchema>(_objectSchemas));
+        // Defensive copy: the builder must not be able to mutate an already-built environment
+        // by calling WithObjectSchema() again after Build().
+        var frozenSchemas = new System.Collections.ObjectModel.ReadOnlyDictionary<string, CelObjectSchema>(
+            new Dictionary<string, CelObjectSchema>(_objectSchemas, StringComparer.Ordinal));
+        return new CelEnvironment(_profile, _schema, _limits, _evaluationLimits, frozenSchemas);
     }
 }

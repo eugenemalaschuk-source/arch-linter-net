@@ -30,8 +30,9 @@ public sealed class CelObjectSchema
     internal CelObjectSchema(string objectTypeId, IReadOnlyList<CelObjectMember> members)
     {
         ObjectTypeId = objectTypeId;
-        Members = members;
-        Identity = ComputeIdentity(objectTypeId, members);
+        // Copy to a truly frozen list so callers cannot cast Members back to T[] and mutate it.
+        Members = new List<CelObjectMember>(members).AsReadOnly();
+        Identity = ComputeIdentity(objectTypeId, Members);
     }
 
     private static string ComputeIdentity(string objectTypeId, IReadOnlyList<CelObjectMember> members)

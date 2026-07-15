@@ -1,3 +1,4 @@
+using ArchLinterNet.CEL;
 using ArchLinterNet.CEL.Compilation;
 using ArchLinterNet.CEL.Diagnostics;
 using ArchLinterNet.CEL.Evaluation;
@@ -202,6 +203,93 @@ public sealed class CelInternalApiCoverageTests
         var span = new CelSourceSpan(3, 9);
         Assert.That(span.ToString(), Does.Contain("3"));
         Assert.That(span.ToString(), Does.Contain("9"));
+    }
+
+    // ── Builder mutation after Build() must not affect environment (Critical 3) ─
+
+    [Test]
+    public void CelEnvironmentBuilder_MutatingAfterBuild_DoesNotAffectBuiltEnvironment()
+    {
+        var schemaBuilder = CelContextSchema.CreateBuilder("s");
+        schemaBuilder.AddVariable("x", CelType.String);
+        var schema = schemaBuilder.Build();
+
+        var objSchemaA = CelObjectSchema.CreateBuilder("typeA").Build();
+
+        var builder = CelEnvironment.CreateBuilder(CelProfile.V1)
+            .WithContextSchema(schema)
+            .WithObjectSchema(objSchemaA);
+        var env = builder.Build();
+
+        // Add another object schema AFTER Build() — must not appear in the already-built env.
+        var objSchemaB = CelObjectSchema.CreateBuilder("typeB").Build();
+        builder.WithObjectSchema(objSchemaB);
+
+        Assert.That(env.ObjectSchemas, Contains.Key("typeA"));
+        Assert.That(env.ObjectSchemas, Does.Not.ContainKey("typeB"));
+    }
+
+    // ── Cast-and-mutate immutability regressions (Important 4) ───────────────
+
+    [Test]
+    public void CelContextSchema_Variables_CannotMutateThroughCast()
+    {
+        var schemaBuilder = CelContextSchema.CreateBuilder("s");
+        schemaBuilder.AddVariable("a", CelType.Bool);
+        var schema = schemaBuilder.Build();
+
+        // Variables is IReadOnlyList<CelVariable> — must NOT be castable back to List<> or T[].
+        Assert.That(schema.Variables as CelVariable[], Is.Null,
+            "Variables must not be a raw array that can be mutated via cast.");
+        Assert.That(schema.Variables as List<CelVariable>, Is.Null,
+            "Variables must not be a mutable List<> that can be mutated via cast.");
+    }
+
+    [Test]
+    public void CelObjectSchema_Members_CannotMutateThroughCast()
+    {
+        var objSchemaBuilder = CelObjectSchema.CreateBuilder("t");
+        objSchemaBuilder.AddMember("n", CelType.Int);
+        var objSchema = objSchemaBuilder.Build();
+
+        Assert.That(objSchema.Members as CelObjectMember[], Is.Null,
+            "Members must not be a raw array that can be mutated via cast.");
+        Assert.That(objSchema.Members as List<CelObjectMember>, Is.Null,
+            "Members must not be a mutable List<> that can be mutated via cast.");
+    }
+
+    [Test]
+    public void CelEvaluationContext_Assignments_CannotMutateThroughCast()
+    {
+        var schema = BuildSimpleSchema();
+        var handle = schema.Variables[0];
+        var ctx = schema.CreateEvaluationContextBuilder()
+            .Set(handle, CelValue.String("v"))
+            .Build();
+
+        Assert.That(ctx.Assignments as List<(CelVariable, CelValue)>, Is.Null,
+            "Assignments must not be a mutable List<> that can be mutated via cast.");
+    }
+
+    // ── Depth limit prevents stack overflow via public Set() ─────────────────
+
+    [Test]
+    public void CelEvaluationContextBuilder_DeeplyNestedList_FailsValidation()
+    {
+        // Build a list nested 20 levels deep — exceeds MaxValidationDepth (16).
+        var inner = CelValue.List([CelValue.Int(1)]);
+        for (var i = 0; i < 20; i++)
+            inner = CelValue.List([inner]);
+
+        var schemaBuilder = CelContextSchema.CreateBuilder("ctx");
+        var handle = schemaBuilder.AddVariable("v",
+            CelType.ListOf(CelType.ListOf(CelType.ListOf(CelType.Int))));
+        var schema = schemaBuilder.Build();
+
+        Assert.That(
+            () => schema.CreateEvaluationContextBuilder().Set(handle, inner),
+            Throws.ArgumentException,
+            "Set() must reject values that exceed the maximum structural validation depth.");
     }
 
     // ── Helpers ──────────────────────────────────────────────────────────────

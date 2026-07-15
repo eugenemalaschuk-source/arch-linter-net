@@ -33,8 +33,9 @@ public sealed class CelContextSchema
     internal CelContextSchema(string schemaId, IReadOnlyList<CelVariable> variables)
     {
         SchemaId = schemaId;
-        Variables = variables;
-        Identity = ComputeIdentity(schemaId, variables);
+        // Copy to a truly frozen list so callers cannot cast Variables back to T[] and mutate it.
+        Variables = new List<CelVariable>(variables).AsReadOnly();
+        Identity = ComputeIdentity(schemaId, Variables);
     }
 
     private static string ComputeIdentity(string schemaId, IReadOnlyList<CelVariable> variables)

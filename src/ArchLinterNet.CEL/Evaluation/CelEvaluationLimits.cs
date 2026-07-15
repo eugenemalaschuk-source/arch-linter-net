@@ -8,8 +8,9 @@ namespace ArchLinterNet.CEL.Evaluation;
 /// </summary>
 /// <remarks>
 /// <para>
-/// Per-call limits may tighten but not exceed the environment-level limits set by
-/// <see cref="CelCompilationLimits"/>. Every evaluation path is intrinsically bounded;
+/// Per-call limits may tighten but must not exceed the environment-level evaluation limits
+/// stored in <see cref="CelEnvironment.EvaluationLimits"/>. Every evaluation path is
+/// intrinsically bounded;
 /// no unbounded evaluation overload exists.
 /// </para>
 /// <para>This class is immutable and thread-safe.</para>

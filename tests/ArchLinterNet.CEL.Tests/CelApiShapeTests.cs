@@ -170,7 +170,7 @@ public sealed class CelApiShapeTests
         var env = BuildSimpleEnvironment();
         var result = env.CompilePredicate("source == 'hello'");
 
-        Assert.That(result.IsSuccess, Is.TypeOf<bool>());
+        Assert.That(result.IsSuccess, Is.False);
         Assert.That(result.Diagnostics, Is.Not.Null);
         Assert.That(result.CompilationKey, Is.Not.Null);
     }
@@ -367,7 +367,7 @@ public sealed class CelApiShapeTests
     }
 
     [Test]
-    public void CelObjectSchema_IdentityIsDeterministic()
+    public void CelObjectSchema_TwoIdenticalSchemas_HaveSameIdentity()
     {
         var builderA = CelObjectSchema.CreateBuilder("item");
         builderA.AddMember("n", CelType.String);
@@ -377,8 +377,8 @@ public sealed class CelApiShapeTests
         builderB.AddMember("n", CelType.String);
         var schemaB = builderB.Build();
 
-        Assert.That(schemaA.ObjectTypeId, Is.EqualTo(schemaB.ObjectTypeId));
-        Assert.That(schemaA.Members.Count, Is.EqualTo(schemaB.Members.Count));
+        // Identity is derived from ObjectTypeId + member names/types — must be deterministic.
+        Assert.That(schemaA.Identity, Is.EqualTo(schemaB.Identity));
     }
 
     // ── Environment with object schema ────────────────────────────────────────
@@ -561,10 +561,12 @@ public sealed class CelApiShapeTests
     [Test]
     public void CelEvaluationContextBuilder_Set_ForeignHandle_ThrowsArgumentException()
     {
+        // Build schema A — we don't need the variable handle, only the schema.
         var builderA = CelContextSchema.CreateBuilder("a");
         builderA.AddVariable("x", CelType.String);
         var schemaA = builderA.Build();
 
+        // Build schema B — we need its variable handle to prove it's foreign to schema A.
         var builderB = CelContextSchema.CreateBuilder("b");
         var handleFromB = builderB.AddVariable("x", CelType.String);
         builderB.Build();
@@ -728,6 +730,29 @@ public sealed class CelApiShapeTests
         var c = new CelSourceSpan(2, 5);
         Assert.That(a, Is.EqualTo(b));
         Assert.That(a, Is.Not.EqualTo(c));
+    }
+
+    // ── EvaluationLimits on environment ───────────────────────────────────────
+
+    [Test]
+    public void CelEnvironment_EvaluationLimits_DefaultsToSafeDefaults()
+    {
+        var env = BuildSimpleEnvironment();
+        Assert.That(env.EvaluationLimits, Is.Not.Null);
+        Assert.That(env.EvaluationLimits.MaxIterations, Is.GreaterThan(0));
+        Assert.That(env.EvaluationLimits.MaxCostUnits, Is.GreaterThan(0));
+    }
+
+    [Test]
+    public void CelEnvironmentBuilder_WithEvaluationLimits_SetsLimits()
+    {
+        var limits = new CelEvaluationLimits(maxIterations: 10, maxCostUnits: 1000);
+        var env = CelEnvironment.CreateBuilder(CelProfile.V1)
+            .WithContextSchema(BuildSimpleSchema())
+            .WithEvaluationLimits(limits)
+            .Build();
+
+        Assert.That(env.EvaluationLimits, Is.SameAs(limits));
     }
 
     // ── Helpers ──────────────────────────────────────────────────────────────

@@ -61,7 +61,7 @@ public sealed class CelExternalConsumerSampleTests
 
         // ── 4. Inspect the compilation result ─────────────────────────────────
         Assert.That(compilation, Is.Not.Null);
-        Assert.That(compilation.IsSuccess, Is.TypeOf<bool>());
+        Assert.That(compilation.IsSuccess, Is.False);
         Assert.That(compilation.Diagnostics, Is.Not.Null);
         Assert.That(compilation.CompilationKey, Is.Not.Null);
 
