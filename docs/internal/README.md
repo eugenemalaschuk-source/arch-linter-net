@@ -14,6 +14,10 @@ It is intentionally excluded from the public MkDocs/GitHub Pages product site.
 
 - [CEL engine architecture blueprint](cel-engine-architecture.md) — processing pipeline, component ownership, extension-direction matrix, and prohibited shortcuts for the `ArchLinterNet.CEL` engine (#322/#324).
 
+- [CEL policy model blueprint](cel-policy-model.md) — explicit `when` fields,
+  typed Core fact contexts, fail-closed semantics, and worked examples for the
+  future policy-expression surface (#162/#163).
+
 - [Policy import format draft](policy-import-format-draft.md) - approved format decisions implemented by issue #281.
 
 - [Policy import architecture and implementation reference](policy-import-architecture.md) - resolver/composer/provenance boundaries and the #281/#282 test matrix.

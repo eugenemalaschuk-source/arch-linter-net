@@ -53,6 +53,16 @@ type (framework/BCL types, primitives, etc.) can never match any selector and is
 mirroring how the existing `allow_only` family only considers references already inside a declared
 layer.
 
+## Reserved CEL predicates
+
+The reviewed CEL policy model for issue #162 defines future explicit `when`
+fields for contextual `source`/`allowed`/`exclude` selectors. Those fields are
+**not implemented yet** and must remain fail-closed until issue #163 lands.
+
+If introduced later, the rule stays the same as everywhere else in the model:
+existing selector fields remain literal and only an explicit `when` field may
+carry a CEL predicate.
+
 ## Exclude vs. allowed vs. ignored_violations
 
 Three mechanisms interact, applied in this order:
