@@ -453,6 +453,47 @@ public sealed class CelParserTests
     }
 
     [Test]
+    public void ConditionalOperator_WithArithmeticInTrueBranch_IsUnsupportedFeature()
+    {
+        // The true branch must be fully validated (including any arithmetic it contains) via
+        // the real grammar, not a truncated ParseOr() that would misreport this as a missing ':'.
+        var diag = ParseFail("a ? b + c : d");
+        Assert.That(diag.Code, Is.EqualTo(CelDiagnosticCode.UnsupportedFeature));
+    }
+
+    [Test]
+    public void ConditionalOperator_WithArithmeticInFalseBranch_IsUnsupportedFeature()
+    {
+        var diag = ParseFail("a ? b : c + d");
+        Assert.That(diag.Code, Is.EqualTo(CelDiagnosticCode.UnsupportedFeature));
+    }
+
+    [Test]
+    public void ConditionalOperator_WithNestedTernaryInFalseBranch_IsUnsupportedFeature()
+    {
+        // Pinned grammar: Expr = ConditionalOr ["?" ConditionalOr ":" Expr] — the false branch is
+        // the full recursive Expr, so an unparenthesized nested ternary there is valid CEL syntax.
+        var diag = ParseFail("a ? b : c ? d : e");
+        Assert.That(diag.Code, Is.EqualTo(CelDiagnosticCode.UnsupportedFeature));
+    }
+
+    [Test]
+    public void ConditionalOperator_WithUnparenthesizedNestedTernaryInTrueBranch_IsSyntaxError()
+    {
+        // The true branch is ConditionalOr only (no unparenthesized nested ternary allowed there
+        // per the grammar) — the inner '?' is not consumed, so the outer ':' expectation fails.
+        var diag = ParseFail("a ? b ? c : d : e");
+        Assert.That(diag.Code, Is.EqualTo(CelDiagnosticCode.SyntaxError));
+    }
+
+    [Test]
+    public void ConditionalOperator_WithParenthesizedNestedTernaryInTrueBranch_IsUnsupportedFeature()
+    {
+        var diag = ParseFail("a ? (b ? c : d) : e");
+        Assert.That(diag.Code, Is.EqualTo(CelDiagnosticCode.UnsupportedFeature));
+    }
+
+    [Test]
     public void NullLiteral_IsUnsupportedFeature()
     {
         var diag = ParseFail("x == null");
@@ -512,6 +553,62 @@ public sealed class CelParserTests
     public void RootQualifiedMessageLiteral_IsUnsupportedFeature()
     {
         var diag = ParseFail(".pkg.Type{field: 1}");
+        Assert.That(diag.Code, Is.EqualTo(CelDiagnosticCode.UnsupportedFeature));
+    }
+
+    [Test]
+    public void MessageLiteralWithNonIdentifierFieldKey_IsSyntaxError()
+    {
+        // Message-literal field keys must be bare identifiers (field names) — unlike map
+        // literals, an arbitrary expression key is not valid CEL for a message literal.
+        var diag = ParseFail("Type{1: 2}");
+        Assert.That(diag.Code, Is.EqualTo(CelDiagnosticCode.SyntaxError));
+    }
+
+    [Test]
+    public void MessageLiteralWithStringFieldKey_IsSyntaxError()
+    {
+        var diag = ParseFail("Type{'field': 1}");
+        Assert.That(diag.Code, Is.EqualTo(CelDiagnosticCode.SyntaxError));
+    }
+
+    [Test]
+    public void MapLiteralWithNonIdentifierKey_IsStillUnsupportedFeature()
+    {
+        // Standalone "{" (no qualified-name receiver) is a map literal — arbitrary-expression
+        // keys are valid CEL for it, unlike a message literal.
+        var diag = ParseFail("{1: 2}");
+        Assert.That(diag.Code, Is.EqualTo(CelDiagnosticCode.UnsupportedFeature));
+    }
+
+    // ── Unary prefix chains: '!'/'-' each self-chain but never mix ────────────
+
+    [Test]
+    public void MixedBangThenMinus_IsSyntaxError()
+    {
+        var diag = ParseFail("!-x");
+        Assert.That(diag.Code, Is.EqualTo(CelDiagnosticCode.SyntaxError));
+    }
+
+    [Test]
+    public void MixedMinusThenBang_IsSyntaxError()
+    {
+        var diag = ParseFail("-!x");
+        Assert.That(diag.Code, Is.EqualTo(CelDiagnosticCode.SyntaxError));
+    }
+
+    [Test]
+    public void TripleBangChain_StillParsesAsNestedNot()
+    {
+        var node = (CelUnarySyntax)ParseOk("!!!x");
+        Assert.That(node.Operand, Is.TypeOf<CelUnarySyntax>());
+        Assert.That(((CelUnarySyntax)node.Operand).Operand, Is.TypeOf<CelUnarySyntax>());
+    }
+
+    [Test]
+    public void TripleMinusChain_IsStillUnsupportedFeature()
+    {
+        var diag = ParseFail("---x");
         Assert.That(diag.Code, Is.EqualTo(CelDiagnosticCode.UnsupportedFeature));
     }
 
@@ -636,6 +733,44 @@ public sealed class CelParserTests
         var diag = ParseFail("a == b && c == d", limits);
         Assert.That(diag.Code, Is.EqualTo(CelDiagnosticCode.BudgetExceeded));
         Assert.That(diag.Parameters["limitName"], Is.EqualTo("MaxAstNodeCount"));
+    }
+
+    [Test]
+    public void MaxLiteralSize_Exceeded_ByListLiteralElementCount_ReturnsBudgetExceeded()
+    {
+        // MaxLiteralSize is documented as bounding element count for list/map literals — even
+        // though they're deferred (UnsupportedFeature), the validation pass must still respect it.
+        var limits = new CelCompilationLimits(
+            maxExpressionLength: 4096, maxNestingDepth: 32, maxIdentifierCount: 64,
+            maxTokenCount: 2048, maxAstNodeCount: 1024, maxLiteralSize: 3);
+
+        var diag = ParseFail("[1, 2, 3, 4, 5]", limits);
+        Assert.That(diag.Code, Is.EqualTo(CelDiagnosticCode.BudgetExceeded));
+        Assert.That(diag.Parameters["limitName"], Is.EqualTo("MaxLiteralSize"));
+    }
+
+    [Test]
+    public void MaxLiteralSize_Exceeded_ByMapLiteralEntryCount_ReturnsBudgetExceeded()
+    {
+        var limits = new CelCompilationLimits(
+            maxExpressionLength: 4096, maxNestingDepth: 32, maxIdentifierCount: 64,
+            maxTokenCount: 2048, maxAstNodeCount: 1024, maxLiteralSize: 2);
+
+        var diag = ParseFail("{'a': 1, 'b': 2, 'c': 3}", limits);
+        Assert.That(diag.Code, Is.EqualTo(CelDiagnosticCode.BudgetExceeded));
+        Assert.That(diag.Parameters["limitName"], Is.EqualTo("MaxLiteralSize"));
+    }
+
+    [Test]
+    public void MaxLiteralSize_Exceeded_ByMessageLiteralFieldCount_ReturnsBudgetExceeded()
+    {
+        var limits = new CelCompilationLimits(
+            maxExpressionLength: 4096, maxNestingDepth: 32, maxIdentifierCount: 64,
+            maxTokenCount: 2048, maxAstNodeCount: 1024, maxLiteralSize: 2);
+
+        var diag = ParseFail("Type{a: 1, b: 2, c: 3}", limits);
+        Assert.That(diag.Code, Is.EqualTo(CelDiagnosticCode.BudgetExceeded));
+        Assert.That(diag.Parameters["limitName"], Is.EqualTo("MaxLiteralSize"));
     }
 
     // ── profileId / category on every diagnostic ──────────────────────────────

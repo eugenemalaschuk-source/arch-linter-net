@@ -573,7 +573,17 @@ this spec:
   incomplete instance (e.g. `a +` with no right-hand operand, `a ? b` with no `:` and false
   branch, a bare `.` with no following identifier, or an unterminated `[`/`{`) SHALL be
   `SyntaxError`, since it is not valid CEL syntax to begin with — only a fully-formed but deferred
-  construct is `UnsupportedFeature`.
+  construct is `UnsupportedFeature`. This validation SHALL follow the pinned grammar's actual
+  sub-structure, not a simplified approximation: the conditional operator's true branch is
+  `ConditionalOr` precedence (an unparenthesized nested ternary there is `SyntaxError`, not
+  `UnsupportedFeature`) while its false branch is the full recursive `Expr` (an unparenthesized
+  nested ternary there is valid and SHALL also be fully validated); a message literal's field keys
+  (`IDENT ("." IDENT)* "{" field ":" value ...  "}"`) SHALL be bare identifiers, never an arbitrary
+  expression — `Type{1: 2}` and `Type{'field': 1}` are `SyntaxError`, unlike a standalone map
+  literal (`{1: 2}`) whose keys are arbitrary expressions and remains `UnsupportedFeature`.
+- A unary prefix chain (`"!" {"!"} Member` or `"-" {"-"} Member`) SHALL repeat only the same
+  operator; mixing `!` and `-` in one prefix chain (e.g. `!-x`, `-!x`) has no valid CEL
+  interpretation under the pinned grammar and SHALL be `SyntaxError`, not `UnsupportedFeature`.
 - A reserved identifier (`as`, `break`, `const`, `continue`, `else`, `for`, `function`, `if`,
   `import`, `let`, `loop`, `package`, `namespace`, `return`, `var`, `void`, `while`) used as a bare
   primary expression reference SHALL be `SyntaxError`; the same word used in member-selector
@@ -592,6 +602,16 @@ this spec:
 - An unescaped carriage return (`\r`), like an unescaped newline (`\n`), SHALL terminate a
   single/double-quoted or raw string literal with `SyntaxError` rather than being silently
   absorbed into the string's content.
+- The tokenizer SHALL recognize the combined byte-plus-raw string prefix (`br"..."`/`Br"..."`/
+  `bR"..."`/`BR"..."`, byte marker first per `BYTES_LIT : ("b"|"B") STRING_LIT` /
+  `STRING_LIT : ["r"|"R"] STRING`), not only the single-marker forms. `\u`/`\U` (Unicode
+  code-point escapes) SHALL be rejected as invalid inside a byte-string literal — they have no
+  meaning for a raw byte sequence, unlike `\x`/`\X` (byte-value escapes), which SHALL both be
+  accepted as equivalent.
+- `MaxLiteralSize` SHALL bound element/entry count during list/map/message-literal syntax
+  validation (each parsed element or `key : value` entry counted as it is validated), matching its
+  documented "element count for list/map literals" contract, in addition to the already-enforced
+  string/byte-string content-length bound.
 - The parser SHALL enforce `MaxNestingDepth` against every postfix member-access (`.selector`) or
   indexing (`[...]`) step in a chain, not only against recursive constructs like parenthesized
   sub-expressions — the public `MaxNestingDepth` documentation explicitly lists "member access
@@ -731,4 +751,54 @@ this spec:
 - **WHEN** the string literal `'a` followed by an unescaped carriage return followed by `b'` is
   tokenized
 - **THEN** tokenization fails with a `SyntaxError` diagnostic
+
+#### Scenario: A ternary's true branch containing arithmetic is fully validated, not misreported as a missing colon
+
+- **WHEN** the expression `a ? b + c : d` is parsed
+- **THEN** compilation fails with an `UnsupportedFeature` diagnostic, not a `SyntaxError` about a
+  missing `:`
+
+#### Scenario: A ternary's false branch may contain an unparenthesized nested ternary
+
+- **WHEN** the expression `a ? b : c ? d : e` is parsed
+- **THEN** compilation fails with an `UnsupportedFeature` diagnostic
+
+#### Scenario: A ternary's true branch may not contain an unparenthesized nested ternary
+
+- **WHEN** the expression `a ? b ? c : d : e` is parsed
+- **THEN** compilation fails with a `SyntaxError` diagnostic
+
+#### Scenario: A message literal field key must be a bare identifier
+
+- **WHEN** the expression `Type{1: 2}` is parsed
+- **THEN** compilation fails with a `SyntaxError` diagnostic, not `UnsupportedFeature`
+
+#### Scenario: A map literal key may be an arbitrary expression
+
+- **WHEN** the expression `{1: 2}` (standalone brace, no qualified-name receiver) is parsed
+- **THEN** compilation fails with an `UnsupportedFeature` diagnostic (still deferred, just not a
+  syntax error)
+
+#### Scenario: Mixing '!' and '-' in a unary prefix chain is a syntax error
+
+- **WHEN** the expression `!-x` is parsed
+- **THEN** compilation fails with a `SyntaxError` diagnostic, not `UnsupportedFeature`
+
+#### Scenario: A combined byte-and-raw string prefix is recognized
+
+- **WHEN** the source `br'a\nb'` is tokenized
+- **THEN** it produces a single `BytesLiteral` token whose decoded value is the four raw
+  characters `a`, `\`, `n`, `b` (escapes are not processed)
+
+#### Scenario: A Unicode escape inside a byte-string literal is rejected
+
+- **WHEN** the byte-string literal `b'A'` is tokenized
+- **THEN** tokenization fails with a `SyntaxError` diagnostic
+
+#### Scenario: MaxLiteralSize bounds list-literal element count during validation
+
+- **WHEN** `CelCompilationLimits.MaxLiteralSize` is exceeded by the number of elements in a list
+  literal being validated (e.g. `[1, 2, 3, 4, 5]` against a limit of `3`)
+- **THEN** compilation fails with a `BudgetExceeded` diagnostic carrying
+  `limitName = "MaxLiteralSize"`
 

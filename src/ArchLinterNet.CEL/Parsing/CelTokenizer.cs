@@ -43,15 +43,10 @@ internal static class CelTokenizer
             CelToken? token;
             CelDiagnostic? error;
 
-            if (IsRawStringPrefix(source, pos))
+            if (TryMatchStringPrefix(source, pos, out var prefixIsRaw, out var prefixIsBytes, out var prefixLength))
             {
-                pos++;
-                (token, error) = LexString(source, ref pos, start, isRaw: true, isBytes: false, profileId);
-            }
-            else if (IsByteStringPrefix(source, pos))
-            {
-                pos++;
-                (token, error) = LexString(source, ref pos, start, isRaw: false, isBytes: true, profileId);
+                pos += prefixLength;
+                (token, error) = LexString(source, ref pos, start, isRaw: prefixIsRaw, isBytes: prefixIsBytes, profileId);
             }
             else if (c is '\'' or '"')
             {
@@ -122,11 +117,43 @@ internal static class CelTokenizer
     // whitespace-category characters (e.g. vertical tab U+000B) the grammar does not include.
     private static bool IsWhitespace(char c) => c is '\t' or '\n' or '\f' or '\r' or ' ';
 
-    private static bool IsRawStringPrefix(string source, int pos) =>
-        (source[pos] is 'r' or 'R') && pos + 1 < source.Length && source[pos + 1] is '\'' or '"';
+    /// <summary>
+    /// Matches a string-literal prefix per the pinned grammar's
+    /// <c>BYTES_LIT : ("b"|"B") STRING_LIT</c> / <c>STRING_LIT : ["r"|"R"] STRING</c> productions:
+    /// an optional byte marker (<c>b</c>/<c>B</c>) followed by an optional raw marker
+    /// (<c>r</c>/<c>R</c>), immediately followed by the opening quote — e.g. <c>r'...'</c>,
+    /// <c>b'...'</c>, and combined <c>br'...'</c>/<c>bR'...'</c>/<c>Br'...'</c>/<c>BR'...'</c>.
+    /// The reverse order (<c>rb"..."</c>) has no lexical form in the pinned grammar and is not
+    /// matched here — it is left to fall through to <see cref="IsIdentifierStart"/> and produce
+    /// an ordinary (malformed) parse, consistent with genuinely invented syntax.
+    /// </summary>
+    private static bool TryMatchStringPrefix(string source, int pos, out bool isRaw, out bool isBytes, out int prefixLength)
+    {
+        isRaw = false;
+        isBytes = false;
+        var p = pos;
 
-    private static bool IsByteStringPrefix(string source, int pos) =>
-        (source[pos] is 'b' or 'B') && pos + 1 < source.Length && source[pos + 1] is '\'' or '"';
+        if (p < source.Length && source[p] is 'b' or 'B')
+        {
+            isBytes = true;
+            p++;
+        }
+
+        if (p < source.Length && source[p] is 'r' or 'R')
+        {
+            isRaw = true;
+            p++;
+        }
+
+        if (p > pos && p < source.Length && source[p] is '\'' or '"')
+        {
+            prefixLength = p - pos;
+            return true;
+        }
+
+        prefixLength = 0;
+        return false;
+    }
 
     // The pinned CEL grammar restricts IDENT to ASCII: [_a-zA-Z][_a-zA-Z0-9]*. char.IsLetter/
     // IsLetterOrDigit would accept Unicode letters, which is not valid CEL syntax.
@@ -289,7 +316,7 @@ internal static class CelTokenizer
 
             if (c == '\\' && !isRaw)
             {
-                var (ok, error) = AppendEscape(source, ref pos, sb, start, profileId);
+                var (ok, error) = AppendEscape(source, ref pos, sb, start, isBytes, profileId);
                 if (!ok)
                     return (null, error);
                 continue;
@@ -306,7 +333,7 @@ internal static class CelTokenizer
     }
 
     private static (bool, CelDiagnostic?) AppendEscape(
-        string source, ref int pos, System.Text.StringBuilder sb, int literalStart, CelProfileId profileId)
+        string source, ref int pos, System.Text.StringBuilder sb, int literalStart, bool isBytes, CelProfileId profileId)
     {
         pos++; // consume '\'
         if (pos >= source.Length)
@@ -327,9 +354,23 @@ internal static class CelTokenizer
             case 'b': sb.Append('\b'); pos++; return (true, null);
             case 'f': sb.Append('\f'); pos++; return (true, null);
             case 'v': sb.Append('\v'); pos++; return (true, null);
-            case 'x': return AppendHexByteEscape(source, ref pos, sb, literalStart, profileId);
-            case 'u': return AppendUnicode4Escape(source, ref pos, sb, literalStart, profileId);
-            case 'U': return AppendUnicodeEscape(source, ref pos, sb, literalStart, profileId);
+            case 'x': case 'X': return AppendHexByteEscape(source, ref pos, sb, literalStart, profileId);
+            case 'u':
+                if (isBytes)
+                {
+                    return (false, CelParseDiagnostics.SyntaxError(
+                        new CelSourceSpan(literalStart, pos + 1), "'\\u' is not a valid escape sequence in a byte-string literal.", profileId));
+                }
+
+                return AppendUnicode4Escape(source, ref pos, sb, literalStart, profileId);
+            case 'U':
+                if (isBytes)
+                {
+                    return (false, CelParseDiagnostics.SyntaxError(
+                        new CelSourceSpan(literalStart, pos + 1), "'\\U' is not a valid escape sequence in a byte-string literal.", profileId));
+                }
+
+                return AppendUnicodeEscape(source, ref pos, sb, literalStart, profileId);
             default:
                 return (false, CelParseDiagnostics.SyntaxError(
                     new CelSourceSpan(literalStart, pos + 1), $"Unknown escape sequence '\\{esc}'.", profileId));

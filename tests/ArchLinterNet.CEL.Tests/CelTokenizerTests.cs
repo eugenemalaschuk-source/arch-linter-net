@@ -186,6 +186,49 @@ public sealed class CelTokenizerTests
     }
 
     [Test]
+    public void CombinedRawByteStringLiteral_Tokenizes()
+    {
+        // BYTES_LIT : ("b"|"B") STRING_LIT ; STRING_LIT : ["r"|"R"] STRING — "br'...'" is a raw
+        // byte-string literal; escapes must not be processed.
+        var tokens = TokenizeOk(@"br'a\nb'");
+        Assert.That(tokens[0].Kind, Is.EqualTo(CelTokenKind.BytesLiteral));
+        Assert.That(tokens[0].StringValue, Is.EqualTo(@"a\nb"));
+    }
+
+    [Test]
+    public void CombinedRawByteStringLiteral_UppercaseVariant_Tokenizes()
+    {
+        var tokens = TokenizeOk("BR'abc'");
+        Assert.That(tokens[0].Kind, Is.EqualTo(CelTokenKind.BytesLiteral));
+        Assert.That(tokens[0].StringValue, Is.EqualTo("abc"));
+    }
+
+    [Test]
+    public void ByteStringLiteral_HexEscapeUppercaseX_Tokenizes()
+    {
+        var tokens = TokenizeOk(@"b'\X41'");
+        Assert.That(tokens[0].Kind, Is.EqualTo(CelTokenKind.BytesLiteral));
+        Assert.That(tokens[0].StringValue, Is.EqualTo("A"));
+    }
+
+    [Test]
+    public void ByteStringLiteral_UnicodeEscape_IsSyntaxError()
+    {
+        // \u and \U decode a Unicode code point, which has no meaning for a raw byte sequence —
+        // only \x/\X (byte-value escapes) are valid inside a byte-string literal.
+        var source = "b'" + "\\u0041" + "'";
+        var diag = TokenizeFail(source);
+        Assert.That(diag.Code, Is.EqualTo(CelDiagnosticCode.SyntaxError));
+    }
+
+    [Test]
+    public void ByteStringLiteral_LongUnicodeEscape_IsSyntaxError()
+    {
+        var diag = TokenizeFail(@"b'\U00000041'");
+        Assert.That(diag.Code, Is.EqualTo(CelDiagnosticCode.SyntaxError));
+    }
+
+    [Test]
     public void UnterminatedStringLiteral_IsSyntaxError()
     {
         var diag = TokenizeFail("'unterminated");

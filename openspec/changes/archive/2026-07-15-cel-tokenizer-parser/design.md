@@ -185,6 +185,76 @@ pinned grammar excludes both `\n` and `\r` from a normal string's character clas
 carriage return was silently absorbed into string content instead of ending the literal with
 `SyntaxError` (also caught in review); the check now covers both.
 
+### 12. The conditional operator's branches follow the grammar's actual sub-structure, not a shared simplification
+
+The pinned grammar is `Expr = ConditionalOr ["?" ConditionalOr ":" Expr]` — the true branch is
+`ConditionalOr` precedence (no unparenthesized nested ternary there), the false branch is the full
+recursive `Expr` (nested ternary IS allowed there, unparenthesized). The initial implementation
+parsed both branches with a bare `ParseOr()` call and never re-checked for trailing deferred
+arithmetic or a nested `?` before deciding `Expect(':')`/throwing — so `a ? b + c : d` (arithmetic
+in the true branch) produced a nonsensical "expected ':' but found '+'" `SyntaxError` instead of
+correctly validating the arithmetic and reporting `UnsupportedFeature`, and an incomplete false
+branch could reach the throw before its own trailing content was verified (caught in review). The
+fix: the true branch now goes through `ParseConditionalOrOperand()` (`ParseOr()` plus the same
+deferred-arithmetic-chain validation `ParseExpression()` performs, but without the nested-`?`
+check — matching `ConditionalOr` precedence exactly), and the false branch now goes through the
+real `ParseExpression()` (handling nested ternaries and arithmetic identically to a top-level
+expression, exactly as the grammar specifies).
+
+### 13. Message-literal field keys are bare identifiers; map-literal keys remain arbitrary expressions
+
+The pinned grammar distinguishes `FieldInitializerList` (message literal: `IDENT ":" value`,
+field keys are bare identifiers) from `MapInitializerList` (map literal: `key ":" value`, keys are
+arbitrary expressions) — these are syntactically different once you know which construct you're
+in, and the parser already knows: a `{` after a qualified-name-shaped receiver is unambiguously a
+message literal (`IsQualifiedNameCandidate`, decision 10), a standalone `{` is unambiguously a map
+literal. The initial implementation used the same general-expression key parser for both, wrongly
+accepting `Type{1: 2}` as well-formed deferred syntax when it is not valid CEL under any
+interpretation (caught in review). `ParseBraceEntry(isMessageLiteral)` now requires a bare
+`Identifier` token for a message-literal key and rejects anything else with `SyntaxError`, while a
+map literal's key continues to use the general expression parser.
+
+### 14. Unary prefix chains reject mixing '!' and '-'
+
+The pinned grammar's `Unary` production is `Member | "!" {"!"} Member | "-" {"-"} Member` — each
+alternative repeats only its own operator; there is no production allowing `!` and `-` to
+alternate in one prefix chain. The initial implementation's `ParseUnary()` recursed into itself
+unconditionally for both operators, so `!-x` and `-!x` were silently accepted (the inner operator
+just recursed into the outer one's handling) even though neither has any valid CEL interpretation
+(caught in review). `ParsePrefixChain(opKind)` now consumes a run of the *same* operator
+iteratively, then explicitly rejects the *other* prefix operator as `SyntaxError` before parsing
+the `Member` — `!!!x` and `---x` still work exactly as before (verified by regression tests), but
+`!-x`/`-!x` are now correctly invalid.
+
+### 15. Byte-string literals: combined `br"..."` prefix, and `\x`/`\X` only (no `\u`/`\U`)
+
+Two related lexer gaps, both caught in review. First, the pinned grammar defines
+`BYTES_LIT : ("b"|"B") STRING_LIT` and `STRING_LIT : ["r"|"R"] STRING` — a byte-string literal can
+itself have an inner raw-string prefix (`br"..."`, `Br"..."`, `bR"..."`, `BR"..."`; byte marker
+always first, since `STRING_LIT`'s raw marker is nested inside `BYTES_LIT`'s byte marker in the
+grammar, not the reverse). The initial implementation only matched a single prefix character at a
+time, so `br'...'` fell through to being lexed as a bare two-letter identifier `br` followed by an
+unrelated string token — entirely losing the byte-string meaning. `TryMatchStringPrefix` now
+matches an optional byte marker followed by an optional raw marker before the opening quote.
+Second, `\u`/`\U` (Unicode code-point escapes) were accepted unchanged inside byte-string literals
+even though a byte sequence has no Unicode code points to decode into — only `\x`/`\X` (raw byte
+value escapes) are meaningful there. `AppendEscape` now takes an `isBytes` flag and rejects `\u`/
+`\U` with `SyntaxError` when lexing a byte-string literal; `\X` (uppercase) is also now accepted as
+an alias for `\x`, matching the grammar's case-insensitive hex-escape marker.
+
+### 16. MaxLiteralSize bounds list/map/message-literal element count during validation
+
+`MaxLiteralSize`'s public doc has always promised "element count, for list/map literals," but the
+initial implementation only checked it against string/byte-string content length — the
+list/map/message-literal validation added by decision 9 never consulted it, silently accepting an
+unbounded element/entry count while still being fully bounded by `MaxTokenCount`/`MaxAstNodeCount`
+indirectly (caught in review as a documentation/implementation mismatch, not a security gap, since
+those other budgets already prevent unbounded work — but the *wrong limit* would fire, confusing
+callers who set a tight `MaxLiteralSize` expecting it to catch this case first). `TrackLiteralElement`
+now increments per parsed element (list) or entry (map/message) and throws `BudgetExceeded` with
+`limitName = "MaxLiteralSize"` the moment the count is exceeded, consistent with the documented
+contract.
+
 ## Risks / Trade-offs
 
 - Omitting triple-quoted strings and octal escapes is a real (if currently unreachable) grammar
@@ -193,6 +263,10 @@ carriage return was silently absorbed into string content instead of ending the 
 - Fail-fast diagnostics mean a source with multiple syntax problems only ever reports the first.
   Acceptable for v1's use case; would need explicit revisiting if this engine grows an
   interactive-editing/IDE consumer.
+- The reverse byte/raw prefix order (`rb"..."`) has no lexical form in the pinned grammar and is
+  intentionally not matched — it falls through to being lexed as an ordinary (malformed)
+  identifier-then-string sequence, which is correct per the grammar but may surprise a reader
+  expecting prefix-order symmetry.
 
 ## Migration Plan
 

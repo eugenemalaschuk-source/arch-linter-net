@@ -12,7 +12,7 @@ namespace ArchLinterNet.CEL.Parsing;
 /// <para>
 /// Implements the frozen precedence/associativity table from the <c>cel-profile-v1</c> spec,
 /// lowest to highest binding power: <c>||</c> &lt; <c>&amp;&amp;</c> &lt; non-associative
-/// comparisons (<c>== != &lt; &lt;= &gt; &gt;= in</c>) &lt; unary <c>!</c> &lt; postfix
+/// comparisons (<c>== != &lt; &lt;= &gt; &gt;= in</c>) &lt; unary <c>!</c>/<c>-</c> &lt; postfix
 /// member access/indexing.
 /// </para>
 /// <para>
@@ -95,12 +95,16 @@ internal sealed class CelParser
 
             if (Check(CelTokenKind.Question))
             {
-                // Validate the full "? true : false" shape before classifying as deferred —
-                // "a ? b" (missing ':' and false-branch) is malformed, not deferred syntax.
+                // Pinned grammar: Expr = ConditionalOr ["?" ConditionalOr ":" Expr]. The true
+                // branch is at ConditionalOr precedence (no unparenthesized nested ternary), the
+                // false branch is the full recursive Expr (nested ternary IS allowed there).
+                // Both must be fully validated (including any arithmetic they contain) before
+                // classifying the whole thing as deferred — "a ? b" (missing ':'/false branch)
+                // is malformed, not deferred syntax.
                 var questionToken = Advance();
-                _ = ParseOr();
+                _ = ParseConditionalOrOperand();
                 Expect(CelTokenKind.Colon, "':'");
-                var falseBranch = ParseOr();
+                var falseBranch = ParseExpression();
                 throw FailUnsupported(
                     Merge(questionToken.Span, falseBranch.Span),
                     "The conditional operator ('? :') is deferred in Profile v1.", "conditional");
@@ -124,6 +128,18 @@ internal sealed class CelParser
         {
             _depth--;
         }
+    }
+
+    /// <summary>
+    /// Parses one ConditionalOr-level operand (used for the ternary's true branch), including
+    /// validating — but not yet classifying — any trailing deferred arithmetic chain.
+    /// </summary>
+    private CelSyntaxNode ParseConditionalOrOperand()
+    {
+        var expr = ParseOr();
+        if (IsDeferredBinaryOperator(Current.Kind))
+            ConsumeDeferredArithmeticChain();
+        return expr;
     }
 
     private CelSourceSpan ConsumeDeferredArithmeticChain()
@@ -210,51 +226,67 @@ internal sealed class CelParser
         CelTokenKind.Gt or CelTokenKind.GtEq or
         CelTokenKind.In;
 
+    /// <summary>
+    /// Pinned grammar: <c>Unary: Member | "!" {"!"} Member | "-" {"-"} Member</c> — a unary
+    /// prefix chain may repeat only the SAME operator; mixing `!` and `-` (e.g. `!-x`, `-!x`) has
+    /// no valid CEL interpretation and is a syntax error, not deferred syntax.
+    /// </summary>
     private CelSyntaxNode ParseUnary()
     {
         if (Check(CelTokenKind.Bang))
-        {
-            var bangToken = Advance();
-            _depth++;
-            if (_depth > _limits.MaxNestingDepth)
-                throw FailBudget(bangToken.Span, "MaxNestingDepth", _depth);
-            try
-            {
-                var operand = ParseUnary();
-                return Track(new CelUnarySyntax(Merge(bangToken.Span, operand.Span), CelUnaryOperator.Not, operand));
-            }
-            finally
-            {
-                _depth--;
-            }
-        }
-
+            return ParsePrefixChain(CelTokenKind.Bang);
         if (Check(CelTokenKind.Minus))
-        {
-            // Unlike '+', '-' has a real unary form in the pinned CEL grammar
-            // (Unary: "-" {"-"} Member) — deferred (arithmetic) in v1, not invented syntax.
-            // A bare '-' with no valid operand following is still malformed, not deferred.
-            var minusToken = Advance();
-            _depth++;
-            if (_depth > _limits.MaxNestingDepth)
-                throw FailBudget(minusToken.Span, "MaxNestingDepth", _depth);
-            try
-            {
-                var operand = ParseUnary();
-                throw FailUnsupported(
-                    Merge(minusToken.Span, operand.Span),
-                    "Arithmetic operators (including unary '-') are deferred in Profile v1.", "arithmetic");
-            }
-            finally
-            {
-                _depth--;
-            }
-        }
+            return ParsePrefixChain(CelTokenKind.Minus);
 
         // '+' has no unary/prefix form in the pinned CEL grammar (only '!' and '-' do), and
         // '*'/'/'/'%' never have a prefix form either — encountering any of them here is always
         // invented/invalid syntax, handled by ParsePrimary's default case (SyntaxError).
         return ParsePostfix();
+    }
+
+    private CelSyntaxNode ParsePrefixChain(CelTokenKind opKind)
+    {
+        var opTokens = new List<CelToken>();
+        try
+        {
+            while (Check(opKind))
+            {
+                var opToken = Advance();
+                opTokens.Add(opToken);
+                _depth++;
+                if (_depth > _limits.MaxNestingDepth)
+                    throw FailBudget(opToken.Span, "MaxNestingDepth", _depth);
+            }
+
+            var otherOp = opKind == CelTokenKind.Bang ? CelTokenKind.Minus : CelTokenKind.Bang;
+            if (Check(otherOp))
+            {
+                throw Fail(
+                    Current.Span,
+                    $"Cannot mix '{(opKind == CelTokenKind.Bang ? "!" : "-")}' and " +
+                    $"'{(opKind == CelTokenKind.Bang ? "-" : "!")}' in a unary prefix chain.");
+            }
+
+            var operand = ParsePostfix();
+
+            if (opKind == CelTokenKind.Bang)
+            {
+                var result = operand;
+                for (var i = opTokens.Count - 1; i >= 0; i--)
+                    result = Track(new CelUnarySyntax(Merge(opTokens[i].Span, result.Span), CelUnaryOperator.Not, result));
+                return result;
+            }
+
+            // '-' has a real unary form in the pinned grammar but is deferred (arithmetic) in
+            // v1, never accepted as part of the literal — see design decision 1.
+            throw FailUnsupported(
+                Merge(opTokens[0].Span, operand.Span),
+                "Arithmetic operators (including unary '-') are deferred in Profile v1.", "arithmetic");
+        }
+        finally
+        {
+            _depth -= opTokens.Count;
+        }
     }
 
     private CelSyntaxNode ParsePostfix()
@@ -297,7 +329,8 @@ internal sealed class CelParser
                     // syntax per the pinned grammar (only after a qualified-name-shaped receiver;
                     // e.g. `1{}` has no such receiver and is genuinely invalid, not deferred).
                     // Validate the brace contents are well-formed before classifying as deferred.
-                    var closeBrace = ParseBraceBody();
+                    var openBrace = Current;
+                    var closeBrace = ParseBraceBody(openBrace.Span, isMessageLiteral: true);
                     throw FailUnsupported(
                         Merge(expr.Span, closeBrace.Span), "Message literal syntax is deferred in Profile v1.", "message-literal");
                 }
@@ -340,19 +373,30 @@ internal sealed class CelParser
         _ => false,
     };
 
-    /// <summary>Validates a <c>"{" [entry ("," entry)*] "}"</c> body (map/message literal contents) and returns the closing brace token.</summary>
-    private CelToken ParseBraceBody()
+    /// <summary>
+    /// Validates a <c>"{" [entry ("," entry)*] "}"</c> body and returns the closing brace token.
+    /// A standalone <c>{</c> (<paramref name="isMessageLiteral"/> <c>false</c>) is a map literal —
+    /// entry keys are arbitrary expressions. A <c>{</c> following a qualified-name receiver
+    /// (<paramref name="isMessageLiteral"/> <c>true</c>) is a message literal per
+    /// <c>IDENT ("." IDENT)* "{" ... "}"</c> — entry keys MUST be bare field-name identifiers, so
+    /// e.g. <c>Type{1: 2}</c> is a syntax error, not deferred syntax. Entry count is bounded by
+    /// <c>MaxLiteralSize</c>, matching its "element count for list/map literals" contract.
+    /// </summary>
+    private CelToken ParseBraceBody(CelSourceSpan openSpan, bool isMessageLiteral)
     {
         Advance(); // consume '{'
+        var entryCount = 0;
         if (!Check(CelTokenKind.RBrace))
         {
-            ParseMapOrMessageEntry();
+            ParseBraceEntry(isMessageLiteral);
+            TrackLiteralElement(openSpan, ++entryCount);
             while (Check(CelTokenKind.Comma))
             {
                 Advance();
                 if (Check(CelTokenKind.RBrace))
                     break;
-                ParseMapOrMessageEntry();
+                ParseBraceEntry(isMessageLiteral);
+                TrackLiteralElement(openSpan, ++entryCount);
             }
         }
 
@@ -360,9 +404,23 @@ internal sealed class CelParser
     }
 
     /// <summary>Validates one <c>key ":" value</c> entry. Discards the parsed nodes — only used to verify well-formedness.</summary>
-    private void ParseMapOrMessageEntry()
+    private void ParseBraceEntry(bool isMessageLiteral)
     {
-        ParseExpression();
+        if (isMessageLiteral)
+        {
+            // Message-literal field keys are bare identifiers (field names), never a general
+            // expression — `Type{1: 2}` is not valid CEL under any interpretation.
+            var fieldToken = Current;
+            if (fieldToken.Kind != CelTokenKind.Identifier)
+                throw Fail(fieldToken.Span, $"Expected a field name but found '{fieldToken.Text}'.");
+            Advance();
+            TrackIdentifier(fieldToken.Span);
+        }
+        else
+        {
+            ParseExpression();
+        }
+
         Expect(CelTokenKind.Colon, "':'");
         ParseExpression();
     }
@@ -416,8 +474,9 @@ internal sealed class CelParser
             case CelTokenKind.LBrace:
                 {
                     // Validate the brace contents before classifying as deferred — a malformed
-                    // or unterminated `{...}` is a syntax error, not deferred syntax.
-                    var closeBrace = ParseBraceBody();
+                    // or unterminated `{...}` is a syntax error, not deferred syntax. Standalone
+                    // "{" (no preceding qualified name) is a map literal — arbitrary-expression keys.
+                    var closeBrace = ParseBraceBody(token.Span, isMessageLiteral: false);
                     throw FailUnsupported(
                         Merge(token.Span, closeBrace.Span), "Map/message literal syntax is deferred in Profile v1.", "map-literal");
                 }
@@ -426,12 +485,15 @@ internal sealed class CelParser
                 {
                     // Validate the bracket contents before classifying as deferred — a bare "["
                     // with no valid contents (e.g. "[" alone) is a syntax error, not deferred.
+                    // Element count is bounded by MaxLiteralSize.
                     Advance();
                     var lastSpan = token.Span;
+                    var elementCount = 0;
                     if (!Check(CelTokenKind.RBracket))
                     {
                         var elem = ParseExpression();
                         lastSpan = elem.Span;
+                        TrackLiteralElement(token.Span, ++elementCount);
                         while (Check(CelTokenKind.Comma))
                         {
                             Advance();
@@ -439,6 +501,7 @@ internal sealed class CelParser
                                 break;
                             var next = ParseExpression();
                             lastSpan = next.Span;
+                            TrackLiteralElement(token.Span, ++elementCount);
                         }
                     }
 
@@ -518,6 +581,18 @@ internal sealed class CelParser
         _identifierCount++;
         if (_identifierCount > _limits.MaxIdentifierCount)
             throw FailBudget(span, "MaxIdentifierCount", _identifierCount);
+    }
+
+    /// <summary>
+    /// Counts one element/entry of a list/map/message literal being validated against
+    /// <see cref="CelCompilationLimits.MaxLiteralSize"/>, matching its documented "element count
+    /// for list/map literals" contract (string/bytes literals are bounded by content length
+    /// instead, in the tokenizer).
+    /// </summary>
+    private void TrackLiteralElement(CelSourceSpan span, int count)
+    {
+        if (count > _limits.MaxLiteralSize)
+            throw FailBudget(span, "MaxLiteralSize", count);
     }
 
     private static CelSourceSpan Merge(CelSourceSpan a, CelSourceSpan b) =>
