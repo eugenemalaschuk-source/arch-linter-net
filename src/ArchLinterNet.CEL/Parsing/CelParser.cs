@@ -308,14 +308,27 @@ internal sealed class CelParser
     /// parenthesization. This is deliberately tracked as explicit parse state rather than inferred
     /// from the resulting <see cref="CelSyntaxNode"/>'s shape: a parenthesized qualified name (e.g.
     /// <c>(Type)</c>) produces the exact same <see cref="CelIdentifierSyntax"/> node a bare
-    /// <c>Type</c> would, but per the pinned grammar a message literal's <c>IDENT ("." IDENT)*</c>
+    /// <c>Type</c> would, but per the pinned grammar a message literal's <c>SELECTOR ("." SELECTOR)*</c>
     /// prefix is a primary-level production, not a generic postfix step usable after any
     /// expression that happens to evaluate to an identifier shape — so <c>(Type){field: 1}</c> must
     /// be <c>SyntaxError</c> even though <c>Type{field: 1}</c> is <c>UnsupportedFeature</c>.
     /// </summary>
+    /// <remarks>
+    /// <paramref name="pendingReservedRoot"/> is non-null exactly when <c>expr</c>'s chain started
+    /// with a reserved identifier (e.g. <c>package</c>) — per the pinned grammar, a reserved word
+    /// is only valid as the root of a <c>SELECTOR ("." SELECTOR)*</c> chain that is ITSELF only
+    /// valid when it terminates in a message literal (<c>"{" fieldInits "}"</c>); it is invalid as
+    /// a plain qualified-name reference, a call, or an index target. Checking only the token
+    /// immediately following the reserved root (as an earlier fix did) is insufficient —
+    /// <c>package.Type</c> must also be rejected, not only <c>package</c> alone — so this flag is
+    /// carried through the *entire* postfix chain and only resolved once the chain is known to
+    /// have ended: cleared (satisfied) the moment a message literal is actually reached, and
+    /// checked — throwing if still set — after the loop exits with no message literal reached. See
+    /// design decision 23.
+    /// </remarks>
     private CelSyntaxNode ParsePostfix()
     {
-        var expr = ParsePrimary(out var isQualifiedNameChain);
+        var expr = ParsePrimary(out var isQualifiedNameChain, out var pendingReservedRoot);
         var chainDepth = 0;
         try
         {
@@ -360,6 +373,7 @@ internal sealed class CelParser
                     MarkDeferred(span, "Message literal syntax is deferred in Profile v1.", "message-literal");
                     expr = Track(new CelDeferredSyntax(span));
                     isQualifiedNameChain = false;
+                    pendingReservedRoot = null; // satisfied — the chain reached a message literal
                 }
                 else
                 {
@@ -370,6 +384,14 @@ internal sealed class CelParser
         finally
         {
             _depth -= chainDepth;
+        }
+
+        if (pendingReservedRoot is { } reserved)
+        {
+            throw Fail(
+                reserved.Span,
+                $"'{reserved.Text}' is a reserved identifier; it is only valid as the root of a " +
+                "message-literal type name (must be followed by a '{...}' body somewhere in the chain).");
         }
 
         return expr;
@@ -463,10 +485,14 @@ internal sealed class CelParser
         return args;
     }
 
-    /// <summary>See the <see cref="ParsePostfix"/> doc for what <paramref name="isQualifiedNameChain"/> means.</summary>
-    private CelSyntaxNode ParsePrimary(out bool isQualifiedNameChain)
+    /// <summary>
+    /// See the <see cref="ParsePostfix"/> doc for what <paramref name="isQualifiedNameChain"/> and
+    /// <paramref name="pendingReservedRoot"/> mean.
+    /// </summary>
+    private CelSyntaxNode ParsePrimary(out bool isQualifiedNameChain, out CelToken? pendingReservedRoot)
     {
         isQualifiedNameChain = false;
+        pendingReservedRoot = null;
         var token = Current;
         switch (token.Kind)
         {
@@ -499,7 +525,7 @@ internal sealed class CelParser
             case CelTokenKind.LBracket:
                 return ParseListLiteralPrimary(token);
             case CelTokenKind.Dot:
-                return ParseRootQualifiedNamePrimary(out isQualifiedNameChain);
+                return ParseRootQualifiedNamePrimary(out isQualifiedNameChain, out pendingReservedRoot);
             case CelTokenKind.LParen:
                 {
                     // isQualifiedNameChain stays false regardless of what the parenthesized
@@ -515,7 +541,7 @@ internal sealed class CelParser
                 }
 
             case CelTokenKind.Identifier:
-                return ParseIdentifierPrimary(token, out isQualifiedNameChain);
+                return ParseIdentifierPrimary(token, out isQualifiedNameChain, out pendingReservedRoot);
             case CelTokenKind.Eof:
                 throw Fail(token.Span, "Expected an expression but reached the end of input.");
             default:
@@ -575,21 +601,25 @@ internal sealed class CelParser
     /// call/message-literal/<c>MaxNestingDepth</c> handling to <c>pkg.f()</c> /
     /// <c>pkg.Type{field: 1}</c> instead of a bespoke (and previously incomplete) parallel path.
     /// A bare <c>.</c> with no following identifier is a syntax error, not deferred syntax. See
-    /// <see cref="RequireNonTerminalReservedUsage"/> for the reserved-word rule applied here.
+    /// <see cref="ParsePostfix"/>'s remarks for how a reserved <paramref name="nameToken"/>'s
+    /// validity is resolved (<paramref name="pendingReservedRoot"/> output).
     /// </summary>
-    private CelSyntaxNode ParseRootQualifiedNamePrimary(out bool isQualifiedNameChain)
+    private CelSyntaxNode ParseRootQualifiedNamePrimary(out bool isQualifiedNameChain, out CelToken? pendingReservedRoot)
     {
         var dotToken = Advance();
         var nameToken = ExpectSelectorName();
         var span = Merge(dotToken.Span, nameToken.Span);
-        RequireNonTerminalReservedUsage(nameToken, span);
+        pendingReservedRoot = nameToken.IsReserved ? nameToken : null;
         TrackIdentifier(nameToken.Span);
         MarkDeferred(span, "Root-qualified ('.'-prefixed) name syntax is deferred in Profile v1.", "root-qualified-name");
 
         if (Check(CelTokenKind.LParen))
         {
             // Root-qualified free function call, e.g. ".f(...)" — the result is a call, not a
-            // qualified name (mirrors ParseIdentifierPrimary's own call handling).
+            // qualified name (mirrors ParseIdentifierPrimary's own call handling). A reserved
+            // root immediately followed by "(" never satisfies pendingReservedRoot (only a
+            // message literal does), so this call is left to fail at the caller's chain-exit
+            // check, e.g. ".package()" — see design decision 23.
             isQualifiedNameChain = false;
             Advance();
             var args = ParseArguments();
@@ -601,36 +631,15 @@ internal sealed class CelParser
         return Track(new CelIdentifierSyntax(span, nameToken.Text));
     }
 
-    /// <summary>
-    /// A reserved identifier (e.g. <c>package</c>, <c>namespace</c>) that begins a primary
-    /// expression follows <c>cel-profile-v1</c>'s <c>IDENT = SELECTOR - RESERVED</c> /
-    /// <c>SELECTOR = identifier-regex - KEYWORD</c> distinction the same way it already applies
-    /// to schema-declared names: it is <c>SELECTOR</c>-governed (reserved words allowed) whenever
-    /// it leads into further qualification — a following <c>.</c> (another chain segment) or
-    /// <c>{</c> (a message literal) — since in that position it is a type/namespace path segment,
-    /// not a variable/function reference. It is <c>IDENT</c>-governed (reserved words rejected)
-    /// whenever nothing else consumes it further — a bare terminal reference (<c>package</c> used
-    /// as a value) or an attempted call (<c>package(...)</c>) — since those usages resolve it as
-    /// an actual variable/function name, which a reserved word can never be. This is checked via
-    /// one-token lookahead at the point the reserved identifier is consumed, before deciding
-    /// whether the caller may treat it as a call.
-    /// </summary>
-    private void RequireNonTerminalReservedUsage(CelToken nameToken, CelSourceSpan span)
-    {
-        if (!nameToken.IsReserved)
-            return;
-        if (Check(CelTokenKind.Dot) || Check(CelTokenKind.LBrace))
-            return;
-        throw Fail(span, $"'{nameToken.Text}' is a reserved identifier and cannot be used as a value.");
-    }
-
-    private CelSyntaxNode ParseIdentifierPrimary(CelToken token, out bool isQualifiedNameChain)
+    private CelSyntaxNode ParseIdentifierPrimary(CelToken token, out bool isQualifiedNameChain, out CelToken? pendingReservedRoot)
     {
         Advance();
-        RequireNonTerminalReservedUsage(token, token.Span);
+        pendingReservedRoot = token.IsReserved ? token : null;
         TrackIdentifier(token.Span);
         if (Check(CelTokenKind.LParen))
         {
+            // A reserved token here (e.g. "package(...)") never satisfies pendingReservedRoot —
+            // left to fail at the caller's chain-exit check, per design decision 23.
             isQualifiedNameChain = false; // a free-function call result is never a qualified name
             Advance();
             var args = ParseArguments();

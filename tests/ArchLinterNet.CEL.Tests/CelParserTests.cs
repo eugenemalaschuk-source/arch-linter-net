@@ -348,6 +348,45 @@ public sealed class CelParserTests
         Assert.That(diag.Code, Is.EqualTo(CelDiagnosticCode.SyntaxError));
     }
 
+    // ── A reserved-word root must terminate in a message literal, not just be
+    // ── immediately followed by '.' — a dot merely continuing the chain toward a
+    // ── call/index/plain-end is still invalid.
+
+    [Test]
+    public void ReservedWordRootedChain_WithNoMessageLiteral_IsSyntaxError()
+    {
+        var diag = ParseFail("package.Type");
+        Assert.That(diag.Code, Is.EqualTo(CelDiagnosticCode.SyntaxError));
+    }
+
+    [Test]
+    public void ReservedWordRootedChain_EndingInCall_IsSyntaxError()
+    {
+        var diag = ParseFail("package.Type()");
+        Assert.That(diag.Code, Is.EqualTo(CelDiagnosticCode.SyntaxError));
+    }
+
+    [Test]
+    public void ReservedWordRootedChain_EndingInIndex_IsSyntaxError()
+    {
+        var diag = ParseFail("package.Type[0]");
+        Assert.That(diag.Code, Is.EqualTo(CelDiagnosticCode.SyntaxError));
+    }
+
+    [Test]
+    public void RootQualifiedReservedWordRootedChain_WithNoMessageLiteral_IsSyntaxError()
+    {
+        var diag = ParseFail(".package.Type");
+        Assert.That(diag.Code, Is.EqualTo(CelDiagnosticCode.SyntaxError));
+    }
+
+    [Test]
+    public void RootQualifiedReservedWordRootedChain_EndingInCall_IsSyntaxError()
+    {
+        var diag = ParseFail(".package.Type()");
+        Assert.That(diag.Code, Is.EqualTo(CelDiagnosticCode.SyntaxError));
+    }
+
     [Test]
     public void ReservedWordAsCallNameOnReceiver_StillParses()
     {

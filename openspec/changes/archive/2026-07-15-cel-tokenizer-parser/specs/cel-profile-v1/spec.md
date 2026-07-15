@@ -86,21 +86,27 @@ this spec:
   unconsumed, and every `.member`/`[index]` step in a root-qualified chain after the leading one
   is bounded by `MaxNestingDepth` through the same mechanism a non-root-qualified chain uses.
 - A reserved identifier (see the existing `IDENT = SELECTOR - RESERVED` / `SELECTOR =
-  identifier-regex - KEYWORD` distinction) that begins a primary expression SHALL be
-  `SELECTOR`-governed (reserved words allowed) whenever it leads into further qualification — an
-  immediately following `.` (another chain segment) or `{` (a message literal) — since in that
-  position it is a type/namespace path segment, not a variable/function reference; it SHALL
-  remain `IDENT`-governed (reserved words rejected as `SyntaxError`) whenever nothing else
-  consumes it further, i.e. a bare terminal reference (`package` used as a value) or an attempted
-  call (`package(...)`), since those usages resolve it as an actual variable/function name, which
-  a reserved word can never be. This rule applies identically whether the reserved identifier is
-  root-qualified or not: `package{field: 1}`, `package.Type{field: 1}`, and
-  `.package{field: 1}` SHALL all be `UnsupportedFeature` (valid, deferred qualified-name/
-  message-literal syntax), while `package()`, `.package`, and `.package()` SHALL all be
-  `SyntaxError` (a reserved word can never be a callable name or a bare terminal reference, root-
-  qualified or not). A reserved word used as an ordinary member-selector or receiver-call name on
-  a non-reserved receiver (e.g. `x.package()`) is unaffected by this rule — it was already
-  `SELECTOR`-governed under the existing member-access requirement.
+  identifier-regex - KEYWORD` distinction) that begins a primary expression is only valid as the
+  root of a `SELECTOR ("." SELECTOR)*` chain that ITSELF terminates in a message literal
+  (`"{" fieldInits "}"`) — a reserved root is never a valid plain qualified-name reference, call
+  target, or index target on its own. This is a whole-chain requirement, not satisfied merely by
+  the token immediately following the reserved root being `.`: the parser SHALL track this as
+  pending state through the entire chain (every `.member` step the chain passes through, however
+  many segments), resolving it only once the chain is known to have ended — satisfied the moment
+  a message literal (`{...}`) is actually reached anywhere in the chain, and reported as
+  `SyntaxError` if the chain instead ends via a call, an index, or simply no further tokens, with
+  no message literal ever reached. This rule applies identically whether the reserved identifier
+  is root-qualified or not: `package{field: 1}`, `package.Type{field: 1}`,
+  `package.Type.Other{field: 1}`, and `.package{field: 1}` SHALL all be `UnsupportedFeature`
+  (valid, deferred qualified-name/message-literal syntax), while `package()`, `package.Type`,
+  `package.Type()`, `package.Type[0]`, `.package`, `.package()`, and `.package.Type` SHALL all be
+  `SyntaxError` (a reserved word can never be a callable name, an index target, or a bare/plain
+  qualified-name reference, root-qualified or not, unless the chain it roots eventually reaches a
+  message literal). A reserved word used as an ordinary member-selector or receiver-call name on a
+  non-reserved receiver (e.g. `x.package()`, `x.package`) is unaffected by this rule — it was
+  already `SELECTOR`-governed under the existing member-access requirement, and the pending-state
+  tracking above only ever originates from a reserved *root* token, never from a reserved word
+  reached partway through a chain whose root was not itself reserved.
 - The decision to classify an expression as `UnsupportedFeature` (as opposed to allowing parsing
   to continue toward a normal result) SHALL be deferred until the entire top-level expression has
   finished parsing successfully — every enclosing `(`/`[`/`{` matched with its closing
@@ -387,6 +393,37 @@ this spec:
 
 - **WHEN** the expression `x.package()` is parsed
 - **THEN** it parses successfully as a receiver call named `package` on `x`
+
+#### Scenario: A reserved-word-rooted chain with no message literal anywhere is a syntax error
+
+- **WHEN** the expression `package.Type` (no trailing `{...}`) is parsed
+- **THEN** compilation fails with a `SyntaxError` diagnostic — a `.` immediately following the
+  reserved root is not by itself sufficient; the chain must actually reach a message literal
+
+#### Scenario: A reserved-word-rooted chain ending in a call is a syntax error
+
+- **WHEN** the expression `package.Type()` is parsed
+- **THEN** compilation fails with a `SyntaxError` diagnostic
+
+#### Scenario: A reserved-word-rooted chain ending in an index is a syntax error
+
+- **WHEN** the expression `package.Type[0]` is parsed
+- **THEN** compilation fails with a `SyntaxError` diagnostic
+
+#### Scenario: A root-qualified reserved-word-rooted chain with no message literal is a syntax error
+
+- **WHEN** the expression `.package.Type` is parsed
+- **THEN** compilation fails with a `SyntaxError` diagnostic
+
+#### Scenario: A root-qualified reserved-word-rooted chain ending in a call is a syntax error
+
+- **WHEN** the expression `.package.Type()` is parsed
+- **THEN** compilation fails with a `SyntaxError` diagnostic
+
+#### Scenario: A reserved-word-rooted chain reaching a message literal through multiple segments is deferred
+
+- **WHEN** the expression `package.Type.Other{field: 1}` is parsed
+- **THEN** compilation fails with an `UnsupportedFeature` diagnostic, not `SyntaxError`
 
 #### Scenario: A message literal field key must be a bare identifier
 

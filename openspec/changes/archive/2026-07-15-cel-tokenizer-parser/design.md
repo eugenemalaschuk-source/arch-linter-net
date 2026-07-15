@@ -442,6 +442,45 @@ receiver, handled by `ParsePostfix`'s pre-existing, unchanged `ExpectSelectorNam
 unaffected, since that was never routed through either `ParseIdentifierPrimary` or
 `ParseRootQualifiedNamePrimary` to begin with.
 
+**Incomplete — see decision 23 below.** The one-token lookahead in decision 22 checks only
+whether the token *immediately following* a reserved root is `.` or `{`; it does not verify the
+chain actually *reaches* a message literal. A later review round found this insufficient:
+`package.Type` (dot follows, but the chain never reaches `{`) was wrongly accepted as a valid
+qualified-name reference, and `package.Type()`/`package.Type[0]` (dot follows, then the chain
+ends in a call/index instead of a message literal) were wrongly accepted as deferred
+root-qualified/qualified-name syntax, when the pinned grammar only permits a reserved root inside
+a chain that terminates in a message literal.
+
+### 23. A reserved-word root's validity is a whole-chain property, resolved once the chain is known to have ended
+
+Decision 22's one-token lookahead answered the wrong question: "is the *next* token `.` or `{`?"
+instead of "does this chain *eventually* reach a message literal?" A dot immediately following a
+reserved root only promises *more chain*, not that the chain will end in `{...}` — `package.Type`
+satisfies the one-token check (next token is `.`) and then simply ends, `package.Type()` and
+`package.Type[0]` satisfy it and then the chain terminates via a call/index instead. All three are
+invalid per the pinned grammar (a reserved word is only valid as a message-literal type-name
+root), but decision 22's check had already committed to "valid" after the first token and never
+revisited the decision.
+
+The fix threads a `CelToken? pendingReservedRoot` through the *entire* postfix chain (mirroring
+how `isQualifiedNameChain`, decision 20, is already threaded) rather than deciding validity
+eagerly at the root: `ParsePrimary`/`ParseIdentifierPrimary`/`ParseRootQualifiedNamePrimary` set it
+to the reserved token when the primary's root was reserved (`null` otherwise — a reserved word
+reached later via an ordinary `.member` step never sets it, since decision 22 already established
+that position is unconditionally `SELECTOR`-governed). `ParsePostfix`'s loop clears it to `null`
+the moment a message literal is actually reached (the pending requirement is satisfied) and
+otherwise carries it forward unchanged across `.member`/`.call()`/`[index]` steps. Only after the
+loop exits — meaning the chain is known to have ended, one way or another — does `ParsePostfix`
+check whether it's still non-null and throw `SyntaxError` if so. This correctly rejects
+`package.Type`, `package.Type()`, `package.Type[0]`, `.package.Type`, and `.package.Type()` while
+still accepting `package.Type{field: 1}` and arbitrarily long chains like
+`package.Type.Other{field: 1}`, since the pending flag survives however many `.member` hops occur
+before the message literal is reached.
+
+This also required correcting the OpenSpec text itself, which decision 22 had written to say an
+immediately-following `.` was sufficient — an error in the same direction as the implementation
+bug it was documenting, caught in the same review round that caught the implementation gap.
+
 ## Risks / Trade-offs
 
 - Omitting triple-quoted strings and octal escapes is a real (if currently unreachable) grammar

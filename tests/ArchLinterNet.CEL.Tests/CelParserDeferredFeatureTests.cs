@@ -203,6 +203,15 @@ public sealed class CelParserDeferredFeatureTests
     }
 
     [Test]
+    public void ReservedWordRootedMultiSegmentChain_TerminatingInMessageLiteral_IsUnsupportedFeature()
+    {
+        // The reserved root's pending-message-literal requirement must survive an arbitrarily
+        // long chain of intervening (non-reserved) ".member" steps, not just a single hop.
+        var diag = ParseFail("package.Type.Other{field: 1}");
+        Assert.That(diag.Code, Is.EqualTo(CelDiagnosticCode.UnsupportedFeature));
+    }
+
+    [Test]
     public void MaxNestingDepth_ExceededByRootQualifiedMemberChain_ReturnsBudgetExceeded()
     {
         // The links after the leading ".pkg" flow through the same EnterChainStep-tracked
