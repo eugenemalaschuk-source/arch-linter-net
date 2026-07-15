@@ -9,7 +9,7 @@ the source of truth that implementation tasks #325–#329 must satisfy.
 ## Requirements
 ### Requirement: Profile identity and CEL baseline are pinned
 
-ArchLinter CEL Profile v1 (`CelProfileId = "arch-linter/cel/v1"`) SHALL pin the normative CEL language specification at commit `59505c14f3187e6eb9684fbd3d07146f614c6148` of `https://github.com/google/cel-spec` (`doc/langdef.md` at that commit). The repository is `google/cel-spec`, not `cel-expr/cel-spec`. The profile identifier SHALL be a stable, versioned string that appears in `CelCompilationKey` and diagnostic messages. The profile SHALL NOT claim full CEL conformance; it defines a deliberate subset.
+ArchLinter CEL Profile v1 (`CelProfileId = "arch-linter/cel/v1"`) SHALL pin the normative CEL language specification at commit `59505c14f3187e6eb9684fbd3d07146f614c6148`, `doc/langdef.md`, in the canonical repository `https://github.com/cel-expr/cel-spec` (the historical address `google/cel-spec` redirects there; both resolve to the same commit). The profile identifier SHALL be a stable, versioned string that appears in `CelCompilationKey` and as a structured `profileId` parameter on compilation diagnostics. The profile SHALL NOT claim full CEL conformance; it defines a deliberate subset.
 
 #### Scenario: Profile identity is accessible from public API
 
@@ -20,6 +20,11 @@ ArchLinter CEL Profile v1 (`CelProfileId = "arch-linter/cel/v1"`) SHALL pin the 
 
 - **WHEN** a consumer inspects `CelProfile.V1`
 - **THEN** it is a non-null, immutable singleton representing the only supported profile
+
+#### Scenario: Compilation diagnostics carry the profile identifier as a structured parameter
+
+- **WHEN** a compilation produces any diagnostic
+- **THEN** `diagnostic.Parameters["profileId"]` equals `"arch-linter/cel/v1"`
 
 ### Requirement: Supported value types for Profile v1
 
@@ -42,7 +47,7 @@ Profile v1 SHALL support the following value types in `CelType`: `Bool`, `String
 
 ### Requirement: Supported operators and access forms for Profile v1
 
-Profile v1 SHALL support: logical negation (`!`); logical conjunction (`&&`) and disjunction (`||`) with CEL short-circuit semantics; equality (`==`, `!=`); ordered comparison (`<`, `<=`, `>`, `>=`); set membership (`in`); member access via dot notation; map and list indexing via bracket notation. Arithmetic expressions, conditional (`? :`), and all other CEL operators are deferred and SHALL NOT be accepted by the compiler in v1.
+Profile v1 SHALL support: logical negation (`!`); logical conjunction (`&&`) and disjunction (`||`) with CEL error-aware commutative semantics (see the logical-operator/error-semantics requirement); equality (`==`, `!=`); ordered comparison (`<`, `<=`, `>`, `>=`); set membership (`in`); member access via dot notation; map and list indexing via bracket notation. Arithmetic expressions, conditional (`? :`), and all other CEL operators are deferred and SHALL NOT be accepted by the compiler in v1.
 
 #### Scenario: Operator/access coverage is documented in Profile v1 spec
 
@@ -52,7 +57,7 @@ Profile v1 SHALL support: logical negation (`!`); logical conjunction (`&&`) and
 
 ### Requirement: Operator precedence, associativity, and per-operator type signatures are frozen
 
-Profile v1 SHALL define a single, total precedence order for every supported operator, from lowest to highest binding power: (1) `||`; (2) `&&`; (3) `==`, `!=`, `<`, `<=`, `>`, `>=`, `in` (all non-associative — the grammar SHALL NOT accept chained comparisons such as `a < b < c` without explicit parentheses); (4) unary `!` (prefix); (5) member access (`.`) and indexing (`[]`) (left-to-right). Binary logical operators (`||`, `&&`) SHALL be left-associative. Parenthesized sub-expressions SHALL override precedence. This order matches the pinned `google/cel-spec` grammar restricted to the v1 subset and SHALL NOT change without a new profile version.
+Profile v1 SHALL define a single, total precedence order for every supported operator, from lowest to highest binding power: (1) `||`; (2) `&&`; (3) `==`, `!=`, `<`, `<=`, `>`, `>=`, `in` (all non-associative — the grammar SHALL NOT accept chained comparisons such as `a < b < c` without explicit parentheses); (4) unary `!` (prefix); (5) member access (`.`) and indexing (`[]`) (left-to-right). Binary logical operators (`||`, `&&`) SHALL be left-associative. Parenthesized sub-expressions SHALL override precedence. This order matches the pinned `cel-expr/cel-spec` grammar restricted to the v1 subset and SHALL NOT change without a new profile version.
 
 Each supported operator SHALL have the following frozen type signature and static (compile-time) type-check behavior — a signature violation SHALL produce a `TypeMismatch` diagnostic at compile time, not a runtime error:
 
@@ -84,25 +89,58 @@ Each supported operator SHALL have the following frozen type signature and stati
 - **WHEN** an expression compares an `Int`-typed operand with a `Float`-typed operand using `<`
 - **THEN** compilation fails with a `TypeMismatch` diagnostic; v1 performs no implicit numeric widening
 
-### Requirement: Short-circuit, error-propagation, missing-key, and invalid-index semantics are normative
+### Requirement: Logical-operator, error-propagation, missing-key, and invalid-index semantics are normative
 
-`&&` and `||` SHALL short-circuit at evaluation time per the pinned CEL spec: for `a && b`, if `a` evaluates to `false`, `b` SHALL NOT be evaluated and the result SHALL be `false`; for `a || b`, if `a` evaluates to `true`, `b` SHALL NOT be evaluated and the result SHALL be `true`. Otherwise both operands SHALL be evaluated and combined normally. Because v1 performs full static type-checking at compile time (Requirement: "Immutable public environment and compilation lifecycle"), no operand of `&&`/`||`/`!`/comparison operators can have a type error surviving to evaluation — evaluation-time errors in v1 arise only from runtime data conditions below, not from type mismatches.
+`&&` and `||` SHALL follow the pinned CEL Language Definition's error-aware, commutative logical semantics. These are defined by **observable result**, not by evaluation order — an evaluator MAY evaluate operands in any order, may evaluate both, or may skip one, provided the observable outcome matches this table:
 
-Map indexing (`Map[key]`) and `containsKey(key)` on a key absent from the map value at evaluation time SHALL NOT throw a CLR exception. `Map[key]` on a missing key SHALL produce a failed `CelEvaluationResult` (`IsSuccess = false`) carrying a `CelDiagnostic` with code `EvaluationFailure`. `containsKey(key)` on a missing key SHALL return `CelValue.Bool(false)` (it SHALL NOT fail). List indexing (`List[index]`) with `index < 0` or `index >= size()` SHALL likewise produce a failed `CelEvaluationResult` with an `EvaluationFailure` diagnostic rather than throwing. Once evaluation of an expression has produced any `EvaluationFailure`, evaluation of that expression SHALL stop and the result SHALL be that failure — v1 does not continue evaluating and does not aggregate multiple evaluation-time failures into one result.
+For `a && b` (commutative — the table is symmetric in `a` and `b`):
+
+| One operand | Other operand | Result |
+| --- | --- | --- |
+| `false` | anything (`true`, `false`, or evaluation error) | `false` |
+| `true` | `true` | `true` |
+| `true` | evaluation error | that evaluation error |
+| evaluation error | evaluation error | an evaluation error |
+
+For `a || b` (commutative):
+
+| One operand | Other operand | Result |
+| --- | --- | --- |
+| `true` | anything (`true`, `false`, or evaluation error) | `true` |
+| `false` | `false` | `false` |
+| `false` | evaluation error | that evaluation error |
+| evaluation error | evaluation error | an evaluation error |
+
+That is: a determining operand (`false` for `&&`, `true` for `||`) absorbs an evaluation error in the other operand; an error surfaces only when the non-erroring operand does not determine the result. Concretely, with `m[k]` failing on a missing key: `false && m[k]` is `false`; `true || m[k]` is `true`; `true && m[k]` and `false || m[k]` are evaluation errors. The pinned CEL spec notes that traditional McCarthy left-to-right short-circuit is expressible via the conditional operator — which is deferred in v1 — so v1 SHALL NOT guarantee that the right operand is unevaluated; conformance tests (#328) SHALL assert observable results only.
+
+Because v1 performs full static type-checking at compile time (Requirement: "Immutable public environment and compilation lifecycle"), no operand of `&&`/`||`/`!`/comparison operators can have a type error surviving to evaluation — evaluation-time errors in v1 arise only from runtime data conditions below, not from type mismatches.
+
+Map indexing (`Map[key]`) and `containsKey(key)` on a key absent from the map value at evaluation time SHALL NOT throw a CLR exception. `Map[key]` on a missing key SHALL produce a failed `CelEvaluationResult` (`IsSuccess = false`) carrying a `CelDiagnostic` with code `EvaluationFailure`. `containsKey(key)` on a missing key SHALL return `CelValue.Bool(false)` (it SHALL NOT fail). List indexing (`List[index]`) with `index < 0` or `index >= size()` SHALL likewise produce a failed `CelEvaluationResult` with an `EvaluationFailure` diagnostic rather than throwing. Evaluation errors propagate upward through every operator and function **except** `&&`/`||` with a determining operand as defined above, which absorb them; when an error reaches the top of the expression the result is that failure — v1 does not aggregate multiple evaluation-time failures into one result.
 
 Profile v1 has no `null` value: `CelValueKind` and `CelTypeKind` do not include a null/none variant, `CelObjectSchema` members are always present with a value of their declared type, and there is no optional/nullable member concept in v1. Consequently v1 defines no null-propagation or null-coalescing semantics — every value that type-checks at compile time is guaranteed non-null at evaluation time, and "missing" is only observable for map keys and list indices (handled above), never for a declared variable or object member.
 
-#### Scenario: Logical AND short-circuits on a false left operand
+#### Scenario: Determining false operand absorbs an error in the other AND operand
 
-- **WHEN** the evaluator is implemented and `a && b` is evaluated with `a` evaluating to `CelValue.Bool(false)`
-- **THEN** `b` is not evaluated
-- **AND** the result is `CelValue.Bool(false)`
+- **WHEN** the evaluator is implemented and `a && b` is evaluated where `a` evaluates to `CelValue.Bool(false)` and `b` produces an evaluation error (e.g. a missing map key)
+- **THEN** the result is a successful `CelEvaluationResult` with value `CelValue.Bool(false)`
+- **AND** the same result is produced with the operands swapped (`b && a`)
 
-#### Scenario: Logical OR short-circuits on a true left operand
+#### Scenario: Determining true operand absorbs an error in the other OR operand
 
-- **WHEN** the evaluator is implemented and `a || b` is evaluated with `a` evaluating to `CelValue.Bool(true)`
-- **THEN** `b` is not evaluated
-- **AND** the result is `CelValue.Bool(true)`
+- **WHEN** the evaluator is implemented and `a || b` is evaluated where `a` evaluates to `CelValue.Bool(true)` and `b` produces an evaluation error
+- **THEN** the result is a successful `CelEvaluationResult` with value `CelValue.Bool(true)`
+- **AND** the same result is produced with the operands swapped (`b || a`)
+
+#### Scenario: Non-determining operand does not absorb an error
+
+- **WHEN** the evaluator is implemented and `a && b` is evaluated where `a` evaluates to `CelValue.Bool(true)` and `b` produces an evaluation error
+- **THEN** `CelEvaluationResult.IsSuccess` is `false` with an `EvaluationFailure` diagnostic
+- **AND** the analogous `a || b` case with `a` evaluating to `false` and `b` erroring also fails
+
+#### Scenario: Error-free logical evaluation combines normally
+
+- **WHEN** the evaluator is implemented and `a && b` is evaluated with both operands evaluating without error
+- **THEN** the result is `CelValue.Bool(true)` if and only if both are `true`, otherwise `CelValue.Bool(false)`
 
 #### Scenario: Missing map key produces a structured evaluation failure, not an exception
 
@@ -137,7 +175,7 @@ Profile v1 SHALL support exactly the following built-in function overloads. This
 | `startsWith` | `String` | (`String`) | `Bool` | `TypeMismatch` (wrong receiver or argument type); `BindingError` (wrong arity) |
 | `endsWith` | `String` | (`String`) | `Bool` | `TypeMismatch` (wrong receiver or argument type); `BindingError` (wrong arity) |
 | `contains` | `String` | (`String`) | `Bool` | `TypeMismatch` (wrong receiver or argument type); `BindingError` (wrong arity) |
-| `size` | `String` | () | `Int` (UTF-16 code-unit count) | `TypeMismatch` (unsupported receiver); `BindingError` (any argument supplied) |
+| `size` | `String` | () | `Int` (Unicode code-point count) | `TypeMismatch` (unsupported receiver); `BindingError` (any argument supplied) |
 | `size` | `List` | () | `Int` (element count) | `TypeMismatch` (unsupported receiver); `BindingError` (any argument supplied) |
 | `size` | `Map` | () | `Int` (entry count) | `TypeMismatch` (unsupported receiver); `BindingError` (any argument supplied) |
 | `containsKey` | `Map` | (`String`) | `Bool` | `TypeMismatch` (wrong receiver or argument type); `BindingError` (wrong arity) |
@@ -146,7 +184,9 @@ Notes fixing ambiguity for #326:
 
 - `contains` is a **string-only** receiver function in v1 (substring test). List membership is expressed with the `in` operator, not a `contains` overload; a `contains` call on a `List`/`Map`/`Object` receiver is a compile-time `TypeMismatch`.
 - `size()` is supported on exactly `String`, `List`, and `Map` receivers. `size()` on `Bool`, `Int`, `Float`, or `Object` is a compile-time `TypeMismatch`. There is no free-function `size(x)` form in v1 — only receiver call syntax `x.size()`.
-- `containsKey` is a **map-only** receiver function; keys are `String` (v1 maps are string-keyed). Calling it on any other receiver is a compile-time `TypeMismatch`. Its evaluation-time behavior on a missing key (returns `false`, never fails) is defined in the short-circuit/error-semantics requirement.
+- `String.size()` counts **Unicode code points**, matching the pinned CEL Language Definition's model of a string as a sequence of code points — NOT .NET's `string.Length` (UTF-16 code units). A character outside the Basic Multilingual Plane (e.g. `"😀"`, one code point encoded as a surrogate pair) has `size() == 1`, not 2. Combining sequences are NOT collapsed: `"e" + U+0301` (combining acute) is two code points, so `size() == 2` — code points, not grapheme clusters. The evaluator (#327) SHALL count Unicode scalar values (e.g. via `System.Text.Rune` enumeration), never `string.Length`.
+- Malformed UTF-16 cannot reach `size()`: `CelValue.String()` rejects .NET strings containing unpaired surrogates at construction with `ArgumentException` (programmer misuse), because such strings do not represent a valid sequence of Unicode code points and therefore cannot be CEL string values.
+- `containsKey` is a **map-only** receiver function; keys are `String` (v1 maps are string-keyed). Calling it on any other receiver is a compile-time `TypeMismatch`. Its evaluation-time behavior on a missing key (returns `false`, never fails) is defined in the logical-operator/error-semantics requirement.
 - Calling an unknown function name is a compile-time `BindingError`; all mismatches in this table are compile-time diagnostics — no function-dispatch error can survive to evaluation time.
 
 The `matches` function and all regex, timestamp, duration, protobuf, byte/string-conversion, and user-defined functions are deferred and SHALL NOT be resolvable in a Profile v1 compilation (compile-time `UnsupportedFeature` when the name is a known-deferred CEL built-in, `BindingError` otherwise).
@@ -166,6 +206,26 @@ The `matches` function and all regex, timestamp, duration, protobuf, byte/string
 
 - **WHEN** an expression calls `list.contains(x)` on a `List`-typed receiver
 - **THEN** compilation fails with a `TypeMismatch` diagnostic (list membership uses the `in` operator)
+
+#### Scenario: size() counts code points for a BMP string
+
+- **WHEN** the evaluator is implemented and `s.size()` is evaluated with `s` bound to `"abc"`
+- **THEN** the result is `CelValue.Int(3)`
+
+#### Scenario: size() counts a surrogate-pair character as one code point
+
+- **WHEN** the evaluator is implemented and `s.size()` is evaluated with `s` bound to `"😀"` (U+1F600, one code point, two UTF-16 units)
+- **THEN** the result is `CelValue.Int(1)`
+
+#### Scenario: size() counts combining sequences as separate code points
+
+- **WHEN** the evaluator is implemented and `s.size()` is evaluated with `s` bound to `"é"` (LATIN SMALL LETTER E followed by COMBINING ACUTE ACCENT)
+- **THEN** the result is `CelValue.Int(2)`
+
+#### Scenario: CelValue.String rejects malformed UTF-16
+
+- **WHEN** `CelValue.String()` is called with a .NET string containing an unpaired surrogate (e.g. `"\ud83d"` alone)
+- **THEN** an `ArgumentException` is thrown
 
 ### Requirement: Immutable public environment and compilation lifecycle
 
@@ -208,7 +268,7 @@ The `matches` function and all regex, timestamp, duration, protobuf, byte/string
 
 ### Requirement: Immutable context schema and schema-bound activation
 
-`CelContextSchema` SHALL be immutable after construction. It SHALL be identified structurally (a deterministic identity derived from profile, variable names, and type descriptors). `CelContextSchemaBuilder` SHALL return a `CelVariable` handle per `AddVariable()` call. Duplicate variable names during build SHALL produce a programmer-error exception. Variable and object-member names SHALL be validated at declaration time against the CEL identifier grammar (`[_a-zA-Z][_a-zA-Z0-9]*`) — a name that could never be referenced from a Profile v1 expression is rejected with `ArgumentException`. `CelEvaluationContext` SHALL be built via `schema.CreateEvaluationContextBuilder()` and `builder.Set(variable, value)` using the variable handle (not a string key). `CelEvaluationContextBuilder` SHALL additionally expose `Set(string name, CelValue value)` as an ergonomic convenience overload that resolves `name` to its declared `CelVariable` handle via a single lookup and delegates to `Set(CelVariable, CelValue)`; an unknown name SHALL throw `ArgumentException`. The name-based overload exists for benchmarking and ergonomic call sites (see #168); the handle-based overload remains the recommended path for high-volume evaluation to avoid repeated string lookup. Missing variable assignments, duplicate assignments, and type mismatches SHALL produce deterministic errors.
+`CelContextSchema` SHALL be immutable after construction. It SHALL be identified structurally (a deterministic identity derived from profile, variable names, and type descriptors). `CelContextSchemaBuilder` SHALL return a `CelVariable` handle per `AddVariable()` call. Duplicate variable names during build SHALL produce a programmer-error exception. Variable and object-member names SHALL be validated at declaration time per the pinned CEL lexer (`IDENT = SELECTOR - RESERVED`, `SELECTOR = identifier-regex - KEYWORD`): a variable name SHALL be a valid `IDENT` — matching `[_a-zA-Z][_a-zA-Z0-9]*` and being neither a CEL keyword (`false`, `in`, `null`, `true`) nor a reserved identifier (`as`, `break`, `const`, `continue`, `else`, `for`, `function`, `if`, `import`, `let`, `loop`, `package`, `namespace`, `return`, `var`, `void`, `while`); an object-member name SHALL be a valid `SELECTOR` — the same grammar excluding only keywords, because the CEL grammar permits reserved identifiers in member-access position. A name failing its rule is rejected with `ArgumentException`, preserving the guarantee that every schema-declared name is reachable from a Profile v1 expression. `CelEvaluationContext` SHALL be built via `schema.CreateEvaluationContextBuilder()` and `builder.Set(variable, value)` using the variable handle (not a string key). `CelEvaluationContextBuilder` SHALL additionally expose `Set(string name, CelValue value)` as an ergonomic convenience overload that resolves `name` to its declared `CelVariable` handle via a single lookup and delegates to `Set(CelVariable, CelValue)`; an unknown name SHALL throw `ArgumentException`. The name-based overload exists for benchmarking and ergonomic call sites (see #168); the handle-based overload remains the recommended path for high-volume evaluation to avoid repeated string lookup. Missing variable assignments, duplicate assignments, and type mismatches SHALL produce deterministic errors.
 
 #### Scenario: Schema builder returns typed variable handles
 

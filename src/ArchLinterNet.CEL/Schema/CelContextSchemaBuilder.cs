@@ -25,10 +25,11 @@ public sealed class CelContextSchemaBuilder
     {
         if (string.IsNullOrWhiteSpace(name))
             throw new ArgumentException("Variable name must not be null or whitespace.", nameof(name));
-        if (!CelIdentifier.IsValid(name))
+        if (!CelIdentifier.IsValidVariableName(name))
             throw new ArgumentException(
-                $"Variable name '{name}' is not a valid CEL identifier ([_a-zA-Z][_a-zA-Z0-9]*) " +
-                "and could never be referenced from a Profile v1 expression.",
+                $"Variable name '{name}' is not a valid CEL identifier ([_a-zA-Z][_a-zA-Z0-9]*, " +
+                "excluding CEL keywords and reserved words) and could never be referenced from " +
+                "a Profile v1 expression.",
                 nameof(name));
         ArgumentNullException.ThrowIfNull(type);
         if (!_variableNames.Add(name))

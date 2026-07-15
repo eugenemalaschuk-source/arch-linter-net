@@ -25,10 +25,11 @@ public sealed class CelObjectSchemaBuilder
     {
         if (string.IsNullOrWhiteSpace(name))
             throw new ArgumentException("Member name must not be null or whitespace.", nameof(name));
-        if (!CelIdentifier.IsValid(name))
+        if (!CelIdentifier.IsValidMemberName(name))
             throw new ArgumentException(
-                $"Member name '{name}' is not a valid CEL identifier ([_a-zA-Z][_a-zA-Z0-9]*) " +
-                "and could never appear in a Profile v1 member-access expression.",
+                $"Member name '{name}' is not a valid CEL selector ([_a-zA-Z][_a-zA-Z0-9]*, " +
+                "excluding CEL keywords) and could never appear in a Profile v1 member-access " +
+                "expression.",
                 nameof(name));
         ArgumentNullException.ThrowIfNull(type);
         if (!_memberNames.Add(name))

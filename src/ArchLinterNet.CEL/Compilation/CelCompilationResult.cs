@@ -53,11 +53,13 @@ public sealed class CelCompilationResult<T> where T : class
                     "limits",
                     CelDiagnosticSeverity.Error,
                     span: null,
-                    $"Expression length {key.NormalizedSource.Length} exceeds MaxExpressionLength limit.",
+                    $"Expression length {key.NormalizedSource.Length} exceeds MaxExpressionLength limit " +
+                    $"(profile '{key.ProfileId}').",
                     parameters: new Dictionary<string, string>(StringComparer.Ordinal)
                     {
                         ["limitName"] = "MaxExpressionLength",
                         ["observedValue"] = key.NormalizedSource.Length.ToString(),
+                        ["profileId"] = key.ProfileId.Value,
                     }),
             ],
             key: key);
@@ -73,7 +75,12 @@ public sealed class CelCompilationResult<T> where T : class
                     "engine",
                     CelDiagnosticSeverity.Error,
                     span: null,
-                    "CEL compilation is not yet implemented. Parser and type-checker will be added by task #325 and #326."),
+                    $"CEL compilation is not yet implemented for profile '{key.ProfileId}'. " +
+                    "Parser and type-checker will be added by task #325 and #326.",
+                    parameters: new Dictionary<string, string>(StringComparer.Ordinal)
+                    {
+                        ["profileId"] = key.ProfileId.Value,
+                    }),
             ],
             key: key);
 }

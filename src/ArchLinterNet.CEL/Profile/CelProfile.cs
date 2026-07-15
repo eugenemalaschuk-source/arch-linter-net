@@ -8,7 +8,7 @@ namespace ArchLinterNet.CEL.Profile;
 /// <para>
 /// ArchLinter CEL Profile v1 (<c>arch-linter/cel/v1</c>) pins the normative CEL language
 /// specification at commit <c>59505c14f3187e6eb9684fbd3d07146f614c6148</c> of
-/// https://github.com/google/cel-spec/blob/59505c14f3187e6eb9684fbd3d07146f614c6148/doc/langdef.md.
+/// https://github.com/cel-expr/cel-spec/blob/59505c14f3187e6eb9684fbd3d07146f614c6148/doc/langdef.md.
 /// </para>
 /// <para>
 /// Profile v1 does NOT claim full CEL conformance. It defines a deliberate, bounded subset.

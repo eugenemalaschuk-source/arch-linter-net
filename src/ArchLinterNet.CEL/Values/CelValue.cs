@@ -73,10 +73,38 @@ public sealed class CelValue
         new(CelValueKind.Bool, value);
 
     /// <summary>Creates a CEL <c>string</c> value.</summary>
+    /// <exception cref="ArgumentException">
+    /// <paramref name="value"/> contains an unpaired UTF-16 surrogate. CEL strings are sequences
+    /// of Unicode code points; malformed UTF-16 does not represent valid code points and cannot
+    /// be a CEL string value.
+    /// </exception>
     public static CelValue String(string value)
     {
         ArgumentNullException.ThrowIfNull(value);
+        if (!IsWellFormedUtf16(value))
+            throw new ArgumentException(
+                "String contains an unpaired UTF-16 surrogate and does not represent a valid " +
+                "sequence of Unicode code points.",
+                nameof(value));
         return new CelValue(CelValueKind.String, value);
+    }
+
+    private static bool IsWellFormedUtf16(string value)
+    {
+        for (var i = 0; i < value.Length; i++)
+        {
+            var c = value[i];
+            if (char.IsHighSurrogate(c))
+            {
+                if (i + 1 >= value.Length || !char.IsLowSurrogate(value[i + 1])) return false;
+                i++;
+            }
+            else if (char.IsLowSurrogate(c))
+            {
+                return false;
+            }
+        }
+        return true;
     }
 
     /// <summary>Creates a CEL <c>int</c> value (signed 64-bit).</summary>
