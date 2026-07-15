@@ -17,10 +17,10 @@ Treat it as `ISSUE_URL`. Read the issue through the available GitHub integration
 Execute these phases in order:
 
 1. Branch lifecycle.
-2. OpenSpec lifecycle.
-3. Implementation lifecycle.
-4. Validation lifecycle.
-5. Pull request lifecycle.
+1. OpenSpec lifecycle.
+1. Implementation lifecycle.
+1. Validation lifecycle.
+1. Pull request lifecycle.
 
 Do not reorder or skip phases. Keep the user informed at meaningful phase boundaries and stop only for a real access, safety, source-of-truth, or environment blocker.
 
@@ -33,11 +33,11 @@ Every supported shell command must use the `rtk` prefix. Read the repository ins
 Complete this phase before changing files.
 
 1. Determine the repository root, current branch and HEAD, remotes, and working-tree status.
-2. Preserve all existing user changes.
-3. Never implement directly on `main`.
-4. If on `main`, fetch fresh `origin/main`, create an issue-specific feature branch from it, verify checkout, and only then edit files.
-5. If already on another branch, continue only when it belongs to the supplied issue. If it is unrelated and cannot be changed safely, report the blocker and stop.
-6. Never open a feature PR from `main`.
+1. Preserve all existing user changes.
+1. Never implement directly on `main`.
+1. If on `main`, fetch fresh `origin/main`, create an issue-specific feature branch from it, verify checkout, and only then edit files.
+1. If already on another branch, continue only when it belongs to the supplied issue. If it is unrelated and cannot be changed safely, report the blocker and stop.
+1. Never open a feature PR from `main`.
 
 Default invariant: one issue equals one feature branch and one pull request.
 
@@ -60,13 +60,13 @@ OpenSpec normally applies when the issue changes user-visible behavior, architec
 When OpenSpec applies, use this exact order:
 
 1. `opsx-explore`
-2. `opsx-propose`
-3. `opsx-apply`
-4. implementation
-5. tests
-6. spec synchronization
-7. `opsx-archive`
-8. PR
+1. `opsx-propose`
+1. `opsx-apply`
+1. implementation
+1. tests
+1. spec synchronization
+1. `opsx-archive`
+1. PR
 
 Specs must exist before implementation. Synchronize them after implementation and tests. Archive only after synchronization and before opening the PR. Do not move archive work after PR creation or merge.
 
@@ -77,10 +77,10 @@ When OpenSpec does not apply, explicitly record `OpenSpec: not applicable` and e
 Before coding:
 
 1. Summarize the issue objective and acceptance criteria.
-2. Identify affected components and architecture boundaries.
-3. Inspect neighboring implementations and tests.
-4. State scope and non-goals.
-5. Provide a short implementation plan.
+1. Identify affected components and architecture boundaries.
+1. Inspect neighboring implementations and tests.
+1. State scope and non-goals.
+1. Provide a short implementation plan.
 
 During coding:
 
@@ -100,12 +100,12 @@ Implementation is incomplete until validation succeeds.
 Execute in order:
 
 1. Add or update relevant tests.
-2. Run focused tests when useful.
-3. Run `rtk make fmt`.
-4. Inspect formatting changes.
-5. Run `rtk make acceptance`.
-6. Fix issue-related failures.
-7. Rerun validation until it passes.
+1. Run focused tests when useful.
+1. Run `rtk make fmt`.
+1. Inspect formatting changes.
+1. Run `rtk make acceptance`.
+1. Fix issue-related failures.
+1. Rerun validation until it passes.
 
 Do not open a PR when formatting or acceptance was not executed, related failures remain, or success cannot be established. For an environment blocker, report the exact command, observed failure, unvalidated scope, and required prerequisite.
 
@@ -114,12 +114,12 @@ Do not open a PR when formatting or acceptance was not executed, related failure
 When OpenSpec applies:
 
 1. Compare implementation against the proposal and specs.
-2. Update specs to describe actual behavior.
-3. Remove unimplemented claims and add tested guarantees or edge cases.
-4. Keep terminology consistent across code, tests, specs, and docs.
-5. Run OpenSpec validation.
-6. Execute and verify `opsx-archive`.
-7. Inspect the synchronized and archived files.
+1. Update specs to describe actual behavior.
+1. Remove unimplemented claims and add tested guarantees or edge cases.
+1. Keep terminology consistent across code, tests, specs, and docs.
+1. Run OpenSpec validation.
+1. Execute and verify `opsx-archive`.
+1. Inspect the synchronized and archived files.
 
 Do not create the PR before this phase completes.
 
