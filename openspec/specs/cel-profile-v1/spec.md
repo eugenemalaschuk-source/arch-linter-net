@@ -50,6 +50,84 @@ Profile v1 SHALL support: logical negation (`!`); logical conjunction (`&&`) and
 - **THEN** each supported operator is listed with its CEL semantics reference
 - **AND** each deferred operator is listed as explicitly unsupported
 
+### Requirement: Operator precedence, associativity, and per-operator type signatures are frozen
+
+Profile v1 SHALL define a single, total precedence order for every supported operator, from lowest to highest binding power: (1) `||`; (2) `&&`; (3) `==`, `!=`, `<`, `<=`, `>`, `>=`, `in` (all non-associative — the grammar SHALL NOT accept chained comparisons such as `a < b < c` without explicit parentheses); (4) unary `!` (prefix); (5) member access (`.`) and indexing (`[]`) (left-to-right). Binary logical operators (`||`, `&&`) SHALL be left-associative. Parenthesized sub-expressions SHALL override precedence. This order matches the pinned `google/cel-spec` grammar restricted to the v1 subset and SHALL NOT change without a new profile version.
+
+Each supported operator SHALL have the following frozen type signature and static (compile-time) type-check behavior — a signature violation SHALL produce a `TypeMismatch` diagnostic at compile time, not a runtime error:
+
+- `!bool -> bool`. Any other operand type is a compile-time `TypeMismatch`.
+- `bool && bool -> bool`, `bool || bool -> bool`. Non-`bool` operands are a compile-time `TypeMismatch`.
+- `T == T -> bool`, `T != T -> bool` for any two operands of the same supported type `T` (`Bool`, `String`, `Int`, `Float`, `List`, `Map`, `Object`). Comparing operands of two different `CelTypeKind`s SHALL be a compile-time `TypeMismatch` (v1 performs no implicit numeric widening between `Int` and `Float`). `List`/`Map`/`Object` equality SHALL be deep structural equality.
+- `Int|Float <op> Int|Float -> bool` for `<`, `<=`, `>`, `>=` where both operands are the same `CelTypeKind` (`Int`-to-`Int` or `Float`-to-`Float`; no implicit widening). Any other operand type or a mixed `Int`/`Float` pair is a compile-time `TypeMismatch`.
+- `T in List<T> -> bool` and `String in Map<String, T> -> bool` (key membership). A mismatched element/key type is a compile-time `TypeMismatch`.
+- `Object.member -> <member's declared CelType>` where `member` is declared in the `CelObjectSchema` registered for that object's `ObjectTypeId`. Accessing an undeclared member name is a compile-time `SchemaMismatch`.
+- `List[Int] -> <element type>`, `Map[String] -> <value type>`. An index/key expression of the wrong type (e.g. `List[String]`) is a compile-time `TypeMismatch`.
+
+#### Scenario: Precedence table resolves an unparenthesized mixed expression deterministically
+
+- **WHEN** the expression `a || b && c` is parsed
+- **THEN** it is equivalent to `a || (b && c)` because `&&` binds tighter than `||`
+
+#### Scenario: Chained comparisons require explicit parentheses
+
+- **WHEN** the expression `a < b < c` is parsed
+- **THEN** compilation fails with a `SyntaxError` diagnostic (comparison operators are non-associative in v1)
+
+#### Scenario: Cross-kind equality is a compile-time type mismatch
+
+- **WHEN** an expression compares a `String`-typed operand with an `Int`-typed operand using `==`
+- **THEN** compilation fails with a `TypeMismatch` diagnostic; no implicit conversion occurs
+
+#### Scenario: Mixed Int/Float comparison is a compile-time type mismatch
+
+- **WHEN** an expression compares an `Int`-typed operand with a `Float`-typed operand using `<`
+- **THEN** compilation fails with a `TypeMismatch` diagnostic; v1 performs no implicit numeric widening
+
+### Requirement: Short-circuit, error-propagation, missing-key, and invalid-index semantics are normative
+
+`&&` and `||` SHALL short-circuit at evaluation time per the pinned CEL spec: for `a && b`, if `a` evaluates to `false`, `b` SHALL NOT be evaluated and the result SHALL be `false`; for `a || b`, if `a` evaluates to `true`, `b` SHALL NOT be evaluated and the result SHALL be `true`. Otherwise both operands SHALL be evaluated and combined normally. Because v1 performs full static type-checking at compile time (Requirement: "Immutable public environment and compilation lifecycle"), no operand of `&&`/`||`/`!`/comparison operators can have a type error surviving to evaluation — evaluation-time errors in v1 arise only from runtime data conditions below, not from type mismatches.
+
+Map indexing (`Map[key]`) and `containsKey(key)` on a key absent from the map value at evaluation time SHALL NOT throw a CLR exception. `Map[key]` on a missing key SHALL produce a failed `CelEvaluationResult` (`IsSuccess = false`) carrying a `CelDiagnostic` with code `EvaluationFailure`. `containsKey(key)` on a missing key SHALL return `CelValue.Bool(false)` (it SHALL NOT fail). List indexing (`List[index]`) with `index < 0` or `index >= size()` SHALL likewise produce a failed `CelEvaluationResult` with an `EvaluationFailure` diagnostic rather than throwing. Once evaluation of an expression has produced any `EvaluationFailure`, evaluation of that expression SHALL stop and the result SHALL be that failure — v1 does not continue evaluating and does not aggregate multiple evaluation-time failures into one result.
+
+Profile v1 has no `null` value: `CelValueKind` and `CelTypeKind` do not include a null/none variant, `CelObjectSchema` members are always present with a value of their declared type, and there is no optional/nullable member concept in v1. Consequently v1 defines no null-propagation or null-coalescing semantics — every value that type-checks at compile time is guaranteed non-null at evaluation time, and "missing" is only observable for map keys and list indices (handled above), never for a declared variable or object member.
+
+#### Scenario: Logical AND short-circuits on a false left operand
+
+- **WHEN** the evaluator is implemented and `a && b` is evaluated with `a` evaluating to `CelValue.Bool(false)`
+- **THEN** `b` is not evaluated
+- **AND** the result is `CelValue.Bool(false)`
+
+#### Scenario: Logical OR short-circuits on a true left operand
+
+- **WHEN** the evaluator is implemented and `a || b` is evaluated with `a` evaluating to `CelValue.Bool(true)`
+- **THEN** `b` is not evaluated
+- **AND** the result is `CelValue.Bool(true)`
+
+#### Scenario: Missing map key produces a structured evaluation failure, not an exception
+
+- **WHEN** the evaluator is implemented and `m[key]` is evaluated with `key` absent from `m`
+- **THEN** `CelEvaluationResult.IsSuccess` is `false`
+- **AND** `CelEvaluationResult.Diagnostics` contains a `CelDiagnostic` with code `EvaluationFailure`
+- **AND** no CLR exception is thrown
+
+#### Scenario: containsKey on a missing key returns false, not a failure
+
+- **WHEN** the evaluator is implemented and `m.containsKey(key)` is evaluated with `key` absent from `m`
+- **THEN** the result is a successful `CelEvaluationResult` with value `CelValue.Bool(false)`
+
+#### Scenario: Out-of-range list index produces a structured evaluation failure
+
+- **WHEN** the evaluator is implemented and `list[i]` is evaluated with `i` outside `[0, list.size())`
+- **THEN** `CelEvaluationResult.IsSuccess` is `false`
+- **AND** `CelEvaluationResult.Diagnostics` contains a `CelDiagnostic` with code `EvaluationFailure`
+- **AND** no CLR exception is thrown
+
+#### Scenario: Profile v1 has no null value
+
+- **WHEN** `CelValueKind` and `CelTypeKind` are inspected
+- **THEN** neither enum declares a null/none member
+
 ### Requirement: Supported built-in functions for Profile v1
 
 Profile v1 SHALL support the following string and map receiver functions: `startsWith(string)`, `endsWith(string)`, `contains(string)`, `size()`, `containsKey(string)`. The `matches` function and all regex, timestamp, duration, protobuf, and user-defined functions are deferred and SHALL NOT be resolvable in a Profile v1 compilation.
@@ -153,6 +231,10 @@ Profile v1 SHALL support the following string and map receiver functions: `start
 
 `CelCompilationLimits` and `CelEvaluationLimits` SHALL be sealed, immutable classes with all-or-nothing safe-default factories (`SafeDefaults`). Per-call evaluation limits SHALL be allowed to tighten but not exceed the environment/profile maximums. Every public compilation and evaluation path SHALL be intrinsically bounded; no unbounded execution overload SHALL exist. Convenience overloads that omit limits SHALL use documented safe defaults, not unrestricted execution.
 
+The complete compilation-time budget surface that #325 (tokenizer/parser) and #326 (binder/checker) SHALL enforce comprises, at minimum: maximum expression source length in UTF-16 characters (`MaxExpressionLength`, already present); maximum token count produced by the tokenizer (`MaxTokenCount`); maximum AST node count produced by parsing (`MaxAstNodeCount`); maximum sub-expression nesting depth (`MaxNestingDepth`, already present); maximum literal size — the longest string/collection literal accepted in source (`MaxLiteralSize`); maximum distinct identifier references (`MaxIdentifierCount`, already present). Each of these limits SHALL be a positive-only field on `CelCompilationLimits`, SHALL be included as a named component of `CelCompilationLimits.ComputeIdentity()`, and a source exceeding any one of them SHALL produce a `BudgetExceeded` diagnostic before further processing of that phase. `MaxExpressionLength` remains the cheapest, first-checked gate (rejecting oversized source before tokenization even begins); the token/AST/literal limits are checked as each corresponding phase runs. Fields for limits not yet enforced by a landed phase (#325/#326 pending) SHALL still exist on `CelCompilationLimits` so the API shape does not change once those phases ship — an unenforced field SHALL be documented as "reserved, not yet enforced" in its XML doc until the enforcing phase lands.
+
+The complete evaluation-time budget surface that #327 (evaluator) SHALL enforce comprises, at minimum: maximum evaluation steps (`MaxIterations`, already present); maximum accumulated abstract cost units (`MaxCostUnits`, already present); maximum input-value structural depth accepted by `CelEvaluationContextBuilder.Set()` (already enforced pre-evaluator via `MaxValidationDepth`, an internal constant — not yet a public per-environment field); maximum input collection size (element/entry count) accepted by `Set()` for `List`/`Map` values. Exceeding any evaluation-time limit SHALL produce a failed `CelEvaluationResult` with a `BudgetExceeded` diagnostic, not a CLR exception, except where the limit is enforced synchronously inside `Set()` (structural depth, collection size) — those SHALL continue to be reported as `ArgumentException` per the "Immutable context schema and schema-bound activation" requirement, since `Set()` is a builder-time programmer-facing call, not an evaluation call.
+
 #### Scenario: SafeDefaults factories are accessible
 
 - **WHEN** a consumer reads `CelCompilationLimits.SafeDefaults` or `CelEvaluationLimits.SafeDefaults`
@@ -162,6 +244,12 @@ Profile v1 SHALL support the following string and map receiver functions: `start
 
 - **WHEN** the public API surface of `CelCompiledPredicate` and `CelCompiledExpression` is inspected
 - **THEN** there is no `Evaluate()` overload that accepts no limits and performs unrestricted evaluation
+
+#### Scenario: Compilation limits identity incorporates every enforced limit field
+
+- **WHEN** `CelCompilationLimits.ComputeIdentity()` is called
+- **THEN** the returned string changes if any field on `CelCompilationLimits` changes
+- **AND** two `CelCompilationLimits` instances with identical field values produce identical identity strings
 
 ### Requirement: Cache identity is deterministic and caller-owned
 
