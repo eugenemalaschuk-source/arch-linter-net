@@ -111,11 +111,23 @@ recovery or fail-fast behavior" acceptance criterion by picking fail-fast explic
   content length.
 - `MaxNestingDepth`: a single counter incremented on every recursive descent into a sub-expression
   (parenthesized expression, unary operand, index expression, call argument, binary right-hand
-  side) and decremented on return; exceeding it stops parsing immediately.
+  side) and decremented on return; exceeding it stops parsing immediately. It is also incremented
+  once per postfix step in a member-access/indexing chain (each `.selector` or `[index]`) — the
+  public `MaxNestingDepth` doc explicitly lists "member access chains" as an example of what the
+  limit bounds, and the initial implementation only tracked recursive constructs, leaving
+  `a.b.c.d...` completely unbounded (caught in review). Chain steps accumulate for the lifetime of
+  the postfix loop and are released via `try`/`finally` when the loop exits, matching the
+  recursive-construct pattern (a linear chain still counts as "how deep is this expression," it
+  just doesn't recurse to build that depth).
 - `MaxAstNodeCount`: incremented once per constructed `CelSyntaxNode`; exceeding it stops parsing
   immediately.
+- `MaxIdentifierCount`: incremented once per identifier reference consumed — a bare variable
+  reference, a function name (free or receiver call), or a member-selector name. This is a purely
+  syntactic count (no schema/binder information needed), so it is enforced directly by the parser
+  rather than deferred to the binder (#326); the initial implementation left the field entirely
+  unenforced, silently accepting unbounded identifier counts (caught in review).
 
-All four report `BudgetExceeded` with `limitName`/`observedValue`/`profileId` parameters, matching
+All five report `BudgetExceeded` with `limitName`/`observedValue`/`profileId` parameters, matching
 the existing `CelCompilationResult<T>.BudgetExceeded` parameter shape for `MaxExpressionLength`.
 
 ### 8. Identifiers and digits are restricted to ASCII, matching the pinned grammar exactly
@@ -129,6 +141,49 @@ This also fixed a related digit-literal bug: the decimal-point branch for `FLOAT
 trailing `.` with no following digit (`"3."`), but the pinned grammar requires `DIGIT+` after the
 point; the tokenizer now only consumes `.` as part of a float literal when at least one digit
 follows, leaving a bare trailing `.` to tokenize separately as `Dot`.
+
+### 9. A deferred construct is only classified as `UnsupportedFeature` after its own syntax is verified complete
+
+The initial implementation classified a construct as deferred the moment it recognized the
+*first* token of a deferred form (a `+`/`-`/`*`/`/`/`%` trailing an expression, a `?`, a leading
+`.`, or a `{`/`[` at primary position), without checking whether what followed was actually
+well-formed. That meant `a +` (dangling operator, no right-hand operand), `a ? b` (missing `:`
+and false branch), `[` (unterminated list), and `.` (no following identifier) were all wrongly
+reported as `UnsupportedFeature` — a "this is valid CEL, just deferred" claim that is false for
+genuinely malformed input (caught in review). The fix: each deferred-construct branch now
+consumes and validates the construct's full grammar (the arithmetic chain's operands via
+`ParseUnary()`, the conditional's true-branch/`:`/false-branch, the list/map/message literal's
+element or `key : value` entries and closing bracket/brace, the root-qualified name's `.IDENT`
+chain) *before* throwing `UnsupportedFeature`; any failure during that validation naturally
+propagates as `SyntaxError` from the underlying `ParseExpression`/`Expect` calls, since a
+malformed deferred construct is exactly as invalid as any other malformed CEL. The validation
+parses are throwaway (their nodes are discarded — Profile v1 has no AST shape for arithmetic,
+conditionals, or literals), but still count against `MaxAstNodeCount`/`MaxNestingDepth` via the
+same `Track()`/depth machinery as real nodes, so a pathological deferred-construct chain (e.g. a
+10,000-term `a+a+a+...`) is still bounded rather than an unbounded validation pass.
+
+### 10. Message-literal detection requires a qualified-name-shaped receiver
+
+The pinned grammar's message-literal production is `IDENT ("." IDENT)* "{" ... "}"` — the `{`
+only follows a *qualified name*, never an arbitrary expression. The initial implementation treated
+any `{` immediately following any postfix expression as a message literal, which wrongly
+classified genuinely invalid forms like `1{}` (an integer literal followed by `{}`, which has no
+meaning under any CEL grammar) as deferred syntax (caught in review). `IsQualifiedNameCandidate`
+now walks the built syntax node: `true` only for a bare identifier or a member-access chain
+rooted in one; a call result, index result, or literal is never a candidate, so `{` following one
+falls through to the ordinary "unexpected trailing input" `SyntaxError` path instead.
+
+### 11. Whitespace and string-terminator characters match the pinned grammar exactly, not .NET's broader Unicode categories
+
+The pinned grammar's `WHITESPACE` token is `[\t\n\f\r ]` — five specific ASCII characters. The
+initial implementation used `char.IsWhiteSpace(c)`, which also treats non-ASCII Unicode space
+separators (e.g. U+00A0 NBSP) and other whitespace-category code points (e.g. U+000B vertical
+tab) as skippable whitespace — accepting characters the grammar does not (caught in review). The
+tokenizer now checks the five characters explicitly. Separately, the string-literal lexer only
+rejected an unescaped `\n` as terminating a normal (non-raw, non-triple-quoted) string, but the
+pinned grammar excludes both `\n` and `\r` from a normal string's character class — an unescaped
+carriage return was silently absorbed into string content instead of ending the literal with
+`SyntaxError` (also caught in review); the check now covers both.
 
 ## Risks / Trade-offs
 

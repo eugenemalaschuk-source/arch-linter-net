@@ -340,6 +340,91 @@ public sealed class CelParserTests
         Assert.That(diag.Code, Is.EqualTo(CelDiagnosticCode.SyntaxError));
     }
 
+    // ── Malformed deferred constructs are SyntaxError, not UnsupportedFeature ─
+    // A construct's syntax must itself be well-formed before it can be classified as
+    // "valid CEL, deferred by Profile v1" — a dangling operator with no operand is malformed.
+
+    [Test]
+    public void DanglingArithmeticOperator_IsSyntaxError()
+    {
+        var diag = ParseFail("a +");
+        Assert.That(diag.Code, Is.EqualTo(CelDiagnosticCode.SyntaxError));
+    }
+
+    [Test]
+    public void DanglingUnaryMinus_IsSyntaxError()
+    {
+        var diag = ParseFail("-");
+        Assert.That(diag.Code, Is.EqualTo(CelDiagnosticCode.SyntaxError));
+    }
+
+    [Test]
+    public void LeadingUnaryPlus_HasNoValidCelForm_IsSyntaxError()
+    {
+        // Unlike '-', '+' has no unary/prefix form anywhere in the pinned CEL grammar.
+        var diag = ParseFail("+5");
+        Assert.That(diag.Code, Is.EqualTo(CelDiagnosticCode.SyntaxError));
+    }
+
+    [Test]
+    public void ConditionalMissingColonAndFalseBranch_IsSyntaxError()
+    {
+        var diag = ParseFail("a ? b");
+        Assert.That(diag.Code, Is.EqualTo(CelDiagnosticCode.SyntaxError));
+    }
+
+    [Test]
+    public void ConditionalMissingFalseBranch_IsSyntaxError()
+    {
+        var diag = ParseFail("a ? b :");
+        Assert.That(diag.Code, Is.EqualTo(CelDiagnosticCode.SyntaxError));
+    }
+
+    [Test]
+    public void UnterminatedListLiteral_IsSyntaxError()
+    {
+        var diag = ParseFail("[");
+        Assert.That(diag.Code, Is.EqualTo(CelDiagnosticCode.SyntaxError));
+    }
+
+    [Test]
+    public void UnterminatedListLiteralWithTrailingComma_IsSyntaxError()
+    {
+        var diag = ParseFail("[1, 2,");
+        Assert.That(diag.Code, Is.EqualTo(CelDiagnosticCode.SyntaxError));
+    }
+
+    [Test]
+    public void BareDot_WithNoFollowingIdentifier_IsSyntaxError()
+    {
+        var diag = ParseFail(".");
+        Assert.That(diag.Code, Is.EqualTo(CelDiagnosticCode.SyntaxError));
+    }
+
+    [Test]
+    public void MessageLiteralOnNonQualifiedNameReceiver_IsSyntaxError()
+    {
+        // A literal is never a valid message-literal receiver; "1{}" is genuinely invalid CEL,
+        // not deferred syntax — the parser must not treat every "{" after any expression as a
+        // message literal.
+        var diag = ParseFail("1{}");
+        Assert.That(diag.Code, Is.EqualTo(CelDiagnosticCode.SyntaxError));
+    }
+
+    [Test]
+    public void UnterminatedMapLiteral_IsSyntaxError()
+    {
+        var diag = ParseFail("{'a': 1");
+        Assert.That(diag.Code, Is.EqualTo(CelDiagnosticCode.SyntaxError));
+    }
+
+    [Test]
+    public void MalformedMapLiteralEntry_MissingColon_IsSyntaxError()
+    {
+        var diag = ParseFail("{'a' 1}");
+        Assert.That(diag.Code, Is.EqualTo(CelDiagnosticCode.SyntaxError));
+    }
+
     // ── Deferred-but-valid CEL syntax: UnsupportedFeature, not SyntaxError ────
 
     [TestCase("a + b")]
@@ -477,6 +562,68 @@ public sealed class CelParserTests
         var diag = ParseFail("(((((x)))))", limits);
         Assert.That(diag.Code, Is.EqualTo(CelDiagnosticCode.BudgetExceeded));
         Assert.That(diag.Parameters["limitName"], Is.EqualTo("MaxNestingDepth"));
+    }
+
+    [Test]
+    public void MaxNestingDepth_ExceededByMemberAccessChain_ReturnsBudgetExceeded()
+    {
+        // The public MaxNestingDepth doc explicitly lists "member access chains" as an example
+        // of what the limit bounds — a long non-parenthesized chain must trip it too.
+        var limits = new CelCompilationLimits(
+            maxExpressionLength: 4096, maxNestingDepth: 3, maxIdentifierCount: 64,
+            maxTokenCount: 2048, maxAstNodeCount: 1024, maxLiteralSize: 1024);
+
+        var diag = ParseFail("a.b.c.d.e", limits);
+        Assert.That(diag.Code, Is.EqualTo(CelDiagnosticCode.BudgetExceeded));
+        Assert.That(diag.Parameters["limitName"], Is.EqualTo("MaxNestingDepth"));
+    }
+
+    [Test]
+    public void MaxNestingDepth_ExceededByIndexChain_ReturnsBudgetExceeded()
+    {
+        var limits = new CelCompilationLimits(
+            maxExpressionLength: 4096, maxNestingDepth: 3, maxIdentifierCount: 64,
+            maxTokenCount: 2048, maxAstNodeCount: 1024, maxLiteralSize: 1024);
+
+        var diag = ParseFail("a[0][0][0][0]", limits);
+        Assert.That(diag.Code, Is.EqualTo(CelDiagnosticCode.BudgetExceeded));
+        Assert.That(diag.Parameters["limitName"], Is.EqualTo("MaxNestingDepth"));
+    }
+
+    [Test]
+    public void MaxIdentifierCount_Exceeded_ReturnsBudgetExceeded()
+    {
+        var limits = new CelCompilationLimits(
+            maxExpressionLength: 4096, maxNestingDepth: 32, maxIdentifierCount: 1,
+            maxTokenCount: 2048, maxAstNodeCount: 1024, maxLiteralSize: 1024);
+
+        var diag = ParseFail("a || b", limits);
+        Assert.That(diag.Code, Is.EqualTo(CelDiagnosticCode.BudgetExceeded));
+        Assert.That(diag.Parameters["limitName"], Is.EqualTo("MaxIdentifierCount"));
+    }
+
+    [Test]
+    public void MaxIdentifierCount_CountsMemberNamesAndCallNames()
+    {
+        var limits = new CelCompilationLimits(
+            maxExpressionLength: 4096, maxNestingDepth: 32, maxIdentifierCount: 2,
+            maxTokenCount: 2048, maxAstNodeCount: 1024, maxLiteralSize: 1024);
+
+        // "x" (1) + "startsWith" (2) — the third identifier ("y") must exceed the limit.
+        var diag = ParseFail("x.startsWith(y)", limits);
+        Assert.That(diag.Code, Is.EqualTo(CelDiagnosticCode.BudgetExceeded));
+        Assert.That(diag.Parameters["limitName"], Is.EqualTo("MaxIdentifierCount"));
+    }
+
+    [Test]
+    public void MaxIdentifierCount_WithinLimit_Parses()
+    {
+        var limits = new CelCompilationLimits(
+            maxExpressionLength: 4096, maxNestingDepth: 32, maxIdentifierCount: 2,
+            maxTokenCount: 2048, maxAstNodeCount: 1024, maxLiteralSize: 1024);
+
+        var node = (CelBinarySyntax)ParseOk("a || b", limits);
+        Assert.That(node.Operator, Is.EqualTo(CelBinaryOperator.Or));
     }
 
     [Test]

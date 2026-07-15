@@ -99,7 +99,7 @@ internal static class CelTokenizer
         while (pos < source.Length)
         {
             var c = source[pos];
-            if (char.IsWhiteSpace(c))
+            if (IsWhitespace(c))
             {
                 pos++;
                 continue;
@@ -116,6 +116,11 @@ internal static class CelTokenizer
             break;
         }
     }
+
+    // The pinned grammar's WHITESPACE token is exactly [\t\n\f\r ] — not char.IsWhiteSpace(),
+    // which also accepts non-ASCII Unicode space separators (e.g. NBSP U+00A0) and other
+    // whitespace-category characters (e.g. vertical tab U+000B) the grammar does not include.
+    private static bool IsWhitespace(char c) => c is '\t' or '\n' or '\f' or '\r' or ' ';
 
     private static bool IsRawStringPrefix(string source, int pos) =>
         (source[pos] is 'r' or 'R') && pos + 1 < source.Length && source[pos + 1] is '\'' or '"';
@@ -279,7 +284,7 @@ internal static class CelTokenizer
                 break;
             }
 
-            if (c == '\n')
+            if (c is '\n' or '\r')
                 return (null, CelParseDiagnostics.SyntaxError(new CelSourceSpan(start, pos), "Unterminated string literal (unescaped newline).", profileId));
 
             if (c == '\\' && !isRaw)

@@ -316,6 +316,46 @@ public sealed class CelTokenizerTests
         }));
     }
 
+    [Test]
+    public void CarriageReturn_IsSkippedAsWhitespace()
+    {
+        var tokens = TokenizeOk("true\r\n==\rfalse");
+        Assert.That(tokens.Select(t => t.Kind), Is.EqualTo(new[]
+        {
+            CelTokenKind.BoolLiteral, CelTokenKind.EqEq, CelTokenKind.BoolLiteral, CelTokenKind.Eof,
+        }));
+    }
+
+    [Test]
+    public void NonBreakingSpace_IsNotValidWhitespace()
+    {
+        // The pinned grammar defines whitespace as only tab, newline, form-feed, carriage
+        // return, and space -- U+00A0 (NBSP) is not part of it, even though
+        // char.IsWhiteSpace(c) considers it whitespace.
+        var source = "true" + (char)0x00A0 + "==" + (char)0x00A0 + "false";
+        var result = CelTokenizer.Tokenize(source, CelCompilationLimits.SafeDefaults, CelProfile.V1.Id);
+        Assert.That(result.IsSuccess, Is.False);
+        Assert.That(result.Diagnostic!.Code, Is.EqualTo(CelDiagnosticCode.SyntaxError));
+    }
+
+    [Test]
+    public void VerticalTab_IsNotValidWhitespace()
+    {
+        // U+000B (vertical tab) is whitespace per char.IsWhiteSpace() but not part of the
+        // pinned grammar's whitespace definition.
+        var source = "true" + (char)0x000B + "==" + (char)0x000B + "false";
+        var result = CelTokenizer.Tokenize(source, CelCompilationLimits.SafeDefaults, CelProfile.V1.Id);
+        Assert.That(result.IsSuccess, Is.False);
+        Assert.That(result.Diagnostic!.Code, Is.EqualTo(CelDiagnosticCode.SyntaxError));
+    }
+
+    [Test]
+    public void UnescapedCarriageReturn_InsideStringLiteral_IsSyntaxError()
+    {
+        var diag = TokenizeFail("'a\rb'");
+        Assert.That(diag.Code, Is.EqualTo(CelDiagnosticCode.SyntaxError));
+    }
+
     // ── Source spans ────────────────────────────────────────────────────────────
 
     [Test]
