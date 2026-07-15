@@ -50,6 +50,8 @@ ArchLinterNet does not currently validate:
 - semantic data-flow analysis;
 - third-party package internals;
 - full MSBuild evaluation, target execution, or arbitrary imported-property semantics;
+- CEL-backed policy expressions; if introduced later they will use explicit
+  `when` fields and will never be inferred from ordinary strings;
 - unrestricted custom contract families outside the documented YAML schema;
 - unrestricted namespace pattern systems;
 - arbitrary YAML fields such as `severity`, `from`, `to`, `regex`, `owner`, or custom rule groups unless the schema documents them.
