@@ -28,13 +28,15 @@ public sealed class CelInternalApiCoverageTests
             profileId: CelProfile.V1.Id,
             schemaIdentity: "schema-id",
             requiredResultType: CelRequiredResultType.Predicate,
-            compilationLimitsIdentity: "len=4096,nest=32,ids=64");
+            compilationLimitsIdentity: "len=4096,nest=32,ids=64",
+            evaluationLimitsIdentity: "iters=1000,cost=100000");
 
         Assert.That(key.NormalizedSource, Is.EqualTo("x == 1"));
         Assert.That(key.ProfileId, Is.EqualTo(CelProfile.V1.Id));
         Assert.That(key.SchemaIdentity, Is.EqualTo("schema-id"));
         Assert.That(key.RequiredResultType, Is.EqualTo(CelRequiredResultType.Predicate));
         Assert.That(key.CompilationLimitsIdentity, Is.EqualTo("len=4096,nest=32,ids=64"));
+        Assert.That(key.EvaluationLimitsIdentity, Is.EqualTo("iters=1000,cost=100000"));
     }
 
     [Test]
@@ -67,7 +69,7 @@ public sealed class CelInternalApiCoverageTests
     {
         var schema = BuildSimpleSchema();
         var key = BuildKey("x == 1");
-        var pred = new CelCompiledPredicate(CelProfile.V1, schema, key, CelCompilationLimits.SafeDefaults);
+        var pred = new CelCompiledPredicate(CelProfile.V1, schema, key, CelCompilationLimits.SafeDefaults, CelEvaluationLimits.SafeDefaults);
 
         Assert.That(pred.Profile, Is.SameAs(CelProfile.V1));
         Assert.That(pred.Schema, Is.SameAs(schema));
@@ -84,7 +86,7 @@ public sealed class CelInternalApiCoverageTests
             .Set(handle, CelValue.String("v"))
             .Build();
         var pred = new CelCompiledPredicate(
-            CelProfile.V1, schema, BuildKey("x"), CelCompilationLimits.SafeDefaults);
+            CelProfile.V1, schema, BuildKey("x"), CelCompilationLimits.SafeDefaults, CelEvaluationLimits.SafeDefaults);
 
         Assert.That(
             () => pred.Evaluate(ctx, CelEvaluationLimits.SafeDefaults),
@@ -100,12 +102,64 @@ public sealed class CelInternalApiCoverageTests
             .Set(handle, CelValue.String("v"))
             .Build();
         var pred = new CelCompiledPredicate(
-            CelProfile.V1, schema, BuildKey("x"), CelCompilationLimits.SafeDefaults);
+            CelProfile.V1, schema, BuildKey("x"), CelCompilationLimits.SafeDefaults, CelEvaluationLimits.SafeDefaults);
 
         Assert.That(
             () => pred.Evaluate(ctx),
             Throws.TypeOf<NotImplementedException>(),
             "The safe-default Evaluate(context) overload must delegate to Evaluate(context, limits).");
+    }
+
+    [Test]
+    public void CelCompiledPredicate_Evaluate_LimitsExceedCeiling_ThrowsArgumentException()
+    {
+        var schema = BuildSimpleSchema();
+        var handle = schema.Variables[0];
+        var ctx = schema.CreateEvaluationContextBuilder()
+            .Set(handle, CelValue.String("v"))
+            .Build();
+        var ceiling = new CelEvaluationLimits(maxIterations: 10, maxCostUnits: 100);
+        var pred = new CelCompiledPredicate(
+            CelProfile.V1, schema, BuildKey("x"), CelCompilationLimits.SafeDefaults, ceiling);
+
+        // SafeDefaults (1000 iterations) exceeds the captured ceiling (10) — programmer error.
+        Assert.That(
+            () => pred.Evaluate(ctx, CelEvaluationLimits.SafeDefaults),
+            Throws.ArgumentException,
+            "Per-call limits above the environment ceiling must be rejected.");
+    }
+
+    [Test]
+    public void CelCompiledPredicate_Evaluate_DefaultOverload_UsesCapturedCeiling()
+    {
+        var schema = BuildSimpleSchema();
+        var handle = schema.Variables[0];
+        var ctx = schema.CreateEvaluationContextBuilder()
+            .Set(handle, CelValue.String("v"))
+            .Build();
+        var ceiling = new CelEvaluationLimits(maxIterations: 10, maxCostUnits: 100);
+        var pred = new CelCompiledPredicate(
+            CelProfile.V1, schema, BuildKey("x"), CelCompilationLimits.SafeDefaults, ceiling);
+
+        Assert.That(pred.EvaluationLimits, Is.SameAs(ceiling));
+        // Default overload uses the captured ceiling, never the global SafeDefaults, so it must
+        // pass the ceiling check and reach the not-yet-implemented evaluator stub.
+        Assert.That(() => pred.Evaluate(ctx), Throws.TypeOf<NotImplementedException>());
+    }
+
+    [Test]
+    public void CelCompiledPredicate_Evaluate_TighterLimits_PassCeilingCheck()
+    {
+        var schema = BuildSimpleSchema();
+        var handle = schema.Variables[0];
+        var ctx = schema.CreateEvaluationContextBuilder()
+            .Set(handle, CelValue.String("v"))
+            .Build();
+        var pred = new CelCompiledPredicate(
+            CelProfile.V1, schema, BuildKey("x"), CelCompilationLimits.SafeDefaults, CelEvaluationLimits.SafeDefaults);
+
+        var tighter = new CelEvaluationLimits(maxIterations: 1, maxCostUnits: 1);
+        Assert.That(() => pred.Evaluate(ctx, tighter), Throws.TypeOf<NotImplementedException>());
     }
 
     // ── CelCompiledExpression — internal constructor and stub Evaluate ────────
@@ -115,7 +169,7 @@ public sealed class CelInternalApiCoverageTests
     {
         var schema = BuildSimpleSchema();
         var key = BuildKey("x + 1");
-        var expr = new CelCompiledExpression(CelProfile.V1, schema, key, CelCompilationLimits.SafeDefaults);
+        var expr = new CelCompiledExpression(CelProfile.V1, schema, key, CelCompilationLimits.SafeDefaults, CelEvaluationLimits.SafeDefaults);
 
         Assert.That(expr.Profile, Is.SameAs(CelProfile.V1));
         Assert.That(expr.Schema, Is.SameAs(schema));
@@ -132,7 +186,7 @@ public sealed class CelInternalApiCoverageTests
             .Set(handle, CelValue.String("v"))
             .Build();
         var expr = new CelCompiledExpression(
-            CelProfile.V1, schema, BuildKey("x"), CelCompilationLimits.SafeDefaults);
+            CelProfile.V1, schema, BuildKey("x"), CelCompilationLimits.SafeDefaults, CelEvaluationLimits.SafeDefaults);
 
         Assert.That(
             () => expr.Evaluate(ctx, CelEvaluationLimits.SafeDefaults),
@@ -148,7 +202,7 @@ public sealed class CelInternalApiCoverageTests
             .Set(handle, CelValue.String("v"))
             .Build();
         var expr = new CelCompiledExpression(
-            CelProfile.V1, schema, BuildKey("x"), CelCompilationLimits.SafeDefaults);
+            CelProfile.V1, schema, BuildKey("x"), CelCompilationLimits.SafeDefaults, CelEvaluationLimits.SafeDefaults);
 
         Assert.That(
             () => expr.Evaluate(ctx),
@@ -221,6 +275,60 @@ public sealed class CelInternalApiCoverageTests
         Assert.That(diag.Span!.Value.Start, Is.EqualTo(2));
         Assert.That(diag.Span!.Value.End, Is.EqualTo(7));
         Assert.That(diag.Code, Is.EqualTo(CelDiagnosticCode.SyntaxError));
+    }
+
+    [Test]
+    public void CelDiagnostic_WithoutParameters_ExposesEmptyParameters()
+    {
+        var diag = new CelDiagnostic(
+            CelDiagnosticCode.SyntaxError,
+            "parser",
+            CelDiagnosticSeverity.Error,
+            span: null,
+            "unexpected token");
+
+        Assert.That(diag.Parameters, Is.Not.Null);
+        Assert.That(diag.Parameters, Is.Empty);
+    }
+
+    [Test]
+    public void CelDiagnostic_WithParameters_ExposesFrozenParameters()
+    {
+        var source = new Dictionary<string, string> { ["limitName"] = "MaxIterations" };
+        var diag = new CelDiagnostic(
+            CelDiagnosticCode.BudgetExceeded,
+            "limits",
+            CelDiagnosticSeverity.Error,
+            span: null,
+            "budget exceeded",
+            parameters: source);
+
+        Assert.That(diag.Parameters["limitName"], Is.EqualTo("MaxIterations"));
+        Assert.That(diag.Parameters as Dictionary<string, string>, Is.Null,
+            "Parameters must not be a mutable Dictionary<> that can be mutated via cast.");
+
+        // Mutating the source dictionary after construction must not affect the diagnostic.
+        source["limitName"] = "changed";
+        Assert.That(diag.Parameters["limitName"], Is.EqualTo("MaxIterations"));
+    }
+
+    [Test]
+    public void CelCompilationResult_BudgetExceeded_CarriesStructuredParameters()
+    {
+        var schemaBuilder = CelContextSchema.CreateBuilder("s");
+        schemaBuilder.AddVariable("x", CelType.String);
+        var env = CelEnvironment.CreateBuilder(CelProfile.V1)
+            .WithContextSchema(schemaBuilder.Build())
+            .WithCompilationLimits(new CelCompilationLimits(
+                maxExpressionLength: 3, maxNestingDepth: 4, maxIdentifierCount: 4,
+                maxTokenCount: 64, maxAstNodeCount: 64, maxLiteralSize: 64))
+            .Build();
+
+        var result = env.CompilePredicate("x == 'long'");
+
+        Assert.That(result.Diagnostics[0].Code, Is.EqualTo(CelDiagnosticCode.BudgetExceeded));
+        Assert.That(result.Diagnostics[0].Parameters["limitName"], Is.EqualTo("MaxExpressionLength"));
+        Assert.That(result.Diagnostics[0].Parameters, Contains.Key("observedValue"));
     }
 
     [Test]
@@ -305,25 +413,93 @@ public sealed class CelInternalApiCoverageTests
             "Assignments must not be a mutable List<> that can be mutated via cast.");
     }
 
+    [Test]
+    public void CelCompilationResult_Diagnostics_CannotMutateThroughCast()
+    {
+        var schemaBuilder = CelContextSchema.CreateBuilder("s");
+        schemaBuilder.AddVariable("x", CelType.String);
+        var env = CelEnvironment.CreateBuilder(CelProfile.V1)
+            .WithContextSchema(schemaBuilder.Build())
+            .Build();
+
+        var result = env.CompilePredicate("true");
+
+        Assert.That(result.Diagnostics as CelDiagnostic[], Is.Null,
+            "Diagnostics must not be a raw array that can be mutated via cast.");
+        Assert.That(result.Diagnostics as List<CelDiagnostic>, Is.Null,
+            "Diagnostics must not be a mutable List<> that can be mutated via cast.");
+    }
+
+    [Test]
+    public void CelEvaluationResult_Diagnostics_CannotMutateThroughCast()
+    {
+        var result = new CelEvaluationResult(
+            isSuccess: false,
+            value: null,
+            diagnostics:
+            [
+                new CelDiagnostic(
+                    CelDiagnosticCode.EvaluationFailure,
+                    "eval",
+                    CelDiagnosticSeverity.Error,
+                    span: null,
+                    "evaluation failed"),
+            ]);
+
+        Assert.That(result.Diagnostics as CelDiagnostic[], Is.Null,
+            "Diagnostics must not be a raw array that can be mutated via cast.");
+        Assert.That(result.Diagnostics as List<CelDiagnostic>, Is.Null,
+            "Diagnostics must not be a mutable List<> that can be mutated via cast.");
+    }
+
     // ── Depth limit prevents stack overflow via public Set() ─────────────────
 
     [Test]
     public void CelEvaluationContextBuilder_DeeplyNestedList_FailsValidation()
     {
-        // Build a list nested 20 levels deep — exceeds MaxValidationDepth (16).
-        var inner = CelValue.List([CelValue.Int(1)]);
-        for (var i = 0; i < 20; i++)
-            inner = CelValue.List([inner]);
+        // Build a declared type AND a value both nested 21 levels deep, so the declared type
+        // matches the value at every level and the only possible rejection is the depth budget
+        // (MaxValidationDepth = 16) — not an ordinary type mismatch.
+        const int Nesting = 21;
+        var declaredType = CelType.Int;
+        var value = CelValue.Int(1);
+        for (var i = 0; i < Nesting; i++)
+        {
+            declaredType = CelType.ListOf(declaredType);
+            value = CelValue.List([value]);
+        }
 
         var schemaBuilder = CelContextSchema.CreateBuilder("ctx");
-        var handle = schemaBuilder.AddVariable("v",
-            CelType.ListOf(CelType.ListOf(CelType.ListOf(CelType.Int))));
+        var handle = schemaBuilder.AddVariable("v", declaredType);
         var schema = schemaBuilder.Build();
 
         Assert.That(
-            () => schema.CreateEvaluationContextBuilder().Set(handle, inner),
+            () => schema.CreateEvaluationContextBuilder().Set(handle, value),
             Throws.ArgumentException,
             "Set() must reject values that exceed the maximum structural validation depth.");
+    }
+
+    [Test]
+    public void CelEvaluationContextBuilder_NestedListWithinDepthLimit_PassesValidation()
+    {
+        // 10 levels is comfortably within MaxValidationDepth (16); with a matching declared
+        // type the assignment must succeed, proving the previous test fails on depth alone.
+        const int Nesting = 10;
+        var declaredType = CelType.Int;
+        var value = CelValue.Int(1);
+        for (var i = 0; i < Nesting; i++)
+        {
+            declaredType = CelType.ListOf(declaredType);
+            value = CelValue.List([value]);
+        }
+
+        var schemaBuilder = CelContextSchema.CreateBuilder("ctx");
+        var handle = schemaBuilder.AddVariable("v", declaredType);
+        var schema = schemaBuilder.Build();
+
+        Assert.That(
+            () => schema.CreateEvaluationContextBuilder().Set(handle, value),
+            Throws.Nothing);
     }
 
     // ── Name-based Set() convenience overload (issue #168 benchmark surface) ─
@@ -365,6 +541,150 @@ public sealed class CelInternalApiCoverageTests
         var byName = schema.CreateEvaluationContextBuilder().Set("x", CelValue.String("v")).Build();
 
         Assert.That(byHandle.Assignments[0].Value.AsString(), Is.EqualTo(byName.Assignments[0].Value.AsString()));
+    }
+
+    // ── Strict object validation: exact member-set match (Profile v1 has no
+    //    null/optional members, so missing and extra members are both rejected) ─
+
+    private static (CelContextSchema Schema, CelVariable Handle, CelEnvironment Env) BuildObjectEnvironment()
+    {
+        var schemaBuilder = CelContextSchema.CreateBuilder("obj-ctx");
+        var handle = schemaBuilder.AddVariable("o", CelType.ObjectOf("thing"));
+        var schema = schemaBuilder.Build();
+
+        var objSchemaBuilder = CelObjectSchema.CreateBuilder("thing");
+        objSchemaBuilder.AddMember("name", CelType.String);
+        objSchemaBuilder.AddMember("count", CelType.Int);
+        var objSchema = objSchemaBuilder.Build();
+
+        var env = CelEnvironment.CreateBuilder(CelProfile.V1)
+            .WithContextSchema(schema)
+            .WithObjectSchema(objSchema)
+            .Build();
+        return (schema, handle, env);
+    }
+
+    [Test]
+    public void CelEvaluationContextBuilder_ObjectWithAllDeclaredMembers_PassesValidation()
+    {
+        var (_, handle, env) = BuildObjectEnvironment();
+        var value = CelValue.Object(new CelObjectValue("thing", new Dictionary<string, CelValue>
+        {
+            ["name"] = CelValue.String("a"),
+            ["count"] = CelValue.Int(1),
+        }));
+
+        Assert.That(
+            () => env.CreateEvaluationContextBuilder().Set(handle, value),
+            Throws.Nothing);
+    }
+
+    [Test]
+    public void CelEvaluationContextBuilder_ObjectMissingDeclaredMember_FailsValidation()
+    {
+        var (_, handle, env) = BuildObjectEnvironment();
+        var value = CelValue.Object(new CelObjectValue("thing", new Dictionary<string, CelValue>
+        {
+            ["name"] = CelValue.String("a"),
+            // "count" is missing — normatively impossible at evaluation time, so rejected here.
+        }));
+
+        Assert.That(
+            () => env.CreateEvaluationContextBuilder().Set(handle, value),
+            Throws.ArgumentException);
+    }
+
+    [Test]
+    public void CelEvaluationContextBuilder_EmptyObjectAgainstNonEmptySchema_FailsValidation()
+    {
+        var (_, handle, env) = BuildObjectEnvironment();
+        var value = CelValue.Object(new CelObjectValue("thing", new Dictionary<string, CelValue>()));
+
+        Assert.That(
+            () => env.CreateEvaluationContextBuilder().Set(handle, value),
+            Throws.ArgumentException);
+    }
+
+    [Test]
+    public void CelEvaluationContextBuilder_ObjectWithExtraMember_FailsValidation()
+    {
+        var (_, handle, env) = BuildObjectEnvironment();
+        var value = CelValue.Object(new CelObjectValue("thing", new Dictionary<string, CelValue>
+        {
+            ["name"] = CelValue.String("a"),
+            ["count"] = CelValue.Int(1),
+            ["extra"] = CelValue.Bool(true),
+        }));
+
+        Assert.That(
+            () => env.CreateEvaluationContextBuilder().Set(handle, value),
+            Throws.ArgumentException);
+    }
+
+    [Test]
+    public void CelEvaluationContextBuilder_UnregisteredObjectTypeId_FailsValidation()
+    {
+        var schemaBuilder = CelContextSchema.CreateBuilder("obj-ctx");
+        var handle = schemaBuilder.AddVariable("o", CelType.ObjectOf("unregistered"));
+        var schema = schemaBuilder.Build();
+        var env = CelEnvironment.CreateBuilder(CelProfile.V1)
+            .WithContextSchema(schema)
+            .Build();
+
+        var value = CelValue.Object(new CelObjectValue("unregistered", new Dictionary<string, CelValue>()));
+
+        Assert.That(
+            () => env.CreateEvaluationContextBuilder().Set(handle, value),
+            Throws.ArgumentException,
+            "An object type with no registered schema cannot be validated and must be rejected.");
+    }
+
+    [Test]
+    public void CelEvaluationContextBuilder_NestedObjectMissingMember_FailsValidation()
+    {
+        var schemaBuilder = CelContextSchema.CreateBuilder("obj-ctx");
+        var handle = schemaBuilder.AddVariable("o", CelType.ObjectOf("outer"));
+        var schema = schemaBuilder.Build();
+
+        var innerBuilder = CelObjectSchema.CreateBuilder("inner");
+        innerBuilder.AddMember("id", CelType.Int);
+        var innerSchema = innerBuilder.Build();
+
+        var outerBuilder = CelObjectSchema.CreateBuilder("outer");
+        outerBuilder.AddMember("child", CelType.ObjectOf("inner"));
+        var outerSchema = outerBuilder.Build();
+
+        var env = CelEnvironment.CreateBuilder(CelProfile.V1)
+            .WithContextSchema(schema)
+            .WithObjectSchema(innerSchema)
+            .WithObjectSchema(outerSchema)
+            .Build();
+
+        // Inner object is missing its declared "id" member.
+        var value = CelValue.Object(new CelObjectValue("outer", new Dictionary<string, CelValue>
+        {
+            ["child"] = CelValue.Object(new CelObjectValue("inner", new Dictionary<string, CelValue>())),
+        }));
+
+        Assert.That(
+            () => env.CreateEvaluationContextBuilder().Set(handle, value),
+            Throws.ArgumentException);
+    }
+
+    [Test]
+    public void CelEvaluationContextBuilder_SchemaOnlyBuilder_ObjectValue_ThrowsInvalidOperation()
+    {
+        var schemaBuilder = CelContextSchema.CreateBuilder("obj-ctx");
+        var handle = schemaBuilder.AddVariable("o", CelType.ObjectOf("thing"));
+        var schema = schemaBuilder.Build();
+
+        var value = CelValue.Object(new CelObjectValue("thing", new Dictionary<string, CelValue>()));
+
+        // schema.CreateEvaluationContextBuilder() has no object catalog; accepting the object
+        // unvalidated would bypass schema invariants, so it must throw instead.
+        Assert.That(
+            () => schema.CreateEvaluationContextBuilder().Set(handle, value),
+            Throws.InvalidOperationException);
     }
 
     // ── Collection-size limit prevents unbounded CPU use via public Set() ────
@@ -418,6 +738,27 @@ public sealed class CelInternalApiCoverageTests
             Throws.Nothing);
     }
 
+    // ── CEL identifier validation on schema-declared names ───────────────────
+
+    [Test]
+    public void CelContextSchemaBuilder_NonIdentifierVariableName_ThrowsArgumentException()
+    {
+        var builder = CelContextSchema.CreateBuilder("s");
+        Assert.That(() => builder.AddVariable("source role", CelType.String), Throws.ArgumentException);
+        Assert.That(() => builder.AddVariable("1st", CelType.String), Throws.ArgumentException);
+        Assert.That(() => builder.AddVariable("a-b", CelType.String), Throws.ArgumentException);
+        Assert.That(() => builder.AddVariable("_ok1", CelType.String), Throws.Nothing);
+    }
+
+    [Test]
+    public void CelObjectSchemaBuilder_NonIdentifierMemberName_ThrowsArgumentException()
+    {
+        var builder = CelObjectSchema.CreateBuilder("t");
+        Assert.That(() => builder.AddMember("my member", CelType.String), Throws.ArgumentException);
+        Assert.That(() => builder.AddMember("9lives", CelType.Int), Throws.ArgumentException);
+        Assert.That(() => builder.AddMember("valid_Name2", CelType.Bool), Throws.Nothing);
+    }
+
     // ── Helpers ──────────────────────────────────────────────────────────────
 
     private static CelContextSchema BuildSimpleSchema()
@@ -433,5 +774,6 @@ public sealed class CelInternalApiCoverageTests
             profileId: CelProfile.V1.Id,
             schemaIdentity: "cov-v1-identity",
             requiredResultType: CelRequiredResultType.Predicate,
-            compilationLimitsIdentity: CelCompilationLimits.SafeDefaults.ComputeIdentity());
+            compilationLimitsIdentity: CelCompilationLimits.SafeDefaults.ComputeIdentity(),
+            evaluationLimitsIdentity: CelEvaluationLimits.SafeDefaults.ComputeIdentity());
 }

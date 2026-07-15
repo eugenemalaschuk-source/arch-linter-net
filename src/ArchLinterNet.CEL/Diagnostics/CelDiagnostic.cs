@@ -31,18 +31,34 @@ public sealed class CelDiagnostic
     /// </summary>
     public string Message { get; }
 
+    /// <summary>
+    /// Gets structured, machine-readable parameters for this diagnostic, keyed by stable
+    /// parameter names (e.g. <c>expectedType</c>, <c>actualType</c>, <c>identifier</c>,
+    /// <c>limitName</c>, <c>observedValue</c>). Machine consumers SHOULD read these instead of
+    /// parsing <see cref="Message"/>. Empty when a diagnostic carries no parameters.
+    /// </summary>
+    public IReadOnlyDictionary<string, string> Parameters { get; }
+
+    private static readonly IReadOnlyDictionary<string, string> _emptyParameters =
+        new Dictionary<string, string>().AsReadOnly();
+
     internal CelDiagnostic(
         CelDiagnosticCode code,
         string category,
         CelDiagnosticSeverity severity,
         CelSourceSpan? span,
-        string message)
+        string message,
+        IReadOnlyDictionary<string, string>? parameters = null)
     {
         Code = code;
         Category = category;
         Severity = severity;
         Span = span;
         Message = message;
+        // Copy to a truly frozen dictionary so callers cannot cast Parameters back and mutate it.
+        Parameters = parameters is null || parameters.Count == 0
+            ? _emptyParameters
+            : new Dictionary<string, string>(parameters, StringComparer.Ordinal).AsReadOnly();
     }
 
     /// <inheritdoc/>

@@ -48,4 +48,15 @@ public sealed class CelEvaluationLimits
         MaxIterations = maxIterations;
         MaxCostUnits = maxCostUnits;
     }
+
+    /// <summary>
+    /// Returns whether every budget in this instance is less than or equal to the corresponding
+    /// budget in <paramref name="ceiling"/>.
+    /// </summary>
+    internal bool IsWithin(CelEvaluationLimits ceiling) =>
+        MaxIterations <= ceiling.MaxIterations && MaxCostUnits <= ceiling.MaxCostUnits;
+
+    /// <summary>Returns a stable identity string for use in <see cref="CelCompilationKey"/>.</summary>
+    internal string ComputeIdentity() =>
+        $"iters={MaxIterations},cost={MaxCostUnits}";
 }

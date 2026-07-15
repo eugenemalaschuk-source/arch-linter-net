@@ -37,7 +37,8 @@ public sealed class CelCompilationResult<T> where T : class
     {
         IsSuccess = isSuccess;
         Program = program;
-        Diagnostics = diagnostics;
+        // Copy to a truly frozen list so callers cannot cast Diagnostics back to T[]/List<> and mutate it.
+        Diagnostics = new List<CelDiagnostic>(diagnostics).AsReadOnly();
         CompilationKey = key;
     }
 
@@ -52,7 +53,12 @@ public sealed class CelCompilationResult<T> where T : class
                     "limits",
                     CelDiagnosticSeverity.Error,
                     span: null,
-                    $"Expression length {key.NormalizedSource.Length} exceeds MaxExpressionLength limit."),
+                    $"Expression length {key.NormalizedSource.Length} exceeds MaxExpressionLength limit.",
+                    parameters: new Dictionary<string, string>(StringComparer.Ordinal)
+                    {
+                        ["limitName"] = "MaxExpressionLength",
+                        ["observedValue"] = key.NormalizedSource.Length.ToString(),
+                    }),
             ],
             key: key);
 

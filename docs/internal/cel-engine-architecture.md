@@ -212,6 +212,36 @@ The following patterns are permanently prohibited. A change that introduces any 
 
 ______________________________________________________________________
 
+## Comparative CEL implementation review
+
+The public API shape was derived from a comparative review of seven existing CEL implementations,
+as required by [#324](https://github.com/eugenemalaschuk-source/arch-linter-net/issues/324). Each
+row records what was adopted, what was rejected, why, and which `ArchLinterNet.CEL` public type
+carries the decision.
+
+| Implementation | Lifecycle / API shape | Adopted pattern | Rejected pattern | Rationale | Affected public type(s) |
+|---|---|---|---|---|---|
+| **cel-java** (google/cel-java) | Immutable `CelCompiler`/`CelRuntime` built by builders; compile → plan → evaluate; structured `CelValidationResult` | Builder-constructed immutable environment; compile-once/evaluate-many; structured compilation result with diagnostics instead of exceptions | `Program.eval(Map<String,Object>)` accepting raw maps of arbitrary Java objects | Raw-object activation reintroduces reflection and defeats the closed value model | `CelEnvironment`, `CelEnvironmentBuilder`, `CelCompilationResult<T>` |
+| **cel-go** (google/cel-go) | `cel.Env` with declarations; `Compile`/`Program` split; `EvalOptions` cost limits; `Ast` exposed publicly | Environment-owned declarations (context schema); explicit cost/step budgets as first-class API (`CelEvaluationLimits`) | Public `Ast` type and `env.Extend` runtime environment extension | Public AST becomes a forever-versioned contract; runtime extension breaks environment immutability | `CelContextSchema`, `CelEvaluationLimits`, `CelEnvironment` (no `Extend`, no public AST) |
+| **Project Nessie cel-java bindings** | Thin wrapper pinning script/declaration pairs; caches compiled scripts keyed by expression text | Caller-owned caching of compiled programs | Cache keyed by expression text alone | Same text under different schemas/limits produces different programs; text-only keys cause wrong-hit bugs | `CelCompilationKey` (source + profile + schema + result type + both limit identities) |
+| **Cel.NET** (early .NET port) | Direct port of Go structure; `object`-based value model; reflection-driven member access | Confirmation that a .NET CEL engine is feasible | `object`-typed values and reflection-driven member binding | Violates the no-reflection boundary; nullable analysis and AOT suffer; type errors surface at evaluation instead of compile time | `CelValue` (closed factory + typed accessors), `CelObjectSchema` (declared members) |
+| **TELUS cel-dotnet** | Interpreter-style evaluate(text, context) one-shot API | Nothing structural | One-shot `Evaluate(string, IDictionary)` combining parse+bind+eval per call | Re-parses on every evaluation; incompatible with compile-once/evaluate-many linting workloads; no cache identity possible | `CelCompiledPredicate`/`CelCompiledExpression` (separate compiled artifacts) |
+| **cel-compiled experiments** (compiled-delegate approaches) | Compile CEL to IL/delegates for speed | Goal of zero re-parse on warm path | Emitting delegates/`Expression<T>` as the public compilation output | Delegates bypass evaluation budgets and diagnostics; prohibited-shortcut list forbids this permanently | `CelCompiledPredicate` (opaque, non-convertible), prohibited-shortcuts table |
+| **celdotnet** (community port) | Partial grammar; silent acceptance of unsupported syntax; ad-hoc error strings | Nothing structural | Accepting unsupported syntax with best-effort semantics; string-typed error reporting | Silent grammar drift breaks profile stability; display-string errors are not a machine contract | `CelProfile` (explicit versioned subset), `CelDiagnostic` (stable codes + structured parameters) |
+
+Cross-cutting conclusions embedded in the API:
+
+- Every reviewed implementation that exposed raw host objects (cel-java maps, Cel.NET reflection)
+  pushed type errors to evaluation time; ArchLinterNet.CEL rejects host objects at the API
+  boundary instead (`CelValue` factories, schema-declared object members).
+- No reviewed implementation encoded evaluation policy in its cache identity; Nessie's text-keyed
+  cache demonstrated the resulting wrong-hit class of bugs, which `CelCompilationKey` closes by
+  including profile, schema, result-type, compilation-limits, and evaluation-limits identities.
+- go/java's environment-extension APIs were the main source of thread-safety caveats in their
+  docs; `CelEnvironment` is closed at `Build()` with defensive copies for that reason.
+
+______________________________________________________________________
+
 ## References
 
 - Parent story: [#322](https://github.com/eugenemalaschuk-source/arch-linter-net/issues/322)

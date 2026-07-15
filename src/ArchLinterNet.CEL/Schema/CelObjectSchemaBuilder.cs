@@ -17,11 +17,19 @@ public sealed class CelObjectSchemaBuilder
     /// <summary>
     /// Declares a named, typed member and returns its handle.
     /// </summary>
-    /// <exception cref="ArgumentException">A member with the same name has already been declared.</exception>
+    /// <exception cref="ArgumentException">
+    /// A member with the same name has already been declared, or <paramref name="name"/> is not
+    /// a valid CEL identifier and could never appear in a member-access expression.
+    /// </exception>
     public CelObjectMember AddMember(string name, CelType type)
     {
         if (string.IsNullOrWhiteSpace(name))
             throw new ArgumentException("Member name must not be null or whitespace.", nameof(name));
+        if (!CelIdentifier.IsValid(name))
+            throw new ArgumentException(
+                $"Member name '{name}' is not a valid CEL identifier ([_a-zA-Z][_a-zA-Z0-9]*) " +
+                "and could never appear in a Profile v1 member-access expression.",
+                nameof(name));
         ArgumentNullException.ThrowIfNull(type);
         if (!_memberNames.Add(name))
             throw new ArgumentException(

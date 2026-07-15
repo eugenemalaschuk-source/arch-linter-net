@@ -115,7 +115,8 @@ public sealed class CelEnvironment
             profileId: Profile.Id,
             schemaIdentity: ComputeSchemaIdentity(),
             requiredResultType: resultType,
-            compilationLimitsIdentity: CompilationLimits.ComputeIdentity());
+            compilationLimitsIdentity: CompilationLimits.ComputeIdentity(),
+            evaluationLimitsIdentity: EvaluationLimits.ComputeIdentity());
 
     private string ComputeSchemaIdentity()
     {

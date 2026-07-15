@@ -31,7 +31,8 @@ public sealed class CelEvaluationResult
     {
         IsSuccess = isSuccess;
         Value = value;
-        Diagnostics = diagnostics;
+        // Copy to a truly frozen list so callers cannot cast Diagnostics back to T[]/List<> and mutate it.
+        Diagnostics = new List<CelDiagnostic>(diagnostics).AsReadOnly();
     }
 
     /// <summary>

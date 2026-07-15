@@ -434,53 +434,6 @@ public sealed class CelApiShapeTests
         Assert.That(result.CompilationKey.RequiredResultType, Is.EqualTo(CelRequiredResultType.General));
     }
 
-    // ── BudgetExceeded diagnostic ─────────────────────────────────────────────
-
-    [Test]
-    public void CelEnvironment_CompilePredicate_ExceedsMaxLength_ReturnsBudgetExceeded()
-    {
-        var tightLimits = new CelCompilationLimits(
-            maxExpressionLength: 5, maxNestingDepth: 4, maxIdentifierCount: 4,
-            maxTokenCount: 64, maxAstNodeCount: 64, maxLiteralSize: 64);
-        var env = CelEnvironment.CreateBuilder(CelProfile.V1)
-            .WithContextSchema(BuildSimpleSchema())
-            .WithCompilationLimits(tightLimits)
-            .Build();
-
-        var result = env.CompilePredicate("source == 'too_long_value'");
-
-        Assert.That(result.IsSuccess, Is.False);
-        Assert.That(result.Diagnostics[0].Code, Is.EqualTo(CelDiagnosticCode.BudgetExceeded));
-    }
-
-    [Test]
-    public void CelEnvironment_Compile_ExceedsMaxLength_ReturnsBudgetExceeded()
-    {
-        var tightLimits = new CelCompilationLimits(
-            maxExpressionLength: 3, maxNestingDepth: 4, maxIdentifierCount: 4,
-            maxTokenCount: 64, maxAstNodeCount: 64, maxLiteralSize: 64);
-        var env = CelEnvironment.CreateBuilder(CelProfile.V1)
-            .WithContextSchema(BuildSimpleSchema())
-            .WithCompilationLimits(tightLimits)
-            .Build();
-
-        var result = env.Compile("1 + 2");
-
-        Assert.That(result.IsSuccess, Is.False);
-        Assert.That(result.Diagnostics[0].Code, Is.EqualTo(CelDiagnosticCode.BudgetExceeded));
-    }
-
-    [Test]
-    public void CelCompilationLimits_ZeroOrNegativeArgs_ThrowArgumentOutOfRange()
-    {
-        Assert.That(() => new CelCompilationLimits(0, 4, 4, 4, 4, 4), Throws.TypeOf<ArgumentOutOfRangeException>());
-        Assert.That(() => new CelCompilationLimits(4, 0, 4, 4, 4, 4), Throws.TypeOf<ArgumentOutOfRangeException>());
-        Assert.That(() => new CelCompilationLimits(4, 4, 0, 4, 4, 4), Throws.TypeOf<ArgumentOutOfRangeException>());
-        Assert.That(() => new CelCompilationLimits(4, 4, 4, 0, 4, 4), Throws.TypeOf<ArgumentOutOfRangeException>());
-        Assert.That(() => new CelCompilationLimits(4, 4, 4, 4, 0, 4), Throws.TypeOf<ArgumentOutOfRangeException>());
-        Assert.That(() => new CelCompilationLimits(4, 4, 4, 4, 4, 0), Throws.TypeOf<ArgumentOutOfRangeException>());
-    }
-
     // ── CelValue: object factory and accessor ─────────────────────────────────
 
     [Test]
@@ -633,55 +586,6 @@ public sealed class CelApiShapeTests
             Throws.ArgumentException);
     }
 
-    // ── Cache identity regressions ────────────────────────────────────────────
-
-    [Test]
-    public void CelCompilationKey_SameSource_ProducesEqualKeys()
-    {
-        var env = BuildSimpleEnvironment();
-        var r1 = env.CompilePredicate("source == 'x'");
-        var r2 = env.CompilePredicate("source == 'x'");
-        Assert.That(r1.CompilationKey, Is.EqualTo(r2.CompilationKey));
-        Assert.That(r1.CompilationKey.GetHashCode(), Is.EqualTo(r2.CompilationKey.GetHashCode()));
-    }
-
-    [Test]
-    public void CelCompilationKey_DifferentSource_ProducesDifferentKeys()
-    {
-        var env = BuildSimpleEnvironment();
-        var r1 = env.CompilePredicate("source == 'x'");
-        var r2 = env.CompilePredicate("source == 'y'");
-        Assert.That(r1.CompilationKey, Is.Not.EqualTo(r2.CompilationKey));
-    }
-
-    [Test]
-    public void CelCompilationKey_WhitespaceInStringLiteral_ProducesDifferentKeys()
-    {
-        // Regression: "source == 'x'" and "source == ' x'" must be distinct keys.
-        // Earlier code normalized whitespace inside string literals, which was wrong.
-        var env = BuildSimpleEnvironment();
-        var r1 = env.CompilePredicate("source == 'x'");
-        var r2 = env.CompilePredicate("source == ' x'");
-        Assert.That(r1.CompilationKey, Is.Not.EqualTo(r2.CompilationKey));
-    }
-
-    [Test]
-    public void CelContextSchema_Identity_CollisionSafe()
-    {
-        // Regression: schemas that produce the same string under naive delimiter encoding
-        // must produce distinct identities under the length-prefixed encoding.
-        // SchemaId = "x|a:string" with 0 vars  vs  SchemaId = "x" with var "a:string".
-        // Old "|"-only format: both produce "x|a:string". New format: distinct.
-        var builderA = CelContextSchema.CreateBuilder("x|a:string");
-        var schemaA = builderA.Build();
-
-        var builderB = CelContextSchema.CreateBuilder("x");
-        builderB.AddVariable("a:string", CelType.String);
-        var schemaB = builderB.Build();
-
-        Assert.That(schemaA.Identity, Is.Not.EqualTo(schemaB.Identity));
-    }
-
     // ── CelProfileId operators ────────────────────────────────────────────────
 
     [Test]
@@ -737,29 +641,6 @@ public sealed class CelApiShapeTests
         var c = new CelSourceSpan(2, 5);
         Assert.That(a, Is.EqualTo(b));
         Assert.That(a, Is.Not.EqualTo(c));
-    }
-
-    // ── EvaluationLimits on environment ───────────────────────────────────────
-
-    [Test]
-    public void CelEnvironment_EvaluationLimits_DefaultsToSafeDefaults()
-    {
-        var env = BuildSimpleEnvironment();
-        Assert.That(env.EvaluationLimits, Is.Not.Null);
-        Assert.That(env.EvaluationLimits.MaxIterations, Is.GreaterThan(0));
-        Assert.That(env.EvaluationLimits.MaxCostUnits, Is.GreaterThan(0));
-    }
-
-    [Test]
-    public void CelEnvironmentBuilder_WithEvaluationLimits_SetsLimits()
-    {
-        var limits = new CelEvaluationLimits(maxIterations: 10, maxCostUnits: 1000);
-        var env = CelEnvironment.CreateBuilder(CelProfile.V1)
-            .WithContextSchema(BuildSimpleSchema())
-            .WithEvaluationLimits(limits)
-            .Build();
-
-        Assert.That(env.EvaluationLimits, Is.SameAs(limits));
     }
 
     // ── Helpers ──────────────────────────────────────────────────────────────

@@ -139,13 +139,27 @@ public sealed class CelEvaluationContextBuilder
         if (obj.ObjectTypeId != declared.SchemaId) return false;
         if (obj.Members.Count > MaxValidationCollectionSize) return false;
 
-        if (_objectSchemas is null || !_objectSchemas.TryGetValue(obj.ObjectTypeId, out var objSchema))
-            return true;
+        // Object values can only be validated against a registered object schema. A builder
+        // without a catalog (created via schema.CreateEvaluationContextBuilder()) must not
+        // silently accept unvalidated objects — that would let a context violate the schema
+        // invariant that every declared member is present with a value of its declared type.
+        if (_objectSchemas is null)
+            throw new InvalidOperationException(
+                $"Cannot validate object value of type '{obj.ObjectTypeId}': this evaluation " +
+                "context builder has no object schema catalog. Create the builder via " +
+                "CelEnvironment.CreateEvaluationContextBuilder() so registered object schemas " +
+                "are available for member validation.");
 
-        foreach (var (memberName, memberValue) in obj.Members)
+        if (!_objectSchemas.TryGetValue(obj.ObjectTypeId, out var objSchema))
+            return false;
+
+        // Profile v1 has no null/optional members: the member set must match the schema exactly.
+        // A missing declared member or an extra undeclared member both reject the value.
+        if (obj.Members.Count != objSchema.Members.Count) return false;
+
+        foreach (var memberDef in objSchema.Members)
         {
-            var memberDef = objSchema.Members.FirstOrDefault(m => m.Name == memberName);
-            if (memberDef is null) return false;
+            if (!obj.Members.TryGetValue(memberDef.Name, out var memberValue)) return false;
             if (!ValueMatchesType(memberDef.Type, memberValue, depth)) return false;
         }
         return true;
