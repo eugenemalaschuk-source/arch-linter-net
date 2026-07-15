@@ -411,6 +411,37 @@ recorded as a residual trade-off below rather than closed, since closing it woul
 a depth contribution out of `ParsePrimary` through every other case, for one link's worth of
 budget.
 
+### 22. A reserved word beginning a primary is IDENT-governed or SELECTOR-governed depending on what follows it, not on its root-qualified/non-root-qualified position
+
+Decision 4 established `IDENT = SELECTOR - RESERVED` / `SELECTOR = identifier-regex - KEYWORD` for
+schema-declared names, and the parser already applied `IDENT` rules (reserved words rejected) to
+*any* reserved word starting a primary expression, and `SELECTOR` rules (reserved words allowed)
+to a reserved word reached via `.member`. This is too coarse: a reserved word starting a primary
+is not always "a bare variable reference" — it can also be the first segment of a qualified
+type/message name (`package.Type`, or `package` immediately followed by a message literal's `{`),
+which is a `SELECTOR`-governed position semantically identical to a `.member` step, just written
+without a leading dot. The parser rejected `package{field: 1}` outright before ever checking
+whether a `{` followed (`ParseIdentifierPrimary` threw on `token.IsReserved` unconditionally,
+before even consuming the token), and — independently — `ParseRootQualifiedNamePrimary` accepted
+*any* reserved word via `ExpectSelectorName()` unconditionally, so `.package` and `.package()`
+(both invalid — a reserved word can never be a bare reference or a callable name, root-qualified
+or not) were wrongly accepted as deferred root-qualified syntax. Both gaps were caught in the same
+review round; the OpenSpec text was also found to describe the message-literal/qualified-name
+prefix as `IDENT ("." IDENT)*`, which is actually wrong given the spec's own `SELECTOR` rule
+already permits reserved words there — the grammar notation is now `SELECTOR ("." SELECTOR)*`.
+
+The fix is one-token lookahead, applied identically in both `ParseIdentifierPrimary` and
+`ParseRootQualifiedNamePrimary` via a shared `RequireNonTerminalReservedUsage` helper: a reserved
+word is valid (do not throw) exactly when the *next* token is `.` (more qualification coming) or
+`{` (a message literal); it is invalid (throw `SyntaxError`) for anything else, including `(`
+(an attempted call) or end-of-construct (a bare terminal reference). This correctly classifies:
+`package{field: 1}`, `package.Type{field: 1}`, `.package{field: 1}` as valid deferred syntax
+(`UnsupportedFeature`); `package()`, `.package`, `.package()` as `SyntaxError`; and leaves
+`x.package()` (reserved word in ordinary `.member`/`.call()` selector position on a non-reserved
+receiver, handled by `ParsePostfix`'s pre-existing, unchanged `ExpectSelectorName()` path) fully
+unaffected, since that was never routed through either `ParseIdentifierPrimary` or
+`ParseRootQualifiedNamePrimary` to begin with.
+
 ## Risks / Trade-offs
 
 - Omitting triple-quoted strings and octal escapes is a real (if currently unreachable) grammar

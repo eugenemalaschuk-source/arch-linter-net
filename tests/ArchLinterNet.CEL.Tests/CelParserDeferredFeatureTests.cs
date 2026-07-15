@@ -178,6 +178,30 @@ public sealed class CelParserDeferredFeatureTests
         Assert.That(diag.Code, Is.EqualTo(CelDiagnosticCode.UnsupportedFeature));
     }
 
+    // ── Reserved words are valid as a qualified-name/message-literal prefix ───
+    // (SELECTOR-governed), invalid as a terminal bare reference or call name (IDENT-governed).
+
+    [Test]
+    public void ReservedWordImmediatelyFollowedByBrace_IsUnsupportedFeature()
+    {
+        var diag = ParseFail("package{field: 1}");
+        Assert.That(diag.Code, Is.EqualTo(CelDiagnosticCode.UnsupportedFeature));
+    }
+
+    [Test]
+    public void ReservedWordAsQualifiedNameRoot_IsUnsupportedFeature()
+    {
+        var diag = ParseFail("package.Type{field: 1}");
+        Assert.That(diag.Code, Is.EqualTo(CelDiagnosticCode.UnsupportedFeature));
+    }
+
+    [Test]
+    public void RootQualifiedReservedWordImmediatelyFollowedByBrace_IsUnsupportedFeature()
+    {
+        var diag = ParseFail(".package{field: 1}");
+        Assert.That(diag.Code, Is.EqualTo(CelDiagnosticCode.UnsupportedFeature));
+    }
+
     [Test]
     public void MaxNestingDepth_ExceededByRootQualifiedMemberChain_ReturnsBudgetExceeded()
     {

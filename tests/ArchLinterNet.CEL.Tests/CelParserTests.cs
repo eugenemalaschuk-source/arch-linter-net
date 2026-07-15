@@ -327,6 +327,38 @@ public sealed class CelParserTests
     }
 
     [Test]
+    public void ReservedWordAsFreeCallName_IsSyntaxError()
+    {
+        // A reserved word can never resolve as an actual callable function name.
+        var diag = ParseFail("package()");
+        Assert.That(diag.Code, Is.EqualTo(CelDiagnosticCode.SyntaxError));
+    }
+
+    [Test]
+    public void RootQualifiedReservedWord_WithNothingFollowing_IsSyntaxError()
+    {
+        var diag = ParseFail(".package");
+        Assert.That(diag.Code, Is.EqualTo(CelDiagnosticCode.SyntaxError));
+    }
+
+    [Test]
+    public void RootQualifiedReservedWordCall_IsSyntaxError()
+    {
+        var diag = ParseFail(".package()");
+        Assert.That(diag.Code, Is.EqualTo(CelDiagnosticCode.SyntaxError));
+    }
+
+    [Test]
+    public void ReservedWordAsCallNameOnReceiver_StillParses()
+    {
+        // "package" used in SELECTOR (member/call-name) position on a non-reserved receiver was
+        // already valid and must remain so — untouched by the qualified-name-prefix fix.
+        var node = (CelCallSyntax)ParseOk("x.package()");
+        Assert.That(node.FunctionName, Is.EqualTo("package"));
+        Assert.That(node.Receiver, Is.Not.Null);
+    }
+
+    [Test]
     public void UnexpectedToken_AtPrimaryPosition_IsSyntaxError()
     {
         var diag = ParseFail(")");

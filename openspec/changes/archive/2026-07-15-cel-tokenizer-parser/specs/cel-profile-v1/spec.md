@@ -33,8 +33,10 @@ this spec:
   Numeric literals follow the same ASCII-digit restriction (`[0-9]`), and a decimal point SHALL
   only be consumed as part of a `FLOAT_LIT` when followed by at least one digit — `3.` alone is
   not a valid float literal and SHALL tokenize as an `IntLiteral` followed by a separate `.`.
-- `IDENT ("." IDENT)* "{" ... "}"` (message/proto literal construction) and a leading `.` before
-  an identifier (root/absolute-qualified name syntax, e.g. `.pkg.Type`) are both valid CEL primary
+- `SELECTOR ("." SELECTOR)* "{" ... "}"` (message/proto literal construction — every segment,
+  including the first, is `SELECTOR`-governed, not `IDENT`-governed; see the reserved-word bullet
+  below) and a leading `.` before an identifier (root/absolute-qualified name syntax, e.g.
+  `.pkg.Type`) are both valid CEL primary
   forms under the pinned grammar; Profile v1 defers both, so the parser SHALL report
   `UnsupportedFeature` for each — never `SyntaxError` — at the point the grammar would otherwise
   accept them, and this SHALL hold regardless of nesting position (e.g. inside call arguments,
@@ -60,7 +62,7 @@ this spec:
   `ConditionalOr` has already returned, so arithmetic combined with a comparison anywhere in the
   expression (e.g. `a + b == c`, or nested inside a ternary branch as in `a ? b + c == d : e`) is
   classified correctly instead of producing a spurious `SyntaxError` about a missing `:`/`)`; a
-  message literal's field keys (`IDENT ("." IDENT)* "{" field ":" value ...  "}"`) SHALL be bare
+  message literal's field keys (`SELECTOR ("." SELECTOR)* "{" field ":" value ...  "}"`) SHALL be bare
   identifiers, never an arbitrary expression — `Type{1: 2}` and `Type{'field': 1}` are
   `SyntaxError`, unlike a standalone map literal (`{1: 2}`) whose keys are arbitrary expressions
   and remains `UnsupportedFeature`; this bare-identifier-field-key requirement SHALL apply
@@ -83,6 +85,22 @@ this spec:
   (root-qualified message literal) parse completely instead of leaving a trailing `(`/`{`
   unconsumed, and every `.member`/`[index]` step in a root-qualified chain after the leading one
   is bounded by `MaxNestingDepth` through the same mechanism a non-root-qualified chain uses.
+- A reserved identifier (see the existing `IDENT = SELECTOR - RESERVED` / `SELECTOR =
+  identifier-regex - KEYWORD` distinction) that begins a primary expression SHALL be
+  `SELECTOR`-governed (reserved words allowed) whenever it leads into further qualification — an
+  immediately following `.` (another chain segment) or `{` (a message literal) — since in that
+  position it is a type/namespace path segment, not a variable/function reference; it SHALL
+  remain `IDENT`-governed (reserved words rejected as `SyntaxError`) whenever nothing else
+  consumes it further, i.e. a bare terminal reference (`package` used as a value) or an attempted
+  call (`package(...)`), since those usages resolve it as an actual variable/function name, which
+  a reserved word can never be. This rule applies identically whether the reserved identifier is
+  root-qualified or not: `package{field: 1}`, `package.Type{field: 1}`, and
+  `.package{field: 1}` SHALL all be `UnsupportedFeature` (valid, deferred qualified-name/
+  message-literal syntax), while `package()`, `.package`, and `.package()` SHALL all be
+  `SyntaxError` (a reserved word can never be a callable name or a bare terminal reference, root-
+  qualified or not). A reserved word used as an ordinary member-selector or receiver-call name on
+  a non-reserved receiver (e.g. `x.package()`) is unaffected by this rule — it was already
+  `SELECTOR`-governed under the existing member-access requirement.
 - The decision to classify an expression as `UnsupportedFeature` (as opposed to allowing parsing
   to continue toward a normal result) SHALL be deferred until the entire top-level expression has
   finished parsing successfully — every enclosing `(`/`[`/`{` matched with its closing
@@ -334,6 +352,41 @@ this spec:
   member-access chain (e.g. `.a.b.c.d.e`)
 - **THEN** compilation fails with a `BudgetExceeded` diagnostic carrying
   `limitName = "MaxNestingDepth"`
+
+#### Scenario: A reserved word immediately followed by a message literal brace is deferred, not a syntax error
+
+- **WHEN** the expression `package{field: 1}` is parsed
+- **THEN** compilation fails with an `UnsupportedFeature` diagnostic, not `SyntaxError`
+
+#### Scenario: A reserved word as the root of a multi-segment qualified name is deferred
+
+- **WHEN** the expression `package.Type{field: 1}` is parsed
+- **THEN** compilation fails with an `UnsupportedFeature` diagnostic, not `SyntaxError`
+
+#### Scenario: A root-qualified reserved word immediately followed by a message literal brace is deferred
+
+- **WHEN** the expression `.package{field: 1}` is parsed
+- **THEN** compilation fails with an `UnsupportedFeature` diagnostic, not `SyntaxError`
+
+#### Scenario: A reserved word used as a callable free-function name is a syntax error
+
+- **WHEN** the expression `package()` is parsed
+- **THEN** compilation fails with a `SyntaxError` diagnostic
+
+#### Scenario: A root-qualified reserved word with nothing following is a syntax error
+
+- **WHEN** the expression `.package` is parsed
+- **THEN** compilation fails with a `SyntaxError` diagnostic
+
+#### Scenario: A root-qualified reserved word used as a call name is a syntax error
+
+- **WHEN** the expression `.package()` is parsed
+- **THEN** compilation fails with a `SyntaxError` diagnostic
+
+#### Scenario: A reserved word as a member/call selector on a non-reserved receiver is unaffected
+
+- **WHEN** the expression `x.package()` is parsed
+- **THEN** it parses successfully as a receiver call named `package` on `x`
 
 #### Scenario: A message literal field key must be a bare identifier
 

@@ -574,14 +574,16 @@ internal sealed class CelParser
     /// identifier chain, so e.g. <c>.pkg.f()</c> and <c>.pkg.Type{field: 1}</c> get identical
     /// call/message-literal/<c>MaxNestingDepth</c> handling to <c>pkg.f()</c> /
     /// <c>pkg.Type{field: 1}</c> instead of a bespoke (and previously incomplete) parallel path.
-    /// A bare <c>.</c> with no following identifier is a syntax error, not deferred syntax.
+    /// A bare <c>.</c> with no following identifier is a syntax error, not deferred syntax. See
+    /// <see cref="RequireNonTerminalReservedUsage"/> for the reserved-word rule applied here.
     /// </summary>
     private CelSyntaxNode ParseRootQualifiedNamePrimary(out bool isQualifiedNameChain)
     {
         var dotToken = Advance();
         var nameToken = ExpectSelectorName();
-        TrackIdentifier(nameToken.Span);
         var span = Merge(dotToken.Span, nameToken.Span);
+        RequireNonTerminalReservedUsage(nameToken, span);
+        TrackIdentifier(nameToken.Span);
         MarkDeferred(span, "Root-qualified ('.'-prefixed) name syntax is deferred in Profile v1.", "root-qualified-name");
 
         if (Check(CelTokenKind.LParen))
@@ -599,11 +601,33 @@ internal sealed class CelParser
         return Track(new CelIdentifierSyntax(span, nameToken.Text));
     }
 
+    /// <summary>
+    /// A reserved identifier (e.g. <c>package</c>, <c>namespace</c>) that begins a primary
+    /// expression follows <c>cel-profile-v1</c>'s <c>IDENT = SELECTOR - RESERVED</c> /
+    /// <c>SELECTOR = identifier-regex - KEYWORD</c> distinction the same way it already applies
+    /// to schema-declared names: it is <c>SELECTOR</c>-governed (reserved words allowed) whenever
+    /// it leads into further qualification — a following <c>.</c> (another chain segment) or
+    /// <c>{</c> (a message literal) — since in that position it is a type/namespace path segment,
+    /// not a variable/function reference. It is <c>IDENT</c>-governed (reserved words rejected)
+    /// whenever nothing else consumes it further — a bare terminal reference (<c>package</c> used
+    /// as a value) or an attempted call (<c>package(...)</c>) — since those usages resolve it as
+    /// an actual variable/function name, which a reserved word can never be. This is checked via
+    /// one-token lookahead at the point the reserved identifier is consumed, before deciding
+    /// whether the caller may treat it as a call.
+    /// </summary>
+    private void RequireNonTerminalReservedUsage(CelToken nameToken, CelSourceSpan span)
+    {
+        if (!nameToken.IsReserved)
+            return;
+        if (Check(CelTokenKind.Dot) || Check(CelTokenKind.LBrace))
+            return;
+        throw Fail(span, $"'{nameToken.Text}' is a reserved identifier and cannot be used as a value.");
+    }
+
     private CelSyntaxNode ParseIdentifierPrimary(CelToken token, out bool isQualifiedNameChain)
     {
-        if (token.IsReserved)
-            throw Fail(token.Span, $"'{token.Text}' is a reserved identifier and cannot be used as a value.");
         Advance();
+        RequireNonTerminalReservedUsage(token, token.Span);
         TrackIdentifier(token.Span);
         if (Check(CelTokenKind.LParen))
         {
