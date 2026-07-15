@@ -36,6 +36,23 @@ match. Selectors do not support wildcard or regular-expression values. A valid
 selector that matches no loaded types is reported as an empty selector unless
 the layer is marked `external: true`.
 
+## Reserved selector predicates
+
+The reviewed CEL policy model for issue #162 reserves a future explicit
+`layers.<name>.selector.when` field for narrow boolean predicates over the
+matched candidate type. That field is **not implemented yet** and must remain
+fail-closed until issue #163 lands.
+
+Important boundary:
+
+- ordinary selector fields such as `role`, `metadata`, `namespace`, and
+  `namespace_suffix` are always literal values, never implicitly parsed as
+  expressions;
+- if CEL-backed predicates are introduced later, they will use only an explicit
+  `when` field;
+- policy authors and AI agents should not invent `when` in current runtime
+  policies.
+
 ## Literal namespace prefixes
 
 A literal `namespace` value matches the exact namespace and child namespaces:

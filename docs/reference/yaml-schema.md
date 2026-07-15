@@ -8,6 +8,10 @@ policies with schema-aware editors or AI agents.
 > Note: the current runtime YAML loader ignores unmatched properties while
 > deserializing. Validate against the JSON Schema before opening policy PRs if
 > you need unsupported fields to fail fast.
+>
+> CEL-backed policy predicates are **not** a current schema/runtime feature.
+> The reviewed future model uses explicit `when` fields only and never implicit
+> parsing of ordinary strings.
 
 ## Root and fragment schemas
 

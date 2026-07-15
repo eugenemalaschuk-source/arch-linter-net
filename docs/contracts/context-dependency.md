@@ -71,6 +71,19 @@ A missing role, or a missing constrained metadata key, is a non-match — never 
 [Semantic classification](../policy-format/semantic-classification.md#metadata-extraction-syntax)
 for how metadata values themselves are extracted and canonicalized.
 
+## Reserved CEL predicates
+
+The reviewed CEL policy model for issue #162 also defines future explicit
+`when` fields on contextual `source`/`forbidden`/`exclude` selectors. Those
+predicate fields are **not implemented yet** and current policies must not rely
+on them until issue #163 lands.
+
+If introduced later, `when` will be additive and explicit only:
+
+- existing `role` and `metadata` entries remain literal;
+- no contextual selector string is implicitly parsed as an expression;
+- expression failures stay fail-closed rather than weakening the contract.
+
 ## Exclude vs. ignored_violations
 
 `exclude` is a **pre-match filter on candidate targets** — a target matching an `exclude` selector
