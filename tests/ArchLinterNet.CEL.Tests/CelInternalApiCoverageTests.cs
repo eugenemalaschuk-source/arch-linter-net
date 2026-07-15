@@ -1,4 +1,5 @@
 using ArchLinterNet.CEL;
+using ArchLinterNet.CEL.Binding;
 using ArchLinterNet.CEL.Compilation;
 using ArchLinterNet.CEL.Diagnostics;
 using ArchLinterNet.CEL.Evaluation;
@@ -69,7 +70,7 @@ public sealed class CelInternalApiCoverageTests
     {
         var schema = BuildSimpleSchema();
         var key = BuildKey("x == 1");
-        var pred = new CelCompiledPredicate(CelProfile.V1, schema, key, CelCompilationLimits.SafeDefaults, CelEvaluationLimits.SafeDefaults);
+        var pred = new CelCompiledPredicate(CelProfile.V1, schema, key, CelCompilationLimits.SafeDefaults, CelEvaluationLimits.SafeDefaults, BuildBoundExpression());
 
         Assert.That(pred.Profile, Is.SameAs(CelProfile.V1));
         Assert.That(pred.Schema, Is.SameAs(schema));
@@ -86,7 +87,7 @@ public sealed class CelInternalApiCoverageTests
             .Set(handle, CelValue.String("v"))
             .Build();
         var pred = new CelCompiledPredicate(
-            CelProfile.V1, schema, BuildKey("x"), CelCompilationLimits.SafeDefaults, CelEvaluationLimits.SafeDefaults);
+            CelProfile.V1, schema, BuildKey("x"), CelCompilationLimits.SafeDefaults, CelEvaluationLimits.SafeDefaults, BuildBoundExpression());
 
         Assert.That(
             () => pred.Evaluate(ctx, CelEvaluationLimits.SafeDefaults),
@@ -102,7 +103,7 @@ public sealed class CelInternalApiCoverageTests
             .Set(handle, CelValue.String("v"))
             .Build();
         var pred = new CelCompiledPredicate(
-            CelProfile.V1, schema, BuildKey("x"), CelCompilationLimits.SafeDefaults, CelEvaluationLimits.SafeDefaults);
+            CelProfile.V1, schema, BuildKey("x"), CelCompilationLimits.SafeDefaults, CelEvaluationLimits.SafeDefaults, BuildBoundExpression());
 
         Assert.That(
             () => pred.Evaluate(ctx),
@@ -120,7 +121,7 @@ public sealed class CelInternalApiCoverageTests
             .Build();
         var ceiling = new CelEvaluationLimits(maxIterations: 10, maxCostUnits: 100);
         var pred = new CelCompiledPredicate(
-            CelProfile.V1, schema, BuildKey("x"), CelCompilationLimits.SafeDefaults, ceiling);
+            CelProfile.V1, schema, BuildKey("x"), CelCompilationLimits.SafeDefaults, ceiling, BuildBoundExpression());
 
         // SafeDefaults (1000 iterations) exceeds the captured ceiling (10) — programmer error.
         Assert.That(
@@ -139,7 +140,7 @@ public sealed class CelInternalApiCoverageTests
             .Build();
         var ceiling = new CelEvaluationLimits(maxIterations: 10, maxCostUnits: 100);
         var pred = new CelCompiledPredicate(
-            CelProfile.V1, schema, BuildKey("x"), CelCompilationLimits.SafeDefaults, ceiling);
+            CelProfile.V1, schema, BuildKey("x"), CelCompilationLimits.SafeDefaults, ceiling, BuildBoundExpression());
 
         Assert.That(pred.EvaluationLimits, Is.SameAs(ceiling));
         // Default overload uses the captured ceiling, never the global SafeDefaults, so it must
@@ -156,7 +157,7 @@ public sealed class CelInternalApiCoverageTests
             .Set(handle, CelValue.String("v"))
             .Build();
         var pred = new CelCompiledPredicate(
-            CelProfile.V1, schema, BuildKey("x"), CelCompilationLimits.SafeDefaults, CelEvaluationLimits.SafeDefaults);
+            CelProfile.V1, schema, BuildKey("x"), CelCompilationLimits.SafeDefaults, CelEvaluationLimits.SafeDefaults, BuildBoundExpression());
 
         var tighter = new CelEvaluationLimits(maxIterations: 1, maxCostUnits: 1);
         Assert.That(() => pred.Evaluate(ctx, tighter), Throws.TypeOf<NotImplementedException>());
@@ -169,7 +170,7 @@ public sealed class CelInternalApiCoverageTests
     {
         var schema = BuildSimpleSchema();
         var key = BuildKey("x + 1");
-        var expr = new CelCompiledExpression(CelProfile.V1, schema, key, CelCompilationLimits.SafeDefaults, CelEvaluationLimits.SafeDefaults);
+        var expr = new CelCompiledExpression(CelProfile.V1, schema, key, CelCompilationLimits.SafeDefaults, CelEvaluationLimits.SafeDefaults, BuildBoundExpression());
 
         Assert.That(expr.Profile, Is.SameAs(CelProfile.V1));
         Assert.That(expr.Schema, Is.SameAs(schema));
@@ -186,7 +187,7 @@ public sealed class CelInternalApiCoverageTests
             .Set(handle, CelValue.String("v"))
             .Build();
         var expr = new CelCompiledExpression(
-            CelProfile.V1, schema, BuildKey("x"), CelCompilationLimits.SafeDefaults, CelEvaluationLimits.SafeDefaults);
+            CelProfile.V1, schema, BuildKey("x"), CelCompilationLimits.SafeDefaults, CelEvaluationLimits.SafeDefaults, BuildBoundExpression());
 
         Assert.That(
             () => expr.Evaluate(ctx, CelEvaluationLimits.SafeDefaults),
@@ -202,7 +203,7 @@ public sealed class CelInternalApiCoverageTests
             .Set(handle, CelValue.String("v"))
             .Build();
         var expr = new CelCompiledExpression(
-            CelProfile.V1, schema, BuildKey("x"), CelCompilationLimits.SafeDefaults, CelEvaluationLimits.SafeDefaults);
+            CelProfile.V1, schema, BuildKey("x"), CelCompilationLimits.SafeDefaults, CelEvaluationLimits.SafeDefaults, BuildBoundExpression());
 
         Assert.That(
             () => expr.Evaluate(ctx),
@@ -333,7 +334,7 @@ public sealed class CelInternalApiCoverageTests
     }
 
     [Test]
-    public void CelCompilationResult_NotYetImplemented_CarriesProfileIdParameter()
+    public void CelCompilationResult_ValidLiteralPredicate_SucceedsWithNoDiagnostics()
     {
         var schemaBuilder = CelContextSchema.CreateBuilder("s");
         schemaBuilder.AddVariable("x", CelType.String);
@@ -343,9 +344,27 @@ public sealed class CelInternalApiCoverageTests
 
         var result = env.CompilePredicate("true");
 
-        Assert.That(result.Diagnostics[0].Code, Is.EqualTo(CelDiagnosticCode.NotYetImplemented));
+        Assert.That(result.IsSuccess, Is.True);
+        Assert.That(result.Program, Is.Not.Null);
+        Assert.That(result.Diagnostics, Has.Count.EqualTo(0));
+    }
+
+    [Test]
+    public void CelCompilationResult_BinderDiagnostic_CarriesProfileIdParameter()
+    {
+        var schemaBuilder = CelContextSchema.CreateBuilder("s");
+        schemaBuilder.AddVariable("x", CelType.String);
+        var env = CelEnvironment.CreateBuilder(CelProfile.V1)
+            .WithContextSchema(schemaBuilder.Build())
+            .Build();
+
+        var result = env.CompilePredicate("y == 'z'");
+
+        Assert.That(result.IsSuccess, Is.False);
+        Assert.That(result.Diagnostics[0].Code, Is.EqualTo(CelDiagnosticCode.BindingError));
+        Assert.That(result.Diagnostics[0].Category, Is.EqualTo("binder"));
         Assert.That(result.Diagnostics[0].Parameters["profileId"], Is.EqualTo("arch-linter/cel/v1"));
-        Assert.That(result.Diagnostics[0].Message, Does.Contain("arch-linter/cel/v1"));
+        Assert.That(result.Diagnostics[0].Parameters["identifier"], Is.EqualTo("y"));
     }
 
     [Test]
@@ -486,4 +505,7 @@ public sealed class CelInternalApiCoverageTests
             requiredResultType: CelRequiredResultType.Predicate,
             compilationLimitsIdentity: CelCompilationLimits.SafeDefaults.ComputeIdentity(),
             evaluationLimitsIdentity: CelEvaluationLimits.SafeDefaults.ComputeIdentity());
+
+    private static CelBoundExpression BuildBoundExpression() =>
+        new(new CelBoundBoolLiteral(new CelSourceSpan(0, 4), true));
 }

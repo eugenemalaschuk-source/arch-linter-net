@@ -1,6 +1,6 @@
 using System.Text;
+using ArchLinterNet.CEL.Binding;
 using ArchLinterNet.CEL.Compilation;
-using ArchLinterNet.CEL.Diagnostics;
 using ArchLinterNet.CEL.Evaluation;
 using ArchLinterNet.CEL.Parsing;
 using ArchLinterNet.CEL.Profile;
@@ -91,10 +91,11 @@ public sealed class CelEnvironment
         var key = BuildKey(source, CelRequiredResultType.Predicate);
         if (source.Length > CompilationLimits.MaxExpressionLength)
             return CelCompilationResult<CelCompiledPredicate>.BudgetExceeded(key);
-        var parseError = TryParse(source);
-        if (parseError is not null)
-            return new CelCompilationResult<CelCompiledPredicate>(false, null, [parseError], key);
-        return CelCompilationResult<CelCompiledPredicate>.NotYetImplemented(key);
+        var bindResult = ParseAndBind(source, CelRequiredResultType.Predicate);
+        if (!bindResult.IsSuccess)
+            return new CelCompilationResult<CelCompiledPredicate>(false, null, [bindResult.Diagnostic!], key);
+        var program = new CelCompiledPredicate(Profile, Schema, key, CompilationLimits, EvaluationLimits, bindResult.Bound!);
+        return new CelCompilationResult<CelCompiledPredicate>(true, program, [], key);
     }
 
     /// <summary>
@@ -111,25 +112,28 @@ public sealed class CelEnvironment
         var key = BuildKey(source, CelRequiredResultType.General);
         if (source.Length > CompilationLimits.MaxExpressionLength)
             return CelCompilationResult<CelCompiledExpression>.BudgetExceeded(key);
-        var parseError = TryParse(source);
-        if (parseError is not null)
-            return new CelCompilationResult<CelCompiledExpression>(false, null, [parseError], key);
-        return CelCompilationResult<CelCompiledExpression>.NotYetImplemented(key);
+        var bindResult = ParseAndBind(source, CelRequiredResultType.General);
+        if (!bindResult.IsSuccess)
+            return new CelCompilationResult<CelCompiledExpression>(false, null, [bindResult.Diagnostic!], key);
+        var program = new CelCompiledExpression(Profile, Schema, key, CompilationLimits, EvaluationLimits, bindResult.Bound!);
+        return new CelCompilationResult<CelCompiledExpression>(true, program, [], key);
     }
 
     /// <summary>
-    /// Runs the tokenizer and parser over <paramref name="source"/>. Returns <c>null</c> when the
-    /// expression is syntactically valid Profile v1 CEL (binding/type-checking is #326's scope);
-    /// otherwise returns the single diagnostic explaining the syntax error, unsupported-feature
-    /// condition, or structural-limit violation encountered.
+    /// Runs the tokenizer, parser, and binder over <paramref name="source"/>. Returns a failed
+    /// <see cref="CelBindResult"/> carrying the single diagnostic explaining the syntax error,
+    /// unsupported-feature condition, structural-limit violation, or binding/type-check failure
+    /// encountered; returns a successful result carrying the bound-expression plan otherwise.
     /// </summary>
-    private CelDiagnostic? TryParse(string source)
+    private CelBindResult ParseAndBind(string source, CelRequiredResultType requiredResultType)
     {
         var tokenizeResult = CelTokenizer.Tokenize(source, CompilationLimits, Profile.Id);
         if (!tokenizeResult.IsSuccess)
-            return tokenizeResult.Diagnostic;
+            return CelBindResult.Failed(tokenizeResult.Diagnostic!);
         var parseResult = CelParser.Parse(tokenizeResult.Tokens, CompilationLimits, Profile.Id);
-        return parseResult.IsSuccess ? null : parseResult.Diagnostic;
+        if (!parseResult.IsSuccess)
+            return CelBindResult.Failed(parseResult.Diagnostic!);
+        return CelBinder.Bind(parseResult.Root!, Schema, ObjectSchemas, requiredResultType, Profile.Id);
     }
 
     private CelCompilationKey BuildKey(string source, CelRequiredResultType resultType) =>

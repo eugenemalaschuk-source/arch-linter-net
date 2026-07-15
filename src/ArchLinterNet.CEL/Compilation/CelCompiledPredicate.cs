@@ -1,3 +1,4 @@
+using ArchLinterNet.CEL.Binding;
 using ArchLinterNet.CEL.Evaluation;
 using ArchLinterNet.CEL.Profile;
 using ArchLinterNet.CEL.Schema;
@@ -37,18 +38,26 @@ public sealed class CelCompiledPredicate
     /// </summary>
     public CelEvaluationLimits EvaluationLimits { get; }
 
+    /// <summary>
+    /// Gets the internal bound-expression plan produced by the binder. Never exposed publicly;
+    /// consumed only by the evaluator (#327).
+    /// </summary>
+    internal CelBoundExpression Bound { get; }
+
     internal CelCompiledPredicate(
         CelProfile profile,
         CelContextSchema schema,
         CelCompilationKey compilationKey,
         CelCompilationLimits compilationLimits,
-        CelEvaluationLimits evaluationLimits)
+        CelEvaluationLimits evaluationLimits,
+        CelBoundExpression bound)
     {
         Profile = profile;
         Schema = schema;
         CompilationKey = compilationKey;
         CompilationLimits = compilationLimits;
         EvaluationLimits = evaluationLimits;
+        Bound = bound;
     }
 
     /// <summary>
