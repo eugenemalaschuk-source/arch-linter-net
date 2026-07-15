@@ -226,21 +226,29 @@ iteratively, then explicitly rejects the *other* prefix operator as `SyntaxError
 the `Member` — `!!!x` and `---x` still work exactly as before (verified by regression tests), but
 `!-x`/`-!x` are now correctly invalid.
 
-### 15. Byte-string literals: combined `br"..."` prefix, and `\x`/`\X` only (no `\u`/`\U`)
+### 15. Byte-string literals: combined `br"..."` prefix; `\x`/`\X`/`\u` accepted, only `\U` string-only
 
-Two related lexer gaps, both caught in review. First, the pinned grammar defines
-`BYTES_LIT : ("b"|"B") STRING_LIT` and `STRING_LIT : ["r"|"R"] STRING` — a byte-string literal can
-itself have an inner raw-string prefix (`br"..."`, `Br"..."`, `bR"..."`, `BR"..."`; byte marker
-always first, since `STRING_LIT`'s raw marker is nested inside `BYTES_LIT`'s byte marker in the
-grammar, not the reverse). The initial implementation only matched a single prefix character at a
-time, so `br'...'` fell through to being lexed as a bare two-letter identifier `br` followed by an
-unrelated string token — entirely losing the byte-string meaning. `TryMatchStringPrefix` now
-matches an optional byte marker followed by an optional raw marker before the opening quote.
-Second, `\u`/`\U` (Unicode code-point escapes) were accepted unchanged inside byte-string literals
-even though a byte sequence has no Unicode code points to decode into — only `\x`/`\X` (raw byte
-value escapes) are meaningful there. `AppendEscape` now takes an `isBytes` flag and rejects `\u`/
-`\U` with `SyntaxError` when lexing a byte-string literal; `\X` (uppercase) is also now accepted as
-an alias for `\x`, matching the grammar's case-insensitive hex-escape marker.
+Two related lexer gaps, both caught in review (one of them twice — see the correction below).
+First, the pinned grammar defines `BYTES_LIT : ("b"|"B") STRING_LIT` and
+`STRING_LIT : ["r"|"R"] STRING` — a byte-string literal can itself have an inner raw-string prefix
+(`br"..."`, `Br"..."`, `bR"..."`, `BR"..."`; byte marker always first, since `STRING_LIT`'s raw
+marker is nested inside `BYTES_LIT`'s byte marker in the grammar, not the reverse). The initial
+implementation only matched a single prefix character at a time, so `br'...'` fell through to
+being lexed as a bare two-letter identifier `br` followed by an unrelated string token — entirely
+losing the byte-string meaning. `TryMatchStringPrefix` now matches an optional byte marker
+followed by an optional raw marker before the opening quote.
+
+Second — corrected twice, so recorded carefully: the pinned grammar's byte-string escape set
+includes `\u` (4-digit Unicode escape) but *not* `\U` (8-digit). The initial implementation
+accepted both unchanged inside byte-string literals (a gap, since a byte sequence has no 8-digit
+Unicode code points to decode into — `\U` can address the full Unicode range up to 0x10FFFF, which
+does not fit the byte-literal escape model). The first review-fix pass over-corrected by rejecting
+*both* `\u` and `\U` inside byte-string literals; a later review pass confirmed the pinned grammar
+actually accepts `\u` there (only `\U` is string-only) — an easy mistake given `\u`/`\U` read as a
+natural pair, but the grammar treats them asymmetrically for byte literals specifically.
+`AppendEscape` now takes an `isBytes` flag and rejects only `\U` (not `\u`) with `SyntaxError` when
+lexing a byte-string literal; `\X` (uppercase) is also accepted as an alias for `\x`, matching the
+grammar's case-insensitive hex-escape marker.
 
 ### 16. MaxLiteralSize bounds list/map/message-literal element count during validation
 
@@ -254,6 +262,94 @@ callers who set a tight `MaxLiteralSize` expecting it to catch this case first).
 now increments per parsed element (list) or entry (map/message) and throws `BudgetExceeded` with
 `limitName = "MaxLiteralSize"` the moment the count is exceeded, consistent with the documented
 contract.
+
+### 17. Deferred-construct classification is a pending decision reported only once the whole expression has parsed, not an immediate throw
+
+The most significant fix in this review round, replacing the model decision 9 originally
+established. Decision 9 said a deferred construct is only classified as `UnsupportedFeature`
+*after* its own syntax is validated — but the implementation still *threw immediately* the moment
+that validation succeeded, before the surrounding context had a chance to validate anything past
+it. Two concrete failures resulted, both caught in review: `(a + b` (a genuinely unterminated
+paren) reported `UnsupportedFeature` instead of `SyntaxError`, because `ParseExpression` threw for
+the validated `a + b` chain before `ParsePrimary`'s `Expect(RParen, ...)` ever ran; and
+`a ? b + c == d : e` reported a nonsensical `SyntaxError` ("expected ':'") instead of
+`UnsupportedFeature`, because the arithmetic-chain check lived as a one-shot post-check *after*
+`ParseOr()` returned, so it never re-examined the token stream after consuming `b + c` to notice a
+trailing `==` was still part of the same operand (see decision 18).
+
+The fix replaces every deferred-construct "validate then throw" with "validate then record a
+pending diagnostic and return a `CelDeferredSyntax` placeholder, keep parsing normally." A single
+`_pendingDeferred` field (span + message + feature, set once — `??=` semantics, so the first
+deferred construct encountered wins) accumulates across the whole recursive-descent walk. Only
+`CelParser.Parse` — after the *entire* top-level expression has parsed successfully and the
+top-level trailing-input check has passed — checks `_pendingDeferred` and reports it. Any genuine
+syntax error anywhere in the structure (a missing closing paren/bracket/brace, a missing ternary
+`:`, a malformed nested construct) still throws immediately via the existing exception mechanism,
+which unwinds past the pending-deferred bookkeeping entirely — so structural malformedness is
+still caught with full fidelity, exactly where it occurs, and always wins over a deferred-feature
+classification for the same expression.
+
+Every call site that used to `throw FailUnsupported(...)` now calls `MarkDeferred(...)` and
+returns a `Track(new CelDeferredSyntax(span))` placeholder instead: null/uint/bytes literals,
+list/map literals (`ParsePrimary`'s `LBrace`/`LBracket` cases), unary minus (`ParsePrefixChain`),
+the ternary operator, and the message-literal postfix branch. `CelDeferredSyntax` carries only a
+span — it is never a "real" node semantically, only a vehicle to let the surrounding
+recursive-descent machinery (span merging, postfix chaining, argument/element lists) continue
+exactly as if a normal node had been returned, since Profile v1 has no AST shape to build for any
+of these constructs and none of them will ever survive to be used once the pending diagnostic is
+eventually reported.
+
+### 18. Deferred arithmetic is absorbed at the pinned grammar's `Addition`/`Multiplication` level, not as a post-hoc trailer check
+
+The pinned grammar is `Relation = Addition [Relop Addition]`, `Addition = Multiplication
+{("+"|"-") Multiplication}`, `Multiplication = Unary {("*"|"/"|"%") Unary}` — arithmetic sits
+*between* `Unary` and `Relation` (comparison) in the precedence chain, meaning each comparison
+operand is itself allowed to be an arithmetic expression. The implementation instead had
+`ParseComparison` call bare `ParseUnary()` for its operands, with a single arithmetic-chain check
+bolted on as a post-check inside `ParseExpression`, run only once after `ParseOr()` had already
+fully returned. This meant arithmetic was only recognized when it trailed a completely-reduced
+`ConditionalOr` with nothing else pending — the moment a comparison operator followed the
+arithmetic (`a + b == c`), `ParseComparison` had already returned early (its "operand" `ParseUnary`
+call stopping right before the `+`, never having seen a comparison operator to match), leaving the
+`+` to be discovered later, in the wrong place in the grammar, or (inside a ternary true branch)
+never revisited at all before the missing-`:` error fired (see decision 17's example).
+
+The fix introduces `ParseAdditionLevel`, called from `ParseComparison` in place of bare
+`ParseUnary()` for both its `left` and `right` operands. It absorbs a flat run of
+`+`/`-`/`*`/`/`/`%` around `Unary` operands — deliberately *not* distinguishing `Addition` from
+`Multiplication` precedence, because Profile v1 never builds a real arithmetic AST for either, so
+the precedence difference would only change tree *shape* (irrelevant, since the tree is discarded)
+and never *which tokens are consumed* (the only thing that matters for correctly delimiting the
+deferred region and validating what follows it) — collapsing the two grammar levels into one loop
+is a safe, non-lossy simplification given that constraint, not a grammar shortcut that changes
+observable behavior. Marking deferred now happens inside this loop (per decision 17's
+mark-don't-throw model), so `a + b == c`, `a ? b + c == d : e`, and `(a + b) == c` all correctly
+absorb the arithmetic at the operand level before the enclosing comparison/ternary/parenthesis
+logic ever runs.
+
+### 19. A root-qualified name's trailing message literal gets the same field-key validation as a non-root-qualified one
+
+Decision 10 established that message-literal detection requires a qualified-name-shaped receiver
+(`IsQualifiedNameCandidate`), and decision 13 required message-literal field keys to be bare
+identifiers. The root-qualified-name case (`ParsePrimary`'s `Dot` branch) originally built its
+result as an opaque placeholder and threw immediately — which, independent of decision 17's fix,
+meant `IsQualifiedNameCandidate` never got a chance to recognize it (an opaque placeholder is not
+an identifier or member-access node), so a trailing `{` after a root-qualified name was never
+routed through `ParsePostfix`'s message-literal branch at all; it just became unconsumed trailing
+input. `.pkg.Type{1: 2}` therefore skipped field-key validation entirely — caught in review as
+inconsistent with the identical, non-root-qualified `Type{1: 2}` case, which does correctly reject
+a non-identifier key.
+
+The fix: the `Dot` case now builds the `.pkg.Type` chain using the exact same
+`CelIdentifierSyntax`/`CelMemberAccessSyntax` node shapes an ordinary (non-root-qualified)
+reference chain would use, marking deferred (root-qualified name) once the chain is fully
+consumed, but *returning that node* rather than an opaque placeholder. Because the returned shape
+is indistinguishable from a normal identifier/member-access chain, `IsQualifiedNameCandidate`
+recognizes it, and `ParsePostfix`'s existing message-literal branch (unchanged) naturally applies
+the same bare-identifier-field-key validation to whatever follows — no duplicated validation logic
+needed. `.pkg.Type{1: 2}` is now `SyntaxError` (bad field key) exactly like `Type{1: 2}`;
+`.pkg.Type{field: 1}` remains `UnsupportedFeature` (root-qualified name is deferred regardless of
+what follows it).
 
 ## Risks / Trade-offs
 

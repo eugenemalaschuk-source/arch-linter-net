@@ -53,6 +53,24 @@ internal sealed class CelStringLiteralSyntax : CelSyntaxNode
     public CelStringLiteralSyntax(CelSourceSpan span, string value) : base(span) => Value = value;
 }
 
+/// <summary>
+/// A placeholder standing in for a deferred (valid-but-excluded-from-v1) CEL construct — e.g. an
+/// arithmetic sub-expression, a conditional, a list/map/message literal, or a bare deferred
+/// literal token. Carries only the span the deferred construct occupies. Never appears in a
+/// successfully-compiled result: whenever the parser produces one, it also records a pending
+/// <c>UnsupportedFeature</c> diagnostic that <see cref="CelParser.Parse"/> reports once the whole
+/// expression has finished parsing (see design decision 17 — the pending-deferred model exists so
+/// enclosing structural validation, such as a ternary's `:` or a call's closing `)`, still
+/// completes before the deferred classification is decided, instead of short-circuiting on sight
+/// of the first deferred token the way an immediate-throw design would).
+/// </summary>
+internal sealed class CelDeferredSyntax : CelSyntaxNode
+{
+    public CelDeferredSyntax(CelSourceSpan span) : base(span)
+    {
+    }
+}
+
 /// <summary>A bare identifier reference (a variable name to be resolved by the binder).</summary>
 internal sealed class CelIdentifierSyntax : CelSyntaxNode
 {

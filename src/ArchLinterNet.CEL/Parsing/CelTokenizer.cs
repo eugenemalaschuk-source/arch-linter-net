@@ -355,14 +355,9 @@ internal static class CelTokenizer
             case 'f': sb.Append('\f'); pos++; return (true, null);
             case 'v': sb.Append('\v'); pos++; return (true, null);
             case 'x': case 'X': return AppendHexByteEscape(source, ref pos, sb, literalStart, profileId);
-            case 'u':
-                if (isBytes)
-                {
-                    return (false, CelParseDiagnostics.SyntaxError(
-                        new CelSourceSpan(literalStart, pos + 1), "'\\u' is not a valid escape sequence in a byte-string literal.", profileId));
-                }
-
-                return AppendUnicode4Escape(source, ref pos, sb, literalStart, profileId);
+            // Unlike '\U' (below), the pinned grammar's byte-string escape set includes '\u' —
+            // only the 8-digit '\U' form is string-only.
+            case 'u': return AppendUnicode4Escape(source, ref pos, sb, literalStart, profileId);
             case 'U':
                 if (isBytes)
                 {

@@ -54,10 +54,27 @@ this spec:
   sub-structure, not a simplified approximation: the conditional operator's true branch is
   `ConditionalOr` precedence (an unparenthesized nested ternary there is `SyntaxError`, not
   `UnsupportedFeature`) while its false branch is the full recursive `Expr` (an unparenthesized
-  nested ternary there is valid and SHALL also be fully validated); a message literal's field keys
-  (`IDENT ("." IDENT)* "{" field ":" value ...  "}"`) SHALL be bare identifiers, never an arbitrary
-  expression — `Type{1: 2}` and `Type{'field': 1}` are `SyntaxError`, unlike a standalone map
-  literal (`{1: 2}`) whose keys are arbitrary expressions and remains `UnsupportedFeature`.
+  nested ternary there is valid and SHALL also be fully validated); deferred arithmetic SHALL be
+  absorbed at the `Relation = Addition [Relop Addition]` grammar level — i.e. as part of parsing
+  each comparison operand — rather than only recognized as a flat trailer once a fully-reduced
+  `ConditionalOr` has already returned, so arithmetic combined with a comparison anywhere in the
+  expression (e.g. `a + b == c`, or nested inside a ternary branch as in `a ? b + c == d : e`) is
+  classified correctly instead of producing a spurious `SyntaxError` about a missing `:`/`)`; a
+  message literal's field keys (`IDENT ("." IDENT)* "{" field ":" value ...  "}"`) SHALL be bare
+  identifiers, never an arbitrary expression — `Type{1: 2}` and `Type{'field': 1}` are
+  `SyntaxError`, unlike a standalone map literal (`{1: 2}`) whose keys are arbitrary expressions
+  and remains `UnsupportedFeature`; this bare-identifier-field-key requirement SHALL apply
+  identically when the message-literal receiver is a root-qualified name (e.g.
+  `.pkg.Type{1: 2}` SHALL be `SyntaxError` for the same reason `Type{1: 2}` is, not bypass field
+  validation by virtue of being root-qualified).
+- The decision to classify an expression as `UnsupportedFeature` (as opposed to allowing parsing
+  to continue toward a normal result) SHALL be deferred until the entire top-level expression has
+  finished parsing successfully — every enclosing `(`/`[`/`{` matched with its closing
+  `)`/`]`/`}`, every ternary's `:` and false branch present, full input consumed. A deferred
+  construct's own syntax being valid SHALL NOT cause the parser to stop validating whatever
+  encloses it; only the first such classification decision made SHALL be reported (first deferred
+  construct encountered, in a diagnostic-stability sense — not necessarily the syntactically
+  outermost one).
 - A unary prefix chain (`"!" {"!"} Member` or `"-" {"-"} Member`) SHALL repeat only the same
   operator; mixing `!` and `-` in one prefix chain (e.g. `!-x`, `-!x`) has no valid CEL
   interpretation under the pinned grammar and SHALL be `SyntaxError`, not `UnsupportedFeature`.
@@ -81,10 +98,11 @@ this spec:
   absorbed into the string's content.
 - The tokenizer SHALL recognize the combined byte-plus-raw string prefix (`br"..."`/`Br"..."`/
   `bR"..."`/`BR"..."`, byte marker first per `BYTES_LIT : ("b"|"B") STRING_LIT` /
-  `STRING_LIT : ["r"|"R"] STRING`), not only the single-marker forms. `\u`/`\U` (Unicode
-  code-point escapes) SHALL be rejected as invalid inside a byte-string literal — they have no
-  meaning for a raw byte sequence, unlike `\x`/`\X` (byte-value escapes), which SHALL both be
-  accepted as equivalent.
+  `STRING_LIT : ["r"|"R"] STRING`), not only the single-marker forms. `\x`/`\X` (byte-value
+  escapes) SHALL both be accepted as equivalent, and `\u` (4-digit Unicode escape) SHALL be
+  accepted inside a byte-string literal exactly as in a string literal; only `\U` (8-digit
+  Unicode escape) SHALL be rejected inside a byte-string literal — the pinned grammar's
+  byte-string escape set includes `\u` but not `\U`.
 - `MaxLiteralSize` SHALL bound element/entry count during list/map/message-literal syntax
   validation (each parsed element or `key : value` entry counted as it is validated), matching its
   documented "element count for list/map literals" contract, in addition to the already-enforced
@@ -245,6 +263,33 @@ this spec:
 - **WHEN** the expression `a ? b ? c : d : e` is parsed
 - **THEN** compilation fails with a `SyntaxError` diagnostic
 
+#### Scenario: Arithmetic combined with a comparison is classified correctly, not as a missing colon
+
+- **WHEN** the expression `a ? b + c == d : e` is parsed
+- **THEN** compilation fails with an `UnsupportedFeature` diagnostic, not a `SyntaxError` about a
+  missing `:`
+
+#### Scenario: Arithmetic inside a comparison operand is deferred, not a syntax error
+
+- **WHEN** the expression `a + b == c` is parsed
+- **THEN** compilation fails with an `UnsupportedFeature` diagnostic
+
+#### Scenario: An unterminated parenthesized sub-expression containing arithmetic is a syntax error
+
+- **WHEN** the expression `(a + b` (missing closing paren) is parsed
+- **THEN** compilation fails with a `SyntaxError` diagnostic, not `UnsupportedFeature` — the
+  missing `)` SHALL be caught before the deferred-arithmetic classification is ever considered
+
+#### Scenario: An unterminated call containing an arithmetic argument is a syntax error
+
+- **WHEN** the expression `f(a + b` (missing closing paren) is parsed
+- **THEN** compilation fails with a `SyntaxError` diagnostic, not `UnsupportedFeature`
+
+#### Scenario: A root-qualified message literal's field key is validated the same as a non-root-qualified one
+
+- **WHEN** the expression `.pkg.Type{1: 2}` is parsed
+- **THEN** compilation fails with a `SyntaxError` diagnostic, not `UnsupportedFeature`
+
 #### Scenario: A message literal field key must be a bare identifier
 
 - **WHEN** the expression `Type{1: 2}` is parsed
@@ -267,9 +312,14 @@ this spec:
 - **THEN** it produces a single `BytesLiteral` token whose decoded value is the four raw
   characters `a`, `\`, `n`, `b` (escapes are not processed)
 
-#### Scenario: A Unicode escape inside a byte-string literal is rejected
+#### Scenario: A 4-digit Unicode escape inside a byte-string literal is accepted
 
 - **WHEN** the byte-string literal `b'A'` is tokenized
+- **THEN** it produces a `BytesLiteral` token whose decoded value is `"A"`
+
+#### Scenario: An 8-digit Unicode escape inside a byte-string literal is rejected
+
+- **WHEN** the byte-string literal `b'\U00000041'` is tokenized
 - **THEN** tokenization fails with a `SyntaxError` diagnostic
 
 #### Scenario: MaxLiteralSize bounds list-literal element count during validation

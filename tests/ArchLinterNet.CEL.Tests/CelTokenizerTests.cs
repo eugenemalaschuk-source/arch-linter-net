@@ -212,13 +212,14 @@ public sealed class CelTokenizerTests
     }
 
     [Test]
-    public void ByteStringLiteral_UnicodeEscape_IsSyntaxError()
+    public void ByteStringLiteral_ShortUnicodeEscape_IsAccepted()
     {
-        // \u and \U decode a Unicode code point, which has no meaning for a raw byte sequence —
-        // only \x/\X (byte-value escapes) are valid inside a byte-string literal.
+        // Unlike '\U' (below), the pinned grammar's byte-string escape set includes the 4-digit
+        // '\u' form — only the 8-digit '\U' form is string-only.
         var source = "b'" + "\\u0041" + "'";
-        var diag = TokenizeFail(source);
-        Assert.That(diag.Code, Is.EqualTo(CelDiagnosticCode.SyntaxError));
+        var tokens = TokenizeOk(source);
+        Assert.That(tokens[0].Kind, Is.EqualTo(CelTokenKind.BytesLiteral));
+        Assert.That(tokens[0].StringValue, Is.EqualTo("A"));
     }
 
     [Test]
