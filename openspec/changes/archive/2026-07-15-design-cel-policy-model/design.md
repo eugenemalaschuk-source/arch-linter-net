@@ -123,18 +123,37 @@ The model uses closed CEL context schemas built only from public
 - contextual source predicate: `source`
 - contextual target/exclude predicate: `source`, `target`, `dependency`
 
-The shared subject object is intentionally bounded:
+The shared subject object is a closed catalog — exactly these members:
 
 - identity: `fullName`, `simpleName`, `namespace`, `assemblyName`,
   `projectName`
-- classification: `role`, `metadataText`, `metadataBool`, `metadataNumber`
+- classification: `role`, `metadataText`, `metadataBool`
 - type facts: `kind`, `isAbstract`, `isSealed`, `baseTypeNames`,
   `interfaceTypeNames`, `attributeTypeNames`
-- path facts: `sourcePaths`
+- path facts: `sourcePaths`, `sourceDirectoryPrefixes`
+
+`sourceDirectoryPrefixes` is the precomputed list of every repository-relative
+ancestor directory of every source path (no trailing slash). It exists because
+CEL profile v1 `in` over a list is exact element membership and the profile has
+no list comprehensions, so directory-prefix predicates need a precomputed
+representation rather than substring tricks over `sourcePaths`.
+
+Numeric metadata is excluded from the first wave. The classification pipeline
+canonicalizes numbers into `decimal`, and CEL profile v1 has only signed 64-bit
+`Int` and IEEE 754 `Float` with no implicit widening — no lossless mapping
+exists, and a lossy conversion could change comparison outcomes relative to
+literal metadata selectors. Numeric metadata stays matchable through literal
+`metadata` selectors; a future reviewed spec change may add a numeric bag
+together with explicit conversion rules and non-representability diagnostics.
 
 The `dependency` object is available only where a source-target edge exists and
-captures reviewed edge facts such as dependency kind and whether the edge came
-from method-body evidence.
+is likewise a closed catalog: `kind`, `viaMethodBody`, `sourceMemberName`,
+`targetMemberName`.
+
+Adding, removing, or retyping any member of either schema requires a reviewed
+change to the `cel-policy-model` spec, because the member set defines the
+policy attack surface, structural schema identity, compilation cache identity,
+and policy expression compatibility.
 
 Why:
 
@@ -149,6 +168,10 @@ Alternatives considered:
   boundary and safety constraints.
 - Flatten every fact into top-level variables. Rejected because it scales badly
   and makes source/target contexts harder to explain.
+- Expose numeric metadata as `Map[Float]` or split `Int`/`Float` bags now.
+  Rejected for the first wave because either choice forces conversion rules
+  that #162 cannot validate against real usage; exclusion is lossless and
+  reversible.
 
 ### D5. Expression failures are configuration errors, not selector misses
 
@@ -237,11 +260,18 @@ Why:
 No rollback-specific data migration is needed because this issue introduces only
 design and documentation artifacts.
 
+## Resolved Questions
+
+- Numeric metadata mapping: **excluded from the first wave** (see D4). No
+  `decimal → Int/Float` conversion is defined here; adding numeric facts later
+  requires a reviewed spec change that fixes conversion rules and diagnostics.
+- Dependency edge facts: the first-wave `dependency` schema is **closed** to
+  `kind`, `viaMethodBody`, `sourceMemberName`, and `targetMemberName` (see D4).
+  Further edge facts require a reviewed spec change rather than staying loosely
+  reserved.
+
 ## Open Questions
 
-- Whether `metadataNumber` should surface only `Float`, only `Int`, or a split
-  numeric view when #163 maps the existing canonical decimal domain into CEL v1.
 - Whether future semantic coverage should report a separate "expression error"
-  bucket or reuse existing stale/unknown evidence shapes.
-- Whether target-edge facts beyond dependency kind and method-body origin are
-  needed in the first implementation, or can remain reserved in the blueprint.
+  bucket or reuse existing stale/unknown evidence shapes. (Non-blocking for
+  #163: it concerns coverage reporting shape, not policy semantics.)

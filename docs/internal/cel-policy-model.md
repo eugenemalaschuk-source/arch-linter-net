@@ -87,6 +87,12 @@ ______________________________________________________________________
 The policy model uses fixed CEL root variables. These are public-API-owned
 Core schemas, not reflection-backed CLR objects.
 
+Both schemas below are **closed catalogs**: the listed members are the complete
+first-wave surface. Adding, removing, or retyping a member requires a reviewed
+spec change to `cel-policy-model`, because the member set defines the policy
+attack surface, the structural schema identity, and the compilation cache
+identity that #163 builds on.
+
 ### Selector-backed layer predicate
 
 Root variable:
@@ -110,6 +116,7 @@ Root variables:
 ### Shared subject object
 
 Every `subject`, `source`, and `target` object shares the same bounded shape.
+This member list is exhaustive for the first wave.
 
 | Member | Type | Notes |
 |---|---|---|
@@ -121,7 +128,6 @@ Every `subject`, `source`, and `target` object shares the same bounded shape.
 | `role` | `String` | Resolved semantic role; empty string only when the surrounding consumer permits unclassified candidates. |
 | `metadataText` | `Map[String]` | String-valued metadata by key. |
 | `metadataBool` | `Map[Bool]` | Boolean-valued metadata by key. |
-| `metadataNumber` | `Map[Float]` | Numeric metadata by key, exposed through one reviewed numeric bag. |
 | `kind` | `String` | Stable kind label such as `class`, `interface`, `enum`, `struct`, or `delegate`. |
 | `isAbstract` | `Bool` | Structural type fact. |
 | `isSealed` | `Bool` | Structural type fact. |
@@ -129,11 +135,21 @@ Every `subject`, `source`, and `target` object shares the same bounded shape.
 | `interfaceTypeNames` | `List[String]` | Full names of implemented interfaces. |
 | `attributeTypeNames` | `List[String]` | Full names of discovered type-level attributes/markers. |
 | `sourcePaths` | `List[String]` | Repository-relative source file paths known for the subject. |
+| `sourceDirectoryPrefixes` | `List[String]` | Every ancestor directory of every entry in `sourcePaths`, repository-relative, `/`-separated, without a trailing slash (e.g. `Assets/Game/Client/Presentation/FishingPresenter.cs` contributes `Assets`, `Assets/Game`, `Assets/Game/Client`, and `Assets/Game/Client/Presentation`). Enables exact-membership path-prefix predicates because CEL profile v1 has no list comprehensions and string `contains` does not apply to lists. |
 
 Notes:
 
 - Metadata is split into typed bags because CEL profile v1 has no heterogeneous
   map value type.
+- Numeric metadata is **excluded from the first wave**. The existing semantic
+  classification canonicalizes numeric metadata into `decimal`, and CEL profile
+  v1 offers only signed 64-bit `Int` and IEEE 754 `Float` with no implicit
+  widening — no lossless mapping exists, and a lossy `decimal → double`
+  conversion could silently change comparison results relative to literal
+  `metadata` selectors. Numeric metadata remains matchable through literal
+  `metadata` selectors with exact decimal semantics. Adding a numeric bag later
+  requires a reviewed spec change that fixes the conversion rules and
+  diagnostics for non-representable values.
 - Missing metadata keys must be guarded with `containsKey` to avoid
   fail-closed evaluation errors.
 - No CLR `Type`, reflection metadata object, Roslyn syntax node, or project
@@ -141,7 +157,8 @@ Notes:
 
 ### Dependency object
 
-`dependency` exists only for contextual target/exclusion predicates.
+`dependency` exists only for contextual target/exclusion predicates. This
+member list is exhaustive for the first wave.
 
 | Member | Type | Notes |
 |---|---|---|
@@ -151,7 +168,8 @@ Notes:
 | `targetMemberName` | `String` | Referenced target member name when known, else empty string. |
 
 The dependency object is intentionally narrow. It carries edge facts, not
-execution capability.
+execution capability. Additional edge facts stay out of the model until a
+reviewed spec change adds them explicitly.
 
 ______________________________________________________________________
 
@@ -297,13 +315,17 @@ layers:
       role: PresentationLayer
       when: >
         "UnityEngine.MonoBehaviour" in subject.baseTypeNames
-        && "Assets/Game/Client/" in subject.sourcePaths
+        && "Assets/Game/Client" in subject.sourceDirectoryPrefixes
 ```
 
 Intent:
 
 - combine semantic role discovery with Unity-specific structural facts;
-- keep the dependency on source-file facts explicit and bounded.
+- keep the dependency on source-file facts explicit and bounded;
+- use `sourceDirectoryPrefixes` for the directory constraint, because `in` over
+  `sourcePaths` is exact element membership — a directory string is never equal
+  to a full file path, so `"Assets/Game/Client/" in subject.sourcePaths` would
+  always be `false` for real files.
 
 ______________________________________________________________________
 

@@ -74,24 +74,39 @@ APIs. A selector-backed layer predicate SHALL expose one root variable named
 `source`. A contextual target or exclusion predicate SHALL expose `source`,
 `target`, and `dependency`.
 
-The shared subject shape SHALL include, at minimum:
+The shared subject shape SHALL consist of exactly the following members and
+types:
 
-- identity facts: `fullName`, `simpleName`, `namespace`, `assemblyName`,
-  `projectName`
-- classification facts: `role`, `metadataText`, `metadataBool`,
-  `metadataNumber`
-- type facts: `kind`, `isAbstract`, `isSealed`, `baseTypeNames`,
-  `interfaceTypeNames`, `attributeTypeNames`
-- path facts: `sourcePaths`
+- identity facts: `fullName: String`, `simpleName: String`,
+  `namespace: String`, `assemblyName: String`, `projectName: String`
+- classification facts: `role: String`, `metadataText: Map[String]`,
+  `metadataBool: Map[Bool]`
+- type facts: `kind: String`, `isAbstract: Bool`, `isSealed: Bool`,
+  `baseTypeNames: List[String]`, `interfaceTypeNames: List[String]`,
+  `attributeTypeNames: List[String]`
+- path facts: `sourcePaths: List[String]`,
+  `sourceDirectoryPrefixes: List[String]` (every repository-relative ancestor
+  directory of every source path, `/`-separated, without a trailing slash)
 
-The `dependency` shape SHALL be limited to deterministic edge facts owned by
-Core and SHALL NOT expose host services, reflection objects, processes,
-environment variables, network access, or user-defined functions.
+Numeric metadata SHALL NOT be exposed in the first-wave subject shape: the
+canonical `decimal` metadata domain has no lossless mapping onto CEL profile v1
+`Int`/`Float`, and numeric metadata remains matchable only through literal
+`metadata` selectors.
+
+The `dependency` shape SHALL consist of exactly the following deterministic
+edge facts owned by Core: `kind: String`, `viaMethodBody: Bool`,
+`sourceMemberName: String`, `targetMemberName: String`. It SHALL NOT expose
+host services, reflection objects, processes, environment variables, network
+access, or user-defined functions.
+
+Both context schemas are closed catalogs: adding, removing, or retyping any
+member SHALL require a reviewed change to this specification.
 
 #### Scenario: Layer selector reads typed subject facts
 
 - **WHEN** a selector predicate references `subject.role`,
-  `subject.metadataText.containsKey("domain")`, or `"Sales" in subject.sourcePaths`
+  `subject.metadataText.containsKey("domain")`, or
+  `"Assets/Game/Client" in subject.sourceDirectoryPrefixes`
 - **THEN** those members resolve through the fixed `subject` schema rather than
   through reflection or dynamic member access
 
