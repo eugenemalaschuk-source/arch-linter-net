@@ -528,7 +528,7 @@ internal sealed class CelParser
     /// keys. Validates the brace contents before classifying as deferred — a malformed or
     /// unterminated <c>{...}</c> is a syntax error, not deferred syntax.
     /// </summary>
-    private CelSyntaxNode ParseMapLiteralPrimary(CelToken token)
+    private CelDeferredSyntax ParseMapLiteralPrimary(CelToken token)
     {
         var closeBrace = ParseBraceBody(token.Span, isMessageLiteral: false);
         var span = Merge(token.Span, closeBrace.Span);
@@ -541,7 +541,7 @@ internal sealed class CelParser
     /// valid contents (e.g. <c>[</c> alone) is a syntax error, not deferred. Element count is
     /// bounded by <c>MaxLiteralSize</c>.
     /// </summary>
-    private CelSyntaxNode ParseListLiteralPrimary(CelToken token)
+    private CelDeferredSyntax ParseListLiteralPrimary(CelToken token)
     {
         Advance();
         var elementCount = 0;
