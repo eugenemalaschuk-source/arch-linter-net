@@ -42,12 +42,9 @@ public sealed class CelCompilationLimits
     /// </summary>
     public CelCompilationLimits(int maxExpressionLength, int maxNestingDepth, int maxIdentifierCount)
     {
-        if (maxExpressionLength <= 0)
-            throw new ArgumentOutOfRangeException(nameof(maxExpressionLength));
-        if (maxNestingDepth <= 0)
-            throw new ArgumentOutOfRangeException(nameof(maxNestingDepth));
-        if (maxIdentifierCount <= 0)
-            throw new ArgumentOutOfRangeException(nameof(maxIdentifierCount));
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(maxExpressionLength);
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(maxNestingDepth);
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(maxIdentifierCount);
 
         MaxExpressionLength = maxExpressionLength;
         MaxNestingDepth = maxNestingDepth;

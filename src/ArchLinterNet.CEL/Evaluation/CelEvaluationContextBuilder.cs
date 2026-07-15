@@ -95,23 +95,13 @@ public sealed class CelEvaluationContextBuilder
     private bool ValidateListElements(CelType declared, CelValue listValue, int depth)
     {
         if (declared.ElementType is null) return true;
-        foreach (var el in listValue.AsList())
-        {
-            if (!ValueMatchesType(declared.ElementType, el, depth))
-                return false;
-        }
-        return true;
+        return listValue.AsList().All(el => ValueMatchesType(declared.ElementType, el, depth));
     }
 
     private bool ValidateMapValues(CelType declared, CelValue mapValue, int depth)
     {
         if (declared.ValueType is null) return true;
-        foreach (var v in mapValue.AsMap().Values)
-        {
-            if (!ValueMatchesType(declared.ValueType, v, depth))
-                return false;
-        }
-        return true;
+        return mapValue.AsMap().Values.All(v => ValueMatchesType(declared.ValueType, v, depth));
     }
 
     private bool ValidateObjectValue(CelType declared, CelObjectValue obj, int depth)

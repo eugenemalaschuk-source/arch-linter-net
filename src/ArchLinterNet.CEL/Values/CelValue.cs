@@ -24,57 +24,81 @@ public sealed class CelValue
     private readonly IReadOnlyDictionary<string, CelValue>? _mapValue;
     private readonly CelObjectValue? _objectValue;
 
-    private CelValue(
-        CelValueKind kind,
-        bool boolValue = false,
-        string? stringValue = null,
-        long intValue = 0L,
-        double floatValue = 0.0,
-        IReadOnlyList<CelValue>? listValue = null,
-        IReadOnlyDictionary<string, CelValue>? mapValue = null,
-        CelObjectValue? objectValue = null)
+    // Split into one constructor per kind (instead of a single constructor with 7 defaulted
+    // scalar/collection parameters) to stay within Sonar's constructor-arity limit (S107).
+    private CelValue(CelValueKind kind, bool boolValue)
     {
         Kind = kind;
         _boolValue = boolValue;
+    }
+
+    private CelValue(CelValueKind kind, string stringValue)
+    {
+        Kind = kind;
         _stringValue = stringValue;
+    }
+
+    private CelValue(CelValueKind kind, long intValue)
+    {
+        Kind = kind;
         _intValue = intValue;
+    }
+
+    private CelValue(CelValueKind kind, double floatValue)
+    {
+        Kind = kind;
         _floatValue = floatValue;
+    }
+
+    private CelValue(CelValueKind kind, IReadOnlyList<CelValue> listValue)
+    {
+        Kind = kind;
         _listValue = listValue;
+    }
+
+    private CelValue(CelValueKind kind, IReadOnlyDictionary<string, CelValue> mapValue)
+    {
+        Kind = kind;
         _mapValue = mapValue;
+    }
+
+    private CelValue(CelValueKind kind, CelObjectValue objectValue)
+    {
+        Kind = kind;
         _objectValue = objectValue;
     }
 
     /// <summary>Creates a CEL <c>bool</c> value.</summary>
     public static CelValue Bool(bool value) =>
-        new(CelValueKind.Bool, boolValue: value);
+        new(CelValueKind.Bool, value);
 
     /// <summary>Creates a CEL <c>string</c> value.</summary>
     public static CelValue String(string value)
     {
         ArgumentNullException.ThrowIfNull(value);
-        return new CelValue(CelValueKind.String, stringValue: value);
+        return new CelValue(CelValueKind.String, value);
     }
 
     /// <summary>Creates a CEL <c>int</c> value (signed 64-bit).</summary>
     public static CelValue Int(long value) =>
-        new(CelValueKind.Int, intValue: value);
+        new(CelValueKind.Int, value);
 
     /// <summary>Creates a CEL <c>double</c> value.</summary>
     public static CelValue Float(double value) =>
-        new(CelValueKind.Float, floatValue: value);
+        new(CelValueKind.Float, value);
 
     /// <summary>Creates an immutable CEL list value. Defensively copies the input.</summary>
     public static CelValue List(IReadOnlyList<CelValue> value)
     {
         ArgumentNullException.ThrowIfNull(value);
-        return new CelValue(CelValueKind.List, listValue: new List<CelValue>(value).AsReadOnly());
+        return new CelValue(CelValueKind.List, new List<CelValue>(value).AsReadOnly());
     }
 
     /// <summary>Creates an immutable, string-keyed CEL map value. Defensively copies the input.</summary>
     public static CelValue Map(IReadOnlyDictionary<string, CelValue> value)
     {
         ArgumentNullException.ThrowIfNull(value);
-        return new CelValue(CelValueKind.Map, mapValue:
+        return new CelValue(CelValueKind.Map,
             new Dictionary<string, CelValue>(value, StringComparer.Ordinal).AsReadOnly());
     }
 
@@ -82,7 +106,7 @@ public sealed class CelValue
     public static CelValue Object(CelObjectValue value)
     {
         ArgumentNullException.ThrowIfNull(value);
-        return new CelValue(CelValueKind.Object, objectValue: value);
+        return new CelValue(CelValueKind.Object, value);
     }
 
     /// <summary>Returns the boolean value. Throws <see cref="InvalidOperationException"/> if kind is not <see cref="CelValueKind.Bool"/>.</summary>

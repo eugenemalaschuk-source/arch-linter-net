@@ -53,6 +53,7 @@ public sealed class CelCompiledExpression
     {
         ArgumentNullException.ThrowIfNull(context);
         ArgumentNullException.ThrowIfNull(limits);
-        throw new NotImplementedException("Evaluator not yet implemented — see #327.");
+        throw new NotImplementedException(
+            $"Evaluator not yet implemented for profile '{Profile.Id}' — see #327.");
     }
 }

@@ -42,10 +42,8 @@ public sealed class CelEvaluationLimits
     /// </summary>
     public CelEvaluationLimits(int maxIterations, long maxCostUnits)
     {
-        if (maxIterations <= 0)
-            throw new ArgumentOutOfRangeException(nameof(maxIterations));
-        if (maxCostUnits <= 0)
-            throw new ArgumentOutOfRangeException(nameof(maxCostUnits));
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(maxIterations);
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(maxCostUnits);
 
         MaxIterations = maxIterations;
         MaxCostUnits = maxCostUnits;
