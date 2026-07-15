@@ -541,11 +541,28 @@ this spec:
   A malformed instance of any of these tokens (e.g. an unterminated byte-string) SHALL still be
   reported as `SyntaxError`, since it is not valid CEL syntax to begin with.
 - String literals SHALL support `'...'` and `"..."` quoting with the escape sequences
-  `\n \t \r \\ \' \" \` \? \a \b \f \v \0`, `\xHH`, `\uHHHH`, and `\UHHHHHHHH`, plus `r"..."` /
-  `R"..."` raw-string quoting (no escape processing). Triple-quoted strings and octal escape
-  sequences are out of scope for Profile v1 lexing; adding them is a pure lexer addition reserved
-  for a future profile version, not a grammar-restructuring change. An unterminated string literal
-  or a malformed escape sequence SHALL be reported as `SyntaxError`.
+  `\n \t \r \\ \' \" \` \? \a \b \f \v`, `\xHH`, `\uHHHH`, and `\UHHHHHHHH`, plus `r"..."` /
+  `R"..."` raw-string quoting (no escape processing). CEL has no standalone `\0` escape (only
+  three-digit octal, which is out of scope below), so `\0` SHALL be rejected as an unknown escape
+  sequence, not silently treated as NUL. `\uHHHH` and `\UHHHHHHHH` SHALL both reject a codepoint
+  in the UTF-16 surrogate range (`0xD800`-`0xDFFF`) — neither is a valid standalone Unicode scalar
+  value. Triple-quoted strings and octal escape sequences are out of scope for Profile v1 lexing;
+  adding them is a pure lexer addition reserved for a future profile version, not a
+  grammar-restructuring change. An unterminated string literal or a malformed escape sequence
+  SHALL be reported as `SyntaxError`.
+- Identifiers SHALL be restricted to the pinned grammar's ASCII `IDENT`/`SELECTOR` alphabet
+  (`[_a-zA-Z][_a-zA-Z0-9]*`); a non-ASCII letter (e.g. `é`) is not part of any identifier and
+  SHALL be reported as `SyntaxError`, not silently accepted as a Unicode identifier character.
+  Numeric literals follow the same ASCII-digit restriction (`[0-9]`), and a decimal point SHALL
+  only be consumed as part of a `FLOAT_LIT` when followed by at least one digit — `3.` alone is
+  not a valid float literal and SHALL tokenize as an `IntLiteral` followed by a separate `.`.
+- `IDENT ("." IDENT)* "{" ... "}"` (message/proto literal construction) and a leading `.` before
+  an identifier (root/absolute-qualified name syntax, e.g. `.pkg.Type`) are both valid CEL primary
+  forms under the pinned grammar; Profile v1 defers both, so the parser SHALL report
+  `UnsupportedFeature` for each — never `SyntaxError` — at the point the grammar would otherwise
+  accept them, and this SHALL hold regardless of nesting position (e.g. inside call arguments,
+  parenthesized sub-expressions, or index expressions), not only at the top level of the
+  expression being compiled.
 - A reserved identifier (`as`, `break`, `const`, `continue`, `else`, `for`, `function`, `if`,
   `import`, `let`, `loop`, `package`, `namespace`, `return`, `var`, `void`, `while`) used as a bare
   primary expression reference SHALL be `SyntaxError`; the same word used in member-selector
@@ -579,6 +596,43 @@ this spec:
 
 - **WHEN** the expression `a => b` is parsed
 - **THEN** compilation fails with a `SyntaxError` diagnostic
+
+#### Scenario: Deferred arithmetic is detected regardless of nesting position
+
+- **WHEN** the expression `f(a + b)` (arithmetic inside a call argument) is parsed
+- **THEN** compilation fails with an `UnsupportedFeature` diagnostic, not a generic `SyntaxError`
+  about an unexpected closing token
+
+#### Scenario: A non-ASCII letter is rejected, not absorbed into an identifier
+
+- **WHEN** the expression `é` is parsed
+- **THEN** compilation fails with a `SyntaxError` diagnostic
+
+#### Scenario: A decimal point with no following digit does not form a float literal
+
+- **WHEN** the source `3.` is tokenized
+- **THEN** it produces an `IntLiteral` token for `3` followed by a separate `.` (`Dot`) token, not
+  a single `FloatLiteral` token
+
+#### Scenario: Message literal syntax is deferred, not a syntax error
+
+- **WHEN** the expression `Type{field: 1}` is parsed
+- **THEN** compilation fails with an `UnsupportedFeature` diagnostic, not `SyntaxError`
+
+#### Scenario: Root-qualified name syntax is deferred, not a syntax error
+
+- **WHEN** the expression `.pkg.Type` is parsed
+- **THEN** compilation fails with an `UnsupportedFeature` diagnostic, not `SyntaxError`
+
+#### Scenario: A standalone \0 escape is rejected
+
+- **WHEN** the string literal `'\0'` is tokenized
+- **THEN** tokenization fails with a `SyntaxError` diagnostic (unknown escape sequence)
+
+#### Scenario: A surrogate-range \u escape is rejected
+
+- **WHEN** the string literal `'\uD800'` is tokenized
+- **THEN** tokenization fails with a `SyntaxError` diagnostic
 
 #### Scenario: Reserved identifier is rejected as a bare reference but accepted as a member name
 

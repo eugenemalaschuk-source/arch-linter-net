@@ -45,12 +45,6 @@ internal sealed class CelParser
             var root = parser.ParseExpression();
             if (parser.Current.Kind != CelTokenKind.Eof)
             {
-                if (IsDeferredBinaryOperator(parser.Current.Kind))
-                {
-                    throw parser.FailUnsupported(
-                        parser.Current.Span, "Arithmetic operators are deferred in Profile v1.", "arithmetic");
-                }
-
                 throw parser.Fail(
                     parser.Current.Span, $"Unexpected trailing input starting with '{parser.Current.Text}'.");
             }
@@ -95,6 +89,15 @@ internal sealed class CelParser
             {
                 throw FailUnsupported(
                     Current.Span, "The conditional operator ('? :') is deferred in Profile v1.", "conditional");
+            }
+
+            // Checked here (not only at the top-level Parse() entry) so `f(a + b)`, `(a + b)`,
+            // and `items[a + b]` all correctly report UnsupportedFeature instead of a generic
+            // "expected ')'/']'/','" SyntaxError from the enclosing construct.
+            if (IsDeferredBinaryOperator(Current.Kind))
+            {
+                throw FailUnsupported(
+                    Current.Span, "Arithmetic operators are deferred in Profile v1.", "arithmetic");
             }
 
             return expr;
@@ -232,6 +235,13 @@ internal sealed class CelParser
                 var closeBracket = Expect(CelTokenKind.RBracket, "']'");
                 expr = Track(new CelIndexSyntax(Merge(expr.Span, closeBracket.Span), expr, index));
             }
+            else if (Check(CelTokenKind.LBrace))
+            {
+                // `IDENT ("." IDENT)* "{" ... "}"` — message literal construction. Valid CEL
+                // syntax per the pinned grammar; message/proto literals are deferred in v1.
+                throw FailUnsupported(
+                    Current.Span, "Message literal syntax is deferred in Profile v1.", "message-literal");
+            }
             else
             {
                 break;
@@ -291,6 +301,11 @@ internal sealed class CelParser
                 throw FailUnsupported(token.Span, "Map/message literal syntax is deferred in Profile v1.", "map-literal");
             case CelTokenKind.LBracket:
                 throw FailUnsupported(token.Span, "List literal syntax is deferred in Profile v1.", "list-literal");
+            case CelTokenKind.Dot:
+                // `"." IDENT ("." IDENT)*` — root/absolute-qualified name syntax. Valid CEL
+                // syntax per the pinned grammar; deferred in v1 (no package-qualified names).
+                throw FailUnsupported(
+                    token.Span, "Root-qualified ('.'-prefixed) name syntax is deferred in Profile v1.", "root-qualified-name");
             case CelTokenKind.Plus:
             case CelTokenKind.Minus:
             case CelTokenKind.Star:

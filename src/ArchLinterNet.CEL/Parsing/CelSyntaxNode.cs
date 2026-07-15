@@ -139,6 +139,9 @@ internal sealed class CelCallSyntax : CelSyntaxNode
     {
         Receiver = receiver;
         FunctionName = functionName;
-        Arguments = arguments;
+        // Defensive copy: the parser passes its working List<CelSyntaxNode> directly, which
+        // callers could otherwise cast IReadOnlyList<> back to List<> and mutate the "immutable"
+        // tree — same pattern as CelDiagnostic.Parameters / CelCompilationResult.Diagnostics.
+        Arguments = new List<CelSyntaxNode>(arguments).AsReadOnly();
     }
 }

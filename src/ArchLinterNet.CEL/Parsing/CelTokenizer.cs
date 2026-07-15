@@ -57,7 +57,7 @@ internal static class CelTokenizer
             {
                 (token, error) = LexString(source, ref pos, start, isRaw: false, isBytes: false, profileId);
             }
-            else if (char.IsDigit(c) || (c == '.' && pos + 1 < source.Length && char.IsDigit(source[pos + 1])))
+            else if (IsAsciiDigit(c) || (c == '.' && pos + 1 < source.Length && IsAsciiDigit(source[pos + 1])))
             {
                 (token, error) = LexNumber(source, ref pos, profileId);
             }
@@ -123,11 +123,17 @@ internal static class CelTokenizer
     private static bool IsByteStringPrefix(string source, int pos) =>
         (source[pos] is 'b' or 'B') && pos + 1 < source.Length && source[pos + 1] is '\'' or '"';
 
-    private static bool IsIdentifierStart(char c) => char.IsLetter(c) || c == '_';
+    // The pinned CEL grammar restricts IDENT to ASCII: [_a-zA-Z][_a-zA-Z0-9]*. char.IsLetter/
+    // IsLetterOrDigit would accept Unicode letters, which is not valid CEL syntax.
+    private static bool IsIdentifierStart(char c) => c is (>= 'a' and <= 'z') or (>= 'A' and <= 'Z') or '_';
 
-    private static bool IsIdentifierPart(char c) => char.IsLetterOrDigit(c) || c == '_';
+    private static bool IsIdentifierPart(char c) => IsIdentifierStart(c) || (c >= '0' && c <= '9');
 
     private static bool IsHexDigit(char c) => c is (>= '0' and <= '9') or (>= 'a' and <= 'f') or (>= 'A' and <= 'F');
+
+    // DIGIT in the pinned CEL grammar is [0-9] only; char.IsDigit(c) would also accept
+    // non-ASCII Unicode decimal digits (e.g. Arabic-indic), which is not valid CEL syntax.
+    private static bool IsAsciiDigit(char c) => c is >= '0' and <= '9';
 
     private static (CelToken?, CelDiagnostic?) LexIdentifierOrKeyword(string source, ref int pos)
     {
@@ -164,14 +170,17 @@ internal static class CelTokenizer
             pos++;
         }
 
-        while (pos < source.Length && char.IsDigit(source[pos]))
+        while (pos < source.Length && IsAsciiDigit(source[pos]))
             pos++;
 
-        if (!sawDot && pos < source.Length && source[pos] == '.')
+        // The pinned grammar requires at least one digit after the decimal point
+        // (DIGIT+ "." DIGIT+ | DIGIT* "." DIGIT+) — "3." alone is not a valid FLOAT_LIT.
+        if (!sawDot && pos < source.Length && source[pos] == '.'
+            && pos + 1 < source.Length && IsAsciiDigit(source[pos + 1]))
         {
             sawDot = true;
             pos++;
-            while (pos < source.Length && char.IsDigit(source[pos]))
+            while (pos < source.Length && IsAsciiDigit(source[pos]))
                 pos++;
         }
 
@@ -182,7 +191,7 @@ internal static class CelTokenizer
             if (pos < source.Length && source[pos] is '+' or '-')
                 pos++;
             var digitsStart = pos;
-            while (pos < source.Length && char.IsDigit(source[pos]))
+            while (pos < source.Length && IsAsciiDigit(source[pos]))
                 pos++;
             if (pos > digitsStart)
                 sawExp = true;
@@ -313,9 +322,8 @@ internal static class CelTokenizer
             case 'b': sb.Append('\b'); pos++; return (true, null);
             case 'f': sb.Append('\f'); pos++; return (true, null);
             case 'v': sb.Append('\v'); pos++; return (true, null);
-            case '0': sb.Append('\0'); pos++; return (true, null);
-            case 'x': return AppendHexEscape(source, ref pos, sb, literalStart, digitCount: 2, profileId);
-            case 'u': return AppendHexEscape(source, ref pos, sb, literalStart, digitCount: 4, profileId);
+            case 'x': return AppendHexByteEscape(source, ref pos, sb, literalStart, profileId);
+            case 'u': return AppendUnicode4Escape(source, ref pos, sb, literalStart, profileId);
             case 'U': return AppendUnicodeEscape(source, ref pos, sb, literalStart, profileId);
             default:
                 return (false, CelParseDiagnostics.SyntaxError(
@@ -323,20 +331,44 @@ internal static class CelTokenizer
         }
     }
 
-    private static (bool, CelDiagnostic?) AppendHexEscape(
-        string source, ref int pos, System.Text.StringBuilder sb, int literalStart, int digitCount, CelProfileId profileId)
+    private static (bool, CelDiagnostic?) AppendHexByteEscape(
+        string source, ref int pos, System.Text.StringBuilder sb, int literalStart, CelProfileId profileId)
     {
-        pos++; // consume 'x'/'u'
+        pos++; // consume 'x'
         var digitsStart = pos;
-        while (pos < source.Length && pos - digitsStart < digitCount && IsHexDigit(source[pos]))
+        while (pos < source.Length && pos - digitsStart < 2 && IsHexDigit(source[pos]))
             pos++;
-        if (pos - digitsStart != digitCount)
+        if (pos - digitsStart != 2)
         {
             return (false, CelParseDiagnostics.SyntaxError(
-                new CelSourceSpan(literalStart, pos), $"Malformed escape sequence: expected {digitCount} hex digits.", profileId));
+                new CelSourceSpan(literalStart, pos), "Malformed \\x escape sequence: expected 2 hex digits.", profileId));
         }
 
         sb.Append((char)Convert.ToInt32(source[digitsStart..pos], 16));
+        return (true, null);
+    }
+
+    private static (bool, CelDiagnostic?) AppendUnicode4Escape(
+        string source, ref int pos, System.Text.StringBuilder sb, int literalStart, CelProfileId profileId)
+    {
+        pos++; // consume 'u'
+        var digitsStart = pos;
+        while (pos < source.Length && pos - digitsStart < 4 && IsHexDigit(source[pos]))
+            pos++;
+        if (pos - digitsStart != 4)
+        {
+            return (false, CelParseDiagnostics.SyntaxError(
+                new CelSourceSpan(literalStart, pos), "Malformed \\u escape sequence: expected 4 hex digits.", profileId));
+        }
+
+        var codepoint = Convert.ToInt32(source[digitsStart..pos], 16);
+        if (codepoint is >= 0xD800 and <= 0xDFFF)
+        {
+            return (false, CelParseDiagnostics.SyntaxError(
+                new CelSourceSpan(literalStart, pos), "\\u escape sequence must not encode a surrogate code point.", profileId));
+        }
+
+        sb.Append((char)codepoint);
         return (true, null);
     }
 

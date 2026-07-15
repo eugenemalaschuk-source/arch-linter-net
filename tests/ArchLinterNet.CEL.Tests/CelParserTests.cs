@@ -402,6 +402,57 @@ public sealed class CelParserTests
         Assert.That(diag.Code, Is.EqualTo(CelDiagnosticCode.UnsupportedFeature));
     }
 
+    [Test]
+    public void MessageLiteral_IsUnsupportedFeature()
+    {
+        var diag = ParseFail("Type{field: 1}");
+        Assert.That(diag.Code, Is.EqualTo(CelDiagnosticCode.UnsupportedFeature));
+    }
+
+    [Test]
+    public void QualifiedMessageLiteral_IsUnsupportedFeature()
+    {
+        var diag = ParseFail("pkg.Type{field: 1}");
+        Assert.That(diag.Code, Is.EqualTo(CelDiagnosticCode.UnsupportedFeature));
+    }
+
+    [Test]
+    public void RootQualifiedName_IsUnsupportedFeature()
+    {
+        var diag = ParseFail(".pkg.Type");
+        Assert.That(diag.Code, Is.EqualTo(CelDiagnosticCode.UnsupportedFeature));
+    }
+
+    [Test]
+    public void RootQualifiedMessageLiteral_IsUnsupportedFeature()
+    {
+        var diag = ParseFail(".pkg.Type{field: 1}");
+        Assert.That(diag.Code, Is.EqualTo(CelDiagnosticCode.UnsupportedFeature));
+    }
+
+    // ── Arithmetic is deferred at every nesting level, not only top-level ─────
+
+    [Test]
+    public void ArithmeticInsideCallArgument_IsUnsupportedFeature()
+    {
+        var diag = ParseFail("f(a + b)");
+        Assert.That(diag.Code, Is.EqualTo(CelDiagnosticCode.UnsupportedFeature));
+    }
+
+    [Test]
+    public void ArithmeticInsideParentheses_IsUnsupportedFeature()
+    {
+        var diag = ParseFail("(a + b)");
+        Assert.That(diag.Code, Is.EqualTo(CelDiagnosticCode.UnsupportedFeature));
+    }
+
+    [Test]
+    public void ArithmeticInsideIndexExpression_IsUnsupportedFeature()
+    {
+        var diag = ParseFail("items[a + b]");
+        Assert.That(diag.Code, Is.EqualTo(CelDiagnosticCode.UnsupportedFeature));
+    }
+
     // ── Structural limits (adversarial) ────────────────────────────────────────
 
     [Test]
@@ -448,5 +499,18 @@ public sealed class CelParserTests
         var diag = ParseFail("a => b");
         Assert.That(diag.Category, Is.EqualTo("parser"));
         Assert.That(diag.Parameters["profileId"], Is.EqualTo("arch-linter/cel/v1"));
+    }
+
+    // ── AST immutability: cast-and-mutate regression ──────────────────────────
+
+    [Test]
+    public void CallSyntax_Arguments_CannotMutateThroughCast()
+    {
+        var node = (CelCallSyntax)ParseOk("f(a, b)");
+
+        Assert.That(node.Arguments as List<CelSyntaxNode>, Is.Null,
+            "Arguments must not be a mutable List<> that can be mutated via cast.");
+        Assert.That(node.Arguments as CelSyntaxNode[], Is.Null,
+            "Arguments must not be a raw array that can be mutated via cast.");
     }
 }

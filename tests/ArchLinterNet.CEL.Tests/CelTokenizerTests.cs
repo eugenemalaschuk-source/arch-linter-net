@@ -47,6 +47,29 @@ public sealed class CelTokenizerTests
         Assert.That(tokens[0].IsReserved, Is.True);
     }
 
+    [Test]
+    public void NonAsciiLetter_IsNotPartOfAnIdentifier()
+    {
+        // The pinned grammar restricts IDENT to ASCII: [_a-zA-Z][_a-zA-Z0-9]*. "é" must not be
+        // absorbed into an identifier — it tokenizes as an unexpected character instead.
+        var result = CelTokenizer.Tokenize("é", CelCompilationLimits.SafeDefaults, CelProfile.V1.Id);
+        Assert.That(result.IsSuccess, Is.False);
+        Assert.That(result.Diagnostic!.Code, Is.EqualTo(CelDiagnosticCode.SyntaxError));
+    }
+
+    [Test]
+    public void NonAsciiLetter_TerminatesAPrecedingIdentifier()
+    {
+        // "a" followed by "é" must tokenize as identifier "a" then fail on "é", not as one
+        // 2-character identifier "aé".
+        var tokens = TokenizeOk("a");
+        Assert.That(tokens[0].Kind, Is.EqualTo(CelTokenKind.Identifier));
+        Assert.That(tokens[0].StringValue, Is.EqualTo("a"));
+
+        var result = CelTokenizer.Tokenize("aé", CelCompilationLimits.SafeDefaults, CelProfile.V1.Id);
+        Assert.That(result.IsSuccess, Is.False);
+    }
+
     [TestCase("true", true)]
     [TestCase("false", false)]
     public void BoolLiteral_Tokenizes(string source, bool expected)
@@ -93,7 +116,6 @@ public sealed class CelTokenizerTests
 
     [TestCase("1.5", 1.5)]
     [TestCase("0.5", 0.5)]
-    [TestCase("3.", 3.0)]
     [TestCase("1e10", 1e10)]
     [TestCase("1.5e-3", 1.5e-3)]
     [TestCase(".5", 0.5)]
@@ -102,6 +124,17 @@ public sealed class CelTokenizerTests
         var tokens = TokenizeOk(source);
         Assert.That(tokens[0].Kind, Is.EqualTo(CelTokenKind.FloatLiteral));
         Assert.That(tokens[0].FloatValue, Is.EqualTo(expected).Within(1e-9));
+    }
+
+    [Test]
+    public void TrailingDotWithNoFollowingDigit_IsNotAFloatLiteral()
+    {
+        // The pinned grammar requires DIGIT+ after the decimal point; "3." alone is not a
+        // valid FLOAT_LIT — it must tokenize as an IntLiteral followed by a separate Dot.
+        var tokens = TokenizeOk("3.");
+        Assert.That(tokens[0].Kind, Is.EqualTo(CelTokenKind.IntLiteral));
+        Assert.That(tokens[0].IntValue, Is.EqualTo(3));
+        Assert.That(tokens[1].Kind, Is.EqualTo(CelTokenKind.Dot));
     }
 
     [Test]
@@ -191,6 +224,23 @@ public sealed class CelTokenizerTests
     public void StringLiteral_SurrogateRangeUnicodeEscape_IsSyntaxError()
     {
         var diag = TokenizeFail(@"'\U0000D800'");
+        Assert.That(diag.Code, Is.EqualTo(CelDiagnosticCode.SyntaxError));
+    }
+
+    [Test]
+    public void StringLiteral_SurrogateRangeShortUnicodeEscape_IsSyntaxError()
+    {
+        // \uD800 alone (not paired) is not a valid Unicode scalar value / CEL code point.
+        var diag = TokenizeFail(@"'\uD800'");
+        Assert.That(diag.Code, Is.EqualTo(CelDiagnosticCode.SyntaxError));
+    }
+
+    [Test]
+    public void StringLiteral_NullEscape_IsUnknownEscape_NotOctal()
+    {
+        // CEL has no standalone "\0" escape (only three-digit octal, which is out of v1 scope
+        // per design.md decision 3) — "\0" must be rejected, not silently treated as NUL.
+        var diag = TokenizeFail(@"'\0'");
         Assert.That(diag.Code, Is.EqualTo(CelDiagnosticCode.SyntaxError));
     }
 

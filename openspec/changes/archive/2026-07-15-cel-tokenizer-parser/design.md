@@ -35,29 +35,42 @@ there — an inconsistent half-feature. Instead `-` always tokenizes as a standa
 **Alternative rejected**: lexer-level negative literals — would let v1 express negative numbers
 through the back door while claiming arithmetic is fully deferred.
 
-### 2. Deferred-but-lexically-valid CEL tokens are tokenized, then rejected by the parser as `UnsupportedFeature`
+### 2. Deferred-but-lexically-valid CEL tokens are tokenized, then rejected by the parser as `UnsupportedFeature` — at every nesting level
 
 `null`, integer literals with a `u`/`U` suffix (`uint`), byte-string literals (`b"..."`), `?`/`:`
-(conditional), and `+ - * / %` (arithmetic) are all normative CEL tokens. The tokenizer accepts
-them (so a malformed variant, e.g. `b"unterminated`, still reports the correct lexical error) and
-the parser converts them to `UnsupportedFeature` at the point the grammar would otherwise accept
-them — never `SyntaxError`, matching the "invalid CEL and valid-but-unsupported CEL are
-distinguishable" acceptance criterion. Truly invented tokens (`=>`, `??`, `~`, stray `` ` ``
-outside a string) have no lexical form in the pinned grammar and are always `SyntaxError`.
+(conditional), `+ - * / %` (arithmetic), `IDENT ("." IDENT)* "{" ... "}"` (message/proto literal
+construction), and a leading `.` before an identifier (root/absolute-qualified name syntax, e.g.
+`.pkg.Type`) are all normative CEL syntax. The tokenizer accepts the lexical tokens involved (so a
+malformed variant, e.g. `b"unterminated`, still reports the correct lexical error) and the parser
+converts each to `UnsupportedFeature` at the point the grammar would otherwise accept it — never
+`SyntaxError`, matching the "invalid CEL and valid-but-unsupported CEL are distinguishable"
+acceptance criterion. This detection happens inside the shared `ParseExpression()` recursion point
+(and the postfix `{` check), not only at the top-level `Parse()` entry, so `f(a + b)`, `(a + b)`,
+and `items[a + b]` are all correctly reported as `UnsupportedFeature` rather than a generic
+"expected `)`/`]`/`,`" `SyntaxError` from the enclosing construct — an initial implementation gap
+caught in review (the top-level-only check missed every nested position). Truly invented tokens
+(`=>`, `??`, `~`, stray `` ` `` outside a string) have no lexical form in the pinned grammar and
+are always `SyntaxError`.
 
-### 3. String literal grammar: single/double quotes, common escapes, raw and byte prefixes; triple-quoted and octal escapes out of scope
+### 3. String literal grammar: single/double quotes, common escapes, raw and byte prefixes; triple-quoted strings, octal escapes, and `\0` out of scope
 
-Supported: `'...'` and `"..."` with escapes `\n \t \r \\ \' \" \` \? \a \b \f \v \0`, `\xHH`,
+Supported: `'...'` and `"..."` with escapes `\n \t \r \\ \' \" \` \? \a \b \f \v`, `\xHH`,
 `\uHHHH`, `\UHHHHHHHH`; `r"..."`/`R"..."` raw strings (no escape processing, matching the pinned
 grammar's raw-string form); `b"..."`/`B"..."` byte-string literals (tokenized, then
-`UnsupportedFeature` at parse time — v1 has no `Bytes` type). Triple-quoted strings (`'''...'''`,
-`"""..."""`) and octal escapes (`\NNN`) are not implemented — Profile v1 policy expressions are
-single-line string comparisons/prefixes (`startsWith`, `endsWith`, `contains`, `containsKey`
-argument literals); neither construct is exercised by any approved v1 use case, and both can be
-added without breaking existing parses if a later profile needs them (pure lexer addition, no
-grammar restructuring). An unterminated string, an invalid escape sequence, or a malformed
-`\xHH`/`\uHHHH`/`\UHHHHHHHH` digit run is `SyntaxError`, not `UnsupportedFeature` — these are
-lexically malformed under the pinned grammar, not valid-but-deferred.
+`UnsupportedFeature` at parse time — v1 has no `Bytes` type). CEL has no standalone `\0` escape
+(only three-digit octal, itself out of scope — see below), so `\0` is rejected as an unknown
+escape, not silently treated as NUL (an initial implementation bug caught in review: `\0` was
+wrongly wired to emit `'\0'`). Both `\uHHHH` and `\UHHHHHHHH` reject a codepoint in the UTF-16
+surrogate range (`0xD800`-`0xDFFF`) — a standalone surrogate is not a valid Unicode scalar value;
+the initial implementation only enforced this for `\U`, missing the 4-digit `\u` form (also caught
+in review). Triple-quoted strings (`'''...'''`, `"""..."""`) and octal escapes (`\NNN`) are not
+implemented — Profile v1 policy expressions are single-line string comparisons/prefixes
+(`startsWith`, `endsWith`, `contains`, `containsKey` argument literals); neither construct is
+exercised by any approved v1 use case, and both can be added without breaking existing parses if a
+later profile needs them (pure lexer addition, no grammar restructuring). An unterminated string,
+an invalid escape sequence, or a malformed `\xHH`/`\uHHHH`/`\UHHHHHHHH` digit run is `SyntaxError`,
+not `UnsupportedFeature` — these are lexically malformed under the pinned grammar, not
+valid-but-deferred.
 
 ### 4. Reserved-identifier position rule matches the pinned `IDENT`/`SELECTOR` distinction already normative for schema names
 
@@ -104,6 +117,18 @@ recovery or fail-fast behavior" acceptance criterion by picking fail-fast explic
 
 All four report `BudgetExceeded` with `limitName`/`observedValue`/`profileId` parameters, matching
 the existing `CelCompilationResult<T>.BudgetExceeded` parameter shape for `MaxExpressionLength`.
+
+### 8. Identifiers and digits are restricted to ASCII, matching the pinned grammar exactly
+
+The pinned grammar's `IDENT` production is `[_a-zA-Z][_a-zA-Z0-9]*` — ASCII only. The initial
+implementation used `char.IsLetter`/`char.IsLetterOrDigit`, which accept any Unicode letter (e.g.
+`é`), silently making `é == é` parse as valid CEL when it is not (caught in review). The tokenizer
+now checks the ASCII ranges explicitly for both identifier characters and digits (`char.IsDigit`
+similarly accepts non-ASCII decimal digits, e.g. Arabic-indic, which `DIGIT = [0-9]` excludes).
+This also fixed a related digit-literal bug: the decimal-point branch for `FLOAT_LIT` accepted a
+trailing `.` with no following digit (`"3."`), but the pinned grammar requires `DIGIT+` after the
+point; the tokenizer now only consumes `.` as part of a float literal when at least one digit
+follows, leaving a bare trailing `.` to tokenize separately as `Dot`.
 
 ## Risks / Trade-offs
 
