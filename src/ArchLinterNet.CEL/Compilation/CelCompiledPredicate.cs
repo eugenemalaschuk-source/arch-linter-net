@@ -57,4 +57,15 @@ public sealed class CelCompiledPredicate
         throw new NotImplementedException(
             $"Evaluator not yet implemented for profile '{Profile.Id}' — see #327.");
     }
+
+    /// <summary>
+    /// Evaluates this predicate against the given context using <see cref="CelEvaluationLimits.SafeDefaults"/>.
+    /// Equivalent to <c>Evaluate(context, CelEvaluationLimits.SafeDefaults)</c>. This is a documented
+    /// safe default, not an unbounded evaluation path.
+    /// </summary>
+    /// <exception cref="NotImplementedException">
+    /// The evaluator is not yet implemented. This will be replaced by the real evaluator in task #327.
+    /// </exception>
+    public CelEvaluationResult Evaluate(CelEvaluationContext context) =>
+        Evaluate(context, CelEvaluationLimits.SafeDefaults);
 }

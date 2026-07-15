@@ -179,7 +179,7 @@ Profile v1 SHALL support the following string and map receiver functions: `start
 
 ### Requirement: Immutable context schema and schema-bound activation
 
-`CelContextSchema` SHALL be immutable after construction. It SHALL be identified structurally (a deterministic identity derived from profile, variable names, and type descriptors). `CelContextSchemaBuilder` SHALL return a `CelVariable` handle per `AddVariable()` call. Duplicate variable names during build SHALL produce a programmer-error exception. `CelEvaluationContext` SHALL be built via `schema.CreateEvaluationContextBuilder()` and `builder.Set(variable, value)` using the variable handle (not a string key). Missing variable assignments, duplicate assignments, and type mismatches SHALL produce deterministic errors.
+`CelContextSchema` SHALL be immutable after construction. It SHALL be identified structurally (a deterministic identity derived from profile, variable names, and type descriptors). `CelContextSchemaBuilder` SHALL return a `CelVariable` handle per `AddVariable()` call. Duplicate variable names during build SHALL produce a programmer-error exception. `CelEvaluationContext` SHALL be built via `schema.CreateEvaluationContextBuilder()` and `builder.Set(variable, value)` using the variable handle (not a string key). `CelEvaluationContextBuilder` SHALL additionally expose `Set(string name, CelValue value)` as an ergonomic convenience overload that resolves `name` to its declared `CelVariable` handle via a single lookup and delegates to `Set(CelVariable, CelValue)`; an unknown name SHALL throw `ArgumentException`. The name-based overload exists for benchmarking and ergonomic call sites (see #168); the handle-based overload remains the recommended path for high-volume evaluation to avoid repeated string lookup. Missing variable assignments, duplicate assignments, and type mismatches SHALL produce deterministic errors.
 
 #### Scenario: Schema builder returns typed variable handles
 
@@ -196,6 +196,16 @@ Profile v1 SHALL support the following string and map receiver functions: `start
 
 - **WHEN** a consumer calls `AddVariable` twice with the same name on the same builder
 - **THEN** an `ArgumentException` or `InvalidOperationException` is thrown
+
+#### Scenario: Name-based Set() resolves to the same assignment as handle-based Set()
+
+- **WHEN** a consumer calls `builder.Set("x", value)` where `"x"` is a declared variable name
+- **THEN** the resulting `CelEvaluationContext.Assignments` entry is identical to what `builder.Set(handle, value)` would have produced
+
+#### Scenario: Name-based Set() with an unknown name is a programmer error
+
+- **WHEN** a consumer calls `builder.Set("undeclared", value)` where no variable named `"undeclared"` exists in the schema
+- **THEN** an `ArgumentException` is thrown
 
 ### Requirement: Immutable CEL value model without CLR reflection
 
@@ -229,7 +239,7 @@ Profile v1 SHALL support the following string and map receiver functions: `start
 
 ### Requirement: Compilation and evaluation limits are immutable with safe defaults
 
-`CelCompilationLimits` and `CelEvaluationLimits` SHALL be sealed, immutable classes with all-or-nothing safe-default factories (`SafeDefaults`). Per-call evaluation limits SHALL be allowed to tighten but not exceed the environment/profile maximums. Every public compilation and evaluation path SHALL be intrinsically bounded; no unbounded execution overload SHALL exist. Convenience overloads that omit limits SHALL use documented safe defaults, not unrestricted execution.
+`CelCompilationLimits` and `CelEvaluationLimits` SHALL be sealed, immutable classes with all-or-nothing safe-default factories (`SafeDefaults`). Per-call evaluation limits SHALL be allowed to tighten but not exceed the environment/profile maximums. Every public compilation and evaluation path SHALL be intrinsically bounded; no unbounded execution overload SHALL exist. Convenience overloads that omit limits SHALL use documented safe defaults, not unrestricted execution. `CelCompiledPredicate` and `CelCompiledExpression` SHALL each expose `Evaluate(CelEvaluationContext context)` as a convenience overload equivalent to `Evaluate(context, CelEvaluationLimits.SafeDefaults)` — this satisfies the "safe-default evaluation overload" benchmarked by #168 without introducing an unbounded evaluation path.
 
 The complete compilation-time budget surface that #325 (tokenizer/parser) and #326 (binder/checker) SHALL enforce comprises, at minimum: maximum expression source length in UTF-16 characters (`MaxExpressionLength`, already present); maximum token count produced by the tokenizer (`MaxTokenCount`); maximum AST node count produced by parsing (`MaxAstNodeCount`); maximum sub-expression nesting depth (`MaxNestingDepth`, already present); maximum literal size — the longest string/collection literal accepted in source (`MaxLiteralSize`); maximum distinct identifier references (`MaxIdentifierCount`, already present). Each of these limits SHALL be a positive-only field on `CelCompilationLimits`, SHALL be included as a named component of `CelCompilationLimits.ComputeIdentity()`, and a source exceeding any one of them SHALL produce a `BudgetExceeded` diagnostic before further processing of that phase. `MaxExpressionLength` remains the cheapest, first-checked gate (rejecting oversized source before tokenization even begins); the token/AST/literal limits are checked as each corresponding phase runs. Fields for limits not yet enforced by a landed phase (#325/#326 pending) SHALL still exist on `CelCompilationLimits` so the API shape does not change once those phases ship — an unenforced field SHALL be documented as "reserved, not yet enforced" in its XML doc until the enforcing phase lands.
 
@@ -244,6 +254,12 @@ The complete evaluation-time budget surface that #327 (evaluator) SHALL enforce 
 
 - **WHEN** the public API surface of `CelCompiledPredicate` and `CelCompiledExpression` is inspected
 - **THEN** there is no `Evaluate()` overload that accepts no limits and performs unrestricted evaluation
+- **AND** the `Evaluate(context)` overload that omits an explicit limits argument internally uses `CelEvaluationLimits.SafeDefaults`
+
+#### Scenario: Safe-default Evaluate overload delegates to the explicit-limits overload
+
+- **WHEN** a consumer calls `predicate.Evaluate(context)`
+- **THEN** the result is identical to calling `predicate.Evaluate(context, CelEvaluationLimits.SafeDefaults)`
 
 #### Scenario: Compilation limits identity incorporates every enforced limit field
 
@@ -265,6 +281,8 @@ The complete evaluation-time budget surface that #327 (evaluator) SHALL enforce 
 ### Requirement: Cache identity is deterministic and caller-owned
 
 `CelCompilationKey` SHALL be a sealed, structurally-equal value object encoding: normalized expression source, `CelProfileId`, structural schema identity, required result type (predicate vs general), compilation limits identity. It SHALL implement `IEquatable<CelCompilationKey>` and override `GetHashCode()`. No process-global mutable cache SHALL exist in `ArchLinterNet.CEL`; cache lifetime SHALL be caller-owned.
+
+Profile v1 defines no independently-configurable semantic options (there is no case-sensitivity flag, numeric-widening toggle, or similar knob) — the profile identity plus schema plus limits fully determine compilation behavior. `CelCompilationKey` therefore SHALL NOT carry a separate semantic-options identity component in v1; introducing one is deferred until a v2+ profile actually defines a configurable semantic axis. The registered object-schema catalog SHALL continue to be folded into `SchemaIdentity` (as `CelExternalConsumerSampleTests.HappyPath_BuildEnvironmentAndInspectCompilationResult` already verifies via `key.SchemaIdentity Does.StartWith(schema.Identity)` plus catalog content) rather than exposed as a separate `CelCompilationKey` field, since the catalog is inseparable from what "the schema" means for binding purposes in v1.
 
 #### Scenario: Two compilations with identical inputs produce equal keys
 

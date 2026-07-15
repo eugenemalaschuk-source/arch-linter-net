@@ -91,6 +91,23 @@ public sealed class CelInternalApiCoverageTests
             Throws.TypeOf<NotImplementedException>());
     }
 
+    [Test]
+    public void CelCompiledPredicate_Evaluate_SafeDefaultOverload_ThrowsNotImplementedException()
+    {
+        var schema = BuildSimpleSchema();
+        var handle = schema.Variables[0];
+        var ctx = schema.CreateEvaluationContextBuilder()
+            .Set(handle, CelValue.String("v"))
+            .Build();
+        var pred = new CelCompiledPredicate(
+            CelProfile.V1, schema, BuildKey("x"), CelCompilationLimits.SafeDefaults);
+
+        Assert.That(
+            () => pred.Evaluate(ctx),
+            Throws.TypeOf<NotImplementedException>(),
+            "The safe-default Evaluate(context) overload must delegate to Evaluate(context, limits).");
+    }
+
     // ── CelCompiledExpression — internal constructor and stub Evaluate ────────
 
     [Test]
@@ -120,6 +137,23 @@ public sealed class CelInternalApiCoverageTests
         Assert.That(
             () => expr.Evaluate(ctx, CelEvaluationLimits.SafeDefaults),
             Throws.TypeOf<NotImplementedException>());
+    }
+
+    [Test]
+    public void CelCompiledExpression_Evaluate_SafeDefaultOverload_ThrowsNotImplementedException()
+    {
+        var schema = BuildSimpleSchema();
+        var handle = schema.Variables[0];
+        var ctx = schema.CreateEvaluationContextBuilder()
+            .Set(handle, CelValue.String("v"))
+            .Build();
+        var expr = new CelCompiledExpression(
+            CelProfile.V1, schema, BuildKey("x"), CelCompilationLimits.SafeDefaults);
+
+        Assert.That(
+            () => expr.Evaluate(ctx),
+            Throws.TypeOf<NotImplementedException>(),
+            "The safe-default Evaluate(context) overload must delegate to Evaluate(context, limits).");
     }
 
     // ── CelEvaluationResult — internal constructor and AsBool paths ───────────
@@ -290,6 +324,47 @@ public sealed class CelInternalApiCoverageTests
             () => schema.CreateEvaluationContextBuilder().Set(handle, inner),
             Throws.ArgumentException,
             "Set() must reject values that exceed the maximum structural validation depth.");
+    }
+
+    // ── Name-based Set() convenience overload (issue #168 benchmark surface) ─
+
+    [Test]
+    public void CelEvaluationContextBuilder_SetByName_ResolvesToDeclaredHandle()
+    {
+        var schemaBuilder = CelContextSchema.CreateBuilder("ctx");
+        schemaBuilder.AddVariable("x", CelType.String);
+        var schema = schemaBuilder.Build();
+
+        var ctx = schema.CreateEvaluationContextBuilder()
+            .Set("x", CelValue.String("v"))
+            .Build();
+
+        Assert.That(ctx.Assignments, Has.Count.EqualTo(1));
+        Assert.That(ctx.Assignments[0].Variable.Name, Is.EqualTo("x"));
+        Assert.That(ctx.Assignments[0].Value.AsString(), Is.EqualTo("v"));
+    }
+
+    [Test]
+    public void CelEvaluationContextBuilder_SetByName_UnknownName_ThrowsArgumentException()
+    {
+        var schema = BuildSimpleSchema();
+
+        Assert.That(
+            () => schema.CreateEvaluationContextBuilder().Set("does-not-exist", CelValue.String("v")),
+            Throws.ArgumentException);
+    }
+
+    [Test]
+    public void CelEvaluationContextBuilder_SetByName_AndSetByHandle_ProduceEquivalentContexts()
+    {
+        var schemaBuilder = CelContextSchema.CreateBuilder("ctx");
+        var handle = schemaBuilder.AddVariable("x", CelType.String);
+        var schema = schemaBuilder.Build();
+
+        var byHandle = schema.CreateEvaluationContextBuilder().Set(handle, CelValue.String("v")).Build();
+        var byName = schema.CreateEvaluationContextBuilder().Set("x", CelValue.String("v")).Build();
+
+        Assert.That(byHandle.Assignments[0].Value.AsString(), Is.EqualTo(byName.Assignments[0].Value.AsString()));
     }
 
     // ── Collection-size limit prevents unbounded CPU use via public Set() ────

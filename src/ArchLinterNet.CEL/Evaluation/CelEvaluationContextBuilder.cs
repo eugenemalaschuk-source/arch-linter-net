@@ -61,6 +61,30 @@ public sealed class CelEvaluationContextBuilder
     }
 
     /// <summary>
+    /// Sets a variable's value by declared name. Ergonomic convenience over
+    /// <see cref="Set(CelVariable, CelValue)"/>: resolves <paramref name="name"/> to its schema
+    /// handle via a single lookup, then delegates to the handle-based overload. Prefer the
+    /// handle-based overload in high-volume evaluation paths to avoid repeated string lookup.
+    /// </summary>
+    /// <exception cref="ArgumentNullException"><paramref name="name"/> or <paramref name="value"/> is null.</exception>
+    /// <exception cref="ArgumentException">
+    /// No variable named <paramref name="name"/> is declared in this schema; the variable has
+    /// already been set; or the value kind does not structurally match the variable's declared type.
+    /// </exception>
+    public CelEvaluationContextBuilder Set(string name, CelValue value)
+    {
+        ArgumentNullException.ThrowIfNull(name);
+        ArgumentNullException.ThrowIfNull(value);
+
+        var variable = _schema.Variables.FirstOrDefault(v => v.Name == name)
+            ?? throw new ArgumentException(
+                $"No variable named '{name}' is declared in schema '{_schema.SchemaId}'.",
+                nameof(name));
+
+        return Set(variable, value);
+    }
+
+    /// <summary>
     /// Builds an immutable <see cref="CelEvaluationContext"/>.
     /// </summary>
     /// <exception cref="InvalidOperationException">One or more required variables have not been set.</exception>
