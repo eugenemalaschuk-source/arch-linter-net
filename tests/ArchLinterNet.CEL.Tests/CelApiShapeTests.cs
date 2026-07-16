@@ -170,20 +170,20 @@ public sealed class CelApiShapeTests
         var env = BuildSimpleEnvironment();
         var result = env.CompilePredicate("source == 'hello'");
 
-        Assert.That(result.IsSuccess, Is.False);
+        Assert.That(result.IsSuccess, Is.True);
+        Assert.That(result.Program, Is.Not.Null);
         Assert.That(result.Diagnostics, Is.Not.Null);
         Assert.That(result.CompilationKey, Is.Not.Null);
     }
 
     [Test]
-    public void CelCompilationResult_StubReturnsNotYetImplementedDiagnostic()
+    public void CelCompilationResult_ValidExpression_SucceedsWithNoDiagnostics()
     {
         var env = BuildSimpleEnvironment();
         var result = env.CompilePredicate("source == 'hello'");
 
-        Assert.That(result.IsSuccess, Is.False);
-        Assert.That(result.Diagnostics, Has.Count.GreaterThan(0));
-        Assert.That(result.Diagnostics[0].Code, Is.EqualTo(CelDiagnosticCode.NotYetImplemented));
+        Assert.That(result.IsSuccess, Is.True);
+        Assert.That(result.Diagnostics, Has.Count.EqualTo(0));
     }
 
     [Test]
@@ -278,7 +278,7 @@ public sealed class CelApiShapeTests
         var result = env.CompilePredicate("x");
         var diag = result.Diagnostics[0];
 
-        Assert.That(diag.Code, Is.EqualTo(CelDiagnosticCode.NotYetImplemented));
+        Assert.That(diag.Code, Is.EqualTo(CelDiagnosticCode.BindingError));
         Assert.That(diag.Severity, Is.EqualTo(CelDiagnosticSeverity.Error));
         Assert.That(diag.Category, Is.Not.Null.And.Not.Empty);
         Assert.That(diag.Message, Is.Not.Null.And.Not.Empty);
@@ -423,14 +423,14 @@ public sealed class CelApiShapeTests
     // ── Compile (non-predicate) overload ──────────────────────────────────────
 
     [Test]
-    public void CelEnvironment_Compile_ReturnsNotYetImplemented()
+    public void CelEnvironment_Compile_ValidExpression_Succeeds()
     {
         var env = BuildSimpleEnvironment();
         var result = env.Compile("source == '_suffix'");
 
         Assert.That(result, Is.Not.Null);
-        Assert.That(result.IsSuccess, Is.False);
-        Assert.That(result.Diagnostics[0].Code, Is.EqualTo(CelDiagnosticCode.NotYetImplemented));
+        Assert.That(result.IsSuccess, Is.True);
+        Assert.That(result.Program, Is.Not.Null);
         Assert.That(result.CompilationKey.RequiredResultType, Is.EqualTo(CelRequiredResultType.General));
     }
 

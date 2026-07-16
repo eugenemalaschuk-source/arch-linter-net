@@ -36,23 +36,41 @@ expression source (string)
   │                 │  tokenizer+parser after the MaxExpressionLength gate — a syntax/
   │                 │  unsupported-feature/structural-limit diagnostic short-circuits
   │                 │  compilation with a real span; syntactically valid Profile v1
-  │                 │  input still returns NotYetImplemented pending #326.
+  │                 │  input proceeds to the binder.
   └────────┬────────┘
            │  internal syntax tree
            ▼
   ┌─────────────────┐
-  │  Binder /       │  (task #326 — type system)
-  │  Type Checker   │  Resolves identifiers against CelContextSchema.
-  │                 │  Checks types against profile function catalog.
-  │                 │  MaxIdentifierCount enforced here.
-  │                 │  Produces structured CelDiagnostic on failure.
+  │  Binder /       │  (task #326 — shipped: ArchLinterNet.CEL.Binding.CelBinder)
+  │  Type Checker   │  Resolves identifiers against CelContextSchema, members against
+  │  (internal)     │  CelObjectSchema, and calls against the closed Profile v1
+  │                 │  built-in function catalog (CelFunctionCatalog) — no reflection,
+  │                 │  no dynamic dispatch, no user-registered functions. Checks every
+  │                 │  operator/index/call against the frozen signature table with no
+  │                 │  implicit Int/Float widening. Binds the whole AST unconditionally
+  │                 │  (both operands of &&/||/in are always bound, regardless of a
+  │                 │  future evaluator's short-circuit semantics). Enforces the
+  │                 │  compilation request's required result type (Predicate requires
+  │                 │  Bool). Fails fast — one diagnostic per attempt, category
+  │                 │  "binder", no aggregation, matching the parser's contract.
+  │  NOT public.    │  MaxIdentifierCount is enforced by the parser (#325), not here —
+  │                 │  it is a purely syntactic count needing no schema information;
+  │                 │  the pipeline row above is stale on this point and was corrected
+  │                 │  by #326. CelEnvironment.CompilePredicate/Compile run the binder
+  │                 │  immediately after a successful parse: binder success now returns
+  │                 │  a real CelCompiledPredicate/CelCompiledExpression instead of
+  │                 │  NotYetImplemented; binder failure returns the structured
+  │                 │  diagnostic instead of NotYetImplemented.
   └────────┬────────┘
            │  immutable bound plan
            ▼
   ┌─────────────────┐
-  │  Bound Plan     │  Internal representation of a fully-checked expression.
-  │  (internal)     │  Owned by CelCompiledPredicate / CelCompiledExpression.
-  │                 │  Never exposed publicly.
+  │  Bound Plan     │  Internal representation of a fully-checked expression
+  │  (internal)     │  (ArchLinterNet.CEL.Binding.CelBoundExpression — one bound node
+  │                 │  per syntax node, each carrying its resolved CelType).
+  │                 │  Owned by CelCompiledPredicate / CelCompiledExpression.
+  │                 │  Never exposed publicly. Evaluate() still throws
+  │                 │  NotImplementedException pending the evaluator (#327).
   └────────┬────────┘
            │
     (compilation complete — CelCompiledPredicate / CelCompiledExpression returned)
@@ -79,12 +97,12 @@ ______________________________________________________________________
 | Component | Owner | Notes |
 |---|---|---|
 | Profile identity (`CelProfile`, `CelProfileId`) | `ArchLinterNet.CEL` public | Stable across versions; v1 ID is `arch-linter/cel/v1` |
-| Grammar gates (token set, operator set) | `ArchLinterNet.CEL.Parsing` internal (`CelTokenizer`, `CelParser`) | Controlled per-profile; no public API. Deviation from the original design: the gate lives in the tokenizer/parser themselves (deferred tokens are lexed, then rejected by the parser with `UnsupportedFeature`), not in `CelEngine` — `CelEngine` remains an unused placeholder pending #326/#327 |
+| Grammar gates (token set, operator set) | `ArchLinterNet.CEL.Parsing` internal (`CelTokenizer`, `CelParser`) | Controlled per-profile; no public API. Deviation from the original design: the gate lives in the tokenizer/parser themselves (deferred tokens are lexed, then rejected by the parser with `UnsupportedFeature`), not in `CelEngine` — `CelEngine` remains an unused placeholder pending #327 |
 | Value model (`CelValue`, `CelObjectValue`, `CelValueKind`) | `ArchLinterNet.CEL` public | No CLR reflection; all factories are typed |
 | Type descriptors (`CelType`, `CelTypeKind`) | `ArchLinterNet.CEL` public | Static factories only |
 | Context schema (`CelContextSchema`, `CelVariable`) | `ArchLinterNet.CEL` public | Structural identity is deterministic |
-| Function catalog | `CelEngine` internal | Declared per-profile; immutable; no public registration |
-| Bound operations (bound plan, binding tables) | `CelEngine` internal | Never exposed |
+| Function catalog | `ArchLinterNet.CEL.Binding.CelFunctionCatalog` internal | Declared per-profile; immutable; no public registration; `CelEngine` remains an unused placeholder |
+| Bound operations (bound plan, binding tables) | `ArchLinterNet.CEL.Binding` internal (`CelBinder`, `CelBoundExpression`, `CelBoundNode` hierarchy) | Never exposed |
 | Evaluation budgets (`CelCompilationLimits`, `CelEvaluationLimits`) | `ArchLinterNet.CEL` public | SafeDefaults provided; no unbounded path |
 | Compiled programs (`CelCompiledPredicate`, `CelCompiledExpression`) | `ArchLinterNet.CEL` public | Immutable; thread-safe; hold bound plan internally |
 | Diagnostics (`CelDiagnostic`, `CelDiagnosticCode`, `CelSourceSpan`) | `ArchLinterNet.CEL` public | Stable codes; message is display-only |
@@ -104,7 +122,7 @@ Capabilities deferred: arithmetic (`+`, `-`, `*`, `/`, `%`), conditional express
 |---|---|
 | Classification | Standard CEL (normative spec features) |
 | Intended owner | `ArchLinterNet.CEL` public API (new profile version) |
-| Existing seam | `CelProfile` identity gate in `CelEngine` grammar; type-system additions in task #326 |
+| Existing seam | `CelProfile` identity gate in `CelEngine` grammar; type-system additions shipped by task #326 (`ArchLinterNet.CEL.Binding`) |
 | New profile version required? | Yes — Profile v2+ adds these; Profile v1 semantics remain frozen |
 | Affected layers | Tokenizer, parser, type-checker, evaluator, function catalog, diagnostics |
 | Safety implications | Arithmetic can overflow; timestamp/duration parsing can be malformed; regex can cause ReDoS if unbounded |
@@ -128,13 +146,13 @@ Capabilities deferred: POCO/CLR type adapters, `System.Text.Json` adapter, proto
 
 ### 3. Function catalog
 
-Capabilities deferred: caller-defined functions, host-registered function bundles, operator overloads.
+Capabilities deferred: caller-defined functions, host-registered function bundles, operator overloads. The closed Profile v1 catalog itself (`startsWith`/`endsWith`/`contains`/`size`/`containsKey`) is shipped — see `ArchLinterNet.CEL.Binding.CelFunctionCatalog`.
 
 | Field | Details |
 |---|---|
 | Classification | Standard CEL (built-in) + canonical extension (host-defined) |
-| Intended owner | `CelEngine` internal (built-in functions); future profiles may add more built-ins |
-| Existing seam | Internal function-catalog lookup inside `CelEngine`; profile gates which functions are available |
+| Intended owner | `ArchLinterNet.CEL.Binding.CelFunctionCatalog` internal (built-in functions); future profiles may add more built-ins |
+| Existing seam | Internal function-catalog lookup inside `ArchLinterNet.CEL.Binding` (`CelFunctionCatalog`, consumed by `CelBinder`); profile gates which functions are available |
 | New profile version required? | Adding new built-ins requires a new profile; host-defined functions require explicit API design (excluded from v1) |
 | Affected layers | Binder, type-checker, evaluator |
 | Safety implications | User-defined functions could execute arbitrary code; excluded from v1 for this reason |
