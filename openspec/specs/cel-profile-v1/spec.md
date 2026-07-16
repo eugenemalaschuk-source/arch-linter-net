@@ -1229,8 +1229,15 @@ elsewhere in this spec:
   approaches the *product* of both operand lengths, not their sum, so `ComputeCost` for `contains`
   SHALL be the fixed floor plus the product of the receiver string's and argument string's UTF-16
   lengths — a conservative worst-case estimate, deliberately not each operation's exact algorithmic
-  complexity, but never an underestimate. `size` on `List`/`Map` and `containsKey` SHALL cost only
-  the fixed floor, since both are backed by an O(1) count field or hash lookup.
+  complexity, but never an underestimate. `size` on `List`/`Map` SHALL cost only the fixed floor,
+  since both are backed by an O(1) count field. `containsKey` is NOT O(1) despite being a dictionary
+  lookup: hashing the key requires a linear pass over its content, and a hash collision can compare
+  the key against other entries in the same bucket — `CelEvaluationContextBuilder.Set()` bounds
+  map/list entry count but not individual string length, so a fixed floor would let an
+  unbounded-length key be charged the same as a one-character key. `ComputeCost` for `containsKey`
+  SHALL therefore be the fixed floor plus the key argument's UTF-16 length (the hash-computation
+  pass) plus the receiver map's entry count (a conservative bound on worst-case collision-chain
+  comparisons).
 - This change SHALL NOT add, wire, or modify any `CelBoundNode` tree evaluation, `&&`/`||`
   short-circuit/error-absorption behavior, or map/list index runtime-failure handling — those
   remain the bounded evaluator's scope (#328). `CelCompiledPredicate.Evaluate` and
@@ -1292,9 +1299,17 @@ elsewhere in this spec:
 
 #### Scenario: ComputeCost is constant for O(1) operations
 
-- **WHEN** `CelBuiltinFunctionInvoker.ComputeCost` is called for `SizeList`, `SizeMap`, or
-  `ContainsKey` with a small collection, then again with a large collection, all else equal
+- **WHEN** `CelBuiltinFunctionInvoker.ComputeCost` is called for `SizeList` or `SizeMap` with a small
+  collection, then again with a large collection, all else equal
 - **THEN** both calls return the same cost (the fixed floor)
+
+#### Scenario: ComputeCost for containsKey scales with key length and map entry count
+
+- **WHEN** `CelBuiltinFunctionInvoker.ComputeCost` is called for `ContainsKey` with a long key
+  argument, then again with a short key argument, the receiver map held constant
+- **THEN** the long-key call returns a strictly greater cost
+- **AND** when instead the receiver map's entry count is varied with the key argument held
+  constant, the larger map returns a strictly greater cost
 
 #### Scenario: Invoke never throws for a binder-guaranteed-correct call shape
 

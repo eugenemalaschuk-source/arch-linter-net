@@ -84,9 +84,20 @@ internal static class CelBuiltinFunctionInvoker
     /// <see cref="long.MaxValue"/>.
     /// </para>
     /// <para>
-    /// <see cref="CelFunctionOperationId.SizeList"/>, <see cref="CelFunctionOperationId.SizeMap"/>,
-    /// and <see cref="CelFunctionOperationId.ContainsKey"/> are O(1) (backed by a count field / hash
-    /// lookup) and cost only the fixed floor.
+    /// <see cref="CelFunctionOperationId.SizeList"/> and <see cref="CelFunctionOperationId.SizeMap"/>
+    /// are O(1) (backed by a count field) and cost only the fixed floor.
+    /// <see cref="CelFunctionOperationId.ContainsKey"/> is NOT O(1) despite being a dictionary
+    /// lookup: <c>Dictionary&lt;string, _&gt;.ContainsKey</c> first computes
+    /// <c>string.GetHashCode()</c>, which hashes the key's entire content (.NET's string hash —
+    /// Marvin32 — is a linear pass over the string, not a cached/O(1) value), and a hash collision
+    /// can then compare the key against other entries in the same bucket. Because
+    /// <c>CelEvaluationContextBuilder.Set()</c> bounds map/list *entry count* but not individual
+    /// *string length*, an unbounded-length key would otherwise be charged the same fixed floor as
+    /// a one-character key while doing real work linear in its length — the same
+    /// never-underestimate defect the <see cref="CelFunctionOperationId.Contains"/> fix above
+    /// corrected. Its cost is therefore the fixed floor plus the key's length (the hash-computation
+    /// pass, guaranteed) plus the receiver map's entry count (a conservative bound on worst-case
+    /// collision-chain comparisons — never larger than one comparison per entry).
     /// </para>
     /// </remarks>
     /// <param name="operationId">Which catalog overload's cost to compute.</param>
@@ -105,7 +116,10 @@ internal static class CelBuiltinFunctionInvoker
             CelFunctionOperationId.SizeString => FixedCost + Receiver(receiver).Length,
             CelFunctionOperationId.SizeList => FixedCost,
             CelFunctionOperationId.SizeMap => FixedCost,
-            CelFunctionOperationId.ContainsKey => FixedCost,
+            // Key-hash computation is linear in key length; entry count bounds worst-case collision
+            // comparisons — see the method's <remarks> for why a flat floor here would be unsafe.
+            CelFunctionOperationId.ContainsKey =>
+                FixedCost + arguments[0].AsString().Length + NonNull(receiver).AsMap().Count,
             _ => throw new InvalidOperationException($"Unhandled built-in function operation '{operationId}'."),
         };
 

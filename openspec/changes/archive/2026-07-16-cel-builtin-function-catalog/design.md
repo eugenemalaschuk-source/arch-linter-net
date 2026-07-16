@@ -104,8 +104,18 @@ execution mechanism:
   deliberately not each operation's exact complexity, but never an underestimate). The product
   cannot overflow `long`: both lengths are `int`, and `int.MaxValue * (long)int.MaxValue` is well
   within `long.MaxValue`.
-- `size()` on `List`/`Map` and `containsKey` are O(1) (backed by a count field / dictionary lookup)
-  and cost only the fixed floor.
+- `size()` on `List`/`Map` are O(1) (backed by a count field) and cost only the fixed floor.
+- `containsKey` is **not** O(1) despite being a dictionary lookup, discovered in a third review
+  round: `Dictionary<string,_>.ContainsKey` first computes `string.GetHashCode()` — .NET's string
+  hash (Marvin32) is a linear pass over the key's content, not a cached or O(1) value — and a hash
+  collision can then compare the key against other entries in the same bucket.
+  `CelEvaluationContextBuilder.Set()` bounds map/list *entry count* (`MaxValidationCollectionSize`)
+  but not individual *string length*, so an unbounded-length key would have been charged the same
+  fixed floor as a one-character key while doing real linear work — the same never-underestimate
+  defect the `contains` fix above corrected, just for a different operation. `ComputeCost` for
+  `containsKey` is therefore the fixed floor plus the key argument's length (the guaranteed
+  hash-computation pass) plus the receiver map's entry count (a conservative bound on worst-case
+  collision-chain comparisons — never more than one comparison per entry).
 
 `CelBuiltinFunctionInvokerTests` includes an adversarial regression test constructing exactly this
 repeating-near-match-prefix shape and asserting the charged cost is at least an order of magnitude

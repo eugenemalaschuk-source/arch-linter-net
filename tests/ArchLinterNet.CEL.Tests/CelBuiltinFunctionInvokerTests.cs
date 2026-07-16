@@ -239,7 +239,7 @@ public sealed class CelBuiltinFunctionInvokerTests
     }
 
     [Test]
-    public void ComputeCost_SizeListSizeMapContainsKey_AreConstant()
+    public void ComputeCost_SizeListAndSizeMap_AreConstant()
     {
         var smallList = CelValue.List([CelValue.Int(1)]);
         var largeList = CelValue.List(Enumerable.Range(0, 500).Select(i => CelValue.Int(i)).ToList());
@@ -248,6 +248,51 @@ public sealed class CelBuiltinFunctionInvokerTests
         var largeCost = CelBuiltinFunctionInvoker.ComputeCost(CelFunctionOperationId.SizeList, largeList, []);
 
         Assert.That(largeCost, Is.EqualTo(smallCost));
+    }
+
+    [Test]
+    public void ComputeCost_ContainsKey_IsProportionalToKeyLength()
+    {
+        // Dictionary<string,_>.ContainsKey hashes the key's entire content (string.GetHashCode is
+        // a linear pass, not O(1)) before any lookup — a long key must not be charged the same as
+        // a short one.
+        var map = CelValue.Map(new Dictionary<string, CelValue> { ["x"] = CelValue.Bool(true) });
+
+        var shortKeyCost = CelBuiltinFunctionInvoker.ComputeCost(CelFunctionOperationId.ContainsKey, map, [CelValue.String("a")]);
+        var longKeyCost = CelBuiltinFunctionInvoker.ComputeCost(
+            CelFunctionOperationId.ContainsKey, map, [CelValue.String(new string('a', 1000))]);
+
+        Assert.That(longKeyCost, Is.GreaterThan(shortKeyCost));
+    }
+
+    [Test]
+    public void ComputeCost_ContainsKey_IsProportionalToMapEntryCount()
+    {
+        // Conservative bound on worst-case hash-collision-chain comparisons: never larger than one
+        // comparison per entry.
+        var smallMap = CelValue.Map(new Dictionary<string, CelValue> { ["x"] = CelValue.Bool(true) });
+        var largeMap = CelValue.Map(
+            Enumerable.Range(0, 500).ToDictionary(i => $"k{i}", i => (CelValue)CelValue.Bool(true)));
+
+        var smallMapCost = CelBuiltinFunctionInvoker.ComputeCost(CelFunctionOperationId.ContainsKey, smallMap, [CelValue.String("q")]);
+        var largeMapCost = CelBuiltinFunctionInvoker.ComputeCost(CelFunctionOperationId.ContainsKey, largeMap, [CelValue.String("q")]);
+
+        Assert.That(largeMapCost, Is.GreaterThan(smallMapCost));
+    }
+
+    [Test]
+    public void ComputeCost_ContainsKey_MatchesExactFormula()
+    {
+        var map = CelValue.Map(new Dictionary<string, CelValue>
+        {
+            ["a"] = CelValue.Bool(true),
+            ["b"] = CelValue.Bool(false),
+            ["c"] = CelValue.Bool(true),
+        });
+
+        var cost = CelBuiltinFunctionInvoker.ComputeCost(CelFunctionOperationId.ContainsKey, map, [CelValue.String("key")]);
+
+        Assert.That(cost, Is.EqualTo(1L + "key".Length + 3));
     }
 
     [Test]
