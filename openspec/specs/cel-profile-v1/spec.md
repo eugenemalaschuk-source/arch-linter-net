@@ -1021,16 +1021,26 @@ already fixed elsewhere in this spec:
 - `CelCallSyntax` resolution SHALL match the function name, receiver static type (or its absence,
   for a free-function-shaped call), and argument count/types against the closed built-in function
   catalog fixed elsewhere in this spec. A name that matches no catalog entry at all SHALL produce
-  `BindingError`; a name that matches a catalog entry but with a wrong receiver type, argument type,
-  or arity SHALL produce `TypeMismatch` for a type mismatch or `BindingError` for an arity mismatch,
-  exactly as this spec's function-catalog table already specifies per function.
+  `UnsupportedFeature` when the name is a known-deferred CEL built-in (per this spec's blanket
+  `matches`/deferred-function requirement) or `BindingError` otherwise; a name that matches a
+  catalog entry but with a wrong receiver type, argument type, or arity SHALL produce `TypeMismatch`
+  for a type mismatch or `BindingError` for an arity mismatch, exactly as this spec's function-
+  catalog table already specifies per function. A `TypeMismatch` for a wrong argument type SHALL
+  identify the specific mismatched argument — `Parameters["expectedType"]`/`Parameters["actualType"]`
+  SHALL describe that argument's declared and actual type, not the receiver's type, when the
+  receiver itself already matched a candidate overload.
 - `CelIndexSyntax` resolution SHALL type-check its receiver first; a `List` receiver SHALL require
   an `Int`-typed index expression and resolve to the list's element type, a `Map` receiver SHALL
   require a `String`-typed index expression and resolve to the map's value type, and any other
   receiver type or wrong index/key expression type SHALL produce `TypeMismatch`.
 - Operator type checking for `CelUnarySyntax`/`CelBinarySyntax` SHALL apply the frozen signature
   table fixed elsewhere in this spec with no implicit `Int`/`Float` widening; a signature violation
-  SHALL produce `TypeMismatch` carrying `Parameters["expectedType"]` and `Parameters["actualType"]`.
+  SHALL produce `TypeMismatch` carrying `Parameters["expectedType"]` and `Parameters["actualType"]`,
+  attributed to whichever specific operand actually violates the signature (e.g. for a binary
+  numeric-ordering operator, `Parameters["actualType"]` SHALL describe the operand that does not
+  match — the left operand when it is not numeric at all, or the right operand when the left is
+  numeric but the two operands' kinds differ — never an operand that already satisfies the
+  signature) rather than defaulting to a fixed operand position.
 - The compiled result's required result type (`CelRequiredResultType.Predicate` or `General`) SHALL
   be checked against the root expression's resolved static type only after the entire tree has
   bound and type-checked successfully. `Predicate` SHALL require the root type to be `Bool`;
@@ -1092,11 +1102,41 @@ already fixed elsewhere in this spec:
   `String`
 - **THEN** compilation fails with a `BindingError` diagnostic
 
+#### Scenario: A known-deferred built-in function name produces UnsupportedFeature, not BindingError
+
+- **WHEN** the expression `x.matches('a.*')` is compiled against a schema declaring `x` as `String`
+- **THEN** compilation fails with an `UnsupportedFeature` diagnostic, not `BindingError` (`matches`
+  is a known-deferred CEL built-in, distinct from an entirely unknown function name)
+
+#### Scenario: A wrong function-argument type is attributed to the argument, not the receiver
+
+- **WHEN** the expression `x.startsWith(1)` is compiled against a schema declaring `x` as `String`
+  (a valid receiver for `startsWith` — only the argument type is wrong)
+- **THEN** compilation fails with a `TypeMismatch` diagnostic
+- **AND** `diagnostic.Parameters["expectedType"]` equals `"String"` and
+  `diagnostic.Parameters["actualType"]` equals `"Int"` (the argument's expected/actual type, not
+  the receiver's already-matching type)
+
 #### Scenario: Wrong index expression type produces a TypeMismatch
 
 - **WHEN** the expression `list["not-an-int"]` is compiled against a schema declaring `list` as
   `List<Int>`
 - **THEN** compilation fails with a `TypeMismatch` diagnostic
+
+#### Scenario: A numeric-ordering operator with a non-numeric left operand attributes the mismatch to the left operand
+
+- **WHEN** the expression `s < s` is compiled against a schema declaring `s` as `String`
+- **THEN** compilation fails with a `TypeMismatch` diagnostic
+- **AND** `diagnostic.Parameters["actualType"]` equals `"String"` (the left operand's own type, not
+  a copy of the right operand's type)
+
+#### Scenario: A numeric-ordering operator with mixed Int/Float operands attributes the mismatch to the differing right operand
+
+- **WHEN** the expression `i < f` is compiled against a schema declaring `i` as `Int` and `f` as
+  `Float`
+- **THEN** compilation fails with a `TypeMismatch` diagnostic
+- **AND** `diagnostic.Parameters["expectedType"]` equals `"Int"` and
+  `diagnostic.Parameters["actualType"]` equals `"Float"`
 
 #### Scenario: A Predicate compilation whose root type is not Bool fails with TypeMismatch
 

@@ -97,7 +97,7 @@ ______________________________________________________________________
 | Component | Owner | Notes |
 |---|---|---|
 | Profile identity (`CelProfile`, `CelProfileId`) | `ArchLinterNet.CEL` public | Stable across versions; v1 ID is `arch-linter/cel/v1` |
-| Grammar gates (token set, operator set) | `ArchLinterNet.CEL.Parsing` internal (`CelTokenizer`, `CelParser`) | Controlled per-profile; no public API. Deviation from the original design: the gate lives in the tokenizer/parser themselves (deferred tokens are lexed, then rejected by the parser with `UnsupportedFeature`), not in `CelEngine` — `CelEngine` remains an unused placeholder pending #326/#327 |
+| Grammar gates (token set, operator set) | `ArchLinterNet.CEL.Parsing` internal (`CelTokenizer`, `CelParser`) | Controlled per-profile; no public API. Deviation from the original design: the gate lives in the tokenizer/parser themselves (deferred tokens are lexed, then rejected by the parser with `UnsupportedFeature`), not in `CelEngine` — `CelEngine` remains an unused placeholder pending #327 |
 | Value model (`CelValue`, `CelObjectValue`, `CelValueKind`) | `ArchLinterNet.CEL` public | No CLR reflection; all factories are typed |
 | Type descriptors (`CelType`, `CelTypeKind`) | `ArchLinterNet.CEL` public | Static factories only |
 | Context schema (`CelContextSchema`, `CelVariable`) | `ArchLinterNet.CEL` public | Structural identity is deterministic |
@@ -146,13 +146,13 @@ Capabilities deferred: POCO/CLR type adapters, `System.Text.Json` adapter, proto
 
 ### 3. Function catalog
 
-Capabilities deferred: caller-defined functions, host-registered function bundles, operator overloads.
+Capabilities deferred: caller-defined functions, host-registered function bundles, operator overloads. The closed Profile v1 catalog itself (`startsWith`/`endsWith`/`contains`/`size`/`containsKey`) is shipped — see `ArchLinterNet.CEL.Binding.CelFunctionCatalog`.
 
 | Field | Details |
 |---|---|
 | Classification | Standard CEL (built-in) + canonical extension (host-defined) |
-| Intended owner | `CelEngine` internal (built-in functions); future profiles may add more built-ins |
-| Existing seam | Internal function-catalog lookup inside `CelEngine`; profile gates which functions are available |
+| Intended owner | `ArchLinterNet.CEL.Binding.CelFunctionCatalog` internal (built-in functions); future profiles may add more built-ins |
+| Existing seam | Internal function-catalog lookup inside `ArchLinterNet.CEL.Binding` (`CelFunctionCatalog`, consumed by `CelBinder`); profile gates which functions are available |
 | New profile version required? | Adding new built-ins requires a new profile; host-defined functions require explicit API design (excluded from v1) |
 | Affected layers | Binder, type-checker, evaluator |
 | Safety implications | User-defined functions could execute arbitrary code; excluded from v1 for this reason |

@@ -1,5 +1,7 @@
+using System.Linq;
 using System.Reflection;
 using ArchLinterNet.CEL;
+using ArchLinterNet.CEL.Binding;
 using ArchLinterNet.CEL.Compilation;
 using ArchLinterNet.CEL.Diagnostics;
 using ArchLinterNet.CEL.Profile;
@@ -157,6 +159,16 @@ public sealed class CelBinderTests
         Assert.That(result.Diagnostics[0].Code, Is.EqualTo(CelDiagnosticCode.BindingError));
     }
 
+    [Test]
+    public void Call_KnownDeferredBuiltin_ProducesUnsupportedFeature_NotBindingError()
+    {
+        var env = BuildEnvironment();
+        var result = env.CompilePredicate("s.matches('a.*')");
+
+        Assert.That(result.IsSuccess, Is.False);
+        Assert.That(result.Diagnostics[0].Code, Is.EqualTo(CelDiagnosticCode.UnsupportedFeature));
+    }
+
     [TestCase("s.startsWith('a')")]
     [TestCase("s.endsWith('a')")]
     [TestCase("s.contains('a')")]
@@ -208,6 +220,19 @@ public sealed class CelBinderTests
 
         Assert.That(result.IsSuccess, Is.False);
         Assert.That(result.Diagnostics[0].Code, Is.EqualTo(CelDiagnosticCode.TypeMismatch));
+    }
+
+    [Test]
+    public void Call_WrongArgumentType_DiagnosticDescribesTheArgumentNotTheReceiver()
+    {
+        // The receiver ('s', String) is valid — only the argument (1, Int) is wrong. The
+        // diagnostic must describe the actual failing part (String expected, Int actual for the
+        // argument), not the receiver's (already-matching) type.
+        var env = BuildEnvironment();
+        var result = env.CompilePredicate("s.startsWith(1)");
+
+        Assert.That(result.Diagnostics[0].Parameters["expectedType"], Is.EqualTo("String"));
+        Assert.That(result.Diagnostics[0].Parameters["actualType"], Is.EqualTo("Int"));
     }
 
     [Test]
@@ -288,6 +313,11 @@ public sealed class CelBinderTests
 
         Assert.That(result.IsSuccess, Is.False);
         Assert.That(result.Diagnostics[0].Code, Is.EqualTo(CelDiagnosticCode.TypeMismatch));
+        // Left operand (i, Int) is numeric and thus the "expected" type; the right operand
+        // (f, Float) is the one that actually differs — the diagnostic must attribute the
+        // mismatch to the right operand, not report the left operand's own type as "actual".
+        Assert.That(result.Diagnostics[0].Parameters["expectedType"], Is.EqualTo("Int"));
+        Assert.That(result.Diagnostics[0].Parameters["actualType"], Is.EqualTo("Float"));
     }
 
     [Test]
@@ -301,6 +331,19 @@ public sealed class CelBinderTests
     }
 
     [Test]
+    public void Ordering_NonNumericLeftOperand_DiagnosticDescribesTheLeftOperand()
+    {
+        // The left operand (s, String) is the actual problem — it is never numeric, regardless of
+        // what the right operand is. The diagnostic must describe the left operand's own type as
+        // "actual", not the right operand's type.
+        var env = BuildEnvironment();
+        var result = env.CompilePredicate("s < s");
+
+        Assert.That(result.Diagnostics[0].Parameters["expectedType"], Is.EqualTo("Int or Float"));
+        Assert.That(result.Diagnostics[0].Parameters["actualType"], Is.EqualTo("String"));
+    }
+
+    [Test]
     public void In_ListMembership_WrongElementType_ProducesTypeMismatch()
     {
         var env = BuildEnvironment();
@@ -308,6 +351,9 @@ public sealed class CelBinderTests
 
         Assert.That(result.IsSuccess, Is.False);
         Assert.That(result.Diagnostics[0].Code, Is.EqualTo(CelDiagnosticCode.TypeMismatch));
+        // list is List<Int>; the left operand (s, String) is the actual problem.
+        Assert.That(result.Diagnostics[0].Parameters["expectedType"], Is.EqualTo("Int"));
+        Assert.That(result.Diagnostics[0].Parameters["actualType"], Is.EqualTo("String"));
     }
 
     [Test]
@@ -318,6 +364,19 @@ public sealed class CelBinderTests
 
         Assert.That(result.IsSuccess, Is.False);
         Assert.That(result.Diagnostics[0].Code, Is.EqualTo(CelDiagnosticCode.TypeMismatch));
+        Assert.That(result.Diagnostics[0].Parameters["expectedType"], Is.EqualTo("String"));
+        Assert.That(result.Diagnostics[0].Parameters["actualType"], Is.EqualTo("Int"));
+    }
+
+    [Test]
+    public void In_RightOperandNotListOrMap_DiagnosticDescribesTheRightOperand()
+    {
+        var env = BuildEnvironment();
+        var result = env.CompilePredicate("s in i");
+
+        Assert.That(result.IsSuccess, Is.False);
+        Assert.That(result.Diagnostics[0].Code, Is.EqualTo(CelDiagnosticCode.TypeMismatch));
+        Assert.That(result.Diagnostics[0].Parameters["actualType"], Is.EqualTo("Int"));
     }
 
     // ── Whole-AST binding ────────────────────────────────────────────────────
@@ -418,6 +477,20 @@ public sealed class CelBinderTests
             .Build();
 
         Assert.That(() => result.Program!.Evaluate(context), Throws.TypeOf<NotImplementedException>());
+    }
+
+    // ── Bound-plan immutability ──────────────────────────────────────────────
+
+    [Test]
+    public void CelBoundCall_Arguments_DefensiveCopy_MutatingSourceListDoesNotAffectBoundNode()
+    {
+        var overload = CelFunctionCatalog.OverloadsFor("startsWith").First();
+        var mutableArgs = new List<CelBoundNode> { new CelBoundStringLiteral(new CelSourceSpan(0, 1), "a") };
+        var call = new CelBoundCall(new CelSourceSpan(0, 10), null, "startsWith", mutableArgs, overload);
+
+        mutableArgs.Add(new CelBoundStringLiteral(new CelSourceSpan(1, 2), "b"));
+
+        Assert.That(call.Arguments, Has.Count.EqualTo(1));
     }
 
     // ── Public API surface ───────────────────────────────────────────────────

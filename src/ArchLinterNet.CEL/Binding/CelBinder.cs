@@ -158,16 +158,21 @@ internal sealed class CelBinder
 
     private CelBoundBinary BindOrdering(CelBinarySyntax node, CelBoundNode left, CelBoundNode right)
     {
+        var message = $"Operator '{OperatorText(node.Operator)}' requires two operands of the same " +
+            "numeric type (Int or Float, no implicit widening).";
         var leftIsNumeric = left.ResolvedType.Kind is CelTypeKind.Int or CelTypeKind.Float;
-        if (!leftIsNumeric || left.ResolvedType.Kind != right.ResolvedType.Kind)
+        if (!leftIsNumeric)
         {
-            var expected = leftIsNumeric ? CelTypeDisplay.Describe(left.ResolvedType) : "Int or Float";
             throw Fail(CelBindDiagnostics.TypeMismatch(
-                node.Span,
-                $"Operator '{OperatorText(node.Operator)}' requires two operands of the same numeric " +
-                "type (Int or Float, no implicit widening).",
+                left.Span, message, _profileId, "Int or Float", CelTypeDisplay.Describe(left.ResolvedType)));
+        }
+        if (left.ResolvedType.Kind != right.ResolvedType.Kind)
+        {
+            throw Fail(CelBindDiagnostics.TypeMismatch(
+                right.Span,
+                message,
                 _profileId,
-                expected,
+                CelTypeDisplay.Describe(left.ResolvedType),
                 CelTypeDisplay.Describe(right.ResolvedType)));
         }
         return new CelBoundBinary(node.Span, CelType.Bool, node.Operator, left, right);
@@ -175,30 +180,40 @@ internal sealed class CelBinder
 
     private CelBoundBinary BindIn(CelBinarySyntax node, CelBoundNode left, CelBoundNode right)
     {
-        var matches = right.ResolvedType.Kind switch
+        switch (right.ResolvedType.Kind)
         {
-            CelTypeKind.List => CelTypeEquality.AreEqual(left.ResolvedType, right.ResolvedType.ElementType!),
-            CelTypeKind.Map => left.ResolvedType.Kind == CelTypeKind.String,
-            _ => false,
-        };
-        if (!matches)
-        {
-            throw Fail(CelBindDiagnostics.TypeMismatch(
-                node.Span,
-                "Operator 'in' requires 'T in List<T>' or 'String in Map<String, T>'.",
-                _profileId,
-                ExpectedInDescription(right.ResolvedType),
-                CelTypeDisplay.Describe(left.ResolvedType)));
+            case CelTypeKind.List:
+                if (!CelTypeEquality.AreEqual(left.ResolvedType, right.ResolvedType.ElementType!))
+                {
+                    throw Fail(CelBindDiagnostics.TypeMismatch(
+                        left.Span,
+                        "Operator 'in' requires the left operand's type to match the list's element type.",
+                        _profileId,
+                        CelTypeDisplay.Describe(right.ResolvedType.ElementType!),
+                        CelTypeDisplay.Describe(left.ResolvedType)));
+                }
+                break;
+            case CelTypeKind.Map:
+                if (left.ResolvedType.Kind != CelTypeKind.String)
+                {
+                    throw Fail(CelBindDiagnostics.TypeMismatch(
+                        left.Span,
+                        "Operator 'in' requires a String left operand for map key membership.",
+                        _profileId,
+                        "String",
+                        CelTypeDisplay.Describe(left.ResolvedType)));
+                }
+                break;
+            default:
+                throw Fail(CelBindDiagnostics.TypeMismatch(
+                    right.Span,
+                    "Operator 'in' requires a List or Map right operand.",
+                    _profileId,
+                    "List<T> or Map<String, T>",
+                    CelTypeDisplay.Describe(right.ResolvedType)));
         }
         return new CelBoundBinary(node.Span, CelType.Bool, node.Operator, left, right);
     }
-
-    private static string ExpectedInDescription(CelType rightType) => rightType.Kind switch
-    {
-        CelTypeKind.List => CelTypeDisplay.Describe(rightType.ElementType!),
-        CelTypeKind.Map => "String",
-        _ => "List<T> or Map<String, T>",
-    };
 
     private CelBoundMemberAccess BindMemberAccess(CelMemberAccessSyntax node)
     {
@@ -272,6 +287,14 @@ internal sealed class CelBinder
 
         if (!CelFunctionCatalog.HasAnyOverload(node.FunctionName))
         {
+            if (CelDeferredFunctionCatalog.IsKnownDeferred(node.FunctionName))
+            {
+                throw Fail(CelBindDiagnostics.UnsupportedFeature(
+                    node.Span,
+                    $"Function '{node.FunctionName}' is a deferred CEL built-in not supported by Profile v1.",
+                    _profileId,
+                    node.FunctionName));
+            }
             throw Fail(CelBindDiagnostics.BindingError(
                 node.Span, $"Unknown function '{node.FunctionName}'.", _profileId, node.FunctionName));
         }
@@ -288,33 +311,37 @@ internal sealed class CelBinder
         }
 
         var receiverKind = receiver?.ResolvedType.Kind;
-        var matched = arityMatches.FirstOrDefault(o =>
-            o.ReceiverKind == receiverKind &&
-            ArgumentKindsMatch(o.ArgumentKinds, arguments));
-
-        if (matched is null)
+        var receiverMatches = arityMatches.Where(o => o.ReceiverKind == receiverKind).ToList();
+        if (receiverMatches.Count == 0)
         {
             var expectedReceiver = string.Join(" or ", arityMatches.Select(o => o.ReceiverKind?.ToString() ?? "none").Distinct());
             var actualReceiver = receiverKind?.ToString() ?? "none";
             throw Fail(CelBindDiagnostics.TypeMismatch(
                 node.Span,
-                $"Function '{node.FunctionName}' has no overload matching the given receiver/argument types.",
+                $"Function '{node.FunctionName}' has no overload for receiver type '{actualReceiver}'.",
                 _profileId,
                 expectedReceiver,
                 actualReceiver));
         }
 
-        return new CelBoundCall(node.Span, receiver, node.FunctionName, arguments, matched);
-    }
-
-    private static bool ArgumentKindsMatch(IReadOnlyList<CelTypeKind> expected, IReadOnlyList<CelBoundNode> actual)
-    {
-        for (var i = 0; i < expected.Count; i++)
+        // The closed catalog declares at most one overload per (function name, receiver kind,
+        // arity) combination, so the first receiver/arity match is the only candidate whose
+        // argument types are worth checking individually.
+        var candidate = receiverMatches[0];
+        for (var i = 0; i < candidate.ArgumentKinds.Count; i++)
         {
-            if (expected[i] != actual[i].ResolvedType.Kind)
-                return false;
+            if (candidate.ArgumentKinds[i] != arguments[i].ResolvedType.Kind)
+            {
+                throw Fail(CelBindDiagnostics.TypeMismatch(
+                    arguments[i].Span,
+                    $"Function '{node.FunctionName}' argument {i + 1} has the wrong type.",
+                    _profileId,
+                    candidate.ArgumentKinds[i].ToString(),
+                    CelTypeDisplay.Describe(arguments[i].ResolvedType)));
+            }
         }
-        return true;
+
+        return new CelBoundCall(node.Span, receiver, node.FunctionName, arguments, candidate);
     }
 
     private void CheckRequiredResultType(CelBoundNode root, CelRequiredResultType requiredResultType)

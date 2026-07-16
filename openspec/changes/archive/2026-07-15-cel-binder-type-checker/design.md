@@ -96,9 +96,15 @@ story.
   parser's fail-fast contract and `CelCompilationResult<T>` shape; consistency across compiler
   phases is preferred over a scope-expanding multi-diagnostic redesign in this issue.
 - **[Risk] A 1:1 bound-tree duplication of `CelSyntaxNode` adds allocation on every successful
-  compile.** → Mitigation: compilation results are cached by `CelCompilationKey` (already
-  implemented in #334), so the bound tree is built once per distinct expression/schema/limits
-  combination, not per evaluation.
+  compile, and `ArchLinterNet.CEL` performs no caching itself — every `CompilePredicate`/`Compile`
+  call re-tokenizes, re-parses, and re-binds.** → Mitigation: this is the documented, deliberate
+  contract from #334 (`CelCompilationKey` supplies deterministic structural identity so a *caller*
+  can memoize compiled programs; "No process-global mutable cache SHALL exist in
+  `ArchLinterNet.CEL`; cache lifetime SHALL be caller-owned" per the `cel-profile-v1` spec's cache-
+  identity requirement). The bound-tree allocation cost is therefore paid once per call a caller
+  chooses not to cache, not amortized by the library — callers evaluating the same expression
+  repeatedly are expected to hold onto the returned `CelCompiledPredicate`/`CelCompiledExpression`
+  themselves, keyed by `CompilationKey` if desired.
 - **[Risk] Deep-structural equality for `==`/`!=` over `List`/`Map`/`Object` is a binder *type*
   check only (same `CelTypeKind` shape) — the actual deep comparison is evaluator territory (#327)
   and isn't exercised by this change.** → Mitigation: explicitly called out as a non-goal; tests in

@@ -42,4 +42,14 @@ internal static class CelBindDiagnostics
         };
         return new CelDiagnostic(CelDiagnosticCode.TypeMismatch, Category, CelDiagnosticSeverity.Error, span, message, parameters);
     }
+
+    public static CelDiagnostic UnsupportedFeature(CelSourceSpan span, string message, CelProfileId profileId, string feature)
+    {
+        var parameters = new Dictionary<string, string>(StringComparer.Ordinal)
+        {
+            ["profileId"] = profileId.Value,
+            ["feature"] = feature,
+        };
+        return new CelDiagnostic(CelDiagnosticCode.UnsupportedFeature, Category, CelDiagnosticSeverity.Error, span, message, parameters);
+    }
 }

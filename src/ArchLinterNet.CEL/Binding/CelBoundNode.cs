@@ -156,7 +156,9 @@ internal sealed class CelBoundCall : CelBoundNode
     {
         Receiver = receiver;
         FunctionName = functionName;
-        Arguments = arguments;
+        // Defensive copy: mirrors CelCallSyntax.Arguments — callers must not be able to cast
+        // IReadOnlyList<> back to List<> and mutate the "immutable" bound tree.
+        Arguments = new List<CelBoundNode>(arguments).AsReadOnly();
         Overload = overload;
     }
 }
