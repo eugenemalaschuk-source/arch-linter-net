@@ -40,6 +40,7 @@ internal static class CelEvaluator
     private readonly record struct EvaluationStep(CelValue? Value, CelDiagnostic? Diagnostic)
     {
         public bool IsSuccess => Diagnostic is null;
+        public bool IsBudgetExceeded => Diagnostic?.Code == CelDiagnosticCode.BudgetExceeded;
 
         public static EvaluationStep Succeeded(CelValue value) => new(value, null);
 
@@ -148,7 +149,13 @@ internal static class CelEvaluator
                 return EvaluateBooleanRight(binary.Right, static right => right);
             }
 
+            if (left.IsBudgetExceeded)
+                return left;
+
             var right = EvaluateNode(binary.Right);
+            if (right.IsBudgetExceeded)
+                return right;
+
             if (right.IsSuccess && !right.Value!.AsBool())
                 return EvaluationStep.Succeeded(CelValue.Bool(false));
 
@@ -166,7 +173,13 @@ internal static class CelEvaluator
                 return EvaluateBooleanRight(binary.Right, static right => right);
             }
 
+            if (left.IsBudgetExceeded)
+                return left;
+
             var right = EvaluateNode(binary.Right);
+            if (right.IsBudgetExceeded)
+                return right;
+
             if (right.IsSuccess && right.Value!.AsBool())
                 return EvaluationStep.Succeeded(CelValue.Bool(true));
 
@@ -192,7 +205,11 @@ internal static class CelEvaluator
             if (!right.IsSuccess)
                 return right;
 
-            var areEqual = AreEqual(left.Value!, right.Value!);
+            var comparison = CompareValues(left.Value!, right.Value!, binary.Span);
+            if (!comparison.IsSuccess)
+                return comparison;
+
+            var areEqual = comparison.Value!.AsBool();
             return EvaluationStep.Succeeded(CelValue.Bool(negate ? !areEqual : areEqual));
         }
 
@@ -205,6 +222,12 @@ internal static class CelEvaluator
             var right = EvaluateNode(binary.Right);
             if (!right.IsSuccess)
                 return right;
+
+            if (left.Value!.Kind == CelValueKind.Float &&
+                (double.IsNaN(left.Value.AsFloat()) || double.IsNaN(right.Value!.AsFloat())))
+            {
+                return EvaluationStep.Succeeded(CelValue.Bool(false));
+            }
 
             var comparison = left.Value!.Kind switch
             {
@@ -229,13 +252,38 @@ internal static class CelEvaluator
 
             return right.Value!.Kind switch
             {
-                CelValueKind.List => EvaluationStep.Succeeded(CelValue.Bool(
-                    right.Value.AsList().Any(candidate => AreEqual(left.Value!, candidate)))),
-                CelValueKind.Map => EvaluationStep.Succeeded(CelValue.Bool(
-                    right.Value.AsMap().ContainsKey(left.Value!.AsString()))),
+                CelValueKind.List => EvaluateInList(binary.Span, left.Value!, right.Value.AsList()),
+                CelValueKind.Map => EvaluateInMap(binary.Span, left.Value!.AsString(), right.Value.AsMap()),
                 _ => throw new InvalidOperationException(
                     $"Operator 'in' reached unsupported right-hand kind '{right.Value.Kind}'."),
             };
+        }
+
+        private EvaluationStep EvaluateInList(CelSourceSpan span, CelValue needle, IReadOnlyList<CelValue> haystack)
+        {
+            foreach (var candidate in haystack)
+            {
+                var comparison = CompareValues(needle, candidate, span);
+                if (!comparison.IsSuccess)
+                    return comparison;
+
+                if (comparison.Value!.AsBool())
+                    return EvaluationStep.Succeeded(CelValue.Bool(true));
+            }
+
+            return EvaluationStep.Succeeded(CelValue.Bool(false));
+        }
+
+        private EvaluationStep EvaluateInMap(
+            CelSourceSpan span,
+            string key,
+            IReadOnlyDictionary<string, CelValue> map)
+        {
+            var lookupDiagnostic = ChargeCost(span, MapLookupCost(key, map.Count));
+            if (lookupDiagnostic is not null)
+                return EvaluationStep.Failed(lookupDiagnostic);
+
+            return EvaluationStep.Succeeded(CelValue.Bool(map.ContainsKey(key)));
         }
 
         private EvaluationStep EvaluateMemberAccess(CelBoundMemberAccess memberAccess)
@@ -245,6 +293,12 @@ internal static class CelEvaluator
                 return receiver;
 
             var obj = receiver.Value!.AsObject();
+            var lookupDiagnostic = ChargeCost(
+                memberAccess.Span,
+                MapLookupCost(memberAccess.Member.Name, obj.Members.Count));
+            if (lookupDiagnostic is not null)
+                return EvaluationStep.Failed(lookupDiagnostic);
+
             return obj.Members.TryGetValue(memberAccess.Member.Name, out var memberValue)
                 ? EvaluationStep.Succeeded(memberValue)
                 : EvaluationStep.Failed(CelEvaluationDiagnostics.MissingMember(
@@ -289,10 +343,16 @@ internal static class CelEvaluator
         private EvaluationStep EvaluateMapIndex(
             CelBoundIndex index,
             IReadOnlyDictionary<string, CelValue> receiver,
-            string key) =>
-            receiver.TryGetValue(key, out var value)
+            string key)
+        {
+            var lookupDiagnostic = ChargeCost(index.Span, MapLookupCost(key, receiver.Count));
+            if (lookupDiagnostic is not null)
+                return EvaluationStep.Failed(lookupDiagnostic);
+
+            return receiver.TryGetValue(key, out var value)
                 ? EvaluationStep.Succeeded(value)
                 : EvaluationStep.Failed(CelEvaluationDiagnostics.MissingKey(index.Span, key, _profileId));
+        }
 
         private EvaluationStep EvaluateCall(CelBoundCall call)
         {
@@ -346,56 +406,107 @@ internal static class CelEvaluator
                 : null;
         }
 
-        private static bool AreEqual(CelValue left, CelValue right)
+        private EvaluationStep CompareValues(CelValue left, CelValue right, CelSourceSpan span)
         {
+            var baseCostDiagnostic = ChargeCost(span, FixedComparisonCost);
+            if (baseCostDiagnostic is not null)
+                return EvaluationStep.Failed(baseCostDiagnostic);
+
             if (left.Kind != right.Kind)
-                return false;
+                return EvaluationStep.Succeeded(CelValue.Bool(false));
 
             return left.Kind switch
             {
-                CelValueKind.Bool => left.AsBool() == right.AsBool(),
-                CelValueKind.String => string.Equals(left.AsString(), right.AsString(), StringComparison.Ordinal),
-                CelValueKind.Int => left.AsInt() == right.AsInt(),
-                CelValueKind.Float => left.AsFloat().Equals(right.AsFloat()),
-                CelValueKind.List => AreEqual(left.AsList(), right.AsList()),
-                CelValueKind.Map => AreEqual(left.AsMap(), right.AsMap()),
-                CelValueKind.Object => AreEqual(left.AsObject(), right.AsObject()),
+                CelValueKind.Bool => EvaluationStep.Succeeded(CelValue.Bool(left.AsBool() == right.AsBool())),
+                CelValueKind.String => CompareStrings(left.AsString(), right.AsString(), span),
+                CelValueKind.Int => EvaluationStep.Succeeded(CelValue.Bool(left.AsInt() == right.AsInt())),
+                CelValueKind.Float => EvaluationStep.Succeeded(CelValue.Bool(AreFloatsEqual(left.AsFloat(), right.AsFloat()))),
+                CelValueKind.List => CompareLists(left.AsList(), right.AsList(), span),
+                CelValueKind.Map => CompareMaps(left.AsMap(), right.AsMap(), span),
+                CelValueKind.Object => CompareObjects(left.AsObject(), right.AsObject(), span),
                 _ => throw new InvalidOperationException($"Unhandled CEL value kind '{left.Kind}'."),
             };
         }
 
-        private static bool AreEqual(IReadOnlyList<CelValue> left, IReadOnlyList<CelValue> right)
+        private EvaluationStep CompareStrings(string left, string right, CelSourceSpan span)
+        {
+            var costDiagnostic = ChargeCost(span, Math.Max(left.Length, right.Length));
+            if (costDiagnostic is not null)
+                return EvaluationStep.Failed(costDiagnostic);
+
+            return EvaluationStep.Succeeded(CelValue.Bool(string.Equals(left, right, StringComparison.Ordinal)));
+        }
+
+        private EvaluationStep CompareLists(
+            IReadOnlyList<CelValue> left,
+            IReadOnlyList<CelValue> right,
+            CelSourceSpan span)
         {
             if (left.Count != right.Count)
-                return false;
+                return EvaluationStep.Succeeded(CelValue.Bool(false));
 
             for (var i = 0; i < left.Count; i++)
             {
-                if (!AreEqual(left[i], right[i]))
-                    return false;
+                var comparison = CompareValues(left[i], right[i], span);
+                if (!comparison.IsSuccess)
+                    return comparison;
+
+                if (!comparison.Value!.AsBool())
+                    return EvaluationStep.Succeeded(CelValue.Bool(false));
             }
 
-            return true;
+            return EvaluationStep.Succeeded(CelValue.Bool(true));
         }
 
-        private static bool AreEqual(
+        private EvaluationStep CompareMaps(
             IReadOnlyDictionary<string, CelValue> left,
-            IReadOnlyDictionary<string, CelValue> right)
+            IReadOnlyDictionary<string, CelValue> right,
+            CelSourceSpan span)
         {
             if (left.Count != right.Count)
-                return false;
+                return EvaluationStep.Succeeded(CelValue.Bool(false));
 
             foreach (var (key, value) in left)
             {
-                if (!right.TryGetValue(key, out var rightValue) || !AreEqual(value, rightValue))
-                    return false;
+                var lookupDiagnostic = ChargeCost(span, MapLookupCost(key, right.Count));
+                if (lookupDiagnostic is not null)
+                    return EvaluationStep.Failed(lookupDiagnostic);
+
+                if (!right.TryGetValue(key, out var rightValue))
+                    return EvaluationStep.Succeeded(CelValue.Bool(false));
+
+                var comparison = CompareValues(value, rightValue, span);
+                if (!comparison.IsSuccess)
+                    return comparison;
+
+                if (!comparison.Value!.AsBool())
+                    return EvaluationStep.Succeeded(CelValue.Bool(false));
             }
 
-            return true;
+            return EvaluationStep.Succeeded(CelValue.Bool(true));
         }
 
-        private static bool AreEqual(CelObjectValue left, CelObjectValue right) =>
-            string.Equals(left.ObjectTypeId, right.ObjectTypeId, StringComparison.Ordinal) &&
-            AreEqual(left.Members, right.Members);
+        private EvaluationStep CompareObjects(CelObjectValue left, CelObjectValue right, CelSourceSpan span)
+        {
+            if (!string.Equals(left.ObjectTypeId, right.ObjectTypeId, StringComparison.Ordinal))
+                return EvaluationStep.Succeeded(CelValue.Bool(false));
+
+            return CompareMaps(left.Members, right.Members, span);
+        }
+
+        private static bool AreFloatsEqual(double left, double right) =>
+            !double.IsNaN(left) && !double.IsNaN(right) && left.Equals(right);
+
+        private static long MapLookupCost(string key, int entryCount) =>
+            1 + SaturatingMultiply(key.Length, entryCount + 1L);
+
+        private static long SaturatingMultiply(long left, long right) =>
+            left == 0 || right == 0
+                ? 0
+                : long.MaxValue / left < right
+                    ? long.MaxValue
+                    : left * right;
+
+        private const long FixedComparisonCost = 1;
     }
 }

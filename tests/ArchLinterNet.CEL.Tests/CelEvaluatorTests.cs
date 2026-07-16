@@ -177,6 +177,199 @@ public sealed class CelEvaluatorTests
     }
 
     [Test]
+    public void LogicalOperators_DoNotAbsorbBudgetExceededFromLeftOperand()
+    {
+        var env = BuildEnvironment();
+        var orCompilation = env.CompilePredicate("s.contains(prefix) || x");
+        var andCompilation = env.CompilePredicate("s.contains(prefix) && y");
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(orCompilation.IsSuccess, Is.True);
+            Assert.That(andCompilation.IsSuccess, Is.True);
+        });
+
+        var tightLimits = new CelEvaluationLimits(
+            maxIterations: env.EvaluationLimits.MaxIterations,
+            maxCostUnits: 100);
+
+        var orResult = orCompilation.Program!.Evaluate(
+            BuildContext(env, x: true, s: new string('a', 12), prefix: new string('a', 12)),
+            tightLimits);
+        var andResult = andCompilation.Program!.Evaluate(
+            BuildContext(env, y: false, s: new string('a', 12), prefix: new string('a', 12)),
+            tightLimits);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(orResult.IsSuccess, Is.False);
+            Assert.That(orResult.Diagnostics[0].Code, Is.EqualTo(CelDiagnosticCode.BudgetExceeded));
+            Assert.That(andResult.IsSuccess, Is.False);
+            Assert.That(andResult.Diagnostics[0].Code, Is.EqualTo(CelDiagnosticCode.BudgetExceeded));
+        });
+    }
+
+    [Test]
+    public void LogicalOperators_DeterminingLeftOperand_SkipsBudgetedRightOperand()
+    {
+        var env = BuildEnvironment();
+        var orCompilation = env.CompilePredicate("x || s.contains(prefix)");
+        var andCompilation = env.CompilePredicate("x && s.contains(prefix)");
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(orCompilation.IsSuccess, Is.True);
+            Assert.That(andCompilation.IsSuccess, Is.True);
+        });
+
+        var tightLimits = new CelEvaluationLimits(
+            maxIterations: env.EvaluationLimits.MaxIterations,
+            maxCostUnits: 100);
+
+        var orResult = orCompilation.Program!.Evaluate(
+            BuildContext(env, x: true, s: new string('a', 12), prefix: new string('a', 12)),
+            tightLimits);
+        var andResult = andCompilation.Program!.Evaluate(
+            BuildContext(env, x: false, s: new string('a', 12), prefix: new string('a', 12)),
+            tightLimits);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(orResult.IsSuccess, Is.True);
+            Assert.That(orResult.AsBool(), Is.True);
+            Assert.That(andResult.IsSuccess, Is.True);
+            Assert.That(andResult.AsBool(), Is.False);
+        });
+    }
+
+    [Test]
+    public void InList_ChargesCostProportionalToCollectionSize()
+    {
+        var env = BuildEnvironment();
+        var compilation = env.CompilePredicate("needle in list");
+
+        Assert.That(compilation.IsSuccess, Is.True);
+
+        var result = compilation.Program!.Evaluate(
+            BuildContext(
+                env,
+                needle: 999,
+                list: Enumerable.Range(0, 32).Select(value => CelValue.Int(value)).ToArray()),
+            new CelEvaluationLimits(
+                maxIterations: env.EvaluationLimits.MaxIterations,
+                maxCostUnits: 10));
+
+        Assert.That(result.IsSuccess, Is.False);
+        Assert.That(result.Diagnostics[0].Code, Is.EqualTo(CelDiagnosticCode.BudgetExceeded));
+        Assert.That(result.Diagnostics[0].Parameters["limitName"], Is.EqualTo("MaxCostUnits"));
+    }
+
+    [Test]
+    public void InMap_ChargesCostProportionalToLookupWork()
+    {
+        var env = BuildEnvironment();
+        var compilation = env.CompilePredicate("key in map");
+
+        Assert.That(compilation.IsSuccess, Is.True);
+
+        var map = Enumerable.Range(0, 32)
+            .ToDictionary(
+                value => $"entry-{value}",
+                _ => CelValue.Bool(true));
+
+        var result = compilation.Program!.Evaluate(
+            BuildContext(
+                env,
+                key: new string('k', 20),
+                map: map),
+            new CelEvaluationLimits(
+                maxIterations: env.EvaluationLimits.MaxIterations,
+                maxCostUnits: 50));
+
+        Assert.That(result.IsSuccess, Is.False);
+        Assert.That(result.Diagnostics[0].Code, Is.EqualTo(CelDiagnosticCode.BudgetExceeded));
+        Assert.That(result.Diagnostics[0].Parameters["limitName"], Is.EqualTo("MaxCostUnits"));
+    }
+
+    [Test]
+    public void DeepEquality_ChargesCostForNestedCollectionTraversal()
+    {
+        var env = BuildNestedListEnvironment();
+        var compilation = env.CompilePredicate("left == right");
+
+        Assert.That(compilation.IsSuccess, Is.True);
+
+        var leftValue = CelValue.List(
+        [
+            CelValue.List([CelValue.Int(1), CelValue.Int(2), CelValue.Int(3)]),
+            CelValue.List([CelValue.Int(4), CelValue.Int(5), CelValue.Int(6)]),
+            CelValue.List([CelValue.Int(7), CelValue.Int(8), CelValue.Int(9)]),
+        ]);
+
+        var result = compilation.Program!.Evaluate(
+            BuildNestedListContext(env, leftValue, leftValue),
+            new CelEvaluationLimits(
+                maxIterations: env.EvaluationLimits.MaxIterations,
+                maxCostUnits: 12));
+
+        Assert.That(result.IsSuccess, Is.False);
+        Assert.That(result.Diagnostics[0].Code, Is.EqualTo(CelDiagnosticCode.BudgetExceeded));
+        Assert.That(result.Diagnostics[0].Parameters["limitName"], Is.EqualTo("MaxCostUnits"));
+    }
+
+    [Test]
+    public void FloatEquality_NaNIsNotEqualToNaN()
+    {
+        var env = BuildEnvironment();
+        var compilation = env.CompilePredicate("f == g");
+
+        Assert.That(compilation.IsSuccess, Is.True);
+
+        var result = compilation.Program!.Evaluate(BuildContext(
+            env,
+            f: double.NaN,
+            g: double.NaN));
+
+        Assert.That(result.IsSuccess, Is.True);
+        Assert.That(result.AsBool(), Is.False);
+    }
+
+    [Test]
+    public void FloatOrdering_WithNaN_ReturnsFalse()
+    {
+        var env = BuildEnvironment();
+        var compilation = env.CompilePredicate("f < g");
+
+        Assert.That(compilation.IsSuccess, Is.True);
+
+        var result = compilation.Program!.Evaluate(BuildContext(
+            env,
+            f: double.NaN,
+            g: 1.0));
+
+        Assert.That(result.IsSuccess, Is.True);
+        Assert.That(result.AsBool(), Is.False);
+    }
+
+    [Test]
+    public void FloatOrdering_WithInfinityAndZero_PreservesExpectedSemantics()
+    {
+        var env = BuildEnvironment();
+        var compilation = env.CompilePredicate("f < g && g < h");
+
+        Assert.That(compilation.IsSuccess, Is.True);
+
+        var result = compilation.Program!.Evaluate(BuildContext(
+            env,
+            f: double.NegativeInfinity,
+            g: 0.0,
+            h: double.PositiveInfinity));
+
+        Assert.That(result.IsSuccess, Is.True);
+        Assert.That(result.AsBool(), Is.True);
+    }
+
+    [Test]
     public async Task CompiledProgram_CanBeReusedConcurrentlyAcrossIndependentContexts()
     {
         var env = BuildEnvironment();
@@ -208,8 +401,12 @@ public sealed class CelEvaluatorTests
         schemaBuilder.AddVariable("key", CelType.String);
         schemaBuilder.AddVariable("index", CelType.Int);
         schemaBuilder.AddVariable("list", CelType.ListOf(CelType.Int));
+        schemaBuilder.AddVariable("otherList", CelType.ListOf(CelType.Int));
         schemaBuilder.AddVariable("map", CelType.MapOf(CelType.Bool));
         schemaBuilder.AddVariable("obj", CelType.ObjectOf("widget"));
+        schemaBuilder.AddVariable("f", CelType.Float);
+        schemaBuilder.AddVariable("g", CelType.Float);
+        schemaBuilder.AddVariable("h", CelType.Float);
 
         var objectSchemaBuilder = CelObjectSchema.CreateBuilder("widget");
         objectSchemaBuilder.AddMember("name", CelType.String);
@@ -233,9 +430,13 @@ public sealed class CelEvaluatorTests
         string key = "name",
         long index = 0,
         IReadOnlyList<CelValue>? list = null,
+        IReadOnlyList<CelValue>? otherList = null,
         IReadOnlyDictionary<string, CelValue>? map = null,
         string objName = "name",
-        long objCount = 1)
+        long objCount = 1,
+        double f = 1.0,
+        double g = 2.0,
+        double h = 3.0)
     {
         var builder = env.CreateEvaluationContextBuilder();
         builder.Set("x", CelValue.Bool(x));
@@ -246,6 +447,7 @@ public sealed class CelEvaluatorTests
         builder.Set("key", CelValue.String(key));
         builder.Set("index", CelValue.Int(index));
         builder.Set("list", CelValue.List(list ?? [CelValue.Int(1), CelValue.Int(2)]));
+        builder.Set("otherList", CelValue.List(otherList ?? [CelValue.Int(1), CelValue.Int(2)]));
         builder.Set("map", CelValue.Map(map ?? new Dictionary<string, CelValue> { ["name"] = CelValue.Bool(true) }));
         builder.Set(
             "obj",
@@ -256,6 +458,32 @@ public sealed class CelEvaluatorTests
                     ["name"] = CelValue.String(objName),
                     ["count"] = CelValue.Int(objCount),
                 })));
+        builder.Set("f", CelValue.Float(f));
+        builder.Set("g", CelValue.Float(g));
+        builder.Set("h", CelValue.Float(h));
+        return builder.Build();
+    }
+
+    private static CelEnvironment BuildNestedListEnvironment()
+    {
+        var schemaBuilder = CelContextSchema.CreateBuilder("nested-list-eval-schema");
+        schemaBuilder.AddVariable("left", CelType.ListOf(CelType.ListOf(CelType.Int)));
+        schemaBuilder.AddVariable("right", CelType.ListOf(CelType.ListOf(CelType.Int)));
+
+        return CelEnvironment.CreateBuilder(CelProfile.V1)
+            .WithContextSchema(schemaBuilder.Build())
+            .WithEvaluationLimits(CelEvaluationLimits.SafeDefaults)
+            .Build();
+    }
+
+    private static CelEvaluationContext BuildNestedListContext(
+        CelEnvironment env,
+        CelValue left,
+        CelValue right)
+    {
+        var builder = env.CreateEvaluationContextBuilder();
+        builder.Set("left", left);
+        builder.Set("right", right);
         return builder.Build();
     }
 }
