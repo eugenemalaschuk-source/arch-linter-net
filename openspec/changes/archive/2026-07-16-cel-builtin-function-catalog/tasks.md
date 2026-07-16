@@ -1,0 +1,33 @@
+## 1. Operation identity
+
+- [x] 1.1 Add `src/ArchLinterNet.CEL/Binding/CelFunctionOperationId.cs` — internal enum with one member per catalog overload: `StartsWith`, `EndsWith`, `Contains`, `SizeString`, `SizeList`, `SizeMap`, `ContainsKey`.
+- [x] 1.2 Add `OperationId` property to `CelFunctionOverload` (new constructor parameter); update its XML doc.
+- [x] 1.3 Update `CelFunctionCatalog`'s seven overload declarations to pass the matching `CelFunctionOperationId`.
+
+## 2. Built-in function invoker
+
+- [x] 2.1 Add `src/ArchLinterNet.CEL/Binding/CelBuiltinFunctionInvoker.cs` — internal static class, `Invoke(CelFunctionOperationId, CelValue? receiver, IReadOnlyList<CelValue> arguments) -> CelValue`.
+- [x] 2.2 Implement `StartsWith`/`EndsWith`/`Contains` via `string.StartsWith`/`EndsWith`/`Contains` with `StringComparison.Ordinal`.
+- [x] 2.3 Implement `SizeString` via `receiver.AsString().EnumerateRunes().Count()` (Unicode code points, not `string.Length`).
+- [x] 2.4 Implement `SizeList`/`SizeMap` via `.Count`.
+- [x] 2.5 Implement `ContainsKey` via `IReadOnlyDictionary<string, CelValue>.ContainsKey` — no failure path, missing key returns `CelValue.Bool(false)`.
+- [x] 2.6 Add `CelFunctionCatalog.All` — internal read-only enumeration of every declared overload, for a catalog-completeness/security test.
+
+## 3. Tests
+
+- [x] 3.1 Add `tests/ArchLinterNet.CEL.Tests/CelBuiltinFunctionInvokerTests.cs` covering: positive case for each of the seven operation ids; `startsWith`/`endsWith`/`contains` boundary cases (empty needle, needle longer than haystack, exact match, ordinal case sensitivity); `size()` on an empty string/list/map; `size()` on a BMP string (`"abc"` → 3); `size()` on a single surrogate-pair character (`"😀"` → 1); `size()` on a combining sequence (`"é"` as `e` + combining acute → 2); `containsKey` on a present key (`true`) and a missing key (`false`, no exception).
+- [x] 3.2 Add a catalog-completeness test: `CelFunctionCatalog.All` contains exactly the seven documented overloads (function name, receiver kind, argument kinds, result type, operation id) and no more — proves the closed surface for #327's security-test acceptance criterion.
+- [x] 3.3 Run `rtk dotnet test tests/ArchLinterNet.CEL.Tests --no-restore` and fix failures.
+
+## 4. Docs and spec sync
+
+- [x] 4.1 Update `docs/internal/cel-engine-architecture.md`: correct the pipeline diagram's "Bounded Evaluator" row, which currently mislabels task #327 as the tree-walking evaluator (that is #328) — describe #327's actual shipped scope (operation-id seam, pure per-overload implementations) instead; add a "Built-in function execution" row to the component-ownership table.
+- [x] 4.2 Compare implementation against `design.md` and the delta spec; adjust the delta spec only if implementation reveals a genuine scope gap.
+- [x] 4.3 Run `openspec validate --all`.
+- [ ] 4.4 Run `openspec archive cel-builtin-function-catalog` and verify the archived spec.
+
+## 5. Validation and PR
+
+- [x] 5.1 Run `rtk make fmt` and inspect formatting changes.
+- [x] 5.2 Run `rtk make acceptance` (lint + full test suite) and fix any issue-related failures.
+- [ ] 5.3 Open the pull request closing #327.

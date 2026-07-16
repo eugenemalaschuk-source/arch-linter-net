@@ -24,15 +24,23 @@ internal sealed class CelFunctionOverload
     /// <summary>Gets the static result type produced by this overload.</summary>
     public CelType ResultType { get; }
 
+    /// <summary>
+    /// Gets the stable internal identifier <c>CelBuiltinFunctionInvoker</c> uses to execute this
+    /// overload. See <see cref="CelFunctionOperationId"/>.
+    /// </summary>
+    public CelFunctionOperationId OperationId { get; }
+
     public CelFunctionOverload(
         string functionName,
         CelTypeKind? receiverKind,
         IReadOnlyList<CelTypeKind> argumentKinds,
-        CelType resultType)
+        CelType resultType,
+        CelFunctionOperationId operationId)
     {
         FunctionName = functionName;
         ReceiverKind = receiverKind;
         ArgumentKinds = argumentKinds;
         ResultType = resultType;
+        OperationId = operationId;
     }
 }
