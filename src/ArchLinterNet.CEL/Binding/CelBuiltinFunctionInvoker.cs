@@ -90,14 +90,21 @@ internal static class CelBuiltinFunctionInvoker
     /// lookup: <c>Dictionary&lt;string, _&gt;.ContainsKey</c> first computes
     /// <c>string.GetHashCode()</c>, which hashes the key's entire content (.NET's string hash —
     /// Marvin32 — is a linear pass over the string, not a cached/O(1) value), and a hash collision
-    /// can then compare the key against other entries in the same bucket. Because
-    /// <c>CelEvaluationContextBuilder.Set()</c> bounds map/list *entry count* but not individual
-    /// *string length*, an unbounded-length key would otherwise be charged the same fixed floor as
-    /// a one-character key while doing real work linear in its length — the same
-    /// never-underestimate defect the <see cref="CelFunctionOperationId.Contains"/> fix above
-    /// corrected. Its cost is therefore the fixed floor plus the key's length (the hash-computation
-    /// pass, guaranteed) plus the receiver map's entry count (a conservative bound on worst-case
-    /// collision-chain comparisons — never larger than one comparison per entry).
+    /// can then compare the key against other entries in the same bucket via <c>string.Equals</c> —
+    /// and each of those comparisons can itself scan up to the full key length (a near-match
+    /// colliding key fails late, not on the first character). A cost of
+    /// <c>keyLength + entryCount</c> (comparison *count* only, ignoring each comparison's own
+    /// length) would still undercharge an adversarial map by orders of magnitude: entry count
+    /// near-match comparisons at up to key length each is <c>keyLength * entryCount</c> work, not
+    /// <c>keyLength + entryCount</c>. Because <c>CelEvaluationContextBuilder.Set()</c> bounds
+    /// map/list *entry count* but not individual *string length*, this is a real, exploitable gap,
+    /// not a theoretical one. `ComputeCost` for `containsKey` is therefore the fixed floor plus the
+    /// key's length times <c>(entryCount + 1)</c> — the <c>+1</c> covers the initial hash-computation
+    /// pass over the key itself, and the <c>* entryCount</c> term is the conservative worst-case
+    /// bound on collision-chain comparisons, each assumed to cost a full key-length scan. The
+    /// product cannot overflow <see cref="long"/> under Profile v1's existing collection-size bound
+    /// (<c>MaxValidationCollectionSize</c> caps entry count at 1024): even an
+    /// <see cref="int.MaxValue"/>-length key times 1025 is far below <see cref="long.MaxValue"/>.
     /// </para>
     /// </remarks>
     /// <param name="operationId">Which catalog overload's cost to compute.</param>
@@ -116,10 +123,11 @@ internal static class CelBuiltinFunctionInvoker
             CelFunctionOperationId.SizeString => FixedCost + Receiver(receiver).Length,
             CelFunctionOperationId.SizeList => FixedCost,
             CelFunctionOperationId.SizeMap => FixedCost,
-            // Key-hash computation is linear in key length; entry count bounds worst-case collision
-            // comparisons — see the method's <remarks> for why a flat floor here would be unsafe.
+            // keyLength * (entryCount + 1): each of up to entryCount collision-chain comparisons
+            // can itself scan the full key length, not just one character — see the method's
+            // <remarks> for why a keyLength + entryCount sum would still be unsafe here.
             CelFunctionOperationId.ContainsKey =>
-                FixedCost + arguments[0].AsString().Length + NonNull(receiver).AsMap().Count,
+                FixedCost + (long)arguments[0].AsString().Length * (NonNull(receiver).AsMap().Count + 1),
             _ => throw new InvalidOperationException($"Unhandled built-in function operation '{operationId}'."),
         };
 

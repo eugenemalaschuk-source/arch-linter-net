@@ -56,10 +56,11 @@ result computable in isolation, tested directly against `CelValue` inputs, ready
   search whose real cost on an adversarial receiver approaches the *product* of both operand
   lengths, so its cost is that product, not their sum (a second review round caught the initial
   linear-sum formula as an underestimate on exactly this shape of input — see `design.md`);
-  `size` on `List`/`Map` costs only the floor (O(1) count field); `containsKey` does not (a third
-  review round caught the initial "hash lookup is O(1)" assumption as wrong — key hashing is a
-  linear pass over the key's content and map/list entry count is unbounded-by-length — so its cost
-  is the floor plus key length plus map entry count).
+  `size` on `List`/`Map` costs only the floor (O(1) count field); `containsKey` does not. A third
+  review round caught the initial "hash lookup is O(1)" assumption as wrong (key hashing is a
+  linear pass over the key's content); a fourth then caught that round 3's fix — floor + key length
+  + map entry count — still undercounted, since each of up to entry-count collision comparisons can
+  itself scan the full key length. Final cost: floor + `keyLength * (entryCount + 1)`.
 - `CelFunctionCatalog` gains a public-to-the-namespace `All` enumeration (already-internal type) so
   a security/conformance test can assert the catalog is exactly these seven overloads and no more.
 - New `tests/ArchLinterNet.CEL.Tests/CelBuiltinFunctionInvokerTests.cs` — one positive test per

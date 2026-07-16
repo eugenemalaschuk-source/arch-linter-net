@@ -292,7 +292,29 @@ public sealed class CelBuiltinFunctionInvokerTests
 
         var cost = CelBuiltinFunctionInvoker.ComputeCost(CelFunctionOperationId.ContainsKey, map, [CelValue.String("key")]);
 
-        Assert.That(cost, Is.EqualTo(1L + "key".Length + 3));
+        // keyLength * (entryCount + 1), not keyLength + entryCount: each of up to entryCount
+        // collision-chain comparisons can itself scan the full key length.
+        Assert.That(cost, Is.EqualTo(1L + "key".Length * (3 + 1)));
+    }
+
+    [Test]
+    public void ComputeCost_ContainsKey_ChargesPerComparisonKeyLengthNotJustComparisonCount()
+    {
+        // A cost model of keyLength + entryCount (comparison count only) would still undercharge:
+        // up to entryCount collision-chain comparisons can each scan the full key length, so real
+        // worst-case work is keyLength * entryCount, not keyLength + entryCount. With a long key
+        // and a moderately large map, the multiplicative formula must be far above the additive one.
+        const int KeyLength = 500;
+        const int MapEntryCount = 200;
+        var map = CelValue.Map(Enumerable.Range(0, MapEntryCount).ToDictionary(i => $"k{i}", i => (CelValue)CelValue.Bool(true)));
+        var key = CelValue.String(new string('a', KeyLength));
+
+        var cost = CelBuiltinFunctionInvoker.ComputeCost(CelFunctionOperationId.ContainsKey, map, [key]);
+        var additiveFormulaWouldHaveBeen = 1L + KeyLength + MapEntryCount;
+
+        Assert.That(cost, Is.EqualTo(1L + (long)KeyLength * (MapEntryCount + 1)));
+        Assert.That(cost, Is.GreaterThan(additiveFormulaWouldHaveBeen * 10),
+            "the multiplicative cost must be an order of magnitude above what an additive (count-only) model would have charged");
     }
 
     [Test]

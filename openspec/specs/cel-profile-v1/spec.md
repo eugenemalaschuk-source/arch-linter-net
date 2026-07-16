@@ -1231,13 +1231,19 @@ elsewhere in this spec:
   lengths — a conservative worst-case estimate, deliberately not each operation's exact algorithmic
   complexity, but never an underestimate. `size` on `List`/`Map` SHALL cost only the fixed floor,
   since both are backed by an O(1) count field. `containsKey` is NOT O(1) despite being a dictionary
-  lookup: hashing the key requires a linear pass over its content, and a hash collision can compare
-  the key against other entries in the same bucket — `CelEvaluationContextBuilder.Set()` bounds
-  map/list entry count but not individual string length, so a fixed floor would let an
-  unbounded-length key be charged the same as a one-character key. `ComputeCost` for `containsKey`
-  SHALL therefore be the fixed floor plus the key argument's UTF-16 length (the hash-computation
-  pass) plus the receiver map's entry count (a conservative bound on worst-case collision-chain
-  comparisons).
+  lookup: hashing the key requires a linear pass over its content, and each of up to entry-count
+  hash-collision comparisons is itself a `string.Equals` call that can scan the full key length
+  (a near-match colliding key fails late, not on its first character) — a cost of `keyLength +
+  entryCount` (comparison count only, ignoring each comparison's own length) would still
+  underestimate an adversarial map's real work by orders of magnitude, since `entryCount`
+  near-match comparisons at up to `keyLength` each is `keyLength * entryCount` work, not
+  `keyLength + entryCount`. Because `CelEvaluationContextBuilder.Set()` bounds map/list entry count
+  but not individual string length, this is a real, exploitable gap, not a theoretical one.
+  `ComputeCost` for `containsKey` SHALL therefore be the fixed floor plus the key argument's UTF-16
+  length multiplied by `(the receiver map's entry count + 1)` — the `+1` covers the initial
+  hash-computation pass over the key itself, and the multiplication by entry count is the
+  conservative worst-case bound on collision-chain comparisons, each assumed to cost a full
+  key-length scan.
 - This change SHALL NOT add, wire, or modify any `CelBoundNode` tree evaluation, `&&`/`||`
   short-circuit/error-absorption behavior, or map/list index runtime-failure handling — those
   remain the bounded evaluator's scope (#328). `CelCompiledPredicate.Evaluate` and
@@ -1310,6 +1316,14 @@ elsewhere in this spec:
 - **THEN** the long-key call returns a strictly greater cost
 - **AND** when instead the receiver map's entry count is varied with the key argument held
   constant, the larger map returns a strictly greater cost
+
+#### Scenario: ComputeCost for containsKey is multiplicative in key length and entry count, not additive
+
+- **WHEN** `CelBuiltinFunctionInvoker.ComputeCost` is called for `ContainsKey` with a key of length
+  `k` against a receiver map with `n` entries
+- **THEN** the returned cost equals `1 + k * (n + 1)`
+- **AND** for a sufficiently long key and sufficiently large map, that cost is at least an order of
+  magnitude greater than `1 + k + n` would have been
 
 #### Scenario: Invoke never throws for a binder-guaranteed-correct call shape
 

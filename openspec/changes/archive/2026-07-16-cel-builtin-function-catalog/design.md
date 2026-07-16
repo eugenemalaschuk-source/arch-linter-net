@@ -112,15 +112,26 @@ execution mechanism:
   `CelEvaluationContextBuilder.Set()` bounds map/list *entry count* (`MaxValidationCollectionSize`)
   but not individual *string length*, so an unbounded-length key would have been charged the same
   fixed floor as a one-character key while doing real linear work — the same never-underestimate
-  defect the `contains` fix above corrected, just for a different operation. `ComputeCost` for
-  `containsKey` is therefore the fixed floor plus the key argument's length (the guaranteed
-  hash-computation pass) plus the receiver map's entry count (a conservative bound on worst-case
-  collision-chain comparisons — never more than one comparison per entry).
+  defect the `contains` fix above corrected, just for a different operation.
+- A **fourth** review round then caught that the round-3 fix (`keyLength + entryCount`) was itself
+  still an underestimate: it charged for the *number* of collision-chain comparisons but not the
+  *cost of each* — `string.Equals` against a near-match colliding key doesn't fail on the first
+  character, it scans up to the full key length before failing. `entryCount` such comparisons at up
+  to `keyLength` each is `keyLength * entryCount` real work, not `keyLength + entryCount`. The
+  corrected formula is `keyLength * (entryCount + 1)` — the `+1` folds in the one guaranteed
+  hash-computation pass over the key itself, and the multiplication is the conservative worst-case
+  bound assuming every collision-chain comparison scans the full key (it can't overflow `long`
+  given Profile v1's existing 1024-entry collection-size cap). Two review rounds needed to reach a
+  correct `containsKey` cost is itself informative: a per-operation cost model is not "obviously
+  right" the first time an operation *looks* O(1) — the number of sub-steps and the cost of each
+  sub-step are two separate questions, and a cost model that only answers the first will still
+  underestimate.
 
 `CelBuiltinFunctionInvokerTests` includes an adversarial regression test constructing exactly this
 repeating-near-match-prefix shape and asserting the charged cost is at least an order of magnitude
 above what the old linear-sum model would have produced, so a future regression back to a linear
-`contains` cost fails the suite rather than silently reopening the gap.
+`contains` cost fails the suite rather than silently reopening the gap. A second adversarial
+regression test does the same for `containsKey`'s multiplicative-vs-additive formula.
 
 ### String matching is ordinal (UTF-16 code-unit sequence comparison)
 
