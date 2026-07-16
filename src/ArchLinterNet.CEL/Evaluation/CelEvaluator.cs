@@ -14,16 +14,16 @@ internal static class CelEvaluator
 {
     public static CelEvaluationResult Evaluate(
         CelBoundExpression boundExpression,
-        CelContextSchema expectedSchema,
+        string expectedSchemaIdentity,
         CelProfileId profileId,
         CelEvaluationContext context,
         CelEvaluationLimits limits)
     {
-        if (!string.Equals(context.Schema.Identity, expectedSchema.Identity, StringComparison.Ordinal))
+        if (!string.Equals(context.SchemaIdentity, expectedSchemaIdentity, StringComparison.Ordinal))
         {
             return Failure(CelEvaluationDiagnostics.SchemaMismatch(
-                context.Schema.Identity,
-                expectedSchema.Identity,
+                context.SchemaIdentity,
+                expectedSchemaIdentity,
                 profileId));
         }
 

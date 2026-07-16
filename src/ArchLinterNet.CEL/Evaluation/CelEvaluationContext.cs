@@ -20,12 +20,22 @@ public sealed class CelEvaluationContext
     /// <summary>Gets the schema this context was built from.</summary>
     public CelContextSchema Schema { get; }
 
+    /// <summary>
+    /// Gets the structural schema identity captured when this context was built, including the
+    /// environment object-schema catalog when one was available to the builder.
+    /// </summary>
+    internal string SchemaIdentity { get; }
+
     /// <summary>Gets the variable assignments in declaration order.</summary>
     public IReadOnlyList<(CelVariable Variable, CelValue Value)> Assignments { get; }
 
-    internal CelEvaluationContext(CelContextSchema schema, IReadOnlyList<(CelVariable, CelValue)> assignments)
+    internal CelEvaluationContext(
+        CelContextSchema schema,
+        string schemaIdentity,
+        IReadOnlyList<(CelVariable, CelValue)> assignments)
     {
         Schema = schema;
+        SchemaIdentity = schemaIdentity;
         // Copy to a truly frozen list so callers cannot cast Assignments back to List<> and mutate it.
         Assignments = new List<(CelVariable, CelValue)>(assignments).AsReadOnly();
     }

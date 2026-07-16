@@ -10,6 +10,7 @@ public sealed class CelEvaluationContextBuilder
 {
     private readonly CelContextSchema _schema;
     private readonly IReadOnlyDictionary<string, CelObjectSchema>? _objectSchemas;
+    private readonly string _schemaIdentity;
     private readonly Dictionary<CelVariable, CelValue> _assignments = new(ReferenceEqualityComparer.Instance);
 
     // Cap structural validation depth and collection size so deeply-nested or extremely large
@@ -37,6 +38,7 @@ public sealed class CelEvaluationContextBuilder
     {
         _schema = schema;
         _objectSchemas = objectSchemas;
+        _schemaIdentity = schema.ComputeEnvironmentIdentity(objectSchemas);
     }
 
     /// <summary>
@@ -114,7 +116,7 @@ public sealed class CelEvaluationContextBuilder
             .Select(v => (v, _assignments[v]))
             .ToList();
 
-        return new CelEvaluationContext(_schema, assignments);
+        return new CelEvaluationContext(_schema, _schemaIdentity, assignments);
     }
 
     private bool ValueMatchesType(CelType declared, CelValue actual, int depth, ref int nodeCount)

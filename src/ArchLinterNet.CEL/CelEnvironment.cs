@@ -1,4 +1,3 @@
-using System.Text;
 using ArchLinterNet.CEL.Binding;
 using ArchLinterNet.CEL.Compilation;
 using ArchLinterNet.CEL.Evaluation;
@@ -140,21 +139,8 @@ public sealed class CelEnvironment
         new(
             normalizedSource: source,
             profileId: Profile.Id,
-            schemaIdentity: ComputeSchemaIdentity(),
+            schemaIdentity: Schema.ComputeEnvironmentIdentity(ObjectSchemas),
             requiredResultType: resultType,
             compilationLimitsIdentity: CompilationLimits.ComputeIdentity(),
             evaluationLimitsIdentity: EvaluationLimits.ComputeIdentity());
-
-    private string ComputeSchemaIdentity()
-    {
-        if (ObjectSchemas.Count == 0)
-            return Schema.Identity;
-        var sb = new StringBuilder(Schema.Identity);
-        foreach (var kv in ObjectSchemas.OrderBy(k => k.Key, StringComparer.Ordinal))
-        {
-            sb.Append('\0');
-            sb.Append(kv.Value.Identity);
-        }
-        return sb.ToString();
-    }
 }

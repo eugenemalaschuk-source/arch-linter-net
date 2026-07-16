@@ -511,7 +511,7 @@ public sealed class CelInternalApiCoverageTests
         new(
             normalizedSource: source,
             profileId: CelProfile.V1.Id,
-            schemaIdentity: "cov-v1-identity",
+            schemaIdentity: BuildSimpleSchema().Identity,
             requiredResultType: CelRequiredResultType.Predicate,
             compilationLimitsIdentity: CelCompilationLimits.SafeDefaults.ComputeIdentity(),
             evaluationLimitsIdentity: CelEvaluationLimits.SafeDefaults.ComputeIdentity());

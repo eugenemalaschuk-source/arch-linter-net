@@ -77,7 +77,7 @@ public sealed class CelCompiledExpression
                 "Per-call evaluation limits may tighten but must not exceed the environment-level " +
                 $"ceiling captured at compile time ({EvaluationLimits.ComputeIdentity()}).",
                 nameof(limits));
-        return CelEvaluator.Evaluate(Bound, Schema, Profile.Id, context, limits);
+        return CelEvaluator.Evaluate(Bound, CompilationKey.SchemaIdentity, Profile.Id, context, limits);
     }
 
     /// <summary>

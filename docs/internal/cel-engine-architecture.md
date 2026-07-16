@@ -107,10 +107,16 @@ expression source (string)
   │                 │  CelBoundCall, using boundCall.Overload.OperationId to select the
   │                 │  operation — charging ComputeCost's result against MaxCostUnits is
   │                 │  what makes the budget real; skipping it silently reintroduces the
-  │                 │  fixed-unit-cost gap #327 was written to close. Rejects
-  │                 │  incompatible evaluation contexts with SchemaMismatch and
-  │                 │  reports missing-key / invalid-index runtime failures as
-  │                 │  structured CelEvaluationResult diagnostics, never CLR exceptions.
+  │                 │  fixed-unit-cost gap #327 was written to close. Also charges
+  │                 │  non-call runtime work such as list/map membership, map/object
+  │                 │  lookup, string equality, and recursive deep equality so
+  │                 │  MaxCostUnits tracks real collection work instead of only
+  │                 │  built-in invocations. Rejects incompatible evaluation
+  │                 │  contexts using the full compilation schema identity
+  │                 │  (CelContextSchema + object-schema catalog), returning
+  │                 │  SchemaMismatch instead of allowing typed-plan/runtime-data
+  │                 │  skew. Reports missing-key / invalid-index runtime failures
+  │                 │  as structured CelEvaluationResult diagnostics, never CLR exceptions.
   └────────┬────────┘
            │  typed result or failure diagnostics
            ▼
@@ -134,7 +140,7 @@ ______________________________________________________________________
 | Function catalog (declaration) | `ArchLinterNet.CEL.Binding.CelFunctionCatalog` internal | Declared per-profile; immutable; no public registration; `CelEngine` remains an unused placeholder |
 | Built-in function execution | `ArchLinterNet.CEL.Binding.CelBuiltinFunctionInvoker` internal | Shipped by #327. Pure, stateless, keyed by `CelFunctionOperationId` (carried on each `CelFunctionOverload`); every overload is total, no failure channel. `Invoke` and `ComputeCost` are two separate switches over the same enum — the compiler does NOT enforce that adding an operation id updates both (each has a `default` arm, so an omitted `ComputeCost` case is a silent budget-safety gap, not a build error); a code-review checklist item, not a compiler guarantee, is what closes this. Never exposed; #328's evaluator is the only intended caller |
 | Bound operations (bound plan, binding tables) | `ArchLinterNet.CEL.Binding` internal (`CelBinder`, `CelBoundExpression`, `CelBoundNode` hierarchy) | Never exposed |
-| Bounded evaluator runtime | `ArchLinterNet.CEL.Evaluation.CelEvaluator` internal | Shipped by #328. One per-call runtime state, no shared mutable globals, source-span-aware diagnostics, schema-compatibility check, and budget enforcement over bound-node visits plus built-in cost charges |
+| Bounded evaluator runtime | `ArchLinterNet.CEL.Evaluation.CelEvaluator` internal | Shipped by #328. One per-call runtime state, no shared mutable globals, source-span-aware diagnostics, schema-compatibility check against the full environment schema identity, and budget enforcement over bound-node visits, built-in cost charges, and collection/comparison runtime work |
 | Evaluation budgets (`CelCompilationLimits`, `CelEvaluationLimits`) | `ArchLinterNet.CEL` public | SafeDefaults provided; no unbounded path |
 | Compiled programs (`CelCompiledPredicate`, `CelCompiledExpression`) | `ArchLinterNet.CEL` public | Immutable; thread-safe; hold bound plan internally |
 | Diagnostics (`CelDiagnostic`, `CelDiagnosticCode`, `CelSourceSpan`) | `ArchLinterNet.CEL` public | Stable codes; message is display-only |
