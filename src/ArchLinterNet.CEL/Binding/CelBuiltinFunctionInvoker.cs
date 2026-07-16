@@ -59,16 +59,35 @@ internal static class CelBuiltinFunctionInvoker
     /// cost regardless of how much data it scans.
     /// </summary>
     /// <remarks>
-    /// A linear, input-size-proportional heuristic: cost is 1 (a fixed per-call floor) plus the
-    /// UTF-16 length of every string operand scanned by the operation. This is a deliberate
-    /// approximation, not each operation's exact worst-case algorithmic complexity (e.g. naive
-    /// substring search is technically <c>O(n*m)</c>) — a linear model is the same choice CEL's
-    /// reference cost estimation makes for string functions, and it is enough to stop a single call
-    /// against an oversized string from being charged as if it were free, which is the actual
-    /// budget-safety property <see cref="ArchLinterNet.CEL.Evaluation.CelEvaluationLimits.MaxCostUnits"/> exists to
-    /// provide. <see cref="CelFunctionOperationId.SizeList"/>, <see cref="CelFunctionOperationId.SizeMap"/>,
+    /// <para>
+    /// Cost must never *underestimate* an operation's actual work — that is the one property that
+    /// makes <see cref="ArchLinterNet.CEL.Evaluation.CelEvaluationLimits.MaxCostUnits"/> a real
+    /// budget rather than a decoration. Most overloads have an execution mechanism with a real,
+    /// provable linear bound, so a fixed floor of <c>1</c> plus the UTF-16 length of every string
+    /// operand scanned is exact enough: <see cref="StringComparison.Ordinal"/>
+    /// <c>StartsWith</c>/<c>EndsWith</c> compare exactly one aligned prefix/suffix window (a single
+    /// memory comparison, never re-scanned from a different offset), and <c>size()</c> on a
+    /// <see cref="CelValue"/> string is one linear <c>Rune</c> pass.
+    /// </para>
+    /// <para>
+    /// <see cref="CelFunctionOperationId.Contains"/> is the one exception: .NET's
+    /// <c>string.Contains(string, StringComparison.Ordinal)</c> is a candidate-position substring
+    /// search, not a single aligned comparison — on an adversarial receiver built from a repeating
+    /// near-match prefix (e.g. <c>"aaaa...aaab"</c> searched for <c>"aaa...ab"</c>) it re-compares a
+    /// long overlapping run at many candidate offsets, approaching <c>O(receiverLength *
+    /// argumentLength)</c>. A linear estimate here would let a crafted input's real cost exceed its
+    /// charged cost by orders of magnitude, defeating the budget. Its cost is therefore the
+    /// conservative worst-case product of both operand lengths, not their sum — this can
+    /// overcharge realistic calls but never undercharges, which is the only direction that's safe
+    /// for a budget.  The product cannot overflow <see cref="long"/>: <see cref="string.Length"/>
+    /// is an <see cref="int"/>, and <c>int.MaxValue * (long)int.MaxValue</c> is well within
+    /// <see cref="long.MaxValue"/>.
+    /// </para>
+    /// <para>
+    /// <see cref="CelFunctionOperationId.SizeList"/>, <see cref="CelFunctionOperationId.SizeMap"/>,
     /// and <see cref="CelFunctionOperationId.ContainsKey"/> are O(1) (backed by a count field / hash
     /// lookup) and cost only the fixed floor.
+    /// </para>
     /// </remarks>
     /// <param name="operationId">Which catalog overload's cost to compute.</param>
     /// <param name="receiver">The receiver value that would be passed to <see cref="Invoke"/>.</param>
@@ -78,8 +97,11 @@ internal static class CelBuiltinFunctionInvoker
         {
             CelFunctionOperationId.StartsWith or CelFunctionOperationId.EndsWith =>
                 FixedCost + arguments[0].AsString().Length,
+            // Worst-case product, not a sum: string.Contains is a candidate-position search whose
+            // real cost on an adversarial input approaches receiverLength * argumentLength — see
+            // the method's <remarks> for why a linear estimate would be unsafe here.
             CelFunctionOperationId.Contains =>
-                FixedCost + Receiver(receiver).Length + arguments[0].AsString().Length,
+                FixedCost + (long)Receiver(receiver).Length * arguments[0].AsString().Length,
             CelFunctionOperationId.SizeString => FixedCost + Receiver(receiver).Length,
             CelFunctionOperationId.SizeList => FixedCost,
             CelFunctionOperationId.SizeMap => FixedCost,

@@ -84,19 +84,28 @@ expression source (string)
   │                 │  never by re-dispatching on the function name string. Every
   │                 │  overload is total given a binder-guaranteed-correct call shape,
   │                 │  so Invoke() returns a CelValue directly with no failure channel.
+  │                 │  ComputeCost() sits alongside Invoke() with its own case per
+  │                 │  operation id — cost is NOT a byproduct of Invoke() and must
+  │                 │  never underestimate an operation's real work (e.g. Contains'
+  │                 │  cost is receiverLength * argumentLength, a worst-case product,
+  │                 │  not a sum — see the type's XML doc for why a linear estimate
+  │                 │  would let a crafted input's real cost exceed its charged cost).
   │  NOT public.    │  Deviation from the row below (written before task numbering
   │                 │  settled): this task does NOT walk the bound plan or implement
   │                 │  short-circuit semantics — see the "Bounded Evaluator" row (#328).
   └────────┬────────┘
-           │  invocable per-overload implementation, keyed by operation id
+           │  invocable per-overload implementation + cost model, keyed by operation id
            ▼
   ┌─────────────────┐
   │  Bounded        │  (task #328 — not yet shipped)
   │  Evaluator      │  Walks the bound plan against a CelEvaluationContext.
   │                 │  Enforces MaxIterations and MaxCostUnits per call.
   │                 │  Produces CEL short-circuit semantics for && / ||.
-  │                 │  Calls CelBuiltinFunctionInvoker.Invoke for every CelBoundCall,
-  │                 │  using boundCall.Overload.OperationId to select the operation.
+  │                 │  Calls CelBuiltinFunctionInvoker.Invoke AND ComputeCost for every
+  │                 │  CelBoundCall, using boundCall.Overload.OperationId to select the
+  │                 │  operation — charging ComputeCost's result against MaxCostUnits is
+  │                 │  what makes the budget real; skipping it silently reintroduces the
+  │                 │  fixed-unit-cost gap #327 was written to close.
   └────────┬────────┘
            │  typed result or failure diagnostics
            ▼
@@ -118,7 +127,7 @@ ______________________________________________________________________
 | Type descriptors (`CelType`, `CelTypeKind`) | `ArchLinterNet.CEL` public | Static factories only |
 | Context schema (`CelContextSchema`, `CelVariable`) | `ArchLinterNet.CEL` public | Structural identity is deterministic |
 | Function catalog (declaration) | `ArchLinterNet.CEL.Binding.CelFunctionCatalog` internal | Declared per-profile; immutable; no public registration; `CelEngine` remains an unused placeholder |
-| Built-in function execution | `ArchLinterNet.CEL.Binding.CelBuiltinFunctionInvoker` internal | Shipped by #327. Pure, stateless, keyed by `CelFunctionOperationId` (carried on each `CelFunctionOverload`); every overload is total, no failure channel. Never exposed; #328's evaluator is the only intended caller |
+| Built-in function execution | `ArchLinterNet.CEL.Binding.CelBuiltinFunctionInvoker` internal | Shipped by #327. Pure, stateless, keyed by `CelFunctionOperationId` (carried on each `CelFunctionOverload`); every overload is total, no failure channel. `Invoke` and `ComputeCost` are two separate switches over the same enum — the compiler does NOT enforce that adding an operation id updates both (each has a `default` arm, so an omitted `ComputeCost` case is a silent budget-safety gap, not a build error); a code-review checklist item, not a compiler guarantee, is what closes this. Never exposed; #328's evaluator is the only intended caller |
 | Bound operations (bound plan, binding tables) | `ArchLinterNet.CEL.Binding` internal (`CelBinder`, `CelBoundExpression`, `CelBoundNode` hierarchy) | Never exposed |
 | Evaluation budgets (`CelCompilationLimits`, `CelEvaluationLimits`) | `ArchLinterNet.CEL` public | SafeDefaults provided; no unbounded path |
 | Compiled programs (`CelCompiledPredicate`, `CelCompiledExpression`) | `ArchLinterNet.CEL` public | Immutable; thread-safe; hold bound plan internally |
@@ -165,7 +174,7 @@ Capabilities deferred: POCO/CLR type adapters, `System.Text.Json` adapter, proto
 
 Capabilities deferred: caller-defined functions, host-registered function bundles, operator overloads. The closed Profile v1 catalog itself (`startsWith`/`endsWith`/`contains`/`size`/`containsKey`) is shipped — declaration in `ArchLinterNet.CEL.Binding.CelFunctionCatalog`, execution in `ArchLinterNet.CEL.Binding.CelBuiltinFunctionInvoker` (#327).
 
-A future standard built-in follows one controlled path: add a `CelFunctionOperationId` member, add its declaration row to `CelFunctionCatalog` (name, receiver kind, argument kinds, result type, operation id), add its pure implementation as one `case` in `CelBuiltinFunctionInvoker.Invoke`. No parser, binder, or evaluator change is needed beyond that — the binder already resolves any catalog entry generically, and the evaluator (#328) already dispatches any `CelBoundCall` through `boundCall.Overload.OperationId`.
+A future standard built-in follows one controlled path: add a `CelFunctionOperationId` member, add its declaration row to `CelFunctionCatalog` (name, receiver kind, argument kinds, result type, operation id), add its pure implementation as one `case` in `CelBuiltinFunctionInvoker.Invoke` **and** its cost model as one `case` in `CelBuiltinFunctionInvoker.ComputeCost` — both are required; `ComputeCost`'s `default` arm means a missing case is not a compile error, only a test/review gap (see `CelFunctionCatalog.All`-driven coverage in `CelBuiltinFunctionInvokerTests`, which exercises every declared operation id through both methods). No parser, binder, or evaluator change is needed beyond that — the binder already resolves any catalog entry generically, and the evaluator (#328) already dispatches any `CelBoundCall` through `boundCall.Overload.OperationId`.
 
 | Field | Details |
 |---|---|

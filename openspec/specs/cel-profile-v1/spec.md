@@ -1218,11 +1218,19 @@ elsewhere in this spec:
   operation identifier, so a future evaluator (#328) charges each built-in call's true,
   input-size-proportional cost against `CelEvaluationLimits.MaxCostUnits` instead of treating every
   built-in call as a fixed unit cost or duplicating a second per-function switch of its own.
-  `ComputeCost` SHALL return a fixed floor of `1` plus the UTF-16 length of every string operand the
-  operation scans (`startsWith`/`endsWith`: the argument string; `contains`/`size` on `String`: the
-  receiver string, `contains` additionally the argument string) — a linear approximation, not each
-  operation's exact worst-case algorithmic complexity. `size` on `List`/`Map` and `containsKey`
-  SHALL cost only the fixed floor, since both are backed by an O(1) count field or hash lookup.
+  `ComputeCost` SHALL NOT underestimate an operation's actual work — this is the property that makes
+  `MaxCostUnits` a real budget rather than a decoration — so its model differs per operation's actual
+  execution mechanism rather than using one uniform formula: `startsWith`/`endsWith` compare exactly
+  one aligned prefix/suffix window (a single memory comparison, never re-scanned from a different
+  offset) and `size` on `String` is one linear `Rune` pass, so each costs a fixed floor of `1` plus
+  the UTF-16 length of the string operand scanned (the argument for `startsWith`/`endsWith`, the
+  receiver for `size`). `contains` is the exception: it delegates to a candidate-position substring
+  search whose real-world cost on an adversarial receiver (e.g. a long repeating near-match prefix)
+  approaches the *product* of both operand lengths, not their sum, so `ComputeCost` for `contains`
+  SHALL be the fixed floor plus the product of the receiver string's and argument string's UTF-16
+  lengths — a conservative worst-case estimate, deliberately not each operation's exact algorithmic
+  complexity, but never an underestimate. `size` on `List`/`Map` and `containsKey` SHALL cost only
+  the fixed floor, since both are backed by an O(1) count field or hash lookup.
 - This change SHALL NOT add, wire, or modify any `CelBoundNode` tree evaluation, `&&`/`||`
   short-circuit/error-absorption behavior, or map/list index runtime-failure handling — those
   remain the bounded evaluator's scope (#328). `CelCompiledPredicate.Evaluate` and
@@ -1267,11 +1275,20 @@ elsewhere in this spec:
 - **THEN** it contains exactly seven overloads
 - **AND** each overload's `OperationId` uniquely identifies it
 
-#### Scenario: ComputeCost scales with the size of the string data an operation scans
+#### Scenario: ComputeCost scales linearly for single-pass string operations
 
-- **WHEN** `CelBuiltinFunctionInvoker.ComputeCost` is called for `Contains` or `SizeString` with a
-  large receiver string, then again with a small receiver string, all else equal
-- **THEN** the large-receiver call returns a strictly greater cost
+- **WHEN** `CelBuiltinFunctionInvoker.ComputeCost` is called for `StartsWith`, `EndsWith`, or
+  `SizeString` with a large string operand, then again with a small one, all else equal
+- **THEN** the large-operand call returns a strictly greater cost
+
+#### Scenario: ComputeCost for contains is the worst-case product of both operand lengths, not their sum
+
+- **WHEN** `CelBuiltinFunctionInvoker.ComputeCost` is called for `Contains` with a receiver of
+  length `n` and an argument of length `m`
+- **THEN** the returned cost equals `1 + n * m`
+- **AND** for a receiver built from a long repeating near-match prefix (the classic naive-substring-
+  search worst case), that cost is at least an order of magnitude greater than `1 + n + m` would
+  have been
 
 #### Scenario: ComputeCost is constant for O(1) operations
 

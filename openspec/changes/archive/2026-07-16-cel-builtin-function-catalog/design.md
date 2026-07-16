@@ -84,12 +84,33 @@ operation actually scans). `ComputeCost(operationId, receiver, arguments) -> lon
 now: same file, same enum, one `case` added alongside `Invoke`'s `case` whenever a future function
 is added — no second seam to keep in sync.
 
-The model itself is a linear approximation (`1 + Σ length of every string operand scanned`), not
-each operation's exact worst-case complexity (naive substring search is technically `O(n·m)`).
-`size()` on `List`/`Map` and `containsKey` are O(1) (backed by a count field / dictionary lookup) and
-cost only the fixed floor. A linear model is the same simplification CEL's own reference cost
-estimation uses for string functions — the goal is stopping a call against oversized input from
-being charged as free, not modeling an exact machine cost.
+The model must never *underestimate* real work — that's the property that makes a budget a budget —
+so it is not one uniform formula across every operation, it follows each operation's actual
+execution mechanism:
+
+- `startsWith`/`endsWith` compare exactly one aligned prefix/suffix window (a single memory
+  comparison at a fixed offset, never re-scanned from elsewhere) and `size()` on `String` is one
+  linear `Rune` pass — each has a real, provable `O(operand length)` bound, so a fixed floor plus
+  that length is exact enough.
+- `contains` does **not** get the same linear treatment. `string.Contains(str,
+  StringComparison.Ordinal)` is a candidate-position substring search: on a receiver built from a
+  long repeating near-match prefix (e.g. searching `"aaa...ab"` for `"aaa...ab"`-shaped receivers),
+  .NET's implementation re-compares a long overlapping run at many candidate offsets, and real cost
+  approaches `O(receiverLength · argumentLength)`. An initial version of this cost model used
+  `receiverLength + argumentLength` for `contains` too, discovered in review to be an *underestimate*
+  on exactly this adversarial shape — a crafted receiver could do far more real CPU work than its
+  charged cost, defeating `MaxCostUnits` as a budget rather than merely under-modeling it. The fix:
+  `contains`'s cost is the **product** of both operand lengths (a conservative worst-case bound,
+  deliberately not each operation's exact complexity, but never an underestimate). The product
+  cannot overflow `long`: both lengths are `int`, and `int.MaxValue * (long)int.MaxValue` is well
+  within `long.MaxValue`.
+- `size()` on `List`/`Map` and `containsKey` are O(1) (backed by a count field / dictionary lookup)
+  and cost only the fixed floor.
+
+`CelBuiltinFunctionInvokerTests` includes an adversarial regression test constructing exactly this
+repeating-near-match-prefix shape and asserting the charged cost is at least an order of magnitude
+above what the old linear-sum model would have produced, so a future regression back to a linear
+`contains` cost fails the suite rather than silently reopening the gap.
 
 ### String matching is ordinal (UTF-16 code-unit sequence comparison)
 
@@ -99,6 +120,21 @@ context model. `StringComparison.Ordinal` is therefore the only comparison mode 
 CEL strings being plain Unicode code-point sequences with no implicit culture association — the
 same reasoning the spec already applies to reject implicit numeric widening and to require exact
 structural equality for `==`.
+
+### Documenting the Invoke/ComputeCost dual-switch gap explicitly
+
+`Invoke` and `ComputeCost` are two independent `switch` expressions over the same
+`CelFunctionOperationId` enum, each with a `default` arm that throws. That `default` arm means the
+compiler does **not** enforce that adding an operation id updates both switches — a future author
+could add a `case` to `Invoke` alone and the build would still succeed, silently reopening the
+fixed-unit-cost gap this change closes. Rather than removing the `default` arm (which would require
+every switch to be literally exhaustive over the enum, awkward given both are also called
+defensively from generic/future code), `docs/internal/cel-engine-architecture.md`'s "Function
+catalog" extension-direction row now says explicitly that both cases are required, and
+`CelBuiltinFunctionInvokerTests` iterates `CelFunctionCatalog.All` — the same catalog a future
+addition's declaration row must join — through *both* `Invoke` and `ComputeCost`, so a declared
+overload with no matching `ComputeCost` case fails a test immediately rather than only being caught
+by a doc a reviewer might skip.
 
 ## Risks / Trade-offs
 

@@ -195,6 +195,40 @@ public sealed class CelBuiltinFunctionInvokerTests
     }
 
     [Test]
+    public void ComputeCost_Contains_IsExactlyTheWorstCaseProductOfBothLengths()
+    {
+        // Not a sum: string.Contains(Ordinal) is a candidate-position substring search, not a
+        // single aligned comparison, so its cost model must be the worst-case product of both
+        // operand lengths — otherwise a crafted receiver could do far more real work than its
+        // charged cost, defeating MaxCostUnits as a budget.
+        var cost = CelBuiltinFunctionInvoker.ComputeCost(
+            CelFunctionOperationId.Contains, CelValue.String(new string('a', 100)), [CelValue.String(new string('b', 10))]);
+
+        Assert.That(cost, Is.EqualTo(1L + 100 * 10));
+    }
+
+    [Test]
+    public void ComputeCost_Contains_OnAdversarialRepeatingPrefixInput_ChargesQuadraticNotLinearCost()
+    {
+        // Classic naive-substring-search worst case: a receiver of repeated 'a's whose needle is
+        // "aaa...ab" — every candidate offset matches a long run of 'a's before failing on the
+        // final 'b', so the real work approaches receiverLength * argumentLength, not
+        // receiverLength + argumentLength. A cost model that charged the (much smaller) linear sum
+        // here would let this exact shape of input under-charge its real cost.
+        const int ReceiverLength = 2_000;
+        const int ArgumentLength = 200;
+        var receiver = CelValue.String(new string('a', ReceiverLength));
+        var needle = CelValue.String(new string('a', ArgumentLength - 1) + "b");
+
+        var cost = CelBuiltinFunctionInvoker.ComputeCost(CelFunctionOperationId.Contains, receiver, [needle]);
+        var linearSumWouldHaveBeen = 1L + ReceiverLength + ArgumentLength;
+
+        Assert.That(cost, Is.EqualTo(1L + (long)ReceiverLength * ArgumentLength));
+        Assert.That(cost, Is.GreaterThan(linearSumWouldHaveBeen * 10),
+            "the quadratic-shaped cost must be an order of magnitude above what a linear-sum model would have charged");
+    }
+
+    [Test]
     public void ComputeCost_SizeString_IsProportionalToReceiverLength()
     {
         var shortCost = CelBuiltinFunctionInvoker.ComputeCost(CelFunctionOperationId.SizeString, CelValue.String("a"), []);

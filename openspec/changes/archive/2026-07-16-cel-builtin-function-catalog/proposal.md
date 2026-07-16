@@ -47,12 +47,16 @@ result computable in isolation, tested directly against `CelValue` inputs, ready
   diagnostic/failure channel.
 - `CelBuiltinFunctionInvoker` also gains `ComputeCost(CelFunctionOperationId, CelValue? receiver,
   IReadOnlyList<CelValue> arguments) -> long`, next to `Invoke` with one `case` per operation id, so
-  a future evaluator (#328) charges each call's true, input-size-proportional cost against
+  a future evaluator (#328) charges each call's true, never-underestimated cost against
   `CelEvaluationLimits.MaxCostUnits` instead of treating every built-in call as a fixed unit cost (an
   unbounded-relative-to-input-size gap the initial version of this change left open) or having to
-  build its own second per-operation switch. The model is a linear approximation — a fixed floor plus
-  the length of every string operand an operation scans — not each operation's exact worst-case
-  complexity; `size`/`containsKey` on `List`/`Map` cost only the floor (O(1) count/lookup).
+  build its own second per-operation switch. `startsWith`/`endsWith`/`size` on `String` have a real
+  linear execution bound (a single aligned comparison or one linear `Rune` pass) and cost the fixed
+  floor plus the scanned string's length; `contains` delegates to a candidate-position substring
+  search whose real cost on an adversarial receiver approaches the *product* of both operand
+  lengths, so its cost is that product, not their sum (a second review round caught the initial
+  linear-sum formula as an underestimate on exactly this shape of input — see `design.md`);
+  `size`/`containsKey` on `List`/`Map` cost only the floor (O(1) count/lookup).
 - `CelFunctionCatalog` gains a public-to-the-namespace `All` enumeration (already-internal type) so
   a security/conformance test can assert the catalog is exactly these seven overloads and no more.
 - New `tests/ArchLinterNet.CEL.Tests/CelBuiltinFunctionInvokerTests.cs` — one positive test per
