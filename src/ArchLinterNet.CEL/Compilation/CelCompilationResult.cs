@@ -64,23 +64,4 @@ public sealed class CelCompilationResult<T> where T : class
             ],
             key: key);
 
-    internal static CelCompilationResult<T> NotYetImplemented(CelCompilationKey key) =>
-        new(
-            isSuccess: false,
-            program: null,
-            diagnostics:
-            [
-                new CelDiagnostic(
-                    CelDiagnosticCode.NotYetImplemented,
-                    "engine",
-                    CelDiagnosticSeverity.Error,
-                    span: null,
-                    $"CEL compilation is not yet implemented for profile '{key.ProfileId}'. " +
-                    "Parser and type-checker will be added by task #325 and #326.",
-                    parameters: new Dictionary<string, string>(StringComparer.Ordinal)
-                    {
-                        ["profileId"] = key.ProfileId.Value,
-                    }),
-            ],
-            key: key);
 }

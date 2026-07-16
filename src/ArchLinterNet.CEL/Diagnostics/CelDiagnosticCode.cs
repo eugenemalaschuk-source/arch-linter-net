@@ -31,8 +31,8 @@ public enum CelDiagnosticCode
     EvaluationFailure,
 
     /// <summary>
-    /// The requested operation is not yet implemented. Compilation and evaluation stubs return
-    /// this code until the engine is fully implemented by tasks #325–#329.
+    /// The requested operation is not yet implemented. Retained as a published enum member for
+    /// compatibility even though the current Profile v1 compile/evaluate flow no longer emits it.
     /// </summary>
     NotYetImplemented,
 }

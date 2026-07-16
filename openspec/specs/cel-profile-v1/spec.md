@@ -111,7 +111,7 @@ For `a || b` (commutative):
 | `false` | evaluation error | that evaluation error |
 | evaluation error | evaluation error | an evaluation error |
 
-That is: a determining operand (`false` for `&&`, `true` for `||`) absorbs an evaluation error in the other operand; an error surfaces only when the non-erroring operand does not determine the result. Concretely, with `m[k]` failing on a missing key: `false && m[k]` is `false`; `true || m[k]` is `true`; `true && m[k]` and `false || m[k]` are evaluation errors. The pinned CEL spec notes that traditional McCarthy left-to-right short-circuit is expressible via the conditional operator — which is deferred in v1 — so v1 SHALL NOT guarantee that the right operand is unevaluated; conformance tests (#328) SHALL assert observable results only.
+That is: a determining operand (`false` for `&&`, `true` for `||`) absorbs an ordinary evaluation error in the other operand; an error surfaces only when the non-erroring operand does not determine the result. `BudgetExceeded` is terminal rather than an ordinary evaluation error and SHALL never be absorbed. Concretely, with `m[k]` failing on a missing key: `false && m[k]` is `false`; `true || m[k]` is `true`; `true && m[k]` and `false || m[k]` are evaluation errors. The pinned CEL spec notes that traditional McCarthy left-to-right short-circuit is expressible via the conditional operator — which is deferred in v1 — so v1 SHALL NOT guarantee that the right operand is unevaluated; conformance tests (#328) SHALL assert observable results only.
 
 Because v1 performs full static type-checking at compile time (Requirement: "Immutable public environment and compilation lifecycle"), no operand of `&&`/`||`/`!`/comparison operators can have a type error surviving to evaluation — evaluation-time errors in v1 arise only from runtime data conditions below, not from type mismatches.
 
@@ -262,7 +262,7 @@ The `matches` function and all regex, timestamp, duration, protobuf, byte/string
 
 #### Scenario: Compiled predicate evaluates to a structured result
 
-- **WHEN** the evaluator is implemented and a consumer calls `program.Evaluate(context, limits)`
+- **WHEN** a consumer calls `program.Evaluate(context, limits)` on a successfully compiled predicate
 - **THEN** a `CelEvaluationResult` is returned with typed boolean access via `AsBool()`
 - **AND** no delegate is exposed as an evaluation path
 
@@ -300,7 +300,7 @@ The `matches` function and all regex, timestamp, duration, protobuf, byte/string
 
 `CelObjectSchema` SHALL be a sealed, immutable, structurally-identified description of one object type: it SHALL carry `ObjectTypeId` (string), `Members` (frozen `IReadOnlyList<CelObjectMember>` in declaration order), and a deterministic, collision-safe `Identity` string derived from the type id plus member names and types. `CelObjectMember` SHALL be sealed and immutable with `Name` and `Type` properties. `CelObjectSchemaBuilder` SHALL be created via `CelObjectSchema.CreateBuilder(objectTypeId)`; `AddMember(name, type)` SHALL reject duplicate member names with a programmer-error exception.
 
-`CelEnvironmentBuilder.WithObjectSchema(objectSchema)` SHALL register an object schema in the environment's closed catalog; registering two schemas with the same `ObjectTypeId` SHALL throw `ArgumentException`. The catalog SHALL be frozen at `Build()` (defensively copied) and exposed as `CelEnvironment.ObjectSchemas`. Every registered object schema's identity SHALL participate in the compilation key's schema identity.
+`CelEnvironmentBuilder.WithObjectSchema(objectSchema)` SHALL register an object schema in the environment's closed catalog; registering two schemas with the same `ObjectTypeId` SHALL throw `ArgumentException`. The catalog SHALL be frozen at `Build()` (defensively copied) and exposed as `CelEnvironment.ObjectSchemas`. Every registered object schema's identity SHALL participate in the compilation key's schema identity. `CelEvaluationContext` compatibility SHALL be checked against that same full schema identity, not just against the top-level `CelContextSchema.Identity`, so two environments with the same variable declarations but different object-schema catalogs are incompatible at evaluation time.
 
 `CelEnvironment.CreateEvaluationContextBuilder()` SHALL be the standard way to build evaluation contexts when object-typed variables exist: it pre-loads the builder with the environment's object schema catalog. Object-value validation in `Set()` SHALL be strict, matching Profile v1's no-null/no-optional-members model: the supplied `CelObjectValue`'s member set SHALL exactly equal the registered schema's member set — a missing declared member, an extra undeclared member, and an object type id with no registered schema SHALL all be rejected with `ArgumentException`; each present member's value SHALL be recursively validated against its declared type. A builder created via `schema.CreateEvaluationContextBuilder()` (no catalog) SHALL throw `InvalidOperationException` when asked to validate an object value, rather than accepting it unvalidated — there is no path to construct a `CelEvaluationContext` containing an unvalidated object value.
 
@@ -338,6 +338,12 @@ The `matches` function and all regex, timestamp, duration, protobuf, byte/string
 
 - **WHEN** `WithObjectSchema` is called twice with schemas sharing the same `ObjectTypeId`
 - **THEN** an `ArgumentException` is thrown
+
+#### Scenario: Evaluation rejects a context built from a different object schema catalog
+
+- **WHEN** an expression is compiled in one environment and evaluated with a `CelEvaluationContext` built from another environment that has the same `CelContextSchema` but a different `CelObjectSchema` definition for the same `ObjectTypeId`
+- **THEN** evaluation fails with `SchemaMismatch`
+- **AND** no CLR exception is thrown
 
 ### Requirement: Immutable CEL value model without CLR reflection
 
@@ -383,7 +389,12 @@ The evaluation-limits enforcement model is: `CelCompiledPredicate` and `CelCompi
 
 The complete compilation-time budget surface that #325 (tokenizer/parser) and #326 (binder/checker) SHALL enforce comprises, at minimum: maximum expression source length in UTF-16 characters (`MaxExpressionLength`, already present); maximum token count produced by the tokenizer (`MaxTokenCount`); maximum AST node count produced by parsing (`MaxAstNodeCount`); maximum sub-expression nesting depth (`MaxNestingDepth`, already present); maximum literal size — the longest string/collection literal accepted in source (`MaxLiteralSize`); maximum distinct identifier references (`MaxIdentifierCount`, already present). Each of these limits SHALL be a positive-only field on `CelCompilationLimits`, SHALL be included as a named component of `CelCompilationLimits.ComputeIdentity()`, and a source exceeding any one of them SHALL produce a `BudgetExceeded` diagnostic before further processing of that phase. `MaxExpressionLength` remains the cheapest, first-checked gate (rejecting oversized source before tokenization even begins); the token/AST/literal limits are checked as each corresponding phase runs. Fields for limits not yet enforced by a landed phase (#325/#326 pending) SHALL still exist on `CelCompilationLimits` so the API shape does not change once those phases ship — an unenforced field SHALL be documented as "reserved, not yet enforced" in its XML doc until the enforcing phase lands.
 
-The complete evaluation-time budget surface that #328 (evaluator) SHALL enforce comprises, at minimum: maximum evaluation steps (`MaxIterations`, already present); maximum accumulated abstract cost units (`MaxCostUnits`, already present); maximum input-value structural depth accepted by `CelEvaluationContextBuilder.Set()` (already enforced pre-evaluator via `MaxValidationDepth`, an internal constant — not yet a public per-environment field); maximum input collection size (element/entry count) accepted by `Set()` for `List`/`Map`/`Object` values (already enforced pre-evaluator via `MaxValidationCollectionSize`, an internal constant — not yet a public per-environment field); maximum cumulative input-value node count visited across one `Set()` call's recursive structural traversal (already enforced pre-evaluator via `MaxValidationNodeCount`, an internal constant — not yet a public per-environment field). The per-collection cap alone does not bound total validation work: a shallow structure such as a 1024-element list of 1024-element lists keeps every individual collection within `MaxValidationCollectionSize` while still visiting over one million value nodes, so `MaxValidationNodeCount` is a single counter shared across the entire recursive traversal of one `Set()` call, and validation stops immediately once it is exceeded. Exceeding any evaluation-time limit SHALL produce a failed `CelEvaluationResult` with a `BudgetExceeded` diagnostic, not a CLR exception, except where the limit is enforced synchronously inside `Set()` (structural depth, collection size, cumulative node count) — those SHALL continue to be reported as `ArgumentException` per the "Immutable context schema and schema-bound activation" requirement, since `Set()` is a builder-time programmer-facing call, not an evaluation call. Like `MaxValidationDepth` and `MaxValidationCollectionSize`, `MaxValidationNodeCount` is deliberately an immutable Profile v1 constant rather than a `CelEvaluationLimits` field in v1; if a future profile version makes it caller-configurable, it SHALL move onto `CelEvaluationLimits` and become a named component of `CelEvaluationLimits.ComputeIdentity()` / `CelCompilationKey.EvaluationLimitsIdentity`.
+The complete evaluation-time budget surface that #328 (evaluator) SHALL enforce comprises, at minimum: maximum evaluation steps (`MaxIterations`, already present); maximum accumulated abstract cost units (`MaxCostUnits`, already present); maximum input-value structural depth accepted by `CelEvaluationContextBuilder.Set()` (already enforced pre-evaluator via `MaxValidationDepth`, an internal constant — not yet a public per-environment field); maximum input collection size (element/entry count) accepted by `Set()` for `List`/`Map`/`Object` values (already enforced pre-evaluator via `MaxValidationCollectionSize`, an internal constant — not yet a public per-environment field); maximum cumulative input-value node count visited across one `Set()` call's recursive structural traversal (already enforced pre-evaluator via `MaxValidationNodeCount`, an internal constant — not yet a public per-environment field). The per-collection cap alone does not bound total validation work: a shallow structure such as a 1024-element list of 1024-element lists keeps every individual collection within `MaxValidationCollectionSize` while still visiting over one million value nodes, so `MaxValidationNodeCount` is a single counter shared across the entire recursive traversal of one `Set()` call, and validation stops immediately once it is exceeded. `MaxCostUnits` SHALL cover more than built-in-function calls: the evaluator SHALL also charge for `in` over `List`/`Map`, map and object member lookup, string equality (including `ObjectTypeId`), and deep structural comparison of `List`/`Map`/`Object` values, including recursive traversal and per-entry lookups needed to complete those operations. A context SHALL construct and retain its immutable variable-name lookup when it is built; evaluation SHALL reuse that lookup and SHALL NOT rebuild all assignments before walking the bound tree. Exceeding any evaluation-time limit SHALL produce a failed `CelEvaluationResult` with a `BudgetExceeded` diagnostic, not a CLR exception, except where the limit is enforced synchronously inside `Set()` (structural depth, collection size, cumulative node count) — those SHALL continue to be reported as `ArgumentException` per the "Immutable context schema and schema-bound activation" requirement, since `Set()` is a builder-time programmer-facing call, not an evaluation call. Like `MaxValidationDepth` and `MaxValidationCollectionSize`, `MaxValidationNodeCount` is deliberately an immutable Profile v1 constant rather than a `CelEvaluationLimits` field in v1; if a future profile version makes it caller-configurable, it SHALL move onto `CelEvaluationLimits` and become a named component of `CelEvaluationLimits.ComputeIdentity()` / `CelCompilationKey.EvaluationLimitsIdentity`.
+
+#### Scenario: Cost budget applies to collection lookups and deep comparison without built-in calls
+
+- **WHEN** an expression such as `needle in list`, `map[key]`, `obj.member`, or `left == right` performs enough lookup or recursive comparison work to exceed `MaxCostUnits`
+- **THEN** evaluation fails with `BudgetExceeded` even if the expression calls no built-in functions
 
 #### Scenario: SafeDefaults factories are accessible
 
@@ -1054,9 +1065,9 @@ already fixed elsewhere in this spec:
   bound-expression tree SHALL be internal only; it SHALL NOT be exposed by any public type or
   member, and no public API SHALL allow constructing, inspecting, or serializing it.
 - `CelCompiledPredicate` and `CelCompiledExpression` SHALL hold the bound-expression tree internally
-  once binding succeeds, in addition to the properties this spec already fixes for them. Their
-  `Evaluate` methods SHALL continue to throw `NotImplementedException` until the evaluator (#328)
-  lands — binding success alone SHALL NOT enable evaluation.
+  once binding succeeds, in addition to the properties this spec already fixes for them. The
+  evaluator (#328) SHALL consume that bound-expression tree directly; no public API SHALL expose or
+  serialize it.
 - Every diagnostic produced by the binder SHALL use diagnostic category `"binder"` and SHALL carry
   `profileId` in `Parameters`, consistent with this spec's blanket diagnostic requirement.
   `BindingError`/`SchemaMismatch` diagnostics SHALL carry `identifier`; `TypeMismatch` diagnostics
@@ -1170,11 +1181,12 @@ already fixed elsewhere in this spec:
 - **THEN** no public type, member, or method exposes a bound-expression node, tree, or any type
   from the internal `ArchLinterNet.CEL.Binding` namespace
 
-#### Scenario: Successful binding does not enable evaluation
+#### Scenario: Successful binding produces a compiled program consumable by the evaluator
 
 - **WHEN** a `CelCompiledPredicate` or `CelCompiledExpression` is obtained from a successful
   compilation
-- **THEN** calling `Evaluate` still throws `NotImplementedException`
+- **THEN** the compiled program retains the internal bound-expression tree needed for evaluation
+- **AND** no public API exposes that tree directly
 
 ### Requirement: Built-in function execution implementation scope for Profile v1
 
@@ -1244,11 +1256,9 @@ elsewhere in this spec:
   hash-computation pass over the key itself, and the multiplication by entry count is the
   conservative worst-case bound on collision-chain comparisons, each assumed to cost a full
   key-length scan.
-- This change SHALL NOT add, wire, or modify any `CelBoundNode` tree evaluation, `&&`/`||`
-  short-circuit/error-absorption behavior, or map/list index runtime-failure handling — those
-  remain the bounded evaluator's scope (#328). `CelCompiledPredicate.Evaluate` and
-  `CelCompiledExpression.Evaluate` SHALL continue to throw `NotImplementedException` after this
-  change ships, exactly as after the binder (#326).
+- The built-in-function implementation scope remains internal-only: the evaluator (#328) consumes
+  `CelBuiltinFunctionInvoker` indirectly through bound calls, and no public API exposes built-in
+  dispatch hooks, delegates, or mutable function registration.
 
 #### Scenario: startsWith/endsWith/contains use ordinal string comparison
 
@@ -1331,9 +1341,93 @@ elsewhere in this spec:
   of the seven catalog overloads exactly
 - **THEN** it returns a `CelValue` and never throws
 
-#### Scenario: Evaluate remains unimplemented after this change
+### Requirement: Bounded evaluator runtime implementation for Profile v1
 
-- **WHEN** a `CelCompiledPredicate` or `CelCompiledExpression` is obtained from a successful
-  compilation after this change ships
-- **THEN** calling `Evaluate` still throws `NotImplementedException`
+`CelCompiledPredicate.Evaluate(...)` and `CelCompiledExpression.Evaluate(...)` SHALL execute the
+ immutable bound-expression tree produced by the binder through one internal bounded evaluator rather
+ than throwing `NotImplementedException`. The evaluator SHALL remain internal-only: no public type,
+ member, or API surface may expose evaluator classes, delegates, execution plans, bytecode, or
+ other backend-specific artifacts.
 
+Evaluation SHALL be deterministic for the same compiled program, `CelEvaluationContext`, profile,
+ and `CelEvaluationLimits`. Repeated evaluation of one compiled program SHALL perform no parsing,
+ binding, or type-checking. One compiled program SHALL be concurrently reusable across independent
+ evaluation contexts with no shared mutable evaluator state.
+
+The evaluator SHALL enforce both evaluation budgets on every public evaluation path:
+
+- one iteration unit per visited bound node against `MaxIterations`;
+- one additional abstract-cost charge per built-in call using
+  `CelBuiltinFunctionInvoker.ComputeCost(...)` against `MaxCostUnits`.
+
+Exceeding either budget SHALL produce a failed `CelEvaluationResult` with a `BudgetExceeded`
+ diagnostic carrying `limitName`, `observedValue`, and `profileId` parameters. The diagnostic
+ SHALL carry the source span of the bound node whose visit or built-in charge exceeded the budget.
+
+Supplying a `CelEvaluationContext` built for a different schema than the compiled program's
+ `Schema` SHALL NOT produce a CLR member/indexing exception or a wrong result. Evaluation SHALL
+ fail deterministically with a `SchemaMismatch` diagnostic carrying at least `schemaId`,
+ `expectedSchemaId`, and `profileId`.
+
+Normal runtime data failures SHALL surface as failed `CelEvaluationResult` values with code
+ `EvaluationFailure`, never as uncaught CLR exceptions:
+
+- map indexing on a missing key;
+- list indexing with a negative or out-of-range index.
+
+For those failures, the diagnostic SHALL include the source span of the failing index expression
+ and structured parameters identifying the failure kind (`missingKey` or `invalidIndex`) plus the
+ relevant observed key/index.
+
+The evaluator SHALL support the full currently shipped bound-node set:
+
+- literals and identifier lookup;
+- unary `!`;
+- binary logical, equality, ordering, and `in` operators;
+- object member access;
+- list/map indexing;
+- closed built-in-function invocation through `CelBuiltinFunctionInvoker`.
+
+#### Scenario: Successful predicate evaluation returns a boolean result
+
+- **WHEN** a successfully compiled predicate is evaluated against a compatible context within the
+  configured budgets
+- **THEN** `CelEvaluationResult.IsSuccess` is `true`
+- **AND** `CelEvaluationResult.AsBool()` returns the predicate result
+
+#### Scenario: Successful general expression evaluation returns a typed CEL value
+
+- **WHEN** a successfully compiled non-predicate expression is evaluated against a compatible
+  context within the configured budgets
+- **THEN** `CelEvaluationResult.IsSuccess` is `true`
+- **AND** `CelEvaluationResult.Value` is the expected `CelValue`
+
+#### Scenario: Different-schema evaluation context fails with SchemaMismatch
+
+- **WHEN** a compiled program is evaluated with a `CelEvaluationContext` whose schema does not
+  match the program's captured `Schema`
+- **THEN** `CelEvaluationResult.IsSuccess` is `false`
+- **AND** `CelEvaluationResult.Diagnostics` contains a `SchemaMismatch` diagnostic with
+  `schemaId` and `expectedSchemaId` parameters
+
+#### Scenario: Evaluation step budget exhaustion returns BudgetExceeded
+
+- **WHEN** evaluation would visit more bound nodes than `limits.MaxIterations` allows
+- **THEN** `CelEvaluationResult.IsSuccess` is `false`
+- **AND** the failure diagnostic code is `BudgetExceeded`
+- **AND** `diagnostic.Parameters["limitName"]` equals `"MaxIterations"`
+
+#### Scenario: Built-in cost budget exhaustion returns BudgetExceeded
+
+- **WHEN** evaluation stays within the step budget but a built-in call would exceed
+  `limits.MaxCostUnits`
+- **THEN** `CelEvaluationResult.IsSuccess` is `false`
+- **AND** the failure diagnostic code is `BudgetExceeded`
+- **AND** `diagnostic.Parameters["limitName"]` equals `"MaxCostUnits"`
+
+#### Scenario: Concurrent reuse is side-effect free
+
+- **WHEN** one compiled program is evaluated concurrently against multiple independent evaluation
+  contexts
+- **THEN** each call completes with the same result it would produce in isolation
+- **AND** no shared mutable evaluator state is required

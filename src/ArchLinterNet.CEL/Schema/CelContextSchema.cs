@@ -38,6 +38,21 @@ public sealed class CelContextSchema
         Identity = ComputeIdentity(schemaId, Variables);
     }
 
+    internal string ComputeEnvironmentIdentity(IReadOnlyDictionary<string, CelObjectSchema>? objectSchemas)
+    {
+        if (objectSchemas is null || objectSchemas.Count == 0)
+            return Identity;
+
+        var sb = new StringBuilder(Identity);
+        foreach (var kv in objectSchemas.OrderBy(k => k.Key, StringComparer.Ordinal))
+        {
+            sb.Append('\0');
+            sb.Append(kv.Value.Identity);
+        }
+
+        return sb.ToString();
+    }
+
     private static string ComputeIdentity(string schemaId, IReadOnlyList<CelVariable> variables)
     {
         // Length-prefixed, null-byte-separated encoding prevents delimiter-collision between
