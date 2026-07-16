@@ -69,8 +69,8 @@ expression source (string)
   │  (internal)     │  (ArchLinterNet.CEL.Binding.CelBoundExpression — one bound node
   │                 │  per syntax node, each carrying its resolved CelType).
   │                 │  Owned by CelCompiledPredicate / CelCompiledExpression.
-  │                 │  Never exposed publicly. Evaluate() still throws
-  │                 │  NotImplementedException pending the bounded evaluator (#328).
+  │                 │  Never exposed publicly. Consumed directly by the bounded
+  │                 │  evaluator (#328); no public API exposes or serializes it.
   └────────┬────────┘
            │
     (compilation complete — CelCompiledPredicate / CelCompiledExpression returned)
@@ -97,15 +97,20 @@ expression source (string)
            │  invocable per-overload implementation + cost model, keyed by operation id
            ▼
   ┌─────────────────┐
-  │  Bounded        │  (task #328 — not yet shipped)
+  │  Bounded        │  (task #328 — shipped: ArchLinterNet.CEL.Evaluation.CelEvaluator)
   │  Evaluator      │  Walks the bound plan against a CelEvaluationContext.
   │                 │  Enforces MaxIterations and MaxCostUnits per call.
-  │                 │  Produces CEL short-circuit semantics for && / ||.
+  │                 │  Uses a deterministic left-to-right traversal while still
+  │                 │  producing CEL's observable short-circuit/error semantics
+  │                 │  for && / || (determining operands absorb failures).
   │                 │  Calls CelBuiltinFunctionInvoker.Invoke AND ComputeCost for every
   │                 │  CelBoundCall, using boundCall.Overload.OperationId to select the
   │                 │  operation — charging ComputeCost's result against MaxCostUnits is
   │                 │  what makes the budget real; skipping it silently reintroduces the
-  │                 │  fixed-unit-cost gap #327 was written to close.
+  │                 │  fixed-unit-cost gap #327 was written to close. Rejects
+  │                 │  incompatible evaluation contexts with SchemaMismatch and
+  │                 │  reports missing-key / invalid-index runtime failures as
+  │                 │  structured CelEvaluationResult diagnostics, never CLR exceptions.
   └────────┬────────┘
            │  typed result or failure diagnostics
            ▼
@@ -129,6 +134,7 @@ ______________________________________________________________________
 | Function catalog (declaration) | `ArchLinterNet.CEL.Binding.CelFunctionCatalog` internal | Declared per-profile; immutable; no public registration; `CelEngine` remains an unused placeholder |
 | Built-in function execution | `ArchLinterNet.CEL.Binding.CelBuiltinFunctionInvoker` internal | Shipped by #327. Pure, stateless, keyed by `CelFunctionOperationId` (carried on each `CelFunctionOverload`); every overload is total, no failure channel. `Invoke` and `ComputeCost` are two separate switches over the same enum — the compiler does NOT enforce that adding an operation id updates both (each has a `default` arm, so an omitted `ComputeCost` case is a silent budget-safety gap, not a build error); a code-review checklist item, not a compiler guarantee, is what closes this. Never exposed; #328's evaluator is the only intended caller |
 | Bound operations (bound plan, binding tables) | `ArchLinterNet.CEL.Binding` internal (`CelBinder`, `CelBoundExpression`, `CelBoundNode` hierarchy) | Never exposed |
+| Bounded evaluator runtime | `ArchLinterNet.CEL.Evaluation.CelEvaluator` internal | Shipped by #328. One per-call runtime state, no shared mutable globals, source-span-aware diagnostics, schema-compatibility check, and budget enforcement over bound-node visits plus built-in cost charges |
 | Evaluation budgets (`CelCompilationLimits`, `CelEvaluationLimits`) | `ArchLinterNet.CEL` public | SafeDefaults provided; no unbounded path |
 | Compiled programs (`CelCompiledPredicate`, `CelCompiledExpression`) | `ArchLinterNet.CEL` public | Immutable; thread-safe; hold bound plan internally |
 | Diagnostics (`CelDiagnostic`, `CelDiagnosticCode`, `CelSourceSpan`) | `ArchLinterNet.CEL` public | Stable codes; message is display-only |

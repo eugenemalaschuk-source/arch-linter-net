@@ -460,7 +460,7 @@ public sealed class CelBinderTests
     // ── No evaluation enabled by successful binding ─────────────────────────
 
     [Test]
-    public void SuccessfulCompilation_EvaluateStillThrowsNotImplemented()
+    public void SuccessfulCompilation_EvaluateReturnsStructuredResult()
     {
         var env = BuildEnvironment();
         var result = env.CompilePredicate("x");
@@ -476,7 +476,10 @@ public sealed class CelBinderTests
             .Set(env.Schema.Variables.First(v => v.Name == "obj"), CelValue.Object(new CelObjectValue("widget", new Dictionary<string, CelValue> { ["name"] = CelValue.String("n"), ["count"] = CelValue.Int(1) })))
             .Build();
 
-        Assert.That(() => result.Program!.Evaluate(context), Throws.TypeOf<NotImplementedException>());
+        var evaluation = result.Program!.Evaluate(context);
+
+        Assert.That(evaluation.IsSuccess, Is.True);
+        Assert.That(evaluation.AsBool(), Is.True);
     }
 
     // ── Bound-plan immutability ──────────────────────────────────────────────

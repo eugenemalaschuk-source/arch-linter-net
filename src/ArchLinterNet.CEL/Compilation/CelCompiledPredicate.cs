@@ -69,9 +69,6 @@ public sealed class CelCompiledPredicate
     /// <paramref name="limits"/> exceeds the environment-level ceiling in
     /// <see cref="EvaluationLimits"/>. Per-call limits may only tighten the captured maximums.
     /// </exception>
-    /// <exception cref="NotImplementedException">
-    /// The evaluator is not yet implemented. This will be replaced by the real evaluator in task #328.
-    /// </exception>
     public CelEvaluationResult Evaluate(CelEvaluationContext context, CelEvaluationLimits limits)
     {
         ArgumentNullException.ThrowIfNull(context);
@@ -81,8 +78,7 @@ public sealed class CelCompiledPredicate
                 "Per-call evaluation limits may tighten but must not exceed the environment-level " +
                 $"ceiling captured at compile time ({EvaluationLimits.ComputeIdentity()}).",
                 nameof(limits));
-        throw new NotImplementedException(
-            $"Evaluator not yet implemented for profile '{Profile.Id}' — see #328.");
+        return CelEvaluator.Evaluate(Bound, Schema, Profile.Id, context, limits);
     }
 
     /// <summary>
@@ -91,9 +87,6 @@ public sealed class CelCompiledPredicate
     /// <c>Evaluate(context, this.EvaluationLimits)</c>. This is a documented bounded default,
     /// not an unbounded evaluation path.
     /// </summary>
-    /// <exception cref="NotImplementedException">
-    /// The evaluator is not yet implemented. This will be replaced by the real evaluator in task #328.
-    /// </exception>
     public CelEvaluationResult Evaluate(CelEvaluationContext context) =>
         Evaluate(context, EvaluationLimits);
 }

@@ -262,7 +262,7 @@ The `matches` function and all regex, timestamp, duration, protobuf, byte/string
 
 #### Scenario: Compiled predicate evaluates to a structured result
 
-- **WHEN** the evaluator is implemented and a consumer calls `program.Evaluate(context, limits)`
+- **WHEN** a consumer calls `program.Evaluate(context, limits)` on a successfully compiled predicate
 - **THEN** a `CelEvaluationResult` is returned with typed boolean access via `AsBool()`
 - **AND** no delegate is exposed as an evaluation path
 
@@ -1054,9 +1054,9 @@ already fixed elsewhere in this spec:
   bound-expression tree SHALL be internal only; it SHALL NOT be exposed by any public type or
   member, and no public API SHALL allow constructing, inspecting, or serializing it.
 - `CelCompiledPredicate` and `CelCompiledExpression` SHALL hold the bound-expression tree internally
-  once binding succeeds, in addition to the properties this spec already fixes for them. Their
-  `Evaluate` methods SHALL continue to throw `NotImplementedException` until the evaluator (#328)
-  lands — binding success alone SHALL NOT enable evaluation.
+  once binding succeeds, in addition to the properties this spec already fixes for them. The
+  evaluator (#328) SHALL consume that bound-expression tree directly; no public API SHALL expose or
+  serialize it.
 - Every diagnostic produced by the binder SHALL use diagnostic category `"binder"` and SHALL carry
   `profileId` in `Parameters`, consistent with this spec's blanket diagnostic requirement.
   `BindingError`/`SchemaMismatch` diagnostics SHALL carry `identifier`; `TypeMismatch` diagnostics
@@ -1170,11 +1170,12 @@ already fixed elsewhere in this spec:
 - **THEN** no public type, member, or method exposes a bound-expression node, tree, or any type
   from the internal `ArchLinterNet.CEL.Binding` namespace
 
-#### Scenario: Successful binding does not enable evaluation
+#### Scenario: Successful binding produces a compiled program consumable by the evaluator
 
 - **WHEN** a `CelCompiledPredicate` or `CelCompiledExpression` is obtained from a successful
   compilation
-- **THEN** calling `Evaluate` still throws `NotImplementedException`
+- **THEN** the compiled program retains the internal bound-expression tree needed for evaluation
+- **AND** no public API exposes that tree directly
 
 ### Requirement: Built-in function execution implementation scope for Profile v1
 
@@ -1244,11 +1245,9 @@ elsewhere in this spec:
   hash-computation pass over the key itself, and the multiplication by entry count is the
   conservative worst-case bound on collision-chain comparisons, each assumed to cost a full
   key-length scan.
-- This change SHALL NOT add, wire, or modify any `CelBoundNode` tree evaluation, `&&`/`||`
-  short-circuit/error-absorption behavior, or map/list index runtime-failure handling — those
-  remain the bounded evaluator's scope (#328). `CelCompiledPredicate.Evaluate` and
-  `CelCompiledExpression.Evaluate` SHALL continue to throw `NotImplementedException` after this
-  change ships, exactly as after the binder (#326).
+- The built-in-function implementation scope remains internal-only: the evaluator (#328) consumes
+  `CelBuiltinFunctionInvoker` indirectly through bound calls, and no public API exposes built-in
+  dispatch hooks, delegates, or mutable function registration.
 
 #### Scenario: startsWith/endsWith/contains use ordinal string comparison
 
@@ -1331,9 +1330,94 @@ elsewhere in this spec:
   of the seven catalog overloads exactly
 - **THEN** it returns a `CelValue` and never throws
 
-#### Scenario: Evaluate remains unimplemented after this change
+### Requirement: Bounded evaluator runtime implementation for Profile v1
 
-- **WHEN** a `CelCompiledPredicate` or `CelCompiledExpression` is obtained from a successful
-  compilation after this change ships
-- **THEN** calling `Evaluate` still throws `NotImplementedException`
+`CelCompiledPredicate.Evaluate(...)` and `CelCompiledExpression.Evaluate(...)` SHALL execute the
+ immutable bound-expression tree produced by the binder through one internal bounded evaluator rather
+ than throwing `NotImplementedException`. The evaluator SHALL remain internal-only: no public type,
+ member, or API surface may expose evaluator classes, delegates, execution plans, bytecode, or
+ other backend-specific artifacts.
+
+Evaluation SHALL be deterministic for the same compiled program, `CelEvaluationContext`, profile,
+ and `CelEvaluationLimits`. Repeated evaluation of one compiled program SHALL perform no parsing,
+ binding, or type-checking. One compiled program SHALL be concurrently reusable across independent
+ evaluation contexts with no shared mutable evaluator state.
+
+The evaluator SHALL enforce both evaluation budgets on every public evaluation path:
+
+- one iteration unit per visited bound node against `MaxIterations`;
+- one additional abstract-cost charge per built-in call using
+  `CelBuiltinFunctionInvoker.ComputeCost(...)` against `MaxCostUnits`.
+
+Exceeding either budget SHALL produce a failed `CelEvaluationResult` with a `BudgetExceeded`
+ diagnostic carrying `limitName`, `observedValue`, and `profileId` parameters. The diagnostic
+ SHALL carry the source span of the bound node whose visit or built-in charge exceeded the budget.
+
+Supplying a `CelEvaluationContext` built for a different schema than the compiled program's
+ `Schema` SHALL NOT produce a CLR member/indexing exception or a wrong result. Evaluation SHALL
+ fail deterministically with a `SchemaMismatch` diagnostic carrying at least `schemaId`,
+ `expectedSchemaId`, and `profileId`.
+
+Normal runtime data failures SHALL surface as failed `CelEvaluationResult` values with code
+ `EvaluationFailure`, never as uncaught CLR exceptions:
+
+- map indexing on a missing key;
+- list indexing with a negative or out-of-range index.
+
+For those failures, the diagnostic SHALL include the source span of the failing index expression
+ and structured parameters identifying the failure kind (`missingKey` or `invalidIndex`) plus the
+ relevant observed key/index.
+
+The evaluator SHALL support the full currently shipped bound-node set:
+
+- literals and identifier lookup;
+- unary `!`;
+- binary logical, equality, ordering, and `in` operators;
+- object member access;
+- list/map indexing;
+- closed built-in-function invocation through `CelBuiltinFunctionInvoker`.
+
+#### Scenario: Successful predicate evaluation returns a boolean result
+
+- **WHEN** a successfully compiled predicate is evaluated against a compatible context within the
+  configured budgets
+- **THEN** `CelEvaluationResult.IsSuccess` is `true`
+- **AND** `CelEvaluationResult.AsBool()` returns the predicate result
+
+#### Scenario: Successful general expression evaluation returns a typed CEL value
+
+- **WHEN** a successfully compiled non-predicate expression is evaluated against a compatible
+  context within the configured budgets
+- **THEN** `CelEvaluationResult.IsSuccess` is `true`
+- **AND** `CelEvaluationResult.Value` is the expected `CelValue`
+
+#### Scenario: Different-schema evaluation context fails with SchemaMismatch
+
+- **WHEN** a compiled program is evaluated with a `CelEvaluationContext` whose schema does not
+  match the program's captured `Schema`
+- **THEN** `CelEvaluationResult.IsSuccess` is `false`
+- **AND** `CelEvaluationResult.Diagnostics` contains a `SchemaMismatch` diagnostic with
+  `schemaId` and `expectedSchemaId` parameters
+
+#### Scenario: Evaluation step budget exhaustion returns BudgetExceeded
+
+- **WHEN** evaluation would visit more bound nodes than `limits.MaxIterations` allows
+- **THEN** `CelEvaluationResult.IsSuccess` is `false`
+- **AND** the failure diagnostic code is `BudgetExceeded`
+- **AND** `diagnostic.Parameters["limitName"]` equals `"MaxIterations"`
+
+#### Scenario: Built-in cost budget exhaustion returns BudgetExceeded
+
+- **WHEN** evaluation stays within the step budget but a built-in call would exceed
+  `limits.MaxCostUnits`
+- **THEN** `CelEvaluationResult.IsSuccess` is `false`
+- **AND** the failure diagnostic code is `BudgetExceeded`
+- **AND** `diagnostic.Parameters["limitName"]` equals `"MaxCostUnits"`
+
+#### Scenario: Concurrent reuse is side-effect free
+
+- **WHEN** one compiled program is evaluated concurrently against multiple independent evaluation
+  contexts
+- **THEN** each call completes with the same result it would produce in isolation
+- **AND** no shared mutable evaluator state is required
 

@@ -11,10 +11,10 @@ using NUnit.Framework;
 namespace ArchLinterNet.CEL.Tests;
 
 /// <summary>
-/// Coverage tests that exercise internal constructors and stub behaviors via
+/// Coverage tests that exercise internal constructors and evaluator-backed behaviors via
 /// <c>InternalsVisibleTo</c>. These are distinct from the API shape tests because they require
 /// direct access to internal members that no public path can produce yet (e.g. compiled programs,
-/// evaluation results) while the parser and evaluator (#325–#327) are stubs.
+/// evaluation results) even after the public compile/evaluate flow is implemented.
 /// </summary>
 [TestFixture]
 public sealed class CelInternalApiCoverageTests
@@ -63,7 +63,7 @@ public sealed class CelInternalApiCoverageTests
         Assert.That(s, Does.Contain("Predicate"));
     }
 
-    // ── CelCompiledPredicate — internal constructor and stub Evaluate ─────────
+    // ── CelCompiledPredicate — internal constructor and evaluator-backed Evaluate ─────────
 
     [Test]
     public void CelCompiledPredicate_InternalConstructor_SetsAllProperties()
@@ -79,7 +79,7 @@ public sealed class CelInternalApiCoverageTests
     }
 
     [Test]
-    public void CelCompiledPredicate_Evaluate_ThrowsNotImplementedException()
+    public void CelCompiledPredicate_Evaluate_ReturnsSuccessfulResult()
     {
         var schema = BuildSimpleSchema();
         var handle = schema.Variables[0];
@@ -89,13 +89,14 @@ public sealed class CelInternalApiCoverageTests
         var pred = new CelCompiledPredicate(
             CelProfile.V1, schema, BuildKey("x"), CelCompilationLimits.SafeDefaults, CelEvaluationLimits.SafeDefaults, BuildBoundExpression());
 
-        Assert.That(
-            () => pred.Evaluate(ctx, CelEvaluationLimits.SafeDefaults),
-            Throws.TypeOf<NotImplementedException>());
+        var result = pred.Evaluate(ctx, CelEvaluationLimits.SafeDefaults);
+
+        Assert.That(result.IsSuccess, Is.True);
+        Assert.That(result.AsBool(), Is.True);
     }
 
     [Test]
-    public void CelCompiledPredicate_Evaluate_SafeDefaultOverload_ThrowsNotImplementedException()
+    public void CelCompiledPredicate_Evaluate_SafeDefaultOverload_DelegatesToCapturedCeiling()
     {
         var schema = BuildSimpleSchema();
         var handle = schema.Variables[0];
@@ -105,9 +106,10 @@ public sealed class CelInternalApiCoverageTests
         var pred = new CelCompiledPredicate(
             CelProfile.V1, schema, BuildKey("x"), CelCompilationLimits.SafeDefaults, CelEvaluationLimits.SafeDefaults, BuildBoundExpression());
 
-        Assert.That(
-            () => pred.Evaluate(ctx),
-            Throws.TypeOf<NotImplementedException>(),
+        var result = pred.Evaluate(ctx);
+
+        Assert.That(result.IsSuccess, Is.True);
+        Assert.That(result.AsBool(), Is.True,
             "The safe-default Evaluate(context) overload must delegate to Evaluate(context, limits).");
     }
 
@@ -143,9 +145,10 @@ public sealed class CelInternalApiCoverageTests
             CelProfile.V1, schema, BuildKey("x"), CelCompilationLimits.SafeDefaults, ceiling, BuildBoundExpression());
 
         Assert.That(pred.EvaluationLimits, Is.SameAs(ceiling));
-        // Default overload uses the captured ceiling, never the global SafeDefaults, so it must
-        // pass the ceiling check and reach the not-yet-implemented evaluator stub.
-        Assert.That(() => pred.Evaluate(ctx), Throws.TypeOf<NotImplementedException>());
+        var result = pred.Evaluate(ctx);
+
+        Assert.That(result.IsSuccess, Is.True);
+        Assert.That(result.AsBool(), Is.True);
     }
 
     [Test]
@@ -160,10 +163,13 @@ public sealed class CelInternalApiCoverageTests
             CelProfile.V1, schema, BuildKey("x"), CelCompilationLimits.SafeDefaults, CelEvaluationLimits.SafeDefaults, BuildBoundExpression());
 
         var tighter = new CelEvaluationLimits(maxIterations: 1, maxCostUnits: 1);
-        Assert.That(() => pred.Evaluate(ctx, tighter), Throws.TypeOf<NotImplementedException>());
+        var result = pred.Evaluate(ctx, tighter);
+
+        Assert.That(result.IsSuccess, Is.True);
+        Assert.That(result.AsBool(), Is.True);
     }
 
-    // ── CelCompiledExpression — internal constructor and stub Evaluate ────────
+    // ── CelCompiledExpression — internal constructor and evaluator-backed Evaluate ────────
 
     [Test]
     public void CelCompiledExpression_InternalConstructor_SetsAllProperties()
@@ -179,7 +185,7 @@ public sealed class CelInternalApiCoverageTests
     }
 
     [Test]
-    public void CelCompiledExpression_Evaluate_ThrowsNotImplementedException()
+    public void CelCompiledExpression_Evaluate_ReturnsSuccessfulResult()
     {
         var schema = BuildSimpleSchema();
         var handle = schema.Variables[0];
@@ -189,13 +195,15 @@ public sealed class CelInternalApiCoverageTests
         var expr = new CelCompiledExpression(
             CelProfile.V1, schema, BuildKey("x"), CelCompilationLimits.SafeDefaults, CelEvaluationLimits.SafeDefaults, BuildBoundExpression());
 
-        Assert.That(
-            () => expr.Evaluate(ctx, CelEvaluationLimits.SafeDefaults),
-            Throws.TypeOf<NotImplementedException>());
+        var result = expr.Evaluate(ctx, CelEvaluationLimits.SafeDefaults);
+
+        Assert.That(result.IsSuccess, Is.True);
+        Assert.That(result.Value, Is.Not.Null);
+        Assert.That(result.Value!.AsBool(), Is.True);
     }
 
     [Test]
-    public void CelCompiledExpression_Evaluate_SafeDefaultOverload_ThrowsNotImplementedException()
+    public void CelCompiledExpression_Evaluate_SafeDefaultOverload_DelegatesToCapturedCeiling()
     {
         var schema = BuildSimpleSchema();
         var handle = schema.Variables[0];
@@ -205,9 +213,11 @@ public sealed class CelInternalApiCoverageTests
         var expr = new CelCompiledExpression(
             CelProfile.V1, schema, BuildKey("x"), CelCompilationLimits.SafeDefaults, CelEvaluationLimits.SafeDefaults, BuildBoundExpression());
 
-        Assert.That(
-            () => expr.Evaluate(ctx),
-            Throws.TypeOf<NotImplementedException>(),
+        var result = expr.Evaluate(ctx);
+
+        Assert.That(result.IsSuccess, Is.True);
+        Assert.That(result.Value, Is.Not.Null);
+        Assert.That(result.Value!.AsBool(), Is.True,
             "The safe-default Evaluate(context) overload must delegate to Evaluate(context, limits).");
     }
 
