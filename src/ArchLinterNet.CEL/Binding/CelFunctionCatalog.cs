@@ -11,13 +11,13 @@ internal static class CelFunctionCatalog
 {
     private static readonly IReadOnlyList<CelFunctionOverload> _overloads =
     [
-        new CelFunctionOverload("startsWith", CelTypeKind.String, [CelTypeKind.String], CelType.Bool),
-        new CelFunctionOverload("endsWith", CelTypeKind.String, [CelTypeKind.String], CelType.Bool),
-        new CelFunctionOverload("contains", CelTypeKind.String, [CelTypeKind.String], CelType.Bool),
-        new CelFunctionOverload("size", CelTypeKind.String, [], CelType.Int),
-        new CelFunctionOverload("size", CelTypeKind.List, [], CelType.Int),
-        new CelFunctionOverload("size", CelTypeKind.Map, [], CelType.Int),
-        new CelFunctionOverload("containsKey", CelTypeKind.Map, [CelTypeKind.String], CelType.Bool),
+        new CelFunctionOverload("startsWith", CelTypeKind.String, [CelTypeKind.String], CelType.Bool, CelFunctionOperationId.StartsWith),
+        new CelFunctionOverload("endsWith", CelTypeKind.String, [CelTypeKind.String], CelType.Bool, CelFunctionOperationId.EndsWith),
+        new CelFunctionOverload("contains", CelTypeKind.String, [CelTypeKind.String], CelType.Bool, CelFunctionOperationId.Contains),
+        new CelFunctionOverload("size", CelTypeKind.String, [], CelType.Int, CelFunctionOperationId.SizeString),
+        new CelFunctionOverload("size", CelTypeKind.List, [], CelType.Int, CelFunctionOperationId.SizeList),
+        new CelFunctionOverload("size", CelTypeKind.Map, [], CelType.Int, CelFunctionOperationId.SizeMap),
+        new CelFunctionOverload("containsKey", CelTypeKind.Map, [CelTypeKind.String], CelType.Bool, CelFunctionOperationId.ContainsKey),
     ];
 
     /// <summary>
@@ -31,4 +31,10 @@ internal static class CelFunctionCatalog
     /// <summary>Returns every catalog overload declared for <paramref name="functionName"/>.</summary>
     public static IEnumerable<CelFunctionOverload> OverloadsFor(string functionName) =>
         _overloads.Where(o => string.Equals(o.FunctionName, functionName, StringComparison.Ordinal));
+
+    /// <summary>
+    /// Gets the complete, closed set of every overload declared by Profile v1 — suitable for a
+    /// conformance/security test asserting the catalog is exactly these overloads and no more.
+    /// </summary>
+    public static IReadOnlyList<CelFunctionOverload> All => _overloads;
 }
