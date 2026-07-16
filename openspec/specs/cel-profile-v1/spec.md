@@ -184,7 +184,7 @@ Notes fixing ambiguity for #326:
 
 - `contains` is a **string-only** receiver function in v1 (substring test). List membership is expressed with the `in` operator, not a `contains` overload; a `contains` call on a `List`/`Map`/`Object` receiver is a compile-time `TypeMismatch`.
 - `size()` is supported on exactly `String`, `List`, and `Map` receivers. `size()` on `Bool`, `Int`, `Float`, or `Object` is a compile-time `TypeMismatch`. There is no free-function `size(x)` form in v1 — only receiver call syntax `x.size()`.
-- `String.size()` counts **Unicode code points**, matching the pinned CEL Language Definition's model of a string as a sequence of code points — NOT .NET's `string.Length` (UTF-16 code units). A character outside the Basic Multilingual Plane (e.g. `"😀"`, one code point encoded as a surrogate pair) has `size() == 1`, not 2. Combining sequences are NOT collapsed: `"e" + U+0301` (combining acute) is two code points, so `size() == 2` — code points, not grapheme clusters. The evaluator (#327) SHALL count Unicode scalar values (e.g. via `System.Text.Rune` enumeration), never `string.Length`.
+- `String.size()` counts **Unicode code points**, matching the pinned CEL Language Definition's model of a string as a sequence of code points — NOT .NET's `string.Length` (UTF-16 code units). A character outside the Basic Multilingual Plane (e.g. `"😀"`, one code point encoded as a surrogate pair) has `size() == 1`, not 2. Combining sequences are NOT collapsed: `"e" + U+0301` (combining acute) is two code points, so `size() == 2` — code points, not grapheme clusters. The built-in function invoker (#327) SHALL count Unicode scalar values (e.g. via `System.Text.Rune` enumeration), never `string.Length`.
 - Malformed UTF-16 cannot reach `size()`: `CelValue.String()` rejects .NET strings containing unpaired surrogates at construction with `ArgumentException` (programmer misuse), because such strings do not represent a valid sequence of Unicode code points and therefore cannot be CEL string values.
 - `containsKey` is a **map-only** receiver function; keys are `String` (v1 maps are string-keyed). Calling it on any other receiver is a compile-time `TypeMismatch`. Its evaluation-time behavior on a missing key (returns `false`, never fails) is defined in the logical-operator/error-semantics requirement.
 - Calling an unknown function name is a compile-time `BindingError`; all mismatches in this table are compile-time diagnostics — no function-dispatch error can survive to evaluation time.
@@ -356,7 +356,7 @@ The `matches` function and all regex, timestamp, duration, protobuf, byte/string
 
 ### Requirement: Structured diagnostics with stable codes and source spans
 
-`CelDiagnostic` SHALL carry: `Code` (`CelDiagnosticCode` enum), `Category` (string), `Severity` (`CelDiagnosticSeverity` enum), `Span` (`CelSourceSpan` — nullable for non-source-locatable diagnostics), `Message` (display-only, not the machine contract), and `Parameters` (a frozen `IReadOnlyDictionary<string, string>` of structured, machine-readable values keyed by stable parameter names — e.g. `expectedType`, `actualType`, `identifier`, `limitName`, `observedValue` — empty when a diagnostic carries none). Machine consumers SHALL read `Code` and `Parameters`, never parse `Message`. `CelDiagnosticCode` SHALL distinguish at minimum: `SyntaxError`, `UnsupportedFeature`, `BindingError`, `TypeMismatch`, `SchemaMismatch`, `BudgetExceeded`, `EvaluationFailure`, `NotYetImplemented`. Display messages SHALL NOT be treated as machine-readable identifiers. The parser/binder/evaluator (#325–#327) SHALL populate `Parameters` for `TypeMismatch` (expected/actual type), `BindingError` (identifier), `SchemaMismatch` (identifier), and `BudgetExceeded` (limit name, observed value) diagnostics.
+`CelDiagnostic` SHALL carry: `Code` (`CelDiagnosticCode` enum), `Category` (string), `Severity` (`CelDiagnosticSeverity` enum), `Span` (`CelSourceSpan` — nullable for non-source-locatable diagnostics), `Message` (display-only, not the machine contract), and `Parameters` (a frozen `IReadOnlyDictionary<string, string>` of structured, machine-readable values keyed by stable parameter names — e.g. `expectedType`, `actualType`, `identifier`, `limitName`, `observedValue` — empty when a diagnostic carries none). Machine consumers SHALL read `Code` and `Parameters`, never parse `Message`. `CelDiagnosticCode` SHALL distinguish at minimum: `SyntaxError`, `UnsupportedFeature`, `BindingError`, `TypeMismatch`, `SchemaMismatch`, `BudgetExceeded`, `EvaluationFailure`, `NotYetImplemented`. Display messages SHALL NOT be treated as machine-readable identifiers. The parser/binder/evaluator (#325, #326, #328) SHALL populate `Parameters` for `TypeMismatch` (expected/actual type), `BindingError` (identifier), `SchemaMismatch` (identifier), and `BudgetExceeded` (limit name, observed value) diagnostics.
 
 #### Scenario: Compilation diagnostics carry stable codes
 
@@ -383,7 +383,7 @@ The evaluation-limits enforcement model is: `CelCompiledPredicate` and `CelCompi
 
 The complete compilation-time budget surface that #325 (tokenizer/parser) and #326 (binder/checker) SHALL enforce comprises, at minimum: maximum expression source length in UTF-16 characters (`MaxExpressionLength`, already present); maximum token count produced by the tokenizer (`MaxTokenCount`); maximum AST node count produced by parsing (`MaxAstNodeCount`); maximum sub-expression nesting depth (`MaxNestingDepth`, already present); maximum literal size — the longest string/collection literal accepted in source (`MaxLiteralSize`); maximum distinct identifier references (`MaxIdentifierCount`, already present). Each of these limits SHALL be a positive-only field on `CelCompilationLimits`, SHALL be included as a named component of `CelCompilationLimits.ComputeIdentity()`, and a source exceeding any one of them SHALL produce a `BudgetExceeded` diagnostic before further processing of that phase. `MaxExpressionLength` remains the cheapest, first-checked gate (rejecting oversized source before tokenization even begins); the token/AST/literal limits are checked as each corresponding phase runs. Fields for limits not yet enforced by a landed phase (#325/#326 pending) SHALL still exist on `CelCompilationLimits` so the API shape does not change once those phases ship — an unenforced field SHALL be documented as "reserved, not yet enforced" in its XML doc until the enforcing phase lands.
 
-The complete evaluation-time budget surface that #327 (evaluator) SHALL enforce comprises, at minimum: maximum evaluation steps (`MaxIterations`, already present); maximum accumulated abstract cost units (`MaxCostUnits`, already present); maximum input-value structural depth accepted by `CelEvaluationContextBuilder.Set()` (already enforced pre-evaluator via `MaxValidationDepth`, an internal constant — not yet a public per-environment field); maximum input collection size (element/entry count) accepted by `Set()` for `List`/`Map`/`Object` values (already enforced pre-evaluator via `MaxValidationCollectionSize`, an internal constant — not yet a public per-environment field); maximum cumulative input-value node count visited across one `Set()` call's recursive structural traversal (already enforced pre-evaluator via `MaxValidationNodeCount`, an internal constant — not yet a public per-environment field). The per-collection cap alone does not bound total validation work: a shallow structure such as a 1024-element list of 1024-element lists keeps every individual collection within `MaxValidationCollectionSize` while still visiting over one million value nodes, so `MaxValidationNodeCount` is a single counter shared across the entire recursive traversal of one `Set()` call, and validation stops immediately once it is exceeded. Exceeding any evaluation-time limit SHALL produce a failed `CelEvaluationResult` with a `BudgetExceeded` diagnostic, not a CLR exception, except where the limit is enforced synchronously inside `Set()` (structural depth, collection size, cumulative node count) — those SHALL continue to be reported as `ArgumentException` per the "Immutable context schema and schema-bound activation" requirement, since `Set()` is a builder-time programmer-facing call, not an evaluation call. Like `MaxValidationDepth` and `MaxValidationCollectionSize`, `MaxValidationNodeCount` is deliberately an immutable Profile v1 constant rather than a `CelEvaluationLimits` field in v1; if a future profile version makes it caller-configurable, it SHALL move onto `CelEvaluationLimits` and become a named component of `CelEvaluationLimits.ComputeIdentity()` / `CelCompilationKey.EvaluationLimitsIdentity`.
+The complete evaluation-time budget surface that #328 (evaluator) SHALL enforce comprises, at minimum: maximum evaluation steps (`MaxIterations`, already present); maximum accumulated abstract cost units (`MaxCostUnits`, already present); maximum input-value structural depth accepted by `CelEvaluationContextBuilder.Set()` (already enforced pre-evaluator via `MaxValidationDepth`, an internal constant — not yet a public per-environment field); maximum input collection size (element/entry count) accepted by `Set()` for `List`/`Map`/`Object` values (already enforced pre-evaluator via `MaxValidationCollectionSize`, an internal constant — not yet a public per-environment field); maximum cumulative input-value node count visited across one `Set()` call's recursive structural traversal (already enforced pre-evaluator via `MaxValidationNodeCount`, an internal constant — not yet a public per-environment field). The per-collection cap alone does not bound total validation work: a shallow structure such as a 1024-element list of 1024-element lists keeps every individual collection within `MaxValidationCollectionSize` while still visiting over one million value nodes, so `MaxValidationNodeCount` is a single counter shared across the entire recursive traversal of one `Set()` call, and validation stops immediately once it is exceeded. Exceeding any evaluation-time limit SHALL produce a failed `CelEvaluationResult` with a `BudgetExceeded` diagnostic, not a CLR exception, except where the limit is enforced synchronously inside `Set()` (structural depth, collection size, cumulative node count) — those SHALL continue to be reported as `ArgumentException` per the "Immutable context schema and schema-bound activation" requirement, since `Set()` is a builder-time programmer-facing call, not an evaluation call. Like `MaxValidationDepth` and `MaxValidationCollectionSize`, `MaxValidationNodeCount` is deliberately an immutable Profile v1 constant rather than a `CelEvaluationLimits` field in v1; if a future profile version makes it caller-configurable, it SHALL move onto `CelEvaluationLimits` and become a named component of `CelEvaluationLimits.ComputeIdentity()` / `CelCompilationKey.EvaluationLimitsIdentity`.
 
 #### Scenario: SafeDefaults factories are accessible
 
@@ -1055,7 +1055,7 @@ already fixed elsewhere in this spec:
   member, and no public API SHALL allow constructing, inspecting, or serializing it.
 - `CelCompiledPredicate` and `CelCompiledExpression` SHALL hold the bound-expression tree internally
   once binding succeeds, in addition to the properties this spec already fixes for them. Their
-  `Evaluate` methods SHALL continue to throw `NotImplementedException` until the evaluator (#327)
+  `Evaluate` methods SHALL continue to throw `NotImplementedException` until the evaluator (#328)
   lands — binding success alone SHALL NOT enable evaluation.
 - Every diagnostic produced by the binder SHALL use diagnostic category `"binder"` and SHALL carry
   `profileId` in `Parameters`, consistent with this spec's blanket diagnostic requirement.
@@ -1174,5 +1174,166 @@ already fixed elsewhere in this spec:
 
 - **WHEN** a `CelCompiledPredicate` or `CelCompiledExpression` is obtained from a successful
   compilation
+- **THEN** calling `Evaluate` still throws `NotImplementedException`
+
+### Requirement: Built-in function execution implementation scope for Profile v1
+
+`ArchLinterNet.CEL`'s built-in function execution (internal `ArchLinterNet.CEL.Binding` namespace) SHALL implement exactly the following implementation scope, in addition to the built-in function
+table, receiver/argument/result types, and Unicode code-point counting contract already fixed
+elsewhere in this spec:
+
+- Each of the seven catalog overloads fixed by the built-in-function-table requirement (`startsWith`,
+  `endsWith`, `contains`, `size` on `String`/`List`/`Map`, `containsKey`) SHALL be identified by a
+  stable internal `CelFunctionOperationId` enum member, carried on the overload's
+  `CelFunctionOverload` declaration (`OperationId`). Execution SHALL be looked up by this operation
+  identifier, never by re-parsing the function name string or receiver kind a second time — the
+  binder's already-resolved `CelBoundCall.Overload` carries everything execution needs.
+- A single internal, static, stateless `CelBuiltinFunctionInvoker.Invoke(CelFunctionOperationId,
+  CelValue? receiver, IReadOnlyList<CelValue> arguments) -> CelValue` SHALL provide one pure,
+  side-effect-free implementation per operation identifier. It SHALL NOT read or write any static
+  mutable state, perform CLR reflection, or accept a caller-supplied delegate.
+- All seven catalog overloads SHALL be total given a receiver/argument shape the binder has already
+  proven correct: none SHALL have a runtime failure case. `Invoke` therefore SHALL return `CelValue`
+  directly with no failure/diagnostic channel — a future evaluator (#328) is responsible for wrapping
+  a successful `Invoke` call in whatever result shape its evaluation step uses.
+- `startsWith`, `endsWith`, and `contains` SHALL compare strings using ordinal (UTF-16 code-unit
+  sequence) comparison — Profile v1 defines no locale/culture concept, consistent with this spec's
+  existing rejection of implicit numeric widening and its requirement of exact structural equality
+  for `==`.
+- `String.size()` SHALL count Unicode code points via `System.Text.Rune` enumeration over the
+  receiver string, never `string.Length` (UTF-16 code units) — matching this spec's existing
+  surrogate-pair and combining-sequence `size()` scenarios. Because `CelValue.String()` already
+  rejects malformed UTF-16 at construction, every string `Invoke` receives is guaranteed
+  well-formed and safe to enumerate as `Rune`s.
+- `List.size()` and `Map.size()` SHALL return the receiver's element/entry count.
+- `containsKey` SHALL return `CelValue.Bool(false)` for a key absent from the receiver map — it
+  SHALL NOT throw or otherwise signal failure for a missing key, matching this spec's existing
+  logical-operator/error-semantics requirement for `containsKey`'s evaluation-time behavior.
+- `CelFunctionCatalog` SHALL expose its complete overload set as an enumerable collection suitable
+  for a conformance/security test asserting the catalog is exactly these seven overloads and no
+  more.
+- Alongside `Invoke`, a single internal, static, stateless
+  `CelBuiltinFunctionInvoker.ComputeCost(CelFunctionOperationId, CelValue? receiver,
+  IReadOnlyList<CelValue> arguments) -> long` SHALL provide one cost-model implementation per
+  operation identifier, so a future evaluator (#328) charges each built-in call's true,
+  input-size-proportional cost against `CelEvaluationLimits.MaxCostUnits` instead of treating every
+  built-in call as a fixed unit cost or duplicating a second per-function switch of its own.
+  `ComputeCost` SHALL NOT underestimate an operation's actual work — this is the property that makes
+  `MaxCostUnits` a real budget rather than a decoration — so its model differs per operation's actual
+  execution mechanism rather than using one uniform formula: `startsWith`/`endsWith` compare exactly
+  one aligned prefix/suffix window (a single memory comparison, never re-scanned from a different
+  offset) and `size` on `String` is one linear `Rune` pass, so each costs a fixed floor of `1` plus
+  the UTF-16 length of the string operand scanned (the argument for `startsWith`/`endsWith`, the
+  receiver for `size`). `contains` is the exception: it delegates to a candidate-position substring
+  search whose real-world cost on an adversarial receiver (e.g. a long repeating near-match prefix)
+  approaches the *product* of both operand lengths, not their sum, so `ComputeCost` for `contains`
+  SHALL be the fixed floor plus the product of the receiver string's and argument string's UTF-16
+  lengths — a conservative worst-case estimate, deliberately not each operation's exact algorithmic
+  complexity, but never an underestimate. `size` on `List`/`Map` SHALL cost only the fixed floor,
+  since both are backed by an O(1) count field. `containsKey` is NOT O(1) despite being a dictionary
+  lookup: hashing the key requires a linear pass over its content, and each of up to entry-count
+  hash-collision comparisons is itself a `string.Equals` call that can scan the full key length
+  (a near-match colliding key fails late, not on its first character) — a cost of `keyLength +
+  entryCount` (comparison count only, ignoring each comparison's own length) would still
+  underestimate an adversarial map's real work by orders of magnitude, since `entryCount`
+  near-match comparisons at up to `keyLength` each is `keyLength * entryCount` work, not
+  `keyLength + entryCount`. Because `CelEvaluationContextBuilder.Set()` bounds map/list entry count
+  but not individual string length, this is a real, exploitable gap, not a theoretical one.
+  `ComputeCost` for `containsKey` SHALL therefore be the fixed floor plus the key argument's UTF-16
+  length multiplied by `(the receiver map's entry count + 1)` — the `+1` covers the initial
+  hash-computation pass over the key itself, and the multiplication by entry count is the
+  conservative worst-case bound on collision-chain comparisons, each assumed to cost a full
+  key-length scan.
+- This change SHALL NOT add, wire, or modify any `CelBoundNode` tree evaluation, `&&`/`||`
+  short-circuit/error-absorption behavior, or map/list index runtime-failure handling — those
+  remain the bounded evaluator's scope (#328). `CelCompiledPredicate.Evaluate` and
+  `CelCompiledExpression.Evaluate` SHALL continue to throw `NotImplementedException` after this
+  change ships, exactly as after the binder (#326).
+
+#### Scenario: startsWith/endsWith/contains use ordinal string comparison
+
+- **WHEN** `CelBuiltinFunctionInvoker.Invoke` is called for `StartsWith`/`EndsWith`/`Contains` with
+  string operands that would compare differently under a culture-sensitive comparison than under
+  ordinal comparison
+- **THEN** the result matches ordinal (UTF-16 code-unit sequence) comparison semantics
+
+#### Scenario: size() on a BMP string counts code points via Rune enumeration
+
+- **WHEN** `CelBuiltinFunctionInvoker.Invoke` is called for `SizeString` with receiver
+  `CelValue.String("abc")`
+- **THEN** the result is `CelValue.Int(3)`
+
+#### Scenario: size() on a surrogate-pair character counts one code point
+
+- **WHEN** `CelBuiltinFunctionInvoker.Invoke` is called for `SizeString` with receiver
+  `CelValue.String("😀")` (one code point, two UTF-16 code units)
+- **THEN** the result is `CelValue.Int(1)`, not `CelValue.Int(2)`
+
+#### Scenario: size() on a combining sequence counts separate code points
+
+- **WHEN** `CelBuiltinFunctionInvoker.Invoke` is called for `SizeString` with receiver
+  `CelValue.String("é")` (LATIN SMALL LETTER E followed by COMBINING ACUTE ACCENT)
+- **THEN** the result is `CelValue.Int(2)`
+
+#### Scenario: containsKey on a missing key returns false without failing
+
+- **WHEN** `CelBuiltinFunctionInvoker.Invoke` is called for `ContainsKey` with a map receiver that
+  does not contain the supplied key argument
+- **THEN** the result is `CelValue.Bool(false)`
+- **AND** no exception is thrown
+
+#### Scenario: Every catalog overload carries a stable operation identifier
+
+- **WHEN** `CelFunctionCatalog.All` is enumerated
+- **THEN** it contains exactly seven overloads
+- **AND** each overload's `OperationId` uniquely identifies it
+
+#### Scenario: ComputeCost scales linearly for single-pass string operations
+
+- **WHEN** `CelBuiltinFunctionInvoker.ComputeCost` is called for `StartsWith`, `EndsWith`, or
+  `SizeString` with a large string operand, then again with a small one, all else equal
+- **THEN** the large-operand call returns a strictly greater cost
+
+#### Scenario: ComputeCost for contains is the worst-case product of both operand lengths, not their sum
+
+- **WHEN** `CelBuiltinFunctionInvoker.ComputeCost` is called for `Contains` with a receiver of
+  length `n` and an argument of length `m`
+- **THEN** the returned cost equals `1 + n * m`
+- **AND** for a receiver built from a long repeating near-match prefix (the classic naive-substring-
+  search worst case), that cost is at least an order of magnitude greater than `1 + n + m` would
+  have been
+
+#### Scenario: ComputeCost is constant for O(1) operations
+
+- **WHEN** `CelBuiltinFunctionInvoker.ComputeCost` is called for `SizeList` or `SizeMap` with a small
+  collection, then again with a large collection, all else equal
+- **THEN** both calls return the same cost (the fixed floor)
+
+#### Scenario: ComputeCost for containsKey scales with key length and map entry count
+
+- **WHEN** `CelBuiltinFunctionInvoker.ComputeCost` is called for `ContainsKey` with a long key
+  argument, then again with a short key argument, the receiver map held constant
+- **THEN** the long-key call returns a strictly greater cost
+- **AND** when instead the receiver map's entry count is varied with the key argument held
+  constant, the larger map returns a strictly greater cost
+
+#### Scenario: ComputeCost for containsKey is multiplicative in key length and entry count, not additive
+
+- **WHEN** `CelBuiltinFunctionInvoker.ComputeCost` is called for `ContainsKey` with a key of length
+  `k` against a receiver map with `n` entries
+- **THEN** the returned cost equals `1 + k * (n + 1)`
+- **AND** for a sufficiently long key and sufficiently large map, that cost is at least an order of
+  magnitude greater than `1 + k + n` would have been
+
+#### Scenario: Invoke never throws for a binder-guaranteed-correct call shape
+
+- **WHEN** `CelBuiltinFunctionInvoker.Invoke` is called with a receiver/argument shape matching one
+  of the seven catalog overloads exactly
+- **THEN** it returns a `CelValue` and never throws
+
+#### Scenario: Evaluate remains unimplemented after this change
+
+- **WHEN** a `CelCompiledPredicate` or `CelCompiledExpression` is obtained from a successful
+  compilation after this change ships
 - **THEN** calling `Evaluate` still throws `NotImplementedException`
 

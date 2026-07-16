@@ -40,7 +40,7 @@ public sealed class CelCompiledExpression
 
     /// <summary>
     /// Gets the internal bound-expression plan produced by the binder. Never exposed publicly;
-    /// consumed only by the evaluator (#327).
+    /// consumed only by the evaluator (#328).
     /// </summary>
     internal CelBoundExpression Bound { get; }
 
@@ -69,7 +69,7 @@ public sealed class CelCompiledExpression
     /// <see cref="EvaluationLimits"/>. Per-call limits may only tighten the captured maximums.
     /// </exception>
     /// <exception cref="NotImplementedException">
-    /// The evaluator is not yet implemented. This will be replaced by the real evaluator in task #327.
+    /// The evaluator is not yet implemented. This will be replaced by the real evaluator in task #328.
     /// </exception>
     public CelEvaluationResult Evaluate(CelEvaluationContext context, CelEvaluationLimits limits)
     {
@@ -81,7 +81,7 @@ public sealed class CelCompiledExpression
                 $"ceiling captured at compile time ({EvaluationLimits.ComputeIdentity()}).",
                 nameof(limits));
         throw new NotImplementedException(
-            $"Evaluator not yet implemented for profile '{Profile.Id}' — see #327.");
+            $"Evaluator not yet implemented for profile '{Profile.Id}' — see #328.");
     }
 
     /// <summary>
@@ -91,7 +91,7 @@ public sealed class CelCompiledExpression
     /// not an unbounded evaluation path.
     /// </summary>
     /// <exception cref="NotImplementedException">
-    /// The evaluator is not yet implemented. This will be replaced by the real evaluator in task #327.
+    /// The evaluator is not yet implemented. This will be replaced by the real evaluator in task #328.
     /// </exception>
     public CelEvaluationResult Evaluate(CelEvaluationContext context) =>
         Evaluate(context, EvaluationLimits);
