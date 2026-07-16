@@ -15,6 +15,7 @@ internal static class CelEvaluator
     public static CelEvaluationResult Evaluate(
         CelBoundExpression boundExpression,
         string expectedSchemaIdentity,
+        string expectedSchemaId,
         CelProfileId profileId,
         CelEvaluationContext context,
         CelEvaluationLimits limits)
@@ -22,6 +23,8 @@ internal static class CelEvaluator
         if (!string.Equals(context.SchemaIdentity, expectedSchemaIdentity, StringComparison.Ordinal))
         {
             return Failure(CelEvaluationDiagnostics.SchemaMismatch(
+                context.Schema.SchemaId,
+                expectedSchemaId,
                 context.SchemaIdentity,
                 expectedSchemaIdentity,
                 profileId));
@@ -66,10 +69,7 @@ internal static class CelEvaluator
             _boundExpression = boundExpression;
             _profileId = profileId;
             _limits = limits;
-            _valuesByName = context.Assignments.ToDictionary(
-                assignment => assignment.Variable.Name,
-                assignment => assignment.Value,
-                StringComparer.Ordinal);
+            _valuesByName = context.ValuesByName;
         }
 
         public CelEvaluationResult Evaluate()
@@ -488,7 +488,11 @@ internal static class CelEvaluator
 
         private EvaluationStep CompareObjects(CelObjectValue left, CelObjectValue right, CelSourceSpan span)
         {
-            if (!string.Equals(left.ObjectTypeId, right.ObjectTypeId, StringComparison.Ordinal))
+            var typeIdComparison = CompareStrings(left.ObjectTypeId, right.ObjectTypeId, span);
+            if (!typeIdComparison.IsSuccess)
+                return typeIdComparison;
+
+            if (!typeIdComparison.Value!.AsBool())
                 return EvaluationStep.Succeeded(CelValue.Bool(false));
 
             return CompareMaps(left.Members, right.Members, span);

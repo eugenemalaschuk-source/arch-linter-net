@@ -17,16 +17,21 @@ The evaluator SHALL enforce both evaluation budgets on every public evaluation p
 
 - one iteration unit per visited bound node against `MaxIterations`;
 - one additional abstract-cost charge per built-in call using
-  `CelBuiltinFunctionInvoker.ComputeCost(...)` against `MaxCostUnits`.
+  `CelBuiltinFunctionInvoker.ComputeCost(...)` against `MaxCostUnits`, plus charges for
+  collection membership, map/object lookup, string comparison (including `ObjectTypeId`), and
+  recursive structural comparison.
 
 Exceeding either budget SHALL produce a failed `CelEvaluationResult` with a `BudgetExceeded`
  diagnostic carrying `limitName`, `observedValue`, and `profileId` parameters. The diagnostic
  SHALL carry the source span of the bound node whose visit or built-in charge exceeded the budget.
 
-Supplying a `CelEvaluationContext` built for a different schema than the compiled program's
- `Schema` SHALL NOT produce a CLR member/indexing exception or a wrong result. Evaluation SHALL
- fail deterministically with a `SchemaMismatch` diagnostic carrying at least `schemaId`,
- `expectedSchemaId`, and `profileId`.
+Supplying a `CelEvaluationContext` built for a different full compilation schema identity than the
+ compiled program's `Schema` (including the object-schema catalog) SHALL NOT produce a CLR
+ member/indexing exception or a wrong result. Evaluation SHALL fail deterministically with a
+ `SchemaMismatch` diagnostic carrying logical `schemaId` and `expectedSchemaId`, structural
+ `schemaIdentity` and `expectedSchemaIdentity`, and `profileId`. The context SHALL build its
+ immutable variable-name lookup once and evaluation SHALL reuse it without rebuilding all
+ assignments per call.
 
 Normal runtime data failures SHALL surface as failed `CelEvaluationResult` values with code
  `EvaluationFailure`, never as uncaught CLR exceptions:

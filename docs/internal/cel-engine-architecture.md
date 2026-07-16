@@ -102,14 +102,15 @@ expression source (string)
   │                 │  Enforces MaxIterations and MaxCostUnits per call.
   │                 │  Uses a deterministic left-to-right traversal while still
   │                 │  producing CEL's observable short-circuit/error semantics
-  │                 │  for && / || (determining operands absorb failures).
+  │                 │  for && / || (determining operands absorb ordinary failures;
+  │                 │  BudgetExceeded is terminal).
   │                 │  Calls CelBuiltinFunctionInvoker.Invoke AND ComputeCost for every
   │                 │  CelBoundCall, using boundCall.Overload.OperationId to select the
   │                 │  operation — charging ComputeCost's result against MaxCostUnits is
   │                 │  what makes the budget real; skipping it silently reintroduces the
   │                 │  fixed-unit-cost gap #327 was written to close. Also charges
   │                 │  non-call runtime work such as list/map membership, map/object
-  │                 │  lookup, string equality, and recursive deep equality so
+  │                 │  lookup, string equality (including ObjectTypeId), and recursive deep equality so
   │                 │  MaxCostUnits tracks real collection work instead of only
   │                 │  built-in invocations. Rejects incompatible evaluation
   │                 │  contexts using the full compilation schema identity
@@ -117,6 +118,8 @@ expression source (string)
   │                 │  SchemaMismatch instead of allowing typed-plan/runtime-data
   │                 │  skew. Reports missing-key / invalid-index runtime failures
   │                 │  as structured CelEvaluationResult diagnostics, never CLR exceptions.
+  │                 │  Contexts precompute their immutable name lookup at Build(), so
+  │                 │  evaluation does not rebuild an activation-sized dictionary per call.
   └────────┬────────┘
            │  typed result or failure diagnostics
            ▼

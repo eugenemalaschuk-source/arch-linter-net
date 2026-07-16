@@ -29,6 +29,12 @@ public sealed class CelEvaluationContext
     /// <summary>Gets the variable assignments in declaration order.</summary>
     public IReadOnlyList<(CelVariable Variable, CelValue Value)> Assignments { get; }
 
+    /// <summary>
+    /// Gets the immutable name lookup created with this context. Evaluation reuses this table so
+    /// activation setup is not repeated for every compiled-program invocation.
+    /// </summary>
+    internal IReadOnlyDictionary<string, CelValue> ValuesByName { get; }
+
     internal CelEvaluationContext(
         CelContextSchema schema,
         string schemaIdentity,
@@ -38,5 +44,9 @@ public sealed class CelEvaluationContext
         SchemaIdentity = schemaIdentity;
         // Copy to a truly frozen list so callers cannot cast Assignments back to List<> and mutate it.
         Assignments = new List<(CelVariable, CelValue)>(assignments).AsReadOnly();
+        ValuesByName = assignments.ToDictionary(
+            assignment => assignment.Item1.Name,
+            assignment => assignment.Item2,
+            StringComparer.Ordinal);
     }
 }

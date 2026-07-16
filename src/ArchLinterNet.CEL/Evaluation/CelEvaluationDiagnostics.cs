@@ -30,6 +30,8 @@ internal static class CelEvaluationDiagnostics
     public static CelDiagnostic SchemaMismatch(
         string schemaId,
         string expectedSchemaId,
+        string schemaIdentity,
+        string expectedSchemaIdentity,
         CelProfileId profileId) =>
         new(
             CelDiagnosticCode.SchemaMismatch,
@@ -41,6 +43,8 @@ internal static class CelEvaluationDiagnostics
             {
                 ["schemaId"] = schemaId,
                 ["expectedSchemaId"] = expectedSchemaId,
+                ["schemaIdentity"] = schemaIdentity,
+                ["expectedSchemaIdentity"] = expectedSchemaIdentity,
                 ["profileId"] = profileId.ToString(),
             });
 

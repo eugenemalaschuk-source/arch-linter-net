@@ -171,8 +171,10 @@ public sealed class CelEvaluatorTests
 
         Assert.That(result.IsSuccess, Is.False);
         Assert.That(result.Diagnostics[0].Code, Is.EqualTo(CelDiagnosticCode.SchemaMismatch));
-        Assert.That(result.Diagnostics[0].Parameters, Contains.Key("schemaId"));
-        Assert.That(result.Diagnostics[0].Parameters, Contains.Key("expectedSchemaId"));
+        Assert.That(result.Diagnostics[0].Parameters["schemaId"], Is.EqualTo("other-schema"));
+        Assert.That(result.Diagnostics[0].Parameters["expectedSchemaId"], Is.EqualTo("eval-schema"));
+        Assert.That(result.Diagnostics[0].Parameters, Contains.Key("schemaIdentity"));
+        Assert.That(result.Diagnostics[0].Parameters, Contains.Key("expectedSchemaIdentity"));
     }
 
     [Test]
@@ -221,9 +223,72 @@ public sealed class CelEvaluatorTests
         {
             Assert.That(result.IsSuccess, Is.False);
             Assert.That(result.Diagnostics[0].Code, Is.EqualTo(CelDiagnosticCode.SchemaMismatch));
-            Assert.That(result.Diagnostics[0].Parameters["expectedSchemaId"], Is.EqualTo(compilation.Program.CompilationKey.SchemaIdentity));
-            Assert.That(result.Diagnostics[0].Parameters["schemaId"], Is.Not.EqualTo(compilation.Program.CompilationKey.SchemaIdentity));
+            Assert.That(result.Diagnostics[0].Parameters["schemaId"], Is.EqualTo("shared-schema"));
+            Assert.That(result.Diagnostics[0].Parameters["expectedSchemaId"], Is.EqualTo("shared-schema"));
+            Assert.That(result.Diagnostics[0].Parameters["schemaIdentity"], Is.Not.EqualTo(compilation.Program.CompilationKey.SchemaIdentity));
+            Assert.That(result.Diagnostics[0].Parameters["expectedSchemaIdentity"], Is.EqualTo(compilation.Program.CompilationKey.SchemaIdentity));
         });
+    }
+
+    [Test]
+    public void ObjectEquality_ChargesComparisonOfLongObjectTypeIds()
+    {
+        var typeId = new string('w', 4_096);
+        var independentlyAllocatedTypeId = new string(typeId.ToCharArray());
+        var schemaBuilder = CelContextSchema.CreateBuilder("long-object-id-schema");
+        schemaBuilder.AddVariable("left", CelType.ObjectOf(typeId));
+        schemaBuilder.AddVariable("right", CelType.ObjectOf(typeId));
+
+        var objectSchema = CelObjectSchema.CreateBuilder(typeId).Build();
+        var env = CelEnvironment.CreateBuilder(CelProfile.V1)
+            .WithContextSchema(schemaBuilder.Build())
+            .WithObjectSchema(objectSchema)
+            .WithEvaluationLimits(CelEvaluationLimits.SafeDefaults)
+            .Build();
+        var compilation = env.CompilePredicate("left == right");
+        Assert.That(compilation.IsSuccess, Is.True);
+
+        var context = env.CreateEvaluationContextBuilder()
+            .Set("left", CelValue.Object(new CelObjectValue(typeId, new Dictionary<string, CelValue>())))
+            .Set("right", CelValue.Object(new CelObjectValue(independentlyAllocatedTypeId, new Dictionary<string, CelValue>())))
+            .Build();
+
+        var result = compilation.Program!.Evaluate(
+            context,
+            new CelEvaluationLimits(maxIterations: 10, maxCostUnits: 100));
+
+        Assert.That(result.IsSuccess, Is.False);
+        Assert.That(result.Diagnostics[0].Code, Is.EqualTo(CelDiagnosticCode.BudgetExceeded));
+        Assert.That(result.Diagnostics[0].Parameters["limitName"], Is.EqualTo("MaxCostUnits"));
+    }
+
+    [Test]
+    public void Evaluate_WithManyUnusedAssignments_UsesTheContextLookupWithinTheEvaluationBudget()
+    {
+        var schemaBuilder = CelContextSchema.CreateBuilder("large-context-schema");
+        schemaBuilder.AddVariable("x", CelType.Bool);
+        for (var i = 0; i < 2_000; i++)
+            schemaBuilder.AddVariable($"unused{i}", CelType.Bool);
+
+        var schema = schemaBuilder.Build();
+        var env = CelEnvironment.CreateBuilder(CelProfile.V1)
+            .WithContextSchema(schema)
+            .WithEvaluationLimits(CelEvaluationLimits.SafeDefaults)
+            .Build();
+        var contextBuilder = env.CreateEvaluationContextBuilder().Set("x", CelValue.Bool(true));
+        for (var i = 0; i < 2_000; i++)
+            contextBuilder.Set($"unused{i}", CelValue.Bool(false));
+
+        var compilation = env.CompilePredicate("x");
+        Assert.That(compilation.IsSuccess, Is.True);
+
+        var context = contextBuilder.Build();
+        var result = compilation.Program!.Evaluate(
+            context,
+            new CelEvaluationLimits(maxIterations: 1, maxCostUnits: 1));
+
+        Assert.That(result.IsSuccess, Is.True);
+        Assert.That(result.AsBool(), Is.True);
     }
 
     [Test]
