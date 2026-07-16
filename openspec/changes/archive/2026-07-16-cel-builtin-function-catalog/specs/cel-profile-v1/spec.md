@@ -36,6 +36,17 @@ elsewhere in this spec:
 - `CelFunctionCatalog` SHALL expose its complete overload set as an enumerable collection suitable
   for a conformance/security test asserting the catalog is exactly these seven overloads and no
   more.
+- Alongside `Invoke`, a single internal, static, stateless
+  `CelBuiltinFunctionInvoker.ComputeCost(CelFunctionOperationId, CelValue? receiver,
+  IReadOnlyList<CelValue> arguments) -> long` SHALL provide one cost-model implementation per
+  operation identifier, so a future evaluator (#328) charges each built-in call's true,
+  input-size-proportional cost against `CelEvaluationLimits.MaxCostUnits` instead of treating every
+  built-in call as a fixed unit cost or duplicating a second per-function switch of its own.
+  `ComputeCost` SHALL return a fixed floor of `1` plus the UTF-16 length of every string operand the
+  operation scans (`startsWith`/`endsWith`: the argument string; `contains`/`size` on `String`: the
+  receiver string, `contains` additionally the argument string) — a linear approximation, not each
+  operation's exact worst-case algorithmic complexity. `size` on `List`/`Map` and `containsKey`
+  SHALL cost only the fixed floor, since both are backed by an O(1) count field or hash lookup.
 - This change SHALL NOT add, wire, or modify any `CelBoundNode` tree evaluation, `&&`/`||`
   short-circuit/error-absorption behavior, or map/list index runtime-failure handling — those
   remain the bounded evaluator's scope (#328). `CelCompiledPredicate.Evaluate` and
@@ -79,6 +90,18 @@ elsewhere in this spec:
 - **WHEN** `CelFunctionCatalog.All` is enumerated
 - **THEN** it contains exactly seven overloads
 - **AND** each overload's `OperationId` uniquely identifies it
+
+#### Scenario: ComputeCost scales with the size of the string data an operation scans
+
+- **WHEN** `CelBuiltinFunctionInvoker.ComputeCost` is called for `Contains` or `SizeString` with a
+  large receiver string, then again with a small receiver string, all else equal
+- **THEN** the large-receiver call returns a strictly greater cost
+
+#### Scenario: ComputeCost is constant for O(1) operations
+
+- **WHEN** `CelBuiltinFunctionInvoker.ComputeCost` is called for `SizeList`, `SizeMap`, or
+  `ContainsKey` with a small collection, then again with a large collection, all else equal
+- **THEN** both calls return the same cost (the fixed floor)
 
 #### Scenario: Invoke never throws for a binder-guaranteed-correct call shape
 

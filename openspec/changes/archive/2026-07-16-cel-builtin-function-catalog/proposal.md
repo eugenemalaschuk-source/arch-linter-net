@@ -45,18 +45,35 @@ result computable in isolation, tested directly against `CelValue` inputs, ready
   All seven catalog overloads are total given a binder-guaranteed-correct receiver/argument shape —
   none can produce a runtime evaluation failure, so `Invoke` returns `CelValue` directly with no
   diagnostic/failure channel.
+- `CelBuiltinFunctionInvoker` also gains `ComputeCost(CelFunctionOperationId, CelValue? receiver,
+  IReadOnlyList<CelValue> arguments) -> long`, next to `Invoke` with one `case` per operation id, so
+  a future evaluator (#328) charges each call's true, input-size-proportional cost against
+  `CelEvaluationLimits.MaxCostUnits` instead of treating every built-in call as a fixed unit cost (an
+  unbounded-relative-to-input-size gap the initial version of this change left open) or having to
+  build its own second per-operation switch. The model is a linear approximation — a fixed floor plus
+  the length of every string operand an operation scans — not each operation's exact worst-case
+  complexity; `size`/`containsKey` on `List`/`Map` cost only the floor (O(1) count/lookup).
 - `CelFunctionCatalog` gains a public-to-the-namespace `All` enumeration (already-internal type) so
   a security/conformance test can assert the catalog is exactly these seven overloads and no more.
 - New `tests/ArchLinterNet.CEL.Tests/CelBuiltinFunctionInvokerTests.cs` — one positive test per
   overload plus the documented edge cases (empty string/list/map, BMP vs. surrogate-pair vs.
-  combining-sequence `size()`, missing-key `containsKey`, substring/prefix/suffix boundary cases)
-  and a catalog-completeness test.
+  combining-sequence `size()`, missing-key `containsKey`, substring/prefix/suffix boundary cases), a
+  full-fidelity catalog-completeness test (function name, receiver kind, every argument kind in
+  order, result type, AND operation id — strong enough to catch e.g. a `StartsWith`/`EndsWith`
+  `OperationId` swap, which a name/receiver/arity-only comparison would miss), a
+  per-overload round-trip invocation test, and `ComputeCost` coverage (proportional-to-input-size
+  and constant-for-O(1)-operations cases).
 - `docs/internal/cel-engine-architecture.md` updated: the pipeline diagram's "Bounded Evaluator"
   row was written before task numbering settled and currently mislabels #327 as the tree-walking
   evaluator; this change corrects it to describe #327's actual shipped scope (pure per-overload
   implementations keyed by operation id) and adds a "Built-in function execution" component
   ownership row, consistent with the "Function catalog" extension-direction section's existing
   description of the seam.
+- Every remaining stale `#327` reference that meant "the evaluator" under the old task numbering
+  (`CelCompiledPredicate`/`CelCompiledExpression` XML docs and `NotImplementedException` messages;
+  four spots in the main `cel-profile-v1` spec) is corrected to `#328`, and the one spec reference
+  that actually describes *this* change's own shipped behavior (Unicode code-point counting) is
+  reattributed from "the evaluator" to "the built-in function invoker."
 
 ## Capabilities
 
@@ -72,8 +89,10 @@ result computable in isolation, tested directly against `CelValue` inputs, ready
 ## Impact
 
 - **`src/ArchLinterNet.CEL/Binding/`**: new `CelFunctionOperationId.cs`, new
-  `CelBuiltinFunctionInvoker.cs`; `CelFunctionOverload.cs` and `CelFunctionCatalog.cs` gain the
-  `OperationId` field/values.
+  `CelBuiltinFunctionInvoker.cs` (`Invoke` + `ComputeCost`); `CelFunctionOverload.cs` and
+  `CelFunctionCatalog.cs` gain the `OperationId` field/values.
+- **`src/ArchLinterNet.CEL/Compilation/CelCompiledPredicate.cs` and `CelCompiledExpression.cs`**:
+  stale `#327` references (from before task numbering settled) corrected to `#328`.
 - **`tests/ArchLinterNet.CEL.Tests/`**: new `CelBuiltinFunctionInvokerTests.cs`.
 - **`docs/internal/cel-engine-architecture.md`**: pipeline row and component-ownership table
   corrected/extended.

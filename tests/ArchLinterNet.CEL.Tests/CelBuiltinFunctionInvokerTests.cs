@@ -170,6 +170,66 @@ public sealed class CelBuiltinFunctionInvokerTests
         Assert.That(result.AsBool(), Is.False);
     }
 
+    // ── ComputeCost — input-size-proportional cost model ───────────────────
+
+    [Test]
+    public void ComputeCost_StartsWith_IsProportionalToArgumentLength()
+    {
+        var shortCost = CelBuiltinFunctionInvoker.ComputeCost(
+            CelFunctionOperationId.StartsWith, CelValue.String("hello world"), [CelValue.String("h")]);
+        var longCost = CelBuiltinFunctionInvoker.ComputeCost(
+            CelFunctionOperationId.StartsWith, CelValue.String("hello world"), [CelValue.String("hello wo")]);
+
+        Assert.That(longCost, Is.GreaterThan(shortCost));
+    }
+
+    [Test]
+    public void ComputeCost_Contains_IsProportionalToReceiverAndArgumentLength()
+    {
+        var smallReceiverCost = CelBuiltinFunctionInvoker.ComputeCost(
+            CelFunctionOperationId.Contains, CelValue.String("abc"), [CelValue.String("b")]);
+        var largeReceiverCost = CelBuiltinFunctionInvoker.ComputeCost(
+            CelFunctionOperationId.Contains, CelValue.String(new string('a', 1000)), [CelValue.String("b")]);
+
+        Assert.That(largeReceiverCost, Is.GreaterThan(smallReceiverCost));
+    }
+
+    [Test]
+    public void ComputeCost_SizeString_IsProportionalToReceiverLength()
+    {
+        var shortCost = CelBuiltinFunctionInvoker.ComputeCost(CelFunctionOperationId.SizeString, CelValue.String("a"), []);
+        var longCost = CelBuiltinFunctionInvoker.ComputeCost(
+            CelFunctionOperationId.SizeString, CelValue.String(new string('a', 1000)), []);
+
+        Assert.That(longCost, Is.GreaterThan(shortCost));
+    }
+
+    [Test]
+    public void ComputeCost_SizeListSizeMapContainsKey_AreConstant()
+    {
+        var smallList = CelValue.List([CelValue.Int(1)]);
+        var largeList = CelValue.List(Enumerable.Range(0, 500).Select(i => CelValue.Int(i)).ToList());
+
+        var smallCost = CelBuiltinFunctionInvoker.ComputeCost(CelFunctionOperationId.SizeList, smallList, []);
+        var largeCost = CelBuiltinFunctionInvoker.ComputeCost(CelFunctionOperationId.SizeList, largeList, []);
+
+        Assert.That(largeCost, Is.EqualTo(smallCost));
+    }
+
+    [Test]
+    public void ComputeCost_EveryOperation_IsAtLeastOne()
+    {
+        foreach (var overload in CelFunctionCatalog.All)
+        {
+            var receiver = SampleReceiver(overload.ReceiverKind);
+            var arguments = overload.ArgumentKinds.Select(k => SampleReceiver(k)).ToList();
+
+            var cost = CelBuiltinFunctionInvoker.ComputeCost(overload.OperationId, receiver, arguments);
+
+            Assert.That(cost, Is.GreaterThanOrEqualTo(1), $"OperationId={overload.OperationId}");
+        }
+    }
+
     // ── Catalog completeness (conformance/security) ────────────────────────
 
     [Test]
@@ -189,21 +249,30 @@ public sealed class CelBuiltinFunctionInvokerTests
     [Test]
     public void Catalog_MatchesTheDocumentedOverloadSet()
     {
+        // Full-fidelity comparison — function name, receiver kind, every argument kind in order,
+        // result type, AND operation id — so a mistake like swapping StartsWith/EndsWith's
+        // OperationId (which would make the future evaluator execute the wrong function while every
+        // other test here still passes) is caught here.
         var actual = CelFunctionCatalog.All
-            .Select(o => (o.FunctionName, o.ReceiverKind, ArgumentCount: o.ArgumentKinds.Count))
+            .Select(o => (
+                o.FunctionName,
+                o.ReceiverKind,
+                ArgumentKinds: string.Join(",", o.ArgumentKinds),
+                ResultType: o.ResultType.Kind,
+                o.OperationId))
             .OrderBy(t => t.FunctionName, StringComparer.Ordinal)
             .ThenBy(t => t.ReceiverKind)
             .ToList();
 
         var expected = new[]
         {
-            ("contains", (CelTypeKind?)CelTypeKind.String, 1),
-            ("containsKey", (CelTypeKind?)CelTypeKind.Map, 1),
-            ("endsWith", (CelTypeKind?)CelTypeKind.String, 1),
-            ("size", (CelTypeKind?)CelTypeKind.List, 0),
-            ("size", (CelTypeKind?)CelTypeKind.Map, 0),
-            ("size", (CelTypeKind?)CelTypeKind.String, 0),
-            ("startsWith", (CelTypeKind?)CelTypeKind.String, 1),
+            ("contains", (CelTypeKind?)CelTypeKind.String, "String", CelTypeKind.Bool, CelFunctionOperationId.Contains),
+            ("containsKey", (CelTypeKind?)CelTypeKind.Map, "String", CelTypeKind.Bool, CelFunctionOperationId.ContainsKey),
+            ("endsWith", (CelTypeKind?)CelTypeKind.String, "String", CelTypeKind.Bool, CelFunctionOperationId.EndsWith),
+            ("size", (CelTypeKind?)CelTypeKind.List, "", CelTypeKind.Int, CelFunctionOperationId.SizeList),
+            ("size", (CelTypeKind?)CelTypeKind.Map, "", CelTypeKind.Int, CelFunctionOperationId.SizeMap),
+            ("size", (CelTypeKind?)CelTypeKind.String, "", CelTypeKind.Int, CelFunctionOperationId.SizeString),
+            ("startsWith", (CelTypeKind?)CelTypeKind.String, "String", CelTypeKind.Bool, CelFunctionOperationId.StartsWith),
         }
             .OrderBy(t => t.Item1, StringComparer.Ordinal)
             .ThenBy(t => t.Item2)
@@ -211,4 +280,29 @@ public sealed class CelBuiltinFunctionInvokerTests
 
         Assert.That(actual, Is.EqualTo(expected));
     }
+
+    [Test]
+    public void Catalog_EveryOverloadInvokesWithoutThrowingUsingItsOwnOperationId()
+    {
+        // Cross-checks each catalog row's declared OperationId against CelBuiltinFunctionInvoker by
+        // actually invoking it with a matching sample receiver/arguments — catches a declaration
+        // whose OperationId does not correspond to a working implementation for its own shape.
+        foreach (var overload in CelFunctionCatalog.All)
+        {
+            var receiver = SampleReceiver(overload.ReceiverKind);
+            var arguments = overload.ArgumentKinds.Select(k => SampleReceiver(k)).ToList();
+
+            Assert.DoesNotThrow(
+                () => CelBuiltinFunctionInvoker.Invoke(overload.OperationId, receiver, arguments),
+                $"Overload '{overload.FunctionName}' (OperationId={overload.OperationId}) failed to invoke.");
+        }
+    }
+
+    private static CelValue SampleReceiver(CelTypeKind? kind) => kind switch
+    {
+        CelTypeKind.String => CelValue.String("sample"),
+        CelTypeKind.List => CelValue.List([CelValue.Int(1)]),
+        CelTypeKind.Map => CelValue.Map(new Dictionary<string, CelValue> { ["k"] = CelValue.Bool(true) }),
+        _ => throw new ArgumentOutOfRangeException(nameof(kind), kind, "Unsupported sample receiver kind."),
+    };
 }

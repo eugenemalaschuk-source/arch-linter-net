@@ -71,6 +71,26 @@ correct/simplest .NET mechanism — `CelValue.String()` already rejects unpaired
 construction, so every string reaching `Invoke` is guaranteed well-formed UTF-16 and therefore safe
 to enumerate as `Rune`s without a malformed-input case.
 
+### Cost model: `ComputeCost` sits next to `Invoke`, one `case` per operation
+
+The issue's controlled-extension-seam requirement is explicit about "explicit complexity/budget
+classification" as part of what a catalog entry must carry, and `CelEvaluationLimits.MaxCostUnits`
+is already public API described as "an abstract measure of computational work" — but leaving cost
+modeling entirely to #328 would force the evaluator to either treat every built-in call as a fixed
+unit cost (unsafe: a `contains()` call against an arbitrarily large receiver string would cost the
+same as one against an empty string, defeating the budget's purpose) or build its own second
+per-`OperationId` switch duplicating knowledge only `CelBuiltinFunctionInvoker` has (what each
+operation actually scans). `ComputeCost(operationId, receiver, arguments) -> long` closes that gap
+now: same file, same enum, one `case` added alongside `Invoke`'s `case` whenever a future function
+is added — no second seam to keep in sync.
+
+The model itself is a linear approximation (`1 + Σ length of every string operand scanned`), not
+each operation's exact worst-case complexity (naive substring search is technically `O(n·m)`).
+`size()` on `List`/`Map` and `containsKey` are O(1) (backed by a count field / dictionary lookup) and
+cost only the fixed floor. A linear model is the same simplification CEL's own reference cost
+estimation uses for string functions — the goal is stopping a call against oversized input from
+being charged as free, not modeling an exact machine cost.
+
 ### String matching is ordinal (UTF-16 code-unit sequence comparison)
 
 The pinned CEL spec does not define culture-sensitive string comparison for `startsWith`/

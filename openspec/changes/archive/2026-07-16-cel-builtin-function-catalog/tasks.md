@@ -30,4 +30,11 @@
 
 - [x] 5.1 Run `rtk make fmt` and inspect formatting changes.
 - [x] 5.2 Run `rtk make acceptance` (lint + full test suite) and fix any issue-related failures.
-- [ ] 5.3 Open the pull request closing #327.
+- [x] 5.3 Open the pull request closing #327.
+
+## 6. Review follow-up (PR #339)
+
+- [x] 6.1 Add `CelBuiltinFunctionInvoker.ComputeCost(CelFunctionOperationId, CelValue? receiver, IReadOnlyList<CelValue> arguments) -> long` — linear, input-size-proportional cost model, one `case` per operation id, next to `Invoke`; add `ComputeCost` test coverage.
+- [x] 6.2 Strengthen `Catalog_MatchesTheDocumentedOverloadSet` to compare every field (argument kinds in order, result type, operation id), not just name/receiver/arity, plus a per-overload round-trip invocation test — catches a mismatched `OperationId` a name/receiver/arity-only comparison would miss.
+- [x] 6.3 Correct remaining stale `#327` references that meant "the evaluator" under the old task numbering: `CelCompiledPredicate.cs`/`CelCompiledExpression.cs` XML docs and `NotImplementedException` messages, and four spots in the main `cel-profile-v1` spec (`openspec/specs/cel-profile-v1/spec.md`) — three renumbered to `#328`, one (`String.size()` Unicode counting, which this change actually implements) reattributed from "the evaluator" to "the built-in function invoker."
+- [x] 6.4 Re-run `rtk dotnet test tests/ArchLinterNet.CEL.Tests --no-restore`, `rtk make fmt`, `rtk make acceptance`, and `rtk openspec validate --all --strict`.
