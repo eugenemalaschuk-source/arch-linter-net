@@ -1,6 +1,5 @@
 using ArchLinterNet.CEL;
 using ArchLinterNet.CEL.Compilation;
-using ArchLinterNet.CEL.Diagnostics;
 using ArchLinterNet.CEL.Profile;
 using ArchLinterNet.CEL.Schema;
 using ArchLinterNet.CEL.Values;
@@ -60,23 +59,16 @@ public sealed class CelExternalConsumerSampleTests
             "source.role == 'service' && target.namespace.startsWith('Example.')");
 
         // ── 4. Inspect the compilation result ─────────────────────────────────
+        // The expression resolves and type-checks successfully (both members declared,
+        // both operators well-typed, root type Bool), so compilation now succeeds — the
+        // binder (#326) replaces the former NotYetImplemented stub for valid input.
         Assert.That(compilation, Is.Not.Null);
-        Assert.That(compilation.IsSuccess, Is.False);
-        Assert.That(compilation.Diagnostics, Is.Not.Null);
+        Assert.That(compilation.IsSuccess, Is.True);
+        Assert.That(compilation.Program, Is.Not.Null);
+        Assert.That(compilation.Diagnostics, Has.Count.EqualTo(0));
         Assert.That(compilation.CompilationKey, Is.Not.Null);
 
-        // Stub behavior: compilation returns NotYetImplemented until #325/#326 ship.
-        // This assertion documents the current stub contract:
-        Assert.That(compilation.IsSuccess, Is.False);
-        Assert.That(compilation.Diagnostics, Has.Count.GreaterThan(0));
-        Assert.That(compilation.Diagnostics[0].Code, Is.EqualTo(CelDiagnosticCode.NotYetImplemented));
-
-        // Diagnostics carry stable codes, severity, and human-readable messages.
-        var diag = compilation.Diagnostics[0];
-        Assert.That(diag.Severity, Is.EqualTo(CelDiagnosticSeverity.Error));
-        Assert.That(diag.Message, Is.Not.Null.And.Not.Empty);
-
-        // Cache identity is deterministic and available even for failed compilations.
+        // Cache identity is deterministic and available regardless of success/failure.
         var key = compilation.CompilationKey;
         Assert.That(key.ProfileId, Is.EqualTo(CelProfile.V1.Id));
         Assert.That(key.RequiredResultType, Is.EqualTo(CelRequiredResultType.Predicate));

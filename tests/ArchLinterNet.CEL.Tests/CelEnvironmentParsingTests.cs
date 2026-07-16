@@ -9,8 +9,9 @@ namespace ArchLinterNet.CEL.Tests;
 /// <summary>
 /// Tests that <see cref="CelEnvironment.CompilePredicate"/> and <see cref="CelEnvironment.Compile"/>
 /// run the tokenizer/parser (#325) after the <c>MaxExpressionLength</c> gate: syntax errors and
-/// deferred-feature usage now surface real, span-carrying diagnostics, while syntactically valid
-/// Profile v1 expressions still fall through to the <c>NotYetImplemented</c> stub (binder is #326).
+/// deferred-feature usage surface real, span-carrying diagnostics, and syntactically valid Profile
+/// v1 expressions that also bind and type-check successfully (#326) now produce a real compiled
+/// program instead of a stub.
 /// </summary>
 [TestFixture]
 public sealed class CelEnvironmentParsingTests
@@ -47,13 +48,14 @@ public sealed class CelEnvironmentParsingTests
     }
 
     [Test]
-    public void CompilePredicate_SyntacticallyValidExpression_StillReturnsNotYetImplemented()
+    public void CompilePredicate_SyntacticallyValidExpression_BindsAndSucceeds()
     {
         var env = BuildEnvironment();
         var result = env.CompilePredicate("source == 'x' && source.startsWith('y')");
 
-        Assert.That(result.IsSuccess, Is.False);
-        Assert.That(result.Diagnostics[0].Code, Is.EqualTo(CelDiagnosticCode.NotYetImplemented));
+        Assert.That(result.IsSuccess, Is.True);
+        Assert.That(result.Program, Is.Not.Null);
+        Assert.That(result.Diagnostics, Has.Count.EqualTo(0));
     }
 
     [Test]
@@ -68,13 +70,14 @@ public sealed class CelEnvironmentParsingTests
     }
 
     [Test]
-    public void Compile_SyntacticallyValidExpression_StillReturnsNotYetImplemented()
+    public void Compile_SyntacticallyValidExpression_BindsAndSucceeds()
     {
         var env = BuildEnvironment();
         var result = env.Compile("source");
 
-        Assert.That(result.IsSuccess, Is.False);
-        Assert.That(result.Diagnostics[0].Code, Is.EqualTo(CelDiagnosticCode.NotYetImplemented));
+        Assert.That(result.IsSuccess, Is.True);
+        Assert.That(result.Program, Is.Not.Null);
+        Assert.That(result.Diagnostics, Has.Count.EqualTo(0));
     }
 
     [Test]
