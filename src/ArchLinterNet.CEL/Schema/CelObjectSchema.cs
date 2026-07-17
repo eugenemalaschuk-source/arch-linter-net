@@ -23,7 +23,8 @@ public sealed class CelObjectSchema
 
     /// <summary>
     /// Gets a deterministic structural identity string derived from <see cref="ObjectTypeId"/>
-    /// and member names and types. Included in <see cref="CelCompilationKey"/> schema identity.
+    /// and member names and types. Included in
+    /// <see cref="ArchLinterNet.CEL.Compilation.CelCompilationKey"/> schema identity.
     /// </summary>
     internal string Identity { get; }
 

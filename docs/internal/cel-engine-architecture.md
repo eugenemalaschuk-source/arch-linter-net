@@ -3,13 +3,15 @@
 This is internal project documentation for maintaining the `arch-linter-net` repository.
 It is intentionally excluded from the public MkDocs/GitHub Pages product site.
 
-This document defines the initial target architecture of `ArchLinterNet.CEL` before any implementation tasks (#325–#329) begin. It is the design/spec slice tracked by #324.
+This document originated as the target architecture of `ArchLinterNet.CEL` written before implementation tasks #325–#329 began, as the design/spec slice tracked by #324. Tasks #325–#329 have since shipped the tokenizer/parser, binder/type checker, built-in function catalog, bounded evaluator, and public compilation pipeline/cache identity described below. Task #330 reconciled and finalized this document against that shipped code: every section is now a description of implemented, tested behavior — not a pre-implementation plan — except where a section is explicitly labeled as a future extension direction.
 
-Tasks #325–#329 must maintain this blueprint as implementation decisions are made. Task #330 must reconcile and finalize it against shipped code.
+The structure below follows the 9 required sections from #330, plus supporting material (comparative implementation review, performance baselines, versioning policy) that #330 also finalized.
 
 ______________________________________________________________________
 
-## Processing pipeline
+## 1. Engine lifecycle and module graph
+
+### Processing pipeline
 
 ```text
 expression source (string)
@@ -131,7 +133,7 @@ expression source (string)
 
 ______________________________________________________________________
 
-## Component ownership
+### Component ownership
 
 | Component | Owner | Notes |
 |---|---|---|
@@ -151,11 +153,33 @@ ______________________________________________________________________
 
 ______________________________________________________________________
 
+## 2. Public API stability boundary
+
+Profile v1 deliberately excludes 9 concepts from the public API surface. Each is a controlled
+architectural boundary, not an oversight — an exclusion is not the same as "not supported" without
+a plan. This section records why each is excluded today and where a future, reviewed implementation
+would fit if ever approved. See [Prohibited shortcuts](#prohibited-shortcuts) below for the
+enforcement side of the same boundary (the patterns a change must never introduce quietly).
+
+| Excluded concept | Why excluded from v1 | Future architectural direction |
+|---|---|---|
+| Parser AST exposure | The internal `CelSyntaxNode` hierarchy would become a forever-versioned public contract the moment it is exposed; no concrete tooling consumer exists yet to justify that cost | A future `ArchLinterNet.CEL.Tooling` package could expose a stable, separately-versioned neutral syntax model — never the parser-generator's own AST types. See section 7 |
+| Arbitrary CLR object binding | Binding directly to arbitrary `object`/POCO instances requires reflection at the value-construction boundary, defeating the closed, statically-typed value model (`CelValue`, `CelObjectSchema`) | Host adapters convert typed host data into `CelValue`/`CelObjectValue` before evaluation, in a separate package that owns any reflection. See section 4 |
+| Reflection and `dynamic` | Both defeat nullable analysis, AOT compatibility, and the schema-declared type-safety contract; `Cel.NET`'s reflection-driven member access was explicitly rejected during the comparative review (see below) for this reason | Not planned for the core engine under any profile; confined permanently to optional adapter packages, never `ArchLinterNet.CEL` itself |
+| Raw `IDictionary<string, object?>` activations | A raw dictionary of untyped values reintroduces the same reflection/type-safety problem as arbitrary CLR binding, one level up at the evaluation-context boundary | `CelEvaluationContextBuilder.Set` requires typed `CelValue` instances via `CelVariable` handles; a host adapter may build a `CelEvaluationContext` from a typed source, but never accepts a raw untyped dictionary as a public compilation/evaluation input |
+| Unrestricted delegates/expression trees | A public compilation result exposing a raw `Func<...>` or `Expression<T>` would bypass `CelEvaluationLimits` and structured diagnostics entirely — the exact failure mode the "compiled-delegate experiments" comparative review row was rejected for | Permanently prohibited as a public compilation result shape. An internal, swappable evaluator backend (section 6) may use delegates internally, but `CelCompiledPredicate`/`CelCompiledExpression` must remain opaque |
+| Public function registration | A mutable, caller-extensible function registry is both a thread-safety hazard (shared mutable state) and an arbitrary-code-execution surface — user-defined functions could run anything | Built-in expansion follows the closed catalog process in section 5 (new profile version, reviewed PR, no runtime registration API). Host-defined functions remain a permanent non-goal for the isolated CEL library; a product layer may wrap `ArchLinterNet.CEL` and interpret function-like syntax itself without exposing a registry |
+| Process-global cache ownership | A static/global cache breaks testability, thread-safety reasoning, and cache-lifetime ownership — the same reasoning behind the "no static mutable registry" prohibited shortcut | Callers own cache lifetime today via a source-text-keyed cache; a future `ArchLinterNet.CEL.Caching` helper package could package this pattern without introducing global state. See section 8 |
+| Unbounded evaluation | Any evaluation path without `CelEvaluationLimits` enforcement would allow a crafted expression to consume unbounded CPU/memory — this is the core safety property the bounded evaluator (#328) exists to guarantee | Not a direction with a future relaxation path; this is a permanent invariant of the engine, enforced structurally (every `Evaluate` overload requires or defaults to limits) |
+| Mutable environments | Go/Java's environment-extension APIs (`env.Extend`) were the primary source of thread-safety caveats in their own documentation, per the comparative review below; `CelEnvironment` is closed at `Build()` specifically to avoid this | Not planned. A caller needing a different schema/profile/limits builds a new `CelEnvironment` via `CelEnvironment.CreateBuilder(...)`, which is cheap relative to compilation |
+
+______________________________________________________________________
+
 ## Extension-direction matrix
 
-For each capability excluded from Profile v1, this matrix records: classification, intended owner, existing seam, whether a new profile version is required, affected pipeline layers, safety/complexity implications, prohibited shortcut, and whether the direction is plausible future work or a permanent non-goal.
+For each capability excluded from Profile v1, this matrix records: classification, intended owner, existing seam, whether a new profile version is required, affected pipeline layers, safety/complexity implications, prohibited shortcut, and whether the direction is plausible future work or a permanent non-goal. Sections 3–8 below correspond to sections 3–8 of #330's required blueprint structure.
 
-### 1. Language and profile expansion
+### 3. Language/profile evolution
 
 Capabilities deferred: arithmetic (`+`, `-`, `*`, `/`, `%`), conditional expression (`? :`), new literals (uint, bytes), timestamp/duration types, optional/null support, comprehensions/macros (`all`, `exists`, `map`, `filter`), regex (`matches`), protobuf integration, unknown/partial evaluation.
 
@@ -170,7 +194,7 @@ Capabilities deferred: arithmetic (`+`, `-`, `*`, `/`, `%`), conditional express
 | Prohibited shortcut | Do NOT add unsupported operators by relaxing the grammar gate without a new profile. Do NOT accept a user expression containing arithmetic in Profile v1 and silently discard the unsupported sub-tree |
 | Direction | Plausible future work per approved profile stories |
 
-### 2. Host adapters
+### 4. Host data adapter direction
 
 Capabilities deferred: POCO/CLR type adapters, `System.Text.Json` adapter, protobuf descriptor adapter.
 
@@ -185,7 +209,7 @@ Capabilities deferred: POCO/CLR type adapters, `System.Text.Json` adapter, proto
 | Prohibited shortcut | Do NOT add reflection, `dynamic`, or automatic POCO member discovery to `CelValue`, `CelObjectValue`, or `CelContextSchema` |
 | Direction | Plausible future work; likely Core-owned for architecture facts |
 
-### 3. Function catalog
+### 5. Function and extension catalog direction
 
 Capabilities deferred: caller-defined functions, host-registered function bundles, operator overloads. The closed Profile v1 catalog itself (`startsWith`/`endsWith`/`contains`/`size`/`containsKey`) is shipped — declaration in `ArchLinterNet.CEL.Binding.CelFunctionCatalog`, execution in `ArchLinterNet.CEL.Binding.CelBuiltinFunctionInvoker` (#327).
 
@@ -202,7 +226,7 @@ A future standard built-in follows one controlled path: add a `CelFunctionOperat
 | Prohibited shortcut | Do NOT add a public `RegisterFunction(...)` API or any mutable function registry — not even a static one |
 | Direction | Built-in expansion is plausible (new profile); host-defined functions are a permanent non-goal for the isolated CEL library (Core/product layer may wrap) |
 
-### 4. Execution backends
+### 6. Execution backend direction
 
 Capabilities deferred: optimized planner, JIT-style compiled backend, alternate interpreter.
 
@@ -217,7 +241,7 @@ Capabilities deferred: optimized planner, JIT-style compiled backend, alternate 
 | Prohibited shortcut | Do NOT expose the bound plan or evaluator internals publicly. Do NOT allow raw delegate escape (e.g., `Func<CelEvaluationContext, bool>` as a public compilation result) |
 | Direction | Plausible future work; no dedicated performance-optimization task is currently scheduled — #329 shipped the public compilation pipeline and cache identity (`CelCompilationKey`), not a backend swap or optimized planner. A pluggable-evaluator seam is itself unbuilt; introducing one is a prerequisite for this direction, not an existing capability |
 
-### 5. Tooling and AST
+### 7. Tooling and AST direction
 
 Capabilities deferred: public AST / neutral syntax model, formatter, pretty-printer, serialization.
 
@@ -232,7 +256,7 @@ Capabilities deferred: public AST / neutral syntax model, formatter, pretty-prin
 | Prohibited shortcut | Do NOT expose parser-generator contexts, grammar rule objects, or internal AST nodes as public API. Do NOT add tooling types to `ArchLinterNet.CEL` until concrete requirements from a tooling story are approved |
 | Direction | Plausible future work; requires a concrete story with stable neutral model design |
 
-### 6. Caching and serialization
+### 8. Cache and serialization direction
 
 Capabilities deferred: caller-owned cache helper implementations, portable checked-expression format.
 
@@ -273,7 +297,7 @@ The two use cases are therefore genuinely different and must not be conflated:
 | Prohibited shortcut | Do NOT add any static mutable cache, `ConcurrentDictionary<CelCompilationKey, ...>`, or thread-static cache to `ArchLinterNet.CEL` |
 | Direction | Plausible future work (caching helper); serialization requires compatibility rules before any story |
 
-### 7. Diagnostics and explainability
+### Additional direction: Diagnostics and explainability
 
 Capabilities deferred: evaluation trace/explain, intermediate value capture, step-by-step debug output.
 
@@ -287,6 +311,32 @@ Capabilities deferred: evaluation trace/explain, intermediate value capture, ste
 | Safety implications | Traces can expose intermediate data; must be opt-in and bounded |
 | Prohibited shortcut | Do NOT expose engine-internal mutable state or `CelEngine` internals as part of any trace API. Do NOT add trace collection that is always-on (must be opt-in to avoid performance impact) |
 | Direction | Plausible future work; requires concrete product story |
+
+______________________________________________________________________
+
+## 9. Extension governance checklist
+
+Every future extension proposal touching `ArchLinterNet.CEL` — a new built-in, a new profile
+version, a host adapter, a tooling feature, or an execution-backend change — must answer all 10
+questions below before implementation begins. A proposal that cannot answer one of these questions
+is not ready for an architecture decision, let alone a PR.
+
+1. Is it standard CEL, a canonical CEL extension, a host adapter, tooling, or an ArchLinterNet
+   product concern?
+1. Which assembly/package owns it?
+1. Does it require a new profile version?
+1. Does it change syntax, typing, evaluation semantics, limits, diagnostics, or cache identity?
+1. How is purity, determinism, termination, and bounded complexity preserved?
+1. How is host escape prevented?
+1. Which conformance fixtures and adversarial tests are required?
+1. Which public/internal documentation changes are required?
+1. Is the public API affected, and how is compatibility protected?
+1. Can the change be implemented through an existing seam, or is an architecture decision
+   required first?
+
+An architecture decision required by question 10 goes through the repository's OpenSpec workflow
+(`openspec/`), not a quiet code change — matching the rule already stated in
+[Prohibited shortcuts](#prohibited-shortcuts) below.
 
 ______________________________________________________________________
 
@@ -306,6 +356,46 @@ The following patterns are permanently prohibited. A change that introduces any 
 | Accepting a POCO or CLR type directly as a `CelObjectValue` member | Object values must be constructed from typed `CelValue` instances |
 | Grammar gate relaxation without a new `CelProfile` | Silently accepting unsupported CEL syntax under Profile v1 would break the stability guarantee |
 | Bypassing `CelEvaluationLimits` in any evaluation path | No unbounded execution path may exist |
+
+______________________________________________________________________
+
+## Versioning and compatibility policy
+
+### Profile versioning
+
+`CelProfile.V1` (ID `arch-linter/cel/v1`) is frozen: no syntax, typing, or evaluation-semantics
+change may land under the v1 profile identity once shipped. Any capability from section 3
+(language/profile evolution) or a new built-in from section 5 that changes what a Profile v1
+expression means requires introducing a new `CelProfile` (e.g. `arch-linter/cel/v2`) with its own
+ID, rather than silently changing what `CelProfile.V1` accepts. A caller that compiled against
+`CelProfile.V1` must keep getting `CelProfile.V1` semantics for the lifetime of the package's
+major/minor version line.
+
+### Package release versioning
+
+`ArchLinterNet.CEL` follows Semantic Versioning 2.0, calculated by the manual release workflow
+from git tags — see `docs/reference/release-process.md` for the full version-calculation rules and
+release scenarios (`preview`, `patch`, `minor`, `major`). Profile v1 semantics themselves are never
+a version-bump lever — per "Profile versioning" above, `CelProfile.V1` is permanently frozen, and no
+release, however versioned, may ship a change to what an already-shipped `CelProfile.V1` expression
+means. Pre-1.0, breaking changes to the public API surface (see section 2) are expected to
+accompany at least a `minor` version bump, given the `0.x` preview status noted in the package
+README. Introducing a new `CelProfile` version (e.g. `arch-linter/cel/v2`) is additive at the
+profile-identity level (existing profile IDs keep working) but is itself a new supported public
+capability, so it accompanies at least a `minor` version bump; it becomes a breaking-change release
+only if it also changes a previously-shipped public API shape.
+
+### API compatibility baseline
+
+`tests/ArchLinterNet.CEL.Tests/CelPublicApiSurfaceApprovalTests.cs` is the current, enforced
+compatibility baseline mechanism: a reflection-based approval test that enumerates every public and
+public-nested type, member, and signature in the `ArchLinterNet.CEL` assembly and compares it
+against a committed baseline file. Any addition, removal, or signature change to the public API
+surface fails this test, forcing an explicit, reviewed baseline update in the same PR — this is the
+gate a section-2 exclusion or section-9 governance-checklist question 9 ("is the public API
+affected") resolves against today. This is a hand-rolled, reflection-based mechanism, not
+`Microsoft.DotNet.ApiCompat` or a NuGet-package-diffing tool; adopting a dedicated API-compat tool
+is plausible future work but is not required while the package remains pre-1.0.
 
 ______________________________________________________________________
 

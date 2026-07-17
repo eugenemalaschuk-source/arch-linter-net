@@ -9,8 +9,8 @@ namespace ArchLinterNet.CEL.Evaluation;
 /// </summary>
 /// <remarks>
 /// <para>
-/// Create via <see cref="CelContextSchema.CreateEvaluationContextBuilder"/>, then call
-/// <see cref="CelEvaluationContextBuilder.Set"/> with the handles returned by
+/// Create via <see cref="CelContextSchema.CreateEvaluationContextBuilder()"/>, then call
+/// <see cref="CelEvaluationContextBuilder.Set(CelVariable, CelValue)"/> with the handles returned by
 /// <see cref="CelContextSchemaBuilder.AddVariable"/>.
 /// </para>
 /// <para>This class is immutable and thread-safe.</para>

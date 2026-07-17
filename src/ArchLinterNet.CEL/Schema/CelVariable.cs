@@ -8,7 +8,8 @@ namespace ArchLinterNet.CEL.Schema;
 /// <remarks>
 /// <para>
 /// Handles are returned by <see cref="CelContextSchemaBuilder.AddVariable"/> and used to set
-/// values in <see cref="CelEvaluationContextBuilder.Set"/>. Using handles rather than string keys
+/// values in <see cref="CelEvaluationContextBuilder.Set(CelVariable, ArchLinterNet.CEL.Values.CelValue)"/>.
+/// Using handles rather than string keys
 /// avoids repeated string lookup in high-volume evaluation paths.
 /// </para>
 /// <para>This class is immutable and thread-safe.</para>
