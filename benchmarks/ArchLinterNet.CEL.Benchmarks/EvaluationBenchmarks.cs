@@ -66,7 +66,14 @@ public class EvaluationBenchmarks
     public CelEvaluationResult BooleanCombination() =>
         _fixtures.BooleanCombination.Evaluate(_fixtures.Context);
 
-    [Benchmark(Description = "Evaluate: explicit per-call limits vs environment ceiling (budget-check overhead)")]
+    // _tighterLimits is deliberately below the environment's SafeDefaults ceiling (100/10,000 vs.
+    // 1,000/100,000) — this benchmark isolates the cost of the explicit-limits overload itself
+    // (limits comparison in Evaluate(context, limits)) using arbitrary but valid tighter limits,
+    // NOT a same-ceiling comparison against the safe-default overload. For that comparison — two
+    // Evaluate calls under the *same* ceiling value, safe-default vs. explicit — see
+    // ApiScenarioBenchmarks.SafeDefaultOverload/ExplicitLimitsOverload, which use the
+    // environment's actual EvaluationLimits on both sides.
+    [Benchmark(Description = "Evaluate: explicit-limits overload with tighter-than-default limits (not a same-ceiling comparison)")]
     public CelEvaluationResult Evaluate_WithExplicitTighterLimits() =>
         _fixtures.StringEquality.Evaluate(_fixtures.Context, _tighterLimits);
 }

@@ -236,13 +236,32 @@ Capabilities deferred: public AST / neutral syntax model, formatter, pretty-prin
 
 Capabilities deferred: caller-owned cache helper implementations, portable checked-expression format.
 
+This row previously described `CelCompilationKey` as the recommended pre-compile cache-lookup key
+without qualification, which #168's benchmarking work (`CacheIdentityBenchmarks`, `RESULTS.md`)
+showed is not achievable through the public API: every component `CelCompilationKey` is built from
+(`CelContextSchema.ComputeEnvironmentIdentity`, `CelCompilationLimits.ComputeIdentity`,
+`CelEvaluationLimits.ComputeIdentity`) is internal, so a caller cannot construct or derive one
+*before* a first `CompilePredicate`/`Compile` call — only receive one as that call's return value.
+The two use cases are therefore genuinely different and must not be conflated:
+
+- **Pre-compile "have I already compiled this?" lookup**, inside one long-lived, immutable
+  `CelEnvironment` instance: key a caller-owned cache by the raw expression **source text**
+  (a `string`, cheap and available before any compile call). Source text alone is a sufficient key
+  *within one environment*, because that environment's schema and limits are fixed for its entire
+  lifetime — they cannot vary call-to-call the way they could across multiple environments.
+- **Post-compile semantic-identity verification**, e.g. confirming two compiled results (possibly
+  from different `CelEnvironment` instances, or produced at different times) are truly equivalent
+  before treating them as interchangeable, or invalidating a cache when an environment's schema or
+  limits change: use the returned **`CelCompilationKey`**, which is available only after compiling
+  and encodes source, profile, schema, result type, and both limit identities structurally.
+
 | Field | Details |
 |---|---|
 | Classification | Optimization / product concern |
-| Intended owner | Callers (using `CelCompilationKey`) or a future `ArchLinterNet.CEL.Caching` helper |
-| Existing seam | `CelCompilationKey` is public and structurally comparable; callers supply their own cache |
+| Intended owner | Callers, using a source-text-keyed cache scoped to one `CelEnvironment` for pre-compile lookup, and `CelCompilationKey` for post-compile identity verification — or a future `ArchLinterNet.CEL.Caching` helper that packages this pattern |
+| Existing seam | `CelCompilationKey` is public and structurally comparable, but is only obtainable as a `CompilePredicate`/`Compile` return value — it cannot serve as a pre-compile lookup key (see above). Callers supply their own source-text-keyed cache for that purpose. |
 | New profile version required? | No — caching is a caller concern |
-| Affected layers | None in the engine; `CelCompilationKey` provides the identity |
+| Affected layers | None in the engine; `CelCompilationKey` provides the post-compile identity |
 | Safety implications | Serialized expressions must include profile + schema identity to avoid cache poisoning across profile versions |
 | Prohibited shortcut | Do NOT add any static mutable cache, `ConcurrentDictionary<CelCompilationKey, ...>`, or thread-static cache to `ArchLinterNet.CEL` |
 | Direction | Plausible future work (caching helper); serialization requires compatibility rules before any story |
@@ -347,9 +366,11 @@ Recorded baseline headlines (see RESULTS.md for full tables and methodology):
   (15.8 ns vs. 2.29 us) and allocates nothing. Note also that `CelCompilationKey.GetHashCode()`
   itself is not cheap (~394 ns, since it string-hashes four separate identity components) — a
   further reason to prefer a source-text-keyed cache over one keyed by `CelCompilationKey`.
-- Selector-scale batch evaluation (10,000 independent contexts against one compiled predicate)
-  shows bounded, linear-scaling GC pressure: ~1.48 Gen0 collections and ~6.64 MB total allocation,
-  both consistent with the single-evaluation baseline — no batch-specific hotspot emerged.
+- Batch evaluation shows genuinely linear-scaling GC pressure — measured at three batch sizes
+  (100/1,000/10,000 independent contexts against one compiled predicate), not asserted from a
+  single point: allocation scales exactly linearly (10.00× per 10× batch-size step) and
+  per-evaluation allocation (~696 B) and time (~305–326 ns) both stay constant across the whole
+  100× range — no batch-specific hotspot emerged.
 - Repeated evaluation performing no parser/binder/type-checker work is instrumented, not just
   asserted: `CelEvaluateCallGraphNeverReachesCompilePipelineTests` statically walks the CIL call
   graph reachable from all four `Evaluate` overloads (explicit-limits and safe-default, on both

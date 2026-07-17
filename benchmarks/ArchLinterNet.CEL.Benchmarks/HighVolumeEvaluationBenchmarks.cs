@@ -12,13 +12,22 @@ namespace ArchLinterNet.CEL.Benchmarks;
 /// evaluations representative of type/edge selector workloads without introducing Core
 /// dependencies." <see cref="EvaluationBenchmarks"/> measures one evaluation at a time; this class
 /// exists specifically to surface GC pressure (Gen0/Gen1 collection counts, total allocated bytes)
-/// at a batch size close to what a real Core integration would drive per analysis pass, which a
+/// at batch sizes close to what a real Core integration would drive per analysis pass, which a
 /// single-call benchmark cannot show.
 /// </summary>
+/// <remarks>
+/// <see cref="BatchSize"/> is parameterized (<c>[Params]</c>), not a single fixed constant: a
+/// measurement at one batch size alone can only show that no *additional* per-call overhead
+/// appears at that specific size — it cannot support a "linearly-scaling" claim, since one point
+/// does not establish a line. Measuring at multiple sizes and checking Mean/Allocated scale
+/// proportionally with <see cref="BatchSize"/> is what actually substantiates (or refutes) linear
+/// scaling; see <c>RESULTS.md</c> for the resulting per-size table and ratio check.
+/// </remarks>
 [MemoryDiagnoser]
 public class HighVolumeEvaluationBenchmarks
 {
-    private const int BatchSize = 10_000;
+    [Params(100, 1_000, 10_000)]
+    public int BatchSize { get; set; }
 
     private CelCompiledPredicate _predicate = null!;
     private CelEvaluationContext[] _contexts = null!;
@@ -41,7 +50,7 @@ public class HighVolumeEvaluationBenchmarks
             _contexts[i] = BenchmarkFixtures.BuildContextFromValues(environment, source, target, sourceValue, targetValue);
     }
 
-    [Benchmark(Description = "Evaluate one compiled predicate across 10,000 independent pre-built contexts (selector-like batch workload)")]
+    [Benchmark(Description = "Evaluate one compiled predicate across BatchSize independent pre-built contexts (selector-like batch workload)")]
     public int EvaluateBatch()
     {
         var successCount = 0;

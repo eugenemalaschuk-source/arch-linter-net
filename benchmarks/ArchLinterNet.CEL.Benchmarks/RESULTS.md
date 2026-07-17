@@ -168,33 +168,47 @@ handle-based does not).
 | Evaluate: map indexing (`lookup[key]`), general-expression path | 103.8 ns | 0.97 | 160 B |
 | Evaluate: numeric comparison (`n > 0 && f < 10.5`) | 183.3 ns | 1.71 | 520 B |
 | Evaluate: boolean combination (3-way `&&`, short-circuiting) | 287.1 ns | 2.67 | 696 B |
-| Evaluate: explicit per-call limits vs. environment ceiling (budget-check overhead) | 110.9 ns | 1.03 | 304 B |
+| Evaluate: explicit-limits overload with tighter-than-default limits (not a same-ceiling comparison) | 110.9 ns | 1.03 | 304 B |
 
 Every single-operator evaluation is sub-200ns and allocates under 500B — confirming repeated
 evaluation of an immutable compiled expression is cheap, with cost scaling near-linearly with bound
 node count (the 3-way boolean combination, which evaluates 3 sub-predicates, costs ~2.67× a single
-equality check). Passing explicit per-call limits equal to the environment ceiling costs
-effectively the same as the safe-default overload (1.03×, within noise) — confirming
+equality check). The last row uses deliberately *tighter* limits than the environment's
+`SafeDefaults` ceiling (100/10,000 vs. 1,000/100,000) — it is not a same-ceiling comparison, and
+its near-1.0× ratio should not be read as "explicit limits cost the same as the safe default." For
+the actual same-ceiling comparison — the safe-default overload vs. the explicit-limits overload
+under the *identical* ceiling value — see `ApiScenarioBenchmarks`' `SafeDefaultOverload` (283.2 ns)
+and `ExplicitLimitsOverload` (284.9 ns, ratio 1.01×) below, which correctly confirms
 `Evaluate(context)` adds no measurable hidden overhead over `Evaluate(context, limits)`.
 
 ### HighVolumeEvaluationBenchmarks — selector-scale batch, GC pressure
 
 Added to close a gap flagged in review: no benchmark previously exercised evaluation at a scale
 representative of a type/edge selector workload, so GC pressure at that scale was unmeasured.
+`BatchSize` is parameterized (`[Params(100, 1_000, 10_000)]`), not a single fixed number — a
+measurement at one size alone can only show "no *additional* overhead at that specific size," not
+support a linear-scaling claim, since one point can't establish a line. Three points plus
+per-evaluation normalization can, and do:
 
-| Method | Mean | Gen0 (per 1,000 ops) | Allocated |
-|---|---:|---:|---:|
-| Evaluate one compiled predicate across 10,000 independent pre-built contexts | 2.952 ms | 1,476.6 | 6.64 MB |
+| BatchSize | Mean | Gen0 (per 1,000 ops) | Allocated | Mean ÷ BatchSize | Allocated ÷ BatchSize |
+|---:|---:|---:|---:|---:|---:|
+| 100 | 31.93 us | 14.77 | 67.97 KB | 319.3 ns | 695.8 B |
+| 1,000 | 304.93 us | 147.46 | 679.69 KB | 304.9 ns | 696.3 B |
+| 10,000 | 3,258.12 us | 1,476.56 | 6,796.88 KB | 325.8 ns | 696.3 B |
 
-Per-evaluation, this normalizes to ~295.2 ns and ~696.3 B — closely matching the single-call
-`ApiScenarioBenchmarks.SafeDefaultOverload` baseline (283.2 ns, 696 B) for the same expression, a
-consistency check that no additional per-call overhead emerges at batch scale (the small time delta
-is `foreach`/array-indexing overhead in the batch loop itself, not evaluation cost). The Gen0 column
-is collections per 1,000 calls to the benchmarked method; since one call evaluates the full
-10,000-context batch, that is ~1.48 Gen0 collections per 10,000-fact evaluation pass — a modest,
-bounded GC-pressure profile for this shape, not a runaway allocation curve. #163's Core integration
-should still confirm this holds at whatever batch size a real analysis pass actually drives (10,000
-was chosen as a round, plausible selector-scale number, not measured against a real Core workload).
+Both `Mean` and `Allocated` scale with `BatchSize` across two full 10× steps (100→1,000→10,000):
+allocation scales *exactly* linearly (679.69 KB / 67.97 KB = 10.00×; 6,796.88 KB / 679.69 KB =
+10.00×, both dead-on the batch-size ratio), and per-evaluation allocation is effectively constant
+across the whole 100× range (695.8 B, 696.3 B, 696.3 B) — closely matching the single-call
+`ApiScenarioBenchmarks.SafeDefaultOverload` baseline (283.2 ns, 696 B) for the same expression. Mean
+time scales close to linearly too (9.5× and 10.7× for the two 10× steps — `ShortRun`'s wide `Error`
+bars, visible in the raw numbers, account for the deviation from exactly 10×); per-evaluation time
+stays clustered around ~305–326 ns at every size, with no growth trend as `BatchSize` increases. This
+is what actually substantiates "linearly-scaling GC pressure, no batch-specific hotspot" — a claim
+the single-point 10,000-only measurement in an earlier revision of this document asserted but did
+not establish. #163's Core integration should still confirm this holds at whatever batch size a
+real analysis pass actually drives; 100/1,000/10,000 were chosen as a plausible selector-scale
+range, not measured against a real Core workload.
 
 ### CacheIdentityBenchmarks — `CelCompilationKey` and caller-owned caching
 
@@ -331,10 +345,13 @@ the same budget also fails (which would mean haystack length had stopped being t
   real API characteristic, not a benchmark artifact: worth documenting explicitly in #330's package
   docs so Core integration keys its own cache by source text (as `CacheIdentityBenchmarks`
   demonstrates), not by attempting to precompute a `CelCompilationKey` before the first compile.
-- **Selector-scale batch evaluation (10,000 contexts) shows bounded, predictable GC pressure**
-  (~1.48 Gen0 collections, ~6.64 MB total, both scaling linearly with the per-evaluation baseline —
-  see `HighVolumeEvaluationBenchmarks` above). No batch-specific overhead or hidden hotspot emerged
-  at this scale; #163 should still confirm against real Core batch sizes once they're concrete.
+- **Batch evaluation shows genuinely linear-scaling GC pressure, measured across three batch
+  sizes (100/1,000/10,000), not asserted from one.** Allocation scales exactly linearly with batch
+  size (10.00× per 10× step) and per-evaluation allocation is constant (~696 B) across the whole
+  100× range; time stays clustered around ~305–326 ns per evaluation at every size with no growth
+  trend — see `HighVolumeEvaluationBenchmarks` above for the full per-size table. No batch-specific
+  overhead or hidden hotspot emerged; #163 should still confirm against real Core batch sizes once
+  they're concrete.
 - **No unexpected allocation hotspot surfaced.** Every measured path's allocation is proportional
   to its own declared inputs (schema size, expression complexity, haystack size) — nothing here
   suggests premature optimization is warranted, consistent with the issue's stated purpose ("not to
@@ -382,7 +399,7 @@ the same budget also fails (which would mean haystack length had stopped being t
   The uncached environment-identity recomputation in `CelEvaluationContextBuilder`'s constructor is
   also a candidate future `ArchLinterNet.CEL` improvement worth a separate issue.
 - #163 (Core integration): the per-operator evaluation numbers (all sub-200ns), the same-expression
-  cache hit/miss numbers (15.8 ns vs. 2.29 us, ~145×), and the selector-scale batch numbers (~1.48
-  Gen0 collections / ~6.64 MB per 10,000 evaluations) give Core a baseline to plan its own
-  selector/architecture-fact evaluation batch sizes against, and confirm a source-text-keyed cache
-  is the right caching primitive to reuse.
+  cache hit/miss numbers (15.8 ns vs. 2.29 us, ~145×), and the batch-scaling numbers (~696 B and
+  ~305–326 ns per evaluation, verified constant across a 100×–10,000× batch-size range) give Core a
+  baseline to plan its own selector/architecture-fact evaluation batch sizes against, and confirm a
+  source-text-keyed cache is the right caching primitive to reuse.
