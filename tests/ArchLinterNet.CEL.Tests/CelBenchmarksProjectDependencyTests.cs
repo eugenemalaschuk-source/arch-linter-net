@@ -24,10 +24,15 @@ namespace ArchLinterNet.CEL.Tests;
 /// project's benchmark or test code introduces or calls into. No file in
 /// <c>benchmarks/ArchLinterNet.CEL.Benchmarks</c> references a <c>Microsoft.CodeAnalysis</c>
 /// namespace. <see cref="BenchmarksProject_RoslynIsOnlyReachableThroughBenchmarkDotNet"/> verifies
-/// this stays true: if a future dependency (direct or transitive, from any package) introduced
-/// Roslyn through a path other than <c>BenchmarkDotNet</c>, or if the whitelist test below ever
-/// let a second direct package reference in, that would be a real, undocumented violation of the
-/// "no Roslyn dependency" constraint — this only accepts the one specific, known, unavoidable path.
+/// this stays true and stays the <em>only</em> path: it walks the reachable set from every
+/// top-level root of this project — every direct <c>PackageReference</c> (currently just
+/// <c>BenchmarkDotNet</c>) and the <c>ArchLinterNet.CEL</c> project reference itself — and asserts
+/// Roslyn is reachable from <c>BenchmarkDotNet</c>'s tree specifically and from no other root's
+/// tree. Proving "reachable via BenchmarkDotNet" alone is not sufficient: a second, independent
+/// path (e.g. Roslyn entering transitively through <c>ArchLinterNet.CEL</c> itself, or through a
+/// future direct dependency the whitelist test below would also flag) could exist at the same time
+/// and this test would stay green if it only checked the one known path without also checking
+/// every other root is Roslyn-free.
 /// </remarks>
 [TestFixture]
 public sealed class CelBenchmarksProjectDependencyTests
@@ -68,8 +73,9 @@ public sealed class CelBenchmarksProjectDependencyTests
     {
         var assetsPath = FindProjectAssetsJson();
         using var document = JsonDocument.Parse(File.ReadAllText(assetsPath));
+        var root = document.RootElement;
 
-        var targets = document.RootElement.GetProperty("targets");
+        var targets = root.GetProperty("targets");
         var targetFramework = targets.EnumerateObject().First();
         var libraries = targetFramework.Value;
 
@@ -90,24 +96,30 @@ public sealed class CelBenchmarksProjectDependencyTests
             dependencyGraph[packageId] = deps;
         }
 
-        // Every Roslyn package actually present in the resolved graph must be reachable by walking
-        // outward from BenchmarkDotNet — if it is reachable from nowhere (dependencyGraph has no
-        // entry reaching it) or reachable only from some other root, that is a new, undocumented
-        // source of the Roslyn dependency this test does not know about.
-        var reachableFromBenchmarkDotNet = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        var stack = new Stack<string>();
-        stack.Push(KnownRoslynTransitiveRoot);
-        while (stack.Count > 0)
+        // Every top-level root of this project: direct PackageReferences (from
+        // project.frameworks.<tfm>.dependencies) plus any ProjectReference (libraries entries with
+        // type "project", e.g. ArchLinterNet.CEL). A root not in this set could not have introduced
+        // the dependency in the first place, so checking only known roots is exhaustive here.
+        var allTopLevelRoots = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var frameworkDependencies = root.GetProperty("project").GetProperty("frameworks")
+            .EnumerateObject().First().Value;
+        if (frameworkDependencies.TryGetProperty("dependencies", out var directDeps))
         {
-            var current = stack.Pop();
-            if (!reachableFromBenchmarkDotNet.Add(current))
-                continue;
-            if (dependencyGraph.TryGetValue(current, out var deps))
-            {
-                foreach (var dep in deps)
-                    stack.Push(dep);
-            }
+            foreach (var dep in directDeps.EnumerateObject())
+                allTopLevelRoots.Add(dep.Name);
         }
+        foreach (var library in libraries.EnumerateObject())
+        {
+            if (library.Value.TryGetProperty("type", out var typeProperty) && typeProperty.GetString() == "project")
+                allTopLevelRoots.Add(library.Name.Split('/')[0]);
+        }
+
+        Assert.That(allTopLevelRoots, Does.Contain(KnownRoslynTransitiveRoot));
+        var otherRoots = allTopLevelRoots.Where(r => !string.Equals(r, KnownRoslynTransitiveRoot, StringComparison.OrdinalIgnoreCase)).ToList();
+        Assert.That(otherRoots, Is.Not.Empty,
+            "Expected at least one other top-level root (e.g. the ArchLinterNet.CEL project " +
+            "reference) besides BenchmarkDotNet — if this project ever has only one root, the " +
+            "exclusivity check below becomes vacuous and this assumption needs revisiting.");
 
         var roslynPackages = allPackageIds.Where(id => id.StartsWith(RoslynPackagePrefix, StringComparison.OrdinalIgnoreCase)).ToList();
         Assert.That(roslynPackages, Is.Not.Empty,
@@ -116,6 +128,7 @@ public sealed class CelBenchmarksProjectDependencyTests
             "Roslyn and this test (and its documentation) should be simplified back to a plain " +
             "\"no Roslyn dependency\" claim.");
 
+        var reachableFromBenchmarkDotNet = ReachableSet(KnownRoslynTransitiveRoot, dependencyGraph);
         var unexplainedRoslynPackages = roslynPackages.Where(id => !reachableFromBenchmarkDotNet.Contains(id)).ToList();
         Assert.That(unexplainedRoslynPackages, Is.Empty,
             $"Found {RoslynPackagePrefix}* package(s) not reachable from {KnownRoslynTransitiveRoot}'s " +
@@ -123,6 +136,43 @@ public sealed class CelBenchmarksProjectDependencyTests
             "something other than BenchmarkDotNet is now pulling in Roslyn — a real violation of " +
             "issue #168's \"no Roslyn dependency\" constraint, not the one known, documented, " +
             "unavoidable path this test accepts.");
+
+        // Exclusivity: BenchmarkDotNet being A path to Roslyn does not prove it is the ONLY path.
+        // Walk every other top-level root independently and confirm none of them can also reach a
+        // Roslyn package — a second, parallel path (e.g. through ArchLinterNet.CEL itself gaining a
+        // transitive Roslyn dependency in the future) would otherwise go undetected as long as
+        // BenchmarkDotNet's own path kept the check above green.
+        foreach (var otherRoot in otherRoots)
+        {
+            var reachableFromOtherRoot = ReachableSet(otherRoot, dependencyGraph);
+            var roslynViaOtherRoot = roslynPackages.Where(reachableFromOtherRoot.Contains).ToList();
+            Assert.That(roslynViaOtherRoot, Is.Empty,
+                $"Found {RoslynPackagePrefix}* package(s) reachable from '{otherRoot}' as well as " +
+                $"from {KnownRoslynTransitiveRoot}: {{{string.Join(", ", roslynViaOtherRoot)}}}. " +
+                $"{KnownRoslynTransitiveRoot} must be the only path to Roslyn — a second, " +
+                "independent path is a real, additional violation of issue #168's \"no Roslyn " +
+                "dependency\" constraint even though the check above (which only proves " +
+                $"reachability via {KnownRoslynTransitiveRoot}) would stay green.");
+        }
+    }
+
+    private static HashSet<string> ReachableSet(string startingRoot, Dictionary<string, List<string>> dependencyGraph)
+    {
+        var reachable = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var stack = new Stack<string>();
+        stack.Push(startingRoot);
+        while (stack.Count > 0)
+        {
+            var current = stack.Pop();
+            if (!reachable.Add(current))
+                continue;
+            if (dependencyGraph.TryGetValue(current, out var deps))
+            {
+                foreach (var dep in deps)
+                    stack.Push(dep);
+            }
+        }
+        return reachable;
     }
 
     private static string FindBenchmarksCsproj()

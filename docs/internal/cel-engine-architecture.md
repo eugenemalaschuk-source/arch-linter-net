@@ -332,13 +332,15 @@ Recorded baseline headlines (see RESULTS.md for full tables and methodology):
 - Compile-once/evaluate-many holds: compilation (2.8–8.0 us) is ~9.6×–77× the cost of evaluating the
   resulting compiled predicate (0.1–0.3 us); for the same expression measured both ways, ~9.9×.
 - Context-construction's object-vs-primitive gap is two distinct costs, not one — with
-  builder-construction isolated from `Set()`/`Build()`: `Set()`'s own structural validation costs
-  ~1.9× more for object-typed values than primitive-typed values (variable count held equal on both
-  sides), while `CelEvaluationContextBuilder`'s *constructor* costs ~13.3× more when the environment
-  has a registered object-schema catalog, because it uncachedly recomputes
-  `schema.ComputeEnvironmentIdentity(...)` on every call. The larger factor is a construction-time
-  cost, not a `Set()`-validation cost. The name-based `Set()` convenience overload costs only ~7.6%
-  more than the stable-handle path.
+  builder-construction isolated from `Set()`+`Build()`: `Set()`+`Build()` together cost ~1.9× more
+  for object-typed values than primitive-typed values (variable count held equal on both sides; this
+  benchmark suite cannot isolate `Set()`'s own structural validation from `Build()`'s work without
+  instrumenting `CelEvaluationContextBuilder` internally), while `CelEvaluationContextBuilder`'s
+  *constructor* costs ~13.8× more when the environment has a registered object-schema catalog,
+  because it uncachedly recomputes `schema.ComputeEnvironmentIdentity(...)` on every call. The
+  larger factor is a construction-time cost, not a `Set()`/`Build()` cost. The measured name-based
+  vs. stable-handle `Set()` overhead (~0.9%) was within this baseline's `ShortRun`-job noise floor —
+  not a reliable magnitude claim.
 - `CelCompilationKey` cannot serve as a pre-compile cache-lookup key through the public API (its
   identity components are internal); a caller-owned cache should key by source text instead — for
   the same expression, a cache hit that way is ~145× faster than a full miss-and-populate path

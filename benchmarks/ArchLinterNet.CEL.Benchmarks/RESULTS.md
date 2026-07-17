@@ -92,51 +92,67 @@ comment on `CompilationBenchmarks.CompilePredicateFailure`).
 
 ### ContextConstructionBenchmarks — stable-handle vs. name-based population
 
-*(Rerun three times after review fixes. Precomputed the source/target `CelValue` object instances
-in `GlobalSetup` instead of inside timed methods. Matched the "no object catalog" schema's variable
+*(Rerun four times after review fixes. Precomputed the source/target `CelValue` object instances in
+`GlobalSetup` instead of inside timed methods. Matched the "no object catalog" schema's variable
 count and `Set()` call count (2 and 2) to the source/target schema, so it isolates object-typed vs.
-primitive-typed validation, not variable count. Latest fix: added
+primitive-typed validation, not variable count. Added
 `ConstructBuilderOnly_WithObjectCatalog`/`ConstructBuilderOnly_NoObjectCatalog`, because
 `CelEvaluationContextBuilder`'s constructor itself recomputes
 `schema.ComputeEnvironmentIdentity(objectSchemas)` on every call — for a non-empty object-schema
 catalog this rebuilds a `StringBuilder` and reconcatenates every registered schema's identity
 string, uncached; for no catalog it is the cheap, already-computed `CelContextSchema.Identity`
-property read. The earlier `~2.33×` total-time comparison attributed the whole gap to
-`Set()`'s structural validation, when part of it was actually this construction-time identity
-recomputation. See `ContextConstructionBenchmarks`'s class remarks for all of the above.)*
+property read. Latest fix: the two `CelValue.Bool(...)` values passed to the primitive-typed
+benchmark's `Set()` calls are now also precomputed in `GlobalSetup`, matching the object-typed
+benchmark's already-precomputed values — the prior version constructed them inside the timed
+method, an asymmetry between the two sides being compared. The subtraction below is also now
+labeled correctly as `Set()`+`Build()`, not `Set()` alone: `Build()` itself does real work
+(checking every declared variable was set, then constructing the assignment list and the
+`CelEvaluationContext`), so the isolated-construction subtraction cannot isolate `Set()` by itself
+without also isolating `Build()`. See `ContextConstructionBenchmarks`'s class remarks for all of
+the above.)*
 
 | Method | Mean | Allocated |
 |---|---:|---:|
-| Build source/target context via stable variable handles (precomputed values) | 885.2 ns | 3,096 B |
-| Build source/target context via name-based `Set()` convenience overload (precomputed values) | 952.3 ns | 3,288 B |
-| Build context with 2 primitive `Bool` variables, no object-schema catalog (same variable/`Set()` count) | 374.7 ns | 1,512 B |
-| Construct `CelEvaluationContextBuilder` only, object-schema catalog present, no `Set()`/`Build()` | 197.2 ns | 1,696 B |
-| Construct `CelEvaluationContextBuilder` only, no object-schema catalog, no `Set()`/`Build()` | 14.8 ns | 128 B |
+| Build source/target context via stable variable handles (precomputed values) | 1,072.4 ns | 3,096 B |
+| Build source/target context via name-based `Set()` convenience overload (precomputed values) | 1,082.4 ns | 3,288 B |
+| Build context with 2 primitive `Bool` variables, no object-schema catalog (same variable/`Set()` count, precomputed values) | 436.0 ns | 1,368 B |
+| Construct `CelEvaluationContextBuilder` only, object-schema catalog present, no `Set()`/`Build()` | 275.1 ns | 1,696 B |
+| Construct `CelEvaluationContextBuilder` only, no object-schema catalog, no `Set()`/`Build()` | 20.0 ns | 128 B |
 
-The name-based convenience overload costs ~7.6% more time and ~6.2% more allocation than the
-stable-handle path for this two-variable, object-typed schema — the extra `FirstOrDefault` name
-lookup is a real but modest fraction of total context-build cost.
+The name-based convenience overload costs ~0.9% more time and ~6.2% more allocation than the
+stable-handle path for this two-variable, object-typed schema at this `ShortRun` job's confidence
+level (both rows' wide `Error` bars overlap — see `RESULTS.md`'s run-configuration note on
+`ShortRun`'s statistical confidence); the extra `FirstOrDefault` name lookup remains a small,
+possibly-negligible fraction of total context-build cost for this shape.
 
-**Splitting construction from `Set()`/`Build()`** (subtracting each construction-only row from its
+**Splitting construction from `Set()`+`Build()`** (subtracting each construction-only row from its
 matching total row above) gives the actual breakdown:
 
 | Component | Object-typed (with catalog) | Primitive-typed (no catalog) | Ratio |
 |---|---:|---:|---:|
-| Builder construction alone | 197.2 ns | 14.8 ns | ~13.3× |
-| `Set()` + `Build()` (total − construction) | ~688.0 ns | ~359.9 ns | ~1.9× |
-| **Total** | **885.2 ns** | **374.7 ns** | **~2.36×** |
+| Builder construction alone | 275.1 ns | 20.0 ns | ~13.8× |
+| `Set()` + `Build()` (total − construction) | ~797.3 ns | ~416.0 ns | ~1.9× |
+| **Total** | **1,072.4 ns** | **436.0 ns** | **~2.46×** |
 
-So of the ~510 ns absolute gap between the two totals, ~182 ns (about a third) is the object-schema
-catalog's uncached identity-string recomputation inside the constructor — not `Set()` validation at
-all — and the remaining ~328 ns (about two-thirds) is genuinely `Set()`'s own recursive
-member-by-member structural validation. The corrected, isolated claim is: **`Set()` itself costs
-~1.9× more for object-typed values than primitive-typed values** (not ~2.33×, which conflated it
-with construction cost), and **separately**, building a `CelEvaluationContextBuilder` for a schema
-with a registered object-schema catalog costs ~13.3× more than for one without — an uncached,
-per-call cost proportional to catalog size that is itself an actionable finding (see below). The
-documented guidance to prefer handle-based `Set()` "in high-volume evaluation paths" remains
-correct directionally but modest in magnitude for this shape (~7.6%) — worth noting for #330's
-docs so the guidance isn't overstated.
+So of the ~636 ns absolute gap between the two totals, ~255 ns (about 40%) is the object-schema
+catalog's uncached identity-string recomputation inside the constructor — not `Set()`/`Build()`
+cost at all — and the remaining ~381 ns (about 60%) is `Set()`+`Build()` combined, which this
+benchmark suite does not further separate (there is no way to call `Set()` without eventually
+calling `Build()` to produce a usable `CelEvaluationContext`, so isolating `Build()`'s own
+contribution beyond this would require instrumenting `CelEvaluationContextBuilder` internally,
+which is out of scope for a benchmark suite that must use only the public API plus the two
+documented internal-access exceptions). The corrected, honestly-labeled claim is: **`Set()`+`Build()`
+together cost ~1.9× more for object-typed values than primitive-typed values** (not ~2.33× or
+~2.36×, both of which conflated this with construction cost; and not attributed to `Set()` alone,
+which overclaimed precision this benchmark design cannot actually deliver), and **separately**,
+building a `CelEvaluationContextBuilder` for a schema with a registered object-schema catalog costs
+~13.8× more than for one without — an uncached, per-call cost proportional to catalog size that is
+itself an actionable finding (see below). The documented guidance to prefer handle-based `Set()`
+"in high-volume evaluation paths" is not strongly supported by this `ShortRun`-job measurement (the
+two totals' confidence intervals overlap) — a full-job rerun is needed before making a magnitude
+claim either way; the direction (handle-based should be no more expensive) remains plausible from
+the implementation (name-based resolution requires an additional `FirstOrDefault` lookup that
+handle-based does not).
 
 ### EvaluationBenchmarks — compile-once/evaluate-many, by operator category
 
@@ -292,20 +308,24 @@ the same budget also fails (which would mean haystack length had stopped being t
   architecture's central promise and it holds — no action needed, but worth quoting concretely
   (and precisely) in #330's docs rather than only asserting it qualitatively.
 - **Context-construction's object-vs-primitive gap is two distinct costs, not one.** With
-  construction isolated from `Set()`/`Build()` (see `ContextConstructionBenchmarks` above): `Set()`
-  itself costs ~1.9× more for object-typed values than primitive-typed values (recursive
-  member-by-member structural validation) — the smaller of the two factors. Separately,
-  `CelEvaluationContextBuilder`'s *constructor* costs ~13.3× more when the environment has a
-  registered object-schema catalog, because it recomputes `schema.ComputeEnvironmentIdentity(...)`
-  — an uncached `StringBuilder` rebuild over every registered schema's identity — on every single
-  call. **Actionable for a future `ArchLinterNet.CEL` change** (out of scope for this PR, which
-  makes no production code changes): caching the environment identity once at `CelEnvironment.Build()`
-  time instead of recomputing it per `CreateEvaluationContextBuilder()` call would remove the larger
-  of the two factors entirely, since the environment's schema/catalog cannot change after `Build()`.
-  If #163's Core integration needs faster context population before that lands, the lower-effort
-  lever on the `Set()` side is reducing per-object member count or the
-  `MaxValidationDepth`/`MaxValidationCollectionSize` traversal cost, not switching from name-based
-  to handle-based `Set()` (that swap alone saves only ~7.6%).
+  construction isolated from `Set()`+`Build()` (see `ContextConstructionBenchmarks` above),
+  `Set()`+`Build()` together cost ~1.9× more for object-typed values than primitive-typed values
+  (`Build()`'s own work — checking every variable was set, constructing the assignment list and the
+  context — is included in this figure; this benchmark suite cannot isolate `Set()`'s structural
+  validation from `Build()` without instrumenting `CelEvaluationContextBuilder` internally, which is
+  out of scope) — the smaller of the two factors. Separately, `CelEvaluationContextBuilder`'s
+  *constructor* costs ~13.8× more when the environment has a registered object-schema catalog,
+  because it recomputes `schema.ComputeEnvironmentIdentity(...)` — an uncached `StringBuilder`
+  rebuild over every registered schema's identity — on every single call. **Actionable for a future
+  `ArchLinterNet.CEL` change** (out of scope for this PR, which makes no production code changes):
+  caching the environment identity once at `CelEnvironment.Build()` time instead of recomputing it
+  per `CreateEvaluationContextBuilder()` call would remove the larger of the two factors entirely,
+  since the environment's schema/catalog cannot change after `Build()`. If #163's Core integration
+  needs faster context population before that lands, the lower-effort lever on the `Set()`+`Build()`
+  side is reducing per-object member count or the `MaxValidationDepth`/`MaxValidationCollectionSize`
+  traversal cost — the name-based-vs-handle-based `Set()` overhead measured in this pass (~0.9%) was
+  within the `ShortRun` job's noise floor and should not be treated as a reliable magnitude claim
+  either way.
 - **`CelCompilationKey` cannot serve as a pre-compile cache key through the public API** (every
   identity component it's built from — schema/limits `ComputeIdentity()` — is internal). This is a
   real API characteristic, not a benchmark artifact: worth documenting explicitly in #330's package
@@ -354,12 +374,13 @@ the same budget also fails (which would mean haystack length had stopped being t
 
 ## Feeding into #330 / #163
 
-- #330 (packaging/reconciliation): the compile-once/evaluate-many magnitude above, the
-  name-based-vs-handle-based finding, the split object-catalog-construction-vs-`Set()` finding, and
-  the `CelCompilationKey`-is-not-a-pre-compile-key finding are all concrete enough to fold into the
-  package's consumer-facing performance guidance. The uncached environment-identity recomputation
-  in `CelEvaluationContextBuilder`'s constructor is also a candidate future `ArchLinterNet.CEL`
-  improvement worth a separate issue.
+- #330 (packaging/reconciliation): the compile-once/evaluate-many magnitude above, the split
+  object-catalog-construction-vs-`Set()`+`Build()` finding, and the
+  `CelCompilationKey`-is-not-a-pre-compile-key finding are all concrete enough to fold into the
+  package's consumer-facing performance guidance. The name-based-vs-handle-based `Set()` overhead
+  needs a full-job rerun before it is precise enough to quote (this pass's ~0.9% is within noise).
+  The uncached environment-identity recomputation in `CelEvaluationContextBuilder`'s constructor is
+  also a candidate future `ArchLinterNet.CEL` improvement worth a separate issue.
 - #163 (Core integration): the per-operator evaluation numbers (all sub-200ns), the same-expression
   cache hit/miss numbers (15.8 ns vs. 2.29 us, ~145×), and the selector-scale batch numbers (~1.48
   Gen0 collections / ~6.64 MB per 10,000 evaluations) give Core a baseline to plan its own
