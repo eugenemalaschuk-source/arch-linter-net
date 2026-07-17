@@ -331,20 +331,28 @@ Recorded baseline headlines (see RESULTS.md for full tables and methodology):
 
 - Compile-once/evaluate-many holds: compilation (2.8–8.0 us) is ~9.6×–77× the cost of evaluating the
   resulting compiled predicate (0.1–0.3 us); for the same expression measured both ways, ~9.9×.
-- Context-construction cost is dominated by structural object-value validation, not by
-  handle-vs-name resolution or variable count — with value construction and variable count held
-  equal on both sides, an object-typed/catalog-validated two-variable schema costs ~2.33× a
-  primitive-typed two-variable schema, while the name-based `Set()` convenience overload costs only
-  ~5% more than the stable-handle path.
+- Context-construction's object-vs-primitive gap is two distinct costs, not one — with
+  builder-construction isolated from `Set()`/`Build()`: `Set()`'s own structural validation costs
+  ~1.9× more for object-typed values than primitive-typed values (variable count held equal on both
+  sides), while `CelEvaluationContextBuilder`'s *constructor* costs ~13.3× more when the environment
+  has a registered object-schema catalog, because it uncachedly recomputes
+  `schema.ComputeEnvironmentIdentity(...)` on every call. The larger factor is a construction-time
+  cost, not a `Set()`-validation cost. The name-based `Set()` convenience overload costs only ~7.6%
+  more than the stable-handle path.
 - `CelCompilationKey` cannot serve as a pre-compile cache-lookup key through the public API (its
   identity components are internal); a caller-owned cache should key by source text instead — for
-  the same expression, a cache hit that way is ~131× faster than a miss-and-recompile (15.6 ns vs.
-  2.04 us) and allocates nothing. Note also that `CelCompilationKey.GetHashCode()` itself is not
-  cheap (~380 ns, since it string-hashes four separate identity components) — a further reason to
-  prefer a source-text-keyed cache over one keyed by `CelCompilationKey`.
+  the same expression, a cache hit that way is ~132× faster than a full miss-and-populate path
+  (15.5 ns vs. 2.05 us) and allocates nothing. Note also that `CelCompilationKey.GetHashCode()`
+  itself is not cheap (~390 ns, since it string-hashes four separate identity components) — a
+  further reason to prefer a source-text-keyed cache over one keyed by `CelCompilationKey`.
+- Selector-scale batch evaluation (10,000 independent contexts against one compiled predicate)
+  shows bounded, linear-scaling GC pressure: ~1.48 Gen0 collections and ~6.64 MB total allocation,
+  both consistent with the single-evaluation baseline — no batch-specific hotspot emerged.
 - Repeated evaluation performing no parser/binder/type-checker work is instrumented, not just
   asserted: `CelEvaluateCallGraphNeverReachesCompilePipelineTests` statically walks the CIL call
-  graph reachable from `Evaluate()` and proves it never reaches the tokenizer, parser, or binder.
+  graph reachable from all four `Evaluate` overloads (explicit-limits and safe-default, on both
+  compiled types) and proves it never reaches the tokenizer, parser, or binder — fail-closed on any
+  unresolved call-graph edge.
 
 ## References
 

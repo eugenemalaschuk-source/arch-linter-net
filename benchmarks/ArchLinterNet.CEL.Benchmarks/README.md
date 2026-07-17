@@ -29,18 +29,22 @@ A `-c Release` build is required — BenchmarkDotNet refuses to run unoptimized 
 | `EnvironmentConstructionBenchmarks` | One-time context-schema, object-schema, and `CelEnvironment` construction/freeze cost. |
 | `PipelineStageBenchmarks` | Tokenize/parse/bind measured individually, using `InternalsVisibleTo`-granted access to the internal pipeline stages (see `ArchLinterNet.CEL.csproj`). Isolates costs the public `CompilePredicate`/`Compile` API only reports combined. |
 | `CompilationBenchmarks` | The full public compilation pipeline via `CompilePredicate`/`Compile`; predicate vs. general-expression overhead; failing-compilation diagnostic overhead. |
-| `ContextConstructionBenchmarks` | Stable-handle vs. name-based `Set()`; context construction with and without the object-schema catalog. |
+| `ContextConstructionBenchmarks` | Stable-handle vs. name-based `Set()`; context construction with and without the object-schema catalog; isolated `CelEvaluationContextBuilder`-construction-only cost (separate from `Set()`/`Build()`). |
 | `EvaluationBenchmarks` | Compile-once/evaluate-many repeated evaluation, broken out by operator/built-in category (string, list, map, comparison, boolean) and by explicit vs. environment-ceiling limits. |
-| `CacheIdentityBenchmarks` | `CelCompilationKey` creation/equality/hashing, and a caller-owned `Dictionary` cache hit/miss pattern (the library holds no process-global cache by design). |
+| `HighVolumeEvaluationBenchmarks` | One compiled predicate evaluated across 10,000 independent pre-built contexts in a single measured batch — surfaces GC pressure (allocation, Gen0/Gen1 counts) at a selector-like scale that a single-call benchmark cannot show. |
+| `CacheIdentityBenchmarks` | `CelCompilationKey` creation/equality/hashing (including an internal-access-isolated construction-only benchmark), and a caller-owned `Dictionary` cache hit vs. full miss-and-populate pattern (the library holds no process-global cache by design). |
 | `ConcurrencyBenchmarks` | Sequential vs. concurrent (`Parallel.For`) evaluation of one immutable compiled predicate across independent, per-task evaluation contexts. |
-| `ApiScenarioBenchmarks` | Deterministic `BudgetExceeded` and `SchemaMismatch` diagnostic paths, and the safe-default `Evaluate(context)` overload vs. the explicit-limits overload. |
+| `ApiScenarioBenchmarks` | Deterministic, self-calibrating `BudgetExceeded` and `SchemaMismatch` diagnostic paths, and the safe-default `Evaluate(context)` overload vs. the explicit-limits overload. |
 
 ## Design constraints this suite follows
 
 - Every scenario benchmark uses the same public safe API real consumers use
   (`CelEnvironment`, `CelCompiledPredicate`/`CelCompiledExpression`, `CelEvaluationContextBuilder`).
-  `PipelineStageBenchmarks` is the one exception, and only to isolate internal-stage cost that the
-  public API deliberately does not expose separately — see its type-level remarks.
+  Two benchmarks are the exception, and only to isolate internal-stage cost the public API
+  deliberately does not expose separately: `PipelineStageBenchmarks` (tokenize/parse/bind measured
+  individually) and `CacheIdentityBenchmarks.ConstructKeyIsolated` (cache-key construction measured
+  without a full compile, using the internal `CelCompilationKey` constructor and internal identity
+  methods) — see each type's/method's remarks.
 - No wall-clock assertions gate CI; this project produces measurements, not pass/fail checks.
 - No `ArchLinterNet.Core`, YAML, Roslyn, or architecture-policy dependency — only
   `ArchLinterNet.CEL` and `BenchmarkDotNet`.

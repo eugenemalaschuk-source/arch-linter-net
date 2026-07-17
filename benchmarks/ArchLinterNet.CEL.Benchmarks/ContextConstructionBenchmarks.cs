@@ -30,6 +30,20 @@ namespace ArchLinterNet.CEL.Benchmarks;
 /// structural validation vs. primitive-typed validation, not variable count or <c>Set()</c> call
 /// count as well.
 /// </para>
+/// <para>
+/// <b>Construction cost is not free of the object-schema catalog either.</b>
+/// <c>CelEvaluationContextBuilder</c>'s constructor computes
+/// <c>schema.ComputeEnvironmentIdentity(objectSchemas)</c> on every call: for a schema with a
+/// non-empty catalog this rebuilds a <c>StringBuilder</c> and reconcatenates every registered
+/// object schema's identity string, uncached, on every single
+/// <c>CreateEvaluationContextBuilder()</c> call — it is not the cheap, already-computed
+/// <c>CelContextSchema.Identity</c> property lookup the no-catalog path gets. So the
+/// <c>BuildContext_StableHandles</c> vs. <c>BuildContext_NoObjectCatalog_TwoPrimitiveVariables</c>
+/// gap is <i>construction identity-string cost plus <c>Set()</c> structural-validation cost</i>
+/// combined, not <c>Set()</c> validation alone. <see cref="ConstructBuilderOnly_WithObjectCatalog"/>
+/// and <see cref="ConstructBuilderOnly_NoObjectCatalog"/> isolate the construction-only component
+/// so the two can be told apart — see <c>RESULTS.md</c> for the resulting split.
+/// </para>
 /// </remarks>
 [MemoryDiagnoser]
 public class ContextConstructionBenchmarks
@@ -76,6 +90,17 @@ public class ContextConstructionBenchmarks
             .Set(_flagA, CelValue.Bool(true))
             .Set(_flagB, CelValue.Bool(false))
             .Build();
+
+    // Isolates CelEvaluationContextBuilder's constructor cost alone (no Set()/Build()) so the
+    // object-schema-catalog identity-recomputation cost baked into every construction can be told
+    // apart from Set()'s own per-member structural validation cost — see the class remarks above.
+    [Benchmark(Description = "Construct CelEvaluationContextBuilder only, object-schema catalog present, no Set()/Build()")]
+    public CelEvaluationContextBuilder ConstructBuilderOnly_WithObjectCatalog() =>
+        _environment.CreateEvaluationContextBuilder();
+
+    [Benchmark(Description = "Construct CelEvaluationContextBuilder only, no object-schema catalog, no Set()/Build()")]
+    public CelEvaluationContextBuilder ConstructBuilderOnly_NoObjectCatalog() =>
+        _twoPrimitiveSchema.CreateEvaluationContextBuilder();
 
     private static CelContextSchema BuildTwoPrimitiveVariableSchema(out CelVariable flagA, out CelVariable flagB)
     {
