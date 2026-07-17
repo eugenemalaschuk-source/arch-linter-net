@@ -52,7 +52,21 @@ public sealed class CelBenchmarksProjectDependencyTests
             .ToList();
         Assert.That(projectReferences, Has.Count.EqualTo(1),
             "The benchmark project must reference exactly one project: ArchLinterNet.CEL.");
-        Assert.That(projectReferences[0], Does.Contain("ArchLinterNet.CEL.csproj"));
+
+        // Resolve the reference to its canonical absolute path and compare against the real
+        // ArchLinterNet.CEL.csproj file, rather than a substring match on the reference text — a
+        // decoy project with a similar name (e.g. "FakeArchLinterNet.CEL.csproj", or a path
+        // elsewhere on disk that merely contains that substring) would pass `Does.Contain` while
+        // not actually being the real, architecture-governed ArchLinterNet.CEL project.
+        var referencedProjectFullPath = Path.GetFullPath(
+            Path.Combine(Path.GetDirectoryName(csprojPath)!, projectReferences[0]));
+        var expectedCelCsprojFullPath = Path.GetFullPath(
+            Path.Combine(FindRepositoryRoot(), "src", "ArchLinterNet.CEL", "ArchLinterNet.CEL.csproj"));
+        Assert.That(referencedProjectFullPath, Is.EqualTo(expectedCelCsprojFullPath).IgnoreCase,
+            $"The benchmark project's ProjectReference resolves to '{referencedProjectFullPath}', " +
+            $"not the real ArchLinterNet.CEL project at '{expectedCelCsprojFullPath}'.");
+        Assert.That(File.Exists(expectedCelCsprojFullPath), Is.True,
+            $"Expected the real ArchLinterNet.CEL project file to exist at '{expectedCelCsprojFullPath}'.");
 
         // Whitelist, not a blocklist of specific forbidden names: any PackageReference other than
         // BenchmarkDotNet fails this test, so a future addition of Core/YAML/an external CEL

@@ -32,20 +32,39 @@ namespace ArchLinterNet.CEL.Tests;
 /// resolves only to the statically-declared method — the actual runtime target could be any
 /// override, and the IL alone does not say which. <see cref="ResolveVirtualTargets"/> follows
 /// every override of the resolved virtual method found anywhere in the scanned assembly, not just
-/// the token-resolved declaration. This covers two distinct dispatch mechanisms, handled
-/// separately because <see cref="MethodInfo.GetBaseDefinition"/> only answers one of them: for a
-/// class-hierarchy virtual method it walks up to the root declaration and matches every override
-/// sharing that root; for an <em>interface</em> method — where <c>GetBaseDefinition()</c> does not
-/// connect the interface declaration to any implementing class's method, implicit or explicit —
-/// it uses <see cref="Type.GetInterfaceMap"/> against every type in the assembly that implements
-/// the interface, which is the API that actually answers "which method does this type use to
-/// satisfy this interface member." Without both, a <c>callvirt</c> through an interface or a
-/// base-typed reference could hide an edge into
-/// <see cref="CelTokenizer"/>/<see cref="CelParser"/>/<see cref="CelBinder"/> by resolving to an
-/// unrelated declaration with no body. A non-virtual <c>call</c> has no such ambiguity — the token
-/// is the exact target — so this treatment applies only to <c>callvirt</c>.
+/// the token-resolved declaration — one mechanism for class-hierarchy overrides
+/// (<see cref="MethodInfo.GetBaseDefinition"/>) and a separate one for interface implementations,
+/// implicit or explicit (<see cref="Type.GetInterfaceMap"/>), since <c>GetBaseDefinition()</c>
+/// does not connect an interface declaration to any implementing method.
 /// <see cref="CelInterfaceDispatchClosureSanityCheckTests"/> proves both branches actually find
 /// their targets, using a synthetic interface/implementations pair scoped to the test assembly.
+/// </para>
+/// <para>
+/// It also accounts for indirect dispatch the token-based walk cannot see through directly:
+/// <c>calli</c> (an unmanaged/managed function-pointer call with no method token at all — never
+/// expected in this codebase, which contains no unsafe code or function pointers; if one is ever
+/// encountered, it is fail-closed reported as unresolved rather than silently skipped) and delegate
+/// invocation (<c>callvirt</c> to <c>Invoke</c>/<c>BeginInvoke</c>/<c>EndInvoke</c> on any
+/// <see cref="Delegate"/>-derived type — the IL at the invocation site alone never names the actual
+/// wrapped method). For delegate invocation, <see cref="ResolveDelegateInvocationTargets"/> answers
+/// "what could this delegate actually point to?" by scanning every method in the assembly for
+/// <c>ldftn</c>/<c>ldvirtftn</c> instructions (the only two ways a non-capturing delegate can be
+/// constructed in this codebase — the actual pattern <c>CelEvaluator</c> uses for its
+/// <c>Func&lt;int, bool&gt;</c>/<c>Func&lt;bool, bool&gt;</c> comparison/projection delegates) and
+/// matching by signature against the delegate's own <c>Invoke</c> signature. This is a sound
+/// over-approximation, not a precise per-call-site resolution: it may include a method that isn't
+/// actually reachable as *this specific* delegate's target if some other, unrelated
+/// same-signature method also happens to be captured elsewhere in the assembly — acceptable, since
+/// over-exploring cannot hide a forbidden edge the way under-exploring could. If no matching
+/// construction site is found anywhere in the assembly (e.g. the delegate could only have come
+/// from a field, a closure, or outside the assembly), that invocation is fail-closed reported as
+/// unresolved rather than silently treated as a dead end — the previous version of this walker did
+/// exactly that for every delegate invocation, since <c>Invoke()</c> has no method body of its own
+/// and the BCL delegate type is filtered out by the assembly boundary before <em>and</em> after
+/// this fix; what changed is that a construction-site match now short-circuits the "unresolved"
+/// report instead of the walker silently doing nothing either way.
+/// <see cref="CelDelegateDispatchClosureSanityCheckTests"/> proves the resolution actually finds a
+/// non-capturing lambda's target using a synthetic method scoped to the test assembly.
 /// </para>
 /// </remarks>
 [TestFixture]
@@ -55,6 +74,7 @@ public sealed class CelEvaluateCallGraphNeverReachesCompilePipelineTests
     private static readonly Assembly _celAssembly = typeof(CelCompiledPredicate).Assembly;
     private static readonly Dictionary<short, OpCode> _opCodesByValue = BuildOpCodeLookup();
     private static readonly Dictionary<MethodInfo, IReadOnlyList<MethodBase>> _virtualOverrideCache = [];
+    private static readonly Dictionary<Assembly, ILookup<string, MethodInfo>> _ldftnTargetIndexCache = [];
 
     [Test]
     public void Evaluate_CallGraph_NeverReachesTokenizerParserOrBinder()
@@ -123,83 +143,111 @@ public sealed class CelEvaluateCallGraphNeverReachesCompilePipelineTests
 
     private static IEnumerable<MethodBase> GetCalledMethods(MethodBase method, List<string> unresolvedEdges)
     {
-        var body = method.GetMethodBody();
-        if (body is null)
-            yield break;
-
-        var il = body.GetILAsByteArray();
-        if (il is null)
-            yield break;
-
-        var module = method.Module;
-        var typeArgs = method.DeclaringType is { IsGenericType: true } declaringType
-            ? declaringType.GetGenericArguments()
-            : null;
-        var methodArgs = method is MethodInfo { IsGenericMethod: true } methodInfo
-            ? methodInfo.GetGenericArguments()
-            : null;
-
-        var i = 0;
-        while (i < il.Length)
+        foreach (var (opcode, token, resolved, failure) in WalkInlineMethodInstructions(method))
         {
-            var code = il[i];
-            OpCode opcode;
-            if (code == 0xFE)
+            if (opcode.Value == OpCodes.Calli.Value)
             {
-                opcode = _opCodesByValue[(short)(0xFE00 | il[i + 1])];
-                i += 2;
-            }
-            else
-            {
-                opcode = _opCodesByValue[code];
-                i += 1;
-            }
-
-            if (opcode.OperandType == OperandType.InlineSwitch)
-            {
-                var caseCount = BitConverter.ToInt32(il, i);
-                i += 4 + (caseCount * 4);
+                // Fail-closed: calli has no method token at all — a function-pointer call whose
+                // target cannot be determined from the IL by any means this walker has. Never
+                // expected in this codebase (no unsafe code/function pointers); if this ever fires,
+                // it must be investigated by hand, not silently skipped.
+                unresolvedEdges.Add($"{method.DeclaringType}.{method.Name} -> calli (unmanaged/managed function pointer call, no method token)");
                 continue;
             }
 
-            var operandSize = GetOperandSize(opcode.OperandType);
-
-            if (opcode.OperandType == OperandType.InlineMethod)
+            if (failure is not null)
             {
-                var token = BitConverter.ToInt32(il, i);
-                MethodBase? resolved = null;
-                try
-                {
-                    resolved = module.ResolveMethod(token, typeArgs, methodArgs);
-                }
-                catch (ArgumentException ex)
-                {
-                    // Fail-closed, not fail-open: an edge this walker cannot resolve is recorded as
-                    // a failure the caller must surface, rather than silently dropped — a dropped
-                    // edge could just as easily be the one call into a forbidden pipeline type.
-                    unresolvedEdges.Add($"{method.DeclaringType}.{method.Name} -> token 0x{token:X8} ({ex.Message})");
-                }
-
-                if (resolved is not null)
-                {
-                    // callvirt: the token names only the statically-declared method; the actual
-                    // runtime target could be any override. call/newobj/ldftn have no such
-                    // ambiguity — the token already names the exact target.
-                    if (opcode.Value == OpCodes.Callvirt.Value && resolved is MethodInfo { IsVirtual: true } virtualMethod)
-                    {
-                        foreach (var target in ResolveVirtualTargets(virtualMethod, _celAssembly, unresolvedEdges))
-                            yield return target;
-                    }
-                    else
-                    {
-                        yield return resolved;
-                    }
-                }
+                // Fail-closed, not fail-open: an edge this walker cannot resolve is recorded as
+                // a failure the caller must surface, rather than silently dropped — a dropped
+                // edge could just as easily be the one call into a forbidden pipeline type.
+                unresolvedEdges.Add($"{method.DeclaringType}.{method.Name} -> token 0x{token:X8} ({failure.Message})");
+                continue;
             }
 
-            i += operandSize;
+            if (resolved is null)
+                continue;
+
+            if (IsDelegateInvocation(resolved))
+            {
+                var targets = ResolveDelegateInvocationTargets((MethodInfo)resolved, _celAssembly);
+                if (targets.Count == 0)
+                {
+                    unresolvedEdges.Add(
+                        $"{method.DeclaringType}.{method.Name} -> {resolved.DeclaringType}.{resolved.Name} " +
+                        "(delegate invocation; no matching ldftn/ldvirtftn construction site found anywhere " +
+                        "in the scanned assembly — target cannot be determined statically)");
+                    continue;
+                }
+
+                foreach (var target in targets)
+                    yield return target;
+                continue;
+            }
+
+            // callvirt: the token names only the statically-declared method; the actual
+            // runtime target could be any override. call/newobj/ldftn/ldvirtftn have no such
+            // ambiguity for non-delegate targets — the token already names the exact target.
+            if (opcode.Value == OpCodes.Callvirt.Value && resolved is MethodInfo { IsVirtual: true } virtualMethod)
+            {
+                foreach (var target in ResolveVirtualTargets(virtualMethod, _celAssembly, unresolvedEdges))
+                    yield return target;
+            }
+            else
+            {
+                yield return resolved;
+            }
         }
     }
+
+    private static bool IsDelegateInvocation(MethodBase method) =>
+        typeof(Delegate).IsAssignableFrom(method.DeclaringType)
+        && method.Name is "Invoke" or "BeginInvoke" or "EndInvoke";
+
+    /// <summary>
+    /// Sound over-approximation of a delegate invocation's possible targets: every method anywhere
+    /// in <paramref name="scanAssembly"/> that is the target of an <c>ldftn</c>/<c>ldvirtftn</c>
+    /// instruction and whose signature (parameter types, in order, plus return type) matches
+    /// <paramref name="delegateInvokeMethod"/>'s own signature. See the type-level remarks for why
+    /// this is sound (may over-include, cannot under-include) rather than a precise per-call-site
+    /// resolution.
+    /// </summary>
+    internal static IReadOnlyList<MethodInfo> ResolveDelegateInvocationTargets(MethodInfo delegateInvokeMethod, Assembly scanAssembly)
+    {
+        var index = BuildLdftnTargetIndex(scanAssembly);
+        return index[SignatureKey(delegateInvokeMethod)].ToList();
+    }
+
+    private static ILookup<string, MethodInfo> BuildLdftnTargetIndex(Assembly scanAssembly)
+    {
+        if (_ldftnTargetIndexCache.TryGetValue(scanAssembly, out var cached))
+            return cached;
+
+        var found = new List<MethodInfo>();
+        foreach (var type in scanAssembly.GetTypes())
+        {
+            var members = type.GetMethods(
+                    BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static | BindingFlags.Instance | BindingFlags.DeclaredOnly)
+                .Cast<MethodBase>()
+                .Concat(type.GetConstructors(
+                    BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static | BindingFlags.Instance | BindingFlags.DeclaredOnly));
+
+            foreach (var member in members)
+            {
+                foreach (var (opcode, _, resolved, _) in WalkInlineMethodInstructions(member))
+                {
+                    if ((opcode.Value == OpCodes.Ldftn.Value || opcode.Value == OpCodes.Ldvirtftn.Value) && resolved is MethodInfo methodInfo)
+                        found.Add(methodInfo);
+                }
+            }
+        }
+
+        var index = found.Distinct().ToLookup(SignatureKey);
+        _ldftnTargetIndexCache[scanAssembly] = index;
+        return index;
+    }
+
+    private static string SignatureKey(MethodInfo method) =>
+        method.ReturnType.FullName + "(" + string.Join(",", method.GetParameters().Select(p => p.ParameterType.FullName)) + ")";
 
     /// <summary>
     /// Returns the token-resolved virtual method itself, plus every override of it (class-hierarchy
@@ -279,6 +327,85 @@ public sealed class CelEvaluateCallGraphNeverReachesCompilePipelineTests
 
         _virtualOverrideCache[virtualMethod] = targets;
         return targets;
+    }
+
+    /// <summary>
+    /// Low-level shared IL walker: yields one entry per instruction in <paramref name="method"/>
+    /// whose operand is a method token (<c>call</c>, <c>callvirt</c>, <c>newobj</c>, <c>ldftn</c>,
+    /// <c>ldvirtftn</c>, <c>jmp</c>) or is <c>calli</c> (no token, <c>InlineSig</c> operand instead).
+    /// For a method-token instruction, <c>resolved</c>/<c>failure</c> report the
+    /// <see cref="Module.ResolveMethod(int, Type[], Type[])"/> outcome; for <c>calli</c> both are
+    /// <c>null</c> and the caller must recognize it by <c>opcode</c> alone (see
+    /// <see cref="GetCalledMethods"/>). Shared by both the call-graph walk itself and
+    /// <see cref="BuildLdftnTargetIndex"/>'s assembly-wide <c>ldftn</c>/<c>ldvirtftn</c> pre-scan,
+    /// so the two cannot silently diverge on IL-decoding details.
+    /// </summary>
+    internal static IEnumerable<(OpCode Opcode, int Token, MethodBase? Resolved, Exception? Failure)> WalkInlineMethodInstructions(MethodBase method)
+    {
+        var body = method.GetMethodBody();
+        if (body is null)
+            yield break;
+
+        var il = body.GetILAsByteArray();
+        if (il is null)
+            yield break;
+
+        var module = method.Module;
+        var typeArgs = method.DeclaringType is { IsGenericType: true } declaringType
+            ? declaringType.GetGenericArguments()
+            : null;
+        var methodArgs = method is MethodInfo { IsGenericMethod: true } methodInfo
+            ? methodInfo.GetGenericArguments()
+            : null;
+
+        var i = 0;
+        while (i < il.Length)
+        {
+            var code = il[i];
+            OpCode opcode;
+            if (code == 0xFE)
+            {
+                opcode = _opCodesByValue[(short)(0xFE00 | il[i + 1])];
+                i += 2;
+            }
+            else
+            {
+                opcode = _opCodesByValue[code];
+                i += 1;
+            }
+
+            if (opcode.OperandType == OperandType.InlineSwitch)
+            {
+                var caseCount = BitConverter.ToInt32(il, i);
+                i += 4 + (caseCount * 4);
+                continue;
+            }
+
+            var operandSize = GetOperandSize(opcode.OperandType);
+
+            if (opcode.Value == OpCodes.Calli.Value)
+            {
+                yield return (opcode, 0, null, null);
+            }
+            else if (opcode.OperandType == OperandType.InlineMethod)
+            {
+                var token = BitConverter.ToInt32(il, i);
+                MethodBase? resolved = null;
+                Exception? failure = null;
+                try
+                {
+                    resolved = module.ResolveMethod(token, typeArgs, methodArgs);
+                }
+                catch (ArgumentException ex)
+                {
+                    failure = ex;
+                }
+
+                yield return (opcode, token, resolved, failure);
+            }
+
+            i += operandSize;
+        }
     }
 
     private static int GetOperandSize(OperandType operandType) => operandType switch

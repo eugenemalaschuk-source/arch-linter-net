@@ -384,9 +384,15 @@ Recorded baseline headlines (see RESULTS.md for full tables and methodology):
   asserted: `CelEvaluateCallGraphNeverReachesCompilePipelineTests` statically walks the CIL call
   graph reachable from all four `Evaluate` overloads (explicit-limits and safe-default, on both
   compiled types) and proves it never reaches the tokenizer, parser, or binder — fail-closed on any
-  unresolved call-graph edge, and conservative for virtual dispatch (a `callvirt` is followed to
-  every override of the resolved method found in the `ArchLinterNet.CEL` assembly, not only the
-  statically-resolved one, since the IL token alone cannot say which override actually runs).
+  unresolved call-graph edge, on `calli` (a function-pointer call with no method token), and
+  conservative for indirect dispatch: virtual/interface calls follow every override or
+  implementation (implicit or explicit) of the resolved method found in the `ArchLinterNet.CEL`
+  assembly, since the IL token alone cannot say which one actually runs; delegate invocations
+  (`Invoke`/`BeginInvoke`/`EndInvoke` on any `Delegate` type, which carry no target information at
+  the call site at all) are resolved by scanning the assembly for `ldftn`/`ldvirtftn` construction
+  sites matching the delegate's signature — the pattern `CelEvaluator`'s own comparison/projection
+  delegates use — and reported as unresolved if no matching construction site exists anywhere in
+  the assembly, rather than silently treated as a dead end.
 
 ## References
 

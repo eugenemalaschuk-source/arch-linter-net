@@ -381,21 +381,40 @@ the same budget also fails (which would mean haystack length had stopped being t
   just "no data flows into Evaluate that could re-tokenize" but "no code path inside Evaluate
   re-tokenizes using state it already holds" (e.g. `CompilationKey.NormalizedSource`), covering
   every reachable path in the current build rather than only the one path a sampled run happens to
-  exercise. The walk is fail-closed on unresolved method tokens, and conservative for virtual
-  dispatch/interface calls: a `callvirt` instruction's token names only the statically-declared
-  method, so the walker follows every override of that method found anywhere in the
-  `ArchLinterNet.CEL` assembly (not just the token-resolved one), since the actual runtime target
-  cannot otherwise be determined from the IL alone. Class-hierarchy overrides and interface
-  implementations are resolved through two different mechanisms — `GetBaseDefinition()` for the
-  former, `Type.GetInterfaceMap` for the latter, since `GetBaseDefinition()` does not connect an
-  interface method to its implicit or explicit implementations. The test is verified against a true
-  positive (confirmed to actually flag `CelEnvironment.CompilePredicate`'s call graph, which does
-  reach `CelTokenizer`, when pointed at it) so its silence on `Evaluate` is a real negative, not a
-  walker that never finds anything; the interface-dispatch branch specifically is verified by
-  `CelInterfaceDispatchClosureSanityCheckTests.cs`, which proves it finds both implicit and explicit
-  implementations using a synthetic interface scoped to the test assembly (no real interface calls
-  exist in `Evaluate()`'s call graph today, so the main test's silence alone can't distinguish "the
-  branch works and found nothing" from "the branch is broken and finds nothing regardless").
+  exercise. The walk is fail-closed on unresolved method tokens, on `calli` (a function-pointer
+  call with no method token at all — never expected in this codebase, which has no unsafe code or
+  function pointers; reported as unresolved rather than silently skipped if it ever appears), and
+  conservative for indirect dispatch it cannot follow by token alone:
+  - **Virtual/interface dispatch**: a `callvirt` instruction's token names only the
+    statically-declared method, so the walker follows every override found anywhere in the
+    `ArchLinterNet.CEL` assembly — class-hierarchy overrides via `GetBaseDefinition()`, interface
+    implementations (implicit or explicit) via `Type.GetInterfaceMap`, since `GetBaseDefinition()`
+    does not connect an interface method to its implementations.
+  - **Delegate invocation**: a `callvirt` to `Invoke`/`BeginInvoke`/`EndInvoke` on any `Delegate`
+    type carries no information about the wrapped method at the invocation site at all. The walker
+    resolves this by scanning every method in the assembly for `ldftn`/`ldvirtftn` instructions
+    (the pattern non-capturing lambdas and method-group conversions compile to — the exact
+    mechanism `CelEvaluator` itself uses for its `Func<int, bool>`/`Func<bool, bool>`
+    comparison/projection delegates) and matching by signature against the delegate's own `Invoke`
+    signature — a sound over-approximation (may include an unrelated same-signature method, cannot
+    hide a real one) rather than precise per-call-site resolution. If no construction site is found
+    anywhere in the assembly (e.g. the delegate could only have come from a field or a closure),
+    the invocation is reported as unresolved rather than silently treated as a dead end — which is
+    what the walker did for *every* delegate invocation before this fix, since `Invoke()` has no
+    method body of its own to explore.
+
+  The test is verified against a true positive (confirmed to actually flag
+  `CelEnvironment.CompilePredicate`'s call graph, which does reach `CelTokenizer`, when pointed at
+  it) so its silence on `Evaluate` is a real negative, not a walker that never finds anything. The
+  interface-dispatch branch is verified by `CelInterfaceDispatchClosureSanityCheckTests.cs` (finds
+  both implicit and explicit implementations via a synthetic interface). The delegate-dispatch
+  branch is verified by `CelDelegateDispatchClosureSanityCheckTests.cs` (finds a known
+  method-group-conversion target by signature, and confirms an unused signature resolves to
+  nothing) — necessary because the codebase's actual delegate invocations
+  (`CelEvaluator.EvaluateOrdering`/`EvaluateBooleanRight`'s `Func<int, bool>`/`Func<bool, bool>`
+  parameters) are now resolved successfully by this mechanism, so the main test's silence alone
+  can't distinguish "the branch works and correctly matched the real targets" from "the branch is
+  broken and matches everything indiscriminately."
 
 ## Feeding into #330 / #163
 
