@@ -75,26 +75,27 @@ comment on `CompilationBenchmarks.CompilePredicateFailure`).
 
 ### ContextConstructionBenchmarks — stable-handle vs. name-based population
 
-*(Rerun after a review fix: the source/target `CelValue` object instances are now precomputed once
-in `GlobalSetup` and reused, instead of being constructed inside the timed methods — see
-`ContextConstructionBenchmarks`'s class remarks. The two rows below now measure only
-`CelEvaluationContextBuilder`'s own cost, not object-value construction cost; both dropped
-substantially from the first baseline pass as a result.)*
+*(Rerun twice after review fixes. First fix: the source/target `CelValue` object instances are now
+precomputed once in `GlobalSetup` and reused, instead of being constructed inside the timed
+methods. Second fix: the "no object catalog" comparison now declares exactly two `Bool` variables
+and calls `Set()` exactly twice — matching the source/target schema's variable/`Set()` count — so
+the comparison below isolates object-typed vs. primitive-typed structural validation, not variable
+count as well. See `ContextConstructionBenchmarks`'s class remarks for both.)*
 
 | Method | Mean | Allocated |
 |---|---:|---:|
-| Build source/target context via stable variable handles (precomputed values) | 913.2 ns | 3.02 KB |
-| Build source/target context via name-based `Set()` convenience overload (precomputed values) | 980.1 ns | 3.21 KB |
-| Build context without object-schema catalog (`schema.CreateEvaluationContextBuilder()`) | 286.4 ns | 1.25 KB |
+| Build source/target context via stable variable handles (precomputed values) | 983.1 ns | 3.02 KB |
+| Build source/target context via name-based `Set()` convenience overload (precomputed values) | 1,035.6 ns | 3.21 KB |
+| Build context with 2 primitive `Bool` variables, no object-schema catalog (same variable/`Set()` count) | 421.2 ns | 1.48 KB |
 
-The name-based convenience overload costs ~7.3% more time and ~6.3% more allocation than the
+The name-based convenience overload costs ~5.3% more time and ~6.3% more allocation than the
 stable-handle path for this two-variable, object-typed schema — the extra `FirstOrDefault` name
-lookup is a real but modest fraction of total context-build cost. Skipping the object-schema
-catalog (primitive-only schema, one `Bool` variable, no structural object validation) is ~3.2×
-cheaper than the object-typed, catalog-validated schema — with value construction now excluded from
-both sides, this comparison isolates `CelEvaluationContextBuilder.Set`'s own structural validation
-cost (recursive member-by-member type checking against the registered object schema) from
-handle-vs-name resolution and from object-value allocation. The documented guidance to prefer
+lookup is a real but modest fraction of total context-build cost. The two-object-variable,
+catalog-validated schema costs ~2.33× the two-primitive-variable schema with the same variable
+count and `Set()` call count — with value construction excluded from all three rows and variable
+count now held constant, this isolates `CelEvaluationContextBuilder.Set`'s own structural
+validation cost (recursive member-by-member type checking against the registered object schema)
+from both handle-vs-name resolution and variable count. The documented guidance to prefer
 handle-based `Set()` "in high-volume evaluation paths" remains correct directionally but modest in
 magnitude for this shape — worth noting for #330's docs so the guidance isn't overstated.
 
@@ -142,7 +143,18 @@ fell through to compiling the longer `ComplexPredicateSource`, which inflated th
 Key construction in isolation (schema/limits identity computation + the `CelCompilationKey`
 constructor) is ~15% of a full compile's time and ~28% of its allocation — meaningful but not the
 dominant cost of `CompilePredicate`; tokenize/parse/bind still account for the remaining ~85%/72%.
-Equality/hashing on an already-built key is effectively free (0 B allocated, low-nanosecond time).
+`Equals` is genuinely cheap (0 B allocated, low-nanosecond time) — but `GetHashCode()` is not:
+at 380.7 ns it costs about as much as isolated key *construction* (341.4 ns) and more than any
+single evaluation in the table above, because it must string-hash four separate identity
+components (`NormalizedSource`, `SchemaIdentity`, `CompilationLimitsIdentity`,
+`EvaluationLimitsIdentity` — `SchemaIdentity` in particular can be long, since it encodes the whole
+registered object-schema catalog structurally), not just one short string. This reinforces, rather
+than merely coincides with, the decision to key a caller-owned cache by the raw source string
+(see `SourceKeyedCacheHit` below, 15.6 ns) instead of by `CelCompilationKey`: even setting aside
+that a `CelCompilationKey` cannot be obtained before a first compile (see the class remarks), using
+one as a `Dictionary` key would also pay ~380 ns of hashing on every lookup — a real, avoidable tax
+a source-text key does not carry for expressions no longer or more complex than
+`RepresentativePredicateSource`.
 The miss benchmark's mean (2,043.9 ns) and allocation (6,432 B) land close to the full-compile row
 above (2,213.1 ns, 6,432 B) — expected, since a miss falls through to exactly that same
 `CompilePredicate` call, and this closeness is itself a consistency check that the fix produced a
@@ -170,19 +182,27 @@ throughput comparison at realistic batch sizes is a candidate follow-up if #163 
 
 ### ApiScenarioBenchmarks — deterministic diagnostic paths, safe-default overload
 
+*(Rerun after a review fix: the budget-exhaustion scenario is now self-calibrating — it derives its
+cost ceiling from a live probe of `CelEvaluator`'s actual per-comparison cost, instead of a
+hardcoded copy of a private cost constant, and `GlobalSetup` now asserts both that the scenario
+still produces `BudgetExceeded` and that a shorter haystack under the same budget still succeeds.
+See `ApiScenarioBenchmarks.SetupBudgetExhaustion` for the mechanism.)*
+
 | Method | Mean | Ratio | Allocated |
 |---|---:|---:|---:|
-| Deterministic `BudgetExceeded` (~200 of a 256-element scan) | 5,531.8 ns | 16.15 | 15,312 B |
-| Deterministic `SchemaMismatch` rejection (context from a different schema) | 407.2 ns | 1.19 | 1,272 B |
-| Successful predicate, zero diagnostics, safe-default overload | 342.6 ns | 1.00 | 696 B |
-| Explicit-limits overload with the same ceiling value | 328.7 ns | 0.96 | 696 B |
+| Deterministic `BudgetExceeded` (~200 of a 256-element scan) | 4,825.9 ns | 17.04 | 15,312 B |
+| Deterministic `SchemaMismatch` rejection (context from a different schema) | 364.9 ns | 1.29 | 1,272 B |
+| Successful predicate, zero diagnostics, safe-default overload | 283.2 ns | 1.00 | 696 B |
+| Explicit-limits overload with the same ceiling value | 284.9 ns | 1.01 | 696 B |
 
-`SchemaMismatch` is rejected cheaply (1.19× baseline) — the evaluator checks schema identity before
-walking the bound plan at all. `BudgetExceeded` costs 16× the successful baseline here because the
-scenario is calibrated (see `ApiScenarioBenchmarks.SetupBudgetExhaustion`) to genuinely scan ~200
-of 256 haystack elements before the cost ceiling trips, so the cost is dominated by real per-element
-string-comparison work, not a fixed penalty — confirming the evaluator's cost accounting is real
-(charged per unit of work, not a flat per-call tax).
+`SchemaMismatch` is rejected cheaply (1.29× baseline) — the evaluator checks schema identity before
+walking the bound plan at all. `BudgetExceeded` costs 17× the successful baseline here because the
+scenario is calibrated (see above) to genuinely scan ~200 of 256 haystack elements before the cost
+ceiling trips, so the cost is dominated by real per-element string-comparison work, not a fixed
+penalty — confirming the evaluator's cost accounting is real (charged per unit of work, not a flat
+per-call tax). This is now verified at setup time, not just claimed: `SetupBudgetExhaustion` throws
+if the calibrated scenario stops producing `BudgetExceeded`, or if a quarter-length haystack under
+the same budget also fails (which would mean haystack length had stopped being the actual driver).
 
 ## Allocation findings / actionable hotspots
 
@@ -190,14 +210,14 @@ string-comparison work, not a fixed penalty — confirming the evaluator's cost 
   roughly 15–75× more expensive than a single evaluation of the resulting predicate (0.1–0.3 us,
   0.2–0.7 KB). This is the architecture's central promise and it holds — no action needed, but
   worth quoting concretely in #330's docs rather than only asserting it qualitatively.
-- **Object-value structural validation, not handle-vs-name resolution, dominates context
-  construction.** With value construction excluded from the measurement (see the rerun note under
-  `ContextConstructionBenchmarks` above), the object-typed/catalog-validated schema still costs
-  ~3.2× the primitive-only schema. If #163's Core integration needs faster context population at
-  very high volume, the actionable lever is reducing per-object member count or the
-  `MaxValidationDepth`/`MaxValidationCollectionSize` traversal cost in
-  `CelEvaluationContextBuilder.Set`, not switching from name-based to handle-based `Set()` (that
-  swap alone saves only ~7%).
+- **Object-value structural validation, not handle-vs-name resolution or variable count, dominates
+  context construction.** With value construction excluded and variable/`Set()` count held equal on
+  both sides (see the rerun note under `ContextConstructionBenchmarks` above), the two-object-variable,
+  catalog-validated schema still costs ~2.33× the two-primitive-variable schema. If #163's Core
+  integration needs faster context population at very high volume, the actionable lever is reducing
+  per-object member count or the `MaxValidationDepth`/`MaxValidationCollectionSize` traversal cost
+  in `CelEvaluationContextBuilder.Set`, not switching from name-based to handle-based `Set()` (that
+  swap alone saves only ~5%).
 - **`CelCompilationKey` cannot serve as a pre-compile cache key through the public API** (every
   identity component it's built from — schema/limits `ComputeIdentity()` — is internal). This is a
   real API characteristic, not a benchmark artifact: worth documenting explicitly in #330's package
@@ -211,13 +231,22 @@ string-comparison work, not a fixed penalty — confirming the evaluator's cost 
   8-task granularity should not be read as a scalability verdict** — see the `ConcurrencyBenchmarks`
   note above.
 - **"No repeated parsing/binding/type-checking during warm evaluation" is now instrumented, not
-  just asserted.** `tests/ArchLinterNet.CEL.Tests/CelRepeatedEvaluationNoReparseTests.cs` proves
-  this deterministically (no wall-clock dependence): `CelCompiledPredicate.Evaluate`'s only
-  overloads take `(context)`/`(context, limits)` — neither carries a source string, token stream,
-  or syntax node, so there is no data-flow path back into `CelTokenizer.Tokenize`/`CelParser.Parse`/
-  `CelBinder.Bind`; the internal `Bound` plan property is get-only (compiler-enforced immutability
-  post-construction); and the exact same `Bound` object reference is observed before and after
-  1,000 evaluations of a compiled predicate.
+  just asserted — at two levels.** `tests/ArchLinterNet.CEL.Tests/CelRepeatedEvaluationNoReparseTests.cs`
+  proves it deterministically at the instance level (no wall-clock dependence):
+  `CelCompiledPredicate.Evaluate`'s only overloads take `(context)`/`(context, limits)` — neither
+  carries a source string, token stream, or syntax node; the internal `Bound` plan property is
+  get-only (compiler-enforced immutability post-construction); and the exact same `Bound` object
+  reference is observed before and after 1,000 evaluations of a compiled predicate.
+  `CelEvaluateCallGraphNeverReachesCompilePipelineTests.cs` goes further and proves it at the
+  *code-path* level: it walks the actual CIL call graph reachable from both `Evaluate(context,
+  limits)` overloads and asserts the walk never reaches `CelTokenizer`, `CelParser`, or `CelBinder`
+  — this rules out not just "no data flows into Evaluate that could re-tokenize" but "no code path
+  inside Evaluate re-tokenizes using state it already holds" (e.g.
+  `CompilationKey.NormalizedSource`), covering every reachable path in the current build rather than
+  only the one path a sampled run happens to exercise. The test is verified against a true positive
+  (confirmed to actually flag `CelEnvironment.CompilePredicate`'s call graph, which does reach
+  `CelTokenizer`, when pointed at it) so its silence on `Evaluate` is a real negative, not a walker
+  that never finds anything.
 
 ## Feeding into #330 / #163
 

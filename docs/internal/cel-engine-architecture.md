@@ -332,12 +332,19 @@ Recorded baseline headlines (see RESULTS.md for full tables and methodology):
 - Compile-once/evaluate-many holds: compilation (2.8–8.0 us) is 15–75× the cost of evaluating the
   resulting compiled predicate (0.1–0.3 us).
 - Context-construction cost is dominated by structural object-value validation, not by
-  handle-vs-name resolution — the name-based `Set()` convenience overload costs only ~3.5% more
-  than the stable-handle path for the representative two-variable schema.
+  handle-vs-name resolution or variable count — with value construction and variable count held
+  equal on both sides, an object-typed/catalog-validated two-variable schema costs ~2.33× a
+  primitive-typed two-variable schema, while the name-based `Set()` convenience overload costs only
+  ~5% more than the stable-handle path.
 - `CelCompilationKey` cannot serve as a pre-compile cache-lookup key through the public API (its
-  identity components are internal); a caller-owned cache should key by source text instead — a
-  cache hit that way is ~400× faster than a miss-and-recompile (19 ns vs. 7.8 us) and allocates
-  nothing.
+  identity components are internal); a caller-owned cache should key by source text instead — for
+  the same expression, a cache hit that way is ~131× faster than a miss-and-recompile (15.6 ns vs.
+  2.04 us) and allocates nothing. Note also that `CelCompilationKey.GetHashCode()` itself is not
+  cheap (~380 ns, since it string-hashes four separate identity components) — a further reason to
+  prefer a source-text-keyed cache over one keyed by `CelCompilationKey`.
+- Repeated evaluation performing no parser/binder/type-checker work is instrumented, not just
+  asserted: `CelEvaluateCallGraphNeverReachesCompilePipelineTests` statically walks the CIL call
+  graph reachable from `Evaluate()` and proves it never reaches the tokenizer, parser, or binder.
 
 ## References
 
