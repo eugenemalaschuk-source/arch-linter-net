@@ -136,7 +136,7 @@ ______________________________________________________________________
 | Component | Owner | Notes |
 |---|---|---|
 | Profile identity (`CelProfile`, `CelProfileId`) | `ArchLinterNet.CEL` public | Stable across versions; v1 ID is `arch-linter/cel/v1` |
-| Grammar gates (token set, operator set) | `ArchLinterNet.CEL.Parsing` internal (`CelTokenizer`, `CelParser`) | Controlled per-profile; no public API. Deviation from the original design: the gate lives in the tokenizer/parser themselves (deferred tokens are lexed, then rejected by the parser with `UnsupportedFeature`), not in `CelEngine` — `CelEngine` remains an unused placeholder pending #328 |
+| Grammar gates (token set, operator set) | `ArchLinterNet.CEL.Parsing` internal (`CelTokenizer`, `CelParser`) | Controlled per-profile; no public API. Deviation from the original design: the gate lives in the tokenizer/parser themselves (deferred tokens are lexed, then rejected by the parser with `UnsupportedFeature`), not in `CelEngine` — `CelEngine` remains an unused placeholder. Update: #328 shipped the bounded evaluator as `ArchLinterNet.CEL.Evaluation.CelEvaluator`, a standalone type, not inside `CelEngine`; `CelEngine` is still an empty placeholder after #325–#329, matching the Function catalog row below |
 | Value model (`CelValue`, `CelObjectValue`, `CelValueKind`) | `ArchLinterNet.CEL` public | No CLR reflection; all factories are typed |
 | Type descriptors (`CelType`, `CelTypeKind`) | `ArchLinterNet.CEL` public | Static factories only |
 | Context schema (`CelContextSchema`, `CelVariable`) | `ArchLinterNet.CEL` public | Structural identity is deterministic |
@@ -215,7 +215,7 @@ Capabilities deferred: optimized planner, JIT-style compiled backend, alternate 
 | Affected layers | Bound plan representation, evaluator |
 | Safety implications | New backend must preserve CEL short-circuit semantics and budget enforcement |
 | Prohibited shortcut | Do NOT expose the bound plan or evaluator interface publicly. Do NOT allow raw delegate escape (e.g., `Func<CelEvaluationContext, bool>` as a public compilation result) |
-| Direction | Plausible future work; task #329 covers performance |
+| Direction | Plausible future work; no dedicated performance-optimization task is currently scheduled — #329 shipped the public compilation pipeline and cache identity (`CelCompilationKey`), not a backend swap or optimized planner |
 
 ### 5. Tooling and AST
 
