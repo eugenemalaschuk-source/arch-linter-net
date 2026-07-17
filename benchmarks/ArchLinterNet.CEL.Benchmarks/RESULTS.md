@@ -331,10 +331,17 @@ the same budget also fails (which would mean haystack length had stopped being t
   dispatch/interface calls: a `callvirt` instruction's token names only the statically-declared
   method, so the walker follows every override of that method found anywhere in the
   `ArchLinterNet.CEL` assembly (not just the token-resolved one), since the actual runtime target
-  cannot otherwise be determined from the IL alone. The test is verified against a true positive
-  (confirmed to actually flag `CelEnvironment.CompilePredicate`'s call graph, which does reach
-  `CelTokenizer`, when pointed at it) so its silence on `Evaluate` is a real negative, not a walker
-  that never finds anything.
+  cannot otherwise be determined from the IL alone. Class-hierarchy overrides and interface
+  implementations are resolved through two different mechanisms — `GetBaseDefinition()` for the
+  former, `Type.GetInterfaceMap` for the latter, since `GetBaseDefinition()` does not connect an
+  interface method to its implicit or explicit implementations. The test is verified against a true
+  positive (confirmed to actually flag `CelEnvironment.CompilePredicate`'s call graph, which does
+  reach `CelTokenizer`, when pointed at it) so its silence on `Evaluate` is a real negative, not a
+  walker that never finds anything; the interface-dispatch branch specifically is verified by
+  `CelInterfaceDispatchClosureSanityCheckTests.cs`, which proves it finds both implicit and explicit
+  implementations using a synthetic interface scoped to the test assembly (no real interface calls
+  exist in `Evaluate()`'s call graph today, so the main test's silence alone can't distinguish "the
+  branch works and found nothing" from "the branch is broken and finds nothing regardless").
 
 ## Feeding into #330 / #163
 

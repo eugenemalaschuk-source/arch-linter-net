@@ -30,13 +30,22 @@ namespace ArchLinterNet.CEL.Tests;
 /// <para>
 /// It is also conservative for virtual dispatch: for a <c>callvirt</c> instruction, the token
 /// resolves only to the statically-declared method — the actual runtime target could be any
-/// override, and the IL alone does not say which. <see cref="ResolveVirtualTargets"/> therefore
-/// follows every override of the resolved virtual method found anywhere in the
-/// <c>ArchLinterNet.CEL</c> assembly, not just the token-resolved declaration, so a `callvirt`
-/// through an interface or a base-typed reference cannot hide an edge into
+/// override, and the IL alone does not say which. <see cref="ResolveVirtualTargets"/> follows
+/// every override of the resolved virtual method found anywhere in the scanned assembly, not just
+/// the token-resolved declaration. This covers two distinct dispatch mechanisms, handled
+/// separately because <see cref="MethodInfo.GetBaseDefinition"/> only answers one of them: for a
+/// class-hierarchy virtual method it walks up to the root declaration and matches every override
+/// sharing that root; for an <em>interface</em> method — where <c>GetBaseDefinition()</c> does not
+/// connect the interface declaration to any implementing class's method, implicit or explicit —
+/// it uses <see cref="Type.GetInterfaceMap"/> against every type in the assembly that implements
+/// the interface, which is the API that actually answers "which method does this type use to
+/// satisfy this interface member." Without both, a <c>callvirt</c> through an interface or a
+/// base-typed reference could hide an edge into
 /// <see cref="CelTokenizer"/>/<see cref="CelParser"/>/<see cref="CelBinder"/> by resolving to an
-/// unrelated base method with no body. A non-virtual <c>call</c> has no such ambiguity — the token
+/// unrelated declaration with no body. A non-virtual <c>call</c> has no such ambiguity — the token
 /// is the exact target — so this treatment applies only to <c>callvirt</c>.
+/// <see cref="CelInterfaceDispatchClosureSanityCheckTests"/> proves both branches actually find
+/// their targets, using a synthetic interface/implementations pair scoped to the test assembly.
 /// </para>
 /// </remarks>
 [TestFixture]
@@ -178,7 +187,7 @@ public sealed class CelEvaluateCallGraphNeverReachesCompilePipelineTests
                     // ambiguity — the token already names the exact target.
                     if (opcode.Value == OpCodes.Callvirt.Value && resolved is MethodInfo { IsVirtual: true } virtualMethod)
                     {
-                        foreach (var target in ResolveVirtualTargets(virtualMethod))
+                        foreach (var target in ResolveVirtualTargets(virtualMethod, _celAssembly))
                             yield return target;
                     }
                     else
@@ -193,30 +202,69 @@ public sealed class CelEvaluateCallGraphNeverReachesCompilePipelineTests
     }
 
     /// <summary>
-    /// Returns the token-resolved virtual method itself, plus every override of it declared
-    /// anywhere in the <c>ArchLinterNet.CEL</c> assembly — conservative handling for virtual
-    /// dispatch/interface calls, since a <c>callvirt</c> token alone does not identify which
-    /// override actually runs. Results are cached per base definition; the CEL assembly's type set
-    /// does not change during a test run.
+    /// Returns the token-resolved virtual method itself, plus every override of it (class-hierarchy
+    /// override, or interface implementation — implicit or explicit) declared anywhere in
+    /// <paramref name="scanAssembly"/> — conservative handling for virtual dispatch/interface calls,
+    /// since a <c>callvirt</c> token alone does not identify which override actually runs. Results
+    /// are cached per resolved method; a given assembly's type set does not change during a test
+    /// run. Internal (not <c>private</c>) so
+    /// <c>CelInterfaceDispatchClosureSanityCheckTests</c> can exercise it directly against a
+    /// synthetic assembly.
     /// </summary>
-    private static IReadOnlyList<MethodBase> ResolveVirtualTargets(MethodInfo virtualMethod)
+    internal static IReadOnlyList<MethodBase> ResolveVirtualTargets(MethodInfo virtualMethod, Assembly scanAssembly)
     {
-        var baseDefinition = virtualMethod.GetBaseDefinition();
-        if (_virtualOverrideCache.TryGetValue(baseDefinition, out var cached))
+        if (_virtualOverrideCache.TryGetValue(virtualMethod, out var cached))
             return cached;
 
         var targets = new List<MethodBase> { virtualMethod };
-        foreach (var type in _celAssembly.GetTypes())
+
+        if (virtualMethod.DeclaringType is { IsInterface: true } interfaceType)
         {
-            foreach (var candidate in type.GetMethods(
-                BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.DeclaredOnly))
+            // GetBaseDefinition() does not connect an interface method declaration to any
+            // implementing class's method — Type.GetInterfaceMap is the API that actually maps an
+            // interface member to the concrete method a given type uses to satisfy it, covering
+            // both implicit and explicit interface implementations.
+            foreach (var type in scanAssembly.GetTypes())
             {
-                if (candidate.IsVirtual && !Equals(candidate, virtualMethod) && candidate.GetBaseDefinition() == baseDefinition)
-                    targets.Add(candidate);
+                if (type.IsInterface || !interfaceType.IsAssignableFrom(type))
+                    continue;
+
+                InterfaceMapping mapping;
+                try
+                {
+                    mapping = type.GetInterfaceMap(interfaceType);
+                }
+                catch (ArgumentException)
+                {
+                    // Some generic-variance/open-generic combinations cannot produce a map; skip
+                    // rather than fail the whole resolution — this narrows coverage for that one
+                    // type, it does not silently approve a forbidden edge (the token-resolved
+                    // interface method itself is still in `targets`).
+                    continue;
+                }
+
+                for (var idx = 0; idx < mapping.InterfaceMethods.Length; idx++)
+                {
+                    if (mapping.InterfaceMethods[idx] == virtualMethod)
+                        targets.Add(mapping.TargetMethods[idx]);
+                }
+            }
+        }
+        else
+        {
+            var baseDefinition = virtualMethod.GetBaseDefinition();
+            foreach (var type in scanAssembly.GetTypes())
+            {
+                foreach (var candidate in type.GetMethods(
+                    BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.DeclaredOnly))
+                {
+                    if (candidate.IsVirtual && !Equals(candidate, virtualMethod) && candidate.GetBaseDefinition() == baseDefinition)
+                        targets.Add(candidate);
+                }
             }
         }
 
-        _virtualOverrideCache[baseDefinition] = targets;
+        _virtualOverrideCache[virtualMethod] = targets;
         return targets;
     }
 
