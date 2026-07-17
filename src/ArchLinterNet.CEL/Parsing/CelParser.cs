@@ -302,7 +302,7 @@ internal sealed class CelParser
     }
 
     /// <summary>
-    /// <paramref name="isQualifiedNameChain"/> tracks whether <c>expr</c> is currently eligible to
+    /// <c>isQualifiedNameChain</c> tracks whether <c>expr</c> is currently eligible to
     /// be a message-literal receiver — true only for a bare identifier / root-qualified-name chain
     /// built purely from <c>.selector</c> steps, with no intervening call, index, or
     /// parenthesization. This is deliberately tracked as explicit parse state rather than inferred
@@ -314,7 +314,7 @@ internal sealed class CelParser
     /// be <c>SyntaxError</c> even though <c>Type{field: 1}</c> is <c>UnsupportedFeature</c>.
     /// </summary>
     /// <remarks>
-    /// <paramref name="pendingReservedRoot"/> is non-null exactly when <c>expr</c>'s chain started
+    /// <c>pendingReservedRoot</c> is non-null exactly when <c>expr</c>'s chain started
     /// with a reserved identifier (e.g. <c>package</c>) — per the pinned grammar, a reserved word
     /// is only valid as the root of a <c>SELECTOR ("." SELECTOR)*</c> chain that is ITSELF only
     /// valid when it terminates in a message literal (<c>"{" fieldInits "}"</c>); it is invalid as
@@ -601,7 +601,7 @@ internal sealed class CelParser
     /// call/message-literal/<c>MaxNestingDepth</c> handling to <c>pkg.f()</c> /
     /// <c>pkg.Type{field: 1}</c> instead of a bespoke (and previously incomplete) parallel path.
     /// A bare <c>.</c> with no following identifier is a syntax error, not deferred syntax. See
-    /// <see cref="ParsePostfix"/>'s remarks for how a reserved <paramref name="nameToken"/>'s
+    /// <see cref="ParsePostfix"/>'s remarks for how a reserved root token's
     /// validity is resolved (<paramref name="pendingReservedRoot"/> output).
     /// </summary>
     private CelSyntaxNode ParseRootQualifiedNamePrimary(out bool isQualifiedNameChain, out CelToken? pendingReservedRoot)

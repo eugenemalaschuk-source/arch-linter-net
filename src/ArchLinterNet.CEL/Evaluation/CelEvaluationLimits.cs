@@ -3,8 +3,9 @@ using ArchLinterNet.CEL.Compilation;
 namespace ArchLinterNet.CEL.Evaluation;
 
 /// <summary>
-/// Immutable evaluation budget limits applied per <see cref="CelCompiledPredicate.Evaluate"/>
-/// or <see cref="CelCompiledExpression.Evaluate"/> call.
+/// Immutable evaluation budget limits applied per
+/// <see cref="CelCompiledPredicate.Evaluate(CelEvaluationContext, CelEvaluationLimits)"/>
+/// or <see cref="CelCompiledExpression.Evaluate(CelEvaluationContext, CelEvaluationLimits)"/> call.
 /// </summary>
 /// <remarks>
 /// <para>

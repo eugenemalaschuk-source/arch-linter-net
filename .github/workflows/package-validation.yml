@@ -66,3 +66,80 @@ jobs:
           core_nupkg=$(printf '%s\n' "${packages[@]}" | grep '^ArchLinterNet\.Core\.')
           unzip -p "nupkg/$core_nupkg" '*.nuspec' | grep -q '<dependency id="ArchLinterNet.CEL"' \
             || { echo "Core .nuspec does not declare ArchLinterNet.CEL as a dependency." >&2; exit 1; }
+
+          cel_nupkg=$(printf '%s\n' "${packages[@]}" | grep '^ArchLinterNet\.CEL\.')
+          if unzip -p "nupkg/$cel_nupkg" '*.nuspec' | grep -q '<dependency '; then
+            echo "ArchLinterNet.CEL .nuspec must declare no dependencies (it must remain a self-contained leaf package)." >&2
+            exit 1
+          fi
+
+          echo "cel_nupkg=$cel_nupkg" >> "$GITHUB_ENV"
+
+      - name: External consumer smoke test
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          cel_version=$(printf '%s\n' "$cel_nupkg" | sed -E 's/^ArchLinterNet\.CEL\.(.+)\.nupkg$/\1/')
+          echo "Detected ArchLinterNet.CEL package version: $cel_version"
+
+          nupkg_dir="$(pwd)/nupkg"
+          smoke_dir=$(mktemp -d)
+          trap 'rm -rf "$smoke_dir"' EXIT
+
+          pushd "$smoke_dir" >/dev/null
+
+          dotnet new console --no-restore >/dev/null
+
+          cat > nuget.config <<EOF
+          <?xml version="1.0" encoding="utf-8"?>
+          <configuration>
+            <packageSources>
+              <clear />
+              <add key="local-cel" value="$nupkg_dir" />
+            </packageSources>
+          </configuration>
+          EOF
+
+          cat > Program.cs <<'CSEOF'
+          using ArchLinterNet.CEL;
+          using ArchLinterNet.CEL.Profile;
+          using ArchLinterNet.CEL.Schema;
+          using ArchLinterNet.CEL.Values;
+
+          // Proves the packed ArchLinterNet.CEL.nupkg (not a ProjectReference) is independently
+          // consumable: define a schema, compile a Profile v1 predicate, and evaluate it.
+          var schemaBuilder = CelContextSchema.CreateBuilder("smoke-test-v1");
+          var flag = schemaBuilder.AddVariable("flag", CelType.Bool);
+          var schema = schemaBuilder.Build();
+
+          var environment = CelEnvironment.CreateBuilder(CelProfile.V1)
+              .WithContextSchema(schema)
+              .Build();
+
+          var compilation = environment.CompilePredicate("flag == true");
+          if (!compilation.IsSuccess)
+          {
+              Console.Error.WriteLine("Compilation failed.");
+              return 1;
+          }
+
+          var context = environment.CreateEvaluationContextBuilder()
+              .Set(flag, CelValue.Bool(true))
+              .Build();
+
+          var result = compilation.Program!.Evaluate(context);
+          if (!result.IsSuccess || result.AsBool() != true)
+          {
+              Console.Error.WriteLine("Evaluation did not produce the expected result.");
+              return 1;
+          }
+
+          Console.WriteLine("ArchLinterNet.CEL external consumer smoke test passed.");
+          return 0;
+          CSEOF
+
+          dotnet add package ArchLinterNet.CEL --version "$cel_version"
+          dotnet run
+
+          popd >/dev/null
