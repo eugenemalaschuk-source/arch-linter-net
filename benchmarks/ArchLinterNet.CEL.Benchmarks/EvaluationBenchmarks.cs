@@ -15,11 +15,15 @@ namespace ArchLinterNet.CEL.Benchmarks;
 public class EvaluationBenchmarks
 {
     private OperationFixtures _fixtures = null!;
+    private CelEvaluationLimits _tighterLimits = null!;
 
     [GlobalSetup]
     public void Setup()
     {
         _fixtures = new OperationFixtures();
+        // Constructed once here, not inside the benchmarked method below, so the measurement is
+        // Evaluate's own budget-check overhead and not CelEvaluationLimits's constructor cost.
+        _tighterLimits = new CelEvaluationLimits(maxIterations: 100, maxCostUnits: 10_000L);
     }
 
     [Benchmark(Baseline = true, Description = "Evaluate: string equality (a == b)")]
@@ -64,5 +68,5 @@ public class EvaluationBenchmarks
 
     [Benchmark(Description = "Evaluate: explicit per-call limits vs environment ceiling (budget-check overhead)")]
     public CelEvaluationResult Evaluate_WithExplicitTighterLimits() =>
-        _fixtures.StringEquality.Evaluate(_fixtures.Context, new CelEvaluationLimits(maxIterations: 100, maxCostUnits: 10_000L));
+        _fixtures.StringEquality.Evaluate(_fixtures.Context, _tighterLimits);
 }

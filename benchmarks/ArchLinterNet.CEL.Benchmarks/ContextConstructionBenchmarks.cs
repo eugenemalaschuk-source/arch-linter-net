@@ -17,6 +17,8 @@ public class ContextConstructionBenchmarks
     private CelEnvironment _environment = null!;
     private CelVariable _source = null!;
     private CelVariable _target = null!;
+    private CelContextSchema _primitiveOnlySchema = null!;
+    private CelVariable _flag = null!;
 
     [GlobalSetup]
     public void Setup()
@@ -26,6 +28,12 @@ public class ContextConstructionBenchmarks
             .WithContextSchema(schema)
             .WithObjectSchema(BenchmarkFixtures.BuildAssemblyObjectSchema())
             .Build();
+
+        // Schema construction happens once here, not inside the benchmarked method below, so
+        // BuildContext_NoObjectCatalog_PrimitivesOnly measures only context-builder/Set()/Build()
+        // cost, not schema construction cost (already isolated separately by
+        // EnvironmentConstructionBenchmarks).
+        _primitiveOnlySchema = BuildPrimitiveOnlySchema(out _flag);
     }
 
     [Benchmark(Description = "Build source/target context via stable variable handles")]
@@ -37,13 +45,10 @@ public class ContextConstructionBenchmarks
         BenchmarkFixtures.BuildMatchingContextByName(_environment);
 
     [Benchmark(Description = "Build context without object-schema catalog (schema.CreateEvaluationContextBuilder())")]
-    public CelEvaluationContext BuildContext_NoObjectCatalog_PrimitivesOnly()
-    {
-        var schema = BuildPrimitiveOnlySchema(out var flag);
-        return schema.CreateEvaluationContextBuilder()
-            .Set(flag, Values.CelValue.Bool(true))
+    public CelEvaluationContext BuildContext_NoObjectCatalog_PrimitivesOnly() =>
+        _primitiveOnlySchema.CreateEvaluationContextBuilder()
+            .Set(_flag, Values.CelValue.Bool(true))
             .Build();
-    }
 
     private static CelContextSchema BuildPrimitiveOnlySchema(out CelVariable flag)
     {

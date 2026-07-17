@@ -4,6 +4,9 @@ BenchmarkDotNet suite for `ArchLinterNet.CEL` (#168). Optional — not part of `
 `make test`. BenchmarkDotNet iterates until statistically stable, which takes minutes per class;
 running it inside the normal acceptance gate would make CI slow and non-deterministic.
 
+See [RESULTS.md](RESULTS.md) for the recorded baseline run (hardware/runtime, per-class results,
+allocation findings, and conclusions feeding #330/#163).
+
 ## Running
 
 ```
@@ -41,6 +44,9 @@ A `-c Release` build is required — BenchmarkDotNet refuses to run unoptimized 
 - No wall-clock assertions gate CI; this project produces measurements, not pass/fail checks.
 - No `ArchLinterNet.Core`, YAML, Roslyn, or architecture-policy dependency — only
   `ArchLinterNet.CEL` and `BenchmarkDotNet`.
-- Budget-exhaustion and schema-mismatch benchmarks are deterministic by construction (a
-  cost ceiling of `1` against a 256-element scan; a context built from a structurally different
-  schema), not by chance or timing.
+- Budget-exhaustion and schema-mismatch benchmarks are deterministic by construction: the
+  budget-exhaustion cost ceiling is calibrated from the exact per-comparison cost math in
+  `CelEvaluator` (see `ApiScenarioBenchmarks.SetupBudgetExhaustion`) to fail after roughly 200 of
+  256 haystack elements — proving the failure genuinely depends on haystack length, not just the
+  first comparison — and the schema-mismatch context is built from a structurally different
+  schema. Neither depends on chance or timing.

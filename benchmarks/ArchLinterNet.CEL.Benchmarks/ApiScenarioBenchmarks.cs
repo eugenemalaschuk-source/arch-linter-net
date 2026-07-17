@@ -46,17 +46,32 @@ public class ApiScenarioBenchmarks
         (_, _mismatchedSchemaContext) = BenchmarkFixtures.BuildMismatchedSchemaContext();
     }
 
+    // "not present in a 256-element list" needle. Deliberately longer than every haystack item
+    // ("item-0".."item-255", 6-8 chars) so CelEvaluator.CompareStrings' Math.Max(left.Length,
+    // right.Length) cost is exactly this needle's length on every "in"-scan iteration — see
+    // SetupBudgetExhaustion for the resulting per-iteration cost math.
+    private const string BudgetHaystackNeedle = "definitely-absent-benchmark-needle-value";
+    private const int HaystackSize = 256;
+
+    // Calibrated to let roughly this many of the 256 iterations succeed before BudgetExceeded, not
+    // just the first one — proving the deterministic failure genuinely depends on haystack length
+    // (a much shorter haystack would finish under budget and succeed with `false` instead).
+    private const int TargetIterationsBeforeExceeding = 200;
+
+    // Must match CelEvaluator's private FixedComparisonCost constant (currently 1): that constant
+    // is not internal, so it cannot be referenced directly here even with InternalsVisibleTo.
+    private const int AssumedFixedComparisonCost = 1;
+
     private void SetupBudgetExhaustion()
     {
-        // "in" membership cost scales with haystack length (CelEvaluator charges per-element
-        // comparison work). A single-cost-unit ceiling against a non-trivial haystack guarantees
-        // BudgetExceeded deterministically on every call — no wall-clock timing involved.
         var schemaBuilder = CelContextSchema.CreateBuilder("budget-exhaustion-v1");
         var needle = schemaBuilder.AddVariable("needle", CelType.String);
         var haystack = schemaBuilder.AddVariable("haystack", CelType.ListOf(CelType.String));
         var schema = schemaBuilder.Build();
 
-        var tightLimits = new CelEvaluationLimits(maxIterations: 1_000_000, maxCostUnits: 1L);
+        var costPerIteration = AssumedFixedComparisonCost + BudgetHaystackNeedle.Length;
+        var maxCostUnits = (long)costPerIteration * TargetIterationsBeforeExceeding;
+        var tightLimits = new CelEvaluationLimits(maxIterations: 1_000_000, maxCostUnits: maxCostUnits);
         var environment = CelEnvironment.CreateBuilder(CelProfile.V1)
             .WithContextSchema(schema)
             .WithEvaluationLimits(tightLimits)
@@ -66,17 +81,17 @@ public class ApiScenarioBenchmarks
         _budgetExhaustionPredicate = compilation.Program!;
         _exhaustedLimits = tightLimits;
 
-        var elements = new List<CelValue>(256);
-        for (var i = 0; i < 256; i++)
+        var elements = new List<CelValue>(HaystackSize);
+        for (var i = 0; i < HaystackSize; i++)
             elements.Add(CelValue.String($"item-{i}"));
 
         _budgetExhaustionContext = environment.CreateEvaluationContextBuilder()
-            .Set(needle, CelValue.String("not-present"))
+            .Set(needle, CelValue.String(BudgetHaystackNeedle))
             .Set(haystack, CelValue.List(elements))
             .Build();
     }
 
-    [Benchmark(Description = "Evaluate: deterministic BudgetExceeded (cost ceiling of 1, 256-element scan)")]
+    [Benchmark(Description = "Evaluate: deterministic BudgetExceeded (~200 of a 256-element scan, cost-calibrated so haystack length actually drives the failure)")]
     public CelEvaluationResult DeterministicBudgetExhaustion() =>
         _budgetExhaustionPredicate.Evaluate(_budgetExhaustionContext, _exhaustedLimits);
 
