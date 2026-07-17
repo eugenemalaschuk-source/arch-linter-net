@@ -63,13 +63,51 @@ jobs:
             exit 1
           fi
 
-          core_nupkg=$(printf '%s\n' "${packages[@]}" | grep '^ArchLinterNet\.Core\.')
-          unzip -p "nupkg/$core_nupkg" '*.nuspec' | grep -q '<dependency id="ArchLinterNet.CEL"' \
-            || { echo "Core .nuspec does not declare ArchLinterNet.CEL as a dependency." >&2; exit 1; }
-
           cel_nupkg=$(printf '%s\n' "${packages[@]}" | grep '^ArchLinterNet\.CEL\.')
-          if unzip -p "nupkg/$cel_nupkg" '*.nuspec' | grep -q '<dependency '; then
+          cel_nuspec=$(unzip -p "nupkg/$cel_nupkg" '*.nuspec')
+          cel_listing=$(unzip -Z1 "nupkg/$cel_nupkg")
+
+          if printf '%s\n' "$cel_nuspec" | grep -q '<dependency '; then
             echo "ArchLinterNet.CEL .nuspec must declare no dependencies (it must remain a self-contained leaf package)." >&2
+            exit 1
+          fi
+
+          for required_entry in README.md lib/net10.0/ArchLinterNet.CEL.dll lib/net10.0/ArchLinterNet.CEL.xml; do
+            if ! printf '%s\n' "$cel_listing" | grep -qxF "$required_entry"; then
+              echo "ArchLinterNet.CEL package is missing required entry '$required_entry' (README and XML API docs must ship in the package)." >&2
+              exit 1
+            fi
+          done
+
+          # Forbidden content: any Core/CLI/Testing assembly, or an asset that would pull in
+          # YAML loading, JSON schema, MSBuild/Buildalyzer, or Roslyn compilation.
+          cel_forbidden_pattern='ArchLinterNet\.(Core|Cli|Testing)\.(dll|xml)$|YamlDotNet|JsonSchema\.Net|Buildalyzer|Microsoft\.CodeAnalysis|Microsoft\.Extensions\.DependencyInjection|System\.Security\.Cryptography\.Xml'
+          if printf '%s\n' "$cel_listing" | grep -Ei "$cel_forbidden_pattern"; then
+            echo "ArchLinterNet.CEL package contains forbidden content (see entries above): must not embed Core/CLI/Testing assemblies or YAML/JSON-schema/Buildalyzer/Roslyn assets." >&2
+            exit 1
+          fi
+
+          cel_package_version=$(printf '%s\n' "$cel_nuspec" | grep -oE '<version>[^<]+</version>' | head -1 | sed -E 's#</?version>##g')
+          echo "Detected ArchLinterNet.CEL package version: $cel_package_version"
+
+          core_nupkg=$(printf '%s\n' "${packages[@]}" | grep '^ArchLinterNet\.Core\.')
+          core_nuspec=$(unzip -p "nupkg/$core_nupkg" '*.nuspec')
+          core_listing=$(unzip -Z1 "nupkg/$core_nupkg")
+
+          core_cel_dependency=$(printf '%s\n' "$core_nuspec" | grep -oE '<dependency id="ArchLinterNet\.CEL"[^/]*/>')
+          if [ -z "$core_cel_dependency" ]; then
+            echo "Core .nuspec does not declare ArchLinterNet.CEL as a dependency." >&2
+            exit 1
+          fi
+
+          core_cel_dependency_version=$(printf '%s\n' "$core_cel_dependency" | grep -oE 'version="[^"]+"' | cut -d'"' -f2)
+          if [ "$core_cel_dependency_version" != "$cel_package_version" ]; then
+            echo "Core declares ArchLinterNet.CEL dependency version '$core_cel_dependency_version' but the packed ArchLinterNet.CEL package version is '$cel_package_version'." >&2
+            exit 1
+          fi
+
+          if printf '%s\n' "$core_listing" | grep -qxF 'lib/net10.0/ArchLinterNet.CEL.dll'; then
+            echo "Core package must not embed ArchLinterNet.CEL.dll; ArchLinterNet.CEL must be a declared dependency only." >&2
             exit 1
           fi
 
