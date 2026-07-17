@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <IsPackable>false</IsPackable>
+    <OutputType>Exe</OutputType>
+    <!-- BenchmarkDotNet requires an optimized build; running via `dotnet run -c Release` is the
+         supported entry point (see benchmarks/ArchLinterNet.CEL.Benchmarks/README.md). -->
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="BenchmarkDotNet" Version="0.14.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\ArchLinterNet.CEL\ArchLinterNet.CEL.csproj" />
+  </ItemGroup>
+
+</Project>

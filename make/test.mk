@@ -1,4 +1,4 @@
-.PHONY: test clean-results test-coverage test-coverage-main-ci test-coverage-badge _acceptance-test
+.PHONY: test clean-results test-coverage test-coverage-main-ci test-coverage-badge _acceptance-test benchmark-cel
 
 test:  ## Run all tests
 	@dotnet test "$(SLNX)" --no-restore
@@ -25,3 +25,11 @@ test-coverage-main-ci:  ## Run coverage for main-branch badge refresh with hang 
 test-coverage-badge: test-coverage  ## Run tests with coverage and print a test-coverage badge Markdown line
 	@cd "$(PROJECT_ROOT)" && UV_PROJECT_ENVIRONMENT="$(PROJECT_ROOT)/.venv" "$(UV)" run --project tools/pyproject.toml \
 		python tools/scripts/test_coverage_badge.py --reports-glob "test-results/**/coverage.cobertura.xml"
+
+# BENCHMARK_FILTER accepts a BenchmarkDotNet glob, e.g.
+# 'make benchmark-cel BENCHMARK_FILTER=*EvaluationBenchmarks*'. Not part of `test` or `acceptance`:
+# BenchmarkDotNet iterates until statistically stable, which takes minutes per class and would make
+# the normal acceptance gate slow and non-deterministic in shared CI runners.
+BENCHMARK_FILTER ?= *
+benchmark-cel:  ## Run the ArchLinterNet.CEL BenchmarkDotNet suite (optional, not part of acceptance/test)
+	@dotnet run -c Release --project "$(PROJECT_ROOT)/benchmarks/ArchLinterNet.CEL.Benchmarks" -- --filter "$(BENCHMARK_FILTER)"

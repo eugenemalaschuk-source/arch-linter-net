@@ -70,3 +70,6 @@ architecture-strict.json
 architecture-audit.json
 architecture-coverage.md
 changed-files.txt
+
+# BenchmarkDotNet output (make benchmark-cel)
+BenchmarkDotNet.Artifacts/
