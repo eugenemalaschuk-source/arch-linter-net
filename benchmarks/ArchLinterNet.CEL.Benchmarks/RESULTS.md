@@ -207,9 +207,14 @@ the same budget also fails (which would mean haystack length had stopped being t
 ## Allocation findings / actionable hotspots
 
 - **Compile-once/evaluate-many is real and large**: compilation (2.8–8.0 us, 6.3–16.6 KB) is
-  roughly 15–75× more expensive than a single evaluation of the resulting predicate (0.1–0.3 us,
-  0.2–0.7 KB). This is the architecture's central promise and it holds — no action needed, but
-  worth quoting concretely in #330's docs rather than only asserting it qualitatively.
+  roughly ~9.6×–77× more expensive than a single evaluation of the resulting predicate (0.1–0.3 us,
+  0.2–0.7 KB) — for the exact same expression (`RepresentativePredicateSource`, compiled at
+  2.814 us via `CompilationBenchmarks` and evaluated at 283.2 ns via `ApiScenarioBenchmarks`'
+  `SafeDefaultOverload`), the ratio is ~9.9×. The wider ~9.6×–77× range spans different
+  expressions/operator categories across the suite, not a single controlled comparison — see the
+  per-class tables above for exactly which pair produces which end of that range. This is the
+  architecture's central promise and it holds — no action needed, but worth quoting concretely
+  (and precisely) in #330's docs rather than only asserting it qualitatively.
 - **Object-value structural validation, not handle-vs-name resolution or variable count, dominates
   context construction.** With value construction excluded and variable/`Set()` count held equal on
   both sides (see the rerun note under `ContextConstructionBenchmarks` above), the two-object-variable,

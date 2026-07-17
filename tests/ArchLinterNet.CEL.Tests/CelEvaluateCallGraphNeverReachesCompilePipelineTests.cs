@@ -10,14 +10,19 @@ namespace ArchLinterNet.CEL.Tests;
 
 /// <summary>
 /// Static call-graph proof, not a sampled runtime observation: walks the actual CIL instructions
-/// reachable from <see cref="CelCompiledPredicate.Evaluate(CelEvaluationContext, CelEvaluationLimits)"/>
-/// and <see cref="CelCompiledExpression.Evaluate(CelEvaluationContext, CelEvaluationLimits)"/> and
-/// asserts the walk never reaches <see cref="CelTokenizer"/>, <see cref="CelParser"/>, or
-/// <see cref="CelBinder"/>. Unlike a call counter sampled over one run, this covers every code path
-/// in the current build unconditionally — including paths a runtime sample would miss — and unlike
-/// the parameter-signature check in <c>CelRepeatedEvaluationNoReparseTests</c>, it also rules out a
-/// regression that re-tokenizes/re-parses/re-binds using state already held on the compiled
-/// instance (e.g. <c>CompilationKey.NormalizedSource</c>) rather than a new external input.
+/// reachable from every public <c>Evaluate</c> overload on <see cref="CelCompiledPredicate"/> and
+/// <see cref="CelCompiledExpression"/> — including the safe-default
+/// <see cref="CelCompiledPredicate.Evaluate(CelEvaluationContext)"/> overload, not only the
+/// explicit-limits one — and asserts the walk never reaches <see cref="CelTokenizer"/>,
+/// <see cref="CelParser"/>, or <see cref="CelBinder"/>. Unlike a call counter sampled over one run,
+/// this covers every code path in the current build unconditionally — including paths a runtime
+/// sample would miss — and unlike the parameter-signature check in
+/// <c>CelRepeatedEvaluationNoReparseTests</c>, it also rules out a regression that
+/// re-tokenizes/re-parses/re-binds using state already held on the compiled instance (e.g.
+/// <c>CompilationKey.NormalizedSource</c>) rather than a new external input. The walk is fail-closed
+/// on unresolved method tokens (see <see cref="GetCalledMethods"/>): an edge this walker cannot
+/// resolve is reported as a failure rather than silently dropped, since a silently-dropped edge
+/// could just as easily be the one edge into the forbidden pipeline types.
 /// </summary>
 [TestFixture]
 public sealed class CelEvaluateCallGraphNeverReachesCompilePipelineTests
@@ -33,18 +38,25 @@ public sealed class CelEvaluateCallGraphNeverReachesCompilePipelineTests
         {
             typeof(CelCompiledPredicate).GetMethod(
                 nameof(CelCompiledPredicate.Evaluate), [typeof(CelEvaluationContext), typeof(CelEvaluationLimits)]),
+            typeof(CelCompiledPredicate).GetMethod(
+                nameof(CelCompiledPredicate.Evaluate), [typeof(CelEvaluationContext)]),
             typeof(CelCompiledExpression).GetMethod(
                 nameof(CelCompiledExpression.Evaluate), [typeof(CelEvaluationContext), typeof(CelEvaluationLimits)]),
+            typeof(CelCompiledExpression).GetMethod(
+                nameof(CelCompiledExpression.Evaluate), [typeof(CelEvaluationContext)]),
         };
-        Assert.That(roots, Has.All.Not.Null, "Both Evaluate(context, limits) entry points must exist.");
+        Assert.That(roots, Has.All.Not.Null,
+            "Both the explicit-limits and the safe-default Evaluate(context) entry points must exist on both compiled types.");
 
         var visited = new HashSet<MethodBase>();
         var offenders = new List<MethodBase>();
+        var unresolvedEdges = new List<string>();
         var stack = new Stack<MethodBase>(roots!);
 
         // Visited-set cap: a genuine explosion here (thousands of distinct CEL-assembly methods
-        // reachable from two Evaluate() overloads) would itself be surprising enough to investigate
-        // rather than silently walk forever — see the "no silent caps" note this throws if hit.
+        // reachable from the four Evaluate() overloads) would itself be surprising enough to
+        // investigate rather than silently walk forever — see the "no silent caps" note this
+        // throws if hit.
         const int MaxVisitedMethods = 2000;
 
         while (stack.Count > 0)
@@ -61,7 +73,7 @@ public sealed class CelEvaluateCallGraphNeverReachesCompilePipelineTests
             if (_forbiddenCompilePipelineTypes.Contains(method.DeclaringType))
                 offenders.Add(method);
 
-            foreach (var called in GetCalledMethods(method))
+            foreach (var called in GetCalledMethods(method, unresolvedEdges))
             {
                 // Only follow edges within ArchLinterNet.CEL itself — BCL/runtime methods are not
                 // part of the compile pipeline and following them would make the graph unbounded.
@@ -70,12 +82,21 @@ public sealed class CelEvaluateCallGraphNeverReachesCompilePipelineTests
             }
         }
 
+        // Fail-closed: an edge this walker could not resolve is treated as a potential hidden call
+        // into the forbidden pipeline, not silently ignored — the offenders check below cannot see
+        // past an edge it never followed.
+        Assert.That(unresolvedEdges, Is.Empty,
+            "Call-graph walk hit unresolvable method token(s) — this test cannot certify the " +
+            "no-reparse guarantee while an edge is unaccounted for. Investigate and either resolve " +
+            "them or narrow the walker; do not silently ignore. Unresolved: " +
+            string.Join("; ", unresolvedEdges));
+
         Assert.That(offenders, Is.Empty,
             "Evaluate()'s call graph must never reach CelTokenizer/CelParser/CelBinder. Reached: " +
             string.Join(", ", offenders.Select(m => $"{m.DeclaringType}.{m.Name}")));
     }
 
-    private static IEnumerable<MethodBase> GetCalledMethods(MethodBase method)
+    private static IEnumerable<MethodBase> GetCalledMethods(MethodBase method, List<string> unresolvedEdges)
     {
         var body = method.GetMethodBody();
         if (body is null)
@@ -126,12 +147,12 @@ public sealed class CelEvaluateCallGraphNeverReachesCompilePipelineTests
                 {
                     resolved = module.ResolveMethod(token, typeArgs, methodArgs);
                 }
-                catch (ArgumentException)
+                catch (ArgumentException ex)
                 {
-                    // A small number of tokens (e.g. certain generic instantiations) are not
-                    // resolvable this way; skipping them is a coverage gap, not a false negative —
-                    // it can only under-report edges, never hide a real forbidden call as clean by
-                    // resolving it incorrectly.
+                    // Fail-closed, not fail-open: an edge this walker cannot resolve is recorded as
+                    // a failure the caller must surface, rather than silently dropped — a dropped
+                    // edge could just as easily be the one call into a forbidden pipeline type.
+                    unresolvedEdges.Add($"{method.DeclaringType}.{method.Name} -> token 0x{token:X8} ({ex.Message})");
                 }
 
                 if (resolved is not null)

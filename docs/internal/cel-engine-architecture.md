@@ -329,8 +329,8 @@ gate.
 
 Recorded baseline headlines (see RESULTS.md for full tables and methodology):
 
-- Compile-once/evaluate-many holds: compilation (2.8–8.0 us) is 15–75× the cost of evaluating the
-  resulting compiled predicate (0.1–0.3 us).
+- Compile-once/evaluate-many holds: compilation (2.8–8.0 us) is ~9.6×–77× the cost of evaluating the
+  resulting compiled predicate (0.1–0.3 us); for the same expression measured both ways, ~9.9×.
 - Context-construction cost is dominated by structural object-value validation, not by
   handle-vs-name resolution or variable count — with value construction and variable count held
   equal on both sides, an object-typed/catalog-validated two-variable schema costs ~2.33× a
