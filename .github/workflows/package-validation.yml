@@ -79,11 +79,12 @@ jobs:
             fi
           done
 
-          # Forbidden content: any Core/CLI/Testing assembly, or an asset that would pull in
-          # YAML loading, JSON schema, MSBuild/Buildalyzer, or Roslyn compilation.
-          cel_forbidden_pattern='ArchLinterNet\.(Core|Cli|Testing)\.(dll|xml)$|YamlDotNet|JsonSchema\.Net|Buildalyzer|Microsoft\.CodeAnalysis|Microsoft\.Extensions\.DependencyInjection|System\.Security\.Cryptography\.Xml'
+          # Forbidden content: any Core/CLI/Testing assembly, an asset that would pull in YAML
+          # loading, JSON schema, MSBuild/Buildalyzer, or Roslyn compilation by library name, or
+          # a raw YAML/JSON-schema file of any origin (not just from a named dependency).
+          cel_forbidden_pattern='ArchLinterNet\.(Core|Cli|Testing)\.(dll|xml)$|YamlDotNet|JsonSchema\.Net|Buildalyzer|Microsoft\.CodeAnalysis|Microsoft\.Extensions\.DependencyInjection|System\.Security\.Cryptography\.Xml|\.ya?ml$|\.schema\.json$'
           if printf '%s\n' "$cel_listing" | grep -Ei "$cel_forbidden_pattern"; then
-            echo "ArchLinterNet.CEL package contains forbidden content (see entries above): must not embed Core/CLI/Testing assemblies or YAML/JSON-schema/Buildalyzer/Roslyn assets." >&2
+            echo "ArchLinterNet.CEL package contains forbidden content (see entries above): must not embed Core/CLI/Testing assemblies, YAML/JSON-schema/Buildalyzer/Roslyn assets, or raw .yml/.yaml/.schema.json files." >&2
             exit 1
           fi
 

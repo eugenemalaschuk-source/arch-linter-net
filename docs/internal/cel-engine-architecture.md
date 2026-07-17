@@ -375,11 +375,15 @@ major/minor version line.
 
 `ArchLinterNet.CEL` follows Semantic Versioning 2.0, calculated by the manual release workflow
 from git tags — see `docs/reference/release-process.md` for the full version-calculation rules and
-release scenarios (`preview`, `patch`, `minor`, `major`). Pre-1.0, breaking changes to the public
-API surface (see section 2) or to Profile v1 semantics are expected to accompany at least a `minor`
-version bump, given the `0.x` preview status noted in the package README. Introducing a new
-`CelProfile` version is additive (existing profile IDs keep working) and does not by itself require
-a breaking-change release, unless it also changes a previously-shipped public API shape.
+release scenarios (`preview`, `patch`, `minor`, `major`). Profile v1 semantics themselves are never
+a version-bump lever — per "Profile versioning" above, `CelProfile.V1` is permanently frozen, and no
+release, however versioned, may ship a change to what an already-shipped `CelProfile.V1` expression
+means. Pre-1.0, breaking changes to the public API surface (see section 2) are expected to
+accompany at least a `minor` version bump, given the `0.x` preview status noted in the package
+README. Introducing a new `CelProfile` version (e.g. `arch-linter/cel/v2`) is additive at the
+profile-identity level (existing profile IDs keep working) but is itself a new supported public
+capability, so it accompanies at least a `minor` version bump; it becomes a breaking-change release
+only if it also changes a previously-shipped public API shape.
 
 ### API compatibility baseline
 
