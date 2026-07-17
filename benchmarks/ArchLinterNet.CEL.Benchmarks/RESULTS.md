@@ -20,6 +20,10 @@ reconciliation pass and #163's Core integration guidance. Not a regression gate 
   exclusively through `CelEnvironment`/`CelCompiledPredicate`/`CelCompiledExpression` (see each
   class's remarks in source for the one exception — `PipelineStageBenchmarks`, which uses
   internal-only access to isolate stage cost; still never a public API surface).
+- `CacheIdentityBenchmarks` and `ContextConstructionBenchmarks` were rerun (same run configuration
+  above) after a review round fixed two measurement flaws in them — an unfair hit-vs-miss expression
+  comparison, and object-value construction leaking into the timed context-builder methods. Their
+  numbers below reflect the fixed versions; see each section's note for what changed and why.
 
 ## Results by class
 
@@ -71,22 +75,28 @@ comment on `CompilationBenchmarks.CompilePredicateFailure`).
 
 ### ContextConstructionBenchmarks — stable-handle vs. name-based population
 
+*(Rerun after a review fix: the source/target `CelValue` object instances are now precomputed once
+in `GlobalSetup` and reused, instead of being constructed inside the timed methods — see
+`ContextConstructionBenchmarks`'s class remarks. The two rows below now measure only
+`CelEvaluationContextBuilder`'s own cost, not object-value construction cost; both dropped
+substantially from the first baseline pass as a result.)*
+
 | Method | Mean | Allocated |
 |---|---:|---:|
-| Build source/target context via stable variable handles | 2,626.1 ns | 6.92 KB |
-| Build source/target context via name-based `Set()` convenience overload | 2,717.6 ns | 7.17 KB |
-| Build context without object-schema catalog (`schema.CreateEvaluationContextBuilder()`) | 362.9 ns | 1.25 KB |
+| Build source/target context via stable variable handles (precomputed values) | 913.2 ns | 3.02 KB |
+| Build source/target context via name-based `Set()` convenience overload (precomputed values) | 980.1 ns | 3.21 KB |
+| Build context without object-schema catalog (`schema.CreateEvaluationContextBuilder()`) | 286.4 ns | 1.25 KB |
 
-The name-based convenience overload costs only ~3.5% more time and ~3.6% more allocation than the
+The name-based convenience overload costs ~7.3% more time and ~6.3% more allocation than the
 stable-handle path for this two-variable, object-typed schema — the extra `FirstOrDefault` name
-lookup is a small fraction of total context-build cost, which is dominated by the recursive
-structural value validation `CelEvaluationContextBuilder.Set` performs (member-by-member type
-checking against the registered object schema). The documented guidance to prefer handle-based
-`Set()` "in high-volume evaluation paths" remains correct directionally, but for this representative
-shape the difference is modest, not dramatic — worth noting for #330's docs so the guidance isn't
-overstated. Skipping the object-schema catalog (primitive-only schema, no structural object
-validation) is ~7× cheaper, confirming object-value validation is the dominant cost in the two rows
-above, not variable-count or handle-vs-name resolution.
+lookup is a real but modest fraction of total context-build cost. Skipping the object-schema
+catalog (primitive-only schema, one `Bool` variable, no structural object validation) is ~3.2×
+cheaper than the object-typed, catalog-validated schema — with value construction now excluded from
+both sides, this comparison isolates `CelEvaluationContextBuilder.Set`'s own structural validation
+cost (recursive member-by-member type checking against the registered object schema) from
+handle-vs-name resolution and from object-value allocation. The documented guidance to prefer
+handle-based `Set()` "in high-volume evaluation paths" remains correct directionally but modest in
+magnitude for this shape — worth noting for #330's docs so the guidance isn't overstated.
 
 ### EvaluationBenchmarks — compile-once/evaluate-many, by operator category
 
@@ -113,25 +123,34 @@ effectively the same as the safe-default overload (1.03×, within noise) — con
 
 ### CacheIdentityBenchmarks — `CelCompilationKey` and caller-owned caching
 
+*(Rerun after a review fix: hit and miss now look up/compile the exact same expression
+— `RepresentativePredicateSource` — differing only in cache *state* (a warm dictionary vs. a
+permanently empty one), so the ratio below is an apples-to-apples same-expression comparison. The
+first baseline pass had compared a hit on the short representative expression against a miss that
+fell through to compiling the longer `ComplexPredicateSource`, which inflated the reported ratio.)*
+
 | Method | Mean | Allocated |
 |---|---:|---:|
-| Isolated cache-key creation (schema/limits identity + ctor, no tokenize/parse/bind) | 424.8 ns | 1,832 B |
-| `CelCompilationKey` via the only public path: full `CompilePredicate` call | 2,638.2 ns | 6,432 B |
-| `CelCompilationKey.Equals` — equivalent schema/source/limits | 17.9 ns | 0 B |
-| `CelCompilationKey.Equals` — different schema identity | 1.2 ns | 0 B |
-| `CelCompilationKey.GetHashCode()` | 435.5 ns | 0 B |
-| Caller-owned cache keyed by source text: hit (dictionary lookup only, zero compiles) | 19.0 ns | 0 B |
-| Caller-owned cache keyed by source text: miss (lookup fails, falls through to compile) | 7,764.6 ns | 16,968 B |
+| Isolated cache-key creation (schema/limits identity + ctor, no tokenize/parse/bind) | 341.4 ns | 1,832 B |
+| `CelCompilationKey` via the only public path: full `CompilePredicate` call | 2,213.1 ns | 6,432 B |
+| `CelCompilationKey.Equals` — equivalent schema/source/limits | 16.4 ns | 0 B |
+| `CelCompilationKey.Equals` — different schema identity | 1.0 ns | 0 B |
+| `CelCompilationKey.GetHashCode()` | 380.7 ns | 0 B |
+| Caller-owned cache keyed by source text: hit for `RepresentativePredicateSource` (dictionary lookup only) | 15.6 ns | 0 B |
+| Caller-owned cache keyed by source text: miss for `RepresentativePredicateSource` (lookup fails, falls through to compile) | 2,043.9 ns | 6,432 B |
 
 Key construction in isolation (schema/limits identity computation + the `CelCompilationKey`
-constructor) is ~16% of a full compile's time and ~28% of its allocation — meaningful but not the
-dominant cost of `CompilePredicate`; tokenize/parse/bind still account for the remaining ~84%/72%.
+constructor) is ~15% of a full compile's time and ~28% of its allocation — meaningful but not the
+dominant cost of `CompilePredicate`; tokenize/parse/bind still account for the remaining ~85%/72%.
 Equality/hashing on an already-built key is effectively free (0 B allocated, low-nanosecond time).
-The realistic caller-owned cache pattern — keyed by raw source text, not by `CelCompilationKey`
-(see the class remarks in `CacheIdentityBenchmarks.cs` for why) — shows the expected dramatic
-payoff: a hit is ~400× faster than a miss (19.0 ns vs. 7,764.6 ns) and allocates nothing, confirming
-that caching identical expressions inside a long-lived `CelEnvironment` is worth doing whenever the
-same source text recurs.
+The miss benchmark's mean (2,043.9 ns) and allocation (6,432 B) land close to the full-compile row
+above (2,213.1 ns, 6,432 B) — expected, since a miss falls through to exactly that same
+`CompilePredicate` call, and this closeness is itself a consistency check that the fix produced a
+coherent measurement. The realistic caller-owned cache pattern — keyed by raw source text, not by
+`CelCompilationKey` (see the class remarks in `CacheIdentityBenchmarks.cs` for why) — shows the
+expected large payoff for the *same* expression: a hit is ~131× faster than a miss (15.6 ns vs.
+2,043.9 ns) and allocates nothing, confirming that caching identical expressions inside a
+long-lived `CelEnvironment` is worth doing whenever the same source text recurs.
 
 ### ConcurrencyBenchmarks — sequential vs. concurrent reuse of one compiled predicate
 
@@ -172,10 +191,13 @@ string-comparison work, not a fixed penalty — confirming the evaluator's cost 
   0.2–0.7 KB). This is the architecture's central promise and it holds — no action needed, but
   worth quoting concretely in #330's docs rather than only asserting it qualitatively.
 - **Object-value structural validation, not handle-vs-name resolution, dominates context
-  construction.** If #163's Core integration needs faster context population at very high volume,
-  the actionable lever is reducing per-object member count or the `MaxValidationDepth`/
-  `MaxValidationCollectionSize` traversal cost in `CelEvaluationContextBuilder.Set`, not switching
-  from name-based to handle-based `Set()` (that swap alone saves only ~3.5%).
+  construction.** With value construction excluded from the measurement (see the rerun note under
+  `ContextConstructionBenchmarks` above), the object-typed/catalog-validated schema still costs
+  ~3.2× the primitive-only schema. If #163's Core integration needs faster context population at
+  very high volume, the actionable lever is reducing per-object member count or the
+  `MaxValidationDepth`/`MaxValidationCollectionSize` traversal cost in
+  `CelEvaluationContextBuilder.Set`, not switching from name-based to handle-based `Set()` (that
+  swap alone saves only ~7%).
 - **`CelCompilationKey` cannot serve as a pre-compile cache key through the public API** (every
   identity component it's built from — schema/limits `ComputeIdentity()` — is internal). This is a
   real API characteristic, not a benchmark artifact: worth documenting explicitly in #330's package
@@ -188,13 +210,21 @@ string-comparison work, not a fixed penalty — confirming the evaluator's cost 
 - **Concurrent-reuse correctness is confirmed by the test suite; this benchmark's speedup number at
   8-task granularity should not be read as a scalability verdict** — see the `ConcurrencyBenchmarks`
   note above.
+- **"No repeated parsing/binding/type-checking during warm evaluation" is now instrumented, not
+  just asserted.** `tests/ArchLinterNet.CEL.Tests/CelRepeatedEvaluationNoReparseTests.cs` proves
+  this deterministically (no wall-clock dependence): `CelCompiledPredicate.Evaluate`'s only
+  overloads take `(context)`/`(context, limits)` — neither carries a source string, token stream,
+  or syntax node, so there is no data-flow path back into `CelTokenizer.Tokenize`/`CelParser.Parse`/
+  `CelBinder.Bind`; the internal `Bound` plan property is get-only (compiler-enforced immutability
+  post-construction); and the exact same `Bound` object reference is observed before and after
+  1,000 evaluations of a compiled predicate.
 
 ## Feeding into #330 / #163
 
 - #330 (packaging/reconciliation): the compile-once/evaluate-many magnitude above, the
   name-based-vs-handle-based finding, and the `CelCompilationKey`-is-not-a-pre-compile-key finding
   are all concrete enough to fold into the package's consumer-facing performance guidance.
-- #163 (Core integration): the per-operator evaluation numbers (all sub-200ns) and the cache
-  hit/miss numbers (19 ns vs. 7.8 us) give Core a baseline to plan its own selector/architecture-fact
-  evaluation batch sizes against, and confirm a source-text-keyed cache is the right caching
-  primitive to reuse.
+- #163 (Core integration): the per-operator evaluation numbers (all sub-200ns) and the same-expression
+  cache hit/miss numbers (15.6 ns vs. 2.04 us, ~131×) give Core a baseline to plan its own
+  selector/architecture-fact evaluation batch sizes against, and confirm a source-text-keyed cache
+  is the right caching primitive to reuse.

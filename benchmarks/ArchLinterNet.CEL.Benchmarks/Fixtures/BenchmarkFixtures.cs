@@ -75,24 +75,50 @@ internal static class BenchmarkFixtures
         return new CelObjectValue("assembly", members);
     }
 
+    /// <summary>The matching "source" object value used throughout the source/target scenario.</summary>
+    public static CelValue BuildMatchingSourceValue() =>
+        CelValue.Object(BuildAssemblyObject("service", "Example.Services", "Example.Services.Api", serviceLike: true));
+
+    /// <summary>The matching "target" object value used throughout the source/target scenario.</summary>
+    public static CelValue BuildMatchingTargetValue() =>
+        CelValue.Object(BuildAssemblyObject("domain", "Example.Domain", "Example.Domain.Model", serviceLike: false));
+
     /// <summary>
     /// Builds a matching source/target evaluation context using stable variable handles — the
     /// fast path recommended for high-volume evaluation loops.
     /// </summary>
     public static CelEvaluationContext BuildMatchingContext(CelEnvironment environment, CelVariable source, CelVariable target) =>
-        environment.CreateEvaluationContextBuilder()
-            .Set(source, CelValue.Object(BuildAssemblyObject("service", "Example.Services", "Example.Services.Api", serviceLike: true)))
-            .Set(target, CelValue.Object(BuildAssemblyObject("domain", "Example.Domain", "Example.Domain.Model", serviceLike: false)))
-            .Build();
+        BuildContextFromValues(environment, source, target, BuildMatchingSourceValue(), BuildMatchingTargetValue());
 
     /// <summary>
     /// Builds the same context using the ergonomic name-based <c>Set(string, CelValue)</c>
     /// overload, for comparison against <see cref="BuildMatchingContext"/>.
     /// </summary>
     public static CelEvaluationContext BuildMatchingContextByName(CelEnvironment environment) =>
+        BuildContextFromValuesByName(environment, BuildMatchingSourceValue(), BuildMatchingTargetValue());
+
+    /// <summary>
+    /// Builds a context from already-constructed <see cref="CelValue"/> instances via stable
+    /// variable handles, so a caller measuring only context-builder cost (structural validation +
+    /// <c>Set()</c>/<c>Build()</c>) can precompute <paramref name="sourceValue"/>/
+    /// <paramref name="targetValue"/> once and exclude their construction cost from the measurement.
+    /// </summary>
+    public static CelEvaluationContext BuildContextFromValues(
+        CelEnvironment environment, CelVariable source, CelVariable target, CelValue sourceValue, CelValue targetValue) =>
         environment.CreateEvaluationContextBuilder()
-            .Set("source", CelValue.Object(BuildAssemblyObject("service", "Example.Services", "Example.Services.Api", serviceLike: true)))
-            .Set("target", CelValue.Object(BuildAssemblyObject("domain", "Example.Domain", "Example.Domain.Model", serviceLike: false)))
+            .Set(source, sourceValue)
+            .Set(target, targetValue)
+            .Build();
+
+    /// <summary>
+    /// Name-based-overload counterpart to <see cref="BuildContextFromValues"/>, for isolating
+    /// context-builder cost from value-construction cost on the name-based <c>Set()</c> path.
+    /// </summary>
+    public static CelEvaluationContext BuildContextFromValuesByName(
+        CelEnvironment environment, CelValue sourceValue, CelValue targetValue) =>
+        environment.CreateEvaluationContextBuilder()
+            .Set("source", sourceValue)
+            .Set("target", targetValue)
             .Build();
 
     /// <summary>A context built against a structurally different (mismatched) schema, for schema-rejection benchmarks.</summary>

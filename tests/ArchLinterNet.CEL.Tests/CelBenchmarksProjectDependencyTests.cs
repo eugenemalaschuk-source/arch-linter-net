@@ -16,9 +16,7 @@ namespace ArchLinterNet.CEL.Tests;
 [TestFixture]
 public sealed class CelBenchmarksProjectDependencyTests
 {
-    private const string ProhibitedProjectReferenceFragment = "ArchLinterNet.Core";
-    private static readonly string[] _prohibitedPackageReferences =
-        ["YamlDotNet", "Microsoft.CodeAnalysis", "Buildalyzer"];
+    private static readonly string[] _allowedPackageReferences = ["BenchmarkDotNet"];
 
     [Test]
     public void BenchmarksProject_ReferencesOnlyCelAndBenchmarkDotNet()
@@ -32,18 +30,17 @@ public sealed class CelBenchmarksProjectDependencyTests
         Assert.That(projectReferences, Has.Count.EqualTo(1),
             "The benchmark project must reference exactly one project: ArchLinterNet.CEL.");
         Assert.That(projectReferences[0], Does.Contain("ArchLinterNet.CEL.csproj"));
-        Assert.That(projectReferences[0], Does.Not.Contain(ProhibitedProjectReferenceFragment + "."),
-            $"{csprojPath} must not reference {ProhibitedProjectReferenceFragment} or any Core-dependent project.");
 
+        // Whitelist, not a blocklist of specific forbidden names: any PackageReference other than
+        // BenchmarkDotNet fails this test, so a future addition of Core/YAML/Roslyn/an external CEL
+        // runtime/anything else is caught regardless of what it happens to be named.
         var packageReferences = document.Descendants("PackageReference")
             .Select(el => el.Attribute("Include")!.Value)
             .ToList();
-        foreach (var prohibited in _prohibitedPackageReferences)
-        {
-            Assert.That(packageReferences, Has.None.EqualTo(prohibited),
-                $"{csprojPath} must not depend on {prohibited} (issue #168 required constraint: " +
-                "no Core, YAML, Roslyn, or external CEL runtime dependency in the reusable benchmark surface).");
-        }
+        Assert.That(packageReferences, Is.EquivalentTo(_allowedPackageReferences),
+            $"{csprojPath} must depend on exactly {{{string.Join(", ", _allowedPackageReferences)}}} " +
+            "(issue #168 required constraint: no Core, YAML, Roslyn, or external CEL runtime " +
+            $"dependency in the reusable benchmark surface); found {{{string.Join(", ", packageReferences)}}}.");
     }
 
     private static string FindBenchmarksCsproj()

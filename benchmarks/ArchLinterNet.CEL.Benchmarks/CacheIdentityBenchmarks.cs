@@ -36,7 +36,8 @@ public class CacheIdentityBenchmarks
     private CelCompilationKey _keyA = null!;
     private CelCompilationKey _keyAIdentical = null!;
     private CelCompilationKey _keyDifferentSchema = null!;
-    private Dictionary<string, CelCompiledPredicate> _sourceKeyedCache = null!;
+    private Dictionary<string, CelCompiledPredicate> _warmSourceKeyedCache = null!;
+    private Dictionary<string, CelCompiledPredicate> _emptySourceKeyedCache = null!;
 
     [GlobalSetup]
     public void Setup()
@@ -50,11 +51,16 @@ public class CacheIdentityBenchmarks
         var (mismatchedEnvironment, _) = BenchmarkFixtures.BuildMismatchedSchemaContext();
         _keyDifferentSchema = mismatchedEnvironment.CompilePredicate("source.role == 'service'").CompilationKey;
 
-        _sourceKeyedCache = new Dictionary<string, CelCompiledPredicate>(StringComparer.Ordinal)
+        // Hit and miss both look up/compile the exact same expression (RepresentativePredicateSource)
+        // — only cache *state* differs between the two dictionaries below, not the expression being
+        // compiled — so the hit-vs-miss cost comparison is apples-to-apples, not skewed by comparing
+        // a short expression's hit against a longer expression's miss.
+        _warmSourceKeyedCache = new Dictionary<string, CelCompiledPredicate>(StringComparer.Ordinal)
         {
             [BenchmarkFixtures.RepresentativePredicateSource] =
                 _environment.CompilePredicate(BenchmarkFixtures.RepresentativePredicateSource).Program!,
         };
+        _emptySourceKeyedCache = new Dictionary<string, CelCompiledPredicate>(StringComparer.Ordinal);
     }
 
     // Mirrors exactly what CelEnvironment.BuildKey computes internally on every CompilePredicate/
@@ -83,17 +89,18 @@ public class CacheIdentityBenchmarks
     [Benchmark(Description = "CelCompilationKey.GetHashCode()")]
     public int GetHashCodeCost() => _keyA.GetHashCode();
 
-    [Benchmark(Description = "Caller-owned cache keyed by source text: hit (dictionary lookup only, zero compiles)")]
-    public CelCompiledPredicate SourceKeyedCacheHit() => _sourceKeyedCache[BenchmarkFixtures.RepresentativePredicateSource];
+    [Benchmark(Description = "Caller-owned cache keyed by source text: hit for RepresentativePredicateSource (dictionary lookup only, zero compiles)")]
+    public CelCompiledPredicate SourceKeyedCacheHit() => _warmSourceKeyedCache[BenchmarkFixtures.RepresentativePredicateSource];
 
-    // ComplexPredicateSource is intentionally never inserted into _sourceKeyedCache, so this
-    // benchmark is a permanent, repeatable miss across every invocation/iteration — it never
-    // mutates shared state, so it cannot silently turn into a hit on a later call.
-    [Benchmark(Description = "Caller-owned cache keyed by source text: miss (lookup fails, falls through to compile, not inserted)")]
+    // _emptySourceKeyedCache is never populated (a fresh, permanently-empty dictionary built once
+    // in Setup), so this is a repeatable miss on every invocation/iteration without mutating shared
+    // state — and it looks up/compiles the *same* RepresentativePredicateSource as the hit benchmark
+    // above, so the hit-vs-miss ratio isolates cache-state cost, not expression-complexity cost.
+    [Benchmark(Description = "Caller-owned cache keyed by source text: miss for RepresentativePredicateSource (lookup fails, falls through to compile)")]
     public CelCompiledPredicate SourceKeyedCacheMiss()
     {
-        if (_sourceKeyedCache.TryGetValue(BenchmarkFixtures.ComplexPredicateSource, out var cached))
+        if (_emptySourceKeyedCache.TryGetValue(BenchmarkFixtures.RepresentativePredicateSource, out var cached))
             return cached;
-        return _environment.CompilePredicate(BenchmarkFixtures.ComplexPredicateSource).Program!;
+        return _environment.CompilePredicate(BenchmarkFixtures.RepresentativePredicateSource).Program!;
     }
 }
