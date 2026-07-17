@@ -210,12 +210,12 @@ Capabilities deferred: optimized planner, JIT-style compiled backend, alternate 
 |---|---|
 | Classification | Optimization |
 | Intended owner | `CelEngine` internal; pluggable behind the non-public bound plan |
-| Existing seam | `CelCompiledPredicate.Evaluate` / `CelCompiledExpression.Evaluate` delegate to an internal evaluator held by the compiled program; the evaluator is never exposed |
-| New profile version required? | No — backend swap is transparent to consumers |
+| Existing seam | `CelCompiledPredicate.Evaluate` / `CelCompiledExpression.Evaluate` call the static `ArchLinterNet.CEL.Evaluation.CelEvaluator.Evaluate(...)`, passing the held bound plan, schema, and limits; there is no evaluator *instance* held by the compiled program today, and no swappable-backend abstraction exists yet — a backend swap would first require introducing one (e.g. an internal evaluator seam the compiled program holds instead of calling the static method directly). The bound plan itself is never exposed |
+| New profile version required? | No — backend swap would be transparent to consumers once a swappable seam exists |
 | Affected layers | Bound plan representation, evaluator |
 | Safety implications | New backend must preserve CEL short-circuit semantics and budget enforcement |
-| Prohibited shortcut | Do NOT expose the bound plan or evaluator interface publicly. Do NOT allow raw delegate escape (e.g., `Func<CelEvaluationContext, bool>` as a public compilation result) |
-| Direction | Plausible future work; no dedicated performance-optimization task is currently scheduled — #329 shipped the public compilation pipeline and cache identity (`CelCompilationKey`), not a backend swap or optimized planner |
+| Prohibited shortcut | Do NOT expose the bound plan or evaluator internals publicly. Do NOT allow raw delegate escape (e.g., `Func<CelEvaluationContext, bool>` as a public compilation result) |
+| Direction | Plausible future work; no dedicated performance-optimization task is currently scheduled — #329 shipped the public compilation pipeline and cache identity (`CelCompilationKey`), not a backend swap or optimized planner. A pluggable-evaluator seam is itself unbuilt; introducing one is a prerequisite for this direction, not an existing capability |
 
 ### 5. Tooling and AST
 
