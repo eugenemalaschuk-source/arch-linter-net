@@ -6,7 +6,16 @@
     <Nullable>enable</Nullable>
     <PackageId>ArchLinterNet.CEL</PackageId>
     <Description>Common Expression Language (CEL) evaluation engine for ArchLinterNet. Provides a reusable, host-agnostic expression evaluator for use by ArchLinterNet.Core.</Description>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
   </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Overrides the repo-wide root README (Directory.Build.props) with a CEL-specific one,
+         since this package's usage/lifecycle/non-goals are unrelated to the YAML/CLI product. -->
+    <None Remove="..\..\README.md" />
+    <None Include="README.md" Pack="true" PackagePath="\" />
+  </ItemGroup>
 
   <ItemGroup>
     <InternalsVisibleTo Include="ArchLinterNet.CEL.Tests" />
