@@ -236,13 +236,39 @@ Capabilities deferred: public AST / neutral syntax model, formatter, pretty-prin
 
 Capabilities deferred: caller-owned cache helper implementations, portable checked-expression format.
 
+This row previously described `CelCompilationKey` as the recommended pre-compile cache-lookup key
+without qualification, which #168's benchmarking work (`CacheIdentityBenchmarks`, `RESULTS.md`)
+showed is not achievable through the public API: every component `CelCompilationKey` is built from
+(`CelContextSchema.ComputeEnvironmentIdentity`, `CelCompilationLimits.ComputeIdentity`,
+`CelEvaluationLimits.ComputeIdentity`) is internal, so a caller cannot construct or derive one
+*before* a first `CompilePredicate`/`Compile` call — only receive one as that call's return value.
+The two use cases are therefore genuinely different and must not be conflated:
+
+- **Pre-compile "have I already compiled this?" lookup**, inside one long-lived, immutable
+  `CelEnvironment` instance: key a caller-owned cache by the raw expression **source text**
+  (a `string`, cheap and available before any compile call), *scoped to one compilation kind*.
+  One `CelEnvironment` fixes schema, profile, and limits for its entire lifetime, but it does not
+  fix the choice between `CompilePredicate` and `Compile` — the same source text compiled both ways
+  from the same environment produces two different results (`CelCompiledPredicate` vs.
+  `CelCompiledExpression`, distinguished by `CelCompilationKey.RequiredResultType`). Source text
+  alone is therefore a sufficient key only when the cache itself is already scoped to one
+  compilation kind — in practice, a distinct typed dictionary per kind (e.g.
+  `Dictionary<string, CelCompiledPredicate>`, which cannot silently accept a `Compile()` result — a
+  CLR type-safety property, not just a convention) or, if a caller genuinely needs one shared cache
+  for both, a `(source, requiredResultType)` composite key instead of source text alone.
+- **Post-compile semantic-identity verification**, e.g. confirming two compiled results (possibly
+  from different `CelEnvironment` instances, or produced at different times) are truly equivalent
+  before treating them as interchangeable, or invalidating a cache when an environment's schema or
+  limits change: use the returned **`CelCompilationKey`**, which is available only after compiling
+  and encodes source, profile, schema, result type, and both limit identities structurally.
+
 | Field | Details |
 |---|---|
 | Classification | Optimization / product concern |
-| Intended owner | Callers (using `CelCompilationKey`) or a future `ArchLinterNet.CEL.Caching` helper |
-| Existing seam | `CelCompilationKey` is public and structurally comparable; callers supply their own cache |
+| Intended owner | Callers, using a source-text-keyed cache scoped to one `CelEnvironment` for pre-compile lookup, and `CelCompilationKey` for post-compile identity verification — or a future `ArchLinterNet.CEL.Caching` helper that packages this pattern |
+| Existing seam | `CelCompilationKey` is public and structurally comparable, but is only obtainable as a `CompilePredicate`/`Compile` return value — it cannot serve as a pre-compile lookup key (see above). Callers supply their own source-text-keyed cache for that purpose. |
 | New profile version required? | No — caching is a caller concern |
-| Affected layers | None in the engine; `CelCompilationKey` provides the identity |
+| Affected layers | None in the engine; `CelCompilationKey` provides the post-compile identity |
 | Safety implications | Serialized expressions must include profile + schema identity to avoid cache poisoning across profile versions |
 | Prohibited shortcut | Do NOT add any static mutable cache, `ConcurrentDictionary<CelCompilationKey, ...>`, or thread-static cache to `ArchLinterNet.CEL` |
 | Direction | Plausible future work (caching helper); serialization requires compatibility rules before any story |
@@ -313,10 +339,66 @@ Cross-cutting conclusions embedded in the API:
 
 ______________________________________________________________________
 
+## Performance and allocation baselines
+
+Task #168 added `benchmarks/ArchLinterNet.CEL.Benchmarks`, a BenchmarkDotNet suite covering
+environment/schema construction, staged tokenize/parse/bind cost, the full public compilation
+pipeline, context construction (stable-handle vs. name-based), compile-once/evaluate-many
+evaluation broken out by operator/built-in category, `CelCompilationKey` cache-identity behavior,
+concurrent reuse of one compiled predicate, and deterministic `BudgetExceeded`/`SchemaMismatch`
+diagnostic paths. See `benchmarks/ArchLinterNet.CEL.Benchmarks/README.md` for what each class
+measures and how to run it (`rtk make benchmark-cel`, optional — not part of `make acceptance`),
+and `benchmarks/ArchLinterNet.CEL.Benchmarks/RESULTS.md` for the recorded baseline run (hardware,
+runtime, per-class numbers, and allocation findings). Results are inputs to #330's
+packaging/reconciliation pass and to #163's Core integration guidance, not a standing performance
+gate.
+
+Recorded baseline headlines (see RESULTS.md for full tables and methodology):
+
+- Compile-once/evaluate-many holds: compilation (2.8–8.0 us) is ~9.6×–77× the cost of evaluating the
+  resulting compiled predicate (0.1–0.3 us); for the same expression measured both ways, ~9.9×.
+- Context-construction's object-vs-primitive gap is two distinct costs, not one — with
+  builder-construction isolated from `Set()`+`Build()`: `Set()`+`Build()` together cost ~1.9× more
+  for object-typed values than primitive-typed values (variable count held equal on both sides; this
+  benchmark suite cannot isolate `Set()`'s own structural validation from `Build()`'s work without
+  instrumenting `CelEvaluationContextBuilder` internally), while `CelEvaluationContextBuilder`'s
+  *constructor* costs ~13.8× more when the environment has a registered object-schema catalog,
+  because it uncachedly recomputes `schema.ComputeEnvironmentIdentity(...)` on every call. The
+  larger factor is a construction-time cost, not a `Set()`/`Build()` cost. The measured name-based
+  vs. stable-handle `Set()` overhead (~0.9%) was within this baseline's `ShortRun`-job noise floor —
+  not a reliable magnitude claim.
+- `CelCompilationKey` cannot serve as a pre-compile cache-lookup key through the public API (its
+  identity components are internal); a caller-owned cache should key by source text instead,
+  scoped to one compilation kind (`CompilePredicate` vs. `Compile` — see the "Caching and
+  serialization" row above for why source text alone is not enough across both) — for the same
+  expression, a cache hit that way is ~145× faster than a full miss-and-populate path (15.8 ns vs.
+  2.29 us) and allocates nothing. Note also that `CelCompilationKey.GetHashCode()` itself is not
+  cheap (~394 ns, since it string-hashes four separate identity components) — a further reason to
+  prefer a source-text-keyed cache over one keyed by `CelCompilationKey`.
+- Batch evaluation shows genuinely linear-scaling GC pressure — measured at three batch sizes
+  (100/1,000/10,000 independent contexts against one compiled predicate), not asserted from a
+  single point: allocation scales exactly linearly (10.00× per 10× batch-size step) and
+  per-evaluation allocation (~696 B) and time (~305–326 ns) both stay constant across the whole
+  100× range — no batch-specific hotspot emerged.
+- Repeated evaluation performing no parser/binder/type-checker work is instrumented, not just
+  asserted: `CelEvaluateCallGraphNeverReachesCompilePipelineTests` statically walks the CIL call
+  graph reachable from all four `Evaluate` overloads (explicit-limits and safe-default, on both
+  compiled types) and proves it never reaches the tokenizer, parser, or binder — fail-closed on any
+  unresolved call-graph edge, on `calli` (a function-pointer call with no method token), and
+  conservative for indirect dispatch: virtual/interface calls follow every override or
+  implementation (implicit or explicit) of the resolved method found in the `ArchLinterNet.CEL`
+  assembly, since the IL token alone cannot say which one actually runs; delegate invocations
+  (`Invoke`/`BeginInvoke`/`EndInvoke` on any `Delegate` type, which carry no target information at
+  the call site at all) are resolved by scanning the assembly for `ldftn`/`ldvirtftn` construction
+  sites matching the delegate's signature — the pattern `CelEvaluator`'s own comparison/projection
+  delegates use — and reported as unresolved if no matching construction site exists anywhere in
+  the assembly, rather than silently treated as a dead end.
+
 ## References
 
 - Parent story: [#322](https://github.com/eugenemalaschuk-source/arch-linter-net/issues/322)
 - This document: [#324](https://github.com/eugenemalaschuk-source/arch-linter-net/issues/324)
 - Implementation tasks that depend on the decisions above: #325 (tokenizer/parser), #326 (binder/type system), #327 (built-in function catalog execution), #328 (bounded evaluator/runtime semantics), #329 (compilation pipeline/cache identity), #330 (packaging/release readiness/reconciliation)
+- Performance and allocation baselines: [#168](https://github.com/eugenemalaschuk-source/arch-linter-net/issues/168)
 - Core integration consuming the public API: [#163](https://github.com/eugenemalaschuk-source/arch-linter-net/issues/163)
 - Policy expression model using the public API: [#162](https://github.com/eugenemalaschuk-source/arch-linter-net/issues/162)
