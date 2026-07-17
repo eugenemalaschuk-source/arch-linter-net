@@ -10,6 +10,11 @@
 
   <ItemGroup>
     <InternalsVisibleTo Include="ArchLinterNet.CEL.Tests" />
+    <!-- Grants pipeline-stage benchmarks (tokenize/parse/bind measured in isolation) access to
+         internal types. Does not weaken the public safety model: the internal pipeline types
+         remain unexposed to real consumers, and every compile-once/evaluate-many scenario
+         benchmark still goes through the public CelEnvironment/CelCompiledPredicate surface. -->
+    <InternalsVisibleTo Include="ArchLinterNet.CEL.Benchmarks" />
   </ItemGroup>
 
 </Project>

@@ -313,10 +313,23 @@ Cross-cutting conclusions embedded in the API:
 
 ______________________________________________________________________
 
+## Performance and allocation baselines
+
+Task #168 added `benchmarks/ArchLinterNet.CEL.Benchmarks`, a BenchmarkDotNet suite covering
+environment/schema construction, staged tokenize/parse/bind cost, the full public compilation
+pipeline, context construction (stable-handle vs. name-based), compile-once/evaluate-many
+evaluation broken out by operator/built-in category, `CelCompilationKey` cache-identity behavior,
+concurrent reuse of one compiled predicate, and deterministic `BudgetExceeded`/`SchemaMismatch`
+diagnostic paths. See `benchmarks/ArchLinterNet.CEL.Benchmarks/README.md` for what each class
+measures and how to run it (`rtk make benchmark-cel`, optional — not part of `make acceptance`).
+Results are inputs to #330's packaging/reconciliation pass and to #163's Core integration guidance,
+not a standing performance gate.
+
 ## References
 
 - Parent story: [#322](https://github.com/eugenemalaschuk-source/arch-linter-net/issues/322)
 - This document: [#324](https://github.com/eugenemalaschuk-source/arch-linter-net/issues/324)
 - Implementation tasks that depend on the decisions above: #325 (tokenizer/parser), #326 (binder/type system), #327 (built-in function catalog execution), #328 (bounded evaluator/runtime semantics), #329 (compilation pipeline/cache identity), #330 (packaging/release readiness/reconciliation)
+- Performance and allocation baselines: [#168](https://github.com/eugenemalaschuk-source/arch-linter-net/issues/168)
 - Core integration consuming the public API: [#163](https://github.com/eugenemalaschuk-source/arch-linter-net/issues/163)
 - Policy expression model using the public API: [#162](https://github.com/eugenemalaschuk-source/arch-linter-net/issues/162)
