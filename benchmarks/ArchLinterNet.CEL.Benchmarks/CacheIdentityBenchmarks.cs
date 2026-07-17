@@ -20,10 +20,18 @@ namespace ArchLinterNet.CEL.Benchmarks;
 /// <see cref="CelEnvironment.CompilePredicate"/>/<see cref="CelEnvironment.Compile"/> call — which
 /// has already paid the tokenize/parse/bind cost the cache exists to avoid. The realistic pattern,
 /// benchmarked below via <c>SourceKeyedCache*</c>, keys a caller-owned cache by the raw expression
-/// source string instead (cheap and available before any compile call); within one
-/// <see cref="CelEnvironment"/> instance the source string alone is a sufficient cache key, since
-/// schema and limits are fixed for that environment's lifetime. <see cref="CelCompilationKey"/>
-/// remains useful for verifying identity equivalence across environments/compiles after the fact
+/// source string instead (cheap and available before any compile call), <b>scoped to one
+/// compilation kind</b>: one <see cref="CelEnvironment"/> instance fixes schema and limits for its
+/// entire lifetime, but it does not fix the choice between <c>CompilePredicate</c> and
+/// <c>Compile</c> — the same source text compiled both ways from the same environment produces two
+/// different results (<see cref="CelCompiledPredicate"/> vs. <c>CelCompiledExpression</c>,
+/// distinguished by <c>CelCompilationKey.RequiredResultType</c>). Source text alone is a sufficient
+/// key only when the cache is already scoped to one kind — the
+/// <c>Dictionary&lt;string, CelCompiledPredicate&gt;</c> used below is exactly that: its value type
+/// makes it predicate-only by construction, so it cannot silently accept a <c>Compile()</c> result.
+/// A caller needing one shared cache for both kinds instead needs a
+/// <c>(source, requiredResultType)</c> composite key. <see cref="CelCompilationKey"/> remains useful
+/// for verifying identity equivalence across environments/compiles after the fact
 /// (<see cref="EqualsEquivalent"/>/<see cref="EqualsDifferentSchema"/> below), and
 /// <see cref="ConstructKeyIsolated"/> isolates its own construction cost using internal access
 /// (granted the same way as <c>PipelineStageBenchmarks</c>) so that cost is visible independent of

@@ -31,7 +31,7 @@ A `-c Release` build is required — BenchmarkDotNet refuses to run unoptimized 
 | `CompilationBenchmarks` | The full public compilation pipeline via `CompilePredicate`/`Compile`; predicate vs. general-expression overhead; failing-compilation diagnostic overhead. |
 | `ContextConstructionBenchmarks` | Stable-handle vs. name-based `Set()`; context construction with and without the object-schema catalog; isolated `CelEvaluationContextBuilder`-construction-only cost (separate from `Set()`/`Build()`). |
 | `EvaluationBenchmarks` | Compile-once/evaluate-many repeated evaluation, broken out by operator/built-in category (string, list, map, comparison, boolean) and by explicit vs. environment-ceiling limits. |
-| `HighVolumeEvaluationBenchmarks` | One compiled predicate evaluated across 10,000 independent pre-built contexts in a single measured batch — surfaces GC pressure (allocation, Gen0/Gen1 counts) at a selector-like scale that a single-call benchmark cannot show. |
+| `HighVolumeEvaluationBenchmarks` | One compiled predicate evaluated across a parameterized batch of independent pre-built contexts (100 / 1,000 / 10,000, `[Params]`) in a single measured call per size — surfaces GC pressure (allocation, Gen0/Gen1 counts) at selector-like scale, and across three sizes rather than one, so the scaling behavior (linear or not) is actually measured instead of assumed. |
 | `CacheIdentityBenchmarks` | `CelCompilationKey` creation/equality/hashing (including an internal-access-isolated construction-only benchmark), and a caller-owned `Dictionary` cache hit vs. full miss-and-populate pattern (the library holds no process-global cache by design). |
 | `ConcurrencyBenchmarks` | Sequential vs. concurrent (`Parallel.For`) evaluation of one immutable compiled predicate across independent, per-task evaluation contexts. |
 | `ApiScenarioBenchmarks` | Deterministic, self-calibrating `BudgetExceeded` and `SchemaMismatch` diagnostic paths, and the safe-default `Evaluate(context)` overload vs. the explicit-limits overload. |
@@ -57,8 +57,20 @@ A `-c Release` build is required — BenchmarkDotNet refuses to run unoptimized 
   BenchmarkDotNet's own dependency tree, so a future dependency change that introduced Roslyn some
   other way would fail this test rather than pass silently.
 - Budget-exhaustion and schema-mismatch benchmarks are deterministic by construction: the
-  budget-exhaustion cost ceiling is calibrated from the exact per-comparison cost math in
-  `CelEvaluator` (see `ApiScenarioBenchmarks.SetupBudgetExhaustion`) to fail after roughly 200 of
-  256 haystack elements — proving the failure genuinely depends on haystack length, not just the
-  first comparison — and the schema-mismatch context is built from a structurally different
-  schema. Neither depends on chance or timing.
+  budget-exhaustion cost ceiling is self-calibrating, not a hardcoded copy of `CelEvaluator`'s cost
+  math — `ApiScenarioBenchmarks.SetupBudgetExhaustion` derives the real per-comparison cost from a
+  live `MaxCostUnits=1` probe's `BudgetExceeded` diagnostic (which `CelEvaluator`'s private cost
+  constants cannot be referenced from directly, even with `InternalsVisibleTo`), then calibrates the
+  actual scenario to fail after roughly 200 of 256 haystack elements and asserts at setup time that
+  it still does — proving the failure genuinely depends on haystack length, not just the first
+  comparison, and staying correct even if `CelEvaluator`'s cost model changes. The schema-mismatch
+  context is built from a structurally different schema. Neither depends on chance or timing.
+- A caller-owned cache keyed by source text (see `CacheIdentityBenchmarks.SourceKeyedCacheHit`/
+  `SourceKeyedCacheMissAndPopulate`) is safe only *within one compilation kind*: one `CelEnvironment`
+  fixes schema/profile/limits, but not the choice between `CompilePredicate` and `Compile` — the
+  same source text compiled both ways produces different results
+  (`CelCompiledPredicate`/`CelCompiledExpression`, tracked as `CelCompilationKey.RequiredResultType`).
+  A single cache must therefore either use a distinct typed dictionary per compilation kind (as
+  `CacheIdentityBenchmarks` does — `Dictionary<string, CelCompiledPredicate>`, which cannot silently
+  hold a `Compile()` result) or key by `(source, requiredResultType)` if a caller genuinely needs one
+  shared cache for both.

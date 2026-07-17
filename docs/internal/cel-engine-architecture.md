@@ -246,9 +246,16 @@ The two use cases are therefore genuinely different and must not be conflated:
 
 - **Pre-compile "have I already compiled this?" lookup**, inside one long-lived, immutable
   `CelEnvironment` instance: key a caller-owned cache by the raw expression **source text**
-  (a `string`, cheap and available before any compile call). Source text alone is a sufficient key
-  *within one environment*, because that environment's schema and limits are fixed for its entire
-  lifetime — they cannot vary call-to-call the way they could across multiple environments.
+  (a `string`, cheap and available before any compile call), *scoped to one compilation kind*.
+  One `CelEnvironment` fixes schema, profile, and limits for its entire lifetime, but it does not
+  fix the choice between `CompilePredicate` and `Compile` — the same source text compiled both ways
+  from the same environment produces two different results (`CelCompiledPredicate` vs.
+  `CelCompiledExpression`, distinguished by `CelCompilationKey.RequiredResultType`). Source text
+  alone is therefore a sufficient key only when the cache itself is already scoped to one
+  compilation kind — in practice, a distinct typed dictionary per kind (e.g.
+  `Dictionary<string, CelCompiledPredicate>`, which cannot silently accept a `Compile()` result — a
+  CLR type-safety property, not just a convention) or, if a caller genuinely needs one shared cache
+  for both, a `(source, requiredResultType)` composite key instead of source text alone.
 - **Post-compile semantic-identity verification**, e.g. confirming two compiled results (possibly
   from different `CelEnvironment` instances, or produced at different times) are truly equivalent
   before treating them as interchangeable, or invalidating a cache when an environment's schema or
@@ -361,11 +368,13 @@ Recorded baseline headlines (see RESULTS.md for full tables and methodology):
   vs. stable-handle `Set()` overhead (~0.9%) was within this baseline's `ShortRun`-job noise floor —
   not a reliable magnitude claim.
 - `CelCompilationKey` cannot serve as a pre-compile cache-lookup key through the public API (its
-  identity components are internal); a caller-owned cache should key by source text instead — for
-  the same expression, a cache hit that way is ~145× faster than a full miss-and-populate path
-  (15.8 ns vs. 2.29 us) and allocates nothing. Note also that `CelCompilationKey.GetHashCode()`
-  itself is not cheap (~394 ns, since it string-hashes four separate identity components) — a
-  further reason to prefer a source-text-keyed cache over one keyed by `CelCompilationKey`.
+  identity components are internal); a caller-owned cache should key by source text instead,
+  scoped to one compilation kind (`CompilePredicate` vs. `Compile` — see the "Caching and
+  serialization" row above for why source text alone is not enough across both) — for the same
+  expression, a cache hit that way is ~145× faster than a full miss-and-populate path (15.8 ns vs.
+  2.29 us) and allocates nothing. Note also that `CelCompilationKey.GetHashCode()` itself is not
+  cheap (~394 ns, since it string-hashes four separate identity components) — a further reason to
+  prefer a source-text-keyed cache over one keyed by `CelCompilationKey`.
 - Batch evaluation shows genuinely linear-scaling GC pressure — measured at three batch sizes
   (100/1,000/10,000 independent contexts against one compiled predicate), not asserted from a
   single point: allocation scales exactly linearly (10.00× per 10× batch-size step) and

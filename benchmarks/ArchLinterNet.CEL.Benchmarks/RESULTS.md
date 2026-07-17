@@ -264,11 +264,15 @@ and its insert (176 B — a `Dictionary<TKey,TValue>`'s initial internal arrays 
 expected, since a miss falls through to exactly that same `CompilePredicate` call and then pays a
 real (if small) insertion cost on top, and this closeness is itself a consistency check that the
 fix produced a coherent measurement. The realistic caller-owned cache pattern — keyed by raw source
-text, not by `CelCompilationKey` (see the class remarks in `CacheIdentityBenchmarks.cs` for why) —
-shows the expected large payoff for the *same* expression: a hit is ~145× faster than the full
-miss-and-populate path (15.8 ns vs. 2,290.3 ns) and allocates nothing, confirming that caching
-identical expressions inside a long-lived `CelEnvironment` is worth doing whenever the same source
-text recurs.
+text, not by `CelCompilationKey` (see the class remarks in `CacheIdentityBenchmarks.cs` for why),
+**and scoped to one compilation kind** (the `Dictionary<string, CelCompiledPredicate>` used here is
+predicate-only by construction — a `CompilePredicate`/`Compile` choice is not fixed by the
+environment the way schema/limits are, so a cache spanning both kinds needs a
+`(source, requiredResultType)` key instead of source text alone; see the "Caching and
+serialization" row in `docs/internal/cel-engine-architecture.md`) — shows the expected large payoff
+for the *same* expression: a hit is ~145× faster than the full miss-and-populate path (15.8 ns vs.
+2,290.3 ns) and allocates nothing, confirming that caching identical expressions inside a
+long-lived `CelEnvironment` is worth doing whenever the same source text recurs.
 
 ### ConcurrencyBenchmarks — sequential vs. concurrent reuse of one compiled predicate
 
@@ -343,8 +347,12 @@ the same budget also fails (which would mean haystack length had stopped being t
 - **`CelCompilationKey` cannot serve as a pre-compile cache key through the public API** (every
   identity component it's built from — schema/limits `ComputeIdentity()` — is internal). This is a
   real API characteristic, not a benchmark artifact: worth documenting explicitly in #330's package
-  docs so Core integration keys its own cache by source text (as `CacheIdentityBenchmarks`
-  demonstrates), not by attempting to precompute a `CelCompilationKey` before the first compile.
+  docs so Core integration keys its own cache by source text, scoped to one compilation kind — a
+  separate typed cache (or dictionary) per `CompilePredicate` vs. `Compile`, or a
+  `(source, requiredResultType)` composite key if one shared cache is needed (as
+  `CacheIdentityBenchmarks` demonstrates) — not by attempting to precompute a `CelCompilationKey`
+  before the first compile, and not by assuming source text alone disambiguates both compilation
+  kinds.
 - **Batch evaluation shows genuinely linear-scaling GC pressure, measured across three batch
   sizes (100/1,000/10,000), not asserted from one.** Allocation scales exactly linearly with batch
   size (10.00× per 10× step) and per-evaluation allocation is constant (~696 B) across the whole
@@ -402,4 +410,5 @@ the same budget also fails (which would mean haystack length had stopped being t
   cache hit/miss numbers (15.8 ns vs. 2.29 us, ~145×), and the batch-scaling numbers (~696 B and
   ~305–326 ns per evaluation, verified constant across a 100×–10,000× batch-size range) give Core a
   baseline to plan its own selector/architecture-fact evaluation batch sizes against, and confirm a
-  source-text-keyed cache is the right caching primitive to reuse.
+  source-text-keyed cache (scoped per compilation kind — see the `CacheIdentityBenchmarks` note
+  above) is the right caching primitive to reuse.
