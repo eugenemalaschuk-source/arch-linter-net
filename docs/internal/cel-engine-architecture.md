@@ -141,7 +141,7 @@ ______________________________________________________________________
 | Type descriptors (`CelType`, `CelTypeKind`) | `ArchLinterNet.CEL` public | Static factories only |
 | Context schema (`CelContextSchema`, `CelVariable`) | `ArchLinterNet.CEL` public | Structural identity is deterministic |
 | Function catalog (declaration) | `ArchLinterNet.CEL.Binding.CelFunctionCatalog` internal | Declared per-profile; immutable; no public registration; `CelEngine` remains an unused placeholder |
-| Built-in function execution | `ArchLinterNet.CEL.Binding.CelBuiltinFunctionInvoker` internal | Shipped by #327. Pure, stateless, keyed by `CelFunctionOperationId` (carried on each `CelFunctionOverload`); every overload is total, no failure channel. `Invoke` and `ComputeCost` are two separate switches over the same enum — the compiler does NOT enforce that adding an operation id updates both (each has a `default` arm, so an omitted `ComputeCost` case is a silent budget-safety gap, not a build error); a code-review checklist item, not a compiler guarantee, is what closes this. Never exposed; #328's evaluator is the only intended caller |
+| Built-in function execution | `ArchLinterNet.CEL.Binding.CelBuiltinFunctionInvoker` internal | Shipped by #327. Pure, stateless, keyed by `CelFunctionOperationId` (carried on each `CelFunctionOverload`); every overload is total, no failure channel. `Invoke` and `ComputeCost` are two separate switches over the same enum — the compiler does NOT enforce that adding an operation id updates both (each has a `default` arm, so an omitted `ComputeCost` case is a silent budget-safety gap, not a build error); a code-review checklist item, not a compiler guarantee, is what closes this. Never exposed; `ArchLinterNet.CEL.Evaluation.CelEvaluator` (#328, shipped) is the only caller |
 | Bound operations (bound plan, binding tables) | `ArchLinterNet.CEL.Binding` internal (`CelBinder`, `CelBoundExpression`, `CelBoundNode` hierarchy) | Never exposed |
 | Bounded evaluator runtime | `ArchLinterNet.CEL.Evaluation.CelEvaluator` internal | Shipped by #328. One per-call runtime state, no shared mutable globals, source-span-aware diagnostics, schema-compatibility check against the full environment schema identity, and budget enforcement over bound-node visits, built-in cost charges, and collection/comparison runtime work |
 | Evaluation budgets (`CelCompilationLimits`, `CelEvaluationLimits`) | `ArchLinterNet.CEL` public | SafeDefaults provided; no unbounded path |
@@ -163,7 +163,7 @@ Capabilities deferred: arithmetic (`+`, `-`, `*`, `/`, `%`), conditional express
 |---|---|
 | Classification | Standard CEL (normative spec features) |
 | Intended owner | `ArchLinterNet.CEL` public API (new profile version) |
-| Existing seam | `CelProfile` identity gate in `CelEngine` grammar; type-system additions shipped by task #326 (`ArchLinterNet.CEL.Binding`) |
+| Existing seam | `CelProfile` identity gate in the `CelTokenizer`/`CelParser` grammar (not `CelEngine` — see the Grammar gates row above); type-system additions shipped by task #326 (`ArchLinterNet.CEL.Binding`) |
 | New profile version required? | Yes — Profile v2+ adds these; Profile v1 semantics remain frozen |
 | Affected layers | Tokenizer, parser, type-checker, evaluator, function catalog, diagnostics |
 | Safety implications | Arithmetic can overflow; timestamp/duration parsing can be malformed; regex can cause ReDoS if unbounded |
@@ -195,7 +195,7 @@ A future standard built-in follows one controlled path: add a `CelFunctionOperat
 |---|---|
 | Classification | Standard CEL (built-in) + canonical extension (host-defined) |
 | Intended owner | `ArchLinterNet.CEL.Binding.CelFunctionCatalog` internal (declaration) + `ArchLinterNet.CEL.Binding.CelBuiltinFunctionInvoker` internal (execution); future profiles may add more built-ins |
-| Existing seam | Internal function-catalog lookup inside `ArchLinterNet.CEL.Binding` (`CelFunctionCatalog`, consumed by `CelBinder`) plus operation-id-keyed execution (`CelBuiltinFunctionInvoker`, to be consumed by #328's evaluator); profile gates which functions are available |
+| Existing seam | Internal function-catalog lookup inside `ArchLinterNet.CEL.Binding` (`CelFunctionCatalog`, consumed by `CelBinder`) plus operation-id-keyed execution (`CelBuiltinFunctionInvoker`, consumed by `CelEvaluator` — #328, shipped); profile gates which functions are available |
 | New profile version required? | Adding new built-ins requires a new profile; host-defined functions require explicit API design (excluded from v1) |
 | Affected layers | Binder, type-checker, evaluator |
 | Safety implications | User-defined functions could execute arbitrary code; excluded from v1 for this reason |

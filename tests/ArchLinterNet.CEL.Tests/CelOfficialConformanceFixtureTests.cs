@@ -54,7 +54,7 @@ public sealed class CelOfficialConformanceFixtureTests
     [TestCase("!true", false, TestName = "logic.NOT.not_true")]
     [TestCase("!false", true, TestName = "logic.NOT.not_false")]
     // ── comparisons.textproto: eq_literal (string subset; numeric/uint/dyn cases excluded) ──
-    [TestCase("'' == ''", true, TestName = "comparisons.eq_literal.eq_string")]
+    [TestCase("'' == \"\"", true, TestName = "comparisons.eq_literal.eq_string")]
     [TestCase("'a' == 'b'", false, TestName = "comparisons.eq_literal.not_eq_string")]
     [TestCase("'abc' == 'ABC'", false, TestName = "comparisons.eq_literal.not_eq_string_case")]
     [TestCase("'ίσος' == 'ίσος'", true, TestName = "comparisons.eq_literal.eq_string_unicode")]
