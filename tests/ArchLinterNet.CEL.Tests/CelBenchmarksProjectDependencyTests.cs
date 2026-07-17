@@ -58,8 +58,19 @@ public sealed class CelBenchmarksProjectDependencyTests
         // decoy project with a similar name (e.g. "FakeArchLinterNet.CEL.csproj", or a path
         // elsewhere on disk that merely contains that substring) would pass `Does.Contain` while
         // not actually being the real, architecture-governed ArchLinterNet.CEL project.
+        //
+        // MSBuild path separators in a .csproj are always backslashes on disk regardless of the OS
+        // that later builds the project (MSBuild itself normalizes them at build time) — but
+        // Path.Combine/Path.GetFullPath do NOT treat '\' as a separator on non-Windows, so passing
+        // the raw "..\..\src\ArchLinterNet.CEL\ArchLinterNet.CEL.csproj" straight through silently
+        // produces a bogus, non-existent path on Linux/macOS CI runners. Normalize both '\' and '/'
+        // to the current platform's separator before combining, so this test resolves the same real
+        // file on every OS `rtk make acceptance` runs on.
+        var normalizedReference = projectReferences[0]
+            .Replace('\\', Path.DirectorySeparatorChar)
+            .Replace('/', Path.DirectorySeparatorChar);
         var referencedProjectFullPath = Path.GetFullPath(
-            Path.Combine(Path.GetDirectoryName(csprojPath)!, projectReferences[0]));
+            Path.Combine(Path.GetDirectoryName(csprojPath)!, normalizedReference));
         var expectedCelCsprojFullPath = Path.GetFullPath(
             Path.Combine(FindRepositoryRoot(), "src", "ArchLinterNet.CEL", "ArchLinterNet.CEL.csproj"));
         Assert.That(referencedProjectFullPath, Is.EqualTo(expectedCelCsprojFullPath).IgnoreCase,
