@@ -65,9 +65,12 @@ public sealed class CelPublicApiSurfaceApprovalTests
         var builder = new StringBuilder();
         foreach (var type in types)
         {
+            var suffix = type.IsEnum
+                ? " : " + DescribeType(System.Enum.GetUnderlyingType(type), null)
+                : DescribeBaseTypesAndInterfaces(type);
             builder.Append(DescribeTypeKind(type)).Append(' ').Append(QualifiedName(type))
                 .Append(DescribeGenericParams(type.IsGenericTypeDefinition ? type.GetGenericArguments() : []))
-                .Append(DescribeBaseTypesAndInterfaces(type))
+                .Append(suffix)
                 .Append('\n');
             foreach (var member in DescribeMembers(type))
                 builder.Append("  ").Append(member).Append('\n');
@@ -80,13 +83,23 @@ public sealed class CelPublicApiSurfaceApprovalTests
     {
         if (type.IsInterface) return "interface";
         if (type.IsEnum) return "enum";
-        if (type.IsValueType) return "struct";
+        if (type.IsValueType)
+        {
+            var modifiers = "";
+            if (IsReadOnlyStruct(type)) modifiers += "readonly ";
+            if (type.IsByRefLike) modifiers += "ref ";
+            return $"{modifiers}struct";
+        }
+
         if (typeof(System.Delegate).IsAssignableFrom(type)) return "delegate";
         if (type.IsAbstract && type.IsSealed) return "static class";
         if (type.IsSealed) return "sealed class";
         if (type.IsAbstract) return "abstract class";
         return "class";
     }
+
+    private static bool IsReadOnlyStruct(System.Type type) =>
+        type.GetCustomAttributesData().Any(a => a.AttributeType == typeof(IsReadOnlyAttribute));
 
     private static string DescribeBaseTypesAndInterfaces(System.Type type)
     {
@@ -445,7 +458,7 @@ public sealed class CelPublicApiSurfaceApprovalTests
         "  property ArchLinterNet.CEL.Evaluation.CelEvaluationLimits EvaluationLimits {get;}\n" +
         "  property ArchLinterNet.CEL.Profile.CelProfile Profile {get;}\n" +
         "  property ArchLinterNet.CEL.Schema.CelContextSchema Schema {get;}\n" +
-        "enum ArchLinterNet.CEL.Compilation.CelRequiredResultType\n" +
+        "enum ArchLinterNet.CEL.Compilation.CelRequiredResultType : int\n" +
         "  enum-member General = 1\n" +
         "  enum-member Predicate = 0\n" +
         "sealed class ArchLinterNet.CEL.Diagnostics.CelDiagnostic\n" +
@@ -456,7 +469,7 @@ public sealed class CelPublicApiSurfaceApprovalTests
         "  property System.Collections.Generic.IReadOnlyDictionary<string,string> Parameters {get;}\n" +
         "  property string Category {get;}\n" +
         "  property string Message {get;}\n" +
-        "enum ArchLinterNet.CEL.Diagnostics.CelDiagnosticCode\n" +
+        "enum ArchLinterNet.CEL.Diagnostics.CelDiagnosticCode : int\n" +
         "  enum-member BindingError = 2\n" +
         "  enum-member BudgetExceeded = 5\n" +
         "  enum-member EvaluationFailure = 6\n" +
@@ -465,11 +478,11 @@ public sealed class CelPublicApiSurfaceApprovalTests
         "  enum-member SyntaxError = 0\n" +
         "  enum-member TypeMismatch = 3\n" +
         "  enum-member UnsupportedFeature = 1\n" +
-        "enum ArchLinterNet.CEL.Diagnostics.CelDiagnosticSeverity\n" +
+        "enum ArchLinterNet.CEL.Diagnostics.CelDiagnosticSeverity : int\n" +
         "  enum-member Error = 0\n" +
         "  enum-member Info = 2\n" +
         "  enum-member Warning = 1\n" +
-        "struct ArchLinterNet.CEL.Diagnostics.CelSourceSpan : System.IEquatable<ArchLinterNet.CEL.Diagnostics.CelSourceSpan>\n" +
+        "readonly struct ArchLinterNet.CEL.Diagnostics.CelSourceSpan : System.IEquatable<ArchLinterNet.CEL.Diagnostics.CelSourceSpan>\n" +
         "  ctor(int start, int end)\n" +
         "  method bool Equals(ArchLinterNet.CEL.Diagnostics.CelSourceSpan other)\n" +
         "  method bool Equals(object? obj)\n" +
@@ -500,7 +513,7 @@ public sealed class CelPublicApiSurfaceApprovalTests
         "  field static readonly ArchLinterNet.CEL.Profile.CelProfile V1\n" +
         "  method string ToString()\n" +
         "  property ArchLinterNet.CEL.Profile.CelProfileId Id {get;}\n" +
-        "struct ArchLinterNet.CEL.Profile.CelProfileId : System.IEquatable<ArchLinterNet.CEL.Profile.CelProfileId>\n" +
+        "readonly struct ArchLinterNet.CEL.Profile.CelProfileId : System.IEquatable<ArchLinterNet.CEL.Profile.CelProfileId>\n" +
         "  implicit operator ArchLinterNet.CEL.Profile.CelProfileId(string value)\n" +
         "  method bool Equals(ArchLinterNet.CEL.Profile.CelProfileId other)\n" +
         "  method bool Equals(object? obj)\n" +
@@ -542,7 +555,7 @@ public sealed class CelPublicApiSurfaceApprovalTests
         "  property static ArchLinterNet.CEL.Schema.CelType Int {get;}\n" +
         "  property static ArchLinterNet.CEL.Schema.CelType String {get;}\n" +
         "  property string? SchemaId {get;}\n" +
-        "enum ArchLinterNet.CEL.Schema.CelTypeKind\n" +
+        "enum ArchLinterNet.CEL.Schema.CelTypeKind : int\n" +
         "  enum-member Bool = 0\n" +
         "  enum-member Float = 3\n" +
         "  enum-member Int = 2\n" +
@@ -576,7 +589,7 @@ public sealed class CelPublicApiSurfaceApprovalTests
         "  method string AsString()\n" +
         "  method string ToString()\n" +
         "  property ArchLinterNet.CEL.Values.CelValueKind Kind {get;}\n" +
-        "enum ArchLinterNet.CEL.Values.CelValueKind\n" +
+        "enum ArchLinterNet.CEL.Values.CelValueKind : int\n" +
         "  enum-member Bool = 0\n" +
         "  enum-member Float = 3\n" +
         "  enum-member Int = 2\n" +
