@@ -32,10 +32,19 @@ namespace ArchLinterNet.CEL.Benchmarks;
 [MemoryDiagnoser]
 public class CacheIdentityBenchmarks
 {
+    // Deliberately declared with no "target" reference so it compiles under both the full
+    // source/target schema and the mismatched (source-only) schema below — see SchemaComparisonKeyA
+    // / SchemaComparisonKeyB in Setup: EqualsDifferentSchema needs the exact same NormalizedSource
+    // string on both keys, or CelCompilationKey.Equals' NormalizedSource check (checked first, and
+    // short-circuiting) exits before ever reaching the SchemaIdentity comparison this benchmark
+    // means to measure.
+    private const string SourceOnlyPredicateSource = "source.role == 'service'";
+
     private CelEnvironment _environment = null!;
     private CelCompilationKey _keyA = null!;
     private CelCompilationKey _keyAIdentical = null!;
-    private CelCompilationKey _keyDifferentSchema = null!;
+    private CelCompilationKey _schemaComparisonKeyA = null!;
+    private CelCompilationKey _schemaComparisonKeyB = null!;
     private Dictionary<string, CelCompiledPredicate> _warmSourceKeyedCache = null!;
 
     [GlobalSetup]
@@ -45,10 +54,13 @@ public class CacheIdentityBenchmarks
         _keyA = _environment.CompilePredicate(BenchmarkFixtures.RepresentativePredicateSource).CompilationKey;
         _keyAIdentical = _environment.CompilePredicate(BenchmarkFixtures.RepresentativePredicateSource).CompilationKey;
 
-        // The mismatched-schema environment only declares "source" (no "target"), so it is
-        // compiled with a source-only predicate rather than RepresentativePredicateSource.
+        // Same NormalizedSource (SourceOnlyPredicateSource) compiled under two structurally
+        // different schemas — the full source/target schema (with its object-schema catalog) vs.
+        // the mismatched schema (source-only, no catalog) — so Equals genuinely reaches and compares
+        // SchemaIdentity instead of short-circuiting on a NormalizedSource mismatch.
+        _schemaComparisonKeyA = _environment.CompilePredicate(SourceOnlyPredicateSource).CompilationKey;
         var (mismatchedEnvironment, _) = BenchmarkFixtures.BuildMismatchedSchemaContext();
-        _keyDifferentSchema = mismatchedEnvironment.CompilePredicate("source.role == 'service'").CompilationKey;
+        _schemaComparisonKeyB = mismatchedEnvironment.CompilePredicate(SourceOnlyPredicateSource).CompilationKey;
 
         // Hit and miss (SourceKeyedCacheHit / SourceKeyedCacheMissAndPopulate below) both look
         // up/compile the exact same expression (RepresentativePredicateSource), so the hit-vs-miss
@@ -81,8 +93,11 @@ public class CacheIdentityBenchmarks
     [Benchmark(Description = "CelCompilationKey.Equals — equivalent schema/source/limits")]
     public bool EqualsEquivalent() => _keyA.Equals(_keyAIdentical);
 
-    [Benchmark(Description = "CelCompilationKey.Equals — different schema identity")]
-    public bool EqualsDifferentSchema() => _keyA.Equals(_keyDifferentSchema);
+    // _schemaComparisonKeyA/B share the exact same NormalizedSource, so Equals cannot short-circuit
+    // on that first check — this measures the SchemaIdentity string comparison itself, not a fast
+    // exit from differing source text.
+    [Benchmark(Description = "CelCompilationKey.Equals — different schema identity, same source text")]
+    public bool EqualsDifferentSchema() => _schemaComparisonKeyA.Equals(_schemaComparisonKeyB);
 
     [Benchmark(Description = "CelCompilationKey.GetHashCode()")]
     public int GetHashCodeCost() => _keyA.GetHashCode();

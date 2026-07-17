@@ -19,17 +19,33 @@ namespace ArchLinterNet.CEL.Tests;
 /// sample would miss — and unlike the parameter-signature check in
 /// <c>CelRepeatedEvaluationNoReparseTests</c>, it also rules out a regression that
 /// re-tokenizes/re-parses/re-binds using state already held on the compiled instance (e.g.
-/// <c>CompilationKey.NormalizedSource</c>) rather than a new external input. The walk is fail-closed
-/// on unresolved method tokens (see <see cref="GetCalledMethods"/>): an edge this walker cannot
-/// resolve is reported as a failure rather than silently dropped, since a silently-dropped edge
-/// could just as easily be the one edge into the forbidden pipeline types.
+/// <c>CompilationKey.NormalizedSource</c>) rather than a new external input.
 /// </summary>
+/// <remarks>
+/// <para>
+/// The walk is fail-closed on unresolved method tokens (see <see cref="GetCalledMethods"/>): an
+/// edge this walker cannot resolve is reported as a failure rather than silently dropped, since a
+/// silently-dropped edge could just as easily be the one edge into the forbidden pipeline types.
+/// </para>
+/// <para>
+/// It is also conservative for virtual dispatch: for a <c>callvirt</c> instruction, the token
+/// resolves only to the statically-declared method — the actual runtime target could be any
+/// override, and the IL alone does not say which. <see cref="ResolveVirtualTargets"/> therefore
+/// follows every override of the resolved virtual method found anywhere in the
+/// <c>ArchLinterNet.CEL</c> assembly, not just the token-resolved declaration, so a `callvirt`
+/// through an interface or a base-typed reference cannot hide an edge into
+/// <see cref="CelTokenizer"/>/<see cref="CelParser"/>/<see cref="CelBinder"/> by resolving to an
+/// unrelated base method with no body. A non-virtual <c>call</c> has no such ambiguity — the token
+/// is the exact target — so this treatment applies only to <c>callvirt</c>.
+/// </para>
+/// </remarks>
 [TestFixture]
 public sealed class CelEvaluateCallGraphNeverReachesCompilePipelineTests
 {
     private static readonly Type[] _forbiddenCompilePipelineTypes = [typeof(CelTokenizer), typeof(CelParser), typeof(CelBinder)];
     private static readonly Assembly _celAssembly = typeof(CelCompiledPredicate).Assembly;
     private static readonly Dictionary<short, OpCode> _opCodesByValue = BuildOpCodeLookup();
+    private static readonly Dictionary<MethodInfo, IReadOnlyList<MethodBase>> _virtualOverrideCache = [];
 
     [Test]
     public void Evaluate_CallGraph_NeverReachesTokenizerParserOrBinder()
@@ -156,11 +172,52 @@ public sealed class CelEvaluateCallGraphNeverReachesCompilePipelineTests
                 }
 
                 if (resolved is not null)
-                    yield return resolved;
+                {
+                    // callvirt: the token names only the statically-declared method; the actual
+                    // runtime target could be any override. call/newobj/ldftn have no such
+                    // ambiguity — the token already names the exact target.
+                    if (opcode.Value == OpCodes.Callvirt.Value && resolved is MethodInfo { IsVirtual: true } virtualMethod)
+                    {
+                        foreach (var target in ResolveVirtualTargets(virtualMethod))
+                            yield return target;
+                    }
+                    else
+                    {
+                        yield return resolved;
+                    }
+                }
             }
 
             i += operandSize;
         }
+    }
+
+    /// <summary>
+    /// Returns the token-resolved virtual method itself, plus every override of it declared
+    /// anywhere in the <c>ArchLinterNet.CEL</c> assembly — conservative handling for virtual
+    /// dispatch/interface calls, since a <c>callvirt</c> token alone does not identify which
+    /// override actually runs. Results are cached per base definition; the CEL assembly's type set
+    /// does not change during a test run.
+    /// </summary>
+    private static IReadOnlyList<MethodBase> ResolveVirtualTargets(MethodInfo virtualMethod)
+    {
+        var baseDefinition = virtualMethod.GetBaseDefinition();
+        if (_virtualOverrideCache.TryGetValue(baseDefinition, out var cached))
+            return cached;
+
+        var targets = new List<MethodBase> { virtualMethod };
+        foreach (var type in _celAssembly.GetTypes())
+        {
+            foreach (var candidate in type.GetMethods(
+                BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.DeclaredOnly))
+            {
+                if (candidate.IsVirtual && !Equals(candidate, virtualMethod) && candidate.GetBaseDefinition() == baseDefinition)
+                    targets.Add(candidate);
+            }
+        }
+
+        _virtualOverrideCache[baseDefinition] = targets;
+        return targets;
     }
 
     private static int GetOperandSize(OperandType operandType) => operandType switch

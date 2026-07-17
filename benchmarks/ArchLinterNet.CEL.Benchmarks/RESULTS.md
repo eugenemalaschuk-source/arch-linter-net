@@ -18,14 +18,18 @@ reconciliation pass and #163's Core integration guidance. Not a regression gate 
   (`make benchmark-cel` with no `--job` override) for tighter confidence intervals.
 - Expression source, profile version, and public API path: Profile v1 (`arch-linter/cel/v1`),
   exclusively through `CelEnvironment`/`CelCompiledPredicate`/`CelCompiledExpression` (see each
-  class's remarks in source for the one exception — `PipelineStageBenchmarks`, which uses
-  internal-only access to isolate stage cost; still never a public API surface).
+  class's/method's remarks in source for the two exceptions — `PipelineStageBenchmarks`, which uses
+  internal-only access to isolate tokenize/parse/bind stage cost, and
+  `CacheIdentityBenchmarks.ConstructKeyIsolated`, which uses the internal `CelCompilationKey`
+  constructor and internal identity methods to isolate cache-key-construction cost; neither is ever
+  a public API surface).
 - `CacheIdentityBenchmarks`, `ContextConstructionBenchmarks`, and `ApiScenarioBenchmarks` were
   rerun (same run configuration above) across several review rounds that fixed measurement flaws in
   them (unfair hit-vs-miss expression comparison, object-value construction leaking into timed
   methods, an apples-to-oranges structural-validation comparison, an inconsistent hit/miss lookup
-  method, a miss path that never modeled cache population). `HighVolumeEvaluationBenchmarks` was
-  added in the latest round to close a coverage gap (no batch/selector-scale benchmark existed).
+  method, a miss path that never modeled cache population, a schema-equality comparison that
+  short-circuited on source text before ever reaching schema identity). `HighVolumeEvaluationBenchmarks`
+  was added in a later round to close a coverage gap (no batch/selector-scale benchmark existed).
   Numbers below reflect the current, fixed versions; see each section's note for what changed and
   why.
 
@@ -171,47 +175,59 @@ was chosen as a round, plausible selector-scale number, not measured against a r
 
 *(Rerun across several review fixes. Hit and miss now look up/compile the exact same expression
 — `RepresentativePredicateSource` — differing only in cache *state*, not expression complexity.
-Latest fix: both hit and the miss path now use `TryGetValue` (the miss row previously used a
-permanently-empty dictionary and `TryGetValue`, while hit used the indexer — an inconsistent
-lookup method between the two rows being compared), and the miss row now models the *full*
-miss-and-populate path a real caller runs — a fresh dictionary, a failed `TryGetValue`, the
-fallback compile, and the resulting insert — instead of a lookup-then-compile that never actually
-populates the cache. See `CacheIdentityBenchmarks`'s class remarks for the full reasoning.)*
+Both hit and the miss path use `TryGetValue` (previously the hit row used the indexer while miss
+used `TryGetValue` — an inconsistent lookup method between the two rows being compared), and the
+miss row models the *full* miss-and-populate path a real caller runs — a fresh dictionary, a
+failed `TryGetValue`, the fallback compile, and the resulting insert. Latest fix: the "different
+schema identity" `Equals` row now compares two keys built from the *same* `NormalizedSource` text
+compiled under two different schemas — `Equals` checks `NormalizedSource` first and
+short-circuits (see its implementation), so the previous version, which compared keys from two
+different expressions, was measuring a fast exit on differing source text, never actually
+reaching the `SchemaIdentity` comparison this row claims to measure. See
+`CacheIdentityBenchmarks`'s class remarks for the full reasoning on all of the above.)*
 
 | Method | Mean | Allocated |
 |---|---:|---:|
-| Isolated cache-key creation (schema/limits identity + ctor, no tokenize/parse/bind) | 353.3 ns | 1,832 B |
-| `CelCompilationKey` via the only public path: full `CompilePredicate` call | 2,280.0 ns | 6,432 B |
-| `CelCompilationKey.Equals` — equivalent schema/source/limits | 15.2 ns | 0 B |
-| `CelCompilationKey.Equals` — different schema identity | 0.9 ns | 0 B |
-| `CelCompilationKey.GetHashCode()` | 390.6 ns | 0 B |
-| Caller-owned cache keyed by source text: hit for `RepresentativePredicateSource` (`TryGetValue`, zero compiles) | 15.5 ns | 0 B |
-| Caller-owned cache keyed by source text: full miss-and-populate path (fresh dict, `TryGetValue` miss, compile, insert) | 2,052.9 ns | 6,608 B |
+| Isolated cache-key creation (schema/limits identity + ctor, no tokenize/parse/bind) | 361.9 ns | 1,832 B |
+| `CelCompilationKey` via the only public path: full `CompilePredicate` call | 2,324.2 ns | 6,432 B |
+| `CelCompilationKey.Equals` — equivalent schema/source/limits | 16.5 ns | 0 B |
+| `CelCompilationKey.Equals` — different schema identity, same source text | 1.7 ns | 0 B |
+| `CelCompilationKey.GetHashCode()` | 393.9 ns | 0 B |
+| Caller-owned cache keyed by source text: hit for `RepresentativePredicateSource` (`TryGetValue`, zero compiles) | 15.8 ns | 0 B |
+| Caller-owned cache keyed by source text: full miss-and-populate path (fresh dict, `TryGetValue` miss, compile, insert) | 2,290.3 ns | 6,608 B |
+
+The "different schema identity" row is still fast (1.7 ns) even though it now genuinely reaches
+and compares `SchemaIdentity` — this is expected, not a sign the fix didn't work: .NET's ordinal
+`string.Equals` fast-paths on a length mismatch (or an early differing character) before scanning
+the rest of either string, and the two `SchemaIdentity` values here differ in declared-variable
+count (one vs. two variables), so the mismatch is detected almost immediately regardless of how
+long either string is. The number is now an honest measurement of that fast-path cost, not an
+artifact of comparing unrelated expressions.
 
 Key construction in isolation (schema/limits identity computation + the `CelCompilationKey`
 constructor) is ~15% of a full compile's time and ~28% of its allocation — meaningful but not the
 dominant cost of `CompilePredicate`; tokenize/parse/bind still account for the remaining ~85%/72%.
 `Equals` is genuinely cheap (0 B allocated, low-nanosecond time) — but `GetHashCode()` is not:
-at 390.6 ns it costs about as much as isolated key *construction* (353.3 ns) and more than any
+at 393.9 ns it costs about as much as isolated key *construction* (361.9 ns) and more than any
 single evaluation in the table above, because it must string-hash four separate identity
 components (`NormalizedSource`, `SchemaIdentity`, `CompilationLimitsIdentity`,
 `EvaluationLimitsIdentity` — `SchemaIdentity` in particular can be long, since it encodes the whole
 registered object-schema catalog structurally), not just one short string. This reinforces, rather
 than merely coincides with, the decision to key a caller-owned cache by the raw source string
-(see `SourceKeyedCacheHit` below, 15.5 ns) instead of by `CelCompilationKey`: even setting aside
+(see `SourceKeyedCacheHit` below, 15.8 ns) instead of by `CelCompilationKey`: even setting aside
 that a `CelCompilationKey` cannot be obtained before a first compile (see the class remarks), using
-one as a `Dictionary` key would also pay ~390 ns of hashing on every lookup — a real, avoidable tax
+one as a `Dictionary` key would also pay ~394 ns of hashing on every lookup — a real, avoidable tax
 a source-text key does not carry for expressions no longer or more complex than
 `RepresentativePredicateSource`.
-The full miss-and-populate benchmark's mean (2,052.9 ns) and allocation (6,608 B) land close to the
-full-compile row above (2,280.0 ns, 6,432 B) plus a small extra allocation for the fresh dictionary
+The full miss-and-populate benchmark's mean (2,290.3 ns) and allocation (6,608 B) land close to the
+full-compile row above (2,324.2 ns, 6,432 B) plus a small extra allocation for the fresh dictionary
 and its insert (176 B — a `Dictionary<TKey,TValue>`'s initial internal arrays for one entry) —
 expected, since a miss falls through to exactly that same `CompilePredicate` call and then pays a
 real (if small) insertion cost on top, and this closeness is itself a consistency check that the
 fix produced a coherent measurement. The realistic caller-owned cache pattern — keyed by raw source
 text, not by `CelCompilationKey` (see the class remarks in `CacheIdentityBenchmarks.cs` for why) —
-shows the expected large payoff for the *same* expression: a hit is ~132× faster than the full
-miss-and-populate path (15.5 ns vs. 2,052.9 ns) and allocates nothing, confirming that caching
+shows the expected large payoff for the *same* expression: a hit is ~145× faster than the full
+miss-and-populate path (15.8 ns vs. 2,290.3 ns) and allocates nothing, confirming that caching
 identical expressions inside a long-lived `CelEnvironment` is worth doing whenever the same source
 text recurs.
 
@@ -305,12 +321,17 @@ the same budget also fails (which would mean haystack length had stopped being t
   get-only (compiler-enforced immutability post-construction); and the exact same `Bound` object
   reference is observed before and after 1,000 evaluations of a compiled predicate.
   `CelEvaluateCallGraphNeverReachesCompilePipelineTests.cs` goes further and proves it at the
-  *code-path* level: it walks the actual CIL call graph reachable from both `Evaluate(context,
-  limits)` overloads and asserts the walk never reaches `CelTokenizer`, `CelParser`, or `CelBinder`
-  — this rules out not just "no data flows into Evaluate that could re-tokenize" but "no code path
-  inside Evaluate re-tokenizes using state it already holds" (e.g.
-  `CompilationKey.NormalizedSource`), covering every reachable path in the current build rather than
-  only the one path a sampled run happens to exercise. The test is verified against a true positive
+  *code-path* level: it walks the actual CIL call graph reachable from all four `Evaluate` overloads
+  (explicit-limits and safe-default, on both `CelCompiledPredicate` and `CelCompiledExpression`) and
+  asserts the walk never reaches `CelTokenizer`, `CelParser`, or `CelBinder` — this rules out not
+  just "no data flows into Evaluate that could re-tokenize" but "no code path inside Evaluate
+  re-tokenizes using state it already holds" (e.g. `CompilationKey.NormalizedSource`), covering
+  every reachable path in the current build rather than only the one path a sampled run happens to
+  exercise. The walk is fail-closed on unresolved method tokens, and conservative for virtual
+  dispatch/interface calls: a `callvirt` instruction's token names only the statically-declared
+  method, so the walker follows every override of that method found anywhere in the
+  `ArchLinterNet.CEL` assembly (not just the token-resolved one), since the actual runtime target
+  cannot otherwise be determined from the IL alone. The test is verified against a true positive
   (confirmed to actually flag `CelEnvironment.CompilePredicate`'s call graph, which does reach
   `CelTokenizer`, when pointed at it) so its silence on `Evaluate` is a real negative, not a walker
   that never finds anything.
@@ -324,7 +345,7 @@ the same budget also fails (which would mean haystack length had stopped being t
   in `CelEvaluationContextBuilder`'s constructor is also a candidate future `ArchLinterNet.CEL`
   improvement worth a separate issue.
 - #163 (Core integration): the per-operator evaluation numbers (all sub-200ns), the same-expression
-  cache hit/miss numbers (15.5 ns vs. 2.05 us, ~132×), and the selector-scale batch numbers (~1.48
+  cache hit/miss numbers (15.8 ns vs. 2.29 us, ~145×), and the selector-scale batch numbers (~1.48
   Gen0 collections / ~6.64 MB per 10,000 evaluations) give Core a baseline to plan its own
   selector/architecture-fact evaluation batch sizes against, and confirm a source-text-keyed cache
   is the right caching primitive to reuse.

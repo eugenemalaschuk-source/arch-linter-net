@@ -341,9 +341,9 @@ Recorded baseline headlines (see RESULTS.md for full tables and methodology):
   more than the stable-handle path.
 - `CelCompilationKey` cannot serve as a pre-compile cache-lookup key through the public API (its
   identity components are internal); a caller-owned cache should key by source text instead — for
-  the same expression, a cache hit that way is ~132× faster than a full miss-and-populate path
-  (15.5 ns vs. 2.05 us) and allocates nothing. Note also that `CelCompilationKey.GetHashCode()`
-  itself is not cheap (~390 ns, since it string-hashes four separate identity components) — a
+  the same expression, a cache hit that way is ~145× faster than a full miss-and-populate path
+  (15.8 ns vs. 2.29 us) and allocates nothing. Note also that `CelCompilationKey.GetHashCode()`
+  itself is not cheap (~394 ns, since it string-hashes four separate identity components) — a
   further reason to prefer a source-text-keyed cache over one keyed by `CelCompilationKey`.
 - Selector-scale batch evaluation (10,000 independent contexts against one compiled predicate)
   shows bounded, linear-scaling GC pressure: ~1.48 Gen0 collections and ~6.64 MB total allocation,
@@ -352,7 +352,9 @@ Recorded baseline headlines (see RESULTS.md for full tables and methodology):
   asserted: `CelEvaluateCallGraphNeverReachesCompilePipelineTests` statically walks the CIL call
   graph reachable from all four `Evaluate` overloads (explicit-limits and safe-default, on both
   compiled types) and proves it never reaches the tokenizer, parser, or binder — fail-closed on any
-  unresolved call-graph edge.
+  unresolved call-graph edge, and conservative for virtual dispatch (a `callvirt` is followed to
+  every override of the resolved method found in the `ArchLinterNet.CEL` assembly, not only the
+  statically-resolved one, since the IL token alone cannot say which override actually runs).
 
 ## References
 
