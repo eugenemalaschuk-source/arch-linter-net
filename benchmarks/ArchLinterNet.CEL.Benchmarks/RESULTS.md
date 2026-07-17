@@ -23,6 +23,15 @@ reconciliation pass and #163's Core integration guidance. Not a regression gate 
   `CacheIdentityBenchmarks.ConstructKeyIsolated`, which uses the internal `CelCompilationKey`
   constructor and internal identity methods to isolate cache-key-construction cost; neither is ever
   a public API surface).
+- No *direct* dependency on `ArchLinterNet.Core`, YAML, Roslyn, or an external CEL runtime — only
+  `ArchLinterNet.CEL` and `BenchmarkDotNet` are directly referenced. BenchmarkDotNet 0.14.0 itself
+  transitively depends on `Microsoft.CodeAnalysis.CSharp` (Roslyn) for its own internal
+  benchmark-harness generation; this is inherent to using the tool the issue explicitly directs
+  ("Prefer BenchmarkDotNet..."), not a Roslyn dependency introduced by any CEL benchmark or test
+  code. `CelBenchmarksProjectDependencyTests` (in `ArchLinterNet.CEL.Tests`, runs in
+  `make acceptance`) enforces both the direct-reference whitelist and that every resolved
+  `Microsoft.CodeAnalysis*` package is reachable only through BenchmarkDotNet's own dependency
+  tree — verified to actually fail if that stopped being true.
 - `CacheIdentityBenchmarks`, `ContextConstructionBenchmarks`, and `ApiScenarioBenchmarks` were
   rerun (same run configuration above) across several review rounds that fixed measurement flaws in
   them (unfair hit-vs-miss expression comparison, object-value construction leaking into timed

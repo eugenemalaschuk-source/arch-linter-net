@@ -187,7 +187,7 @@ public sealed class CelEvaluateCallGraphNeverReachesCompilePipelineTests
                     // ambiguity — the token already names the exact target.
                     if (opcode.Value == OpCodes.Callvirt.Value && resolved is MethodInfo { IsVirtual: true } virtualMethod)
                     {
-                        foreach (var target in ResolveVirtualTargets(virtualMethod, _celAssembly))
+                        foreach (var target in ResolveVirtualTargets(virtualMethod, _celAssembly, unresolvedEdges))
                             yield return target;
                     }
                     else
@@ -205,13 +205,22 @@ public sealed class CelEvaluateCallGraphNeverReachesCompilePipelineTests
     /// Returns the token-resolved virtual method itself, plus every override of it (class-hierarchy
     /// override, or interface implementation — implicit or explicit) declared anywhere in
     /// <paramref name="scanAssembly"/> — conservative handling for virtual dispatch/interface calls,
-    /// since a <c>callvirt</c> token alone does not identify which override actually runs. Results
-    /// are cached per resolved method; a given assembly's type set does not change during a test
-    /// run. Internal (not <c>private</c>) so
-    /// <c>CelInterfaceDispatchClosureSanityCheckTests</c> can exercise it directly against a
-    /// synthetic assembly.
+    /// since a <c>callvirt</c> token alone does not identify which override actually runs. A type
+    /// that implements the interface but whose implementation this method fails to resolve (see the
+    /// <see cref="Type.GetInterfaceMap"/> failure case below) is recorded into
+    /// <paramref name="unresolvedEdges"/> rather than silently skipped — fail-closed, matching
+    /// <see cref="GetCalledMethods"/>'s own token-resolution failures: a type whose implementation
+    /// could not be checked is exactly as unaccounted-for as an edge that could not be resolved at
+    /// all, and could just as easily be the one implementation that calls into the forbidden
+    /// pipeline. Results are cached per resolved method; a given assembly's type set does not
+    /// change during a test run — the cache is safe across repeated calls for the same method
+    /// because any failure it recorded was already appended to the caller's
+    /// <paramref name="unresolvedEdges"/> list on the first (uncached) call. Internal (not
+    /// <c>private</c>) so <c>CelInterfaceDispatchClosureSanityCheckTests</c> can exercise it
+    /// directly against a synthetic assembly.
     /// </summary>
-    internal static IReadOnlyList<MethodBase> ResolveVirtualTargets(MethodInfo virtualMethod, Assembly scanAssembly)
+    internal static IReadOnlyList<MethodBase> ResolveVirtualTargets(
+        MethodInfo virtualMethod, Assembly scanAssembly, List<string> unresolvedEdges)
     {
         if (_virtualOverrideCache.TryGetValue(virtualMethod, out var cached))
             return cached;
@@ -234,12 +243,16 @@ public sealed class CelEvaluateCallGraphNeverReachesCompilePipelineTests
                 {
                     mapping = type.GetInterfaceMap(interfaceType);
                 }
-                catch (ArgumentException)
+                catch (ArgumentException ex)
                 {
-                    // Some generic-variance/open-generic combinations cannot produce a map; skip
-                    // rather than fail the whole resolution — this narrows coverage for that one
-                    // type, it does not silently approve a forbidden edge (the token-resolved
-                    // interface method itself is still in `targets`).
+                    // Fail-closed: a type this method could not map is a potential hidden
+                    // implementation the walk never gets to inspect — recorded as an unresolved
+                    // edge so Evaluate_CallGraph_NeverReachesTokenizerParserOrBinder's own
+                    // unresolvedEdges assertion fails the test, exactly like a raw IL token-
+                    // resolution failure in GetCalledMethods does.
+                    unresolvedEdges.Add(
+                        $"{virtualMethod.DeclaringType}.{virtualMethod.Name} -> could not map onto " +
+                        $"implementing type {type} ({ex.Message})");
                     continue;
                 }
 

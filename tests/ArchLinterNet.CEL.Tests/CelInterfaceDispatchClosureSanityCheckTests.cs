@@ -50,13 +50,17 @@ public sealed class CelInterfaceDispatchClosureSanityCheckTests
     public void ResolveVirtualTargets_FindsImplicitInterfaceImplementationsAcrossMultipleTypes()
     {
         var interfaceMethod = typeof(ISanityCheckInterface).GetMethod(nameof(ISanityCheckInterface.ImplicitMethod))!;
+        var unresolvedEdges = new List<string>();
 
         var targets = CelEvaluateCallGraphNeverReachesCompilePipelineTests.ResolveVirtualTargets(
-            interfaceMethod, typeof(ISanityCheckInterface).Assembly);
+            interfaceMethod, typeof(ISanityCheckInterface).Assembly, unresolvedEdges);
 
         var implicitOnImplicitImpl = typeof(ImplicitImplementation).GetMethod(nameof(ImplicitImplementation.ImplicitMethod))!;
         var implicitOnAnotherImpl = typeof(AnotherImplicitImplementation).GetMethod(nameof(AnotherImplicitImplementation.ImplicitMethod))!;
 
+        Assert.That(unresolvedEdges, Is.Empty,
+            "These well-formed synthetic types must map cleanly — a non-empty list here would mean " +
+            "the fail-closed reporting path itself is misfiring on ordinary input.");
         Assert.That(targets, Does.Contain(interfaceMethod),
             "The token-resolved interface method itself must still be in the result.");
         Assert.That(targets, Does.Contain(implicitOnImplicitImpl),
@@ -69,9 +73,10 @@ public sealed class CelInterfaceDispatchClosureSanityCheckTests
     public void ResolveVirtualTargets_FindsExplicitInterfaceImplementations()
     {
         var interfaceMethod = typeof(ISanityCheckInterface).GetMethod(nameof(ISanityCheckInterface.ExplicitMethod))!;
+        var unresolvedEdges = new List<string>();
 
         var targets = CelEvaluateCallGraphNeverReachesCompilePipelineTests.ResolveVirtualTargets(
-            interfaceMethod, typeof(ISanityCheckInterface).Assembly);
+            interfaceMethod, typeof(ISanityCheckInterface).Assembly, unresolvedEdges);
 
         // Explicit interface implementations are private methods named
         // "<Namespace>.ISanityCheckInterface.ExplicitMethod" — GetMethod(name) cannot find them by
@@ -80,6 +85,7 @@ public sealed class CelInterfaceDispatchClosureSanityCheckTests
         var mapping = typeof(ImplicitImplementation).GetInterfaceMap(typeof(ISanityCheckInterface));
         var expectedExplicitTarget = mapping.TargetMethods[Array.IndexOf(mapping.InterfaceMethods, interfaceMethod)];
 
+        Assert.That(unresolvedEdges, Is.Empty);
         Assert.That(targets, Does.Contain(interfaceMethod),
             "The token-resolved interface method itself must still be in the result.");
         Assert.That(targets, Does.Contain(expectedExplicitTarget),

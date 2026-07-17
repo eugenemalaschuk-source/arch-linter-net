@@ -46,8 +46,16 @@ A `-c Release` build is required — BenchmarkDotNet refuses to run unoptimized 
   without a full compile, using the internal `CelCompilationKey` constructor and internal identity
   methods) — see each type's/method's remarks.
 - No wall-clock assertions gate CI; this project produces measurements, not pass/fail checks.
-- No `ArchLinterNet.Core`, YAML, Roslyn, or architecture-policy dependency — only
-  `ArchLinterNet.CEL` and `BenchmarkDotNet`.
+- No *direct* `ArchLinterNet.Core`, YAML, Roslyn, or architecture-policy dependency — only
+  `ArchLinterNet.CEL` and `BenchmarkDotNet`, enforced by
+  `CelBenchmarksProjectDependencyTests.BenchmarksProject_ReferencesOnlyCelAndBenchmarkDotNet`.
+  BenchmarkDotNet 0.14.0 itself transitively depends on `Microsoft.CodeAnalysis.CSharp` (Roslyn) for
+  its own internal benchmark-harness generation — inherent to using the tool this suite is built on,
+  not a Roslyn dependency any CEL benchmark or test code introduces or calls into. A second guard
+  test, `BenchmarksProject_RoslynIsOnlyReachableThroughBenchmarkDotNet`, verifies every
+  `Microsoft.CodeAnalysis*` package in the resolved dependency graph is reachable only through
+  BenchmarkDotNet's own dependency tree, so a future dependency change that introduced Roslyn some
+  other way would fail this test rather than pass silently.
 - Budget-exhaustion and schema-mismatch benchmarks are deterministic by construction: the
   budget-exhaustion cost ceiling is calibrated from the exact per-comparison cost math in
   `CelEvaluator` (see `ApiScenarioBenchmarks.SetupBudgetExhaustion`) to fail after roughly 200 of
