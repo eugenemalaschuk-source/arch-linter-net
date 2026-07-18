@@ -108,6 +108,44 @@ access, or user-defined functions.
 Both context schemas are closed catalogs: adding, removing, or retyping any
 member SHALL require a reviewed change to this specification.
 
+**`dependency` is schema-declared but reserved (rejected at policy load) in
+this wave.** The scanning path the runtime uses for contextual dependency/
+allow-only matching reports type-level reference existence only; it does not
+yet track which member produced an edge or whether it is reachable only via
+a method body. Populating `dependency` with the same fixed values for every
+candidate — rather than real per-edge facts — would let a `when` referencing
+it compile successfully and then silently never behave as the predicate
+implies, regardless of the actual edge. Until either real per-edge facts are
+implemented or `ArchLinterNet.CEL` exposes a public API letting Core
+determine which identifiers a compiled predicate references (neither of
+which this wave provides), policy loading SHALL reject any `when` at a
+`forbidden[*]`/`allowed[*]`/`exclude[*]` location that references the word
+`dependency` anywhere in its source text, including inside a string literal
+or comment. This rejection is deliberately unconditional (a whole-string
+match, not a syntax-aware one) because ArchLinterNet.CEL's lexical grammar
+(raw-string escaping, comments, quoting) is not something Core can safely
+reimplement piecemeal without a real bypass risk — a syntax-aware attempt at
+this exact check found two before this unconditional form was adopted.
+
+#### Scenario: A `when` referencing `dependency` is rejected at policy load
+
+- **WHEN** a `forbidden[*]`/`allowed[*]`/`exclude[*]` selector declares
+  `when: dependency.viaMethodBody == false` or any other expression
+  containing the word `dependency`
+- **THEN** policy loading fails with an actionable error explaining that
+  `dependency` facts are not populated with real per-edge data in this
+  release, rather than compiling successfully into a predicate that would
+  silently never behave as written
+
+#### Scenario: A `when` mentioning "dependency" only in an unrelated string is still rejected
+
+- **WHEN** a `forbidden[*]`/`allowed[*]`/`exclude[*]` selector's `when`
+  contains the word `dependency` only inside a string literal or comment,
+  unrelated to the `dependency` root variable
+- **THEN** policy loading still rejects the expression, since precisely
+  distinguishing this case from a real reference requires replicating CEL's
+  lexical grammar, which this rejection deliberately does not attempt
+
 #### Scenario: Layer selector reads typed subject facts
 
 - **WHEN** a selector predicate references `subject.role`,

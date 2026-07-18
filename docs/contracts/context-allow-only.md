@@ -58,9 +58,9 @@ layer.
 Contextual `source`/`allowed`/`exclude` selectors accept an optional `when`
 field, evaluated the same way as the `context_dependencies` family: additive
 to literal `role`/`metadata`, with `allowed[*].when`/`exclude[*].when`
-compiling against a context exposing `source`, `target`, and `dependency` so
-an `allowed` selector can restrict targets to the same context as their
-source:
+compiling against a context schema declaring `source`, `target`, and
+`dependency` so an `allowed` selector can restrict targets to the same
+context as their source:
 
 ```yaml
 contracts:
@@ -82,6 +82,11 @@ rather than being treated as a non-match, and is never suppressed by
 baseline. When no `allowed` selector matches but one came close (its literal
 `role`/`metadata` matched and only `when` evaluated `false`), the violation's
 evidence names that near-miss expression.
+
+**`dependency` is reserved, not usable, in this release** — see the
+identical note in
+[Contextual dependency contracts](context-dependency.md#cel-predicates); the
+same fail-closed rejection applies here for `allowed[*].when`/`exclude[*].when`.
 
 ## Exclude vs. allowed vs. ignored_violations
 

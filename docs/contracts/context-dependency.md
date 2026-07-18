@@ -79,8 +79,8 @@ the literal constraints already match *and* `when` evaluates to `true`.
 
 `source.when` compiles against a `source` context (the same subject shape
 used by layer selectors). `forbidden[*].when`/`exclude[*].when` compile
-against a context exposing `source`, `target`, and `dependency` — enabling
-cross-context comparisons such as:
+against a context whose schema declares `source`, `target`, and `dependency`
+— enabling cross-context comparisons such as:
 
 ```yaml
 contracts:
@@ -104,6 +104,18 @@ contracts:
 - when a matching `forbidden` selector declared `when`, the violation's
   evidence names that expression's source text alongside the existing
   role/metadata evidence.
+
+**`dependency` is reserved, not usable, in this release.** The schema
+declares `dependency` (`kind`, `viaMethodBody`, `sourceMemberName`,
+`targetMemberName`) on the target/exclude context, but the runtime does not
+yet populate these with real per-edge data — every candidate would resolve
+to the same fixed values regardless of the actual reference, so a predicate
+reading them would silently never behave as intended. Policy loading
+therefore rejects any `when` at a `forbidden[*]`/`allowed[*]`/`exclude[*]`
+location that references the word `dependency` at all, including inside a
+string literal or comment, with an actionable error — do not author
+`dependency.*` until real per-edge facts or a documented alternative ships.
+Express constraints using `source`/`target` instead.
 
 ## Exclude vs. ignored_violations
 
