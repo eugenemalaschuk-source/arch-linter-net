@@ -7,6 +7,26 @@ classification:
       role: DomainLayer
       metadata:
         module: constructor[0]
+    - attribute: MyCompany.Product.Architecture.ApplicationLayerAttribute
+      role: ApplicationLayer
+      metadata:
+        module: constructor[0]
+    - attribute: MyCompany.Product.Architecture.PortAttribute
+      role: Port
+      metadata:
+        module: constructor[0]
+    - attribute: MyCompany.Product.Architecture.AdapterAttribute
+      role: Adapter
+      metadata:
+        module: constructor[0]
+    - attribute: MyCompany.Product.Architecture.AntiCorruptionLayerAttribute
+      role: AntiCorruptionLayer
+      metadata:
+        module: constructor[0]
+    - attribute: MyCompany.Product.Architecture.LegacyDatabaseAdapterAttribute
+      role: Adapter
+      metadata:
+        module: constructor[0]
 
 layers:
   composition_root:
@@ -21,6 +41,12 @@ layers:
     namespace: MyCompany.Product.Modules.Inventory.Domain
   inventory_contracts:
     namespace: MyCompany.Product.Modules.Inventory.Contracts
+  catalog_domain:
+    namespace: MyCompany.Product.Modules.Catalog.Domain
+  catalog_contracts:
+    namespace: MyCompany.Product.Modules.Catalog.Contracts
+  legacy_crm_domain:
+    namespace: MyCompany.Product.Modules.LegacyCrm.Domain
 
 analysis:
   target_assemblies:
@@ -28,6 +54,8 @@ analysis:
     - MyCompany.Product.Modules.Sales
     - MyCompany.Product.Modules.Inventory
     - MyCompany.Product.SharedKernel
+    - MyCompany.Product.Modules.Catalog
+    - MyCompany.Product.Modules.LegacyCrm
 
 contracts:
   strict_composition:
@@ -61,6 +89,11 @@ contracts:
       source: inventory_contracts
       allowed: [shared_kernel]
       reason: Inventory public contracts expose only stable shared-kernel types.
+    - id: catalog-contracts-use-shared-kernel
+      name: catalog-contracts-use-shared-kernel
+      source: catalog_contracts
+      allowed: [shared_kernel]
+      reason: Catalog public contracts expose only stable shared-kernel types.
 
   strict_context_dependencies:
     - id: sales-domain-does-not-use-other-domains
@@ -75,3 +108,54 @@ contracts:
             module: "!{source.metadata.module}"
       reason: Semantic module metadata prevents direct cross-context domain dependencies.
 
+  strict_port_boundaries:
+    - id: sales-to-catalog-through-port
+      name: sales-may-reach-catalog-only-through-port
+      source:
+        role: ApplicationLayer
+        metadata:
+          module: Sales
+      target_context:
+        metadata:
+          module: Catalog
+      allowed_seams:
+        - role: Port
+          metadata:
+            module: Catalog
+      forbidden:
+        - role: DomainLayer
+          metadata:
+            module: Catalog
+        - role: Adapter
+          metadata:
+            module: Catalog
+      reason: Sales must reach Catalog only through the reviewed Catalog port, never Catalog internals.
+    - id: legacy-crm-through-acl
+      name: legacy-crm-must-use-anti-corruption-layer
+      source:
+        role: DomainLayer
+        metadata:
+          module: LegacyCrm
+      target_context:
+        metadata:
+          module: LegacyCrm
+      allowed_seams:
+        - role: AntiCorruptionLayer
+          metadata:
+            module: LegacyCrm
+      forbidden:
+        - role: Adapter
+          metadata:
+            module: LegacyCrm
+      reason: LegacyCrm domain code must reach the legacy database only through the reviewed anti-corruption layer, never a raw database adapter.
+
+  strict_layout_conventions:
+    - id: application-services-have-matching-interfaces
+      name: application-services-folder-requires-concrete-services-with-interfaces
+      files_matching:
+        folder_segment: Services
+      require_type_kind: class
+      required_name_suffix: Service
+      require_matching_interface:
+        name_prefix: I
+      reason: Every Application service class needs a matching interface, and the Services folder must not accumulate misplaced interfaces.

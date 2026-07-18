@@ -1,0 +1,12 @@
+# yaml-language-server: $schema=../../../../../../../schema/dependencies.arch.fragment.schema.json
+contracts:
+  strict_layout_conventions:
+    - id: application-services-have-matching-interfaces
+      name: application-services-folder-requires-concrete-services-with-interfaces
+      files_matching:
+        folder_segment: Services
+      require_type_kind: class
+      required_name_suffix: Service
+      require_matching_interface:
+        name_prefix: I
+      reason: Every Application service class needs a matching interface, and the Services folder must not accumulate misplaced interfaces.

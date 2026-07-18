@@ -5,6 +5,9 @@ imports:
   - policy/shared/layers.arch.yml
   - policy/bounded-contexts/sales.arch.yml
   - policy/bounded-contexts/inventory.arch.yml
+  - policy/bounded-contexts/catalog.arch.yml
+  - policy/bounded-contexts/legacy-crm.arch.yml
+  - policy/shared/application-layout.arch.yml
 
 classification:
   attributes:
@@ -23,6 +26,8 @@ analysis:
     - MyCompany.Product.Modules.Sales
     - MyCompany.Product.Modules.Inventory
     - MyCompany.Product.SharedKernel
+    - MyCompany.Product.Modules.Catalog
+    - MyCompany.Product.Modules.LegacyCrm
 
 contracts:
   strict_composition:

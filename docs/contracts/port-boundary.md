@@ -42,3 +42,10 @@ under `forbidden`.
 
 Strict findings fail validation. Audit findings are reported under the normal
 audit behavior. Both groups support ordinary `ignored_violations` baselines.
+
+This shape — including the Catalog port seam, the forbidden direct Catalog
+reference, and an `AntiCorruptionLayer` seam for a legacy context — is
+exercised end-to-end (pass, fail, strict-vs-audit, and JSON diagnostic output)
+in `tests/ArchLinterNet.Cli.Tests/PortLayoutCliTests.cs`, and demonstrated in
+narrative form in the modular-monolith sample under
+`samples/policies/imports/modular-monolith/architecture/policy/bounded-contexts/`.

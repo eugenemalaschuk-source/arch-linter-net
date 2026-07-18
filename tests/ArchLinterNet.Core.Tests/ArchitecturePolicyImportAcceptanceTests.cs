@@ -20,6 +20,29 @@ public sealed class ArchitecturePolicyImportAcceptanceTests
     }
 
     [Test]
+    public void Load_ModularMonolithSample_ContainsPortBoundaryAndLayoutConventionContracts()
+    {
+        ArchitectureContractDocument document = Load("samples/policies/imports/modular-monolith/architecture/arch.yml");
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(document.Contracts.StrictPortBoundaries.Select(c => c.Id),
+                Is.EquivalentTo(new[] { "sales-to-catalog-through-port", "legacy-crm-through-acl" }));
+            Assert.That(document.Contracts.StrictLayoutConventions.Select(c => c.Id),
+                Is.EquivalentTo(new[] { "application-services-have-matching-interfaces" }));
+        });
+    }
+
+    [Test]
+    public void Load_UnityClientSample_ContainsLayoutConventionContract()
+    {
+        ArchitectureContractDocument document = Load("samples/policies/imports/unity-client/architecture/arch.yml");
+
+        Assert.That(document.Contracts.StrictLayoutConventions.Select(c => c.Id),
+            Is.EquivalentTo(new[] { "runtime-folder-forbids-editor-types" }));
+    }
+
+    [Test]
     public void Load_RecommendedAndArbitraryFixtureNames_ProduceEquivalentModels()
     {
         ArchitectureContractDocument recommended = Load(

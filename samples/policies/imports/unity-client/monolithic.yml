@@ -58,6 +58,14 @@ contracts:
       forbidden: [gameplay_editor]
       reason: Runtime features cannot depend on editor-only namespaces.
 
+  strict_layout_conventions:
+    - id: runtime-folder-forbids-editor-types
+      name: runtime-folder-must-not-contain-editor-types
+      files_matching:
+        folder_segment: Runtime
+      forbidden_name_suffix: Editor
+      reason: Files under a Runtime folder segment must not declare Editor-only types; editor code belongs under the Editor folder segment.
+
   strict_external:
     - id: runtime-does-not-use-unity-editor-api
       name: runtime-does-not-use-unity-editor-api
