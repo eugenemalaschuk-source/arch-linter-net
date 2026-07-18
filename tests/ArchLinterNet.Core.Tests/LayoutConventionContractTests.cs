@@ -34,6 +34,14 @@ public sealed class LayoutConventionContractTests
             "namespace LayoutConventionContractTestFixtures.WhenRefinement { public sealed class IncludedByWhen { } }");
         WriteFixtureFile("WhenRefinement/ExcludedByWhen.cs",
             "namespace LayoutConventionContractTestFixtures.WhenRefinement { public sealed class ExcludedByWhen { } }");
+        // Both types below share ONE physical file but declare different namespaces - regression
+        // fixture for file-level (not fact-level) selector matching: once the file matches via
+        // ServiceInMatchingNamespace's namespace, IEscapingInterface must not be able to dodge
+        // expectations just because its own namespace segment differs.
+        WriteFixtureFile("MixedNamespaceFile/Mixed.cs", """
+            namespace LayoutConventionContractTestFixtures.MixedNamespaceFile { public sealed class ServiceInMatchingNamespace { } }
+            namespace LayoutConventionContractTestFixtures.MixedNamespaceFileOther { public interface IEscapingInterface { } }
+            """);
     }
 
     [TearDown]
@@ -130,6 +138,50 @@ public sealed class LayoutConventionContractTests
 
         var violations = runner.Session.CheckLayoutConventionsContract(contract);
 
+        Assert.That(violations.Any(v =>
+            v.SourceType.Contains("IWronglyPlacedService", StringComparison.Ordinal)), Is.True);
+    }
+
+    // Regression: file selection must be file-granular, not fact-granular. Both types below share one
+    // physical file but declare different namespaces; the file matches via ServiceInMatchingNamespace's
+    // namespace segment, so IEscapingInterface (declared under a different namespace in that same file)
+    // must still be caught by forbid_type_kind instead of escaping because its own namespace differs.
+    [Test]
+    public void CheckLayoutConventionsContract_NamespaceSegmentMatch_AppliesToWholeFileNotJustMatchingFact()
+    {
+        var contract = new ArchitectureLayoutConventionContract
+        {
+            Name = "matching-namespace-folder-must-not-contain-interfaces",
+            FilesMatching = new ArchitectureLayoutFileMatcher { NamespaceSegment = "MixedNamespaceFile" },
+            ForbidTypeKind = "interface"
+        };
+        var runner = new ArchitectureContractRunner(CreateContext(), CreateDocument(contract));
+
+        var violations = runner.Session.CheckLayoutConventionsContract(contract);
+
+        Assert.That(violations.Any(v =>
+            v.SourceType.Contains("IEscapingInterface", StringComparison.Ordinal)), Is.True,
+            "A type in the same matched file must not escape expectations by declaring a different namespace.");
+    }
+
+    // Regression: only folder_segment/file_name_* selector fields require source-enriched facts.
+    // A namespace_segment-only contract must keep working from reflection-derived namespace facts
+    // even when no source_roots is configured, instead of being unconditionally disabled.
+    [Test]
+    public void CheckLayoutConventionsContract_NamespaceSegmentOnly_WorksWithoutSourceRoots()
+    {
+        var contract = new ArchitectureLayoutConventionContract
+        {
+            Name = "services-namespace-must-not-contain-interfaces",
+            FilesMatching = new ArchitectureLayoutFileMatcher { NamespaceSegment = "Services" },
+            ForbidTypeKind = "interface"
+        };
+        var runner = new ArchitectureContractRunner(CreateContext(), CreateDocument(contract, withSourceRoots: false));
+
+        var violations = runner.Session.CheckLayoutConventionsContract(contract);
+
+        Assert.That(violations.Any(v => v.Payload is LayoutConventionPayload { DataUnavailable: true }), Is.False,
+            "A namespace_segment-only contract must not report path-based-checks-unavailable.");
         Assert.That(violations.Any(v =>
             v.SourceType.Contains("IWronglyPlacedService", StringComparison.Ordinal)), Is.True);
     }

@@ -18,7 +18,15 @@ public sealed partial class ArchitectureAnalysisSession
 
         List<ArchitectureViolation> violations = new();
 
-        if (SourceFileFactIndex.AllFacts.All(fact => fact.SourceFilePath == null))
+        // Only folder/file-name selector fields require source-enriched facts; namespace_segment works
+        // from reflection-derived namespace facts alone. A contract using namespace_segment only must
+        // keep evaluating even when no source enrichment happened for this run - disabling it
+        // unconditionally would silently turn a working namespace-only rule into a permanent no-op.
+        bool selectorNeedsSourcePath = !string.IsNullOrEmpty(contract.FilesMatching.FolderSegment)
+            || !string.IsNullOrEmpty(contract.FilesMatching.FileNameSuffix)
+            || !string.IsNullOrEmpty(contract.FilesMatching.FileNamePrefix);
+
+        if (selectorNeedsSourcePath && SourceFileFactIndex.AllFacts.All(fact => fact.SourceFilePath == null))
         {
             violations.Add(new ArchitectureViolation(
                 contract.Name,
@@ -48,9 +56,18 @@ public sealed partial class ArchitectureAnalysisSession
         return violations;
     }
 
+    // File selection is file-granular, not fact-granular: a file matches folder_segment/file_name_*
+    // (shared by every type declared in it) or namespace_segment (true if ANY declared type in the
+    // file has that namespace segment) as a whole, and once a file matches, every declared type in
+    // it becomes a candidate - not just the one(s) whose own namespace happened to match. Matching
+    // fact-by-fact instead would let an offending type escape every expectation just by being
+    // declared under a different namespace in the same already-selected file. Facts with no
+    // resolvable source file (no source enrichment, or an ambiguous partial-class declaration) can
+    // only ever satisfy namespace_segment, evaluated per-type since there is no file to group by.
     private List<LayoutFileGroup> CollectMatchedFileGroups(ArchitectureLayoutFileMatcher matcher)
     {
-        Dictionary<string, List<ArchitectureDeclaredTypeFact>> byGroupKey = new(StringComparer.Ordinal);
+        Dictionary<string, List<(Type Type, ArchitectureDeclaredTypeFact Fact)>> byFile = new(StringComparer.Ordinal);
+        List<(Type Type, ArchitectureDeclaredTypeFact Fact)> unfiled = new();
 
         foreach (Type type in TypeIndex.AllTypes())
         {
@@ -62,73 +79,120 @@ public sealed partial class ArchitectureAnalysisSession
                 continue;
             }
 
-            if (!MatchesFilesSelector(matcher, fact))
+            if (fact.SourceFilePath != null)
             {
-                continue;
-            }
+                if (!byFile.TryGetValue(fact.SourceFilePath, out List<(Type Type, ArchitectureDeclaredTypeFact Fact)>? entries))
+                {
+                    entries = new List<(Type, ArchitectureDeclaredTypeFact)>();
+                    byFile[fact.SourceFilePath] = entries;
+                }
 
-            if (matcher.CompiledWhen != null && !EvaluateLayoutWhen(matcher, type))
+                entries.Add((type, fact));
+            }
+            else
             {
-                continue;
+                unfiled.Add((type, fact));
             }
-
-            string groupKey = fact.SourceFilePath ?? $"~unfiled~/{fact.AssemblyName}/{fact.FullTypeName}";
-            if (!byGroupKey.TryGetValue(groupKey, out List<ArchitectureDeclaredTypeFact>? facts))
-            {
-                facts = new List<ArchitectureDeclaredTypeFact>();
-                byGroupKey[groupKey] = facts;
-            }
-
-            facts.Add(fact);
         }
 
-        return byGroupKey
-            .OrderBy(entry => entry.Key, StringComparer.Ordinal)
-            .Select(entry => new LayoutFileGroup(
-                entry.Value[0].SourceFilePath,
-                entry.Value[0].FileNameWithoutExtension,
-                entry.Value))
-            .ToList();
+        List<LayoutFileGroup> groups = new();
+
+        foreach ((string filePath, List<(Type Type, ArchitectureDeclaredTypeFact Fact)> entries) in
+                 byFile.OrderBy(entry => entry.Key, StringComparer.Ordinal))
+        {
+            if (!MatchesFileLevelSelector(matcher, entries))
+            {
+                continue;
+            }
+
+            List<ArchitectureDeclaredTypeFact> eligibleFacts = FilterByWhen(matcher, entries);
+            if (eligibleFacts.Count == 0)
+            {
+                continue;
+            }
+
+            groups.Add(new LayoutFileGroup(filePath, entries[0].Fact.FileNameWithoutExtension, eligibleFacts));
+        }
+
+        foreach ((Type Type, ArchitectureDeclaredTypeFact Fact) entry in
+                 unfiled.OrderBy(entry => entry.Fact.FullTypeName, StringComparer.Ordinal))
+        {
+            if (!MatchesUnfiledFact(matcher, entry.Fact))
+            {
+                continue;
+            }
+
+            if (matcher.CompiledWhen != null && !EvaluateLayoutWhen(matcher, entry.Type))
+            {
+                continue;
+            }
+
+            groups.Add(new LayoutFileGroup(null, null, new List<ArchitectureDeclaredTypeFact> { entry.Fact }));
+        }
+
+        return groups;
     }
 
-    private static bool MatchesFilesSelector(ArchitectureLayoutFileMatcher matcher, ArchitectureDeclaredTypeFact fact)
+    private List<ArchitectureDeclaredTypeFact> FilterByWhen(
+        ArchitectureLayoutFileMatcher matcher, List<(Type Type, ArchitectureDeclaredTypeFact Fact)> entries)
     {
-        bool requiresSourceFile = !string.IsNullOrEmpty(matcher.FolderSegment)
-            || !string.IsNullOrEmpty(matcher.FileNameSuffix)
-            || !string.IsNullOrEmpty(matcher.FileNamePrefix);
-
-        if (requiresSourceFile && fact.SourceFilePath == null)
+        if (matcher.CompiledWhen == null)
         {
-            return false;
+            return entries.Select(entry => entry.Fact).ToList();
         }
+
+        return entries.Where(entry => EvaluateLayoutWhen(matcher, entry.Type)).Select(entry => entry.Fact).ToList();
+    }
+
+    private static bool MatchesFileLevelSelector(
+        ArchitectureLayoutFileMatcher matcher, List<(Type Type, ArchitectureDeclaredTypeFact Fact)> entries)
+    {
+        // Every entry in this list shares the same SourceFilePath, so FolderSegments/FileNameWithoutExtension
+        // are identical across all of them - the first entry's fact is representative for those fields.
+        ArchitectureDeclaredTypeFact representative = entries[0].Fact;
 
         if (!string.IsNullOrEmpty(matcher.FolderSegment)
-            && !fact.FolderSegments.Contains(matcher.FolderSegment, StringComparer.Ordinal))
-        {
-            return false;
-        }
-
-        if (!string.IsNullOrEmpty(matcher.NamespaceSegment)
-            && !fact.NamespaceSegments.Contains(matcher.NamespaceSegment, StringComparer.Ordinal))
+            && !representative.FolderSegments.Contains(matcher.FolderSegment, StringComparer.Ordinal))
         {
             return false;
         }
 
         if (!string.IsNullOrEmpty(matcher.FileNameSuffix)
-            && (fact.FileNameWithoutExtension == null
-                || !fact.FileNameWithoutExtension.EndsWith(matcher.FileNameSuffix, StringComparison.Ordinal)))
+            && (representative.FileNameWithoutExtension == null
+                || !representative.FileNameWithoutExtension.EndsWith(matcher.FileNameSuffix, StringComparison.Ordinal)))
         {
             return false;
         }
 
         if (!string.IsNullOrEmpty(matcher.FileNamePrefix)
-            && (fact.FileNameWithoutExtension == null
-                || !fact.FileNameWithoutExtension.StartsWith(matcher.FileNamePrefix, StringComparison.Ordinal)))
+            && (representative.FileNameWithoutExtension == null
+                || !representative.FileNameWithoutExtension.StartsWith(matcher.FileNamePrefix, StringComparison.Ordinal)))
+        {
+            return false;
+        }
+
+        if (!string.IsNullOrEmpty(matcher.NamespaceSegment)
+            && !entries.Any(entry => entry.Fact.NamespaceSegments.Contains(matcher.NamespaceSegment, StringComparer.Ordinal)))
         {
             return false;
         }
 
         return true;
+    }
+
+    private static bool MatchesUnfiledFact(ArchitectureLayoutFileMatcher matcher, ArchitectureDeclaredTypeFact fact)
+    {
+        bool requiresSourceFile = !string.IsNullOrEmpty(matcher.FolderSegment)
+            || !string.IsNullOrEmpty(matcher.FileNameSuffix)
+            || !string.IsNullOrEmpty(matcher.FileNamePrefix);
+        if (requiresSourceFile)
+        {
+            return false;
+        }
+
+        // LayoutConventionsValidator guarantees at least one files_matching field is populated; with
+        // requiresSourceFile false, namespace_segment must be the populated one.
+        return fact.NamespaceSegments.Contains(matcher.NamespaceSegment, StringComparer.Ordinal);
     }
 
     private bool EvaluateLayoutWhen(ArchitectureLayoutFileMatcher matcher, Type type)
@@ -334,7 +398,7 @@ public sealed partial class ArchitectureAnalysisSession
 
     private static ArchitectureTypeKind ParseTypeKind(string value)
     {
-        return Enum.TryParse(value, ignoreCase: true, out ArchitectureTypeKind kind)
+        return ArchitectureLayoutTypeKindParser.TryParse(value, out ArchitectureTypeKind kind)
             ? kind
             : throw new InvalidOperationException(
                 $"Unrecognized type kind '{value}'. Expected one of: class, interface, struct, enum, record, delegate.");

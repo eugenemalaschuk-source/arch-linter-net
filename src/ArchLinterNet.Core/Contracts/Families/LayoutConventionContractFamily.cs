@@ -84,3 +84,26 @@ public sealed class ArchitectureLayoutConventionContract : IArchitectureContract
 
     [YamlMember(Alias = "reason")] public string Reason { get; set; } = string.Empty;
 }
+
+// Single source of truth for `require_type_kind`/`forbid_type_kind` string parsing, shared by
+// LayoutConventionsValidator (load-time) and ArchitectureAnalysisSession.LayoutConventions
+// (execution-time), so both reject the same inputs identically. Deliberately NOT Enum.TryParse:
+// that method accepts any string parseable as the enum's underlying integer (e.g. "6", "999")
+// as an unnamed, always-non-matching value, and accepts "Unknown" - an internal reflection-fallback
+// sentinel from ArchitectureDeclaredTypeFact, never a legitimate policy-author choice - producing a
+// contract that loads successfully but can never match anything (fail-open, silently a no-op).
+internal static class ArchitectureLayoutTypeKindParser
+{
+    private static readonly Dictionary<string, ArchitectureTypeKind> _byName =
+        new(StringComparer.OrdinalIgnoreCase)
+        {
+            ["class"] = ArchitectureTypeKind.Class,
+            ["interface"] = ArchitectureTypeKind.Interface,
+            ["struct"] = ArchitectureTypeKind.Struct,
+            ["enum"] = ArchitectureTypeKind.Enum,
+            ["record"] = ArchitectureTypeKind.Record,
+            ["delegate"] = ArchitectureTypeKind.Delegate,
+        };
+
+    public static bool TryParse(string value, out ArchitectureTypeKind kind) => _byName.TryGetValue(value, out kind);
+}

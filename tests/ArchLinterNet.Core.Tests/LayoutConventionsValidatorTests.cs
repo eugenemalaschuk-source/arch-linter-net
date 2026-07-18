@@ -93,6 +93,52 @@ public sealed class LayoutConventionsValidatorTests
         Assert.That(exception!.Message, Does.Contain("not a recognized type kind"));
     }
 
+    // Regression: Enum.TryParse<ArchitectureTypeKind>("999", ignoreCase: true, out _) returns true for
+    // any numeric string, producing an unnamed enum value that can never equal a real TypeKind - a
+    // policy that loads successfully but silently never matches anything.
+    [Test]
+    public void Load_LayoutConventionContract_NumericTypeKindString_Throws()
+    {
+        string path = WritePolicy($"""
+            version: 1
+            name: Test
+            analysis:
+              target_assemblies: [{AssemblyName}]
+            contracts:
+              strict_layout_conventions:
+                - name: numeric-kind
+                  files_matching:
+                    folder_segment: Services
+                  require_type_kind: "999"
+            """);
+
+        var exception = Assert.Throws<InvalidOperationException>(() => new ArchitecturePolicyDocumentLoader().Load(path));
+        Assert.That(exception!.Message, Does.Contain("not a recognized type kind"));
+    }
+
+    // Regression: "unknown" parses successfully to ArchitectureTypeKind.Unknown, an internal
+    // reflection-fallback sentinel (see ArchitectureDeclaredTypeFacts.cs) never legitimately produced
+    // for real declared types - a policy author declaring it would get a rule that can never match.
+    [Test]
+    public void Load_LayoutConventionContract_UnknownTypeKindSentinel_Throws()
+    {
+        string path = WritePolicy($"""
+            version: 1
+            name: Test
+            analysis:
+              target_assemblies: [{AssemblyName}]
+            contracts:
+              strict_layout_conventions:
+                - name: unknown-kind
+                  files_matching:
+                    folder_segment: Services
+                  forbid_type_kind: unknown
+            """);
+
+        var exception = Assert.Throws<InvalidOperationException>(() => new ArchitecturePolicyDocumentLoader().Load(path));
+        Assert.That(exception!.Message, Does.Contain("not a recognized type kind"));
+    }
+
     [Test]
     public void Load_LayoutConventionContract_InvalidWhenExpression_Throws()
     {

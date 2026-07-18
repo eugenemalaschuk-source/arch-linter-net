@@ -1,6 +1,5 @@
 using ArchLinterNet.Core.Contracts;
 using ArchLinterNet.Core.Contracts.Families;
-using ArchLinterNet.Core.Model;
 
 namespace ArchLinterNet.Core.Contracts.Validators;
 
@@ -56,7 +55,7 @@ internal sealed class LayoutConventionsValidator : IArchitecturePolicyDocumentVa
             return;
         }
 
-        if (!Enum.TryParse(value, ignoreCase: true, out ArchitectureTypeKind _))
+        if (!ArchitectureLayoutTypeKindParser.TryParse(value, out _))
         {
             throw new InvalidOperationException(
                 $"Layout convention contract '{contractName}' declares '{fieldName}: {value}', which is not a " +

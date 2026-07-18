@@ -25,3 +25,13 @@ namespace LayoutConventionContractTestFixtures.WhenRefinement
 
     public sealed class ExcludedByWhen;
 }
+
+namespace LayoutConventionContractTestFixtures.MixedNamespaceFile
+{
+    public sealed class ServiceInMatchingNamespace;
+}
+
+namespace LayoutConventionContractTestFixtures.MixedNamespaceFileOther
+{
+    public interface IEscapingInterface;
+}
