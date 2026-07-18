@@ -709,4 +709,139 @@ public sealed class ExpressionCompilationValidatorTests
 
         Assert.DoesNotThrow(() => new ArchitecturePolicyDocumentLoader().Load(policyPath));
     }
+
+    // Regression coverage for the PR #347 third review round: a sibling-key heuristic ("opaque if a
+    // 'role' key sits next to it, or if it is the node's only key") is bypassable anywhere in the
+    // tree by wrapping the payload in a fabricated container that happens to satisfy the heuristic.
+    // Opaque-ness is now determined by exact structural path (mirroring _allowedWhenLocations), not
+    // by the shape of the immediate parent node. See IsRecognizedOpaqueValueKey /
+    // _recognizedOpaqueMetadataLocations.
+
+    [Test]
+    public void Load_WhenUnderBogusExtensionsSoleMetadataChild_ThrowsUnsupportedLocation()
+    {
+        // The exact reviewer repro: a single-key `extensions.metadata` container is not a legitimate
+        // ArchitectureContextMetadataSelector (target_context) location, so it must not be opaque.
+        string policyPath = WritePolicy($$"""
+            version: 1
+            name: Test
+            analysis:
+              target_assemblies: [{{AssemblyName}}]
+            extensions:
+              metadata:
+                when: "true"
+            contracts:
+              strict: []
+            """);
+
+        InvalidOperationException ex = Assert.Throws<InvalidOperationException>(() =>
+            new ArchitecturePolicyDocumentLoader().Load(policyPath))!;
+
+        Assert.That(ex.Message, Does.Contain("extensions.metadata.when"));
+    }
+
+    [Test]
+    public void Load_WhenUnderBogusRoleSiblingContainer_ThrowsUnsupportedLocation()
+    {
+        // A fabricated node with a "role" sibling next to "metadata" is not one of the real
+        // selector-shaped locations this schema declares "role"+"metadata" together at.
+        string policyPath = WritePolicy($$"""
+            version: 1
+            name: Test
+            analysis:
+              target_assemblies: [{{AssemblyName}}]
+            classification:
+              extensions:
+                role: whatever
+                metadata:
+                  when: "true"
+            contracts:
+              strict: []
+            """);
+
+        InvalidOperationException ex = Assert.Throws<InvalidOperationException>(() =>
+            new ArchitecturePolicyDocumentLoader().Load(policyPath))!;
+
+        Assert.That(ex.Message, Does.Contain("classification.extensions.metadata.when"));
+    }
+
+    [Test]
+    public void Load_PortBoundaryTargetContextMetadata_IsRecognizedOpaque()
+    {
+        // The one genuine "sole-key metadata" location (ArchitectureContextMetadataSelector) must
+        // still load fine now that opaqueness is path-exact rather than shape-based.
+        string policyPath = WritePolicy($$"""
+            version: 1
+            name: Test
+            analysis:
+              target_assemblies: [{{AssemblyName}}]
+            contracts:
+              strict_port_boundaries:
+                - name: port-boundary
+                  source: { role: ApplicationLayer }
+                  target_context: { metadata: { domain: Catalog } }
+                  allowed_seams: [{ role: Port }]
+                  forbidden: [{ role: DomainLayer }]
+                  reason: Test.
+            """);
+
+        Assert.DoesNotThrow(() => new ArchitecturePolicyDocumentLoader().Load(policyPath));
+    }
+
+    [Test]
+    public void Load_ClassificationAttributeMetadata_IsRecognizedOpaque()
+    {
+        string policyPath = WritePolicy($$"""
+            version: 1
+            name: Test
+            analysis:
+              target_assemblies: [{{AssemblyName}}]
+            classification:
+              attributes:
+                - attribute: Acme.DomainMarkerAttribute
+                  role: DomainLayer
+                  metadata:
+                    when: onboarding
+            contracts:
+              strict: []
+            """);
+
+        Assert.DoesNotThrow(() => new ArchitecturePolicyDocumentLoader().Load(policyPath));
+    }
+
+    [Test]
+    public void Load_ProjectMetadataRequiredProperties_IsRecognizedOpaque()
+    {
+        string policyPath = WritePolicy($$"""
+            version: 1
+            name: Test
+            analysis:
+              target_assemblies: [{{AssemblyName}}]
+            contracts:
+              strict_project_metadata:
+                - name: project-metadata
+                  projects: ["*.csproj"]
+                  required_properties:
+                    when: onboarding
+            """);
+
+        Assert.DoesNotThrow(() => new ArchitecturePolicyDocumentLoader().Load(policyPath));
+    }
+
+    [Test]
+    public void Load_AnalysisConditionSets_IsRecognizedOpaque()
+    {
+        string policyPath = WritePolicy($$"""
+            version: 1
+            name: Test
+            analysis:
+              target_assemblies: [{{AssemblyName}}]
+              condition_sets:
+                when: [SOME_SYMBOL]
+            contracts:
+              strict: []
+            """);
+
+        Assert.DoesNotThrow(() => new ArchitecturePolicyDocumentLoader().Load(policyPath));
+    }
 }

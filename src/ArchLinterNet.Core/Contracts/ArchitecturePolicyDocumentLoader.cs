@@ -379,7 +379,7 @@ public sealed partial class ArchitecturePolicyDocumentLoader : IArchitecturePoli
                     continue;
                 }
 
-                if (IsRecognizedOpaqueValueKey(key, node))
+                if (IsRecognizedOpaqueValueKey(key, structuralPath))
                 {
                     continue;
                 }
@@ -418,46 +418,81 @@ public sealed partial class ArchitecturePolicyDocumentLoader : IArchitecturePoli
         }
     }
 
-    // A key is a recognized, legitimate opaque (arbitrary user-content) value boundary only when its parent
-    // node's shape confirms it - by SIBLING key, not by name alone. Matching by name alone (e.g. treating any
-    // node containing a "metadata" key as opaque, regardless of where it sits) lets an author hide an
-    // unsupported `when` inside a same-named-but-unrelated container at a completely different, unapproved
-    // location (e.g. a bogus `analysis.metadata.when`, since ArchitectureAnalysisConfiguration has no real
-    // Metadata property); the fake container is silently dropped by IgnoreUnmatchedProperties() right
-    // alongside the `when` it wraps, but the walk must still see and reject the `when` itself before that
-    // happens. "role", "projects", "target_assemblies"/"solution" are the fixed sibling properties every real
-    // occurrence of these opaque fields carries in this schema (selectors/classification entries always
-    // declare "role"; ArchitectureContextMetadataSelector's "metadata" is its sole required property;
-    // ProjectMetadataContract's required_properties/forbidden_properties always sit beside "projects";
-    // ArchitectureAnalysisConfiguration's condition_sets always sits beside target_assemblies or solution).
-    private static bool IsRecognizedOpaqueValueKey(string key, YamlMappingNode node)
+    // A key is a recognized, legitimate opaque (arbitrary user-content) value boundary only when the CURRENT
+    // node's exact structural path is one of the fixed positions this schema actually declares that property
+    // at - never by key name alone, and never by a sibling-key heuristic. A sibling-key check (e.g. "opaque if
+    // a 'role' key sits next to it, or if it is the node's only key") is still bypassable anywhere in the tree
+    // by wrapping the payload in a fabricated container that happens to satisfy the heuristic (e.g.
+    // `extensions: { metadata: { when: "..." } }`, or `classification.extensions: { role: x, metadata: { when:
+    // "..." } }`) - IgnoreUnmatchedProperties() silently drops the fabricated container together with the
+    // `when` it shields, exactly like the direct-sibling case this whole raw pass exists to catch. Exact-path
+    // matching closes that off: `extensions`/`classification.extensions` are not on either list below, so the
+    // walk keeps descending into them and still finds the `when` underneath.
+    //
+    // The metadata-bearing selector/classification/coverage-exclusion locations mirror _allowedWhenLocations'
+    // context-selector paths (role+metadata+when are declared together on the same node) plus every
+    // metadata-bearing shape `when` is NOT approved on (port-boundary/adapter-binding selectors, classification
+    // extraction entries, semantic-role coverage exclusions).
+    private static readonly string[][] _recognizedOpaqueMetadataLocations = _allowedWhenLocations
+        .Select(location => location.Append(MetadataKey).ToArray())
+        .Concat(new[]
+        {
+            new[] { "contracts", "strict_port_boundaries", "*", "source", MetadataKey },
+            new[] { "contracts", "strict_port_boundaries", "*", "allowed_seams", "*", MetadataKey },
+            new[] { "contracts", "strict_port_boundaries", "*", "forbidden", "*", MetadataKey },
+            new[] { "contracts", "strict_port_boundaries", "*", "exclude", "*", MetadataKey },
+            new[] { "contracts", "strict_port_boundaries", "*", "target_context", MetadataKey },
+            new[] { "contracts", "strict_port_boundaries", "*", "adapter_bindings", "*", "adapter", MetadataKey },
+            new[] { "contracts", "strict_port_boundaries", "*", "adapter_bindings", "*", "expected_port", MetadataKey },
+            new[] { "contracts", "strict_port_boundaries", "*", "adapter_bindings", "*", "allowed_contexts", "*", MetadataKey },
+            new[] { "contracts", "audit_port_boundaries", "*", "source", MetadataKey },
+            new[] { "contracts", "audit_port_boundaries", "*", "allowed_seams", "*", MetadataKey },
+            new[] { "contracts", "audit_port_boundaries", "*", "forbidden", "*", MetadataKey },
+            new[] { "contracts", "audit_port_boundaries", "*", "exclude", "*", MetadataKey },
+            new[] { "contracts", "audit_port_boundaries", "*", "target_context", MetadataKey },
+            new[] { "contracts", "audit_port_boundaries", "*", "adapter_bindings", "*", "adapter", MetadataKey },
+            new[] { "contracts", "audit_port_boundaries", "*", "adapter_bindings", "*", "expected_port", MetadataKey },
+            new[] { "contracts", "audit_port_boundaries", "*", "adapter_bindings", "*", "allowed_contexts", "*", MetadataKey },
+            new[] { "classification", "attributes", "*", MetadataKey },
+            new[] { "classification", "assembly_attributes", "*", MetadataKey },
+            new[] { "classification", "inheritance", "*", MetadataKey },
+            new[] { "classification", "namespace", "*", MetadataKey },
+            new[] { "classification", "path", "*", MetadataKey },
+            new[] { "classification", "overrides", "*", MetadataKey },
+            new[] { "contracts", "strict_coverage", "*", "exclude", "*", MetadataKey },
+            new[] { "contracts", "audit_coverage", "*", "exclude", "*", MetadataKey },
+        })
+        .ToArray();
+
+    private static readonly string[][] _recognizedOpaqueScalarMapLocations =
     {
+        new[] { "contracts", "strict_project_metadata", "*", "required_properties" },
+        new[] { "contracts", "strict_project_metadata", "*", "forbidden_properties" },
+        new[] { "contracts", "audit_project_metadata", "*", "required_properties" },
+        new[] { "contracts", "audit_project_metadata", "*", "forbidden_properties" },
+    };
+
+    private static readonly string[][] _recognizedOpaqueConditionSetsLocations =
+    {
+        new[] { "analysis", "condition_sets" },
+    };
+
+    private static bool IsRecognizedOpaqueValueKey(string key, IReadOnlyList<string> structuralPath)
+    {
+        string[] ownPath = new List<string>(structuralPath) { key }.ToArray();
         return key switch
         {
-            MetadataKey => HasSiblingKey(node, "role") || node.Children.Count == 1,
-            "required_properties" or "forbidden_properties" => HasSiblingKey(node, "projects"),
-            "condition_sets" => HasSiblingKey(node, "target_assemblies") || HasSiblingKey(node, "solution"),
+            MetadataKey => MatchesAnyPattern(ownPath, _recognizedOpaqueMetadataLocations),
+            "required_properties" or "forbidden_properties" => MatchesAnyPattern(ownPath, _recognizedOpaqueScalarMapLocations),
+            "condition_sets" => MatchesAnyPattern(ownPath, _recognizedOpaqueConditionSetsLocations),
             _ => false,
         };
-    }
-
-    private static bool HasSiblingKey(YamlMappingNode node, string siblingKey)
-    {
-        foreach ((YamlNode keyNode, _) in node.Children)
-        {
-            if (keyNode is YamlScalarNode scalar && string.Equals(scalar.Value, siblingKey, StringComparison.Ordinal))
-            {
-                return true;
-            }
-        }
-
-        return false;
     }
 
     private static void ValidateWhenFieldDeclaration(List<string> structuralPath, List<string> displayPath, YamlNode valueNode)
     {
         string location = string.Join(".", displayPath.Append(WhenKey));
-        if (!IsAllowedWhenLocation(structuralPath))
+        if (!MatchesAnyPattern(structuralPath, _allowedWhenLocations))
         {
             throw new InvalidOperationException(
                 $"'{location}' is not one of the approved expression locations. " +
@@ -471,19 +506,19 @@ public sealed partial class ArchitecturePolicyDocumentLoader : IArchitecturePoli
         }
     }
 
-    private static bool IsAllowedWhenLocation(IReadOnlyList<string> structuralPath)
+    private static bool MatchesAnyPattern(IReadOnlyList<string> structuralPath, string[][] patterns)
     {
-        foreach (string[] allowed in _allowedWhenLocations)
+        foreach (string[] pattern in patterns)
         {
-            if (structuralPath.Count != allowed.Length)
+            if (structuralPath.Count != pattern.Length)
             {
                 continue;
             }
 
             bool matches = true;
-            for (int index = 0; index < allowed.Length; index++)
+            for (int index = 0; index < pattern.Length; index++)
             {
-                if (allowed[index] != "*" && !string.Equals(structuralPath[index], allowed[index], StringComparison.Ordinal))
+                if (pattern[index] != "*" && !string.Equals(structuralPath[index], pattern[index], StringComparison.Ordinal))
                 {
                     matches = false;
                     break;

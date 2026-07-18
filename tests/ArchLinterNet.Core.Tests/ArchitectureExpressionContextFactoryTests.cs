@@ -141,6 +141,28 @@ public sealed class ArchitectureExpressionContextFactoryTests
         });
     }
 
+    [Test]
+    public void Evaluator_WrapsUnguardedMissingKeyEvaluationAsErrorNotNonMatch()
+    {
+        // Fail-closed per openspec/specs/cel-policy-model/spec.md's "Missing key during evaluation is
+        // not treated as false" scenario: an unguarded out-of-range map access is a configuration/
+        // evaluation error the caller must surface, never silently downgraded to an ordinary non-match.
+        CelEnvironment environment = SelectorEnvironment();
+        var compiled = environment.CompilePredicate("subject.metadataText[\"missing\"] == \"x\"");
+        Assert.That(compiled.IsSuccess, Is.True);
+        var context = ArchitectureExpressionContextFactory.CreateSelectorContext(SalesSubject);
+
+        ArchitectureExpressionEvaluationResult result =
+            ArchitectureExpressionEvaluator.Evaluate(compiled.Program!, context);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(result.IsError, Is.True);
+            Assert.That(result.IsMatch, Is.False);
+            Assert.That(result.ErrorMessage, Is.Not.Null.And.Not.Empty);
+        });
+    }
+
     // Environments below mirror ArchitectureExpressionSchemas exactly (same profile/object schemas)
     // to compile predicates for these direct-factory tests without depending on internal statics
     // from a different module. Uses the loader end-to-end (ExpressionCompilationValidatorTests)
