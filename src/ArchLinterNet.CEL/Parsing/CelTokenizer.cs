@@ -61,11 +61,17 @@ internal static class CelTokenizer
         if (TryMatchStringPrefix(source, pos, out var prefixIsRaw, out var prefixIsBytes, out var prefixLength))
         {
             pos += prefixLength;
+            if (IsTripleQuoteOpener(source, pos))
+                return LexTripleQuotedString(source, ref pos, start, isRaw: prefixIsRaw, isBytes: prefixIsBytes, profileId);
             return LexString(source, ref pos, start, isRaw: prefixIsRaw, isBytes: prefixIsBytes, profileId);
         }
 
         if (c is '\'' or '"')
+        {
+            if (IsTripleQuoteOpener(source, pos))
+                return LexTripleQuotedString(source, ref pos, start, isRaw: false, isBytes: false, profileId);
             return LexString(source, ref pos, start, isRaw: false, isBytes: false, profileId);
+        }
 
         if (IsAsciiDigit(c) || (c == '.' && pos + 1 < source.Length && IsAsciiDigit(source[pos + 1])))
             return LexNumber(source, ref pos, profileId);
@@ -78,7 +84,15 @@ internal static class CelTokenizer
 
     private static CelDiagnostic? CheckTokenBudgets(CelToken token, int tokenCountBeforeThis, CelCompilationLimits limits, CelProfileId profileId)
     {
+        // Every literal kind that carries a decoded StringValue (including the deferred
+        // TripleQuotedStringLiteral/StringLiteralWithOctalEscape kinds, whose content is decoded
+        // exactly like an ordinary string even though the resulting token is never evaluated) is
+        // bounded uniformly by decoded content length, matching the documented "longest string/
+        // collection literal accepted in source" MaxLiteralSize contract — never by raw token text
+        // length (which would inconsistently penalize delimiters/prefixes the content itself
+        // doesn't carry, e.g. a triple-quote literal's 6 quote characters).
         if (token.Kind is CelTokenKind.StringLiteral or CelTokenKind.BytesLiteral
+                or CelTokenKind.TripleQuotedStringLiteral or CelTokenKind.StringLiteralWithOctalEscape
             && token.StringValue is not null && token.StringValue.Length > limits.MaxLiteralSize)
         {
             return CelParseDiagnostics.BudgetExceeded(token.Span, "MaxLiteralSize", token.StringValue.Length, profileId);
@@ -155,6 +169,74 @@ internal static class CelTokenizer
 
         prefixLength = 0;
         return false;
+    }
+
+    /// <summary>
+    /// Detects a triple-quoted string opener (<c>'''</c>/<c>"""</c>) at <paramref name="pos"/>
+    /// (which points at the opening quote character, after any <c>r</c>/<c>b</c> prefix has
+    /// already been consumed). Triple-quoted strings are valid CEL lexical syntax but deferred by
+    /// Profile v1 (design decision 3, <c>openspec/specs/cel-profile-v1/spec.md</c>) — without this
+    /// check the tokenizer would silently mis-tokenize <c>'''hello'''</c> as three adjacent
+    /// single-quoted string literals (<c>''</c>, <c>'hello'</c>, <c>''</c>) instead of tokenizing
+    /// it as one construct the parser can cleanly classify as <c>UnsupportedFeature</c>.
+    /// </summary>
+    private static bool IsTripleQuoteOpener(string source, int pos) =>
+        pos + 2 < source.Length && source[pos] == source[pos + 1] && source[pos] == source[pos + 2];
+
+    /// <summary>
+    /// Tokenizes a triple-quoted string literal (<paramref name="pos"/> points at the opening
+    /// quote character; any <c>r</c>/<c>b</c> prefix has already been consumed by the caller) as a
+    /// single <see cref="CelTokenKind.TripleQuotedStringLiteral"/> token — mirroring how
+    /// <c>null</c>/<c>u</c>-suffixed/byte-string literals tokenize successfully so the parser can
+    /// classify them as a fully-formed but deferred construct (<c>UnsupportedFeature</c>) rather
+    /// than the tokenizer reporting <c>SyntaxError</c> for valid CEL syntax. For a raw
+    /// (<paramref name="isRaw"/>) literal a backslash has no special meaning (matches
+    /// <see cref="LexString"/>'s own raw handling) — only a literal 3-quote run terminates it. For
+    /// a non-raw literal, escape sequences are validated via the exact same <see cref="AppendEscape"/>
+    /// logic <see cref="LexString"/> uses (the CEL escape grammar is uniform across single/double/
+    /// triple-quote forms), so an invalid escape (e.g. <c>\q</c>) is still <c>SyntaxError</c> —
+    /// "fully validate syntax, then classify as deferred" applies here exactly as it does to every
+    /// other deferred construct in this spec, not just closer-detection. An unterminated
+    /// triple-quoted string (no matching closer before the end of input) is likewise still
+    /// genuinely malformed CEL and SHALL remain <c>SyntaxError</c>.
+    /// </summary>
+    private static (CelToken?, CelDiagnostic?) LexTripleQuotedString(
+        string source, ref int pos, int start, bool isRaw, bool isBytes, CelProfileId profileId)
+    {
+        var quote = source[pos];
+        pos += 3;
+        var sb = new System.Text.StringBuilder();
+
+        while (true)
+        {
+            if (pos >= source.Length)
+            {
+                return (null, CelParseDiagnostics.SyntaxError(
+                    new CelSourceSpan(start, pos), "Unterminated triple-quoted string literal.", profileId));
+            }
+
+            var c = source[pos];
+            if (c == '\\' && !isRaw)
+            {
+                var (ok, error, _) = AppendEscape(source, ref pos, sb, start, isBytes, profileId);
+                if (!ok)
+                    return (null, error);
+                continue;
+            }
+
+            if (c == quote && pos + 2 < source.Length && source[pos + 1] == quote && source[pos + 2] == quote)
+            {
+                pos += 3;
+                break;
+            }
+
+            sb.Append(c);
+            pos++;
+        }
+
+        var span = new CelSourceSpan(start, pos);
+        var text = source[start..pos];
+        return (new CelToken(CelTokenKind.TripleQuotedStringLiteral, span, text, stringValue: sb.ToString()), null);
     }
 
     // The pinned CEL grammar restricts IDENT to ASCII: [_a-zA-Z][_a-zA-Z0-9]*. char.IsLetter/
@@ -255,6 +337,14 @@ internal static class CelTokenizer
     {
         if (!double.TryParse(text, NumberStyles.Float, CultureInfo.InvariantCulture, out var dval))
             return (null, CelParseDiagnostics.SyntaxError(span, "Malformed floating-point literal.", profileId));
+
+        // double.TryParse silently rounds an out-of-range magnitude to +/-Infinity instead of
+        // failing (e.g. "1.99e90000009", well past IEEE 754 double's ~1.8e308 max) — Profile v1's
+        // Float type is "IEEE 754 double" (a finite/representable value), so a literal that cannot
+        // be represented SHALL be a SyntaxError, never silently become Infinity.
+        if (double.IsInfinity(dval))
+            return (null, CelParseDiagnostics.SyntaxError(span, "Floating-point literal magnitude is out of range.", profileId));
+
         return (new CelToken(CelTokenKind.FloatLiteral, span, text, floatValue: dval), null);
     }
 
@@ -318,6 +408,7 @@ internal static class CelTokenizer
         var quote = source[pos];
         pos++;
         var sb = new System.Text.StringBuilder();
+        var sawOctalEscape = false;
 
         while (true)
         {
@@ -336,9 +427,10 @@ internal static class CelTokenizer
 
             if (c == '\\' && !isRaw)
             {
-                var (ok, error) = AppendEscape(source, ref pos, sb, start, isBytes, profileId);
+                var (ok, error, wasOctal) = AppendEscape(source, ref pos, sb, start, isBytes, profileId);
                 if (!ok)
                     return (null, error);
+                sawOctalEscape |= wasOctal;
                 continue;
             }
 
@@ -348,48 +440,126 @@ internal static class CelTokenizer
 
         var span = new CelSourceSpan(start, pos);
         var text = source[start..pos];
-        var kind = isBytes ? CelTokenKind.BytesLiteral : CelTokenKind.StringLiteral;
+        var kind = DetermineStringTokenKind(isBytes, sawOctalEscape);
         return (new CelToken(kind, span, text, stringValue: sb.ToString()), null);
     }
 
-    private static (bool, CelDiagnostic?) AppendEscape(
+    /// <summary>
+    /// A byte-string literal is already always deferred (<c>UnsupportedFeature</c>) regardless of
+    /// content, so an octal escape inside one needs no separate token kind — only a plain string
+    /// literal (previously always fully-supported) needs to be reclassified as deferred when it
+    /// contains a well-formed octal escape (category B: valid CEL, unsupported by v1).
+    /// </summary>
+    private static CelTokenKind DetermineStringTokenKind(bool isBytes, bool sawOctalEscape)
+    {
+        if (isBytes)
+            return CelTokenKind.BytesLiteral;
+        if (sawOctalEscape)
+            return CelTokenKind.StringLiteralWithOctalEscape;
+        return CelTokenKind.StringLiteral;
+    }
+
+    /// <summary>
+    /// Decodes one escape sequence starting at the <c>\</c> already found by the caller. Shared by
+    /// <see cref="LexString"/> and <see cref="LexTripleQuotedString"/> — the CEL escape grammar is
+    /// uniform across single/double/triple-quote forms, so a non-raw triple-quoted literal must
+    /// validate its escapes exactly the same way a regular string does (an unknown escape like
+    /// <c>\q</c> is <c>SyntaxError</c> there too, not silently accepted as part of a "deferred"
+    /// construct's content). Returns whether the escape was a well-formed octal sequence
+    /// (<c>WasOctal</c>) so <see cref="LexString"/> can reclassify the containing plain string
+    /// literal as deferred; triple-quoted callers ignore this flag since they are already deferred.
+    /// </summary>
+    private static (bool Ok, CelDiagnostic? Error, bool WasOctal) AppendEscape(
         string source, ref int pos, System.Text.StringBuilder sb, int literalStart, bool isBytes, CelProfileId profileId)
     {
         pos++; // consume '\'
         if (pos >= source.Length)
-            return (false, CelParseDiagnostics.SyntaxError(new CelSourceSpan(literalStart, pos), "Unterminated escape sequence.", profileId));
+            return (false, CelParseDiagnostics.SyntaxError(new CelSourceSpan(literalStart, pos), "Unterminated escape sequence.", profileId), false);
 
         var esc = source[pos];
         switch (esc)
         {
-            case 'n': sb.Append('\n'); pos++; return (true, null);
-            case 't': sb.Append('\t'); pos++; return (true, null);
-            case 'r': sb.Append('\r'); pos++; return (true, null);
-            case '\\': sb.Append('\\'); pos++; return (true, null);
-            case '\'': sb.Append('\''); pos++; return (true, null);
-            case '"': sb.Append('"'); pos++; return (true, null);
-            case '`': sb.Append('`'); pos++; return (true, null);
-            case '?': sb.Append('?'); pos++; return (true, null);
-            case 'a': sb.Append('\a'); pos++; return (true, null);
-            case 'b': sb.Append('\b'); pos++; return (true, null);
-            case 'f': sb.Append('\f'); pos++; return (true, null);
-            case 'v': sb.Append('\v'); pos++; return (true, null);
-            case 'x': case 'X': return AppendHexByteEscape(source, ref pos, sb, literalStart, profileId);
+            case 'n': sb.Append('\n'); pos++; return (true, null, false);
+            case 't': sb.Append('\t'); pos++; return (true, null, false);
+            case 'r': sb.Append('\r'); pos++; return (true, null, false);
+            case '\\': sb.Append('\\'); pos++; return (true, null, false);
+            case '\'': sb.Append('\''); pos++; return (true, null, false);
+            case '"': sb.Append('"'); pos++; return (true, null, false);
+            case '`': sb.Append('`'); pos++; return (true, null, false);
+            case '?': sb.Append('?'); pos++; return (true, null, false);
+            case 'a': sb.Append('\a'); pos++; return (true, null, false);
+            case 'b': sb.Append('\b'); pos++; return (true, null, false);
+            case 'f': sb.Append('\f'); pos++; return (true, null, false);
+            case 'v': sb.Append('\v'); pos++; return (true, null, false);
+            case 'x':
+            case 'X':
+                {
+                    var (ok, error) = AppendHexByteEscape(source, ref pos, sb, literalStart, profileId);
+                    return (ok, error, false);
+                }
+
             // Unlike '\U' (below), the pinned grammar's byte-string escape set includes '\u' —
             // only the 8-digit '\U' form is string-only.
-            case 'u': return AppendUnicode4Escape(source, ref pos, sb, literalStart, profileId);
+            case 'u':
+                {
+                    var (ok, error) = AppendUnicode4Escape(source, ref pos, sb, literalStart, profileId);
+                    return (ok, error, false);
+                }
+
             case 'U':
                 if (isBytes)
                 {
                     return (false, CelParseDiagnostics.SyntaxError(
-                        new CelSourceSpan(literalStart, pos + 1), "'\\U' is not a valid escape sequence in a byte-string literal.", profileId));
+                        new CelSourceSpan(literalStart, pos + 1), "'\\U' is not a valid escape sequence in a byte-string literal.", profileId), false);
                 }
 
-                return AppendUnicodeEscape(source, ref pos, sb, literalStart, profileId);
+                {
+                    var (ok, error) = AppendUnicodeEscape(source, ref pos, sb, literalStart, profileId);
+                    return (ok, error, false);
+                }
+
             default:
+                if (esc is >= '0' and <= '7')
+                {
+                    var (ok, error) = AppendOctalEscape(source, ref pos, sb, literalStart, profileId);
+                    return (ok, error, ok);
+                }
+
                 return (false, CelParseDiagnostics.SyntaxError(
-                    new CelSourceSpan(literalStart, pos + 1), $"Unknown escape sequence '\\{esc}'.", profileId));
+                    new CelSourceSpan(literalStart, pos + 1), $"Unknown escape sequence '\\{esc}'.", profileId), false);
         }
+    }
+
+    /// <summary>
+    /// Decodes a three-digit octal escape (<c>\NNN</c>, each <c>N</c> an octal digit), matching the
+    /// pinned grammar's <c>\000</c>-<c>\377</c> (0-255) byte-value range — the same range and
+    /// decode model as <see cref="AppendHexByteEscape"/>'s <c>\xHH</c>. Octal escapes are valid CEL
+    /// lexical syntax that Profile v1 defers (see <see cref="AppendEscape"/>'s caller); this method
+    /// only validates well-formedness (exactly 3 octal digits, in range) — the caller decides
+    /// deferred-classification. Fewer than 3 octal digits, a non-octal digit, or a value beyond
+    /// <c>\377</c> is genuinely malformed CEL and SHALL remain <c>SyntaxError</c>.
+    /// </summary>
+    private static (bool, CelDiagnostic?) AppendOctalEscape(
+        string source, ref int pos, System.Text.StringBuilder sb, int literalStart, CelProfileId profileId)
+    {
+        var digitsStart = pos;
+        while (pos < source.Length && pos - digitsStart < 3 && source[pos] is >= '0' and <= '7')
+            pos++;
+        if (pos - digitsStart != 3)
+        {
+            return (false, CelParseDiagnostics.SyntaxError(
+                new CelSourceSpan(literalStart, pos), "Malformed octal escape sequence: expected 3 octal digits.", profileId));
+        }
+
+        var codepoint = Convert.ToInt32(source[digitsStart..pos], 8);
+        if (codepoint > 0xFF)
+        {
+            return (false, CelParseDiagnostics.SyntaxError(
+                new CelSourceSpan(literalStart, pos), "Octal escape sequence is outside the valid range (\\000-\\377).", profileId));
+        }
+
+        sb.Append((char)codepoint);
+        return (true, null);
     }
 
     private static (bool, CelDiagnostic?) AppendHexByteEscape(
@@ -446,14 +616,14 @@ internal static class CelTokenizer
                 new CelSourceSpan(literalStart, pos), "Malformed \\U escape sequence: expected 8 hex digits.", profileId));
         }
 
-        var codepoint = Convert.ToInt32(source[digitsStart..pos], 16);
+        var codepoint = Convert.ToInt64(source[digitsStart..pos], 16);
         if (codepoint > 0x10FFFF || (codepoint >= 0xD800 && codepoint <= 0xDFFF))
         {
             return (false, CelParseDiagnostics.SyntaxError(
                 new CelSourceSpan(literalStart, pos), "\\U escape sequence is outside the valid Unicode range.", profileId));
         }
 
-        sb.Append(char.ConvertFromUtf32(codepoint));
+        sb.Append(char.ConvertFromUtf32((int)codepoint));
         return (true, null);
     }
 

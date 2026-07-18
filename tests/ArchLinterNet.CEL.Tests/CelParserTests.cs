@@ -404,6 +404,15 @@ public sealed class CelParserTests
         Assert.That(diag.Code, Is.EqualTo(CelDiagnosticCode.SyntaxError));
     }
 
+    // Upstream corpus (hbjydev/celdotnet CelParserTests.Throws_OnTrailingTokens) #338 — two
+    // complete primaries back-to-back with no connecting operator.
+    [Test]
+    public void TwoAdjacentPrimariesWithNoOperator_IsSyntaxError()
+    {
+        var diag = ParseFail("1 2");
+        Assert.That(diag.Code, Is.EqualTo(CelDiagnosticCode.SyntaxError));
+    }
+
     [Test]
     public void UnclosedParenthesis_IsSyntaxError()
     {
@@ -472,6 +481,24 @@ public sealed class CelParserTests
         Assert.That(diag.Code, Is.EqualTo(CelDiagnosticCode.SyntaxError));
     }
 
+    // Upstream corpus (google/cel-java parser_errors.baseline: `in` alone →
+    // "mismatched input 'in' expecting {...}") #338 — the `in` operator keyword tokenizes as its
+    // own CelTokenKind.In (not a plain Identifier), so it can never stand alone as a primary
+    // expression the way a reserved word can (reserved words are still Identifier-kind).
+    [Test]
+    public void BareInKeyword_IsSyntaxError()
+    {
+        var diag = ParseFail("in");
+        Assert.That(diag.Code, Is.EqualTo(CelDiagnosticCode.SyntaxError));
+    }
+
+    [Test]
+    public void BareQuestionToken_IsSyntaxError()
+    {
+        var diag = ParseFail("?");
+        Assert.That(diag.Code, Is.EqualTo(CelDiagnosticCode.SyntaxError));
+    }
+
     [Test]
     public void MessageLiteralOnNonQualifiedNameReceiver_IsSyntaxError()
     {
@@ -479,6 +506,28 @@ public sealed class CelParserTests
         // not deferred syntax — the parser must not treat every "{" after any expression as a
         // message literal.
         var diag = ParseFail("1{}");
+        Assert.That(diag.Code, Is.EqualTo(CelDiagnosticCode.SyntaxError));
+    }
+
+    // Upstream corpus (google/cel-go parser_test.go, "Tests from Java parser" section:
+    // "TestAllTypes(){}" → mismatched input '{', "TestAllTypes{}()" → mismatched input '(') #338.
+    [Test]
+    public void MessageLiteralOnCallResultReceiver_IsSyntaxError()
+    {
+        // A free-function call result, like a literal, is never a valid message-literal
+        // receiver — only a qualified-name-shaped expression is (see
+        // MessageLiteralOnNonQualifiedNameReceiver_IsSyntaxError above for the literal case).
+        var diag = ParseFail("f(){}");
+        Assert.That(diag.Code, Is.EqualTo(CelDiagnosticCode.SyntaxError));
+    }
+
+    [Test]
+    public void CallImmediatelyFollowingAMessageLiteral_IsSyntaxError()
+    {
+        // A message literal's own value is never itself callable — trailing "(...)" after a
+        // "{...}" body is unconsumed input, reported before the message-literal's own pending
+        // UnsupportedFeature classification is ever reached (trailing-input check runs first).
+        var diag = ParseFail("Type{}()");
         Assert.That(diag.Code, Is.EqualTo(CelDiagnosticCode.SyntaxError));
     }
 

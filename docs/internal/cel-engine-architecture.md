@@ -30,8 +30,9 @@ expression source (string)
   │  (internal)     │  CelSyntaxNode hierarchy). Precedence-climbing (Pratt) parser;
   │                 │  MaxNestingDepth and MaxAstNodeCount enforced here. Distinguishes
   │                 │  SyntaxError (invented/malformed syntax) from UnsupportedFeature
-  │                 │  (valid CEL excluded from v1: arithmetic, `? :`, null/uint/bytes
-  │                 │  literals, list/map/message literals). Fails fast — one diagnostic
+  │                 │  (valid CEL excluded from v1: arithmetic, `? :`, null/uint/bytes/
+  │                 │  triple-quoted-string/octal-escape literals, list/map/message
+  │                 │  literals). Fails fast — one diagnostic
   │                 │  per attempt, no error recovery. Full input consumption required.
   │  NOT public.    │  AST nodes are never exposed. Binder (#326) consumes CelSyntaxNode
   │                 │  internally; CelEnvironment.CompilePredicate/Compile call the
@@ -181,7 +182,9 @@ For each capability excluded from Profile v1, this matrix records: classificatio
 
 ### 3. Language/profile evolution
 
-Capabilities deferred: arithmetic (`+`, `-`, `*`, `/`, `%`), conditional expression (`? :`), new literals (uint, bytes), timestamp/duration types, optional/null support, comprehensions/macros (`all`, `exists`, `map`, `filter`), regex (`matches`), protobuf integration, unknown/partial evaluation.
+Capabilities deferred: arithmetic (`+`, `-`, `*`, `/`, `%`), conditional expression (`? :`), new literals (uint, bytes), triple-quoted string literals (`'''...'''`/`"""..."""`), octal string escapes (`\NNN`), timestamp/duration types, optional/null support, comprehensions/macros (`all`, `exists`, `map`, `filter`), regex (`matches`), protobuf integration, unknown/partial evaluation.
+
+Triple-quoted string literals and octal escapes are already tokenized today (`CelTokenizer.LexTripleQuotedString`, `CelTokenKind.TripleQuotedStringLiteral`/`StringLiteralWithOctalEscape`) — the tokenizer fully validates their well-formedness (matching closer; for octal, exactly three digits in the `\000`-`\377` range) and `CelParser.ParsePrimary` classifies a well-formed instance `UnsupportedFeature`, following exactly the same shipped pattern as `null`/`uint`/byte-string literals in the row directly below. A malformed instance (unterminated triple-quote, incomplete/out-of-range octal escape) is `SyntaxError`. What remains actually deferred to a future profile version is triple-quote *content* semantics beyond well-formedness (e.g. any quote-form-specific escape nuance the pinned grammar might define) and octal-escape *decoding into a CEL value* — the lexical recognition and diagnostic classification are shipped, not future work (see `#338`'s corpus-mining task and `docs/internal/cel-corpus-mining-manifest.md`).
 
 | Field | Details |
 |---|---|
