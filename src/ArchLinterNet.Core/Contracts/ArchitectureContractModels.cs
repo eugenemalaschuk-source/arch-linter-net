@@ -136,11 +136,13 @@ public sealed class ArchitectureLayerSelector
     [YamlIgnore]
     internal CelCompiledPredicate? CompiledWhen { get; set; }
 
-    // Populated alongside CompiledWhen with the YAML path (e.g. "layers.sales.selector") so an
-    // evaluation-time error can name exactly which layer's selector failed — the layer name isn't
-    // otherwise recoverable at the matcher, which only receives the selector object.
+    // Populated alongside CompiledWhen via ArchitecturePolicyProvenanceIndex.TryGetLocation(path) —
+    // a real, resolved location (source file, YAML path, line/column) — so an evaluation-time error
+    // can construct a proper ArchitecturePolicyDiagnostic naming exactly which layer's selector
+    // failed, through the same structured JSON/SARIF path load-time errors use. The layer name
+    // isn't otherwise recoverable at the matcher, which only receives the selector object.
     [YamlIgnore]
-    internal string? WhenLocation { get; set; }
+    internal ArchitecturePolicySourceLocation? WhenLocation { get; set; }
 }
 
 public sealed class ArchitectureExternalDependencyGroup

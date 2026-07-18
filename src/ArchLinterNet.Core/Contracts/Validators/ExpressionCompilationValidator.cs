@@ -5,6 +5,7 @@ using ArchLinterNet.CEL.Diagnostics;
 using ArchLinterNet.Core.Contracts.Expressions;
 using ArchLinterNet.Core.Contracts.Families;
 using ArchLinterNet.Core.Contracts.PolicyImports;
+using ArchLinterNet.Core.Model;
 
 namespace ArchLinterNet.Core.Contracts.Validators;
 
@@ -38,19 +39,61 @@ internal sealed class ExpressionCompilationValidator : IArchitecturePolicyDocume
     // real edge, silently weakening the contract instead of failing closed. Reject any occurrence of
     // the `dependency` identifier at policy-load time until real per-edge facts exist.
     //
-    // Deliberately a bare `\bdependency\b`, not `\bdependency\.` — CEL's grammar allows postfix
-    // member access after any parenthesized expression, so `(dependency).viaMethodBody` still
-    // reaches the same root variable while never producing the literal substring `dependency.`.
-    // Since CEL has no reflection, string-based dynamic member access, or way to alias an
-    // identifier, the token `dependency` can only ever appear in valid CEL source text by
-    // literally naming this root variable — so matching the bare identifier, with no assumption
-    // about what (if anything) follows it, is what actually closes the bypass. The trade-off is
-    // reduced precision: this also rejects a `when` that happens to reference the word
-    // "dependency" inside a string literal (e.g. a metadata value check). That is an acceptable,
-    // deliberately fail-closed trade-off for a rejection whose entire purpose is to prevent a
-    // predicate from silently reading facts that don't vary per edge.
-    private static readonly Regex _dependencyMemberReferencePattern =
+    // The identifier is matched only outside quoted string literal spans (see
+    // ContainsDependencyIdentifierOutsideStrings) so a `when` referencing the literal word
+    // "dependency" inside a metadata comparison — e.g. target.metadataText["dependency"] == "x" —
+    // is not rejected. String-skipping is only trusted for the ordinary single ' or double " quoted
+    // forms; if the expression contains a triple-quote opener ('''/\"\"\") anywhere, quote-tracking
+    // falls back to matching the bare identifier across the whole expression unconditionally (over-
+    // rejecting is the safe failure mode here, not under-rejecting).
+    private static readonly Regex _dependencyIdentifierPattern =
         new(@"\bdependency\b", RegexOptions.Compiled | RegexOptions.CultureInvariant);
+
+    private static bool ReferencesDependencyIdentifier(string expression)
+    {
+        if (expression.Contains("'''", StringComparison.Ordinal) || expression.Contains("\"\"\"", StringComparison.Ordinal))
+        {
+            return _dependencyIdentifierPattern.IsMatch(expression);
+        }
+
+        return _dependencyIdentifierPattern.Matches(expression).Any(match => !IsInsideStringLiteral(expression, match.Index));
+    }
+
+    // Scans expression from the start, toggling single/double-quote string-literal state (honoring
+    // backslash escapes within a literal), and reports whether characterIndex falls inside one.
+    // O(n) per call, re-scanning from the start each time — fine here since a `when` string is a
+    // narrow single predicate, not a large document, and this runs once per selector at load time.
+    private static bool IsInsideStringLiteral(string expression, int characterIndex)
+    {
+        bool inSingleQuote = false;
+        bool inDoubleQuote = false;
+        int i = 0;
+        while (i < characterIndex)
+        {
+            char c = expression[i];
+            if (inSingleQuote)
+            {
+                if (c == '\\' && i + 1 < expression.Length) { i += 2; continue; }
+                if (c == '\'') inSingleQuote = false;
+                i++;
+                continue;
+            }
+
+            if (inDoubleQuote)
+            {
+                if (c == '\\' && i + 1 < expression.Length) { i += 2; continue; }
+                if (c == '"') inDoubleQuote = false;
+                i++;
+                continue;
+            }
+
+            if (c == '\'') { inSingleQuote = true; i++; continue; }
+            if (c == '"') { inDoubleQuote = true; i++; continue; }
+            i++;
+        }
+
+        return inSingleQuote || inDoubleQuote;
+    }
 
     public void Validate(ArchitectureContractDocument document)
     {
@@ -61,7 +104,7 @@ internal sealed class ExpressionCompilationValidator : IArchitecturePolicyDocume
                     ArchitecturePolicyProvenancePath.Property(LayersProperty), layerName),
                 SelectorProperty);
             document.Provenance.SetValidationSubject(path);
-            CompileLayerSelector(layer.Selector, layerName, path);
+            CompileLayerSelector(document, layer.Selector, layerName, path);
         }
 
         CompileContextDependencyGroup(document, document.Contracts.StrictContextDependencies, "strict_context_dependencies");
@@ -102,7 +145,8 @@ internal sealed class ExpressionCompilationValidator : IArchitecturePolicyDocume
                 ArchitecturePolicyProvenancePath.Property(ContractsProperty), groupKey),
             index);
 
-    private static void CompileLayerSelector(ArchitectureLayerSelector? selector, string layerName, string path)
+    private static void CompileLayerSelector(
+        ArchitectureContractDocument document, ArchitectureLayerSelector? selector, string layerName, string path)
     {
         if (selector is null || string.IsNullOrEmpty(selector.When))
         {
@@ -118,7 +162,8 @@ internal sealed class ExpressionCompilationValidator : IArchitecturePolicyDocume
         }
 
         selector.CompiledWhen = result.Program;
-        selector.WhenLocation = path;
+        document.Provenance.TryGetLocation(path, out ArchitecturePolicySourceLocation? location);
+        selector.WhenLocation = location;
     }
 
     private static void CompileContextualSource(
@@ -142,7 +187,8 @@ internal sealed class ExpressionCompilationValidator : IArchitecturePolicyDocume
         }
 
         source.CompiledWhen = result.Program;
-        source.WhenLocation = path;
+        document.Provenance.TryGetLocation(path, out ArchitecturePolicySourceLocation? location);
+        source.WhenLocation = location;
         source.WhenContractName = contractName;
     }
 
@@ -170,7 +216,7 @@ internal sealed class ExpressionCompilationValidator : IArchitecturePolicyDocume
                 ArchitecturePolicyProvenancePath.AppendProperty(contractPath, fieldName), index);
             document.Provenance.SetValidationSubject(path);
 
-            if (_dependencyMemberReferencePattern.IsMatch(selector.When))
+            if (ReferencesDependencyIdentifier(selector.When))
             {
                 throw new InvalidOperationException(
                     $"Contextual contract '{contractName}' declares a '{fieldName}[{index}].when' expression that " +
@@ -191,7 +237,8 @@ internal sealed class ExpressionCompilationValidator : IArchitecturePolicyDocume
             }
 
             selector.CompiledWhen = result.Program;
-            selector.WhenLocation = path;
+            document.Provenance.TryGetLocation(path, out ArchitecturePolicySourceLocation? location);
+            selector.WhenLocation = location;
             selector.WhenContractName = contractName;
         }
     }

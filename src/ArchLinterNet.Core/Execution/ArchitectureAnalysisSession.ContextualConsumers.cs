@@ -43,7 +43,8 @@ public sealed partial class ArchitectureAnalysisSession
             selector.Role, metadata, selector.When, source?.Role, sourceMetadata, source?.When);
         _registeredContextualConsumers.TryAdd(identity,
             new ArchitectureContextualConsumerReference(
-                selector.Role, metadata, description, source?.Role, sourceMetadata, selector.When, source?.When)
+                selector.Role, metadata, description, source?.Role, sourceMetadata, selector.When, source?.When,
+                selector.WhenLocation, source?.WhenLocation, selector.WhenContractName, source?.WhenContractName)
             {
                 CompiledWhen = selector.CompiledWhen,
                 SourceCompiledWhen = source?.CompiledWhen

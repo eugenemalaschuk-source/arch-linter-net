@@ -70,7 +70,7 @@ internal static partial class ArchitectureContextSelectorMatcher
         }
 
         string contractLabel = selector.WhenContractName == null ? string.Empty : $"Contract '{selector.WhenContractName}' ";
-        string locationLabel = selector.WhenLocation == null ? string.Empty : $"at '{selector.WhenLocation}' ";
+        string locationLabel = selector.WhenLocation == null ? string.Empty : $"at '{selector.WhenLocation.YamlPath}' ";
 
         if (sourceDescriptor == null || sourceType == null)
         {
@@ -79,7 +79,8 @@ internal static partial class ArchitectureContextSelectorMatcher
                 $"for source '{ArchitectureTypeNames.SafeFullName(candidateType)}'";
             CelEvaluationContext sourceContext = ArchitectureExpressionContextFactory.CreateContextualSourceContext(
                 expressionFacts.BuildSubjectFacts(candidateType));
-            return ArchitectureExpressionFactService.Evaluate(selector.CompiledWhen, sourceContext, sourceDescription);
+            return ArchitectureExpressionFactService.Evaluate(
+                selector.CompiledWhen, sourceContext, sourceDescription, selector.WhenLocation);
         }
 
         string targetDescription =
@@ -89,7 +90,8 @@ internal static partial class ArchitectureContextSelectorMatcher
             expressionFacts.BuildSubjectFacts(sourceType),
             expressionFacts.BuildSubjectFacts(candidateType),
             ArchitectureExpressionFactService.BuildDependencyFacts());
-        return ArchitectureExpressionFactService.Evaluate(selector.CompiledWhen, targetContext, targetDescription);
+        return ArchitectureExpressionFactService.Evaluate(
+            selector.CompiledWhen, targetContext, targetDescription, selector.WhenLocation);
     }
 
     // Exposed internally (not just used by the Matches overloads above) so callers that need to

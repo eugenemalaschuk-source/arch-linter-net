@@ -24,7 +24,11 @@ public sealed record ArchitectureContextualConsumerReference(
     string? SourceRole = null,
     IReadOnlyDictionary<string, object>? SourceMetadata = null,
     string? When = null,
-    string? SourceWhen = null)
+    string? SourceWhen = null,
+    ArchitecturePolicySourceLocation? WhenLocation = null,
+    ArchitecturePolicySourceLocation? SourceWhenLocation = null,
+    string? WhenContractName = null,
+    string? SourceWhenContractName = null)
 {
     // Kept internal (unlike the positional properties above) so the compiled CEL predicate — an
     // ArchLinterNet.CEL engine type — never appears on this Core model's public surface, matching

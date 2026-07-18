@@ -238,6 +238,59 @@ public sealed partial class ExpressionCompilationValidatorTests
         Assert.That(ex.Message, Does.Contain("dependency"));
     }
 
+    // Regression: the word "dependency" appearing inside a quoted string literal (an ordinary
+    // metadata value comparison, nothing to do with the `dependency` root variable) must not be
+    // rejected — only an actual identifier reference outside string literals is unsafe.
+    [Test]
+    public void Load_ContextDependencyForbiddenWhen_ReferencesDependencyOnlyInsideStringLiteral_Compiles()
+    {
+        string policyPath = WritePolicy($$"""
+            version: 1
+            name: Test
+            analysis:
+              target_assemblies: [{{AssemblyName}}]
+            contracts:
+              strict_context_dependencies:
+                - name: domain-isolation
+                  source:
+                    role: DomainLayer
+                  forbidden:
+                    - role: DomainLayer
+                      when: target.metadataText["domain"] == "some-dependency-value"
+                  reason: Test.
+            """);
+
+        ArchitectureContractDocument document = new ArchitecturePolicyDocumentLoader().Load(policyPath);
+
+        Assert.That(document.Contracts.StrictContextDependencies[0].Forbidden[0].CompiledWhen, Is.Not.Null);
+    }
+
+    // Safety net: an expression containing a triple-quote opener falls back to matching the bare
+    // identifier across the whole string (over-rejecting, not under-rejecting) rather than trying to
+    // track triple-quoted string state, which this scanner does not attempt to model correctly.
+    [Test]
+    public void Load_ContextDependencyForbiddenWhen_TripleQuotedStringContainingDependency_StillRejected()
+    {
+        string policyPath = WritePolicy($$"""""
+            version: 1
+            name: Test
+            analysis:
+              target_assemblies: [{{AssemblyName}}]
+            contracts:
+              strict_context_dependencies:
+                - name: domain-isolation
+                  source:
+                    role: DomainLayer
+                  forbidden:
+                    - role: DomainLayer
+                      when: target.metadataText["domain"] == """some-dependency-value"""
+                  reason: Test.
+            """"");
+
+        Assert.Throws<InvalidOperationException>(() =>
+            new ArchitecturePolicyDocumentLoader().Load(policyPath));
+    }
+
     [Test]
     public void Load_ContextAllowOnlyExcludeWhen_ReferencesDependency_ThrowsActionableError()
     {

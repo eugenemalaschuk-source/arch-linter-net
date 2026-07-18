@@ -1,6 +1,8 @@
 using ArchLinterNet.CEL.Compilation;
 using ArchLinterNet.CEL.Evaluation;
+using ArchLinterNet.Core.Contracts;
 using ArchLinterNet.Core.Discovery;
+using ArchLinterNet.Core.Model;
 using ArchLinterNet.Core.Scanning;
 
 namespace ArchLinterNet.Core.Execution.Expressions;
@@ -66,15 +68,37 @@ internal sealed class ArchitectureExpressionFactService
     // openspec/specs/cel-policy-model/spec.md. description identifies the owning selector/contract
     // and the expression source text for the resulting error message, mirroring how
     // ExpressionCompilationValidator already reports compile-time failures.
-    public static bool Evaluate(CelCompiledPredicate predicate, CelEvaluationContext context, string description)
+    //
+    // location, when available (ArchitectureContextSelector/ArchitectureLayerSelector.WhenLocation,
+    // resolved by ExpressionCompilationValidator at compile time via
+    // ArchitecturePolicyProvenanceIndex.TryGetLocation — see design.md's Post-Review Follow-Up),
+    // upgrades the thrown exception to ArchitecturePolicyValidationException carrying a real
+    // ArchitecturePolicyDiagnostic. ValidateCommandHandler already pattern-matches on that type and
+    // routes it through the same structured --format json/sarif "architecture_policy_error" path a
+    // load-time policy error gets, with YAML source/line/column — not the generic, message-only
+    // fallback catch. Falls back to a plain InvalidOperationException only when no location could be
+    // resolved (should not happen in practice, since ArchitecturePolicyProvenanceIndex.Bind walks
+    // every document unconditionally, but this method must not throw on that possibility itself).
+    public static bool Evaluate(
+        CelCompiledPredicate predicate, CelEvaluationContext context, string description, ArchitecturePolicySourceLocation? location)
     {
         ArchitectureExpressionEvaluationResult result = ArchitectureExpressionEvaluator.Evaluate(predicate, context);
-        if (result.IsError)
+        if (!result.IsError)
         {
-            throw new InvalidOperationException(
-                $"{description} 'when' expression failed to evaluate: {result.ErrorMessage}");
+            return result.IsMatch;
         }
 
-        return result.IsMatch;
+        string message = $"{description} 'when' expression failed to evaluate: {result.ErrorMessage}";
+        if (location is null)
+        {
+            throw new InvalidOperationException(message);
+        }
+
+        var diagnostic = new ArchitecturePolicyDiagnostic(
+            ArchitecturePolicyDiagnosticKind.SemanticValidation,
+            location,
+            Array.Empty<ArchitecturePolicySourceLocation>(),
+            location.Source.ImportChain);
+        throw new ArchitecturePolicyValidationException(message, diagnostic, new InvalidOperationException(message));
     }
 }

@@ -1,4 +1,5 @@
 using ArchLinterNet.CEL.Compilation;
+using ArchLinterNet.Core.Model;
 using YamlDotNet.Serialization;
 
 namespace ArchLinterNet.Core.Contracts;
@@ -29,14 +30,15 @@ public sealed class ArchitectureContextSelector
     [YamlIgnore]
     internal CelCompiledPredicate? CompiledWhen { get; set; }
 
-    // Populated alongside CompiledWhen by ExpressionCompilationValidator, using the same YAML path
-    // it already computes for provenance (e.g. "contracts.strict_context_dependencies[0].forbidden[2]").
-    // Carried on the selector itself (not recovered from ArchitecturePolicyProvenanceIndex, whose
-    // "current validation subject" is a single mutable field overwritten per selector during Load
-    // and unavailable by the time contract checking runs) so an evaluation-time error can name
-    // exactly which selector failed, not just which type of selector.
+    // Populated alongside CompiledWhen by ExpressionCompilationValidator via
+    // ArchitecturePolicyProvenanceIndex.TryGetLocation(path) — a real, resolved location (source
+    // file, YAML path, line/column), not just a path string. Carried on the selector itself (not
+    // recovered from the provenance index's "current validation subject", a single mutable field
+    // overwritten per selector during Load and unavailable by the time contract checking runs) so
+    // an evaluation-time error can construct a proper ArchitecturePolicyDiagnostic naming exactly
+    // which selector failed, through the same structured JSON/SARIF path load-time errors use.
     [YamlIgnore]
-    internal string? WhenLocation { get; set; }
+    internal ArchitecturePolicySourceLocation? WhenLocation { get; set; }
 
     // The owning contract's declared `name`, for the same reason as WhenLocation — evaluation
     // happens well after Load(), with no ArchitectureContractDependencyContract/AllowOnlyContract

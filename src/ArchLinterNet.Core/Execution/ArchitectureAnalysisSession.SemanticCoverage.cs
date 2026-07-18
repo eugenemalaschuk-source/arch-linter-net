@@ -206,7 +206,8 @@ public sealed partial class ArchitectureAnalysisSession
     private bool MatchesContextualConsumer(ArchitectureContextualConsumerReference consumer, Type type)
     {
         ArchitectureContextSelector selector = CreateContextualSelector(
-            consumer.Role, consumer.Metadata, consumer.When, consumer.CompiledWhen);
+            consumer.Role, consumer.Metadata, consumer.When, consumer.CompiledWhen,
+            consumer.WhenLocation, consumer.WhenContractName);
         if (consumer.SourceRole == null)
         {
             return ArchitectureContextSelectorMatcher.Matches(
@@ -214,7 +215,8 @@ public sealed partial class ArchitectureAnalysisSession
         }
 
         ArchitectureContextSelector sourceSelector = CreateContextualSelector(
-            consumer.SourceRole, consumer.SourceMetadata!, consumer.SourceWhen, consumer.SourceCompiledWhen);
+            consumer.SourceRole, consumer.SourceMetadata!, consumer.SourceWhen, consumer.SourceCompiledWhen,
+            consumer.SourceWhenLocation, consumer.SourceWhenContractName);
         return RoleIndex.ClassifiedTypes().Any(sourceType =>
             RoleIndex.TryGetRole(sourceType, out ArchitectureTypeClassificationResult sourceDescriptor)
             && ArchitectureContextSelectorMatcher.Matches(
@@ -223,18 +225,27 @@ public sealed partial class ArchitectureAnalysisSession
                 selector, type, RoleIndex, sourceDescriptor, ExpressionFacts, sourceType));
     }
 
+    // Rebuilds a synthetic ArchitectureContextSelector from a coverage-facing consumer reference
+    // for matching purposes only. WhenLocation/WhenContractName must be carried through too (not
+    // just When/CompiledWhen) — otherwise an evaluation error triggered from this coverage-matching
+    // path loses YAML provenance even though the same error triggered from ordinary violation
+    // checking (which always uses the real, originally-compiled selector) has it.
     private static ArchitectureContextSelector CreateContextualSelector(
         string role,
         IReadOnlyDictionary<string, object> metadata,
-        string? When,
-        ArchLinterNet.CEL.Compilation.CelCompiledPredicate? CompiledWhen)
+        string? when,
+        ArchLinterNet.CEL.Compilation.CelCompiledPredicate? compiledWhen,
+        ArchitecturePolicySourceLocation? whenLocation,
+        string? whenContractName)
     {
         return new ArchitectureContextSelector
         {
             Role = role,
             Metadata = new Dictionary<string, object>(metadata, StringComparer.Ordinal),
-            When = When,
-            CompiledWhen = CompiledWhen
+            When = when,
+            CompiledWhen = compiledWhen,
+            WhenLocation = whenLocation,
+            WhenContractName = whenContractName
         };
     }
 
