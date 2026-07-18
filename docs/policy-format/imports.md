@@ -277,6 +277,7 @@ The repository contains acceptance-tested examples:
 - committed naming fixtures pair `architecture/arch.yml` and `*.arch.yml` with
   equivalent arbitrary names to prevent filename-driven behavior.
 
-Future CEL expressions compose as scalar values inside their owning nodes when
-their fields are supported. Imports do not grant CEL filesystem, import-graph,
+CEL `when` expressions compose as scalar values inside their owning nodes
+exactly like any other selector field, and keep their fragment provenance
+after composition. Imports do not grant CEL filesystem, import-graph,
 templating, or cross-file-anchor access.

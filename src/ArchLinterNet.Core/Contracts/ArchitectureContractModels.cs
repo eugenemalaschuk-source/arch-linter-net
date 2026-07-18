@@ -135,6 +135,14 @@ public sealed class ArchitectureLayerSelector
     // idiom so evaluation (added by #164) never re-parses the expression.
     [YamlIgnore]
     internal CelCompiledPredicate? CompiledWhen { get; set; }
+
+    // Populated alongside CompiledWhen via ArchitecturePolicyProvenanceIndex.TryGetLocation(path) —
+    // a real, resolved location (source file, YAML path, line/column) — so an evaluation-time error
+    // can construct a proper ArchitecturePolicyDiagnostic naming exactly which layer's selector
+    // failed, through the same structured JSON/SARIF path load-time errors use. The layer name
+    // isn't otherwise recoverable at the matcher, which only receives the selector object.
+    [YamlIgnore]
+    internal ArchitecturePolicySourceLocation? WhenLocation { get; set; }
 }
 
 public sealed class ArchitectureExternalDependencyGroup

@@ -101,6 +101,71 @@ adding a broad `application` layer that hides cross-module coupling. Use glob
 layers as aggregate views, not as a replacement for the concrete layers you need
 for specific contracts and diagnostics.
 
+## CEL When Predicates
+
+`layers.<name>.selector.when` and contextual dependency/allow-only
+`source`/`forbidden`/`allowed`/`exclude` selectors accept an optional `when`
+field carrying a narrow CEL boolean predicate. This is the **only** place a
+CEL expression is ever accepted — every other YAML string, including every
+other selector field, stays literal.
+
+Prefer a narrow, explainable `when` over one that is broad enough to weaken
+the contract:
+
+```yaml
+# Good: narrow, explains intent, refines an already-scoped literal match.
+layers:
+  sales_domain:
+    selector:
+      role: Domain
+      when: subject.metadataText["domain"] == "Sales"
+
+# Bad: trivially true for almost every candidate — defeats the point of a
+# selector and will surface as a broad-match signal in coverage/explain
+# output rather than silently passing review.
+layers:
+  everything:
+    selector:
+      role: Domain
+      when: "true"
+```
+
+Cross-context comparisons (source vs. target) are the primary reason to reach
+for `when` over literal `metadata` matching — for example, forbidding any
+cross-domain reference without hand-listing every domain pair:
+
+```yaml
+contracts:
+  strict_context_dependencies:
+    - name: sales-must-not-depend-on-other-domain
+      source:
+        role: Domain
+      forbidden:
+        - role: Domain
+          when: target.metadataText["domain"] != source.metadataText["domain"]
+      reason: Bounded contexts must not depend on each other's domain types.
+```
+
+Rules for agents:
+
+- Never author `when` anywhere outside the closed set of locations above —
+  policy loading rejects it, but do not rely on that as your only check.
+- Guard a map lookup before comparing it (`subject.metadataText.containsKey("domain") && subject.metadataText["domain"] == "Sales"`)
+  when the key may legitimately be absent for some classified type. An
+  unguarded lookup against a missing key is an **evaluation failure**, not a
+  non-match — it fails the run as a policy/configuration error, and a
+  baseline does not suppress it.
+- `when` is additive to `role`/`metadata`, never a replacement for them —
+  keep `role` as the fast, explainable pre-filter and use `when` only for
+  the comparison `role`/`metadata` cannot express.
+- Numeric metadata is not exposed to `when` (`metadataText`/`metadataBool`
+  only) — match numeric metadata with a literal `metadata` constraint
+  instead.
+- After adding or narrowing a `when`, check the selector isn't reported stale
+  in coverage output — a `when` that never evaluates `true` for any
+  classified type makes the whole selector stale even though its literal
+  `role`/`metadata` still matches real types.
+
 ## Choose Strict Or Audit
 
 Use strict rules for current gates. Add an `id` for stable CLI and CI references:

@@ -3,6 +3,7 @@ using ArchLinterNet.Core.Contracts.Families;
 using ArchLinterNet.Core.Contracts.PolicyImports;
 using ArchLinterNet.Core.Discovery;
 using ArchLinterNet.Core.Execution.Abstractions;
+using ArchLinterNet.Core.Execution.Expressions;
 using ArchLinterNet.Core.Model;
 using ArchLinterNet.Core.Resolution;
 using ArchLinterNet.Core.Scanning;
@@ -53,6 +54,7 @@ public sealed partial class ArchitectureAnalysisSession
             fileSystem: null,
             context.ProjectDiscovery,
             sourceRootAssemblyOwnership: null);
+        ExpressionFacts = new ArchitectureExpressionFactService(RoleIndex, SourceFileFactIndex, context.ProjectDiscovery);
         RegisterAllContextualConsumersFromDocument();
     }
 
@@ -96,14 +98,16 @@ public sealed partial class ArchitectureAnalysisSession
 
     public ArchitectureSourceFileFactIndex SourceFileFactIndex { get; }
 
+    internal ArchitectureExpressionFactService ExpressionFacts { get; }
+
     private Type[] FindTypesInLayer(ArchitectureLayer layer)
     {
-        return TypeIndex.FindTypesInLayer(layer, RoleIndex);
+        return TypeIndex.FindTypesInLayer(layer, RoleIndex, ExpressionFacts);
     }
 
     private bool MatchesLayer(ArchitectureLayer layer, Type type)
     {
-        return ArchitectureLayerTypeMatcher.Matches(layer, type, RoleIndex);
+        return ArchitectureLayerTypeMatcher.Matches(layer, type, RoleIndex, ExpressionFacts);
     }
 
     private bool IsInAnyDeclaredLayer(Type type)

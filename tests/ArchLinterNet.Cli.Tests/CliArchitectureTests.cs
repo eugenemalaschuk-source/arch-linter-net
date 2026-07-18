@@ -122,6 +122,55 @@ public sealed class CliArchitectureTests
     }
 
     [Test]
+    public void ValidateHandler_UntypedExecutionError_WritesStructuredJsonNotPlainStderr()
+    {
+        // An expression evaluation failure (e.g. a `when` predicate failing at check time, well
+        // after policy load succeeds) surfaces as a bare InvalidOperationException with no
+        // ArchitecturePolicyDiagnostic - it must still respect --format json instead of degrading
+        // to an unstructured stderr line, so JSON-consuming CI tooling gets parseable output.
+        FakeCliRuntime runtime = new()
+        {
+            ExceptionToThrow = new InvalidOperationException(
+                "Contextual selector (role: DomainLayer) 'when' expression failed to evaluate: missing key")
+        };
+        FakeCliConsole console = new();
+        ValidateCommandHandler handler = new(runtime, console, new FakeFileSystem(exists: true));
+
+        int exitCode = handler.Execute(new ValidateCommandOptions(
+            "policy.yml", "strict", "json", [], null, false, null, false, false));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(exitCode, Is.EqualTo(CliExitCodes.InvalidArgumentsOrRuntimeError));
+            Assert.That(console.StdOut, Does.Contain("architecture_execution_error"));
+            Assert.That(console.StdOut, Does.Contain("failed to evaluate"));
+            Assert.That(console.StdErr, Is.Empty);
+        });
+    }
+
+    [Test]
+    public void ValidateHandler_UntypedExecutionError_WritesStructuredSarifNotPlainStderr()
+    {
+        FakeCliRuntime runtime = new()
+        {
+            ExceptionToThrow = new InvalidOperationException("'when' expression failed to evaluate: missing key")
+        };
+        FakeCliConsole console = new();
+        ValidateCommandHandler handler = new(runtime, console, new FakeFileSystem(exists: true));
+
+        int exitCode = handler.Execute(new ValidateCommandOptions(
+            "policy.yml", "strict", "sarif", [], null, false, null, false, false));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(exitCode, Is.EqualTo(CliExitCodes.InvalidArgumentsOrRuntimeError));
+            Assert.That(console.StdOut, Does.Contain("architecture-execution"));
+            Assert.That(console.StdOut, Does.Contain("failed to evaluate"));
+            Assert.That(console.StdErr, Is.Empty);
+        });
+    }
+
+    [Test]
     public void ValidateHandler_WritesTypedRootPolicyFailureAsSarif()
     {
         ArchitecturePolicySourceDescriptor source = new(

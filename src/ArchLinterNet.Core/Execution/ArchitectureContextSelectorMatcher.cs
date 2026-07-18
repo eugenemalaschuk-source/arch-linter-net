@@ -1,6 +1,8 @@
 using System.Collections;
 using System.Text.RegularExpressions;
+using ArchLinterNet.CEL.Evaluation;
 using ArchLinterNet.Core.Contracts;
+using ArchLinterNet.Core.Execution.Expressions;
 using ArchLinterNet.Core.Scanning;
 
 namespace ArchLinterNet.Core.Execution;
@@ -24,7 +26,78 @@ internal static partial class ArchitectureContextSelectorMatcher
     // sourceDescriptor is the current contract evaluation's source type's own resolved role/metadata,
     // used to resolve not-equal-to-source constraints. Pass null when matching the contract's own
     // `source` selector itself (which has no other source to reference).
+    //
+    // This overload only supports literal role/metadata matching. It is used by call sites where a
+    // `when` expression can never be present structurally — port-boundary/adapter-binding selectors,
+    // which reuse ArchitectureContextSelector's shape but have their raw YAML `when` key rejected at
+    // policy-load time (see ArchitecturePolicyDocumentLoader's contextual selector key validators).
+    // The guard below turns a violation of that structural invariant into a clear error instead of
+    // silently ignoring a compiled predicate.
     public static bool Matches(
+        ArchitectureContextSelector selector,
+        Type candidateType,
+        ArchitectureRoleIndex roleIndex,
+        ArchitectureTypeClassificationResult? sourceDescriptor)
+    {
+        if (selector.CompiledWhen != null)
+        {
+            throw new InvalidOperationException(
+                "ArchitectureContextSelector unexpectedly compiled a 'when' predicate in a context that " +
+                "does not support expression evaluation. This indicates a policy-loading validation gap.");
+        }
+
+        return MatchesLiteral(selector, candidateType, roleIndex, sourceDescriptor);
+    }
+
+    // The `when`-aware overload used by the contextual dependency/allow-only contract families and
+    // semantic coverage, where `when` is an approved location. sourceType is the actual candidate
+    // type behind sourceDescriptor, needed to build full subject facts for the `source` side of a
+    // contextual target/exclude predicate; pass both null together when selector is the contract's
+    // own `source` selector (candidateType is itself becoming `source`, evaluated under
+    // ContextualSourceEnvironment rather than ContextualTargetEnvironment).
+    public static bool Matches(
+        ArchitectureContextSelector selector,
+        Type candidateType,
+        ArchitectureRoleIndex roleIndex,
+        ArchitectureTypeClassificationResult? sourceDescriptor,
+        ArchitectureExpressionFactService expressionFacts,
+        Type? sourceType)
+    {
+        bool matchesLiteral = MatchesLiteral(selector, candidateType, roleIndex, sourceDescriptor);
+        if (!matchesLiteral || selector.CompiledWhen == null)
+        {
+            return matchesLiteral;
+        }
+
+        string contractLabel = selector.WhenContractName == null ? string.Empty : $"Contract '{selector.WhenContractName}' ";
+        string locationLabel = selector.WhenLocation == null ? string.Empty : $"at '{selector.WhenLocation.YamlPath}' ";
+
+        if (sourceDescriptor == null || sourceType == null)
+        {
+            string sourceDescription =
+                $"{contractLabel}{locationLabel}(role: {selector.Role}, when: {selector.When}) " +
+                $"for source '{ArchitectureTypeNames.SafeFullName(candidateType)}'";
+            CelEvaluationContext sourceContext = ArchitectureExpressionContextFactory.CreateContextualSourceContext(
+                expressionFacts.BuildSubjectFacts(candidateType));
+            return ArchitectureExpressionFactService.Evaluate(
+                selector.CompiledWhen, sourceContext, sourceDescription, selector.WhenLocation);
+        }
+
+        string targetDescription =
+            $"{contractLabel}{locationLabel}(role: {selector.Role}, when: {selector.When}) " +
+            $"for source '{ArchitectureTypeNames.SafeFullName(sourceType)}' -> target '{ArchitectureTypeNames.SafeFullName(candidateType)}'";
+        CelEvaluationContext targetContext = ArchitectureExpressionContextFactory.CreateContextualTargetContext(
+            expressionFacts.BuildSubjectFacts(sourceType),
+            expressionFacts.BuildSubjectFacts(candidateType),
+            ArchitectureExpressionFactService.BuildDependencyFacts());
+        return ArchitectureExpressionFactService.Evaluate(
+            selector.CompiledWhen, targetContext, targetDescription, selector.WhenLocation);
+    }
+
+    // Exposed internally (not just used by the Matches overloads above) so callers that need to
+    // report *why* a selector didn't fully match — e.g. a near-miss "when" evaluated false — can
+    // check literal role/metadata matching without evaluating any expression.
+    internal static bool MatchesLiteral(
         ArchitectureContextSelector selector,
         Type candidateType,
         ArchitectureRoleIndex roleIndex,

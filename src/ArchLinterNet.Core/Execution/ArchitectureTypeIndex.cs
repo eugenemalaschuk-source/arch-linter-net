@@ -1,5 +1,6 @@
 using System.Reflection;
 using ArchLinterNet.Core.Contracts;
+using ArchLinterNet.Core.Execution.Expressions;
 using ArchLinterNet.Core.Resolution;
 using ArchLinterNet.Core.Scanning;
 
@@ -28,10 +29,11 @@ public sealed class ArchitectureTypeIndex
             .ToArray();
     }
 
-    public Type[] FindTypesInLayer(ArchitectureLayer layer, ArchitectureRoleIndex roleIndex)
+    internal Type[] FindTypesInLayer(
+        ArchitectureLayer layer, ArchitectureRoleIndex roleIndex, ArchitectureExpressionFactService expressionFacts)
     {
         return _allTypes.Value
-            .Where(type => ArchitectureLayerTypeMatcher.Matches(layer, type, roleIndex))
+            .Where(type => ArchitectureLayerTypeMatcher.Matches(layer, type, roleIndex, expressionFacts))
             .ToArray();
     }
 

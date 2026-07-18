@@ -1,7 +1,9 @@
 using System.Globalization;
+using System.Reflection;
 using ArchLinterNet.Core.Contracts;
 using ArchLinterNet.Core.Contracts.Validators;
 using ArchLinterNet.Core.Execution;
+using ArchLinterNet.Core.Execution.Expressions;
 using ArchLinterNet.Core.Resolution;
 using AttributeRoleExtractionTestFixtures;
 using NUnit.Framework;
@@ -11,6 +13,15 @@ namespace ArchLinterNet.Core.Tests;
 [TestFixture]
 public sealed class LayerResolverTests
 {
+    private static ArchitectureExpressionFactService CreateExpressionFacts(
+        ArchitectureRoleIndex roleIndex, IReadOnlyCollection<Assembly> assemblies)
+    {
+        return new ArchitectureExpressionFactService(
+            roleIndex,
+            new ArchitectureSourceFileFactIndex(assemblies, ".", Array.Empty<string>()),
+            projectDiscovery: null);
+    }
+
     private static readonly string[] _candidateLayerNames = { "semantic", "core" };
     private static readonly string[] _selectorMetadataDomains = { "Sales", "Billing" };
 
@@ -193,8 +204,9 @@ public sealed class LayerResolverTests
             Selector = new ArchitectureLayerSelector { Role = "DomainLayer" }
         };
 
-        Type[] matches = new ArchitectureTypeIndex(new[] { typeof(TypeWithConstructorDefault).Assembly })
-            .FindTypesInLayer(layer, index);
+        Assembly[] assemblies = { typeof(TypeWithConstructorDefault).Assembly };
+        Type[] matches = new ArchitectureTypeIndex(assemblies)
+            .FindTypesInLayer(layer, index, CreateExpressionFacts(index, assemblies));
 
         Assert.That(matches, Does.Contain(typeof(TypeWithConstructorDefault)));
         Assert.That(matches, Does.Not.Contain(typeof(PlainType)));
@@ -223,8 +235,9 @@ public sealed class LayerResolverTests
             Selector = new ArchitectureLayerSelector { Role = "OtherLayer" }
         };
 
-        Type[] matches = new ArchitectureTypeIndex(new[] { typeof(TypeWithConstructorDefault).Assembly })
-            .FindTypesInLayer(layer, index);
+        Assembly[] assemblies = { typeof(TypeWithConstructorDefault).Assembly };
+        Type[] matches = new ArchitectureTypeIndex(assemblies)
+            .FindTypesInLayer(layer, index, CreateExpressionFacts(index, assemblies));
 
         Assert.That(matches, Is.Empty);
     }
@@ -263,7 +276,8 @@ public sealed class LayerResolverTests
             }
         };
 
-        Type[] matches = typeIndex.FindTypesInLayer(layer, roleIndex);
+        Type[] matches = typeIndex.FindTypesInLayer(
+            layer, roleIndex, CreateExpressionFacts(roleIndex, new[] { typeof(TypeWithBooleanProperty).Assembly }));
 
         Assert.That(matches, Does.Contain(typeof(TypeWithBooleanProperty)));
         Assert.That(matches, Does.Not.Contain(typeof(TypeWithConstructorDefault)));
@@ -295,7 +309,8 @@ public sealed class LayerResolverTests
             }
         };
 
-        Type[] matches = typeIndex.FindTypesInLayer(layer, roleIndex);
+        Type[] matches = typeIndex.FindTypesInLayer(
+            layer, roleIndex, CreateExpressionFacts(roleIndex, new[] { typeof(TypeWithConstructorDefault).Assembly }));
 
         Assert.That(matches, Does.Contain(typeof(TypeWithConstructorDefault)));
     }
@@ -470,8 +485,10 @@ public sealed class LayerResolverTests
                 }
             }
         };
-        var typeIndex = new ArchitectureTypeIndex(new[] { typeof(TypeWithBooleanProperty).Assembly });
+        Assembly[] assemblies = { typeof(TypeWithBooleanProperty).Assembly };
+        var typeIndex = new ArchitectureTypeIndex(assemblies);
         var roleIndex = new ArchitectureRoleIndex(classification, typeIndex);
+        var expressionFacts = CreateExpressionFacts(roleIndex, assemblies);
 
         Assert.DoesNotThrow(() =>
         {
@@ -484,7 +501,8 @@ public sealed class LayerResolverTests
                         Metadata = new Dictionary<string, object> { ["domain"] = 5 }
                     }
                 },
-                roleIndex);
+                roleIndex,
+                expressionFacts);
             Type[] boolVsString = typeIndex.FindTypesInLayer(
                 new ArchitectureLayer
                 {
@@ -494,7 +512,8 @@ public sealed class LayerResolverTests
                         Metadata = new Dictionary<string, object> { ["enabled"] = "true" }
                     }
                 },
-                roleIndex);
+                roleIndex,
+                expressionFacts);
 
             Assert.That(stringVsNumber, Is.Empty);
             Assert.That(boolVsString, Is.Empty);

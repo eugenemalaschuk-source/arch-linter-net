@@ -115,8 +115,11 @@ ArchLinterNet does not currently validate:
 - code ownership or review ownership;
 - semantic data-flow analysis;
 - third-party package internals;
-- CEL-backed policy expressions; any future support will use explicit `when`
-  fields and will not be inferred from ordinary strings;
+- CEL-backed policy expressions outside the closed set of `when` locations
+  (`layers.<name>.selector.when` and contextual dependency/allow-only
+  `source`/`forbidden`/`allowed`/`exclude` selectors — see the
+  [policy authoring guide](policy-authoring-guide.md#cel-when-predicates));
+  `when` is never inferred from ordinary strings anywhere else;
 - unrestricted namespace pattern systems;
 - unrestricted custom contract families outside the documented YAML schema;
 - arbitrary YAML fields such as `severity`, `from`, `to`, `regex`, `owner`, or custom rule groups unless the schema documents them.

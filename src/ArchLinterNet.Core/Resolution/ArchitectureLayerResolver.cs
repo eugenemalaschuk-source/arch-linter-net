@@ -95,7 +95,8 @@ internal static class ArchitectureLayerResolver
         string metadata = layer.Selector.Metadata.Count == 0
             ? string.Empty
             : $", metadata: {string.Join(", ", layer.Selector.Metadata.OrderBy(e => e.Key, StringComparer.Ordinal).Select(e => $"{e.Key}={FormatScalar(e.Value)}"))}";
-        return $"selector(role: {layer.Selector.Role}{metadata})";
+        string when = string.IsNullOrEmpty(layer.Selector.When) ? string.Empty : $", when: {layer.Selector.When}";
+        return $"selector(role: {layer.Selector.Role}{metadata}{when})";
     }
 
     private static string FormatScalar(object value)
