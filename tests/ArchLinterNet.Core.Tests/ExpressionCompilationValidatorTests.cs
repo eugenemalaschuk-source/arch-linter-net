@@ -238,11 +238,14 @@ public sealed partial class ExpressionCompilationValidatorTests
         Assert.That(ex.Message, Does.Contain("dependency"));
     }
 
-    // Regression: the word "dependency" appearing inside a quoted string literal (an ordinary
-    // metadata value comparison, nothing to do with the `dependency` root variable) must not be
-    // rejected — only an actual identifier reference outside string literals is unsafe.
+    // Deliberate, documented trade-off: the rejection is an unconditional whole-string bare-word
+    // match, so the word "dependency" appearing inside a quoted string literal is also rejected,
+    // even though it doesn't reference the `dependency` root variable. Two earlier attempts at
+    // string/comment-aware precision each introduced a real bypass (see
+    // ExpressionCompilationValidator's ReferencesDependencyIdentifier doc comment for the specific
+    // cases) - accepting this over-rejection is the price of a check that cannot be bypassed.
     [Test]
-    public void Load_ContextDependencyForbiddenWhen_ReferencesDependencyOnlyInsideStringLiteral_Compiles()
+    public void Load_ContextDependencyForbiddenWhen_ReferencesDependencyOnlyInsideStringLiteral_StillRejected()
     {
         string policyPath = WritePolicy($$"""
             version: 1
@@ -260,14 +263,43 @@ public sealed partial class ExpressionCompilationValidatorTests
                   reason: Test.
             """);
 
-        ArchitectureContractDocument document = new ArchitecturePolicyDocumentLoader().Load(policyPath);
-
-        Assert.That(document.Contracts.StrictContextDependencies[0].Forbidden[0].CompiledWhen, Is.Not.Null);
+        Assert.Throws<InvalidOperationException>(() =>
+            new ArchitecturePolicyDocumentLoader().Load(policyPath));
     }
 
-    // Safety net: an expression containing a triple-quote opener falls back to matching the bare
-    // identifier across the whole string (over-rejecting, not under-rejecting) rather than trying to
-    // track triple-quoted string state, which this scanner does not attempt to model correctly.
+    // Regression for the specific bypass a hand-rolled quote-tracking scanner had: CEL raw strings
+    // (r'...') don't treat backslash as an escape character, so r'\' is a complete 3-character raw
+    // string that closes at the quote immediately after the backslash. A scanner that always treats
+    // backslash as escaping the next character (correct for ordinary strings, wrong for raw ones)
+    // would misread this as "still inside a string" and let the real `dependency` reference past
+    // unnoticed. The unconditional whole-string match has no such state to get wrong.
+    [Test]
+    public void Load_ContextDependencyForbiddenWhen_ReferencesDependencyAfterRawStringBackslash_StillRejected()
+    {
+        string policyPath = WritePolicy($$"""
+            version: 1
+            name: Test
+            analysis:
+              target_assemblies: [{{AssemblyName}}]
+            contracts:
+              strict_context_dependencies:
+                - name: domain-isolation
+                  source:
+                    role: DomainLayer
+                  forbidden:
+                    - role: DomainLayer
+                      when: r'\' == "x" || dependency.viaMethodBody == false
+                  reason: Test.
+            """);
+
+        InvalidOperationException ex = Assert.Throws<InvalidOperationException>(() =>
+            new ArchitecturePolicyDocumentLoader().Load(policyPath))!;
+
+        Assert.That(ex.Message, Does.Contain("dependency"));
+    }
+
+    // Safety net (still applicable): the unconditional match rejects an expression containing a
+    // triple-quote opener too, the same as everywhere else in this file.
     [Test]
     public void Load_ContextDependencyForbiddenWhen_TripleQuotedStringContainingDependency_StillRejected()
     {

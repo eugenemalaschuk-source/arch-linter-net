@@ -39,60 +39,29 @@ internal sealed class ExpressionCompilationValidator : IArchitecturePolicyDocume
     // real edge, silently weakening the contract instead of failing closed. Reject any occurrence of
     // the `dependency` identifier at policy-load time until real per-edge facts exist.
     //
-    // The identifier is matched only outside quoted string literal spans (see
-    // ContainsDependencyIdentifierOutsideStrings) so a `when` referencing the literal word
-    // "dependency" inside a metadata comparison — e.g. target.metadataText["dependency"] == "x" —
-    // is not rejected. String-skipping is only trusted for the ordinary single ' or double " quoted
-    // forms; if the expression contains a triple-quote opener ('''/\"\"\") anywhere, quote-tracking
-    // falls back to matching the bare identifier across the whole expression unconditionally (over-
-    // rejecting is the safe failure mode here, not under-rejecting).
+    // Deliberately an unconditional whole-string bare-word match, with no attempt to skip string
+    // literals or comments. Two earlier review rounds each found a real bypass in a "smarter"
+    // version of this check: a first pass required the literal substring "dependency." and missed
+    // CEL's postfix-member-access-after-parentheses grammar ((dependency).viaMethodBody); a second
+    // pass added hand-rolled quote-tracking to avoid false-positiving on the word "dependency"
+    // inside string literals, and that scanner didn't know CEL raw strings (`r'...'`) don't treat
+    // backslash as an escape character — `r'\' == "x" || dependency.viaMethodBody` fooled it into
+    // treating the real reference as still "inside" the raw string. CEL also supports `//` line
+    // comments, which a quote-only scanner never accounts for either. Correctly replicating CEL's
+    // full lexical grammar (raw/byte-string prefixes, escape rules, comments, triple-quoted forms)
+    // by hand in Core — without access to the real tokenizer, which is deliberately internal to
+    // ArchLinterNet.CEL — has now proven to be exactly the kind of thing that's easy to get subtly
+    // wrong twice in a row. The unconditional bare-word match is the one form of this check that is
+    // provably impossible to bypass, at the accepted cost of also rejecting the word "dependency"
+    // inside an unrelated string literal or comment. That trade-off is minor (rename the metadata
+    // value, or phrase the comparison differently) next to what a bypass would mean: a predicate
+    // that looks like it checks per-edge facts but silently never does.
     private static readonly Regex _dependencyIdentifierPattern =
         new(@"\bdependency\b", RegexOptions.Compiled | RegexOptions.CultureInvariant);
 
     private static bool ReferencesDependencyIdentifier(string expression)
     {
-        if (expression.Contains("'''", StringComparison.Ordinal) || expression.Contains("\"\"\"", StringComparison.Ordinal))
-        {
-            return _dependencyIdentifierPattern.IsMatch(expression);
-        }
-
-        return _dependencyIdentifierPattern.Matches(expression).Any(match => !IsInsideStringLiteral(expression, match.Index));
-    }
-
-    // Scans expression from the start, toggling single/double-quote string-literal state (honoring
-    // backslash escapes within a literal), and reports whether characterIndex falls inside one.
-    // O(n) per call, re-scanning from the start each time — fine here since a `when` string is a
-    // narrow single predicate, not a large document, and this runs once per selector at load time.
-    private static bool IsInsideStringLiteral(string expression, int characterIndex)
-    {
-        bool inSingleQuote = false;
-        bool inDoubleQuote = false;
-        int i = 0;
-        while (i < characterIndex)
-        {
-            char c = expression[i];
-            if (inSingleQuote)
-            {
-                if (c == '\\' && i + 1 < expression.Length) { i += 2; continue; }
-                if (c == '\'') inSingleQuote = false;
-                i++;
-                continue;
-            }
-
-            if (inDoubleQuote)
-            {
-                if (c == '\\' && i + 1 < expression.Length) { i += 2; continue; }
-                if (c == '"') inDoubleQuote = false;
-                i++;
-                continue;
-            }
-
-            if (c == '\'') { inSingleQuote = true; i++; continue; }
-            if (c == '"') { inDoubleQuote = true; i++; continue; }
-            i++;
-        }
-
-        return inSingleQuote || inDoubleQuote;
+        return _dependencyIdentifierPattern.IsMatch(expression);
     }
 
     public void Validate(ArchitectureContractDocument document)
