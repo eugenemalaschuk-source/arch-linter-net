@@ -1,3 +1,4 @@
+using ArchLinterNet.CEL.Compilation;
 using YamlDotNet.Serialization;
 
 namespace ArchLinterNet.Core.Contracts;
@@ -7,10 +8,24 @@ namespace ArchLinterNet.Core.Contracts;
 // contextual dependency/allow-only contract families and supports a broader metadata operator
 // vocabulary (exact, any, in, not-equal-to-source), resolved by ArchitectureContextSelectorMatcher.
 // See openspec/changes/add-contextual-dependency-contracts/design.md Decision 1.
+//
+// This type is also reused, unchanged in accepted keys, by ArchitecturePortBoundaryContract and
+// ArchitectureAdapterPortBinding (Families/PortBoundaryContractFamily.cs). `when` is part of
+// openspec/specs/cel-policy-model/spec.md's closed first-wave location list only for the
+// context_dependencies/context_allow_only families - ArchitecturePolicyDocumentLoader's raw-YAML
+// key validators (ValidateContextualSelectorNodeKeys/ValidateContextualSelectorListKeys) must keep
+// rejecting `when` as an unknown property for port-boundary/adapter-binding selectors even though
+// the property exists structurally on this shared type. See
+// openspec/changes/core-cel-integration/design.md Decision D4.
 public sealed class ArchitectureContextSelector
 {
     [YamlMember(Alias = "role")] public string Role { get; set; } = string.Empty;
 
     [YamlMember(Alias = "metadata")]
     public Dictionary<string, object> Metadata { get; set; } = new(StringComparer.Ordinal);
+
+    [YamlMember(Alias = "when")] public string? When { get; set; }
+
+    [YamlIgnore]
+    internal CelCompiledPredicate? CompiledWhen { get; set; }
 }

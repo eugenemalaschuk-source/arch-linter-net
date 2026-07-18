@@ -136,6 +136,11 @@
         "metadata": {
           "$ref": "#/$defs/scalarMap",
           "description": "Optional exact-match, AND-combined metadata key/value constraints. All declared keys must match."
+        },
+        "when": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Optional ArchLinter CEL Profile v1 boolean predicate refining this selector over a `subject` context. See openspec/specs/cel-policy-model/spec.md."
         }
       }
     },
@@ -211,6 +216,51 @@
           }
         }
       ]
+    },
+    "expressionField": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Optional ArchLinter CEL Profile v1 boolean predicate. See openspec/specs/cel-policy-model/spec.md."
+    },
+    "contextSourceSelectorWithExpression": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["role"],
+      "description": "contextSourceSelector plus the optional `when` field, used only where openspec/specs/cel-policy-model/spec.md's closed first-wave location list allows expressions on a contextual source selector (contextDependencyContract.source, contextAllowOnlyContract.source). Port-boundary and adapter-binding source selectors keep using contextSourceSelector without `when`.",
+      "properties": {
+        "role": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Exact-match role name assigned by classification, matched directly against a candidate type's resolved role rather than through a declared layers.<name>."
+        },
+        "metadata": {
+          "type": "object",
+          "additionalProperties": { "$ref": "#/$defs/contextSourceMetadataValue" },
+          "default": {},
+          "description": "Optional metadata constraints for the contract's own `source` selector. Supports the 'exact', 'any' ('*'), and 'in' operators - not-equal-to-source ('!{source.metadata.<key>}') is rejected here because the source selector has no other source to compare against; it is valid only on forbidden/allowed/exclude selectors (see contextSelector)."
+        },
+        "when": { "$ref": "#/$defs/expressionField" }
+      }
+    },
+    "contextSelectorWithExpression": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["role"],
+      "description": "contextSelector plus the optional `when` field, used only where openspec/specs/cel-policy-model/spec.md's closed first-wave location list allows expressions on a contextual target/exclusion selector (contextDependencyContract.forbidden/exclude, contextAllowOnlyContract.allowed/exclude). Port-boundary and adapter-binding selectors keep using contextSelector without `when`.",
+      "properties": {
+        "role": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Exact-match role name assigned by classification, matched directly against a candidate type's resolved role rather than through a declared layers.<name>."
+        },
+        "metadata": {
+          "type": "object",
+          "additionalProperties": { "$ref": "#/$defs/contextMetadataValue" },
+          "default": {},
+          "description": "Optional metadata constraints, each evaluated by exactly one of four deterministic operators (checked in this order): a YAML sequence of literal scalars ('in' — matches any listed entry), the literal string '*' ('any' — matches any resolved value provided the key is present), a string matching '!{source.metadata.<key>}' ('not-equal-to-source' — matches when the candidate's value differs from the current source type's own resolved value for <key>; only meaningful on forbidden/allowed/exclude selectors), or any other scalar ('exact' literal match)."
+        },
+        "when": { "$ref": "#/$defs/expressionField" }
+      }
     },
     "externalDependencyGroup": {
       "type": "object",
@@ -978,15 +1028,15 @@
           "properties": {
             "name": { "type": "string", "minLength": 1 },
             "id": { "type": "string", "minLength": 1 },
-            "source": { "$ref": "#/$defs/contextSourceSelector" },
+            "source": { "$ref": "#/$defs/contextSourceSelectorWithExpression" },
             "forbidden": {
               "type": "array",
-              "items": { "$ref": "#/$defs/contextSelector" },
+              "items": { "$ref": "#/$defs/contextSelectorWithExpression" },
               "minItems": 1
             },
             "exclude": {
               "type": "array",
-              "items": { "$ref": "#/$defs/contextSelector" },
+              "items": { "$ref": "#/$defs/contextSelectorWithExpression" },
               "default": []
             },
             "ignored_violations": { "$ref": "#/$defs/ignoredViolations" },
@@ -1005,15 +1055,15 @@
           "properties": {
             "name": { "type": "string", "minLength": 1 },
             "id": { "type": "string", "minLength": 1 },
-            "source": { "$ref": "#/$defs/contextSourceSelector" },
+            "source": { "$ref": "#/$defs/contextSourceSelectorWithExpression" },
             "allowed": {
               "type": "array",
-              "items": { "$ref": "#/$defs/contextSelector" },
+              "items": { "$ref": "#/$defs/contextSelectorWithExpression" },
               "minItems": 1
             },
             "exclude": {
               "type": "array",
-              "items": { "$ref": "#/$defs/contextSelector" },
+              "items": { "$ref": "#/$defs/contextSelectorWithExpression" },
               "default": []
             },
             "ignored_violations": { "$ref": "#/$defs/ignoredViolations" },

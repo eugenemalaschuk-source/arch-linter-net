@@ -1,3 +1,4 @@
+using ArchLinterNet.CEL.Compilation;
 using ArchLinterNet.Core.Model;
 using ArchLinterNet.Core.Resolution;
 using YamlDotNet.Serialization;
@@ -124,6 +125,16 @@ public sealed class ArchitectureLayerSelector
 
     [YamlMember(Alias = "metadata")]
     public Dictionary<string, object> Metadata { get; set; } = new(StringComparer.Ordinal);
+
+    // Refines the selector match over a `subject` CEL context. See
+    // openspec/specs/cel-policy-model/spec.md and Contracts/Validators/ExpressionCompilationValidator.cs.
+    [YamlMember(Alias = "when")] public string? When { get; set; }
+
+    // Populated once by ExpressionCompilationValidator during ArchitecturePolicyDocumentLoader.Load
+    // when When is non-empty; mirrors ArchitectureLayer's _cachedGlobPattern/GlobPattern lazy-field
+    // idiom so evaluation (added by #164) never re-parses the expression.
+    [YamlIgnore]
+    internal CelCompiledPredicate? CompiledWhen { get; set; }
 }
 
 public sealed class ArchitectureExternalDependencyGroup
