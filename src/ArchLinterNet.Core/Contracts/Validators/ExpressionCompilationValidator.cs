@@ -21,7 +21,7 @@ namespace ArchLinterNet.Core.Contracts.Validators;
 // attaches the precise fragment/path for composed (imported) policies rather than the whole
 // contract's location. Strict and audit groups are walked separately (not concatenated) because
 // each has its own independent YAML index sequence.
-internal sealed class ExpressionCompilationValidator : IArchitecturePolicyDocumentValidator
+internal sealed partial class ExpressionCompilationValidator : IArchitecturePolicyDocumentValidator
 {
     private const string ContractsProperty = "contracts";
     private const string LayersProperty = "layers";
@@ -56,12 +56,12 @@ internal sealed class ExpressionCompilationValidator : IArchitecturePolicyDocume
     // inside an unrelated string literal or comment. That trade-off is minor (rename the metadata
     // value, or phrase the comparison differently) next to what a bypass would mean: a predicate
     // that looks like it checks per-edge facts but silently never does.
-    private static readonly Regex _dependencyIdentifierPattern =
-        new(@"\bdependency\b", RegexOptions.Compiled | RegexOptions.CultureInvariant);
+    [GeneratedRegex(@"\bdependency\b", RegexOptions.CultureInvariant)]
+    private static partial Regex DependencyIdentifierPattern();
 
     private static bool ReferencesDependencyIdentifier(string expression)
     {
-        return _dependencyIdentifierPattern.IsMatch(expression);
+        return DependencyIdentifierPattern().IsMatch(expression);
     }
 
     public void Validate(ArchitectureContractDocument document)
