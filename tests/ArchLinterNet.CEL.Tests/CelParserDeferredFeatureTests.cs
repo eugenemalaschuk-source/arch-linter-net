@@ -299,6 +299,31 @@ public sealed class CelParserDeferredFeatureTests
     }
 
     [Test]
+    public void NonRawTripleQuotedStringLiteral_WithInvalidEscape_IsSyntaxError()
+    {
+        var diag = ParseFail(@"'''\q'''");
+        Assert.That(diag.Code, Is.EqualTo(CelDiagnosticCode.SyntaxError));
+    }
+
+    // Upstream corpus (cel-spec parse.textproto "string_literals" section) #338 — a well-formed
+    // three-digit octal escape (\NNN) is valid CEL syntax, just deferred: UnsupportedFeature,
+    // never SyntaxError.
+    [Test]
+    public void StringLiteralWithOctalEscape_IsUnsupportedFeature()
+    {
+        var diag = ParseFail(@"'\012'");
+        Assert.That(diag.Code, Is.EqualTo(CelDiagnosticCode.UnsupportedFeature));
+        Assert.That(diag.Parameters["feature"], Is.EqualTo("octal-escape"));
+    }
+
+    [Test]
+    public void MalformedOctalEscape_IsSyntaxError()
+    {
+        var diag = ParseFail(@"'\08'");
+        Assert.That(diag.Code, Is.EqualTo(CelDiagnosticCode.SyntaxError));
+    }
+
+    [Test]
     public void ListLiteral_IsUnsupportedFeature()
     {
         var diag = ParseFail("[1, 2, 3]");

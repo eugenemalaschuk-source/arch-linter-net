@@ -39,10 +39,18 @@ internal enum CelTokenKind
 
     /// <summary>
     /// A <c>'''...'''</c>/<c>"""..."""</c> triple-quoted string literal. Deferred: triple-quote
-    /// lexing is out of scope for Profile v1. Content is not escape-decoded (see
-    /// <see cref="CelTokenizer"/>).
+    /// lexing is out of scope for Profile v1.
     /// </summary>
     TripleQuotedStringLiteral,
+
+    /// <summary>
+    /// A single/double-quoted string literal containing a well-formed three-digit octal escape
+    /// sequence (<c>\NNN</c>). Deferred: octal escape decoding is out of scope for Profile v1
+    /// (the containing string literal as a whole defers, even if it also uses otherwise-supported
+    /// escapes). A malformed octal sequence (not exactly three octal digits, or out of the
+    /// <c>\000</c>-<c>\377</c> byte range) is <c>SyntaxError</c>, not this kind.
+    /// </summary>
+    StringLiteralWithOctalEscape,
 
     /// <summary>A <c>b"..."</c>/<c>B"..."</c> byte-string literal. Deferred: Profile v1 has no Bytes type.</summary>
     BytesLiteral,

@@ -297,6 +297,17 @@ public sealed class CelTokenizerTests
     }
 
     [Test]
+    public void ByteStringLiteral_OctalEscape_IsAccepted()
+    {
+        // A byte-string literal is already always deferred (UnsupportedFeature) regardless of
+        // content, so an octal escape decodes normally here — no separate deferred kind is needed
+        // (unlike a plain string literal, which reclassifies via StringLiteralWithOctalEscape).
+        var tokens = TokenizeOk(@"b'\101'");
+        Assert.That(tokens[0].Kind, Is.EqualTo(CelTokenKind.BytesLiteral));
+        Assert.That(tokens[0].StringValue, Is.EqualTo("A"));
+    }
+
+    [Test]
     public void ByteStringLiteral_ShortUnicodeEscape_IsAccepted()
     {
         // Unlike '\U' (below), the pinned grammar's byte-string escape set includes the 4-digit
@@ -365,24 +376,27 @@ public sealed class CelTokenizerTests
     }
 
     [Test]
-    public void StringLiteral_NullEscape_IsUnknownEscape_NotOctal()
+    public void StandaloneZeroEscape_IsMalformedOctal_NotNulTreatment()
     {
-        // CEL has no standalone "\0" escape (only three-digit octal, which is out of v1 scope
-        // per design.md decision 3) — "\0" must be rejected, not silently treated as NUL.
+        // CEL has no standalone "\0" escape — only a well-formed three-digit octal escape
+        // (\NNN, category B: valid CEL, deferred by v1) is meaningful; "\0" alone is a malformed
+        // (incomplete) octal sequence and must be rejected, not silently treated as NUL.
         var diag = TokenizeFail(@"'\0'");
         Assert.That(diag.Code, Is.EqualTo(CelDiagnosticCode.SyntaxError));
     }
 
     // ── Upstream corpus (cel-spec tests/simple/testdata/parse.textproto, "string_literals"
     // section, pinned commit 59505c14f3187e6eb9684fbd3d07146f614c6148) #338 ─────────────────────
-    // Triple-quoted strings and octal escapes are documented as out of scope for Profile v1
-    // lexing (design decision 3). Before this corpus pass, no test asserted *how* a triple-quote
-    // opener actually failed: the tokenizer silently mis-tokenized "'''hello'''" as three adjacent
-    // single-quoted literals ('', 'hello', '') rather than tokenizing it as one construct, which
-    // then produced a confusing "unexpected trailing input" SyntaxError at the wrong span instead
-    // of a clean, correctly-classified UnsupportedFeature diagnostic (triple-quoted strings are
-    // valid CEL, just deferred — see CelTokenizer.LexTripleQuotedString and the
-    // CelTokenKind.TripleQuotedStringLiteral parser case in CelParserDeferredFeatureTests).
+    // Triple-quoted strings and octal escapes are valid CEL lexical syntax that Profile v1 defers
+    // (category B). Before this corpus pass, no test asserted *how* a triple-quote opener actually
+    // failed: the tokenizer silently mis-tokenized "'''hello'''" as three adjacent single-quoted
+    // literals ('', 'hello', '') instead of one construct. A follow-up review round (PR #346) found
+    // the first fix itself misclassified a well-formed triple-quoted literal as SyntaxError instead
+    // of UnsupportedFeature, and that the same "any backslash escapes the next character"
+    // shortcut both broke raw triple-quoted literals (where backslash has no special meaning) and
+    // let a genuinely invalid escape (e.g. \q) inside a non-raw triple-quoted literal pass as
+    // "well-formed". Fixed by reusing AppendEscape (the exact same escape-validation logic
+    // LexString uses) for non-raw triple-quoted content, and skipping it entirely when raw.
 
     [TestCase("'''hello'''", TestName = "corpus.parse.string_literals.triple_single_quoted")]
     [TestCase("\"\"\"hello\"\"\"", TestName = "corpus.parse.string_literals.triple_double_quoted")]
@@ -418,12 +432,50 @@ public sealed class CelTokenizerTests
         Assert.That(tokens[1].Kind, Is.EqualTo(CelTokenKind.Eof));
     }
 
-    [TestCase(@"'\012'", TestName = "corpus.parse.string_literals.single_quoted_octal_escapes")]
-    [TestCase(@"' \000 \012 \177 '", TestName = "corpus.parse.string_literals.octal_escapes_all_control")]
-    public void OctalEscape_IsRejectedAsUnknownEscape(string source)
+    [Test]
+    public void RawTripleQuotedString_BackslashHasNoSpecialMeaning()
     {
-        // Octal escapes (\NNN) are valid CEL lexical syntax but out of scope for Profile v1
-        // (design decision 3) — confirmed still rejected cleanly, not silently misinterpreted.
+        // Regression for a review finding: unconditionally treating '\' as an escape marker (even
+        // in a *raw* triple-quoted literal, where it must be an ordinary content character) made
+        // this valid literal falsely report as unterminated.
+        var tokens = TokenizeOk(@"r'''a\'''");
+        Assert.That(tokens[0].Kind, Is.EqualTo(CelTokenKind.TripleQuotedStringLiteral));
+        Assert.That(tokens[0].Text, Is.EqualTo(@"r'''a\'''"));
+        Assert.That(tokens[1].Kind, Is.EqualTo(CelTokenKind.Eof));
+    }
+
+    [Test]
+    public void NonRawTripleQuotedString_WithInvalidEscape_IsSyntaxError()
+    {
+        // Regression for a review finding: "fully validate syntax, then classify as deferred"
+        // applies to escape-sequence validity inside a non-raw triple-quoted literal too, not
+        // only to closer-detection — an unknown escape like \q must still be SyntaxError, not
+        // silently accepted as part of a "well-formed" deferred construct.
+        var diag = TokenizeFail(@"'''\q'''");
+        Assert.That(diag.Code, Is.EqualTo(CelDiagnosticCode.SyntaxError));
+    }
+
+    // Upstream corpus (cel-spec parse.textproto "string_literals"; single_quoted_octal_escapes /
+    // octal_escapes_all_control) #338 — a well-formed 3-digit octal escape (\NNN) is valid CEL
+    // syntax Profile v1 defers (category B: UnsupportedFeature), not malformed CEL (SyntaxError).
+    // A review round on PR #346 caught that the first pass incorrectly rejected these with
+    // SyntaxError; corrected via CelTokenKind.StringLiteralWithOctalEscape.
+
+    [TestCase(@"'\012'", TestName = "corpus.parse.string_literals.single_quoted_octal_escape")]
+    [TestCase(@"' \000 \012 \177 '", TestName = "corpus.parse.string_literals.octal_escapes_all_control")]
+    [TestCase(@"'a\012b'", TestName = "corpus.parse.string_literals.octal_escape_mixed_with_plain_content")]
+    public void WellFormedOctalEscape_TokenizesAsStringLiteralWithOctalEscape(string source)
+    {
+        var tokens = TokenizeOk(source);
+        Assert.That(tokens[0].Kind, Is.EqualTo(CelTokenKind.StringLiteralWithOctalEscape));
+        Assert.That(tokens[1].Kind, Is.EqualTo(CelTokenKind.Eof));
+    }
+
+    [TestCase(@"'\08'", TestName = "corpus.parse.string_literals.octal_escape_invalid_digit")]
+    [TestCase(@"'\01'", TestName = "corpus.parse.string_literals.octal_escape_too_few_digits")]
+    [TestCase(@"'\400'", TestName = "corpus.parse.string_literals.octal_escape_out_of_byte_range")]
+    public void MalformedOctalEscape_IsSyntaxError(string source)
+    {
         var diag = TokenizeFail(source);
         Assert.That(diag.Code, Is.EqualTo(CelDiagnosticCode.SyntaxError));
     }
@@ -589,7 +641,7 @@ public sealed class CelTokenizerTests
     }
 
     [Test]
-    public void MaxLiteralSize_Exceeded_ByTripleQuotedStringRawLength_ReturnsBudgetExceeded()
+    public void MaxLiteralSize_Exceeded_ByTripleQuotedStringContentLength_ReturnsBudgetExceeded()
     {
         var limits = new CelCompilationLimits(
             maxExpressionLength: 4096, maxNestingDepth: 32, maxIdentifierCount: 64,
@@ -598,6 +650,22 @@ public sealed class CelTokenizerTests
         var diag = TokenizeFail("'''too long a triple-quoted literal'''", limits);
         Assert.That(diag.Code, Is.EqualTo(CelDiagnosticCode.BudgetExceeded));
         Assert.That(diag.Parameters["limitName"], Is.EqualTo("MaxLiteralSize"));
+    }
+
+    [Test]
+    public void MaxLiteralSize_TripleQuotedStringWithinLimit_IsBoundedByContentNotDelimiters()
+    {
+        // Regression for a review finding: the triple-quote budget check must count decoded
+        // content length, not raw token text (which would inconsistently include the 6 quote
+        // characters plus any prefix). "'''a'''" has 1 character of content — it must fit under
+        // a limit of 1, even though its raw token text is 7 characters long.
+        var limits = new CelCompilationLimits(
+            maxExpressionLength: 4096, maxNestingDepth: 32, maxIdentifierCount: 64,
+            maxTokenCount: 1024, maxAstNodeCount: 1024, maxLiteralSize: 1);
+
+        var tokens = TokenizeOk("'''a'''", limits);
+        Assert.That(tokens[0].Kind, Is.EqualTo(CelTokenKind.TripleQuotedStringLiteral));
+        Assert.That(tokens[0].StringValue, Is.EqualTo("a"));
     }
 
     // ── profileId on every diagnostic ──────────────────────────────────────────

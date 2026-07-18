@@ -524,6 +524,10 @@ internal sealed class CelParser
                 Advance();
                 MarkDeferred(token.Span, "Triple-quoted string literals are deferred in Profile v1.", "triple-quoted-string");
                 return Track(new CelDeferredSyntax(token.Span));
+            case CelTokenKind.StringLiteralWithOctalEscape:
+                Advance();
+                MarkDeferred(token.Span, "String literals containing an octal escape sequence are deferred in Profile v1.", "octal-escape");
+                return Track(new CelDeferredSyntax(token.Span));
             case CelTokenKind.LBrace:
                 return ParseMapLiteralPrimary(token);
             case CelTokenKind.LBracket:
