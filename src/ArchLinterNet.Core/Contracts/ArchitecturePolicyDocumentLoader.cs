@@ -18,6 +18,7 @@ public sealed partial class ArchitecturePolicyDocumentLoader : IArchitecturePoli
     private const string SourceKey = "source";
     private const string ForbiddenKey = "forbidden";
     private const string WhenKey = "when";
+    private const string ContractsKey = "contracts";
     private const string UnnamedContractName = "<unnamed>";
 
     private static readonly string[] _targetContextAllowedKeys = { "metadata" };
@@ -286,7 +287,7 @@ public sealed partial class ArchitecturePolicyDocumentLoader : IArchitecturePoli
 
         if (stream.Documents.Count == 0
             || stream.Documents[0].RootNode is not YamlMappingNode root
-            || !TryGetMappingChild(root, "contracts", out YamlMappingNode? contracts))
+            || !TryGetMappingChild(root, ContractsKey, out YamlMappingNode? contracts))
         {
             return;
         }
@@ -306,7 +307,7 @@ public sealed partial class ArchitecturePolicyDocumentLoader : IArchitecturePoli
 
         if (stream.Documents.Count == 0
             || stream.Documents[0].RootNode is not YamlMappingNode root
-            || !TryGetMappingChild(root, "contracts", out YamlMappingNode? contracts))
+            || !TryGetMappingChild(root, ContractsKey, out YamlMappingNode? contracts))
         {
             return;
         }
@@ -382,7 +383,7 @@ public sealed partial class ArchitecturePolicyDocumentLoader : IArchitecturePoli
 
         if (stream.Documents.Count == 0
             || stream.Documents[0].RootNode is not YamlMappingNode root
-            || !TryGetMappingChild(root, "contracts", out YamlMappingNode? contracts))
+            || !TryGetMappingChild(root, ContractsKey, out YamlMappingNode? contracts))
         {
             return;
         }
@@ -598,7 +599,7 @@ public sealed partial class ArchitecturePolicyDocumentLoader : IArchitecturePoli
     {
         return ArchitecturePolicyProvenancePath.AppendIndex(
             ArchitecturePolicyProvenancePath.AppendProperty(
-                ArchitecturePolicyProvenancePath.Property("contracts"), groupKey),
+                ArchitecturePolicyProvenancePath.Property(ContractsKey), groupKey),
             index);
     }
 

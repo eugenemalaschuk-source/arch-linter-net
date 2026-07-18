@@ -81,7 +81,7 @@ public sealed class LayoutConventionContractTests
             projectDiscovery: null);
     }
 
-    private ArchitectureContractDocument CreateDocument(
+    private static ArchitectureContractDocument CreateDocument(
         ArchitectureLayoutConventionContract contract,
         bool audit = false,
         bool withSourceRoots = true,
