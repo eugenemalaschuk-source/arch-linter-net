@@ -17,6 +17,7 @@ public sealed partial class ArchitecturePolicyDocumentLoader : IArchitecturePoli
     private const string MetadataKey = "metadata";
     private const string SourceKey = "source";
     private const string ForbiddenKey = "forbidden";
+    private const string WhenKey = "when";
     private const string UnnamedContractName = "<unnamed>";
 
     private static readonly string[] _targetContextAllowedKeys = { "metadata" };
@@ -85,6 +86,7 @@ public sealed partial class ArchitecturePolicyDocumentLoader : IArchitecturePoli
             ValidateRawLayerYaml(yaml, provenance);
             ValidateRawContextualContractYaml(yaml, provenance);
             ValidateRawSemanticCoverageYaml(yaml, provenance);
+            ValidateRawWhenFieldLocations(yaml);
         }
         catch (InvalidOperationException exception)
         {
@@ -228,7 +230,8 @@ public sealed partial class ArchitecturePolicyDocumentLoader : IArchitecturePoli
             {
                 if (selKeyNode is YamlScalarNode selKeyScalar
                     && !string.Equals(selKeyScalar.Value, "role", StringComparison.Ordinal)
-                    && !string.Equals(selKeyScalar.Value, MetadataKey, StringComparison.Ordinal))
+                    && !string.Equals(selKeyScalar.Value, MetadataKey, StringComparison.Ordinal)
+                    && !string.Equals(selKeyScalar.Value, WhenKey, StringComparison.Ordinal))
                 {
                     throw new InvalidOperationException(
                         $"Layer '{layerName}' selector contains unknown property '{selKeyScalar.Value}'.");
@@ -381,11 +384,11 @@ public sealed partial class ArchitecturePolicyDocumentLoader : IArchitecturePoli
 
             if (TryGetChild(contractNode, SourceKey, out YamlNode? sourceNode) && sourceNode is YamlMappingNode sourceMapping)
             {
-                ValidateContextualSelectorNodeKeys(sourceMapping, contractName, SourceKey);
+                ValidateContextualSelectorNodeKeys(sourceMapping, contractName, SourceKey, allowWhen: true);
             }
 
-            ValidateContextualSelectorListKeys(contractNode, contractName, targetListKey);
-            ValidateContextualSelectorListKeys(contractNode, contractName, "exclude");
+            ValidateContextualSelectorListKeys(contractNode, contractName, targetListKey, allowWhen: true);
+            ValidateContextualSelectorListKeys(contractNode, contractName, "exclude", allowWhen: true);
         }
     }
 
@@ -454,7 +457,8 @@ public sealed partial class ArchitecturePolicyDocumentLoader : IArchitecturePoli
         }
     }
 
-    private static void ValidateContextualSelectorListKeys(YamlMappingNode contractNode, string contractName, string listKey)
+    private static void ValidateContextualSelectorListKeys(
+        YamlMappingNode contractNode, string contractName, string listKey, bool allowWhen = false)
     {
         if (!TryGetChild(contractNode, listKey, out YamlNode? listNode) || listNode is not YamlSequenceNode listSequence)
         {
@@ -465,22 +469,31 @@ public sealed partial class ArchitecturePolicyDocumentLoader : IArchitecturePoli
         {
             if (itemNode is YamlMappingNode itemMapping)
             {
-                ValidateContextualSelectorNodeKeys(itemMapping, contractName, listKey);
+                ValidateContextualSelectorNodeKeys(itemMapping, contractName, listKey, allowWhen);
             }
         }
     }
 
-    private static void ValidateContextualSelectorNodeKeys(YamlMappingNode selectorNode, string contractName, string fieldName)
+    // allowWhen is scoped per call site (not per selector type): ArchitectureContextSelector is
+    // reused by port-boundary/adapter-binding contracts, which openspec/specs/cel-policy-model's
+    // closed first-wave `when` location list does not include. Only ValidateContextualContractGroup
+    // (context_dependencies/context_allow_only) passes allowWhen: true. See
+    // openspec/changes/core-cel-integration/design.md Decision D4.
+    private static void ValidateContextualSelectorNodeKeys(
+        YamlMappingNode selectorNode, string contractName, string fieldName, bool allowWhen = false)
     {
         foreach ((YamlNode keyNode, _) in selectorNode.Children)
         {
             if (keyNode is YamlScalarNode scalar
                 && !string.Equals(scalar.Value, "role", StringComparison.Ordinal)
-                && !string.Equals(scalar.Value, "metadata", StringComparison.Ordinal))
+                && !string.Equals(scalar.Value, "metadata", StringComparison.Ordinal)
+                && !(allowWhen && string.Equals(scalar.Value, WhenKey, StringComparison.Ordinal)))
             {
                 throw new InvalidOperationException(
                     $"Contextual contract '{contractName}' declares an unknown property '{scalar.Value}' on its '{fieldName}' selector. " +
-                    "A contextual selector supports only 'role' and 'metadata'.");
+                    (allowWhen
+                        ? "A contextual selector supports only 'role', 'metadata', and 'when'."
+                        : "A contextual selector supports only 'role' and 'metadata'."));
             }
         }
     }
