@@ -406,4 +406,192 @@ public sealed class ExpressionCompilationValidatorTests
 
         Assert.That(document.Layers["sales"].Selector!.CompiledWhen, Is.Not.Null);
     }
+
+    // Regression coverage for PR #347 review findings (openspec/changes/core-cel-integration):
+    // (1) 'when' outside the seven approved locations was silently dropped by
+    //     IgnoreUnmatchedProperties() for monolithic (non-import) policies, because
+    //     ArchitecturePolicyEffectiveSchemaValidator only runs when imports are present;
+    // (2) an explicitly empty/null 'when' was treated as though the field were absent instead of
+    //     failing the load;
+    // (3) compile-failure diagnostics were attributed only to the owning layer/contract, not the
+    //     exact '<field>[<index>].when' node, losing precision for composed-policy provenance.
+    // See ArchitecturePolicyDocumentLoader.ValidateRawWhenFieldLocations and
+    // ExpressionCompilationValidator's per-selector SetValidationSubject calls.
+
+    [Test]
+    public void Load_WhenUnderAnalysis_MonolithicPolicy_ThrowsUnsupportedLocation()
+    {
+        string policyPath = WritePolicy($$"""
+            version: 1
+            name: Test
+            analysis:
+              target_assemblies: [{{AssemblyName}}]
+              when: "true"
+            contracts:
+              strict: []
+            """);
+
+        InvalidOperationException ex = Assert.Throws<InvalidOperationException>(() =>
+            new ArchitecturePolicyDocumentLoader().Load(policyPath))!;
+
+        Assert.That(ex.Message, Does.Contain("analysis.when"));
+    }
+
+    [Test]
+    public void Load_WhenOnBareContractEntry_MonolithicPolicy_ThrowsUnsupportedLocation()
+    {
+        // Non-contextual families (e.g. `contracts.strict`) have no `when`-eligible field at all -
+        // a `when` key directly on the contract object must still be rejected, not silently dropped.
+        string policyPath = WritePolicy($$"""
+            version: 1
+            name: Test
+            analysis:
+              target_assemblies: [{{AssemblyName}}]
+            contracts:
+              strict:
+                - name: no-domain-to-application
+                  source: Domain
+                  forbidden: [Application]
+                  when: "true"
+            """);
+
+        InvalidOperationException ex = Assert.Throws<InvalidOperationException>(() =>
+            new ArchitecturePolicyDocumentLoader().Load(policyPath))!;
+
+        Assert.That(ex.Message, Does.Contain("contracts.strict.0.when"));
+    }
+
+    [Test]
+    public void Load_MetadataKeyLiterallyNamedWhen_DoesNotTriggerLocationCheck()
+    {
+        // A user metadata entry legitimately named "when" (e.g. domain=Sales, when=onboarding) is
+        // ordinary metadata content, not the CEL expression field, and must load normally.
+        string policyPath = WritePolicy($$"""
+            version: 1
+            name: Test
+            analysis:
+              target_assemblies: [{{AssemblyName}}]
+            layers:
+              sales:
+                selector:
+                  role: DomainLayer
+                  metadata:
+                    when: onboarding
+            contracts:
+              strict: []
+            """);
+
+        Assert.DoesNotThrow(() => new ArchitecturePolicyDocumentLoader().Load(policyPath));
+    }
+
+    [Test]
+    public void Load_EmptyWhenOnLayerSelector_ThrowsInsteadOfTreatingAsAbsent()
+    {
+        string policyPath = WritePolicy($$"""
+            version: 1
+            name: Test
+            analysis:
+              target_assemblies: [{{AssemblyName}}]
+            layers:
+              sales:
+                selector:
+                  role: DomainLayer
+                  when: ""
+            contracts:
+              strict: []
+            """);
+
+        InvalidOperationException ex = Assert.Throws<InvalidOperationException>(() =>
+            new ArchitecturePolicyDocumentLoader().Load(policyPath))!;
+
+        Assert.That(ex.Message, Does.Contain("non-empty string"));
+    }
+
+    [Test]
+    public void Load_NullWhenOnLayerSelector_ThrowsInsteadOfTreatingAsAbsent()
+    {
+        string policyPath = WritePolicy($$"""
+            version: 1
+            name: Test
+            analysis:
+              target_assemblies: [{{AssemblyName}}]
+            layers:
+              sales:
+                selector:
+                  role: DomainLayer
+                  when:
+            contracts:
+              strict: []
+            """);
+
+        InvalidOperationException ex = Assert.Throws<InvalidOperationException>(() =>
+            new ArchitecturePolicyDocumentLoader().Load(policyPath))!;
+
+        Assert.That(ex.Message, Does.Contain("non-empty string"));
+    }
+
+    [Test]
+    public void Load_MissingWhen_LoadsNormally()
+    {
+        // Absent (never-declared) `when` remains the ordinary, unaffected literal-only path.
+        string policyPath = WritePolicy($$"""
+            version: 1
+            name: Test
+            analysis:
+              target_assemblies: [{{AssemblyName}}]
+            layers:
+              sales:
+                selector:
+                  role: DomainLayer
+            contracts:
+              strict: []
+            """);
+
+        Assert.DoesNotThrow(() => new ArchitecturePolicyDocumentLoader().Load(policyPath));
+    }
+
+    [Test]
+    public void Load_InvalidImportedForbiddenWhen_ErrorMessageAndProvenanceIdentifyExactIndex()
+    {
+        string root = Path.Combine(_tempDir, "root.yml");
+        File.WriteAllText(root, $$"""
+            version: 1
+            name: Test
+            imports:
+              - fragment.yml
+            analysis:
+              target_assemblies: [{{AssemblyName}}]
+            contracts:
+              strict: []
+            """);
+        File.WriteAllText(Path.Combine(_tempDir, "fragment.yml"), """
+            layers:
+              sales:
+                namespace: App.Sales
+            contracts:
+              strict_context_dependencies:
+                - name: domain-isolation
+                  source:
+                    role: DomainLayer
+                  forbidden:
+                    - role: DomainLayer
+                    - role: DomainLayer
+                    - role: DomainLayer
+                      when: "subject.role =="
+                  reason: Test.
+            """);
+
+        // Composed (imported) policies wrap the InvalidOperationException in
+        // ArchitecturePolicyValidationException (a subclass, for fragment enrichment) - Assert.Catch
+        // matches by assignability, unlike Assert.Throws's exact-type check.
+        InvalidOperationException ex = Assert.Catch<InvalidOperationException>(() =>
+            new ArchitecturePolicyDocumentLoader().Load(root))!;
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(ex.Message, Does.Contain("forbidden[2].when"));
+            Assert.That(ex.Message, Does.Contain("fragment.yml"));
+            Assert.That(ex.Message, Does.Contain("contracts.strict_context_dependencies[0].forbidden[2]"));
+        });
+    }
 }

@@ -86,6 +86,7 @@ public sealed partial class ArchitecturePolicyDocumentLoader : IArchitecturePoli
             ValidateRawLayerYaml(yaml, provenance);
             ValidateRawContextualContractYaml(yaml, provenance);
             ValidateRawSemanticCoverageYaml(yaml, provenance);
+            ValidateRawWhenFieldLocations(yaml);
         }
         catch (InvalidOperationException exception)
         {
@@ -311,6 +312,148 @@ public sealed partial class ArchitecturePolicyDocumentLoader : IArchitecturePoli
 
         ValidateSemanticCoverageContractGroup(contracts!, "strict_coverage", provenance);
         ValidateSemanticCoverageContractGroup(contracts!, "audit_coverage", provenance);
+    }
+
+    // Closed first-wave `when` locations from openspec/specs/cel-policy-model/spec.md. IgnoreUnmatchedProperties()
+    // silently drops any YAML key that has no matching C# property, so a `when` field declared anywhere else
+    // (e.g. `analysis.when`, a bare contract-level `contracts.strict[0].when`) would otherwise vanish during
+    // deserialization instead of failing the load - this raw pass (run for every policy, not only composed ones,
+    // unlike ArchitecturePolicyEffectiveSchemaValidator) is the only place that can still see it. Each entry is
+    // the exact sequence of mapping-key segments from the document root to the selector node that is allowed to
+    // declare `when`; "*" matches any single mapping key or sequence index at that position.
+    private static readonly string[][] _allowedWhenLocations =
+    {
+        new[] { "layers", "*", "selector" },
+        new[] { "contracts", "strict_context_dependencies", "*", "source" },
+        new[] { "contracts", "strict_context_dependencies", "*", "forbidden", "*" },
+        new[] { "contracts", "strict_context_dependencies", "*", "exclude", "*" },
+        new[] { "contracts", "audit_context_dependencies", "*", "source" },
+        new[] { "contracts", "audit_context_dependencies", "*", "forbidden", "*" },
+        new[] { "contracts", "audit_context_dependencies", "*", "exclude", "*" },
+        new[] { "contracts", "strict_context_allow_only", "*", "source" },
+        new[] { "contracts", "strict_context_allow_only", "*", "allowed", "*" },
+        new[] { "contracts", "strict_context_allow_only", "*", "exclude", "*" },
+        new[] { "contracts", "audit_context_allow_only", "*", "source" },
+        new[] { "contracts", "audit_context_allow_only", "*", "allowed", "*" },
+        new[] { "contracts", "audit_context_allow_only", "*", "exclude", "*" },
+    };
+
+    // Keys whose values are arbitrary user-authored dictionaries (metadata bags, scalar maps, named condition
+    // sets) rather than fixed schema structure - a metadata entry the author happens to name "when" (e.g.
+    // `metadata: { when: onboarding }`) is ordinary user content, not the CEL expression field, so the walk
+    // below must not descend into these to look for a stray `when` key. Group-name dictionaries (`layers`,
+    // `external_dependencies`, `packages`) are deliberately NOT listed here: their values are fixed-shape
+    // objects the walk must continue into to reach e.g. `layers.<name>.selector`. A layer/group/condition-set
+    // literally named "when" is a known, accepted, extremely unlikely false-positive this trade-off allows.
+    private static readonly string[] _opaqueWhenBoundaryKeys =
+        { MetadataKey, "required_properties", "forbidden_properties", "condition_sets" };
+
+    private static void ValidateRawWhenFieldLocations(string yaml)
+    {
+        var stream = new YamlStream();
+        stream.Load(new StringReader(yaml));
+
+        if (stream.Documents.Count == 0 || stream.Documents[0].RootNode is not YamlMappingNode root)
+        {
+            return;
+        }
+
+        WalkForWhenFields(root, new List<string>(), new List<string>());
+    }
+
+    private static void WalkForWhenFields(YamlMappingNode node, List<string> structuralPath, List<string> displayPath)
+    {
+        foreach ((YamlNode keyNode, YamlNode valueNode) in node.Children)
+        {
+            if (keyNode is not YamlScalarNode { Value: { } key })
+            {
+                continue;
+            }
+
+            if (string.Equals(key, WhenKey, StringComparison.Ordinal))
+            {
+                ValidateWhenFieldDeclaration(structuralPath, displayPath, valueNode);
+                continue;
+            }
+
+            if (_opaqueWhenBoundaryKeys.Contains(key, StringComparer.Ordinal))
+            {
+                continue;
+            }
+
+            if (valueNode is YamlMappingNode childMapping)
+            {
+                structuralPath.Add(key);
+                displayPath.Add(key);
+                WalkForWhenFields(childMapping, structuralPath, displayPath);
+                structuralPath.RemoveAt(structuralPath.Count - 1);
+                displayPath.RemoveAt(displayPath.Count - 1);
+            }
+            else if (valueNode is YamlSequenceNode sequence)
+            {
+                structuralPath.Add(key);
+                structuralPath.Add("*");
+                displayPath.Add(key);
+                for (int index = 0; index < sequence.Children.Count; index++)
+                {
+                    if (sequence.Children[index] is YamlMappingNode itemMapping)
+                    {
+                        displayPath.Add(index.ToString(System.Globalization.CultureInfo.InvariantCulture));
+                        WalkForWhenFields(itemMapping, structuralPath, displayPath);
+                        displayPath.RemoveAt(displayPath.Count - 1);
+                    }
+                }
+
+                structuralPath.RemoveAt(structuralPath.Count - 1);
+                structuralPath.RemoveAt(structuralPath.Count - 1);
+                displayPath.RemoveAt(displayPath.Count - 1);
+            }
+        }
+    }
+
+    private static void ValidateWhenFieldDeclaration(List<string> structuralPath, List<string> displayPath, YamlNode valueNode)
+    {
+        string location = string.Join(".", displayPath.Append(WhenKey));
+        if (!IsAllowedWhenLocation(structuralPath))
+        {
+            throw new InvalidOperationException(
+                $"'{location}' is not one of the approved expression locations. " +
+                "See openspec/specs/cel-policy-model/spec.md for the closed list of locations that may declare 'when'.");
+        }
+
+        if (valueNode is not YamlScalarNode whenScalar || IsExplicitNull(whenScalar) || string.IsNullOrEmpty(whenScalar.Value))
+        {
+            throw new InvalidOperationException(
+                $"'{location}' must be a non-empty string when declared.");
+        }
+    }
+
+    private static bool IsAllowedWhenLocation(IReadOnlyList<string> structuralPath)
+    {
+        foreach (string[] allowed in _allowedWhenLocations)
+        {
+            if (structuralPath.Count != allowed.Length)
+            {
+                continue;
+            }
+
+            bool matches = true;
+            for (int index = 0; index < allowed.Length; index++)
+            {
+                if (allowed[index] != "*" && !string.Equals(structuralPath[index], allowed[index], StringComparison.Ordinal))
+                {
+                    matches = false;
+                    break;
+                }
+            }
+
+            if (matches)
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private static void ValidateSemanticCoverageContractGroup(
