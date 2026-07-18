@@ -278,6 +278,51 @@ public sealed class CelParserDeferredFeatureTests
         Assert.That(diag.Code, Is.EqualTo(CelDiagnosticCode.UnsupportedFeature));
     }
 
+    // Upstream corpus (cel-spec parse.textproto "string_literals" section) #338 — triple-quoted
+    // strings are valid CEL syntax, just deferred, exactly like null/uint/byte-string literals
+    // above: UnsupportedFeature, never SyntaxError.
+    [TestCase("'''hello'''")]
+    [TestCase("\"\"\"hello\"\"\"")]
+    [TestCase("r'''hello'''")]
+    public void TripleQuotedStringLiteral_IsUnsupportedFeature(string source)
+    {
+        var diag = ParseFail(source);
+        Assert.That(diag.Code, Is.EqualTo(CelDiagnosticCode.UnsupportedFeature));
+        Assert.That(diag.Parameters["feature"], Is.EqualTo("triple-quoted-string"));
+    }
+
+    [Test]
+    public void UnterminatedTripleQuotedStringLiteral_IsSyntaxError()
+    {
+        var diag = ParseFail("'''unterminated");
+        Assert.That(diag.Code, Is.EqualTo(CelDiagnosticCode.SyntaxError));
+    }
+
+    [Test]
+    public void NonRawTripleQuotedStringLiteral_WithInvalidEscape_IsSyntaxError()
+    {
+        var diag = ParseFail(@"'''\q'''");
+        Assert.That(diag.Code, Is.EqualTo(CelDiagnosticCode.SyntaxError));
+    }
+
+    // Upstream corpus (cel-spec parse.textproto "string_literals" section) #338 — a well-formed
+    // three-digit octal escape (\NNN) is valid CEL syntax, just deferred: UnsupportedFeature,
+    // never SyntaxError.
+    [Test]
+    public void StringLiteralWithOctalEscape_IsUnsupportedFeature()
+    {
+        var diag = ParseFail(@"'\012'");
+        Assert.That(diag.Code, Is.EqualTo(CelDiagnosticCode.UnsupportedFeature));
+        Assert.That(diag.Parameters["feature"], Is.EqualTo("octal-escape"));
+    }
+
+    [Test]
+    public void MalformedOctalEscape_IsSyntaxError()
+    {
+        var diag = ParseFail(@"'\08'");
+        Assert.That(diag.Code, Is.EqualTo(CelDiagnosticCode.SyntaxError));
+    }
+
     [Test]
     public void ListLiteral_IsUnsupportedFeature()
     {
@@ -342,6 +387,17 @@ public sealed class CelParserDeferredFeatureTests
         // Standalone "{" (no qualified-name receiver) is a map literal — arbitrary-expression
         // keys are valid CEL for it, unlike a message literal.
         var diag = ParseFail("{1: 2}");
+        Assert.That(diag.Code, Is.EqualTo(CelDiagnosticCode.UnsupportedFeature));
+    }
+
+    // Upstream corpus (google/cel-go parser_test.go: `"😁" in ["😁", "😑", "😦"]`) #338 — a
+    // deferred list literal as the RHS of a supported comparison operator (`in`) must still be
+    // fully validated and cleanly classified as UnsupportedFeature, not produce a spurious
+    // SyntaxError about the enclosing `in` expression.
+    [Test]
+    public void ListLiteralAsInOperatorRightHandSide_IsUnsupportedFeature()
+    {
+        var diag = ParseFail("a in [1, 2, 3]");
         Assert.That(diag.Code, Is.EqualTo(CelDiagnosticCode.UnsupportedFeature));
     }
 

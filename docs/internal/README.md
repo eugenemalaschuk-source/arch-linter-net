@@ -14,6 +14,8 @@ It is intentionally excluded from the public MkDocs/GitHub Pages product site.
 
 - [CEL engine architecture blueprint](cel-engine-architecture.md) — processing pipeline, component ownership, extension-direction matrix, and prohibited shortcuts for the `ArchLinterNet.CEL` engine (#322/#324).
 
+- [CEL upstream corpus mining manifest](cel-corpus-mining-manifest.md) — provenance-aware classification of upstream CEL test corpora reviewed for parser/tokenizer hardening, and what was adapted or deferred (#338).
+
 - [CEL policy model blueprint](cel-policy-model.md) — explicit `when` fields,
   typed Core fact contexts, fail-closed semantics, and worked examples for the
   future policy-expression surface (#162/#163).

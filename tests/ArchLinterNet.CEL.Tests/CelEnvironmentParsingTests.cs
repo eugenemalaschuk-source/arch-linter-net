@@ -91,6 +91,19 @@ public sealed class CelEnvironmentParsingTests
     }
 
     [Test]
+    public void Compile_HighBitSetLongUnicodeEscape_ReturnsSyntaxErrorNotClrException()
+    {
+        // PR #346 review finding: an 8-hex-digit \U escape with the sign bit set (e.g. 0x80000000)
+        // must surface as a structured SyntaxError through the full public compile pipeline, not
+        // leak an unhandled ArgumentOutOfRangeException from char.ConvertFromUtf32.
+        var env = BuildEnvironment();
+        var result = env.Compile(@"'\U80000000'");
+
+        Assert.That(result.IsSuccess, Is.False);
+        Assert.That(result.Diagnostics[0].Code, Is.EqualTo(CelDiagnosticCode.SyntaxError));
+    }
+
+    [Test]
     public void CompilePredicate_MaxExpressionLengthGate_RunsBeforeParsing()
     {
         var tightLimits = new CelCompilationLimits(
