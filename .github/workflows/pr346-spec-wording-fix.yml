@@ -1,0 +1,62 @@
+name: PR 346 spec wording fix
+
+on:
+  push:
+    branches:
+      - issue-338-cel-corpus-hardening
+
+permissions:
+  contents: write
+
+jobs:
+  fix-spec-wording:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: issue-338-cel-corpus-hardening
+          fetch-depth: 0
+
+      - name: Correct float literal wording
+        shell: python
+        run: |
+          from pathlib import Path
+
+          old = """A float literal
+            (`FLOAT_LIT`) whose decimal value cannot be represented as a finite IEEE 754 double (i.e. whose
+            magnitude, typically from an extreme exponent, would round to positive or negative infinity)
+            SHALL be reported as `SyntaxError` — Profile v1's `Float` type is a finite representable value
+            (see the value-types requirement), so a literal that cannot be represented as one SHALL NOT be
+            silently accepted as `Infinity`."""
+
+          new = """A float literal
+            (`FLOAT_LIT`) whose decimal text overflows the finite representable range of an IEEE 754 double
+            (i.e. whose magnitude, typically from an extreme exponent, would otherwise round to positive or
+            negative infinity during parsing) SHALL be reported as `SyntaxError` rather than silently
+            converted into a non-finite `Infinity` token value. This literal-level rule does not narrow the
+            `CelValue.Float(double)` runtime value domain or prohibit non-finite IEEE 754 values supplied
+            through the public value API."""
+
+          changed = []
+          for path in Path("openspec").rglob("*.md"):
+              text = path.read_text(encoding="utf-8")
+              if old not in text:
+                  continue
+              path.write_text(text.replace(old, new), encoding="utf-8")
+              changed.append(str(path))
+
+          if not changed:
+              raise SystemExit("Expected float-literal wording was not found")
+
+          print("Updated:")
+          print("\n".join(changed))
+
+      - name: Commit correction
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add openspec
+          git diff --cached --check
+          git commit -m "docs: clarify float literal overflow scope"
+          git push origin HEAD:issue-338-cel-corpus-hardening
