@@ -28,6 +28,7 @@ Most contract families have two variants:
 | [Unity asmdef](asmdef.md) | `strict_asmdef` | `audit_asmdef` | Unity assembly definition references must follow architecture rules. |
 | [Layer template](layer-templates.md) | `strict_layer_templates` | `audit_layer_templates` | The same ordered layer shape applies to multiple namespace containers. |
 | [Type placement](type-placement.md) | `strict_type_placement` | `audit_type_placement` | An architectural role must live in a declared layer/namespace/project/assembly and/or carry a declared naming suffix/prefix. |
+| [Layout conventions](layout-conventions.md) | `strict_layout_conventions` | `audit_layout_conventions` | A folder/namespace/file-name convention must hold: type kind, naming, file/type-name matching, and matching-interface counterparts. |
 | [Public API surface](public-api-surface.md) | `strict_public_api_surface` | `audit_public_api_surface` | An assembly's exported public/protected types and members must match a declared allowlist. |
 | [Attribute usage](attribute-usage.md) | `strict_attribute_usage` | `audit_attribute_usage` | A declared attribute/marker type must (or must not) appear in a declared layer/namespace/project/assembly. |
 | [Inheritance](inheritance.md) | `strict_inheritance` | `audit_inheritance` | Types in a declared source layer/namespace must not inherit (directly or transitively) from declared base types. |

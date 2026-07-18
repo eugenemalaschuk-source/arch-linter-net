@@ -86,6 +86,7 @@ public sealed partial class ArchitecturePolicyDocumentLoader : IArchitecturePoli
             ValidateRawLayerYaml(yaml, provenance);
             ValidateRawContextualContractYaml(yaml, provenance);
             ValidateRawSemanticCoverageYaml(yaml, provenance);
+            ValidateRawLayoutConventionYaml(yaml, provenance);
             ValidateRawWhenFieldLocations(yaml);
         }
         catch (InvalidOperationException exception)
@@ -353,6 +354,60 @@ public sealed partial class ArchitecturePolicyDocumentLoader : IArchitecturePoli
                         "namespace", "namespace_suffix", "project", "assembly", "contract_id", "between",
                         "role", "metadata", "reason"
                     });
+            }
+        }
+    }
+
+    private static readonly string[] _layoutFilesMatchingAllowedKeys =
+        { "folder_segment", "namespace_segment", "file_name_suffix", "file_name_prefix", WhenKey };
+
+    // Mirrors ValidateRawContextualContractYaml's rationale: IgnoreUnmatchedProperties() would
+    // otherwise silently drop a typo'd files_matching key (e.g. "folder_segments" for
+    // "folder_segment"), leaving the selector looking like a legitimate-but-empty field instead of
+    // failing the load. ValidateRawWhenFieldLocations (WhenFields.cs) separately enforces that `when`
+    // may only appear on this exact node - this pass only checks the non-`when` field names.
+    private static void ValidateRawLayoutConventionYaml(string yaml, ArchitecturePolicyProvenanceIndex provenance)
+    {
+        var stream = new YamlStream();
+        stream.Load(new StringReader(yaml));
+
+        if (stream.Documents.Count == 0
+            || stream.Documents[0].RootNode is not YamlMappingNode root
+            || !TryGetMappingChild(root, "contracts", out YamlMappingNode? contracts))
+        {
+            return;
+        }
+
+        ValidateLayoutConventionContractGroup(contracts!, "strict_layout_conventions", provenance);
+        ValidateLayoutConventionContractGroup(contracts!, "audit_layout_conventions", provenance);
+    }
+
+    private static void ValidateLayoutConventionContractGroup(
+        YamlMappingNode contracts, string groupKey, ArchitecturePolicyProvenanceIndex provenance)
+    {
+        if (!TryGetChild(contracts, groupKey, out YamlNode? groupNode) || groupNode is not YamlSequenceNode sequence)
+        {
+            return;
+        }
+
+        for (int index = 0; index < sequence.Children.Count; index++)
+        {
+            if (sequence.Children[index] is not YamlMappingNode contractNode)
+            {
+                continue;
+            }
+
+            provenance.SetValidationSubject(ContractPath(groupKey, index));
+            string contractName = TryGetChild(contractNode, "name", out YamlNode? nameNode)
+                && nameNode is YamlScalarNode nameScalar
+                    ? nameScalar.Value ?? UnnamedContractName
+                    : UnnamedContractName;
+
+            if (TryGetChild(contractNode, "files_matching", out YamlNode? filesMatchingNode)
+                && filesMatchingNode is YamlMappingNode filesMatchingMapping)
+            {
+                ValidateKnownKeys(
+                    filesMatchingMapping, contractName, "files_matching", _layoutFilesMatchingAllowedKeys);
             }
         }
     }

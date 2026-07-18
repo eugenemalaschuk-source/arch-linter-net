@@ -200,6 +200,16 @@ contracts:
       types_matching:
         name_suffix: Service
       must_reside_in_layers: [core]
+  strict_layout_conventions:
+    - name: layout conventions strict rule
+      files_matching:
+        folder_segment: Services
+      require_type_kind: class
+  audit_layout_conventions:
+    - name: layout conventions audit rule
+      files_matching:
+        folder_segment: Services
+      require_type_kind: class
   strict_public_api_surface:
     - name: public api surface strict rule
       assemblies: [Test.Core]
@@ -296,6 +306,8 @@ contracts:
         Assert.That(contracts.AuditAcyclicSiblings, Has.Count.EqualTo(1));
         Assert.That(contracts.StrictTypePlacement, Has.Count.EqualTo(1));
         Assert.That(contracts.AuditTypePlacement, Has.Count.EqualTo(1));
+        Assert.That(contracts.StrictLayoutConventions, Has.Count.EqualTo(1));
+        Assert.That(contracts.AuditLayoutConventions, Has.Count.EqualTo(1));
         Assert.That(contracts.StrictPublicApiSurface, Has.Count.EqualTo(1));
         Assert.That(contracts.AuditPublicApiSurface, Has.Count.EqualTo(1));
         Assert.That(contracts.StrictAttributeUsage, Has.Count.EqualTo(1));
@@ -310,8 +322,8 @@ contracts:
         Assert.That(contracts.AuditCoverage, Has.Count.EqualTo(1));
 
         // AllStrict/AllAudit must reflect the populated groups too, excluding layer_template.
-        Assert.That(contracts.AllStrict.Count(), Is.EqualTo(24));
-        Assert.That(contracts.AllAudit.Count(), Is.EqualTo(24));
+        Assert.That(contracts.AllStrict.Count(), Is.EqualTo(25));
+        Assert.That(contracts.AllAudit.Count(), Is.EqualTo(25));
     }
 
     [Test]

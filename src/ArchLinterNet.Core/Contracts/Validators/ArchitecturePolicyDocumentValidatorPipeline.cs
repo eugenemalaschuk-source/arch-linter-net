@@ -24,6 +24,7 @@ internal static class ArchitecturePolicyDocumentValidatorPipeline
         new PackageAllowOnlyValidator(),
         new ProjectMetadataValidator(),
         new TypePlacementValidator(),
+        new LayoutConventionsValidator(),
         new PublicApiSurfaceValidator(),
         new AttributeUsageValidator(),
         new InheritanceValidator(),
