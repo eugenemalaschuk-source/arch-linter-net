@@ -338,15 +338,12 @@ public sealed partial class ArchitecturePolicyDocumentLoader : IArchitecturePoli
         new[] { "contracts", "audit_context_allow_only", "*", "exclude", "*" },
     };
 
-    // Keys whose values are arbitrary user-authored dictionaries (metadata bags, scalar maps, named condition
-    // sets) rather than fixed schema structure - a metadata entry the author happens to name "when" (e.g.
-    // `metadata: { when: onboarding }`) is ordinary user content, not the CEL expression field, so the walk
-    // below must not descend into these to look for a stray `when` key. Group-name dictionaries (`layers`,
-    // `external_dependencies`, `packages`) are deliberately NOT listed here: their values are fixed-shape
-    // objects the walk must continue into to reach e.g. `layers.<name>.selector`. A layer/group/condition-set
-    // literally named "when" is a known, accepted, extremely unlikely false-positive this trade-off allows.
-    private static readonly string[] _opaqueWhenBoundaryKeys =
-        { MetadataKey, "required_properties", "forbidden_properties", "condition_sets" };
+    // Top-level dictionaries keyed by an author-chosen, arbitrary name (layer name, external-dependency-group
+    // name, package-group name) rather than a fixed schema property. A layer literally named "when" (e.g.
+    // `layers: { when: { namespace: ... } }`) is a legitimate, previously-valid name - the walk must not treat
+    // that name itself as the CEL expression marker, even though it resumes normal (name-is-schema-property)
+    // checking one level deeper, inside that named entry's own mapping.
+    private static readonly string[] _arbitraryNameGroupKeys = { "layers", "external_dependencies", "packages" };
 
     private static void ValidateRawWhenFieldLocations(string yaml)
     {
@@ -358,10 +355,11 @@ public sealed partial class ArchitecturePolicyDocumentLoader : IArchitecturePoli
             return;
         }
 
-        WalkForWhenFields(root, new List<string>(), new List<string>());
+        WalkForWhenFields(root, new List<string>(), new List<string>(), childKeysAreArbitraryNames: false);
     }
 
-    private static void WalkForWhenFields(YamlMappingNode node, List<string> structuralPath, List<string> displayPath)
+    private static void WalkForWhenFields(
+        YamlMappingNode node, List<string> structuralPath, List<string> displayPath, bool childKeysAreArbitraryNames)
     {
         foreach ((YamlNode keyNode, YamlNode valueNode) in node.Children)
         {
@@ -370,22 +368,31 @@ public sealed partial class ArchitecturePolicyDocumentLoader : IArchitecturePoli
                 continue;
             }
 
-            if (string.Equals(key, WhenKey, StringComparison.Ordinal))
+            // Arbitrary names (layer/group names) are ordinary data, never the reserved "when" marker or an
+            // opaque-value boundary - both checks below are schema-property concerns and only apply when this
+            // node's own keys are fixed schema properties, not author-chosen names.
+            if (!childKeysAreArbitraryNames)
             {
-                ValidateWhenFieldDeclaration(structuralPath, displayPath, valueNode);
-                continue;
+                if (string.Equals(key, WhenKey, StringComparison.Ordinal))
+                {
+                    ValidateWhenFieldDeclaration(structuralPath, displayPath, valueNode);
+                    continue;
+                }
+
+                if (IsRecognizedOpaqueValueKey(key, node))
+                {
+                    continue;
+                }
             }
 
-            if (_opaqueWhenBoundaryKeys.Contains(key, StringComparer.Ordinal))
-            {
-                continue;
-            }
+            bool nextChildKeysAreArbitraryNames =
+                !childKeysAreArbitraryNames && _arbitraryNameGroupKeys.Contains(key, StringComparer.Ordinal);
 
             if (valueNode is YamlMappingNode childMapping)
             {
                 structuralPath.Add(key);
                 displayPath.Add(key);
-                WalkForWhenFields(childMapping, structuralPath, displayPath);
+                WalkForWhenFields(childMapping, structuralPath, displayPath, nextChildKeysAreArbitraryNames);
                 structuralPath.RemoveAt(structuralPath.Count - 1);
                 displayPath.RemoveAt(displayPath.Count - 1);
             }
@@ -399,7 +406,7 @@ public sealed partial class ArchitecturePolicyDocumentLoader : IArchitecturePoli
                     if (sequence.Children[index] is YamlMappingNode itemMapping)
                     {
                         displayPath.Add(index.ToString(System.Globalization.CultureInfo.InvariantCulture));
-                        WalkForWhenFields(itemMapping, structuralPath, displayPath);
+                        WalkForWhenFields(itemMapping, structuralPath, displayPath, childKeysAreArbitraryNames: false);
                         displayPath.RemoveAt(displayPath.Count - 1);
                     }
                 }
@@ -409,6 +416,42 @@ public sealed partial class ArchitecturePolicyDocumentLoader : IArchitecturePoli
                 displayPath.RemoveAt(displayPath.Count - 1);
             }
         }
+    }
+
+    // A key is a recognized, legitimate opaque (arbitrary user-content) value boundary only when its parent
+    // node's shape confirms it - by SIBLING key, not by name alone. Matching by name alone (e.g. treating any
+    // node containing a "metadata" key as opaque, regardless of where it sits) lets an author hide an
+    // unsupported `when` inside a same-named-but-unrelated container at a completely different, unapproved
+    // location (e.g. a bogus `analysis.metadata.when`, since ArchitectureAnalysisConfiguration has no real
+    // Metadata property); the fake container is silently dropped by IgnoreUnmatchedProperties() right
+    // alongside the `when` it wraps, but the walk must still see and reject the `when` itself before that
+    // happens. "role", "projects", "target_assemblies"/"solution" are the fixed sibling properties every real
+    // occurrence of these opaque fields carries in this schema (selectors/classification entries always
+    // declare "role"; ArchitectureContextMetadataSelector's "metadata" is its sole required property;
+    // ProjectMetadataContract's required_properties/forbidden_properties always sit beside "projects";
+    // ArchitectureAnalysisConfiguration's condition_sets always sits beside target_assemblies or solution).
+    private static bool IsRecognizedOpaqueValueKey(string key, YamlMappingNode node)
+    {
+        return key switch
+        {
+            MetadataKey => HasSiblingKey(node, "role") || node.Children.Count == 1,
+            "required_properties" or "forbidden_properties" => HasSiblingKey(node, "projects"),
+            "condition_sets" => HasSiblingKey(node, "target_assemblies") || HasSiblingKey(node, "solution"),
+            _ => false,
+        };
+    }
+
+    private static bool HasSiblingKey(YamlMappingNode node, string siblingKey)
+    {
+        foreach ((YamlNode keyNode, _) in node.Children)
+        {
+            if (keyNode is YamlScalarNode scalar && string.Equals(scalar.Value, siblingKey, StringComparison.Ordinal))
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private static void ValidateWhenFieldDeclaration(List<string> structuralPath, List<string> displayPath, YamlNode valueNode)

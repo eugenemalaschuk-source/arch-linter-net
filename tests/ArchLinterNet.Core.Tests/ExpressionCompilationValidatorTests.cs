@@ -594,4 +594,119 @@ public sealed class ExpressionCompilationValidatorTests
             Assert.That(ex.Message, Does.Contain("contracts.strict_context_dependencies[0].forbidden[2]"));
         });
     }
+
+    // Regression coverage for the PR #347 second review round: (A) the raw walk's opaque-value
+    // exclusion was name-only ("metadata"/"condition_sets"/etc regardless of location), so an
+    // unsupported `when` could be smuggled under a same-named-but-unrelated bogus container (e.g.
+    // `analysis.metadata.when` - ArchitectureAnalysisConfiguration has no real Metadata property,
+    // so the whole container silently vanishes during deserialization, `when` included); (B) any
+    // mapping key literally named "when" was unconditionally treated as the CEL marker, so a
+    // layer/external-dependency-group/package-group literally named "when" (a previously valid,
+    // arbitrary name) incorrectly failed to load. See
+    // ArchitecturePolicyDocumentLoader.IsRecognizedOpaqueValueKey (sibling-key-based, not name-only)
+    // and the childKeysAreArbitraryNames parameter threaded through WalkForWhenFields.
+
+    [Test]
+    public void Load_WhenNestedUnderBogusAnalysisMetadataContainer_ThrowsUnsupportedLocation()
+    {
+        string policyPath = WritePolicy($$"""
+            version: 1
+            name: Test
+            analysis:
+              target_assemblies: [{{AssemblyName}}]
+              metadata:
+                when: "true"
+            contracts:
+              strict: []
+            """);
+
+        InvalidOperationException ex = Assert.Throws<InvalidOperationException>(() =>
+            new ArchitecturePolicyDocumentLoader().Load(policyPath))!;
+
+        Assert.That(ex.Message, Does.Contain("analysis.metadata.when"));
+    }
+
+    [Test]
+    public void Load_WhenNestedUnderBogusConditionSetsContainer_ThrowsUnsupportedLocation()
+    {
+        // condition_sets is only a recognized opaque boundary as a sibling of target_assemblies/solution
+        // (i.e. genuinely inside `analysis`) - here it is nested one level too deep, inside a bogus
+        // `analysis.classification_placeholder.condition_sets`-shaped container, and must not shield `when`.
+        string policyPath = WritePolicy($$"""
+            version: 1
+            name: Test
+            analysis:
+              target_assemblies: [{{AssemblyName}}]
+            classification:
+              condition_sets:
+                when: "true"
+            contracts:
+              strict: []
+            """);
+
+        InvalidOperationException ex = Assert.Throws<InvalidOperationException>(() =>
+            new ArchitecturePolicyDocumentLoader().Load(policyPath))!;
+
+        Assert.That(ex.Message, Does.Contain("classification.condition_sets.when"));
+    }
+
+    [Test]
+    public void Load_LayerLiterallyNamedWhen_LoadsNormally()
+    {
+        string policyPath = WritePolicy($$"""
+            version: 1
+            name: Test
+            analysis:
+              target_assemblies: [{{AssemblyName}}]
+            layers:
+              when:
+                namespace: App.Whenever
+            contracts:
+              strict: []
+            """);
+
+        Assert.DoesNotThrow(() => new ArchitecturePolicyDocumentLoader().Load(policyPath));
+    }
+
+    [Test]
+    public void Load_LayerLiterallyNamedWhen_SelectorWhenStillCompiles()
+    {
+        // Confirms the arbitrary-name exemption is scoped to exactly the group-name level: one level
+        // deeper, inside the "when"-named layer's own selector, `when` is still the real CEL field.
+        string policyPath = WritePolicy($$"""
+            version: 1
+            name: Test
+            analysis:
+              target_assemblies: [{{AssemblyName}}]
+            layers:
+              when:
+                selector:
+                  role: DomainLayer
+                  when: subject.role == "DomainLayer"
+            contracts:
+              strict: []
+            """);
+
+        ArchitectureContractDocument document = new ArchitecturePolicyDocumentLoader().Load(policyPath);
+
+        Assert.That(document.Layers["when"].Selector!.CompiledWhen, Is.Not.Null);
+    }
+
+    [Test]
+    public void Load_ExternalDependencyGroupLiterallyNamedWhen_LoadsNormally()
+    {
+        string policyPath = WritePolicy($$"""
+            version: 1
+            name: Test
+            analysis:
+              target_assemblies: [{{AssemblyName}}]
+            external_dependencies:
+              when:
+                namespace_prefixes: [System.Whenever]
+            contracts:
+              strict: []
+            """);
+
+        Assert.DoesNotThrow(() => new ArchitecturePolicyDocumentLoader().Load(policyPath));
+    }
 }
