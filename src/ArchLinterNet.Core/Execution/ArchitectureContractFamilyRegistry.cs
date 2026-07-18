@@ -272,6 +272,14 @@ internal static class ArchitectureContractFamilyRegistry
             },
         },
         new(
+            "layout_conventions", "strict_layout_conventions", "audit_layout_conventions", true,
+            g => g.StrictLayoutConventions, g => g.AuditLayoutConventions,
+            (session, contract) => ArchitectureHandlerResult.FromViolations(
+                session.CheckLayoutConventionsContract((ArchitectureLayoutConventionContract)contract)))
+        {
+            OwnedContractTypes = new[] { typeof(ArchitectureLayoutConventionContract) },
+        },
+        new(
             "public_api_surface", "strict_public_api_surface", "audit_public_api_surface", true,
             g => g.StrictPublicApiSurface, g => g.AuditPublicApiSurface,
             (session, contract) => ArchitectureHandlerResult.FromViolations(

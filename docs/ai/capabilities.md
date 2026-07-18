@@ -38,6 +38,7 @@ focused local fragments and contains:
 | External allow-only | `strict_external_allow_only` | `audit_external_allow_only` | Source layer references only explicitly allowed vendor/framework dependency groups. |
 | Layer template | `strict_layer_templates` | `audit_layer_templates` | Reusable layer order applied to multiple containers. |
 | Type placement | `strict_type_placement` | `audit_type_placement` | A selected architectural role resides in a declared layer/namespace/project/assembly and/or carries a declared naming suffix/prefix. |
+| Layout conventions | `strict_layout_conventions` | `audit_layout_conventions` | Declared types in source files selected by folder/namespace segment and/or file-name prefix/suffix satisfy a required/forbidden type kind, required/forbidden naming, file-name-matches-primary-type, and/or matching-interface counterpart expectation. |
 | Public API surface | `strict_public_api_surface` | `audit_public_api_surface` | An assembly's exported public/protected/protected-internal types and members match a declared signature allowlist. |
 | Attribute usage | `strict_attribute_usage` | `audit_attribute_usage` | A declared attribute/marker type appears only in (or never in) a declared layer/namespace/project/assembly. |
 | Inheritance | `strict_inheritance` | `audit_inheritance` | Types in a declared source layer/namespace do not inherit (directly or transitively) from declared forbidden base types. |
@@ -63,6 +64,8 @@ A layer may declare a `selector` (`role` and optional `metadata` key/value const
 `ignored_violations` should be exact and narrow. Broad patterns should be treated as temporary migration debt and reviewed by a human.
 
 Type placement `types_matching` fields (`name_suffix`, `name_prefix`, `namespace`, `layer`, `base_type`, `implements_interface`, `has_attribute`) combine with AND semantics — every populated field must match. There is no regex or expression-language selector. `must_reside_in_projects` resolves to assembly-name matching via project discovery (see [Type placement contracts](../contracts/type-placement.md)); it is not physical `.csproj`-membership tracking.
+
+Layout conventions `files_matching` fields (`folder_segment`, `namespace_segment`, `file_name_suffix`, `file_name_prefix`) combine with AND semantics — every populated field must match; there is no regex. `files_matching.when` is the one exception to the "no expression-language selector" rule elsewhere in this family: an optional CEL predicate narrowing which declared types in an already-selected file are checked (see the closed `when` location list below). `require_matching_interface` only applies to concrete (non-abstract) classes. Folder/file-name matching and record-vs-class/struct type-kind classification require `analysis.source_roots`; when that data is missing for the whole run, or for an individual declared type under partial enrichment, the contract reports a deterministic "unavailable" diagnostic rather than silently passing. See [Layout convention contracts](../contracts/layout-conventions.md).
 
 Public API surface `declared_api` entries are normalized signature strings (`<kind> <FullyQualifiedName>[(<param types>)][: <member type>]`); generic type/method parameters are rendered positionally (`!N`/`!!N`), not by their source-declared name. `forbid_public_constants_unless_declared` is an independent, stricter check layered on top of the general declaration — an exported `const` field can still be forbidden even when its full signature is already in `declared_api`, unless its fully-qualified name is also in `allowed_public_constants`. See [Public API surface contracts](../contracts/public-api-surface.md) for the full grammar.
 
@@ -116,8 +119,9 @@ ArchLinterNet does not currently validate:
 - semantic data-flow analysis;
 - third-party package internals;
 - CEL-backed policy expressions outside the closed set of `when` locations
-  (`layers.<name>.selector.when` and contextual dependency/allow-only
-  `source`/`forbidden`/`allowed`/`exclude` selectors — see the
+  (`layers.<name>.selector.when`; contextual dependency/allow-only
+  `source`/`forbidden`/`allowed`/`exclude` selectors; and layout convention
+  `files_matching.when` — see the
   [policy authoring guide](policy-authoring-guide.md#cel-when-predicates));
   `when` is never inferred from ordinary strings anywhere else;
 - unrestricted namespace pattern systems;

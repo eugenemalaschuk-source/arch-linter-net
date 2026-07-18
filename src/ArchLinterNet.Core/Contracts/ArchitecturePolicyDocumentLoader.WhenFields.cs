@@ -33,6 +33,8 @@ public sealed partial class ArchitecturePolicyDocumentLoader
         new[] { "contracts", "audit_context_allow_only", "*", "source" },
         new[] { "contracts", "audit_context_allow_only", "*", "allowed", "*" },
         new[] { "contracts", "audit_context_allow_only", "*", "exclude", "*" },
+        new[] { "contracts", "strict_layout_conventions", "*", "files_matching" },
+        new[] { "contracts", "audit_layout_conventions", "*", "files_matching" },
     };
 
     // Top-level dictionaries keyed by an author-chosen, arbitrary name (layer name, external-dependency-group

@@ -23,6 +23,7 @@ public sealed class ArchitectureDiagnosticFormatterTests
     private static readonly string[] _compositionReferences = ["Composition.Ref"];
     private static readonly string[] _projectReferences = ["Project.Ref"];
     private static readonly string[] _externalReferences = ["External.Ref"];
+    private static readonly string[] _layoutConventionReferences = ["Layout.Ref"];
     private static readonly ArchitectureCoverageSummaryExcludedItem[] _excludedCoverageItems = [new("z-excluded", "generated")];
     private static readonly ArchitectureCoverageSummaryEvidenceItem[] _uncoveredCoverageItems = [new("a-uncovered", "a-evidence")];
     private static readonly ArchitectureCoverageSummaryEvidenceItem[] _staleCoverageItems = [new("b-stale", "b-evidence")];
@@ -194,7 +195,15 @@ public sealed class ArchitectureDiagnosticFormatterTests
             new("project", "project-id", "Project.Source", "Project.Forbidden", _projectReferences)
             { Payload = new ProjectMetadataPayload("forbidden_property", "Nullable", "enable", "disable", "src/App.csproj") },
             new("external", "external-id", "External.Source", "External.Forbidden", _externalReferences)
-            { Payload = new ExternalDependencyPayload("vendor_sdk") }
+            { Payload = new ExternalDependencyPayload("vendor_sdk") },
+            new("layout", "layout-id", "Layout.Source", "Layout.Forbidden", _layoutConventionReferences)
+            { Payload = new LayoutConventionPayload(
+                MatchedFilePath: "src/App/Services/OrderService.cs",
+                ExpectedTypeKind: "class",
+                ActualTypeKind: "interface",
+                ExpectedTypeName: "Expected.Name",
+                ActualTypeName: "Actual.Name",
+                ExpectedCounterpartName: "IOrderService") }
         };
 
         string human = _formatter.FormatViolationsForHumans(violations);
@@ -206,6 +215,10 @@ public sealed class ArchitectureDiagnosticFormatterTests
         Assert.That(human, Does.Contain("matched_api: Forbidden.Api"));
         Assert.That(human, Does.Contain("source_path: src/App.csproj"));
         Assert.That(human, Does.Contain("external_group: vendor_sdk"));
+        Assert.That(human, Does.Contain("file: src/App/Services/OrderService.cs"));
+        Assert.That(human, Does.Contain("expected_kind: class, actual_kind: interface"));
+        Assert.That(human, Does.Contain("expected_name: Expected.Name, actual_name: Actual.Name"));
+        Assert.That(human, Does.Contain("expected_counterpart: IOrderService"));
 
         using var document = JsonDocument.Parse(_formatter.FormatResultForCiArtifacts(
             "strict", false, violations, Array.Empty<string>()));
@@ -217,6 +230,28 @@ public sealed class ArchitectureDiagnosticFormatterTests
         Assert.That(serialized.ToString(), Does.Contain("matched_interface"));
         Assert.That(serialized.ToString(), Does.Contain("project_metadata_source_path"));
         Assert.That(serialized.ToString(), Does.Contain("forbidden_external_group"));
+        Assert.That(serialized.ToString(), Does.Contain("matched_file_path"));
+        Assert.That(serialized.ToString(), Does.Contain("expected_type_kind"));
+        Assert.That(serialized.ToString(), Does.Contain("actual_type_kind"));
+        Assert.That(serialized.ToString(), Does.Contain("expected_counterpart_name"));
+    }
+
+    [Test]
+    public void FormatViolationsForHumans_LayoutConventionDataUnavailable_IncludesUnavailableMarker()
+    {
+        var violations = new List<ArchitectureViolation>
+        {
+            new("layout", "layout-id", "layout-rule", "path-based layout checks unavailable", _layoutConventionReferences)
+            { Payload = new LayoutConventionPayload(DataUnavailable: true) }
+        };
+
+        string human = _formatter.FormatViolationsForHumans(violations);
+        Assert.That(human, Does.Contain("path-based layout checks unavailable"));
+
+        using var document = JsonDocument.Parse(_formatter.FormatResultForCiArtifacts(
+            "strict", false, violations, Array.Empty<string>()));
+        JsonElement violation = document.RootElement.GetProperty("violations")[0];
+        Assert.That(violation.GetProperty("data_unavailable").GetBoolean(), Is.True);
     }
 
     [Test]

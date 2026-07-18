@@ -71,7 +71,9 @@ public sealed partial class ArchitectureAnalysisSession
         bool placementOk = !context.HasPlacementExpectation || IsAllowedLocation(
             actualNamespace, actualAssemblyName, context.AllowedLayers, contract.MustResideInNamespaces, context.AllowedAssemblyNames);
 
-        bool namingOk = IsNamingSatisfied(type.Name, contract);
+        bool namingOk = ArchitectureNameConventionMatcher.Matches(
+            type.Name, contract.RequiredNameSuffix, contract.RequiredNamePrefix,
+            contract.ForbiddenNameSuffix, contract.ForbiddenNamePrefix);
 
         if (placementOk && namingOk)
         {
@@ -133,35 +135,6 @@ public sealed partial class ArchitectureAnalysisSession
         return allowedAssemblyNames.Contains(actualAssemblyName);
     }
 
-    private static bool IsNamingSatisfied(string typeName, ArchitectureTypePlacementContract contract)
-    {
-        if (!string.IsNullOrEmpty(contract.RequiredNameSuffix)
-            && !typeName.EndsWith(contract.RequiredNameSuffix, StringComparison.Ordinal))
-        {
-            return false;
-        }
-
-        if (!string.IsNullOrEmpty(contract.RequiredNamePrefix)
-            && !typeName.StartsWith(contract.RequiredNamePrefix, StringComparison.Ordinal))
-        {
-            return false;
-        }
-
-        if (!string.IsNullOrEmpty(contract.ForbiddenNameSuffix)
-            && typeName.EndsWith(contract.ForbiddenNameSuffix, StringComparison.Ordinal))
-        {
-            return false;
-        }
-
-        if (!string.IsNullOrEmpty(contract.ForbiddenNamePrefix)
-            && typeName.StartsWith(contract.ForbiddenNamePrefix, StringComparison.Ordinal))
-        {
-            return false;
-        }
-
-        return true;
-    }
-
     private static string DescribeExpectedLocation(ArchitectureTypePlacementContract contract)
     {
         List<string> parts = new();
@@ -188,31 +161,10 @@ public sealed partial class ArchitectureAnalysisSession
         return string.Join("; ", parts);
     }
 
-    private static string DescribeExpectedName(ArchitectureTypePlacementContract contract)
-    {
-        List<string> parts = new();
-        if (!string.IsNullOrEmpty(contract.RequiredNameSuffix))
-        {
-            parts.Add($"required_suffix: {contract.RequiredNameSuffix}");
-        }
-
-        if (!string.IsNullOrEmpty(contract.RequiredNamePrefix))
-        {
-            parts.Add($"required_prefix: {contract.RequiredNamePrefix}");
-        }
-
-        if (!string.IsNullOrEmpty(contract.ForbiddenNameSuffix))
-        {
-            parts.Add($"forbidden_suffix: {contract.ForbiddenNameSuffix}");
-        }
-
-        if (!string.IsNullOrEmpty(contract.ForbiddenNamePrefix))
-        {
-            parts.Add($"forbidden_prefix: {contract.ForbiddenNamePrefix}");
-        }
-
-        return string.Join("; ", parts);
-    }
+    private static string DescribeExpectedName(ArchitectureTypePlacementContract contract) =>
+        ArchitectureNameConventionMatcher.Describe(
+            contract.RequiredNameSuffix, contract.RequiredNamePrefix,
+            contract.ForbiddenNameSuffix, contract.ForbiddenNamePrefix);
 
     // "Project" residency is resolved to assembly-name equivalence via project discovery: there is
     // no Type -> .csproj mapping anywhere in this codebase (a project maps 1:1 to a single assembly

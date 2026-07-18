@@ -74,6 +74,8 @@ public sealed partial class ArchitectureAnalysisSession
         AddGroup("audit_asmdef", AuditMode, "asmdef", groups.AuditAsmdef);
         AddGroup("strict_type_placement", StrictMode, "type_placement", groups.StrictTypePlacement);
         AddGroup("audit_type_placement", AuditMode, "type_placement", groups.AuditTypePlacement);
+        AddGroup("strict_layout_conventions", StrictMode, "layout_conventions", groups.StrictLayoutConventions);
+        AddGroup("audit_layout_conventions", AuditMode, "layout_conventions", groups.AuditLayoutConventions);
         AddGroup("strict_attribute_usage", StrictMode, "attribute_usage", groups.StrictAttributeUsage);
         AddGroup("audit_attribute_usage", AuditMode, "attribute_usage", groups.AuditAttributeUsage);
         AddGroup("strict_inheritance", StrictMode, "inheritance", groups.StrictInheritance);

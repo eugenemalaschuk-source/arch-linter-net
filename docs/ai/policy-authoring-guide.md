@@ -103,11 +103,12 @@ for specific contracts and diagnostics.
 
 ## CEL When Predicates
 
-`layers.<name>.selector.when` and contextual dependency/allow-only
-`source`/`forbidden`/`allowed`/`exclude` selectors accept an optional `when`
-field carrying a narrow CEL boolean predicate. This is the **only** place a
-CEL expression is ever accepted — every other YAML string, including every
-other selector field, stays literal.
+`layers.<name>.selector.when`, contextual dependency/allow-only
+`source`/`forbidden`/`allowed`/`exclude` selectors, and layout convention
+`files_matching.when` accept an optional `when` field carrying a narrow CEL
+boolean predicate. This is the **only** set of places a CEL expression is
+ever accepted — every other YAML string, including every other selector
+field, stays literal.
 
 Prefer a narrow, explainable `when` over one that is broad enough to weaken
 the contract:

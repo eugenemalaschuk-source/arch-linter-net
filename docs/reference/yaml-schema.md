@@ -288,6 +288,7 @@ contracts:
   strict_external_allow_only: []
   strict_acyclic_siblings: []
   strict_type_placement: []
+  strict_layout_conventions: []
   strict_public_api_surface: []
   strict_coverage: []
 
@@ -308,6 +309,7 @@ contracts:
   audit_external_allow_only: []
   audit_acyclic_siblings: []
   audit_type_placement: []
+  audit_layout_conventions: []
   audit_public_api_surface: []
   audit_coverage: []
 ```

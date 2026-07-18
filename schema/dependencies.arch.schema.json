@@ -840,6 +840,16 @@
           "items": { "$ref": "#/$defs/typePlacementContract" },
           "default": []
         },
+        "strict_layout_conventions": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/layoutConventionContract" },
+          "default": []
+        },
+        "audit_layout_conventions": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/layoutConventionContract" },
+          "default": []
+        },
         "strict_public_api_surface": {
           "type": "array",
           "items": { "$ref": "#/$defs/publicApiSurfaceContract" },
@@ -1397,6 +1407,62 @@
             "required_name_prefix": { "type": "string", "minLength": 1 },
             "forbidden_name_suffix": { "type": "string", "minLength": 1 },
             "forbidden_name_prefix": { "type": "string", "minLength": 1 },
+            "ignored_violations": { "$ref": "#/$defs/ignoredViolations" },
+            "reason": { "type": "string" }
+          }
+        }
+      ]
+    },
+    "layoutFileMatcher": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "folder_segment": { "type": "string", "minLength": 1 },
+        "namespace_segment": { "type": "string", "minLength": 1 },
+        "file_name_suffix": { "type": "string", "minLength": 1 },
+        "file_name_prefix": { "type": "string", "minLength": 1 },
+        "when": {
+          "$ref": "#/$defs/expressionField",
+          "description": "Optional ArchLinter CEL Profile v1 boolean predicate refining matched declared types over a `subject` context. See openspec/specs/cel-policy-model/spec.md's closed first-wave location list."
+        }
+      }
+    },
+    "requireMatchingInterface": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "name_prefix": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Expected counterpart interface name prefix, prepended to the matched class's simple name. Defaults to 'I' when omitted."
+        }
+      }
+    },
+    "layoutConventionContract": {
+      "allOf": [
+        { "$ref": "#/$defs/baseContractFields" },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["name", "files_matching"],
+          "properties": {
+            "name": { "type": "string", "minLength": 1 },
+            "id": { "type": "string", "minLength": 1 },
+            "files_matching": { "$ref": "#/$defs/layoutFileMatcher" },
+            "require_type_kind": {
+              "type": "string",
+              "enum": ["class", "interface", "struct", "enum", "record", "delegate"]
+            },
+            "forbid_type_kind": {
+              "type": "string",
+              "enum": ["class", "interface", "struct", "enum", "record", "delegate"]
+            },
+            "required_name_suffix": { "type": "string", "minLength": 1 },
+            "required_name_prefix": { "type": "string", "minLength": 1 },
+            "forbidden_name_suffix": { "type": "string", "minLength": 1 },
+            "forbidden_name_prefix": { "type": "string", "minLength": 1 },
+            "require_type_name_matches_file_name": { "type": "boolean", "default": false },
+            "require_matching_interface": { "$ref": "#/$defs/requireMatchingInterface" },
             "ignored_violations": { "$ref": "#/$defs/ignoredViolations" },
             "reason": { "type": "string" }
           }

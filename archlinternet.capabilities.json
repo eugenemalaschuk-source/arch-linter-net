@@ -105,6 +105,13 @@
       "validates": "A type selected by constrained matchers (name suffix/prefix, namespace, layer, base type, implemented interface, attribute) resides in a declared layer/namespace/project/assembly and/or carries a declared naming suffix/prefix. must_reside_in_projects resolves to assembly-name matching via project discovery, not physical .csproj-membership tracking. Requires at least one placement or naming expectation."
     },
     {
+      "kind": "layout-conventions",
+      "strictGroup": "strict_layout_conventions",
+      "auditGroup": "audit_layout_conventions",
+      "fields": ["name", "id", "files_matching.folder_segment", "files_matching.namespace_segment", "files_matching.file_name_suffix", "files_matching.file_name_prefix", "files_matching.when", "require_type_kind", "forbid_type_kind", "required_name_suffix", "required_name_prefix", "forbidden_name_suffix", "forbidden_name_prefix", "require_type_name_matches_file_name", "require_matching_interface.name_prefix", "ignored_violations", "reason"],
+      "validates": "Source files selected by folder segment, namespace segment, and/or file-name prefix/suffix (files_matching, AND-combined, no regex) have their declared types checked against a required/forbidden type kind, required/forbidden naming suffix/prefix, file-name-matches-primary-type-name, and/or a matching-interface counterpart for every concrete (non-abstract) class. files_matching.when is an optional ArchLinter CEL Profile v1 predicate compiled against the same closed subject context shape as layers.<name>.selector.when, narrowing which declared types in an already-selected file are evaluated. Requires at least one files_matching selector field and at least one expectation. Record vs. class/struct classification and file/folder facts require analysis.source_roots to be configured; a contract needing that data reports a deterministic 'unavailable' diagnostic instead of silently passing when it is missing for the whole run or for an individual declared type."
+    },
+    {
       "kind": "public-api-surface",
       "strictGroup": "strict_public_api_surface",
       "auditGroup": "audit_public_api_surface",

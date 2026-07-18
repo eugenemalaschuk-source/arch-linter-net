@@ -186,6 +186,16 @@
           "items": { "$ref": "#/$defs/baselineContractEntry" },
           "default": []
         },
+        "strict_layout_conventions": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/baselineContractEntry" },
+          "default": []
+        },
+        "audit_layout_conventions": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/baselineContractEntry" },
+          "default": []
+        },
         "strict_public_api_surface": {
           "type": "array",
           "items": { "$ref": "#/$defs/baselineContractEntry" },
