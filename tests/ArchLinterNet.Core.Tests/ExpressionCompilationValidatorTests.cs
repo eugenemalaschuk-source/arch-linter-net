@@ -131,7 +131,7 @@ public sealed partial class ExpressionCompilationValidatorTests
                     - role: DomainLayer
                   exclude:
                     - role: SharedKernel
-                      when: dependency.viaMethodBody == false
+                      when: target.role == "SharedKernel"
                   reason: Test.
             """);
 
@@ -159,7 +159,7 @@ public sealed partial class ExpressionCompilationValidatorTests
                       when: target.role == "SharedKernel"
                   exclude:
                     - role: SharedKernel
-                      when: dependency.kind == "type_reference"
+                      when: target.metadataText.containsKey("domain")
                   reason: Test.
             """);
 
@@ -171,6 +171,72 @@ public sealed partial class ExpressionCompilationValidatorTests
             Assert.That(contract.Source.CompiledWhen, Is.Not.Null);
             Assert.That(contract.Allowed[0].CompiledWhen, Is.Not.Null);
             Assert.That(contract.Exclude[0].CompiledWhen, Is.Not.Null);
+        });
+    }
+
+    // dependency.* facts are populated with fixed, non-per-edge constants in this release (see
+    // ArchitectureExpressionFactService.BuildDependencyFacts and
+    // openspec/changes/cel-selector-contextual-integration/design.md Decision D6) — a `when` that
+    // reads them would compile but then always evaluate the same way regardless of the real edge,
+    // silently weakening the contract instead of failing closed. Policy loading rejects any
+    // reference to `dependency` at a target-context `when` location until real per-edge facts exist.
+    [Test]
+    public void Load_ContextDependencyForbiddenWhen_ReferencesDependency_ThrowsActionableError()
+    {
+        string policyPath = WritePolicy($$"""
+            version: 1
+            name: Test
+            analysis:
+              target_assemblies: [{{AssemblyName}}]
+            contracts:
+              strict_context_dependencies:
+                - name: domain-isolation
+                  source:
+                    role: DomainLayer
+                  forbidden:
+                    - role: DomainLayer
+                      when: dependency.viaMethodBody == false
+                  reason: Test.
+            """);
+
+        InvalidOperationException ex = Assert.Throws<InvalidOperationException>(() =>
+            new ArchitecturePolicyDocumentLoader().Load(policyPath))!;
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(ex.Message, Does.Contain("dependency"));
+            Assert.That(ex.Message, Does.Contain("forbidden[0].when"));
+        });
+    }
+
+    [Test]
+    public void Load_ContextAllowOnlyExcludeWhen_ReferencesDependency_ThrowsActionableError()
+    {
+        string policyPath = WritePolicy($$"""
+            version: 1
+            name: Test
+            analysis:
+              target_assemblies: [{{AssemblyName}}]
+            contracts:
+              strict_context_allow_only:
+                - name: sales-allow-only
+                  source:
+                    role: DomainLayer
+                  allowed:
+                    - role: SharedKernel
+                  exclude:
+                    - role: SharedKernel
+                      when: dependency.kind == "type_reference"
+                  reason: Test.
+            """);
+
+        InvalidOperationException ex = Assert.Throws<InvalidOperationException>(() =>
+            new ArchitecturePolicyDocumentLoader().Load(policyPath))!;
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(ex.Message, Does.Contain("dependency"));
+            Assert.That(ex.Message, Does.Contain("exclude[0].when"));
         });
     }
 

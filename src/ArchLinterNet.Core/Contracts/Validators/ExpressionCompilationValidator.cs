@@ -1,3 +1,4 @@
+using System.Text.RegularExpressions;
 using ArchLinterNet.CEL;
 using ArchLinterNet.CEL.Compilation;
 using ArchLinterNet.CEL.Diagnostics;
@@ -25,6 +26,22 @@ internal sealed class ExpressionCompilationValidator : IArchitecturePolicyDocume
     private const string LayersProperty = "layers";
     private const string SelectorProperty = "selector";
     private const string SourceProperty = "source";
+
+    // ArchLinterNet.CEL exposes no public API to introspect which identifiers/members a compiled
+    // predicate references (its bound-expression tree is deliberately internal — see
+    // docs/internal/cel-engine-architecture.md's "Prohibited shortcuts" table), so Core cannot ask
+    // "does this expression read dependency.viaMethodBody" after compilation. `dependency` facts
+    // are populated with fixed, non-per-edge constants in this release (see
+    // ArchitectureExpressionFactService.BuildDependencyFacts and
+    // openspec/changes/cel-selector-contextual-integration/design.md Decision D6) — a `when` that
+    // reads them would compile successfully and then always evaluate the same way regardless of the
+    // real edge, silently weakening the contract instead of failing closed. Reject any reference to
+    // the `dependency` root variable's members at policy-load time until real per-edge facts exist.
+    // `\bdependency\.` (not a bare `\bdependency\b`) because a bare `dependency` reference cannot
+    // type-check to Bool on its own (it's an Object, never a valid predicate result by itself), so
+    // every reachable CEL usage of this identifier is a member access.
+    private static readonly Regex _dependencyMemberReferencePattern =
+        new(@"\bdependency\.", RegexOptions.Compiled | RegexOptions.CultureInvariant);
 
     public void Validate(ArchitectureContractDocument document)
     {
@@ -140,6 +157,17 @@ internal sealed class ExpressionCompilationValidator : IArchitecturePolicyDocume
             document.Provenance.SetValidationSubject(
                 ArchitecturePolicyProvenancePath.AppendIndex(
                     ArchitecturePolicyProvenancePath.AppendProperty(contractPath, fieldName), index));
+
+            if (_dependencyMemberReferencePattern.IsMatch(selector.When))
+            {
+                throw new InvalidOperationException(
+                    $"Contextual contract '{contractName}' declares a '{fieldName}[{index}].when' expression that " +
+                    "references 'dependency'. Dependency-edge facts (kind, viaMethodBody, sourceMemberName, " +
+                    "targetMemberName) are not populated with real per-edge data in this release — every candidate " +
+                    "would see the same fixed values, so a predicate reading them would silently never behave as " +
+                    "intended. Remove the 'dependency' reference and express the constraint using 'source'/'target' " +
+                    "facts instead.");
+            }
 
             CelCompilationResult<CelCompiledPredicate> result =
                 ArchitectureExpressionSchemas.ContextualTargetEnvironment.CompilePredicate(selector.When);

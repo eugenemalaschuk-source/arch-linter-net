@@ -214,7 +214,7 @@ public sealed partial class ArchitectureAnalysisSession
         }
 
         ArchitectureContextSelector sourceSelector = CreateContextualSelector(
-            consumer.SourceRole, consumer.SourceMetadata!, When: null, CompiledWhen: null);
+            consumer.SourceRole, consumer.SourceMetadata!, consumer.SourceWhen, consumer.SourceCompiledWhen);
         return RoleIndex.ClassifiedTypes().Any(sourceType =>
             RoleIndex.TryGetRole(sourceType, out ArchitectureTypeClassificationResult sourceDescriptor)
             && ArchitectureContextSelectorMatcher.Matches(

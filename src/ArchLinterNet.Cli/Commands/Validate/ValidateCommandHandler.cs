@@ -28,9 +28,56 @@ internal sealed class ValidateCommandHandler(ICliRuntime runtime, ICliConsole co
         }
         catch (Exception ex)
         {
-            console.Error.WriteLine($"Architecture validation error: {ex.Message}");
+            WriteExecutionError(options.Format, ex.Message);
             return CliExitCodes.InvalidArgumentsOrRuntimeError;
         }
+    }
+
+    // Catches every error that isn't a structured ArchitecturePolicyDiagnostic — including an
+    // expression evaluation failure thrown deep inside contract checking (e.g.
+    // ArchitectureExpressionFactService.Evaluate for a `when` predicate), which happens well after
+    // policy load succeeds and so is never wrapped with policy-location provenance. Without this,
+    // a --format json/sarif run would receive an unstructured stderr line instead of the format it
+    // asked for; this emits the same "unexpected error" shape on stdout that format expects, with no
+    // location (none is available at this point) rather than silently degrading to plain text.
+    private void WriteExecutionError(string format, string message)
+    {
+        if (format == "json")
+        {
+            console.Out.WriteLine(JsonSerializer.Serialize(new
+            {
+                kind = "architecture_execution_error",
+                message,
+            }));
+            return;
+        }
+
+        if (format == "sarif")
+        {
+            console.Out.WriteLine(JsonSerializer.Serialize(new
+            {
+                version = "2.1.0",
+                runs = new[]
+                {
+                    new
+                    {
+                        tool = new { driver = new { name = "arch-linter-net" } },
+                        results = new[]
+                        {
+                            new
+                            {
+                                ruleId = "architecture-execution",
+                                message = new { text = message },
+                                locations = Array.Empty<object>(),
+                            },
+                        },
+                    },
+                },
+            }));
+            return;
+        }
+
+        console.Error.WriteLine($"Architecture validation error: {message}");
     }
 
     private int? TryWriteImmediateResponse(ValidateCommandOptions options)

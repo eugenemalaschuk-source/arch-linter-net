@@ -23,10 +23,13 @@ public sealed record ArchitectureContextualConsumerReference(
     string Description,
     string? SourceRole = null,
     IReadOnlyDictionary<string, object>? SourceMetadata = null,
-    string? When = null)
+    string? When = null,
+    string? SourceWhen = null)
 {
     // Kept internal (unlike the positional properties above) so the compiled CEL predicate — an
     // ArchLinterNet.CEL engine type — never appears on this Core model's public surface, matching
     // ArchitectureContextSelector.CompiledWhen's own internal visibility.
     internal CelCompiledPredicate? CompiledWhen { get; init; }
+
+    internal CelCompiledPredicate? SourceCompiledWhen { get; init; }
 }

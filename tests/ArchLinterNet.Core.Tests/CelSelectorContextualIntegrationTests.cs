@@ -274,6 +274,127 @@ public sealed class CelSelectorContextualIntegrationTests
             """);
 
     [Test]
+    public void ContextDependency_SourceWhen_RestrictsWhichTypesQualifyAsSource()
+    {
+        ArchitectureContractDocument document = Load($$"""
+            version: 1
+            name: Test
+            analysis:
+              target_assemblies: [{{AssemblyName}}]
+            classification:
+              attributes:
+                - attribute: ContextualContractTestFixtures.ContextDomainMarkerAttribute
+                  role: DomainLayer
+                  metadata:
+                    domain: constructor[0]
+            contracts:
+              strict_context_dependencies:
+                - name: sales-only-no-inventory
+                  id: sales-only-no-inventory
+                  source:
+                    role: DomainLayer
+                    when: source.metadataText["domain"] == "Sales"
+                  forbidden:
+                    - role: DomainLayer
+                      metadata:
+                        domain: Inventory
+                  reason: Only Sales-domain sources are in scope for this contract.
+            """);
+        var runner = new ArchitectureContractRunner(CreateContext(), document);
+        ArchitectureContextDependencyContract contract = document.Contracts.StrictContextDependencies[0];
+
+        List<ArchitectureViolation> violations = runner.Session.CheckContextDependencyContract(contract);
+
+        Assert.Multiple(() =>
+        {
+            // SalesCheckout (domain=Sales) -> InventoryStockItem: source.when matches, violation fires.
+            Assert.That(violations.Any(v => v.SourceType == typeof(ContextualContractTestFixtures.SalesCheckout).FullName), Is.True);
+            // InventoryWarehouse (domain=Inventory) -> InventoryStockItem: source.when excludes it as a
+            // source entirely, so no violation is ever considered for it under this contract.
+            Assert.That(violations.Any(v => v.SourceType == typeof(ContextualContractTestFixtures.InventoryWarehouse).FullName), Is.False);
+        });
+    }
+
+    [Test]
+    public void ContextDependency_SourceWhen_EvaluationFailure_FailsClosed()
+    {
+        ArchitectureContractDocument document = Load($$"""
+            version: 1
+            name: Test
+            analysis:
+              target_assemblies: [{{AssemblyName}}]
+            classification:
+              attributes:
+                - attribute: ContextualContractTestFixtures.ContextDomainMarkerAttribute
+                  role: DomainLayer
+                  metadata:
+                    domain: constructor[0]
+            contracts:
+              strict_context_dependencies:
+                - name: sales-only-no-inventory
+                  id: sales-only-no-inventory
+                  source:
+                    role: DomainLayer
+                    when: source.metadataText["nonexistent-key"] == "Sales"
+                  forbidden:
+                    - role: DomainLayer
+                      metadata:
+                        domain: Inventory
+                  reason: Test.
+            """);
+        var runner = new ArchitectureContractRunner(CreateContext(), document);
+        ArchitectureContextDependencyContract contract = document.Contracts.StrictContextDependencies[0];
+
+        Assert.Throws<InvalidOperationException>(() => runner.Session.CheckContextDependencyContract(contract));
+    }
+
+    [Test]
+    public void RegisteredContextualConsumers_SameRoleDifferentWhen_BothRetainedNotCollapsed()
+    {
+        // Regression for a TryAdd identity collision: two forbidden selectors sharing role DomainLayer
+        // but declaring different `when` expressions must be distinct consumption records - collapsing
+        // them would silently drop one selector's `when` from stale-selector coverage detection.
+        ArchitectureContractDocument document = Load($$"""
+            version: 1
+            name: Test
+            analysis:
+              target_assemblies: [{{AssemblyName}}]
+            classification:
+              attributes:
+                - attribute: ContextualContractTestFixtures.ContextDomainMarkerAttribute
+                  role: DomainLayer
+                  metadata:
+                    domain: constructor[0]
+            contracts:
+              strict_context_dependencies:
+                - name: dependency-contract-a
+                  id: dependency-contract-a
+                  source:
+                    role: DomainLayer
+                  forbidden:
+                    - role: DomainLayer
+                      when: target.metadataText["domain"] == "Inventory"
+                  reason: Test A.
+                - name: dependency-contract-b
+                  id: dependency-contract-b
+                  source:
+                    role: DomainLayer
+                  forbidden:
+                    - role: DomainLayer
+                      when: target.metadataText["domain"] == "SharedKernel"
+                  reason: Test B.
+            """);
+        var runner = new ArchitectureContractRunner(CreateContext(), document);
+
+        IReadOnlyCollection<ArchitectureContextualConsumerReference> consumers = runner.Session.RegisteredContextualConsumers;
+
+        Assert.That(
+            consumers.Count(c => c.Role == "DomainLayer" && c.SourceRole == "DomainLayer"),
+            Is.EqualTo(2),
+            "Two forbidden selectors with the same role but different `when` must remain two distinct consumer records.");
+    }
+
+    [Test]
     public void ContextDependency_ForbiddenWhen_CrossDomainComparison_MatchesCrossDomainReference()
     {
         const string When = "target.metadataText[\"domain\"] != source.metadataText[\"domain\"]";
@@ -532,6 +653,27 @@ public sealed class CelSelectorContextualIntegrationTests
         string second = RunOnce();
 
         Assert.That(first, Is.EqualTo(second));
+    }
+
+    // --- Structural invariant guard: `when` must never reach a location that doesn't support it ---
+
+    [Test]
+    public void ContextSelectorMatcher_LiteralOnlyOverload_ThrowsIfCompiledWhenIsSomehowPresent()
+    {
+        // Port-boundary/adapter-binding selectors reuse ArchitectureContextSelector's shape but
+        // have `when` rejected at policy-load time, so the literal-only 4-arg Matches overload
+        // those call sites use should never see a compiled predicate. This proves the guard fires
+        // instead of silently ignoring one, should that structural invariant ever be violated.
+        var compiled = ArchLinterNet.Core.Contracts.Expressions.ArchitectureExpressionSchemas.SelectorEnvironment
+            .CompilePredicate("subject.role == \"DomainLayer\"");
+        var selector = new ArchitectureContextSelector { Role = "DomainLayer", CompiledWhen = compiled.Program };
+        var roleIndex = new ArchitectureRoleIndex(
+            new ArchitectureClassificationConfiguration(),
+            new ArchitectureTypeIndex(new[] { typeof(CelSelectorContextualIntegrationTests).Assembly }));
+
+        Assert.Throws<InvalidOperationException>(() =>
+            ArchLinterNet.Core.Execution.ArchitectureContextSelectorMatcher.Matches(
+                selector, typeof(ContextualContractTestFixtures.SalesOrder), roleIndex, sourceDescriptor: null));
     }
 
     // --- helpers ---

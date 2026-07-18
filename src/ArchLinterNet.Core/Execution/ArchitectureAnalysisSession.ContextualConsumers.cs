@@ -34,12 +34,18 @@ public sealed partial class ArchitectureAnalysisSession
             : source.Metadata.OrderBy(entry => entry.Key, StringComparer.Ordinal)
                 .ToDictionary(entry => entry.Key, entry => entry.Value, StringComparer.Ordinal);
         string description = DescribeContextualConsumer(selector.Role, metadata, source?.Role, sourceMetadata);
-        string identity = CreateContextualConsumerIdentity(selector.Role, metadata, source?.Role, sourceMetadata);
+        // `when` participates in identity (not just role/metadata): two selectors sharing one
+        // role/metadata shape but declaring different `when` expressions are distinct consumption
+        // records, not duplicates — collapsing them via TryAdd would silently drop one selector's
+        // `when` from stale-selector coverage detection, keyed on declaration order.
+        string identity = CreateContextualConsumerIdentity(
+            selector.Role, metadata, selector.When, source?.Role, sourceMetadata, source?.When);
         _registeredContextualConsumers.TryAdd(identity,
             new ArchitectureContextualConsumerReference(
-                selector.Role, metadata, description, source?.Role, sourceMetadata, selector.When)
+                selector.Role, metadata, description, source?.Role, sourceMetadata, selector.When, source?.When)
             {
-                CompiledWhen = selector.CompiledWhen
+                CompiledWhen = selector.CompiledWhen,
+                SourceCompiledWhen = source?.CompiledWhen
             });
     }
 
@@ -58,13 +64,15 @@ public sealed partial class ArchitectureAnalysisSession
     private static string CreateContextualConsumerIdentity(
         string role,
         IReadOnlyDictionary<string, object> metadata,
+        string? when,
         string? sourceRole,
-        IReadOnlyDictionary<string, object>? sourceMetadata)
+        IReadOnlyDictionary<string, object>? sourceMetadata,
+        string? sourceWhen)
     {
-        string selector = CreateContextualSelectorIdentity(role, metadata);
+        string selector = $"{CreateContextualSelectorIdentity(role, metadata)};when={FormatContextualMetadataValue(when)}";
         return sourceRole == null
             ? selector
-            : $"{CreateContextualSelectorIdentity(sourceRole, sourceMetadata!)}=>{selector}";
+            : $"{CreateContextualSelectorIdentity(sourceRole, sourceMetadata!)};when={FormatContextualMetadataValue(sourceWhen)}=>{selector}";
     }
 
     private static string DescribeContextualSelector(string role, IReadOnlyDictionary<string, object> metadata)
