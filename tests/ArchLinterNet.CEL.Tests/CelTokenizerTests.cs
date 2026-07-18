@@ -376,6 +376,24 @@ public sealed class CelTokenizerTests
     }
 
     [Test]
+    public void StringLiteral_HighBitSetLongUnicodeEscape_IsSyntaxErrorNotClrException()
+    {
+        // PR #346 review finding: \U80000000 sets the sign bit of a 32-bit hex parse, so an
+        // Int32-based conversion turns it negative and slips past the "> 0x10FFFF" bounds check,
+        // reaching char.ConvertFromUtf32 with an out-of-range value and throwing an unhandled
+        // ArgumentOutOfRangeException instead of a structured SyntaxError.
+        var diag = TokenizeFail(@"'\U80000000'");
+        Assert.That(diag.Code, Is.EqualTo(CelDiagnosticCode.SyntaxError));
+    }
+
+    [Test]
+    public void StringLiteral_MaxHexLongUnicodeEscape_IsSyntaxErrorNotClrException()
+    {
+        var diag = TokenizeFail(@"'\UFFFFFFFF'");
+        Assert.That(diag.Code, Is.EqualTo(CelDiagnosticCode.SyntaxError));
+    }
+
+    [Test]
     public void StandaloneZeroEscape_IsMalformedOctal_NotNulTreatment()
     {
         // CEL has no standalone "\0" escape — only a well-formed three-digit octal escape

@@ -440,14 +440,23 @@ internal static class CelTokenizer
 
         var span = new CelSourceSpan(start, pos);
         var text = source[start..pos];
-        // A byte-string literal is already always deferred (UnsupportedFeature) regardless of
-        // content, so an octal escape inside one needs no separate token kind — only a plain
-        // string literal (previously always fully-supported) needs to be reclassified as deferred
-        // when it contains a well-formed octal escape (category B: valid CEL, unsupported by v1).
-        var kind = isBytes
-            ? CelTokenKind.BytesLiteral
-            : sawOctalEscape ? CelTokenKind.StringLiteralWithOctalEscape : CelTokenKind.StringLiteral;
+        var kind = DetermineStringTokenKind(isBytes, sawOctalEscape);
         return (new CelToken(kind, span, text, stringValue: sb.ToString()), null);
+    }
+
+    /// <summary>
+    /// A byte-string literal is already always deferred (<c>UnsupportedFeature</c>) regardless of
+    /// content, so an octal escape inside one needs no separate token kind — only a plain string
+    /// literal (previously always fully-supported) needs to be reclassified as deferred when it
+    /// contains a well-formed octal escape (category B: valid CEL, unsupported by v1).
+    /// </summary>
+    private static CelTokenKind DetermineStringTokenKind(bool isBytes, bool sawOctalEscape)
+    {
+        if (isBytes)
+            return CelTokenKind.BytesLiteral;
+        if (sawOctalEscape)
+            return CelTokenKind.StringLiteralWithOctalEscape;
+        return CelTokenKind.StringLiteral;
     }
 
     /// <summary>
@@ -607,14 +616,14 @@ internal static class CelTokenizer
                 new CelSourceSpan(literalStart, pos), "Malformed \\U escape sequence: expected 8 hex digits.", profileId));
         }
 
-        var codepoint = Convert.ToInt32(source[digitsStart..pos], 16);
+        var codepoint = Convert.ToInt64(source[digitsStart..pos], 16);
         if (codepoint > 0x10FFFF || (codepoint >= 0xD800 && codepoint <= 0xDFFF))
         {
             return (false, CelParseDiagnostics.SyntaxError(
                 new CelSourceSpan(literalStart, pos), "\\U escape sequence is outside the valid Unicode range.", profileId));
         }
 
-        sb.Append(char.ConvertFromUtf32(codepoint));
+        sb.Append(char.ConvertFromUtf32((int)codepoint));
         return (true, null);
     }
 
