@@ -59,3 +59,10 @@ namespace LayoutConventionContractTestFixtures.AmbiguousFolder
 {
     public sealed class PartialOffender;
 }
+
+// An abstract class is itself an extension point, not a leaf implementation - require_matching_interface
+// must not demand an I-prefixed counterpart for it.
+namespace LayoutConventionContractTestFixtures.AbstractServices
+{
+    public abstract class AbstractBaseService;
+}

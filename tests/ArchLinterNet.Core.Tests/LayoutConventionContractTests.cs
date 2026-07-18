@@ -50,6 +50,8 @@ public sealed class LayoutConventionContractTests
             "namespace LayoutConventionContractTestFixtures.AmbiguousFolder { public sealed class PartialOffender { } }");
         WriteFixtureFile("Elsewhere/PartialOffender.Part2.cs",
             "namespace LayoutConventionContractTestFixtures.AmbiguousFolder { public sealed class PartialOffender { } }");
+        WriteFixtureFile("AbstractServices/AbstractBaseService.cs",
+            "namespace LayoutConventionContractTestFixtures.AbstractServices { public abstract class AbstractBaseService { } }");
     }
 
     [TearDown]
@@ -613,5 +615,58 @@ public sealed class LayoutConventionContractTests
         Assert.That(violations.Any(v =>
             v.SourceType.Contains("PartialOffender", StringComparison.Ordinal)
             && v.Payload is LayoutConventionPayload { DataUnavailable: true }), Is.True);
+    }
+
+    // Regression: subject.sourcePaths is empty (not an evaluation error) for a candidate with no
+    // resolved source file. The run-level guard only catches this when NO fact anywhere in the run
+    // has a path; here OTHER fixtures ARE source-enriched, so only this specific unfiled candidate
+    // must be flagged as unresolvable instead of silently excluded by the always-false predicate.
+    [Test]
+    public void CheckLayoutConventionsContract_WhenReferencesSourcePaths_PartialEnrichment_UnfiledCandidateIsViolation()
+    {
+        string assemblyName = typeof(LayoutConventionContractTests).Assembly.GetName().Name!;
+        string policyPath = Path.Combine(_tempDir, "dependencies.arch.yml");
+        File.WriteAllText(policyPath, $"""
+            version: 1
+            name: Test
+            analysis:
+              target_assemblies: [{assemblyName}]
+              source_roots: ["."]
+            contracts:
+              strict_layout_conventions:
+                - name: path-based-when-rule
+                  files_matching:
+                    namespace_segment: UnfiledNamespace
+                    when: subject.sourcePaths.size() > 0
+                  forbid_type_kind: interface
+            """);
+
+        ArchitectureContractDocument document = new ArchitecturePolicyDocumentLoader().Load(policyPath);
+        var contract = document.Contracts.StrictLayoutConventions[0];
+        var runner = new ArchitectureContractRunner(CreateContext(), document);
+
+        var violations = runner.Session.CheckLayoutConventionsContract(contract);
+
+        Assert.That(violations.Any(v =>
+            v.SourceType.Contains("NoSourceFileType", StringComparison.Ordinal)
+            && v.Payload is LayoutConventionPayload { DataUnavailable: true }), Is.True);
+    }
+
+    // Regression: require_matching_interface must only demand a counterpart for concrete classes -
+    // an abstract class is itself an extension point, not a leaf implementation.
+    [Test]
+    public void CheckLayoutConventionsContract_RequireMatchingInterface_AbstractClass_NoViolation()
+    {
+        var contract = new ArchitectureLayoutConventionContract
+        {
+            Name = "abstract-services-require-matching-interface",
+            FilesMatching = new ArchitectureLayoutFileMatcher { FolderSegment = "AbstractServices" },
+            RequireMatchingInterface = new ArchitectureRequireMatchingInterface { NamePrefix = "I" }
+        };
+        var runner = new ArchitectureContractRunner(CreateContext(), CreateDocument(contract));
+
+        var violations = runner.Session.CheckLayoutConventionsContract(contract);
+
+        Assert.That(violations.Any(v => v.SourceType.Contains("AbstractBaseService", StringComparison.Ordinal)), Is.False);
     }
 }

@@ -74,14 +74,23 @@ public sealed partial class ArchitectureAnalysisSession
         }
 
         ArchitectureContractExecutionContext executionContext = CreateExecutionContext(contract, contract.IgnoredViolations);
-        List<LayoutFileGroup> matchedGroups = CollectMatchedFileGroups(contract.FilesMatching);
+
+        // Built once, shared by every path below that needs to resolve a live Type from a fact's
+        // (assembly, full name) identity: the ambiguous-declaration `when` check, the unfiled-fact
+        // `when`-on-missing-path check, and require_matching_interface's abstract-class exclusion.
+        Dictionary<(string AssemblyName, string FullTypeName), Type>? typesByIdentity =
+            contract.FilesMatching.CompiledWhen != null || contract.RequireMatchingInterface != null
+                ? BuildTypeIdentityLookup()
+                : null;
+
+        List<LayoutFileGroup> matchedGroups = CollectMatchedFileGroups(contract, executionContext, violations);
 
         foreach (LayoutFileGroup group in matchedGroups)
         {
-            EvaluateFileGroupExpectations(contract, group, executionContext, violations);
+            EvaluateFileGroupExpectations(contract, group, executionContext, violations, typesByIdentity);
         }
 
-        AddAmbiguousSourceDeclarationViolations(contract, executionContext, violations);
+        AddAmbiguousSourceDeclarationViolations(contract, executionContext, violations, typesByIdentity);
 
         executionContext.CollectUnmatchedIgnores(_unmatchedIgnoredViolations);
         return violations;
@@ -106,7 +115,8 @@ public sealed partial class ArchitectureAnalysisSession
     private void AddAmbiguousSourceDeclarationViolations(
         ArchitectureLayoutConventionContract contract,
         ArchitectureContractExecutionContext executionContext,
-        List<ArchitectureViolation> violations)
+        List<ArchitectureViolation> violations,
+        Dictionary<(string AssemblyName, string FullTypeName), Type>? typesByIdentity)
     {
         ArchitectureLayoutFileMatcher matcher = contract.FilesMatching;
         bool selectorNeedsSourcePath = !string.IsNullOrEmpty(matcher.FolderSegment)
@@ -116,8 +126,6 @@ public sealed partial class ArchitectureAnalysisSession
         {
             return;
         }
-
-        Dictionary<(string AssemblyName, string FullTypeName), Type> typesByIdentity = BuildTypeIdentityLookup();
 
         foreach (ArchitectureDeclaredTypeSourceAmbiguity ambiguity in SourceFileFactIndex.Ambiguities
                      .OrderBy(a => a.FullTypeName, StringComparer.Ordinal))
@@ -140,7 +148,8 @@ public sealed partial class ArchitectureAnalysisSession
 
             if (matcher.CompiledWhen != null)
             {
-                if (!typesByIdentity.TryGetValue((ambiguity.AssemblyName, ambiguity.FullTypeName), out Type? type)
+                if (typesByIdentity == null
+                    || !typesByIdentity.TryGetValue((ambiguity.AssemblyName, ambiguity.FullTypeName), out Type? type)
                     || !EvaluateLayoutWhen(matcher, type))
                 {
                     continue;
@@ -223,8 +232,12 @@ public sealed partial class ArchitectureAnalysisSession
     // declared under a different namespace in the same already-selected file. Facts with no
     // resolvable source file (no source enrichment, or an ambiguous partial-class declaration) can
     // only ever satisfy namespace_segment, evaluated per-type since there is no file to group by.
-    private List<LayoutFileGroup> CollectMatchedFileGroups(ArchitectureLayoutFileMatcher matcher)
+    private List<LayoutFileGroup> CollectMatchedFileGroups(
+        ArchitectureLayoutConventionContract contract,
+        ArchitectureContractExecutionContext executionContext,
+        List<ArchitectureViolation> violations)
     {
+        ArchitectureLayoutFileMatcher matcher = contract.FilesMatching;
         Dictionary<string, List<(Type Type, ArchitectureDeclaredTypeFact Fact)>> byFile = new(StringComparer.Ordinal);
         List<(Type Type, ArchitectureDeclaredTypeFact Fact)> unfiled = new();
 
@@ -273,6 +286,18 @@ public sealed partial class ArchitectureAnalysisSession
             groups.Add(new LayoutFileGroup(filePath, entries[0].Fact.FileNameWithoutExtension, eligibleFacts));
         }
 
+        // A `when` referencing subject.sourcePaths/sourceDirectoryPrefixes evaluates those as an
+        // empty list - not an evaluation error - for a fact with no resolved source file, so it can
+        // silently exclude a candidate the run-level guard never sees (that guard only fires when
+        // NO fact anywhere has a path; this is the partial-enrichment case where other facts do).
+        // An ambiguous partial-class declaration is exempt: its sourcePaths carries every candidate
+        // declaration path (see ArchitectureExpressionSubjectFactBuilder.ResolveSourcePaths), so a
+        // path-referencing predicate evaluates against real data for it, same as any filed fact.
+        bool whenReferencesSourcePath = matcher.CompiledWhen != null && ReferencesSourcePathIdentifier(matcher.When);
+        HashSet<(string AssemblyName, string FullTypeName)>? ambiguousIdentities = whenReferencesSourcePath
+            ? SourceFileFactIndex.Ambiguities.Select(a => (a.AssemblyName, a.FullTypeName)).ToHashSet()
+            : null;
+
         foreach ((Type Type, ArchitectureDeclaredTypeFact Fact) entry in
                  unfiled.OrderBy(entry => entry.Fact.FullTypeName, StringComparer.Ordinal))
         {
@@ -281,9 +306,24 @@ public sealed partial class ArchitectureAnalysisSession
                 continue;
             }
 
-            if (matcher.CompiledWhen != null && !EvaluateLayoutWhen(matcher, entry.Type))
+            if (matcher.CompiledWhen != null)
             {
-                continue;
+                if (whenReferencesSourcePath
+                    && !ambiguousIdentities!.Contains((entry.Fact.AssemblyName, entry.Fact.FullTypeName)))
+                {
+                    AddViolation(
+                        contract, executionContext, violations,
+                        sourceType: entry.Fact.FullTypeName,
+                        forbiddenReference: "cannot evaluate files_matching.when: it references source-path facts " +
+                            "(sourcePaths/sourceDirectoryPrefixes), but this declared type has no resolved source file",
+                        payload: new LayoutConventionPayload(DataUnavailable: true));
+                    continue;
+                }
+
+                if (!EvaluateLayoutWhen(matcher, entry.Type))
+                {
+                    continue;
+                }
             }
 
             groups.Add(new LayoutFileGroup(null, null, new List<ArchitectureDeclaredTypeFact> { entry.Fact }));
@@ -367,7 +407,8 @@ public sealed partial class ArchitectureAnalysisSession
         ArchitectureLayoutConventionContract contract,
         LayoutFileGroup group,
         ArchitectureContractExecutionContext executionContext,
-        List<ArchitectureViolation> violations)
+        List<ArchitectureViolation> violations,
+        Dictionary<(string AssemblyName, string FullTypeName), Type>? typesByIdentity)
     {
         string groupLabel = group.SourceFilePath ?? group.Facts[0].FullTypeName;
 
@@ -471,7 +512,7 @@ public sealed partial class ArchitectureAnalysisSession
 
         if (contract.RequireMatchingInterface != null)
         {
-            EvaluateMatchingInterfaceExpectation(contract, group, executionContext, violations);
+            EvaluateMatchingInterfaceExpectation(contract, group, executionContext, violations, typesByIdentity);
         }
     }
 
@@ -479,14 +520,28 @@ public sealed partial class ArchitectureAnalysisSession
         ArchitectureLayoutConventionContract contract,
         LayoutFileGroup group,
         ArchitectureContractExecutionContext executionContext,
-        List<ArchitectureViolation> violations)
+        List<ArchitectureViolation> violations,
+        Dictionary<(string AssemblyName, string FullTypeName), Type>? typesByIdentity)
     {
         string namePrefix = string.IsNullOrEmpty(contract.RequireMatchingInterface!.NamePrefix)
             ? "I"
             : contract.RequireMatchingInterface.NamePrefix!;
 
+        // A matching-interface counterpart is only meaningful for a concrete class: an abstract
+        // class is itself an extension point (a base for concrete implementations to satisfy),
+        // not a leaf type callers depend on through an interface seam, so requiring an I-prefixed
+        // interface for it would be a spurious violation. ArchitectureDeclaredTypeFact carries no
+        // IsAbstract field (source-file-fact-index's fact model is CLR-kind-only), so this resolves
+        // the live reflected Type via the shared identity lookup to read it.
         foreach (ArchitectureDeclaredTypeFact fact in group.Facts.Where(f => f.TypeKind == ArchitectureTypeKind.Class))
         {
+            if (typesByIdentity != null
+                && typesByIdentity.TryGetValue((fact.AssemblyName, fact.FullTypeName), out Type? type)
+                && type.IsAbstract)
+            {
+                continue;
+            }
+
             string expectedCounterpartName = namePrefix + fact.SimpleTypeName;
             List<ArchitectureDeclaredTypeFact> candidates = SourceFileFactIndex.AllFacts
                 .Where(candidate => candidate.TypeKind == ArchitectureTypeKind.Interface
