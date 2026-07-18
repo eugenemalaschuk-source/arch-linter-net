@@ -1,3 +1,4 @@
+using System.Text.RegularExpressions;
 using ArchLinterNet.Core.Contracts;
 using ArchLinterNet.Core.Contracts.Families;
 using ArchLinterNet.Core.Execution.Expressions;
@@ -9,6 +10,20 @@ namespace ArchLinterNet.Core.Execution;
 
 public sealed partial class ArchitectureAnalysisSession
 {
+    // Unconditional bare-word match, deliberately not a "smarter" syntax-aware check - mirrors
+    // ExpressionCompilationValidator's DependencyIdentifierPattern and its documented rationale:
+    // ArchLinterNet.CEL exposes no public API to introspect which identifiers a compiled predicate
+    // references, and two prior attempts at hand-rolled CEL-lexical-grammar-aware string scanning
+    // in this codebase each found a real bypass. A `when` referencing subject.sourcePaths or
+    // subject.sourceDirectoryPrefixes against an empty-facts run would otherwise silently evaluate
+    // to `false` for every candidate (an empty list, not an evaluation error) and produce a clean
+    // pass that looks identical to "everything complies".
+    [GeneratedRegex(@"\b(sourcePaths|sourceDirectoryPrefixes)\b", RegexOptions.CultureInvariant)]
+    private static partial Regex SourcePathIdentifierPattern();
+
+    private static bool ReferencesSourcePathIdentifier(string? when) =>
+        !string.IsNullOrEmpty(when) && SourcePathIdentifierPattern().IsMatch(when);
+
     public List<ArchitectureViolation> CheckLayoutConventionsContract(ArchitectureLayoutConventionContract contract)
     {
         if (!IsContractSelected(contract.Id) || IsDanglingButCoveredByRuleInputCoverage(contract))
@@ -27,13 +42,18 @@ public sealed partial class ArchitectureAnalysisSession
         // otherwise report zero violations forever once every match becomes an "unfiled" group.
         // Record type-kind expectations are included for the same reason: per source-file-fact-index,
         // reflection alone classifies record types as Class/Struct - "Record" is only ever accurate
-        // when Roslyn source enrichment succeeded for that specific declaration.
+        // when Roslyn source enrichment succeeded for that specific declaration. A `when` referencing
+        // subject.sourcePaths/subject.sourceDirectoryPrefixes is included too: those lists are empty
+        // (not an evaluation error) for a candidate with no resolved source file, so a path-based
+        // predicate over an entirely unenriched run would otherwise silently exclude every candidate
+        // and look like a clean pass.
         bool needsSourcePath = !string.IsNullOrEmpty(contract.FilesMatching.FolderSegment)
             || !string.IsNullOrEmpty(contract.FilesMatching.FileNameSuffix)
             || !string.IsNullOrEmpty(contract.FilesMatching.FileNamePrefix)
             || contract.RequireTypeNameMatchesFileName
             || IsRecordKind(contract.RequireTypeKind)
-            || IsRecordKind(contract.ForbidTypeKind);
+            || IsRecordKind(contract.ForbidTypeKind)
+            || ReferencesSourcePathIdentifier(contract.FilesMatching.When);
 
         if (needsSourcePath && SourceFileFactIndex.AllFacts.All(fact => fact.SourceFilePath == null))
         {
@@ -78,6 +98,11 @@ public sealed partial class ArchitectureAnalysisSession
     // declaration path, so when at least one of them would satisfy the folder/file-name selector
     // (and any populated namespace_segment, checked against the fact's always-reliable reflection
     // namespace), report it as unresolvable instead of silently excluding it.
+    //
+    // A populated `when` still gets the final say, exactly like CollectMatchedFileGroups gives it
+    // for ordinary candidates: if `when` would have excluded this type anyway (e.g. it isn't the
+    // role the predicate scopes to), reporting it as unresolvable would be a false positive - a
+    // blocking diagnostic for a type the policy was never actually going to flag.
     private void AddAmbiguousSourceDeclarationViolations(
         ArchitectureLayoutConventionContract contract,
         ArchitectureContractExecutionContext executionContext,
@@ -87,10 +112,12 @@ public sealed partial class ArchitectureAnalysisSession
         bool selectorNeedsSourcePath = !string.IsNullOrEmpty(matcher.FolderSegment)
             || !string.IsNullOrEmpty(matcher.FileNameSuffix)
             || !string.IsNullOrEmpty(matcher.FileNamePrefix);
-        if (!selectorNeedsSourcePath)
+        if (!selectorNeedsSourcePath || SourceFileFactIndex.Ambiguities.Count == 0)
         {
             return;
         }
+
+        Dictionary<(string AssemblyName, string FullTypeName), Type> typesByIdentity = BuildTypeIdentityLookup();
 
         foreach (ArchitectureDeclaredTypeSourceAmbiguity ambiguity in SourceFileFactIndex.Ambiguities
                      .OrderBy(a => a.FullTypeName, StringComparer.Ordinal))
@@ -111,6 +138,15 @@ public sealed partial class ArchitectureAnalysisSession
                 continue;
             }
 
+            if (matcher.CompiledWhen != null)
+            {
+                if (!typesByIdentity.TryGetValue((ambiguity.AssemblyName, ambiguity.FullTypeName), out Type? type)
+                    || !EvaluateLayoutWhen(matcher, type))
+                {
+                    continue;
+                }
+            }
+
             AddViolation(
                 contract, executionContext, violations,
                 sourceType: ambiguity.FullTypeName,
@@ -118,6 +154,22 @@ public sealed partial class ArchitectureAnalysisSession
                     $"({string.Join(", ", ambiguity.SourceFilePaths)}), so its folder/file-name facts are ambiguous",
                 payload: new LayoutConventionPayload(DataUnavailable: true));
         }
+    }
+
+    private Dictionary<(string AssemblyName, string FullTypeName), Type> BuildTypeIdentityLookup()
+    {
+        Dictionary<(string, string), Type> lookup = new();
+        foreach (Type type in TypeIndex.AllTypes())
+        {
+            string assemblyName = type.Assembly.GetName().Name ?? string.Empty;
+            string fullName = ArchitectureTypeNames.SafeFullName(type);
+            if (!string.IsNullOrEmpty(fullName))
+            {
+                lookup[(assemblyName, fullName)] = type;
+            }
+        }
+
+        return lookup;
     }
 
     private static bool AnyCandidatePathMatchesFileSelector(

@@ -128,6 +128,48 @@ public sealed class ArchitectureSarifFormatterTests
         Assert.That(message, Does.Contain("ref1"));
     }
 
+    // Regression: MatchedFilePath is a real repository-relative .cs path, unlike every other
+    // family's SourceType (a fully-qualified type name) - it must produce a SARIF physicalLocation
+    // so GitHub Code Scanning can anchor the finding to that file, not fall back to logicalLocations.
+    [Test]
+    public void FormatResultAsSarif_LayoutConventionDiagnostic_WithMatchedFilePath_UsesPhysicalLocation()
+    {
+        var violations = new List<ArchitectureViolation>
+        {
+            new("layout-rule", "layout-id", "Layout.Source", "forbidden type kind 'interface'", _ref1)
+            { Payload = new LayoutConventionPayload(MatchedFilePath: "src/App/Services/Bad.cs") }
+        };
+
+        JsonElement root = Run("strict", violations);
+
+        JsonElement result = root.GetProperty("runs")[0].GetProperty("results")[0];
+        Assert.That(result.TryGetProperty("locations", out JsonElement locations), Is.True);
+        Assert.That(
+            locations[0].GetProperty("physicalLocation").GetProperty("artifactLocation").GetProperty("uri").GetString(),
+            Is.EqualTo("src/App/Services/Bad.cs"));
+        Assert.That(result.TryGetProperty("logicalLocations", out _), Is.False);
+    }
+
+    // Regression: an "unavailable"/ambiguous layout diagnostic has no single resolved file
+    // (MatchedFilePath is null) - it must fall back to the generic logicalLocations by type name,
+    // not fabricate a physical location that doesn't exist.
+    [Test]
+    public void FormatResultAsSarif_LayoutConventionDiagnostic_WithoutMatchedFilePath_UsesLogicalLocation()
+    {
+        var violations = new List<ArchitectureViolation>
+        {
+            new("layout-rule", "layout-id", "Layout.Source", "path-based layout checks unavailable", _ref1)
+            { Payload = new LayoutConventionPayload(DataUnavailable: true) }
+        };
+
+        JsonElement root = Run("strict", violations);
+
+        JsonElement result = root.GetProperty("runs")[0].GetProperty("results")[0];
+        Assert.That(result.TryGetProperty("logicalLocations", out JsonElement logicalLocations), Is.True);
+        Assert.That(logicalLocations[0].GetProperty("fullyQualifiedName").GetString(), Is.EqualTo("Layout.Source"));
+        Assert.That(result.TryGetProperty("locations", out _), Is.False);
+    }
+
     [Test]
     public void FormatResultAsSarif_StrictMode_LevelIsError()
     {

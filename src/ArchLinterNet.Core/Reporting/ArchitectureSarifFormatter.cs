@@ -132,6 +132,15 @@ public sealed partial class ArchitectureSarifFormatter : IArchitectureSarifForma
         {
             json["locations"] = BuildPhysicalLocations(sourceType, references);
         }
+        else if (diagnostic is LayoutConventionDiagnostic { MatchedFilePath: { } matchedFilePath })
+        {
+            // Unlike every other family's SourceType (a fully-qualified type name with no direct
+            // filesystem mapping), a layout convention diagnostic's MatchedFilePath is already a
+            // real repository-relative .cs path - using it as a physical location lets GitHub Code
+            // Scanning anchor the finding to that file/line instead of falling back to a generic
+            // logical (type-name) location it cannot resolve on disk.
+            json["locations"] = BuildPhysicalLocations(matchedFilePath, Array.Empty<string>());
+        }
         else
         {
             json["logicalLocations"] = BuildLogicalLocations(sourceType, LogicalLocationKindFor(diagnostic, forbiddenNamespace));

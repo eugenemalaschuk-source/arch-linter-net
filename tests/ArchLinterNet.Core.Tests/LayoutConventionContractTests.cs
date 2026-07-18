@@ -515,4 +515,103 @@ public sealed class LayoutConventionContractTests
         Assert.That(violations, Has.Count.EqualTo(1));
         Assert.That(((LayoutConventionPayload)violations[0].Payload!).DataUnavailable, Is.True);
     }
+
+    // Regression: subject.sourcePaths/sourceDirectoryPrefixes are empty lists (not an evaluation
+    // error) for a candidate with no resolved source file, so a `when` referencing them would
+    // otherwise silently exclude every candidate on a fully-unenriched run and look like a clean
+    // pass instead of the "unavailable" diagnostic every other path-dependent field gets.
+    [Test]
+    public void CheckLayoutConventionsContract_WhenReferencesSourcePaths_NoSourceRootsAtAll_EmitsUnavailableDiagnostic()
+    {
+        string assemblyName = typeof(LayoutConventionContractTests).Assembly.GetName().Name!;
+        string policyPath = Path.Combine(_tempDir, "dependencies.arch.yml");
+        File.WriteAllText(policyPath, $"""
+            version: 1
+            name: Test
+            analysis:
+              target_assemblies: [{assemblyName}]
+            contracts:
+              strict_layout_conventions:
+                - name: path-based-when-rule
+                  files_matching:
+                    namespace_segment: Services
+                    when: subject.sourcePaths.size() > 0
+                  forbid_type_kind: interface
+            """);
+
+        ArchitectureContractDocument document = new ArchitecturePolicyDocumentLoader().Load(policyPath);
+        var contract = document.Contracts.StrictLayoutConventions[0];
+        var runner = new ArchitectureContractRunner(CreateContext(), document);
+
+        var violations = runner.Session.CheckLayoutConventionsContract(contract);
+
+        Assert.That(violations, Has.Count.EqualTo(1));
+        Assert.That(((LayoutConventionPayload)violations[0].Payload!).DataUnavailable, Is.True);
+    }
+
+    // Regression: an ambiguous partial-class type whose candidate path matches the folder selector
+    // must still respect `when` - if the predicate would have excluded it (e.g. wrong role/name),
+    // reporting it as "cannot evaluate" would be a false positive for a type the policy was never
+    // going to flag in the first place.
+    [Test]
+    public void CheckLayoutConventionsContract_AmbiguousPartialType_WhenExcludes_NoViolation()
+    {
+        string assemblyName = typeof(LayoutConventionContractTests).Assembly.GetName().Name!;
+        string policyPath = Path.Combine(_tempDir, "dependencies.arch.yml");
+        File.WriteAllText(policyPath, $"""
+            version: 1
+            name: Test
+            analysis:
+              target_assemblies: [{assemblyName}]
+              source_roots: ["."]
+            contracts:
+              strict_layout_conventions:
+                - name: services-must-not-contain-offenders
+                  files_matching:
+                    folder_segment: Services
+                    when: subject.simpleName == "NotThePartialOffender"
+                  forbid_type_kind: class
+            """);
+
+        ArchitectureContractDocument document = new ArchitecturePolicyDocumentLoader().Load(policyPath);
+        var contract = document.Contracts.StrictLayoutConventions[0];
+        var runner = new ArchitectureContractRunner(CreateContext(), document);
+
+        var violations = runner.Session.CheckLayoutConventionsContract(contract);
+
+        Assert.That(violations.Any(v => v.SourceType.Contains("PartialOffender", StringComparison.Ordinal)), Is.False);
+    }
+
+    // Regression: the flip side of the test above - when `when` would have matched the ambiguous
+    // type, it must still be reported as unresolvable.
+    [Test]
+    public void CheckLayoutConventionsContract_AmbiguousPartialType_WhenIncludes_IsViolation()
+    {
+        string assemblyName = typeof(LayoutConventionContractTests).Assembly.GetName().Name!;
+        string policyPath = Path.Combine(_tempDir, "dependencies.arch.yml");
+        File.WriteAllText(policyPath, $"""
+            version: 1
+            name: Test
+            analysis:
+              target_assemblies: [{assemblyName}]
+              source_roots: ["."]
+            contracts:
+              strict_layout_conventions:
+                - name: services-must-not-contain-offenders
+                  files_matching:
+                    folder_segment: Services
+                    when: subject.simpleName == "PartialOffender"
+                  forbid_type_kind: class
+            """);
+
+        ArchitectureContractDocument document = new ArchitecturePolicyDocumentLoader().Load(policyPath);
+        var contract = document.Contracts.StrictLayoutConventions[0];
+        var runner = new ArchitectureContractRunner(CreateContext(), document);
+
+        var violations = runner.Session.CheckLayoutConventionsContract(contract);
+
+        Assert.That(violations.Any(v =>
+            v.SourceType.Contains("PartialOffender", StringComparison.Ordinal)
+            && v.Payload is LayoutConventionPayload { DataUnavailable: true }), Is.True);
+    }
 }
