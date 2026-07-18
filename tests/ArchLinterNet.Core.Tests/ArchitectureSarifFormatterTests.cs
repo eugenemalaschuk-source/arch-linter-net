@@ -111,6 +111,24 @@ public sealed class ArchitectureSarifFormatterTests
     }
 
     [Test]
+    public void FormatResultAsSarif_LayoutConventionDiagnostic_ExtractsFieldsIntoMessage()
+    {
+        var violations = new List<ArchitectureViolation>
+        {
+            new("layout-rule", "layout-id", "Layout.Source", "forbidden type kind 'interface'", _ref1)
+            { Payload = new LayoutConventionPayload(MatchedFilePath: "src/App/Services/Bad.cs") }
+        };
+
+        JsonElement root = Run("strict", violations);
+
+        JsonElement result = root.GetProperty("runs")[0].GetProperty("results")[0];
+        string message = result.GetProperty("message").GetProperty("text").GetString()!;
+        Assert.That(message, Does.Contain("Layout.Source"));
+        Assert.That(message, Does.Contain("forbidden type kind 'interface'"));
+        Assert.That(message, Does.Contain("ref1"));
+    }
+
+    [Test]
     public void FormatResultAsSarif_StrictMode_LevelIsError()
     {
         var violations = new List<ArchitectureViolation>

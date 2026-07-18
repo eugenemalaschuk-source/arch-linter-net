@@ -247,7 +247,10 @@ public sealed partial class ArchitectureAnalysisSession
 
         foreach (ArchitectureDeclaredTypeFact fact in group.Facts)
         {
-            if (!IsNamingSatisfied(fact.SimpleTypeName, contract))
+            bool namingOk = ArchitectureNameConventionMatcher.Matches(
+                fact.SimpleTypeName, contract.RequiredNameSuffix, contract.RequiredNamePrefix,
+                contract.ForbiddenNameSuffix, contract.ForbiddenNamePrefix);
+            if (!namingOk)
             {
                 AddViolation(
                     contract, executionContext, violations,
@@ -255,7 +258,9 @@ public sealed partial class ArchitectureAnalysisSession
                     forbiddenReference: $"actual name '{fact.SimpleTypeName}' does not satisfy naming expectation",
                     payload: new LayoutConventionPayload(
                         MatchedFilePath: group.SourceFilePath,
-                        ExpectedTypeName: DescribeExpectedName(contract),
+                        ExpectedTypeName: ArchitectureNameConventionMatcher.Describe(
+                            contract.RequiredNameSuffix, contract.RequiredNamePrefix,
+                            contract.ForbiddenNameSuffix, contract.ForbiddenNamePrefix),
                         ActualTypeName: fact.SimpleTypeName));
             }
         }
@@ -339,61 +344,6 @@ public sealed partial class ArchitectureAnalysisSession
         {
             Payload = payload
         });
-    }
-
-    private static bool IsNamingSatisfied(string typeName, ArchitectureLayoutConventionContract contract)
-    {
-        if (!string.IsNullOrEmpty(contract.RequiredNameSuffix)
-            && !typeName.EndsWith(contract.RequiredNameSuffix, StringComparison.Ordinal))
-        {
-            return false;
-        }
-
-        if (!string.IsNullOrEmpty(contract.RequiredNamePrefix)
-            && !typeName.StartsWith(contract.RequiredNamePrefix, StringComparison.Ordinal))
-        {
-            return false;
-        }
-
-        if (!string.IsNullOrEmpty(contract.ForbiddenNameSuffix)
-            && typeName.EndsWith(contract.ForbiddenNameSuffix, StringComparison.Ordinal))
-        {
-            return false;
-        }
-
-        if (!string.IsNullOrEmpty(contract.ForbiddenNamePrefix)
-            && typeName.StartsWith(contract.ForbiddenNamePrefix, StringComparison.Ordinal))
-        {
-            return false;
-        }
-
-        return true;
-    }
-
-    private static string DescribeExpectedName(ArchitectureLayoutConventionContract contract)
-    {
-        List<string> parts = new();
-        if (!string.IsNullOrEmpty(contract.RequiredNameSuffix))
-        {
-            parts.Add($"required_suffix: {contract.RequiredNameSuffix}");
-        }
-
-        if (!string.IsNullOrEmpty(contract.RequiredNamePrefix))
-        {
-            parts.Add($"required_prefix: {contract.RequiredNamePrefix}");
-        }
-
-        if (!string.IsNullOrEmpty(contract.ForbiddenNameSuffix))
-        {
-            parts.Add($"forbidden_suffix: {contract.ForbiddenNameSuffix}");
-        }
-
-        if (!string.IsNullOrEmpty(contract.ForbiddenNamePrefix))
-        {
-            parts.Add($"forbidden_prefix: {contract.ForbiddenNamePrefix}");
-        }
-
-        return string.Join("; ", parts);
     }
 
     private static ArchitectureTypeKind ParseTypeKind(string value)

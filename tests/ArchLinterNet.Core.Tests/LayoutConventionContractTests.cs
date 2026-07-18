@@ -2,6 +2,7 @@ using ArchLinterNet.Core.Contracts;
 using ArchLinterNet.Core.Contracts.Families;
 using ArchLinterNet.Core.Discovery;
 using ArchLinterNet.Core.Execution;
+using ArchLinterNet.Core.Execution.Abstractions;
 using ArchLinterNet.Core.Model;
 using NUnit.Framework;
 using ArchitectureContractGroups = ArchLinterNet.Core.Contracts.Families.ArchitectureContractGroups;
@@ -360,5 +361,30 @@ public sealed class LayoutConventionContractTests
         var secondRun = new ArchitectureContractRunner(CreateContext(), document).Session.CheckLayoutConventionsContract(contract);
 
         Assert.That(firstRun.Select(v => v.SourceType), Is.EqualTo(secondRun.Select(v => v.SourceType)));
+    }
+
+    // Routes through ArchitectureContractFamilyRegistry's "layout_conventions" Checker delegate and
+    // ArchitectureContractHandlerRegistry, not just the direct session call every other test in this
+    // file uses - exercises the family's actual dispatch wiring end-to-end, matching how the CLI runs it.
+    [Test]
+    public void Executor_RoutesLayoutConventionsThroughRegistry_MatchesDirectSessionCall()
+    {
+        var contract = new ArchitectureLayoutConventionContract
+        {
+            Name = "services-folder-must-not-contain-interfaces",
+            FilesMatching = new ArchitectureLayoutFileMatcher { FolderSegment = "Services" },
+            ForbidTypeKind = "interface"
+        };
+        var document = CreateDocument(contract);
+
+        var directRunner = new ArchitectureContractRunner(CreateContext(), document);
+        List<ArchitectureViolation> expected = directRunner.Session.CheckLayoutConventionsContract(contract);
+
+        var executorRunner = new ArchitectureContractRunner(CreateContext(), document);
+        ArchitectureContractExecutionResult result = new ArchitectureContractExecutor()
+            .Execute(executorRunner.Session, "strict", new ArchitectureContractHandlerRegistry());
+
+        Assert.That(result.Violations.Select(v => v.SourceType), Is.EquivalentTo(expected.Select(v => v.SourceType)));
+        Assert.That(result.Violations, Has.Count.GreaterThan(0));
     }
 }
