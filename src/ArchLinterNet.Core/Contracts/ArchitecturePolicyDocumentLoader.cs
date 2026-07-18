@@ -363,6 +363,13 @@ public sealed partial class ArchitecturePolicyDocumentLoader : IArchitecturePoli
 
     private static readonly string[] _layoutRequireMatchingInterfaceAllowedKeys = { "name_prefix" };
 
+    private static readonly string[] _layoutConventionContractAllowedKeys =
+    {
+        "name", "id", "files_matching", "require_type_kind", "forbid_type_kind",
+        "required_name_suffix", "required_name_prefix", "forbidden_name_suffix", "forbidden_name_prefix",
+        "require_type_name_matches_file_name", "require_matching_interface", "ignored_violations", "reason"
+    };
+
     // Mirrors ValidateRawContextualContractYaml's rationale: IgnoreUnmatchedProperties() would
     // otherwise silently drop a typo'd files_matching key (e.g. "folder_segments" for
     // "folder_segment"), leaving the selector looking like a legitimate-but-empty field instead of
@@ -404,6 +411,14 @@ public sealed partial class ArchitecturePolicyDocumentLoader : IArchitecturePoli
                 && nameNode is YamlScalarNode nameScalar
                     ? nameScalar.Value ?? UnnamedContractName
                     : UnnamedContractName;
+
+            // Top-level fields too: without this, a typo like "required_name_sufix" is silently
+            // dropped by IgnoreUnmatchedProperties() for a monolithic (non-imported) policy - the
+            // composed-policy path catches this via schema/dependencies.arch.schema.json's
+            // additionalProperties: false, but that JSON-schema pass never runs for a monolithic
+            // policy, so this raw-YAML check is the only place monolithic policies get the same
+            // protection. Mirrors ValidatePortBoundaryContractNodeKeys's identical rationale.
+            ValidateKnownKeys(contractNode, contractName, "layout convention contract", _layoutConventionContractAllowedKeys);
 
             if (TryGetChild(contractNode, "files_matching", out YamlNode? filesMatchingNode)
                 && filesMatchingNode is YamlMappingNode filesMatchingMapping)

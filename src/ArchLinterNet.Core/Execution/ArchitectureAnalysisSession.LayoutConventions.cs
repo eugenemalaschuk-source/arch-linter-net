@@ -25,10 +25,15 @@ public sealed partial class ArchitectureAnalysisSession
         // require_type_name_matches_file_name is included here too: it inherently needs a resolved
         // FileNameWithoutExtension, so a namespace_segment-only contract combined with it would
         // otherwise report zero violations forever once every match becomes an "unfiled" group.
+        // Record type-kind expectations are included for the same reason: per source-file-fact-index,
+        // reflection alone classifies record types as Class/Struct - "Record" is only ever accurate
+        // when Roslyn source enrichment succeeded for that specific declaration.
         bool needsSourcePath = !string.IsNullOrEmpty(contract.FilesMatching.FolderSegment)
             || !string.IsNullOrEmpty(contract.FilesMatching.FileNameSuffix)
             || !string.IsNullOrEmpty(contract.FilesMatching.FileNamePrefix)
-            || contract.RequireTypeNameMatchesFileName;
+            || contract.RequireTypeNameMatchesFileName
+            || IsRecordKind(contract.RequireTypeKind)
+            || IsRecordKind(contract.ForbidTypeKind);
 
         if (needsSourcePath && SourceFileFactIndex.AllFacts.All(fact => fact.SourceFilePath == null))
         {
@@ -56,8 +61,106 @@ public sealed partial class ArchitectureAnalysisSession
             EvaluateFileGroupExpectations(contract, group, executionContext, violations);
         }
 
+        AddAmbiguousSourceDeclarationViolations(contract, executionContext, violations);
+
         executionContext.CollectUnmatchedIgnores(_unmatchedIgnoredViolations);
         return violations;
+    }
+
+    private static bool IsRecordKind(string value) =>
+        ArchitectureLayoutTypeKindParser.TryParse(value, out ArchitectureTypeKind kind) && kind == ArchitectureTypeKind.Record;
+
+    // A partial-class declaration spread across multiple files gets a null SourceFilePath (see
+    // source-file-fact-index's ambiguity model) and is therefore invisible to folder_segment/
+    // file_name_* selectors - CollectMatchedFileGroups correctly cannot place it in any file group.
+    // Left unaddressed, a violating type could dodge a folder-based rule simply by being declared
+    // as a partial class, with zero diagnostic explaining why. Ambiguities do carry every candidate
+    // declaration path, so when at least one of them would satisfy the folder/file-name selector
+    // (and any populated namespace_segment, checked against the fact's always-reliable reflection
+    // namespace), report it as unresolvable instead of silently excluding it.
+    private void AddAmbiguousSourceDeclarationViolations(
+        ArchitectureLayoutConventionContract contract,
+        ArchitectureContractExecutionContext executionContext,
+        List<ArchitectureViolation> violations)
+    {
+        ArchitectureLayoutFileMatcher matcher = contract.FilesMatching;
+        bool selectorNeedsSourcePath = !string.IsNullOrEmpty(matcher.FolderSegment)
+            || !string.IsNullOrEmpty(matcher.FileNameSuffix)
+            || !string.IsNullOrEmpty(matcher.FileNamePrefix);
+        if (!selectorNeedsSourcePath)
+        {
+            return;
+        }
+
+        foreach (ArchitectureDeclaredTypeSourceAmbiguity ambiguity in SourceFileFactIndex.Ambiguities
+                     .OrderBy(a => a.FullTypeName, StringComparer.Ordinal))
+        {
+            if (!AnyCandidatePathMatchesFileSelector(matcher, ambiguity.SourceFilePaths))
+            {
+                continue;
+            }
+
+            if (!SourceFileFactIndex.TryGetFact(ambiguity.AssemblyName, ambiguity.FullTypeName, out ArchitectureDeclaredTypeFact fact))
+            {
+                continue;
+            }
+
+            if (!string.IsNullOrEmpty(matcher.NamespaceSegment)
+                && !fact.NamespaceSegments.Contains(matcher.NamespaceSegment, StringComparer.Ordinal))
+            {
+                continue;
+            }
+
+            AddViolation(
+                contract, executionContext, violations,
+                sourceType: ambiguity.FullTypeName,
+                forbiddenReference: "cannot evaluate: declared across multiple source files " +
+                    $"({string.Join(", ", ambiguity.SourceFilePaths)}), so its folder/file-name facts are ambiguous",
+                payload: new LayoutConventionPayload(DataUnavailable: true));
+        }
+    }
+
+    private static bool AnyCandidatePathMatchesFileSelector(
+        ArchitectureLayoutFileMatcher matcher, IReadOnlyList<string> candidatePaths)
+    {
+        foreach (string path in candidatePaths)
+        {
+            string[] folderSegments = GetFolderSegmentsFromPath(path);
+            string fileName = GetFileNameWithoutExtensionFromPath(path);
+
+            if (!string.IsNullOrEmpty(matcher.FolderSegment) && !folderSegments.Contains(matcher.FolderSegment, StringComparer.Ordinal))
+            {
+                continue;
+            }
+
+            if (!string.IsNullOrEmpty(matcher.FileNameSuffix) && !fileName.EndsWith(matcher.FileNameSuffix, StringComparison.Ordinal))
+            {
+                continue;
+            }
+
+            if (!string.IsNullOrEmpty(matcher.FileNamePrefix) && !fileName.StartsWith(matcher.FileNamePrefix, StringComparison.Ordinal))
+            {
+                continue;
+            }
+
+            return true;
+        }
+
+        return false;
+    }
+
+    private static string[] GetFolderSegmentsFromPath(string normalizedRelativePath)
+    {
+        int lastSlash = normalizedRelativePath.LastIndexOf('/');
+        return lastSlash <= 0 ? Array.Empty<string>() : normalizedRelativePath[..lastSlash].Split('/');
+    }
+
+    private static string GetFileNameWithoutExtensionFromPath(string normalizedRelativePath)
+    {
+        int lastSlash = normalizedRelativePath.LastIndexOf('/');
+        string fileName = lastSlash >= 0 ? normalizedRelativePath[(lastSlash + 1)..] : normalizedRelativePath;
+        int dot = fileName.LastIndexOf('.');
+        return dot > 0 ? fileName[..dot] : fileName;
     }
 
     // File selection is file-granular, not fact-granular: a file matches folder_segment/file_name_*
@@ -216,10 +319,18 @@ public sealed partial class ArchitectureAnalysisSession
     {
         string groupLabel = group.SourceFilePath ?? group.Facts[0].FullTypeName;
 
+        // Record classification is only Roslyn-accurate on facts with a resolved SourceFilePath; an
+        // unfiled group (no source enrichment, or an ambiguous partial-class declaration) reports
+        // Class/Struct from reflection alone even for a genuine record - matching or excluding it by
+        // TypeKind == Record would silently pass a violating type or false-flag a compliant one.
         if (!string.IsNullOrEmpty(contract.RequireTypeKind))
         {
             ArchitectureTypeKind requiredKind = ParseTypeKind(contract.RequireTypeKind);
-            if (!group.Facts.Any(fact => fact.TypeKind == requiredKind))
+            if (requiredKind == ArchitectureTypeKind.Record && group.SourceFilePath == null)
+            {
+                AddUnresolvedRecordKindViolation(contract, group, executionContext, violations, "require_type_kind");
+            }
+            else if (!group.Facts.Any(fact => fact.TypeKind == requiredKind))
             {
                 string actualKinds = string.Join(", ", group.Facts.Select(f => f.TypeKind.ToString()).Distinct(StringComparer.Ordinal));
                 AddViolation(
@@ -236,16 +347,23 @@ public sealed partial class ArchitectureAnalysisSession
         if (!string.IsNullOrEmpty(contract.ForbidTypeKind))
         {
             ArchitectureTypeKind forbiddenKind = ParseTypeKind(contract.ForbidTypeKind);
-            foreach (ArchitectureDeclaredTypeFact fact in group.Facts.Where(f => f.TypeKind == forbiddenKind))
+            if (forbiddenKind == ArchitectureTypeKind.Record && group.SourceFilePath == null)
             {
-                AddViolation(
-                    contract, executionContext, violations,
-                    sourceType: fact.FullTypeName,
-                    forbiddenReference: $"forbidden type kind '{contract.ForbidTypeKind}'",
-                    payload: new LayoutConventionPayload(
-                        MatchedFilePath: group.SourceFilePath,
-                        ExpectedTypeKind: $"not {contract.ForbidTypeKind}",
-                        ActualTypeKind: fact.TypeKind.ToString()));
+                AddUnresolvedRecordKindViolation(contract, group, executionContext, violations, "forbid_type_kind");
+            }
+            else
+            {
+                foreach (ArchitectureDeclaredTypeFact fact in group.Facts.Where(f => f.TypeKind == forbiddenKind))
+                {
+                    AddViolation(
+                        contract, executionContext, violations,
+                        sourceType: fact.FullTypeName,
+                        forbiddenReference: $"forbidden type kind '{contract.ForbidTypeKind}'",
+                        payload: new LayoutConventionPayload(
+                            MatchedFilePath: group.SourceFilePath,
+                            ExpectedTypeKind: $"not {contract.ForbidTypeKind}",
+                            ActualTypeKind: fact.TypeKind.ToString()));
+                }
             }
         }
 
@@ -340,6 +458,23 @@ public sealed partial class ArchitectureAnalysisSession
                     MatchedFilePath: group.SourceFilePath,
                     ExpectedCounterpartName: expectedCounterpartName));
         }
+    }
+
+    private static void AddUnresolvedRecordKindViolation(
+        ArchitectureLayoutConventionContract contract,
+        LayoutFileGroup group,
+        ArchitectureContractExecutionContext executionContext,
+        List<ArchitectureViolation> violations,
+        string fieldName)
+    {
+        string groupLabel = group.SourceFilePath ?? group.Facts[0].FullTypeName;
+        AddViolation(
+            contract, executionContext, violations,
+            sourceType: groupLabel,
+            forbiddenReference: $"cannot evaluate {fieldName}: record — record vs class/struct classification requires " +
+                "source-enriched facts, unavailable for this declared type (missing source enrichment or an ambiguous " +
+                "partial-class declaration)",
+            payload: new LayoutConventionPayload(DataUnavailable: true));
     }
 
     private static void AddViolation(

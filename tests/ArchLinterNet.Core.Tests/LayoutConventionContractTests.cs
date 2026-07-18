@@ -43,6 +43,13 @@ public sealed class LayoutConventionContractTests
             namespace LayoutConventionContractTestFixtures.MixedNamespaceFile { public sealed class ServiceInMatchingNamespace { } }
             namespace LayoutConventionContractTestFixtures.MixedNamespaceFileOther { public interface IEscapingInterface { } }
             """);
+        // Same namespace+type name declared in two distinct files - a partial-class ambiguity per
+        // ArchitectureSourceFileFactIndex, giving PartialOffender a null SourceFilePath even though
+        // one of its two candidate declaration paths sits under "Services".
+        WriteFixtureFile("Services/PartialOffender.Part1.cs",
+            "namespace LayoutConventionContractTestFixtures.AmbiguousFolder { public sealed class PartialOffender { } }");
+        WriteFixtureFile("Elsewhere/PartialOffender.Part2.cs",
+            "namespace LayoutConventionContractTestFixtures.AmbiguousFolder { public sealed class PartialOffender { } }");
     }
 
     [TearDown]
@@ -428,5 +435,84 @@ public sealed class LayoutConventionContractTests
         Assert.That(violations.Any(v =>
             v.SourceType.Contains("NoSourceFileType", StringComparison.Ordinal)
             && v.Payload is LayoutConventionPayload { DataUnavailable: true }), Is.True);
+    }
+
+    // Regression: a partial-class declaration spread across two files gets a null SourceFilePath
+    // (ambiguous), which previously made it silently invisible to folder_segment-based rules even
+    // though one of its candidate declaration paths sits under the flagged folder.
+    [Test]
+    public void CheckLayoutConventionsContract_AmbiguousPartialType_CandidatePathMatchesFolder_IsViolation()
+    {
+        var contract = new ArchitectureLayoutConventionContract
+        {
+            Name = "services-must-not-contain-offenders",
+            FilesMatching = new ArchitectureLayoutFileMatcher { FolderSegment = "Services" },
+            ForbidTypeKind = "class"
+        };
+        var runner = new ArchitectureContractRunner(CreateContext(), CreateDocument(contract));
+
+        var violations = runner.Session.CheckLayoutConventionsContract(contract);
+
+        Assert.That(violations.Any(v =>
+            v.SourceType.Contains("PartialOffender", StringComparison.Ordinal)
+            && v.Payload is LayoutConventionPayload { DataUnavailable: true }), Is.True);
+    }
+
+    // Regression: an ambiguity whose candidate paths do NOT satisfy the folder/file-name selector
+    // must not be reported - only ambiguities that could plausibly match are flagged as unresolvable.
+    [Test]
+    public void CheckLayoutConventionsContract_AmbiguousPartialType_NoCandidatePathMatches_NoViolation()
+    {
+        var contract = new ArchitectureLayoutConventionContract
+        {
+            Name = "interfaces-must-not-contain-offenders",
+            FilesMatching = new ArchitectureLayoutFileMatcher { FolderSegment = "Interfaces" },
+            ForbidTypeKind = "class"
+        };
+        var runner = new ArchitectureContractRunner(CreateContext(), CreateDocument(contract));
+
+        var violations = runner.Session.CheckLayoutConventionsContract(contract);
+
+        Assert.That(violations.Any(v => v.SourceType.Contains("PartialOffender", StringComparison.Ordinal)), Is.False);
+    }
+
+    // Regression: reflection alone classifies records as Class/Struct (see source-file-fact-index) -
+    // a record type with no resolvable source file must not silently pass forbid_type_kind: record.
+    [Test]
+    public void CheckLayoutConventionsContract_ForbidRecordKind_UnresolvedSourceFile_IsViolationNotSilentPass()
+    {
+        var contract = new ArchitectureLayoutConventionContract
+        {
+            Name = "records-forbidden-in-record-kind-namespace",
+            FilesMatching = new ArchitectureLayoutFileMatcher { NamespaceSegment = "RecordKind" },
+            ForbidTypeKind = "record"
+        };
+        var runner = new ArchitectureContractRunner(CreateContext(), CreateDocument(contract));
+
+        var violations = runner.Session.CheckLayoutConventionsContract(contract);
+
+        Assert.That(violations.Any(v =>
+            v.SourceType.Contains("UnresolvedRecord", StringComparison.Ordinal)
+            && v.Payload is LayoutConventionPayload { DataUnavailable: true }), Is.True);
+    }
+
+    // Regression: the run-level guard must also treat a record type-kind expectation as needing
+    // source-path data, so a namespace_segment-only contract with zero source enrichment gets the
+    // single clean "unavailable" diagnostic instead of silently reporting zero violations.
+    [Test]
+    public void CheckLayoutConventionsContract_ForbidRecordKind_NoSourceRootsAtAll_EmitsUnavailableDiagnostic()
+    {
+        var contract = new ArchitectureLayoutConventionContract
+        {
+            Name = "records-forbidden",
+            FilesMatching = new ArchitectureLayoutFileMatcher { NamespaceSegment = "Services" },
+            ForbidTypeKind = "record"
+        };
+        var runner = new ArchitectureContractRunner(CreateContext(), CreateDocument(contract, withSourceRoots: false));
+
+        var violations = runner.Session.CheckLayoutConventionsContract(contract);
+
+        Assert.That(violations, Has.Count.EqualTo(1));
+        Assert.That(((LayoutConventionPayload)violations[0].Payload!).DataUnavailable, Is.True);
     }
 }

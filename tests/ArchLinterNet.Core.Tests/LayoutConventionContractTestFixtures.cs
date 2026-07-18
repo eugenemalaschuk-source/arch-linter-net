@@ -43,3 +43,19 @@ namespace LayoutConventionContractTestFixtures.UnfiledNamespace
 {
     public sealed class NoSourceFileType;
 }
+
+// Declared as a real record (compiles to a class at the CLR level - reflection alone can never
+// distinguish it from an ordinary class). Deliberately has NO corresponding WriteFixtureFile call,
+// so its fact never gets Roslyn-accurate TypeKind enrichment even under partial source enrichment.
+namespace LayoutConventionContractTestFixtures.RecordKind
+{
+    public sealed record UnresolvedRecord;
+}
+
+// Two distinct written files below both declare this exact namespace+type name, producing a
+// partial-class ambiguity (null SourceFilePath) whose one candidate declaration path sits under
+// "Services" - regression fixture for folder-based rules escaping via ambiguous source mapping.
+namespace LayoutConventionContractTestFixtures.AmbiguousFolder
+{
+    public sealed class PartialOffender;
+}

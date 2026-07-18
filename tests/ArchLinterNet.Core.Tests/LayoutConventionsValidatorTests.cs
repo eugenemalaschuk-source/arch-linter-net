@@ -177,8 +177,11 @@ public sealed class LayoutConventionsValidatorTests
                   when: "true"
             """);
 
+        // Caught by the top-level contract key allowlist (added to close a separate typo-tolerance
+        // gap) before it ever reaches the closed `when`-location check - `when` is simply not a
+        // recognized top-level layout convention contract field, only files_matching.when is.
         var exception = Assert.Throws<InvalidOperationException>(() => new ArchitecturePolicyDocumentLoader().Load(path));
-        Assert.That(exception!.Message, Does.Contain("approved expression locations"));
+        Assert.That(exception!.Message, Does.Contain("unknown property 'when'"));
     }
 
     [Test]
@@ -219,6 +222,32 @@ public sealed class LayoutConventionsValidatorTests
                     folder_segment: Services
                   require_matching_interface:
                     name_prefx: I
+            """);
+
+        var exception = Assert.Throws<InvalidOperationException>(() => new ArchitecturePolicyDocumentLoader().Load(path));
+        Assert.That(exception!.Message, Does.Contain("unknown property"));
+    }
+
+    // Regression: for a monolithic (non-imported) policy, IgnoreUnmatchedProperties() would
+    // otherwise silently drop a typo'd top-level expectation field like "required_name_sufix",
+    // leaving the naming constraint quietly unenforced instead of failing to load. The composed-
+    // policy path already catches this via the JSON schema's additionalProperties: false, but that
+    // pass never runs for a monolithic policy.
+    [Test]
+    public void Load_LayoutConventionContract_TypoTopLevelExpectationField_Throws()
+    {
+        string path = WritePolicy($"""
+            version: 1
+            name: Test
+            analysis:
+              target_assemblies: [{AssemblyName}]
+            contracts:
+              strict_layout_conventions:
+                - name: typo-top-level-field
+                  files_matching:
+                    folder_segment: Services
+                  require_type_kind: class
+                  required_name_sufix: Service
             """);
 
         var exception = Assert.Throws<InvalidOperationException>(() => new ArchitecturePolicyDocumentLoader().Load(path));
