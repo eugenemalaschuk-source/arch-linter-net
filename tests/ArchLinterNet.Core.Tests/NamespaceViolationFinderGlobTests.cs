@@ -1,6 +1,7 @@
 using ArchLinterNet.Core.Contracts;
 using ArchLinterNet.Core.Contracts.Families;
 using ArchLinterNet.Core.Execution;
+using ArchLinterNet.Core.Execution.Expressions;
 using ArchLinterNet.Core.Model;
 using ArchLinterNet.Core.Reporting;
 using ArchLinterNet.Core.Resolution;
@@ -92,7 +93,12 @@ public sealed class NamespaceViolationFinderGlobTests
                 forbiddenLayer,
                 Array.Empty<string>(),
                 executionContext,
-                roleIndex: roleIndex)
+                roleIndex: roleIndex,
+                expressionFacts: new ArchitectureExpressionFactService(
+                    roleIndex,
+                    new ArchitectureSourceFileFactIndex(
+                        new[] { typeof(SelectorReferenceSource).Assembly }, ".", Array.Empty<string>()),
+                    projectDiscovery: null))
             .ToArray();
 
         Assert.That(violations, Has.Length.EqualTo(1));
@@ -125,7 +131,12 @@ public sealed class NamespaceViolationFinderGlobTests
                 forbiddenLayer,
                 Array.Empty<string>(),
                 executionContext,
-                roleIndex: roleIndex)
+                roleIndex: roleIndex,
+                expressionFacts: new ArchitectureExpressionFactService(
+                    roleIndex,
+                    new ArchitectureSourceFileFactIndex(
+                        new[] { typeof(SelectorReferenceSource).Assembly }, ".", Array.Empty<string>()),
+                    projectDiscovery: null))
             .ToArray();
 
         Assert.That(violations, Has.Length.EqualTo(1));

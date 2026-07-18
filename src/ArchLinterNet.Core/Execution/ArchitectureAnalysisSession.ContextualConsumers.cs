@@ -36,7 +36,11 @@ public sealed partial class ArchitectureAnalysisSession
         string description = DescribeContextualConsumer(selector.Role, metadata, source?.Role, sourceMetadata);
         string identity = CreateContextualConsumerIdentity(selector.Role, metadata, source?.Role, sourceMetadata);
         _registeredContextualConsumers.TryAdd(identity,
-            new ArchitectureContextualConsumerReference(selector.Role, metadata, description, source?.Role, sourceMetadata));
+            new ArchitectureContextualConsumerReference(
+                selector.Role, metadata, description, source?.Role, sourceMetadata, selector.When)
+            {
+                CompiledWhen = selector.CompiledWhen
+            });
     }
 
     private static string DescribeContextualConsumer(

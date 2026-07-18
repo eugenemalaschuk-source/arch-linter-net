@@ -36,22 +36,42 @@ match. Selectors do not support wildcard or regular-expression values. A valid
 selector that matches no loaded types is reported as an empty selector unless
 the layer is marked `external: true`.
 
-## Reserved selector predicates
+## Selector `when` predicates
 
-The reviewed CEL policy model for issue #162 reserves a future explicit
-`layers.<name>.selector.when` field for narrow boolean predicates over the
-matched candidate type. That field is **not implemented yet** and must remain
-fail-closed until issue #163 lands.
+`layers.<name>.selector` accepts an optional `when` field: a CEL predicate
+that refines the selector's literal `role`/`metadata` match. `when` is
+additive — a type belongs to the layer only if it already matches `role` and
+`metadata`, *and* `when` evaluates to `true`:
+
+```yaml
+layers:
+  sales_domain:
+    selector:
+      role: Domain
+      when: subject.metadataText["domain"] == "Sales"
+```
+
+`when` compiles against a fixed `subject` context exposing identity facts
+(`fullName`, `simpleName`, `namespace`, `assemblyName`, `projectName`),
+classification facts (`role`, `metadataText: Map[String]`,
+`metadataBool: Map[Bool]`), type facts (`kind`, `isAbstract`, `isSealed`,
+`baseTypeNames`, `interfaceTypeNames`, `attributeTypeNames`), and path facts
+(`sourcePaths`, `sourceDirectoryPrefixes`). Numeric metadata is not exposed to
+`when` — match it with a literal `metadata` constraint instead.
 
 Important boundary:
 
 - ordinary selector fields such as `role`, `metadata`, `namespace`, and
   `namespace_suffix` are always literal values, never implicitly parsed as
-  expressions;
-- if CEL-backed predicates are introduced later, they will use only an explicit
-  `when` field;
-- policy authors and AI agents should not invent `when` in current runtime
-  policies.
+  expressions — only the explicit `when` field carries a CEL predicate;
+- a selector with no `when` behaves exactly as before this field existed —
+  `when` never runs unless declared;
+- `when` evaluating to `false` is an ordinary non-match; a `when` evaluation
+  failure (e.g. an unguarded reference to an absent `metadataText` key) fails
+  the run as a policy/configuration error, not a silent non-match, and is
+  never suppressed by baseline;
+- a selector whose combined literal-and-`when` match set is empty is reported
+  as an empty/stale selector the same way a purely literal empty selector is.
 
 ## Literal namespace prefixes
 

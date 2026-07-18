@@ -1,0 +1,81 @@
+## Context
+
+`ArchLinterNet.Core` already has, from #111/#112/#163:
+
+- `ArchitectureLayerSelector.When`/`CompiledWhen` and `ArchitectureContextSelector.When`/`CompiledWhen` — compiled at policy load time by `ExpressionCompilationValidator`, using the closed schemas in `ArchitectureExpressionSchemas` (`SelectorEnvironment` → `subject`; `ContextualSourceEnvironment` → `source`; `ContextualTargetEnvironment` → `source`, `target`, `dependency`).
+- `ArchitectureExpressionContextFactory` (`CreateSubjectValue`, `CreateDependencyValue`, `CreateSelectorContext`, `CreateContextualSourceContext`, `CreateContextualTargetContext`) and `ArchitectureExpressionEvaluator`/`ArchitectureExpressionEvaluationResult` — the typed context-building and evaluation-wrapper API, explicitly built for this task to consume, explicitly not called by anything yet.
+- `ArchitectureExpressionSubjectFacts`/`ArchitectureExpressionDependencyFacts` — empty DTO shells with no population logic anywhere in the codebase.
+- Two matcher call sites, both CEL-blind today: `ArchitectureLayerTypeMatcher.Matches` (namespace/role/metadata only) and `ArchitectureContextSelectorMatcher.Matches` (role/metadata + the four existing string operators only).
+
+The normative spec (`openspec/specs/cel-policy-model/spec.md`) already fixes the subject/dependency shapes and the fail-closed evaluation contract; this change does not revisit that shape, only implements it.
+
+## Goals / Non-Goals
+
+**Goals:**
+
+- Make `when` predicates actually participate in layer-selector and contextual-selector matching, evaluated against real per-candidate facts.
+- Preserve the literal-only fast path exactly: a selector with no `when` must not construct a CEL context, evaluate anything, or change behavior/performance versus today.
+- Make an expression evaluation failure a run-failing policy/configuration error, indistinguishable in severity from a compilation error, for both strict and audit contracts, never suppressed by baseline.
+- Make `when`-augmented matches and stale selectors explainable through existing diagnostic surfaces (configuration diagnostics, context-dependency/allow-only diagnostics, semantic coverage), without inventing a new diagnostic kind where an existing one already fits (`architecture-coverage-model`'s six-term vocabulary, `semantic-classification-model`'s selector diagnostics).
+
+**Non-Goals:**
+
+- Changing the `explain` CLI verb (`ArchitectureExplainApplicationService`) or the dependency-graph edge model to carry expression evidence. The issue's acceptance criteria accepts "explainable in diagnostics **or** explain output"; diagnostics is the lower-risk, already-fits-the-existing-pattern path. Graph-level explain integration is deferred as separate follow-up.
+- Any new `when` YAML location beyond the seven already closed in `ExpressionCompilationValidator.WhenFields`.
+- Any change to `ArchLinterNet.CEL` itself — this change only consumes its existing public API through `ArchitectureExpressionEvaluator`.
+- Numeric metadata exposure to CEL (`metadataText`/`metadataBool` only, per spec).
+- Runtime DI graph analysis, custom contract plugins, or regex.
+- Re-deriving the subject/dependency schema shape — it is already normatively fixed.
+
+## Decisions
+
+### D1: Fact population is reflection-based and happens once per candidate type, not once per selector evaluation
+
+`ArchitectureExpressionSubjectFacts` requires 16 members including base/interface/attribute type name lists — expensive to recompute per selector. Facts SHALL be built once per candidate `System.Type` (memoized on the existing per-session type descriptor / role-index entry, alongside where `role`/`metadata` are already resolved) and reused across every selector's `when` evaluation for that candidate within one analysis session.
+
+*Alternative considered*: build facts lazily per-`when`-evaluation. Rejected — with N selectors and M candidate types, this is O(N×M) reflection work instead of O(M); the existing `RoleIndex` already does one-pass classification per type, so fact population naturally piggybacks on that existing pass.
+
+### D2: Matchers evaluate `when` as an additional AND-ed condition, not a replacement for literal criteria
+
+Per `semantic-classification-model`'s existing "layer may declare namespace and selector together" precedent (both must match), `when` is additive: a selector's literal `role`/`metadata` (or contextual selector's role/metadata/operators) must still match, and if `when` is also present, it must also evaluate `true`. This keeps `role`/`metadata` as the fast, indexable pre-filter and `when` as a refinement — consistent with the spec's framing of CEL as "the constrained predicate language for these scenarios, not... a global template system."
+
+*Alternative considered*: `when` fully replaces role/metadata when present. Rejected — the shipped schema requires `role` as a mandatory field on every selector regardless of `when` (`semantic-classification-model` Requirement "Selector syntax is additive..." — role is non-empty-required), so role is never actually absent; treating `when` as replacement would contradict the already-shipped mandatory-role schema.
+
+### D3: Evaluation errors surface as a new `ExpressionEvaluationError` configuration diagnostic, distinct from ordinary violations and from compile-time diagnostics
+
+`ArchitectureExpressionEvaluationResult.Error(string)` already models this. The checking session (`ArchitectureAnalysisSession`) SHALL treat any `IsError` result the same way it treats an unrecoverable configuration problem today — collected as a blocking error for the run, reported once per distinct evaluation failure (selector identity + candidate identity + message), not swallowed into the violation list and not filtered by strict/audit or by baseline.
+
+*Alternative considered*: represent evaluation errors as ordinary `strict` violations so they participate in existing baseline/ignore machinery. Rejected — the spec is explicit that evaluation failure "means the policy is invalid for that run" and "SHALL NOT" be treated as a non-match or silently ignored; routing it through the violation pipeline would make it baseline-suppressible, which the spec forbids ("Baseline does not suppress expression infrastructure errors").
+
+### D4: Stale-selector detection re-runs the same combined literal+`when` matcher against the classified-type set, rather than tracking match counts separately
+
+`ArchitectureAnalysisSession.SemanticCoverage.GetSemanticStaleItems` asks "does this selector match zero classified types." For selector-backed *layers*, this holds exactly as originally reasoned: it already calls the (now `when`-aware) `ArchitectureLayerTypeMatcher.Matches` through `MatchesLayer`, so it becomes correct automatically. For *contextual* consumer references, this required one additional change beyond what was originally scoped here: `ArchitectureContextualConsumerReference` (the coverage-facing marker `RegisterContextualConsumerCore` builds from a contextual selector) captured only `Role`/`Metadata`, dropping the selector's own `When`/`CompiledWhen` entirely — a synthetic role/metadata-only `ArchitectureContextSelector` was rebuilt for coverage matching, so a `when`-refined contextual selector's coverage/staleness would have been evaluated as if `when` didn't exist. Fixed by adding `When` (public) and `CompiledWhen` (internal, mirroring `ArchitectureContextSelector.CompiledWhen`'s own visibility) to the reference record and threading them through `RegisterContextualConsumerCore` and `MatchesContextualConsumer`.
+
+One residual gap accepted for this wave: `ArchitectureContextualConsumerReference` tracks `SourceRole`/`SourceMetadata` for a forbidden/allowed/exclude selector's paired source selector, but not a `SourceWhen`. If a contract's `source` selector itself declares `when` *and* a forbidden/allowed/exclude selector also declares `when`, coverage/staleness for that pairing evaluates only the forbidden/allowed/exclude selector's own `when` — the source-side `when` is not re-checked during stale-selector detection (it is still correctly enforced during ordinary violation checking, which always operates on the real `ArchitectureContextSelector` objects, not this coverage-facing reference). Tracked as a documented limitation, not a silent gap: coverage still correctly reports a selector as covered/stale for every case that doesn't compound `when` on both the source and target sides of one contract.
+
+### D5: Contextual selector's `target`/`source` shape reuses the same subject-fact builder for both sides of a comparison
+
+`ContextualTargetEnvironment` exposes `source`, `target`, `dependency` — both `source` and `target` are `subject`-shaped (built via the same `CreateSubjectValue`/fact-population path as D1), just populated from different candidate types. This directly enables the issue's cross-comparison use case (`target.metadataText["domain"] == source.metadataText["domain"]`) without any new fact-building code path.
+
+### D6: `dependency` facts are deterministic but intentionally minimal in this wave — no reference-scanner rewrite
+
+`ArchitectureReferenceScanner.GetReferencedTypes` (the scan path `CheckContextDependencyContract`/`CheckContextAllowOnlyContract` actually use) reports type-level reference existence only; it does not track which member produced an edge, and "via method body" is a wholly separate, pattern-scoped IL scan (`ArchitectureIlMethodBodyScanner`) used only by the forbidden-call-pattern method-body contract family — it was never general-purpose type-pair edge data. Building a faithful per-edge `dependency` fact (`kind`, `viaMethodBody`, `sourceMemberName`, `targetMemberName`) would require re-architecting the reference scanner to yield structured edges instead of a flat `IEnumerable<Type>`, touching every consumer of `GetReferencedTypes` (composition, port-boundary, independence, and both contextual families) — sized like a separate story, not a task inside this change.
+
+`ArchitectureExpressionFactService.BuildDependencyFacts()` therefore returns one fixed, deterministic value: `kind: "declared-member-reference"`, `viaMethodBody: false`, `sourceMemberName`/`targetMemberName: ""`. This satisfies the closed schema shape (compiles, never throws, never varies non-deterministically) without claiming fidelity the scanner doesn't have. Critically, the issue's actual worked example — `target.metadataText["domain"] == source.metadataText["domain"]` — never touches `dependency.*` at all, so this scope reduction does not block the primary requested capability. Member-level dependency-fact enrichment is deferred as explicit follow-up scope, tracked the same way the `explain` CLI verb was deferred in the proposal.
+
+*Alternative considered*: extend the scanner now. Rejected for this change — the blast radius (every `GetReferencedTypes` consumer) and the "no fragile behavior changes to already-shipped contract families" risk outweigh delivering `dependency.*` fidelity in this wave.
+
+## Risks / Trade-offs
+
+- **[Risk] Reflection-based fact population (base types, interfaces, attributes) could be a meaningful perf regression for large solutions, especially since it must run even for candidates that end up matching no selector.** → Mitigation: build facts lazily on first access within a session (a candidate type never touched by any `when`-bearing selector never pays the cost), and only for policies that declare at least one `when` anywhere (checked once at policy-load time, matching the existing "selector with no `when` never touches the CEL engine" fast-path framing). Benchmarked in #168 groundwork; this change should add a benchmark scenario per AGENTS.md's `rtk make acceptance` gate if a perf regression is suspected, but does not need to re-run #168's full benchmark suite.
+- **[Risk] `sourceDirectoryPrefixes` (every repo-relative ancestor directory of every source path) is unbounded in cardinality for types with many partial-class source files.** → Mitigation: dedupe via `HashSet<string>` before exposing as `List[String]`; this is a closed, spec-fixed shape so no design flexibility here, only implementation efficiency.
+- **[Risk] Introducing a new "expression evaluation error" failure category could be confused with existing "configuration diagnostic" categories in CLI JSON output, breaking a consumer's exit-code or diagnostic-kind assumptions.** → Mitigation: reuse the existing configuration/validation error reporting path (the same one `ExpressionCompilationValidator` already uses for compile errors) rather than inventing a new diagnostic kind — evaluation errors and compilation errors becoming siblings under one existing category, which is what the spec's "fail the policy load"-equivalent framing implies for runtime evaluation too.
+- **[Trade-off] Not touching `explain` command in this wave means a user debugging *why* a `when`-driven contextual violation fired must read the violation diagnostic's expression-provenance fields, not run `explain --source --target`.** → Acceptable per the issue's "diagnostics or explain output" acceptance wording; documented as a known gap in this change's docs update, with a natural follow-up scope.
+
+## Migration Plan
+
+Purely additive at the code level (new evaluation path activates only when a policy declares `when`); no schema version bump (`policy schema version` stays `1` per the already-shipped compatibility requirement). Existing literal-only policies and existing `when`-declaring-but-not-yet-evaluated policies (there should be none in the wild yet, since #163 fail-closed-rejected any live evaluation) both continue to load. No rollback concerns beyond normal PR revert — no persisted state, no migration script needed.
+
+## Open Questions
+
+- None blocking implementation. If `make acceptance`'s existing self-architecture-policy fixtures reveal a specific perf concern during implementation, a benchmark can be added at that point rather than pre-emptively speculating on numbers here.

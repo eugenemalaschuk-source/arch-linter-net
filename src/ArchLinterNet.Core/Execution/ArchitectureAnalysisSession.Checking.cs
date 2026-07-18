@@ -31,12 +31,12 @@ public sealed partial class ArchitectureAnalysisSession
             if (transitive)
             {
                 violations.AddRange(ArchitectureNamespaceViolationFinder.FindTransitiveNamespaceViolations(sourceTypes,
-                    forbiddenLayer, contract.AllowedTypes, Context.TargetAssemblies, executionContext, ReferenceGraph, RoleIndex));
+                    forbiddenLayer, contract.AllowedTypes, Context.TargetAssemblies, executionContext, ReferenceGraph, RoleIndex, ExpressionFacts));
             }
             else
             {
                 violations.AddRange(ArchitectureNamespaceViolationFinder.FindNamespaceViolations(sourceTypes, forbiddenLayer,
-                    contract.AllowedTypes, executionContext, ReferenceGraph, RoleIndex));
+                    contract.AllowedTypes, executionContext, ReferenceGraph, RoleIndex, ExpressionFacts));
             }
         }
 
@@ -48,13 +48,13 @@ public sealed partial class ArchitectureAnalysisSession
                 {
                     violations.AddRange(ArchitectureNamespaceViolationFinder.FindTransitiveNamespaceViolations(sourceTypes,
                         new ArchitectureLayer { Namespace = forbiddenNamespace },
-                    contract.AllowedTypes, Context.TargetAssemblies, executionContext, ReferenceGraph, RoleIndex));
+                    contract.AllowedTypes, Context.TargetAssemblies, executionContext, ReferenceGraph, RoleIndex, ExpressionFacts));
                 }
                 else
                 {
                     violations.AddRange(ArchitectureNamespaceViolationFinder.FindNamespaceViolations(sourceTypes,
                         new ArchitectureLayer { Namespace = forbiddenNamespace },
-                    contract.AllowedTypes, executionContext, ReferenceGraph, RoleIndex));
+                    contract.AllowedTypes, executionContext, ReferenceGraph, RoleIndex, ExpressionFacts));
                 }
             }
         }
@@ -146,7 +146,8 @@ public sealed partial class ArchitectureAnalysisSession
             {
                 var (_, forbiddenLayer, _) = effectiveLayers[forbiddenIndex];
                 foreach (ArchitectureViolation v in ArchitectureNamespaceViolationFinder.FindNamespaceViolations(
-                    sourceTypes, forbiddenLayer, Array.Empty<string>(), executionContext, ReferenceGraph, RoleIndex))
+                    sourceTypes, forbiddenLayer, Array.Empty<string>(), executionContext, ReferenceGraph, RoleIndex,
+                    ExpressionFacts))
                 {
                     violations.Add(v with
                     {
@@ -244,7 +245,7 @@ public sealed partial class ArchitectureAnalysisSession
                     .Where(r => !contract.AllowedTypes.Contains(r.FullName))
                     .Where(r => r.Type != null && IsInAnyDeclaredLayer(r.Type))
                     .Where(r => !ArchitectureNamespaceViolationFinder.IsInAnyAllowedLayer(
-                        r.Type!, allowedLayers, RoleIndex))
+                        r.Type!, allowedLayers, RoleIndex, ExpressionFacts))
                     .Where(r => !executionContext.IsIgnored(sourceFullName, r.FullName))
                     .Select(r => r.FullName)
                     .Distinct()
@@ -622,7 +623,7 @@ public sealed partial class ArchitectureAnalysisSession
                 ArchitectureLayer forbiddenLayer =
                     ArchitectureLayerResolver.ResolveLayer(Document, contract.Name, forbiddenLayerName);
                 violations.AddRange(ArchitectureNamespaceViolationFinder.FindNamespaceViolations(sourceTypes, forbiddenLayer,
-                    Array.Empty<string>(), executionContext, null, RoleIndex));
+                    Array.Empty<string>(), executionContext, null, RoleIndex, ExpressionFacts));
             }
         }
 

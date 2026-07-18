@@ -1,3 +1,5 @@
+using ArchLinterNet.CEL.Compilation;
+
 namespace ArchLinterNet.Core.Model;
 
 // A plain data marker recording that a contextual dependency/allow-only contract's selector
@@ -10,9 +12,21 @@ namespace ArchLinterNet.Core.Model;
 // alone" requirement. Metadata is empty when the selector declares no metadata constraints
 // (role-only consumption). Description is a deterministic key for deduplication and diagnostics.
 // See openspec/changes/add-contextual-dependency-contracts/design.md Decision 7.
+//
+// When/CompiledWhen mirror the originating ArchitectureContextSelector's own fields (added by
+// #164 — see openspec/changes/cel-selector-contextual-integration/design.md) so stale-selector
+// coverage detection re-evaluates the selector's `when` expression, not just its literal
+// role/metadata, when deciding whether the selector still matches any classified fact.
 public sealed record ArchitectureContextualConsumerReference(
     string Role,
     IReadOnlyDictionary<string, object> Metadata,
     string Description,
     string? SourceRole = null,
-    IReadOnlyDictionary<string, object>? SourceMetadata = null);
+    IReadOnlyDictionary<string, object>? SourceMetadata = null,
+    string? When = null)
+{
+    // Kept internal (unlike the positional properties above) so the compiled CEL predicate — an
+    // ArchLinterNet.CEL engine type — never appears on this Core model's public surface, matching
+    // ArchitectureContextSelector.CompiledWhen's own internal visibility.
+    internal CelCompiledPredicate? CompiledWhen { get; init; }
+}

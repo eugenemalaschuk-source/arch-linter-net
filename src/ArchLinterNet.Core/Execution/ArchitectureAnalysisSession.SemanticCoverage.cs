@@ -205,29 +205,36 @@ public sealed partial class ArchitectureAnalysisSession
 
     private bool MatchesContextualConsumer(ArchitectureContextualConsumerReference consumer, Type type)
     {
-        ArchitectureContextSelector selector = CreateContextualSelector(consumer.Role, consumer.Metadata);
+        ArchitectureContextSelector selector = CreateContextualSelector(
+            consumer.Role, consumer.Metadata, consumer.When, consumer.CompiledWhen);
         if (consumer.SourceRole == null)
         {
-            return ArchitectureContextSelectorMatcher.Matches(selector, type, RoleIndex, sourceDescriptor: null);
+            return ArchitectureContextSelectorMatcher.Matches(
+                selector, type, RoleIndex, sourceDescriptor: null, ExpressionFacts, sourceType: null);
         }
 
         ArchitectureContextSelector sourceSelector = CreateContextualSelector(
-            consumer.SourceRole,
-            consumer.SourceMetadata!);
+            consumer.SourceRole, consumer.SourceMetadata!, When: null, CompiledWhen: null);
         return RoleIndex.ClassifiedTypes().Any(sourceType =>
             RoleIndex.TryGetRole(sourceType, out ArchitectureTypeClassificationResult sourceDescriptor)
-            && ArchitectureContextSelectorMatcher.Matches(sourceSelector, sourceType, RoleIndex, sourceDescriptor: null)
-            && ArchitectureContextSelectorMatcher.Matches(selector, type, RoleIndex, sourceDescriptor));
+            && ArchitectureContextSelectorMatcher.Matches(
+                sourceSelector, sourceType, RoleIndex, sourceDescriptor: null, ExpressionFacts, sourceType: null)
+            && ArchitectureContextSelectorMatcher.Matches(
+                selector, type, RoleIndex, sourceDescriptor, ExpressionFacts, sourceType));
     }
 
     private static ArchitectureContextSelector CreateContextualSelector(
         string role,
-        IReadOnlyDictionary<string, object> metadata)
+        IReadOnlyDictionary<string, object> metadata,
+        string? When,
+        ArchLinterNet.CEL.Compilation.CelCompiledPredicate? CompiledWhen)
     {
         return new ArchitectureContextSelector
         {
             Role = role,
-            Metadata = new Dictionary<string, object>(metadata, StringComparer.Ordinal)
+            Metadata = new Dictionary<string, object>(metadata, StringComparer.Ordinal),
+            When = When,
+            CompiledWhen = CompiledWhen
         };
     }
 

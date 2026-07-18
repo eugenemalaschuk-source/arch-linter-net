@@ -111,7 +111,8 @@ The coverage contract family SHALL accept `scope: semantic_role` for strict and 
 - **THEN** its validation and findings remain identical to the pre-semantic integration behavior
 
 ### Requirement: Semantic coverage classifies discovered facts and stale selectors
-Semantic role coverage SHALL classify each in-scope resolved role/metadata fact as `covered`, `excluded`, or `uncovered`, SHALL classify a selector or contextual semantic reference with no current match as `stale`, and SHALL classify unresolved role references or classification conflicts as `unknown` or `conflicting` evidence without treating them as dependency violations.
+
+Semantic role coverage SHALL classify each in-scope resolved role/metadata fact as `covered`, `excluded`, or `uncovered`, SHALL classify a selector or contextual semantic reference with no current match as `stale` — accounting for the selector's `when` expression when one is declared, not literal `role`/`metadata` criteria alone — and SHALL classify unresolved role references or classification conflicts as `unknown` or `conflicting` evidence without treating them as dependency violations. An expression evaluation failure encountered while determining a selector's match set SHALL be reported through the expression-evaluation-error path defined by `semantic-classification-model`/`contextual-dependency-contracts`/`contextual-allow-only-contracts`, and SHALL NOT be silently classified as `stale` or `uncovered`.
 
 #### Scenario: Unclassified first-party code is visible when semantic coverage is enabled
 - **WHEN** semantic classification is enabled and a first-party type in the contract roots has no resolved role
@@ -126,8 +127,16 @@ Semantic role coverage SHALL classify each in-scope resolved role/metadata fact 
 - **THEN** the fact is classified as covered even if no layer selector matches it
 
 #### Scenario: Empty semantic selector is stale
-- **WHEN** a semantic layer or contextual selector is valid but matches no current classified fact
-- **THEN** coverage reports a stale semantic selector with selector evidence
+- **WHEN** a semantic layer or contextual selector is valid but its combined literal-and-`when` match set contains no current classified fact
+- **THEN** coverage reports a stale semantic selector with selector evidence, including the `when` expression source text when one is declared
+
+#### Scenario: A broad `when` expression is visible as coverage evidence, not a silent pass
+- **WHEN** a selector's `when` expression matches a broad set of classified facts (e.g. an expression that is trivially `true` for most candidates)
+- **THEN** semantic coverage continues to classify matched facts as `covered` using the same evidence path as a literal match — broad matching remains visible through ordinary coverage/stale-selector reporting rather than being hidden by expression evaluation succeeding
+
+#### Scenario: Expression evaluation failure is not misclassified as stale or uncovered
+- **WHEN** determining a selector's match set requires evaluating a `when` expression that fails to evaluate for some candidate
+- **THEN** the coverage engine does not classify the affected selector as `stale` or the affected fact as `uncovered`; the run instead fails with the reported expression evaluation error
 
 ### Requirement: Semantic exclusions are explicit and documented
 Every semantic-role coverage exclusion SHALL include a non-empty reason and SHALL be applied using exact role and metadata matching; excluded facts SHALL be reported with the reason and SHALL not also appear as uncovered.

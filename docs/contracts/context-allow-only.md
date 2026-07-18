@@ -53,15 +53,35 @@ type (framework/BCL types, primitives, etc.) can never match any selector and is
 mirroring how the existing `allow_only` family only considers references already inside a declared
 layer.
 
-## Reserved CEL predicates
+## CEL predicates
 
-The reviewed CEL policy model for issue #162 defines future explicit `when`
-fields for contextual `source`/`allowed`/`exclude` selectors. Those fields are
-**not implemented yet** and must remain fail-closed until issue #163 lands.
+Contextual `source`/`allowed`/`exclude` selectors accept an optional `when`
+field, evaluated the same way as the `context_dependencies` family: additive
+to literal `role`/`metadata`, with `allowed[*].when`/`exclude[*].when`
+compiling against a context exposing `source`, `target`, and `dependency` so
+an `allowed` selector can restrict targets to the same context as their
+source:
 
-If introduced later, the rule stays the same as everywhere else in the model:
-existing selector fields remain literal and only an explicit `when` field may
-carry a CEL predicate.
+```yaml
+contracts:
+  strict_context_allow_only:
+    - name: sales-same-domain-only
+      source:
+        role: Domain
+      allowed:
+        - role: Domain
+          when: target.metadataText["domain"] == source.metadataText["domain"]
+      reason: Sales may only depend on its own domain.
+```
+
+The rule stays the same as everywhere else in the model: existing selector
+fields remain literal and only an explicit `when` field carries a CEL
+predicate. A `when` evaluation failure fails the run as a policy/configuration
+error — for both `strict_context_allow_only` and `audit_context_allow_only` —
+rather than being treated as a non-match, and is never suppressed by
+baseline. When no `allowed` selector matches but one came close (its literal
+`role`/`metadata` matched and only `when` evaluated `false`), the violation's
+evidence names that near-miss expression.
 
 ## Exclude vs. allowed vs. ignored_violations
 

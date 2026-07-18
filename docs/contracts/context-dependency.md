@@ -71,18 +71,39 @@ A missing role, or a missing constrained metadata key, is a non-match — never 
 [Semantic classification](../policy-format/semantic-classification.md#metadata-extraction-syntax)
 for how metadata values themselves are extracted and canonicalized.
 
-## Reserved CEL predicates
+## CEL predicates
 
-The reviewed CEL policy model for issue #162 also defines future explicit
-`when` fields on contextual `source`/`forbidden`/`exclude` selectors. Those
-predicate fields are **not implemented yet** and current policies must not rely
-on them until issue #163 lands.
+Contextual `source`/`forbidden`/`exclude` selectors accept an optional `when`
+field. `when` is additive to `role`/`metadata`: a candidate matches only if
+the literal constraints already match *and* `when` evaluates to `true`.
 
-If introduced later, `when` will be additive and explicit only:
+`source.when` compiles against a `source` context (the same subject shape
+used by layer selectors). `forbidden[*].when`/`exclude[*].when` compile
+against a context exposing `source`, `target`, and `dependency` — enabling
+cross-context comparisons such as:
 
-- existing `role` and `metadata` entries remain literal;
-- no contextual selector string is implicitly parsed as an expression;
-- expression failures stay fail-closed rather than weakening the contract.
+```yaml
+contracts:
+  strict_context_dependencies:
+    - name: sales-must-not-depend-on-other-domain
+      source:
+        role: Domain
+      forbidden:
+        - role: Domain
+          when: target.metadataText["domain"] != source.metadataText["domain"]
+      reason: Bounded contexts must not depend on each other's domain types.
+```
+
+- existing `role` and `metadata` entries remain literal; only the explicit
+  `when` field carries a CEL predicate;
+- a selector with no `when` behaves exactly as before this field existed;
+- a `when` evaluation failure fails the run as a policy/configuration error —
+  for both `strict_context_dependencies` and `audit_context_dependencies` —
+  rather than being treated as a non-match or silently ignored, and is never
+  suppressed by baseline;
+- when a matching `forbidden` selector declared `when`, the violation's
+  evidence names that expression's source text alongside the existing
+  role/metadata evidence.
 
 ## Exclude vs. ignored_violations
 
