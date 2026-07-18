@@ -30,5 +30,6 @@ internal static class ArchitecturePolicyDocumentValidatorPipeline
         new InterfaceImplementationValidator(),
         new CompositionValidator(),
         new ContextualContractValidator(),
+        new ExpressionCompilationValidator(),
     ];
 }
