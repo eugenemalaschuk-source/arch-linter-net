@@ -10,11 +10,12 @@ this spec:
 - Numeric literals SHALL NOT include a sign; `-` SHALL always tokenize as a standalone operator
   token. A leading `-` before a numeric literal SHALL be reported as `UnsupportedFeature`
   (arithmetic/unary-minus is deferred), never accepted as part of the literal. A float literal
-  (`FLOAT_LIT`) whose decimal value cannot be represented as a finite IEEE 754 double (i.e. whose
-  magnitude, typically from an extreme exponent, would round to positive or negative infinity)
-  SHALL be reported as `SyntaxError` — Profile v1's `Float` type is a finite representable value
-  (see the value-types requirement), so a literal that cannot be represented as one SHALL NOT be
-  silently accepted as `Infinity`.
+  (`FLOAT_LIT`) whose decimal text overflows the finite representable range of an IEEE 754 double
+  (i.e. whose magnitude, typically from an extreme exponent, would otherwise round to positive or
+  negative infinity during parsing) SHALL be reported as `SyntaxError` rather than silently
+  converted into a non-finite `Infinity` token value. This literal-level rule does not narrow the
+  `CelValue.Float(double)` runtime value domain or prohibit non-finite IEEE 754 values supplied
+  through the public value API.
 - The tokenizer SHALL accept `null` literals, `u`/`U`-suffixed unsigned-integer literals, and
   `b"..."`/`B"..."` byte-string literals as valid tokens (they are normative CEL syntax), and the
   parser SHALL reject each with `UnsupportedFeature` at the point the grammar would otherwise
