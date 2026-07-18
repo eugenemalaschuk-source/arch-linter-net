@@ -345,6 +345,17 @@ public sealed class CelParserDeferredFeatureTests
         Assert.That(diag.Code, Is.EqualTo(CelDiagnosticCode.UnsupportedFeature));
     }
 
+    // Upstream corpus (google/cel-go parser_test.go: `"😁" in ["😁", "😑", "😦"]`) #338 — a
+    // deferred list literal as the RHS of a supported comparison operator (`in`) must still be
+    // fully validated and cleanly classified as UnsupportedFeature, not produce a spurious
+    // SyntaxError about the enclosing `in` expression.
+    [Test]
+    public void ListLiteralAsInOperatorRightHandSide_IsUnsupportedFeature()
+    {
+        var diag = ParseFail("a in [1, 2, 3]");
+        Assert.That(diag.Code, Is.EqualTo(CelDiagnosticCode.UnsupportedFeature));
+    }
+
     // ── Unary prefix chains: '!'/'-' each self-chain but never mix ────────────
 
     [Test]

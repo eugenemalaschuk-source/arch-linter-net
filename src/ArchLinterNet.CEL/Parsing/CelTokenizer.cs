@@ -283,6 +283,14 @@ internal static class CelTokenizer
     {
         if (!double.TryParse(text, NumberStyles.Float, CultureInfo.InvariantCulture, out var dval))
             return (null, CelParseDiagnostics.SyntaxError(span, "Malformed floating-point literal.", profileId));
+
+        // double.TryParse silently rounds an out-of-range magnitude to +/-Infinity instead of
+        // failing (e.g. "1.99e90000009", well past IEEE 754 double's ~1.8e308 max) — Profile v1's
+        // Float type is "IEEE 754 double" (a finite/representable value), so a literal that cannot
+        // be represented SHALL be a SyntaxError, never silently become Infinity.
+        if (double.IsInfinity(dval))
+            return (null, CelParseDiagnostics.SyntaxError(span, "Floating-point literal magnitude is out of range.", profileId));
+
         return (new CelToken(CelTokenKind.FloatLiteral, span, text, floatValue: dval), null);
     }
 

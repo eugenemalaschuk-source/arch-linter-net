@@ -141,6 +141,36 @@ public sealed class CelTokenizerTests
         Assert.That(tokens[0].FloatValue, Is.EqualTo(expected).Within(1e-9));
     }
 
+    // Upstream corpus (plaisted/cel-compiled ParserTests.ParseFloatWithUintSuffixThrows) #338 —
+    // the `u`/`U` unsigned-integer suffix is a NUM_INT-only grammar production; a float literal
+    // followed by "u" tokenizes as a FloatLiteral immediately followed by a separate one-letter
+    // "u" identifier, not a single malformed token, and the two adjacent primaries then fail to
+    // parse (no connecting operator) — confirmed already-correct.
+    [Test]
+    public void UintSuffix_AfterFloatLiteral_DoesNotAttachToTheFloat()
+    {
+        var tokens = TokenizeOk("3.14u");
+        Assert.That(tokens[0].Kind, Is.EqualTo(CelTokenKind.FloatLiteral));
+        Assert.That(tokens[0].FloatValue, Is.EqualTo(3.14).Within(1e-9));
+        Assert.That(tokens[1].Kind, Is.EqualTo(CelTokenKind.Identifier));
+        Assert.That(tokens[1].StringValue, Is.EqualTo("u"));
+    }
+
+    // Upstream corpus (google/cel-go parser/parser_test.go, "Tests from C++ parser" section,
+    // `1.99e90000009` → "invalid double literal") #338. Before this pass, an out-of-range
+    // exponent silently produced a FloatLiteral token whose decoded value was +Infinity — since
+    // double.TryParse rounds an unrepresentable magnitude to Infinity instead of failing — rather
+    // than being rejected. Profile v1's Float type is documented as "IEEE 754 double" (a finite
+    // representable value); a policy expression with a typo'd exponent silently becoming infinity
+    // is a correctness hazard, not a permissive convenience. Fixed to reject with SyntaxError.
+    [TestCase("1.99e90000009", TestName = "corpus.parser.float_literals.huge_positive_exponent")]
+    [TestCase("1e400", TestName = "corpus.parser.float_literals.exponent_past_double_max")]
+    public void FloatLiteral_MagnitudeOutOfDoubleRange_IsSyntaxError_NotSilentInfinity(string source)
+    {
+        var diag = TokenizeFail(source);
+        Assert.That(diag.Code, Is.EqualTo(CelDiagnosticCode.SyntaxError));
+    }
+
     [Test]
     public void TrailingDotWithNoFollowingDigit_IsNotAFloatLiteral()
     {
@@ -156,6 +186,17 @@ public sealed class CelTokenizerTests
     public void IntLiteral_OutOfRange_IsSyntaxError()
     {
         var diag = TokenizeFail("99999999999999999999999999");
+        Assert.That(diag.Code, Is.EqualTo(CelDiagnosticCode.SyntaxError));
+    }
+
+    // Upstream corpus (google/cel-go parser_test.go: "0xFFFFFFFFFFFFFFFFF" → "invalid int
+    // literal", "0xFFFFFFFFFFFFFFFFFu" → "invalid uint literal") #338. Confirmed already-correct
+    // (17 hex digits overflows ulong); now explicitly regression-tested with provenance.
+    [TestCase("0xFFFFFFFFFFFFFFFFF", TestName = "corpus.parser.hex_int_literals.overflow_signed")]
+    [TestCase("0xFFFFFFFFFFFFFFFFFu", TestName = "corpus.parser.hex_int_literals.overflow_unsigned")]
+    public void HexIntLiteral_Overflow_IsSyntaxError(string source)
+    {
+        var diag = TokenizeFail(source);
         Assert.That(diag.Code, Is.EqualTo(CelDiagnosticCode.SyntaxError));
     }
 
@@ -404,12 +445,16 @@ public sealed class CelTokenizerTests
         }
     }
 
+    // "@" and "$" added from google/cel-go parser_test.go ("*@a | b", "1 + $") #338 — not
+    // previously covered by this table.
     [TestCase("=")]
     [TestCase("&")]
     [TestCase("|")]
     [TestCase("~")]
     [TestCase("^")]
     [TestCase("`")]
+    [TestCase("@")]
+    [TestCase("$")]
     public void InventedOrUnsupportedCharacter_IsSyntaxError(string source)
     {
         var diag = TokenizeFail(source);

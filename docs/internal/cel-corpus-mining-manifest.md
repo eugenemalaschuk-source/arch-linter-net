@@ -15,44 +15,52 @@ navigation — internal engineering record only.
 
 ## Reviewed corpora
 
-| # | Repository | Pinned ref | Files reviewed | Status |
+All eight repositories named in issue #338 were fetched and reviewed (two passes: an initial
+cel-spec-focused pass, then a full second pass covering the remaining seven).
+
+| # | Repository | Ref reviewed | Files reviewed | Status |
 |---|---|---|---|---|
 | 1 | `cel-expr/cel-spec` | `59505c14f3187e6eb9684fbd3d07146f614c6148` (already pinned by `cel-profile-v1` spec) | `tests/simple/testdata/parse.textproto` (full: `nest`, `repeat`, `string_literals`, `bytes_literals`, `whitespace`, `comments`, `selectors`, `receiver_function_names`, `struct_field_names` sections); `logic.textproto`, `comparisons.textproto`, `string.textproto` (cross-checked against already-adapted fixtures in `CelOfficialConformanceFixtureTests`) | Reviewed |
-| 2 | `cel-expr/cel-go` | HEAD at review time (no v1-pinned SHA; classification-only, not a runtime dependency) | Parser precedence/associativity idioms cross-checked against `cel-profile-v1`'s frozen precedence table (already normatively pinned; no new gap found) | Reviewed (spot-check) |
-| 3 | `cel-expr/cel-java` | HEAD at review time | Same precedence/associativity cross-check as #2 | Reviewed (spot-check) |
-| 4 | `projectnessie/cel-java` (table-driven parser/unparser suite) | — | Not fetched this pass | **Deferred — see Follow-up** |
-| 5 | `rayokota/cel.net` (C# port, Java-parser-corpus adaptation) | — | Not fetched this pass | **Deferred — see Follow-up** |
-| 6 | `telus-labs/cel-net` | — | Not fetched this pass | **Deferred — see Follow-up** |
-| 7 | `plaisted/cel-compiled` | — | Not fetched this pass | **Deferred — see Follow-up** |
-| 8 | `hbjydev/celdotnet` | — | Not fetched this pass | **Deferred — see Follow-up** |
+| 2 | `google/cel-go` | HEAD at review time (no v1-pinned SHA; classification-only, not a runtime dependency) | `parser/parser_test.go` (full: literal table, parse-error table, macro tests, "Tests from C++/Java parser" sections), `parser/unescape_test.go` (full) | Reviewed (full) |
+| 3 | `google/cel-java` | HEAD at review time | `parser/src/test/resources/parser_errors.baseline` (full: every `I:`/`E:` error-corpus entry) | Reviewed (full) |
+| 4 | `projectnessie/cel-java` | HEAD at review time | `core/src/test/java/org/projectnessie/cel/parser/ParserTest.java` (full) — confirmed to be a direct table-for-table Java port of `cel-go`'s own `parser_test.go` corpus (same numbered cases, same error strings); reviewed for divergence, found none beyond translation | Reviewed (full) |
+| 5 | `rayokota/cel.net` | HEAD at review time | `src/test/Cel/Parser/ParserTest.cs`, `src/test/Cel/Parser/UnescapeTest.cs` — confirmed direct C# port of the same cel-go/cel-java corpus | Reviewed (full) |
+| 6 | `telus-labs/cel-net` | HEAD at review time | `tests/Cel.Tests/Tests/CelParserTests.cs` (full — small, independently-written suite) | Reviewed (full) |
+| 7 | `plaisted/cel-compiled` | HEAD at review time | `Cel.Compiled.Tests/ParserTests.cs` (full — independently-written suite covering full CEL incl. arithmetic, which this port implements and Profile v1 defers) | Reviewed (full) |
+| 8 | `hbjydev/celdotnet` | HEAD at review time | `tests/CelDotNet.Tests/Lexer/CelLexerTests.cs`, `tests/CelDotNet.Tests/Parser/CelParserTests.cs` (full — independently-written suite; this port also implements triple-quoted strings and full arithmetic, both deferred/excluded in Profile v1) | Reviewed (full) |
 
-## Scenario matrix (adapted or confirmed this pass)
+## Scenario matrix (adapted or confirmed)
 
 | Upstream source | Scenario | Classification | Local test | Outcome |
 |---|---|---|---|---|
-| cel-spec `parse.textproto` `string_literals` | `'''hello'''` / `"""hello"""` triple-quote openers | B | `CelTokenizerTests.TripleQuotedStringLiteral_IsRejectedAtTheOpener_NotMisTokenized` | **Defect found and fixed** — previously silently re-tokenized as three adjacent string literals instead of one clean `SyntaxError` at the opener. See `CelTokenizer.IsTripleQuoteOpener`/`TripleQuoteUnsupportedError`. |
-| cel-spec `parse.textproto` `string_literals` | `r'''...'''`, `b"""..."""` prefixed triple-quote openers | B | same test (parameterized) | Same fix; span correctly includes the prefix. |
+| cel-spec `parse.textproto` `string_literals` | `'''hello'''` / `"""hello"""` triple-quote openers (and `r'''...'''`/`b"""..."""` prefixed forms) | B | `CelTokenizerTests.TripleQuotedStringLiteral_IsRejectedAtTheOpener_NotMisTokenized` | **Defect found and fixed** — previously silently re-tokenized as three adjacent string literals instead of one clean `SyntaxError` at the opener. See `CelTokenizer.IsTripleQuoteOpener`/`TripleQuoteUnsupportedError`. |
+| google/cel-go `parser_test.go` ("Tests from C++ parser": `1.99e90000009` → "invalid double literal") | Float literal with an exponent beyond IEEE 754 double's representable range | B/C boundary | `CelTokenizerTests.FloatLiteral_MagnitudeOutOfDoubleRange_IsSyntaxError_NotSilentInfinity` | **Defect found and fixed** — `double.TryParse` silently rounded the magnitude to `+Infinity` instead of failing; the tokenizer trusted that success unconditionally, so a typo'd/absurd exponent silently produced an `Infinity`-valued `FloatLiteral` token rather than a `SyntaxError`. See `CelTokenizer.BuildFloatToken`. |
 | cel-spec `parse.textproto` `string_literals` | Octal escapes (`\012`, `\000`, `\177`) | B | `CelTokenizerTests.OctalEscape_IsRejectedAsUnknownEscape` | Confirmed already-correct rejection (design decision 3); now explicitly regression-tested with upstream provenance. |
-| cel-spec `parse.textproto` implicit keyword-casing convention (grammar defines `true`/`false`/`null`/`in` as fixed-case tokens) | `True`, `TRUE`, `False`, `Null`, `In` | A (must tokenize as plain identifiers, not keywords) | `CelTokenizerTests.MixedOrUpperCaseKeyword_TokenizesAsPlainIdentifier` | Confirmed already-correct; regression-tested. |
-| cel-spec grammar `STRING_LIT : ["r"|"R"] STRING` / `BYTES_LIT : ("b"|"B") STRING_LIT` prefix boundary | Bare `r`/`b`/`R`/`B` and `r_value`/`bytes_count` identifiers; reverse-order `rb'...'` (no lexical form) | A / D | `CelTokenizerTests.StringPrefixLetter_NotFollowedByQuote_TokenizesAsIdentifier`, `.ReverseOrderRawByteStringPrefix_HasNoLexicalForm_TokenizesAsIdentifierThenString` | Confirmed already-correct; regression-tested. `rb'...'` explicitly excluded as D (no CEL lexical form; upstream grammar only defines byte-marker-first ordering). |
+| cel-spec grammar keyword-casing convention; `telus-labs/cel-net` `CelParserTests` | `True`, `TRUE`, `False`, `Null`, `In` | A (must tokenize as plain identifiers, not keywords) | `CelTokenizerTests.MixedOrUpperCaseKeyword_TokenizesAsPlainIdentifier` | Confirmed already-correct; regression-tested. |
+| cel-spec grammar `STRING_LIT : ["r"|"R"] STRING` / `BYTES_LIT : ("b"|"B") STRING_LIT` prefix boundary; `plaisted/cel-compiled` `ParseRAsIdentifier`/`ParseRbAsIdentifier` | Bare `r`/`b`/`R`/`B` and `r_value`/`bytes_count` identifiers; reverse-order `rb'...'` (no lexical form) | A / D | `CelTokenizerTests.StringPrefixLetter_NotFollowedByQuote_TokenizesAsIdentifier`, `.ReverseOrderRawByteStringPrefix_HasNoLexicalForm_TokenizesAsIdentifierThenString` | Confirmed already-correct; regression-tested. `rb'...'` explicitly excluded as D (no CEL lexical form; upstream grammar only defines byte-marker-first ordering). |
 | cel-spec `parse.textproto` `receiver_function_names` | Reserved words as receiver-call names (`a.as()`, `a.package()`, ...) | A (must parse; binder then reports `BindingError` for unknown function) | Already covered by `CelParserTests.ReservedWordAsCallNameOnReceiver_StillParses` | No gap — pre-existing coverage confirmed sufficient. |
 | cel-spec `parse.textproto` `selectors` | Reserved words as map/struct member selectors (`x.as`, `x.break`, ...) | A | Already covered by existing `CelParserDeferredFeatureTests` reserved-word suite | No gap. |
-| cel-spec `parse.textproto` `nest`/`repeat` sections | Deeply nested/repeated arithmetic, list/map/message literals, chained ternaries | B/E (arithmetic, literals, ternary are deferred; message literals need proto schema, out of v1 scope entirely) | Already covered by `CelParserDeferredFeatureTests` `MaxNestingDepth`/`MaxAstNodeCount`/`MaxLiteralSize` adversarial suite | No gap — existing structural-limit tests already exercise this shape (bounded nesting/chains), just via synthetic rather than upstream-literal expressions. |
+| cel-spec `parse.textproto` `nest`/`repeat` sections | Deeply nested/repeated arithmetic, list/map/message literals, chained ternaries | B/E | Already covered by `CelParserDeferredFeatureTests` `MaxNestingDepth`/`MaxAstNodeCount`/`MaxLiteralSize` adversarial suite | No gap — existing structural-limit tests already exercise this shape. |
 | cel-spec `parse.textproto` `whitespace`/`comments` | Tab/newline/form-feed/CR-separated tokens; `//`-comment-separated tokens | A | Already covered by `CelTokenizerTests` whitespace/comment tests | No gap. |
-| cel-spec `parse.textproto` `string_literals` | Full escape catalog (`\a \b \f \t \v`, hex/octal/short-unicode/long-unicode, mixed-case hex digits, unassigned code points) | A (supported escapes) / B (octal) | Already covered by `CelTokenizerTests.StringLiteral_DecodesEscapes` plus this pass's octal addition | No gap beyond the octal item above. |
+| cel-spec `parse.textproto` `string_literals` | Full escape catalog (`\a \b \f \t \v`, hex/octal/short-unicode/long-unicode, mixed-case hex digits, unassigned code points) | A (supported escapes) / B (octal) | Already covered by `CelTokenizerTests.StringLiteral_DecodesEscapes` plus the octal addition above | No gap. |
+| google/cel-go `parser_test.go` (`*@a \| b`, `1 + $`) | Invented characters `@` and `$` | C | `CelTokenizerTests.InventedOrUnsupportedCharacter_IsSyntaxError` (extended) | Confirmed already-correct; regression-tested. |
+| google/cel-go `parser_test.go` (`0xFFFFFFFFFFFFFFFFF[u]` → "invalid int/uint literal") | Hex int/uint literal overflow (17 hex digits) | C | `CelTokenizerTests.HexIntLiteral_Overflow_IsSyntaxError` | Confirmed already-correct; regression-tested. |
+| google/cel-go `parser_test.go` (`TestAllTypes(){}`, `TestAllTypes{}()`) | A call result is never a message-literal receiver; a message literal is never itself callable | C | `CelParserTests.MessageLiteralOnCallResultReceiver_IsSyntaxError`, `.CallImmediatelyFollowingAMessageLiteral_IsSyntaxError` | Confirmed already-correct; regression-tested (distinct code path from the existing literal-receiver case `1{}`). |
+| google/cel-go `parser_test.go` (`"😁" in ["😁", ...]`) | A deferred list literal as the RHS of the `in` operator | B | `CelParserDeferredFeatureTests.ListLiteralAsInOperatorRightHandSide_IsUnsupportedFeature` | Confirmed already-correct; regression-tested (deferred-construct classification must work when nested under a supported comparison operator, not just at top level). |
+| google/cel-java `parser_errors.baseline` (`in` alone → "mismatched input 'in'"); (`?` alone → "mismatched input '?'") | Bare `in` keyword and bare `?` token as invalid primary expressions | C | `CelParserTests.BareInKeyword_IsSyntaxError`, `.BareQuestionToken_IsSyntaxError` | Confirmed already-correct; regression-tested (`in` tokenizes as its own `CelTokenKind.In`, distinct from reserved-word `Identifier` tokens, so it was worth confirming separately). |
+| hbjydev/celdotnet `Throws_OnTrailingTokens` | Two adjacent complete primaries with no connecting operator (`1 2`) | C | `CelParserTests.TwoAdjacentPrimariesWithNoOperator_IsSyntaxError` | Confirmed already-correct; regression-tested. |
+| plaisted/cel-compiled `ParseFloatWithUintSuffixThrows` | The `u`/`U` unsigned-integer suffix does not attach to a float literal (`3.14u`) | C | `CelTokenizerTests.UintSuffix_AfterFloatLiteral_DoesNotAttachToTheFloat` | Confirmed already-correct (tokenizes as `FloatLiteral` + separate `u` identifier, which then fails to parse); regression-tested. |
+| google/cel-java `parser_errors.baseline` (`` `bar` ``, `` foo.`bar` ``, escaped/backtick identifiers) | CEL's backtick "extended identifier" extension syntax | D | N/A | Not imported — not part of the pinned core grammar; already rejected via the existing invented-backtick-character test. No action needed. |
+| google/cel-java `parser_errors.baseline` (`a.?b`, `a[?b]`, `Msg{?field: value}`, `[?a, ?b]`) | CEL optional-chaining (`?.`) extension syntax | D/E | N/A | Not imported — part of the `cel.lib.ext.optional` extension library, not the pinned core `cel-spec` grammar. Already rejected (generic `SyntaxError`); mapped as a future-profile research item, no v1 test required. |
+| hbjydev/celdotnet `Tokenises_TripleQuotedStrings` | This independent .NET port implements triple-quoted strings | D | N/A | Not imported as a requirement — Profile v1 deliberately excludes triple-quoted strings (design decision 3); this port choosing to support more than v1 needs is expected variance, not evidence v1 should follow. |
+| plaisted/cel-compiled full arithmetic/precedence suite; hbjydev/celdotnet full arithmetic suite | Arithmetic operator precedence/associativity (`+ - * / %`) | E | N/A | Both ports implement arithmetic (deferred in Profile v1). Their precedence tests were reviewed for parser-shape ideas but are not directly portable since our parser treats the whole arithmetic chain as an opaque deferred region (see `CelParser.ParseAdditionLevel`); no gap in our own deferred-arithmetic-detection coverage was found. |
 
 ## Follow-up
 
-Repositories #4–#8 (Nessie's large table-driven cel-java parser/unparser suite, and the four
-independent .NET CEL ports) were not fetched and diffed against `ArchLinterNet.CEL` in this pass —
-doing so exhaustively (per-repository commit pinning, license/attribution review, and defect
-triage) is out of proportion to what a single implementation task can respond to safely without
-risking either a shallow pass or an unbounded one. Per issue #338's own provision ("If a finding
-requires a material architecture/profile decision beyond this task ... create a linked blocking
-bug/design issue ... keep this task and the story open"), this is recorded as tracked follow-up
-rather than claimed as covered. The cel-spec-derived scenario families above (string lexing,
-identifier/keyword boundaries, receiver-call/selector reserved-word handling, structural limits)
-are the highest-value, most implementation-agnostic corpus source since the .NET/JVM ports largely
-re-derive their own test suites from the same pinned grammar; the residual risk in the deferred
-repositories is concentrated in library-specific API surface (D-classified, explicitly out of
-scope) rather than core lexical/syntactic gaps.
+None outstanding for the repositories named in issue #338 — all eight were reviewed in full across
+two passes. Residual, explicitly out-of-scope items are the CEL extension-library syntax forms
+(backtick "extended identifiers", `?.`/`[?`/optional-field-init syntax) encountered in the
+google/cel-java corpus: these belong to `cel.lib.ext.*` extension libraries layered on top of the
+pinned `cel-expr/cel-spec` core grammar, not the core grammar itself, so they are classification D
+(and, for the optional-chaining family, E — mapped to the future-profile research direction in
+`docs/internal/cel-engine-architecture.md` rather than given a v1 regression test).

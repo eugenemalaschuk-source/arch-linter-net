@@ -543,7 +543,12 @@ this spec:
 
 - Numeric literals SHALL NOT include a sign; `-` SHALL always tokenize as a standalone operator
   token. A leading `-` before a numeric literal SHALL be reported as `UnsupportedFeature`
-  (arithmetic/unary-minus is deferred), never accepted as part of the literal.
+  (arithmetic/unary-minus is deferred), never accepted as part of the literal. A float literal
+  (`FLOAT_LIT`) whose decimal value cannot be represented as a finite IEEE 754 double (i.e. whose
+  magnitude, typically from an extreme exponent, would round to positive or negative infinity)
+  SHALL be reported as `SyntaxError` — Profile v1's `Float` type is a finite representable value
+  (see the value-types requirement), so a literal that cannot be represented as one SHALL NOT be
+  silently accepted as `Infinity`.
 - The tokenizer SHALL accept `null` literals, `u`/`U`-suffixed unsigned-integer literals, and
   `b"..."`/`B"..."` byte-string literals as valid tokens (they are normative CEL syntax), and the
   parser SHALL reject each with `UnsupportedFeature` at the point the grammar would otherwise
@@ -734,6 +739,12 @@ this spec:
 - **WHEN** the source `3.` is tokenized
 - **THEN** it produces an `IntLiteral` token for `3` followed by a separate `.` (`Dot`) token, not
   a single `FloatLiteral` token
+
+#### Scenario: A float literal whose magnitude cannot be represented is a syntax error, not Infinity
+
+- **WHEN** the source `1.99e90000009` (an exponent far beyond IEEE 754 double's range) is tokenized
+- **THEN** tokenization fails with a `SyntaxError` diagnostic
+- **AND** no `FloatLiteral` token carrying `double.PositiveInfinity` is produced
 
 #### Scenario: Message literal syntax is deferred, not a syntax error
 
