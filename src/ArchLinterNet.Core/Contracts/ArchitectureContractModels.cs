@@ -135,6 +135,12 @@ public sealed class ArchitectureLayerSelector
     // idiom so evaluation (added by #164) never re-parses the expression.
     [YamlIgnore]
     internal CelCompiledPredicate? CompiledWhen { get; set; }
+
+    // Populated alongside CompiledWhen with the YAML path (e.g. "layers.sales.selector") so an
+    // evaluation-time error can name exactly which layer's selector failed — the layer name isn't
+    // otherwise recoverable at the matcher, which only receives the selector object.
+    [YamlIgnore]
+    internal string? WhenLocation { get; set; }
 }
 
 public sealed class ArchitectureExternalDependencyGroup

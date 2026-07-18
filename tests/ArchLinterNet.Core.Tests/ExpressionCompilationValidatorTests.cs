@@ -209,6 +209,35 @@ public sealed partial class ExpressionCompilationValidatorTests
         });
     }
 
+    // Regression: the rejection regex must catch the identifier `dependency` regardless of what
+    // syntax reaches it, not just the literal substring "dependency." — CEL allows postfix member
+    // access after any parenthesized expression, so `(dependency).viaMethodBody` names the same
+    // root variable while never producing that substring.
+    [Test]
+    public void Load_ContextDependencyForbiddenWhen_ReferencesDependencyThroughParentheses_StillRejected()
+    {
+        string policyPath = WritePolicy($$"""
+            version: 1
+            name: Test
+            analysis:
+              target_assemblies: [{{AssemblyName}}]
+            contracts:
+              strict_context_dependencies:
+                - name: domain-isolation
+                  source:
+                    role: DomainLayer
+                  forbidden:
+                    - role: DomainLayer
+                      when: (dependency).viaMethodBody == false
+                  reason: Test.
+            """);
+
+        InvalidOperationException ex = Assert.Throws<InvalidOperationException>(() =>
+            new ArchitecturePolicyDocumentLoader().Load(policyPath))!;
+
+        Assert.That(ex.Message, Does.Contain("dependency"));
+    }
+
     [Test]
     public void Load_ContextAllowOnlyExcludeWhen_ReferencesDependency_ThrowsActionableError()
     {

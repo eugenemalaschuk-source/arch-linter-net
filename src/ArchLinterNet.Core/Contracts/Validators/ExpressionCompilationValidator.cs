@@ -35,13 +35,22 @@ internal sealed class ExpressionCompilationValidator : IArchitecturePolicyDocume
     // ArchitectureExpressionFactService.BuildDependencyFacts and
     // openspec/changes/cel-selector-contextual-integration/design.md Decision D6) — a `when` that
     // reads them would compile successfully and then always evaluate the same way regardless of the
-    // real edge, silently weakening the contract instead of failing closed. Reject any reference to
-    // the `dependency` root variable's members at policy-load time until real per-edge facts exist.
-    // `\bdependency\.` (not a bare `\bdependency\b`) because a bare `dependency` reference cannot
-    // type-check to Bool on its own (it's an Object, never a valid predicate result by itself), so
-    // every reachable CEL usage of this identifier is a member access.
+    // real edge, silently weakening the contract instead of failing closed. Reject any occurrence of
+    // the `dependency` identifier at policy-load time until real per-edge facts exist.
+    //
+    // Deliberately a bare `\bdependency\b`, not `\bdependency\.` — CEL's grammar allows postfix
+    // member access after any parenthesized expression, so `(dependency).viaMethodBody` still
+    // reaches the same root variable while never producing the literal substring `dependency.`.
+    // Since CEL has no reflection, string-based dynamic member access, or way to alias an
+    // identifier, the token `dependency` can only ever appear in valid CEL source text by
+    // literally naming this root variable — so matching the bare identifier, with no assumption
+    // about what (if anything) follows it, is what actually closes the bypass. The trade-off is
+    // reduced precision: this also rejects a `when` that happens to reference the word
+    // "dependency" inside a string literal (e.g. a metadata value check). That is an acceptable,
+    // deliberately fail-closed trade-off for a rejection whose entire purpose is to prevent a
+    // predicate from silently reading facts that don't vary per edge.
     private static readonly Regex _dependencyMemberReferencePattern =
-        new(@"\bdependency\.", RegexOptions.Compiled | RegexOptions.CultureInvariant);
+        new(@"\bdependency\b", RegexOptions.Compiled | RegexOptions.CultureInvariant);
 
     public void Validate(ArchitectureContractDocument document)
     {
@@ -52,7 +61,7 @@ internal sealed class ExpressionCompilationValidator : IArchitecturePolicyDocume
                     ArchitecturePolicyProvenancePath.Property(LayersProperty), layerName),
                 SelectorProperty);
             document.Provenance.SetValidationSubject(path);
-            CompileLayerSelector(layer.Selector, layerName);
+            CompileLayerSelector(layer.Selector, layerName, path);
         }
 
         CompileContextDependencyGroup(document, document.Contracts.StrictContextDependencies, "strict_context_dependencies");
@@ -93,7 +102,7 @@ internal sealed class ExpressionCompilationValidator : IArchitecturePolicyDocume
                 ArchitecturePolicyProvenancePath.Property(ContractsProperty), groupKey),
             index);
 
-    private static void CompileLayerSelector(ArchitectureLayerSelector? selector, string layerName)
+    private static void CompileLayerSelector(ArchitectureLayerSelector? selector, string layerName, string path)
     {
         if (selector is null || string.IsNullOrEmpty(selector.When))
         {
@@ -109,6 +118,7 @@ internal sealed class ExpressionCompilationValidator : IArchitecturePolicyDocume
         }
 
         selector.CompiledWhen = result.Program;
+        selector.WhenLocation = path;
     }
 
     private static void CompileContextualSource(
@@ -119,8 +129,8 @@ internal sealed class ExpressionCompilationValidator : IArchitecturePolicyDocume
             return;
         }
 
-        document.Provenance.SetValidationSubject(
-            ArchitecturePolicyProvenancePath.AppendProperty(contractPath, SourceProperty));
+        string path = ArchitecturePolicyProvenancePath.AppendProperty(contractPath, SourceProperty);
+        document.Provenance.SetValidationSubject(path);
 
         CelCompilationResult<CelCompiledPredicate> result =
             ArchitectureExpressionSchemas.ContextualSourceEnvironment.CompilePredicate(source.When);
@@ -132,6 +142,8 @@ internal sealed class ExpressionCompilationValidator : IArchitecturePolicyDocume
         }
 
         source.CompiledWhen = result.Program;
+        source.WhenLocation = path;
+        source.WhenContractName = contractName;
     }
 
     private static void CompileContextualTargets(
@@ -154,9 +166,9 @@ internal sealed class ExpressionCompilationValidator : IArchitecturePolicyDocume
                 continue;
             }
 
-            document.Provenance.SetValidationSubject(
-                ArchitecturePolicyProvenancePath.AppendIndex(
-                    ArchitecturePolicyProvenancePath.AppendProperty(contractPath, fieldName), index));
+            string path = ArchitecturePolicyProvenancePath.AppendIndex(
+                ArchitecturePolicyProvenancePath.AppendProperty(contractPath, fieldName), index);
+            document.Provenance.SetValidationSubject(path);
 
             if (_dependencyMemberReferencePattern.IsMatch(selector.When))
             {
@@ -179,6 +191,8 @@ internal sealed class ExpressionCompilationValidator : IArchitecturePolicyDocume
             }
 
             selector.CompiledWhen = result.Program;
+            selector.WhenLocation = path;
+            selector.WhenContractName = contractName;
         }
     }
 

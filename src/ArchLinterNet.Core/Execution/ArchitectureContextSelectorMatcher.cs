@@ -69,19 +69,27 @@ internal static partial class ArchitectureContextSelectorMatcher
             return matchesLiteral;
         }
 
-        string description = $"Contextual selector (role: {selector.Role})";
+        string contractLabel = selector.WhenContractName == null ? string.Empty : $"Contract '{selector.WhenContractName}' ";
+        string locationLabel = selector.WhenLocation == null ? string.Empty : $"at '{selector.WhenLocation}' ";
+
         if (sourceDescriptor == null || sourceType == null)
         {
+            string sourceDescription =
+                $"{contractLabel}{locationLabel}(role: {selector.Role}, when: {selector.When}) " +
+                $"for source '{ArchitectureTypeNames.SafeFullName(candidateType)}'";
             CelEvaluationContext sourceContext = ArchitectureExpressionContextFactory.CreateContextualSourceContext(
                 expressionFacts.BuildSubjectFacts(candidateType));
-            return ArchitectureExpressionFactService.Evaluate(selector.CompiledWhen, sourceContext, description);
+            return ArchitectureExpressionFactService.Evaluate(selector.CompiledWhen, sourceContext, sourceDescription);
         }
 
+        string targetDescription =
+            $"{contractLabel}{locationLabel}(role: {selector.Role}, when: {selector.When}) " +
+            $"for source '{ArchitectureTypeNames.SafeFullName(sourceType)}' -> target '{ArchitectureTypeNames.SafeFullName(candidateType)}'";
         CelEvaluationContext targetContext = ArchitectureExpressionContextFactory.CreateContextualTargetContext(
             expressionFacts.BuildSubjectFacts(sourceType),
             expressionFacts.BuildSubjectFacts(candidateType),
             ArchitectureExpressionFactService.BuildDependencyFacts());
-        return ArchitectureExpressionFactService.Evaluate(selector.CompiledWhen, targetContext, description);
+        return ArchitectureExpressionFactService.Evaluate(selector.CompiledWhen, targetContext, targetDescription);
     }
 
     // Exposed internally (not just used by the Matches overloads above) so callers that need to

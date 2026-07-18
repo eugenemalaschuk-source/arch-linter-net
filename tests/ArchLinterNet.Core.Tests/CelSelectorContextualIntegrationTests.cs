@@ -171,7 +171,12 @@ public sealed class CelSelectorContextualIntegrationTests
         InvalidOperationException ex = Assert.Throws<InvalidOperationException>(
             () => TypesMatchingLayer(runner.Session, document.Layers["sales_domain"]))!;
 
-        Assert.That(ex.Message, Does.Contain("When").IgnoreCase);
+        Assert.Multiple(() =>
+        {
+            Assert.That(ex.Message, Does.Contain("/layers/sales_domain/selector"), "must name the YAML location");
+            Assert.That(ex.Message, Does.Contain("subject.metadataText[\"missing-key\"]"), "must include the exact expression");
+            Assert.That(ex.Message, Does.Contain("DomainLayer"), "must include the selector role");
+        });
     }
 
     // --- Stale-selector coverage awareness of `When` ---
@@ -349,6 +354,67 @@ public sealed class CelSelectorContextualIntegrationTests
     }
 
     [Test]
+    public void SemanticCoverage_TwoStaleConsumersWithDifferentWhen_ReportDistinguishableEvidence()
+    {
+        // Regression: even after the identity-collision fix keeps both records, their Description
+        // text (the evidence string shown in stale-selector diagnostics) must also differ - it must
+        // not be built from role/metadata alone, or two distinct stale predicates would render as
+        // two identical-looking lines with no way to tell which `when` actually went stale.
+        ArchitectureContractDocument document = Load($$"""
+            version: 1
+            name: Test
+            analysis:
+              target_assemblies: [{{AssemblyName}}]
+            classification:
+              attributes:
+                - attribute: ContextualContractTestFixtures.ContextDomainMarkerAttribute
+                  role: DomainLayer
+                  metadata:
+                    domain: constructor[0]
+            contracts:
+              strict_context_dependencies:
+                - name: dependency-contract-a
+                  id: dependency-contract-a
+                  source:
+                    role: DomainLayer
+                  forbidden:
+                    - role: DomainLayer
+                      when: target.metadataText["domain"] == "NonExistentDomainA"
+                  reason: Test A.
+                - name: dependency-contract-b
+                  id: dependency-contract-b
+                  source:
+                    role: DomainLayer
+                  forbidden:
+                    - role: DomainLayer
+                      when: target.metadataText["domain"] == "NonExistentDomainB"
+                  reason: Test B.
+              strict_coverage:
+                - name: semantic-role-coverage
+                  id: semantic-role-coverage
+                  scope: semantic_role
+                  roots:
+                    - namespace: ContextualContractTestFixtures
+            """);
+        var runner = new ArchitectureContractRunner(CreateContext(), document);
+        ArchitectureCoverageSummary summary = runner.BuildCoverageSummary(document.Contracts.StrictCoverage[0])!;
+
+        var forbiddenStaleItems = summary.StaleItems
+            .Where(item => item.Item.Contains("NonExistentDomainA") || item.Item.Contains("NonExistentDomainB"))
+            .ToArray();
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(forbiddenStaleItems, Has.Length.EqualTo(2));
+            Assert.That(forbiddenStaleItems.Select(item => item.Item).Distinct().Count(), Is.EqualTo(2));
+            Assert.That(forbiddenStaleItems, Has.Some.Matches<ArchitectureCoverageSummaryEvidenceItem>(
+                item => item.Item.Contains("NonExistentDomainA")));
+            Assert.That(forbiddenStaleItems, Has.Some.Matches<ArchitectureCoverageSummaryEvidenceItem>(
+                item => item.Item.Contains("NonExistentDomainB")));
+        });
+    }
+
+    [Test]
     public void RegisteredContextualConsumers_SameRoleDifferentWhen_BothRetainedNotCollapsed()
     {
         // Regression for a TryAdd identity collision: two forbidden selectors sharing role DomainLayer
@@ -446,7 +512,20 @@ public sealed class CelSelectorContextualIntegrationTests
         var runner = new ArchitectureContractRunner(CreateContext(), document);
         ArchitectureContextDependencyContract contract = document.Contracts.StrictContextDependencies[0];
 
-        Assert.Throws<InvalidOperationException>(() => runner.Session.CheckContextDependencyContract(contract));
+        InvalidOperationException ex = Assert.Throws<InvalidOperationException>(
+            () => runner.Session.CheckContextDependencyContract(contract))!;
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(ex.Message, Does.Contain("sales-must-not-depend-on-other-domain"), "must name the contract");
+            Assert.That(ex.Message, Does.Contain("/contracts/strict_context_dependencies/0/forbidden/0"), "must name the YAML location");
+            Assert.That(ex.Message, Does.Contain(When), "must include the exact expression");
+            // Which specific ContextualContractTestFixtures type triggers the failure first depends
+            // on RoleIndex classification order, not something this test pins down - assert the
+            // shape (both a source and a target identity are named) rather than a specific pair.
+            Assert.That(ex.Message, Does.Contain("for source 'ContextualContractTestFixtures."), "must name a source type");
+            Assert.That(ex.Message, Does.Contain("-> target 'ContextualContractTestFixtures."), "must name a target type");
+        });
     }
 
     [Test]

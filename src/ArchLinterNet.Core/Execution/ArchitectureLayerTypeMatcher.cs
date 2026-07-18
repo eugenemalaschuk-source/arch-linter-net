@@ -38,7 +38,9 @@ internal static class ArchitectureLayerTypeMatcher
 
         CelEvaluationContext context = ArchitectureExpressionContextFactory.CreateSelectorContext(
             expressionFacts.BuildSubjectFacts(type));
-        return ArchitectureExpressionFactService.Evaluate(
-            layer.Selector.CompiledWhen, context, $"Layer selector (role: {layer.Selector.Role})");
+        string description =
+            $"Layer selector at '{layer.Selector.WhenLocation}' (role: {layer.Selector.Role}, " +
+            $"when: {layer.Selector.When}) for type '{ArchitectureTypeNames.SafeFullName(type)}'";
+        return ArchitectureExpressionFactService.Evaluate(layer.Selector.CompiledWhen, context, description);
     }
 }
