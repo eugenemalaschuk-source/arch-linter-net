@@ -1,11 +1,14 @@
+using ArchLinterNet.CEL.Evaluation;
 using ArchLinterNet.Core.Contracts;
+using ArchLinterNet.Core.Execution.Expressions;
 using ArchLinterNet.Core.Scanning;
 
 namespace ArchLinterNet.Core.Execution;
 
 internal static class ArchitectureLayerTypeMatcher
 {
-    public static bool Matches(ArchitectureLayer layer, Type type, ArchitectureRoleIndex roleIndex)
+    public static bool Matches(
+        ArchitectureLayer layer, Type type, ArchitectureRoleIndex roleIndex, ArchitectureExpressionFactService expressionFacts)
     {
         if (!string.IsNullOrWhiteSpace(layer.Namespace)
             && !Resolution.ArchitectureLayerResolver.MatchesNamespace(
@@ -25,8 +28,20 @@ internal static class ArchitectureLayerTypeMatcher
             return false;
         }
 
-        return layer.Selector.Metadata.All(entry =>
+        bool matchesLiteral = layer.Selector.Metadata.All(entry =>
             descriptor.Metadata.TryGetValue(entry.Key, out object? actual)
             && ArchitectureMetadataValueComparer.ValuesEqual(actual, entry.Value));
+        if (!matchesLiteral || layer.Selector.CompiledWhen == null)
+        {
+            return matchesLiteral;
+        }
+
+        CelEvaluationContext context = ArchitectureExpressionContextFactory.CreateSelectorContext(
+            expressionFacts.BuildSubjectFacts(type));
+        string description =
+            $"Layer selector at '{layer.Selector.WhenLocation?.YamlPath}' (role: {layer.Selector.Role}, " +
+            $"when: {layer.Selector.When}) for type '{ArchitectureTypeNames.SafeFullName(type)}'";
+        return ArchitectureExpressionFactService.Evaluate(
+            layer.Selector.CompiledWhen, context, description, layer.Selector.WhenLocation);
     }
 }

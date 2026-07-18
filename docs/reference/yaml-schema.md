@@ -9,9 +9,15 @@ policies with schema-aware editors or AI agents.
 > deserializing. Validate against the JSON Schema before opening policy PRs if
 > you need unsupported fields to fail fast.
 >
-> CEL-backed policy predicates are **not** a current schema/runtime feature.
-> The reviewed future model uses explicit `when` fields only and never implicit
-> parsing of ordinary strings.
+> CEL-backed policy predicates are live for a closed set of locations: an
+> optional `when` field on `layers.<name>.selector` and on contextual
+> dependency/allow-only `source`/`forbidden`/`allowed`/`exclude` selectors. See
+> [Layers and namespace patterns](../policy-format/layers-and-namespaces.md#selector-when-predicates),
+> [Contextual dependency contracts](../contracts/context-dependency.md#cel-predicates),
+> and [Contextual allow-only contracts](../contracts/context-allow-only.md#cel-predicates).
+> `when` is compiled and evaluated at these locations only — every other
+> string field remains a literal value, never implicitly parsed as an
+> expression.
 
 ## Root and fragment schemas
 
