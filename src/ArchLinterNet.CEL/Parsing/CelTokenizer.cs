@@ -61,11 +61,17 @@ internal static class CelTokenizer
         if (TryMatchStringPrefix(source, pos, out var prefixIsRaw, out var prefixIsBytes, out var prefixLength))
         {
             pos += prefixLength;
+            if (IsTripleQuoteOpener(source, pos))
+                return (null, TripleQuoteUnsupportedError(source, ref pos, start, profileId));
             return LexString(source, ref pos, start, isRaw: prefixIsRaw, isBytes: prefixIsBytes, profileId);
         }
 
         if (c is '\'' or '"')
+        {
+            if (IsTripleQuoteOpener(source, pos))
+                return (null, TripleQuoteUnsupportedError(source, ref pos, start, profileId));
             return LexString(source, ref pos, start, isRaw: false, isBytes: false, profileId);
+        }
 
         if (IsAsciiDigit(c) || (c == '.' && pos + 1 < source.Length && IsAsciiDigit(source[pos + 1])))
             return LexNumber(source, ref pos, profileId);
@@ -155,6 +161,28 @@ internal static class CelTokenizer
 
         prefixLength = 0;
         return false;
+    }
+
+    /// <summary>
+    /// Detects a triple-quoted string opener (<c>'''</c>/<c>"""</c>) at <paramref name="pos"/>
+    /// (which points at the opening quote character, after any <c>r</c>/<c>b</c> prefix has
+    /// already been consumed). Triple-quoted strings are valid CEL lexical syntax but out of
+    /// scope for Profile v1 (design decision 3, <c>openspec/specs/cel-profile-v1/spec.md</c>) —
+    /// without this check the tokenizer would silently mis-tokenize <c>'''hello'''</c> as three
+    /// adjacent single-quoted string literals (<c>''</c>, <c>'hello'</c>, <c>''</c>) instead of
+    /// cleanly rejecting the construct, producing a confusing downstream "unexpected trailing
+    /// input" error at the wrong span rather than a diagnostic that names the actual problem.
+    /// </summary>
+    private static bool IsTripleQuoteOpener(string source, int pos) =>
+        pos + 2 < source.Length && source[pos] == source[pos + 1] && source[pos] == source[pos + 2];
+
+    private static CelDiagnostic TripleQuoteUnsupportedError(string source, ref int pos, int start, CelProfileId profileId)
+    {
+        pos += 3;
+        return CelParseDiagnostics.SyntaxError(
+            new CelSourceSpan(start, pos),
+            $"Triple-quoted string literals ('{source[start]}{source[start]}{source[start]}...') are not supported in Profile v1.",
+            profileId);
     }
 
     // The pinned CEL grammar restricts IDENT to ASCII: [_a-zA-Z][_a-zA-Z0-9]*. char.IsLetter/

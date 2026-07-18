@@ -79,6 +79,21 @@ public sealed class CelTokenizerTests
         Assert.That(tokens[0].BoolValue, Is.EqualTo(expected));
     }
 
+    // Upstream corpus (cel-spec / cel-go / cel-java parser suites) consistently test that boolean
+    // and null keywords are case-sensitive lexical tokens, not case-insensitive keywords — "True"/
+    // "TRUE"/"Null" have no special lexical form and must tokenize as ordinary identifiers.
+    [TestCase("True")]
+    [TestCase("TRUE")]
+    [TestCase("False")]
+    [TestCase("Null")]
+    [TestCase("In")]
+    public void MixedOrUpperCaseKeyword_TokenizesAsPlainIdentifier(string source)
+    {
+        var tokens = TokenizeOk(source);
+        Assert.That(tokens[0].Kind, Is.EqualTo(CelTokenKind.Identifier));
+        Assert.That(tokens[0].StringValue, Is.EqualTo(source));
+    }
+
     [Test]
     public void NullKeyword_TokenizesAsNullLiteral()
     {
@@ -185,6 +200,35 @@ public sealed class CelTokenizerTests
         Assert.That(tokens[0].StringValue, Is.EqualTo("abc"));
     }
 
+    // Upstream corpus: "r"/"b"/"R"/"B" are ordinary identifier letters except when immediately
+    // followed by a quote (the string-prefix grammar production) — a bare "r" or an identifier
+    // merely starting with "r"/"b" must not be mistaken for a truncated string prefix.
+    [TestCase("r")]
+    [TestCase("b")]
+    [TestCase("R")]
+    [TestCase("B")]
+    [TestCase("r_value")]
+    [TestCase("bytes_count")]
+    public void StringPrefixLetter_NotFollowedByQuote_TokenizesAsIdentifier(string source)
+    {
+        var tokens = TokenizeOk(source);
+        Assert.That(tokens[0].Kind, Is.EqualTo(CelTokenKind.Identifier));
+        Assert.That(tokens[0].StringValue, Is.EqualTo(source));
+    }
+
+    [Test]
+    public void ReverseOrderRawByteStringPrefix_HasNoLexicalForm_TokenizesAsIdentifierThenString()
+    {
+        // BYTES_LIT : ("b"|"B") STRING_LIT — the raw marker must come after the byte marker, not
+        // before. "rb'...'" has no combined-prefix lexical form; it tokenizes as identifier "rb"
+        // followed by an ordinary (non-raw) string literal, per TryMatchStringPrefix's contract.
+        var tokens = TokenizeOk(@"rb'abc'");
+        Assert.That(tokens[0].Kind, Is.EqualTo(CelTokenKind.Identifier));
+        Assert.That(tokens[0].StringValue, Is.EqualTo("rb"));
+        Assert.That(tokens[1].Kind, Is.EqualTo(CelTokenKind.StringLiteral));
+        Assert.That(tokens[1].StringValue, Is.EqualTo("abc"));
+    }
+
     [Test]
     public void CombinedRawByteStringLiteral_Tokenizes()
     {
@@ -285,6 +329,38 @@ public sealed class CelTokenizerTests
         // CEL has no standalone "\0" escape (only three-digit octal, which is out of v1 scope
         // per design.md decision 3) — "\0" must be rejected, not silently treated as NUL.
         var diag = TokenizeFail(@"'\0'");
+        Assert.That(diag.Code, Is.EqualTo(CelDiagnosticCode.SyntaxError));
+    }
+
+    // ── Upstream corpus (cel-spec tests/simple/testdata/parse.textproto, "string_literals"
+    // section, pinned commit 59505c14f3187e6eb9684fbd3d07146f614c6148) #338 ─────────────────────
+    // Triple-quoted strings and octal escapes are documented as out of scope for Profile v1
+    // lexing (design decision 3). Before this corpus pass, no test asserted *how* a triple-quote
+    // opener actually failed: the tokenizer silently mis-tokenized "'''hello'''" as three adjacent
+    // single-quoted literals ('', 'hello', '') rather than rejecting the construct as a unit,
+    // producing a confusing "unexpected trailing input" error at the wrong span. Fixed to reject
+    // cleanly at the opener with an accurate 3-character span (see CelTokenizer.IsTripleQuoteOpener).
+
+    [TestCase("'''hello'''", 3, TestName = "corpus.parse.string_literals.triple_single_quoted")]
+    [TestCase("\"\"\"hello\"\"\"", 3, TestName = "corpus.parse.string_literals.triple_double_quoted")]
+    [TestCase("r'''hello'''", 4, TestName = "corpus.parse.string_literals.raw_triple_single_quoted")]
+    [TestCase("b\"\"\"hello\"\"\"", 4, TestName = "corpus.parse.string_literals.bytes_triple_double_quoted")]
+    public void TripleQuotedStringLiteral_IsRejectedAtTheOpener_NotMisTokenized(string source, int expectedSpanLength)
+    {
+        var diag = TokenizeFail(source);
+        Assert.That(diag.Code, Is.EqualTo(CelDiagnosticCode.SyntaxError));
+        // Span covers exactly the (possibly prefixed) 3-character quote-run opener, not some
+        // later position reached by misinterpreting it as several shorter literals.
+        Assert.That(diag.Span!.Value.End - diag.Span.Value.Start, Is.EqualTo(expectedSpanLength));
+    }
+
+    [TestCase(@"'\012'", TestName = "corpus.parse.string_literals.single_quoted_octal_escapes")]
+    [TestCase(@"' \000 \012 \177 '", TestName = "corpus.parse.string_literals.octal_escapes_all_control")]
+    public void OctalEscape_IsRejectedAsUnknownEscape(string source)
+    {
+        // Octal escapes (\NNN) are valid CEL lexical syntax but out of scope for Profile v1
+        // (design decision 3) — confirmed still rejected cleanly, not silently misinterpreted.
+        var diag = TokenizeFail(source);
         Assert.That(diag.Code, Is.EqualTo(CelDiagnosticCode.SyntaxError));
     }
 

@@ -560,7 +560,11 @@ this spec:
   value. Triple-quoted strings and octal escape sequences are out of scope for Profile v1 lexing;
   adding them is a pure lexer addition reserved for a future profile version, not a
   grammar-restructuring change. An unterminated string literal or a malformed escape sequence
-  SHALL be reported as `SyntaxError`.
+  SHALL be reported as `SyntaxError`. A triple-quote opener (`'''` or `"""`, with or without a
+  `r`/`R`/`b`/`B` prefix) SHALL be rejected as a single `SyntaxError` at the opener itself (a
+  3-character span, plus any prefix) — it SHALL NOT be silently re-tokenized as a sequence of
+  shorter single/double-quoted string literals, since that produces a misleading diagnostic at the
+  wrong source location instead of naming the actual unsupported construct.
 - Identifiers SHALL be restricted to the pinned grammar's ASCII `IDENT`/`SELECTOR` alphabet
   (`[_a-zA-Z][_a-zA-Z0-9]*`); a non-ASCII letter (e.g. `é`) is not part of any identifier and
   SHALL be reported as `SyntaxError`, not silently accepted as a Unicode identifier character.
@@ -745,6 +749,14 @@ this spec:
 
 - **WHEN** the string literal `'\0'` is tokenized
 - **THEN** tokenization fails with a `SyntaxError` diagnostic (unknown escape sequence)
+
+#### Scenario: A triple-quoted string opener is rejected as a unit, not re-tokenized as shorter literals
+
+- **WHEN** `'''hello'''` is tokenized
+- **THEN** tokenization fails with a single `SyntaxError` diagnostic whose span covers exactly the
+  3-character `'''` opener
+- **AND** the tokenizer does NOT succeed by re-interpreting the input as three adjacent
+  single-quoted string literals (`''`, `'hello'`, `''`)
 
 #### Scenario: A surrogate-range \u escape is rejected
 
@@ -1431,3 +1443,4 @@ The evaluator SHALL support the full currently shipped bound-node set:
   contexts
 - **THEN** each call completes with the same result it would produce in isolation
 - **AND** no shared mutable evaluator state is required
+
