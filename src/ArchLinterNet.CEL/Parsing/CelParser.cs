@@ -520,6 +520,10 @@ internal sealed class CelParser
                 Advance();
                 MarkDeferred(token.Span, "Byte-string literals are deferred in Profile v1.", "bytes");
                 return Track(new CelDeferredSyntax(token.Span));
+            case CelTokenKind.TripleQuotedStringLiteral:
+                Advance();
+                MarkDeferred(token.Span, "Triple-quoted string literals are deferred in Profile v1.", "triple-quoted-string");
+                return Track(new CelDeferredSyntax(token.Span));
             case CelTokenKind.LBrace:
                 return ParseMapLiteralPrimary(token);
             case CelTokenKind.LBracket:

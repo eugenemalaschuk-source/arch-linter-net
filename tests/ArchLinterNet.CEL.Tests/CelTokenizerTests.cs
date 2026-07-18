@@ -378,21 +378,44 @@ public sealed class CelTokenizerTests
     // Triple-quoted strings and octal escapes are documented as out of scope for Profile v1
     // lexing (design decision 3). Before this corpus pass, no test asserted *how* a triple-quote
     // opener actually failed: the tokenizer silently mis-tokenized "'''hello'''" as three adjacent
-    // single-quoted literals ('', 'hello', '') rather than rejecting the construct as a unit,
-    // producing a confusing "unexpected trailing input" error at the wrong span. Fixed to reject
-    // cleanly at the opener with an accurate 3-character span (see CelTokenizer.IsTripleQuoteOpener).
+    // single-quoted literals ('', 'hello', '') rather than tokenizing it as one construct, which
+    // then produced a confusing "unexpected trailing input" SyntaxError at the wrong span instead
+    // of a clean, correctly-classified UnsupportedFeature diagnostic (triple-quoted strings are
+    // valid CEL, just deferred — see CelTokenizer.LexTripleQuotedString and the
+    // CelTokenKind.TripleQuotedStringLiteral parser case in CelParserDeferredFeatureTests).
 
-    [TestCase("'''hello'''", 3, TestName = "corpus.parse.string_literals.triple_single_quoted")]
-    [TestCase("\"\"\"hello\"\"\"", 3, TestName = "corpus.parse.string_literals.triple_double_quoted")]
-    [TestCase("r'''hello'''", 4, TestName = "corpus.parse.string_literals.raw_triple_single_quoted")]
-    [TestCase("b\"\"\"hello\"\"\"", 4, TestName = "corpus.parse.string_literals.bytes_triple_double_quoted")]
-    public void TripleQuotedStringLiteral_IsRejectedAtTheOpener_NotMisTokenized(string source, int expectedSpanLength)
+    [TestCase("'''hello'''", TestName = "corpus.parse.string_literals.triple_single_quoted")]
+    [TestCase("\"\"\"hello\"\"\"", TestName = "corpus.parse.string_literals.triple_double_quoted")]
+    [TestCase("r'''hello'''", TestName = "corpus.parse.string_literals.raw_triple_single_quoted")]
+    [TestCase("b\"\"\"hello\"\"\"", TestName = "corpus.parse.string_literals.bytes_triple_double_quoted")]
+    [TestCase("br'''hello'''", TestName = "corpus.parse.string_literals.raw_bytes_triple_single_quoted")]
+    public void TripleQuotedStringLiteral_TokenizesAsOneToken_NotMisTokenized(string source)
     {
+        var tokens = TokenizeOk(source);
+        Assert.That(tokens[0].Kind, Is.EqualTo(CelTokenKind.TripleQuotedStringLiteral));
+        Assert.That(tokens[0].Text, Is.EqualTo(source));
+        Assert.That(tokens[1].Kind, Is.EqualTo(CelTokenKind.Eof));
+    }
+
+    [TestCase("'''unterminated", TestName = "corpus.parse.string_literals.unterminated_triple_single_quoted")]
+    [TestCase("\"\"\"unterminated", TestName = "corpus.parse.string_literals.unterminated_triple_double_quoted")]
+    [TestCase("'''unterminated''", TestName = "corpus.parse.string_literals.unterminated_triple_with_partial_closer")]
+    public void UnterminatedTripleQuotedString_IsSyntaxError(string source)
+    {
+        // Genuinely malformed CEL (no matching closer before end of input) must still be
+        // SyntaxError — only a fully-formed triple-quoted literal is deferred.
         var diag = TokenizeFail(source);
         Assert.That(diag.Code, Is.EqualTo(CelDiagnosticCode.SyntaxError));
-        // Span covers exactly the (possibly prefixed) 3-character quote-run opener, not some
-        // later position reached by misinterpreting it as several shorter literals.
-        Assert.That(diag.Span!.Value.End - diag.Span.Value.Start, Is.EqualTo(expectedSpanLength));
+    }
+
+    [Test]
+    public void TripleQuotedString_EscapedQuoteDoesNotFalselyTerminate()
+    {
+        // A backslash-escaped quote character must not be mistaken for (part of) the closing
+        // triple-quote — "\'''" inside the body should not end the literal early.
+        var tokens = TokenizeOk(@"'''a\'''b'''");
+        Assert.That(tokens[0].Kind, Is.EqualTo(CelTokenKind.TripleQuotedStringLiteral));
+        Assert.That(tokens[1].Kind, Is.EqualTo(CelTokenKind.Eof));
     }
 
     [TestCase(@"'\012'", TestName = "corpus.parse.string_literals.single_quoted_octal_escapes")]
@@ -561,6 +584,18 @@ public sealed class CelTokenizerTests
             maxTokenCount: 1024, maxAstNodeCount: 1024, maxLiteralSize: 4);
 
         var diag = TokenizeFail("'too long a string literal'", limits);
+        Assert.That(diag.Code, Is.EqualTo(CelDiagnosticCode.BudgetExceeded));
+        Assert.That(diag.Parameters["limitName"], Is.EqualTo("MaxLiteralSize"));
+    }
+
+    [Test]
+    public void MaxLiteralSize_Exceeded_ByTripleQuotedStringRawLength_ReturnsBudgetExceeded()
+    {
+        var limits = new CelCompilationLimits(
+            maxExpressionLength: 4096, maxNestingDepth: 32, maxIdentifierCount: 64,
+            maxTokenCount: 1024, maxAstNodeCount: 1024, maxLiteralSize: 4);
+
+        var diag = TokenizeFail("'''too long a triple-quoted literal'''", limits);
         Assert.That(diag.Code, Is.EqualTo(CelDiagnosticCode.BudgetExceeded));
         Assert.That(diag.Parameters["limitName"], Is.EqualTo("MaxLiteralSize"));
     }

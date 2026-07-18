@@ -562,14 +562,24 @@ this spec:
   three-digit octal, which is out of scope below), so `\0` SHALL be rejected as an unknown escape
   sequence, not silently treated as NUL. `\uHHHH` and `\UHHHHHHHH` SHALL both reject a codepoint
   in the UTF-16 surrogate range (`0xD800`-`0xDFFF`) — neither is a valid standalone Unicode scalar
-  value. Triple-quoted strings and octal escape sequences are out of scope for Profile v1 lexing;
-  adding them is a pure lexer addition reserved for a future profile version, not a
-  grammar-restructuring change. An unterminated string literal or a malformed escape sequence
-  SHALL be reported as `SyntaxError`. A triple-quote opener (`'''` or `"""`, with or without a
-  `r`/`R`/`b`/`B` prefix) SHALL be rejected as a single `SyntaxError` at the opener itself (a
-  3-character span, plus any prefix) — it SHALL NOT be silently re-tokenized as a sequence of
-  shorter single/double-quoted string literals, since that produces a misleading diagnostic at the
-  wrong source location instead of naming the actual unsupported construct.
+  value. Octal escape sequences are out of scope for Profile v1 lexing; adding them is a pure
+  lexer addition reserved for a future profile version, not a grammar-restructuring change. An
+  unterminated string literal or a malformed escape sequence SHALL be reported as `SyntaxError`.
+  The tokenizer SHALL accept a well-formed triple-quoted string literal (`'''...'''`/`"""..."""`,
+  with or without an `r`/`R`/`b`/`B` prefix) as a single valid token — mirroring `null`/`u`-suffixed
+  unsigned-integer/byte-string literals above — rather than silently re-tokenizing it as a sequence
+  of shorter single/double-quoted string literals (which would produce a misleading diagnostic at
+  the wrong source location instead of naming the actual construct). The parser SHALL reject a
+  well-formed triple-quoted string literal token with `UnsupportedFeature` (triple-quoted-string
+  lexing beyond opener recognition, including its own escape/content semantics, is out of scope for
+  Profile v1 and reserved for a future profile version), never `SyntaxError`, consistent with the
+  `null`/`uint`/byte-string literal precedent. Well-formedness for this purpose means the tokenizer
+  located a matching closing triple-quote before the end of input, treating a backslash as escaping
+  (skipping) exactly the one character that follows it so an escaped quote character cannot falsely
+  end the scan; a triple-quoted string with no matching closer before the end of input SHALL be
+  reported as `SyntaxError`, since it is not valid CEL syntax to begin with — only a fully-formed
+  triple-quoted literal is deferred, matching this spec's general fully-formed-vs-dangling
+  deferred-construct rule below.
 - Identifiers SHALL be restricted to the pinned grammar's ASCII `IDENT`/`SELECTOR` alphabet
   (`[_a-zA-Z][_a-zA-Z0-9]*`); a non-ASCII letter (e.g. `é`) is not part of any identifier and
   SHALL be reported as `SyntaxError`, not silently accepted as a Unicode identifier character.
@@ -590,13 +600,14 @@ this spec:
   literal is never a valid message-literal receiver under the pinned grammar, so e.g. `1{}` SHALL
   be `SyntaxError`, not `UnsupportedFeature`.
 - A deferred construct (arithmetic, the conditional operator, a list/map/message literal, a
-  root-qualified name) SHALL only be classified as `UnsupportedFeature` after the parser has
-  verified its own syntax is complete and well-formed under the pinned grammar; a dangling or
-  incomplete instance (e.g. `a +` with no right-hand operand, `a ? b` with no `:` and false
-  branch, a bare `.` with no following identifier, or an unterminated `[`/`{`) SHALL be
-  `SyntaxError`, since it is not valid CEL syntax to begin with — only a fully-formed but deferred
-  construct is `UnsupportedFeature`. This validation SHALL follow the pinned grammar's actual
-  sub-structure, not a simplified approximation: the conditional operator's true branch is
+  root-qualified name, a triple-quoted string literal) SHALL only be classified as
+  `UnsupportedFeature` after the parser has verified its own syntax is complete and well-formed
+  under the pinned grammar; a dangling or incomplete instance (e.g. `a +` with no right-hand
+  operand, `a ? b` with no `:` and false branch, a bare `.` with no following identifier, an
+  unterminated `[`/`{`, or an unterminated triple-quoted string) SHALL be `SyntaxError`, since it
+  is not valid CEL syntax to begin with — only a fully-formed but deferred construct is
+  `UnsupportedFeature`. This validation SHALL follow the pinned grammar's actual sub-structure, not
+  a simplified approximation: the conditional operator's true branch is
   `ConditionalOr` precedence (an unparenthesized nested ternary there is `SyntaxError`, not
   `UnsupportedFeature`) while its false branch is the full recursive `Expr` (an unparenthesized
   nested ternary there is valid and SHALL also be fully validated); deferred arithmetic SHALL be
@@ -689,7 +700,9 @@ this spec:
 - `MaxLiteralSize` SHALL bound element/entry count during list/map/message-literal syntax
   validation (each parsed element or `key : value` entry counted as it is validated), matching its
   documented "element count for list/map literals" contract, in addition to the already-enforced
-  string/byte-string content-length bound.
+  string/byte-string content-length bound. A triple-quoted string literal's raw token length SHALL
+  be bounded by the same `MaxLiteralSize` limit (it carries no separately-decoded content, since
+  its value is never evaluated).
 - The parser SHALL enforce `MaxNestingDepth` against every postfix member-access (`.selector`) or
   indexing (`[...]`) step in a chain, not only against recursive constructs like parenthesized
   sub-expressions — the public `MaxNestingDepth` documentation explicitly lists "member access
@@ -761,13 +774,33 @@ this spec:
 - **WHEN** the string literal `'\0'` is tokenized
 - **THEN** tokenization fails with a `SyntaxError` diagnostic (unknown escape sequence)
 
-#### Scenario: A triple-quoted string opener is rejected as a unit, not re-tokenized as shorter literals
+#### Scenario: A well-formed triple-quoted string literal is deferred, not a syntax error
+
+- **WHEN** the expression `'''hello'''` is parsed
+- **THEN** compilation fails with an `UnsupportedFeature` diagnostic, not `SyntaxError`
+- **AND** `diagnostic.Parameters["feature"]` equals `"triple-quoted-string"`
+- **WHEN** the same check is repeated for `"""hello"""`, `r'''hello'''`, `b"""hello"""`, and
+  `br'''hello'''`
+- **THEN** each fails with the same `UnsupportedFeature` diagnostic, not `SyntaxError`
+
+#### Scenario: A triple-quoted string literal tokenizes as one construct, not re-tokenized as shorter literals
 
 - **WHEN** `'''hello'''` is tokenized
-- **THEN** tokenization fails with a single `SyntaxError` diagnostic whose span covers exactly the
-  3-character `'''` opener
+- **THEN** it produces a single `TripleQuotedStringLiteral` token spanning the entire input
 - **AND** the tokenizer does NOT succeed by re-interpreting the input as three adjacent
   single-quoted string literals (`''`, `'hello'`, `''`)
+
+#### Scenario: An unterminated triple-quoted string literal is a syntax error, not an unsupported feature
+
+- **WHEN** the expression `'''unterminated` (no matching closing `'''`) is parsed
+- **THEN** compilation fails with a `SyntaxError` diagnostic, not `UnsupportedFeature`
+
+#### Scenario: An escaped quote character inside a triple-quoted string does not falsely end the scan
+
+- **WHEN** the source `'''a\'''b'''` is tokenized (an escaped `'` immediately followed by two more
+  `'` characters partway through the content)
+- **THEN** it produces a single `TripleQuotedStringLiteral` token spanning the entire input, not a
+  token ending at the escaped sequence
 
 #### Scenario: A surrogate-range \u escape is rejected
 
@@ -1019,6 +1052,13 @@ this spec:
 - **WHEN** `CelCompilationLimits.MaxLiteralSize` is exceeded by the number of elements in a list
   literal being validated (e.g. `[1, 2, 3, 4, 5]` against a limit of `3`)
 - **THEN** compilation fails with a `BudgetExceeded` diagnostic carrying
+  `limitName = "MaxLiteralSize"`
+
+#### Scenario: MaxLiteralSize bounds a triple-quoted string literal's raw token length
+
+- **WHEN** `CelCompilationLimits.MaxLiteralSize` is exceeded by the raw character length of a
+  triple-quoted string literal being tokenized
+- **THEN** tokenization fails with a `BudgetExceeded` diagnostic carrying
   `limitName = "MaxLiteralSize"`
 
 ### Requirement: Binder and static type checker implementation scope for Profile v1

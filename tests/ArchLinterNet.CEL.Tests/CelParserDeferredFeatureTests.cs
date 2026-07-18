@@ -278,6 +278,26 @@ public sealed class CelParserDeferredFeatureTests
         Assert.That(diag.Code, Is.EqualTo(CelDiagnosticCode.UnsupportedFeature));
     }
 
+    // Upstream corpus (cel-spec parse.textproto "string_literals" section) #338 — triple-quoted
+    // strings are valid CEL syntax, just deferred, exactly like null/uint/byte-string literals
+    // above: UnsupportedFeature, never SyntaxError.
+    [TestCase("'''hello'''")]
+    [TestCase("\"\"\"hello\"\"\"")]
+    [TestCase("r'''hello'''")]
+    public void TripleQuotedStringLiteral_IsUnsupportedFeature(string source)
+    {
+        var diag = ParseFail(source);
+        Assert.That(diag.Code, Is.EqualTo(CelDiagnosticCode.UnsupportedFeature));
+        Assert.That(diag.Parameters["feature"], Is.EqualTo("triple-quoted-string"));
+    }
+
+    [Test]
+    public void UnterminatedTripleQuotedStringLiteral_IsSyntaxError()
+    {
+        var diag = ParseFail("'''unterminated");
+        Assert.That(diag.Code, Is.EqualTo(CelDiagnosticCode.SyntaxError));
+    }
+
     [Test]
     public void ListLiteral_IsUnsupportedFeature()
     {

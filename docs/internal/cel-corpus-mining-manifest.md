@@ -16,24 +16,29 @@ navigation — internal engineering record only.
 ## Reviewed corpora
 
 All eight repositories named in issue #338 were fetched and reviewed (two passes: an initial
-cel-spec-focused pass, then a full second pass covering the remaining seven).
+cel-spec-focused pass, then a full second pass covering the remaining seven). Every non-cel-spec
+repository is pinned to the exact commit SHA fetched, so this review is reproducible — `git show <sha>:<path>` against the given repository reconstructs exactly what was read.
 
-| # | Repository | Ref reviewed | Files reviewed | Status |
+| # | Repository | Pinned commit SHA | Files reviewed | Status |
 |---|---|---|---|---|
 | 1 | `cel-expr/cel-spec` | `59505c14f3187e6eb9684fbd3d07146f614c6148` (already pinned by `cel-profile-v1` spec) | `tests/simple/testdata/parse.textproto` (full: `nest`, `repeat`, `string_literals`, `bytes_literals`, `whitespace`, `comments`, `selectors`, `receiver_function_names`, `struct_field_names` sections); `logic.textproto`, `comparisons.textproto`, `string.textproto` (cross-checked against already-adapted fixtures in `CelOfficialConformanceFixtureTests`) | Reviewed |
-| 2 | `google/cel-go` | HEAD at review time (no v1-pinned SHA; classification-only, not a runtime dependency) | `parser/parser_test.go` (full: literal table, parse-error table, macro tests, "Tests from C++/Java parser" sections), `parser/unescape_test.go` (full) | Reviewed (full) |
-| 3 | `google/cel-java` | HEAD at review time | `parser/src/test/resources/parser_errors.baseline` (full: every `I:`/`E:` error-corpus entry) | Reviewed (full) |
-| 4 | `projectnessie/cel-java` | HEAD at review time | `core/src/test/java/org/projectnessie/cel/parser/ParserTest.java` (full) — confirmed to be a direct table-for-table Java port of `cel-go`'s own `parser_test.go` corpus (same numbered cases, same error strings); reviewed for divergence, found none beyond translation | Reviewed (full) |
-| 5 | `rayokota/cel.net` | HEAD at review time | `src/test/Cel/Parser/ParserTest.cs`, `src/test/Cel/Parser/UnescapeTest.cs` — confirmed direct C# port of the same cel-go/cel-java corpus | Reviewed (full) |
-| 6 | `telus-labs/cel-net` | HEAD at review time | `tests/Cel.Tests/Tests/CelParserTests.cs` (full — small, independently-written suite) | Reviewed (full) |
-| 7 | `plaisted/cel-compiled` | HEAD at review time | `Cel.Compiled.Tests/ParserTests.cs` (full — independently-written suite covering full CEL incl. arithmetic, which this port implements and Profile v1 defers) | Reviewed (full) |
-| 8 | `hbjydev/celdotnet` | HEAD at review time | `tests/CelDotNet.Tests/Lexer/CelLexerTests.cs`, `tests/CelDotNet.Tests/Parser/CelParserTests.cs` (full — independently-written suite; this port also implements triple-quoted strings and full arithmetic, both deferred/excluded in Profile v1) | Reviewed (full) |
+| 2 | `google/cel-go` | `82a222f46994cfdf3d161480ca00d06dac341f96` | `parser/parser_test.go` (full: literal table, parse-error table, macro tests, "Tests from C++/Java parser" sections), `parser/unescape_test.go` (full) | Reviewed (full) |
+| 3 | `google/cel-java` | `ff7bccfe61d49894e156c1e994a2c4f161627340` | `parser/src/test/resources/parser_errors.baseline` (full: every `I:`/`E:` error-corpus entry) | Reviewed (full) |
+| 4 | `projectnessie/cel-java` | `079fcc5fa65897e429bbdc36bc6e67ea08431038` | `core/src/test/java/org/projectnessie/cel/parser/ParserTest.java` (full) — confirmed to be a direct table-for-table Java port of `cel-go`'s own `parser_test.go` corpus (same numbered cases, same error strings); reviewed for divergence, found none beyond translation | Reviewed (full) |
+| 5 | `rayokota/cel.net` | `fede03221723b096b7ca2122bb62e405d5cf6c95` | `src/test/Cel/Parser/ParserTest.cs`, `src/test/Cel/Parser/UnescapeTest.cs` — confirmed direct C# port of the same cel-go/cel-java corpus | Reviewed (full) |
+| 6 | `telus-labs/cel-net` | `3031d5c39d23818524a4d75ebe532a1515f6fc11` | `tests/Cel.Tests/Tests/CelParserTests.cs` (full — small, independently-written suite) | Reviewed (full) |
+| 7 | `plaisted/cel-compiled` | `c8822e22f767b389465e535848c274e298e6975e` | `Cel.Compiled.Tests/ParserTests.cs` (full — independently-written suite covering full CEL incl. arithmetic, which this port implements and Profile v1 defers) | Reviewed (full) |
+| 8 | `hbjydev/celdotnet` | `516cdc2e1678457fc002615158ab4ff919afff51` | `tests/CelDotNet.Tests/Lexer/CelLexerTests.cs`, `tests/CelDotNet.Tests/Parser/CelParserTests.cs` (full — independently-written suite; this port also implements triple-quoted strings and full arithmetic, both deferred/excluded in Profile v1) | Reviewed (full) |
+
+These SHAs are review-provenance pins (the exact commit read), not Profile v1 runtime or build
+dependencies — none of these repositories are referenced by `ArchLinterNet.CEL`'s source or test
+project files.
 
 ## Scenario matrix (adapted or confirmed)
 
 | Upstream source | Scenario | Classification | Local test | Outcome |
 |---|---|---|---|---|
-| cel-spec `parse.textproto` `string_literals` | `'''hello'''` / `"""hello"""` triple-quote openers (and `r'''...'''`/`b"""..."""` prefixed forms) | B | `CelTokenizerTests.TripleQuotedStringLiteral_IsRejectedAtTheOpener_NotMisTokenized` | **Defect found and fixed** — previously silently re-tokenized as three adjacent string literals instead of one clean `SyntaxError` at the opener. See `CelTokenizer.IsTripleQuoteOpener`/`TripleQuoteUnsupportedError`. |
+| cel-spec `parse.textproto` `string_literals` | `'''hello'''` / `"""hello"""` triple-quote openers (and `r'''...'''`/`b"""..."""` prefixed forms) | B | `CelTokenizerTests.TripleQuotedStringLiteral_TokenizesAsOneToken_NotMisTokenized`, `CelParserDeferredFeatureTests.TripleQuotedStringLiteral_IsUnsupportedFeature` | **Defect found and fixed, twice.** First pass: the tokenizer silently re-tokenized `'''hello'''` as three adjacent string literals instead of one construct. Second pass (per code review on PR #346): the initial fix classified a well-formed triple-quoted literal as `SyntaxError`, but per this manifest's own classification model triple-quoted strings are category B (valid CEL, merely unsupported) — they must produce `UnsupportedFeature`, matching how `null`/`u`-suffixed/byte-string literals are already handled (tokenize successfully as a dedicated deferred token kind, then the parser classifies them once fully validated). Fixed by adding `CelTokenKind.TripleQuotedStringLiteral` and `CelTokenizer.LexTripleQuotedString` (escape-aware closer scan; still `SyntaxError` if genuinely unterminated), with a matching `CelParser.ParsePrimary` case. |
 | google/cel-go `parser_test.go` ("Tests from C++ parser": `1.99e90000009` → "invalid double literal") | Float literal with an exponent beyond IEEE 754 double's representable range | B/C boundary | `CelTokenizerTests.FloatLiteral_MagnitudeOutOfDoubleRange_IsSyntaxError_NotSilentInfinity` | **Defect found and fixed** — `double.TryParse` silently rounded the magnitude to `+Infinity` instead of failing; the tokenizer trusted that success unconditionally, so a typo'd/absurd exponent silently produced an `Infinity`-valued `FloatLiteral` token rather than a `SyntaxError`. See `CelTokenizer.BuildFloatToken`. |
 | cel-spec `parse.textproto` `string_literals` | Octal escapes (`\012`, `\000`, `\177`) | B | `CelTokenizerTests.OctalEscape_IsRejectedAsUnknownEscape` | Confirmed already-correct rejection (design decision 3); now explicitly regression-tested with upstream provenance. |
 | cel-spec grammar keyword-casing convention; `telus-labs/cel-net` `CelParserTests` | `True`, `TRUE`, `False`, `Null`, `In` | A (must tokenize as plain identifiers, not keywords) | `CelTokenizerTests.MixedOrUpperCaseKeyword_TokenizesAsPlainIdentifier` | Confirmed already-correct; regression-tested. |

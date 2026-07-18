@@ -62,14 +62,14 @@ internal static class CelTokenizer
         {
             pos += prefixLength;
             if (IsTripleQuoteOpener(source, pos))
-                return (null, TripleQuoteUnsupportedError(source, ref pos, start, profileId));
+                return LexTripleQuotedString(source, ref pos, start, profileId);
             return LexString(source, ref pos, start, isRaw: prefixIsRaw, isBytes: prefixIsBytes, profileId);
         }
 
         if (c is '\'' or '"')
         {
             if (IsTripleQuoteOpener(source, pos))
-                return (null, TripleQuoteUnsupportedError(source, ref pos, start, profileId));
+                return LexTripleQuotedString(source, ref pos, start, profileId);
             return LexString(source, ref pos, start, isRaw: false, isBytes: false, profileId);
         }
 
@@ -89,6 +89,13 @@ internal static class CelTokenizer
         {
             return CelParseDiagnostics.BudgetExceeded(token.Span, "MaxLiteralSize", token.StringValue.Length, profileId);
         }
+
+        // TripleQuotedStringLiteral carries no decoded StringValue (its content is never
+        // evaluated — it is always classified UnsupportedFeature by the parser), so bound it by
+        // raw token text length instead, matching the documented "longest string/collection
+        // literal accepted in source" MaxLiteralSize contract.
+        if (token.Kind == CelTokenKind.TripleQuotedStringLiteral && token.Text.Length > limits.MaxLiteralSize)
+            return CelParseDiagnostics.BudgetExceeded(token.Span, "MaxLiteralSize", token.Text.Length, profileId);
 
         var newCount = tokenCountBeforeThis + 1;
         if (newCount > limits.MaxTokenCount)
@@ -166,23 +173,58 @@ internal static class CelTokenizer
     /// <summary>
     /// Detects a triple-quoted string opener (<c>'''</c>/<c>"""</c>) at <paramref name="pos"/>
     /// (which points at the opening quote character, after any <c>r</c>/<c>b</c> prefix has
-    /// already been consumed). Triple-quoted strings are valid CEL lexical syntax but out of
-    /// scope for Profile v1 (design decision 3, <c>openspec/specs/cel-profile-v1/spec.md</c>) —
-    /// without this check the tokenizer would silently mis-tokenize <c>'''hello'''</c> as three
-    /// adjacent single-quoted string literals (<c>''</c>, <c>'hello'</c>, <c>''</c>) instead of
-    /// cleanly rejecting the construct, producing a confusing downstream "unexpected trailing
-    /// input" error at the wrong span rather than a diagnostic that names the actual problem.
+    /// already been consumed). Triple-quoted strings are valid CEL lexical syntax but deferred by
+    /// Profile v1 (design decision 3, <c>openspec/specs/cel-profile-v1/spec.md</c>) — without this
+    /// check the tokenizer would silently mis-tokenize <c>'''hello'''</c> as three adjacent
+    /// single-quoted string literals (<c>''</c>, <c>'hello'</c>, <c>''</c>) instead of tokenizing
+    /// it as one construct the parser can cleanly classify as <c>UnsupportedFeature</c>.
     /// </summary>
     private static bool IsTripleQuoteOpener(string source, int pos) =>
         pos + 2 < source.Length && source[pos] == source[pos + 1] && source[pos] == source[pos + 2];
 
-    private static CelDiagnostic TripleQuoteUnsupportedError(string source, ref int pos, int start, CelProfileId profileId)
+    /// <summary>
+    /// Tokenizes a triple-quoted string literal (<paramref name="pos"/> points at the opening
+    /// quote character; any <c>r</c>/<c>b</c> prefix has already been consumed by the caller) as a
+    /// single <see cref="CelTokenKind.TripleQuotedStringLiteral"/> token — mirroring how
+    /// <c>null</c>/<c>u</c>-suffixed/byte-string literals tokenize successfully so the parser can
+    /// classify them as a fully-formed but deferred construct (<c>UnsupportedFeature</c>) rather
+    /// than the tokenizer reporting <c>SyntaxError</c> for valid CEL syntax. Content is not
+    /// escape-decoded (triple-quote escape semantics are themselves out of scope for v1 lexing);
+    /// a backslash still skips the following character so an escaped quote cannot falsely
+    /// terminate the scan. An unterminated triple-quoted string (no matching closer before the end
+    /// of input) is still genuinely malformed CEL and SHALL remain <c>SyntaxError</c>.
+    /// </summary>
+    private static (CelToken?, CelDiagnostic?) LexTripleQuotedString(string source, ref int pos, int start, CelProfileId profileId)
     {
+        var quote = source[pos];
         pos += 3;
-        return CelParseDiagnostics.SyntaxError(
-            new CelSourceSpan(start, pos),
-            $"Triple-quoted string literals ('{source[start]}{source[start]}{source[start]}...') are not supported in Profile v1.",
-            profileId);
+
+        while (true)
+        {
+            if (pos >= source.Length)
+            {
+                return (null, CelParseDiagnostics.SyntaxError(
+                    new CelSourceSpan(start, pos), "Unterminated triple-quoted string literal.", profileId));
+            }
+
+            var c = source[pos];
+            if (c == '\\' && pos + 1 < source.Length)
+            {
+                pos += 2;
+                continue;
+            }
+
+            if (c == quote && pos + 2 < source.Length && source[pos + 1] == quote && source[pos + 2] == quote)
+            {
+                pos += 3;
+                break;
+            }
+
+            pos++;
+        }
+
+        var span = new CelSourceSpan(start, pos);
+        return (new CelToken(CelTokenKind.TripleQuotedStringLiteral, span, source[start..pos]), null);
     }
 
     // The pinned CEL grammar restricts IDENT to ASCII: [_a-zA-Z][_a-zA-Z0-9]*. char.IsLetter/

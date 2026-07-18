@@ -37,6 +37,13 @@ internal enum CelTokenKind
     /// <summary>A single/double-quoted or raw string literal.</summary>
     StringLiteral,
 
+    /// <summary>
+    /// A <c>'''...'''</c>/<c>"""..."""</c> triple-quoted string literal. Deferred: triple-quote
+    /// lexing is out of scope for Profile v1. Content is not escape-decoded (see
+    /// <see cref="CelTokenizer"/>).
+    /// </summary>
+    TripleQuotedStringLiteral,
+
     /// <summary>A <c>b"..."</c>/<c>B"..."</c> byte-string literal. Deferred: Profile v1 has no Bytes type.</summary>
     BytesLiteral,
 
