@@ -80,6 +80,39 @@ internal sealed partial class ExpressionCompilationValidator : IArchitecturePoli
         CompileContextDependencyGroup(document, document.Contracts.AuditContextDependencies, "audit_context_dependencies");
         CompileContextAllowOnlyGroup(document, document.Contracts.StrictContextAllowOnly, "strict_context_allow_only");
         CompileContextAllowOnlyGroup(document, document.Contracts.AuditContextAllowOnly, "audit_context_allow_only");
+        CompileLayoutConventionGroup(document, document.Contracts.StrictLayoutConventions, "strict_layout_conventions");
+        CompileLayoutConventionGroup(document, document.Contracts.AuditLayoutConventions, "audit_layout_conventions");
+    }
+
+    private static void CompileLayoutConventionGroup(
+        ArchitectureContractDocument document, List<ArchitectureLayoutConventionContract> contracts, string groupKey)
+    {
+        for (int index = 0; index < contracts.Count; index++)
+        {
+            ArchitectureLayoutConventionContract contract = contracts[index];
+            ArchitectureLayoutFileMatcher matcher = contract.FilesMatching;
+            if (matcher is null || string.IsNullOrEmpty(matcher.When))
+            {
+                continue;
+            }
+
+            string path = ArchitecturePolicyProvenancePath.AppendProperty(ContractPath(groupKey, index), "files_matching");
+            document.Provenance.SetValidationSubject(path);
+
+            CelCompilationResult<CelCompiledPredicate> result =
+                ArchitectureExpressionSchemas.SelectorEnvironment.CompilePredicate(matcher.When);
+            if (!result.IsSuccess)
+            {
+                throw new InvalidOperationException(
+                    $"Layout convention contract '{contract.Name}' declares a 'files_matching.when' expression " +
+                    $"that failed to compile: {Describe(result.Diagnostics)}");
+            }
+
+            matcher.CompiledWhen = result.Program;
+            document.Provenance.TryGetLocation(path, out ArchitecturePolicySourceLocation? location);
+            matcher.WhenLocation = location;
+            matcher.WhenContractName = contract.Name;
+        }
     }
 
     private static void CompileContextDependencyGroup(

@@ -249,6 +249,7 @@ public sealed partial class ArchitectureDiagnosticFormatter : IArchitectureDiagn
         ConfigurationDiagnostic d => d.SourceType,
         ExternalDependencyDiagnostic d => d.SourceType,
         TypePlacementDiagnostic d => d.SourceType,
+        LayoutConventionDiagnostic d => d.SourceType,
         PublicApiSurfaceDiagnostic d => d.SourceType,
         AttributeUsageDiagnostic d => d.SourceType,
         InheritanceDiagnostic d => d.SourceType,
@@ -267,6 +268,7 @@ public sealed partial class ArchitectureDiagnosticFormatter : IArchitectureDiagn
         ConfigurationDiagnostic d => d.ForbiddenNamespace,
         ExternalDependencyDiagnostic d => d.ForbiddenNamespace,
         TypePlacementDiagnostic d => d.ForbiddenNamespace,
+        LayoutConventionDiagnostic d => d.ForbiddenNamespace,
         PublicApiSurfaceDiagnostic d => d.ForbiddenNamespace,
         AttributeUsageDiagnostic d => d.ForbiddenNamespace,
         InheritanceDiagnostic d => d.ForbiddenNamespace,
@@ -285,6 +287,7 @@ public sealed partial class ArchitectureDiagnosticFormatter : IArchitectureDiagn
         ConfigurationDiagnostic d => d.ForbiddenReferences,
         ExternalDependencyDiagnostic d => d.ForbiddenReferences,
         TypePlacementDiagnostic d => d.ForbiddenReferences,
+        LayoutConventionDiagnostic d => d.ForbiddenReferences,
         PublicApiSurfaceDiagnostic d => d.ForbiddenReferences,
         AttributeUsageDiagnostic d => d.ForbiddenReferences,
         InheritanceDiagnostic d => d.ForbiddenReferences,
@@ -329,6 +332,11 @@ public sealed partial class ArchitectureDiagnosticFormatter : IArchitectureDiagn
         if (diagnostic is TypePlacementDiagnostic typePlacement)
         {
             context += FormatTypePlacementContextForHumans(typePlacement);
+        }
+
+        if (diagnostic is LayoutConventionDiagnostic layoutConvention)
+        {
+            context += FormatLayoutConventionContextForHumans(layoutConvention);
         }
 
         if (diagnostic is PublicApiSurfaceDiagnostic publicApiSurface)
@@ -581,6 +589,11 @@ public sealed partial class ArchitectureDiagnosticFormatter : IArchitectureDiagn
         if (diagnostic is TypePlacementDiagnostic typePlacement)
         {
             ApplyTypePlacementCiFields(typePlacement, obj);
+        }
+
+        if (diagnostic is LayoutConventionDiagnostic layoutConvention)
+        {
+            ApplyLayoutConventionCiFields(layoutConvention, obj);
         }
 
         if (diagnostic is PublicApiSurfaceDiagnostic publicApiSurface)

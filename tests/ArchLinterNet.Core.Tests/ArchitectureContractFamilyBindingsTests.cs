@@ -15,12 +15,12 @@ namespace ArchLinterNet.Core.Tests;
 public sealed class ArchitectureContractFamilyBindingsTests
 {
     [Test]
-    public void All_HasTwentyEightUniqueFamilyIds()
+    public void All_HasTwentyNineUniqueFamilyIds()
     {
         var familyIds = ArchitectureContractFamilyBindings.All.Select(b => b.FamilyId).ToList();
 
-        Assert.That(familyIds, Has.Count.EqualTo(28));
-        Assert.That(familyIds.Distinct(StringComparer.Ordinal).Count(), Is.EqualTo(28));
+        Assert.That(familyIds, Has.Count.EqualTo(29));
+        Assert.That(familyIds.Distinct(StringComparer.Ordinal).Count(), Is.EqualTo(29));
     }
 
     [Test]

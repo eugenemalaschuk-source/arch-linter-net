@@ -41,6 +41,8 @@ internal static class ArchitectureContractFamilyBindings
             g => g.AuditAcyclicSiblings, true),
         new ArchitectureContractFamilyBinding("type_placement", g => g.StrictTypePlacement,
             g => g.AuditTypePlacement, true),
+        new ArchitectureContractFamilyBinding("layout_conventions", g => g.StrictLayoutConventions,
+            g => g.AuditLayoutConventions, true),
         new ArchitectureContractFamilyBinding("public_api_surface", g => g.StrictPublicApiSurface,
             g => g.AuditPublicApiSurface, true),
         new ArchitectureContractFamilyBinding("attribute_usage", g => g.StrictAttributeUsage,

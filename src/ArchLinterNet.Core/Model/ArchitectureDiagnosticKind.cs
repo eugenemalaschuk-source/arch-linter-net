@@ -18,5 +18,6 @@ public enum ArchitectureDiagnosticKind
     ProjectMetadata,
     ContextDependency,
     ContextAllowOnly,
-    PortBoundary
+    PortBoundary,
+    LayoutConvention
 }

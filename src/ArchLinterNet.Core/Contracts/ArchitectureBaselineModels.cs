@@ -57,6 +57,8 @@ public sealed class ArchitectureBaselineContractGroups
     [YamlMember(Alias = "audit_acyclic_siblings")] public List<ArchitectureBaselineContractEntry> AuditAcyclicSiblings { get; set; } = new();
     [YamlMember(Alias = "strict_type_placement")] public List<ArchitectureBaselineContractEntry> StrictTypePlacement { get; set; } = new();
     [YamlMember(Alias = "audit_type_placement")] public List<ArchitectureBaselineContractEntry> AuditTypePlacement { get; set; } = new();
+    [YamlMember(Alias = "strict_layout_conventions")] public List<ArchitectureBaselineContractEntry> StrictLayoutConventions { get; set; } = new();
+    [YamlMember(Alias = "audit_layout_conventions")] public List<ArchitectureBaselineContractEntry> AuditLayoutConventions { get; set; } = new();
     [YamlMember(Alias = "strict_public_api_surface")] public List<ArchitectureBaselineContractEntry> StrictPublicApiSurface { get; set; } = new();
     [YamlMember(Alias = "audit_public_api_surface")] public List<ArchitectureBaselineContractEntry> AuditPublicApiSurface { get; set; } = new();
     [YamlMember(Alias = "strict_attribute_usage")] public List<ArchitectureBaselineContractEntry> StrictAttributeUsage { get; set; } = new();
@@ -99,6 +101,7 @@ public sealed class ArchitectureBaselineContractGroups
         "strict_external_allow_only", "audit_external_allow_only",
         "strict_acyclic_siblings", "audit_acyclic_siblings",
         "strict_type_placement", "audit_type_placement",
+        "strict_layout_conventions", "audit_layout_conventions",
         "strict_public_api_surface", "audit_public_api_surface",
         "strict_attribute_usage", "audit_attribute_usage",
         "strict_inheritance", "audit_inheritance",
@@ -148,6 +151,8 @@ public sealed class ArchitectureBaselineContractGroups
             "audit_acyclic_siblings" => AuditAcyclicSiblings,
             "strict_type_placement" => StrictTypePlacement,
             "audit_type_placement" => AuditTypePlacement,
+            "strict_layout_conventions" => StrictLayoutConventions,
+            "audit_layout_conventions" => AuditLayoutConventions,
             "strict_public_api_surface" => StrictPublicApiSurface,
             "audit_public_api_surface" => AuditPublicApiSurface,
             "strict_attribute_usage" => StrictAttributeUsage,
@@ -209,6 +214,8 @@ public sealed class ArchitectureBaselineContractGroups
             case "audit_acyclic_siblings": AuditAcyclicSiblings = entries; break;
             case "strict_type_placement": StrictTypePlacement = entries; break;
             case "audit_type_placement": AuditTypePlacement = entries; break;
+            case "strict_layout_conventions": StrictLayoutConventions = entries; break;
+            case "audit_layout_conventions": AuditLayoutConventions = entries; break;
             case "strict_public_api_surface": StrictPublicApiSurface = entries; break;
             case "audit_public_api_surface": AuditPublicApiSurface = entries; break;
             case "strict_attribute_usage": StrictAttributeUsage = entries; break;
