@@ -361,6 +361,8 @@ public sealed partial class ArchitecturePolicyDocumentLoader : IArchitecturePoli
     private static readonly string[] _layoutFilesMatchingAllowedKeys =
         { "folder_segment", "namespace_segment", "file_name_suffix", "file_name_prefix", WhenKey };
 
+    private static readonly string[] _layoutRequireMatchingInterfaceAllowedKeys = { "name_prefix" };
+
     // Mirrors ValidateRawContextualContractYaml's rationale: IgnoreUnmatchedProperties() would
     // otherwise silently drop a typo'd files_matching key (e.g. "folder_segments" for
     // "folder_segment"), leaving the selector looking like a legitimate-but-empty field instead of
@@ -408,6 +410,18 @@ public sealed partial class ArchitecturePolicyDocumentLoader : IArchitecturePoli
             {
                 ValidateKnownKeys(
                     filesMatchingMapping, contractName, "files_matching", _layoutFilesMatchingAllowedKeys);
+            }
+
+            // Same rationale as files_matching above: require_matching_interface has exactly one
+            // accepted key (name_prefix). Without this raw-YAML check, a typo like "name_prefx"
+            // would be silently dropped by IgnoreUnmatchedProperties(), leaving NamePrefix null and
+            // the contract quietly falling back to the default "I" prefix instead of failing to load.
+            if (TryGetChild(contractNode, "require_matching_interface", out YamlNode? requireMatchingInterfaceNode)
+                && requireMatchingInterfaceNode is YamlMappingNode requireMatchingInterfaceMapping)
+            {
+                ValidateKnownKeys(
+                    requireMatchingInterfaceMapping, contractName, "require_matching_interface",
+                    _layoutRequireMatchingInterfaceAllowedKeys);
             }
         }
     }

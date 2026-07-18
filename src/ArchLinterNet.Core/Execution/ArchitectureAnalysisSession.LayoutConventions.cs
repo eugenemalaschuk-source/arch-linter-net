@@ -22,11 +22,15 @@ public sealed partial class ArchitectureAnalysisSession
         // from reflection-derived namespace facts alone. A contract using namespace_segment only must
         // keep evaluating even when no source enrichment happened for this run - disabling it
         // unconditionally would silently turn a working namespace-only rule into a permanent no-op.
-        bool selectorNeedsSourcePath = !string.IsNullOrEmpty(contract.FilesMatching.FolderSegment)
+        // require_type_name_matches_file_name is included here too: it inherently needs a resolved
+        // FileNameWithoutExtension, so a namespace_segment-only contract combined with it would
+        // otherwise report zero violations forever once every match becomes an "unfiled" group.
+        bool needsSourcePath = !string.IsNullOrEmpty(contract.FilesMatching.FolderSegment)
             || !string.IsNullOrEmpty(contract.FilesMatching.FileNameSuffix)
-            || !string.IsNullOrEmpty(contract.FilesMatching.FileNamePrefix);
+            || !string.IsNullOrEmpty(contract.FilesMatching.FileNamePrefix)
+            || contract.RequireTypeNameMatchesFileName;
 
-        if (selectorNeedsSourcePath && SourceFileFactIndex.AllFacts.All(fact => fact.SourceFilePath == null))
+        if (needsSourcePath && SourceFileFactIndex.AllFacts.All(fact => fact.SourceFilePath == null))
         {
             violations.Add(new ArchitectureViolation(
                 contract.Name,
@@ -265,18 +269,34 @@ public sealed partial class ArchitectureAnalysisSession
             }
         }
 
-        if (contract.RequireTypeNameMatchesFileName && group.FileNameWithoutExtension != null
-            && !group.Facts.Any(fact => string.Equals(fact.SimpleTypeName, group.FileNameWithoutExtension, StringComparison.Ordinal)))
+        if (contract.RequireTypeNameMatchesFileName)
         {
-            string actualNames = string.Join(", ", group.Facts.Select(f => f.SimpleTypeName));
-            AddViolation(
-                contract, executionContext, violations,
-                sourceType: groupLabel,
-                forbiddenReference: $"no declared type named '{group.FileNameWithoutExtension}', found: [{actualNames}]",
-                payload: new LayoutConventionPayload(
-                    MatchedFilePath: group.SourceFilePath,
-                    ExpectedTypeName: group.FileNameWithoutExtension,
-                    ActualTypeName: actualNames));
+            // Defense-in-depth for partial source enrichment: the run-level "unavailable" guard
+            // above only fires when NO fact anywhere has a resolved source file. A namespace_segment
+            // match can still land an individual group with no resolvable file (group.FileNameWithoutExtension
+            // == null) even while other facts in the run do have paths - silently skipping such a group
+            // would fail open (a policy that loads and "runs" but can never produce this violation).
+            if (group.FileNameWithoutExtension == null)
+            {
+                AddViolation(
+                    contract, executionContext, violations,
+                    sourceType: groupLabel,
+                    forbiddenReference: "require_type_name_matches_file_name cannot be evaluated: no resolvable source " +
+                        "file for this declared type (missing source enrichment or an ambiguous partial-class declaration)",
+                    payload: new LayoutConventionPayload(DataUnavailable: true));
+            }
+            else if (!group.Facts.Any(fact => string.Equals(fact.SimpleTypeName, group.FileNameWithoutExtension, StringComparison.Ordinal)))
+            {
+                string actualNames = string.Join(", ", group.Facts.Select(f => f.SimpleTypeName));
+                AddViolation(
+                    contract, executionContext, violations,
+                    sourceType: groupLabel,
+                    forbiddenReference: $"no declared type named '{group.FileNameWithoutExtension}', found: [{actualNames}]",
+                    payload: new LayoutConventionPayload(
+                        MatchedFilePath: group.SourceFilePath,
+                        ExpectedTypeName: group.FileNameWithoutExtension,
+                        ActualTypeName: actualNames));
+            }
         }
 
         if (contract.RequireMatchingInterface != null)

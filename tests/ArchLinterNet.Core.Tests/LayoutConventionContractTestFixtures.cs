@@ -35,3 +35,11 @@ namespace LayoutConventionContractTestFixtures.MixedNamespaceFileOther
 {
     public interface IEscapingInterface;
 }
+
+// Deliberately has NO corresponding WriteFixtureFile call in LayoutConventionContractTests.SetUp,
+// so this type's ArchitectureDeclaredTypeFact always has a null SourceFilePath even when other
+// fixtures in the same run are source-enriched (partial-enrichment regression fixture).
+namespace LayoutConventionContractTestFixtures.UnfiledNamespace
+{
+    public sealed class NoSourceFileType;
+}

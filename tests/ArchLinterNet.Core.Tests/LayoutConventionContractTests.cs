@@ -387,4 +387,46 @@ public sealed class LayoutConventionContractTests
         Assert.That(result.Violations.Select(v => v.SourceType), Is.EquivalentTo(expected.Select(v => v.SourceType)));
         Assert.That(result.Violations, Has.Count.GreaterThan(0));
     }
+
+    // Regression: require_type_name_matches_file_name inherently needs a resolved file name.
+    // A namespace_segment-only contract combined with it, run with no source_roots configured at
+    // all, must not silently report zero violations forever - the run-level guard now treats
+    // require_type_name_matches_file_name as needing source-path data too.
+    [Test]
+    public void CheckLayoutConventionsContract_RequireTypeNameMatchesFileName_NoSourceRootsAtAll_EmitsUnavailableDiagnostic()
+    {
+        var contract = new ArchitectureLayoutConventionContract
+        {
+            Name = "namespace-only-file-name-match",
+            FilesMatching = new ArchitectureLayoutFileMatcher { NamespaceSegment = "Services" },
+            RequireTypeNameMatchesFileName = true
+        };
+        var runner = new ArchitectureContractRunner(CreateContext(), CreateDocument(contract, withSourceRoots: false));
+
+        var violations = runner.Session.CheckLayoutConventionsContract(contract);
+
+        Assert.That(violations, Has.Count.EqualTo(1));
+        Assert.That(((LayoutConventionPayload)violations[0].Payload!).DataUnavailable, Is.True);
+    }
+
+    // Regression: even when SOME facts in the run are source-enriched (so the run-level guard does
+    // not fire), a namespace_segment match can still land on a type with no resolvable source file.
+    // require_type_name_matches_file_name must report that as a violation, not silently skip it.
+    [Test]
+    public void CheckLayoutConventionsContract_RequireTypeNameMatchesFileName_UnfiledMatch_IsViolationNotSilentPass()
+    {
+        var contract = new ArchitectureLayoutConventionContract
+        {
+            Name = "namespace-only-file-name-match",
+            FilesMatching = new ArchitectureLayoutFileMatcher { NamespaceSegment = "UnfiledNamespace" },
+            RequireTypeNameMatchesFileName = true
+        };
+        var runner = new ArchitectureContractRunner(CreateContext(), CreateDocument(contract));
+
+        var violations = runner.Session.CheckLayoutConventionsContract(contract);
+
+        Assert.That(violations.Any(v =>
+            v.SourceType.Contains("NoSourceFileType", StringComparison.Ordinal)
+            && v.Payload is LayoutConventionPayload { DataUnavailable: true }), Is.True);
+    }
 }

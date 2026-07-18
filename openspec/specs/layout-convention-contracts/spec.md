@@ -102,7 +102,7 @@ The system SHALL allow `layout_conventions` contracts to require that every matc
 - **THEN** the system SHALL apply `I` as the expected counterpart prefix
 
 ### Requirement: Refine matched declared types with an optional CEL predicate
-The system SHALL allow `files_matching.when` to compile as a boolean predicate under ArchLinter CEL Profile v1 against the existing `subject` context schema, evaluated once per declared type in a selector-matched file; a declared type for which `when` evaluates `false` (or fails to evaluate) SHALL be excluded from every expectation check for that contract.
+The system SHALL allow `files_matching.when` to compile as a boolean predicate under ArchLinter CEL Profile v1 against the existing `subject` context schema, evaluated once per declared type in a selector-matched file; a declared type for which `when` evaluates `false` SHALL be excluded from every expectation check for that contract. Per the fail-closed predicate semantics openspec/specs/cel-policy-model/spec.md defines for every other `when` location, a `when` that fails to *evaluate* (as opposed to evaluating to `false`) SHALL NOT be treated as a non-match — it SHALL block the run with a configuration error, exactly as a compile-time failure would.
 
 #### Scenario: When predicate narrows matched declared types
 - **WHEN** a contract declares `files_matching.folder_segment: Services` and `files_matching.when: subject.role == 'ApplicationService'`
@@ -111,6 +111,10 @@ The system SHALL allow `files_matching.when` to compile as a boolean predicate u
 #### Scenario: Invalid when expression fails policy loading
 - **WHEN** a `files_matching.when` expression fails to compile under ArchLinter CEL Profile v1
 - **THEN** policy loading SHALL fail with an actionable compilation diagnostic identifying the contract and the `when` source location
+
+#### Scenario: When expression evaluation failure blocks the run rather than excluding the type
+- **WHEN** a `files_matching.when` expression compiles successfully but fails to *evaluate* for a candidate declared type (for example, a missing map key)
+- **THEN** the run SHALL fail with a blocking configuration error identifying the contract and the failing expression, exactly as `openspec/specs/cel-policy-model/spec.md`'s fail-closed evaluation semantics require elsewhere — the candidate SHALL NOT be silently excluded as if `when` had evaluated to `false`
 
 #### Scenario: When predicate compiles against the existing subject schema without new members
 - **WHEN** a `files_matching.when` expression references `subject.sourcePaths`, `subject.sourceDirectoryPrefixes`, `subject.role`, `subject.kind`, or any other member of the closed `subject` shape

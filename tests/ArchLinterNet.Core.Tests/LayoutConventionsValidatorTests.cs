@@ -200,4 +200,28 @@ public sealed class LayoutConventionsValidatorTests
         var exception = Assert.Throws<InvalidOperationException>(() => new ArchitecturePolicyDocumentLoader().Load(path));
         Assert.That(exception!.Message, Does.Contain("unknown property"));
     }
+
+    // Regression: IgnoreUnmatchedProperties() would otherwise silently drop a typo'd
+    // require_matching_interface key (e.g. "name_prefx"), leaving NamePrefix null and the contract
+    // quietly falling back to the default "I" prefix instead of failing to load.
+    [Test]
+    public void Load_LayoutConventionContract_TypoRequireMatchingInterfaceField_Throws()
+    {
+        string path = WritePolicy($"""
+            version: 1
+            name: Test
+            analysis:
+              target_assemblies: [{AssemblyName}]
+            contracts:
+              strict_layout_conventions:
+                - name: typo-counterpart-field
+                  files_matching:
+                    folder_segment: Services
+                  require_matching_interface:
+                    name_prefx: I
+            """);
+
+        var exception = Assert.Throws<InvalidOperationException>(() => new ArchitecturePolicyDocumentLoader().Load(path));
+        Assert.That(exception!.Message, Does.Contain("unknown property"));
+    }
 }
