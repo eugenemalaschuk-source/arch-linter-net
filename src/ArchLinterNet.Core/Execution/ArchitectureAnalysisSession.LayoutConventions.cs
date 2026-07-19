@@ -100,16 +100,22 @@ public sealed partial class ArchitectureAnalysisSession
     // every fact in it - see CollectFiledGroups/CollectUnfiledGroups, which filter via
     // EvaluateLayoutWhen before a group is ever constructed - so every violation raised against an
     // already-built group's facts always reports ExpressionParticipationResult.Matched, mirroring
-    // ArchitectureAnalysisSession.CheckingContext's BuildWhenExpression for the same reason.
-    private static ExpressionParticipation? BuildLayoutWhenExpression(
+    // ArchitectureAnalysisSession.CheckingContext's AddWhenExpression for the same reason. Returns a
+    // list (of at most one entry, since layout conventions have exactly one `when` location) for
+    // uniformity with the contextual dependency/allow-only payloads' WhenExpressions shape.
+    private static IReadOnlyList<ExpressionParticipation>? BuildLayoutWhenExpressions(
         ArchitectureLayoutConventionContract contract) =>
         contract.FilesMatching.CompiledWhen == null
             ? null
-            : new ExpressionParticipation(
-                contract.FilesMatching.WhenContractName ?? contract.Name,
-                contract.FilesMatching.When!,
-                contract.FilesMatching.WhenLocation?.YamlPath,
-                ExpressionParticipationResult.Matched);
+            : new[]
+            {
+                new ExpressionParticipation(
+                    contract.FilesMatching.WhenContractName ?? contract.Name,
+                    "files_matching",
+                    contract.FilesMatching.When!,
+                    contract.FilesMatching.WhenLocation?.YamlPath,
+                    ExpressionParticipationResult.Matched),
+            };
 
     private static bool IsRecordKind(string value) =>
         ArchitectureLayoutTypeKindParser.TryParse(value, out ArchitectureTypeKind kind) && kind == ArchitectureTypeKind.Record;
@@ -522,7 +528,7 @@ public sealed partial class ArchitectureAnalysisSession
                 MatchedFilePath: group.SourceFilePath,
                 ExpectedTypeKind: contract.RequireTypeKind,
                 ActualTypeKind: actualKinds,
-                WhenExpression: BuildLayoutWhenExpression(contract)));
+                WhenExpressions: BuildLayoutWhenExpressions(contract)));
     }
 
     private static void EvaluateForbidTypeKind(
@@ -553,7 +559,7 @@ public sealed partial class ArchitectureAnalysisSession
                     MatchedFilePath: group.SourceFilePath,
                     ExpectedTypeKind: $"not {contract.ForbidTypeKind}",
                     ActualTypeKind: fact.TypeKind.ToString(),
-                    WhenExpression: BuildLayoutWhenExpression(contract)));
+                    WhenExpressions: BuildLayoutWhenExpressions(contract)));
         }
     }
 
@@ -583,7 +589,7 @@ public sealed partial class ArchitectureAnalysisSession
                         contract.RequiredNameSuffix, contract.RequiredNamePrefix,
                         contract.ForbiddenNameSuffix, contract.ForbiddenNamePrefix),
                     ActualTypeName: fact.SimpleTypeName,
-                    WhenExpression: BuildLayoutWhenExpression(contract)));
+                    WhenExpressions: BuildLayoutWhenExpressions(contract)));
         }
     }
 
@@ -630,7 +636,7 @@ public sealed partial class ArchitectureAnalysisSession
                 MatchedFilePath: group.SourceFilePath,
                 ExpectedTypeName: group.FileNameWithoutExtension,
                 ActualTypeName: actualNames,
-                WhenExpression: BuildLayoutWhenExpression(contract)));
+                WhenExpressions: BuildLayoutWhenExpressions(contract)));
     }
 
     private void EvaluateMatchingInterfaceExpectation(
@@ -681,7 +687,7 @@ public sealed partial class ArchitectureAnalysisSession
                 payload: new LayoutConventionPayload(
                     MatchedFilePath: group.SourceFilePath,
                     ExpectedCounterpartName: expectedCounterpartName,
-                    WhenExpression: BuildLayoutWhenExpression(contract)));
+                    WhenExpressions: BuildLayoutWhenExpressions(contract)));
         }
     }
 

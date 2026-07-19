@@ -149,7 +149,7 @@ public sealed partial class ArchitectureSarifFormatter : IArchitectureSarifForma
         object[] relatedPolicyLocations = FormatPolicyLocationsForSarif(
             diagnostic.PolicyLocation,
             diagnostic.RelatedPolicyLocations);
-        object[] relatedLocations = AppendWhenExpressionRelatedLocation(relatedPolicyLocations, GetWhenExpression(diagnostic));
+        object[] relatedLocations = AppendWhenExpressionRelatedLocations(relatedPolicyLocations, GetWhenExpressions(diagnostic));
         if (relatedLocations.Length > 0)
         {
             json["relatedLocations"] = relatedLocations;
@@ -160,41 +160,45 @@ public sealed partial class ArchitectureSarifFormatter : IArchitectureSarifForma
 
     // CEL expression participation (violation-reporting/sarif-diagnostics-output capability): added
     // alongside, never replacing, existing policy-origin related locations - a diagnostic can carry
-    // both at once.
-    private static ExpressionParticipation? GetWhenExpression(ArchitectureDiagnostic diagnostic) => diagnostic switch
+    // both at once. A single violation can have multiple participating expressions (e.g. source.when
+    // and forbidden[*].when), each appended as its own related location.
+    private static IReadOnlyList<ExpressionParticipation>? GetWhenExpressions(ArchitectureDiagnostic diagnostic) => diagnostic switch
     {
-        ContextDependencyDiagnostic d => d.WhenExpression,
-        ContextAllowOnlyDiagnostic d => d.WhenExpression,
-        LayoutConventionDiagnostic d => d.WhenExpression,
+        ContextDependencyDiagnostic d => d.WhenExpressions,
+        ContextAllowOnlyDiagnostic d => d.WhenExpressions,
+        LayoutConventionDiagnostic d => d.WhenExpressions,
         _ => null,
     };
 
-    private static object[] AppendWhenExpressionRelatedLocation(
-        object[] relatedPolicyLocations, ExpressionParticipation? whenExpression)
+    private static object[] AppendWhenExpressionRelatedLocations(
+        object[] relatedPolicyLocations, IReadOnlyList<ExpressionParticipation>? whenExpressions)
     {
-        if (whenExpression == null)
+        if (whenExpressions == null || whenExpressions.Count == 0)
         {
             return relatedPolicyLocations;
         }
 
-        string result = whenExpression.Result switch
+        object[] additional = whenExpressions.Select((whenExpression, index) =>
         {
-            ExpressionParticipationResult.Matched => "matched",
-            ExpressionParticipationResult.NotMatched => "did not match",
-            _ => "failed to evaluate",
-        };
-
-        var whenLocation = new Dictionary<string, object?>
-        {
-            ["id"] = relatedPolicyLocations.Length + 1,
-            [MessagePropertyName] = new Dictionary<string, object?>
+            string result = whenExpression.Result switch
             {
-                ["text"] = $"CEL expression '{whenExpression.Source}' {result}" +
-                    (whenExpression.YamlPath != null ? $" (at {whenExpression.YamlPath})" : string.Empty),
-            },
-        };
+                ExpressionParticipationResult.Matched => "matched",
+                ExpressionParticipationResult.NotMatched => "did not match",
+                _ => "failed to evaluate",
+            };
 
-        return relatedPolicyLocations.Append((object)whenLocation).ToArray();
+            return (object)new Dictionary<string, object?>
+            {
+                ["id"] = relatedPolicyLocations.Length + index + 1,
+                [MessagePropertyName] = new Dictionary<string, object?>
+                {
+                    ["text"] = $"CEL expression '{whenExpression.Source}' ({whenExpression.Location}) {result}" +
+                        (whenExpression.YamlPath != null ? $" (at {whenExpression.YamlPath})" : string.Empty),
+                },
+            };
+        }).ToArray();
+
+        return relatedPolicyLocations.Concat(additional).ToArray();
     }
 
     public static object[] FormatPolicyLocationsForSarif(

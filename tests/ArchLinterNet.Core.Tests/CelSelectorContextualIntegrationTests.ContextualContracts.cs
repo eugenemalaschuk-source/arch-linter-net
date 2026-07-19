@@ -400,12 +400,13 @@ public sealed partial class CelSelectorContextualIntegrationTests
             v.SourceType == typeof(ContextualContractTestFixtures.SalesCheckout).FullName);
         var payload = (ContextDependencyPayload)violation.Payload!;
 
+        Assert.That(payload.WhenExpressions, Is.Not.Null.And.Not.Empty);
+        ExpressionParticipation forbidden = payload.WhenExpressions!.First(e => e.Location == "forbidden");
         Assert.Multiple(() =>
         {
-            Assert.That(payload.WhenExpression, Is.Not.Null);
-            Assert.That(payload.WhenExpression!.Source, Is.EqualTo(When));
-            Assert.That(payload.WhenExpression!.Result, Is.EqualTo(ExpressionParticipationResult.Matched));
-            Assert.That(payload.WhenExpression!.YamlPath, Is.EqualTo("contracts.strict_context_dependencies[0].forbidden[0]"));
+            Assert.That(forbidden.Source, Is.EqualTo(When));
+            Assert.That(forbidden.Result, Is.EqualTo(ExpressionParticipationResult.Matched));
+            Assert.That(forbidden.YamlPath, Is.EqualTo("contracts.strict_context_dependencies[0].forbidden[0]"));
         });
     }
 
@@ -421,7 +422,7 @@ public sealed partial class CelSelectorContextualIntegrationTests
             v.SourceType == typeof(ContextualContractTestFixtures.SalesCheckout).FullName);
         var payload = (ContextDependencyPayload)violation.Payload!;
 
-        Assert.That(payload.WhenExpression, Is.Null);
+        Assert.That(payload.WhenExpressions, Is.Null.Or.Empty);
     }
 
     [Test]
@@ -457,11 +458,12 @@ public sealed partial class CelSelectorContextualIntegrationTests
             v.SourceType == typeof(ContextualContractTestFixtures.SalesCheckout).FullName);
         var payload = (ContextAllowOnlyPayload)violation.Payload!;
 
+        Assert.That(payload.WhenExpressions, Is.Not.Null.And.Not.Empty);
+        ExpressionParticipation allowed = payload.WhenExpressions!.First(e => e.Location == "allowed");
         Assert.Multiple(() =>
         {
-            Assert.That(payload.WhenExpression, Is.Not.Null);
-            Assert.That(payload.WhenExpression!.Result, Is.EqualTo(ExpressionParticipationResult.NotMatched));
-            Assert.That(payload.WhenExpression!.Source, Is.EqualTo("target.metadataText[\"domain\"] == source.metadataText[\"domain\"]"));
+            Assert.That(allowed.Result, Is.EqualTo(ExpressionParticipationResult.NotMatched));
+            Assert.That(allowed.Source, Is.EqualTo("target.metadataText[\"domain\"] == source.metadataText[\"domain\"]"));
         });
     }
 

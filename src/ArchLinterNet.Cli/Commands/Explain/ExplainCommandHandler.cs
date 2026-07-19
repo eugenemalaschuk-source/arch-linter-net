@@ -60,25 +60,31 @@ internal sealed class ExplainCommandHandler(ICliRuntime runtime, ICliConsole con
             ArchitectureExplainOutcome outcome = runtime.Explain(request);
             if (options.Format == "json")
             {
-                console.Out.WriteLine(JsonSerializer.Serialize(new
+                var jsonObj = new Dictionary<string, object?>
                 {
-                    source = outcome.Source,
-                    target = outcome.Target,
-                    path = outcome.Path,
-                    contractIds = outcome.ContractIds,
-                    expressionParticipation = outcome.ExpressionParticipation.Select(p => new
+                    ["source"] = outcome.Source,
+                    ["target"] = outcome.Target,
+                    ["path"] = outcome.Path,
+                    ["contractIds"] = outcome.ContractIds,
+                };
+
+                if (outcome.ExpressionParticipation.Count > 0)
+                {
+                    jsonObj["expressionParticipation"] = outcome.ExpressionParticipation.Select(p => new Dictionary<string, object?>
                     {
-                        contractId = p.ContractId,
-                        source = p.Source,
-                        yamlPath = p.YamlPath,
-                        result = p.Result switch
+                        ["contractId"] = p.ContractId,
+                        ["source"] = p.Source,
+                        ["yamlPath"] = p.YamlPath,
+                        ["result"] = p.Result switch
                         {
                             ExpressionParticipationResult.Matched => "matched",
                             ExpressionParticipationResult.NotMatched => "not_matched",
                             _ => "evaluation_failed",
                         },
-                    }),
-                }));
+                    }).ToArray();
+                }
+
+                console.Out.WriteLine(JsonSerializer.Serialize(jsonObj));
             }
             else if (outcome.Path == null)
             {

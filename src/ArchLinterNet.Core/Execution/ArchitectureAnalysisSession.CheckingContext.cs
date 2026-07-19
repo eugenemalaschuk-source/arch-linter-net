@@ -74,6 +74,12 @@ public sealed partial class ArchitectureAnalysisSession
 
             RoleIndex.TryGetRole(referencedType, out ArchitectureTypeClassificationResult targetDescriptor);
 
+            List<ExpressionParticipation> whenExpressions = new();
+            // contract.Source.When already evaluated true for this sourceType - FindContextSelectorMatchingTypes
+            // filtered by it before this method was ever called for this candidate.
+            AddWhenExpression(whenExpressions, contract.Name, contract.Source, "source", ExpressionParticipationResult.Matched);
+            AddWhenExpression(whenExpressions, contract.Name, matchedSelector, "forbidden", ExpressionParticipationResult.Matched);
+
             violations.Add(new ArchitectureViolation(
                 contract.Name, contract.Id, sourceFullName,
                 DescribeContextSelector(matchedSelector),
@@ -85,7 +91,7 @@ public sealed partial class ArchitectureAnalysisSession
                     TargetRole: targetDescriptor.Role,
                     TargetMetadata: targetDescriptor.Metadata,
                     MatchedSelector: "forbidden",
-                    WhenExpression: BuildWhenExpression(contract.Name, matchedSelector, ExpressionParticipationResult.Matched))
+                    WhenExpressions: whenExpressions.Count == 0 ? null : whenExpressions)
             });
         }
     }
@@ -148,6 +154,10 @@ public sealed partial class ArchitectureAnalysisSession
                 ? new[] { targetFullName }
                 : new[] { targetFullName, nearMissWhen };
 
+            List<ExpressionParticipation> whenExpressions = new();
+            AddWhenExpression(whenExpressions, contract.Name, contract.Source, "source", ExpressionParticipationResult.Matched);
+            AddWhenExpression(whenExpressions, contract.Name, nearMissSelector, "allowed", ExpressionParticipationResult.NotMatched);
+
             violations.Add(new ArchitectureViolation(
                 contract.Name, contract.Id, sourceFullName, "outside allowed context selectors", evidence)
             {
@@ -157,9 +167,7 @@ public sealed partial class ArchitectureAnalysisSession
                     TargetRole: targetDescriptor.Role,
                     TargetMetadata: targetDescriptor.Metadata,
                     MatchedSelector: "none",
-                    WhenExpression: nearMissSelector == null
-                        ? null
-                        : BuildWhenExpression(contract.Name, nearMissSelector, ExpressionParticipationResult.NotMatched))
+                    WhenExpressions: whenExpressions.Count == 0 ? null : whenExpressions)
             });
         }
     }
@@ -206,17 +214,23 @@ public sealed partial class ArchitectureAnalysisSession
 
     // Built from data ArchitectureContextSelector already carries (raw source text, resolved YAML
     // location) rather than re-deriving anything - see ArchitectureContextSelector's own doc comment
-    // for why WhenLocation/WhenContractName live on the selector itself.
-    private static ExpressionParticipation? BuildWhenExpression(
-        string contractName, ArchitectureContextSelector selector, ExpressionParticipationResult result)
+    // for why WhenLocation/WhenContractName live on the selector itself. A no-op when the selector (or
+    // the selector reference itself, e.g. no near-miss) has no `when` - callers can call this
+    // unconditionally for every selector that might participate.
+    private static void AddWhenExpression(
+        List<ExpressionParticipation> whenExpressions,
+        string contractName,
+        ArchitectureContextSelector? selector,
+        string location,
+        ExpressionParticipationResult result)
     {
-        if (string.IsNullOrEmpty(selector.When))
+        if (selector == null || string.IsNullOrEmpty(selector.When))
         {
-            return null;
+            return;
         }
 
-        return new ExpressionParticipation(
-            selector.WhenContractName ?? contractName, selector.When, selector.WhenLocation?.YamlPath, result);
+        whenExpressions.Add(new ExpressionParticipation(
+            selector.WhenContractName ?? contractName, location, selector.When, selector.WhenLocation?.YamlPath, result));
     }
 
     private IEnumerable<Type> FindContextSelectorMatchingTypes(ArchitectureContextSelector selector)

@@ -96,11 +96,11 @@ locations or logical code locations.
 - **THEN** SARIF policy artifact URIs use the same repository-relative `/`-separated paths and contain no machine-specific absolute path
 
 ### Requirement: SARIF results expose CEL expression provenance as related locations
-When a diagnostic rendered as a SARIF result has CEL expression participation (per the `violation-reporting` capability's `when_expression` data), the SARIF formatter SHALL add a related location whose message includes the expression's source text and result, in addition to any existing physical/logical locations and policy-origin related locations. SARIF results for diagnostics without expression participation SHALL be unaffected.
+When a diagnostic rendered as a SARIF result has CEL expression participation (per the `violation-reporting` capability's `when_expressions` data), the SARIF formatter SHALL add one related location per participating expression, each whose message includes the expression's source text, its location (which selector it came from), and its result, in addition to any existing physical/logical locations and policy-origin related locations. SARIF results for diagnostics without expression participation SHALL be unaffected.
 
 #### Scenario: SARIF result includes expression-provenance related location
 - **WHEN** a context-dependency violation with a `when`-bearing forbidden selector is rendered as SARIF
-- **THEN** the result's `relatedLocations` includes an entry whose `message.text` states the evaluated expression's source text and that it matched
+- **THEN** the result's `relatedLocations` includes an entry whose `message.text` states the evaluated expression's source text, the selector location, and that it matched
 
 #### Scenario: Existing policy-origin related locations are preserved
 - **WHEN** a diagnostic has both policy-origin related locations and CEL expression participation

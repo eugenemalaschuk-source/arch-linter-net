@@ -325,11 +325,12 @@ public sealed class LayoutConventionContractTests
         ArchitectureViolation violation = violations.First(v => v.SourceType.Contains("IncludedByWhen", StringComparison.Ordinal));
         var payload = (LayoutConventionPayload)violation.Payload!;
 
+        Assert.That(payload.WhenExpressions, Is.Not.Null.And.Not.Empty);
+        ExpressionParticipation filesMatching = payload.WhenExpressions![0];
         Assert.Multiple(() =>
         {
-            Assert.That(payload.WhenExpression, Is.Not.Null);
-            Assert.That(payload.WhenExpression!.Source, Is.EqualTo("subject.simpleName == \"IncludedByWhen\""));
-            Assert.That(payload.WhenExpression!.Result, Is.EqualTo(ExpressionParticipationResult.Matched));
+            Assert.That(filesMatching.Source, Is.EqualTo("subject.simpleName == \"IncludedByWhen\""));
+            Assert.That(filesMatching.Result, Is.EqualTo(ExpressionParticipationResult.Matched));
         });
     }
 
@@ -349,7 +350,7 @@ public sealed class LayoutConventionContractTests
             v.SourceType.Contains("IWronglyPlacedService", StringComparison.Ordinal));
         var payload = (LayoutConventionPayload)violation.Payload!;
 
-        Assert.That(payload.WhenExpression, Is.Null);
+        Assert.That(payload.WhenExpressions, Is.Null.Or.Empty);
     }
 
     [Test]

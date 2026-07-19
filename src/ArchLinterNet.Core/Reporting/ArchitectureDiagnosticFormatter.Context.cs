@@ -19,7 +19,7 @@ public sealed partial class ArchitectureDiagnosticFormatter
                $"target_role: {diagnostic.TargetRole ?? "?"}, " +
                $"target_metadata: {FormatMetadataForHumans(diagnostic.TargetMetadata)}, " +
                $"matched_selector: {diagnostic.MatchedSelector ?? "?"}" +
-               $"{FormatWhenExpressionForHumans(diagnostic.WhenExpression)})";
+               $"{FormatWhenExpressionsForHumans(diagnostic.WhenExpressions)})";
     }
 
     private static string FormatContextAllowOnlyContextForHumans(ContextAllowOnlyDiagnostic diagnostic)
@@ -29,38 +29,45 @@ public sealed partial class ArchitectureDiagnosticFormatter
                $"target_role: {diagnostic.TargetRole ?? "?"}, " +
                $"target_metadata: {FormatMetadataForHumans(diagnostic.TargetMetadata)}, " +
                $"matched_selector: {diagnostic.MatchedSelector ?? "?"}" +
-               $"{FormatWhenExpressionForHumans(diagnostic.WhenExpression)})";
+               $"{FormatWhenExpressionsForHumans(diagnostic.WhenExpressions)})";
     }
 
     // Shared by every diagnostic kind that can carry expression participation (context-dependency,
-    // context-allow-only, layout-convention) - additive: diagnostics without a `when`-bearing
-    // selector produce an empty suffix, leaving existing output byte-identical.
-    private static string FormatWhenExpressionForHumans(ExpressionParticipation? whenExpression)
+    // context-allow-only, layout-convention) - additive: diagnostics without any `when`-bearing
+    // selector produce an empty suffix, leaving existing output byte-identical. A single violation
+    // can carry more than one entry (e.g. both `source.when` and the matched `forbidden[*].when`);
+    // each is rendered with its Location so a reader can tell which selector it came from.
+    private static string FormatWhenExpressionsForHumans(IReadOnlyList<ExpressionParticipation>? whenExpressions)
     {
-        if (whenExpression == null)
+        if (whenExpressions == null || whenExpressions.Count == 0)
         {
             return string.Empty;
         }
 
-        string result = whenExpression.Result switch
+        return string.Concat(whenExpressions.Select(whenExpression =>
         {
-            ExpressionParticipationResult.Matched => "matched",
-            ExpressionParticipationResult.NotMatched => "not matched",
-            _ => "evaluation failed",
-        };
+            string result = whenExpression.Result switch
+            {
+                ExpressionParticipationResult.Matched => "matched",
+                ExpressionParticipationResult.NotMatched => "not matched",
+                _ => "evaluation failed",
+            };
 
-        return $", when: {whenExpression.Source} ({result})";
+            return $", when ({whenExpression.Location}): {whenExpression.Source} ({result})";
+        }));
     }
 
-    private static void ApplyWhenExpressionCiFields(ExpressionParticipation? whenExpression, Dictionary<string, object?> obj)
+    private static void ApplyWhenExpressionsCiFields(
+        IReadOnlyList<ExpressionParticipation>? whenExpressions, Dictionary<string, object?> obj)
     {
-        if (whenExpression == null)
+        if (whenExpressions == null || whenExpressions.Count == 0)
         {
             return;
         }
 
-        obj["when_expression"] = new Dictionary<string, object?>
+        obj["when_expressions"] = whenExpressions.Select(whenExpression => new Dictionary<string, object?>
         {
+            ["location"] = whenExpression.Location,
             ["source"] = whenExpression.Source,
             ["result"] = whenExpression.Result switch
             {
@@ -69,7 +76,7 @@ public sealed partial class ArchitectureDiagnosticFormatter
                 _ => "evaluation_failed",
             },
             ["yaml_path"] = whenExpression.YamlPath,
-        };
+        }).ToArray();
     }
 
     private static string FormatMetadataForHumans(IReadOnlyDictionary<string, object>? metadata)
@@ -101,7 +108,7 @@ public sealed partial class ArchitectureDiagnosticFormatter
         if (diagnostic.MatchedSelector != null)
             obj["matched_selector"] = diagnostic.MatchedSelector;
 
-        ApplyWhenExpressionCiFields(diagnostic.WhenExpression, obj);
+        ApplyWhenExpressionsCiFields(diagnostic.WhenExpressions, obj);
     }
 
     private static void ApplyContextAllowOnlyCiFields(ContextAllowOnlyDiagnostic diagnostic, Dictionary<string, object?> obj)
@@ -121,7 +128,7 @@ public sealed partial class ArchitectureDiagnosticFormatter
         if (diagnostic.MatchedSelector != null)
             obj["matched_selector"] = diagnostic.MatchedSelector;
 
-        ApplyWhenExpressionCiFields(diagnostic.WhenExpression, obj);
+        ApplyWhenExpressionsCiFields(diagnostic.WhenExpressions, obj);
     }
 
     private static string FormatPortBoundaryContextForHumans(PortBoundaryDiagnostic diagnostic) =>

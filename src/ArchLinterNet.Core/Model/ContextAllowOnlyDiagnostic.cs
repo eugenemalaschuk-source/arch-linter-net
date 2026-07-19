@@ -20,5 +20,5 @@ public sealed record ContextAllowOnlyDiagnostic(
     // is itself the stable, structured evidence that every allowed selector was checked and none
     // matched, present in both JSON and human output (distinct from a missing/omitted field).
     public string? MatchedSelector { get; init; }
-    public ExpressionParticipation? WhenExpression { get; init; }
+    public IReadOnlyList<ExpressionParticipation>? WhenExpressions { get; init; }
 }

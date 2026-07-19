@@ -8,7 +8,7 @@ public sealed record LayoutConventionPayload(
     string? ActualTypeName = null,
     string? ExpectedCounterpartName = null,
     bool DataUnavailable = false,
-    ExpressionParticipation? WhenExpression = null)
+    IReadOnlyList<ExpressionParticipation>? WhenExpressions = null)
     : IArchitectureDiagnosticPayload
 {
     public ArchitectureDiagnostic ToDiagnostic(ArchitectureViolation violation) =>
@@ -24,6 +24,6 @@ public sealed record LayoutConventionPayload(
             ActualTypeName = ActualTypeName,
             ExpectedCounterpartName = ExpectedCounterpartName,
             DataUnavailable = DataUnavailable,
-            WhenExpression = WhenExpression
+            WhenExpressions = WhenExpressions
         };
 }

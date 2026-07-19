@@ -4,12 +4,14 @@ using ArchLinterNet.Core.Model;
 
 namespace ArchLinterNet.Core.Graph;
 
-// Depends on the concrete ArchitectureGraphApplicationService (not just its interface) so it can
-// reuse the internal BuildSession + richer ArchitectureDependencyGraphBuilder.Build overload,
-// getting both the graph and the exact ArchitectureViolation instances behind each edge in a single
-// contract-execution pass, rather than running contract execution a second time just to recover CEL
-// expression participation. See design.md Decision D3 (publish-cel-diagnostics-docs).
-public sealed class ArchitectureExplainApplicationService(ArchitectureGraphApplicationService graphApplicationService)
+// Accepts IArchitectureGraphApplicationService to preserve the public DI contract. When the
+// resolved implementation is the concrete ArchitectureGraphApplicationService, Explain() casts to
+// it to reuse BuildSession + the richer ArchitectureDependencyGraphBuilder.Build overload, getting
+// both the graph and the exact ArchitectureViolation instances behind each edge in a single pass.
+// When the caller supplies a stub or mock (tests, alternative implementations), it falls back to the
+// standard BuildGraph path — CEL expression participation is empty in that case, which is acceptable
+// because tests that assert on expression participation are integration-level and use the concrete type.
+public sealed class ArchitectureExplainApplicationService(IArchitectureGraphApplicationService graphApplicationService)
     : IArchitectureExplainApplicationService
 {
     public ArchitectureExplainOutcome Explain(ArchitectureExplainRequest request)
@@ -30,10 +32,19 @@ public sealed class ArchitectureExplainApplicationService(ArchitectureGraphAppli
             ConditionSetName = request.ConditionSetName,
         };
 
-        ArchitectureAnalysisSession session = graphApplicationService.BuildSession(graphRequest, out List<ArchitectureViolation> violations);
-        ArchitectureDependencyGraph graph = ArchitectureDependencyGraphBuilder.Build(
-            session, request.Level, violations,
-            out IReadOnlyDictionary<(string Source, string Target), IReadOnlyList<ArchitectureViolation>> edgeViolations);
+        ArchitectureDependencyGraph graph;
+        IReadOnlyDictionary<(string Source, string Target), IReadOnlyList<ArchitectureViolation>> edgeViolations;
+
+        if (graphApplicationService is ArchitectureGraphApplicationService concreteService)
+        {
+            ArchitectureAnalysisSession session = concreteService.BuildSession(graphRequest, out List<ArchitectureViolation> violations);
+            graph = ArchitectureDependencyGraphBuilder.Build(session, request.Level, violations, out edgeViolations);
+        }
+        else
+        {
+            graph = graphApplicationService.BuildGraph(graphRequest).Graph;
+            edgeViolations = new Dictionary<(string, string), IReadOnlyList<ArchitectureViolation>>();
+        }
 
         ArchitectureExplainOutcome outcome = FindShortestPath(graph, request.Source, request.Target);
         return outcome with { ExpressionParticipation = CollectExpressionParticipation(outcome.Path, edgeViolations) };
@@ -64,30 +75,33 @@ public sealed class ArchitectureExplainApplicationService(ArchitectureGraphAppli
 
             foreach (ArchitectureViolation violation in hopViolations)
             {
-                ExpressionParticipation? whenExpression = GetWhenExpression(violation.Payload);
-                if (whenExpression == null || violation.ContractId == null)
+                IReadOnlyList<ExpressionParticipation>? whenExpressions = GetWhenExpressions(violation.Payload);
+                if (whenExpressions == null || whenExpressions.Count == 0 || violation.ContractId == null)
                 {
                     continue;
                 }
 
-                if (!seen.Add((violation.ContractId, whenExpression.Source)))
+                foreach (ExpressionParticipation whenExpression in whenExpressions)
                 {
-                    continue;
-                }
+                    if (!seen.Add((violation.ContractId, whenExpression.Source)))
+                    {
+                        continue;
+                    }
 
-                participation.Add(new ExplainExpressionParticipation(
-                    violation.ContractId, whenExpression.Source, whenExpression.YamlPath, whenExpression.Result));
+                    participation.Add(new ExplainExpressionParticipation(
+                        violation.ContractId, whenExpression.Source, whenExpression.YamlPath, whenExpression.Result));
+                }
             }
         }
 
         return participation;
     }
 
-    private static ExpressionParticipation? GetWhenExpression(IArchitectureDiagnosticPayload? payload) => payload switch
+    private static IReadOnlyList<ExpressionParticipation>? GetWhenExpressions(IArchitectureDiagnosticPayload? payload) => payload switch
     {
-        ContextDependencyPayload p => p.WhenExpression,
-        ContextAllowOnlyPayload p => p.WhenExpression,
-        LayoutConventionPayload p => p.WhenExpression,
+        ContextDependencyPayload p => p.WhenExpressions,
+        ContextAllowOnlyPayload p => p.WhenExpressions,
+        LayoutConventionPayload p => p.WhenExpressions,
         _ => null,
     };
 

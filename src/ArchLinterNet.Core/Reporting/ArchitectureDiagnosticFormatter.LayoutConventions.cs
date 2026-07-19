@@ -35,9 +35,9 @@ public sealed partial class ArchitectureDiagnosticFormatter
             parts.Add($"expected_counterpart: {layoutConvention.ExpectedCounterpartName}");
         }
 
-        if (layoutConvention.WhenExpression != null)
+        if (layoutConvention.WhenExpressions is { Count: > 0 })
         {
-            string whenSuffix = FormatWhenExpressionForHumans(layoutConvention.WhenExpression);
+            string whenSuffix = FormatWhenExpressionsForHumans(layoutConvention.WhenExpressions);
             parts.Add(whenSuffix.TrimStart(',', ' '));
         }
 
@@ -67,6 +67,6 @@ public sealed partial class ArchitectureDiagnosticFormatter
         if (layoutConvention.DataUnavailable)
             obj["data_unavailable"] = layoutConvention.DataUnavailable;
 
-        ApplyWhenExpressionCiFields(layoutConvention.WhenExpression, obj);
+        ApplyWhenExpressionsCiFields(layoutConvention.WhenExpressions, obj);
     }
 }

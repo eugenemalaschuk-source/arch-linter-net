@@ -64,14 +64,15 @@ public sealed class ArchitectureDiagnosticFormatterTests
             new("contract", null, "Source.Type", "role:DomainLayer", _reference1)
             {
                 Payload = new ContextDependencyPayload(
-                    WhenExpression: new ExpressionParticipation(
-                        "contract", "target.metadataText[\"domain\"] != source.metadataText[\"domain\"]", "contracts.strict_context_dependencies[0].forbidden[0]", ExpressionParticipationResult.Matched))
+                    WhenExpressions: new[] { new ExpressionParticipation(
+                        "contract", "forbidden", "target.metadataText[\"domain\"] != source.metadataText[\"domain\"]",
+                        "contracts.strict_context_dependencies[0].forbidden[0]", ExpressionParticipationResult.Matched) })
             }
         };
 
         string output = _formatter.FormatViolationsForHumans(violations);
 
-        Assert.That(output, Does.Contain("when: target.metadataText[\"domain\"] != source.metadataText[\"domain\"] (matched)"));
+        Assert.That(output, Does.Contain("when (forbidden): target.metadataText[\"domain\"] != source.metadataText[\"domain\"] (matched)"));
     }
 
     [Test]
@@ -82,17 +83,19 @@ public sealed class ArchitectureDiagnosticFormatterTests
             new("contract", "contract-id", "Source.Type", "role:DomainLayer", _reference1)
             {
                 Payload = new ContextDependencyPayload(
-                    WhenExpression: new ExpressionParticipation(
-                        "contract", "target.metadataText[\"domain\"] != source.metadataText[\"domain\"]", "contracts.strict_context_dependencies[0].forbidden[0]", ExpressionParticipationResult.Matched))
+                    WhenExpressions: new[] { new ExpressionParticipation(
+                        "contract", "forbidden", "target.metadataText[\"domain\"] != source.metadataText[\"domain\"]",
+                        "contracts.strict_context_dependencies[0].forbidden[0]", ExpressionParticipationResult.Matched) })
             }
         };
 
         string json = _formatter.FormatViolationsForCiArtifacts("contract", "contract-id", violations);
         using JsonDocument document = JsonDocument.Parse(json);
-        JsonElement whenExpression = document.RootElement.GetProperty("violations")[0].GetProperty("when_expression");
+        JsonElement whenExpression = document.RootElement.GetProperty("violations")[0].GetProperty("when_expressions")[0];
 
         Assert.Multiple(() =>
         {
+            Assert.That(whenExpression.GetProperty("location").GetString(), Is.EqualTo("forbidden"));
             Assert.That(whenExpression.GetProperty("source").GetString(),
                 Is.EqualTo("target.metadataText[\"domain\"] != source.metadataText[\"domain\"]"));
             Assert.That(whenExpression.GetProperty("result").GetString(), Is.EqualTo("matched"));
@@ -116,7 +119,7 @@ public sealed class ArchitectureDiagnosticFormatterTests
         using JsonDocument document = JsonDocument.Parse(json);
         JsonElement violation = document.RootElement.GetProperty("violations")[0];
 
-        Assert.That(violation.TryGetProperty("when_expression", out _), Is.False);
+        Assert.That(violation.TryGetProperty("when_expressions", out _), Is.False);
     }
 
     [Test]

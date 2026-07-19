@@ -169,11 +169,15 @@ When a context-dependency, context-allow-only, or layout-convention violation in
 
 #### Scenario: JSON violation includes expression participation
 - **WHEN** a context-dependency contract's `forbidden[*].when` predicate evaluates `true` and produces a violation
-- **THEN** the JSON output for that violation includes a `when_expression` object with the expression's source text, its YAML path, and `"result": "matched"`
+- **THEN** the JSON output for that violation includes a `when_expressions` array; each entry has `location`, `source`, `result` (`"matched"`), and `yaml_path`
+
+#### Scenario: Multiple expressions on one violation
+- **WHEN** both `source.when` and a matched `forbidden[*].when` are present on a single violation
+- **THEN** the `when_expressions` array contains one entry per participating selector, each with its own `location` (`"source"` and `"forbidden"` respectively)
 
 #### Scenario: Human output includes the expression text
 - **WHEN** the same violation is rendered as human-readable output
-- **THEN** the output line includes the evaluated `when` expression's source text alongside the existing violation description
+- **THEN** the output line includes the evaluated `when` expression's source text and its location alongside the existing violation description
 
 #### Scenario: Non-CEL violation is unaffected
 - **WHEN** a context-dependency or layout-convention violation involves no `when`-bearing selector
@@ -181,5 +185,5 @@ When a context-dependency, context-allow-only, or layout-convention violation in
 
 #### Scenario: Layout-convention violation includes expression participation
 - **WHEN** a `strict_layout_conventions[*].files_matching.when` predicate narrows which files are checked and a violation results
-- **THEN** the JSON output for that violation includes the same `when_expression` shape used for context-dependency/context-allow-only violations
+- **THEN** the JSON output for that violation includes a `when_expressions` array with `location: "files_matching"` and the same per-entry shape used for context-dependency/context-allow-only violations
 

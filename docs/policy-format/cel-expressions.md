@@ -381,28 +381,41 @@ Every diagnostic message names the owning contract, the exact YAML path of the
 and the expression's own source text — so a failure is traceable back to the
 authored YAML without needing to reproduce it.
 
-### `when_expression` in JSON and SARIF output
+### `when_expressions` in JSON and SARIF output
 
-When a `when`-bearing selector participates in a context-dependency,
+When one or more `when`-bearing selectors participate in a context-dependency,
 context-allow-only, or layout-convention violation, `--format json` includes a
-`when_expression` object on that violation:
+`when_expressions` array on that violation. A single violation can carry more
+than one entry — for example both `source.when` and the matched
+`forbidden[*].when`:
 
 ```json
 {
-  "when_expression": {
-    "source": "target.metadataText[\"domain\"] != source.metadataText[\"domain\"]",
-    "result": "matched",
-    "yaml_path": "contracts.strict_context_dependencies[0].forbidden[0]"
-  }
+  "when_expressions": [
+    {
+      "location": "source",
+      "source": "source.metadataText[\"tier\"] == \"premium\"",
+      "result": "matched",
+      "yaml_path": "contracts.strict_context_dependencies[0].source"
+    },
+    {
+      "location": "forbidden",
+      "source": "target.metadataText[\"domain\"] != source.metadataText[\"domain\"]",
+      "result": "matched",
+      "yaml_path": "contracts.strict_context_dependencies[0].forbidden[0]"
+    }
+  ]
 }
 ```
 
-`result` is one of `matched`, `not_matched` (a context-allow-only near-miss —
-a candidate's literal `role`/`metadata` matched an allowed selector but its
-`when` evaluated `false`), or `evaluation_failed`. The field is omitted
-entirely when no `when`-bearing selector was involved — existing JSON output
-for literal-only policies is unaffected. `--format sarif` adds the same
-information as a related location on the result.
+`location` identifies which selector the expression came from (`source`,
+`forbidden`, `allowed`, or `files_matching`). `result` is one of `matched`,
+`not_matched` (a context-allow-only near-miss — a candidate's literal
+`role`/`metadata` matched an allowed selector but its `when` evaluated
+`false`), or `evaluation_failed`. The field is omitted entirely when no
+`when`-bearing selector was involved — existing JSON output for literal-only
+policies is unaffected. `--format sarif` adds the same information as one
+related location per expression on the result.
 
 ### `explain` and CEL
 
