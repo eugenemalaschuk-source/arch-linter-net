@@ -56,9 +56,25 @@ public sealed partial class ArchitectureAnalysisSession
                 continue;
             }
 
-            ArchitectureContextSelector? matchedSelector = contract.Forbidden.FirstOrDefault(selector =>
-                ArchitectureContextSelectorMatcher.Matches(
-                    selector, referencedType, RoleIndex, sourceDescriptor, ExpressionFacts, sourceType));
+            // Iterate in order and stop at the first full match, so only selectors that were
+            // actually evaluated before the winner can be marked NotMatched. Selectors after the
+            // winning one are never reached by Matches() and must not appear as NotMatched.
+            ArchitectureContextSelector? matchedSelector = null;
+            List<ArchitectureContextSelector> notMatchedForbidden = new();
+            foreach (ArchitectureContextSelector candidate in contract.Forbidden)
+            {
+                if (ArchitectureContextSelectorMatcher.Matches(
+                        candidate, referencedType, RoleIndex, sourceDescriptor, ExpressionFacts, sourceType))
+                {
+                    matchedSelector = candidate;
+                    break;
+                }
+                if (!string.IsNullOrEmpty(candidate.When)
+                    && ArchitectureContextSelectorMatcher.MatchesLiteral(candidate, referencedType, RoleIndex, sourceDescriptor))
+                {
+                    notMatchedForbidden.Add(candidate);
+                }
+            }
 
             if (matchedSelector == null)
             {
@@ -73,15 +89,6 @@ public sealed partial class ArchitectureAnalysisSession
             }
 
             RoleIndex.TryGetRole(referencedType, out ArchitectureTypeClassificationResult targetDescriptor);
-
-            // Forbidden selectors whose literal role/metadata matched but whose `when` returned false -
-            // they were evaluated during the Matches pass above and came before or after the winner,
-            // so surfacing them as NotMatched gives the diagnostic full CEL provenance for the decision.
-            IReadOnlyList<ArchitectureContextSelector> notMatchedForbidden = contract.Forbidden
-                .Where(s => !ReferenceEquals(s, matchedSelector)
-                    && !string.IsNullOrEmpty(s.When)
-                    && ArchitectureContextSelectorMatcher.MatchesLiteral(s, referencedType, RoleIndex, sourceDescriptor))
-                .ToList();
 
             // Exclude selectors that matched literally but whose `when` returned false - because
             // IsExcludedFromContextMatch returned false, reaching here proves all exclude selectors
@@ -268,7 +275,12 @@ public sealed partial class ArchitectureAnalysisSession
         }
 
         whenExpressions.Add(new ExpressionParticipation(
-            selector.WhenContractName ?? contractName, location, selector.When, selector.WhenLocation?.YamlPath, result));
+            selector.WhenContractName ?? contractName, location, selector.When, selector.WhenLocation?.YamlPath, result)
+        {
+            PolicySourcePath = selector.WhenLocation?.SourcePath,
+            PolicySourceLine = selector.WhenLocation?.Line,
+            PolicySourceColumn = selector.WhenLocation?.Column,
+        });
     }
 
     private IEnumerable<Type> FindContextSelectorMatchingTypes(ArchitectureContextSelector selector)

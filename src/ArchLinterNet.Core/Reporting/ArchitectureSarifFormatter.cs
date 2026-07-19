@@ -187,7 +187,7 @@ public sealed partial class ArchitectureSarifFormatter : IArchitectureSarifForma
                 _ => "failed to evaluate",
             };
 
-            return (object)new Dictionary<string, object?>
+            var entry = new Dictionary<string, object?>
             {
                 ["id"] = relatedPolicyLocations.Length + index + 1,
                 [MessagePropertyName] = new Dictionary<string, object?>
@@ -196,6 +196,19 @@ public sealed partial class ArchitectureSarifFormatter : IArchitectureSarifForma
                         (whenExpression.YamlPath != null ? $" (at {whenExpression.YamlPath})" : string.Empty),
                 },
             };
+            if (whenExpression.PolicySourcePath != null)
+            {
+                entry["physicalLocation"] = new Dictionary<string, object?>
+                {
+                    ["artifactLocation"] = new Dictionary<string, object?> { ["uri"] = whenExpression.PolicySourcePath },
+                    ["region"] = new Dictionary<string, object?>
+                    {
+                        ["startLine"] = whenExpression.PolicySourceLine,
+                        ["startColumn"] = whenExpression.PolicySourceColumn,
+                    },
+                };
+            }
+            return (object)entry;
         }).ToArray();
 
         return relatedPolicyLocations.Concat(additional).ToArray();

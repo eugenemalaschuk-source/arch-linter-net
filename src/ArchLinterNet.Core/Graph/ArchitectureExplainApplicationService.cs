@@ -53,7 +53,7 @@ public sealed class ArchitectureExplainApplicationService(IArchitectureGraphAppl
         }
 
         List<ExplainExpressionParticipation> participation = new();
-        HashSet<(string HopSource, string HopTarget, string ContractId, string Location, string Source)> seen = new();
+        HashSet<(string HopSource, string HopTarget, string ContractId, string Location, string Source, string? YamlPath)> seen = new();
 
         for (int i = 0; i < path.Count - 1; i++)
         {
@@ -75,7 +75,7 @@ public sealed class ArchitectureExplainApplicationService(IArchitectureGraphAppl
 
                 foreach (ExpressionParticipation whenExpression in whenExpressions)
                 {
-                    if (!seen.Add((hopSource, hopTarget, violation.ContractId, whenExpression.Location, whenExpression.Source)))
+                    if (!seen.Add((hopSource, hopTarget, violation.ContractId, whenExpression.Location, whenExpression.Source, whenExpression.YamlPath)))
                     {
                         continue;
                     }

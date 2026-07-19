@@ -9,5 +9,5 @@ public sealed record ArchitectureGraphOutcome(ArchitectureDependencyGraph Graph)
     // not opt in. ArchitectureExplainApplicationService treats null as "no CEL participation
     // available" and returns an empty ExpressionParticipation list — correct behaviour since
     // only the concrete service runs a real contract-execution pass.
-    public IReadOnlyDictionary<(string Source, string Target), IReadOnlyList<ArchitectureViolation>>? EdgeViolations { get; init; }
+    internal IReadOnlyDictionary<(string Source, string Target), IReadOnlyList<ArchitectureViolation>>? EdgeViolations { get; init; }
 }

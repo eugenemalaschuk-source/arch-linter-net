@@ -69,6 +69,9 @@ public sealed partial class ArchitectureAnalysisSession
                 })
             {
                 Payload = new LayoutConventionPayload(DataUnavailable: true)
+                {
+                    WhenExpressions = BuildUnevaluatedLayoutWhenExpressions(contract),
+                }
             });
             return violations;
         }
@@ -114,7 +117,31 @@ public sealed partial class ArchitectureAnalysisSession
                     "files_matching",
                     contract.FilesMatching.When!,
                     contract.FilesMatching.WhenLocation?.YamlPath,
-                    ExpressionParticipationResult.Matched),
+                    ExpressionParticipationResult.Matched)
+                {
+                    PolicySourcePath = contract.FilesMatching.WhenLocation?.SourcePath,
+                    PolicySourceLine = contract.FilesMatching.WhenLocation?.Line,
+                    PolicySourceColumn = contract.FilesMatching.WhenLocation?.Column,
+                },
+            };
+
+    private static IReadOnlyList<ExpressionParticipation>? BuildUnevaluatedLayoutWhenExpressions(
+        ArchitectureLayoutConventionContract contract) =>
+        contract.FilesMatching.CompiledWhen == null
+            ? null
+            : new[]
+            {
+                new ExpressionParticipation(
+                    contract.FilesMatching.WhenContractName ?? contract.Name,
+                    "files_matching",
+                    contract.FilesMatching.When!,
+                    contract.FilesMatching.WhenLocation?.YamlPath,
+                    ExpressionParticipationResult.EvaluationFailed)
+                {
+                    PolicySourcePath = contract.FilesMatching.WhenLocation?.SourcePath,
+                    PolicySourceLine = contract.FilesMatching.WhenLocation?.Line,
+                    PolicySourceColumn = contract.FilesMatching.WhenLocation?.Column,
+                },
             };
 
     private static bool IsRecordKind(string value) =>
@@ -390,7 +417,10 @@ public sealed partial class ArchitectureAnalysisSession
                     sourceType: entry.Fact.FullTypeName,
                     forbiddenReference: "cannot evaluate files_matching.when: it references source-path facts " +
                         "(sourcePaths/sourceDirectoryPrefixes), but this declared type has no resolved source file",
-                    payload: new LayoutConventionPayload(DataUnavailable: true));
+                    payload: new LayoutConventionPayload(DataUnavailable: true)
+                    {
+                        WhenExpressions = BuildUnevaluatedLayoutWhenExpressions(contract),
+                    });
                 continue;
             }
 

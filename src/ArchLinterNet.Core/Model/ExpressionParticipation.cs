@@ -22,4 +22,13 @@ public sealed record ExpressionParticipation(
     string Location,
     string Source,
     string? YamlPath,
-    ExpressionParticipationResult Result);
+    ExpressionParticipationResult Result)
+{
+    // Physical location of the `when` declaration in the policy source file — populated from
+    // WhenLocation at capture time so SARIF can emit a proper physical location (file + line +
+    // column) instead of a text-only pseudo-location. Null when the location was not resolved
+    // (e.g. the location was not tracked in this execution context).
+    public string? PolicySourcePath { get; init; }
+    public int? PolicySourceLine { get; init; }
+    public int? PolicySourceColumn { get; init; }
+}
