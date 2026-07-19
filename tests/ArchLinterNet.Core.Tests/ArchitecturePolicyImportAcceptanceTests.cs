@@ -20,6 +20,50 @@ public sealed class ArchitecturePolicyImportAcceptanceTests
     }
 
     [Test]
+    public void Load_ModularMonolithSample_ContainsPortBoundaryAndLayoutConventionContracts()
+    {
+        ArchitectureContractDocument document = Load("samples/policies/imports/modular-monolith/architecture/arch.yml");
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(document.Contracts.StrictPortBoundaries.Select(c => c.Id),
+                Is.EquivalentTo(new[] { "sales-to-catalog-through-port", "legacy-crm-through-acl" }));
+            Assert.That(document.Contracts.StrictLayoutConventions.Select(c => c.Id),
+                Is.EquivalentTo(new[] { "application-services-have-matching-interfaces" }));
+        });
+    }
+
+    [Test]
+    public void Load_ModularMonolithSample_IsolationContractsCoverEveryBoundedContextDomain()
+    {
+        // Regression: adding a bounded context (Catalog, LegacyCrm) without extending the sample's
+        // own independence/SharedKernel isolation contracts would silently permit exactly the
+        // coupling those contracts' `reason` text promises is prevented.
+        ArchitectureContractDocument document = Load("samples/policies/imports/modular-monolith/architecture/arch.yml");
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(
+                document.Contracts.StrictIndependence
+                    .Single(c => c.Id == "bounded-context-domains-independent").Layers,
+                Is.EquivalentTo(new[] { "sales_domain", "inventory_domain", "catalog_domain", "legacy_crm_domain" }));
+            Assert.That(
+                document.Contracts.Strict
+                    .Single(c => c.Id == "shared-kernel-does-not-depend-on-modules").Forbidden,
+                Is.EquivalentTo(new[] { "sales_domain", "inventory_domain", "catalog_domain", "legacy_crm_domain" }));
+        });
+    }
+
+    [Test]
+    public void Load_UnityClientSample_ContainsLayoutConventionContract()
+    {
+        ArchitectureContractDocument document = Load("samples/policies/imports/unity-client/architecture/arch.yml");
+
+        Assert.That(document.Contracts.StrictLayoutConventions.Select(c => c.Id),
+            Is.EquivalentTo(new[] { "runtime-folder-forbids-editor-types" }));
+    }
+
+    [Test]
     public void Load_RecommendedAndArbitraryFixtureNames_ProduceEquivalentModels()
     {
         ArchitectureContractDocument recommended = Load(

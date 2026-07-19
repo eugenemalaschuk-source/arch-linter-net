@@ -12,3 +12,11 @@ contracts:
       source: game_core
       forbidden: [unity_adapters, gameplay_editor]
       reason: Pure game core remains independent of Unity-specific adapters and editor code.
+
+  strict_layout_conventions:
+    - id: runtime-folder-forbids-editor-types
+      name: runtime-folder-must-not-contain-editor-types
+      files_matching:
+        folder_segment: Runtime
+      forbidden_name_suffix: Editor
+      reason: Files under a Runtime folder segment must not declare Editor-only types; editor code belongs under the Editor folder segment.

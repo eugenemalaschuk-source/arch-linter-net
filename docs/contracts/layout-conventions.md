@@ -90,3 +90,13 @@ Diagnostics identify the matched file, the contract, and whichever of expected/a
 - No runtime dependency-injection resolution.
 - No standalone "unmapped folder" discovery that scans the whole repository for folders not covered by any configured contract — declare `audit_layout_conventions` entries for the folders you want drift-checked.
 - No configurable counterpart naming beyond a single prefix — `require_matching_interface` supports `name_prefix` only.
+
+## Worked, tested examples
+
+The Services/Interfaces matching-counterpart shape above, and a `files_matching.when`
+CEL predicate narrowing which declared types are checked, are exercised
+end-to-end (pass, fail, and JSON diagnostic output) in
+`tests/ArchLinterNet.Cli.Tests/LayoutConventionCliTests.cs`. The modular-monolith
+sample (`samples/policies/imports/modular-monolith/architecture/policy/shared/application-layout.arch.yml`)
+and the Unity-client sample (`samples/policies/imports/unity-client/architecture/policy/runtime.arch.yml`)
+demonstrate the same shape in narrative, composition-focused form.

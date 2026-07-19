@@ -8,5 +8,5 @@ contracts:
     - id: shared-kernel-does-not-depend-on-modules
       name: shared-kernel-does-not-depend-on-modules
       source: shared_kernel
-      forbidden: [sales_domain, inventory_domain]
+      forbidden: [sales_domain, inventory_domain, catalog_domain, legacy_crm_domain]
       reason: Shared kernel code must remain reusable by every bounded context.

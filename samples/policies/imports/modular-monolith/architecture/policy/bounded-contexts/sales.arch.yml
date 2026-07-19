@@ -5,6 +5,21 @@ layers:
   sales_contracts:
     namespace: MyCompany.Product.Modules.Sales.Contracts
 
+classification:
+  attributes:
+    - attribute: MyCompany.Product.Architecture.ApplicationLayerAttribute
+      role: ApplicationLayer
+      metadata:
+        module: constructor[0]
+    - attribute: MyCompany.Product.Architecture.PortAttribute
+      role: Port
+      metadata:
+        module: constructor[0]
+    - attribute: MyCompany.Product.Architecture.AdapterAttribute
+      role: Adapter
+      metadata:
+        module: constructor[0]
+
 contracts:
   strict_allow_only:
     - id: sales-contracts-use-shared-kernel
@@ -25,3 +40,26 @@ contracts:
           metadata:
             module: "!{source.metadata.module}"
       reason: Semantic module metadata prevents direct cross-context domain dependencies.
+
+  strict_port_boundaries:
+    - id: sales-to-catalog-through-port
+      name: sales-may-reach-catalog-only-through-port
+      source:
+        role: ApplicationLayer
+        metadata:
+          module: Sales
+      target_context:
+        metadata:
+          module: Catalog
+      allowed_seams:
+        - role: Port
+          metadata:
+            module: Catalog
+      forbidden:
+        - role: DomainLayer
+          metadata:
+            module: Catalog
+        - role: Adapter
+          metadata:
+            module: Catalog
+      reason: Sales must reach Catalog only through the reviewed Catalog port, never Catalog internals.
