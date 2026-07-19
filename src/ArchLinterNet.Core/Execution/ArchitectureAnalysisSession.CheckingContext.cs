@@ -56,9 +56,25 @@ public sealed partial class ArchitectureAnalysisSession
                 continue;
             }
 
-            ArchitectureContextSelector? matchedSelector = contract.Forbidden.FirstOrDefault(selector =>
-                ArchitectureContextSelectorMatcher.Matches(
-                    selector, referencedType, RoleIndex, sourceDescriptor, ExpressionFacts, sourceType));
+            // Iterate in order and stop at the first full match, so only selectors that were
+            // actually evaluated before the winner can be marked NotMatched. Selectors after the
+            // winning one are never reached by Matches() and must not appear as NotMatched.
+            ArchitectureContextSelector? matchedSelector = null;
+            List<ArchitectureContextSelector> notMatchedForbidden = new();
+            foreach (ArchitectureContextSelector candidate in contract.Forbidden)
+            {
+                if (ArchitectureContextSelectorMatcher.Matches(
+                        candidate, referencedType, RoleIndex, sourceDescriptor, ExpressionFacts, sourceType))
+                {
+                    matchedSelector = candidate;
+                    break;
+                }
+                if (!string.IsNullOrEmpty(candidate.When)
+                    && ArchitectureContextSelectorMatcher.MatchesLiteral(candidate, referencedType, RoleIndex, sourceDescriptor))
+                {
+                    notMatchedForbidden.Add(candidate);
+                }
+            }
 
             if (matchedSelector == null)
             {
@@ -74,6 +90,24 @@ public sealed partial class ArchitectureAnalysisSession
 
             RoleIndex.TryGetRole(referencedType, out ArchitectureTypeClassificationResult targetDescriptor);
 
+            // Exclude selectors that matched literally but whose `when` returned false - because
+            // IsExcludedFromContextMatch returned false, reaching here proves all exclude selectors
+            // that matched role/metadata must have had when=false.
+            IReadOnlyList<ArchitectureContextSelector> notMatchedExclude = contract.Exclude
+                .Where(s => !string.IsNullOrEmpty(s.When)
+                    && ArchitectureContextSelectorMatcher.MatchesLiteral(s, referencedType, RoleIndex, sourceDescriptor))
+                .ToList();
+
+            List<ExpressionParticipation> whenExpressions = new();
+            // contract.Source.When already evaluated true for this sourceType - FindContextSelectorMatchingTypes
+            // filtered by it before this method was ever called for this candidate.
+            AddWhenExpression(whenExpressions, contract.Name, contract.Source, "source", ExpressionParticipationResult.Matched);
+            foreach (ArchitectureContextSelector s in notMatchedForbidden)
+                AddWhenExpression(whenExpressions, contract.Name, s, "forbidden", ExpressionParticipationResult.NotMatched);
+            AddWhenExpression(whenExpressions, contract.Name, matchedSelector, "forbidden", ExpressionParticipationResult.Matched);
+            foreach (ArchitectureContextSelector s in notMatchedExclude)
+                AddWhenExpression(whenExpressions, contract.Name, s, "exclude", ExpressionParticipationResult.NotMatched);
+
             violations.Add(new ArchitectureViolation(
                 contract.Name, contract.Id, sourceFullName,
                 DescribeContextSelector(matchedSelector),
@@ -85,6 +119,9 @@ public sealed partial class ArchitectureAnalysisSession
                     TargetRole: targetDescriptor.Role,
                     TargetMetadata: targetDescriptor.Metadata,
                     MatchedSelector: "forbidden")
+                {
+                    WhenExpressions = whenExpressions.Count == 0 ? null : whenExpressions,
+                }
             });
         }
     }
@@ -128,7 +165,7 @@ public sealed partial class ArchitectureAnalysisSession
         {
             if (!IsContextAllowOnlyCandidateViolation(
                     contract, referencedType, sourceDescriptor, sourceType,
-                    out ArchitectureTypeClassificationResult targetDescriptor, out string? nearMissWhen))
+                    out ArchitectureTypeClassificationResult targetDescriptor, out IReadOnlyList<ArchitectureContextSelector> nearMissSelectors))
             {
                 continue;
             }
@@ -140,9 +177,28 @@ public sealed partial class ArchitectureAnalysisSession
                 continue;
             }
 
-            string[] evidence = nearMissWhen == null
+            string[] evidence = nearMissSelectors.Count == 0
                 ? new[] { targetFullName }
-                : new[] { targetFullName, nearMissWhen };
+                : new[] { targetFullName }.Concat(
+                    nearMissSelectors.Select(s => $"when: {s.When} (evaluated false for this target)"))
+                    .ToArray();
+
+            // Exclude selectors that matched literally but whose `when` returned false - reaching
+            // here proves all exclude selectors that matched role/metadata must have had when=false,
+            // because IsContextAllowOnlyCandidateViolation called IsExcludedFromContextMatch first.
+            IReadOnlyList<ArchitectureContextSelector> notMatchedExclude = contract.Exclude
+                .Where(s => !string.IsNullOrEmpty(s.When)
+                    && ArchitectureContextSelectorMatcher.MatchesLiteral(s, referencedType, RoleIndex, sourceDescriptor))
+                .ToList();
+
+            List<ExpressionParticipation> whenExpressions = new();
+            AddWhenExpression(whenExpressions, contract.Name, contract.Source, "source", ExpressionParticipationResult.Matched);
+            foreach (ArchitectureContextSelector nearMiss in nearMissSelectors)
+            {
+                AddWhenExpression(whenExpressions, contract.Name, nearMiss, "allowed", ExpressionParticipationResult.NotMatched);
+            }
+            foreach (ArchitectureContextSelector s in notMatchedExclude)
+                AddWhenExpression(whenExpressions, contract.Name, s, "exclude", ExpressionParticipationResult.NotMatched);
 
             violations.Add(new ArchitectureViolation(
                 contract.Name, contract.Id, sourceFullName, "outside allowed context selectors", evidence)
@@ -153,13 +209,16 @@ public sealed partial class ArchitectureAnalysisSession
                     TargetRole: targetDescriptor.Role,
                     TargetMetadata: targetDescriptor.Metadata,
                     MatchedSelector: "none")
+                {
+                    WhenExpressions = whenExpressions.Count == 0 ? null : whenExpressions,
+                }
             });
         }
     }
 
-    // nearMissWhen is set when no allowed selector matched, but at least one allowed selector's
-    // literal role/metadata criteria matched and only failed because its `when` evaluated false —
-    // surfaced as extra diagnostic evidence per the contextual-allow-only-contracts delta spec's
+    // nearMissSelectors are all allowed[*] selectors whose literal role/metadata criteria matched
+    // but whose `when` predicate evaluated false — each is surfaced as a separate evidence item and
+    // ExpressionParticipation entry per the contextual-allow-only-contracts delta spec's
     // "Diagnostic identifies a participating when expression" scenario.
     private bool IsContextAllowOnlyCandidateViolation(
         ArchitectureContextAllowOnlyContract contract,
@@ -167,10 +226,10 @@ public sealed partial class ArchitectureAnalysisSession
         ArchitectureTypeClassificationResult sourceDescriptor,
         Type sourceType,
         out ArchitectureTypeClassificationResult targetDescriptor,
-        out string? nearMissWhen)
+        out IReadOnlyList<ArchitectureContextSelector> nearMissSelectors)
     {
         targetDescriptor = default!;
-        nearMissWhen = null;
+        nearMissSelectors = Array.Empty<ArchitectureContextSelector>();
 
         if (IsExcludedFromContextMatch(referencedType, contract.Exclude, sourceDescriptor, sourceType))
         {
@@ -186,19 +245,42 @@ public sealed partial class ArchitectureAnalysisSession
             return false;
         }
 
-        ArchitectureContextSelector? nearMissSelector = contract.Allowed.FirstOrDefault(selector =>
+        nearMissSelectors = contract.Allowed.Where(selector =>
             !string.IsNullOrEmpty(selector.When)
-            && ArchitectureContextSelectorMatcher.MatchesLiteral(selector, referencedType, RoleIndex, sourceDescriptor));
-        if (nearMissSelector != null)
-        {
-            nearMissWhen = $"when: {nearMissSelector.When} (evaluated false for this target)";
-        }
+            && ArchitectureContextSelectorMatcher.MatchesLiteral(selector, referencedType, RoleIndex, sourceDescriptor))
+            .ToList();
 
         // Only role-classified referenced types are meaningful candidates for a contextual
         // allow-only violation — an unclassified type (framework/BCL types, primitives, etc.)
         // cannot match any selector and reporting it would be unrelated noise, mirroring how
         // CheckAllowOnlyContract only considers references already inside a declared layer.
         return RoleIndex.TryGetRole(referencedType, out targetDescriptor);
+    }
+
+    // Built from data ArchitectureContextSelector already carries (raw source text, resolved YAML
+    // location) rather than re-deriving anything - see ArchitectureContextSelector's own doc comment
+    // for why WhenLocation/WhenContractName live on the selector itself. A no-op when the selector (or
+    // the selector reference itself, e.g. no near-miss) has no `when` - callers can call this
+    // unconditionally for every selector that might participate.
+    private static void AddWhenExpression(
+        List<ExpressionParticipation> whenExpressions,
+        string contractName,
+        ArchitectureContextSelector? selector,
+        string location,
+        ExpressionParticipationResult result)
+    {
+        if (selector == null || string.IsNullOrEmpty(selector.When))
+        {
+            return;
+        }
+
+        whenExpressions.Add(new ExpressionParticipation(
+            selector.WhenContractName ?? contractName, location, selector.When, selector.WhenLocation?.YamlPath, result)
+        {
+            PolicySourcePath = selector.WhenLocation?.SourcePath,
+            PolicySourceLine = selector.WhenLocation?.Line,
+            PolicySourceColumn = selector.WhenLocation?.Column,
+        });
     }
 
     private IEnumerable<Type> FindContextSelectorMatchingTypes(ArchitectureContextSelector selector)

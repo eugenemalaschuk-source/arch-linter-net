@@ -15,4 +15,5 @@ public sealed record ContextDependencyDiagnostic(
     public string? TargetRole { get; init; }
     public IReadOnlyDictionary<string, object>? TargetMetadata { get; init; }
     public string? MatchedSelector { get; init; }
+    public IReadOnlyList<ExpressionParticipation>? WhenExpressions { get; init; }
 }

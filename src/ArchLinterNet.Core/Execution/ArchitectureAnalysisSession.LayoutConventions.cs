@@ -69,6 +69,9 @@ public sealed partial class ArchitectureAnalysisSession
                 })
             {
                 Payload = new LayoutConventionPayload(DataUnavailable: true)
+                {
+                    WhenExpressions = BuildUnevaluatedLayoutWhenExpressions(contract),
+                }
             });
             return violations;
         }
@@ -95,6 +98,51 @@ public sealed partial class ArchitectureAnalysisSession
         executionContext.CollectUnmatchedIgnores(_unmatchedIgnoredViolations);
         return violations;
     }
+
+    // A files_matching group only exists because its `when` (if any) already evaluated true for
+    // every fact in it - see CollectFiledGroups/CollectUnfiledGroups, which filter via
+    // EvaluateLayoutWhen before a group is ever constructed - so every violation raised against an
+    // already-built group's facts always reports ExpressionParticipationResult.Matched, mirroring
+    // ArchitectureAnalysisSession.CheckingContext's AddWhenExpression for the same reason. Returns a
+    // list (of at most one entry, since layout conventions have exactly one `when` location) for
+    // uniformity with the contextual dependency/allow-only payloads' WhenExpressions shape.
+    private static IReadOnlyList<ExpressionParticipation>? BuildLayoutWhenExpressions(
+        ArchitectureLayoutConventionContract contract) =>
+        contract.FilesMatching.CompiledWhen == null
+            ? null
+            : new[]
+            {
+                new ExpressionParticipation(
+                    contract.FilesMatching.WhenContractName ?? contract.Name,
+                    "files_matching",
+                    contract.FilesMatching.When!,
+                    contract.FilesMatching.WhenLocation?.YamlPath,
+                    ExpressionParticipationResult.Matched)
+                {
+                    PolicySourcePath = contract.FilesMatching.WhenLocation?.SourcePath,
+                    PolicySourceLine = contract.FilesMatching.WhenLocation?.Line,
+                    PolicySourceColumn = contract.FilesMatching.WhenLocation?.Column,
+                },
+            };
+
+    private static IReadOnlyList<ExpressionParticipation>? BuildUnevaluatedLayoutWhenExpressions(
+        ArchitectureLayoutConventionContract contract) =>
+        contract.FilesMatching.CompiledWhen == null
+            ? null
+            : new[]
+            {
+                new ExpressionParticipation(
+                    contract.FilesMatching.WhenContractName ?? contract.Name,
+                    "files_matching",
+                    contract.FilesMatching.When!,
+                    contract.FilesMatching.WhenLocation?.YamlPath,
+                    ExpressionParticipationResult.EvaluationFailed)
+                {
+                    PolicySourcePath = contract.FilesMatching.WhenLocation?.SourcePath,
+                    PolicySourceLine = contract.FilesMatching.WhenLocation?.Line,
+                    PolicySourceColumn = contract.FilesMatching.WhenLocation?.Column,
+                },
+            };
 
     private static bool IsRecordKind(string value) =>
         ArchitectureLayoutTypeKindParser.TryParse(value, out ArchitectureTypeKind kind) && kind == ArchitectureTypeKind.Record;
@@ -140,7 +188,10 @@ public sealed partial class ArchitectureAnalysisSession
                 sourceType: ambiguity.FullTypeName,
                 forbiddenReference: "cannot evaluate: declared across multiple source files " +
                     $"({string.Join(", ", ambiguity.SourceFilePaths)}), so its folder/file-name facts are ambiguous",
-                payload: new LayoutConventionPayload(DataUnavailable: true));
+                payload: new LayoutConventionPayload(DataUnavailable: true)
+                {
+                    WhenExpressions = BuildLayoutWhenExpressions(contract),
+                });
         }
     }
 
@@ -366,7 +417,10 @@ public sealed partial class ArchitectureAnalysisSession
                     sourceType: entry.Fact.FullTypeName,
                     forbiddenReference: "cannot evaluate files_matching.when: it references source-path facts " +
                         "(sourcePaths/sourceDirectoryPrefixes), but this declared type has no resolved source file",
-                    payload: new LayoutConventionPayload(DataUnavailable: true));
+                    payload: new LayoutConventionPayload(DataUnavailable: true)
+                    {
+                        WhenExpressions = BuildUnevaluatedLayoutWhenExpressions(contract),
+                    });
                 continue;
             }
 
@@ -506,7 +560,10 @@ public sealed partial class ArchitectureAnalysisSession
             payload: new LayoutConventionPayload(
                 MatchedFilePath: group.SourceFilePath,
                 ExpectedTypeKind: contract.RequireTypeKind,
-                ActualTypeKind: actualKinds));
+                ActualTypeKind: actualKinds)
+            {
+                WhenExpressions = BuildLayoutWhenExpressions(contract),
+            });
     }
 
     private static void EvaluateForbidTypeKind(
@@ -536,7 +593,10 @@ public sealed partial class ArchitectureAnalysisSession
                 payload: new LayoutConventionPayload(
                     MatchedFilePath: group.SourceFilePath,
                     ExpectedTypeKind: $"not {contract.ForbidTypeKind}",
-                    ActualTypeKind: fact.TypeKind.ToString()));
+                    ActualTypeKind: fact.TypeKind.ToString())
+                {
+                    WhenExpressions = BuildLayoutWhenExpressions(contract),
+                });
         }
     }
 
@@ -565,7 +625,10 @@ public sealed partial class ArchitectureAnalysisSession
                     ExpectedTypeName: ArchitectureNameConventionMatcher.Describe(
                         contract.RequiredNameSuffix, contract.RequiredNamePrefix,
                         contract.ForbiddenNameSuffix, contract.ForbiddenNamePrefix),
-                    ActualTypeName: fact.SimpleTypeName));
+                    ActualTypeName: fact.SimpleTypeName)
+                {
+                    WhenExpressions = BuildLayoutWhenExpressions(contract),
+                });
         }
     }
 
@@ -594,7 +657,10 @@ public sealed partial class ArchitectureAnalysisSession
                 sourceType: groupLabel,
                 forbiddenReference: "require_type_name_matches_file_name cannot be evaluated: no resolvable source " +
                     "file for this declared type (missing source enrichment or an ambiguous partial-class declaration)",
-                payload: new LayoutConventionPayload(DataUnavailable: true));
+                payload: new LayoutConventionPayload(DataUnavailable: true)
+                {
+                    WhenExpressions = BuildLayoutWhenExpressions(contract),
+                });
             return;
         }
 
@@ -611,7 +677,10 @@ public sealed partial class ArchitectureAnalysisSession
             payload: new LayoutConventionPayload(
                 MatchedFilePath: group.SourceFilePath,
                 ExpectedTypeName: group.FileNameWithoutExtension,
-                ActualTypeName: actualNames));
+                ActualTypeName: actualNames)
+            {
+                WhenExpressions = BuildLayoutWhenExpressions(contract),
+            });
     }
 
     private void EvaluateMatchingInterfaceExpectation(
@@ -661,7 +730,10 @@ public sealed partial class ArchitectureAnalysisSession
                 forbiddenReference: reason,
                 payload: new LayoutConventionPayload(
                     MatchedFilePath: group.SourceFilePath,
-                    ExpectedCounterpartName: expectedCounterpartName));
+                    ExpectedCounterpartName: expectedCounterpartName)
+                {
+                    WhenExpressions = BuildLayoutWhenExpressions(contract),
+                });
         }
     }
 
@@ -679,7 +751,10 @@ public sealed partial class ArchitectureAnalysisSession
             forbiddenReference: $"cannot evaluate {fieldName}: record — record vs class/struct classification requires " +
                 "source-enriched facts, unavailable for this declared type (missing source enrichment or an ambiguous " +
                 "partial-class declaration)",
-            payload: new LayoutConventionPayload(DataUnavailable: true));
+            payload: new LayoutConventionPayload(DataUnavailable: true)
+            {
+                WhenExpressions = BuildLayoutWhenExpressions(contract),
+            });
     }
 
     private static void AddViolation(

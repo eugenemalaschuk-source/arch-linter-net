@@ -8,6 +8,10 @@ public sealed record ContextDependencyPayload(
     string? MatchedSelector = null)
     : IArchitectureDiagnosticPayload
 {
+    // Non-positional so the CLR constructor signature (used by already-compiled consumers)
+    // stays at 5 parameters — adding it as a 6th positional parameter would be a binary
+    // breaking change even with a default value. Callers assign via object-initializer syntax.
+    public IReadOnlyList<ExpressionParticipation>? WhenExpressions { get; init; }
     public ArchitectureDiagnostic ToDiagnostic(ArchitectureViolation violation) =>
         new ContextDependencyDiagnostic(
             violation.ContractName, violation.ContractId, violation.SourceType,
@@ -18,6 +22,7 @@ public sealed record ContextDependencyPayload(
             SourceMetadata = SourceMetadata,
             TargetRole = TargetRole,
             TargetMetadata = TargetMetadata,
-            MatchedSelector = MatchedSelector
+            MatchedSelector = MatchedSelector,
+            WhenExpressions = WhenExpressions
         };
 }

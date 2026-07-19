@@ -38,7 +38,10 @@ ArchLinterNet supports static architecture validation through documented YAML po
 - condition sets for source-level analysis;
 - ignored violations and generated baselines;
 - human and JSON diagnostics;
-- CLI and test-adapter execution.
+- CLI and test-adapter execution;
+- CEL-backed `when` predicates on a closed set of selector locations (standard
+  CEL under ArchLinter CEL Profile v1, a safe subset — not a proprietary DSL
+  and not full CEL conformance; see the [CEL policy expressions guide](cel-expressions.md)).
 
 ## Not supported
 
@@ -51,9 +54,7 @@ ArchLinterNet does not currently validate:
 - third-party package internals;
 - full MSBuild evaluation, target execution, or arbitrary imported-property semantics;
 - CEL-backed policy expressions outside the closed set of `when` locations
-  (`layers.<name>.selector.when` and contextual dependency/allow-only
-  `source`/`forbidden`/`allowed`/`exclude` selectors — see
-  [Layers and namespace patterns](layers-and-namespaces.md#selector-when-predicates));
+  documented in the [CEL policy expressions guide](cel-expressions.md#locations-that-accept-when);
   `when` is never inferred from ordinary strings anywhere else;
 - unrestricted custom contract families outside the documented YAML schema;
 - unrestricted namespace pattern systems;
