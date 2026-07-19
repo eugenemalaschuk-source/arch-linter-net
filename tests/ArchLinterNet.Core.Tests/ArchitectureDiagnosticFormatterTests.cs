@@ -57,6 +57,69 @@ public sealed class ArchitectureDiagnosticFormatterTests
     }
 
     [Test]
+    public void FormatViolationsForHumans_ContextDependencyWithWhenExpression_IncludesExpressionAndResult()
+    {
+        var violations = new List<ArchitectureViolation>
+        {
+            new("contract", null, "Source.Type", "role:DomainLayer", _reference1)
+            {
+                Payload = new ContextDependencyPayload(
+                    WhenExpression: new ExpressionParticipation(
+                        "contract", "target.metadataText[\"domain\"] != source.metadataText[\"domain\"]", "contracts.strict_context_dependencies[0].forbidden[0]", ExpressionParticipationResult.Matched))
+            }
+        };
+
+        string output = _formatter.FormatViolationsForHumans(violations);
+
+        Assert.That(output, Does.Contain("when: target.metadataText[\"domain\"] != source.metadataText[\"domain\"] (matched)"));
+    }
+
+    [Test]
+    public void FormatResultForCiArtifacts_ContextDependencyWithWhenExpression_IncludesStructuredField()
+    {
+        var violations = new List<ArchitectureViolation>
+        {
+            new("contract", "contract-id", "Source.Type", "role:DomainLayer", _reference1)
+            {
+                Payload = new ContextDependencyPayload(
+                    WhenExpression: new ExpressionParticipation(
+                        "contract", "target.metadataText[\"domain\"] != source.metadataText[\"domain\"]", "contracts.strict_context_dependencies[0].forbidden[0]", ExpressionParticipationResult.Matched))
+            }
+        };
+
+        string json = _formatter.FormatViolationsForCiArtifacts("contract", "contract-id", violations);
+        using JsonDocument document = JsonDocument.Parse(json);
+        JsonElement whenExpression = document.RootElement.GetProperty("violations")[0].GetProperty("when_expression");
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(whenExpression.GetProperty("source").GetString(),
+                Is.EqualTo("target.metadataText[\"domain\"] != source.metadataText[\"domain\"]"));
+            Assert.That(whenExpression.GetProperty("result").GetString(), Is.EqualTo("matched"));
+            Assert.That(whenExpression.GetProperty("yaml_path").GetString(),
+                Is.EqualTo("contracts.strict_context_dependencies[0].forbidden[0]"));
+        });
+    }
+
+    [Test]
+    public void FormatResultForCiArtifacts_ContextDependencyWithoutWhenExpression_OmitsField()
+    {
+        var violations = new List<ArchitectureViolation>
+        {
+            new("contract", "contract-id", "Source.Type", "role:DomainLayer", _reference1)
+            {
+                Payload = new ContextDependencyPayload()
+            }
+        };
+
+        string json = _formatter.FormatViolationsForCiArtifacts("contract", "contract-id", violations);
+        using JsonDocument document = JsonDocument.Parse(json);
+        JsonElement violation = document.RootElement.GetProperty("violations")[0];
+
+        Assert.That(violation.TryGetProperty("when_expression", out _), Is.False);
+    }
+
+    [Test]
     public void FormatViolationsForHumans_ConfigurationDiagnosticWithDependencyPaths_IncludesViaLines()
     {
         var violations = new List<ArchitectureViolation>

@@ -18,7 +18,8 @@ public sealed partial class ArchitectureDiagnosticFormatter
                $"source_metadata: {FormatMetadataForHumans(diagnostic.SourceMetadata)}, " +
                $"target_role: {diagnostic.TargetRole ?? "?"}, " +
                $"target_metadata: {FormatMetadataForHumans(diagnostic.TargetMetadata)}, " +
-               $"matched_selector: {diagnostic.MatchedSelector ?? "?"})";
+               $"matched_selector: {diagnostic.MatchedSelector ?? "?"}" +
+               $"{FormatWhenExpressionForHumans(diagnostic.WhenExpression)})";
     }
 
     private static string FormatContextAllowOnlyContextForHumans(ContextAllowOnlyDiagnostic diagnostic)
@@ -27,7 +28,48 @@ public sealed partial class ArchitectureDiagnosticFormatter
                $"source_metadata: {FormatMetadataForHumans(diagnostic.SourceMetadata)}, " +
                $"target_role: {diagnostic.TargetRole ?? "?"}, " +
                $"target_metadata: {FormatMetadataForHumans(diagnostic.TargetMetadata)}, " +
-               $"matched_selector: {diagnostic.MatchedSelector ?? "?"})";
+               $"matched_selector: {diagnostic.MatchedSelector ?? "?"}" +
+               $"{FormatWhenExpressionForHumans(diagnostic.WhenExpression)})";
+    }
+
+    // Shared by every diagnostic kind that can carry expression participation (context-dependency,
+    // context-allow-only, layout-convention) - additive: diagnostics without a `when`-bearing
+    // selector produce an empty suffix, leaving existing output byte-identical.
+    private static string FormatWhenExpressionForHumans(ExpressionParticipation? whenExpression)
+    {
+        if (whenExpression == null)
+        {
+            return string.Empty;
+        }
+
+        string result = whenExpression.Result switch
+        {
+            ExpressionParticipationResult.Matched => "matched",
+            ExpressionParticipationResult.NotMatched => "not matched",
+            _ => "evaluation failed",
+        };
+
+        return $", when: {whenExpression.Source} ({result})";
+    }
+
+    private static void ApplyWhenExpressionCiFields(ExpressionParticipation? whenExpression, Dictionary<string, object?> obj)
+    {
+        if (whenExpression == null)
+        {
+            return;
+        }
+
+        obj["when_expression"] = new Dictionary<string, object?>
+        {
+            ["source"] = whenExpression.Source,
+            ["result"] = whenExpression.Result switch
+            {
+                ExpressionParticipationResult.Matched => "matched",
+                ExpressionParticipationResult.NotMatched => "not_matched",
+                _ => "evaluation_failed",
+            },
+            ["yaml_path"] = whenExpression.YamlPath,
+        };
     }
 
     private static string FormatMetadataForHumans(IReadOnlyDictionary<string, object>? metadata)
@@ -58,6 +100,8 @@ public sealed partial class ArchitectureDiagnosticFormatter
 
         if (diagnostic.MatchedSelector != null)
             obj["matched_selector"] = diagnostic.MatchedSelector;
+
+        ApplyWhenExpressionCiFields(diagnostic.WhenExpression, obj);
     }
 
     private static void ApplyContextAllowOnlyCiFields(ContextAllowOnlyDiagnostic diagnostic, Dictionary<string, object?> obj)
@@ -76,6 +120,8 @@ public sealed partial class ArchitectureDiagnosticFormatter
 
         if (diagnostic.MatchedSelector != null)
             obj["matched_selector"] = diagnostic.MatchedSelector;
+
+        ApplyWhenExpressionCiFields(diagnostic.WhenExpression, obj);
     }
 
     private static string FormatPortBoundaryContextForHumans(PortBoundaryDiagnostic diagnostic) =>

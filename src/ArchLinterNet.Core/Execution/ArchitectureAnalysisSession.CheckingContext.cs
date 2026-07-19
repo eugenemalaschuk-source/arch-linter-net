@@ -84,7 +84,8 @@ public sealed partial class ArchitectureAnalysisSession
                     SourceMetadata: sourceDescriptor.Metadata,
                     TargetRole: targetDescriptor.Role,
                     TargetMetadata: targetDescriptor.Metadata,
-                    MatchedSelector: "forbidden")
+                    MatchedSelector: "forbidden",
+                    WhenExpression: BuildWhenExpression(contract.Name, matchedSelector, ExpressionParticipationResult.Matched))
             });
         }
     }
@@ -128,7 +129,7 @@ public sealed partial class ArchitectureAnalysisSession
         {
             if (!IsContextAllowOnlyCandidateViolation(
                     contract, referencedType, sourceDescriptor, sourceType,
-                    out ArchitectureTypeClassificationResult targetDescriptor, out string? nearMissWhen))
+                    out ArchitectureTypeClassificationResult targetDescriptor, out ArchitectureContextSelector? nearMissSelector))
             {
                 continue;
             }
@@ -140,6 +141,9 @@ public sealed partial class ArchitectureAnalysisSession
                 continue;
             }
 
+            string? nearMissWhen = nearMissSelector == null
+                ? null
+                : $"when: {nearMissSelector.When} (evaluated false for this target)";
             string[] evidence = nearMissWhen == null
                 ? new[] { targetFullName }
                 : new[] { targetFullName, nearMissWhen };
@@ -152,7 +156,10 @@ public sealed partial class ArchitectureAnalysisSession
                     SourceMetadata: sourceDescriptor.Metadata,
                     TargetRole: targetDescriptor.Role,
                     TargetMetadata: targetDescriptor.Metadata,
-                    MatchedSelector: "none")
+                    MatchedSelector: "none",
+                    WhenExpression: nearMissSelector == null
+                        ? null
+                        : BuildWhenExpression(contract.Name, nearMissSelector, ExpressionParticipationResult.NotMatched))
             });
         }
     }
@@ -167,10 +174,10 @@ public sealed partial class ArchitectureAnalysisSession
         ArchitectureTypeClassificationResult sourceDescriptor,
         Type sourceType,
         out ArchitectureTypeClassificationResult targetDescriptor,
-        out string? nearMissWhen)
+        out ArchitectureContextSelector? nearMissSelector)
     {
         targetDescriptor = default!;
-        nearMissWhen = null;
+        nearMissSelector = null;
 
         if (IsExcludedFromContextMatch(referencedType, contract.Exclude, sourceDescriptor, sourceType))
         {
@@ -186,19 +193,30 @@ public sealed partial class ArchitectureAnalysisSession
             return false;
         }
 
-        ArchitectureContextSelector? nearMissSelector = contract.Allowed.FirstOrDefault(selector =>
+        nearMissSelector = contract.Allowed.FirstOrDefault(selector =>
             !string.IsNullOrEmpty(selector.When)
             && ArchitectureContextSelectorMatcher.MatchesLiteral(selector, referencedType, RoleIndex, sourceDescriptor));
-        if (nearMissSelector != null)
-        {
-            nearMissWhen = $"when: {nearMissSelector.When} (evaluated false for this target)";
-        }
 
         // Only role-classified referenced types are meaningful candidates for a contextual
         // allow-only violation — an unclassified type (framework/BCL types, primitives, etc.)
         // cannot match any selector and reporting it would be unrelated noise, mirroring how
         // CheckAllowOnlyContract only considers references already inside a declared layer.
         return RoleIndex.TryGetRole(referencedType, out targetDescriptor);
+    }
+
+    // Built from data ArchitectureContextSelector already carries (raw source text, resolved YAML
+    // location) rather than re-deriving anything - see ArchitectureContextSelector's own doc comment
+    // for why WhenLocation/WhenContractName live on the selector itself.
+    private static ExpressionParticipation? BuildWhenExpression(
+        string contractName, ArchitectureContextSelector selector, ExpressionParticipationResult result)
+    {
+        if (string.IsNullOrEmpty(selector.When))
+        {
+            return null;
+        }
+
+        return new ExpressionParticipation(
+            selector.WhenContractName ?? contractName, selector.When, selector.WhenLocation?.YamlPath, result);
     }
 
     private IEnumerable<Type> FindContextSelectorMatchingTypes(ArchitectureContextSelector selector)

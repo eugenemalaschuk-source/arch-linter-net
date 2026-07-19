@@ -243,6 +243,17 @@ catalog](semantic-role-catalog.md). It defines first-wave roles, metadata keys,
 support tiers, and YAML-first examples; it does not make the reserved fields
 active.
 
+## CEL policy expressions
+
+A closed set of selector fields (`layers.<name>.selector.when`, contextual
+dependency/allow-only selectors, and `files_matching.when` on layout
+convention contracts) accepts an optional CEL `when` predicate that narrows an
+already-scoped literal selector.
+
+Read [CEL policy expressions](cel-expressions.md) for the full authoring
+reference, the ArchLinter CEL Profile v1 support matrix, worked examples, and
+diagnostics.
+
 ## Supported capabilities and non-goals
 
 Before adding fields, check [Supported capabilities and non-goals](supported-capabilities.md). ArchLinterNet intentionally does not validate runtime dependency injection behavior, security/authorization correctness, code ownership, or semantic data flow.

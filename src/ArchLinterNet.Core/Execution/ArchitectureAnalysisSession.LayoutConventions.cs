@@ -96,6 +96,21 @@ public sealed partial class ArchitectureAnalysisSession
         return violations;
     }
 
+    // A files_matching group only exists because its `when` (if any) already evaluated true for
+    // every fact in it - see CollectFiledGroups/CollectUnfiledGroups, which filter via
+    // EvaluateLayoutWhen before a group is ever constructed - so every violation raised against an
+    // already-built group's facts always reports ExpressionParticipationResult.Matched, mirroring
+    // ArchitectureAnalysisSession.CheckingContext's BuildWhenExpression for the same reason.
+    private static ExpressionParticipation? BuildLayoutWhenExpression(
+        ArchitectureLayoutConventionContract contract) =>
+        contract.FilesMatching.CompiledWhen == null
+            ? null
+            : new ExpressionParticipation(
+                contract.FilesMatching.WhenContractName ?? contract.Name,
+                contract.FilesMatching.When!,
+                contract.FilesMatching.WhenLocation?.YamlPath,
+                ExpressionParticipationResult.Matched);
+
     private static bool IsRecordKind(string value) =>
         ArchitectureLayoutTypeKindParser.TryParse(value, out ArchitectureTypeKind kind) && kind == ArchitectureTypeKind.Record;
 
@@ -506,7 +521,8 @@ public sealed partial class ArchitectureAnalysisSession
             payload: new LayoutConventionPayload(
                 MatchedFilePath: group.SourceFilePath,
                 ExpectedTypeKind: contract.RequireTypeKind,
-                ActualTypeKind: actualKinds));
+                ActualTypeKind: actualKinds,
+                WhenExpression: BuildLayoutWhenExpression(contract)));
     }
 
     private static void EvaluateForbidTypeKind(
@@ -536,7 +552,8 @@ public sealed partial class ArchitectureAnalysisSession
                 payload: new LayoutConventionPayload(
                     MatchedFilePath: group.SourceFilePath,
                     ExpectedTypeKind: $"not {contract.ForbidTypeKind}",
-                    ActualTypeKind: fact.TypeKind.ToString()));
+                    ActualTypeKind: fact.TypeKind.ToString(),
+                    WhenExpression: BuildLayoutWhenExpression(contract)));
         }
     }
 
@@ -565,7 +582,8 @@ public sealed partial class ArchitectureAnalysisSession
                     ExpectedTypeName: ArchitectureNameConventionMatcher.Describe(
                         contract.RequiredNameSuffix, contract.RequiredNamePrefix,
                         contract.ForbiddenNameSuffix, contract.ForbiddenNamePrefix),
-                    ActualTypeName: fact.SimpleTypeName));
+                    ActualTypeName: fact.SimpleTypeName,
+                    WhenExpression: BuildLayoutWhenExpression(contract)));
         }
     }
 
@@ -611,7 +629,8 @@ public sealed partial class ArchitectureAnalysisSession
             payload: new LayoutConventionPayload(
                 MatchedFilePath: group.SourceFilePath,
                 ExpectedTypeName: group.FileNameWithoutExtension,
-                ActualTypeName: actualNames));
+                ActualTypeName: actualNames,
+                WhenExpression: BuildLayoutWhenExpression(contract)));
     }
 
     private void EvaluateMatchingInterfaceExpectation(
@@ -661,7 +680,8 @@ public sealed partial class ArchitectureAnalysisSession
                 forbiddenReference: reason,
                 payload: new LayoutConventionPayload(
                     MatchedFilePath: group.SourceFilePath,
-                    ExpectedCounterpartName: expectedCounterpartName));
+                    ExpectedCounterpartName: expectedCounterpartName,
+                    WhenExpression: BuildLayoutWhenExpression(contract)));
         }
     }
 

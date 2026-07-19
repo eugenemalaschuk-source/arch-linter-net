@@ -56,7 +56,8 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<IArchitectureBaselineApplicationService, ArchitectureBaselineApplicationService>();
         services.AddSingleton<IAsmdefValidationService, AsmdefValidationService>();
         services.AddSingleton<IArchitectureGraphFormatter, ArchitectureGraphFormatter>();
-        services.AddSingleton<IArchitectureGraphApplicationService, ArchitectureGraphApplicationService>();
+        services.AddSingleton<ArchitectureGraphApplicationService>();
+        services.AddSingleton<IArchitectureGraphApplicationService>(ResolveGraphApplicationService);
         services.AddSingleton<IArchitectureExplainApplicationService, ArchitectureExplainApplicationService>();
         return services;
     }
@@ -64,5 +65,14 @@ public static class ServiceCollectionExtensions
     private static ArchitectureContractHandlerRegistry ResolveHandlerRegistry(IServiceProvider sp)
     {
         return sp.GetRequiredService<ArchitectureContractHandlerRegistry>();
+    }
+
+    // Registered as itself (not just behind IArchitectureGraphApplicationService) so
+    // ArchitectureExplainApplicationService can depend on the concrete type directly and reuse its
+    // internal BuildSession/richer Build overload for CEL expression-participation lookups, instead
+    // of re-running contract execution a second time.
+    private static ArchitectureGraphApplicationService ResolveGraphApplicationService(IServiceProvider sp)
+    {
+        return sp.GetRequiredService<ArchitectureGraphApplicationService>();
     }
 }

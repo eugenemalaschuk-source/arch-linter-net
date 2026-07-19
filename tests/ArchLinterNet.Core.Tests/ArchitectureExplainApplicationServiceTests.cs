@@ -185,6 +185,113 @@ public sealed class ArchitectureExplainApplicationServiceTests
     }
 
     [Test]
+    public void Explain_ContextDependencyWithMatchedWhen_ExpressionParticipationIsPopulated()
+    {
+        // Reuses ContextualContractTestFixtures (compiled into this test assembly) rather than
+        // inventing new fixture types: SalesCheckout (domain=Sales) references InventoryStockItem
+        // (domain=Inventory) - a real cross-domain edge the `when` below matches.
+        string policyPath = WritePolicy($$"""
+            version: 1
+            name: Test
+
+            analysis:
+              target_assemblies: [ArchLinterNet.Core.Tests]
+
+            classification:
+              attributes:
+                - attribute: ContextualContractTestFixtures.ContextDomainMarkerAttribute
+                  role: DomainLayer
+                  metadata:
+                    domain: constructor[0]
+
+            contracts:
+              strict_context_dependencies:
+                - id: cross-domain-when
+                  name: cross-domain-when
+                  source:
+                    role: DomainLayer
+                  forbidden:
+                    - role: DomainLayer
+                      when: target.metadataText["domain"] != source.metadataText["domain"]
+                  reason: Test.
+            """);
+
+        try
+        {
+            using ArchitectureEngine engine = CreateEngine();
+
+            ArchitectureExplainOutcome outcome = engine.Explain(new ArchitectureExplainRequest
+            {
+                PolicyPath = policyPath,
+                Source = typeof(ContextualContractTestFixtures.SalesCheckout).FullName!,
+                Target = typeof(ContextualContractTestFixtures.InventoryStockItem).FullName!,
+                Level = ArchitectureGraphLevel.Type,
+            });
+
+            Assert.That(outcome.Path, Is.EqualTo(new[]
+            {
+                typeof(ContextualContractTestFixtures.SalesCheckout).FullName,
+                typeof(ContextualContractTestFixtures.InventoryStockItem).FullName,
+            }));
+            Assert.That(outcome.ExpressionParticipation, Has.Count.EqualTo(1));
+            Assert.Multiple(() =>
+            {
+                Assert.That(outcome.ExpressionParticipation[0].ContractId, Is.EqualTo("cross-domain-when"));
+                Assert.That(outcome.ExpressionParticipation[0].Source,
+                    Is.EqualTo("target.metadataText[\"domain\"] != source.metadataText[\"domain\"]"));
+                Assert.That(outcome.ExpressionParticipation[0].Result, Is.EqualTo(ExpressionParticipationResult.Matched));
+            });
+        }
+        finally
+        {
+            Directory.Delete(Path.GetDirectoryName(policyPath)!, true);
+        }
+    }
+
+    [Test]
+    public void Explain_NoCelInvolvement_ExpressionParticipationIsEmpty()
+    {
+        string policyPath = WritePolicy("""
+            version: 1
+            name: Test
+
+            layers:
+              execution:
+                namespace: ArchLinterNet.Core.Execution
+              contracts:
+                namespace: ArchLinterNet.Core.Contracts
+
+            analysis:
+              target_assemblies: [ArchLinterNet.Core]
+
+            contracts:
+              strict:
+                - id: no-execution-to-contracts
+                  name: execution-must-not-depend-on-contracts
+                  source: execution
+                  forbidden: [contracts]
+            """);
+
+        try
+        {
+            using ArchitectureEngine engine = CreateEngine();
+
+            ArchitectureExplainOutcome outcome = engine.Explain(new ArchitectureExplainRequest
+            {
+                PolicyPath = policyPath,
+                Source = ExecutionNamespace,
+                Target = ContractsNamespace,
+            });
+
+            Assert.That(outcome.ExpressionParticipation, Is.Empty);
+        }
+        finally
+        {
+            Directory.Delete(Path.GetDirectoryName(policyPath)!, true);
+        }
+    }
+
+    [Test]
     public void Explain_AssemblyLevel_ThrowsArgumentException()
     {
         string policyPath = WritePolicy("""

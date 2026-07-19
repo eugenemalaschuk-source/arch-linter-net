@@ -110,6 +110,15 @@ boolean predicate. This is the **only** set of places a CEL expression is
 ever accepted — every other YAML string, including every other selector
 field, stays literal.
 
+`when` is standard [CEL](https://github.com/cel-expr/cel-spec), restricted to
+a documented safe subset (ArchLinter CEL Profile v1) — not a proprietary
+ArchLinterNet DSL. This page and the
+[public CEL policy expressions guide](../policy-format/cel-expressions.md) use
+the same terminology, profile version, and examples — there is no separate,
+hidden AI-only convention. Read the full guide for the authoring reference,
+the Profile v1 support matrix, and diagnostics; the rules below are agent
+review guidance layered on top of it, not a substitute for it.
+
 Prefer a narrow, explainable `when` over one that is broad enough to weaken
 the contract:
 
@@ -151,14 +160,27 @@ Rules for agents:
 
 - Never author `when` anywhere outside the closed set of locations above —
   policy loading rejects it, but do not rely on that as your only check.
+- Never invent operators, functions, or syntax beyond what the
+  [Profile v1 support matrix](../policy-format/cel-expressions.md#profile-v1-support-matrix)
+  documents. If an expression needs something the matrix doesn't list (regex,
+  arithmetic, a custom function), it is not available — rewrite the rule
+  around a supported construct or fall back to a literal selector, do not
+  guess at syntax that might compile.
+- Never weaken a policy's boundary merely to make generated code pass
+  validation — broadening a `when` predicate (or a literal selector) to admit
+  code that should actually be moved, renamed, or reconsidered defeats the
+  purpose of the contract. Fix the code, narrow the predicate correctly, or
+  raise the conflict for human review instead.
+- Prefer a literal `role`/`metadata` selector when it can express the rule on
+  its own — reach for `when` only for the comparison a literal selector
+  cannot express (cross-context comparisons, structural facts, path
+  prefixes). `when` is additive to `role`/`metadata`, never a replacement for
+  them — keep `role` as the fast, explainable pre-filter.
 - Guard a map lookup before comparing it (`subject.metadataText.containsKey("domain") && subject.metadataText["domain"] == "Sales"`)
   when the key may legitimately be absent for some classified type. An
   unguarded lookup against a missing key is an **evaluation failure**, not a
   non-match — it fails the run as a policy/configuration error, and a
   baseline does not suppress it.
-- `when` is additive to `role`/`metadata`, never a replacement for them —
-  keep `role` as the fast, explainable pre-filter and use `when` only for
-  the comparison `role`/`metadata` cannot express.
 - Numeric metadata is not exposed to `when` (`metadataText`/`metadataBool`
   only) — match numeric metadata with a literal `metadata` constraint
   instead.

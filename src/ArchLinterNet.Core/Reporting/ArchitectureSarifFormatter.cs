@@ -149,12 +149,52 @@ public sealed partial class ArchitectureSarifFormatter : IArchitectureSarifForma
         object[] relatedPolicyLocations = FormatPolicyLocationsForSarif(
             diagnostic.PolicyLocation,
             diagnostic.RelatedPolicyLocations);
-        if (relatedPolicyLocations.Length > 0)
+        object[] relatedLocations = AppendWhenExpressionRelatedLocation(relatedPolicyLocations, GetWhenExpression(diagnostic));
+        if (relatedLocations.Length > 0)
         {
-            json["relatedLocations"] = relatedPolicyLocations;
+            json["relatedLocations"] = relatedLocations;
         }
 
         return new ResultEntry(ruleId, diagnostic.ContractName, sourceType, forbiddenNamespace, json);
+    }
+
+    // CEL expression participation (violation-reporting/sarif-diagnostics-output capability): added
+    // alongside, never replacing, existing policy-origin related locations - a diagnostic can carry
+    // both at once.
+    private static ExpressionParticipation? GetWhenExpression(ArchitectureDiagnostic diagnostic) => diagnostic switch
+    {
+        ContextDependencyDiagnostic d => d.WhenExpression,
+        ContextAllowOnlyDiagnostic d => d.WhenExpression,
+        LayoutConventionDiagnostic d => d.WhenExpression,
+        _ => null,
+    };
+
+    private static object[] AppendWhenExpressionRelatedLocation(
+        object[] relatedPolicyLocations, ExpressionParticipation? whenExpression)
+    {
+        if (whenExpression == null)
+        {
+            return relatedPolicyLocations;
+        }
+
+        string result = whenExpression.Result switch
+        {
+            ExpressionParticipationResult.Matched => "matched",
+            ExpressionParticipationResult.NotMatched => "did not match",
+            _ => "failed to evaluate",
+        };
+
+        var whenLocation = new Dictionary<string, object?>
+        {
+            ["id"] = relatedPolicyLocations.Length + 1,
+            [MessagePropertyName] = new Dictionary<string, object?>
+            {
+                ["text"] = $"CEL expression '{whenExpression.Source}' {result}" +
+                    (whenExpression.YamlPath != null ? $" (at {whenExpression.YamlPath})" : string.Empty),
+            },
+        };
+
+        return relatedPolicyLocations.Append((object)whenLocation).ToArray();
     }
 
     public static object[] FormatPolicyLocationsForSarif(
@@ -310,6 +350,8 @@ public sealed partial class ArchitectureSarifFormatter : IArchitectureSarifForma
             InterfaceImplementationDiagnostic d => (d.SourceType, d.ForbiddenNamespace, d.ForbiddenReferences),
             CompositionDiagnostic d => (d.SourceType, d.ForbiddenNamespace, d.ForbiddenReferences),
             ProjectMetadataDiagnostic d => (d.SourceType, d.ForbiddenNamespace, d.ForbiddenReferences),
+            ContextDependencyDiagnostic d => (d.SourceType, d.ForbiddenNamespace, d.ForbiddenReferences),
+            ContextAllowOnlyDiagnostic d => (d.SourceType, d.ForbiddenNamespace, d.ForbiddenReferences),
             _ => (string.Empty, string.Empty, Array.Empty<string>()),
         };
 

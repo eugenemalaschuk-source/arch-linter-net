@@ -385,6 +385,86 @@ public sealed partial class CelSelectorContextualIntegrationTests
         Assert.That(violation.ForbiddenReferences.Any(reference => reference.Contains("when:")), Is.True);
     }
 
+    // --- Structured expression participation on violation payloads (publish-cel-diagnostics-docs) ---
+
+    [Test]
+    public void ContextDependency_ForbiddenWhen_PayloadCarriesStructuredExpressionParticipation()
+    {
+        const string When = "target.metadataText[\"domain\"] != source.metadataText[\"domain\"]";
+        ArchitectureContractDocument document = LoadContextDependencyDocument(When);
+        var runner = new ArchitectureContractRunner(CreateContext(), document);
+        ArchitectureContextDependencyContract contract = document.Contracts.StrictContextDependencies[0];
+
+        List<ArchitectureViolation> violations = runner.Session.CheckContextDependencyContract(contract);
+        ArchitectureViolation violation = violations.First(v =>
+            v.SourceType == typeof(ContextualContractTestFixtures.SalesCheckout).FullName);
+        var payload = (ContextDependencyPayload)violation.Payload!;
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(payload.WhenExpression, Is.Not.Null);
+            Assert.That(payload.WhenExpression!.Source, Is.EqualTo(When));
+            Assert.That(payload.WhenExpression!.Result, Is.EqualTo(ExpressionParticipationResult.Matched));
+            Assert.That(payload.WhenExpression!.YamlPath, Is.EqualTo("contracts.strict_context_dependencies[0].forbidden[0]"));
+        });
+    }
+
+    [Test]
+    public void ContextDependency_ForbiddenWithoutWhen_PayloadOmitsExpressionParticipation()
+    {
+        ArchitectureContractDocument document = LoadContextDependencyDocumentLiteralOnly();
+        var runner = new ArchitectureContractRunner(CreateContext(), document);
+        ArchitectureContextDependencyContract contract = document.Contracts.StrictContextDependencies[0];
+
+        List<ArchitectureViolation> violations = runner.Session.CheckContextDependencyContract(contract);
+        ArchitectureViolation violation = violations.First(v =>
+            v.SourceType == typeof(ContextualContractTestFixtures.SalesCheckout).FullName);
+        var payload = (ContextDependencyPayload)violation.Payload!;
+
+        Assert.That(payload.WhenExpression, Is.Null);
+    }
+
+    [Test]
+    public void ContextAllowOnly_NearMissWhen_PayloadCarriesNotMatchedExpressionParticipation()
+    {
+        ArchitectureContractDocument document = Load($$"""
+            version: 1
+            name: Test
+            analysis:
+              target_assemblies: [{{AssemblyName}}]
+            classification:
+              attributes:
+                - attribute: ContextualContractTestFixtures.ContextDomainMarkerAttribute
+                  role: DomainLayer
+                  metadata:
+                    domain: constructor[0]
+            contracts:
+              strict_context_allow_only:
+                - name: sales-same-domain-only
+                  id: sales-same-domain-only
+                  source:
+                    role: DomainLayer
+                  allowed:
+                    - role: DomainLayer
+                      when: target.metadataText["domain"] == source.metadataText["domain"]
+                  reason: Sales may only depend on its own domain.
+            """);
+        var runner = new ArchitectureContractRunner(CreateContext(), document);
+        ArchitectureContextAllowOnlyContract contract = document.Contracts.StrictContextAllowOnly[0];
+
+        List<ArchitectureViolation> violations = runner.Session.CheckContextAllowOnlyContract(contract);
+        ArchitectureViolation violation = violations.First(v =>
+            v.SourceType == typeof(ContextualContractTestFixtures.SalesCheckout).FullName);
+        var payload = (ContextAllowOnlyPayload)violation.Payload!;
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(payload.WhenExpression, Is.Not.Null);
+            Assert.That(payload.WhenExpression!.Result, Is.EqualTo(ExpressionParticipationResult.NotMatched));
+            Assert.That(payload.WhenExpression!.Source, Is.EqualTo("target.metadataText[\"domain\"] == source.metadataText[\"domain\"]"));
+        });
+    }
+
     // --- Selectors without `When` remain unaffected (regression safety net) ---
 
     [Test]

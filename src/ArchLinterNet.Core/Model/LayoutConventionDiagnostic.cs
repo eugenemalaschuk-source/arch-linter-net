@@ -17,4 +17,5 @@ public sealed record LayoutConventionDiagnostic(
     public string? ActualTypeName { get; init; }
     public string? ExpectedCounterpartName { get; init; }
     public bool DataUnavailable { get; init; }
+    public ExpressionParticipation? WhenExpression { get; init; }
 }

@@ -1,9 +1,15 @@
+using ArchLinterNet.Core.Execution;
 using ArchLinterNet.Core.Graph.Abstractions;
 using ArchLinterNet.Core.Model;
 
 namespace ArchLinterNet.Core.Graph;
 
-public sealed class ArchitectureExplainApplicationService(IArchitectureGraphApplicationService graphApplicationService)
+// Depends on the concrete ArchitectureGraphApplicationService (not just its interface) so it can
+// reuse the internal BuildSession + richer ArchitectureDependencyGraphBuilder.Build overload,
+// getting both the graph and the exact ArchitectureViolation instances behind each edge in a single
+// contract-execution pass, rather than running contract execution a second time just to recover CEL
+// expression participation. See design.md Decision D3 (publish-cel-diagnostics-docs).
+public sealed class ArchitectureExplainApplicationService(ArchitectureGraphApplicationService graphApplicationService)
     : IArchitectureExplainApplicationService
 {
     public ArchitectureExplainOutcome Explain(ArchitectureExplainRequest request)
@@ -24,10 +30,66 @@ public sealed class ArchitectureExplainApplicationService(IArchitectureGraphAppl
             ConditionSetName = request.ConditionSetName,
         };
 
-        ArchitectureDependencyGraph graph = graphApplicationService.BuildGraph(graphRequest).Graph;
+        ArchitectureAnalysisSession session = graphApplicationService.BuildSession(graphRequest, out List<ArchitectureViolation> violations);
+        ArchitectureDependencyGraph graph = ArchitectureDependencyGraphBuilder.Build(
+            session, request.Level, violations,
+            out IReadOnlyDictionary<(string Source, string Target), IReadOnlyList<ArchitectureViolation>> edgeViolations);
 
-        return FindShortestPath(graph, request.Source, request.Target);
+        ArchitectureExplainOutcome outcome = FindShortestPath(graph, request.Source, request.Target);
+        return outcome with { ExpressionParticipation = CollectExpressionParticipation(outcome.Path, edgeViolations) };
     }
+
+    // Attributes CEL `when` predicate results to the resolved path's hops, using the exact
+    // ArchitectureViolation instances the single contract-execution pass already produced - no
+    // re-evaluation of any selector. Deduplicated by (ContractId, Source) since more than one
+    // violation on the same hop can share the same contributing expression.
+    private static IReadOnlyList<ExplainExpressionParticipation> CollectExpressionParticipation(
+        IReadOnlyList<string>? path,
+        IReadOnlyDictionary<(string Source, string Target), IReadOnlyList<ArchitectureViolation>> edgeViolations)
+    {
+        if (path == null || path.Count < 2)
+        {
+            return Array.Empty<ExplainExpressionParticipation>();
+        }
+
+        List<ExplainExpressionParticipation> participation = new();
+        HashSet<(string ContractId, string Source)> seen = new();
+
+        for (int i = 0; i < path.Count - 1; i++)
+        {
+            if (!edgeViolations.TryGetValue((path[i], path[i + 1]), out IReadOnlyList<ArchitectureViolation>? hopViolations))
+            {
+                continue;
+            }
+
+            foreach (ArchitectureViolation violation in hopViolations)
+            {
+                ExpressionParticipation? whenExpression = GetWhenExpression(violation.Payload);
+                if (whenExpression == null || violation.ContractId == null)
+                {
+                    continue;
+                }
+
+                if (!seen.Add((violation.ContractId, whenExpression.Source)))
+                {
+                    continue;
+                }
+
+                participation.Add(new ExplainExpressionParticipation(
+                    violation.ContractId, whenExpression.Source, whenExpression.YamlPath, whenExpression.Result));
+            }
+        }
+
+        return participation;
+    }
+
+    private static ExpressionParticipation? GetWhenExpression(IArchitectureDiagnosticPayload? payload) => payload switch
+    {
+        ContextDependencyPayload p => p.WhenExpression,
+        ContextAllowOnlyPayload p => p.WhenExpression,
+        LayoutConventionPayload p => p.WhenExpression,
+        _ => null,
+    };
 
     private static ArchitectureExplainOutcome FindShortestPath(
         ArchitectureDependencyGraph graph,

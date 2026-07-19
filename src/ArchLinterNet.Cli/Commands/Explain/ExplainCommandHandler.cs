@@ -66,6 +66,18 @@ internal sealed class ExplainCommandHandler(ICliRuntime runtime, ICliConsole con
                     target = outcome.Target,
                     path = outcome.Path,
                     contractIds = outcome.ContractIds,
+                    expressionParticipation = outcome.ExpressionParticipation.Select(p => new
+                    {
+                        contractId = p.ContractId,
+                        source = p.Source,
+                        yamlPath = p.YamlPath,
+                        result = p.Result switch
+                        {
+                            ExpressionParticipationResult.Matched => "matched",
+                            ExpressionParticipationResult.NotMatched => "not_matched",
+                            _ => "evaluation_failed",
+                        },
+                    }),
                 }));
             }
             else if (outcome.Path == null)
@@ -78,6 +90,18 @@ internal sealed class ExplainCommandHandler(ICliRuntime runtime, ICliConsole con
                 if (outcome.ContractIds.Count > 0)
                 {
                     console.Out.WriteLine($"Contract IDs: {string.Join(", ", outcome.ContractIds)}");
+                }
+
+                foreach (ExplainExpressionParticipation participation in outcome.ExpressionParticipation)
+                {
+                    string result = participation.Result switch
+                    {
+                        ExpressionParticipationResult.Matched => "matched",
+                        ExpressionParticipationResult.NotMatched => "not matched",
+                        _ => "evaluation failed",
+                    };
+                    console.Out.WriteLine(
+                        $"  [{participation.ContractId}] when: {participation.Source} ({result})");
                 }
             }
 

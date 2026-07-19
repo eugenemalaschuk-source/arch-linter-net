@@ -5,7 +5,8 @@ public sealed record ContextAllowOnlyPayload(
     IReadOnlyDictionary<string, object>? SourceMetadata = null,
     string? TargetRole = null,
     IReadOnlyDictionary<string, object>? TargetMetadata = null,
-    string? MatchedSelector = null)
+    string? MatchedSelector = null,
+    ExpressionParticipation? WhenExpression = null)
     : IArchitectureDiagnosticPayload
 {
     public ArchitectureDiagnostic ToDiagnostic(ArchitectureViolation violation) =>
@@ -18,6 +19,7 @@ public sealed record ContextAllowOnlyPayload(
             SourceMetadata = SourceMetadata,
             TargetRole = TargetRole,
             TargetMetadata = TargetMetadata,
-            MatchedSelector = MatchedSelector
+            MatchedSelector = MatchedSelector,
+            WhenExpression = WhenExpression
         };
 }
