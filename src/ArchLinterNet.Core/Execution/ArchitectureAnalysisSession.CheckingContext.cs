@@ -137,7 +137,7 @@ public sealed partial class ArchitectureAnalysisSession
         {
             if (!IsContextAllowOnlyCandidateViolation(
                     contract, referencedType, sourceDescriptor, sourceType,
-                    out ArchitectureTypeClassificationResult targetDescriptor, out ArchitectureContextSelector? nearMissSelector))
+                    out ArchitectureTypeClassificationResult targetDescriptor, out IReadOnlyList<ArchitectureContextSelector> nearMissSelectors))
             {
                 continue;
             }
@@ -149,16 +149,18 @@ public sealed partial class ArchitectureAnalysisSession
                 continue;
             }
 
-            string? nearMissWhen = nearMissSelector == null
-                ? null
-                : $"when: {nearMissSelector.When} (evaluated false for this target)";
-            string[] evidence = nearMissWhen == null
+            string[] evidence = nearMissSelectors.Count == 0
                 ? new[] { targetFullName }
-                : new[] { targetFullName, nearMissWhen };
+                : new[] { targetFullName }.Concat(
+                    nearMissSelectors.Select(s => $"when: {s.When} (evaluated false for this target)"))
+                    .ToArray();
 
             List<ExpressionParticipation> whenExpressions = new();
             AddWhenExpression(whenExpressions, contract.Name, contract.Source, "source", ExpressionParticipationResult.Matched);
-            AddWhenExpression(whenExpressions, contract.Name, nearMissSelector, "allowed", ExpressionParticipationResult.NotMatched);
+            foreach (ArchitectureContextSelector nearMiss in nearMissSelectors)
+            {
+                AddWhenExpression(whenExpressions, contract.Name, nearMiss, "allowed", ExpressionParticipationResult.NotMatched);
+            }
 
             violations.Add(new ArchitectureViolation(
                 contract.Name, contract.Id, sourceFullName, "outside allowed context selectors", evidence)
@@ -176,9 +178,9 @@ public sealed partial class ArchitectureAnalysisSession
         }
     }
 
-    // nearMissWhen is set when no allowed selector matched, but at least one allowed selector's
-    // literal role/metadata criteria matched and only failed because its `when` evaluated false —
-    // surfaced as extra diagnostic evidence per the contextual-allow-only-contracts delta spec's
+    // nearMissSelectors are all allowed[*] selectors whose literal role/metadata criteria matched
+    // but whose `when` predicate evaluated false — each is surfaced as a separate evidence item and
+    // ExpressionParticipation entry per the contextual-allow-only-contracts delta spec's
     // "Diagnostic identifies a participating when expression" scenario.
     private bool IsContextAllowOnlyCandidateViolation(
         ArchitectureContextAllowOnlyContract contract,
@@ -186,10 +188,10 @@ public sealed partial class ArchitectureAnalysisSession
         ArchitectureTypeClassificationResult sourceDescriptor,
         Type sourceType,
         out ArchitectureTypeClassificationResult targetDescriptor,
-        out ArchitectureContextSelector? nearMissSelector)
+        out IReadOnlyList<ArchitectureContextSelector> nearMissSelectors)
     {
         targetDescriptor = default!;
-        nearMissSelector = null;
+        nearMissSelectors = Array.Empty<ArchitectureContextSelector>();
 
         if (IsExcludedFromContextMatch(referencedType, contract.Exclude, sourceDescriptor, sourceType))
         {
@@ -205,9 +207,10 @@ public sealed partial class ArchitectureAnalysisSession
             return false;
         }
 
-        nearMissSelector = contract.Allowed.FirstOrDefault(selector =>
+        nearMissSelectors = contract.Allowed.Where(selector =>
             !string.IsNullOrEmpty(selector.When)
-            && ArchitectureContextSelectorMatcher.MatchesLiteral(selector, referencedType, RoleIndex, sourceDescriptor));
+            && ArchitectureContextSelectorMatcher.MatchesLiteral(selector, referencedType, RoleIndex, sourceDescriptor))
+            .ToList();
 
         // Only role-classified referenced types are meaningful candidates for a contextual
         // allow-only violation — an unclassified type (framework/BCL types, primitives, etc.)

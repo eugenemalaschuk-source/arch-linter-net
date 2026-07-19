@@ -1,7 +1,7 @@
 ## ADDED Requirements
 
 ### Requirement: SARIF results expose CEL expression provenance as related locations
-When a diagnostic rendered as a SARIF result has CEL expression participation (per the `violation-reporting` capability's `when_expression` data), the SARIF formatter SHALL add a related location whose message includes the expression's source text and result, in addition to any existing physical/logical locations and policy-origin related locations. SARIF results for diagnostics without expression participation SHALL be unaffected.
+When a diagnostic rendered as a SARIF result has CEL expression participation (per the `violation-reporting` capability's `when_expressions` array), the SARIF formatter SHALL add one related location per expression entry whose message includes the expression's source text and result, in addition to any existing physical/logical locations and policy-origin related locations. SARIF results for diagnostics without expression participation SHALL be unaffected.
 
 #### Scenario: SARIF result includes expression-provenance related location
 - **WHEN** a context-dependency violation with a `when`-bearing forbidden selector is rendered as SARIF

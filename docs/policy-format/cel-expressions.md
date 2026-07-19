@@ -158,8 +158,8 @@ the schema-defined `Object` types described above (`subject`/`source`/
 
 Arithmetic (`+`, `-`, `*`, `/`), the conditional operator (`? :`), and every
 other standard CEL operator are **deferred** and rejected at compile time.
-Comparison operators are non-associative — `a < b < c` requires explicit
-parentheses.
+Comparison operators are non-associative — `a < b < c` is a type error; use
+`a < b && b < c` instead.
 
 ### Supported functions
 
@@ -317,8 +317,7 @@ when: subject.metadataText["priority"] + 1 > 5
 
 ```yaml
 # Bad: trivially true for almost every candidate. Adds no narrowing and
-# defeats the point of a selector — will surface as a broad-match signal in
-# coverage/explain output.
+# defeats the point of a selector.
 layers:
   everything:
     selector:
@@ -430,12 +429,6 @@ Contract IDs: cross-domain-when
 ```
 
 `--format json` adds the same data as an `expressionParticipation` array.
-
-### Narrowing an overly broad predicate
-
-If a coverage report or `explain` flags a selector as broad or stale, tighten
-`when` (or the underlying `role`/`metadata` selector) rather than leaving a
-`when: "true"`-shaped predicate in place — see the anti-patterns above.
 
 ## AI authoring guidance
 

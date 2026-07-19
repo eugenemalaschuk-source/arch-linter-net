@@ -7,9 +7,9 @@
 
 ## 2. CLI JSON and human output (violation-reporting)
 
-- [x] 2.1 Add `when_expression` (source, result, yaml_path) to the JSON violation DTO(s) in `ValidateCommandHandler` for context-dependency/context-allow-only/layout-convention violations, omitted when absent
+- [x] 2.1 Add `when_expressions` (source, result, yaml_path) to the JSON violation DTO(s) in `ValidateCommandHandler` for context-dependency/context-allow-only/layout-convention violations, omitted when absent
 - [x] 2.2 Append the expression source text and result to the human-readable violation line for the same diagnostic kinds
-- [x] 2.3 CLI tests in `ArchLinterNet.Cli.Tests` extending `LayoutConventionCliTests` to assert the new JSON `when_expression` field end-to-end; Core-level formatter tests cover the human-text case and the non-CEL-unchanged case
+- [x] 2.3 CLI tests in `ArchLinterNet.Cli.Tests` extending `LayoutConventionCliTests` to assert the new JSON `when_expressions` field end-to-end; Core-level formatter tests cover the human-text case and the non-CEL-unchanged case
 
 ## 3. SARIF output (sarif-diagnostics-output)
 
