@@ -1,0 +1,14 @@
+# yaml-language-server: $schema=../../../../../../../schema/dependencies.arch.fragment.schema.json
+layers:
+  catalog_domain:
+    namespace: MyCompany.Product.Modules.Catalog.Domain
+  catalog_contracts:
+    namespace: MyCompany.Product.Modules.Catalog.Contracts
+
+contracts:
+  strict_allow_only:
+    - id: catalog-contracts-use-shared-kernel
+      name: catalog-contracts-use-shared-kernel
+      source: catalog_contracts
+      allowed: [shared_kernel]
+      reason: Catalog public contracts expose only stable shared-kernel types.

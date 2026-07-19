@@ -167,6 +167,22 @@ Rules for agents:
   classified type makes the whole selector stale even though its literal
   `role`/`metadata` still matches real types.
 
+### Worked examples: two kinds of sample
+
+- `samples/policies/imports/modular-monolith/` and `samples/policies/imports/unity-client/`
+  are narrative, composition-focused examples — realistic multi-fragment
+  policies proven to be schema-valid and to compose correctly (see
+  `ArchitecturePolicyImportAcceptanceTests`), but not run against real
+  compiled code.
+- `tests/ArchLinterNet.Cli.Tests/PortLayoutCliTests.cs` and
+  `LayoutConventionCliTests.cs` are the proven/tested shapes — real compiled
+  fixture types plus policy YAML, run end-to-end through the production
+  `ValidateCommandHandler`, asserting actual pass/fail, strict-vs-audit, and
+  JSON diagnostic output for the port-boundary, anti-corruption-layer, and
+  layout-convention (including a `when`-narrowed) contract families. Copy
+  from these when you need to confirm a shape actually behaves as documented,
+  not only that it parses.
+
 ## Choose Strict Or Audit
 
 Use strict rules for current gates. Add an `id` for stable CLI and CI references:

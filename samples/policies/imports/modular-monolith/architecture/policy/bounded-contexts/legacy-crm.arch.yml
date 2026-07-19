@@ -1,0 +1,36 @@
+# yaml-language-server: $schema=../../../../../../../schema/dependencies.arch.fragment.schema.json
+layers:
+  legacy_crm_domain:
+    namespace: MyCompany.Product.Modules.LegacyCrm.Domain
+
+classification:
+  attributes:
+    - attribute: MyCompany.Product.Architecture.AntiCorruptionLayerAttribute
+      role: AntiCorruptionLayer
+      metadata:
+        module: constructor[0]
+    - attribute: MyCompany.Product.Architecture.LegacyDatabaseAdapterAttribute
+      role: Adapter
+      metadata:
+        module: constructor[0]
+
+contracts:
+  strict_port_boundaries:
+    - id: legacy-crm-through-acl
+      name: legacy-crm-must-use-anti-corruption-layer
+      source:
+        role: DomainLayer
+        metadata:
+          module: LegacyCrm
+      target_context:
+        metadata:
+          module: LegacyCrm
+      allowed_seams:
+        - role: AntiCorruptionLayer
+          metadata:
+            module: LegacyCrm
+      forbidden:
+        - role: Adapter
+          metadata:
+            module: LegacyCrm
+      reason: LegacyCrm domain code must reach the legacy database only through the reviewed anti-corruption layer, never a raw database adapter.
