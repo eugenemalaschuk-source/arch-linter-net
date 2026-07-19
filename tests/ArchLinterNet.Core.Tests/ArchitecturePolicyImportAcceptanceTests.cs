@@ -34,6 +34,27 @@ public sealed class ArchitecturePolicyImportAcceptanceTests
     }
 
     [Test]
+    public void Load_ModularMonolithSample_IsolationContractsCoverEveryBoundedContextDomain()
+    {
+        // Regression: adding a bounded context (Catalog, LegacyCrm) without extending the sample's
+        // own independence/SharedKernel isolation contracts would silently permit exactly the
+        // coupling those contracts' `reason` text promises is prevented.
+        ArchitectureContractDocument document = Load("samples/policies/imports/modular-monolith/architecture/arch.yml");
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(
+                document.Contracts.StrictIndependence
+                    .Single(c => c.Id == "bounded-context-domains-independent").Layers,
+                Is.EquivalentTo(new[] { "sales_domain", "inventory_domain", "catalog_domain", "legacy_crm_domain" }));
+            Assert.That(
+                document.Contracts.Strict
+                    .Single(c => c.Id == "shared-kernel-does-not-depend-on-modules").Forbidden,
+                Is.EquivalentTo(new[] { "sales_domain", "inventory_domain", "catalog_domain", "legacy_crm_domain" }));
+        });
+    }
+
+    [Test]
     public void Load_UnityClientSample_ContainsLayoutConventionContract()
     {
         ArchitectureContractDocument document = Load("samples/policies/imports/unity-client/architecture/arch.yml");

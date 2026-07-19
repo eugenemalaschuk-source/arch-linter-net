@@ -53,4 +53,4 @@
 - [x] 9.1 Run `rtk make lint` and confirm architecture/format/code-size lint still pass.
 - [x] 9.2 Run `rtk make test` (or targeted `rtk dotnet test tests/ArchLinterNet.Core.Tests --no-restore` and `rtk dotnet test tests/ArchLinterNet.Cli.Tests --no-restore`) and confirm all new and existing tests pass.
 - [x] 9.3 Run `rtk make acceptance` as the final gate.
-- [ ] 9.4 Run `openspec validate --all` after archiving.
+- [x] 9.4 Run `openspec validate --all` after archiving.

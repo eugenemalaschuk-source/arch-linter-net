@@ -88,9 +88,10 @@ types plus a policy YAML written and validated through the real
 and layout-convention contract shapes documented in
 `docs/contracts/port-boundary.md` and `docs/contracts/layout-conventions.md`:
 a passing case producing no violation, a violating case producing a violation
-with diagnostic evidence, a strict violation failing the run while the same
-rule declared under the audit group does not fail the run, and at least one
-violation produced by a contract using an explicit CEL `when` predicate.
+with diagnostic evidence, a strict violation failing a strict-mode run while
+the same rule declared only under the audit group does not affect a
+strict-mode run of that policy, and at least one violation produced by a
+contract using an explicit CEL `when` predicate.
 
 #### Scenario: Approved port seam passes and a forbidden direct reference fails
 - **WHEN** a fixture type reaches another bounded context only through a
@@ -122,12 +123,14 @@ violation produced by a contract using an explicit CEL `when` predicate.
   be checked against the contract's expectations, and the run SHALL report a
   violation for at least one such type
 
-#### Scenario: Strict violation fails the run while the audit equivalent does not
-- **WHEN** the same underlying rule shape is declared once under a `strict_*`
-  group and once under the matching `audit_*` group in separate fixture runs
-- **THEN** the strict run SHALL exit with a non-zero exit code and the audit
-  run SHALL report the finding without the strict run's contract being
-  affected
+#### Scenario: An audit-only rule does not affect a strict-mode run
+- **WHEN** a rule shape is declared only under an `audit_*` group, and the same
+  policy is run once in `--mode audit` and once in `--mode strict`
+- **THEN** the audit run SHALL report the finding (still exiting non-zero, per
+  the documented exit-code convention where CI opts an audit run out via
+  `continue-on-error` rather than the process itself succeeding) and the
+  strict run SHALL exit 0 and SHALL NOT report that finding, because the rule
+  is not declared under any `strict_*` group
 
 #### Scenario: JSON output includes diagnostic evidence for a fixture violation
 - **WHEN** `ValidateCommandHandler` runs with `--format json` against a

@@ -40,6 +40,6 @@ contracts:
   strict_independence:
     - id: bounded-context-domains-independent
       name: bounded-context-domains-independent
-      layers: [sales_domain, inventory_domain]
+      layers: [sales_domain, inventory_domain, catalog_domain, legacy_crm_domain]
       reason: Bounded-context domains communicate through contracts, not direct implementation references.
 

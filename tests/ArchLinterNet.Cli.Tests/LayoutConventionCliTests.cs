@@ -104,7 +104,7 @@ public sealed class LayoutConventionCliTests
                 Assert.That(stdOut, Does.Contain("PortLayoutPaymentService"));
                 Assert.That(stdOut, Does.Contain("IPortLayoutPaymentService"),
                     "The diagnostic must name the expected counterpart interface.");
-                Assert.That(stdOut, Does.Not.Contain("PortLayoutOrderService.cs is missing"),
+                Assert.That(stdOut, Does.Not.Contain("PortLayoutOrderService"),
                     "The service with a matching interface must not be reported as a violation.");
                 Assert.That(stdErr, Is.Empty);
             });
