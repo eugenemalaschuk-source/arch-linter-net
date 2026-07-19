@@ -103,7 +103,9 @@ boundary SHALL be the selected root's own directory. Each import SHALL be made
 absolute, physically canonicalized, and verified to remain within that
 boundary before being read. Authored path casing SHALL exactly match the
 filesystem entry, and canonical boundary-relative portability identities SHALL
-be compared case-insensitively.
+be compared case-insensitively. On macOS, source identity SHALL be derived
+through managed canonical filesystem operations without a Darwin
+processor-specific unmanaged metadata layout.
 
 #### Scenario: Relative in-bound import for an architecture root
 - **WHEN** the selected root is `architecture/arch.yml`
@@ -123,6 +125,10 @@ be compared case-insensitively.
 #### Scenario: Path casing differs
 - **WHEN** authored path casing differs from the on-disk path casing
 - **THEN** loading fails consistently, including on a case-insensitive filesystem
+
+#### Scenario: Intel macOS loads a valid imported policy
+- **WHEN** a macOS x86_64 host loads a valid root policy that imports one regular fragment
+- **THEN** loading succeeds without relying on a Darwin unmanaged metadata layout
 
 ### Requirement: Duplicate paths and cycles fail deterministically
 The resolver SHALL maintain an active import stack and a completed canonical-path set. Reaching a path already on the active stack SHALL be reported as a cycle; reaching a previously completed physical file or case-insensitive portability identity SHALL be reported as a duplicate import. The resolver SHALL NOT silently deduplicate either case.
@@ -193,8 +199,11 @@ adapter loading without storing machine-specific absolute paths in public output
 Conflict diagnostics SHALL carry both the original and conflicting typed locations.
 Shape, effective-schema, semantic, missing-reference, consistency, and contract-family
 diagnostics SHALL carry the typed location of the node that introduced the invalid
-value. Human diagnostics SHALL retain root-policy context while identifying fragment
-locations, and machine-readable ordering SHALL follow composed source order.
+value. A failure resolving the explicitly selected policy SHALL identify that source
+as the root policy. An imported-source failure SHALL identify its declaring fragment
+and import edge with an ordered root-based import chain. Human diagnostics SHALL retain
+root-policy context while identifying fragment locations, and machine-readable ordering
+SHALL follow composed source order.
 
 #### Scenario: Conflicting definitions name both sources
 - **WHEN** two files declare the same keyed definition, singleton setting, or contract ID
@@ -207,6 +216,10 @@ locations, and machine-readable ordering SHALL follow composed source order.
 #### Scenario: Invalid inline root value retains arbitrary root identity
 - **WHEN** the explicitly selected root has an arbitrary filename and an inline value fails validation
 - **THEN** the diagnostic identifies that path as a root-role location without consulting its filename pattern
+
+#### Scenario: Selected root cannot be resolved
+- **WHEN** the user-selected root policy is missing, unreadable, non-regular, outside its boundary, or mismatched in case
+- **THEN** the typed diagnostic identifies the selected source as a root policy rather than an import and has no declaring-fragment import edge
 
 #### Scenario: Nested resolution failure retains import chain
 - **WHEN** a nested import is missing, outside the boundary, cyclic, duplicated, or over a graph limit
@@ -489,3 +502,4 @@ The repository SHALL contain executable NUnit-backed fixtures that prove equival
 #### Scenario: Conflicting public fixtures load
 - **WHEN** the acceptance suite loads root-versus-fragment or fragment-versus-fragment duplicate definitions
 - **THEN** loading fails with a composition-conflict category identifying both participating sources
+

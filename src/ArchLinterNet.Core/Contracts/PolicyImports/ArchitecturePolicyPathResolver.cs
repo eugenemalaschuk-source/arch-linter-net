@@ -182,13 +182,7 @@ internal sealed class ArchitecturePolicyPathResolver : IArchitecturePolicyPathRe
     {
         if (OperatingSystem.IsMacOS())
         {
-            if (StatDarwin(path, out DarwinStat stat) != 0
-                || !IsRegularFile(stat.Mode))
-            {
-                throw NotRegularFile(authoredPath);
-            }
-
-            return $"unix:{stat.Device:X8}:{stat.Inode:X16}";
+            return GetManagedFileIdentity(path, authoredPath);
         }
 
         return RuntimeInformation.ProcessArchitecture switch
@@ -197,6 +191,28 @@ internal sealed class ArchitecturePolicyPathResolver : IArchitecturePolicyPathRe
             Architecture.Arm64 => GetLinuxArm64FileIdentity(path, authoredPath),
             _ => throw NotRegularFile(authoredPath)
         };
+    }
+
+    private static string GetManagedFileIdentity(string path, string authoredPath)
+    {
+        try
+        {
+            if (!File.Exists(path)
+                || (File.GetAttributes(path) & FileAttributes.Directory) != 0)
+            {
+                throw NotRegularFile(authoredPath);
+            }
+        }
+        catch (IOException)
+        {
+            throw NotRegularFile(authoredPath);
+        }
+        catch (UnauthorizedAccessException)
+        {
+            throw NotRegularFile(authoredPath);
+        }
+
+        return $"path:{Path.GetFullPath(path)}";
     }
 
     private static string GetLinuxX64FileIdentity(string path, string authoredPath)
@@ -279,9 +295,6 @@ internal sealed class ArchitecturePolicyPathResolver : IArchitecturePolicyPathRe
     [DllImport("libc", SetLastError = true, EntryPoint = "stat")]
     private static extern int StatLinuxArm64(string path, out LinuxArm64Stat stat);
 
-    [DllImport("libc", SetLastError = true, EntryPoint = "stat")]
-    private static extern int StatDarwin(string path, out DarwinStat stat);
-
     [StructLayout(LayoutKind.Sequential)]
     internal struct LinuxX64Stat
     {
@@ -299,17 +312,6 @@ internal sealed class ArchitecturePolicyPathResolver : IArchitecturePolicyPathRe
         public ulong Device;
         public ulong Inode;
         public uint Mode;
-        [MarshalAs(UnmanagedType.ByValArray, SizeConst = 256)]
-        public byte[] RemainingFields;
-    }
-
-    [StructLayout(LayoutKind.Sequential)]
-    private struct DarwinStat
-    {
-        public uint Device;
-        public ushort Mode;
-        public ushort LinkCount;
-        public ulong Inode;
         [MarshalAs(UnmanagedType.ByValArray, SizeConst = 256)]
         public byte[] RemainingFields;
     }

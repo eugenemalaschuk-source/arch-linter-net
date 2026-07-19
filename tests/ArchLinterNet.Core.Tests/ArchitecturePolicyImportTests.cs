@@ -44,6 +44,17 @@ public sealed class ArchitecturePolicyImportTests
     }
 
     [Test]
+    public void Load_RootWithOneRegularFragment_ComposesWithoutDarwinStatInterop()
+    {
+        string root = Write("architecture/root.yml", RootYaml("layers.yml"));
+        Write("architecture/layers.yml", LayersFragment());
+
+        ArchitectureContractDocument document = new ArchitecturePolicyDocumentLoader().Load(root);
+
+        Assert.That(document.Layers, Contains.Key("domain"));
+    }
+
+    [Test]
     public void Load_RecommendedAndArbitraryNames_ProduceEquivalentModels()
     {
         string recommended = Write("recommended/architecture/arch.yml", RootYaml("policy/layers.arch.yml"));
@@ -421,7 +432,7 @@ public sealed class ArchitecturePolicyImportTests
     }
 
     [Test]
-    public void PathResolver_DeclaresDistinctLinuxStatLayoutsForX64AndArm64()
+    public void PathResolver_DeclaresDistinctLinuxStatLayoutsForX64AndArm64WithoutDarwinInterop()
     {
         int x64ModeOffset = Marshal.OffsetOf<ArchitecturePolicyPathResolver.LinuxX64Stat>(
             nameof(ArchitecturePolicyPathResolver.LinuxX64Stat.Mode)).ToInt32();
@@ -432,6 +443,10 @@ public sealed class ArchitecturePolicyImportTests
         {
             Assert.That(x64ModeOffset, Is.EqualTo(24));
             Assert.That(arm64ModeOffset, Is.EqualTo(16));
+            Assert.That(typeof(ArchitecturePolicyPathResolver).GetNestedType(
+                "DarwinStat",
+                System.Reflection.BindingFlags.NonPublic),
+                Is.Null);
         });
     }
 

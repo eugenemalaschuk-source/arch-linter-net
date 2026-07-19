@@ -129,6 +129,25 @@ public sealed class ArchitecturePolicyProvenanceTests
     }
 
     [Test]
+    public void Load_MissingSelectedRoot_CarriesRootPolicyDiagnostic()
+    {
+        string root = Path.Combine(_temporaryDirectory, "architecture", "missing.yml");
+
+        ArchitecturePolicyImportException exception = Assert.Throws<ArchitecturePolicyImportException>(
+            () => new ArchitecturePolicyDocumentLoader().Load(root))!;
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(exception.Category, Is.EqualTo(ArchitecturePolicyImportErrorCategory.MissingFile));
+            Assert.That(exception.Diagnostic!.Location!.Role, Is.EqualTo(ArchitecturePolicyDocumentRole.Root));
+            Assert.That(exception.Diagnostic.Location.SourcePath, Is.EqualTo("architecture/missing.yml"));
+            Assert.That(exception.Diagnostic.Location.Source.DeclaringSourcePath, Is.Null);
+            Assert.That(exception.Diagnostic.Location.Source.AuthoredImportPath, Is.Null);
+            Assert.That(exception.Diagnostic.ImportChain, Is.EqualTo(new[] { "architecture/missing.yml" }));
+        });
+    }
+
+    [Test]
     public void Load_ImportCycle_CarriesNestedChainAndBothEdges()
     {
         string root = Write("architecture/root.yml", RootYaml("a.yml"));

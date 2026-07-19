@@ -51,9 +51,36 @@ public sealed partial class ArchitecturePolicyDocumentLoader : IArchitecturePoli
 
     public ArchitectureContractDocument Load(string policyPath)
     {
+        ArchitecturePolicyRootPath resolvedRoot;
+        try
+        {
+            resolvedRoot = _pathResolver.ResolveRoot(policyPath);
+        }
+        catch (ArchitecturePolicyImportException exception)
+        {
+            ArchitecturePolicySourceDescriptor unresolvedRoot =
+                ArchitecturePolicyProvenanceFactory.CreateRootDescriptor(_pathResolver, policyPath);
+            throw ArchitecturePolicyDiagnosticFactory.Enrich(
+                exception,
+                ArchitecturePolicyDiagnosticFactory.Location(unresolvedRoot));
+        }
+
+        string rootSourcePath = Path.GetRelativePath(resolvedRoot.BoundaryPath, resolvedRoot.FullPath)
+            .Replace(Path.DirectorySeparatorChar, '/');
+        var rootDescriptor = new ArchitecturePolicySourceDescriptor(
+            rootSourcePath,
+            rootSourcePath,
+            ArchitecturePolicyDocumentRole.Root,
+            0,
+            null,
+            null,
+            new[] { rootSourcePath });
         if (!_fileSystem.FileExists(policyPath))
         {
-            throw new FileNotFoundException($"Architecture contract file not found: {policyPath}");
+            throw ArchitecturePolicyDiagnosticFactory.Exception(
+                ArchitecturePolicyImportErrorCategory.MissingFile,
+                $"Root policy file not found: {policyPath}",
+                ArchitecturePolicyDiagnosticFactory.Location(rootDescriptor));
         }
 
         IDeserializer deserializer = new DeserializerBuilder()
@@ -66,8 +93,6 @@ public sealed partial class ArchitecturePolicyDocumentLoader : IArchitecturePoli
 
         string yaml = _fileSystem.ReadAllText(policyPath);
         ArchitecturePolicyProvenanceIndex provenance;
-        ArchitecturePolicySourceDescriptor rootDescriptor =
-            ArchitecturePolicyProvenanceFactory.CreateRootDescriptor(_pathResolver, policyPath);
         if (ArchitecturePolicySourceParser.ContainsImports(yaml, rootDescriptor))
         {
             IReadOnlyList<ArchitecturePolicySource> sources = _importResolver.Resolve(policyPath, yaml);

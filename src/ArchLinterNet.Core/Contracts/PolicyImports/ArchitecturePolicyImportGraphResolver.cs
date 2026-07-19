@@ -24,7 +24,18 @@ internal sealed class ArchitecturePolicyImportGraphResolver
 
     public IReadOnlyList<ArchitecturePolicySource> Resolve(string rootPath, string rootYaml)
     {
-        ArchitecturePolicyRootPath root = _pathResolver.ResolveRoot(rootPath);
+        ArchitecturePolicyRootPath root;
+        try
+        {
+            root = _pathResolver.ResolveRoot(rootPath);
+        }
+        catch (ArchitecturePolicyImportException exception)
+        {
+            throw ArchitecturePolicyDiagnosticFactory.Enrich(
+                exception,
+                ArchitecturePolicyDiagnosticFactory.Location(CreateRootDescriptor(rootPath)));
+        }
+
         string rootIdentity = Path.GetRelativePath(root.BoundaryPath, root.FullPath)
             .Replace(Path.DirectorySeparatorChar, '/');
         var rootDescriptor = new ArchitecturePolicySourceDescriptor(
@@ -45,6 +56,29 @@ internal sealed class ArchitecturePolicyImportGraphResolver
 
         Visit(rootSource, depth: 0, state);
         return state.Sources;
+    }
+
+    private static ArchitecturePolicySourceDescriptor CreateRootDescriptor(string rootPath)
+    {
+        string normalizedPath = Path.GetFullPath(rootPath);
+        string sourcePath = Path.GetFileName(normalizedPath);
+        string? directory = Path.GetDirectoryName(normalizedPath);
+        if (directory is not null && string.Equals(
+                Path.GetFileName(directory),
+                "architecture",
+                StringComparison.OrdinalIgnoreCase))
+        {
+            sourcePath = $"architecture/{sourcePath}";
+        }
+
+        return new ArchitecturePolicySourceDescriptor(
+            sourcePath,
+            sourcePath,
+            ArchitecturePolicyDocumentRole.Root,
+            0,
+            null,
+            null,
+            new[] { sourcePath });
     }
 
     private void Visit(ArchitecturePolicySource source, int depth, ResolutionState state)
