@@ -90,8 +90,10 @@ public sealed partial class ArchitectureAnalysisSession
                     SourceMetadata: sourceDescriptor.Metadata,
                     TargetRole: targetDescriptor.Role,
                     TargetMetadata: targetDescriptor.Metadata,
-                    MatchedSelector: "forbidden",
-                    WhenExpressions: whenExpressions.Count == 0 ? null : whenExpressions)
+                    MatchedSelector: "forbidden")
+                {
+                    WhenExpressions = whenExpressions.Count == 0 ? null : whenExpressions,
+                }
             });
         }
     }
@@ -166,8 +168,10 @@ public sealed partial class ArchitectureAnalysisSession
                     SourceMetadata: sourceDescriptor.Metadata,
                     TargetRole: targetDescriptor.Role,
                     TargetMetadata: targetDescriptor.Metadata,
-                    MatchedSelector: "none",
-                    WhenExpressions: whenExpressions.Count == 0 ? null : whenExpressions)
+                    MatchedSelector: "none")
+                {
+                    WhenExpressions = whenExpressions.Count == 0 ? null : whenExpressions,
+                }
             });
         }
     }

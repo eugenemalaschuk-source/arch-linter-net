@@ -1,16 +1,13 @@
-using ArchLinterNet.Core.Execution;
 using ArchLinterNet.Core.Graph.Abstractions;
 using ArchLinterNet.Core.Model;
 
 namespace ArchLinterNet.Core.Graph;
 
-// Accepts IArchitectureGraphApplicationService to preserve the public DI contract. When the
-// resolved implementation is the concrete ArchitectureGraphApplicationService, Explain() casts to
-// it to reuse BuildSession + the richer ArchitectureDependencyGraphBuilder.Build overload, getting
-// both the graph and the exact ArchitectureViolation instances behind each edge in a single pass.
-// When the caller supplies a stub or mock (tests, alternative implementations), it falls back to the
-// standard BuildGraph path — CEL expression participation is empty in that case, which is acceptable
-// because tests that assert on expression participation are integration-level and use the concrete type.
+// Depends only on IArchitectureGraphApplicationService. CEL expression participation is surfaced
+// via ArchitectureGraphOutcome.EdgeViolations, which ArchitectureGraphApplicationService populates
+// using the richer ArchitectureDependencyGraphBuilder.Build overload. Alternative implementations
+// that do not set EdgeViolations receive empty expression-participation output — the right
+// behaviour since only the concrete service runs a real contract-execution pass.
 public sealed class ArchitectureExplainApplicationService(IArchitectureGraphApplicationService graphApplicationService)
     : IArchitectureExplainApplicationService
 {
@@ -32,28 +29,19 @@ public sealed class ArchitectureExplainApplicationService(IArchitectureGraphAppl
             ConditionSetName = request.ConditionSetName,
         };
 
-        ArchitectureDependencyGraph graph;
-        IReadOnlyDictionary<(string Source, string Target), IReadOnlyList<ArchitectureViolation>> edgeViolations;
+        ArchitectureGraphOutcome graphOutcome = graphApplicationService.BuildGraph(graphRequest);
+        IReadOnlyDictionary<(string Source, string Target), IReadOnlyList<ArchitectureViolation>> edgeViolations =
+            graphOutcome.EdgeViolations ?? new Dictionary<(string, string), IReadOnlyList<ArchitectureViolation>>();
 
-        if (graphApplicationService is ArchitectureGraphApplicationService concreteService)
-        {
-            ArchitectureAnalysisSession session = concreteService.BuildSession(graphRequest, out List<ArchitectureViolation> violations);
-            graph = ArchitectureDependencyGraphBuilder.Build(session, request.Level, violations, out edgeViolations);
-        }
-        else
-        {
-            graph = graphApplicationService.BuildGraph(graphRequest).Graph;
-            edgeViolations = new Dictionary<(string, string), IReadOnlyList<ArchitectureViolation>>();
-        }
-
-        ArchitectureExplainOutcome outcome = FindShortestPath(graph, request.Source, request.Target);
+        ArchitectureExplainOutcome outcome = FindShortestPath(graphOutcome.Graph, request.Source, request.Target);
         return outcome with { ExpressionParticipation = CollectExpressionParticipation(outcome.Path, edgeViolations) };
     }
 
     // Attributes CEL `when` predicate results to the resolved path's hops, using the exact
     // ArchitectureViolation instances the single contract-execution pass already produced - no
-    // re-evaluation of any selector. Deduplicated by (ContractId, Source) since more than one
-    // violation on the same hop can share the same contributing expression.
+    // re-evaluation of any selector. Deduplicated by (ContractId, Location, Source) since more
+    // than one violation on the same hop can share the same expression; Location is included in
+    // the key so source.when and forbidden.when with identical text produce distinct entries.
     private static IReadOnlyList<ExplainExpressionParticipation> CollectExpressionParticipation(
         IReadOnlyList<string>? path,
         IReadOnlyDictionary<(string Source, string Target), IReadOnlyList<ArchitectureViolation>> edgeViolations)
@@ -64,7 +52,7 @@ public sealed class ArchitectureExplainApplicationService(IArchitectureGraphAppl
         }
 
         List<ExplainExpressionParticipation> participation = new();
-        HashSet<(string ContractId, string Source)> seen = new();
+        HashSet<(string ContractId, string Location, string Source)> seen = new();
 
         for (int i = 0; i < path.Count - 1; i++)
         {
@@ -83,7 +71,7 @@ public sealed class ArchitectureExplainApplicationService(IArchitectureGraphAppl
 
                 foreach (ExpressionParticipation whenExpression in whenExpressions)
                 {
-                    if (!seen.Add((violation.ContractId, whenExpression.Source)))
+                    if (!seen.Add((violation.ContractId, whenExpression.Location, whenExpression.Source)))
                     {
                         continue;
                     }

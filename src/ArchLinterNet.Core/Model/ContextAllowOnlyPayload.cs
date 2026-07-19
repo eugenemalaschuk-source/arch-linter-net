@@ -5,10 +5,10 @@ public sealed record ContextAllowOnlyPayload(
     IReadOnlyDictionary<string, object>? SourceMetadata = null,
     string? TargetRole = null,
     IReadOnlyDictionary<string, object>? TargetMetadata = null,
-    string? MatchedSelector = null,
-    IReadOnlyList<ExpressionParticipation>? WhenExpressions = null)
+    string? MatchedSelector = null)
     : IArchitectureDiagnosticPayload
 {
+    public IReadOnlyList<ExpressionParticipation>? WhenExpressions { get; init; }
     public ArchitectureDiagnostic ToDiagnostic(ArchitectureViolation violation) =>
         new ContextAllowOnlyDiagnostic(
             violation.ContractName, violation.ContractId, violation.SourceType,

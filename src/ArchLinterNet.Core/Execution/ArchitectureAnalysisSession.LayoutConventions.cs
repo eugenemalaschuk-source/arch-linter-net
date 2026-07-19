@@ -527,8 +527,10 @@ public sealed partial class ArchitectureAnalysisSession
             payload: new LayoutConventionPayload(
                 MatchedFilePath: group.SourceFilePath,
                 ExpectedTypeKind: contract.RequireTypeKind,
-                ActualTypeKind: actualKinds,
-                WhenExpressions: BuildLayoutWhenExpressions(contract)));
+                ActualTypeKind: actualKinds)
+            {
+                WhenExpressions = BuildLayoutWhenExpressions(contract),
+            });
     }
 
     private static void EvaluateForbidTypeKind(
@@ -558,8 +560,10 @@ public sealed partial class ArchitectureAnalysisSession
                 payload: new LayoutConventionPayload(
                     MatchedFilePath: group.SourceFilePath,
                     ExpectedTypeKind: $"not {contract.ForbidTypeKind}",
-                    ActualTypeKind: fact.TypeKind.ToString(),
-                    WhenExpressions: BuildLayoutWhenExpressions(contract)));
+                    ActualTypeKind: fact.TypeKind.ToString())
+                {
+                    WhenExpressions = BuildLayoutWhenExpressions(contract),
+                });
         }
     }
 
@@ -588,8 +592,10 @@ public sealed partial class ArchitectureAnalysisSession
                     ExpectedTypeName: ArchitectureNameConventionMatcher.Describe(
                         contract.RequiredNameSuffix, contract.RequiredNamePrefix,
                         contract.ForbiddenNameSuffix, contract.ForbiddenNamePrefix),
-                    ActualTypeName: fact.SimpleTypeName,
-                    WhenExpressions: BuildLayoutWhenExpressions(contract)));
+                    ActualTypeName: fact.SimpleTypeName)
+                {
+                    WhenExpressions = BuildLayoutWhenExpressions(contract),
+                });
         }
     }
 
@@ -635,8 +641,10 @@ public sealed partial class ArchitectureAnalysisSession
             payload: new LayoutConventionPayload(
                 MatchedFilePath: group.SourceFilePath,
                 ExpectedTypeName: group.FileNameWithoutExtension,
-                ActualTypeName: actualNames,
-                WhenExpressions: BuildLayoutWhenExpressions(contract)));
+                ActualTypeName: actualNames)
+            {
+                WhenExpressions = BuildLayoutWhenExpressions(contract),
+            });
     }
 
     private void EvaluateMatchingInterfaceExpectation(
@@ -686,8 +694,10 @@ public sealed partial class ArchitectureAnalysisSession
                 forbiddenReference: reason,
                 payload: new LayoutConventionPayload(
                     MatchedFilePath: group.SourceFilePath,
-                    ExpectedCounterpartName: expectedCounterpartName,
-                    WhenExpressions: BuildLayoutWhenExpressions(contract)));
+                    ExpectedCounterpartName: expectedCounterpartName)
+                {
+                    WhenExpressions = BuildLayoutWhenExpressions(contract),
+                });
         }
     }
 

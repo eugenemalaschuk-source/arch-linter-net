@@ -88,10 +88,12 @@ public sealed class ArchitectureSarifFormatterTests
         {
             new("cross-domain", "cross-domain-id", "Source.Type", "role:DomainLayer", _ref1)
             {
-                Payload = new ContextDependencyPayload(
-                    WhenExpressions: new[] { new ExpressionParticipation(
+                Payload = new ContextDependencyPayload()
+                {
+                    WhenExpressions = new[] { new ExpressionParticipation(
                         "cross-domain", "forbidden", "target.metadataText[\"domain\"] != source.metadataText[\"domain\"]",
-                        "contracts.strict_context_dependencies[0].forbidden[0]", ExpressionParticipationResult.Matched) })
+                        "contracts.strict_context_dependencies[0].forbidden[0]", ExpressionParticipationResult.Matched) },
+                }
             }
         };
 

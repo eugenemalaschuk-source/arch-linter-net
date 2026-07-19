@@ -63,10 +63,10 @@ public sealed class ArchitectureDiagnosticFormatterTests
         {
             new("contract", null, "Source.Type", "role:DomainLayer", _reference1)
             {
-                Payload = new ContextDependencyPayload(
-                    WhenExpressions: new[] { new ExpressionParticipation(
-                        "contract", "forbidden", "target.metadataText[\"domain\"] != source.metadataText[\"domain\"]",
-                        "contracts.strict_context_dependencies[0].forbidden[0]", ExpressionParticipationResult.Matched) })
+                Payload = new ContextDependencyPayload { WhenExpressions = new[] {
+                    new ExpressionParticipation("contract", "forbidden",
+                        "target.metadataText[\"domain\"] != source.metadataText[\"domain\"]",
+                        "contracts.strict_context_dependencies[0].forbidden[0]", ExpressionParticipationResult.Matched) } }
             }
         };
 
@@ -82,10 +82,10 @@ public sealed class ArchitectureDiagnosticFormatterTests
         {
             new("contract", "contract-id", "Source.Type", "role:DomainLayer", _reference1)
             {
-                Payload = new ContextDependencyPayload(
-                    WhenExpressions: new[] { new ExpressionParticipation(
-                        "contract", "forbidden", "target.metadataText[\"domain\"] != source.metadataText[\"domain\"]",
-                        "contracts.strict_context_dependencies[0].forbidden[0]", ExpressionParticipationResult.Matched) })
+                Payload = new ContextDependencyPayload { WhenExpressions = new[] {
+                    new ExpressionParticipation("contract", "forbidden",
+                        "target.metadataText[\"domain\"] != source.metadataText[\"domain\"]",
+                        "contracts.strict_context_dependencies[0].forbidden[0]", ExpressionParticipationResult.Matched) } }
             }
         };
 

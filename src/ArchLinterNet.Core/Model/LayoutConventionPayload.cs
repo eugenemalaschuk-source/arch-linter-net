@@ -7,10 +7,10 @@ public sealed record LayoutConventionPayload(
     string? ExpectedTypeName = null,
     string? ActualTypeName = null,
     string? ExpectedCounterpartName = null,
-    bool DataUnavailable = false,
-    IReadOnlyList<ExpressionParticipation>? WhenExpressions = null)
+    bool DataUnavailable = false)
     : IArchitectureDiagnosticPayload
 {
+    public IReadOnlyList<ExpressionParticipation>? WhenExpressions { get; init; }
     public ArchitectureDiagnostic ToDiagnostic(ArchitectureViolation violation) =>
         new LayoutConventionDiagnostic(
             violation.ContractName, violation.ContractId, violation.SourceType,
