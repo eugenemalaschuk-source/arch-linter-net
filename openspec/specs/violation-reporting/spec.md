@@ -164,3 +164,26 @@ this preserves original-then-conflicting order.
 - **AND THEN** each related-location message identifies its authored YAML path
   and each physical location contains a portable policy source URI
 
+### Requirement: Violations expose CEL expression participation additively
+When a context-dependency, context-allow-only, or layout-convention violation involves a selector that declares `when`, the human-readable and CI JSON output SHALL include the expression's source text, its YAML location, and its result (`matched`, `not_matched`, or `evaluation_failed`), in addition to all existing fields for that diagnostic kind. Diagnostics with no `when`-bearing selector SHALL omit this data entirely rather than emitting empty or null placeholders.
+
+#### Scenario: JSON violation includes expression participation
+- **WHEN** a context-dependency contract's `forbidden[*].when` predicate evaluates `true` and produces a violation
+- **THEN** the JSON output for that violation includes a `when_expressions` array; each entry has `location`, `source`, `result` (`"matched"`), and `yaml_path`
+
+#### Scenario: Multiple expressions on one violation
+- **WHEN** both `source.when` and a matched `forbidden[*].when` are present on a single violation
+- **THEN** the `when_expressions` array contains one entry per participating selector, each with its own `location` (`"source"` and `"forbidden"` respectively)
+
+#### Scenario: Human output includes the expression text
+- **WHEN** the same violation is rendered as human-readable output
+- **THEN** the output line includes the evaluated `when` expression's source text and its location alongside the existing violation description
+
+#### Scenario: Non-CEL violation is unaffected
+- **WHEN** a context-dependency or layout-convention violation involves no `when`-bearing selector
+- **THEN** its human-readable and JSON output are identical to the output produced before this change
+
+#### Scenario: Layout-convention violation includes expression participation
+- **WHEN** a `strict_layout_conventions[*].files_matching.when` predicate narrows which files are checked and a violation results
+- **THEN** the JSON output for that violation includes a `when_expressions` array with `location: "files_matching"` and the same per-entry shape used for context-dependency/context-allow-only violations
+

@@ -24,8 +24,10 @@ public sealed class ArchitectureGraphApplicationService(
 
         ArchitectureAnalysisSession session = BuildSession(request, out List<ArchitectureViolation> violations);
 
-        ArchitectureDependencyGraph graph = ArchitectureDependencyGraphBuilder.Build(session, request.Level, violations);
-        return new ArchitectureGraphOutcome(graph);
+        ArchitectureDependencyGraph graph = ArchitectureDependencyGraphBuilder.Build(
+            session, request.Level, violations,
+            out IReadOnlyDictionary<(string Source, string Target), IReadOnlyList<ArchitectureViolation>> edgeViolations);
+        return new ArchitectureGraphOutcome(graph) { EdgeViolations = edgeViolations };
     }
 
     internal ArchitectureAnalysisSession BuildSession(

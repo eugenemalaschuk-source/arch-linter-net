@@ -60,13 +60,33 @@ internal sealed class ExplainCommandHandler(ICliRuntime runtime, ICliConsole con
             ArchitectureExplainOutcome outcome = runtime.Explain(request);
             if (options.Format == "json")
             {
-                console.Out.WriteLine(JsonSerializer.Serialize(new
+                var jsonObj = new Dictionary<string, object?>
                 {
-                    source = outcome.Source,
-                    target = outcome.Target,
-                    path = outcome.Path,
-                    contractIds = outcome.ContractIds,
-                }));
+                    ["source"] = outcome.Source,
+                    ["target"] = outcome.Target,
+                    ["path"] = outcome.Path,
+                    ["contractIds"] = outcome.ContractIds,
+                };
+
+                if (outcome.ExpressionParticipation.Count > 0)
+                {
+                    jsonObj["expressionParticipation"] = outcome.ExpressionParticipation.Select(p => new Dictionary<string, object?>
+                    {
+                        ["contractId"] = p.ContractId,
+                        ["hopSource"] = p.HopSource,
+                        ["hopTarget"] = p.HopTarget,
+                        ["source"] = p.Source,
+                        ["yamlPath"] = p.YamlPath,
+                        ["result"] = p.Result switch
+                        {
+                            ExpressionParticipationResult.Matched => "matched",
+                            ExpressionParticipationResult.NotMatched => "not_matched",
+                            _ => "evaluation_failed",
+                        },
+                    }).ToArray();
+                }
+
+                console.Out.WriteLine(JsonSerializer.Serialize(jsonObj));
             }
             else if (outcome.Path == null)
             {
@@ -78,6 +98,21 @@ internal sealed class ExplainCommandHandler(ICliRuntime runtime, ICliConsole con
                 if (outcome.ContractIds.Count > 0)
                 {
                     console.Out.WriteLine($"Contract IDs: {string.Join(", ", outcome.ContractIds)}");
+                }
+
+                foreach (ExplainExpressionParticipation participation in outcome.ExpressionParticipation)
+                {
+                    string result = participation.Result switch
+                    {
+                        ExpressionParticipationResult.Matched => "matched",
+                        ExpressionParticipationResult.NotMatched => "not matched",
+                        _ => "evaluation failed",
+                    };
+                    string hop = participation.HopSource != null && participation.HopTarget != null
+                        ? $"{participation.HopSource} -> {participation.HopTarget}: "
+                        : string.Empty;
+                    console.Out.WriteLine(
+                        $"  [{participation.ContractId}] {hop}when: {participation.Source} ({result})");
                 }
             }
 

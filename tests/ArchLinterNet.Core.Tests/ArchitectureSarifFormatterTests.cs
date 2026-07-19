@@ -62,6 +62,69 @@ public sealed class ArchitectureSarifFormatterTests
     }
 
     [Test]
+    public void FormatResultAsSarif_ContextDependencyDiagnostic_PopulatesSourceAndReferences()
+    {
+        // Regression: ContextDependencyDiagnostic/ContextAllowOnlyDiagnostic were previously absent
+        // from ArchitectureSarifFormatter's ExtractFields switch, so SARIF rendered them with an
+        // empty source/forbidden-namespace/references triple instead of the real violation data.
+        var violations = new List<ArchitectureViolation>
+        {
+            new("cross-domain", "cross-domain-id", "Source.Type", "role:DomainLayer", _ref1)
+            {
+                Payload = new ContextDependencyPayload()
+            }
+        };
+
+        JsonElement result = Run("strict", violations).GetProperty("runs")[0].GetProperty("results")[0];
+
+        Assert.That(result.GetProperty("message").GetProperty("text").GetString(),
+            Does.Contain("Source.Type -> role:DomainLayer: ref1"));
+    }
+
+    [Test]
+    public void FormatResultAsSarif_ContextDependencyWithWhenExpression_AddsRelatedLocation()
+    {
+        var violations = new List<ArchitectureViolation>
+        {
+            new("cross-domain", "cross-domain-id", "Source.Type", "role:DomainLayer", _ref1)
+            {
+                Payload = new ContextDependencyPayload()
+                {
+                    WhenExpressions = new[] { new ExpressionParticipation(
+                        "cross-domain", "forbidden", "target.metadataText[\"domain\"] != source.metadataText[\"domain\"]",
+                        "contracts.strict_context_dependencies[0].forbidden[0]", ExpressionParticipationResult.Matched) },
+                }
+            }
+        };
+
+        JsonElement result = Run("strict", violations).GetProperty("runs")[0].GetProperty("results")[0];
+        JsonElement relatedLocations = result.GetProperty("relatedLocations");
+
+        Assert.That(
+            Enumerable.Range(0, relatedLocations.GetArrayLength())
+                .Select(i => relatedLocations[i].GetProperty("message").GetProperty("text").GetString())
+                .Any(text => text!.Contains("target.metadataText[\"domain\"] != source.metadataText[\"domain\"]")
+                    && text.Contains("matched")),
+            Is.True);
+    }
+
+    [Test]
+    public void FormatResultAsSarif_ContextDependencyWithoutWhenExpression_HasNoRelatedLocations()
+    {
+        var violations = new List<ArchitectureViolation>
+        {
+            new("cross-domain", "cross-domain-id", "Source.Type", "role:DomainLayer", _ref1)
+            {
+                Payload = new ContextDependencyPayload()
+            }
+        };
+
+        JsonElement result = Run("strict", violations).GetProperty("runs")[0].GetProperty("results")[0];
+
+        Assert.That(result.TryGetProperty("relatedLocations", out _), Is.False);
+    }
+
+    [Test]
     public void FormatResultAsSarif_ContractWithoutId_UsesNormalizedNameAsRuleId()
     {
         var violations = new List<ArchitectureViolation>

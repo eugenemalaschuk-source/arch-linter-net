@@ -184,6 +184,9 @@ public sealed class LayoutConventionCliTests
                 Assert.That(stdOut, Does.Contain("\"matched_file_path\""));
                 Assert.That(stdOut, Does.Contain("\"actual_type_kind\""));
                 Assert.That(stdOut, Does.Contain("handlers-forbid-when-narrowed-class-json"));
+                Assert.That(stdOut, Does.Contain("\"when_expressions\""));
+                Assert.That(stdOut, Does.Contain("subject.simpleName == \\u0022PortLayoutWhenNarrowedTarget\\u0022"));
+                Assert.That(stdOut, Does.Contain("\"result\":\"matched\""));
             });
         }
         finally

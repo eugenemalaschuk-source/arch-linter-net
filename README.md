@@ -105,6 +105,7 @@ ArchLinterNet focuses on static architecture guardrails:
 - Project/solution discovery when assemblies are not hand-listed.
 - Policy-consistency diagnostics for contradictory or unreachable policy definitions.
 - Strict gates, audit diagnostics, JSON output, timings, and migration baselines.
+- CEL-backed `when` predicates narrowing selectors on a closed set of locations — standard CEL under a safe, documented profile, not a proprietary DSL.
 
 ArchLinterNet does **not** validate runtime dependency injection behavior, authorization/security correctness, code ownership, semantic data flow, or arbitrary custom YAML fields outside the documented schema.
 
@@ -118,6 +119,7 @@ Public product documentation is published through MkDocs and GitHub Pages:
 - [CLI usage](https://eugenemalaschuk-source.github.io/arch-linter-net/cli/)
 - [Policy format](https://eugenemalaschuk-source.github.io/arch-linter-net/policy-format/)
 - [Policy imports](https://eugenemalaschuk-source.github.io/arch-linter-net/policy-format/imports/)
+- [CEL policy expressions](https://eugenemalaschuk-source.github.io/arch-linter-net/policy-format/cel-expressions/)
 - [Contract families](https://eugenemalaschuk-source.github.io/arch-linter-net/contracts/)
 - [Coverage contracts](https://eugenemalaschuk-source.github.io/arch-linter-net/contracts/coverage/)
 - [CI integration](https://eugenemalaschuk-source.github.io/arch-linter-net/guides/ci-integration/)

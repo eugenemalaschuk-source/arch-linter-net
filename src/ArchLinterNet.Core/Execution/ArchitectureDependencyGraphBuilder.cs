@@ -15,13 +15,27 @@ internal static class ArchitectureDependencyGraphBuilder
     public static ArchitectureDependencyGraph Build(
         ArchitectureAnalysisSession session,
         ArchitectureGraphLevel level,
-        IReadOnlyCollection<ArchitectureViolation> violations)
+        IReadOnlyCollection<ArchitectureViolation> violations) =>
+        Build(session, level, violations, out _);
+
+    // Overload used by ArchitectureExplainApplicationService to attribute CEL expression
+    // participation to a resolved path's edges: edgeViolations tracks, per resolved (source, target)
+    // edge, the exact ArchitectureViolation instances that contributed a contract ID to it - the same
+    // data edgeContractIds already summarizes as plain strings, kept alongside rather than replacing
+    // it so every existing caller (graph/validate, which only need Build's original 3-arg form) is
+    // unaffected.
+    internal static ArchitectureDependencyGraph Build(
+        ArchitectureAnalysisSession session,
+        ArchitectureGraphLevel level,
+        IReadOnlyCollection<ArchitectureViolation> violations,
+        out IReadOnlyDictionary<(string Source, string Target), IReadOnlyList<ArchitectureViolation>> edgeViolations)
     {
         ArgumentNullException.ThrowIfNull(session);
         ArgumentNullException.ThrowIfNull(violations);
 
         Dictionary<string, ArchitectureGraphNodeKind> nodeKinds = new(StringComparer.Ordinal);
         Dictionary<(string Source, string Target), HashSet<string>> edgeContractIds = new();
+        Dictionary<(string Source, string Target), List<ArchitectureViolation>> edgeViolationsBuilder = new();
 
         Func<string, string?> resolveId = level switch
         {
@@ -41,7 +55,10 @@ internal static class ArchitectureDependencyGraphBuilder
             SeedExternalNodesAndEdges(session, resolveId, nodeKinds, edgeContractIds);
         }
 
-        OverlayViolations(violations, level, resolveId, nodeKinds, edgeContractIds);
+        OverlayViolations(violations, level, resolveId, nodeKinds, edgeContractIds, edgeViolationsBuilder);
+
+        edgeViolations = edgeViolationsBuilder.ToDictionary(
+            pair => pair.Key, IReadOnlyList<ArchitectureViolation> (pair) => pair.Value);
 
         return ToGraph(nodeKinds, edgeContractIds);
     }
@@ -242,7 +259,8 @@ internal static class ArchitectureDependencyGraphBuilder
         ArchitectureGraphLevel level,
         Func<string, string?> resolveId,
         Dictionary<string, ArchitectureGraphNodeKind> nodeKinds,
-        Dictionary<(string Source, string Target), HashSet<string>> edgeContractIds)
+        Dictionary<(string Source, string Target), HashSet<string>> edgeContractIds,
+        Dictionary<(string Source, string Target), List<ArchitectureViolation>> edgeViolationsBuilder)
     {
         foreach (ArchitectureViolation violation in violations)
         {
@@ -257,7 +275,8 @@ internal static class ArchitectureDependencyGraphBuilder
                 continue;
             }
 
-            OverlayViolation(violation, level, resolveId, nodeKinds, edgeContractIds, sourceId, violation.ContractId);
+            OverlayViolation(
+                violation, level, resolveId, nodeKinds, edgeContractIds, edgeViolationsBuilder, sourceId, violation.ContractId);
         }
     }
 
@@ -267,6 +286,7 @@ internal static class ArchitectureDependencyGraphBuilder
         Func<string, string?> resolveId,
         Dictionary<string, ArchitectureGraphNodeKind> nodeKinds,
         Dictionary<(string Source, string Target), HashSet<string>> edgeContractIds,
+        Dictionary<(string Source, string Target), List<ArchitectureViolation>> edgeViolationsBuilder,
         string sourceId,
         string contractId)
     {
@@ -282,7 +302,7 @@ internal static class ArchitectureDependencyGraphBuilder
             return;
         }
 
-        OverlayForbiddenReferenceTargets(violation, resolveId, edgeContractIds, sourceId, contractId);
+        OverlayForbiddenReferenceTargets(violation, resolveId, edgeContractIds, edgeViolationsBuilder, sourceId, contractId);
     }
 
     private static void OverlayExternalDependencyViolation(
@@ -328,6 +348,7 @@ internal static class ArchitectureDependencyGraphBuilder
         ArchitectureViolation violation,
         Func<string, string?> resolveId,
         Dictionary<(string Source, string Target), HashSet<string>> edgeContractIds,
+        Dictionary<(string Source, string Target), List<ArchitectureViolation>> edgeViolationsBuilder,
         string sourceId,
         string contractId)
     {
@@ -350,6 +371,15 @@ internal static class ArchitectureDependencyGraphBuilder
         foreach (string targetId in targetIds)
         {
             TagEdge(edgeContractIds, sourceId, targetId, contractId);
+
+            (string Source, string Target) edgeKey = (sourceId, targetId);
+            if (!edgeViolationsBuilder.TryGetValue(edgeKey, out List<ArchitectureViolation>? edgeViolations))
+            {
+                edgeViolations = new List<ArchitectureViolation>();
+                edgeViolationsBuilder[edgeKey] = edgeViolations;
+            }
+
+            edgeViolations.Add(violation);
         }
     }
 

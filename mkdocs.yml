@@ -39,6 +39,7 @@ nav:
       - Semantic classification: policy-format/semantic-classification.md
       - Semantic role catalog: policy-format/semantic-role-catalog.md
       - Supported capabilities and non-goals: policy-format/supported-capabilities.md
+      - CEL policy expressions: policy-format/cel-expressions.md
   - Contracts:
       - Overview: contracts/index.md
       - Dependency contracts: contracts/dependency.md

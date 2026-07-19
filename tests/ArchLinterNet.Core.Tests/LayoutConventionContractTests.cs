@@ -298,6 +298,62 @@ public sealed class LayoutConventionContractTests
     }
 
     [Test]
+    public void CheckLayoutConventionsContract_WhenRefinement_PayloadCarriesStructuredExpressionParticipation()
+    {
+        string assemblyName = typeof(LayoutConventionContractTests).Assembly.GetName().Name!;
+        string policyPath = Path.Combine(_tempDir, "dependencies.arch.yml");
+        File.WriteAllText(policyPath, $"""
+            version: 1
+            name: Test
+            analysis:
+              target_assemblies: [{assemblyName}]
+              source_roots: ["."]
+            contracts:
+              strict_layout_conventions:
+                - name: when-refined-naming
+                  files_matching:
+                    folder_segment: WhenRefinement
+                    when: subject.simpleName == "IncludedByWhen"
+                  required_name_suffix: DoesNotMatchAnything
+            """);
+
+        ArchitectureContractDocument document = new ArchitecturePolicyDocumentLoader().Load(policyPath);
+        var contract = document.Contracts.StrictLayoutConventions[0];
+        var runner = new ArchitectureContractRunner(CreateContext(), document);
+
+        var violations = runner.Session.CheckLayoutConventionsContract(contract);
+        ArchitectureViolation violation = violations.First(v => v.SourceType.Contains("IncludedByWhen", StringComparison.Ordinal));
+        var payload = (LayoutConventionPayload)violation.Payload!;
+
+        Assert.That(payload.WhenExpressions, Is.Not.Null.And.Not.Empty);
+        ExpressionParticipation filesMatching = payload.WhenExpressions![0];
+        Assert.Multiple(() =>
+        {
+            Assert.That(filesMatching.Source, Is.EqualTo("subject.simpleName == \"IncludedByWhen\""));
+            Assert.That(filesMatching.Result, Is.EqualTo(ExpressionParticipationResult.Matched));
+        });
+    }
+
+    [Test]
+    public void CheckLayoutConventionsContract_NoWhen_PayloadOmitsExpressionParticipation()
+    {
+        var contract = new ArchitectureLayoutConventionContract
+        {
+            Name = "services-folder-must-not-contain-interfaces",
+            FilesMatching = new ArchitectureLayoutFileMatcher { FolderSegment = "Services" },
+            ForbidTypeKind = "interface"
+        };
+        var runner = new ArchitectureContractRunner(CreateContext(), CreateDocument(contract));
+
+        var violations = runner.Session.CheckLayoutConventionsContract(contract);
+        ArchitectureViolation violation = violations.First(v =>
+            v.SourceType.Contains("IWronglyPlacedService", StringComparison.Ordinal));
+        var payload = (LayoutConventionPayload)violation.Payload!;
+
+        Assert.That(payload.WhenExpressions, Is.Null.Or.Empty);
+    }
+
+    [Test]
     public void CheckLayoutConventionsContract_NoSourceEnrichedFacts_EmitsUnavailableDiagnostic()
     {
         var contract = new ArchitectureLayoutConventionContract

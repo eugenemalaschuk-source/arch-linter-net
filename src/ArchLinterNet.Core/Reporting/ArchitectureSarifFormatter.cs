@@ -149,12 +149,69 @@ public sealed partial class ArchitectureSarifFormatter : IArchitectureSarifForma
         object[] relatedPolicyLocations = FormatPolicyLocationsForSarif(
             diagnostic.PolicyLocation,
             diagnostic.RelatedPolicyLocations);
-        if (relatedPolicyLocations.Length > 0)
+        object[] relatedLocations = AppendWhenExpressionRelatedLocations(relatedPolicyLocations, GetWhenExpressions(diagnostic));
+        if (relatedLocations.Length > 0)
         {
-            json["relatedLocations"] = relatedPolicyLocations;
+            json["relatedLocations"] = relatedLocations;
         }
 
         return new ResultEntry(ruleId, diagnostic.ContractName, sourceType, forbiddenNamespace, json);
+    }
+
+    // CEL expression participation (violation-reporting/sarif-diagnostics-output capability): added
+    // alongside, never replacing, existing policy-origin related locations - a diagnostic can carry
+    // both at once. A single violation can have multiple participating expressions (e.g. source.when
+    // and forbidden[*].when), each appended as its own related location.
+    private static IReadOnlyList<ExpressionParticipation>? GetWhenExpressions(ArchitectureDiagnostic diagnostic) => diagnostic switch
+    {
+        ContextDependencyDiagnostic d => d.WhenExpressions,
+        ContextAllowOnlyDiagnostic d => d.WhenExpressions,
+        LayoutConventionDiagnostic d => d.WhenExpressions,
+        _ => null,
+    };
+
+    private static object[] AppendWhenExpressionRelatedLocations(
+        object[] relatedPolicyLocations, IReadOnlyList<ExpressionParticipation>? whenExpressions)
+    {
+        if (whenExpressions == null || whenExpressions.Count == 0)
+        {
+            return relatedPolicyLocations;
+        }
+
+        object[] additional = whenExpressions.Select((whenExpression, index) =>
+        {
+            string result = whenExpression.Result switch
+            {
+                ExpressionParticipationResult.Matched => "matched",
+                ExpressionParticipationResult.NotMatched => "did not match",
+                _ => "failed to evaluate",
+            };
+
+            var entry = new Dictionary<string, object?>
+            {
+                ["id"] = relatedPolicyLocations.Length + index + 1,
+                [MessagePropertyName] = new Dictionary<string, object?>
+                {
+                    ["text"] = $"CEL expression '{whenExpression.Source}' ({whenExpression.Location}) {result}" +
+                        (whenExpression.YamlPath != null ? $" (at {whenExpression.YamlPath})" : string.Empty),
+                },
+            };
+            if (whenExpression.PolicySourcePath != null)
+            {
+                entry["physicalLocation"] = new Dictionary<string, object?>
+                {
+                    ["artifactLocation"] = new Dictionary<string, object?> { ["uri"] = whenExpression.PolicySourcePath },
+                    ["region"] = new Dictionary<string, object?>
+                    {
+                        ["startLine"] = whenExpression.PolicySourceLine,
+                        ["startColumn"] = whenExpression.PolicySourceColumn,
+                    },
+                };
+            }
+            return (object)entry;
+        }).ToArray();
+
+        return relatedPolicyLocations.Concat(additional).ToArray();
     }
 
     public static object[] FormatPolicyLocationsForSarif(
@@ -310,6 +367,8 @@ public sealed partial class ArchitectureSarifFormatter : IArchitectureSarifForma
             InterfaceImplementationDiagnostic d => (d.SourceType, d.ForbiddenNamespace, d.ForbiddenReferences),
             CompositionDiagnostic d => (d.SourceType, d.ForbiddenNamespace, d.ForbiddenReferences),
             ProjectMetadataDiagnostic d => (d.SourceType, d.ForbiddenNamespace, d.ForbiddenReferences),
+            ContextDependencyDiagnostic d => (d.SourceType, d.ForbiddenNamespace, d.ForbiddenReferences),
+            ContextAllowOnlyDiagnostic d => (d.SourceType, d.ForbiddenNamespace, d.ForbiddenReferences),
             _ => (string.Empty, string.Empty, Array.Empty<string>()),
         };
 

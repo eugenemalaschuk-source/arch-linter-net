@@ -17,7 +17,8 @@ policies with schema-aware editors or AI agents.
 > and [Contextual allow-only contracts](../contracts/context-allow-only.md#cel-predicates).
 > `when` is compiled and evaluated at these locations only — every other
 > string field remains a literal value, never implicitly parsed as an
-> expression.
+> expression. See the [CEL policy expressions guide](../policy-format/cel-expressions.md)
+> for the full authoring reference, supported-syntax matrix, and diagnostics.
 
 ## Root and fragment schemas
 

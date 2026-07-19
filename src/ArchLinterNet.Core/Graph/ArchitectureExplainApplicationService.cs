@@ -3,6 +3,11 @@ using ArchLinterNet.Core.Model;
 
 namespace ArchLinterNet.Core.Graph;
 
+// Depends only on IArchitectureGraphApplicationService. CEL expression participation is surfaced
+// via ArchitectureGraphOutcome.EdgeViolations, which ArchitectureGraphApplicationService populates
+// using the richer ArchitectureDependencyGraphBuilder.Build overload. Alternative implementations
+// that do not set EdgeViolations receive empty expression-participation output — the right
+// behaviour since only the concrete service runs a real contract-execution pass.
 public sealed class ArchitectureExplainApplicationService(IArchitectureGraphApplicationService graphApplicationService)
     : IArchitectureExplainApplicationService
 {
@@ -24,10 +29,77 @@ public sealed class ArchitectureExplainApplicationService(IArchitectureGraphAppl
             ConditionSetName = request.ConditionSetName,
         };
 
-        ArchitectureDependencyGraph graph = graphApplicationService.BuildGraph(graphRequest).Graph;
+        ArchitectureGraphOutcome graphOutcome = graphApplicationService.BuildGraph(graphRequest);
+        IReadOnlyDictionary<(string Source, string Target), IReadOnlyList<ArchitectureViolation>> edgeViolations =
+            graphOutcome.EdgeViolations ?? new Dictionary<(string, string), IReadOnlyList<ArchitectureViolation>>();
 
-        return FindShortestPath(graph, request.Source, request.Target);
+        ArchitectureExplainOutcome outcome = FindShortestPath(graphOutcome.Graph, request.Source, request.Target);
+        return outcome with { ExpressionParticipation = CollectExpressionParticipation(outcome.Path, edgeViolations) };
     }
+
+    // Attributes CEL `when` predicate results to the resolved path's hops, using the exact
+    // ArchitectureViolation instances the single contract-execution pass already produced - no
+    // re-evaluation of any selector. Deduplicated by (HopSource, HopTarget, ContractId, Location,
+    // Source) so the same expression appearing on distinct hops (e.g. A→B and B→C) produces a
+    // separate entry for each hop; within one hop, Location is included so source.when and
+    // forbidden.when with identical text are not collapsed.
+    private static IReadOnlyList<ExplainExpressionParticipation> CollectExpressionParticipation(
+        IReadOnlyList<string>? path,
+        IReadOnlyDictionary<(string Source, string Target), IReadOnlyList<ArchitectureViolation>> edgeViolations)
+    {
+        if (path == null || path.Count < 2)
+        {
+            return Array.Empty<ExplainExpressionParticipation>();
+        }
+
+        List<ExplainExpressionParticipation> participation = new();
+        HashSet<(string HopSource, string HopTarget, string ContractId, string Location, string Source, string? YamlPath)> seen = new();
+
+        for (int i = 0; i < path.Count - 1; i++)
+        {
+            string hopSource = path[i];
+            string hopTarget = path[i + 1];
+
+            if (!edgeViolations.TryGetValue((hopSource, hopTarget), out IReadOnlyList<ArchitectureViolation>? hopViolations))
+            {
+                continue;
+            }
+
+            foreach (ArchitectureViolation violation in hopViolations)
+            {
+                IReadOnlyList<ExpressionParticipation>? whenExpressions = GetWhenExpressions(violation.Payload);
+                if (whenExpressions == null || whenExpressions.Count == 0 || violation.ContractId == null)
+                {
+                    continue;
+                }
+
+                foreach (ExpressionParticipation whenExpression in whenExpressions)
+                {
+                    if (!seen.Add((hopSource, hopTarget, violation.ContractId, whenExpression.Location, whenExpression.Source, whenExpression.YamlPath)))
+                    {
+                        continue;
+                    }
+
+                    participation.Add(new ExplainExpressionParticipation(
+                        violation.ContractId, whenExpression.Source, whenExpression.YamlPath, whenExpression.Result)
+                    {
+                        HopSource = hopSource,
+                        HopTarget = hopTarget,
+                    });
+                }
+            }
+        }
+
+        return participation;
+    }
+
+    private static IReadOnlyList<ExpressionParticipation>? GetWhenExpressions(IArchitectureDiagnosticPayload? payload) => payload switch
+    {
+        ContextDependencyPayload p => p.WhenExpressions,
+        ContextAllowOnlyPayload p => p.WhenExpressions,
+        LayoutConventionPayload p => p.WhenExpressions,
+        _ => null,
+    };
 
     private static ArchitectureExplainOutcome FindShortestPath(
         ArchitectureDependencyGraph graph,
