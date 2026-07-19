@@ -74,11 +74,32 @@ public sealed partial class ArchitectureAnalysisSession
 
             RoleIndex.TryGetRole(referencedType, out ArchitectureTypeClassificationResult targetDescriptor);
 
+            // Forbidden selectors whose literal role/metadata matched but whose `when` returned false -
+            // they were evaluated during the Matches pass above and came before or after the winner,
+            // so surfacing them as NotMatched gives the diagnostic full CEL provenance for the decision.
+            IReadOnlyList<ArchitectureContextSelector> notMatchedForbidden = contract.Forbidden
+                .Where(s => !ReferenceEquals(s, matchedSelector)
+                    && !string.IsNullOrEmpty(s.When)
+                    && ArchitectureContextSelectorMatcher.MatchesLiteral(s, referencedType, RoleIndex, sourceDescriptor))
+                .ToList();
+
+            // Exclude selectors that matched literally but whose `when` returned false - because
+            // IsExcludedFromContextMatch returned false, reaching here proves all exclude selectors
+            // that matched role/metadata must have had when=false.
+            IReadOnlyList<ArchitectureContextSelector> notMatchedExclude = contract.Exclude
+                .Where(s => !string.IsNullOrEmpty(s.When)
+                    && ArchitectureContextSelectorMatcher.MatchesLiteral(s, referencedType, RoleIndex, sourceDescriptor))
+                .ToList();
+
             List<ExpressionParticipation> whenExpressions = new();
             // contract.Source.When already evaluated true for this sourceType - FindContextSelectorMatchingTypes
             // filtered by it before this method was ever called for this candidate.
             AddWhenExpression(whenExpressions, contract.Name, contract.Source, "source", ExpressionParticipationResult.Matched);
+            foreach (ArchitectureContextSelector s in notMatchedForbidden)
+                AddWhenExpression(whenExpressions, contract.Name, s, "forbidden", ExpressionParticipationResult.NotMatched);
             AddWhenExpression(whenExpressions, contract.Name, matchedSelector, "forbidden", ExpressionParticipationResult.Matched);
+            foreach (ArchitectureContextSelector s in notMatchedExclude)
+                AddWhenExpression(whenExpressions, contract.Name, s, "exclude", ExpressionParticipationResult.NotMatched);
 
             violations.Add(new ArchitectureViolation(
                 contract.Name, contract.Id, sourceFullName,
@@ -155,12 +176,22 @@ public sealed partial class ArchitectureAnalysisSession
                     nearMissSelectors.Select(s => $"when: {s.When} (evaluated false for this target)"))
                     .ToArray();
 
+            // Exclude selectors that matched literally but whose `when` returned false - reaching
+            // here proves all exclude selectors that matched role/metadata must have had when=false,
+            // because IsContextAllowOnlyCandidateViolation called IsExcludedFromContextMatch first.
+            IReadOnlyList<ArchitectureContextSelector> notMatchedExclude = contract.Exclude
+                .Where(s => !string.IsNullOrEmpty(s.When)
+                    && ArchitectureContextSelectorMatcher.MatchesLiteral(s, referencedType, RoleIndex, sourceDescriptor))
+                .ToList();
+
             List<ExpressionParticipation> whenExpressions = new();
             AddWhenExpression(whenExpressions, contract.Name, contract.Source, "source", ExpressionParticipationResult.Matched);
             foreach (ArchitectureContextSelector nearMiss in nearMissSelectors)
             {
                 AddWhenExpression(whenExpressions, contract.Name, nearMiss, "allowed", ExpressionParticipationResult.NotMatched);
             }
+            foreach (ArchitectureContextSelector s in notMatchedExclude)
+                AddWhenExpression(whenExpressions, contract.Name, s, "exclude", ExpressionParticipationResult.NotMatched);
 
             violations.Add(new ArchitectureViolation(
                 contract.Name, contract.Id, sourceFullName, "outside allowed context selectors", evidence)

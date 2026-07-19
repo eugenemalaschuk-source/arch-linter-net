@@ -240,6 +240,10 @@ public sealed class ArchitectureExplainApplicationServiceTests
                 Assert.That(outcome.ExpressionParticipation[0].Source,
                     Is.EqualTo("target.metadataText[\"domain\"] != source.metadataText[\"domain\"]"));
                 Assert.That(outcome.ExpressionParticipation[0].Result, Is.EqualTo(ExpressionParticipationResult.Matched));
+                Assert.That(outcome.ExpressionParticipation[0].HopSource,
+                    Is.EqualTo(typeof(ContextualContractTestFixtures.SalesCheckout).FullName));
+                Assert.That(outcome.ExpressionParticipation[0].HopTarget,
+                    Is.EqualTo(typeof(ContextualContractTestFixtures.InventoryStockItem).FullName));
             });
         }
         finally

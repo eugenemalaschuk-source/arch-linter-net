@@ -161,7 +161,10 @@ public sealed partial class ArchitectureAnalysisSession
                 sourceType: ambiguity.FullTypeName,
                 forbiddenReference: "cannot evaluate: declared across multiple source files " +
                     $"({string.Join(", ", ambiguity.SourceFilePaths)}), so its folder/file-name facts are ambiguous",
-                payload: new LayoutConventionPayload(DataUnavailable: true));
+                payload: new LayoutConventionPayload(DataUnavailable: true)
+                {
+                    WhenExpressions = BuildLayoutWhenExpressions(contract),
+                });
         }
     }
 
@@ -624,7 +627,10 @@ public sealed partial class ArchitectureAnalysisSession
                 sourceType: groupLabel,
                 forbiddenReference: "require_type_name_matches_file_name cannot be evaluated: no resolvable source " +
                     "file for this declared type (missing source enrichment or an ambiguous partial-class declaration)",
-                payload: new LayoutConventionPayload(DataUnavailable: true));
+                payload: new LayoutConventionPayload(DataUnavailable: true)
+                {
+                    WhenExpressions = BuildLayoutWhenExpressions(contract),
+                });
             return;
         }
 
@@ -715,7 +721,10 @@ public sealed partial class ArchitectureAnalysisSession
             forbiddenReference: $"cannot evaluate {fieldName}: record — record vs class/struct classification requires " +
                 "source-enriched facts, unavailable for this declared type (missing source enrichment or an ambiguous " +
                 "partial-class declaration)",
-            payload: new LayoutConventionPayload(DataUnavailable: true));
+            payload: new LayoutConventionPayload(DataUnavailable: true)
+            {
+                WhenExpressions = BuildLayoutWhenExpressions(contract),
+            });
     }
 
     private static void AddViolation(

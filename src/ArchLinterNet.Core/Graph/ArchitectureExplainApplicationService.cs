@@ -39,9 +39,10 @@ public sealed class ArchitectureExplainApplicationService(IArchitectureGraphAppl
 
     // Attributes CEL `when` predicate results to the resolved path's hops, using the exact
     // ArchitectureViolation instances the single contract-execution pass already produced - no
-    // re-evaluation of any selector. Deduplicated by (ContractId, Location, Source) since more
-    // than one violation on the same hop can share the same expression; Location is included in
-    // the key so source.when and forbidden.when with identical text produce distinct entries.
+    // re-evaluation of any selector. Deduplicated by (HopSource, HopTarget, ContractId, Location,
+    // Source) so the same expression appearing on distinct hops (e.g. A→B and B→C) produces a
+    // separate entry for each hop; within one hop, Location is included so source.when and
+    // forbidden.when with identical text are not collapsed.
     private static IReadOnlyList<ExplainExpressionParticipation> CollectExpressionParticipation(
         IReadOnlyList<string>? path,
         IReadOnlyDictionary<(string Source, string Target), IReadOnlyList<ArchitectureViolation>> edgeViolations)
@@ -52,11 +53,14 @@ public sealed class ArchitectureExplainApplicationService(IArchitectureGraphAppl
         }
 
         List<ExplainExpressionParticipation> participation = new();
-        HashSet<(string ContractId, string Location, string Source)> seen = new();
+        HashSet<(string HopSource, string HopTarget, string ContractId, string Location, string Source)> seen = new();
 
         for (int i = 0; i < path.Count - 1; i++)
         {
-            if (!edgeViolations.TryGetValue((path[i], path[i + 1]), out IReadOnlyList<ArchitectureViolation>? hopViolations))
+            string hopSource = path[i];
+            string hopTarget = path[i + 1];
+
+            if (!edgeViolations.TryGetValue((hopSource, hopTarget), out IReadOnlyList<ArchitectureViolation>? hopViolations))
             {
                 continue;
             }
@@ -71,13 +75,17 @@ public sealed class ArchitectureExplainApplicationService(IArchitectureGraphAppl
 
                 foreach (ExpressionParticipation whenExpression in whenExpressions)
                 {
-                    if (!seen.Add((violation.ContractId, whenExpression.Location, whenExpression.Source)))
+                    if (!seen.Add((hopSource, hopTarget, violation.ContractId, whenExpression.Location, whenExpression.Source)))
                     {
                         continue;
                     }
 
                     participation.Add(new ExplainExpressionParticipation(
-                        violation.ContractId, whenExpression.Source, whenExpression.YamlPath, whenExpression.Result));
+                        violation.ContractId, whenExpression.Source, whenExpression.YamlPath, whenExpression.Result)
+                    {
+                        HopSource = hopSource,
+                        HopTarget = hopTarget,
+                    });
                 }
             }
         }

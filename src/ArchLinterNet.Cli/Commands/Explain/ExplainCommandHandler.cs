@@ -73,6 +73,8 @@ internal sealed class ExplainCommandHandler(ICliRuntime runtime, ICliConsole con
                     jsonObj["expressionParticipation"] = outcome.ExpressionParticipation.Select(p => new Dictionary<string, object?>
                     {
                         ["contractId"] = p.ContractId,
+                        ["hopSource"] = p.HopSource,
+                        ["hopTarget"] = p.HopTarget,
                         ["source"] = p.Source,
                         ["yamlPath"] = p.YamlPath,
                         ["result"] = p.Result switch
@@ -106,8 +108,11 @@ internal sealed class ExplainCommandHandler(ICliRuntime runtime, ICliConsole con
                         ExpressionParticipationResult.NotMatched => "not matched",
                         _ => "evaluation failed",
                     };
+                    string hop = participation.HopSource != null && participation.HopTarget != null
+                        ? $"{participation.HopSource} -> {participation.HopTarget}: "
+                        : string.Empty;
                     console.Out.WriteLine(
-                        $"  [{participation.ContractId}] when: {participation.Source} ({result})");
+                        $"  [{participation.ContractId}] {hop}when: {participation.Source} ({result})");
                 }
             }
 
