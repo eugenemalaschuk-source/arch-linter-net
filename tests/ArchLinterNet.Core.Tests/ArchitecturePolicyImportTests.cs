@@ -10,7 +10,7 @@ using NUnit.Framework;
 namespace ArchLinterNet.Core.Tests;
 
 [TestFixture]
-public sealed class ArchitecturePolicyImportTests
+public sealed partial class ArchitecturePolicyImportTests
 {
     private string _temporaryDirectory = null!;
 
@@ -476,7 +476,11 @@ public sealed class ArchitecturePolicyImportTests
         ArchitecturePolicyImportException exception = Assert.Throws<ArchitecturePolicyImportException>(
             () => new ArchitecturePolicyDocumentLoader().Load(pipe))!;
 
-        Assert.That(exception.Category, Is.EqualTo(ArchitecturePolicyImportErrorCategory.SourceShape));
+        Assert.Multiple(() =>
+        {
+            Assert.That(exception.Category, Is.EqualTo(ArchitecturePolicyImportErrorCategory.SourceShape));
+            Assert.That(exception.Message, Does.StartWith("Root policy '"));
+        });
     }
 
     [Test]
@@ -773,7 +777,7 @@ public sealed class ArchitecturePolicyImportTests
     [DllImport("libc", SetLastError = true, EntryPoint = "link")]
     private static extern int CreateHardLinkUnix(string existingFileName, string fileName);
 
-    [DllImport("libc", SetLastError = true, EntryPoint = "mkfifo")]
-    private static extern int CreateNamedPipeUnix(string pathName, uint mode);
+    [LibraryImport("libc", EntryPoint = "mkfifo", SetLastError = true, StringMarshalling = StringMarshalling.Utf8)]
+    private static partial int CreateNamedPipeUnix(string pathName, uint mode);
 
 }

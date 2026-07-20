@@ -31,10 +31,9 @@ internal sealed class ArchitecturePolicyImportGraphResolver
         }
         catch (ArchitecturePolicyImportException exception)
         {
-            throw ArchitecturePolicyDiagnosticFactory.Enrich(
+            throw ArchitecturePolicyDiagnosticFactory.EnrichRoot(
                 exception,
-                ArchitecturePolicyDiagnosticFactory.Location(
-                    ArchitecturePolicyProvenanceFactory.CreateUnresolvedRootDescriptor(rootPath)));
+                ArchitecturePolicyProvenanceFactory.CreateUnresolvedRootDescriptor(rootPath));
         }
 
         string rootIdentity = Path.GetRelativePath(root.BoundaryPath, root.FullPath)
@@ -202,6 +201,7 @@ internal sealed class ArchitecturePolicyImportGraphResolver
             ArchitecturePolicySourceReader.ReadAllText(
                 _fileSystem,
                 resolved.FullPath,
+                resolved.PortableIdentity,
                 importLocation,
                 importChain));
         state.PortableIdentities.Add(resolved.PortableIdentity);

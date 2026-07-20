@@ -79,6 +79,25 @@ internal static class ArchitecturePolicyDiagnosticFactory
         return Exception(exception.Category, exception.Message, location, importChain: importChain);
     }
 
+    public static ArchitecturePolicyImportException EnrichRoot(
+        ArchitecturePolicyImportException exception,
+        ArchitecturePolicySourceDescriptor root)
+    {
+        return Exception(
+            exception.Category,
+            RootMessage(exception.Message),
+            Location(root));
+    }
+
+    private static string RootMessage(string message)
+    {
+        const string importPrefix = "Policy import ";
+        const string rootPrefix = "Root policy ";
+        return message.StartsWith(importPrefix, StringComparison.Ordinal)
+            ? rootPrefix + message[importPrefix.Length..]
+            : message;
+    }
+
     private static ArchitecturePolicyDiagnosticKind KindFor(ArchitecturePolicyImportErrorCategory category)
     {
         return category switch

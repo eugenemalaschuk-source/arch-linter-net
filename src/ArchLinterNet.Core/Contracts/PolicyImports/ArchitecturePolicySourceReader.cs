@@ -8,6 +8,7 @@ internal static class ArchitecturePolicySourceReader
     public static string ReadAllText(
         IArchitectureFileSystem fileSystem,
         string path,
+        string sourcePath,
         ArchitecturePolicySourceLocation location,
         IEnumerable<string> importChain)
     {
@@ -19,7 +20,7 @@ internal static class ArchitecturePolicySourceReader
         {
             throw ArchitecturePolicyDiagnosticFactory.Exception(
                 ArchitecturePolicyImportErrorCategory.MissingFile,
-                $"Policy source file not found: {location.SourcePath}",
+                $"Policy source file not found: {sourcePath}",
                 location,
                 importChain: importChain);
         }
@@ -27,27 +28,28 @@ internal static class ArchitecturePolicySourceReader
         {
             throw ArchitecturePolicyDiagnosticFactory.Exception(
                 ArchitecturePolicyImportErrorCategory.MissingFile,
-                $"Policy source file not found: {location.SourcePath}",
+                $"Policy source file not found: {sourcePath}",
                 location,
                 importChain: importChain);
         }
         catch (UnauthorizedAccessException)
         {
-            throw Unreadable(location, importChain);
+            throw Unreadable(sourcePath, location, importChain);
         }
         catch (IOException)
         {
-            throw Unreadable(location, importChain);
+            throw Unreadable(sourcePath, location, importChain);
         }
     }
 
     private static ArchitecturePolicyImportException Unreadable(
+        string sourcePath,
         ArchitecturePolicySourceLocation location,
         IEnumerable<string> importChain)
     {
         return ArchitecturePolicyDiagnosticFactory.Exception(
             ArchitecturePolicyImportErrorCategory.UnreadableFile,
-            $"Policy source '{location.SourcePath}' is not readable.",
+            $"Policy source '{sourcePath}' is not readable.",
             location,
             importChain: importChain);
     }

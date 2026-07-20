@@ -15,6 +15,9 @@ public sealed class ArchitecturePolicyProvenanceTests
     private static readonly string[] _allowForbidPaths = { "architecture/allow.yml", "architecture/forbid.yml" };
     private static readonly string[] _cycleImportChain =
         { "architecture/root.yml", "architecture/a.yml", "architecture/nested/b.yml", "architecture/a.yml" };
+    private static readonly string[] _missingRootImportChain = { "architecture/missing.yml" };
+    private static readonly string[] _rootImportChain = { "architecture/root.yml" };
+    private static readonly string[] _unreadableFragmentImportChain = { "architecture/root.yml", "architecture/fragment.yml" };
     private static readonly string[] _cycleRelatedSourcePaths = { "architecture/a.yml" };
     private static readonly string[] _duplicateContractPaths = { "architecture/root.yml", "architecture/fragment.yml" };
     private static readonly string[] _fragmentContractImportChain =
@@ -145,7 +148,7 @@ public sealed class ArchitecturePolicyProvenanceTests
             Assert.That(exception.Diagnostic.Location.SourcePath, Is.EqualTo("architecture/missing.yml"));
             Assert.That(exception.Diagnostic.Location.Source.DeclaringSourcePath, Is.Null);
             Assert.That(exception.Diagnostic.Location.Source.AuthoredImportPath, Is.Null);
-            Assert.That(exception.Diagnostic.ImportChain, Is.EqualTo(new[] { "architecture/missing.yml" }));
+            Assert.That(exception.Diagnostic.ImportChain, Is.EqualTo(_missingRootImportChain));
         });
     }
 
@@ -162,7 +165,7 @@ public sealed class ArchitecturePolicyProvenanceTests
             Assert.That(exception.Category, Is.EqualTo(ArchitecturePolicyImportErrorCategory.UnreadableFile));
             Assert.That(exception.Diagnostic!.Location!.Role, Is.EqualTo(ArchitecturePolicyDocumentRole.Root));
             Assert.That(exception.Diagnostic.Location.SourcePath, Is.EqualTo("architecture/root.yml"));
-            Assert.That(exception.Diagnostic.ImportChain, Is.EqualTo(new[] { "architecture/root.yml" }));
+            Assert.That(exception.Diagnostic.ImportChain, Is.EqualTo(_rootImportChain));
         });
     }
 
@@ -181,8 +184,9 @@ public sealed class ArchitecturePolicyProvenanceTests
             Assert.That(exception.Diagnostic!.Location!.Role, Is.EqualTo(ArchitecturePolicyDocumentRole.Root));
             Assert.That(exception.Diagnostic.Location.SourcePath, Is.EqualTo("architecture/root.yml"));
             Assert.That(exception.Diagnostic.Location.YamlPath, Is.EqualTo("imports[0]"));
+            Assert.That(exception.Message, Is.EqualTo("Policy source 'architecture/fragment.yml' is not readable."));
             Assert.That(exception.Diagnostic.ImportChain,
-                Is.EqualTo(new[] { "architecture/root.yml", "architecture/fragment.yml" }));
+                Is.EqualTo(_unreadableFragmentImportChain));
         });
     }
 
@@ -200,7 +204,7 @@ public sealed class ArchitecturePolicyProvenanceTests
             Assert.That(exception.Category, Is.EqualTo(ArchitecturePolicyImportErrorCategory.MissingFile));
             Assert.That(exception.Diagnostic!.Location!.Role, Is.EqualTo(ArchitecturePolicyDocumentRole.Root));
             Assert.That(exception.Diagnostic.Location.SourcePath, Is.EqualTo("architecture/root.yml"));
-            Assert.That(exception.Diagnostic.ImportChain, Is.EqualTo(new[] { "architecture/root.yml" }));
+            Assert.That(exception.Diagnostic.ImportChain, Is.EqualTo(_rootImportChain));
         });
     }
 

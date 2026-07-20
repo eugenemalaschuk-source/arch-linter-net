@@ -4,7 +4,7 @@ using Microsoft.Win32.SafeHandles;
 
 namespace ArchLinterNet.Core.Contracts.PolicyImports;
 
-internal sealed class ArchitecturePolicyPathResolver : IArchitecturePolicyPathResolver
+internal sealed partial class ArchitecturePolicyPathResolver : IArchitecturePolicyPathResolver
 {
     public ArchitecturePolicyRootPath ResolveRoot(string rootPath)
     {
@@ -344,11 +344,6 @@ internal sealed class ArchitecturePolicyPathResolver : IArchitecturePolicyPathRe
         return (mode & FileTypeMask) == RegularFile;
     }
 
-    private static bool IsRegularFile(ushort mode)
-    {
-        return (mode & (ushort)FileTypeMask) == (ushort)RegularFile;
-    }
-
     private static ArchitecturePolicyImportException Missing(string authoredPath)
     {
         return new ArchitecturePolicyImportException(
@@ -459,8 +454,8 @@ internal sealed class ArchitecturePolicyPathResolver : IArchitecturePolicyPathRe
     [DllImport("libc", SetLastError = true, EntryPoint = "stat")]
     private static extern int StatLinuxArm64(string path, out LinuxArm64Stat stat);
 
-    [DllImport("libc", SetLastError = true, EntryPoint = "getattrlist")]
-    private static extern int GetAttributeList(
+    [LibraryImport("libc", EntryPoint = "getattrlist", SetLastError = true, StringMarshalling = StringMarshalling.Utf8)]
+    private static partial int GetAttributeList(
         string path,
         ref DarwinAttributeList attributes,
         out DarwinFileIdentityAttributes attributeBuffer,

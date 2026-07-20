@@ -268,8 +268,8 @@ jobs:
         if: steps.architecture_coverage.outcome == 'failure'
         run: exit 1
 
-  macos_intel_policy_import_regression:
-    name: Intel macOS Policy Import Regression
+  macos_intel_tests:
+    name: Intel macOS Test Suite
     if: github.event_name == 'pull_request'
     runs-on: macos-15-intel
     timeout-minutes: 10
@@ -293,13 +293,11 @@ jobs:
       - name: Restore
         run: make restore
 
-      - name: Run imported-policy regressions
-        run: >-
-          dotnet test tests/ArchLinterNet.Core.Tests --no-restore
-          --filter "FullyQualifiedName~Load_RootWithOneRegularFragment_ComposesWithPlatformFileIdentity|FullyQualifiedName~Load_HardLinkedImportAlias|FullyQualifiedName~Load_NamedPipeImport|FullyQualifiedName~Load_NamedPipeRoot"
+      - name: Run test suite
+        run: make test
 
-  windows_policy_import_regression:
-    name: Windows Policy Import Regression
+  windows_tests:
+    name: Windows Test Suite
     if: github.event_name == 'pull_request'
     runs-on: windows-latest
     timeout-minutes: 10
@@ -320,14 +318,12 @@ jobs:
       - name: Restore
         run: make restore
 
-      - name: Run Windows directory regressions
+      - name: Run test suite
         shell: bash
-        run: >-
-          dotnet test tests/ArchLinterNet.Core.Tests --no-restore
-          --filter "FullyQualifiedName~Load_DirectoryImport_ExposesSourceShapeCategoryOnWindows|FullyQualifiedName~Load_DirectoryRoot_ExposesSourceShapeCategoryOnWindows"
+        run: make test
 
-  macos_arm64_policy_import_regression:
-    name: Apple Silicon macOS Policy Import Regression
+  macos_arm64_tests:
+    name: Apple Silicon macOS Test Suite
     if: github.event_name == 'pull_request'
     runs-on: macos-14
     timeout-minutes: 10
@@ -351,10 +347,8 @@ jobs:
       - name: Restore
         run: make restore
 
-      - name: Run imported-policy regressions
-        run: >-
-          dotnet test tests/ArchLinterNet.Core.Tests --no-restore
-          --filter "FullyQualifiedName~Load_RootWithOneRegularFragment_ComposesWithPlatformFileIdentity|FullyQualifiedName~Load_HardLinkedImportAlias|FullyQualifiedName~Load_NamedPipeImport|FullyQualifiedName~Load_NamedPipeRoot"
+      - name: Run test suite
+        run: make test
 
   main_badge_refresh:
     name: Main Badge Refresh
