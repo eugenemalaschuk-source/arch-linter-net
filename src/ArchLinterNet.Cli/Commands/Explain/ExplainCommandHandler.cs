@@ -1,11 +1,12 @@
 using System.Text.Json;
 using ArchLinterNet.Cli.Abstractions;
+using ArchLinterNet.Cli.Commands;
 using ArchLinterNet.Core.Graph;
 using ArchLinterNet.Core.Model;
 
 namespace ArchLinterNet.Cli.Commands.Explain;
 
-internal sealed class ExplainCommandHandler(ICliRuntime runtime, ICliConsole console, IFileSystem fileSystem)
+internal sealed class ExplainCommandHandler(ICliRuntime runtime, ICliConsole console)
 {
     public int Execute(ExplainCommandOptions options)
     {
@@ -36,12 +37,6 @@ internal sealed class ExplainCommandHandler(ICliRuntime runtime, ICliConsole con
         if (string.IsNullOrEmpty(options.Source) || string.IsNullOrEmpty(options.Target))
         {
             console.Error.WriteLine("--source and --target are required.");
-            return CliExitCodes.InvalidArgumentsOrRuntimeError;
-        }
-
-        if (!fileSystem.FileExists(options.PolicyPath))
-        {
-            console.Error.WriteLine($"Policy file not found: {options.PolicyPath}");
             return CliExitCodes.InvalidArgumentsOrRuntimeError;
         }
 
@@ -120,6 +115,16 @@ internal sealed class ExplainCommandHandler(ICliRuntime runtime, ICliConsole con
         }
         catch (Exception ex)
         {
+            if (options.Format == "json" && PolicyDiagnosticOutputWriter.TryWriteJson(console, ex))
+            {
+                return CliExitCodes.InvalidArgumentsOrRuntimeError;
+            }
+
+            if (PolicyDiagnosticOutputWriter.TryWriteHuman(console, "Explain error", ex))
+            {
+                return CliExitCodes.InvalidArgumentsOrRuntimeError;
+            }
+
             console.Error.WriteLine($"Explain error: {ex.Message}");
             return CliExitCodes.InvalidArgumentsOrRuntimeError;
         }

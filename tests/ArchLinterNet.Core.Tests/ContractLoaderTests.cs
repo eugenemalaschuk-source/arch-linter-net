@@ -1,4 +1,5 @@
 using ArchLinterNet.Core.Contracts;
+using ArchLinterNet.Core.Model;
 using ArchLinterNet.Core.Resolution;
 using NUnit.Framework;
 
@@ -237,12 +238,14 @@ contracts:
     }
 
     [Test]
-    public void LoadFromPath_MissingFile_ThrowsFileNotFoundException()
+    public void LoadFromPath_MissingFile_ThrowsTypedRootPolicyDiagnostic()
     {
         string missingPath = Path.Combine(_tempDir, "nonexistent.yml");
 
-        Assert.Throws<FileNotFoundException>(() =>
-            new ArchitecturePolicyDocumentLoader().Load(missingPath));
+        ArchitecturePolicyImportException exception = Assert.Throws<ArchitecturePolicyImportException>(() =>
+            new ArchitecturePolicyDocumentLoader().Load(missingPath))!;
+
+        Assert.That(exception.Diagnostic!.Location!.Role, Is.EqualTo(ArchitecturePolicyDocumentRole.Root));
     }
 
     [Test]

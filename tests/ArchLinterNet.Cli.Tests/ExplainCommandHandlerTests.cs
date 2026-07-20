@@ -2,6 +2,7 @@ using System.Text;
 using System.Text.Json;
 using ArchLinterNet.Cli.Abstractions;
 using ArchLinterNet.Cli.Commands.Explain;
+using ArchLinterNet.Core.Contracts;
 using ArchLinterNet.Core.Graph;
 using ArchLinterNet.Core.Model;
 using ArchLinterNet.Core.Reporting;
@@ -13,13 +14,27 @@ namespace ArchLinterNet.Cli.Tests;
 [TestFixture]
 public sealed class ExplainCommandHandlerTests
 {
+    private static ArchitecturePolicyImportException PolicyException()
+    {
+        ArchitecturePolicySourceDescriptor source = new(
+            "architecture/root.yml", "architecture/root.yml", ArchitecturePolicyDocumentRole.Root,
+            0, null, null, ["architecture/root.yml"]);
+        return new ArchitecturePolicyImportException(
+            ArchitecturePolicyImportErrorCategory.MissingFile,
+            "Root policy file not found: architecture/root.yml",
+            new ArchitecturePolicyDiagnostic(
+                ArchitecturePolicyDiagnosticKind.ImportResolution,
+                new ArchitecturePolicySourceLocation(source, "$", 1, 1, null, null),
+                [],
+                source.ImportChain));
+    }
+
     // ── Helpers ──────────────────────────────────────────────────────────────
 
     private static ExplainCommandHandler Handler(
         ExplainStubRuntime runtime,
-        RecordingCliConsole console,
-        bool policyExists = true) =>
-        new(runtime, console, new StubFileSystem(policyExists));
+        RecordingCliConsole console) =>
+        new(runtime, console);
 
     private static ExplainCommandOptions Options(
         string? source = "A",
@@ -68,13 +83,47 @@ public sealed class ExplainCommandHandlerTests
     }
 
     [Test]
-    public void PolicyFileNotFound_ReturnsError()
+    public void TypedPolicyFailure_BypassesFileExistsAndWritesJson()
     {
+        ArchitecturePolicyImportException exception = PolicyException();
+        var runtime = new ExplainStubRuntime { ThrowException = exception };
         var console = new RecordingCliConsole();
-        int result = Handler(new ExplainStubRuntime(), console, policyExists: false).Execute(Options());
+        int result = Handler(runtime, console).Execute(Options(format: "json"));
 
-        Assert.That(result, Is.EqualTo(CliExitCodes.InvalidArgumentsOrRuntimeError));
-        Assert.That(console.ErrorText, Does.Contain("Policy file not found"));
+        Assert.Multiple(() =>
+        {
+            Assert.That(result, Is.EqualTo(CliExitCodes.InvalidArgumentsOrRuntimeError));
+            Assert.That(console.OutputText, Does.Contain("architecture_policy_error").And.Contain("architecture/root.yml"));
+            Assert.That(console.ErrorText, Is.Empty);
+        });
+    }
+
+    [Test]
+    public void TypedPolicyFailure_WritesOrderedImportChainForHumanOutput()
+    {
+        ArchitecturePolicySourceDescriptor source = new(
+            "architecture/root.yml", "architecture/fragment.yml", ArchitecturePolicyDocumentRole.Fragment,
+            1, "architecture/root.yml", "fragment.yml", ["architecture/root.yml", "architecture/fragment.yml"]);
+        var exception = new ArchitecturePolicyImportException(
+            ArchitecturePolicyImportErrorCategory.MissingFile,
+            "Policy source file not found: architecture/fragment.yml",
+            new ArchitecturePolicyDiagnostic(
+                ArchitecturePolicyDiagnosticKind.ImportResolution,
+                new ArchitecturePolicySourceLocation(source, "imports[0]", 2, 1, null, null),
+                [],
+                source.ImportChain));
+        var runtime = new ExplainStubRuntime { ThrowException = exception };
+        var console = new RecordingCliConsole();
+
+        int result = Handler(runtime, console).Execute(Options());
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(result, Is.EqualTo(CliExitCodes.InvalidArgumentsOrRuntimeError));
+            Assert.That(console.ErrorText,
+                Does.Contain("Import chain: architecture/root.yml -> architecture/fragment.yml"));
+            Assert.That(console.ErrorText, Does.Contain("architecture/fragment.yml"));
+        });
     }
 
     [Test]
@@ -506,9 +555,4 @@ public sealed class ExplainCommandHandlerTests
         public string ErrorText => _error.ToString();
     }
 
-    private sealed class StubFileSystem(bool exists) : IFileSystem
-    {
-        public bool FileExists(string path) => exists;
-        public void WriteAllText(string path, string contents) { }
-    }
 }

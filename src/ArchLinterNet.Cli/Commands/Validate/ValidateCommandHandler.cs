@@ -1,5 +1,6 @@
 using System.Text.Json;
 using ArchLinterNet.Cli.Abstractions;
+using ArchLinterNet.Cli.Commands;
 using ArchLinterNet.Core.Contracts;
 using ArchLinterNet.Core.Model;
 using ArchLinterNet.Core.Reporting;
@@ -7,7 +8,7 @@ using ArchLinterNet.Core.Validation;
 
 namespace ArchLinterNet.Cli.Commands.Validate;
 
-internal sealed class ValidateCommandHandler(ICliRuntime runtime, ICliConsole console, IFileSystem fileSystem)
+internal sealed class ValidateCommandHandler(ICliRuntime runtime, ICliConsole console)
 {
     public int Execute(ValidateCommandOptions options)
     {
@@ -23,7 +24,7 @@ internal sealed class ValidateCommandHandler(ICliRuntime runtime, ICliConsole co
         }
         catch (Exception ex) when (TryGetPolicyDiagnostic(ex, out ArchitecturePolicyDiagnostic? diagnostic))
         {
-            WritePolicyDiagnostic(options.Format, ex.Message, diagnostic!);
+            WritePolicyDiagnostic(options.Format, ex, diagnostic!);
             return CliExitCodes.InvalidArgumentsOrRuntimeError;
         }
         catch (Exception ex)
@@ -106,12 +107,6 @@ internal sealed class ValidateCommandHandler(ICliRuntime runtime, ICliConsole co
             return CliExitCodes.InvalidArgumentsOrRuntimeError;
         }
 
-        if (!fileSystem.FileExists(options.PolicyPath))
-        {
-            console.Error.WriteLine($"Policy file not found: {options.PolicyPath}");
-            return CliExitCodes.InvalidArgumentsOrRuntimeError;
-        }
-
         return null;
     }
 
@@ -167,18 +162,13 @@ internal sealed class ValidateCommandHandler(ICliRuntime runtime, ICliConsole co
         return diagnostic is not null;
     }
 
-    private void WritePolicyDiagnostic(string format, string message, ArchitecturePolicyDiagnostic diagnostic)
+    private void WritePolicyDiagnostic(string format, Exception exception, ArchitecturePolicyDiagnostic diagnostic)
     {
+        ArchitecturePolicyImportErrorCategory? category = (exception as ArchitecturePolicyImportException)?.Category;
+        string message = exception.Message;
         if (format == "json")
         {
-            console.Out.WriteLine(JsonSerializer.Serialize(new
-            {
-                kind = "architecture_policy_error",
-                message,
-                policy_location = diagnostic.Location is null ? null : ArchitectureDiagnosticFormatter.FormatPolicyLocationForJson(diagnostic.Location),
-                related_policy_locations = diagnostic.RelatedLocations.Select(ArchitectureDiagnosticFormatter.FormatPolicyLocationForJson),
-                import_chain = diagnostic.ImportChain,
-            }));
+            PolicyDiagnosticOutputWriter.WriteJson(console, message, diagnostic, category?.ToString());
             return;
         }
 
@@ -201,6 +191,7 @@ internal sealed class ValidateCommandHandler(ICliRuntime runtime, ICliConsole co
                             {
                                 ruleId = "architecture-policy",
                                 message = new { text = message },
+                                properties = new { error_category = category?.ToString(), import_chain = diagnostic.ImportChain },
                                 locations = diagnostic.Location is null ? Array.Empty<object>() : new object[]
                                 {
                                     new
@@ -221,10 +212,7 @@ internal sealed class ValidateCommandHandler(ICliRuntime runtime, ICliConsole co
             return;
         }
 
-        string location = diagnostic.Location is null
-            ? string.Empty
-            : $" (policy: {diagnostic.Location.SourcePath}:{diagnostic.Location.YamlPath}; root: {diagnostic.Location.RootPath})";
-        console.Error.WriteLine($"Architecture validation error: {message}{location}");
+        PolicyDiagnosticOutputWriter.WriteHuman(console, "Architecture validation error", message, diagnostic);
     }
 
     private void WriteHumanOutput(ValidationOutcome outcome)

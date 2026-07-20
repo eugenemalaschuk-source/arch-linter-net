@@ -60,8 +60,7 @@ public sealed class CliArchitectureTests
     {
         FakeCliRuntime runtime = new();
         FakeCliConsole console = new();
-        FakeFileSystem fileSystem = new(exists: true);
-        ValidateCommandHandler handler = new(runtime, console, fileSystem);
+        ValidateCommandHandler handler = new(runtime, console);
 
         int exitCode = handler.Execute(new ValidateCommandOptions(
             "policy.yml",
@@ -102,7 +101,7 @@ public sealed class CliArchitectureTests
                 new ArchitecturePolicyDiagnostic(ArchitecturePolicyDiagnosticKind.SourceShape, location, [], source.ImportChain))
         };
         FakeCliConsole console = new();
-        ValidateCommandHandler handler = new(runtime, console, new FakeFileSystem(exists: true));
+        ValidateCommandHandler handler = new(runtime, console);
 
         int exitCode = handler.Execute(new ValidateCommandOptions(
             "policy.yml", "strict", "json", [], null, false, null, false, false));
@@ -111,6 +110,7 @@ public sealed class CliArchitectureTests
         {
             Assert.That(exitCode, Is.EqualTo(CliExitCodes.InvalidArgumentsOrRuntimeError));
             Assert.That(console.StdOut, Does.Contain("architecture_policy_error"));
+            Assert.That(console.StdOut, Does.Contain("SourceShape"));
             Assert.That(console.StdOut, Does.Contain("architecture/root.yml"));
             Assert.That(console.StdOut, Does.Contain("policy_location"));
             Assert.That(console.StdOut, Does.Contain("source_path"));
@@ -134,7 +134,7 @@ public sealed class CliArchitectureTests
                 "Contextual selector (role: DomainLayer) 'when' expression failed to evaluate: missing key")
         };
         FakeCliConsole console = new();
-        ValidateCommandHandler handler = new(runtime, console, new FakeFileSystem(exists: true));
+        ValidateCommandHandler handler = new(runtime, console);
 
         int exitCode = handler.Execute(new ValidateCommandOptions(
             "policy.yml", "strict", "json", [], null, false, null, false, false));
@@ -156,7 +156,7 @@ public sealed class CliArchitectureTests
             ExceptionToThrow = new InvalidOperationException("'when' expression failed to evaluate: missing key")
         };
         FakeCliConsole console = new();
-        ValidateCommandHandler handler = new(runtime, console, new FakeFileSystem(exists: true));
+        ValidateCommandHandler handler = new(runtime, console);
 
         int exitCode = handler.Execute(new ValidateCommandOptions(
             "policy.yml", "strict", "sarif", [], null, false, null, false, false));
@@ -185,7 +185,7 @@ public sealed class CliArchitectureTests
                 new ArchitecturePolicyDiagnostic(ArchitecturePolicyDiagnosticKind.SourceShape, location, [], source.ImportChain))
         };
         FakeCliConsole console = new();
-        ValidateCommandHandler handler = new(runtime, console, new FakeFileSystem(exists: true));
+        ValidateCommandHandler handler = new(runtime, console);
 
         int exitCode = handler.Execute(new ValidateCommandOptions(
             "policy.yml", "strict", "sarif", [], null, false, null, false, false));
@@ -196,6 +196,73 @@ public sealed class CliArchitectureTests
             Assert.That(console.StdOut, Does.Contain("architecture-policy"));
             Assert.That(console.StdOut, Does.Contain("architecture/root.yml"));
             Assert.That(console.StdErr, Is.Empty);
+        });
+    }
+
+    [Test]
+    public void ValidateHandler_WritesOrderedImportChainForSarifAndHumanOutput()
+    {
+        ArchitecturePolicySourceDescriptor source = new(
+            "architecture/root.yml", "architecture/fragment.yml", ArchitecturePolicyDocumentRole.Fragment,
+            1, "architecture/root.yml", "fragment.yml", ["architecture/root.yml", "architecture/fragment.yml"]);
+        ArchitecturePolicySourceLocation location = new(source, "imports[0]", 2, 3, null, null);
+        var exception = new ArchitecturePolicyImportException(
+            ArchitecturePolicyImportErrorCategory.PathCaseMismatch,
+            "Policy import 'fragment.yml' does not match on-disk casing.",
+            new ArchitecturePolicyDiagnostic(
+                ArchitecturePolicyDiagnosticKind.ImportResolution,
+                location,
+                [],
+                source.ImportChain));
+        FakeCliRuntime runtime = new() { ExceptionToThrow = exception };
+        FakeCliConsole sarifConsole = new();
+        FakeCliConsole humanConsole = new();
+
+        _ = new ValidateCommandHandler(runtime, sarifConsole).Execute(new ValidateCommandOptions(
+            "policy.yml", "strict", "sarif", [], null, false, null, false, false));
+        _ = new ValidateCommandHandler(runtime, humanConsole).Execute(new ValidateCommandOptions(
+            "policy.yml", "strict", "human", [], null, false, null, false, false));
+
+        using JsonDocument document = JsonDocument.Parse(sarifConsole.StdOut);
+        JsonElement importChain = document.RootElement.GetProperty("runs")[0].GetProperty("results")[0]
+            .GetProperty("properties").GetProperty("import_chain");
+        Assert.Multiple(() =>
+        {
+            Assert.That(importChain.EnumerateArray().Select(item => item.GetString()), Is.EqualTo(source.ImportChain));
+            Assert.That(humanConsole.StdErr,
+                Does.Contain("Import chain: architecture/root.yml -> architecture/fragment.yml"));
+            Assert.That(humanConsole.StdErr, Does.Contain("does not match on-disk casing"));
+        });
+    }
+
+    [Test]
+    public void GraphHandler_WritesOrderedImportChainForDotFailures()
+    {
+        ArchitecturePolicySourceDescriptor source = new(
+            "architecture/root.yml", "architecture/fragment.yml", ArchitecturePolicyDocumentRole.Fragment,
+            1, "architecture/root.yml", "fragment.yml", ["architecture/root.yml", "architecture/fragment.yml"]);
+        FakeCliRuntime runtime = new()
+        {
+            ExceptionToThrow = new ArchitecturePolicyImportException(
+                ArchitecturePolicyImportErrorCategory.MissingFile,
+                "Policy source file not found: architecture/fragment.yml",
+                new ArchitecturePolicyDiagnostic(
+                    ArchitecturePolicyDiagnosticKind.ImportResolution,
+                    new ArchitecturePolicySourceLocation(source, "imports[0]", 2, 1, null, null),
+                    [],
+                    source.ImportChain))
+        };
+        FakeCliConsole console = new();
+
+        int exitCode = new GraphCommandHandler(runtime, console).Execute(new GraphCommandOptions(
+            "policy.yml", "strict", "namespace", "dot", null, [], false));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(exitCode, Is.EqualTo(CliExitCodes.InvalidArgumentsOrRuntimeError));
+            Assert.That(console.StdErr,
+                Does.Contain("Import chain: architecture/root.yml -> architecture/fragment.yml"));
+            Assert.That(console.StdErr, Does.Contain("Graph export error:"));
         });
     }
 
@@ -218,7 +285,7 @@ public sealed class CliArchitectureTests
                 new ArchitecturePolicyDiagnostic(ArchitecturePolicyDiagnosticKind.CompositionConflict, primary, [related], root.ImportChain))
         };
         FakeCliConsole console = new();
-        ValidateCommandHandler handler = new(runtime, console, new FakeFileSystem(exists: true));
+        ValidateCommandHandler handler = new(runtime, console);
 
         handler.Execute(new ValidateCommandOptions("policy.yml", "strict", "sarif", [], null, false, null, false, false));
 
@@ -358,7 +425,8 @@ public sealed class CliArchitectureTests
 
         public BaselineVerifyOutcome VerifyBaseline(BaselineVerifyRequest request) => throw new NotSupportedException();
 
-        public ArchitectureGraphOutcome BuildGraph(ArchitectureGraphRequest request) => throw new NotSupportedException();
+        public ArchitectureGraphOutcome BuildGraph(ArchitectureGraphRequest request) =>
+            throw ExceptionToThrow ?? new NotSupportedException();
 
         public string FormatGraphAsJson(ArchitectureDependencyGraph graph) => throw new NotSupportedException();
 

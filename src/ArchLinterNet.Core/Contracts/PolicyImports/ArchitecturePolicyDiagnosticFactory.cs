@@ -79,6 +79,44 @@ internal static class ArchitecturePolicyDiagnosticFactory
         return Exception(exception.Category, exception.Message, location, importChain: importChain);
     }
 
+    public static ArchitecturePolicyImportException EnrichRoot(
+        ArchitecturePolicyImportException exception,
+        ArchitecturePolicySourceDescriptor root)
+    {
+        return Exception(
+            exception.Category,
+            RootMessage(exception, root.SourcePath),
+            Location(root));
+    }
+
+    private static string RootMessage(ArchitecturePolicyImportException exception, string sourcePath)
+    {
+        return exception.Category switch
+        {
+            ArchitecturePolicyImportErrorCategory.MissingFile => $"Root policy file not found: {sourcePath}",
+            ArchitecturePolicyImportErrorCategory.SourceShape =>
+                $"Root policy '{sourcePath}' must resolve to a readable regular file.",
+            ArchitecturePolicyImportErrorCategory.UnreadableFile =>
+                $"Root policy '{sourcePath}' is not readable.",
+            ArchitecturePolicyImportErrorCategory.PlatformFailure =>
+                $"Root policy '{sourcePath}' could not be inspected ({NativeErrorContext(exception.Message)}).",
+            ArchitecturePolicyImportErrorCategory.OutOfBoundary =>
+                $"Root policy '{sourcePath}' resolves outside the repository boundary.",
+            ArchitecturePolicyImportErrorCategory.PathCaseMismatch =>
+                $"Root policy '{sourcePath}' does not match on-disk casing.",
+            _ => $"Root policy '{sourcePath}' could not be resolved."
+        };
+    }
+
+    private static string NativeErrorContext(string message)
+    {
+        int start = message.LastIndexOf('(');
+        string trimmed = message.TrimEnd('.', '!', '?');
+        return start >= 0 && trimmed.EndsWith(')')
+            ? trimmed[(start + 1)..^1]
+            : "native error";
+    }
+
     private static ArchitecturePolicyDiagnosticKind KindFor(ArchitecturePolicyImportErrorCategory category)
     {
         return category switch
