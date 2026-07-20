@@ -164,6 +164,14 @@ internal static class ArchitecturePolicyProvenanceFactory
         string yaml)
     {
         ArchitecturePolicySourceDescriptor descriptor = CreateRootDescriptor(pathResolver, policyPath);
+        return CreateMonolithic(descriptor, policyPath, yaml);
+    }
+
+    public static ArchitecturePolicyProvenanceIndex CreateMonolithic(
+        ArchitecturePolicySourceDescriptor descriptor,
+        string policyPath,
+        string yaml)
+    {
         var stream = new YamlStream();
         stream.Load(new StringReader(yaml));
         if (stream.Documents.Count != 1 || stream.Documents[0].RootNode is not YamlMappingNode root)
@@ -201,6 +209,20 @@ internal static class ArchitecturePolicyProvenanceFactory
             return CreateUnresolvedRootDescriptor(policyPath);
         }
 
+        return new ArchitecturePolicySourceDescriptor(
+            sourcePath,
+            sourcePath,
+            ArchitecturePolicyDocumentRole.Root,
+            0,
+            null,
+            null,
+            new[] { sourcePath });
+    }
+
+    internal static ArchitecturePolicySourceDescriptor CreateRootDescriptor(ArchitecturePolicyRootPath root)
+    {
+        string sourcePath = Path.GetRelativePath(root.BoundaryPath, root.FullPath)
+            .Replace(Path.DirectorySeparatorChar, '/');
         return new ArchitecturePolicySourceDescriptor(
             sourcePath,
             sourcePath,

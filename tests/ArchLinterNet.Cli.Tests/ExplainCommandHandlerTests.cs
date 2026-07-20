@@ -99,6 +99,34 @@ public sealed class ExplainCommandHandlerTests
     }
 
     [Test]
+    public void TypedPolicyFailure_WritesOrderedImportChainForHumanOutput()
+    {
+        ArchitecturePolicySourceDescriptor source = new(
+            "architecture/root.yml", "architecture/fragment.yml", ArchitecturePolicyDocumentRole.Fragment,
+            1, "architecture/root.yml", "fragment.yml", ["architecture/root.yml", "architecture/fragment.yml"]);
+        var exception = new ArchitecturePolicyImportException(
+            ArchitecturePolicyImportErrorCategory.MissingFile,
+            "Policy source file not found: architecture/fragment.yml",
+            new ArchitecturePolicyDiagnostic(
+                ArchitecturePolicyDiagnosticKind.ImportResolution,
+                new ArchitecturePolicySourceLocation(source, "imports[0]", 2, 1, null, null),
+                [],
+                source.ImportChain));
+        var runtime = new ExplainStubRuntime { ThrowException = exception };
+        var console = new RecordingCliConsole();
+
+        int result = Handler(runtime, console).Execute(Options());
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(result, Is.EqualTo(CliExitCodes.InvalidArgumentsOrRuntimeError));
+            Assert.That(console.ErrorText,
+                Does.Contain("Import chain: architecture/root.yml -> architecture/fragment.yml"));
+            Assert.That(console.ErrorText, Does.Contain("architecture/fragment.yml"));
+        });
+    }
+
+    [Test]
     public void RuntimeException_ReturnsErrorWithMessage()
     {
         var runtime = new ExplainStubRuntime { ThrowException = new InvalidOperationException("engine error") };

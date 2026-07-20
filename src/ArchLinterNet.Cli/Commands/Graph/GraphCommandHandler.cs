@@ -61,6 +61,11 @@ internal sealed class GraphCommandHandler(ICliRuntime runtime, ICliConsole conso
                 return CliExitCodes.InvalidArgumentsOrRuntimeError;
             }
 
+            if (PolicyDiagnosticOutputWriter.TryWriteHuman(console, "Graph export error", ex))
+            {
+                return CliExitCodes.InvalidArgumentsOrRuntimeError;
+            }
+
             console.Error.WriteLine($"Graph export error: {ex.Message}");
             return CliExitCodes.InvalidArgumentsOrRuntimeError;
         }

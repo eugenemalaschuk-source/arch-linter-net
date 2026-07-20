@@ -191,7 +191,7 @@ internal sealed class ValidateCommandHandler(ICliRuntime runtime, ICliConsole co
                             {
                                 ruleId = "architecture-policy",
                                 message = new { text = message },
-                                properties = new { error_category = category?.ToString() },
+                                properties = new { error_category = category?.ToString(), import_chain = diagnostic.ImportChain },
                                 locations = diagnostic.Location is null ? Array.Empty<object>() : new object[]
                                 {
                                     new
@@ -212,10 +212,7 @@ internal sealed class ValidateCommandHandler(ICliRuntime runtime, ICliConsole co
             return;
         }
 
-        string location = diagnostic.Location is null
-            ? string.Empty
-            : $" (policy: {diagnostic.Location.SourcePath}:{diagnostic.Location.YamlPath}; root: {diagnostic.Location.RootPath})";
-        console.Error.WriteLine($"Architecture validation error: {message}{location}");
+        PolicyDiagnosticOutputWriter.WriteHuman(console, "Architecture validation error", message, diagnostic);
     }
 
     private void WriteHumanOutput(ValidationOutcome outcome)

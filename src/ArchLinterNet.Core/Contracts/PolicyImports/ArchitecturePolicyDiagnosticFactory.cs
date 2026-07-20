@@ -100,6 +100,10 @@ internal static class ArchitecturePolicyDiagnosticFactory
                 $"Root policy '{sourcePath}' is not readable.",
             ArchitecturePolicyImportErrorCategory.PlatformFailure =>
                 $"Root policy '{sourcePath}' could not be inspected ({NativeErrorContext(exception.Message)}).",
+            ArchitecturePolicyImportErrorCategory.OutOfBoundary =>
+                $"Root policy '{sourcePath}' resolves outside the repository boundary.",
+            ArchitecturePolicyImportErrorCategory.PathCaseMismatch =>
+                $"Root policy '{sourcePath}' does not match on-disk casing.",
             _ => $"Root policy '{sourcePath}' could not be resolved."
         };
     }
@@ -107,8 +111,9 @@ internal static class ArchitecturePolicyDiagnosticFactory
     private static string NativeErrorContext(string message)
     {
         int start = message.LastIndexOf('(');
-        return start >= 0 && message.EndsWith(')')
-            ? message[(start + 1)..^1]
+        string trimmed = message.TrimEnd('.', '!', '?');
+        return start >= 0 && trimmed.EndsWith(')')
+            ? trimmed[(start + 1)..^1]
             : "native error";
     }
 

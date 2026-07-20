@@ -36,16 +36,16 @@ internal sealed class ArchitecturePolicyImportGraphResolver
                 ArchitecturePolicyProvenanceFactory.CreateUnresolvedRootDescriptor(rootPath));
         }
 
-        string rootIdentity = Path.GetRelativePath(root.BoundaryPath, root.FullPath)
-            .Replace(Path.DirectorySeparatorChar, '/');
-        var rootDescriptor = new ArchitecturePolicySourceDescriptor(
-            rootIdentity,
-            rootIdentity,
-            ArchitecturePolicyDocumentRole.Root,
-            0,
-            null,
-            null,
-            new[] { rootIdentity });
+        ArchitecturePolicySourceDescriptor rootDescriptor =
+            ArchitecturePolicyProvenanceFactory.CreateRootDescriptor(root);
+        return Resolve(root, rootDescriptor, rootYaml);
+    }
+
+    public IReadOnlyList<ArchitecturePolicySource> Resolve(
+        ArchitecturePolicyRootPath root,
+        ArchitecturePolicySourceDescriptor rootDescriptor,
+        string rootYaml)
+    {
         ArchitecturePolicySource rootSource = _parser.Parse(
             rootDescriptor,
             root.FullPath,

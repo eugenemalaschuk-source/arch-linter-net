@@ -120,6 +120,11 @@ internal sealed class ExplainCommandHandler(ICliRuntime runtime, ICliConsole con
                 return CliExitCodes.InvalidArgumentsOrRuntimeError;
             }
 
+            if (PolicyDiagnosticOutputWriter.TryWriteHuman(console, "Explain error", ex))
+            {
+                return CliExitCodes.InvalidArgumentsOrRuntimeError;
+            }
+
             console.Error.WriteLine($"Explain error: {ex.Message}");
             return CliExitCodes.InvalidArgumentsOrRuntimeError;
         }

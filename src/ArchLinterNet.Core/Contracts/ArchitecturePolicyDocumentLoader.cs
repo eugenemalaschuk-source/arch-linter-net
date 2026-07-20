@@ -53,8 +53,9 @@ public sealed partial class ArchitecturePolicyDocumentLoader : IArchitecturePoli
     {
         ArchitecturePolicyRootPath? resolvedRoot = EnsureSelectedRootIsRegularFile(policyPath);
 
-        ArchitecturePolicySourceDescriptor rootDescriptor =
-            ArchitecturePolicyProvenanceFactory.CreateRootDescriptor(_pathResolver, policyPath);
+        ArchitecturePolicySourceDescriptor rootDescriptor = resolvedRoot is null
+            ? ArchitecturePolicyProvenanceFactory.CreateRootDescriptor(_pathResolver, policyPath)
+            : ArchitecturePolicyProvenanceFactory.CreateRootDescriptor(resolvedRoot);
         if (!_fileSystem.FileExists(policyPath))
         {
             throw ArchitecturePolicyDiagnosticFactory.Exception(
@@ -81,7 +82,9 @@ public sealed partial class ArchitecturePolicyDocumentLoader : IArchitecturePoli
         ArchitecturePolicyProvenanceIndex provenance;
         if (ArchitecturePolicySourceParser.ContainsImports(yaml, rootDescriptor))
         {
-            IReadOnlyList<ArchitecturePolicySource> sources = _importResolver.Resolve(policyPath, yaml);
+            IReadOnlyList<ArchitecturePolicySource> sources = resolvedRoot is null
+                ? _importResolver.Resolve(policyPath, yaml)
+                : _importResolver.Resolve(resolvedRoot, rootDescriptor, yaml);
             ArchitecturePolicyCompositionResult composition =
                 new ArchitecturePolicyDocumentComposer().Compose(sources);
             yaml = composition.Yaml;
@@ -90,7 +93,7 @@ public sealed partial class ArchitecturePolicyDocumentLoader : IArchitecturePoli
         }
         else
         {
-            provenance = ArchitecturePolicyProvenanceFactory.CreateMonolithic(_pathResolver, policyPath, yaml);
+            provenance = ArchitecturePolicyProvenanceFactory.CreateMonolithic(rootDescriptor, policyPath, yaml);
         }
 
         try
@@ -164,7 +167,7 @@ public sealed partial class ArchitecturePolicyDocumentLoader : IArchitecturePoli
         catch (ArchitecturePolicyImportException exception)
         {
             ArchitecturePolicySourceDescriptor unresolvedRoot =
-                ArchitecturePolicyProvenanceFactory.CreateRootDescriptor(_pathResolver, policyPath);
+                ArchitecturePolicyProvenanceFactory.CreateUnresolvedRootDescriptor(policyPath);
             throw ArchitecturePolicyDiagnosticFactory.EnrichRoot(
                 exception,
                 unresolvedRoot);

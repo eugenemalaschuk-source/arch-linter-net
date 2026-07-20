@@ -20,6 +20,10 @@ internal static class ArchitecturePolicySourceReader
                 ? ArchitecturePolicyPathResolver.ReadVerifiedAllText(path, sourcePath, expectedFileIdentity)
                 : fileSystem.ReadAllText(path);
         }
+        catch (ArchitecturePolicyImportException exception)
+        {
+            throw ArchitecturePolicyDiagnosticFactory.Enrich(exception, location, importChain);
+        }
         catch (FileNotFoundException)
         {
             throw ArchitecturePolicyDiagnosticFactory.Exception(

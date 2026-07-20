@@ -41,4 +41,37 @@ internal static class PolicyDiagnosticOutputWriter
             import_chain = diagnostic.ImportChain,
         }));
     }
+
+    public static bool TryWriteHuman(ICliConsole console, string prefix, Exception exception)
+    {
+        ArchitecturePolicyDiagnostic? diagnostic = exception switch
+        {
+            ArchitecturePolicyImportException importException => importException.Diagnostic,
+            ArchitecturePolicyValidationException validationException => validationException.Diagnostic,
+            _ => null,
+        };
+        if (diagnostic is null)
+        {
+            return false;
+        }
+
+        WriteHuman(console, prefix, exception.Message, diagnostic);
+        return true;
+    }
+
+    public static void WriteHuman(
+        ICliConsole console,
+        string prefix,
+        string message,
+        ArchitecturePolicyDiagnostic diagnostic)
+    {
+        string location = diagnostic.Location is null
+            ? string.Empty
+            : $" (policy: {diagnostic.Location.SourcePath}:{diagnostic.Location.YamlPath}; root: {diagnostic.Location.RootPath})";
+        console.Error.WriteLine($"{prefix}: {message}{location}");
+        if (diagnostic.ImportChain.Count > 0)
+        {
+            console.Error.WriteLine($"Import chain: {string.Join(" -> ", diagnostic.ImportChain)}");
+        }
+    }
 }
