@@ -8,6 +8,6 @@ internal sealed class GraphCommandModule : ITopLevelCliSubcommandModule
 
     public System.CommandLine.Command CreateCommand(ICliRuntime runtime, ICliConsole console, IFileSystem fileSystem)
     {
-        return new GraphCommandDefinition(new GraphCommandHandler(runtime, console, fileSystem)).Create();
+        return new GraphCommandDefinition(new GraphCommandHandler(runtime, console)).Create();
     }
 }

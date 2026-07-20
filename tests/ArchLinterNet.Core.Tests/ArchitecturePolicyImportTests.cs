@@ -10,7 +10,7 @@ using NUnit.Framework;
 namespace ArchLinterNet.Core.Tests;
 
 [TestFixture]
-public sealed class ArchitecturePolicyImportTests
+public sealed partial class ArchitecturePolicyImportTests
 {
     private string _temporaryDirectory = null!;
 
@@ -44,6 +44,17 @@ public sealed class ArchitecturePolicyImportTests
     }
 
     [Test]
+    public void Load_RootWithOneRegularFragment_ComposesWithPlatformFileIdentity()
+    {
+        string root = Write("architecture/root.yml", RootYaml("layers.yml"));
+        Write("architecture/layers.yml", LayersFragment());
+
+        ArchitectureContractDocument document = new ArchitecturePolicyDocumentLoader().Load(root);
+
+        Assert.That(document.Layers, Contains.Key("domain"));
+    }
+
+    [Test]
     public void Load_RecommendedAndArbitraryNames_ProduceEquivalentModels()
     {
         string recommended = Write("recommended/architecture/arch.yml", RootYaml("policy/layers.arch.yml"));
@@ -71,6 +82,18 @@ public sealed class ArchitecturePolicyImportTests
         ArchitectureContractDocument single = new ArchitecturePolicyDocumentLoader().Load(monolithic);
 
         Assert.That(NormalizeBehavior(composed), Is.EqualTo(NormalizeBehavior(single)));
+    }
+
+    [Test]
+    public void Load_MonolithicVirtualPolicy_UsesInjectedFileSystem()
+    {
+        const string PolicyPath = "/virtual/architecture/root.yml";
+        var fileSystem = new FakeArchitectureFileSystem();
+        fileSystem.AddFile(PolicyPath, EffectiveRootYaml(), DateTime.UtcNow);
+
+        ArchitectureContractDocument document = new ArchitecturePolicyDocumentLoader(fileSystem).Load(PolicyPath);
+
+        Assert.That(document.Layers, Contains.Key("domain"));
     }
 
     [Test]
@@ -421,17 +444,161 @@ public sealed class ArchitecturePolicyImportTests
     }
 
     [Test]
+    public void Load_NamedPipeImport_ExposesSourceShapeWithoutReadingIt()
+    {
+        if (OperatingSystem.IsWindows())
+        {
+            Assert.Ignore("The regression fixture uses POSIX mkfifo.");
+        }
+
+        string root = Write("architecture/root.yml", RootYaml("pipe.yml"));
+        string pipe = Path.Combine(Path.GetDirectoryName(root)!, "pipe.yml");
+        Assert.That(CreateNamedPipeUnix(pipe, 0x180), Is.EqualTo(0));
+
+        ArchitecturePolicyImportException exception = Assert.Throws<ArchitecturePolicyImportException>(
+            () => new ArchitecturePolicyDocumentLoader().Load(root))!;
+
+        Assert.That(exception.Category, Is.EqualTo(ArchitecturePolicyImportErrorCategory.SourceShape));
+    }
+
+    [Test]
+    public void Load_NamedPipeRoot_ExposesSourceShapeWithoutReadingIt()
+    {
+        if (OperatingSystem.IsWindows())
+        {
+            Assert.Ignore("The regression fixture uses POSIX mkfifo.");
+        }
+
+        string pipe = Path.Combine(_temporaryDirectory, "architecture", "root.yml");
+        Directory.CreateDirectory(Path.GetDirectoryName(pipe)!);
+        Assert.That(CreateNamedPipeUnix(pipe, 0x180), Is.EqualTo(0));
+
+        ArchitecturePolicyImportException exception = Assert.Throws<ArchitecturePolicyImportException>(
+            () => new ArchitecturePolicyDocumentLoader().Load(pipe))!;
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(exception.Category, Is.EqualTo(ArchitecturePolicyImportErrorCategory.SourceShape));
+            Assert.That(exception.Message, Does.StartWith("Root policy '"));
+        });
+    }
+
+    [Test]
+    public void Load_DirectoryImport_ExposesSourceShapeCategoryOnWindows()
+    {
+        if (!OperatingSystem.IsWindows())
+        {
+            Assert.Ignore("The regression fixture exercises the Windows CreateFile path.");
+        }
+
+        string root = Write("architecture/root.yml", RootYaml("directory.yml"));
+        Directory.CreateDirectory(Path.Combine(Path.GetDirectoryName(root)!, "directory.yml"));
+
+        ArchitecturePolicyImportException exception = Assert.Throws<ArchitecturePolicyImportException>(
+            () => new ArchitecturePolicyDocumentLoader().Load(root))!;
+
+        Assert.That(exception.Category, Is.EqualTo(ArchitecturePolicyImportErrorCategory.SourceShape));
+    }
+
+    [Test]
+    public void Load_DirectoryRoot_ExposesSourceShapeCategoryOnWindows()
+    {
+        if (!OperatingSystem.IsWindows())
+        {
+            Assert.Ignore("The regression fixture exercises the Windows CreateFile path.");
+        }
+
+        string root = Path.Combine(_temporaryDirectory, "architecture", "root.yml");
+        Directory.CreateDirectory(root);
+
+        ArchitecturePolicyImportException exception = Assert.Throws<ArchitecturePolicyImportException>(
+            () => new ArchitecturePolicyDocumentLoader().Load(root))!;
+
+        Assert.That(exception.Category, Is.EqualTo(ArchitecturePolicyImportErrorCategory.SourceShape));
+    }
+
+    [Test]
+    public void ImportErrorCategories_PreserveReleasedNumericValues()
+    {
+        Assert.Multiple(() =>
+        {
+            Assert.That((int)ArchitecturePolicyImportErrorCategory.PortablePath, Is.EqualTo(0));
+            Assert.That((int)ArchitecturePolicyImportErrorCategory.MissingFile, Is.EqualTo(1));
+            Assert.That((int)ArchitecturePolicyImportErrorCategory.OutOfBoundary, Is.EqualTo(2));
+            Assert.That((int)ArchitecturePolicyImportErrorCategory.PathCaseMismatch, Is.EqualTo(3));
+            Assert.That((int)ArchitecturePolicyImportErrorCategory.Cycle, Is.EqualTo(4));
+            Assert.That((int)ArchitecturePolicyImportErrorCategory.DuplicateImport, Is.EqualTo(5));
+            Assert.That((int)ArchitecturePolicyImportErrorCategory.GraphLimit, Is.EqualTo(6));
+            Assert.That((int)ArchitecturePolicyImportErrorCategory.SourceShape, Is.EqualTo(7));
+            Assert.That((int)ArchitecturePolicyImportErrorCategory.CompositionConflict, Is.EqualTo(8));
+            Assert.That((int)ArchitecturePolicyImportErrorCategory.UnreadableFile, Is.EqualTo(9));
+            Assert.That((int)ArchitecturePolicyImportErrorCategory.PlatformFailure, Is.EqualTo(10));
+        });
+    }
+
+    [TestCase(2, ArchitecturePolicyImportErrorCategory.MissingFile)]
+    [TestCase(3, ArchitecturePolicyImportErrorCategory.MissingFile)]
+    [TestCase(5, ArchitecturePolicyImportErrorCategory.UnreadableFile)]
+    [TestCase(32, ArchitecturePolicyImportErrorCategory.UnreadableFile)]
+    [TestCase(87, ArchitecturePolicyImportErrorCategory.PlatformFailure)]
+    public void PathResolver_ClassifiesWin32NativeFailures(int error, ArchitecturePolicyImportErrorCategory category)
+    {
+        ArchitecturePolicyImportException exception = ArchitecturePolicyPathResolver.ClassifyWindowsNativeFailure("fragment.yml", error);
+
+        Assert.That(exception.Category, Is.EqualTo(category));
+        if (category == ArchitecturePolicyImportErrorCategory.PlatformFailure)
+        {
+            Assert.That(exception.Message, Does.Contain("Win32 87"));
+        }
+    }
+
+    [TestCase(2, ArchitecturePolicyImportErrorCategory.MissingFile)]
+    [TestCase(20, ArchitecturePolicyImportErrorCategory.MissingFile)]
+    [TestCase(1, ArchitecturePolicyImportErrorCategory.UnreadableFile)]
+    [TestCase(13, ArchitecturePolicyImportErrorCategory.UnreadableFile)]
+    [TestCase(5, ArchitecturePolicyImportErrorCategory.PlatformFailure)]
+    public void PathResolver_ClassifiesErrnoNativeFailures(int error, ArchitecturePolicyImportErrorCategory category)
+    {
+        ArchitecturePolicyImportException exception = ArchitecturePolicyPathResolver.ClassifyUnixNativeFailure("fragment.yml", error);
+
+        Assert.That(exception.Category, Is.EqualTo(category));
+        if (category == ArchitecturePolicyImportErrorCategory.PlatformFailure)
+        {
+            Assert.That(exception.Message, Does.Contain("errno 5"));
+        }
+    }
+
+    [TestCase(typeof(FileNotFoundException), ArchitecturePolicyImportErrorCategory.MissingFile)]
+    [TestCase(typeof(DirectoryNotFoundException), ArchitecturePolicyImportErrorCategory.MissingFile)]
+    [TestCase(typeof(UnauthorizedAccessException), ArchitecturePolicyImportErrorCategory.UnreadableFile)]
+    [TestCase(typeof(IOException), ArchitecturePolicyImportErrorCategory.UnreadableFile)]
+    public void PathResolver_ClassifiesManagedFileSystemFailures(
+        Type exceptionType,
+        ArchitecturePolicyImportErrorCategory category)
+    {
+        var exception = (Exception)Activator.CreateInstance(exceptionType)!;
+
+        ArchitecturePolicyImportException result =
+            ArchitecturePolicyPathResolver.ClassifyManagedFileSystemFailure("fragment.yml", exception);
+
+        Assert.That(result.Category, Is.EqualTo(category));
+    }
+
+    [Test]
     public void PathResolver_DeclaresDistinctLinuxStatLayoutsForX64AndArm64()
     {
         int x64ModeOffset = Marshal.OffsetOf<ArchitecturePolicyPathResolver.LinuxX64Stat>(
             nameof(ArchitecturePolicyPathResolver.LinuxX64Stat.Mode)).ToInt32();
         int arm64ModeOffset = Marshal.OffsetOf<ArchitecturePolicyPathResolver.LinuxArm64Stat>(
             nameof(ArchitecturePolicyPathResolver.LinuxArm64Stat.Mode)).ToInt32();
-
         Assert.Multiple(() =>
         {
             Assert.That(x64ModeOffset, Is.EqualTo(24));
             Assert.That(arm64ModeOffset, Is.EqualTo(16));
+            Assert.That(typeof(ArchitecturePolicyPathResolver).GetNestedType(
+                "DarwinStat",
+                System.Reflection.BindingFlags.NonPublic),
+                Is.Null);
         });
     }
 
@@ -609,4 +776,8 @@ public sealed class ArchitecturePolicyImportTests
 
     [DllImport("libc", SetLastError = true, EntryPoint = "link")]
     private static extern int CreateHardLinkUnix(string existingFileName, string fileName);
+
+    [LibraryImport("libc", EntryPoint = "mkfifo", SetLastError = true, StringMarshalling = StringMarshalling.Utf8)]
+    private static partial int CreateNamedPipeUnix(string pathName, uint mode);
+
 }

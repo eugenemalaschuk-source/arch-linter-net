@@ -4,6 +4,7 @@ using ArchLinterNet.Cli.Abstractions;
 using ArchLinterNet.Cli.Commands.Explain;
 using ArchLinterNet.Cli.Commands.Graph;
 using ArchLinterNet.Cli.Infrastructure;
+using ArchLinterNet.Core.Contracts;
 using ArchLinterNet.Core.Graph;
 using ArchLinterNet.Core.Model;
 using ArchLinterNet.Core.Reporting;
@@ -21,13 +22,28 @@ public sealed class CliHandlerCoverageTests
     private static readonly string[] _versionArgs = ["--version"];
     private static readonly string[] _graphUnknownOptionArgs = ["graph", "--unknown"];
 
+    private static ArchitecturePolicyImportException PolicyException()
+    {
+        ArchitecturePolicySourceDescriptor source = new(
+            "architecture/root.yml", "architecture/root.yml", ArchitecturePolicyDocumentRole.Root,
+            0, null, null, ["architecture/root.yml"]);
+        return new ArchitecturePolicyImportException(
+            ArchitecturePolicyImportErrorCategory.MissingFile,
+            "Root policy file not found: architecture/root.yml",
+            new ArchitecturePolicyDiagnostic(
+                ArchitecturePolicyDiagnosticKind.ImportResolution,
+                new ArchitecturePolicySourceLocation(source, "$", 1, 1, null, null),
+                [],
+                source.ImportChain));
+    }
+
     [TestCase("invalid", "namespace", "json", "Invalid mode")]
     [TestCase("strict", "invalid", "json", "Invalid level")]
     [TestCase("strict", "namespace", "invalid", "Invalid format")]
     public void Graph_InvalidOptions_ReportError(string mode, string level, string format, string expectedError)
     {
         var console = new RecordingConsole();
-        int result = new GraphCommandHandler(new RecordingRuntime(), console, new RecordingFileSystem(true)).Execute(
+        int result = new GraphCommandHandler(new RecordingRuntime(), console).Execute(
             new GraphCommandOptions("policy.yml", mode, level, format, null, Array.Empty<string>(), false));
 
         Assert.That(result, Is.EqualTo(CliExitCodes.InvalidArgumentsOrRuntimeError));
@@ -39,7 +55,7 @@ public sealed class CliHandlerCoverageTests
     {
         var runtime = new RecordingRuntime { GraphText = "digraph G {}" };
         var console = new RecordingConsole();
-        int result = new GraphCommandHandler(runtime, console, new RecordingFileSystem(true)).Execute(
+        int result = new GraphCommandHandler(runtime, console).Execute(
             new GraphCommandOptions("policy.yml", "audit", "type", "dot", "ci", _ruleA, false));
 
         Assert.That(result, Is.EqualTo(CliExitCodes.Success));
@@ -50,6 +66,22 @@ public sealed class CliHandlerCoverageTests
     }
 
     [Test]
+    public void Graph_TypedPolicyFailure_BypassesFileExistsAndWritesJson()
+    {
+        var runtime = new RecordingRuntime { GraphException = PolicyException() };
+        var console = new RecordingConsole();
+        int result = new GraphCommandHandler(runtime, console).Execute(
+            new GraphCommandOptions("policy.yml", "strict", "namespace", "json", null, Array.Empty<string>(), false));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(result, Is.EqualTo(CliExitCodes.InvalidArgumentsOrRuntimeError));
+            Assert.That(console.OutputText, Does.Contain("architecture_policy_error").And.Contain("architecture/root.yml"));
+            Assert.That(console.ErrorText, Is.Empty);
+        });
+    }
+
+    [Test]
     public void Explain_HumanPathAndJsonOutput_UseRuntimeOutcome()
     {
         var runtime = new RecordingRuntime
@@ -57,14 +89,14 @@ public sealed class CliHandlerCoverageTests
             ExplainResult = new ArchitectureExplainOutcome("Source", "Target", _explainPath, _ruleA)
         };
         var humanConsole = new RecordingConsole();
-        var handler = new ExplainCommandHandler(runtime, humanConsole, new RecordingFileSystem(true));
+        var handler = new ExplainCommandHandler(runtime, humanConsole);
 
         Assert.That(handler.Execute(new ExplainCommandOptions("policy.yml", "strict", "namespace", "human", null, "Source", "Target", false)),
             Is.EqualTo(CliExitCodes.Success));
         Assert.That(humanConsole.OutputText, Does.Contain("Source -> Mid -> Target").And.Contain("Contract IDs: rule-a"));
 
         var jsonConsole = new RecordingConsole();
-        Assert.That(new ExplainCommandHandler(runtime, jsonConsole, new RecordingFileSystem(true)).Execute(
+        Assert.That(new ExplainCommandHandler(runtime, jsonConsole).Execute(
             new ExplainCommandOptions("policy.yml", "strict", "namespace", "json", null, "Source", "Target", false)),
             Is.EqualTo(CliExitCodes.Success));
         Assert.That(jsonConsole.OutputText, Does.Contain("\"source\":\"Source\"").And.Contain("\"rule-a\""));
@@ -74,14 +106,14 @@ public sealed class CliHandlerCoverageTests
     public void Explain_MissingArgumentsAndRuntimeFailure_ReportError()
     {
         var missingConsole = new RecordingConsole();
-        int missingResult = new ExplainCommandHandler(new RecordingRuntime(), missingConsole, new RecordingFileSystem(true)).Execute(
+        int missingResult = new ExplainCommandHandler(new RecordingRuntime(), missingConsole).Execute(
             new ExplainCommandOptions("policy.yml", "strict", "namespace", "human", null, null, "Target", false));
         Assert.That(missingResult, Is.EqualTo(CliExitCodes.InvalidArgumentsOrRuntimeError));
         Assert.That(missingConsole.ErrorText, Does.Contain("--source and --target are required"));
 
         var failureConsole = new RecordingConsole();
         var failingRuntime = new RecordingRuntime { ExplainException = new InvalidOperationException("boom") };
-        int failureResult = new ExplainCommandHandler(failingRuntime, failureConsole, new RecordingFileSystem(true)).Execute(
+        int failureResult = new ExplainCommandHandler(failingRuntime, failureConsole).Execute(
             new ExplainCommandOptions("policy.yml", "strict", "namespace", "human", null, "Source", "Target", false));
         Assert.That(failureResult, Is.EqualTo(CliExitCodes.InvalidArgumentsOrRuntimeError));
         Assert.That(failureConsole.ErrorText, Does.Contain("Explain error: boom"));
@@ -156,12 +188,6 @@ public sealed class CliHandlerCoverageTests
         Assert.That(console.ErrorText, Does.Contain("graph --help"));
     }
 
-    private sealed class RecordingFileSystem(bool exists) : IFileSystem
-    {
-        public bool FileExists(string path) => exists;
-        public void WriteAllText(string path, string contents) { }
-    }
-
     private sealed class RootCommandFactory : ICliRootCommandFactory
     {
         public Command Create()
@@ -187,11 +213,16 @@ public sealed class CliHandlerCoverageTests
         private static readonly ArchitectureDependencyGraph _emptyGraph = new(Array.Empty<ArchitectureGraphNode>(), Array.Empty<ArchitectureGraphEdge>());
         public string Version => "1.0.0";
         public string GraphText { get; init; } = "{}";
+        public Exception? GraphException { get; init; }
         public ArchitectureGraphRequest? GraphRequest { get; private set; }
         public ArchitectureExplainOutcome ExplainResult { get; init; } = new("Source", "Target", null, Array.Empty<string>());
         public Exception? ExplainException { get; init; }
         public bool TryParseGraphLevel(string value, out ArchitectureGraphLevel level) => Enum.TryParse(value, true, out level);
-        public ArchitectureGraphOutcome BuildGraph(ArchitectureGraphRequest request) { GraphRequest = request; return new ArchitectureGraphOutcome(_emptyGraph); }
+        public ArchitectureGraphOutcome BuildGraph(ArchitectureGraphRequest request)
+        {
+            GraphRequest = request;
+            return GraphException is null ? new ArchitectureGraphOutcome(_emptyGraph) : throw GraphException;
+        }
         public string FormatGraphAsJson(ArchitectureDependencyGraph graph) => GraphText;
         public string FormatGraphAsDot(ArchitectureDependencyGraph graph) => GraphText;
         public string FormatGraphAsMermaid(ArchitectureDependencyGraph graph) => GraphText;

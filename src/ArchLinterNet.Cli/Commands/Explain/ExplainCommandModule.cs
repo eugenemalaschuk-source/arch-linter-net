@@ -8,6 +8,6 @@ internal sealed class ExplainCommandModule : ITopLevelCliSubcommandModule
 
     public System.CommandLine.Command CreateCommand(ICliRuntime runtime, ICliConsole console, IFileSystem fileSystem)
     {
-        return new ExplainCommandDefinition(new ExplainCommandHandler(runtime, console, fileSystem)).Create();
+        return new ExplainCommandDefinition(new ExplainCommandHandler(runtime, console)).Create();
     }
 }

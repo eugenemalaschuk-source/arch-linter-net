@@ -60,8 +60,7 @@ public sealed class LayoutConventionCliTests
     {
         var runtime = new CliRuntime();
         var console = new RecordingConsole();
-        var fileSystem = new FileSystem();
-        var handler = new ValidateCommandHandler(runtime, console, fileSystem);
+        var handler = new ValidateCommandHandler(runtime, console);
 
         int exitCode = handler.Execute(new ValidateCommandOptions(
             policyPath, mode, format, Array.Empty<string>(), null,

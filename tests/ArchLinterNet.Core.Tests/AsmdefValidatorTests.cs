@@ -1,4 +1,6 @@
 using ArchLinterNet.Core.Asmdef;
+using ArchLinterNet.Core.Contracts;
+using ArchLinterNet.Core.Model;
 using NUnit.Framework;
 
 namespace ArchLinterNet.Core.Tests;
@@ -7,9 +9,11 @@ namespace ArchLinterNet.Core.Tests;
 public class AsmdefValidatorTests
 {
     [Test]
-    public void Validate_NonExistentFile_ThrowsFileNotFoundException()
+    public void Validate_NonExistentFile_ThrowsTypedRootPolicyDiagnostic()
     {
-        Assert.Throws<FileNotFoundException>(() =>
-            AsmdefValidator.Validate(contractPath: "nonexistent.yml"));
+        ArchitecturePolicyImportException exception = Assert.Throws<ArchitecturePolicyImportException>(() =>
+            AsmdefValidator.Validate(contractPath: "nonexistent.yml"))!;
+
+        Assert.That(exception.Diagnostic!.Location!.Role, Is.EqualTo(ArchitecturePolicyDocumentRole.Root));
     }
 }

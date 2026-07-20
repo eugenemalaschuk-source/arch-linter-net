@@ -6,6 +6,6 @@ internal sealed class ValidateCommandModule : IRootCliCommandModule
 {
     public System.CommandLine.RootCommand CreateRootCommand(ICliRuntime runtime, ICliConsole console, IFileSystem fileSystem)
     {
-        return new ValidateCommandDefinition(new ValidateCommandHandler(runtime, console, fileSystem)).CreateRootCommand();
+        return new ValidateCommandDefinition(new ValidateCommandHandler(runtime, console)).CreateRootCommand();
     }
 }

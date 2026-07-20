@@ -1,5 +1,7 @@
 using ArchLinterNet.Core.Contracts;
 using ArchLinterNet.Core.Execution;
+using ArchLinterNet.Core.IO;
+using ArchLinterNet.Core.IO.Abstractions;
 using ArchLinterNet.Core.Model;
 using ArchLinterNet.Core.Reporting;
 using AttributeRoleExtractionTestFixtures;
@@ -13,6 +15,9 @@ public sealed class ArchitecturePolicyProvenanceTests
     private static readonly string[] _allowForbidPaths = { "architecture/allow.yml", "architecture/forbid.yml" };
     private static readonly string[] _cycleImportChain =
         { "architecture/root.yml", "architecture/a.yml", "architecture/nested/b.yml", "architecture/a.yml" };
+    private static readonly string[] _missingRootImportChain = { "architecture/missing.yml" };
+    private static readonly string[] _rootImportChain = { "architecture/root.yml" };
+    private static readonly string[] _unreadableFragmentImportChain = { "architecture/root.yml", "architecture/fragment.yml" };
     private static readonly string[] _cycleRelatedSourcePaths = { "architecture/a.yml" };
     private static readonly string[] _duplicateContractPaths = { "architecture/root.yml", "architecture/fragment.yml" };
     private static readonly string[] _fragmentContractImportChain =
@@ -125,6 +130,105 @@ public sealed class ArchitecturePolicyProvenanceTests
             Assert.That(exception.Diagnostic!.Location!.SourcePath, Is.EqualTo("architecture/a.yml"));
             Assert.That(exception.Diagnostic.Location.YamlPath, Is.EqualTo("imports[0]"));
             Assert.That(exception.Diagnostic.ImportChain, Is.EqualTo(_nestedMissingImportChain));
+        });
+    }
+
+    [Test]
+    public void Load_MissingSelectedRoot_CarriesRootPolicyDiagnostic()
+    {
+        string root = Path.Combine(_temporaryDirectory, "architecture", "missing.yml");
+
+        ArchitecturePolicyImportException exception = Assert.Throws<ArchitecturePolicyImportException>(
+            () => new ArchitecturePolicyDocumentLoader().Load(root))!;
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(exception.Category, Is.EqualTo(ArchitecturePolicyImportErrorCategory.MissingFile));
+            Assert.That(exception.Diagnostic!.Location!.Role, Is.EqualTo(ArchitecturePolicyDocumentRole.Root));
+            Assert.That(exception.Diagnostic.Location.SourcePath, Is.EqualTo("architecture/missing.yml"));
+            Assert.That(exception.Diagnostic.Location.Source.DeclaringSourcePath, Is.Null);
+            Assert.That(exception.Diagnostic.Location.Source.AuthoredImportPath, Is.Null);
+            Assert.That(exception.Message, Is.EqualTo("Root policy file not found: architecture/missing.yml"));
+            Assert.That(exception.Message, Does.Not.Contain(_temporaryDirectory));
+            Assert.That(exception.Diagnostic.ImportChain, Is.EqualTo(_missingRootImportChain));
+        });
+    }
+
+    [Test]
+    public void Load_UnreadableSelectedRoot_CarriesRootPolicyDiagnostic()
+    {
+        string root = Write("architecture/root.yml", EffectiveRootYaml());
+
+        ArchitecturePolicyImportException exception = Assert.Throws<ArchitecturePolicyImportException>(
+            () => new ArchitecturePolicyDocumentLoader(new ThrowingReadFileSystem(root)).Load(root))!;
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(exception.Category, Is.EqualTo(ArchitecturePolicyImportErrorCategory.UnreadableFile));
+            Assert.That(exception.Diagnostic!.Location!.Role, Is.EqualTo(ArchitecturePolicyDocumentRole.Root));
+            Assert.That(exception.Diagnostic.Location.SourcePath, Is.EqualTo("architecture/root.yml"));
+            Assert.That(exception.Diagnostic.ImportChain, Is.EqualTo(_rootImportChain));
+        });
+    }
+
+    [Test]
+    public void Load_UnreadableFragment_CarriesImportEdgeAndChain()
+    {
+        string root = Write("architecture/root.yml", RootYaml("fragment.yml"));
+        string fragment = Write("architecture/fragment.yml", LayersFragment());
+
+        ArchitecturePolicyImportException exception = Assert.Throws<ArchitecturePolicyImportException>(
+            () => new ArchitecturePolicyDocumentLoader(new ThrowingReadFileSystem(fragment)).Load(root))!;
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(exception.Category, Is.EqualTo(ArchitecturePolicyImportErrorCategory.UnreadableFile));
+            Assert.That(exception.Diagnostic!.Location!.Role, Is.EqualTo(ArchitecturePolicyDocumentRole.Root));
+            Assert.That(exception.Diagnostic.Location.SourcePath, Is.EqualTo("architecture/root.yml"));
+            Assert.That(exception.Diagnostic.Location.YamlPath, Is.EqualTo("imports[0]"));
+            Assert.That(exception.Message, Is.EqualTo("Policy source 'architecture/fragment.yml' is not readable."));
+            Assert.That(exception.Diagnostic.ImportChain,
+                Is.EqualTo(_unreadableFragmentImportChain));
+        });
+    }
+
+    [Test]
+    public void Load_RootRemovedBeforeRead_CarriesMissingFileDiagnostic()
+    {
+        string root = Write("architecture/root.yml", EffectiveRootYaml());
+
+        ArchitecturePolicyImportException exception = Assert.Throws<ArchitecturePolicyImportException>(
+            () => new ArchitecturePolicyDocumentLoader(
+                new ThrowingReadFileSystem(root, new DirectoryNotFoundException("Test-only missing policy source."))).Load(root))!;
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(exception.Category, Is.EqualTo(ArchitecturePolicyImportErrorCategory.MissingFile));
+            Assert.That(exception.Diagnostic!.Location!.Role, Is.EqualTo(ArchitecturePolicyDocumentRole.Root));
+            Assert.That(exception.Diagnostic.Location.SourcePath, Is.EqualTo("architecture/root.yml"));
+            Assert.That(exception.Diagnostic.ImportChain, Is.EqualTo(_rootImportChain));
+        });
+    }
+
+    [TestCase(typeof(FileNotFoundException), ArchitecturePolicyImportErrorCategory.MissingFile)]
+    [TestCase(typeof(DirectoryNotFoundException), ArchitecturePolicyImportErrorCategory.MissingFile)]
+    [TestCase(typeof(UnauthorizedAccessException), ArchitecturePolicyImportErrorCategory.UnreadableFile)]
+    [TestCase(typeof(IOException), ArchitecturePolicyImportErrorCategory.UnreadableFile)]
+    public void Load_RootReadFailure_UsesTypedSourceReaderDiagnostic(
+        Type exceptionType,
+        ArchitecturePolicyImportErrorCategory category)
+    {
+        string root = Write("architecture/root.yml", EffectiveRootYaml());
+        var readException = (Exception)Activator.CreateInstance(exceptionType, "Test-only read failure.")!;
+
+        ArchitecturePolicyImportException exception = Assert.Throws<ArchitecturePolicyImportException>(
+            () => new ArchitecturePolicyDocumentLoader(new ThrowingReadFileSystem(root, readException)).Load(root))!;
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(exception.Category, Is.EqualTo(category));
+            Assert.That(exception.Diagnostic!.Location!.Role, Is.EqualTo(ArchitecturePolicyDocumentRole.Root));
+            Assert.That(exception.Diagnostic.Location.SourcePath, Is.EqualTo("architecture/root.yml"));
         });
     }
 
@@ -549,5 +653,35 @@ public sealed class ArchitecturePolicyProvenanceTests
             contracts:
               strict: []
             """;
+    }
+
+    private sealed class ThrowingReadFileSystem(string unreadablePath, Exception? exception = null) : IArchitectureFileSystem
+    {
+        private readonly ArchitectureFileSystem _inner = ArchitectureFileSystem.Real;
+        private readonly string _unreadablePath = Path.GetFullPath(unreadablePath);
+        private readonly Exception _exception = exception ?? new UnauthorizedAccessException("Test-only unreadable policy source.");
+
+        public bool FileExists(string path) => _inner.FileExists(path);
+
+        public string ReadAllText(string path)
+        {
+            if (string.Equals(Path.GetFullPath(path), _unreadablePath, StringComparison.Ordinal))
+            {
+                throw _exception;
+            }
+
+            return _inner.ReadAllText(path);
+        }
+
+        public IEnumerable<string> ReadLines(string path) => _inner.ReadLines(path);
+
+        public bool DirectoryExists(string path) => _inner.DirectoryExists(path);
+
+        public IEnumerable<string> EnumerateFiles(string path, string searchPattern, SearchOption searchOption) =>
+            _inner.EnumerateFiles(path, searchPattern, searchOption);
+
+        public DateTime GetLastWriteTimeUtc(string path) => _inner.GetLastWriteTimeUtc(path);
+
+        public string GetCurrentDirectory() => _inner.GetCurrentDirectory();
     }
 }

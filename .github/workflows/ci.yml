@@ -169,6 +169,8 @@ jobs:
           {
             echo "### SonarCloud PR analysis"
             echo
+            echo "- Scanner completion: ${{ steps.sonar_end.outcome || 'skipped' }}"
+            echo "- Coverage reports: ${{ steps.coverage_reports.outputs.files != '' && 'found' || 'not found' }}"
             echo "- Quality gate check: review the Sonar-created GitHub status/check on this pull request."
             echo "- SonarCloud PR analysis: [Open SonarCloud PR report](https://sonarcloud.io/summary/new_code?id=${SONAR_PROJECT_KEY}&pullRequest=${{ github.event.pull_request.number }})"
           } >> "$GITHUB_STEP_SUMMARY"
@@ -265,6 +267,88 @@ jobs:
       - name: Fail if strict architecture coverage failed
         if: steps.architecture_coverage.outcome == 'failure'
         run: exit 1
+
+  macos_intel_tests:
+    name: Intel macOS Test Suite
+    if: github.event_name == 'pull_request'
+    runs-on: macos-15-intel
+    timeout-minutes: 10
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
+        with:
+          persist-credentials: false
+
+      - name: Verify Intel macOS runner
+        run: test "$(uname -m)" = x86_64
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Restore
+        run: make restore
+
+      - name: Run test suite
+        run: make test
+
+  windows_tests:
+    name: Windows Test Suite
+    if: github.event_name == 'pull_request'
+    runs-on: windows-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
+        with:
+          persist-credentials: false
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Restore
+        run: make restore
+
+      - name: Run test suite
+        shell: bash
+        run: make test
+
+  macos_arm64_tests:
+    name: Apple Silicon macOS Test Suite
+    if: github.event_name == 'pull_request'
+    runs-on: macos-14
+    timeout-minutes: 10
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
+        with:
+          persist-credentials: false
+
+      - name: Verify Apple Silicon macOS runner
+        run: test "$(uname -m)" = arm64
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Restore
+        run: make restore
+
+      - name: Run test suite
+        run: make test
 
   main_badge_refresh:
     name: Main Badge Refresh

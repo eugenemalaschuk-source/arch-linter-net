@@ -51,9 +51,17 @@ public sealed partial class ArchitecturePolicyDocumentLoader : IArchitecturePoli
 
     public ArchitectureContractDocument Load(string policyPath)
     {
-        if (!_fileSystem.FileExists(policyPath))
+        ArchitecturePolicyRootPath? resolvedRoot = EnsureSelectedRootIsRegularFile(policyPath);
+
+        ArchitecturePolicySourceDescriptor rootDescriptor = resolvedRoot is null
+            ? ArchitecturePolicyProvenanceFactory.CreateRootDescriptor(_pathResolver, policyPath)
+            : ArchitecturePolicyProvenanceFactory.CreateRootDescriptor(resolvedRoot);
+        if (resolvedRoot is null && !_fileSystem.FileExists(policyPath))
         {
-            throw new FileNotFoundException($"Architecture contract file not found: {policyPath}");
+            throw ArchitecturePolicyDiagnosticFactory.Exception(
+                ArchitecturePolicyImportErrorCategory.MissingFile,
+                $"Root policy file not found: {rootDescriptor.SourcePath}",
+                ArchitecturePolicyDiagnosticFactory.Location(rootDescriptor));
         }
 
         IDeserializer deserializer = new DeserializerBuilder()
@@ -64,13 +72,19 @@ public sealed partial class ArchitecturePolicyDocumentLoader : IArchitecturePoli
                 syntax => syntax.Before<YamlDotNet.Serialization.NodeDeserializers.ScalarNodeDeserializer>())
             .Build();
 
-        string yaml = _fileSystem.ReadAllText(policyPath);
+        string yaml = ArchitecturePolicySourceReader.ReadAllText(
+            _fileSystem,
+            resolvedRoot?.PhysicalPath ?? policyPath,
+            rootDescriptor.SourcePath,
+            resolvedRoot?.FileIdentity,
+            ArchitecturePolicyDiagnosticFactory.Location(rootDescriptor),
+            rootDescriptor.ImportChain);
         ArchitecturePolicyProvenanceIndex provenance;
-        ArchitecturePolicySourceDescriptor rootDescriptor =
-            ArchitecturePolicyProvenanceFactory.CreateRootDescriptor(_pathResolver, policyPath);
         if (ArchitecturePolicySourceParser.ContainsImports(yaml, rootDescriptor))
         {
-            IReadOnlyList<ArchitecturePolicySource> sources = _importResolver.Resolve(policyPath, yaml);
+            IReadOnlyList<ArchitecturePolicySource> sources = resolvedRoot is null
+                ? _importResolver.Resolve(policyPath, yaml)
+                : _importResolver.Resolve(resolvedRoot, rootDescriptor, yaml);
             ArchitecturePolicyCompositionResult composition =
                 new ArchitecturePolicyDocumentComposer().Compose(sources);
             yaml = composition.Yaml;
@@ -79,7 +93,7 @@ public sealed partial class ArchitecturePolicyDocumentLoader : IArchitecturePoli
         }
         else
         {
-            provenance = ArchitecturePolicyProvenanceFactory.CreateMonolithic(_pathResolver, policyPath, yaml);
+            provenance = ArchitecturePolicyProvenanceFactory.CreateMonolithic(rootDescriptor, policyPath, yaml);
         }
 
         try
@@ -137,6 +151,27 @@ public sealed partial class ArchitecturePolicyDocumentLoader : IArchitecturePoli
         }
 
         return document;
+    }
+
+    private ArchitecturePolicyRootPath? EnsureSelectedRootIsRegularFile(string policyPath)
+    {
+        if (_fileSystem is not ArchitectureFileSystem)
+        {
+            return null;
+        }
+
+        try
+        {
+            return _pathResolver.ResolveRoot(policyPath);
+        }
+        catch (ArchitecturePolicyImportException exception)
+        {
+            ArchitecturePolicySourceDescriptor unresolvedRoot =
+                ArchitecturePolicyProvenanceFactory.CreateUnresolvedRootDescriptor(policyPath);
+            throw ArchitecturePolicyDiagnosticFactory.EnrichRoot(
+                exception,
+                unresolvedRoot);
+        }
     }
 
     // classification.path is schema-accepted but unimplemented (path-convention classification

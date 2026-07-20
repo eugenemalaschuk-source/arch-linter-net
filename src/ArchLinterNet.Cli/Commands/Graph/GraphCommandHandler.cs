@@ -1,10 +1,11 @@
 using ArchLinterNet.Cli.Abstractions;
+using ArchLinterNet.Cli.Commands;
 using ArchLinterNet.Core.Graph;
 using ArchLinterNet.Core.Model;
 
 namespace ArchLinterNet.Cli.Commands.Graph;
 
-internal sealed class GraphCommandHandler(ICliRuntime runtime, ICliConsole console, IFileSystem fileSystem)
+internal sealed class GraphCommandHandler(ICliRuntime runtime, ICliConsole console)
 {
     public int Execute(GraphCommandOptions options)
     {
@@ -32,12 +33,6 @@ internal sealed class GraphCommandHandler(ICliRuntime runtime, ICliConsole conso
             return CliExitCodes.InvalidArgumentsOrRuntimeError;
         }
 
-        if (!fileSystem.FileExists(options.PolicyPath))
-        {
-            console.Error.WriteLine($"Policy file not found: {options.PolicyPath}");
-            return CliExitCodes.InvalidArgumentsOrRuntimeError;
-        }
-
         try
         {
             ArchitectureGraphRequest request = new()
@@ -61,6 +56,16 @@ internal sealed class GraphCommandHandler(ICliRuntime runtime, ICliConsole conso
         }
         catch (Exception ex)
         {
+            if (options.Format == "json" && PolicyDiagnosticOutputWriter.TryWriteJson(console, ex))
+            {
+                return CliExitCodes.InvalidArgumentsOrRuntimeError;
+            }
+
+            if (PolicyDiagnosticOutputWriter.TryWriteHuman(console, "Graph export error", ex))
+            {
+                return CliExitCodes.InvalidArgumentsOrRuntimeError;
+            }
+
             console.Error.WriteLine($"Graph export error: {ex.Message}");
             return CliExitCodes.InvalidArgumentsOrRuntimeError;
         }
