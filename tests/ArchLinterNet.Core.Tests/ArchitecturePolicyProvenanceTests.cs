@@ -148,6 +148,8 @@ public sealed class ArchitecturePolicyProvenanceTests
             Assert.That(exception.Diagnostic.Location.SourcePath, Is.EqualTo("architecture/missing.yml"));
             Assert.That(exception.Diagnostic.Location.Source.DeclaringSourcePath, Is.Null);
             Assert.That(exception.Diagnostic.Location.Source.AuthoredImportPath, Is.Null);
+            Assert.That(exception.Message, Is.EqualTo("Root policy file not found: architecture/missing.yml"));
+            Assert.That(exception.Message, Does.Not.Contain(_temporaryDirectory));
             Assert.That(exception.Diagnostic.ImportChain, Is.EqualTo(_missingRootImportChain));
         });
     }

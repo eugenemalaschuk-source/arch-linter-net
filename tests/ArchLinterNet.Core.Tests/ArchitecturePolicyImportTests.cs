@@ -539,6 +539,7 @@ public sealed partial class ArchitecturePolicyImportTests
     [TestCase(2, ArchitecturePolicyImportErrorCategory.MissingFile)]
     [TestCase(3, ArchitecturePolicyImportErrorCategory.MissingFile)]
     [TestCase(5, ArchitecturePolicyImportErrorCategory.UnreadableFile)]
+    [TestCase(32, ArchitecturePolicyImportErrorCategory.UnreadableFile)]
     [TestCase(87, ArchitecturePolicyImportErrorCategory.PlatformFailure)]
     public void PathResolver_ClassifiesWin32NativeFailures(int error, ArchitecturePolicyImportErrorCategory category)
     {

@@ -1,5 +1,7 @@
 using System.Text.Json;
 using ArchLinterNet.Cli.Abstractions;
+using ArchLinterNet.Cli.Commands;
+using ArchLinterNet.Core.Contracts;
 using ArchLinterNet.Core.Graph;
 using ArchLinterNet.Core.Model;
 
@@ -36,12 +38,6 @@ internal sealed class ExplainCommandHandler(ICliRuntime runtime, ICliConsole con
         if (string.IsNullOrEmpty(options.Source) || string.IsNullOrEmpty(options.Target))
         {
             console.Error.WriteLine("--source and --target are required.");
-            return CliExitCodes.InvalidArgumentsOrRuntimeError;
-        }
-
-        if (!fileSystem.FileExists(options.PolicyPath))
-        {
-            console.Error.WriteLine($"Policy file not found: {options.PolicyPath}");
             return CliExitCodes.InvalidArgumentsOrRuntimeError;
         }
 
@@ -118,10 +114,26 @@ internal sealed class ExplainCommandHandler(ICliRuntime runtime, ICliConsole con
 
             return CliExitCodes.Success;
         }
+        catch (ArchitecturePolicyImportException exception) when (exception.Diagnostic is not null)
+        {
+            WritePolicyDiagnostic(options.Format, exception);
+            return CliExitCodes.InvalidArgumentsOrRuntimeError;
+        }
         catch (Exception ex)
         {
             console.Error.WriteLine($"Explain error: {ex.Message}");
             return CliExitCodes.InvalidArgumentsOrRuntimeError;
         }
+    }
+
+    private void WritePolicyDiagnostic(string format, ArchitecturePolicyImportException exception)
+    {
+        if (format == "json")
+        {
+            PolicyDiagnosticOutputWriter.WriteJson(console, exception.Message, exception.Diagnostic!);
+            return;
+        }
+
+        console.Error.WriteLine($"Explain error: {exception.Message}");
     }
 }

@@ -390,7 +390,7 @@ internal sealed partial class ArchitecturePolicyPathResolver : IArchitecturePoli
         return error switch
         {
             2 or 3 => Missing(authoredPath),
-            5 => Unreadable(authoredPath),
+            5 or 32 => Unreadable(authoredPath),
             _ => PlatformFailure(authoredPath, "Win32", error)
         };
     }

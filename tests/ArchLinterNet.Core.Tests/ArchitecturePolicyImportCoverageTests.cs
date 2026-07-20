@@ -20,6 +20,8 @@ public sealed class ArchitecturePolicyImportCoverageTests
             Assert.That(exception.Category, Is.EqualTo(ArchitecturePolicyImportErrorCategory.MissingFile));
             Assert.That(exception.Diagnostic!.Location!.Role, Is.EqualTo(ArchitecturePolicyDocumentRole.Root));
             Assert.That(exception.Diagnostic.Location.SourcePath, Is.EqualTo("architecture/missing.yml"));
+            Assert.That(exception.Message, Is.EqualTo("Root policy file not found: architecture/missing.yml"));
+            Assert.That(exception.Message, Does.Not.Contain("/virtual/"));
         });
     }
 
@@ -40,6 +42,7 @@ public sealed class ArchitecturePolicyImportCoverageTests
             Assert.That(exception.Category, Is.EqualTo(ArchitecturePolicyImportErrorCategory.PlatformFailure));
             Assert.That(exception.Diagnostic!.Location!.Role, Is.EqualTo(ArchitecturePolicyDocumentRole.Root));
             Assert.That(exception.Diagnostic.Location.SourcePath, Is.EqualTo("architecture/root.yml"));
+            Assert.That(exception.Message, Is.EqualTo("Root policy 'architecture/root.yml' could not be inspected (native error)."));
         });
     }
 

@@ -102,7 +102,7 @@ public sealed class CliArchitectureTests
                 new ArchitecturePolicyDiagnostic(ArchitecturePolicyDiagnosticKind.SourceShape, location, [], source.ImportChain))
         };
         FakeCliConsole console = new();
-        ValidateCommandHandler handler = new(runtime, console, new FakeFileSystem(exists: true));
+        ValidateCommandHandler handler = new(runtime, console, new FakeFileSystem(exists: false));
 
         int exitCode = handler.Execute(new ValidateCommandOptions(
             "policy.yml", "strict", "json", [], null, false, null, false, false));

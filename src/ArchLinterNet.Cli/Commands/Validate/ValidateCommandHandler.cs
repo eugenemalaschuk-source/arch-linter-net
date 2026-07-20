@@ -1,5 +1,6 @@
 using System.Text.Json;
 using ArchLinterNet.Cli.Abstractions;
+using ArchLinterNet.Cli.Commands;
 using ArchLinterNet.Core.Contracts;
 using ArchLinterNet.Core.Model;
 using ArchLinterNet.Core.Reporting;
@@ -106,12 +107,6 @@ internal sealed class ValidateCommandHandler(ICliRuntime runtime, ICliConsole co
             return CliExitCodes.InvalidArgumentsOrRuntimeError;
         }
 
-        if (!fileSystem.FileExists(options.PolicyPath))
-        {
-            console.Error.WriteLine($"Policy file not found: {options.PolicyPath}");
-            return CliExitCodes.InvalidArgumentsOrRuntimeError;
-        }
-
         return null;
     }
 
@@ -171,14 +166,7 @@ internal sealed class ValidateCommandHandler(ICliRuntime runtime, ICliConsole co
     {
         if (format == "json")
         {
-            console.Out.WriteLine(JsonSerializer.Serialize(new
-            {
-                kind = "architecture_policy_error",
-                message,
-                policy_location = diagnostic.Location is null ? null : ArchitectureDiagnosticFormatter.FormatPolicyLocationForJson(diagnostic.Location),
-                related_policy_locations = diagnostic.RelatedLocations.Select(ArchitectureDiagnosticFormatter.FormatPolicyLocationForJson),
-                import_chain = diagnostic.ImportChain,
-            }));
+            PolicyDiagnosticOutputWriter.WriteJson(console, message, diagnostic);
             return;
         }
 

@@ -59,7 +59,7 @@ public sealed partial class ArchitecturePolicyDocumentLoader : IArchitecturePoli
         {
             throw ArchitecturePolicyDiagnosticFactory.Exception(
                 ArchitecturePolicyImportErrorCategory.MissingFile,
-                $"Root policy file not found: {policyPath}",
+                $"Root policy file not found: {rootDescriptor.SourcePath}",
                 ArchitecturePolicyDiagnosticFactory.Location(rootDescriptor));
         }
 

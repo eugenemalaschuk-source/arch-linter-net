@@ -4,6 +4,7 @@ using ArchLinterNet.Cli.Abstractions;
 using ArchLinterNet.Cli.Commands.Explain;
 using ArchLinterNet.Cli.Commands.Graph;
 using ArchLinterNet.Cli.Infrastructure;
+using ArchLinterNet.Core.Contracts;
 using ArchLinterNet.Core.Graph;
 using ArchLinterNet.Core.Model;
 using ArchLinterNet.Core.Reporting;
@@ -20,6 +21,21 @@ public sealed class CliHandlerCoverageTests
     private static readonly string[] _helpArgs = ["--help"];
     private static readonly string[] _versionArgs = ["--version"];
     private static readonly string[] _graphUnknownOptionArgs = ["graph", "--unknown"];
+
+    private static ArchitecturePolicyImportException PolicyException()
+    {
+        ArchitecturePolicySourceDescriptor source = new(
+            "architecture/root.yml", "architecture/root.yml", ArchitecturePolicyDocumentRole.Root,
+            0, null, null, ["architecture/root.yml"]);
+        return new ArchitecturePolicyImportException(
+            ArchitecturePolicyImportErrorCategory.MissingFile,
+            "Root policy file not found: architecture/root.yml",
+            new ArchitecturePolicyDiagnostic(
+                ArchitecturePolicyDiagnosticKind.ImportResolution,
+                new ArchitecturePolicySourceLocation(source, "$", 1, 1, null, null),
+                [],
+                source.ImportChain));
+    }
 
     [TestCase("invalid", "namespace", "json", "Invalid mode")]
     [TestCase("strict", "invalid", "json", "Invalid level")]
@@ -47,6 +63,22 @@ public sealed class CliHandlerCoverageTests
         Assert.That(runtime.GraphRequest.Level, Is.EqualTo(ArchitectureGraphLevel.Type));
         Assert.That(runtime.GraphRequest.ContractIds, Is.EqualTo(_ruleA));
         Assert.That(console.OutputText, Does.Contain("digraph G"));
+    }
+
+    [Test]
+    public void Graph_TypedPolicyFailure_BypassesFileExistsAndWritesJson()
+    {
+        var runtime = new RecordingRuntime { GraphException = PolicyException() };
+        var console = new RecordingConsole();
+        int result = new GraphCommandHandler(runtime, console, new RecordingFileSystem(false)).Execute(
+            new GraphCommandOptions("policy.yml", "strict", "namespace", "json", null, Array.Empty<string>(), false));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(result, Is.EqualTo(CliExitCodes.InvalidArgumentsOrRuntimeError));
+            Assert.That(console.OutputText, Does.Contain("architecture_policy_error").And.Contain("architecture/root.yml"));
+            Assert.That(console.ErrorText, Is.Empty);
+        });
     }
 
     [Test]
@@ -187,11 +219,16 @@ public sealed class CliHandlerCoverageTests
         private static readonly ArchitectureDependencyGraph _emptyGraph = new(Array.Empty<ArchitectureGraphNode>(), Array.Empty<ArchitectureGraphEdge>());
         public string Version => "1.0.0";
         public string GraphText { get; init; } = "{}";
+        public Exception? GraphException { get; init; }
         public ArchitectureGraphRequest? GraphRequest { get; private set; }
         public ArchitectureExplainOutcome ExplainResult { get; init; } = new("Source", "Target", null, Array.Empty<string>());
         public Exception? ExplainException { get; init; }
         public bool TryParseGraphLevel(string value, out ArchitectureGraphLevel level) => Enum.TryParse(value, true, out level);
-        public ArchitectureGraphOutcome BuildGraph(ArchitectureGraphRequest request) { GraphRequest = request; return new ArchitectureGraphOutcome(_emptyGraph); }
+        public ArchitectureGraphOutcome BuildGraph(ArchitectureGraphRequest request)
+        {
+            GraphRequest = request;
+            return GraphException is null ? new ArchitectureGraphOutcome(_emptyGraph) : throw GraphException;
+        }
         public string FormatGraphAsJson(ArchitectureDependencyGraph graph) => GraphText;
         public string FormatGraphAsDot(ArchitectureDependencyGraph graph) => GraphText;
         public string FormatGraphAsMermaid(ArchitectureDependencyGraph graph) => GraphText;

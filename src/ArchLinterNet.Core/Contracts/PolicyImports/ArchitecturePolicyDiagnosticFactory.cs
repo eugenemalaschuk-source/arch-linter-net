@@ -85,17 +85,31 @@ internal static class ArchitecturePolicyDiagnosticFactory
     {
         return Exception(
             exception.Category,
-            RootMessage(exception.Message),
+            RootMessage(exception, root.SourcePath),
             Location(root));
     }
 
-    private static string RootMessage(string message)
+    private static string RootMessage(ArchitecturePolicyImportException exception, string sourcePath)
     {
-        const string ImportPrefix = "Policy import ";
-        const string RootPrefix = "Root policy ";
-        return message.StartsWith(ImportPrefix, StringComparison.Ordinal)
-            ? RootPrefix + message[ImportPrefix.Length..]
-            : message;
+        return exception.Category switch
+        {
+            ArchitecturePolicyImportErrorCategory.MissingFile => $"Root policy file not found: {sourcePath}",
+            ArchitecturePolicyImportErrorCategory.SourceShape =>
+                $"Root policy '{sourcePath}' must resolve to a readable regular file.",
+            ArchitecturePolicyImportErrorCategory.UnreadableFile =>
+                $"Root policy '{sourcePath}' is not readable.",
+            ArchitecturePolicyImportErrorCategory.PlatformFailure =>
+                $"Root policy '{sourcePath}' could not be inspected ({NativeErrorContext(exception.Message)}).",
+            _ => $"Root policy '{sourcePath}' could not be resolved."
+        };
+    }
+
+    private static string NativeErrorContext(string message)
+    {
+        int start = message.LastIndexOf('(');
+        return start >= 0 && message.EndsWith(')')
+            ? message[(start + 1)..^1]
+            : "native error";
     }
 
     private static ArchitecturePolicyDiagnosticKind KindFor(ArchitecturePolicyImportErrorCategory category)
