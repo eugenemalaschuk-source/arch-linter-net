@@ -33,7 +33,8 @@ internal sealed class ArchitecturePolicyImportGraphResolver
         {
             throw ArchitecturePolicyDiagnosticFactory.Enrich(
                 exception,
-                ArchitecturePolicyDiagnosticFactory.Location(CreateRootDescriptor(rootPath)));
+                ArchitecturePolicyDiagnosticFactory.Location(
+                    ArchitecturePolicyProvenanceFactory.CreateUnresolvedRootDescriptor(rootPath)));
         }
 
         string rootIdentity = Path.GetRelativePath(root.BoundaryPath, root.FullPath)
@@ -56,29 +57,6 @@ internal sealed class ArchitecturePolicyImportGraphResolver
 
         Visit(rootSource, depth: 0, state);
         return state.Sources;
-    }
-
-    private static ArchitecturePolicySourceDescriptor CreateRootDescriptor(string rootPath)
-    {
-        string normalizedPath = Path.GetFullPath(rootPath);
-        string sourcePath = Path.GetFileName(normalizedPath);
-        string? directory = Path.GetDirectoryName(normalizedPath);
-        if (directory is not null && string.Equals(
-                Path.GetFileName(directory),
-                "architecture",
-                StringComparison.OrdinalIgnoreCase))
-        {
-            sourcePath = $"architecture/{sourcePath}";
-        }
-
-        return new ArchitecturePolicySourceDescriptor(
-            sourcePath,
-            sourcePath,
-            ArchitecturePolicyDocumentRole.Root,
-            0,
-            null,
-            null,
-            new[] { sourcePath });
     }
 
     private void Visit(ArchitecturePolicySource source, int depth, ResolutionState state)
@@ -112,7 +90,7 @@ internal sealed class ArchitecturePolicyImportGraphResolver
         ArchitecturePolicyResolvedPath resolved = ResolveImport(source, state, importPath, importLocation);
         EnsureNotActive(state, resolved, importLocation);
         EnsureNotDuplicate(state, resolved, importPath, importLocation);
-        ParseAndVisitImport(source, depth, state, importPath, resolved);
+        ParseAndVisitImport(source, depth, state, importPath, importLocation, resolved);
     }
 
     private static void EnsureWithinLimits(
@@ -204,6 +182,7 @@ internal sealed class ArchitecturePolicyImportGraphResolver
         int depth,
         ResolutionState state,
         string importPath,
+        ArchitecturePolicySourceLocation importLocation,
         ArchitecturePolicyResolvedPath resolved)
     {
         string[] importChain = state.Stack.Append(resolved.PortableIdentity).ToArray();
@@ -220,7 +199,11 @@ internal sealed class ArchitecturePolicyImportGraphResolver
             resolved.FullPath,
             resolved.PhysicalPath,
             resolved.FileIdentity,
-            _fileSystem.ReadAllText(resolved.FullPath));
+            ArchitecturePolicySourceReader.ReadAllText(
+                _fileSystem,
+                resolved.FullPath,
+                importLocation,
+                importChain));
         state.PortableIdentities.Add(resolved.PortableIdentity);
         state.FirstImports[resolved.FileIdentity] = importPath;
         Visit(child, depth + 1, state);

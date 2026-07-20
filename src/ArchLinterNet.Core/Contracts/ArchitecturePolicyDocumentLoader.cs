@@ -91,7 +91,11 @@ public sealed partial class ArchitecturePolicyDocumentLoader : IArchitecturePoli
                 syntax => syntax.Before<YamlDotNet.Serialization.NodeDeserializers.ScalarNodeDeserializer>())
             .Build();
 
-        string yaml = _fileSystem.ReadAllText(policyPath);
+        string yaml = ArchitecturePolicySourceReader.ReadAllText(
+            _fileSystem,
+            policyPath,
+            ArchitecturePolicyDiagnosticFactory.Location(rootDescriptor),
+            rootDescriptor.ImportChain);
         ArchitecturePolicyProvenanceIndex provenance;
         if (ArchitecturePolicySourceParser.ContainsImports(yaml, rootDescriptor))
         {

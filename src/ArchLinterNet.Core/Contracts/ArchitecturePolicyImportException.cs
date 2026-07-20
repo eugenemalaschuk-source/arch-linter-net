@@ -6,6 +6,7 @@ public enum ArchitecturePolicyImportErrorCategory
 {
     PortablePath,
     MissingFile,
+    UnreadableFile,
     OutOfBoundary,
     PathCaseMismatch,
     Cycle,

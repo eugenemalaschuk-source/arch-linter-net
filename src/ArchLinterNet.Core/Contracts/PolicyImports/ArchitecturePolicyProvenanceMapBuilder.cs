@@ -198,7 +198,30 @@ internal static class ArchitecturePolicyProvenanceFactory
         }
         catch (ArchitecturePolicyImportException)
         {
-            sourcePath = Path.GetFileName(policyPath).Replace(Path.DirectorySeparatorChar, '/');
+            return CreateUnresolvedRootDescriptor(policyPath);
+        }
+
+        return new ArchitecturePolicySourceDescriptor(
+            sourcePath,
+            sourcePath,
+            ArchitecturePolicyDocumentRole.Root,
+            0,
+            null,
+            null,
+            new[] { sourcePath });
+    }
+
+    internal static ArchitecturePolicySourceDescriptor CreateUnresolvedRootDescriptor(string policyPath)
+    {
+        string normalizedPath = Path.GetFullPath(policyPath);
+        string sourcePath = Path.GetFileName(normalizedPath);
+        string? directory = Path.GetDirectoryName(normalizedPath);
+        if (directory is not null && string.Equals(
+                Path.GetFileName(directory),
+                "architecture",
+                StringComparison.OrdinalIgnoreCase))
+        {
+            sourcePath = $"architecture/{sourcePath}";
         }
 
         return new ArchitecturePolicySourceDescriptor(

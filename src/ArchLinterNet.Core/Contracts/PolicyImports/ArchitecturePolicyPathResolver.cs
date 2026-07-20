@@ -182,7 +182,7 @@ internal sealed class ArchitecturePolicyPathResolver : IArchitecturePolicyPathRe
     {
         if (OperatingSystem.IsMacOS())
         {
-            return GetManagedFileIdentity(path, authoredPath);
+            return GetMacOSFileIdentity(path, authoredPath);
         }
 
         return RuntimeInformation.ProcessArchitecture switch
@@ -193,7 +193,7 @@ internal sealed class ArchitecturePolicyPathResolver : IArchitecturePolicyPathRe
         };
     }
 
-    private static string GetManagedFileIdentity(string path, string authoredPath)
+    private static string GetMacOSFileIdentity(string path, string authoredPath)
     {
         try
         {
@@ -212,7 +212,22 @@ internal sealed class ArchitecturePolicyPathResolver : IArchitecturePolicyPathRe
             throw NotRegularFile(authoredPath);
         }
 
-        return $"path:{Path.GetFullPath(path)}";
+        var attributes = new DarwinAttributeList
+        {
+            BitmapCount = AttributeBitMapCount,
+            CommonAttributes = CommonDeviceAttribute | CommonFileIdAttribute,
+        };
+        if (GetAttributeList(
+                path,
+                ref attributes,
+                out DarwinFileIdentityAttributes identity,
+                (nuint)Marshal.SizeOf<DarwinFileIdentityAttributes>(),
+                options: 0) != 0)
+        {
+            throw NotRegularFile(authoredPath);
+        }
+
+        return $"darwin:{identity.Device:X8}:{identity.FileId:X16}";
     }
 
     private static string GetLinuxX64FileIdentity(string path, string authoredPath)
@@ -270,6 +285,9 @@ internal sealed class ArchitecturePolicyPathResolver : IArchitecturePolicyPathRe
     private const uint FileTypeDisk = 0x00000001;
     private const uint FileTypeMask = 0xF000;
     private const uint RegularFile = 0x8000;
+    private const ushort AttributeBitMapCount = 5;
+    private const uint CommonDeviceAttribute = 0x00000002;
+    private const uint CommonFileIdAttribute = 0x02000000;
 
     [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
     private static extern SafeFileHandle CreateFile(
@@ -295,6 +313,14 @@ internal sealed class ArchitecturePolicyPathResolver : IArchitecturePolicyPathRe
     [DllImport("libc", SetLastError = true, EntryPoint = "stat")]
     private static extern int StatLinuxArm64(string path, out LinuxArm64Stat stat);
 
+    [DllImport("libc", SetLastError = true, EntryPoint = "getattrlist")]
+    private static extern int GetAttributeList(
+        string path,
+        ref DarwinAttributeList attributes,
+        out DarwinFileIdentityAttributes attributeBuffer,
+        nuint attributeBufferSize,
+        uint options);
+
     [StructLayout(LayoutKind.Sequential)]
     internal struct LinuxX64Stat
     {
@@ -314,6 +340,26 @@ internal sealed class ArchitecturePolicyPathResolver : IArchitecturePolicyPathRe
         public uint Mode;
         [MarshalAs(UnmanagedType.ByValArray, SizeConst = 256)]
         public byte[] RemainingFields;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct DarwinAttributeList
+    {
+        public ushort BitmapCount;
+        public ushort Reserved;
+        public uint CommonAttributes;
+        public uint VolumeAttributes;
+        public uint DirectoryAttributes;
+        public uint FileAttributes;
+        public uint ForkAttributes;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct DarwinFileIdentityAttributes
+    {
+        public uint Length;
+        public uint Device;
+        public ulong FileId;
     }
 
     [StructLayout(LayoutKind.Sequential)]
