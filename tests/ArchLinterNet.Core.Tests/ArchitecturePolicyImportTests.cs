@@ -585,21 +585,24 @@ public sealed partial class ArchitecturePolicyImportTests
     }
 
     [Test]
-    public void PathResolver_DeclaresDistinctLinuxStatLayoutsForX64AndArm64()
+    public void PathResolver_DeclaresPlatformSpecificStatLayouts()
     {
         int x64ModeOffset = Marshal.OffsetOf<ArchitecturePolicyPathResolver.LinuxX64Stat>(
             nameof(ArchitecturePolicyPathResolver.LinuxX64Stat.Mode)).ToInt32();
         int arm64ModeOffset = Marshal.OffsetOf<ArchitecturePolicyPathResolver.LinuxArm64Stat>(
             nameof(ArchitecturePolicyPathResolver.LinuxArm64Stat.Mode)).ToInt32();
+        Type? darwinStat = typeof(ArchitecturePolicyPathResolver).GetNestedType(
+            "DarwinStat",
+            System.Reflection.BindingFlags.NonPublic);
 
         Assert.Multiple(() =>
         {
             Assert.That(x64ModeOffset, Is.EqualTo(24));
             Assert.That(arm64ModeOffset, Is.EqualTo(16));
-            Assert.That(typeof(ArchitecturePolicyPathResolver).GetNestedType(
-                "DarwinStat",
-                System.Reflection.BindingFlags.NonPublic),
-                Is.Null);
+            Assert.That(darwinStat, Is.Not.Null);
+            Assert.That(darwinStat!.GetField("Device")!.FieldType, Is.EqualTo(typeof(int)));
+            Assert.That(darwinStat.GetField("Mode")!.FieldType, Is.EqualTo(typeof(ushort)));
+            Assert.That(darwinStat.GetField("Inode")!.FieldType, Is.EqualTo(typeof(ulong)));
         });
     }
 
