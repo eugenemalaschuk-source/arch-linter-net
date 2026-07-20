@@ -2,6 +2,7 @@ using ArchLinterNet.Core.Contracts.Abstractions;
 using ArchLinterNet.Core.Contracts.Families;
 using ArchLinterNet.Core.IO;
 using ArchLinterNet.Core.IO.Abstractions;
+using ArchLinterNet.Core.Model;
 using YamlDotNet.Serialization;
 using YamlDotNet.Serialization.NamingConventions;
 
@@ -58,20 +59,22 @@ public sealed class ArchitectureBaselineLoadingService : IArchitectureBaselineLo
 
     private static void ValidateBaseline(ArchitectureBaselineDocument document)
     {
-        if (document.Version != 1)
+        if (document.Version is not (1 or 2))
         {
             throw new InvalidOperationException(
-                $"Unsupported baseline version: {document.Version}. Only version 1 is supported.");
+                $"Unsupported baseline version: {document.Version}. Only versions 1 and 2 are supported.");
         }
 
         foreach (string groupName in ArchitectureBaselineContractGroups.GroupNames)
         {
-            ValidateGroupEntries(document.Baseline.GetGroup(groupName), groupName);
+            ValidateGroupEntries(document.Baseline.GetGroup(groupName), groupName, document.Version);
         }
     }
 
-    private static void ValidateGroupEntries(List<ArchitectureBaselineContractEntry> entries, string groupName)
+    private static void ValidateGroupEntries(List<ArchitectureBaselineContractEntry> entries, string groupName, int documentVersion)
     {
+        bool isStructured = documentVersion == ArchitectureViolationIdentity.CurrentVersion;
+
         for (int i = 0; i < entries.Count; i++)
         {
             var entry = entries[i];
@@ -98,7 +101,55 @@ public sealed class ArchitectureBaselineLoadingService : IArchitectureBaselineLo
                         $"Baseline entry '{entry.Id}' in group '{groupName}' has an ignored_violations entry " +
                         $"at index {j} with an empty or missing 'forbidden_reference'.");
                 }
+
+                if (isStructured)
+                {
+                    ValidateStructuredIdentity(ignore, entry.Id, groupName, j);
+                }
+                else if (ignore.IdentityVersion != null)
+                {
+                    throw new InvalidOperationException(
+                        $"Baseline entry '{entry.Id}' in group '{groupName}' has an ignored_violations entry " +
+                        $"at index {j} with an 'identity_version' field, but the document is 'version: {documentVersion}'. " +
+                        "Structured identity fields are only valid in a 'version: 2' document.");
+                }
             }
+        }
+    }
+
+    // A `version: 2` document is only trustworthy if every entry actually carries the structured
+    // identity that version claims — otherwise a legacy-shaped (or hand-edited, or corrupted) entry
+    // mislabeled as version 2 would silently fall back to default/empty identity fields and match
+    // differently at `validate` time than it does in `diff`/`verify`/`migrate`. Fail closed instead.
+    private static void ValidateStructuredIdentity(ArchitectureBaselineIgnoredViolation ignore, string entryId, string groupName, int index)
+    {
+        if (ignore.IdentityVersion != ArchitectureViolationIdentity.CurrentVersion)
+        {
+            throw new InvalidOperationException(
+                $"Baseline entry '{entryId}' in group '{groupName}' has an ignored_violations entry at index {index} " +
+                $"with a missing or unsupported 'identity_version' (expected {ArchitectureViolationIdentity.CurrentVersion}) " +
+                "in a 'version: 2' document. Every entry in a version-2 baseline must carry structured identity.");
+        }
+
+        if (string.IsNullOrWhiteSpace(ignore.ContractFamily))
+        {
+            throw new InvalidOperationException(
+                $"Baseline entry '{entryId}' in group '{groupName}' has an ignored_violations entry at index {index} " +
+                "with an empty or missing 'contract_family', required in a 'version: 2' document.");
+        }
+
+        if (string.IsNullOrWhiteSpace(ignore.Kind))
+        {
+            throw new InvalidOperationException(
+                $"Baseline entry '{entryId}' in group '{groupName}' has an ignored_violations entry at index {index} " +
+                "with an empty or missing 'kind', required in a 'version: 2' document.");
+        }
+
+        if (ignore.Occurrence == null || ignore.Occurrence < 0)
+        {
+            throw new InvalidOperationException(
+                $"Baseline entry '{entryId}' in group '{groupName}' has an ignored_violations entry at index {index} " +
+                "with a missing or negative 'occurrence', required in a 'version: 2' document.");
         }
     }
 
@@ -107,7 +158,7 @@ public sealed class ArchitectureBaselineLoadingService : IArchitectureBaselineLo
         var groupMerger = new ContractGroupMerger(policyDocument.Contracts);
         foreach (string groupName in ArchitectureBaselineContractGroups.GroupNames)
         {
-            groupMerger.MergeGroup(baselineDocument.Baseline.GetGroup(groupName), groupName);
+            groupMerger.MergeGroup(baselineDocument.Baseline.GetGroup(groupName), groupName, baselineDocument.Version);
         }
     }
 
@@ -120,7 +171,8 @@ public sealed class ArchitectureBaselineLoadingService : IArchitectureBaselineLo
 
         foreach (string groupName in ArchitectureBaselineContractGroups.GroupNames)
         {
-            unknownIds.AddRange(groupMerger.MergeGroup(baselineDocument.Baseline.GetGroup(groupName), groupName));
+            unknownIds.AddRange(groupMerger.MergeGroup(
+                baselineDocument.Baseline.GetGroup(groupName), groupName, baselineDocument.Version));
         }
 
         if (unknownIds.Count > 0)
@@ -143,10 +195,12 @@ public sealed class ArchitectureBaselineLoadingService : IArchitectureBaselineLo
 
         public List<(string GroupName, string ContractId)> MergeGroup(
             List<ArchitectureBaselineContractEntry> baselineEntries,
-            string groupName)
+            string groupName,
+            int documentVersion)
         {
             var unknownIds = new List<(string GroupName, string ContractId)>();
             var contracts = GetContracts(groupName);
+            bool isStructured = documentVersion == ArchitectureViolationIdentity.CurrentVersion;
 
             foreach (var baselineEntry in baselineEntries)
             {
@@ -162,9 +216,15 @@ public sealed class ArchitectureBaselineLoadingService : IArchitectureBaselineLo
                 var ignores = GetIgnoredViolations(contract);
                 foreach (var baselineIgnore in baselineEntry.IgnoredViolations)
                 {
-                    bool isDuplicate = ignores.Any(existing =>
-                        string.Equals(existing.SourceType, baselineIgnore.SourceType, StringComparison.Ordinal) &&
-                        string.Equals(existing.ForbiddenReference, baselineIgnore.ForbiddenReference, StringComparison.Ordinal));
+                    // Version-1 entries dedup by the legacy display pair, exactly as before. Version-2
+                    // entries dedup by the full structured identity — two entries can legitimately
+                    // share (source_type, forbidden_reference) display text while being distinct
+                    // identities (different assembly/member/occurrence), and must both be kept.
+                    bool isDuplicate = isStructured
+                        ? ignores.Any(existing => IdentityEquals(existing, baselineIgnore))
+                        : ignores.Any(existing =>
+                            string.Equals(existing.SourceType, baselineIgnore.SourceType, StringComparison.Ordinal) &&
+                            string.Equals(existing.ForbiddenReference, baselineIgnore.ForbiddenReference, StringComparison.Ordinal));
 
                     if (!isDuplicate)
                     {
@@ -172,13 +232,37 @@ public sealed class ArchitectureBaselineLoadingService : IArchitectureBaselineLo
                         {
                             SourceType = baselineIgnore.SourceType,
                             ForbiddenReference = baselineIgnore.ForbiddenReference,
-                            Reason = baselineIgnore.Reason
+                            Reason = baselineIgnore.Reason,
+                            IdentityVersion = isStructured ? baselineIgnore.IdentityVersion ?? ArchitectureViolationIdentity.CurrentVersion : null,
+                            ContractFamily = isStructured ? baselineIgnore.ContractFamily : null,
+                            Kind = isStructured ? baselineIgnore.Kind : null,
+                            SourceAssembly = isStructured ? baselineIgnore.SourceAssembly : null,
+                            SourceMember = isStructured ? baselineIgnore.SourceMember : null,
+                            TargetAssembly = isStructured ? baselineIgnore.TargetAssembly : null,
+                            TargetType = isStructured ? baselineIgnore.TargetType : null,
+                            TargetMember = isStructured ? baselineIgnore.TargetMember : null,
+                            Occurrence = isStructured ? baselineIgnore.Occurrence ?? 0 : null,
+                            Configuration = isStructured ? baselineIgnore.Configuration : null,
                         });
                     }
                 }
             }
 
             return unknownIds;
+        }
+
+        private static bool IdentityEquals(ArchitectureIgnoredViolation existing, ArchitectureBaselineIgnoredViolation candidate)
+        {
+            return existing.IdentityVersion == ArchitectureViolationIdentity.CurrentVersion
+                && string.Equals(existing.ContractFamily, candidate.ContractFamily, StringComparison.Ordinal)
+                && string.Equals(existing.SourceAssembly, candidate.SourceAssembly, StringComparison.Ordinal)
+                && string.Equals(existing.SourceType, candidate.SourceType, StringComparison.Ordinal)
+                && string.Equals(existing.SourceMember, candidate.SourceMember, StringComparison.Ordinal)
+                && string.Equals(existing.TargetAssembly, candidate.TargetAssembly, StringComparison.Ordinal)
+                && string.Equals(existing.TargetType, candidate.TargetType, StringComparison.Ordinal)
+                && string.Equals(existing.TargetMember, candidate.TargetMember, StringComparison.Ordinal)
+                && (existing.Occurrence ?? 0) == (candidate.Occurrence ?? 0)
+                && string.Equals(existing.Configuration, candidate.Configuration, StringComparison.Ordinal);
         }
 
         private List<IArchitectureContract> GetContracts(string groupName)

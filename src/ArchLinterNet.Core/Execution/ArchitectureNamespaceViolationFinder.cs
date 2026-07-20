@@ -22,6 +22,7 @@ internal static class ArchitectureNamespaceViolationFinder
             .Select(type =>
             {
                 string sourceFullName = ArchitectureTypeNames.SafeFullName(type);
+                string? sourceAssemblyName = ArchitectureTypeNames.SafeAssemblyName(type);
                 var forbiddenMatches = (referenceGraph != null
                         ? referenceGraph.GetReferencedTypes(type)
                         : ArchitectureReferenceScanner.GetReferencedTypes(type))
@@ -34,11 +35,15 @@ internal static class ArchitectureNamespaceViolationFinder
                     .Select(x => new
                     {
                         FullName = ArchitectureTypeNames.SafeFullName(x.Reference),
-                        x.Match.MatchedNamespacePrefix
+                        x.Match.MatchedNamespacePrefix,
+                        x.Reference
                     })
                     .Where(x => !string.IsNullOrEmpty(x.FullName))
                     .Where(x => !allowedTypeFullNames.Contains(x.FullName))
-                    .Where(x => !executionContext.IsIgnored(sourceFullName, x.FullName))
+                    .Where(x => !executionContext.IsIgnored(
+                        sourceFullName, x.FullName,
+                        sourceAssembly: sourceAssemblyName,
+                        targetAssembly: ArchitectureTypeNames.SafeAssemblyName(x.Reference)))
                     .GroupBy(x => x.FullName, StringComparer.Ordinal)
                     .Select(group => new
                     {
@@ -100,6 +105,7 @@ internal static class ArchitectureNamespaceViolationFinder
         ArchitectureExpressionFactService? expressionFacts)
     {
         string sourceFullName = ArchitectureTypeNames.SafeFullName(type);
+        string? sourceAssemblyName = ArchitectureTypeNames.SafeAssemblyName(type);
         List<string> forbiddenRefs = new();
         HashSet<string> matchedPrefixes = new(StringComparer.Ordinal);
         List<IReadOnlyCollection<string>> paths = new();
@@ -112,7 +118,7 @@ internal static class ArchitectureNamespaceViolationFinder
         {
             CollectForbiddenTransitiveReference(
                 referenced, path, forbiddenLayer, allowedTypeFullNames, executionContext, sourceFullName,
-                forbiddenRefs, matchedPrefixes, paths, roleIndex, expressionFacts);
+                sourceAssemblyName, forbiddenRefs, matchedPrefixes, paths, roleIndex, expressionFacts);
         }
 
         if (forbiddenRefs.Count == 0)
@@ -147,6 +153,7 @@ internal static class ArchitectureNamespaceViolationFinder
         IReadOnlyCollection<string> allowedTypeFullNames,
         ArchitectureContractExecutionContext executionContext,
         string sourceFullName,
+        string? sourceAssemblyName,
         List<string> forbiddenRefs,
         HashSet<string> matchedPrefixes,
         List<IReadOnlyCollection<string>> paths,
@@ -170,7 +177,10 @@ internal static class ArchitectureNamespaceViolationFinder
             return;
         }
 
-        if (executionContext.IsIgnored(sourceFullName, refFullName))
+        if (executionContext.IsIgnored(
+                sourceFullName, refFullName,
+                sourceAssembly: sourceAssemblyName,
+                targetAssembly: ArchitectureTypeNames.SafeAssemblyName(referenced)))
         {
             return;
         }

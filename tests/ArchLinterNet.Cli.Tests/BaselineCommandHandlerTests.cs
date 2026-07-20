@@ -12,7 +12,7 @@ using NUnit.Framework;
 namespace ArchLinterNet.Cli.Tests;
 
 [TestFixture]
-public sealed class BaselineCommandHandlerTests
+public sealed partial class BaselineCommandHandlerTests
 {
     private static readonly string[] _contractIds = ["rule-a", "rule-b"];
 
@@ -307,9 +307,12 @@ public sealed class BaselineCommandHandlerTests
     public void BaselineDiff_Success_FormatsJsonAndHumanOutput()
     {
         var newEntry = CreateEntry("group-b", "contract-b", "Source.E", "Forbidden.E", "reason-b");
+        var frozenEntry = CreateEntry("group-b", "contract-b", "Source.Frozen", "Forbidden.Frozen", "reason-frozen");
+        var resolvedEntry = CreateEntry("group-b", "contract-b", "Source.Resolved", "Forbidden.Resolved", "reason-resolved");
+        var configErrorEntry = CreateEntry("group-b", "unknown-contract", "Source.Cfg", "Forbidden.Cfg", "reason-cfg");
         var runtime = new StubRuntime
         {
-            DiffOutcome = new BaselineDiffOutcome(true, [newEntry], Array.Empty<ArchitectureBaselineComparisonEntry>(), Array.Empty<ArchitectureBaselineComparisonEntry>(), Array.Empty<ArchitectureBaselineComparisonEntry>(), Array.Empty<ArchitectureViolation>())
+            DiffOutcome = new BaselineDiffOutcome(true, [newEntry], [frozenEntry], [resolvedEntry], [configErrorEntry], Array.Empty<ArchitectureViolation>())
         };
 
         var jsonConsole = new RecordingConsole();
@@ -323,6 +326,10 @@ public sealed class BaselineCommandHandlerTests
             Assert.That(runtime.DiffRequest, Is.Not.Null);
             Assert.That(runtime.DiffRequest!.ContractIds, Is.EqualTo(_contractIds));
             Assert.That(json.RootElement.GetProperty("new")[0].GetProperty("contractId").GetString(), Is.EqualTo("contract-b"));
+            Assert.That(json.RootElement.GetProperty("new")[0].GetProperty("status").GetString(), Is.EqualTo("new"));
+            Assert.That(json.RootElement.GetProperty("frozen")[0].GetProperty("status").GetString(), Is.EqualTo("matched"));
+            Assert.That(json.RootElement.GetProperty("resolved")[0].GetProperty("status").GetString(), Is.EqualTo("stale"));
+            Assert.That(json.RootElement.GetProperty("configurationErrors")[0].GetProperty("status").GetString(), Is.EqualTo("configuration_error"));
         });
 
         var humanConsole = new RecordingConsole();
@@ -386,15 +393,18 @@ public sealed class BaselineCommandHandlerTests
     public void BaselineVerify_Success_FormatsJsonAndHumanOutput()
     {
         var newEntry = CreateEntry("group-c", "contract-c", "Source.G", "Forbidden.G", "reason-c");
+        var frozenEntry = CreateEntry("group-c", "contract-c", "Source.Frozen", "Forbidden.Frozen", "reason-frozen");
+        var resolvedEntry = CreateEntry("group-c", "contract-c", "Source.Resolved", "Forbidden.Resolved", "reason-resolved");
+        var configErrorEntry = CreateEntry("group-c", "unknown-contract", "Source.Cfg", "Forbidden.Cfg", "reason-cfg");
         var runtime = new StubRuntime
         {
             VerifyOutcome = new BaselineVerifyOutcome(
                 true,
                 false,
                 [newEntry],
-                Array.Empty<ArchitectureBaselineComparisonEntry>(),
-                Array.Empty<ArchitectureBaselineComparisonEntry>(),
-                Array.Empty<ArchitectureBaselineComparisonEntry>(),
+                [frozenEntry],
+                [resolvedEntry],
+                [configErrorEntry],
                 Array.Empty<ArchitectureViolation>())
         };
 
@@ -410,6 +420,10 @@ public sealed class BaselineCommandHandlerTests
             Assert.That(runtime.VerifyRequest!.ContractIds, Is.EqualTo(_contractIds));
             Assert.That(json.RootElement.GetProperty("inSync").GetBoolean(), Is.False);
             Assert.That(json.RootElement.GetProperty("new")[0].GetProperty("sourceType").GetString(), Is.EqualTo("Source.G"));
+            Assert.That(json.RootElement.GetProperty("new")[0].GetProperty("status").GetString(), Is.EqualTo("new"));
+            Assert.That(json.RootElement.GetProperty("frozen")[0].GetProperty("status").GetString(), Is.EqualTo("matched"));
+            Assert.That(json.RootElement.GetProperty("resolved")[0].GetProperty("status").GetString(), Is.EqualTo("stale"));
+            Assert.That(json.RootElement.GetProperty("configurationErrors")[0].GetProperty("status").GetString(), Is.EqualTo("configuration_error"));
         });
 
         runtime.VerifyOutcome = runtime.VerifyOutcome with { InSync = true };
@@ -563,6 +577,9 @@ public sealed class BaselineCommandHandlerTests
         public BaselineVerifyOutcome VerifyOutcome { get; set; } =
             new(true, true, Array.Empty<ArchitectureBaselineComparisonEntry>(), Array.Empty<ArchitectureBaselineComparisonEntry>(), Array.Empty<ArchitectureBaselineComparisonEntry>(), Array.Empty<ArchitectureBaselineComparisonEntry>(), Array.Empty<ArchitectureViolation>());
 
+        public BaselineMigrateOutcome MigrateOutcome { get; set; } =
+            new(true, "migrated", 0, 0, 0, Array.Empty<BaselineMigrateEntryReport>(), Array.Empty<ArchitectureViolation>());
+
         public Exception? GenerateException { get; set; }
 
         public Exception? UpdateException { get; set; }
@@ -573,6 +590,8 @@ public sealed class BaselineCommandHandlerTests
 
         public Exception? VerifyException { get; set; }
 
+        public Exception? MigrateException { get; set; }
+
         public BaselineGenerationRequest? GenerateRequest { get; private set; }
 
         public BaselineUpdateRequest? UpdateRequest { get; private set; }
@@ -582,6 +601,8 @@ public sealed class BaselineCommandHandlerTests
         public BaselineDiffRequest? DiffRequest { get; private set; }
 
         public BaselineVerifyRequest? VerifyRequest { get; private set; }
+
+        public BaselineMigrateRequest? MigrateRequest { get; private set; }
 
         public bool TryParseGraphLevel(string value, out ArchitectureGraphLevel level) => Enum.TryParse(value, true, out level);
 
@@ -633,6 +654,12 @@ public sealed class BaselineCommandHandlerTests
         {
             VerifyRequest = request;
             return VerifyException == null ? VerifyOutcome : throw VerifyException;
+        }
+
+        public BaselineMigrateOutcome MigrateBaseline(BaselineMigrateRequest request)
+        {
+            MigrateRequest = request;
+            return MigrateException == null ? MigrateOutcome : throw MigrateException;
         }
 
         public ArchitectureGraphOutcome BuildGraph(ArchitectureGraphRequest request) => new(_emptyGraph);

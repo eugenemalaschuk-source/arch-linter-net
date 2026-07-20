@@ -138,7 +138,7 @@ public sealed class ArchitectureBaselineIntegrationTests
         ArchitectureBaselineDocument baseline = _generator.Generate(
             policy, runner.BaselineCandidates, "test baseline");
 
-        Assert.That(baseline.Version, Is.EqualTo(1));
+        Assert.That(baseline.Version, Is.EqualTo(2));
         Assert.That(baseline.Baseline.Strict, Has.Count.EqualTo(1));
         Assert.That(baseline.Baseline.Strict[0].Id, Is.EqualTo("exec-no-res"));
         Assert.That(baseline.Baseline.Strict[0].IgnoredViolations, Is.Not.Empty);

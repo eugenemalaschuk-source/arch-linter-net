@@ -171,4 +171,30 @@ public sealed class ArchitectureIgnoredViolation
     public string ForbiddenReference { get; set; } = string.Empty;
 
     [YamlMember(Alias = "reason")] public string Reason { get; set; } = string.Empty;
+
+    // Populated only when this entry was merged in from a `version: 2` baseline document (see
+    // ArchitectureBaselineLoadingService.ContractGroupMerger). When IdentityVersion is set,
+    // ArchitectureIgnoreMatcher matches this entry against the live structured identity instead of
+    // the (source_type, forbidden_reference) glob pair, so runtime `validate --baseline` gets the
+    // same exact-identity guarantees as `baseline diff`/`verify`. Manually authored policy
+    // `ignored_violations` never set these — they stay null and match via the legacy glob path.
+    [YamlMember(Alias = "identity_version")] public int? IdentityVersion { get; set; }
+
+    [YamlMember(Alias = "contract_family")] public string? ContractFamily { get; set; }
+
+    [YamlMember(Alias = "kind")] public string? Kind { get; set; }
+
+    [YamlMember(Alias = "source_assembly")] public string? SourceAssembly { get; set; }
+
+    [YamlMember(Alias = "source_member")] public string? SourceMember { get; set; }
+
+    [YamlMember(Alias = "target_assembly")] public string? TargetAssembly { get; set; }
+
+    [YamlMember(Alias = "target_type")] public string? TargetType { get; set; }
+
+    [YamlMember(Alias = "target_member")] public string? TargetMember { get; set; }
+
+    [YamlMember(Alias = "occurrence")] public int? Occurrence { get; set; }
+
+    [YamlMember(Alias = "configuration")] public string? Configuration { get; set; }
 }

@@ -449,14 +449,15 @@ public sealed partial class ArchitectureAnalysisSession
 
         ArchitectureContractExecutionContext executionContext = CreateExecutionContext(contract, contract.IgnoredViolations);
 
-        (IReadOnlyList<string>? explicitReferenceAssemblyPaths, ArchitectureViolation? fallbackDiagnostic) =
+        (IReadOnlyList<string>? explicitReferenceAssemblyPaths, string? sourceAssemblyHint, ArchitectureViolation? fallbackDiagnostic) =
             ResolveProjectAwareReferenceAssemblyPaths(contract, sourceLayer, sourceRoots);
 
         IReadOnlyList<ArchitectureViolation> roslynViolations = new ArchitectureSourceScanner()
             .FindMethodBodyViolations(Context.RepositoryRoot, sourceLayer.Namespace,
                 contract.ForbiddenCalls, executionContext, sourceRoots: sourceRoots,
                 sourceLayer: sourceLayer, preprocessorSymbols: PreprocessorSymbols,
-                explicitReferenceAssemblyPaths: explicitReferenceAssemblyPaths)
+                explicitReferenceAssemblyPaths: explicitReferenceAssemblyPaths,
+                sourceAssemblyHint: sourceAssemblyHint)
             .ToList();
 
         IReadOnlyList<ArchitectureViolation> ilViolations = new ArchitectureIlMethodBodyScanner().FindMethodBodyViolations(
@@ -484,14 +485,14 @@ public sealed partial class ArchitectureAnalysisSession
     // unchanged. Returns a non-null diagnostic only when discovery IS configured but project-aware
     // resolution couldn't be used (no/ambiguous owning project, or Buildalyzer evaluation failed),
     // so the degraded-accuracy fallback is visible rather than silent.
-    private (IReadOnlyList<string>? ReferenceAssemblyPaths, ArchitectureViolation? FallbackDiagnostic)
+    private (IReadOnlyList<string>? ReferenceAssemblyPaths, string? SourceAssemblyName, ArchitectureViolation? FallbackDiagnostic)
         ResolveProjectAwareReferenceAssemblyPaths(
             ArchitectureMethodBodyContract contract, ArchitectureLayer sourceLayer, string[]? sourceRoots)
     {
         ProjectDiscoveryResult? discovery = Context.ProjectDiscovery;
         if (discovery == null || discovery.DiscoveredProjects.Count == 0)
         {
-            return (null, null);
+            return (null, null, null);
         }
 
         IReadOnlyList<string> matchedFiles = new ArchitectureSourceScanner()
@@ -499,14 +500,14 @@ public sealed partial class ArchitectureAnalysisSession
 
         if (matchedFiles.Count == 0)
         {
-            return (null, null);
+            return (null, null, null);
         }
 
         ArchitectureDiscoveredProject? owningProject = ResolveOwningProject(discovery.DiscoveredProjects, matchedFiles);
 
         if (owningProject == null)
         {
-            return (null, BuildFallbackDiagnostic(contract,
+            return (null, null, BuildFallbackDiagnostic(contract,
                 "no single discovered project owns this contract's source files (files span zero or multiple discovered project directories)"));
         }
 
@@ -516,11 +517,11 @@ public sealed partial class ArchitectureAnalysisSession
 
         if (!resolution.Succeeded)
         {
-            return (null, BuildFallbackDiagnostic(contract,
+            return (null, owningProject.AssemblyName, BuildFallbackDiagnostic(contract,
                 $"project '{owningProject.Path}' could not be evaluated for project-aware Roslyn analysis: {resolution.FailureReason}"));
         }
 
-        return (resolution.Context!.ReferenceAssemblyPaths, null);
+        return (resolution.Context!.ReferenceAssemblyPaths, owningProject.AssemblyName, null);
     }
 
     private static ArchitectureViolation BuildFallbackDiagnostic(ArchitectureMethodBodyContract contract, string reason)

@@ -250,7 +250,7 @@ public sealed class ContextualContractBaselineTests
         var entry = new ArchitectureBaselineContractEntry
         {
             Id = "sales-no-inventory",
-            IgnoredViolations = new List<ArchitectureIgnoredViolation>
+            IgnoredViolations = new List<ArchitectureBaselineIgnoredViolation>
             {
                 new() { SourceType = "A", ForbiddenReference = "B", Reason = "r" }
             }

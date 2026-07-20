@@ -868,6 +868,20 @@ lifecycle explicit — entries are added by the generator and removed as
 violations are fixed. See [Migration Baselines](../guides/migration-baselines.md)
 for the full lifecycle.
 
+Baseline identity is versioned and structured (format `version: 2`) —
+`baseline generate` now emits entries keyed by contract family, source/target
+assembly, source/target member, and an occurrence discriminator, not just the
+`source_type`/`forbidden_reference` display pair. This means two same-named
+types in different assemblies, or two distinct forbidden calls in the same
+source type, are never silently collapsed into one baseline entry. Never
+hand-edit the structured identity fields (`identity_version`, `contract_family`,
+`kind`, `*_assembly`, `*_member`, `occurrence`) — treat them as generator
+output. Existing `version: 1` baseline files keep working with their original
+`(source_type, forbidden_reference)` matching semantics; use
+`arch-linter-net baseline migrate` to upgrade one deliberately (it never
+overwrites the source file and refuses to guess when a legacy entry is
+ambiguous under the new identity — see the migration guide).
+
 ## Validate Before PR
 
 Run strict validation for current gates and audit validation for migration

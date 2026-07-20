@@ -63,6 +63,8 @@ internal interface ICliRuntime
 
     BaselineVerifyOutcome VerifyBaseline(BaselineVerifyRequest request);
 
+    BaselineMigrateOutcome MigrateBaseline(BaselineMigrateRequest request);
+
     ArchitectureGraphOutcome BuildGraph(ArchitectureGraphRequest request);
 
     string FormatGraphAsJson(ArchitectureDependencyGraph graph);

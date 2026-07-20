@@ -13,4 +13,6 @@ public interface IArchitectureBaselineApplicationService
     BaselineDiffOutcome Diff(BaselineDiffRequest request);
 
     BaselineVerifyOutcome Verify(BaselineVerifyRequest request);
+
+    BaselineMigrateOutcome Migrate(BaselineMigrateRequest request);
 }

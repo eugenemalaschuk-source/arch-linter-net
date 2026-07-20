@@ -25,7 +25,7 @@ public partial class CliIntegrationTests
             });
 
             string content = File.ReadAllText(outputPath);
-            Assert.That(content, Does.Contain("version: 1"));
+            Assert.That(content, Does.Contain("version: 2"));
             Assert.That(content, Does.Contain("baseline:"));
         }
         finally

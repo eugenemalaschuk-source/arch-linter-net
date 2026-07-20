@@ -52,7 +52,7 @@ public sealed class CliArchitectureTests
 
         var commandNames = module.CreateCommand(runtime, console, fileSystem).Subcommands.Select(static command => command.Name).ToArray();
 
-        Assert.That(commandNames, Is.EquivalentTo(new[] { "generate", "update", "prune", "diff", "verify" }));
+        Assert.That(commandNames, Is.EquivalentTo(new[] { "generate", "update", "prune", "diff", "verify", "migrate" }));
     }
 
     [Test]
@@ -424,6 +424,7 @@ public sealed class CliArchitectureTests
         public BaselineDiffOutcome DiffBaseline(BaselineDiffRequest request) => throw new NotSupportedException();
 
         public BaselineVerifyOutcome VerifyBaseline(BaselineVerifyRequest request) => throw new NotSupportedException();
+        public BaselineMigrateOutcome MigrateBaseline(BaselineMigrateRequest request) => throw new NotSupportedException();
 
         public ArchitectureGraphOutcome BuildGraph(ArchitectureGraphRequest request) =>
             throw ExceptionToThrow ?? new NotSupportedException();

@@ -115,14 +115,14 @@ internal sealed class BaselineDiffCommandHandler(ICliRuntime runtime, ICliConsol
     {
         return JsonSerializer.Serialize(new
         {
-            @new = newEntries.Select(FormatEntryForJson),
-            frozen = frozen.Select(FormatEntryForJson),
-            resolved = resolved.Select(FormatEntryForJson),
-            configurationErrors = configurationErrors.Select(FormatEntryForJson),
+            @new = newEntries.Select(e => FormatEntryForJson(e, "new")),
+            frozen = frozen.Select(e => FormatEntryForJson(e, "matched")),
+            resolved = resolved.Select(e => FormatEntryForJson(e, "stale")),
+            configurationErrors = configurationErrors.Select(e => FormatEntryForJson(e, "configuration_error")),
         });
     }
 
-    private static object FormatEntryForJson(ArchitectureBaselineComparisonEntry entry)
+    internal static object FormatEntryForJson(ArchitectureBaselineComparisonEntry entry, string status)
     {
         return new
         {
@@ -131,6 +131,7 @@ internal sealed class BaselineDiffCommandHandler(ICliRuntime runtime, ICliConsol
             sourceType = entry.SourceType,
             forbiddenReference = entry.ForbiddenReference,
             reason = entry.Reason,
+            status,
         };
     }
 }
