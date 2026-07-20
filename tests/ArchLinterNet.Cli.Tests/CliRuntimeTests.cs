@@ -62,7 +62,6 @@ public sealed class CliRuntimeTests
         {
             PolicyPath = "unused-nonexistent-policy.yml",
             BaselinePath = Path.Combine(Path.GetTempPath(), $"nonexistent-{Guid.NewGuid():N}.yml"),
-            Mode = "strict",
             DryRun = true,
         }));
     }

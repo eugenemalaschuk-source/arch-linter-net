@@ -23,7 +23,6 @@ public sealed partial class ArchitectureBaselineApplicationServiceFakeCompositio
             PolicyPath = "unused-by-fakes.arch.yml",
             BaselinePath = "unused-by-fakes.baseline.yml",
             OutputPath = "unused-by-fakes.migrated.yml",
-            Mode = "all",
         });
 
         Assert.Multiple(() =>
@@ -88,7 +87,6 @@ public sealed partial class ArchitectureBaselineApplicationServiceFakeCompositio
             PolicyPath = "unused-by-fakes.arch.yml",
             BaselinePath = "unused-by-fakes.baseline.yml",
             OutputPath = "unused-by-fakes.migrated.yml",
-            Mode = "all",
         });
 
         Assert.Multiple(() =>
@@ -114,7 +112,6 @@ public sealed partial class ArchitectureBaselineApplicationServiceFakeCompositio
         {
             PolicyPath = "unused-by-fakes.arch.yml",
             BaselinePath = "unused-by-fakes.baseline.yml",
-            Mode = "all",
             DryRun = true,
         });
 
@@ -140,7 +137,6 @@ public sealed partial class ArchitectureBaselineApplicationServiceFakeCompositio
         {
             PolicyPath = "unused-by-fakes.arch.yml",
             BaselinePath = "unused-by-fakes.baseline.yml",
-            Mode = "all",
         });
 
         Assert.Multiple(() =>
@@ -165,7 +161,6 @@ public sealed partial class ArchitectureBaselineApplicationServiceFakeCompositio
             PolicyPath = "unused-by-fakes.arch.yml",
             BaselinePath = "same-path.baseline.yml",
             OutputPath = "same-path.baseline.yml",
-            Mode = "all",
         });
 
         Assert.Multiple(() =>
@@ -194,7 +189,6 @@ public sealed partial class ArchitectureBaselineApplicationServiceFakeCompositio
             PolicyPath = "unused-by-fakes.arch.yml",
             BaselinePath = "unused-by-fakes.baseline.yml",
             OutputPath = "unused-by-fakes.migrated.yml",
-            Mode = "all",
         });
 
         Assert.Multiple(() =>
@@ -206,14 +200,62 @@ public sealed partial class ArchitectureBaselineApplicationServiceFakeCompositio
     }
 
     [Test]
-    public void Migrate_ScopedToAuditMode_CarriesStrictEntryThroughAsOutOfScope()
+    public void Migrate_AlwaysClassifiesEveryEntry_RegardlessOfContractGroup()
     {
+        // There is no --mode/--contract scoping any more: every entry in the file — strict and
+        // audit alike — is always correlated against the full candidate set and classified.
         var document = CreateDocumentWithStrictAndAuditRules();
         var runnerSetupService = new FakeRunnerSetupService { DocumentToReturn = document };
         var runner = new FakeContractRunner(ArchitectureBaselineApplicationServiceHelper.CreateEmptySession(document))
         {
             BaselineCandidates = new List<ArchitectureBaselineCandidate>
             {
+                new("strict", "known-rule", "SrcA", "RefA"),
+            },
+        };
+        runnerSetupService.RunnerToReturn = runner;
+        var baselineLoadingService = new FakeBaselineLoadingService
+        {
+            DocumentToReturn = CreateBaselineWithStrictAndAuditEntries(),
+        };
+
+        var applicationService = new ArchitectureBaselineApplicationService(
+            runnerSetupService, new FakeContractHandlerRegistry(), new FakeContractExecutor(), new FakeBaselineGenerator(), baselineLoadingService);
+
+        BaselineMigrateOutcome outcome = applicationService.Migrate(new BaselineMigrateRequest
+        {
+            PolicyPath = "unused-by-fakes.arch.yml",
+            BaselinePath = "unused-by-fakes.baseline.yml",
+            OutputPath = "unused-by-fakes.migrated.yml",
+        });
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(outcome.Succeeded, Is.True);
+            // The strict entry (SrcA/RefA) matches its sole candidate; the audit entry (SrcY/RefY)
+            // has zero candidates in this scenario and is genuinely stale — not a special
+            // "out of scope" status, and not silently carried through with a fabricated identity.
+            Assert.That(outcome.Report.Single(r => r.SourceType == "SrcA").Status, Is.EqualTo("matched"));
+            Assert.That(outcome.Report.Single(r => r.SourceType == "SrcY").Status, Is.EqualTo("stale"));
+            Assert.That(outcome.MatchedCount, Is.EqualTo(1));
+            Assert.That(outcome.StaleCount, Is.EqualTo(1));
+        });
+    }
+
+    [Test]
+    public void Migrate_AmbiguousEntryInOtherContractGroup_StillDetectedAndBlocksWrite()
+    {
+        // Reproduces the exact scenario from review: a legacy pair that would have been labeled
+        // "out of scope" under mode/contract filtering (here: an audit-group entry) must still be
+        // recognized as ambiguous when it genuinely correlates to more than one current candidate —
+        // never silently upgraded to a single fabricated v2 identity.
+        var document = CreateDocumentWithStrictAndAuditRules();
+        var runnerSetupService = new FakeRunnerSetupService { DocumentToReturn = document };
+        var runner = new FakeContractRunner(ArchitectureBaselineApplicationServiceHelper.CreateEmptySession(document))
+        {
+            BaselineCandidates = new List<ArchitectureBaselineCandidate>
+            {
+                new("audit", "audit-rule", "SrcY", "RefY"),
                 new("audit", "audit-rule", "SrcY", "RefY"),
             },
         };
@@ -231,74 +273,14 @@ public sealed partial class ArchitectureBaselineApplicationServiceFakeCompositio
             PolicyPath = "unused-by-fakes.arch.yml",
             BaselinePath = "unused-by-fakes.baseline.yml",
             OutputPath = "unused-by-fakes.migrated.yml",
-            Mode = "audit",
-        });
-
-        Assert.Multiple(() =>
-        {
-            Assert.That(outcome.Succeeded, Is.True);
-            // The strict "known-rule" entry (SrcA/RefA) is outside --mode audit scope: it must be
-            // reported out_of_scope, not stale, and must not count toward matched/stale/ambiguous.
-            Assert.That(outcome.Report.Single(r => r.SourceType == "SrcA").Status, Is.EqualTo("out_of_scope"));
-            Assert.That(outcome.MatchedCount, Is.EqualTo(1));
-            Assert.That(outcome.StaleCount, Is.EqualTo(0));
-        });
-    }
-
-    [Test]
-    public void Migrate_UnknownSelectedContract_FailsWithoutWriting()
-    {
-        var document = CreateDocumentWith_knownRule();
-        var runnerSetupService = new FakeRunnerSetupService { DocumentToReturn = document };
-        var runner = new FakeContractRunner(ArchitectureBaselineApplicationServiceHelper.CreateEmptySession(document))
-        {
-            BaselineCandidates = new List<ArchitectureBaselineCandidate>(),
-        };
-        runnerSetupService.RunnerToReturn = runner;
-        var baselineGenerator = new FakeBaselineGenerator();
-        var applicationService = new ArchitectureBaselineApplicationService(
-            runnerSetupService, new FakeContractHandlerRegistry(), new FakeContractExecutor(), baselineGenerator,
-            new FakeBaselineLoadingService { DocumentToReturn = CreateMixedBaseline() });
-
-        BaselineMigrateOutcome outcome = applicationService.Migrate(new BaselineMigrateRequest
-        {
-            PolicyPath = "unused-by-fakes.arch.yml",
-            BaselinePath = "unused-by-fakes.baseline.yml",
-            OutputPath = "unused-by-fakes.migrated.yml",
-            Mode = "all",
-            ContractIds = new[] { "missing-rule" },
         });
 
         Assert.Multiple(() =>
         {
             Assert.That(outcome.Succeeded, Is.False);
-            Assert.That(outcome.Error, Does.Contain("Unknown contract IDs"));
-            Assert.That(outcome.Error, Does.Contain("missing-rule"));
-            Assert.That(baselineGenerator.WasCalled, Is.False);
-        });
-    }
-
-    [Test]
-    public void Migrate_InvalidMode_FailsWithoutCallingCollaborators()
-    {
-        var runnerSetupService = new FakeRunnerSetupService();
-        var applicationService = new ArchitectureBaselineApplicationService(
-            runnerSetupService, new FakeContractHandlerRegistry(), new FakeContractExecutor(), new FakeBaselineGenerator(),
-            new FakeBaselineLoadingService { DocumentToReturn = CreateMixedBaseline() });
-
-        BaselineMigrateOutcome outcome = applicationService.Migrate(new BaselineMigrateRequest
-        {
-            PolicyPath = "unused-by-fakes.arch.yml",
-            BaselinePath = "unused-by-fakes.baseline.yml",
-            OutputPath = "unused-by-fakes.migrated.yml",
-            Mode = "not-a-real-mode",
-        });
-
-        Assert.Multiple(() =>
-        {
-            Assert.That(outcome.Succeeded, Is.False);
-            Assert.That(outcome.Error, Does.Contain("Invalid mode"));
-            Assert.That(runnerSetupService.LoadDocumentCalled, Is.False);
+            Assert.That(outcome.Yaml, Is.Null);
+            Assert.That(outcome.Report.Single(r => r.SourceType == "SrcY").Status, Is.EqualTo("ambiguous"));
+            Assert.That(outcome.AmbiguousCount, Is.EqualTo(1));
         });
     }
 }

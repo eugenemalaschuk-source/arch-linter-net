@@ -195,17 +195,13 @@ public sealed class ArchitectureBaselineApplicationService(
                 $"baseline migrate only upgrades version 1 baselines to version 2; '{request.BaselinePath}' is already version {legacyBaseline.Version}.");
         }
 
-        if (request.Mode is not (ModeStrict or ModeAudit or "all"))
-        {
-            return Fail($"Invalid mode: {request.Mode}. Use 'strict', 'audit', or 'all'.");
-        }
-
-        // Always correlate against the FULL current candidate set — mode "all", no --contract
-        // restriction — regardless of the requested scope. Scoping is applied below, per legacy
-        // entry, to decide which entries this run attempts to migrate; entries outside that scope
-        // are carried through unchanged rather than being collected (and therefore misclassified as
-        // stale and silently dropped) just because this run didn't ask about them.
-        (ArchitectureContractDocument document, IReadOnlyList<ArchitectureBaselineCandidate>? candidates, List<ArchitectureViolation> configViolations) =
+        // A version-2 document cannot preserve version-1 matching semantics for only part of a
+        // file — a legacy entry's exact-pair identity might be ambiguous under structured identity,
+        // and that can only be discovered by actually correlating it. So migrate never scopes by
+        // --mode/--contract: every entry in the file is always classified against the full current
+        // candidate set (which is why candidates are always collected with mode "all" and no
+        // --contract restriction) before anything is written.
+        (_, IReadOnlyList<ArchitectureBaselineCandidate>? candidates, List<ArchitectureViolation> configViolations) =
             CollectCandidates(request.PolicyPath, "all", request.ConditionSetName, contractIds: null);
 
         if (candidates == null)
@@ -214,48 +210,16 @@ public sealed class ArchitectureBaselineApplicationService(
                 false, null, 0, 0, 0, Array.Empty<BaselineMigrateEntryReport>(), configViolations);
         }
 
-        HashSet<string>? selectedContractIds = request.ContractIds is { Count: > 0 }
-            ? new HashSet<string>(request.ContractIds, StringComparer.OrdinalIgnoreCase)
-            : null;
-
-        if (selectedContractIds != null)
-        {
-            HashSet<string> availableIds = CollectAvailableContractIds(document, request.Mode);
-            List<string> unknownIds = selectedContractIds.Where(id => !availableIds.Contains(id)).ToList();
-            if (unknownIds.Count > 0)
-            {
-                return Fail(
-                    $"Unknown contract IDs: {string.Join(", ", unknownIds)}. " +
-                    $"Available IDs in {request.Mode} mode: {string.Join(", ", availableIds.OrderBy(id => id, StringComparer.Ordinal))}");
-            }
-        }
-
         var report = new List<BaselineMigrateEntryReport>();
         var migratedEntries = new List<ArchitectureBaselineComparisonEntry>();
         int matched = 0, stale = 0, ambiguous = 0;
 
         foreach (string groupName in ArchitectureBaselineContractGroups.GroupNames)
         {
-            bool groupInScope = IsInScope(groupName, request.Mode);
-
             foreach (var entry in legacyBaseline.Baseline.GetGroup(groupName))
             {
-                bool entryInScope = groupInScope && (selectedContractIds == null || selectedContractIds.Contains(entry.Id));
-
                 foreach (var ignore in entry.IgnoredViolations)
                 {
-                    if (!entryInScope)
-                    {
-                        // Out of the requested --mode/--contract scope: carry through unchanged
-                        // (uplifted to version-2 shape by the generator's own fallback identity, not
-                        // reclassified against candidates this run never collected).
-                        migratedEntries.Add(new ArchitectureBaselineComparisonEntry(
-                            groupName, entry.Id, ignore.SourceType, ignore.ForbiddenReference, ignore.Reason));
-                        report.Add(new BaselineMigrateEntryReport(
-                            groupName, entry.Id, ignore.SourceType, ignore.ForbiddenReference, "out_of_scope", 0));
-                        continue;
-                    }
-
                     List<ArchitectureBaselineCandidate> matches = candidates
                         .Where(c => c.ContractGroup == groupName
                             && string.Equals(c.ContractId, entry.Id, StringComparison.OrdinalIgnoreCase)
@@ -306,11 +270,6 @@ public sealed class ArchitectureBaselineApplicationService(
     {
         return new BaselineMigrateOutcome(
             false, null, 0, 0, 0, Array.Empty<BaselineMigrateEntryReport>(), Array.Empty<ArchitectureViolation>(), error);
-    }
-
-    private static bool IsInScope(string groupName, string mode)
-    {
-        return mode == "all" || groupName == mode || groupName.StartsWith(mode + "_", StringComparison.Ordinal);
     }
 
     private static bool PathsRefersToSameFile(string outputPath, string baselinePath)

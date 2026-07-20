@@ -128,9 +128,11 @@ explicitly run `baseline migrate` (below).
 1. **Verify** — run `baseline verify` in CI to fail the build if the baseline has drifted out of sync (stale entries or unknown contract IDs), keeping the baseline honest over time
 1. **Migrate** — run `baseline migrate` once, on demand, to deterministically upgrade an existing version 1 baseline to version 2's structured identity
 
-These six subcommands share `--config`/`--policy`, `--mode` (`strict`/`audit`/`all`),
-`--condition-set`, and `--contract` (repeatable, restricts to specific contract IDs),
-consistent with `validate`.
+`generate`/`update`/`prune`/`diff`/`verify` share `--config`/`--policy`, `--mode`
+(`strict`/`audit`/`all`), `--condition-set`, and `--contract` (repeatable, restricts
+to specific contract IDs), consistent with `validate`. `migrate` shares
+`--config`/`--policy` and `--condition-set` but deliberately has no `--mode`/`--contract`
+— see below.
 
 #### Update
 
@@ -199,9 +201,10 @@ arch-linter-net baseline migrate \
 ```
 
 Deterministically upgrades a legacy **version 1** baseline to **version 2**'s
-structured identity. Each legacy entry is correlated against freshly
-collected current-codebase violations by its exact legacy
-`(source_type, forbidden_reference)` pair, scoped to its contract ID:
+structured identity. Every legacy entry, from every contract group in the
+file, is correlated against freshly collected current-codebase violations by
+its exact legacy `(source_type, forbidden_reference)` pair (matched only
+against candidates from the same contract ID):
 
 - **Exactly one match** — the entry is rewritten using that violation's full
   structured identity; its `reason` is preserved verbatim.
@@ -223,15 +226,14 @@ provide `--output` to write the migrated file. `baseline migrate` never
 writes to the same path as `--baseline` — pick a distinct `--output`, review
 it, then swap it in for the original file yourself.
 
-`--mode`/`--contract` scope which entries this run *attempts to classify*
-(matched/stale/ambiguous), not which entries end up in the output. Entries
-outside the requested scope are always carried through into the output
-unchanged, reported as `out_of_scope` — a scoped `baseline migrate --mode
-strict` never touches, reclassifies, or drops your audit debt, and `--contract
-<id>` never touches other contracts' debt. Classification itself always runs
-against the full current violation set regardless of `--mode`/`--contract`,
-so an out-of-scope entry is never misclassified as `stale` just because this
-run didn't ask about it.
+Unlike every other `baseline` subcommand, `migrate` does not accept
+`--mode`/`--contract` — it always classifies **every** entry in the file. A
+version-2 document cannot preserve version-1 matching semantics for only
+part of a file: an entry left unexamined could be exactly the kind of
+ambiguous legacy pair this command exists to catch, discoverable only by
+actually correlating it against current violations. So there is no way to
+migrate "just the strict entries" — the whole file is always classified
+and, if it's clean, upgraded together.
 
 Migration is opt-in and on-demand: nothing about `validate`, `generate`,
 `update`, `prune`, `diff`, or `verify` changes for a baseline you haven't

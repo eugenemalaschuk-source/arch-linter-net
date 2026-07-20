@@ -15,12 +15,6 @@ internal sealed class BaselineMigrateCommandHandler(ICliRuntime runtime, ICliCon
             return CliExitCodes.Success;
         }
 
-        if (options.Mode is not ("strict" or "audit" or "all"))
-        {
-            console.Error.WriteLine($"Invalid mode: {options.Mode}. Use 'strict', 'audit', or 'all'.");
-            return CliExitCodes.InvalidArgumentsOrRuntimeError;
-        }
-
         if (options.BaselinePath == null)
         {
             console.Error.WriteLine("--baseline is required for baseline migrate.");
@@ -52,9 +46,7 @@ internal sealed class BaselineMigrateCommandHandler(ICliRuntime runtime, ICliCon
                 PolicyPath = options.PolicyPath,
                 BaselinePath = options.BaselinePath,
                 OutputPath = options.OutputPath,
-                Mode = options.Mode,
                 ConditionSetName = options.ConditionSetName,
-                ContractIds = options.ContractIds.ToList(),
                 DryRun = options.DryRun,
             });
 
@@ -109,10 +101,9 @@ internal sealed class BaselineMigrateCommandHandler(ICliRuntime runtime, ICliCon
             $"Matched (migrated to version 2): {outcome.MatchedCount}",
             $"Stale (no current match, dropped): {outcome.StaleCount}",
             $"Ambiguous (multiple current matches, requires manual review): {outcome.AmbiguousCount}",
-            $"Out of scope (carried through unchanged): {outcome.Report.Count(e => e.Status == "out_of_scope")}",
         ];
 
-        foreach (BaselineMigrateEntryReport entry in outcome.Report.Where(e => e.Status is not ("matched" or "out_of_scope")))
+        foreach (BaselineMigrateEntryReport entry in outcome.Report.Where(e => e.Status != "matched"))
         {
             lines.Add($"  [{entry.Status}] {entry.ContractGroup}/{entry.ContractId}: {entry.SourceType} -> {entry.ForbiddenReference}"
                 + (entry.Status == "ambiguous" ? $" ({entry.MatchCount} current matches)" : string.Empty));
@@ -145,7 +136,6 @@ internal sealed class BaselineMigrateCommandHandler(ICliRuntime runtime, ICliCon
             matchedCount = outcome.MatchedCount,
             staleCount = outcome.StaleCount,
             ambiguousCount = outcome.AmbiguousCount,
-            outOfScopeCount = outcome.Report.Count(e => e.Status == "out_of_scope"),
             entries = outcome.Report.Select(e => new
             {
                 contractGroup = e.ContractGroup,

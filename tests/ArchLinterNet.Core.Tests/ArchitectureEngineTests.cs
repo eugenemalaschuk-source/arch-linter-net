@@ -112,7 +112,6 @@ public sealed class ArchitectureEngineTests
         {
             PolicyPath = _policyPath,
             BaselinePath = baselinePath,
-            Mode = "strict",
             DryRun = true,
         });
 

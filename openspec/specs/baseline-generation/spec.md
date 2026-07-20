@@ -302,18 +302,16 @@ The system SHALL provide a `baseline verify` CLI subcommand that performs the sa
 
 ### Requirement: User can migrate a legacy baseline file to structured identity
 
-The system SHALL provide a `baseline migrate` CLI subcommand that deterministically upgrades a `version: 1` baseline file to `version: 2` by correlating each legacy `ignored_violations` entry against freshly collected current-codebase candidates carrying full `ArchitectureViolationIdentity` data.
+The system SHALL provide a `baseline migrate` CLI subcommand that deterministically upgrades a `version: 1` baseline file to `version: 2` by correlating every legacy `ignored_violations` entry, from every contract group in the file, against freshly collected current-codebase candidates carrying full `ArchitectureViolationIdentity` data.
 
-Candidate collection for correlation purposes SHALL always cover the full current violation set (equivalent to `--mode all` with no `--contract` restriction), regardless of the `--mode`/`--contract` scope requested for this run, so that classification is never computed against a partial candidate set.
+`baseline migrate` SHALL NOT accept `--mode` or `--contract`. A `version: 2` document cannot preserve `version: 1` matching semantics for only part of a file — an entry left unexamined could itself be ambiguous under structured identity, discoverable only by correlating it — so the command always classifies every entry in the file; there is no partial/scoped migration and no separate "out of scope" status.
 
-For each legacy entry:
-- If the entry's contract group and contract id fall outside the requested `--mode`/`--contract` scope, the system SHALL classify it as `out_of_scope` and carry it through into the migrated output unchanged (uplifted to `version: 2` document shape via a deterministic fallback identity derived from its own contract family/id/source/target text, not reclassified against candidates). An out-of-scope entry SHALL NOT be counted toward `matched`, `stale`, or `ambiguous`, and SHALL NOT block a write due to unrelated ambiguity elsewhere in the file.
-- Otherwise, scoped to its contract id, the system SHALL classify it as exactly one of:
-  - `matched`: exactly one current candidate's legacy-projected `(source_type, forbidden_reference)` pair equals the entry's pair — the entry SHALL be rewritten using that candidate's full structured identity, with `reason` and any issue metadata preserved verbatim;
-  - `stale`: zero current candidates match — the entry SHALL be excluded from the migrated output and reported;
-  - `ambiguous`: more than one current candidate matches — the entry SHALL be excluded from the migrated output and reported; migration SHALL NOT guess or silently broaden the entry to cover multiple identities.
+For each legacy entry, scoped only to its own contract id (to find candidates belonging to the same contract), the system SHALL classify it as exactly one of:
+- `matched`: exactly one current candidate's legacy-projected `(source_type, forbidden_reference)` pair equals the entry's pair — the entry SHALL be rewritten using that candidate's full structured identity, with `reason` and any issue metadata preserved verbatim;
+- `stale`: zero current candidates match — the entry SHALL be excluded from the migrated output and reported;
+- `ambiguous`: more than one current candidate matches — the entry SHALL be excluded from the migrated output and reported; migration SHALL NOT guess or silently broaden the entry to cover multiple identities.
 
-`baseline migrate` SHALL accept `--policy`/`--config`, `--baseline` (required, the legacy file to migrate), `--output` (the destination path for the migrated file), `--mode`, `--condition-set`, `--contract`, `--dry-run`/`--check` (aliases for a report-only run), and `--json`.
+`baseline migrate` SHALL accept `--policy`/`--config`, `--baseline` (required, the legacy file to migrate), `--output` (the destination path for the migrated file), `--condition-set`, `--dry-run`/`--check` (aliases for a report-only run), and `--json`.
 
 `baseline migrate` SHALL NOT write to a path equal to the resolved `--baseline` input path under any circumstance.
 
@@ -337,9 +335,17 @@ Without `--dry-run`/`--check`, `baseline migrate` SHALL require `--output` to be
 - **WHEN** user runs `baseline migrate --baseline legacy.yml --dry-run`
 - **THEN** no file SHALL be written, the command SHALL report the classification (`matched`/`stale`/`ambiguous`) of every entry, and SHALL exit non-zero only if any entry is `ambiguous`
 
-#### Scenario: Scoped migrate carries out-of-scope entries through unchanged
-- **WHEN** user runs `baseline migrate --mode strict` (or `--contract <id>`) against a legacy baseline that also contains audit-group entries (or other contracts') outside that scope
-- **THEN** the migrated output SHALL still contain those out-of-scope entries, uplifted to version-2 shape, reported with `status: out_of_scope`, and SHALL NOT report or treat them as `stale`
+#### Scenario: Migrate has no --mode/--contract options
+- **WHEN** user runs `baseline migrate` with a `--mode` or `--contract` flag
+- **THEN** the command SHALL reject the flag as an unrecognized option and exit with a non-zero code
+
+#### Scenario: Every entry in the file is classified, regardless of contract group
+- **WHEN** user runs `baseline migrate` against a legacy baseline containing entries under multiple contract groups (for example both `strict` and `audit`)
+- **THEN** every entry, from every contract group, SHALL be classified as `matched`, `stale`, or `ambiguous` against the full current candidate set — none SHALL be carried through unclassified
+
+#### Scenario: An entry that would have been out of an old scope is still detected as ambiguous
+- **WHEN** a legacy entry under a non-`strict` contract group correlates to more than one current violation candidate
+- **THEN** the command SHALL classify it as `ambiguous` and fail closed exactly as it would for a `strict`-group entry, never silently upgrading it to a single fabricated identity
 
 #### Scenario: Migrate refuses to overwrite the source file
 - **WHEN** user runs `baseline migrate --baseline legacy.yml --output legacy.yml`

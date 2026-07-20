@@ -50,7 +50,30 @@ baseline:
     }
 
     [Test]
-    public void BaselineMigrate_ModeScoped_CarriesOutOfScopeEntriesThroughUnchanged()
+    public void BaselineMigrate_HasNoModeOrContractOptions()
+    {
+        // baseline migrate deliberately does not accept --mode/--contract: a version-2 document
+        // cannot preserve version-1 matching semantics for only part of a file, so every entry is
+        // always classified against the full current candidate set.
+        string baselinePath = Path.Combine(Path.GetTempPath(), $"legacy-{Guid.NewGuid():N}.yml");
+        try
+        {
+            File.WriteAllText(baselinePath, "version: 1\nbaseline: {}\n");
+
+            var (exitCode, _, stderr) = RunCli("baseline", "migrate",
+                "--config", _passingPolicy, "--baseline", baselinePath, "--dry-run", "--mode", "strict");
+
+            Assert.That(exitCode, Is.EqualTo(2), $"--mode should be rejected as an unrecognized option, stderr: {stderr}");
+        }
+        finally
+        {
+            if (File.Exists(baselinePath))
+                File.Delete(baselinePath);
+        }
+    }
+
+    [Test]
+    public void BaselineMigrate_EntriesAcrossAllContractGroups_AreAllClassified()
     {
         string baselinePath = Path.Combine(Path.GetTempPath(), $"legacy-{Guid.NewGuid():N}.yml");
         string outputPath = Path.Combine(Path.GetTempPath(), $"migrated-{Guid.NewGuid():N}.yml");
@@ -70,78 +93,26 @@ baseline:
       ignored_violations:
         - source_type: Audit.Source
           forbidden_reference: Audit.Target
-          reason: audit debt outside --mode strict scope
+          reason: audit debt
 ");
 
             var (exitCode, stdout, stderr) = RunCli("baseline", "migrate",
-                "--config", _passingWithIdsPolicy, "--baseline", baselinePath, "--output", outputPath,
-                "--mode", "strict");
+                "--config", _passingWithIdsPolicy, "--baseline", baselinePath, "--output", outputPath);
 
             Assert.Multiple(() =>
             {
                 Assert.That(exitCode, Is.EqualTo(0), $"Migrate should succeed, stderr: {stderr}");
-                Assert.That(stdout, Does.Contain("Out of scope (carried through unchanged): 1"));
+                // Neither entry corresponds to a real current violation, so both are genuinely
+                // stale (no candidates) — never a synthetic "out of scope" pass-through.
+                Assert.That(stdout, Does.Contain("Stale (no current match, dropped): 2"));
                 Assert.That(File.Exists(outputPath), Is.True);
             });
 
             string content = File.ReadAllText(outputPath);
             Assert.Multiple(() =>
             {
-                // The audit entry was never examined this run (--mode strict) — it must survive in
-                // the output rather than being silently dropped as "no current match" (stale).
-                Assert.That(content, Does.Contain("Audit.Source"));
-                Assert.That(content, Does.Contain("Audit.Target"));
-                Assert.That(content, Does.Contain("audit debt outside --mode strict scope"));
-            });
-        }
-        finally
-        {
-            if (File.Exists(baselinePath))
-                File.Delete(baselinePath);
-            if (File.Exists(outputPath))
-                File.Delete(outputPath);
-        }
-    }
-
-    [Test]
-    public void BaselineMigrate_ContractScoped_CarriesOtherContractsThroughUnchanged()
-    {
-        string baselinePath = Path.Combine(Path.GetTempPath(), $"legacy-{Guid.NewGuid():N}.yml");
-        string outputPath = Path.Combine(Path.GetTempPath(), $"migrated-{Guid.NewGuid():N}.yml");
-        try
-        {
-            File.WriteAllText(baselinePath, @"
-version: 1
-baseline:
-  strict:
-    - id: core-no-forbidden
-      ignored_violations:
-        - source_type: Selected.Source
-          forbidden_reference: Selected.Target
-          reason: selected contract debt
-    - id: no-non-existent
-      ignored_violations:
-        - source_type: Other.Source
-          forbidden_reference: Other.Target
-          reason: unselected contract debt
-");
-
-            var (exitCode, stdout, stderr) = RunCli("baseline", "migrate",
-                "--config", _passingWithIdsPolicy, "--baseline", baselinePath, "--output", outputPath,
-                "--contract", "core-no-forbidden");
-
-            Assert.Multiple(() =>
-            {
-                Assert.That(exitCode, Is.EqualTo(0), $"Migrate should succeed, stderr: {stderr}");
-                Assert.That(stdout, Does.Contain("Out of scope (carried through unchanged): 1"));
-            });
-
-            string content = File.ReadAllText(outputPath);
-            Assert.Multiple(() =>
-            {
-                Assert.That(content, Does.Contain("Other.Source"));
-                Assert.That(content, Does.Contain("Other.Target"));
-                Assert.That(content, Does.Contain("unselected contract debt"));
+                Assert.That(content, Does.Not.Contain("Strict.Source"));
+                Assert.That(content, Does.Not.Contain("Audit.Source"));
             });
         }
         finally
