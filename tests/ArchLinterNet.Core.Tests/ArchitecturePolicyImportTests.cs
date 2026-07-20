@@ -87,11 +87,11 @@ public sealed class ArchitecturePolicyImportTests
     [Test]
     public void Load_MonolithicVirtualPolicy_UsesInjectedFileSystem()
     {
-        const string policyPath = "/virtual/architecture/root.yml";
+        const string PolicyPath = "/virtual/architecture/root.yml";
         var fileSystem = new FakeArchitectureFileSystem();
-        fileSystem.AddFile(policyPath, EffectiveRootYaml(), DateTime.UtcNow);
+        fileSystem.AddFile(PolicyPath, EffectiveRootYaml(), DateTime.UtcNow);
 
-        ArchitectureContractDocument document = new ArchitecturePolicyDocumentLoader(fileSystem).Load(policyPath);
+        ArchitectureContractDocument document = new ArchitecturePolicyDocumentLoader(fileSystem).Load(PolicyPath);
 
         Assert.That(document.Layers, Contains.Key("domain"));
     }
