@@ -135,6 +135,10 @@ through the native `getattrlist` object metadata API, using `ATTR_CMN_DEVID`,
 - **WHEN** a policy imports a named pipe or another non-regular filesystem object
 - **THEN** loading fails with the `SourceShape` category without opening the object for content reading
 
+#### Scenario: Windows rejects a directory source
+- **WHEN** a selected root or imported path resolves to a directory on Windows
+- **THEN** loading fails with the `SourceShape` category rather than an access-denied diagnostic
+
 #### Scenario: native inspection failure retains its platform context
 - **WHEN** a native metadata call fails for a reason other than a missing path or access denial
 - **THEN** loading fails with the `PlatformFailure` category and the native error domain and code

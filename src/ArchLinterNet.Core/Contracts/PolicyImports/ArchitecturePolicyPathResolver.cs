@@ -95,17 +95,9 @@ internal sealed class ArchitecturePolicyPathResolver : IArchitecturePolicyPathRe
         {
             return Directory.EnumerateFileSystemEntries(path).ToArray();
         }
-        catch (DirectoryNotFoundException)
+        catch (Exception exception) when (IsManagedFileSystemException(exception))
         {
-            throw Missing(authoredPath);
-        }
-        catch (UnauthorizedAccessException)
-        {
-            throw Unreadable(authoredPath);
-        }
-        catch (IOException)
-        {
-            throw Unreadable(authoredPath);
+            throw ClassifyManagedFileSystemFailure(authoredPath, exception);
         }
     }
 
@@ -116,21 +108,9 @@ internal sealed class ArchitecturePolicyPathResolver : IArchitecturePolicyPathRe
             _ = File.GetAttributes(path);
             return Path.GetFullPath(path);
         }
-        catch (FileNotFoundException)
+        catch (Exception exception) when (IsManagedFileSystemException(exception))
         {
-            throw Missing(authoredPath);
-        }
-        catch (DirectoryNotFoundException)
-        {
-            throw Missing(authoredPath);
-        }
-        catch (UnauthorizedAccessException)
-        {
-            throw Unreadable(authoredPath);
-        }
-        catch (IOException)
-        {
-            throw Unreadable(authoredPath);
+            throw ClassifyManagedFileSystemFailure(authoredPath, exception);
         }
     }
 
@@ -159,21 +139,9 @@ internal sealed class ArchitecturePolicyPathResolver : IArchitecturePolicyPathRe
 
             return Path.GetFullPath(current);
         }
-        catch (FileNotFoundException)
+        catch (Exception exception) when (IsManagedFileSystemException(exception))
         {
-            throw Missing(authoredPath);
-        }
-        catch (DirectoryNotFoundException)
-        {
-            throw Missing(authoredPath);
-        }
-        catch (UnauthorizedAccessException)
-        {
-            throw Unreadable(authoredPath);
-        }
-        catch (IOException)
-        {
-            throw Unreadable(authoredPath);
+            throw ClassifyManagedFileSystemFailure(authoredPath, exception);
         }
     }
 
@@ -213,22 +181,54 @@ internal sealed class ArchitecturePolicyPathResolver : IArchitecturePolicyPathRe
         return GetUnixFileIdentity(path, authoredPath);
     }
 
+    [ExcludeFromCodeCoverage]
     private static string GetWindowsFileIdentity(string path, string authoredPath)
     {
+        try
+        {
+            if ((File.GetAttributes(path) & FileAttributes.Directory) != 0)
+            {
+                throw NotRegularFile(authoredPath);
+            }
+        }
+        catch (FileNotFoundException)
+        {
+            throw Missing(authoredPath);
+        }
+        catch (DirectoryNotFoundException)
+        {
+            throw Missing(authoredPath);
+        }
+        catch (UnauthorizedAccessException)
+        {
+            throw Unreadable(authoredPath);
+        }
+        catch (IOException)
+        {
+            throw Unreadable(authoredPath);
+        }
+
         using SafeFileHandle handle = CreateFile(
             path,
             GenericRead,
             FileShareRead | FileShareWrite | FileShareDelete,
             IntPtr.Zero,
             OpenExisting,
-            FileAttributeNormal,
+            FileAttributeNormal | FileFlagBackupSemantics,
             IntPtr.Zero);
         if (handle.IsInvalid)
         {
             throw ClassifyWindowsNativeFailure(authoredPath, Marshal.GetLastPInvokeError());
         }
 
-        if (GetFileType(handle) != FileTypeDisk)
+        uint fileType = GetFileType(handle);
+        int fileTypeError = fileType == FileTypeUnknown ? Marshal.GetLastPInvokeError() : 0;
+        if (fileTypeError != 0)
+        {
+            throw ClassifyWindowsNativeFailure(authoredPath, fileTypeError);
+        }
+
+        if (fileType != FileTypeDisk)
         {
             throw NotRegularFile(authoredPath);
         }
@@ -236,6 +236,11 @@ internal sealed class ArchitecturePolicyPathResolver : IArchitecturePolicyPathRe
         if (!GetFileInformationByHandle(handle, out ByHandleFileInformation information))
         {
             throw ClassifyWindowsNativeFailure(authoredPath, Marshal.GetLastPInvokeError());
+        }
+
+        if ((information.FileAttributes & FileAttributeDirectory) != 0)
+        {
+            throw NotRegularFile(authoredPath);
         }
 
         ulong index = ((ulong)information.FileIndexHigh << 32) | information.FileIndexLow;
@@ -365,6 +370,26 @@ internal sealed class ArchitecturePolicyPathResolver : IArchitecturePolicyPathRe
             $"Policy import '{authoredPath}' is not readable.");
     }
 
+    internal static ArchitecturePolicyImportException ClassifyManagedFileSystemFailure(
+        string authoredPath,
+        Exception exception)
+    {
+        return exception switch
+        {
+            FileNotFoundException or DirectoryNotFoundException => Missing(authoredPath),
+            UnauthorizedAccessException or IOException => Unreadable(authoredPath),
+            _ => throw new ArgumentException("The exception is not a managed filesystem failure.", nameof(exception))
+        };
+    }
+
+    private static bool IsManagedFileSystemException(Exception exception)
+    {
+        return exception is FileNotFoundException
+            or DirectoryNotFoundException
+            or UnauthorizedAccessException
+            or IOException;
+    }
+
     internal static ArchitecturePolicyImportException ClassifyWindowsNativeFailure(string authoredPath, int error)
     {
         return error switch
@@ -397,7 +422,10 @@ internal sealed class ArchitecturePolicyPathResolver : IArchitecturePolicyPathRe
     private const uint FileShareWrite = 0x00000002;
     private const uint FileShareDelete = 0x00000004;
     private const uint OpenExisting = 3;
+    private const uint FileAttributeDirectory = 0x00000010;
     private const uint FileAttributeNormal = 0x00000080;
+    private const uint FileFlagBackupSemantics = 0x02000000;
+    private const uint FileTypeUnknown = 0x00000000;
     private const uint FileTypeDisk = 0x00000001;
     private const uint FileTypeMask = 0xF000;
     private const uint RegularFile = 0x8000;

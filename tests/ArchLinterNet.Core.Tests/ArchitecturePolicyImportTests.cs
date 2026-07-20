@@ -480,6 +480,40 @@ public sealed class ArchitecturePolicyImportTests
     }
 
     [Test]
+    public void Load_DirectoryImport_ExposesSourceShapeCategoryOnWindows()
+    {
+        if (!OperatingSystem.IsWindows())
+        {
+            Assert.Ignore("The regression fixture exercises the Windows CreateFile path.");
+        }
+
+        string root = Write("architecture/root.yml", RootYaml("directory.yml"));
+        Directory.CreateDirectory(Path.Combine(Path.GetDirectoryName(root)!, "directory.yml"));
+
+        ArchitecturePolicyImportException exception = Assert.Throws<ArchitecturePolicyImportException>(
+            () => new ArchitecturePolicyDocumentLoader().Load(root))!;
+
+        Assert.That(exception.Category, Is.EqualTo(ArchitecturePolicyImportErrorCategory.SourceShape));
+    }
+
+    [Test]
+    public void Load_DirectoryRoot_ExposesSourceShapeCategoryOnWindows()
+    {
+        if (!OperatingSystem.IsWindows())
+        {
+            Assert.Ignore("The regression fixture exercises the Windows CreateFile path.");
+        }
+
+        string root = Path.Combine(_temporaryDirectory, "architecture", "root.yml");
+        Directory.CreateDirectory(root);
+
+        ArchitecturePolicyImportException exception = Assert.Throws<ArchitecturePolicyImportException>(
+            () => new ArchitecturePolicyDocumentLoader().Load(root))!;
+
+        Assert.That(exception.Category, Is.EqualTo(ArchitecturePolicyImportErrorCategory.SourceShape));
+    }
+
+    [Test]
     public void ImportErrorCategories_PreserveReleasedNumericValues()
     {
         Assert.Multiple(() =>
@@ -527,6 +561,22 @@ public sealed class ArchitecturePolicyImportTests
         {
             Assert.That(exception.Message, Does.Contain("errno 5"));
         }
+    }
+
+    [TestCase(typeof(FileNotFoundException), ArchitecturePolicyImportErrorCategory.MissingFile)]
+    [TestCase(typeof(DirectoryNotFoundException), ArchitecturePolicyImportErrorCategory.MissingFile)]
+    [TestCase(typeof(UnauthorizedAccessException), ArchitecturePolicyImportErrorCategory.UnreadableFile)]
+    [TestCase(typeof(IOException), ArchitecturePolicyImportErrorCategory.UnreadableFile)]
+    public void PathResolver_ClassifiesManagedFileSystemFailures(
+        Type exceptionType,
+        ArchitecturePolicyImportErrorCategory category)
+    {
+        var exception = (Exception)Activator.CreateInstance(exceptionType)!;
+
+        ArchitecturePolicyImportException result =
+            ArchitecturePolicyPathResolver.ClassifyManagedFileSystemFailure("fragment.yml", exception);
+
+        Assert.That(result.Category, Is.EqualTo(category));
     }
 
     [Test]
