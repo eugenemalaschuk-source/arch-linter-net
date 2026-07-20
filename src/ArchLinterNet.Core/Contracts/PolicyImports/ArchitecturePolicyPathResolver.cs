@@ -6,6 +6,13 @@ namespace ArchLinterNet.Core.Contracts.PolicyImports;
 
 internal sealed partial class ArchitecturePolicyPathResolver : IArchitecturePolicyPathResolver
 {
+    internal static string ReadVerifiedAllText(string path, string authoredPath, string expectedFileIdentity)
+    {
+        return OperatingSystem.IsWindows()
+            ? ReadWindowsFile(path, authoredPath, expectedFileIdentity)
+            : ReadUnixFile(path, authoredPath, expectedFileIdentity);
+    }
+
     public ArchitecturePolicyRootPath ResolveRoot(string rootPath)
     {
         string fullPath = Path.GetFullPath(rootPath);
@@ -80,7 +87,7 @@ internal sealed partial class ArchitecturePolicyPathResolver : IArchitecturePoli
             {
                 throw new ArchitecturePolicyImportException(
                     ArchitecturePolicyImportErrorCategory.PathCaseMismatch,
-                    $"Policy import '{authoredPath}' does not match on-disk casing at '{caseInsensitive}'.");
+                    $"Policy import '{authoredPath}' does not match on-disk casing.");
             }
 
             throw Missing(authoredPath);
@@ -167,7 +174,7 @@ internal sealed partial class ArchitecturePolicyPathResolver : IArchitecturePoli
         {
             throw new ArchitecturePolicyImportException(
                 ArchitecturePolicyImportErrorCategory.OutOfBoundary,
-                $"Policy import '{authoredPath}' resolves outside repository boundary '{boundary}'.");
+                $"Policy import '{authoredPath}' resolves outside the repository boundary.");
         }
     }
 
@@ -245,6 +252,178 @@ internal sealed partial class ArchitecturePolicyPathResolver : IArchitecturePoli
 
         ulong index = ((ulong)information.FileIndexHigh << 32) | information.FileIndexLow;
         return $"windows:{information.VolumeSerialNumber:X8}:{index:X16}";
+    }
+
+    private static string ReadWindowsFile(string path, string authoredPath, string expectedFileIdentity)
+    {
+        using SafeFileHandle handle = OpenWindowsRegularFile(path, authoredPath, out string identity);
+        EnsureExpectedIdentity(authoredPath, expectedFileIdentity, identity);
+        using var stream = new FileStream(handle, FileAccess.Read);
+        using var reader = new StreamReader(stream);
+        return reader.ReadToEnd();
+    }
+
+    private static SafeFileHandle OpenWindowsRegularFile(string path, string authoredPath, out string identity)
+    {
+        try
+        {
+            if ((File.GetAttributes(path) & FileAttributes.Directory) != 0)
+            {
+                throw NotRegularFile(authoredPath);
+            }
+        }
+        catch (FileNotFoundException)
+        {
+            throw Missing(authoredPath);
+        }
+        catch (DirectoryNotFoundException)
+        {
+            throw Missing(authoredPath);
+        }
+        catch (UnauthorizedAccessException)
+        {
+            throw Unreadable(authoredPath);
+        }
+        catch (IOException)
+        {
+            throw Unreadable(authoredPath);
+        }
+
+        SafeFileHandle handle = CreateFile(
+            path,
+            GenericRead,
+            FileShareRead | FileShareWrite | FileShareDelete,
+            IntPtr.Zero,
+            OpenExisting,
+            FileAttributeNormal | FileFlagBackupSemantics,
+            IntPtr.Zero);
+        if (handle.IsInvalid)
+        {
+            handle.Dispose();
+            throw ClassifyWindowsNativeFailure(authoredPath, Marshal.GetLastPInvokeError());
+        }
+
+        uint fileType = GetFileType(handle);
+        int fileTypeError = fileType == FileTypeUnknown ? Marshal.GetLastPInvokeError() : 0;
+        if (fileTypeError != 0)
+        {
+            handle.Dispose();
+            throw ClassifyWindowsNativeFailure(authoredPath, fileTypeError);
+        }
+
+        if (fileType != FileTypeDisk)
+        {
+            handle.Dispose();
+            throw NotRegularFile(authoredPath);
+        }
+
+        if (!GetFileInformationByHandle(handle, out ByHandleFileInformation information))
+        {
+            handle.Dispose();
+            throw ClassifyWindowsNativeFailure(authoredPath, Marshal.GetLastPInvokeError());
+        }
+
+        if ((information.FileAttributes & FileAttributeDirectory) != 0)
+        {
+            handle.Dispose();
+            throw NotRegularFile(authoredPath);
+        }
+
+        ulong index = ((ulong)information.FileIndexHigh << 32) | information.FileIndexLow;
+        identity = $"windows:{information.VolumeSerialNumber:X8}:{index:X16}";
+        return handle;
+    }
+
+    private static string ReadUnixFile(string path, string authoredPath, string expectedFileIdentity)
+    {
+        int descriptor = Open(path, OpenReadOnly | OpenNonBlocking);
+        if (descriptor < 0)
+        {
+            throw ClassifyUnixNativeFailure(authoredPath, Marshal.GetLastPInvokeError());
+        }
+
+        using var handle = new SafeFileHandle((IntPtr)descriptor, ownsHandle: true);
+        string identity = GetUnixHandleIdentity(handle, authoredPath);
+        EnsureExpectedIdentity(authoredPath, expectedFileIdentity, identity);
+        using var stream = new FileStream(handle, FileAccess.Read);
+        using var reader = new StreamReader(stream);
+        return reader.ReadToEnd();
+    }
+
+    private static string GetUnixHandleIdentity(SafeFileHandle handle, string authoredPath)
+    {
+        int descriptor = handle.DangerousGetHandle().ToInt32();
+        if (OperatingSystem.IsMacOS())
+        {
+            var attributes = new DarwinAttributeList
+            {
+                BitmapCount = AttributeBitMapCount,
+                CommonAttributes = CommonDeviceAttribute | CommonObjectTypeAttribute | CommonFileIdAttribute,
+            };
+            if (GetAttributeList(
+                    $"/dev/fd/{descriptor}",
+                    ref attributes,
+                    out DarwinFileIdentityAttributes identity,
+                    (nuint)Marshal.SizeOf<DarwinFileIdentityAttributes>(),
+                    options: 0) != 0)
+            {
+                throw ClassifyUnixNativeFailure(authoredPath, Marshal.GetLastPInvokeError());
+            }
+
+            if (identity.ObjectType != DarwinRegularFile)
+            {
+                throw NotRegularFile(authoredPath);
+            }
+
+            return $"darwin:{identity.Device:X8}:{identity.FileId:X16}";
+        }
+
+        return RuntimeInformation.ProcessArchitecture switch
+        {
+            Architecture.X64 => GetLinuxX64HandleIdentity(descriptor, authoredPath),
+            Architecture.Arm64 => GetLinuxArm64HandleIdentity(descriptor, authoredPath),
+            _ => throw NotRegularFile(authoredPath)
+        };
+    }
+
+    private static string GetLinuxX64HandleIdentity(int descriptor, string authoredPath)
+    {
+        if (FStatLinuxX64(descriptor, out LinuxX64Stat stat) != 0)
+        {
+            throw ClassifyUnixNativeFailure(authoredPath, Marshal.GetLastPInvokeError());
+        }
+
+        if (!IsRegularFile(stat.Mode))
+        {
+            throw NotRegularFile(authoredPath);
+        }
+
+        return $"unix:{stat.Device:X16}:{stat.Inode:X16}";
+    }
+
+    private static string GetLinuxArm64HandleIdentity(int descriptor, string authoredPath)
+    {
+        if (FStatLinuxArm64(descriptor, out LinuxArm64Stat stat) != 0)
+        {
+            throw ClassifyUnixNativeFailure(authoredPath, Marshal.GetLastPInvokeError());
+        }
+
+        if (!IsRegularFile(stat.Mode))
+        {
+            throw NotRegularFile(authoredPath);
+        }
+
+        return $"unix:{stat.Device:X16}:{stat.Inode:X16}";
+    }
+
+    private static void EnsureExpectedIdentity(string authoredPath, string expectedFileIdentity, string actualFileIdentity)
+    {
+        if (!string.Equals(expectedFileIdentity, actualFileIdentity, StringComparison.Ordinal))
+        {
+            throw new ArchitecturePolicyImportException(
+                ArchitecturePolicyImportErrorCategory.PlatformFailure,
+                $"Policy import '{authoredPath}' changed while it was being opened.");
+        }
     }
 
     private static string GetUnixFileIdentity(string path, string authoredPath)
@@ -413,6 +592,8 @@ internal sealed partial class ArchitecturePolicyPathResolver : IArchitecturePoli
     }
 
     private const uint GenericRead = 0x80000000;
+    private const int OpenReadOnly = 0;
+    private static int OpenNonBlocking => OperatingSystem.IsMacOS() ? 0x0004 : 0x0800;
     private const uint FileShareRead = 0x00000001;
     private const uint FileShareWrite = 0x00000002;
     private const uint FileShareDelete = 0x00000004;
@@ -453,6 +634,15 @@ internal sealed partial class ArchitecturePolicyPathResolver : IArchitecturePoli
 
     [DllImport("libc", SetLastError = true, EntryPoint = "stat")]
     private static extern int StatLinuxArm64(string path, out LinuxArm64Stat stat);
+
+    [DllImport("libc", SetLastError = true, EntryPoint = "fstat")]
+    private static extern int FStatLinuxX64(int descriptor, out LinuxX64Stat stat);
+
+    [DllImport("libc", SetLastError = true, EntryPoint = "fstat")]
+    private static extern int FStatLinuxArm64(int descriptor, out LinuxArm64Stat stat);
+
+    [DllImport("libc", SetLastError = true, EntryPoint = "open")]
+    private static extern int Open(string path, int flags);
 
     [LibraryImport("libc", EntryPoint = "getattrlist", SetLastError = true, StringMarshalling = StringMarshalling.Utf8)]
     private static partial int GetAttributeList(

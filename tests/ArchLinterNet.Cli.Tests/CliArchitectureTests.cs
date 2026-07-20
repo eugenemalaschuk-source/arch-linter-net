@@ -110,6 +110,7 @@ public sealed class CliArchitectureTests
         {
             Assert.That(exitCode, Is.EqualTo(CliExitCodes.InvalidArgumentsOrRuntimeError));
             Assert.That(console.StdOut, Does.Contain("architecture_policy_error"));
+            Assert.That(console.StdOut, Does.Contain("SourceShape"));
             Assert.That(console.StdOut, Does.Contain("architecture/root.yml"));
             Assert.That(console.StdOut, Does.Contain("policy_location"));
             Assert.That(console.StdOut, Does.Contain("source_path"));

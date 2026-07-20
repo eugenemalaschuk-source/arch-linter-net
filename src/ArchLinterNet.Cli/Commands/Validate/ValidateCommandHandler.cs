@@ -24,7 +24,7 @@ internal sealed class ValidateCommandHandler(ICliRuntime runtime, ICliConsole co
         }
         catch (Exception ex) when (TryGetPolicyDiagnostic(ex, out ArchitecturePolicyDiagnostic? diagnostic))
         {
-            WritePolicyDiagnostic(options.Format, ex.Message, diagnostic!);
+            WritePolicyDiagnostic(options.Format, ex, diagnostic!);
             return CliExitCodes.InvalidArgumentsOrRuntimeError;
         }
         catch (Exception ex)
@@ -162,11 +162,13 @@ internal sealed class ValidateCommandHandler(ICliRuntime runtime, ICliConsole co
         return diagnostic is not null;
     }
 
-    private void WritePolicyDiagnostic(string format, string message, ArchitecturePolicyDiagnostic diagnostic)
+    private void WritePolicyDiagnostic(string format, Exception exception, ArchitecturePolicyDiagnostic diagnostic)
     {
+        ArchitecturePolicyImportErrorCategory? category = (exception as ArchitecturePolicyImportException)?.Category;
+        string message = exception.Message;
         if (format == "json")
         {
-            PolicyDiagnosticOutputWriter.WriteJson(console, message, diagnostic);
+            PolicyDiagnosticOutputWriter.WriteJson(console, message, diagnostic, category);
             return;
         }
 
@@ -189,6 +191,7 @@ internal sealed class ValidateCommandHandler(ICliRuntime runtime, ICliConsole co
                             {
                                 ruleId = "architecture-policy",
                                 message = new { text = message },
+                                properties = new { error_category = category?.ToString() },
                                 locations = diagnostic.Location is null ? Array.Empty<object>() : new object[]
                                 {
                                     new

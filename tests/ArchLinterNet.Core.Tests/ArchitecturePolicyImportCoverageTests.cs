@@ -1,3 +1,4 @@
+using System.Runtime.InteropServices;
 using ArchLinterNet.Core.Contracts;
 using ArchLinterNet.Core.Contracts.PolicyImports;
 using ArchLinterNet.Core.Model;
@@ -6,7 +7,7 @@ using NUnit.Framework;
 namespace ArchLinterNet.Core.Tests;
 
 [TestFixture]
-public sealed class ArchitecturePolicyImportCoverageTests
+public sealed partial class ArchitecturePolicyImportCoverageTests
 {
     [Test]
     public void Load_MissingVirtualPolicy_ExposesRootMissingFileDiagnostic()
@@ -45,6 +46,41 @@ public sealed class ArchitecturePolicyImportCoverageTests
             Assert.That(exception.Message, Is.EqualTo("Root policy 'architecture/root.yml' could not be inspected (native error)."));
         });
     }
+
+    [Test]
+    public void ReadVerifiedAllText_ReplacedRegularFileWithNamedPipe_ExposesSourceShape()
+    {
+        if (OperatingSystem.IsWindows())
+        {
+            Assert.Ignore("The regression fixture uses POSIX mkfifo.");
+        }
+
+        string directory = Path.Combine(Path.GetTempPath(), $"arch-linter-secure-reader-{Guid.NewGuid():N}", "architecture");
+        Directory.CreateDirectory(directory);
+        string policyPath = Path.Combine(directory, "root.yml");
+        File.WriteAllText(policyPath, "version: 1\n");
+        ArchitecturePolicyRootPath root = new ArchitecturePolicyPathResolver().ResolveRoot(policyPath);
+        File.Delete(policyPath);
+        Assert.That(CreateNamedPipe(policyPath, 0x180), Is.EqualTo(0));
+
+        try
+        {
+            ArchitecturePolicyImportException exception = Assert.Throws<ArchitecturePolicyImportException>(
+                () => ArchitecturePolicyPathResolver.ReadVerifiedAllText(
+                    root.PhysicalPath,
+                    "architecture/root.yml",
+                    root.FileIdentity))!;
+
+            Assert.That(exception.Category, Is.EqualTo(ArchitecturePolicyImportErrorCategory.SourceShape));
+        }
+        finally
+        {
+            Directory.Delete(Path.GetDirectoryName(directory)!, recursive: true);
+        }
+    }
+
+    [LibraryImport("libc", EntryPoint = "mkfifo", SetLastError = true, StringMarshalling = StringMarshalling.Utf8)]
+    private static partial int CreateNamedPipe(string pathName, uint mode);
 
     private sealed class ThrowingPolicyPathResolver : IArchitecturePolicyPathResolver
     {

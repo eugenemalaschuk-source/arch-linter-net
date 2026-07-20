@@ -1,3 +1,4 @@
+using ArchLinterNet.Core.IO;
 using ArchLinterNet.Core.IO.Abstractions;
 using ArchLinterNet.Core.Model;
 
@@ -9,12 +10,15 @@ internal static class ArchitecturePolicySourceReader
         IArchitectureFileSystem fileSystem,
         string path,
         string sourcePath,
+        string? expectedFileIdentity,
         ArchitecturePolicySourceLocation location,
         IEnumerable<string> importChain)
     {
         try
         {
-            return fileSystem.ReadAllText(path);
+            return fileSystem is ArchitectureFileSystem && expectedFileIdentity is not null
+                ? ArchitecturePolicyPathResolver.ReadVerifiedAllText(path, sourcePath, expectedFileIdentity)
+                : fileSystem.ReadAllText(path);
         }
         catch (FileNotFoundException)
         {

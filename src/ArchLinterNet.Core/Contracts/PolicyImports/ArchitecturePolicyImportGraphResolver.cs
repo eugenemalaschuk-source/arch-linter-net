@@ -200,8 +200,9 @@ internal sealed class ArchitecturePolicyImportGraphResolver
             resolved.FileIdentity,
             ArchitecturePolicySourceReader.ReadAllText(
                 _fileSystem,
-                resolved.FullPath,
+                resolved.PhysicalPath,
                 resolved.PortableIdentity,
+                resolved.FileIdentity,
                 importLocation,
                 importChain));
         state.PortableIdentities.Add(resolved.PortableIdentity);

@@ -51,7 +51,7 @@ public sealed partial class ArchitecturePolicyDocumentLoader : IArchitecturePoli
 
     public ArchitectureContractDocument Load(string policyPath)
     {
-        EnsureSelectedRootIsRegularFile(policyPath);
+        ArchitecturePolicyRootPath? resolvedRoot = EnsureSelectedRootIsRegularFile(policyPath);
 
         ArchitecturePolicySourceDescriptor rootDescriptor =
             ArchitecturePolicyProvenanceFactory.CreateRootDescriptor(_pathResolver, policyPath);
@@ -73,8 +73,9 @@ public sealed partial class ArchitecturePolicyDocumentLoader : IArchitecturePoli
 
         string yaml = ArchitecturePolicySourceReader.ReadAllText(
             _fileSystem,
-            policyPath,
+            resolvedRoot?.PhysicalPath ?? policyPath,
             rootDescriptor.SourcePath,
+            resolvedRoot?.FileIdentity,
             ArchitecturePolicyDiagnosticFactory.Location(rootDescriptor),
             rootDescriptor.ImportChain);
         ArchitecturePolicyProvenanceIndex provenance;
@@ -149,16 +150,16 @@ public sealed partial class ArchitecturePolicyDocumentLoader : IArchitecturePoli
         return document;
     }
 
-    private void EnsureSelectedRootIsRegularFile(string policyPath)
+    private ArchitecturePolicyRootPath? EnsureSelectedRootIsRegularFile(string policyPath)
     {
         if (_fileSystem is not ArchitectureFileSystem)
         {
-            return;
+            return null;
         }
 
         try
         {
-            _ = _pathResolver.ResolveRoot(policyPath);
+            return _pathResolver.ResolveRoot(policyPath);
         }
         catch (ArchitecturePolicyImportException exception)
         {
