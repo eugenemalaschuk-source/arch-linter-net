@@ -66,7 +66,7 @@ public sealed class ArchitectureBaselineApplicationService(
         entries.AddRange(newEntries);
         entries.AddRange(comparison.OutOfScope);
 
-        ArchitectureBaselineDocument updated = baselineGenerator.BuildFromEntries(entries);
+        ArchitectureBaselineDocument updated = baselineGenerator.BuildFromEntries(entries, existingBaseline.Version);
         string yaml = baselineGenerator.Serialize(updated);
 
         return new BaselineUpdateOutcome(
@@ -96,7 +96,7 @@ public sealed class ArchitectureBaselineApplicationService(
         survivors.AddRange(comparison.Frozen);
         survivors.AddRange(comparison.OutOfScope);
 
-        ArchitectureBaselineDocument pruned = baselineGenerator.BuildFromEntries(survivors);
+        ArchitectureBaselineDocument pruned = baselineGenerator.BuildFromEntries(survivors, existingBaseline.Version);
         string yaml = baselineGenerator.Serialize(pruned);
 
         List<BaselineRemovedEntry> removed = comparison.Resolved
@@ -173,6 +173,106 @@ public sealed class ArchitectureBaselineApplicationService(
             ConfigurationViolations: Array.Empty<ArchitectureViolation>());
     }
 
+    public BaselineMigrateOutcome Migrate(BaselineMigrateRequest request)
+    {
+        if (!request.DryRun)
+        {
+            if (string.IsNullOrWhiteSpace(request.OutputPath))
+            {
+                return Fail("--output is required for a non-dry-run migration. Use --dry-run/--check to report without writing.");
+            }
+
+            if (PathsRefersToSameFile(request.OutputPath, request.BaselinePath))
+            {
+                return Fail("--output must not be the same path as --baseline; baseline migrate never overwrites the source file.");
+            }
+        }
+
+        ArchitectureBaselineDocument legacyBaseline = baselineLoadingService.Load(request.BaselinePath);
+        if (legacyBaseline.Version != 1)
+        {
+            return Fail(
+                $"baseline migrate only upgrades version 1 baselines to version 2; '{request.BaselinePath}' is already version {legacyBaseline.Version}.");
+        }
+
+        (_, IReadOnlyList<ArchitectureBaselineCandidate>? candidates, List<ArchitectureViolation> configViolations) =
+            CollectCandidates(request.PolicyPath, request.Mode, request.ConditionSetName, request.ContractIds);
+
+        if (candidates == null)
+        {
+            return new BaselineMigrateOutcome(
+                false, null, 0, 0, 0, Array.Empty<BaselineMigrateEntryReport>(), configViolations);
+        }
+
+        var report = new List<BaselineMigrateEntryReport>();
+        var migratedEntries = new List<ArchitectureBaselineComparisonEntry>();
+        int matched = 0, stale = 0, ambiguous = 0;
+
+        foreach (string groupName in ArchitectureBaselineContractGroups.GroupNames)
+        {
+            foreach (var entry in legacyBaseline.Baseline.GetGroup(groupName))
+            {
+                foreach (var ignore in entry.IgnoredViolations)
+                {
+                    List<ArchitectureBaselineCandidate> matches = candidates
+                        .Where(c => c.ContractGroup == groupName
+                            && string.Equals(c.ContractId, entry.Id, StringComparison.OrdinalIgnoreCase)
+                            && c.SourceType == ignore.SourceType
+                            && c.ForbiddenReference == ignore.ForbiddenReference)
+                        .ToList();
+
+                    if (matches.Count == 1)
+                    {
+                        matched++;
+                        ArchitectureBaselineCandidate candidate = matches[0];
+                        migratedEntries.Add(new ArchitectureBaselineComparisonEntry(
+                            groupName, entry.Id, candidate.SourceType, candidate.ForbiddenReference, ignore.Reason, candidate.Identity));
+                        report.Add(new BaselineMigrateEntryReport(
+                            groupName, entry.Id, ignore.SourceType, ignore.ForbiddenReference, "matched", 1));
+                    }
+                    else if (matches.Count == 0)
+                    {
+                        stale++;
+                        report.Add(new BaselineMigrateEntryReport(
+                            groupName, entry.Id, ignore.SourceType, ignore.ForbiddenReference, "stale", 0));
+                    }
+                    else
+                    {
+                        ambiguous++;
+                        report.Add(new BaselineMigrateEntryReport(
+                            groupName, entry.Id, ignore.SourceType, ignore.ForbiddenReference, "ambiguous", matches.Count));
+                    }
+                }
+            }
+        }
+
+        bool canWrite = !request.DryRun && ambiguous == 0;
+        string? yaml = null;
+        if (canWrite)
+        {
+            ArchitectureBaselineDocument migrated = baselineGenerator.BuildFromEntries(
+                migratedEntries, version: ArchitectureViolationIdentity.CurrentVersion);
+            yaml = baselineGenerator.Serialize(migrated);
+        }
+
+        bool succeeded = request.DryRun ? ambiguous == 0 : canWrite;
+
+        return new BaselineMigrateOutcome(succeeded, yaml, matched, stale, ambiguous, report, Array.Empty<ArchitectureViolation>());
+    }
+
+    private static BaselineMigrateOutcome Fail(string error)
+    {
+        return new BaselineMigrateOutcome(
+            false, null, 0, 0, 0, Array.Empty<BaselineMigrateEntryReport>(), Array.Empty<ArchitectureViolation>(), error);
+    }
+
+    private static bool PathsRefersToSameFile(string outputPath, string baselinePath)
+    {
+        string normalizedOutput = Path.GetFullPath(outputPath);
+        string normalizedBaseline = Path.GetFullPath(baselinePath);
+        return string.Equals(normalizedOutput, normalizedBaseline, StringComparison.OrdinalIgnoreCase);
+    }
+
     private (ArchitectureContractDocument Document, IReadOnlyList<ArchitectureBaselineCandidate>? Candidates, List<ArchitectureViolation> ConfigurationViolations)
         CollectCandidates(string policyPath, string mode, string? conditionSetName, IReadOnlyCollection<string>? contractIds)
     {
@@ -236,7 +336,7 @@ public sealed class ArchitectureBaselineApplicationService(
             contractExecutor.Execute(runner.Session, ModeAudit, handlerRegistry, includeAsmdefContracts: false);
         }
 
-        return (document, runner.BaselineCandidates, new List<ArchitectureViolation>());
+        return (document, ArchitectureBaselineCandidateOccurrenceAssigner.Assign(runner.BaselineCandidates), new List<ArchitectureViolation>());
     }
 
     private static HashSet<string> CollectAvailableContractIds(ArchitectureContractDocument document, string mode)

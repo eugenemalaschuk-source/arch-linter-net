@@ -1,3 +1,4 @@
+using ArchLinterNet.Core.Model;
 using YamlDotNet.Serialization;
 
 namespace ArchLinterNet.Core.Contracts;
@@ -6,7 +7,41 @@ public sealed record ArchitectureBaselineCandidate(
     string ContractGroup,
     string? ContractId,
     string SourceType,
-    string ForbiddenReference);
+    string ForbiddenReference,
+    ArchitectureViolationIdentity? Identity = null);
+
+/// <summary>
+/// Assigns a stable, non-line-based <see cref="ArchitectureViolationIdentity.Occurrence"/> discriminator
+/// to candidates that otherwise share every other identity field, so distinct occurrences of the same
+/// source/target pair within one contract never collapse into a single baseline entry. Runs once, in the
+/// deterministic order candidates were collected in, immediately after collection — before both baseline
+/// comparison and baseline generation consume the list, so the two stay consistent with each other.
+/// </summary>
+public static class ArchitectureBaselineCandidateOccurrenceAssigner
+{
+    public static IReadOnlyList<ArchitectureBaselineCandidate> Assign(IReadOnlyList<ArchitectureBaselineCandidate> candidates)
+    {
+        var counters = new Dictionary<(string ContractGroup, string? ContractId, ArchitectureViolationIdentity Identity), int>();
+        var result = new List<ArchitectureBaselineCandidate>(candidates.Count);
+
+        foreach (ArchitectureBaselineCandidate candidate in candidates)
+        {
+            if (candidate.Identity == null)
+            {
+                result.Add(candidate);
+                continue;
+            }
+
+            var key = (candidate.ContractGroup, candidate.ContractId, candidate.Identity with { Occurrence = 0 });
+            int occurrence = counters.TryGetValue(key, out int count) ? count : 0;
+            counters[key] = occurrence + 1;
+
+            result.Add(candidate with { Identity = candidate.Identity with { Occurrence = occurrence } });
+        }
+
+        return result;
+    }
+}
 
 public sealed class ArchitectureBaselineDocument
 {
@@ -247,5 +282,84 @@ public sealed class ArchitectureBaselineContractEntry
     public string Id { get; set; } = string.Empty;
 
     [YamlMember(Alias = "ignored_violations")]
-    public List<ArchitectureIgnoredViolation> IgnoredViolations { get; set; } = new();
+    public List<ArchitectureBaselineIgnoredViolation> IgnoredViolations { get; set; } = new();
+}
+
+/// <summary>
+/// One <c>ignored_violations</c> entry inside a baseline file. Version-1 files only ever populate
+/// <see cref="SourceType"/>/<see cref="ForbiddenReference"/>/<see cref="Reason"/> (the legacy shape);
+/// version-2 files additionally populate the structured identity fields below, which is what
+/// <see cref="ArchitectureBaselineComparer"/> and <see cref="ArchitectureBaselineGenerator"/> use for
+/// matching once the containing document's <see cref="ArchitectureBaselineDocument.Version"/> is 2.
+/// </summary>
+public sealed class ArchitectureBaselineIgnoredViolation
+{
+    [YamlMember(Alias = "source_type")] public string SourceType { get; set; } = string.Empty;
+
+    [YamlMember(Alias = "forbidden_reference")]
+    public string ForbiddenReference { get; set; } = string.Empty;
+
+    [YamlMember(Alias = "reason")] public string Reason { get; set; } = string.Empty;
+
+    [YamlMember(Alias = "identity_version")] public int? IdentityVersion { get; set; }
+
+    [YamlMember(Alias = "contract_family")] public string? ContractFamily { get; set; }
+
+    [YamlMember(Alias = "kind")] public string? Kind { get; set; }
+
+    [YamlMember(Alias = "source_assembly")] public string? SourceAssembly { get; set; }
+
+    [YamlMember(Alias = "source_member")] public string? SourceMember { get; set; }
+
+    [YamlMember(Alias = "target_assembly")] public string? TargetAssembly { get; set; }
+
+    [YamlMember(Alias = "target_type")] public string? TargetType { get; set; }
+
+    [YamlMember(Alias = "target_member")] public string? TargetMember { get; set; }
+
+    [YamlMember(Alias = "occurrence")] public int? Occurrence { get; set; }
+
+    [YamlMember(Alias = "configuration")] public string? Configuration { get; set; }
+
+    /// <summary>
+    /// Builds the structured identity for a version-2 entry. Callers MUST only invoke this on
+    /// entries belonging to a version-2 document (guarded by the document's <c>Version</c>).
+    /// </summary>
+    public ArchitectureViolationIdentity ToIdentity(string contractId)
+    {
+        return new ArchitectureViolationIdentity(
+            IdentityVersion ?? ArchitectureViolationIdentity.CurrentVersion,
+            ContractFamily ?? string.Empty,
+            Kind ?? string.Empty,
+            contractId,
+            SourceAssembly,
+            SourceType,
+            SourceMember,
+            TargetAssembly,
+            TargetType,
+            TargetMember,
+            Occurrence ?? 0,
+            Configuration);
+    }
+
+    public static ArchitectureBaselineIgnoredViolation FromIdentity(
+        ArchitectureViolationIdentity identity, string sourceTypeDisplay, string forbiddenReferenceDisplay, string reason)
+    {
+        return new ArchitectureBaselineIgnoredViolation
+        {
+            SourceType = sourceTypeDisplay,
+            ForbiddenReference = forbiddenReferenceDisplay,
+            Reason = reason,
+            IdentityVersion = identity.IdentityVersion,
+            ContractFamily = identity.ContractFamily,
+            Kind = identity.Kind,
+            SourceAssembly = identity.SourceAssembly,
+            SourceMember = identity.SourceMember,
+            TargetAssembly = identity.TargetAssembly,
+            TargetType = identity.TargetType,
+            TargetMember = identity.TargetMember,
+            Occurrence = identity.Occurrence,
+            Configuration = identity.Configuration,
+        };
+    }
 }

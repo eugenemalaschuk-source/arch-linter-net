@@ -71,10 +71,13 @@ arch-linter-net baseline generate \
 ```
 
 The generated file captures every current violation as an `ignored_violations`
-entry grouped by contract ID. Example output:
+entry grouped by contract ID. Newly generated baselines use format **version
+2**, which carries a versioned, structured identity per entry instead of
+relying on the `source_type`/`forbidden_reference` display text alone. Example
+output:
 
 ```yaml
-version: 1
+version: 2
 baseline:
   strict:
     - id: app-boundaries
@@ -82,10 +85,38 @@ baseline:
         - source_type: MyApp.App.Legacy.LegacyService
           forbidden_reference: MyApp.Infrastructure.LegacyDb
           reason: "Initial baseline — migration tracked in #123"
+          identity_version: 2
+          contract_family: strict
+          kind: dependency
+          source_assembly: MyApp.App
+          target_assembly: MyApp.Infrastructure
+          target_member: MyApp.Infrastructure.LegacyDb
+          occurrence: 0
         - source_type: MyApp.App.Old.OldController
           forbidden_reference: MyApp.Infrastructure.SqlRepo
           reason: "Initial baseline — migration tracked in #123"
+          identity_version: 2
+          contract_family: strict
+          kind: dependency
+          source_assembly: MyApp.App
+          target_assembly: MyApp.Infrastructure
+          target_member: MyApp.Infrastructure.SqlRepo
+          occurrence: 0
 ```
+
+`source_type`/`forbidden_reference` remain present as human-readable display
+fields, but for version 2 entries they are **not** the identity — the
+structured fields are. This is what makes two same-named types in different
+assemblies distinguishable (`source_assembly`/`target_assembly`), and what
+lets multiple distinct forbidden-call occurrences inside one source type each
+get their own entry instead of collapsing into one (`occurrence`). Fields that
+a particular contract family doesn't yet resolve (e.g. `source_member` for
+most families) are simply omitted.
+
+Baseline files written before this change use format **version 1** (the plain
+`(source_type, forbidden_reference)` pair as identity). They continue to load
+and match exactly as before — nothing about their behavior changes until you
+explicitly run `baseline migrate` (below).
 
 ### Baseline lifecycle
 
@@ -93,10 +124,11 @@ baseline:
 1. **Merge** — run `arch-linter-net --policy ... --baseline baseline.yml --mode strict` to enforce boundaries going forward
 1. **Update** — run `baseline update` to add newly-introduced debt while preserving the `reason` text on entries that are still valid, without hand-editing YAML
 1. **Prune** — run `baseline prune` to remove entries whose violation has been fixed or whose contract ID no longer exists, and see exactly what was removed
-1. **Diff** — run `baseline diff` at any time to see new/existing/resolved/configuration-error entries without changing the file
-1. **Verify** — run `baseline verify` in CI to fail the build if the baseline has drifted out of sync (resolved entries or unknown contract IDs), keeping the baseline honest over time
+1. **Diff** — run `baseline diff` at any time to see new/matched/stale/configuration-error entries without changing the file
+1. **Verify** — run `baseline verify` in CI to fail the build if the baseline has drifted out of sync (stale entries or unknown contract IDs), keeping the baseline honest over time
+1. **Migrate** — run `baseline migrate` once, on demand, to deterministically upgrade an existing version 1 baseline to version 2's structured identity
 
-These five subcommands share `--config`/`--policy`, `--mode` (`strict`/`audit`/`all`),
+These six subcommands share `--config`/`--policy`, `--mode` (`strict`/`audit`/`all`),
 `--condition-set`, and `--contract` (repeatable, restricts to specific contract IDs),
 consistent with `validate`.
 
@@ -151,10 +183,50 @@ arch-linter-net baseline verify \
   --baseline baseline.yml
 ```
 
-Runs the same comparison as `diff` but exits non-zero if any resolved entries
+Runs the same comparison as `diff` but exits non-zero if any stale entries
 or configuration errors are found — intended as a CI gate that keeps a
 baseline from silently accumulating stale debt. It does not fail on new,
 unbaselined violations (that's `validate`'s job).
+
+#### Migrate
+
+```bash
+arch-linter-net baseline migrate \
+  --config architecture/dependencies.arch.yml \
+  --baseline baseline.yml \
+  --output baseline.v2.yml \
+  --dry-run
+```
+
+Deterministically upgrades a legacy **version 1** baseline to **version 2**'s
+structured identity. Each legacy entry is correlated against freshly
+collected current-codebase violations by its exact legacy
+`(source_type, forbidden_reference)` pair, scoped to its contract ID:
+
+- **Exactly one match** — the entry is rewritten using that violation's full
+  structured identity; its `reason` is preserved verbatim.
+- **Zero matches** — the entry no longer corresponds to any current
+  violation. It is reported as `stale` and dropped from the migrated output
+  (the underlying debt is gone; there's nothing to migrate).
+- **More than one match** — the legacy pair is ambiguous: it could refer to
+  more than one distinct violation now that identity is structured. Migration
+  refuses to guess. The entry is reported as `ambiguous` and, outside of
+  `--dry-run`, the whole run fails closed — **no file is written** until you
+  resolve the ambiguity (typically by baselining the specific occurrences you
+  intend to keep with a fresh `baseline generate --contract <id>` pass, or by
+  accepting the new, disambiguated entries as new debt).
+
+Run `--dry-run`/`--check` first to see the classification report without
+writing anything — useful as its own CI gate (exit code 1 if any entries are
+ambiguous, 0 otherwise). Once the report is clean, drop `--dry-run` and
+provide `--output` to write the migrated file. `baseline migrate` never
+writes to the same path as `--baseline` — pick a distinct `--output`, review
+it, then swap it in for the original file yourself.
+
+Migration is opt-in and on-demand: nothing about `validate`, `generate`,
+`update`, `prune`, `diff`, or `verify` changes for a baseline you haven't
+migrated. Version 1 files keep working with their existing behavior
+indefinitely.
 
 ### Merge semantics
 
@@ -163,8 +235,21 @@ policy's `ignored_violations` lists before validation. The merge:
 
 - Appends new entries to each contract's existing ignores
 - Skips duplicate `(source_type, forbidden_reference)` pairs that already exist
+  (this dedup is unchanged for both version 1 and version 2 files — it only
+  affects the in-memory ignore list used by `ArchitectureIgnoreMatcher`
+  during validation, not baseline-comparison identity)
 - Reports an error if a baseline entry references a contract ID that doesn't
   exist in the policy (exit code 2)
+
+Baseline **comparison** (`generate`/`update`/`prune`/`diff`/`verify`/`migrate`)
+uses a different, stricter notion of identity than the merge above: version 1
+baselines compare by the exact `(source_type, forbidden_reference)` pair as
+before; version 2 baselines compare by the full structured
+`ArchitectureViolationIdentity` (contract family, kind, source/target
+assembly, source/target type and member, and an occurrence discriminator).
+One baseline entry always suppresses exactly one identity — two same-named
+types in different assemblies, or two distinct forbidden calls in the same
+source type, are never treated as the same entry under version 2.
 
 ### Stale baseline entries
 
@@ -194,7 +279,7 @@ is captured as `source_type: <namespace>` /
 `forbidden_reference: "uncovered namespace"`:
 
 ```yaml
-version: 1
+version: 2
 baseline:
   strict_coverage:
     - id: feature-namespace-coverage
@@ -202,6 +287,11 @@ baseline:
         - source_type: MyApp.Features.Legacy
           forbidden_reference: "uncovered namespace"
           reason: "Coverage baseline — tracked in #103"
+          identity_version: 2
+          contract_family: coverage
+          kind: coverage
+          target_member: "uncovered namespace"
+          occurrence: 0
 ```
 
 For a `rule_input`-scoped coverage contract, each unresolved or empty-input
@@ -209,7 +299,7 @@ rule reference is captured as `source_type: <referenced-contract-id>` /
 `forbidden_reference: <layer-name>`:
 
 ```yaml
-version: 1
+version: 2
 baseline:
   strict_coverage:
     - id: rule-input-coverage
@@ -217,7 +307,17 @@ baseline:
         - source_type: video-to-ghost-rule
           forbidden_reference: ghost
           reason: "Coverage baseline — tracked in #103"
+          identity_version: 2
+          contract_family: coverage
+          kind: coverage
+          target_member: ghost
+          occurrence: 0
 ```
+
+Coverage identity does not yet carry assembly/member qualification (it's
+categorical by nature — a namespace or a rule reference, not a symbol) — the
+`occurrence` discriminator alone is enough to keep distinct coverage findings
+from colliding.
 
 `validate --baseline` suppresses these baselined coverage findings while still
 reporting newly uncovered areas, exactly like ordinary dependency violations.

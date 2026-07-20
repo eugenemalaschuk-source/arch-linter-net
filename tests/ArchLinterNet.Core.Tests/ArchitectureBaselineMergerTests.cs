@@ -45,7 +45,7 @@ public sealed class ArchitectureBaselineMergerTests
                     new()
                     {
                         Id = "my-rule",
-                        IgnoredViolations = new List<ArchitectureIgnoredViolation>
+                        IgnoredViolations = new List<ArchitectureBaselineIgnoredViolation>
                         {
                             new() { SourceType = "Old.Type", ForbiddenReference = "Bad.Type", Reason = "migration" }
                         }
@@ -88,7 +88,7 @@ public sealed class ArchitectureBaselineMergerTests
                     new()
                     {
                         Id = "nonexistent-rule",
-                        IgnoredViolations = new List<ArchitectureIgnoredViolation>
+                        IgnoredViolations = new List<ArchitectureBaselineIgnoredViolation>
                         {
                             new() { SourceType = "X", ForbiddenReference = "Y", Reason = "stale" }
                         }
@@ -146,7 +146,7 @@ public sealed class ArchitectureBaselineMergerTests
                     new()
                     {
                         Id = "my-rule",
-                        IgnoredViolations = new List<ArchitectureIgnoredViolation>
+                        IgnoredViolations = new List<ArchitectureBaselineIgnoredViolation>
                         {
                             new() { SourceType = "Old.Type", ForbiddenReference = "Bad.Type", Reason = "baseline" }
                         }
@@ -205,7 +205,7 @@ public sealed class ArchitectureBaselineMergerTests
                     new()
                     {
                         Id = "my-rule",
-                        IgnoredViolations = new List<ArchitectureIgnoredViolation>
+                        IgnoredViolations = new List<ArchitectureBaselineIgnoredViolation>
                         {
                             new() { SourceType = "New", ForbiddenReference = "Added", Reason = "baseline" }
                         }
@@ -275,7 +275,7 @@ public sealed class ArchitectureBaselineMergerTests
                         Id = "exec-no-res",
                         IgnoredViolations = preMergeViolations
                             .SelectMany(v => v.ForbiddenReferences.Select(fr =>
-                                new ArchitectureIgnoredViolation
+                                new ArchitectureBaselineIgnoredViolation
                                 {
                                     SourceType = v.SourceType,
                                     ForbiddenReference = fr,
@@ -339,7 +339,7 @@ public sealed class ArchitectureBaselineMergerTests
                     new()
                     {
                         Id = "exec-no-res",
-                        IgnoredViolations = new List<ArchitectureIgnoredViolation>
+                        IgnoredViolations = new List<ArchitectureBaselineIgnoredViolation>
                         {
                             new()
                             {
@@ -395,7 +395,7 @@ public sealed class ArchitectureBaselineMergerTests
                     new()
                     {
                         Id = "coverage-rule",
-                        IgnoredViolations = new List<ArchitectureIgnoredViolation>
+                        IgnoredViolations = new List<ArchitectureBaselineIgnoredViolation>
                         {
                             new() { SourceType = "My.Namespace", ForbiddenReference = "uncovered namespace", Reason = "accepted" }
                         }
@@ -436,7 +436,7 @@ public sealed class ArchitectureBaselineMergerTests
                     new()
                     {
                         Id = "asmdep-rule",
-                        IgnoredViolations = new List<ArchitectureIgnoredViolation>
+                        IgnoredViolations = new List<ArchitectureBaselineIgnoredViolation>
                         {
                             new()
                             {
@@ -476,7 +476,7 @@ public sealed class ArchitectureBaselineMergerTests
                     new()
                     {
                         Id = "nonexistent-coverage-rule",
-                        IgnoredViolations = new List<ArchitectureIgnoredViolation>
+                        IgnoredViolations = new List<ArchitectureBaselineIgnoredViolation>
                         {
                             new() { SourceType = "X", ForbiddenReference = "Y", Reason = "stale" }
                         }

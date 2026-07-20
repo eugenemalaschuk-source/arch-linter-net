@@ -150,7 +150,7 @@ public sealed class ArchitectureBaselineApplicationServiceFakeCompositionTests
                         new()
                         {
                             Id = "audit-rule",
-                            IgnoredViolations = new List<ArchitectureIgnoredViolation>
+                            IgnoredViolations = new List<ArchitectureBaselineIgnoredViolation>
                             {
                                 new() { SourceType = "SrcY", ForbiddenReference = "RefY", Reason = "audit reason" },
                             },
@@ -205,7 +205,7 @@ public sealed class ArchitectureBaselineApplicationServiceFakeCompositionTests
                     new()
                     {
                         Id = "known-rule",
-                        IgnoredViolations = new List<ArchitectureIgnoredViolation>
+                        IgnoredViolations = new List<ArchitectureBaselineIgnoredViolation>
                         {
                             new() { SourceType = "SrcA", ForbiddenReference = "RefA", Reason = "old reason A" },
                             new() { SourceType = "SrcB", ForbiddenReference = "RefB", Reason = "old reason B" },
@@ -214,7 +214,7 @@ public sealed class ArchitectureBaselineApplicationServiceFakeCompositionTests
                     new()
                     {
                         Id = "unknown-rule",
-                        IgnoredViolations = new List<ArchitectureIgnoredViolation>
+                        IgnoredViolations = new List<ArchitectureBaselineIgnoredViolation>
                         {
                             new() { SourceType = "SrcC", ForbiddenReference = "RefC", Reason = "old reason C" },
                         },
@@ -368,7 +368,7 @@ public sealed class ArchitectureBaselineApplicationServiceFakeCompositionTests
                         new()
                         {
                             Id = "known-rule",
-                            IgnoredViolations = new List<ArchitectureIgnoredViolation>
+                            IgnoredViolations = new List<ArchitectureBaselineIgnoredViolation>
                             {
                                 new() { SourceType = "SrcA", ForbiddenReference = "RefA", Reason = "old reason A" },
                             },
@@ -423,7 +423,7 @@ public sealed class ArchitectureBaselineApplicationServiceFakeCompositionTests
                     new()
                     {
                         Id = "known-rule",
-                        IgnoredViolations = new List<ArchitectureIgnoredViolation>
+                        IgnoredViolations = new List<ArchitectureBaselineIgnoredViolation>
                         {
                             new() { SourceType = "SrcA", ForbiddenReference = "RefA", Reason = "old reason A" },
                         },
@@ -431,7 +431,7 @@ public sealed class ArchitectureBaselineApplicationServiceFakeCompositionTests
                     new()
                     {
                         Id = "other-rule",
-                        IgnoredViolations = new List<ArchitectureIgnoredViolation>
+                        IgnoredViolations = new List<ArchitectureBaselineIgnoredViolation>
                         {
                             new() { SourceType = "SrcX", ForbiddenReference = "RefX", Reason = "old reason X" },
                         },
@@ -543,7 +543,7 @@ public sealed class ArchitectureBaselineApplicationServiceFakeCompositionTests
                     new()
                     {
                         Id = "known-rule",
-                        IgnoredViolations = new List<ArchitectureIgnoredViolation>
+                        IgnoredViolations = new List<ArchitectureBaselineIgnoredViolation>
                         {
                             new() { SourceType = "SrcA", ForbiddenReference = "RefA", Reason = "old reason A" },
                         },
@@ -554,7 +554,7 @@ public sealed class ArchitectureBaselineApplicationServiceFakeCompositionTests
                     new()
                     {
                         Id = "audit-rule",
-                        IgnoredViolations = new List<ArchitectureIgnoredViolation>
+                        IgnoredViolations = new List<ArchitectureBaselineIgnoredViolation>
                         {
                             new() { SourceType = "SrcY", ForbiddenReference = "RefY", Reason = "old reason Y" },
                         },

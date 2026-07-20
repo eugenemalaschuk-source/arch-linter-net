@@ -118,7 +118,7 @@ public sealed class ArchitectureCoverageBaselineTests
         Assert.That(baseline.Baseline.StrictCoverage, Has.Count.EqualTo(1));
         Assert.That(baseline.Baseline.StrictCoverage[0].Id, Is.EqualTo("feature-namespace-coverage"));
         Assert.That(baseline.Baseline.StrictCoverage[0].IgnoredViolations,
-            Has.Some.Matches<ArchitectureIgnoredViolation>(v =>
+            Has.Some.Matches<ArchitectureBaselineIgnoredViolation>(v =>
                 v.SourceType.EndsWith("AlphaGap", StringComparison.Ordinal)
                 && v.ForbiddenReference == "uncovered namespace"));
     }
@@ -137,9 +137,9 @@ public sealed class ArchitectureCoverageBaselineTests
         Assert.That(baseline.Baseline.StrictCoverage, Has.Count.EqualTo(1));
         var entry = baseline.Baseline.StrictCoverage[0];
         Assert.That(entry.Id, Is.EqualTo("rule-input-coverage"));
-        Assert.That(entry.IgnoredViolations, Has.Some.Matches<ArchitectureIgnoredViolation>(v =>
+        Assert.That(entry.IgnoredViolations, Has.Some.Matches<ArchitectureBaselineIgnoredViolation>(v =>
             v.SourceType == "video-to-ghost-rule" && v.ForbiddenReference == "ghost"));
-        Assert.That(entry.IgnoredViolations, Has.Some.Matches<ArchitectureIgnoredViolation>(v =>
+        Assert.That(entry.IgnoredViolations, Has.Some.Matches<ArchitectureBaselineIgnoredViolation>(v =>
             v.SourceType == "typo-rule" && v.ForbiddenReference == "does_not_exist_layer"));
     }
 

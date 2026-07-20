@@ -46,3 +46,14 @@ internal sealed record BaselineVerifyCommandOptions(
     string Format,
     IReadOnlyList<string> ContractIds,
     bool ShowHelp);
+
+internal sealed record BaselineMigrateCommandOptions(
+    string PolicyPath,
+    string? BaselinePath,
+    string? OutputPath,
+    string Mode,
+    string? ConditionSetName,
+    string Format,
+    IReadOnlyList<string> ContractIds,
+    bool DryRun,
+    bool ShowHelp);

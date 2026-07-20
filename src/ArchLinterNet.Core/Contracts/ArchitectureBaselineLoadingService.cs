@@ -58,10 +58,10 @@ public sealed class ArchitectureBaselineLoadingService : IArchitectureBaselineLo
 
     private static void ValidateBaseline(ArchitectureBaselineDocument document)
     {
-        if (document.Version != 1)
+        if (document.Version is not (1 or 2))
         {
             throw new InvalidOperationException(
-                $"Unsupported baseline version: {document.Version}. Only version 1 is supported.");
+                $"Unsupported baseline version: {document.Version}. Only versions 1 and 2 are supported.");
         }
 
         foreach (string groupName in ArchitectureBaselineContractGroups.GroupNames)

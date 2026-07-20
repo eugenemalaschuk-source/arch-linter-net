@@ -1,8 +1,5 @@
-# Baseline Generation Specification
+## MODIFIED Requirements
 
-## Purpose
-Generates and consumes baseline files that record pre-existing violations so policies can be enforced incrementally going forward.
-## Requirements
 ### Requirement: User can generate a baseline file from current violations
 
 The system SHALL provide a `baseline generate` CLI subcommand that runs validation against the current codebase and writes a baseline file containing `ignored_violations` entries for all current violations not already suppressed by manual ignores.
@@ -111,135 +108,6 @@ The baseline file SHALL NOT be validated against the main policy schema. It SHAL
 - **WHEN** user runs any `baseline` subcommand or `validate --baseline` against a file whose `version` is neither `1` nor `2`
 - **THEN** the command SHALL fail with an explicit unsupported-version error and a non-zero exit code
 
-### Requirement: Baseline entries cover cycle and sibling-cycle contracts
-
-The system SHALL collect baseline candidates for `strict_cycles`, `audit_cycles`, `strict_acyclic_siblings`, and `audit_acyclic_siblings` contracts by recording the `(source_type, forbidden_reference)` pairs at the point where `IsIgnored` is called, before graph edges are aggregated.
-
-Cycle/acyclic-sibling baseline entries SHALL use the same exact `(source_type, forbidden_reference)` format as other contract types.
-
-#### Scenario: Cycle violations are baseline-able
-- **WHEN** a cycle exists between types across layers and baseline generation is run
-- **THEN** the exact type-level reference pairs that form the cycle edges SHALL appear in the baseline under the appropriate cycle contract
-
-#### Scenario: Cycle baseline suppresses type-level edges
-- **WHEN** user applies a cycle baseline and fixes some (but not all) cycle edges
-- **THEN** only the unfixed edges SHALL be reported as new cycle violations; the fixed edges SHALL NOT appear as violations
-
-### Requirement: Reason field is configurable
-
-The baseline generator SHALL support an optional `--reason` flag that overrides the default `"generated baseline"` reason value in all generated entries.
-
-Without `--reason`, the generator SHALL use `"generated baseline"` as the default reason.
-
-The reason field SHALL be informational only — it SHALL NOT participate in ignore matching or deduplication.
-
-#### Scenario: Custom reason overrides default
-- **WHEN** user runs `arch-linter baseline generate --config policy.yml --output baseline.yml --reason "legacy debt accepted Q2 2026"`
-- **THEN** all entries in the generated baseline SHALL have `reason: "legacy debt accepted Q2 2026"` instead of `"generated baseline"`
-
-### Requirement: Baseline generation covers all contract types that support ignored violations
-
-The system SHALL support baseline generation for the following contract groups: `strict`, `audit`, `strict_layers`, `audit_layers`, `strict_allow_only`, `audit_allow_only`, `strict_cycles`, `audit_cycles`, `strict_acyclic_siblings`, `audit_acyclic_siblings`, `strict_method_body`, `audit_method_body`, `strict_independence`, `audit_independence`, `strict_protected`, `audit_protected`, `strict_external`, `audit_external`, `strict_coverage`, `audit_coverage`.
-
-The system SHALL NOT generate baseline entries for `strict_asmdef`, `audit_asmdef`, `strict_layer_templates`, or `audit_layer_templates` (contract types that do not support `ignored_violations`).
-
-#### Scenario: Unsupported contract groups produce no baseline entries
-- **WHEN** user runs baseline generation on a project with asmdef contracts
-- **THEN** the baseline SHALL NOT contain a `strict_asmdef` or `audit_asmdef` section
-
-### Requirement: Baseline generation covers coverage contracts
-
-The system SHALL support baseline generation for the `strict_coverage` and `audit_coverage` contract groups, using the same `id` + `ignored_violations` (`source_type` + `forbidden_reference`) entry format as all other supported contract groups.
-
-Coverage findings from `strict_coverage`/`audit_coverage` contracts (uncovered namespace, unresolved rule reference, empty-input rule reference) SHALL be eligible as baseline candidates the same way ordinary dependency violations are, using the `(source_type, forbidden_reference)` pair already produced for each finding.
-
-#### Scenario: Generate baseline captures uncovered namespaces
-- **WHEN** user runs baseline generation on a project with namespaces not covered by any layer or layer template, evaluated against a `strict_coverage` or `audit_coverage` contract
-- **THEN** each uncovered namespace SHALL appear as an exact `(source_type, forbidden_reference)` entry under the `strict_coverage` or `audit_coverage` group and the corresponding contract ID
-
-#### Scenario: Generate baseline captures unresolved and empty-input rule references
-- **WHEN** user runs baseline generation on a project with a `rule_input`-scoped coverage contract that finds unresolved layer references or layer references with no matching code
-- **THEN** each finding SHALL appear as an exact `(source_type, forbidden_reference)` entry under the corresponding `strict_coverage` or `audit_coverage` contract ID
-
-#### Scenario: Coverage baseline generation is deterministic
-- **WHEN** user runs baseline generation twice against the same unchanged codebase with coverage contracts configured
-- **THEN** the `strict_coverage`/`audit_coverage` sections of both output files SHALL be byte-identical
-
-### Requirement: Coverage gate accepts a baseline of existing uncovered areas
-
-The system SHALL accept `ignored_violations` entries on `strict_coverage` and `audit_coverage` contracts, merged in the same way `--baseline` merges entries for other contract groups, so that coverage findings already present in the baseline are suppressed while new uncovered areas are still reported.
-
-This baseline mechanism SHALL apply only to coverage contract findings. It SHALL NOT suppress, hide, or otherwise interact with ordinary dependency-violation findings from `strict`, `audit`, or any other non-coverage contract group.
-
-#### Scenario: Baseline suppresses previously-accepted uncovered namespaces but flags new ones
-- **WHEN** user runs `validate --baseline` against a project where some uncovered namespaces are recorded in the `strict_coverage` baseline and a new namespace becomes uncovered
-- **THEN** the namespaces present in the baseline SHALL NOT be reported as coverage failures; the new uncovered namespace SHALL still fail validation
-
-#### Scenario: Coverage baseline does not affect ordinary violations
-- **WHEN** user runs `validate --baseline` against a project with both a coverage baseline and ordinary dependency violations not present in any baseline
-- **THEN** the ordinary dependency violations SHALL still be reported as failures, unaffected by the coverage baseline entries
-
-#### Scenario: Audit-only coverage baseline does not fail the gate
-- **WHEN** an `audit_coverage` contract has uncovered areas recorded in its baseline and the corresponding `audit_coverage` contract is configured as non-blocking per existing audit semantics
-- **THEN** validation SHALL report the audit coverage findings without failing the gate, consistent with how `audit` contract groups already behave for ordinary violations
-
-### Requirement: Resolved coverage debt is detected as a stale baseline entry
-
-When a `strict_coverage`/`audit_coverage` baseline entry's `(source_type, forbidden_reference)` pair no longer matches any current coverage finding (the namespace became covered, or the rule reference became resolved), the system SHALL report it as an unmatched ignored violation, using the same `unmatched_ignored_violations` configuration (`error`/`warn`/`off`) already applied to other contract groups.
-
-#### Scenario: Resolved uncovered namespace becomes a stale baseline entry
-- **WHEN** a namespace recorded in the `strict_coverage` baseline is later covered by a layer or layer template, then validation is run with `unmatched_ignored_violations: error`
-- **THEN** the namespace SHALL NOT be reported as a coverage failure, and the stale baseline entry SHALL be reported as an unmatched ignored violation
-
-#### Scenario: Resolved rule-input coverage debt becomes a stale baseline entry
-- **WHEN** a `rule_input`-scoped coverage finding recorded in the baseline (unresolved or empty-input rule reference) is later resolved by adding matching code or a valid layer mapping, then validation is run
-- **THEN** the resolved finding SHALL NOT be reported, and the stale baseline entry SHALL be reported as an unmatched ignored violation
-
-### Requirement: User can update a baseline from current violations while preserving existing entries
-
-The system SHALL provide a `baseline update` CLI subcommand that reads an existing baseline file and the current codebase's violations, and writes a new baseline that:
-- retains, unchanged, every existing baseline entry whose `(contract id, source_type, forbidden_reference)` still matches a current violation, including its original `reason` text verbatim;
-- adds new entries, deterministically, for current violations that have no matching existing baseline entry, using the default reason (`"generated baseline"`) or the `--reason` override for new entries only;
-- leaves entries with no matching current violation (resolved debt) and entries referencing unknown contract ids (configuration errors) untouched in the output — `update` SHALL NOT remove them.
-
-`baseline update` SHALL accept `--policy`/`--config`, `--baseline` (existing baseline file to update), `--output`, `--mode` (strict/audit/all), `--condition-set`, `--contract` (repeatable), and `--reason`, consistent with `baseline generate`.
-
-#### Scenario: Update preserves reason on still-valid entries
-- **WHEN** user runs `baseline update` against a baseline containing an entry with a custom `reason` whose violation is still present in the current codebase
-- **THEN** the updated baseline SHALL contain that entry with the identical `reason` text, unchanged
-
-#### Scenario: Update adds new violations deterministically
-- **WHEN** user runs `baseline update` against a baseline and the current codebase has a new violation not present in the baseline
-- **THEN** the updated baseline SHALL contain a new entry for that violation using the default or `--reason` text
-
-#### Scenario: Update does not remove stale entries
-- **WHEN** user runs `baseline update` against a baseline containing an entry whose violation has been fixed in the current codebase
-- **THEN** the updated baseline SHALL still contain that entry unchanged (removal is handled by `baseline prune`, not `baseline update`)
-
-### Requirement: User can prune stale entries from a baseline
-
-The system SHALL provide a `baseline prune` CLI subcommand that reads an existing baseline file and the current codebase's violations, removes:
-- entries whose `(contract id, source_type, forbidden_reference)` no longer matches any current violation (resolved debt), and
-- entries whose contract id does not exist in the current policy (configuration error),
-
-writes the pruned baseline to `--output`, and reports the list of removed entries, each tagged with its removal reason (`resolved` or `configuration-error`), in both human-readable and `--json` output.
-
-`baseline prune` SHALL NOT add entries for new violations — pruning only removes.
-
-`baseline prune` SHALL accept `--policy`/`--config`, `--baseline`, `--output`, `--mode`, `--condition-set`, and `--contract`, consistent with `baseline generate`.
-
-#### Scenario: Prune removes resolved debt and reports it
-- **WHEN** user runs `baseline prune` against a baseline containing an entry whose violation no longer exists in the current codebase
-- **THEN** the pruned baseline SHALL NOT contain that entry, and the command output SHALL list it as removed with reason `resolved`
-
-#### Scenario: Prune removes entries with unknown contract ids and reports it
-- **WHEN** user runs `baseline prune` against a baseline containing an entry whose contract id does not exist in the current policy
-- **THEN** the pruned baseline SHALL NOT contain that entry, and the command output SHALL list it as removed with reason `configuration-error`
-
-#### Scenario: Prune leaves frozen entries untouched
-- **WHEN** user runs `baseline prune` against a baseline where every entry still matches a current violation
-- **THEN** the pruned baseline SHALL be identical to the input baseline, and no entries SHALL be reported as removed
-
 ### Requirement: User can diff a baseline against current violations
 
 The system SHALL provide a `baseline diff` CLI subcommand that compares an existing baseline file against the current codebase's violations without writing any file, and reports each violation/entry with an explicit structured `status` of exactly one of:
@@ -281,6 +149,8 @@ The system SHALL provide a `baseline verify` CLI subcommand that performs the sa
 #### Scenario: Verify does not fail on new, unbaselined debt
 - **WHEN** user runs `baseline verify` against a baseline that is otherwise fully in sync, but the current codebase has a new violation not present in the baseline
 - **THEN** the command SHALL exit with code 0
+
+## ADDED Requirements
 
 ### Requirement: User can migrate a legacy baseline file to structured identity
 
@@ -326,4 +196,3 @@ Without `--dry-run`/`--check`, `baseline migrate` SHALL require `--output` to be
 #### Scenario: CLI help describes the migrate subcommand
 - **WHEN** user runs `arch-linter baseline --help`
 - **THEN** output SHALL include usage information for `baseline migrate`
-

@@ -9,8 +9,8 @@
   "properties": {
     "version": {
       "type": "integer",
-      "const": 1,
-      "description": "Baseline schema version. Current supported version is 1."
+      "enum": [1, 2],
+      "description": "Baseline file format version. Version 1 uses the legacy exact (source_type, forbidden_reference) pair as identity. Version 2 uses a versioned, structured ArchitectureViolationIdentity per entry (see baselineViolation) and is produced by 'baseline generate' and 'baseline migrate'."
     },
     "baseline": {
       "type": "object",
@@ -287,17 +287,67 @@
         "source_type": {
           "type": "string",
           "minLength": 1,
-          "description": "Exact source type name to suppress."
+          "description": "Human-readable source type name. Identity-bearing in version 1 documents; display-only in version 2 documents (identity is the structured fields below)."
         },
         "forbidden_reference": {
           "type": "string",
           "minLength": 1,
-          "description": "Exact forbidden reference name to suppress."
+          "description": "Human-readable forbidden reference name. Identity-bearing in version 1 documents; display-only in version 2 documents (identity is the structured fields below)."
         },
         "reason": {
           "type": "string",
           "minLength": 1,
-          "description": "Human-readable migration reason or issue reference."
+          "description": "Human-readable migration reason or issue reference. Never participates in matching."
+        },
+        "identity_version": {
+          "type": "integer",
+          "enum": [2],
+          "description": "Structured identity schema version for this entry. Only present in version 2 documents."
+        },
+        "contract_family": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Contract family this identity belongs to (e.g. method_body, cycles), derived from the contract group name."
+        },
+        "kind": {
+          "type": "string",
+          "enum": ["dependency", "reference", "call", "package", "framework", "api_change", "coverage"],
+          "description": "Denormalized, stable classification of the violation kind."
+        },
+        "source_assembly": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Assembly containing the source type, where the checking family supplies it. Null/absent for families not yet assembly-qualified."
+        },
+        "source_member": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Source member, where applicable."
+        },
+        "target_assembly": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Assembly containing the target/forbidden symbol, where the checking family supplies it."
+        },
+        "target_type": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Target type, where distinct from the forbidden reference display text."
+        },
+        "target_member": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Exact forbidden symbol/member/overload. Falls back to the forbidden_reference display text for families that don't yet resolve a member independently."
+        },
+        "occurrence": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Stable, non-line-based ordinal discriminator among matches that otherwise share every other identity field within the same source unit."
+        },
+        "configuration": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Configuration/TFM qualifier, only populated where semantically relevant to the family."
         }
       }
     }

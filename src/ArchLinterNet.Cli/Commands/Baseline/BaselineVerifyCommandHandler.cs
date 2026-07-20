@@ -61,10 +61,11 @@ internal sealed class BaselineVerifyCommandHandler(ICliRuntime runtime, ICliCons
                 console.Out.WriteLine(JsonSerializer.Serialize(new
                 {
                     inSync = outcome.InSync,
-                    @new = outcome.New.Select(FormatEntryForJson),
-                    frozen = outcome.Frozen.Select(FormatEntryForJson),
-                    resolved = outcome.Resolved.Select(FormatEntryForJson),
-                    configurationErrors = outcome.ConfigurationErrors.Select(FormatEntryForJson),
+                    @new = outcome.New.Select(e => BaselineDiffCommandHandler.FormatEntryForJson(e, "new")),
+                    frozen = outcome.Frozen.Select(e => BaselineDiffCommandHandler.FormatEntryForJson(e, "matched")),
+                    resolved = outcome.Resolved.Select(e => BaselineDiffCommandHandler.FormatEntryForJson(e, "stale")),
+                    configurationErrors = outcome.ConfigurationErrors.Select(
+                        e => BaselineDiffCommandHandler.FormatEntryForJson(e, "configuration_error")),
                 }));
             }
             else
@@ -93,17 +94,5 @@ internal sealed class BaselineVerifyCommandHandler(ICliRuntime runtime, ICliCons
         {
             console.Error.WriteLine($"  {violation.SourceType}: {violation.ForbiddenNamespace}");
         }
-    }
-
-    private static object FormatEntryForJson(ArchitectureBaselineComparisonEntry entry)
-    {
-        return new
-        {
-            contractGroup = entry.ContractGroup,
-            contractId = entry.ContractId,
-            sourceType = entry.SourceType,
-            forbiddenReference = entry.ForbiddenReference,
-            reason = entry.Reason,
-        };
     }
 }

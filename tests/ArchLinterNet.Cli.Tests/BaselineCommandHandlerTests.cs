@@ -12,7 +12,7 @@ using NUnit.Framework;
 namespace ArchLinterNet.Cli.Tests;
 
 [TestFixture]
-public sealed class BaselineCommandHandlerTests
+public sealed partial class BaselineCommandHandlerTests
 {
     private static readonly string[] _contractIds = ["rule-a", "rule-b"];
 
@@ -563,6 +563,9 @@ public sealed class BaselineCommandHandlerTests
         public BaselineVerifyOutcome VerifyOutcome { get; set; } =
             new(true, true, Array.Empty<ArchitectureBaselineComparisonEntry>(), Array.Empty<ArchitectureBaselineComparisonEntry>(), Array.Empty<ArchitectureBaselineComparisonEntry>(), Array.Empty<ArchitectureBaselineComparisonEntry>(), Array.Empty<ArchitectureViolation>());
 
+        public BaselineMigrateOutcome MigrateOutcome { get; set; } =
+            new(true, "migrated", 0, 0, 0, Array.Empty<BaselineMigrateEntryReport>(), Array.Empty<ArchitectureViolation>());
+
         public Exception? GenerateException { get; set; }
 
         public Exception? UpdateException { get; set; }
@@ -573,6 +576,8 @@ public sealed class BaselineCommandHandlerTests
 
         public Exception? VerifyException { get; set; }
 
+        public Exception? MigrateException { get; set; }
+
         public BaselineGenerationRequest? GenerateRequest { get; private set; }
 
         public BaselineUpdateRequest? UpdateRequest { get; private set; }
@@ -582,6 +587,8 @@ public sealed class BaselineCommandHandlerTests
         public BaselineDiffRequest? DiffRequest { get; private set; }
 
         public BaselineVerifyRequest? VerifyRequest { get; private set; }
+
+        public BaselineMigrateRequest? MigrateRequest { get; private set; }
 
         public bool TryParseGraphLevel(string value, out ArchitectureGraphLevel level) => Enum.TryParse(value, true, out level);
 
@@ -633,6 +640,12 @@ public sealed class BaselineCommandHandlerTests
         {
             VerifyRequest = request;
             return VerifyException == null ? VerifyOutcome : throw VerifyException;
+        }
+
+        public BaselineMigrateOutcome MigrateBaseline(BaselineMigrateRequest request)
+        {
+            MigrateRequest = request;
+            return MigrateException == null ? MigrateOutcome : throw MigrateException;
         }
 
         public ArchitectureGraphOutcome BuildGraph(ArchitectureGraphRequest request) => new(_emptyGraph);

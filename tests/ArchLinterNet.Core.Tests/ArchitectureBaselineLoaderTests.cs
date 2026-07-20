@@ -137,7 +137,7 @@ baseline:
                     new()
                     {
                         Id = "project-metadata",
-                        IgnoredViolations = new List<ArchitectureIgnoredViolation>
+                        IgnoredViolations = new List<ArchitectureBaselineIgnoredViolation>
                         {
                             new()
                             {

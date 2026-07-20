@@ -54,6 +54,12 @@ public sealed class ArchitectureEngine : IDisposable, IAsyncDisposable
             .Verify(request);
     }
 
+    public BaselineMigrateOutcome MigrateBaseline(BaselineMigrateRequest request)
+    {
+        return _serviceProvider.GetRequiredService<IArchitectureBaselineApplicationService>()
+            .Migrate(request);
+    }
+
     public AsmdefValidationOutcome ValidateAsmdef(AsmdefValidationRequest request)
     {
         return _serviceProvider.GetRequiredService<IAsmdefValidationService>()

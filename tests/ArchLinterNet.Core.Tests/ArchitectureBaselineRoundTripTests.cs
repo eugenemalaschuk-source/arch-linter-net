@@ -39,7 +39,7 @@ public sealed class ArchitectureBaselineRoundTripTests
                     new()
                     {
                         Id = "dep-rule",
-                        IgnoredViolations = new List<ArchitectureIgnoredViolation>
+                        IgnoredViolations = new List<ArchitectureBaselineIgnoredViolation>
                         {
                             new()
                             {
@@ -55,7 +55,7 @@ public sealed class ArchitectureBaselineRoundTripTests
                     new()
                     {
                         Id = "no-cycles",
-                        IgnoredViolations = new List<ArchitectureIgnoredViolation>
+                        IgnoredViolations = new List<ArchitectureBaselineIgnoredViolation>
                         {
                             new()
                             {

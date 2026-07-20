@@ -32,13 +32,41 @@ internal sealed class ArchitectureContractExecutionContext
 
     public string? ContractId { get; }
 
-    public bool IsIgnored(string sourceType, string forbiddenReference)
+    public bool IsIgnored(
+        string sourceType,
+        string forbiddenReference,
+        string? sourceAssembly = null,
+        string? targetAssembly = null,
+        string? sourceMember = null,
+        string? targetMember = null)
     {
         bool ignored = ArchitectureIgnoreMatcher.IsIgnored(sourceType, forbiddenReference, _ignoredViolations, _tracker);
 
         if (!ignored && ContractId != null && _contractGroup != null && _baselineCandidates != null)
         {
-            _baselineCandidates.Add(new ArchitectureBaselineCandidate(_contractGroup, ContractId, sourceType, forbiddenReference));
+            string contractFamily = ArchitectureViolationIdentity.ResolveContractFamily(_contractGroup);
+
+            // Families that don't yet supply a richer targetMember (every family except method-body
+            // and other qualified call sites) still need SOMETHING to discriminate genuinely distinct
+            // targets from the same source — falling back to the full forbiddenReference string
+            // preserves the old (source_type, forbidden_reference) discrimination exactly, so the
+            // occurrence discriminator only kicks in for true duplicates, not distinct targets.
+            string effectiveTargetMember = targetMember ?? forbiddenReference;
+
+            var identity = new ArchitectureViolationIdentity(
+                ArchitectureViolationIdentity.CurrentVersion,
+                contractFamily,
+                ArchitectureViolationIdentity.ResolveKind(contractFamily),
+                ContractId,
+                sourceAssembly,
+                sourceType,
+                sourceMember,
+                targetAssembly,
+                null,
+                effectiveTargetMember,
+                0);
+
+            _baselineCandidates.Add(new ArchitectureBaselineCandidate(_contractGroup, ContractId, sourceType, forbiddenReference, identity));
         }
 
         return ignored;
