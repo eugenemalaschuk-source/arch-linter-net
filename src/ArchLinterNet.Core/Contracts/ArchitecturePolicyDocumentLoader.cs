@@ -56,7 +56,7 @@ public sealed partial class ArchitecturePolicyDocumentLoader : IArchitecturePoli
         ArchitecturePolicySourceDescriptor rootDescriptor = resolvedRoot is null
             ? ArchitecturePolicyProvenanceFactory.CreateRootDescriptor(_pathResolver, policyPath)
             : ArchitecturePolicyProvenanceFactory.CreateRootDescriptor(resolvedRoot);
-        if (!_fileSystem.FileExists(policyPath))
+        if (resolvedRoot is null && !_fileSystem.FileExists(policyPath))
         {
             throw ArchitecturePolicyDiagnosticFactory.Exception(
                 ArchitecturePolicyImportErrorCategory.MissingFile,

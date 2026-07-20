@@ -22,7 +22,9 @@ internal static class ArchitecturePolicySourceReader
         }
         catch (ArchitecturePolicyImportException exception)
         {
-            throw ArchitecturePolicyDiagnosticFactory.Enrich(exception, location, importChain);
+            throw location.Role == ArchitecturePolicyDocumentRole.Root
+                ? ArchitecturePolicyDiagnosticFactory.EnrichRoot(exception, location.Source)
+                : ArchitecturePolicyDiagnosticFactory.Enrich(exception, location, importChain);
         }
         catch (FileNotFoundException)
         {

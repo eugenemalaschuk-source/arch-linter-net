@@ -115,6 +115,9 @@ public sealed partial class ArchitecturePolicyImportCoverageTests
                 Assert.That(exception.Category, Is.EqualTo(ArchitecturePolicyImportErrorCategory.SourceShape));
                 Assert.That(exception.Diagnostic!.Location!.SourcePath, Is.EqualTo("architecture/root.yml"));
                 Assert.That(exception.Diagnostic.ImportChain, Is.EqualTo(descriptor.ImportChain));
+                Assert.That(
+                    exception.Message,
+                    Is.EqualTo("Root policy 'architecture/root.yml' must resolve to a readable regular file."));
             });
         }
         finally
