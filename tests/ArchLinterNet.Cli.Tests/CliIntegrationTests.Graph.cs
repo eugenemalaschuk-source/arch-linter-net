@@ -122,12 +122,13 @@ public partial class CliIntegrationTests
     [Test]
     public void Graph_MissingPolicyFile_ExitsWithError()
     {
-        var (exitCode, _, stderr) = RunCli("graph", "--policy", "/nonexistent/path.yml");
+        var (exitCode, stdout, stderr) = RunCli("graph", "--policy", "/nonexistent/path.yml");
 
         Assert.Multiple(() =>
         {
             Assert.That(exitCode, Is.EqualTo(2));
-            Assert.That(stderr, Does.Contain("not found").Or.Contains("No such file"));
+            Assert.That(stdout, Does.Contain("architecture_policy_error").And.Contain("path.yml"));
+            Assert.That(stderr, Is.Empty);
         });
     }
 
