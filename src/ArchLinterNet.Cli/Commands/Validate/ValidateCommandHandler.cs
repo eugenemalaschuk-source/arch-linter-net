@@ -168,7 +168,7 @@ internal sealed class ValidateCommandHandler(ICliRuntime runtime, ICliConsole co
         string message = exception.Message;
         if (format == "json")
         {
-            PolicyDiagnosticOutputWriter.WriteJson(console, message, diagnostic, category);
+            PolicyDiagnosticOutputWriter.WriteJson(console, message, diagnostic, category?.ToString());
             return;
         }
 

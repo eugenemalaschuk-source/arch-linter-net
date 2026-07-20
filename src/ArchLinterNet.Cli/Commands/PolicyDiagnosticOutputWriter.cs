@@ -10,9 +10,9 @@ internal static class PolicyDiagnosticOutputWriter
 {
     public static bool TryWriteJson(ICliConsole console, Exception exception)
     {
-        (ArchitecturePolicyDiagnostic? Diagnostic, ArchitecturePolicyImportErrorCategory? Category) policyError = exception switch
+        (ArchitecturePolicyDiagnostic? Diagnostic, string? Category) policyError = exception switch
         {
-            ArchitecturePolicyImportException importException => (importException.Diagnostic, importException.Category),
+            ArchitecturePolicyImportException importException => (importException.Diagnostic, importException.Category.ToString()),
             ArchitecturePolicyValidationException validationException => (validationException.Diagnostic, null),
             _ => (null, null),
         };
@@ -29,13 +29,13 @@ internal static class PolicyDiagnosticOutputWriter
         ICliConsole console,
         string message,
         ArchitecturePolicyDiagnostic diagnostic,
-        ArchitecturePolicyImportErrorCategory? category = null)
+        string? category = null)
     {
         console.Out.WriteLine(JsonSerializer.Serialize(new
         {
             kind = "architecture_policy_error",
             message,
-            error_category = category?.ToString(),
+            error_category = category,
             policy_location = diagnostic.Location is null ? null : ArchitectureDiagnosticFormatter.FormatPolicyLocationForJson(diagnostic.Location),
             related_policy_locations = diagnostic.RelatedLocations.Select(ArchitectureDiagnosticFormatter.FormatPolicyLocationForJson),
             import_chain = diagnostic.ImportChain,
