@@ -6,6 +6,7 @@ namespace ArchLinterNet.Core.Contracts.PolicyImports;
 
 internal sealed partial class ArchitecturePolicyPathResolver : IArchitecturePolicyPathResolver
 {
+    [ExcludeFromCodeCoverage]
     internal static string ReadVerifiedAllText(string path, string authoredPath, string expectedFileIdentity)
     {
         return OperatingSystem.IsWindows()
@@ -254,6 +255,7 @@ internal sealed partial class ArchitecturePolicyPathResolver : IArchitecturePoli
         return $"windows:{information.VolumeSerialNumber:X8}:{index:X16}";
     }
 
+    [ExcludeFromCodeCoverage]
     private static string ReadWindowsFile(string path, string authoredPath, string expectedFileIdentity)
     {
         using SafeFileHandle handle = OpenWindowsRegularFile(path, authoredPath, out string identity);
@@ -263,6 +265,7 @@ internal sealed partial class ArchitecturePolicyPathResolver : IArchitecturePoli
         return reader.ReadToEnd();
     }
 
+    [ExcludeFromCodeCoverage]
     private static SafeFileHandle OpenWindowsRegularFile(string path, string authoredPath, out string identity)
     {
         try
@@ -334,6 +337,7 @@ internal sealed partial class ArchitecturePolicyPathResolver : IArchitecturePoli
         return handle;
     }
 
+    [ExcludeFromCodeCoverage]
     private static string ReadUnixFile(string path, string authoredPath, string expectedFileIdentity)
     {
         int descriptor = Open(path, OpenReadOnly | OpenNonBlocking);
@@ -343,39 +347,29 @@ internal sealed partial class ArchitecturePolicyPathResolver : IArchitecturePoli
         }
 
         using var handle = new SafeFileHandle((IntPtr)descriptor, ownsHandle: true);
-        string identity = GetUnixHandleIdentity(handle, authoredPath);
+        string identity = GetUnixHandleIdentity(descriptor, authoredPath);
         EnsureExpectedIdentity(authoredPath, expectedFileIdentity, identity);
         using var stream = new FileStream(handle, FileAccess.Read);
         using var reader = new StreamReader(stream);
         return reader.ReadToEnd();
     }
 
-    private static string GetUnixHandleIdentity(SafeFileHandle handle, string authoredPath)
+    [ExcludeFromCodeCoverage]
+    private static string GetUnixHandleIdentity(int descriptor, string authoredPath)
     {
-        int descriptor = handle.DangerousGetHandle().ToInt32();
         if (OperatingSystem.IsMacOS())
         {
-            var attributes = new DarwinAttributeList
-            {
-                BitmapCount = AttributeBitMapCount,
-                CommonAttributes = CommonDeviceAttribute | CommonObjectTypeAttribute | CommonFileIdAttribute,
-            };
-            if (GetAttributeList(
-                    $"/dev/fd/{descriptor}",
-                    ref attributes,
-                    out DarwinFileIdentityAttributes identity,
-                    (nuint)Marshal.SizeOf<DarwinFileIdentityAttributes>(),
-                    options: 0) != 0)
+            if (FStatDarwin(descriptor, out DarwinStat stat) != 0)
             {
                 throw ClassifyUnixNativeFailure(authoredPath, Marshal.GetLastPInvokeError());
             }
 
-            if (identity.ObjectType != DarwinRegularFile)
+            if (!IsRegularFile(stat.Mode))
             {
                 throw NotRegularFile(authoredPath);
             }
 
-            return $"darwin:{identity.Device:X8}:{identity.FileId:X16}";
+            return $"darwin:{unchecked((uint)stat.Device):X8}:{stat.Inode:X16}";
         }
 
         return RuntimeInformation.ProcessArchitecture switch
@@ -386,6 +380,7 @@ internal sealed partial class ArchitecturePolicyPathResolver : IArchitecturePoli
         };
     }
 
+    [ExcludeFromCodeCoverage]
     private static string GetLinuxX64HandleIdentity(int descriptor, string authoredPath)
     {
         if (FStatLinuxX64(descriptor, out LinuxX64Stat stat) != 0)
@@ -401,6 +396,7 @@ internal sealed partial class ArchitecturePolicyPathResolver : IArchitecturePoli
         return $"unix:{stat.Device:X16}:{stat.Inode:X16}";
     }
 
+    [ExcludeFromCodeCoverage]
     private static string GetLinuxArm64HandleIdentity(int descriptor, string authoredPath)
     {
         if (FStatLinuxArm64(descriptor, out LinuxArm64Stat stat) != 0)
@@ -488,6 +484,7 @@ internal sealed partial class ArchitecturePolicyPathResolver : IArchitecturePoli
         return $"darwin:{identity.Device:X8}:{identity.FileId:X16}";
     }
 
+    [ExcludeFromCodeCoverage]
     private static string GetLinuxX64FileIdentity(string path, string authoredPath)
     {
         if (StatLinuxX64(path, out LinuxX64Stat stat) != 0)
@@ -503,6 +500,7 @@ internal sealed partial class ArchitecturePolicyPathResolver : IArchitecturePoli
         return $"unix:{stat.Device:X16}:{stat.Inode:X16}";
     }
 
+    [ExcludeFromCodeCoverage]
     private static string GetLinuxArm64FileIdentity(string path, string authoredPath)
     {
         if (StatLinuxArm64(path, out LinuxArm64Stat stat) != 0)
@@ -635,14 +633,20 @@ internal sealed partial class ArchitecturePolicyPathResolver : IArchitecturePoli
     [DllImport("libc", SetLastError = true, EntryPoint = "stat")]
     private static extern int StatLinuxArm64(string path, out LinuxArm64Stat stat);
 
+    [SuppressMessage("Interoperability", "SYSLIB1054:Use LibraryImportAttribute instead of DllImportAttribute", Justification = "fstat uses an ABI-specific stat buffer unsupported by LibraryImport.")]
     [DllImport("libc", SetLastError = true, EntryPoint = "fstat")]
     private static extern int FStatLinuxX64(int descriptor, out LinuxX64Stat stat);
 
+    [SuppressMessage("Interoperability", "SYSLIB1054:Use LibraryImportAttribute instead of DllImportAttribute", Justification = "fstat uses an ABI-specific stat buffer unsupported by LibraryImport.")]
     [DllImport("libc", SetLastError = true, EntryPoint = "fstat")]
     private static extern int FStatLinuxArm64(int descriptor, out LinuxArm64Stat stat);
 
-    [DllImport("libc", SetLastError = true, EntryPoint = "open")]
-    private static extern int Open(string path, int flags);
+    [SuppressMessage("Interoperability", "SYSLIB1054:Use LibraryImportAttribute instead of DllImportAttribute", Justification = "fstat uses an ABI-specific stat buffer unsupported by LibraryImport.")]
+    [DllImport("libc", SetLastError = true, EntryPoint = "fstat")]
+    private static extern int FStatDarwin(int descriptor, out DarwinStat stat);
+
+    [LibraryImport("libc", EntryPoint = "open", SetLastError = true, StringMarshalling = StringMarshalling.Utf8)]
+    private static partial int Open(string path, int flags);
 
     [LibraryImport("libc", EntryPoint = "getattrlist", SetLastError = true, StringMarshalling = StringMarshalling.Utf8)]
     private static partial int GetAttributeList(
@@ -692,6 +696,17 @@ internal sealed partial class ArchitecturePolicyPathResolver : IArchitecturePoli
         public uint Device;
         public uint ObjectType;
         public ulong FileId;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct DarwinStat
+    {
+        public int Device;
+        public ushort Mode;
+        public ushort LinkCount;
+        public ulong Inode;
+        [MarshalAs(UnmanagedType.ByValArray, SizeConst = 128)]
+        public byte[] RemainingFields;
     }
 
     [StructLayout(LayoutKind.Sequential)]
