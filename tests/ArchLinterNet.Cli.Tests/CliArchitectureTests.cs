@@ -60,8 +60,7 @@ public sealed class CliArchitectureTests
     {
         FakeCliRuntime runtime = new();
         FakeCliConsole console = new();
-        FakeFileSystem fileSystem = new(exists: true);
-        ValidateCommandHandler handler = new(runtime, console, fileSystem);
+        ValidateCommandHandler handler = new(runtime, console);
 
         int exitCode = handler.Execute(new ValidateCommandOptions(
             "policy.yml",
@@ -102,7 +101,7 @@ public sealed class CliArchitectureTests
                 new ArchitecturePolicyDiagnostic(ArchitecturePolicyDiagnosticKind.SourceShape, location, [], source.ImportChain))
         };
         FakeCliConsole console = new();
-        ValidateCommandHandler handler = new(runtime, console, new FakeFileSystem(exists: false));
+        ValidateCommandHandler handler = new(runtime, console);
 
         int exitCode = handler.Execute(new ValidateCommandOptions(
             "policy.yml", "strict", "json", [], null, false, null, false, false));
@@ -134,7 +133,7 @@ public sealed class CliArchitectureTests
                 "Contextual selector (role: DomainLayer) 'when' expression failed to evaluate: missing key")
         };
         FakeCliConsole console = new();
-        ValidateCommandHandler handler = new(runtime, console, new FakeFileSystem(exists: true));
+        ValidateCommandHandler handler = new(runtime, console);
 
         int exitCode = handler.Execute(new ValidateCommandOptions(
             "policy.yml", "strict", "json", [], null, false, null, false, false));
@@ -156,7 +155,7 @@ public sealed class CliArchitectureTests
             ExceptionToThrow = new InvalidOperationException("'when' expression failed to evaluate: missing key")
         };
         FakeCliConsole console = new();
-        ValidateCommandHandler handler = new(runtime, console, new FakeFileSystem(exists: true));
+        ValidateCommandHandler handler = new(runtime, console);
 
         int exitCode = handler.Execute(new ValidateCommandOptions(
             "policy.yml", "strict", "sarif", [], null, false, null, false, false));
@@ -185,7 +184,7 @@ public sealed class CliArchitectureTests
                 new ArchitecturePolicyDiagnostic(ArchitecturePolicyDiagnosticKind.SourceShape, location, [], source.ImportChain))
         };
         FakeCliConsole console = new();
-        ValidateCommandHandler handler = new(runtime, console, new FakeFileSystem(exists: true));
+        ValidateCommandHandler handler = new(runtime, console);
 
         int exitCode = handler.Execute(new ValidateCommandOptions(
             "policy.yml", "strict", "sarif", [], null, false, null, false, false));
@@ -218,7 +217,7 @@ public sealed class CliArchitectureTests
                 new ArchitecturePolicyDiagnostic(ArchitecturePolicyDiagnosticKind.CompositionConflict, primary, [related], root.ImportChain))
         };
         FakeCliConsole console = new();
-        ValidateCommandHandler handler = new(runtime, console, new FakeFileSystem(exists: true));
+        ValidateCommandHandler handler = new(runtime, console);
 
         handler.Execute(new ValidateCommandOptions("policy.yml", "strict", "sarif", [], null, false, null, false, false));
 
