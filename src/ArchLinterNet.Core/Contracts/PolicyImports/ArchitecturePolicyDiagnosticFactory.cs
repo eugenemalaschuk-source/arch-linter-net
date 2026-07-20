@@ -91,10 +91,10 @@ internal static class ArchitecturePolicyDiagnosticFactory
 
     private static string RootMessage(string message)
     {
-        const string importPrefix = "Policy import ";
-        const string rootPrefix = "Root policy ";
-        return message.StartsWith(importPrefix, StringComparison.Ordinal)
-            ? rootPrefix + message[importPrefix.Length..]
+        const string ImportPrefix = "Policy import ";
+        const string RootPrefix = "Root policy ";
+        return message.StartsWith(ImportPrefix, StringComparison.Ordinal)
+            ? RootPrefix + message[ImportPrefix.Length..]
             : message;
     }
 
