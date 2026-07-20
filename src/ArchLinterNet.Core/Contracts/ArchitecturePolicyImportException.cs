@@ -13,7 +13,8 @@ public enum ArchitecturePolicyImportErrorCategory
     GraphLimit = 6,
     SourceShape = 7,
     CompositionConflict = 8,
-    UnreadableFile = 9
+    UnreadableFile = 9,
+    PlatformFailure = 10
 }
 
 public sealed class ArchitecturePolicyImportException : InvalidOperationException

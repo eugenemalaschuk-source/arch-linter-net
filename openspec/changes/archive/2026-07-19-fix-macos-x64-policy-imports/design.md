@@ -27,23 +27,25 @@ identities.
 
 ## Decisions
 
-### Use physical canonical paths as macOS file identities
+### Use `getattrlist` file identity and vnode type on macOS
 
-After resolving each link segment and validating the target is a regular file,
-the macOS resolver will use the physical canonical path as the graph identity.
-This removes the Darwin `stat` declaration while retaining the established,
-tested Windows and Linux identity paths. Canonicalization continues to collapse
+After resolving each link segment, the macOS resolver obtains `ATTR_CMN_DEVID`,
+`ATTR_CMN_FILEID`, and `ATTR_CMN_OBJTYPE` through `getattrlist`. The device and
+file ID form the graph identity, preserving duplicate detection for hard-link
+aliases; vnode type must be `VREG` before the source is opened. The response
+buffer has an explicit four-byte packing contract, independent of the host
+processor's `stat` ABI. Physical canonicalization continues to collapse
 normalized, case, and symbolic-link aliases; the existing portable identity
-set remains case-insensitive. Native inode identity was considered for macOS,
-but it requires a platform-specific layout and is not necessary for the
-supported authored-import aliases.
+set remains case-insensitive.
 
-### Retain managed regular-file validation
+### Classify native failures by platform error domain
 
-The resolver will validate a canonical target through managed file metadata and
-the existing exact-path existence check. Directories and unreadable/non-file
-targets continue to fail before YAML reads. No operation opens arbitrary
-special files merely to establish identity.
+Windows error codes and POSIX `errno` values are classified independently:
+missing-path and access-denied values retain their typed categories, while
+other native failures use the append-only `PlatformFailure` category and carry
+the native error domain and code. Directories and special files fail as
+`SourceShape` before YAML reads. No operation opens arbitrary special files
+merely to establish identity.
 
 ### Describe root failures as root-policy failures
 
@@ -54,12 +56,11 @@ retain the root-based import chain.
 
 ## Risks / Trade-offs
 
-- [Hard-link aliases have distinct canonical paths] -> Existing portable path
-  identity still rejects authored case aliases and link aliases; coverage will
-  preserve hard-link duplicate detection where the platform exposes it.
-- [Managed metadata can vary by filesystem] -> Tests exercise ordinary files,
-  directories, boundary escapes, and links; platform-native acceptance remains
-  part of the release matrix.
+- [Native metadata differs by OS] -> Isolate native calls and classify Win32
+  and POSIX errors separately; tests exercise each mapping and real macOS jobs
+  exercise hard links and special files on x86_64 and arm64.
+- [File IDs vary by filesystem] -> Pair macOS file IDs with device IDs and
+  preserve exact-path, physical-boundary, and portable identities separately.
 - [Root path may not be repository-relative when resolution fails] -> The
   fallback descriptor uses a normalized selected path and marks it explicitly
   as the root, preserving role clarity without leaking unrelated paths.

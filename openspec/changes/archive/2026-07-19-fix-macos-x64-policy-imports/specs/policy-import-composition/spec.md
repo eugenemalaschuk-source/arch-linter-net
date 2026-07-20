@@ -8,9 +8,10 @@ boundary SHALL be the selected root's own directory. Each import SHALL be made
 absolute, physically canonicalized, and verified to remain within that
 boundary before being read. Authored path casing SHALL exactly match the
 filesystem entry, and canonical boundary-relative portability identities SHALL
-be compared case-insensitively. On macOS, source identity SHALL be derived
-through managed canonical filesystem operations without a Darwin
-processor-specific unmanaged metadata layout.
+be compared case-insensitively. Every imported source SHALL be a readable
+regular file. On macOS, source identity and regular-file type SHALL be derived
+through the native `getattrlist` object metadata API, using `ATTR_CMN_DEVID`,
+`ATTR_CMN_FILEID`, and `ATTR_CMN_OBJTYPE` in a packed processor-neutral buffer.
 
 #### Scenario: Relative in-bound import for an architecture root
 - **WHEN** the selected root is `architecture/arch.yml`
@@ -31,9 +32,17 @@ processor-specific unmanaged metadata layout.
 - **WHEN** authored path casing differs from the on-disk path casing
 - **THEN** loading fails consistently, including on a case-insensitive filesystem
 
-#### Scenario: Intel macOS loads a valid imported policy
-- **WHEN** a macOS x86_64 host loads a valid root policy that imports one regular fragment
-- **THEN** loading succeeds without relying on a Darwin unmanaged metadata layout
+#### Scenario: macOS loads a valid imported policy on both supported architectures
+- **WHEN** a macOS x86_64 or arm64 host loads a valid root policy that imports one regular fragment
+- **THEN** loading succeeds using the native object metadata API
+
+#### Scenario: macOS detects hard-link aliases as duplicates
+- **WHEN** two imports resolve to hard links for the same file
+- **THEN** loading fails with the `DuplicateImport` category
+
+#### Scenario: native inspection failure retains its platform context
+- **WHEN** a native metadata call fails for a reason other than a missing path or access denial
+- **THEN** loading fails with the `PlatformFailure` category and the native error domain and code
 
 ### Requirement: Composed nodes retain source provenance
 Every root-inline and imported composed node SHALL retain typed provenance containing

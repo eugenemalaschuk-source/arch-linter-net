@@ -494,11 +494,43 @@ public sealed class ArchitecturePolicyImportTests
             Assert.That((int)ArchitecturePolicyImportErrorCategory.SourceShape, Is.EqualTo(7));
             Assert.That((int)ArchitecturePolicyImportErrorCategory.CompositionConflict, Is.EqualTo(8));
             Assert.That((int)ArchitecturePolicyImportErrorCategory.UnreadableFile, Is.EqualTo(9));
+            Assert.That((int)ArchitecturePolicyImportErrorCategory.PlatformFailure, Is.EqualTo(10));
         });
     }
 
+    [TestCase(2, ArchitecturePolicyImportErrorCategory.MissingFile)]
+    [TestCase(3, ArchitecturePolicyImportErrorCategory.MissingFile)]
+    [TestCase(5, ArchitecturePolicyImportErrorCategory.UnreadableFile)]
+    [TestCase(87, ArchitecturePolicyImportErrorCategory.PlatformFailure)]
+    public void PathResolver_ClassifiesWin32NativeFailures(int error, ArchitecturePolicyImportErrorCategory category)
+    {
+        ArchitecturePolicyImportException exception = ArchitecturePolicyPathResolver.ClassifyWindowsNativeFailure("fragment.yml", error);
+
+        Assert.That(exception.Category, Is.EqualTo(category));
+        if (category == ArchitecturePolicyImportErrorCategory.PlatformFailure)
+        {
+            Assert.That(exception.Message, Does.Contain("Win32 87"));
+        }
+    }
+
+    [TestCase(2, ArchitecturePolicyImportErrorCategory.MissingFile)]
+    [TestCase(20, ArchitecturePolicyImportErrorCategory.MissingFile)]
+    [TestCase(1, ArchitecturePolicyImportErrorCategory.UnreadableFile)]
+    [TestCase(13, ArchitecturePolicyImportErrorCategory.UnreadableFile)]
+    [TestCase(5, ArchitecturePolicyImportErrorCategory.PlatformFailure)]
+    public void PathResolver_ClassifiesErrnoNativeFailures(int error, ArchitecturePolicyImportErrorCategory category)
+    {
+        ArchitecturePolicyImportException exception = ArchitecturePolicyPathResolver.ClassifyUnixNativeFailure("fragment.yml", error);
+
+        Assert.That(exception.Category, Is.EqualTo(category));
+        if (category == ArchitecturePolicyImportErrorCategory.PlatformFailure)
+        {
+            Assert.That(exception.Message, Does.Contain("errno 5"));
+        }
+    }
+
     [Test]
-    public void PathResolver_DeclaresDistinctLinuxStatLayoutsForX64AndArm64WithoutDarwinInterop()
+    public void PathResolver_DeclaresDistinctLinuxStatLayoutsForX64AndArm64()
     {
         int x64ModeOffset = Marshal.OffsetOf<ArchitecturePolicyPathResolver.LinuxX64Stat>(
             nameof(ArchitecturePolicyPathResolver.LinuxX64Stat.Mode)).ToInt32();

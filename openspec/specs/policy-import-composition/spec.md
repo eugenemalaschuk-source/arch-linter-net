@@ -105,8 +105,8 @@ boundary before being read. Authored path casing SHALL exactly match the
 filesystem entry, and canonical boundary-relative portability identities SHALL
 be compared case-insensitively. Every imported source SHALL be a readable
 regular file. On macOS, source identity and regular-file type SHALL be derived
-through the native `getattrlist` object metadata API, using a processor-neutral
-buffer layout.
+through the native `getattrlist` object metadata API, using `ATTR_CMN_DEVID`,
+`ATTR_CMN_FILEID`, and `ATTR_CMN_OBJTYPE` in a packed processor-neutral buffer.
 
 #### Scenario: Relative in-bound import for an architecture root
 - **WHEN** the selected root is `architecture/arch.yml`
@@ -134,6 +134,10 @@ buffer layout.
 #### Scenario: macOS rejects a special-file import before reading it
 - **WHEN** a policy imports a named pipe or another non-regular filesystem object
 - **THEN** loading fails with the `SourceShape` category without opening the object for content reading
+
+#### Scenario: native inspection failure retains its platform context
+- **WHEN** a native metadata call fails for a reason other than a missing path or access denial
+- **THEN** loading fails with the `PlatformFailure` category and the native error domain and code
 
 ### Requirement: Duplicate paths and cycles fail deterministically
 The resolver SHALL maintain an active import stack and a completed canonical-path set. Reaching a path already on the active stack SHALL be reported as a cycle; reaching a previously completed physical file or case-insensitive portability identity SHALL be reported as a duplicate import. The resolver SHALL NOT silently deduplicate either case.

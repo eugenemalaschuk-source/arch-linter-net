@@ -225,7 +225,7 @@ internal sealed class ArchitecturePolicyPathResolver : IArchitecturePolicyPathRe
             IntPtr.Zero);
         if (handle.IsInvalid)
         {
-            throw NativeFailure(authoredPath, Marshal.GetLastPInvokeError());
+            throw ClassifyWindowsNativeFailure(authoredPath, Marshal.GetLastPInvokeError());
         }
 
         if (GetFileType(handle) != FileTypeDisk)
@@ -235,7 +235,7 @@ internal sealed class ArchitecturePolicyPathResolver : IArchitecturePolicyPathRe
 
         if (!GetFileInformationByHandle(handle, out ByHandleFileInformation information))
         {
-            throw NativeFailure(authoredPath, Marshal.GetLastPInvokeError());
+            throw ClassifyWindowsNativeFailure(authoredPath, Marshal.GetLastPInvokeError());
         }
 
         ulong index = ((ulong)information.FileIndexHigh << 32) | information.FileIndexLow;
@@ -284,7 +284,7 @@ internal sealed class ArchitecturePolicyPathResolver : IArchitecturePolicyPathRe
         var attributes = new DarwinAttributeList
         {
             BitmapCount = AttributeBitMapCount,
-            CommonAttributes = CommonDeviceAttribute | CommonObjectTypeAttribute | CommonObjectIdAttribute,
+            CommonAttributes = CommonDeviceAttribute | CommonObjectTypeAttribute | CommonFileIdAttribute,
         };
         if (GetAttributeList(
                 path,
@@ -293,7 +293,7 @@ internal sealed class ArchitecturePolicyPathResolver : IArchitecturePolicyPathRe
                 (nuint)Marshal.SizeOf<DarwinFileIdentityAttributes>(),
                 options: 0) != 0)
         {
-            throw NativeFailure(authoredPath, Marshal.GetLastPInvokeError());
+            throw ClassifyUnixNativeFailure(authoredPath, Marshal.GetLastPInvokeError());
         }
 
         if (identity.ObjectType != DarwinRegularFile)
@@ -301,14 +301,14 @@ internal sealed class ArchitecturePolicyPathResolver : IArchitecturePolicyPathRe
             throw NotRegularFile(authoredPath);
         }
 
-        return $"darwin:{identity.Device:X8}:{identity.ObjectNumber:X8}:{identity.ObjectGeneration:X8}";
+        return $"darwin:{identity.Device:X8}:{identity.FileId:X16}";
     }
 
     private static string GetLinuxX64FileIdentity(string path, string authoredPath)
     {
         if (StatLinuxX64(path, out LinuxX64Stat stat) != 0)
         {
-            throw NativeFailure(authoredPath, Marshal.GetLastPInvokeError());
+            throw ClassifyUnixNativeFailure(authoredPath, Marshal.GetLastPInvokeError());
         }
 
         if (!IsRegularFile(stat.Mode))
@@ -323,7 +323,7 @@ internal sealed class ArchitecturePolicyPathResolver : IArchitecturePolicyPathRe
     {
         if (StatLinuxArm64(path, out LinuxArm64Stat stat) != 0)
         {
-            throw NativeFailure(authoredPath, Marshal.GetLastPInvokeError());
+            throw ClassifyUnixNativeFailure(authoredPath, Marshal.GetLastPInvokeError());
         }
 
         if (!IsRegularFile(stat.Mode))
@@ -365,14 +365,31 @@ internal sealed class ArchitecturePolicyPathResolver : IArchitecturePolicyPathRe
             $"Policy import '{authoredPath}' is not readable.");
     }
 
-    private static ArchitecturePolicyImportException NativeFailure(string authoredPath, int error)
+    internal static ArchitecturePolicyImportException ClassifyWindowsNativeFailure(string authoredPath, int error)
+    {
+        return error switch
+        {
+            2 or 3 => Missing(authoredPath),
+            5 => Unreadable(authoredPath),
+            _ => PlatformFailure(authoredPath, "Win32", error)
+        };
+    }
+
+    internal static ArchitecturePolicyImportException ClassifyUnixNativeFailure(string authoredPath, int error)
     {
         return error switch
         {
             2 or 20 => Missing(authoredPath),
             1 or 13 => Unreadable(authoredPath),
-            _ => NotRegularFile(authoredPath)
+            _ => PlatformFailure(authoredPath, "errno", error)
         };
+    }
+
+    private static ArchitecturePolicyImportException PlatformFailure(string authoredPath, string errorDomain, int error)
+    {
+        return new ArchitecturePolicyImportException(
+            ArchitecturePolicyImportErrorCategory.PlatformFailure,
+            $"Policy import '{authoredPath}' could not be inspected ({errorDomain} {error}).");
     }
 
     private const uint GenericRead = 0x80000000;
@@ -387,7 +404,7 @@ internal sealed class ArchitecturePolicyPathResolver : IArchitecturePolicyPathRe
     private const ushort AttributeBitMapCount = 5;
     private const uint CommonDeviceAttribute = 0x00000002;
     private const uint CommonObjectTypeAttribute = 0x00000008;
-    private const uint CommonObjectIdAttribute = 0x00000020;
+    private const uint CommonFileIdAttribute = 0x02000000;
     private const uint DarwinRegularFile = 1;
 
     [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
@@ -455,14 +472,13 @@ internal sealed class ArchitecturePolicyPathResolver : IArchitecturePolicyPathRe
         public uint ForkAttributes;
     }
 
-    [StructLayout(LayoutKind.Sequential)]
+    [StructLayout(LayoutKind.Sequential, Pack = 4)]
     private struct DarwinFileIdentityAttributes
     {
         public uint Length;
         public uint Device;
         public uint ObjectType;
-        public uint ObjectNumber;
-        public uint ObjectGeneration;
+        public ulong FileId;
     }
 
     [StructLayout(LayoutKind.Sequential)]
