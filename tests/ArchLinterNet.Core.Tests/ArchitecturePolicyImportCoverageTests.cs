@@ -130,7 +130,7 @@ public sealed partial class ArchitecturePolicyImportCoverageTests
         Directory.CreateDirectory(directory);
         string rootPath = Path.Combine(directory, "root.yml");
         string fragmentPath = Path.Combine(directory, "fragment.yml");
-        File.WriteAllText(rootPath, "imports: [fragment.yml]\n");
+        File.WriteAllText(rootPath, "version: 1\nimports: [fragment.yml]\n");
         File.WriteAllText(fragmentPath, "layers:\n  domain:\n    namespace: App.Domain\n");
         var resolver = new SingleUseRootResolver(new ArchitecturePolicyPathResolver().ResolveRoot(rootPath));
 
