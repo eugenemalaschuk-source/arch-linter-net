@@ -102,6 +102,30 @@ public sealed class ArchitectureEngineTests
     }
 
     [Test]
+    public void MigrateBaseline_EmptyLegacyBaseline_SucceedsWithNoEntries()
+    {
+        ArchitectureEngine engine = new ArchitectureEngineBuilder().AddArchLinterNetCore().Build();
+        string baselinePath = Path.Combine(_tempDir, "baseline.yml");
+        File.WriteAllText(baselinePath, "version: 1\nbaseline: {}\n");
+
+        BaselineMigrateOutcome outcome = engine.MigrateBaseline(new BaselineMigrateRequest
+        {
+            PolicyPath = _policyPath,
+            BaselinePath = baselinePath,
+            DryRun = true,
+        });
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(outcome.Succeeded, Is.True);
+            Assert.That(outcome.MatchedCount, Is.EqualTo(0));
+            Assert.That(outcome.StaleCount, Is.EqualTo(0));
+            Assert.That(outcome.AmbiguousCount, Is.EqualTo(0));
+            Assert.That(outcome.Yaml, Is.Null, "dry-run must never produce output to write.");
+        });
+    }
+
+    [Test]
     public void ServiceCollectionExtensions_RegistersBothApplicationServices()
     {
         ServiceCollection services = new();

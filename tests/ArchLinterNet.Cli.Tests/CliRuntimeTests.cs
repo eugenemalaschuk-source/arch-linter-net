@@ -1,6 +1,7 @@
 using ArchLinterNet.Cli.Infrastructure;
 using ArchLinterNet.Core.Model;
 using ArchLinterNet.Core.Reporting;
+using ArchLinterNet.Core.Validation;
 using NUnit.Framework;
 
 namespace ArchLinterNet.Cli.Tests;
@@ -50,5 +51,18 @@ public sealed class CliRuntimeTests
             notice);
 
         Assert.That(result, Does.Contain("\"declared_entry_count\":1"));
+    }
+
+    [Test]
+    public void MigrateBaseline_MissingBaselineFile_ForwardsToEngineAndThrows()
+    {
+        var runtime = new CliRuntime();
+
+        Assert.Throws<FileNotFoundException>(() => runtime.MigrateBaseline(new BaselineMigrateRequest
+        {
+            PolicyPath = "unused-nonexistent-policy.yml",
+            BaselinePath = Path.Combine(Path.GetTempPath(), $"nonexistent-{Guid.NewGuid():N}.yml"),
+            DryRun = true,
+        }));
     }
 }

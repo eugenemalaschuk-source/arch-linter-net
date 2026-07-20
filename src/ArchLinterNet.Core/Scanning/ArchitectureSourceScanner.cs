@@ -22,7 +22,8 @@ internal interface IArchitectureSourceScanner
         IArchitectureFileSystem? fileSystem = null,
         IRoslynCompilationFactory? compilationFactory = null,
         IArchitectureAssemblyLoader? assemblyLoader = null,
-        IReadOnlyList<string>? explicitReferenceAssemblyPaths = null);
+        IReadOnlyList<string>? explicitReferenceAssemblyPaths = null,
+        string? sourceAssemblyHint = null);
 
     IReadOnlyList<string> FindMatchingSourceFiles(
         string repositoryRoot,
@@ -46,7 +47,8 @@ internal sealed class ArchitectureSourceScanner : IArchitectureSourceScanner
         IArchitectureFileSystem? fileSystem = null,
         IRoslynCompilationFactory? compilationFactory = null,
         IArchitectureAssemblyLoader? assemblyLoader = null,
-        IReadOnlyList<string>? explicitReferenceAssemblyPaths = null)
+        IReadOnlyList<string>? explicitReferenceAssemblyPaths = null,
+        string? sourceAssemblyHint = null)
     {
         fileSystem ??= ArchitectureFileSystem.Real;
         compilationFactory ??= RoslynCompilationFactory.Real;
@@ -78,7 +80,7 @@ internal sealed class ArchitectureSourceScanner : IArchitectureSourceScanner
                 continue;
             }
 
-            List<string> matches = FindForbiddenUsagesInBodies(semanticModel, root, patterns, matchCache);
+            List<ForbiddenCallMatch> matches = FindForbiddenUsagesInBodies(semanticModel, root, patterns, matchCache);
             if (matches.Count == 0)
             {
                 continue;
@@ -87,7 +89,13 @@ internal sealed class ArchitectureSourceScanner : IArchitectureSourceScanner
             string relativePath = GetRelativePath(repositoryRoot, syntaxTree.FilePath);
 
             string[] unignored = matches
-                .Where(match => !executionContext.IsIgnored(relativePath, match))
+                .Where(match => !executionContext.IsIgnored(
+                    relativePath, match.Display,
+                    sourceAssembly: sourceAssemblyHint,
+                    targetAssembly: match.TargetAssembly,
+                    sourceMember: match.SourceMember,
+                    targetMember: match.TargetMember))
+                .Select(match => match.Display)
                 .Distinct(StringComparer.Ordinal)
                 .OrderBy(match => match, StringComparer.Ordinal)
                 .ToArray();
@@ -119,13 +127,21 @@ internal sealed class ArchitectureSourceScanner : IArchitectureSourceScanner
         return FindSourceFilesForNamespace(repositoryRoot, layer, roots, fileSystem);
     }
 
-    private static List<string> FindForbiddenUsagesInBodies(
+    /// <summary>
+    /// One forbidden-call match: <see cref="Display"/> is the human-readable, line-numbered text
+    /// used for violation reporting (never for baseline identity); <see cref="TargetAssembly"/>,
+    /// <see cref="TargetMember"/>, and <see cref="SourceMember"/> are the structured identity fields
+    /// derived from the resolved symbol and its enclosing member.
+    /// </summary>
+    private sealed record ForbiddenCallMatch(string Display, string? TargetAssembly, string TargetMember, string? SourceMember);
+
+    private static List<ForbiddenCallMatch> FindForbiddenUsagesInBodies(
         SemanticModel semanticModel,
         CompilationUnitSyntax root,
         IReadOnlyList<ForbiddenCallPattern> patterns,
         Dictionary<string, bool> matchCache)
     {
-        List<string> matches = new();
+        List<ForbiddenCallMatch> matches = new();
 
         foreach (SyntaxNode bodyNode in EnumerateExecutableBodies(root))
         {
@@ -147,7 +163,10 @@ internal sealed class ArchitectureSourceScanner : IArchitectureSourceScanner
                 string symbolName = symbol.ToDisplayString(SymbolDisplayFormat.CSharpErrorMessageFormat);
                 int line = node.GetLocation().GetLineSpan().StartLinePosition.Line + 1;
                 string fallbackMarker = usedCandidateFallback ? " [ambiguous-candidate]" : string.Empty;
-                matches.Add($"line {line}: {matchedPattern} -> {symbolName}{fallbackMarker}");
+                string display = $"line {line}: {matchedPattern} -> {symbolName}{fallbackMarker}";
+                string? sourceMember = semanticModel.GetEnclosingSymbol(node.SpanStart)
+                    ?.ToDisplayString(SymbolDisplayFormat.CSharpErrorMessageFormat);
+                matches.Add(new ForbiddenCallMatch(display, symbol.ContainingAssembly?.Name, symbolName, sourceMember));
             }
         }
 

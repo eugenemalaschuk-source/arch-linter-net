@@ -103,6 +103,118 @@ baseline:
     }
 
     [Test]
+    public void LoadFromPath_Version2LegacyShapedEntry_Throws()
+    {
+        // A 'version: 2' document whose entries don't actually carry structured identity must be
+        // rejected — otherwise it silently loads with defaulted/empty identity fields and behaves
+        // differently in `validate` (glob fallback never triggers, since IdentityVersion would be
+        // null) than in `diff`/`verify` (which would build a garbage all-empty identity). Fail
+        // closed instead.
+        File.WriteAllText(Path.Combine(_tempDir, "baseline.yml"), @"
+version: 2
+baseline:
+  strict:
+    - id: my-rule
+      ignored_violations:
+        - source_type: Some.Type
+          forbidden_reference: Bad.Type
+          reason: legacy-shaped-mislabeled-as-v2
+");
+        var ex = Assert.Throws<InvalidOperationException>(() =>
+            _service.LoadFromPath(Path.Combine(_tempDir, "baseline.yml")));
+        Assert.That(ex!.Message, Does.Contain("identity_version"));
+    }
+
+    [Test]
+    public void LoadFromPath_Version2MissingContractFamily_Throws()
+    {
+        File.WriteAllText(Path.Combine(_tempDir, "baseline.yml"), @"
+version: 2
+baseline:
+  strict:
+    - id: my-rule
+      ignored_violations:
+        - source_type: Some.Type
+          forbidden_reference: Bad.Type
+          reason: test
+          identity_version: 2
+          kind: dependency
+          occurrence: 0
+");
+        var ex = Assert.Throws<InvalidOperationException>(() =>
+            _service.LoadFromPath(Path.Combine(_tempDir, "baseline.yml")));
+        Assert.That(ex!.Message, Does.Contain("contract_family"));
+    }
+
+    [Test]
+    public void LoadFromPath_Version2MissingOccurrence_Throws()
+    {
+        File.WriteAllText(Path.Combine(_tempDir, "baseline.yml"), @"
+version: 2
+baseline:
+  strict:
+    - id: my-rule
+      ignored_violations:
+        - source_type: Some.Type
+          forbidden_reference: Bad.Type
+          reason: test
+          identity_version: 2
+          contract_family: strict
+          kind: dependency
+");
+        var ex = Assert.Throws<InvalidOperationException>(() =>
+            _service.LoadFromPath(Path.Combine(_tempDir, "baseline.yml")));
+        Assert.That(ex!.Message, Does.Contain("occurrence"));
+    }
+
+    [Test]
+    public void LoadFromPath_Version1EntryWithIdentityVersion_Throws()
+    {
+        // A 'version: 1' document must not silently accept structured-identity fields — those are
+        // only meaningful (and were only ever written) in a 'version: 2' document.
+        File.WriteAllText(Path.Combine(_tempDir, "baseline.yml"), @"
+version: 1
+baseline:
+  strict:
+    - id: my-rule
+      ignored_violations:
+        - source_type: Some.Type
+          forbidden_reference: Bad.Type
+          reason: test
+          identity_version: 2
+");
+        var ex = Assert.Throws<InvalidOperationException>(() =>
+            _service.LoadFromPath(Path.Combine(_tempDir, "baseline.yml")));
+        Assert.That(ex!.Message, Does.Contain("identity_version"));
+    }
+
+    [Test]
+    public void LoadFromPath_WellFormedVersion2Document_LoadsSuccessfully()
+    {
+        File.WriteAllText(Path.Combine(_tempDir, "baseline.yml"), @"
+version: 2
+baseline:
+  strict:
+    - id: my-rule
+      ignored_violations:
+        - source_type: Host.A.Program
+          forbidden_reference: System.Object
+          reason: known debt
+          identity_version: 2
+          contract_family: strict
+          kind: dependency
+          source_assembly: Host.A
+          target_assembly: mscorlib
+          target_member: System.Object
+          occurrence: 0
+");
+        ArchitectureBaselineDocument document = _service.LoadFromPath(Path.Combine(_tempDir, "baseline.yml"));
+
+        Assert.That(document.Version, Is.EqualTo(2));
+        Assert.That(document.Baseline.Strict[0].IgnoredViolations[0].SourceAssembly, Is.EqualTo("Host.A"));
+    }
+
+    [Test]
     public void MergeAndValidate_ProjectMetadataGroup_AppliesIgnoredViolations()
     {
         ArchitectureContractDocument policy = new()
@@ -137,7 +249,7 @@ baseline:
                     new()
                     {
                         Id = "project-metadata",
-                        IgnoredViolations = new List<ArchitectureIgnoredViolation>
+                        IgnoredViolations = new List<ArchitectureBaselineIgnoredViolation>
                         {
                             new()
                             {

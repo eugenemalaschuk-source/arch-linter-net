@@ -33,4 +33,20 @@ internal static class ArchitectureTypeNames
             return string.Empty;
         }
     }
+
+    public static string? SafeAssemblyName(Type type)
+    {
+        try
+        {
+            return type.Assembly.GetName().Name;
+        }
+        catch (FileNotFoundException)
+        {
+            return null;
+        }
+        catch (TypeLoadException)
+        {
+            return null;
+        }
+    }
 }

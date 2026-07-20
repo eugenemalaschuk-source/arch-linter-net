@@ -11,6 +11,8 @@ public static class ArchitectureBaselineComparer
         string mode,
         IReadOnlyCollection<string>? selectedContractIds = null)
     {
+        bool useStructuredIdentity = baselineDocument.Version == 2;
+
         var newEntries = new List<ArchitectureBaselineComparisonEntry>();
         var frozen = new List<ArchitectureBaselineComparisonEntry>();
         var resolved = new List<ArchitectureBaselineComparisonEntry>();
@@ -36,7 +38,7 @@ public static class ArchitectureBaselineComparer
                 : new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
 
             HashSet<string> baselineKeys = ProcessBaselineEntries(
-                groupName, entries, groupInScope, selectedIds, knownIds, canonicalIds, candidates,
+                groupName, entries, groupInScope, selectedIds, knownIds, canonicalIds, candidates, useStructuredIdentity,
                 outOfScope, configurationErrors, frozen, resolved);
 
             if (!groupInScope)
@@ -44,7 +46,7 @@ public static class ArchitectureBaselineComparer
                 continue;
             }
 
-            ProcessNewCandidates(groupName, candidates, selectedIds, canonicalIds, baselineKeys, newEntries);
+            ProcessNewCandidates(groupName, candidates, selectedIds, canonicalIds, baselineKeys, useStructuredIdentity, newEntries);
         }
 
         return new ArchitectureBaselineComparisonResult(newEntries, frozen, resolved, configurationErrors, outOfScope);
@@ -58,6 +60,7 @@ public static class ArchitectureBaselineComparer
         HashSet<string> knownIds,
         Dictionary<string, string> canonicalIds,
         IReadOnlyList<ArchitectureBaselineCandidate> candidates,
+        bool useStructuredIdentity,
         List<ArchitectureBaselineComparisonEntry> outOfScope,
         List<ArchitectureBaselineComparisonEntry> configurationErrors,
         List<ArchitectureBaselineComparisonEntry> frozen,
@@ -75,8 +78,7 @@ public static class ArchitectureBaselineComparer
             {
                 foreach (var ignore in entry.IgnoredViolations)
                 {
-                    outOfScope.Add(new ArchitectureBaselineComparisonEntry(
-                        groupName, entry.Id, ignore.SourceType, ignore.ForbiddenReference, ignore.Reason));
+                    outOfScope.Add(BuildComparisonEntry(groupName, entry.Id, ignore, useStructuredIdentity));
                 }
 
                 continue;
@@ -87,17 +89,21 @@ public static class ArchitectureBaselineComparer
 
             foreach (var ignore in entry.IgnoredViolations)
             {
-                string key = BuildComparisonKey(canonicalContractId, ignore.SourceType, ignore.ForbiddenReference);
-                baselineKeys.Add(key);
+                ArchitectureBaselineComparisonEntry comparisonEntry =
+                    BuildComparisonEntry(groupName, entry.Id, ignore, useStructuredIdentity);
 
-                var comparisonEntry = new ArchitectureBaselineComparisonEntry(
-                    groupName, entry.Id, ignore.SourceType, ignore.ForbiddenReference, ignore.Reason);
+                string key = useStructuredIdentity
+                    ? BuildIdentityKey(ignore.ToIdentity(canonicalContractId))
+                    : BuildLegacyKey(canonicalContractId, ignore.SourceType, ignore.ForbiddenReference);
+                baselineKeys.Add(key);
 
                 if (!idKnown)
                 {
                     configurationErrors.Add(comparisonEntry);
                 }
-                else if (HasMatchingCandidate(candidates, groupName, canonicalContractId, ignore.SourceType, ignore.ForbiddenReference))
+                else if (useStructuredIdentity
+                             ? HasMatchingCandidateByIdentity(candidates, groupName, ignore.ToIdentity(canonicalContractId))
+                             : HasMatchingCandidateLegacy(candidates, groupName, canonicalContractId, ignore.SourceType, ignore.ForbiddenReference))
                 {
                     frozen.Add(comparisonEntry);
                 }
@@ -111,12 +117,21 @@ public static class ArchitectureBaselineComparer
         return baselineKeys;
     }
 
+    private static ArchitectureBaselineComparisonEntry BuildComparisonEntry(
+        string groupName, string contractId, ArchitectureBaselineIgnoredViolation ignore, bool useStructuredIdentity)
+    {
+        return new ArchitectureBaselineComparisonEntry(
+            groupName, contractId, ignore.SourceType, ignore.ForbiddenReference, ignore.Reason,
+            useStructuredIdentity ? ignore.ToIdentity(contractId) : null);
+    }
+
     private static void ProcessNewCandidates(
         string groupName,
         IReadOnlyList<ArchitectureBaselineCandidate> candidates,
         HashSet<string>? selectedIds,
         Dictionary<string, string> canonicalIds,
         HashSet<string> baselineKeys,
+        bool useStructuredIdentity,
         List<ArchitectureBaselineComparisonEntry> newEntries)
     {
         var seenNewKeys = new HashSet<string>(StringComparer.Ordinal);
@@ -132,18 +147,42 @@ public static class ArchitectureBaselineComparer
                 continue;
             }
 
-            string key = BuildComparisonKey(
-                CanonicalizeContractId(canonicalIds, candidate.ContractId),
-                candidate.SourceType,
-                candidate.ForbiddenReference);
+            string canonicalContractId = CanonicalizeContractId(canonicalIds, candidate.ContractId);
+            ArchitectureViolationIdentity? candidateIdentity = useStructuredIdentity
+                ? (candidate.Identity ?? BuildFallbackIdentity(groupName, canonicalContractId, candidate)) with { ContractId = canonicalContractId }
+                : null;
+
+            string key = useStructuredIdentity
+                ? BuildIdentityKey(candidateIdentity!)
+                : BuildLegacyKey(canonicalContractId, candidate.SourceType, candidate.ForbiddenReference);
+
             if (baselineKeys.Contains(key) || !seenNewKeys.Add(key))
             {
                 continue;
             }
 
             newEntries.Add(new ArchitectureBaselineComparisonEntry(
-                groupName, candidate.ContractId, candidate.SourceType, candidate.ForbiddenReference, null));
+                groupName, candidate.ContractId, candidate.SourceType, candidate.ForbiddenReference, null,
+                useStructuredIdentity ? candidateIdentity : null));
         }
+    }
+
+    private static ArchitectureViolationIdentity BuildFallbackIdentity(
+        string groupName, string contractId, ArchitectureBaselineCandidate candidate)
+    {
+        string contractFamily = ArchitectureViolationIdentity.ResolveContractFamily(groupName);
+        return new ArchitectureViolationIdentity(
+            ArchitectureViolationIdentity.CurrentVersion,
+            contractFamily,
+            ArchitectureViolationIdentity.ResolveKind(contractFamily),
+            contractId,
+            SourceAssembly: null,
+            candidate.SourceType,
+            SourceMember: null,
+            TargetAssembly: null,
+            TargetType: null,
+            candidate.ForbiddenReference,
+            Occurrence: 0);
     }
 
     private static Dictionary<string, Dictionary<string, string>> BuildCanonicalIdsByGroup(Families.ArchitectureContractGroups groups)
@@ -222,7 +261,7 @@ public static class ArchitectureBaselineComparer
         return new HashSet<string>(ids.Where(id => id != null)!, StringComparer.OrdinalIgnoreCase);
     }
 
-    private static bool HasMatchingCandidate(
+    private static bool HasMatchingCandidateLegacy(
         IReadOnlyList<ArchitectureBaselineCandidate> candidates,
         string groupName,
         string contractId,
@@ -243,6 +282,31 @@ public static class ArchitectureBaselineComparer
         return false;
     }
 
+    private static bool HasMatchingCandidateByIdentity(
+        IReadOnlyList<ArchitectureBaselineCandidate> candidates,
+        string groupName,
+        ArchitectureViolationIdentity targetIdentity)
+    {
+        foreach (var candidate in candidates)
+        {
+            if (candidate.ContractGroup != groupName || candidate.ContractId == null)
+            {
+                continue;
+            }
+
+            ArchitectureViolationIdentity candidateIdentity = candidate.Identity
+                ?? BuildFallbackIdentity(groupName, candidate.ContractId, candidate);
+
+            if (string.Equals(candidateIdentity.ContractId, targetIdentity.ContractId, StringComparison.OrdinalIgnoreCase)
+                && candidateIdentity with { ContractId = targetIdentity.ContractId } == targetIdentity)
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     private static string CanonicalizeContractId(Dictionary<string, string> canonicalIds, string contractId)
     {
         return canonicalIds.TryGetValue(contractId, out string? canonicalId)
@@ -250,9 +314,14 @@ public static class ArchitectureBaselineComparer
             : contractId;
     }
 
-    private static string BuildComparisonKey(string contractId, string sourceType, string forbiddenReference)
+    private static string BuildLegacyKey(string contractId, string sourceType, string forbiddenReference)
     {
         return $"{contractId}|{sourceType}|{forbiddenReference}";
+    }
+
+    private static string BuildIdentityKey(ArchitectureViolationIdentity identity)
+    {
+        return identity.ToString();
     }
 
     private static bool IsInScope(string groupName, string mode)

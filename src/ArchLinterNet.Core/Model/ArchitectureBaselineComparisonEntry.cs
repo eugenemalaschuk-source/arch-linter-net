@@ -5,7 +5,8 @@ public sealed record ArchitectureBaselineComparisonEntry(
     string ContractId,
     string SourceType,
     string ForbiddenReference,
-    string? Reason);
+    string? Reason,
+    ArchitectureViolationIdentity? Identity = null);
 
 public sealed record ArchitectureBaselineComparisonResult(
     IReadOnlyList<ArchitectureBaselineComparisonEntry> New,

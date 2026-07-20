@@ -5,266 +5,737 @@
   "description": "Schema for baseline YAML files that suppress known violations for architecture policy migration.",
   "type": "object",
   "additionalProperties": false,
-  "required": ["version", "baseline"],
+  "required": [
+    "version",
+    "baseline"
+  ],
   "properties": {
     "version": {
       "type": "integer",
-      "const": 1,
-      "description": "Baseline schema version. Current supported version is 1."
+      "enum": [
+        1,
+        2
+      ],
+      "description": "Baseline file format version. Version 1 uses the legacy exact (source_type, forbidden_reference) pair as identity, and its ignored_violations entries MUST NOT carry structured identity fields. Version 2 uses a versioned, structured ArchitectureViolationIdentity per entry, and every entry MUST carry identity_version, contract_family, kind, and occurrence (produced by 'baseline generate' and 'baseline migrate') so a malformed or hand-edited entry cannot silently pass as valid."
     },
     "baseline": {
       "type": "object",
-      "description": "Contract group entries indexed by contract group name.",
+      "description": "Contract group entries indexed by contract group name. The exact shape required for each entry depends on the top-level 'version' (see the version-conditional definitions below)."
+    }
+  },
+  "if": {
+    "properties": {
+      "version": {
+        "const": 2
+      }
+    }
+  },
+  "then": {
+    "properties": {
+      "baseline": {
+        "$ref": "#/$defs/baselineGroupsV2"
+      }
+    }
+  },
+  "else": {
+    "properties": {
+      "baseline": {
+        "$ref": "#/$defs/baselineGroupsV1"
+      }
+    }
+  },
+  "$defs": {
+    "baselineGroupsV1": {
+      "type": "object",
+      "additionalProperties": false,
       "properties": {
         "strict": {
           "type": "array",
-          "items": { "$ref": "#/$defs/baselineContractEntry" },
+          "items": {
+            "$ref": "#/$defs/baselineContractEntryV1"
+          },
           "default": []
         },
         "audit": {
           "type": "array",
-          "items": { "$ref": "#/$defs/baselineContractEntry" },
+          "items": {
+            "$ref": "#/$defs/baselineContractEntryV1"
+          },
           "default": []
         },
         "strict_layers": {
           "type": "array",
-          "items": { "$ref": "#/$defs/baselineContractEntry" },
+          "items": {
+            "$ref": "#/$defs/baselineContractEntryV1"
+          },
           "default": []
         },
         "audit_layers": {
           "type": "array",
-          "items": { "$ref": "#/$defs/baselineContractEntry" },
+          "items": {
+            "$ref": "#/$defs/baselineContractEntryV1"
+          },
           "default": []
         },
         "strict_allow_only": {
           "type": "array",
-          "items": { "$ref": "#/$defs/baselineContractEntry" },
+          "items": {
+            "$ref": "#/$defs/baselineContractEntryV1"
+          },
           "default": []
         },
         "audit_allow_only": {
           "type": "array",
-          "items": { "$ref": "#/$defs/baselineContractEntry" },
+          "items": {
+            "$ref": "#/$defs/baselineContractEntryV1"
+          },
           "default": []
         },
         "strict_cycles": {
           "type": "array",
-          "items": { "$ref": "#/$defs/baselineContractEntry" },
+          "items": {
+            "$ref": "#/$defs/baselineContractEntryV1"
+          },
           "default": []
         },
         "audit_cycles": {
           "type": "array",
-          "items": { "$ref": "#/$defs/baselineContractEntry" },
+          "items": {
+            "$ref": "#/$defs/baselineContractEntryV1"
+          },
           "default": []
         },
         "strict_method_body": {
           "type": "array",
-          "items": { "$ref": "#/$defs/baselineContractEntry" },
+          "items": {
+            "$ref": "#/$defs/baselineContractEntryV1"
+          },
           "default": []
         },
         "audit_method_body": {
           "type": "array",
-          "items": { "$ref": "#/$defs/baselineContractEntry" },
+          "items": {
+            "$ref": "#/$defs/baselineContractEntryV1"
+          },
           "default": []
         },
         "strict_independence": {
           "type": "array",
-          "items": { "$ref": "#/$defs/baselineContractEntry" },
+          "items": {
+            "$ref": "#/$defs/baselineContractEntryV1"
+          },
           "default": []
         },
         "audit_independence": {
           "type": "array",
-          "items": { "$ref": "#/$defs/baselineContractEntry" },
+          "items": {
+            "$ref": "#/$defs/baselineContractEntryV1"
+          },
           "default": []
         },
         "strict_assembly_independence": {
           "type": "array",
-          "items": { "$ref": "#/$defs/baselineContractEntry" },
+          "items": {
+            "$ref": "#/$defs/baselineContractEntryV1"
+          },
           "default": []
         },
         "audit_assembly_independence": {
           "type": "array",
-          "items": { "$ref": "#/$defs/baselineContractEntry" },
+          "items": {
+            "$ref": "#/$defs/baselineContractEntryV1"
+          },
           "default": []
         },
         "strict_assembly_dependency": {
           "type": "array",
-          "items": { "$ref": "#/$defs/baselineContractEntry" },
+          "items": {
+            "$ref": "#/$defs/baselineContractEntryV1"
+          },
           "default": []
         },
         "audit_assembly_dependency": {
           "type": "array",
-          "items": { "$ref": "#/$defs/baselineContractEntry" },
+          "items": {
+            "$ref": "#/$defs/baselineContractEntryV1"
+          },
           "default": []
         },
         "strict_assembly_allow_only": {
           "type": "array",
-          "items": { "$ref": "#/$defs/baselineContractEntry" },
+          "items": {
+            "$ref": "#/$defs/baselineContractEntryV1"
+          },
           "default": []
         },
         "audit_assembly_allow_only": {
           "type": "array",
-          "items": { "$ref": "#/$defs/baselineContractEntry" },
+          "items": {
+            "$ref": "#/$defs/baselineContractEntryV1"
+          },
           "default": []
         },
         "strict_package_dependency": {
           "type": "array",
-          "items": { "$ref": "#/$defs/baselineContractEntry" },
+          "items": {
+            "$ref": "#/$defs/baselineContractEntryV1"
+          },
           "default": []
         },
         "audit_package_dependency": {
           "type": "array",
-          "items": { "$ref": "#/$defs/baselineContractEntry" },
+          "items": {
+            "$ref": "#/$defs/baselineContractEntryV1"
+          },
           "default": []
         },
         "strict_package_allow_only": {
           "type": "array",
-          "items": { "$ref": "#/$defs/baselineContractEntry" },
+          "items": {
+            "$ref": "#/$defs/baselineContractEntryV1"
+          },
           "default": []
         },
         "audit_package_allow_only": {
           "type": "array",
-          "items": { "$ref": "#/$defs/baselineContractEntry" },
+          "items": {
+            "$ref": "#/$defs/baselineContractEntryV1"
+          },
           "default": []
         },
         "strict_project_metadata": {
           "type": "array",
-          "items": { "$ref": "#/$defs/baselineContractEntry" },
+          "items": {
+            "$ref": "#/$defs/baselineContractEntryV1"
+          },
           "default": []
         },
         "audit_project_metadata": {
           "type": "array",
-          "items": { "$ref": "#/$defs/baselineContractEntry" },
+          "items": {
+            "$ref": "#/$defs/baselineContractEntryV1"
+          },
           "default": []
         },
         "strict_protected": {
           "type": "array",
-          "items": { "$ref": "#/$defs/baselineContractEntry" },
+          "items": {
+            "$ref": "#/$defs/baselineContractEntryV1"
+          },
           "default": []
         },
         "audit_protected": {
           "type": "array",
-          "items": { "$ref": "#/$defs/baselineContractEntry" },
+          "items": {
+            "$ref": "#/$defs/baselineContractEntryV1"
+          },
           "default": []
         },
         "strict_external": {
           "type": "array",
-          "items": { "$ref": "#/$defs/baselineContractEntry" },
+          "items": {
+            "$ref": "#/$defs/baselineContractEntryV1"
+          },
           "default": []
         },
         "audit_external": {
           "type": "array",
-          "items": { "$ref": "#/$defs/baselineContractEntry" },
+          "items": {
+            "$ref": "#/$defs/baselineContractEntryV1"
+          },
           "default": []
         },
         "strict_external_allow_only": {
           "type": "array",
-          "items": { "$ref": "#/$defs/baselineContractEntry" },
+          "items": {
+            "$ref": "#/$defs/baselineContractEntryV1"
+          },
           "default": []
         },
         "audit_external_allow_only": {
           "type": "array",
-          "items": { "$ref": "#/$defs/baselineContractEntry" },
+          "items": {
+            "$ref": "#/$defs/baselineContractEntryV1"
+          },
           "default": []
         },
         "strict_acyclic_siblings": {
           "type": "array",
-          "items": { "$ref": "#/$defs/baselineContractEntry" },
+          "items": {
+            "$ref": "#/$defs/baselineContractEntryV1"
+          },
           "default": []
         },
         "audit_acyclic_siblings": {
           "type": "array",
-          "items": { "$ref": "#/$defs/baselineContractEntry" },
+          "items": {
+            "$ref": "#/$defs/baselineContractEntryV1"
+          },
           "default": []
         },
         "strict_type_placement": {
           "type": "array",
-          "items": { "$ref": "#/$defs/baselineContractEntry" },
+          "items": {
+            "$ref": "#/$defs/baselineContractEntryV1"
+          },
           "default": []
         },
         "audit_type_placement": {
           "type": "array",
-          "items": { "$ref": "#/$defs/baselineContractEntry" },
+          "items": {
+            "$ref": "#/$defs/baselineContractEntryV1"
+          },
           "default": []
         },
         "strict_layout_conventions": {
           "type": "array",
-          "items": { "$ref": "#/$defs/baselineContractEntry" },
+          "items": {
+            "$ref": "#/$defs/baselineContractEntryV1"
+          },
           "default": []
         },
         "audit_layout_conventions": {
           "type": "array",
-          "items": { "$ref": "#/$defs/baselineContractEntry" },
+          "items": {
+            "$ref": "#/$defs/baselineContractEntryV1"
+          },
           "default": []
         },
         "strict_public_api_surface": {
           "type": "array",
-          "items": { "$ref": "#/$defs/baselineContractEntry" },
+          "items": {
+            "$ref": "#/$defs/baselineContractEntryV1"
+          },
           "default": []
         },
         "audit_public_api_surface": {
           "type": "array",
-          "items": { "$ref": "#/$defs/baselineContractEntry" },
+          "items": {
+            "$ref": "#/$defs/baselineContractEntryV1"
+          },
           "default": []
         },
         "strict_attribute_usage": {
           "type": "array",
-          "items": { "$ref": "#/$defs/baselineContractEntry" },
+          "items": {
+            "$ref": "#/$defs/baselineContractEntryV1"
+          },
           "default": []
         },
         "audit_attribute_usage": {
           "type": "array",
-          "items": { "$ref": "#/$defs/baselineContractEntry" },
+          "items": {
+            "$ref": "#/$defs/baselineContractEntryV1"
+          },
           "default": []
         },
         "strict_inheritance": {
           "type": "array",
-          "items": { "$ref": "#/$defs/baselineContractEntry" },
+          "items": {
+            "$ref": "#/$defs/baselineContractEntryV1"
+          },
           "default": []
         },
         "audit_inheritance": {
           "type": "array",
-          "items": { "$ref": "#/$defs/baselineContractEntry" },
+          "items": {
+            "$ref": "#/$defs/baselineContractEntryV1"
+          },
           "default": []
         },
         "strict_interface_implementation": {
           "type": "array",
-          "items": { "$ref": "#/$defs/baselineContractEntry" },
+          "items": {
+            "$ref": "#/$defs/baselineContractEntryV1"
+          },
           "default": []
         },
         "audit_interface_implementation": {
           "type": "array",
-          "items": { "$ref": "#/$defs/baselineContractEntry" },
+          "items": {
+            "$ref": "#/$defs/baselineContractEntryV1"
+          },
           "default": []
         },
         "strict_composition": {
           "type": "array",
-          "items": { "$ref": "#/$defs/baselineContractEntry" },
+          "items": {
+            "$ref": "#/$defs/baselineContractEntryV1"
+          },
           "default": []
         },
         "audit_composition": {
           "type": "array",
-          "items": { "$ref": "#/$defs/baselineContractEntry" },
+          "items": {
+            "$ref": "#/$defs/baselineContractEntryV1"
+          },
           "default": []
         },
         "strict_coverage": {
           "type": "array",
-          "items": { "$ref": "#/$defs/baselineContractEntry" },
+          "items": {
+            "$ref": "#/$defs/baselineContractEntryV1"
+          },
           "default": []
         },
         "audit_coverage": {
           "type": "array",
-          "items": { "$ref": "#/$defs/baselineContractEntry" },
+          "items": {
+            "$ref": "#/$defs/baselineContractEntryV1"
+          },
           "default": []
         }
-            },
-      "additionalProperties": false
-    }
-  },
-  "$defs": {
-    "baselineContractEntry": {
+      }
+    },
+    "baselineGroupsV2": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["id", "ignored_violations"],
+      "properties": {
+        "strict": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/baselineContractEntryV2"
+          },
+          "default": []
+        },
+        "audit": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/baselineContractEntryV2"
+          },
+          "default": []
+        },
+        "strict_layers": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/baselineContractEntryV2"
+          },
+          "default": []
+        },
+        "audit_layers": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/baselineContractEntryV2"
+          },
+          "default": []
+        },
+        "strict_allow_only": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/baselineContractEntryV2"
+          },
+          "default": []
+        },
+        "audit_allow_only": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/baselineContractEntryV2"
+          },
+          "default": []
+        },
+        "strict_cycles": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/baselineContractEntryV2"
+          },
+          "default": []
+        },
+        "audit_cycles": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/baselineContractEntryV2"
+          },
+          "default": []
+        },
+        "strict_method_body": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/baselineContractEntryV2"
+          },
+          "default": []
+        },
+        "audit_method_body": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/baselineContractEntryV2"
+          },
+          "default": []
+        },
+        "strict_independence": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/baselineContractEntryV2"
+          },
+          "default": []
+        },
+        "audit_independence": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/baselineContractEntryV2"
+          },
+          "default": []
+        },
+        "strict_assembly_independence": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/baselineContractEntryV2"
+          },
+          "default": []
+        },
+        "audit_assembly_independence": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/baselineContractEntryV2"
+          },
+          "default": []
+        },
+        "strict_assembly_dependency": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/baselineContractEntryV2"
+          },
+          "default": []
+        },
+        "audit_assembly_dependency": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/baselineContractEntryV2"
+          },
+          "default": []
+        },
+        "strict_assembly_allow_only": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/baselineContractEntryV2"
+          },
+          "default": []
+        },
+        "audit_assembly_allow_only": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/baselineContractEntryV2"
+          },
+          "default": []
+        },
+        "strict_package_dependency": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/baselineContractEntryV2"
+          },
+          "default": []
+        },
+        "audit_package_dependency": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/baselineContractEntryV2"
+          },
+          "default": []
+        },
+        "strict_package_allow_only": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/baselineContractEntryV2"
+          },
+          "default": []
+        },
+        "audit_package_allow_only": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/baselineContractEntryV2"
+          },
+          "default": []
+        },
+        "strict_project_metadata": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/baselineContractEntryV2"
+          },
+          "default": []
+        },
+        "audit_project_metadata": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/baselineContractEntryV2"
+          },
+          "default": []
+        },
+        "strict_protected": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/baselineContractEntryV2"
+          },
+          "default": []
+        },
+        "audit_protected": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/baselineContractEntryV2"
+          },
+          "default": []
+        },
+        "strict_external": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/baselineContractEntryV2"
+          },
+          "default": []
+        },
+        "audit_external": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/baselineContractEntryV2"
+          },
+          "default": []
+        },
+        "strict_external_allow_only": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/baselineContractEntryV2"
+          },
+          "default": []
+        },
+        "audit_external_allow_only": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/baselineContractEntryV2"
+          },
+          "default": []
+        },
+        "strict_acyclic_siblings": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/baselineContractEntryV2"
+          },
+          "default": []
+        },
+        "audit_acyclic_siblings": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/baselineContractEntryV2"
+          },
+          "default": []
+        },
+        "strict_type_placement": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/baselineContractEntryV2"
+          },
+          "default": []
+        },
+        "audit_type_placement": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/baselineContractEntryV2"
+          },
+          "default": []
+        },
+        "strict_layout_conventions": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/baselineContractEntryV2"
+          },
+          "default": []
+        },
+        "audit_layout_conventions": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/baselineContractEntryV2"
+          },
+          "default": []
+        },
+        "strict_public_api_surface": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/baselineContractEntryV2"
+          },
+          "default": []
+        },
+        "audit_public_api_surface": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/baselineContractEntryV2"
+          },
+          "default": []
+        },
+        "strict_attribute_usage": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/baselineContractEntryV2"
+          },
+          "default": []
+        },
+        "audit_attribute_usage": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/baselineContractEntryV2"
+          },
+          "default": []
+        },
+        "strict_inheritance": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/baselineContractEntryV2"
+          },
+          "default": []
+        },
+        "audit_inheritance": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/baselineContractEntryV2"
+          },
+          "default": []
+        },
+        "strict_interface_implementation": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/baselineContractEntryV2"
+          },
+          "default": []
+        },
+        "audit_interface_implementation": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/baselineContractEntryV2"
+          },
+          "default": []
+        },
+        "strict_composition": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/baselineContractEntryV2"
+          },
+          "default": []
+        },
+        "audit_composition": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/baselineContractEntryV2"
+          },
+          "default": []
+        },
+        "strict_coverage": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/baselineContractEntryV2"
+          },
+          "default": []
+        },
+        "audit_coverage": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/baselineContractEntryV2"
+          },
+          "default": []
+        }
+      }
+    },
+    "baselineContractEntryV1": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "ignored_violations"
+      ],
       "properties": {
         "id": {
           "type": "string",
@@ -273,31 +744,148 @@
         },
         "ignored_violations": {
           "type": "array",
-          "items": { "$ref": "#/$defs/baselineViolation" },
+          "items": {
+            "$ref": "#/$defs/baselineViolationV1"
+          },
           "minItems": 1,
           "description": "Violation entries to suppress for this contract."
         }
       }
     },
-    "baselineViolation": {
+    "baselineContractEntryV2": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["source_type", "forbidden_reference"],
+      "required": [
+        "id",
+        "ignored_violations"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Contract ID matching the id field in an architecture contract."
+        },
+        "ignored_violations": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/baselineViolationV2"
+          },
+          "minItems": 1,
+          "description": "Violation entries to suppress for this contract."
+        }
+      }
+    },
+    "baselineViolationV1": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "source_type",
+        "forbidden_reference"
+      ],
       "properties": {
         "source_type": {
           "type": "string",
           "minLength": 1,
-          "description": "Exact source type name to suppress."
+          "description": "Exact source type name to suppress (identity-bearing in version 1)."
         },
         "forbidden_reference": {
           "type": "string",
           "minLength": 1,
-          "description": "Exact forbidden reference name to suppress."
+          "description": "Exact forbidden reference name to suppress (identity-bearing in version 1)."
         },
         "reason": {
           "type": "string",
           "minLength": 1,
-          "description": "Human-readable migration reason or issue reference."
+          "description": "Human-readable migration reason or issue reference. Never participates in matching."
+        }
+      }
+    },
+    "baselineViolationV2": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "source_type",
+        "forbidden_reference",
+        "identity_version",
+        "contract_family",
+        "kind",
+        "occurrence"
+      ],
+      "properties": {
+        "source_type": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Human-readable source type name. Display-only in version 2 documents (identity is the structured fields below)."
+        },
+        "forbidden_reference": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Human-readable forbidden reference name. Display-only in version 2 documents (identity is the structured fields below)."
+        },
+        "reason": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Human-readable migration reason or issue reference. Never participates in matching."
+        },
+        "identity_version": {
+          "type": "integer",
+          "enum": [
+            2
+          ],
+          "description": "Structured identity schema version for this entry. Required in version 2 documents so a legacy-shaped entry mislabeled as version 2 cannot pass validation."
+        },
+        "contract_family": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Contract family this identity belongs to (e.g. method_body, cycles), derived from the contract group name."
+        },
+        "kind": {
+          "type": "string",
+          "enum": [
+            "dependency",
+            "reference",
+            "call",
+            "package",
+            "framework",
+            "api_change",
+            "coverage"
+          ],
+          "description": "Denormalized, stable classification of the violation kind."
+        },
+        "source_assembly": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Assembly containing the source type, where the checking family supplies it. Absent for families not yet assembly-qualified."
+        },
+        "source_member": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Source member, where applicable."
+        },
+        "target_assembly": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Assembly containing the target/forbidden symbol, where the checking family supplies it."
+        },
+        "target_type": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Target type, where distinct from the forbidden reference display text."
+        },
+        "target_member": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Exact forbidden symbol/member/overload. Falls back to the forbidden_reference display text for families that don't yet resolve a member independently."
+        },
+        "occurrence": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Stable, non-line-based ordinal discriminator among matches that otherwise share every other identity field within the same source unit. Required (0 for the first occurrence) so identity is always fully structured."
+        },
+        "configuration": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Configuration/TFM qualifier, only populated where semantically relevant to the family."
         }
       }
     }

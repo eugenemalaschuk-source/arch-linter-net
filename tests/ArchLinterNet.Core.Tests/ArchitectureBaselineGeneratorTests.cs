@@ -1,4 +1,5 @@
 using ArchLinterNet.Core.Contracts;
+using ArchLinterNet.Core.Model;
 using NUnit.Framework;
 using ArchitectureContractGroups = ArchLinterNet.Core.Contracts.Families.ArchitectureContractGroups;
 
@@ -30,7 +31,7 @@ public sealed class ArchitectureBaselineGeneratorTests
         var candidates = Array.Empty<ArchitectureBaselineCandidate>();
         var baseline = _generator.Generate(policy, candidates);
 
-        Assert.That(baseline.Version, Is.EqualTo(1));
+        Assert.That(baseline.Version, Is.EqualTo(2));
         Assert.That(baseline.Baseline.Strict, Is.Empty);
         Assert.That(baseline.Baseline.Audit, Is.Empty);
         Assert.That(baseline.Baseline.StrictLayers, Is.Empty);
@@ -140,6 +141,88 @@ public sealed class ArchitectureBaselineGeneratorTests
 
         Assert.That(baseline.Baseline.Strict, Has.Count.EqualTo(1));
         Assert.That(baseline.Baseline.Strict[0].IgnoredViolations, Has.Count.EqualTo(1));
+    }
+
+    [Test]
+    public void Generate_DistinctOccurrencesOfSameSourceAndTarget_ProduceSeparateEntries()
+    {
+        var policy = new ArchitectureContractDocument
+        {
+            Version = 1,
+            Name = "Test",
+            Layers = new Dictionary<string, ArchitectureLayer>
+            {
+                ["core"] = new() { Namespace = "Test.Core" }
+            },
+            Analysis = new ArchitectureAnalysisConfiguration
+            {
+                TargetAssemblies = new List<string>()
+            },
+            Contracts = new ArchitectureContractGroups()
+        };
+
+        // Simulates two genuinely distinct forbidden-call occurrences that render the same
+        // (source_type, forbidden_reference) display text but were already assigned distinct
+        // occurrence discriminators live upstream, in ArchitectureContractExecutionContext.IsIgnored,
+        // as ArchitectureAnalysisSession scans each call site (before generation runs).
+        var identityTemplate = new ArchitectureViolationIdentity(
+            2, "method_body", "call", "my-rule", "MyApp.App", "MyApp.Service", null,
+            "System", null, "Console.WriteLine(string)", 0);
+
+        var candidates = new List<ArchitectureBaselineCandidate>
+        {
+            new("strict_method_body", "my-rule", "MyApp.Service",
+                "line 10: Console.WriteLine -> System.Console.WriteLine(string)", identityTemplate with { Occurrence = 0 }),
+            new("strict_method_body", "my-rule", "MyApp.Service",
+                "line 20: Console.WriteLine -> System.Console.WriteLine(string)", identityTemplate with { Occurrence = 1 }),
+        };
+
+        var baseline = _generator.Generate(policy, candidates);
+
+        Assert.That(baseline.Baseline.StrictMethodBody, Has.Count.EqualTo(1));
+        Assert.That(baseline.Baseline.StrictMethodBody[0].IgnoredViolations, Has.Count.EqualTo(2),
+            "Each distinct occurrence must produce its own baseline entry, not collapse into one.");
+    }
+
+    [Test]
+    public void BuildFromEntries_Version2_EntryWithoutIdentity_DerivesFallbackIdentity()
+    {
+        // ArchitectureBaselineApplicationService.Migrate builds comparison entries without an
+        // Identity for out-of-scope carry-through entries, relying on BuildFromEntries itself to
+        // derive one — this is the entry-based (not candidate-based) fallback path.
+        var entry = new ArchitectureBaselineComparisonEntry(
+            "strict", "core-rule", "Src.Type", "Ref.Type", "carried through unchanged");
+
+        var baseline = _generator.BuildFromEntries(new[] { entry }, version: 2);
+
+        Assert.That(baseline.Version, Is.EqualTo(2));
+        var violation = baseline.Baseline.Strict[0].IgnoredViolations[0];
+        Assert.Multiple(() =>
+        {
+            Assert.That(violation.SourceType, Is.EqualTo("Src.Type"));
+            Assert.That(violation.ForbiddenReference, Is.EqualTo("Ref.Type"));
+            Assert.That(violation.Reason, Is.EqualTo("carried through unchanged"));
+            Assert.That(violation.IdentityVersion, Is.EqualTo(2));
+            Assert.That(violation.ContractFamily, Is.EqualTo("strict"));
+            Assert.That(violation.Occurrence, Is.EqualTo(0));
+        });
+    }
+
+    [Test]
+    public void BuildFromEntries_Version1_ProducesLegacyDocumentWithoutIdentityFields()
+    {
+        var entry = new ArchitectureBaselineComparisonEntry("strict", "core-rule", "Src.Type", "Ref.Type", "legacy reason");
+
+        var baseline = _generator.BuildFromEntries(new[] { entry }, version: 1);
+
+        Assert.That(baseline.Version, Is.EqualTo(1));
+        var violation = baseline.Baseline.Strict[0].IgnoredViolations[0];
+        Assert.Multiple(() =>
+        {
+            Assert.That(violation.SourceType, Is.EqualTo("Src.Type"));
+            Assert.That(violation.IdentityVersion, Is.Null);
+            Assert.That(violation.ContractFamily, Is.Null);
+        });
     }
 
     [Test]

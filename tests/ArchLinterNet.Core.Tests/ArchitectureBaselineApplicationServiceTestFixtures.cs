@@ -137,11 +137,11 @@ internal sealed class FakeBaselineGenerator : IArchitectureBaselineGenerator
         return new ArchitectureBaselineDocument { Version = 1 };
     }
 
-    public ArchitectureBaselineDocument BuildFromEntries(IReadOnlyList<ArchitectureBaselineComparisonEntry> entries)
+    public ArchitectureBaselineDocument BuildFromEntries(IReadOnlyList<ArchitectureBaselineComparisonEntry> entries, int version = 2)
     {
         WasCalled = true;
         EntriesReceived = entries;
-        return new ArchitectureBaselineDocument { Version = 1 };
+        return new ArchitectureBaselineDocument { Version = version };
     }
 
     public string Serialize(ArchitectureBaselineDocument document)

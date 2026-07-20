@@ -148,6 +148,11 @@ internal sealed class CliRuntime : ICliRuntime
         return _engine.VerifyBaseline(request);
     }
 
+    public BaselineMigrateOutcome MigrateBaseline(BaselineMigrateRequest request)
+    {
+        return _engine.MigrateBaseline(request);
+    }
+
     public ArchitectureGraphOutcome BuildGraph(ArchitectureGraphRequest request)
     {
         return _engine.BuildGraph(request);

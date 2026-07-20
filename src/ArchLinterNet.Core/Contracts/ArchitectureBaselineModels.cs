@@ -1,12 +1,22 @@
+using ArchLinterNet.Core.Model;
 using YamlDotNet.Serialization;
 
 namespace ArchLinterNet.Core.Contracts;
 
+// Occurrence is assigned live, unconditionally, inside ArchitectureContractExecutionContext.IsIgnored
+// as each candidate is discovered — not post-hoc here. A post-hoc pass over only the *surviving*
+// (non-ignored) candidates cannot reproduce the same numbering once any occurrence in a duplicate
+// group is suppressed (by a baseline merge or a manual glob ignore that happens to match one of
+// several duplicates): the survivors would be renumbered contiguously from zero, diverging from what
+// a live `validate --baseline` run (which counts every raw occurrence, suppressed or not, before
+// deciding suppression) computes for the same occurrence. Live, unconditional counting is the only
+// scheme that stays consistent between generation and enforcement.
 public sealed record ArchitectureBaselineCandidate(
     string ContractGroup,
     string? ContractId,
     string SourceType,
-    string ForbiddenReference);
+    string ForbiddenReference,
+    ArchitectureViolationIdentity? Identity = null);
 
 public sealed class ArchitectureBaselineDocument
 {
@@ -247,5 +257,84 @@ public sealed class ArchitectureBaselineContractEntry
     public string Id { get; set; } = string.Empty;
 
     [YamlMember(Alias = "ignored_violations")]
-    public List<ArchitectureIgnoredViolation> IgnoredViolations { get; set; } = new();
+    public List<ArchitectureBaselineIgnoredViolation> IgnoredViolations { get; set; } = new();
+}
+
+/// <summary>
+/// One <c>ignored_violations</c> entry inside a baseline file. Version-1 files only ever populate
+/// <see cref="SourceType"/>/<see cref="ForbiddenReference"/>/<see cref="Reason"/> (the legacy shape);
+/// version-2 files additionally populate the structured identity fields below, which is what
+/// <see cref="ArchitectureBaselineComparer"/> and <see cref="ArchitectureBaselineGenerator"/> use for
+/// matching once the containing document's <see cref="ArchitectureBaselineDocument.Version"/> is 2.
+/// </summary>
+public sealed class ArchitectureBaselineIgnoredViolation
+{
+    [YamlMember(Alias = "source_type")] public string SourceType { get; set; } = string.Empty;
+
+    [YamlMember(Alias = "forbidden_reference")]
+    public string ForbiddenReference { get; set; } = string.Empty;
+
+    [YamlMember(Alias = "reason")] public string Reason { get; set; } = string.Empty;
+
+    [YamlMember(Alias = "identity_version")] public int? IdentityVersion { get; set; }
+
+    [YamlMember(Alias = "contract_family")] public string? ContractFamily { get; set; }
+
+    [YamlMember(Alias = "kind")] public string? Kind { get; set; }
+
+    [YamlMember(Alias = "source_assembly")] public string? SourceAssembly { get; set; }
+
+    [YamlMember(Alias = "source_member")] public string? SourceMember { get; set; }
+
+    [YamlMember(Alias = "target_assembly")] public string? TargetAssembly { get; set; }
+
+    [YamlMember(Alias = "target_type")] public string? TargetType { get; set; }
+
+    [YamlMember(Alias = "target_member")] public string? TargetMember { get; set; }
+
+    [YamlMember(Alias = "occurrence")] public int? Occurrence { get; set; }
+
+    [YamlMember(Alias = "configuration")] public string? Configuration { get; set; }
+
+    /// <summary>
+    /// Builds the structured identity for a version-2 entry. Callers MUST only invoke this on
+    /// entries belonging to a version-2 document (guarded by the document's <c>Version</c>).
+    /// </summary>
+    public ArchitectureViolationIdentity ToIdentity(string contractId)
+    {
+        return new ArchitectureViolationIdentity(
+            IdentityVersion ?? ArchitectureViolationIdentity.CurrentVersion,
+            ContractFamily ?? string.Empty,
+            Kind ?? string.Empty,
+            contractId,
+            SourceAssembly,
+            SourceType,
+            SourceMember,
+            TargetAssembly,
+            TargetType,
+            TargetMember,
+            Occurrence ?? 0,
+            Configuration);
+    }
+
+    public static ArchitectureBaselineIgnoredViolation FromIdentity(
+        ArchitectureViolationIdentity identity, string sourceTypeDisplay, string forbiddenReferenceDisplay, string reason)
+    {
+        return new ArchitectureBaselineIgnoredViolation
+        {
+            SourceType = sourceTypeDisplay,
+            ForbiddenReference = forbiddenReferenceDisplay,
+            Reason = reason,
+            IdentityVersion = identity.IdentityVersion,
+            ContractFamily = identity.ContractFamily,
+            Kind = identity.Kind,
+            SourceAssembly = identity.SourceAssembly,
+            SourceMember = identity.SourceMember,
+            TargetAssembly = identity.TargetAssembly,
+            TargetType = identity.TargetType,
+            TargetMember = identity.TargetMember,
+            Occurrence = identity.Occurrence,
+            Configuration = identity.Configuration,
+        };
+    }
 }

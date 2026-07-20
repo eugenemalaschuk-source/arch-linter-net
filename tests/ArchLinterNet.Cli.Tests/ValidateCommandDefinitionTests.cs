@@ -184,6 +184,7 @@ public sealed class ValidateCommandDefinitionTests
         public BaselinePruneOutcome PruneBaseline(BaselinePruneRequest request) => throw new NotSupportedException();
         public BaselineDiffOutcome DiffBaseline(BaselineDiffRequest request) => throw new NotSupportedException();
         public BaselineVerifyOutcome VerifyBaseline(BaselineVerifyRequest request) => throw new NotSupportedException();
+        public BaselineMigrateOutcome MigrateBaseline(BaselineMigrateRequest request) => throw new NotSupportedException();
         public ArchitectureGraphOutcome BuildGraph(ArchitectureGraphRequest request) => throw new NotSupportedException();
         public string FormatGraphAsJson(ArchitectureDependencyGraph graph) => throw new NotSupportedException();
         public string FormatGraphAsDot(ArchitectureDependencyGraph graph) => throw new NotSupportedException();
