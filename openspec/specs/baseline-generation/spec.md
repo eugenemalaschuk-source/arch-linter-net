@@ -83,7 +83,9 @@ For `version: 1` baseline files, the merge SHALL deduplicate by the legacy `(sou
 
 For `version: 2` baseline files, the merge SHALL deduplicate by full `ArchitectureViolationIdentity` structural equality within each contract.
 
-The merged ignores SHALL participate in all existing validation behavior: matching via `ArchitectureIgnoreMatcher.IsIgnored`, stale tracking via `ArchitectureIgnoreUsageTracker`, and unmatched ignore alerting via `unmatched_ignored_violations` config.
+The merged ignores SHALL participate in all existing validation behavior: matching via `ArchitectureIgnoreMatcher.IsIgnored`, stale tracking via `ArchitectureIgnoreUsageTracker`, and unmatched ignore alerting via `unmatched_ignored_violations` config. For an ignore entry merged from a `version: 2` baseline, `IsIgnored` SHALL match by full structured-identity equality (contract family, kind, source/target assembly, source/target type and member, and occurrence) against the live candidate identity computed at the same call site — never by `(source_type, forbidden_reference)` text matching. For an entry with no structured identity (a manually authored policy ignore, or one merged from a `version: 1` baseline), `IsIgnored` SHALL continue to match by the legacy glob pair exactly as before. This guarantee applies to `validate --baseline` itself, not only to `baseline diff`/`verify`/`migrate` — two same-named types in different assemblies, or two distinct forbidden calls in the same source type, SHALL be distinguished at validation time.
+
+Occurrence discrimination SHALL be computed live and unconditionally, in deterministic call order, at the same choke point that decides whether a call is ignored — not as a separate pass over only the non-suppressed occurrences — so a baselined occurrence's index matches what generation originally assigned it, whether or not this particular run's `--baseline` merge suppresses it.
 
 The baseline file SHALL NOT be validated against the main policy schema. It SHALL be loaded via a dedicated `ArchitectureBaselineDocument` model and loader that dispatches on `version` (`1` or `2`); any other value SHALL fail loading with an explicit unsupported-version error.
 
@@ -110,6 +112,22 @@ The baseline file SHALL NOT be validated against the main policy schema. It SHAL
 #### Scenario: Unsupported baseline version is rejected
 - **WHEN** user runs any `baseline` subcommand or `validate --baseline` against a file whose `version` is neither `1` nor `2`
 - **THEN** the command SHALL fail with an explicit unsupported-version error and a non-zero exit code
+
+#### Scenario: validate --baseline distinguishes same-named types in different assemblies
+- **WHEN** user runs `validate --baseline` with a `version: 2` baseline entry that baselines a violation from one specific assembly, and the current codebase also contains a same-named violation from a different assembly
+- **THEN** the baselined assembly's violation SHALL NOT be reported; the other assembly's same-named violation SHALL still fail validation
+
+#### Scenario: validate --baseline distinguishes multiple occurrences in one type
+- **WHEN** user runs `validate --baseline` with a `version: 2` baseline entry that baselines one specific occurrence of a repeated forbidden call within a source type, and the current codebase still contains a second, distinct occurrence of that same call
+- **THEN** the baselined occurrence SHALL NOT be reported; the second occurrence SHALL still fail validation
+
+#### Scenario: A version: 2 document whose entries lack structured identity fields is rejected
+- **WHEN** a baseline file declares `version: 2` but one or more `ignored_violations` entries are missing `identity_version`, `contract_family`, `kind`, or `occurrence`
+- **THEN** loading SHALL fail with an explicit error identifying the offending entry, rather than silently defaulting the missing fields
+
+#### Scenario: A version: 1 document with structured identity fields is rejected
+- **WHEN** a baseline file declares `version: 1` but one or more `ignored_violations` entries carry an `identity_version` field
+- **THEN** loading SHALL fail with an explicit error, since structured identity fields are only valid in a `version: 2` document
 
 ### Requirement: Baseline entries cover cycle and sibling-cycle contracts
 
@@ -286,10 +304,14 @@ The system SHALL provide a `baseline verify` CLI subcommand that performs the sa
 
 The system SHALL provide a `baseline migrate` CLI subcommand that deterministically upgrades a `version: 1` baseline file to `version: 2` by correlating each legacy `ignored_violations` entry against freshly collected current-codebase candidates carrying full `ArchitectureViolationIdentity` data.
 
-For each legacy entry, scoped to its contract id, the system SHALL classify it as exactly one of:
-- `matched`: exactly one current candidate's legacy-projected `(source_type, forbidden_reference)` pair equals the entry's pair — the entry SHALL be rewritten using that candidate's full structured identity, with `reason` and any issue metadata preserved verbatim;
-- `stale`: zero current candidates match — the entry SHALL be excluded from the migrated output and reported;
-- `ambiguous`: more than one current candidate matches — the entry SHALL be excluded from the migrated output and reported; migration SHALL NOT guess or silently broaden the entry to cover multiple identities.
+Candidate collection for correlation purposes SHALL always cover the full current violation set (equivalent to `--mode all` with no `--contract` restriction), regardless of the `--mode`/`--contract` scope requested for this run, so that classification is never computed against a partial candidate set.
+
+For each legacy entry:
+- If the entry's contract group and contract id fall outside the requested `--mode`/`--contract` scope, the system SHALL classify it as `out_of_scope` and carry it through into the migrated output unchanged (uplifted to `version: 2` document shape via a deterministic fallback identity derived from its own contract family/id/source/target text, not reclassified against candidates). An out-of-scope entry SHALL NOT be counted toward `matched`, `stale`, or `ambiguous`, and SHALL NOT block a write due to unrelated ambiguity elsewhere in the file.
+- Otherwise, scoped to its contract id, the system SHALL classify it as exactly one of:
+  - `matched`: exactly one current candidate's legacy-projected `(source_type, forbidden_reference)` pair equals the entry's pair — the entry SHALL be rewritten using that candidate's full structured identity, with `reason` and any issue metadata preserved verbatim;
+  - `stale`: zero current candidates match — the entry SHALL be excluded from the migrated output and reported;
+  - `ambiguous`: more than one current candidate matches — the entry SHALL be excluded from the migrated output and reported; migration SHALL NOT guess or silently broaden the entry to cover multiple identities.
 
 `baseline migrate` SHALL accept `--policy`/`--config`, `--baseline` (required, the legacy file to migrate), `--output` (the destination path for the migrated file), `--mode`, `--condition-set`, `--contract`, `--dry-run`/`--check` (aliases for a report-only run), and `--json`.
 
@@ -314,6 +336,10 @@ Without `--dry-run`/`--check`, `baseline migrate` SHALL require `--output` to be
 #### Scenario: Dry-run reports without writing
 - **WHEN** user runs `baseline migrate --baseline legacy.yml --dry-run`
 - **THEN** no file SHALL be written, the command SHALL report the classification (`matched`/`stale`/`ambiguous`) of every entry, and SHALL exit non-zero only if any entry is `ambiguous`
+
+#### Scenario: Scoped migrate carries out-of-scope entries through unchanged
+- **WHEN** user runs `baseline migrate --mode strict` (or `--contract <id>`) against a legacy baseline that also contains audit-group entries (or other contracts') outside that scope
+- **THEN** the migrated output SHALL still contain those out-of-scope entries, uplifted to version-2 shape, reported with `status: out_of_scope`, and SHALL NOT report or treat them as `stale`
 
 #### Scenario: Migrate refuses to overwrite the source file
 - **WHEN** user runs `baseline migrate --baseline legacy.yml --output legacy.yml`

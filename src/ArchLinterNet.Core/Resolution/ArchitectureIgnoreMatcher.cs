@@ -1,5 +1,6 @@
 using System.Text.RegularExpressions;
 using ArchLinterNet.Core.Contracts;
+using ArchLinterNet.Core.Model;
 
 namespace ArchLinterNet.Core.Resolution;
 
@@ -15,15 +16,14 @@ internal static class ArchitectureIgnoreMatcher
         string sourceType,
         string forbiddenReference,
         IReadOnlyList<ArchitectureIgnoredViolation> ignoredViolations,
-        ArchitectureIgnoreUsageTracker? usageTracker = null)
+        ArchitectureIgnoreUsageTracker? usageTracker = null,
+        ArchitectureViolationIdentity? liveIdentity = null)
     {
         if (usageTracker == null)
         {
             for (int i = 0; i < ignoredViolations.Count; i++)
             {
-                var ignore = ignoredViolations[i];
-                if (MatchesPattern(sourceType, ignore.SourceType)
-                    && MatchesPattern(forbiddenReference, ignore.ForbiddenReference))
+                if (Matches(sourceType, forbiddenReference, liveIdentity, ignoredViolations[i]))
                 {
                     return true;
                 }
@@ -36,9 +36,7 @@ internal static class ArchitectureIgnoreMatcher
 
         for (int i = 0; i < ignoredViolations.Count; i++)
         {
-            var ignore = ignoredViolations[i];
-            if (MatchesPattern(sourceType, ignore.SourceType)
-                && MatchesPattern(forbiddenReference, ignore.ForbiddenReference))
+            if (Matches(sourceType, forbiddenReference, liveIdentity, ignoredViolations[i]))
             {
                 usageTracker.MarkMatched(i);
                 anyMatched = true;
@@ -46,6 +44,36 @@ internal static class ArchitectureIgnoreMatcher
         }
 
         return anyMatched;
+    }
+
+    // A `version: 2`-sourced ignore entry (IdentityVersion == 2) was merged from a structured
+    // baseline and is matched by exact identity equality — including assembly, member, and
+    // occurrence — never by glob text matching. Manually authored ignores and entries merged from
+    // a `version: 1` baseline have no IdentityVersion and keep the legacy glob-pair behavior
+    // exactly as before.
+    private static bool Matches(
+        string sourceType, string forbiddenReference, ArchitectureViolationIdentity? liveIdentity, ArchitectureIgnoredViolation ignore)
+    {
+        if (ignore.IdentityVersion == ArchitectureViolationIdentity.CurrentVersion && liveIdentity != null)
+        {
+            return MatchesIdentity(liveIdentity, ignore);
+        }
+
+        return MatchesPattern(sourceType, ignore.SourceType) && MatchesPattern(forbiddenReference, ignore.ForbiddenReference);
+    }
+
+    private static bool MatchesIdentity(ArchitectureViolationIdentity live, ArchitectureIgnoredViolation ignore)
+    {
+        return string.Equals(ignore.ContractFamily, live.ContractFamily, StringComparison.Ordinal)
+            && string.Equals(ignore.Kind, live.Kind, StringComparison.Ordinal)
+            && string.Equals(ignore.SourceAssembly, live.SourceAssembly, StringComparison.Ordinal)
+            && string.Equals(ignore.SourceType, live.SourceType, StringComparison.Ordinal)
+            && string.Equals(ignore.SourceMember, live.SourceMember, StringComparison.Ordinal)
+            && string.Equals(ignore.TargetAssembly, live.TargetAssembly, StringComparison.Ordinal)
+            && string.Equals(ignore.TargetType, live.TargetType, StringComparison.Ordinal)
+            && string.Equals(ignore.TargetMember, live.TargetMember, StringComparison.Ordinal)
+            && (ignore.Occurrence ?? 0) == live.Occurrence
+            && string.Equals(ignore.Configuration, live.Configuration, StringComparison.Ordinal);
     }
 
     private static bool MatchesPattern(string value, string pattern)

@@ -22,7 +22,8 @@ internal interface IArchitectureSourceScanner
         IArchitectureFileSystem? fileSystem = null,
         IRoslynCompilationFactory? compilationFactory = null,
         IArchitectureAssemblyLoader? assemblyLoader = null,
-        IReadOnlyList<string>? explicitReferenceAssemblyPaths = null);
+        IReadOnlyList<string>? explicitReferenceAssemblyPaths = null,
+        string? sourceAssemblyHint = null);
 
     IReadOnlyList<string> FindMatchingSourceFiles(
         string repositoryRoot,
@@ -46,7 +47,8 @@ internal sealed class ArchitectureSourceScanner : IArchitectureSourceScanner
         IArchitectureFileSystem? fileSystem = null,
         IRoslynCompilationFactory? compilationFactory = null,
         IArchitectureAssemblyLoader? assemblyLoader = null,
-        IReadOnlyList<string>? explicitReferenceAssemblyPaths = null)
+        IReadOnlyList<string>? explicitReferenceAssemblyPaths = null,
+        string? sourceAssemblyHint = null)
     {
         fileSystem ??= ArchitectureFileSystem.Real;
         compilationFactory ??= RoslynCompilationFactory.Real;
@@ -89,7 +91,9 @@ internal sealed class ArchitectureSourceScanner : IArchitectureSourceScanner
             string[] unignored = matches
                 .Where(match => !executionContext.IsIgnored(
                     relativePath, match.Display,
+                    sourceAssembly: sourceAssemblyHint,
                     targetAssembly: match.TargetAssembly,
+                    sourceMember: match.SourceMember,
                     targetMember: match.TargetMember))
                 .Select(match => match.Display)
                 .Distinct(StringComparer.Ordinal)
@@ -125,10 +129,11 @@ internal sealed class ArchitectureSourceScanner : IArchitectureSourceScanner
 
     /// <summary>
     /// One forbidden-call match: <see cref="Display"/> is the human-readable, line-numbered text
-    /// used for violation reporting (never for baseline identity); <see cref="TargetAssembly"/> and
-    /// <see cref="TargetMember"/> are the structured identity fields derived from the resolved symbol.
+    /// used for violation reporting (never for baseline identity); <see cref="TargetAssembly"/>,
+    /// <see cref="TargetMember"/>, and <see cref="SourceMember"/> are the structured identity fields
+    /// derived from the resolved symbol and its enclosing member.
     /// </summary>
-    private sealed record ForbiddenCallMatch(string Display, string? TargetAssembly, string TargetMember);
+    private sealed record ForbiddenCallMatch(string Display, string? TargetAssembly, string TargetMember, string? SourceMember);
 
     private static List<ForbiddenCallMatch> FindForbiddenUsagesInBodies(
         SemanticModel semanticModel,
@@ -159,7 +164,9 @@ internal sealed class ArchitectureSourceScanner : IArchitectureSourceScanner
                 int line = node.GetLocation().GetLineSpan().StartLinePosition.Line + 1;
                 string fallbackMarker = usedCandidateFallback ? " [ambiguous-candidate]" : string.Empty;
                 string display = $"line {line}: {matchedPattern} -> {symbolName}{fallbackMarker}";
-                matches.Add(new ForbiddenCallMatch(display, symbol.ContainingAssembly?.Name, symbolName));
+                string? sourceMember = semanticModel.GetEnclosingSymbol(node.SpanStart)
+                    ?.ToDisplayString(SymbolDisplayFormat.CSharpErrorMessageFormat);
+                matches.Add(new ForbiddenCallMatch(display, symbol.ContainingAssembly?.Name, symbolName, sourceMember));
             }
         }
 

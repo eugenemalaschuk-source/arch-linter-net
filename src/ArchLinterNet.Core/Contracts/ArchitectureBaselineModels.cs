@@ -3,45 +3,20 @@ using YamlDotNet.Serialization;
 
 namespace ArchLinterNet.Core.Contracts;
 
+// Occurrence is assigned live, unconditionally, inside ArchitectureContractExecutionContext.IsIgnored
+// as each candidate is discovered — not post-hoc here. A post-hoc pass over only the *surviving*
+// (non-ignored) candidates cannot reproduce the same numbering once any occurrence in a duplicate
+// group is suppressed (by a baseline merge or a manual glob ignore that happens to match one of
+// several duplicates): the survivors would be renumbered contiguously from zero, diverging from what
+// a live `validate --baseline` run (which counts every raw occurrence, suppressed or not, before
+// deciding suppression) computes for the same occurrence. Live, unconditional counting is the only
+// scheme that stays consistent between generation and enforcement.
 public sealed record ArchitectureBaselineCandidate(
     string ContractGroup,
     string? ContractId,
     string SourceType,
     string ForbiddenReference,
     ArchitectureViolationIdentity? Identity = null);
-
-/// <summary>
-/// Assigns a stable, non-line-based <see cref="ArchitectureViolationIdentity.Occurrence"/> discriminator
-/// to candidates that otherwise share every other identity field, so distinct occurrences of the same
-/// source/target pair within one contract never collapse into a single baseline entry. Runs once, in the
-/// deterministic order candidates were collected in, immediately after collection — before both baseline
-/// comparison and baseline generation consume the list, so the two stay consistent with each other.
-/// </summary>
-public static class ArchitectureBaselineCandidateOccurrenceAssigner
-{
-    public static IReadOnlyList<ArchitectureBaselineCandidate> Assign(IReadOnlyList<ArchitectureBaselineCandidate> candidates)
-    {
-        var counters = new Dictionary<(string ContractGroup, string? ContractId, ArchitectureViolationIdentity Identity), int>();
-        var result = new List<ArchitectureBaselineCandidate>(candidates.Count);
-
-        foreach (ArchitectureBaselineCandidate candidate in candidates)
-        {
-            if (candidate.Identity == null)
-            {
-                result.Add(candidate);
-                continue;
-            }
-
-            var key = (candidate.ContractGroup, candidate.ContractId, candidate.Identity with { Occurrence = 0 });
-            int occurrence = counters.TryGetValue(key, out int count) ? count : 0;
-            counters[key] = occurrence + 1;
-
-            result.Add(candidate with { Identity = candidate.Identity with { Occurrence = occurrence } });
-        }
-
-        return result;
-    }
-}
 
 public sealed class ArchitectureBaselineDocument
 {

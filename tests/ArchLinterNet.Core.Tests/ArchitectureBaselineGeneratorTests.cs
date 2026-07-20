@@ -163,8 +163,8 @@ public sealed class ArchitectureBaselineGeneratorTests
 
         // Simulates two genuinely distinct forbidden-call occurrences that render the same
         // (source_type, forbidden_reference) display text but were already assigned distinct
-        // occurrence discriminators upstream by ArchitectureBaselineCandidateOccurrenceAssigner
-        // (as ArchitectureBaselineApplicationService.CollectCandidates does before generation).
+        // occurrence discriminators live upstream, in ArchitectureContractExecutionContext.IsIgnored,
+        // as ArchitectureAnalysisSession scans each call site (before generation runs).
         var identityTemplate = new ArchitectureViolationIdentity(
             2, "method_body", "call", "my-rule", "MyApp.App", "MyApp.Service", null,
             "System", null, "Console.WriteLine(string)", 0);

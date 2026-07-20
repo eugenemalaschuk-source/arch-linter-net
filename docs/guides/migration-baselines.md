@@ -223,6 +223,16 @@ provide `--output` to write the migrated file. `baseline migrate` never
 writes to the same path as `--baseline` — pick a distinct `--output`, review
 it, then swap it in for the original file yourself.
 
+`--mode`/`--contract` scope which entries this run *attempts to classify*
+(matched/stale/ambiguous), not which entries end up in the output. Entries
+outside the requested scope are always carried through into the output
+unchanged, reported as `out_of_scope` — a scoped `baseline migrate --mode
+strict` never touches, reclassifies, or drops your audit debt, and `--contract
+<id>` never touches other contracts' debt. Classification itself always runs
+against the full current violation set regardless of `--mode`/`--contract`,
+so an out-of-scope entry is never misclassified as `stale` just because this
+run didn't ask about it.
+
 Migration is opt-in and on-demand: nothing about `validate`, `generate`,
 `update`, `prune`, `diff`, or `verify` changes for a baseline you haven't
 migrated. Version 1 files keep working with their existing behavior
@@ -234,22 +244,22 @@ When `--baseline <path>` is provided, the baseline entries are merged into the
 policy's `ignored_violations` lists before validation. The merge:
 
 - Appends new entries to each contract's existing ignores
-- Skips duplicate `(source_type, forbidden_reference)` pairs that already exist
-  (this dedup is unchanged for both version 1 and version 2 files — it only
-  affects the in-memory ignore list used by `ArchitectureIgnoreMatcher`
-  during validation, not baseline-comparison identity)
 - Reports an error if a baseline entry references a contract ID that doesn't
   exist in the policy (exit code 2)
+- Deduplicates and matches using the **same identity notion baseline
+  comparison uses** — version 1 entries by the exact `(source_type,
+  forbidden_reference)` pair, version 2 entries by the full structured
+  `ArchitectureViolationIdentity` (contract family, kind, source/target
+  assembly, source/target type and member, and an occurrence discriminator).
+  A version-2 entry's assembly/member/occurrence fields are exactly what
+  `validate --baseline` uses to decide whether a given violation is
+  suppressed — this is what makes `validate`, `diff`, `verify`, and `migrate`
+  agree on identity, not just the read-only comparison commands.
 
-Baseline **comparison** (`generate`/`update`/`prune`/`diff`/`verify`/`migrate`)
-uses a different, stricter notion of identity than the merge above: version 1
-baselines compare by the exact `(source_type, forbidden_reference)` pair as
-before; version 2 baselines compare by the full structured
-`ArchitectureViolationIdentity` (contract family, kind, source/target
-assembly, source/target type and member, and an occurrence discriminator).
 One baseline entry always suppresses exactly one identity — two same-named
 types in different assemblies, or two distinct forbidden calls in the same
-source type, are never treated as the same entry under version 2.
+source type, are never treated as the same entry under version 2, in
+`validate` just as much as in `diff`/`verify`.
 
 ### Stale baseline entries
 
