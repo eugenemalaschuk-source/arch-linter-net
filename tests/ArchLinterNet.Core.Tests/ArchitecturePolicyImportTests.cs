@@ -775,4 +775,5 @@ public sealed class ArchitecturePolicyImportTests
 
     [DllImport("libc", SetLastError = true, EntryPoint = "mkfifo")]
     private static extern int CreateNamedPipeUnix(string pathName, uint mode);
+
 }

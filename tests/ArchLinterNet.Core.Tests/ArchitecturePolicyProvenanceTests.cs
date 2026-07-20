@@ -204,6 +204,28 @@ public sealed class ArchitecturePolicyProvenanceTests
         });
     }
 
+    [TestCase(typeof(FileNotFoundException), ArchitecturePolicyImportErrorCategory.MissingFile)]
+    [TestCase(typeof(DirectoryNotFoundException), ArchitecturePolicyImportErrorCategory.MissingFile)]
+    [TestCase(typeof(UnauthorizedAccessException), ArchitecturePolicyImportErrorCategory.UnreadableFile)]
+    [TestCase(typeof(IOException), ArchitecturePolicyImportErrorCategory.UnreadableFile)]
+    public void Load_RootReadFailure_UsesTypedSourceReaderDiagnostic(
+        Type exceptionType,
+        ArchitecturePolicyImportErrorCategory category)
+    {
+        string root = Write("architecture/root.yml", EffectiveRootYaml());
+        var readException = (Exception)Activator.CreateInstance(exceptionType, "Test-only read failure.")!;
+
+        ArchitecturePolicyImportException exception = Assert.Throws<ArchitecturePolicyImportException>(
+            () => new ArchitecturePolicyDocumentLoader(new ThrowingReadFileSystem(root, readException)).Load(root))!;
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(exception.Category, Is.EqualTo(category));
+            Assert.That(exception.Diagnostic!.Location!.Role, Is.EqualTo(ArchitecturePolicyDocumentRole.Root));
+            Assert.That(exception.Diagnostic.Location.SourcePath, Is.EqualTo("architecture/root.yml"));
+        });
+    }
+
     [Test]
     public void Load_ImportCycle_CarriesNestedChainAndBothEdges()
     {
