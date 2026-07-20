@@ -43,7 +43,7 @@ public sealed class CliHandlerCoverageTests
     public void Graph_InvalidOptions_ReportError(string mode, string level, string format, string expectedError)
     {
         var console = new RecordingConsole();
-        int result = new GraphCommandHandler(new RecordingRuntime(), console, new RecordingFileSystem(true)).Execute(
+        int result = new GraphCommandHandler(new RecordingRuntime(), console).Execute(
             new GraphCommandOptions("policy.yml", mode, level, format, null, Array.Empty<string>(), false));
 
         Assert.That(result, Is.EqualTo(CliExitCodes.InvalidArgumentsOrRuntimeError));
@@ -55,7 +55,7 @@ public sealed class CliHandlerCoverageTests
     {
         var runtime = new RecordingRuntime { GraphText = "digraph G {}" };
         var console = new RecordingConsole();
-        int result = new GraphCommandHandler(runtime, console, new RecordingFileSystem(true)).Execute(
+        int result = new GraphCommandHandler(runtime, console).Execute(
             new GraphCommandOptions("policy.yml", "audit", "type", "dot", "ci", _ruleA, false));
 
         Assert.That(result, Is.EqualTo(CliExitCodes.Success));
@@ -70,7 +70,7 @@ public sealed class CliHandlerCoverageTests
     {
         var runtime = new RecordingRuntime { GraphException = PolicyException() };
         var console = new RecordingConsole();
-        int result = new GraphCommandHandler(runtime, console, new RecordingFileSystem(false)).Execute(
+        int result = new GraphCommandHandler(runtime, console).Execute(
             new GraphCommandOptions("policy.yml", "strict", "namespace", "json", null, Array.Empty<string>(), false));
 
         Assert.Multiple(() =>
@@ -89,14 +89,14 @@ public sealed class CliHandlerCoverageTests
             ExplainResult = new ArchitectureExplainOutcome("Source", "Target", _explainPath, _ruleA)
         };
         var humanConsole = new RecordingConsole();
-        var handler = new ExplainCommandHandler(runtime, humanConsole, new RecordingFileSystem(true));
+        var handler = new ExplainCommandHandler(runtime, humanConsole);
 
         Assert.That(handler.Execute(new ExplainCommandOptions("policy.yml", "strict", "namespace", "human", null, "Source", "Target", false)),
             Is.EqualTo(CliExitCodes.Success));
         Assert.That(humanConsole.OutputText, Does.Contain("Source -> Mid -> Target").And.Contain("Contract IDs: rule-a"));
 
         var jsonConsole = new RecordingConsole();
-        Assert.That(new ExplainCommandHandler(runtime, jsonConsole, new RecordingFileSystem(true)).Execute(
+        Assert.That(new ExplainCommandHandler(runtime, jsonConsole).Execute(
             new ExplainCommandOptions("policy.yml", "strict", "namespace", "json", null, "Source", "Target", false)),
             Is.EqualTo(CliExitCodes.Success));
         Assert.That(jsonConsole.OutputText, Does.Contain("\"source\":\"Source\"").And.Contain("\"rule-a\""));
@@ -106,14 +106,14 @@ public sealed class CliHandlerCoverageTests
     public void Explain_MissingArgumentsAndRuntimeFailure_ReportError()
     {
         var missingConsole = new RecordingConsole();
-        int missingResult = new ExplainCommandHandler(new RecordingRuntime(), missingConsole, new RecordingFileSystem(true)).Execute(
+        int missingResult = new ExplainCommandHandler(new RecordingRuntime(), missingConsole).Execute(
             new ExplainCommandOptions("policy.yml", "strict", "namespace", "human", null, null, "Target", false));
         Assert.That(missingResult, Is.EqualTo(CliExitCodes.InvalidArgumentsOrRuntimeError));
         Assert.That(missingConsole.ErrorText, Does.Contain("--source and --target are required"));
 
         var failureConsole = new RecordingConsole();
         var failingRuntime = new RecordingRuntime { ExplainException = new InvalidOperationException("boom") };
-        int failureResult = new ExplainCommandHandler(failingRuntime, failureConsole, new RecordingFileSystem(true)).Execute(
+        int failureResult = new ExplainCommandHandler(failingRuntime, failureConsole).Execute(
             new ExplainCommandOptions("policy.yml", "strict", "namespace", "human", null, "Source", "Target", false));
         Assert.That(failureResult, Is.EqualTo(CliExitCodes.InvalidArgumentsOrRuntimeError));
         Assert.That(failureConsole.ErrorText, Does.Contain("Explain error: boom"));
@@ -186,12 +186,6 @@ public sealed class CliHandlerCoverageTests
         // (IsTopLevelCommand branch) and the arg list is handed straight to the parser.
         Assert.That(result, Is.EqualTo(CliExitCodes.InvalidArgumentsOrRuntimeError));
         Assert.That(console.ErrorText, Does.Contain("graph --help"));
-    }
-
-    private sealed class RecordingFileSystem(bool exists) : IFileSystem
-    {
-        public bool FileExists(string path) => exists;
-        public void WriteAllText(string path, string contents) { }
     }
 
     private sealed class RootCommandFactory : ICliRootCommandFactory

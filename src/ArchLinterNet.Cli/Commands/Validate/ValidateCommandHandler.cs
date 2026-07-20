@@ -8,7 +8,7 @@ using ArchLinterNet.Core.Validation;
 
 namespace ArchLinterNet.Cli.Commands.Validate;
 
-internal sealed class ValidateCommandHandler(ICliRuntime runtime, ICliConsole console, IFileSystem fileSystem)
+internal sealed class ValidateCommandHandler(ICliRuntime runtime, ICliConsole console)
 {
     public int Execute(ValidateCommandOptions options)
     {

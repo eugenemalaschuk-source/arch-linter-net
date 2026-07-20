@@ -33,9 +33,8 @@ public sealed class ExplainCommandHandlerTests
 
     private static ExplainCommandHandler Handler(
         ExplainStubRuntime runtime,
-        RecordingCliConsole console,
-        bool policyExists = true) =>
-        new(runtime, console, new StubFileSystem(policyExists));
+        RecordingCliConsole console) =>
+        new(runtime, console);
 
     private static ExplainCommandOptions Options(
         string? source = "A",
@@ -89,7 +88,7 @@ public sealed class ExplainCommandHandlerTests
         ArchitecturePolicyImportException exception = PolicyException();
         var runtime = new ExplainStubRuntime { ThrowException = exception };
         var console = new RecordingCliConsole();
-        int result = Handler(runtime, console, policyExists: false).Execute(Options(format: "json"));
+        int result = Handler(runtime, console).Execute(Options(format: "json"));
 
         Assert.Multiple(() =>
         {
@@ -528,9 +527,4 @@ public sealed class ExplainCommandHandlerTests
         public string ErrorText => _error.ToString();
     }
 
-    private sealed class StubFileSystem(bool exists) : IFileSystem
-    {
-        public bool FileExists(string path) => exists;
-        public void WriteAllText(string path, string contents) { }
-    }
 }

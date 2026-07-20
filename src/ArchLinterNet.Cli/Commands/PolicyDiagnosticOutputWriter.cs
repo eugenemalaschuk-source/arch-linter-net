@@ -8,6 +8,23 @@ namespace ArchLinterNet.Cli.Commands;
 
 internal static class PolicyDiagnosticOutputWriter
 {
+    public static bool TryWriteJson(ICliConsole console, Exception exception)
+    {
+        ArchitecturePolicyDiagnostic? diagnostic = exception switch
+        {
+            ArchitecturePolicyImportException importException => importException.Diagnostic,
+            ArchitecturePolicyValidationException validationException => validationException.Diagnostic,
+            _ => null,
+        };
+        if (diagnostic is null)
+        {
+            return false;
+        }
+
+        WriteJson(console, exception.Message, diagnostic);
+        return true;
+    }
+
     public static void WriteJson(ICliConsole console, string message, ArchitecturePolicyDiagnostic diagnostic)
     {
         console.Out.WriteLine(JsonSerializer.Serialize(new

@@ -1,13 +1,12 @@
 using System.Text.Json;
 using ArchLinterNet.Cli.Abstractions;
 using ArchLinterNet.Cli.Commands;
-using ArchLinterNet.Core.Contracts;
 using ArchLinterNet.Core.Graph;
 using ArchLinterNet.Core.Model;
 
 namespace ArchLinterNet.Cli.Commands.Explain;
 
-internal sealed class ExplainCommandHandler(ICliRuntime runtime, ICliConsole console, IFileSystem fileSystem)
+internal sealed class ExplainCommandHandler(ICliRuntime runtime, ICliConsole console)
 {
     public int Execute(ExplainCommandOptions options)
     {
@@ -114,26 +113,15 @@ internal sealed class ExplainCommandHandler(ICliRuntime runtime, ICliConsole con
 
             return CliExitCodes.Success;
         }
-        catch (ArchitecturePolicyImportException exception) when (exception.Diagnostic is not null)
-        {
-            WritePolicyDiagnostic(options.Format, exception);
-            return CliExitCodes.InvalidArgumentsOrRuntimeError;
-        }
         catch (Exception ex)
         {
+            if (options.Format == "json" && PolicyDiagnosticOutputWriter.TryWriteJson(console, ex))
+            {
+                return CliExitCodes.InvalidArgumentsOrRuntimeError;
+            }
+
             console.Error.WriteLine($"Explain error: {ex.Message}");
             return CliExitCodes.InvalidArgumentsOrRuntimeError;
         }
-    }
-
-    private void WritePolicyDiagnostic(string format, ArchitecturePolicyImportException exception)
-    {
-        if (format == "json")
-        {
-            PolicyDiagnosticOutputWriter.WriteJson(console, exception.Message, exception.Diagnostic!);
-            return;
-        }
-
-        console.Error.WriteLine($"Explain error: {exception.Message}");
     }
 }

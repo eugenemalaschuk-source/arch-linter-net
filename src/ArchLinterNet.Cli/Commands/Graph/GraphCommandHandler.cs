@@ -1,12 +1,11 @@
 using ArchLinterNet.Cli.Abstractions;
 using ArchLinterNet.Cli.Commands;
-using ArchLinterNet.Core.Contracts;
 using ArchLinterNet.Core.Graph;
 using ArchLinterNet.Core.Model;
 
 namespace ArchLinterNet.Cli.Commands.Graph;
 
-internal sealed class GraphCommandHandler(ICliRuntime runtime, ICliConsole console, IFileSystem fileSystem)
+internal sealed class GraphCommandHandler(ICliRuntime runtime, ICliConsole console)
 {
     public int Execute(GraphCommandOptions options)
     {
@@ -55,26 +54,15 @@ internal sealed class GraphCommandHandler(ICliRuntime runtime, ICliConsole conso
 
             return CliExitCodes.Success;
         }
-        catch (ArchitecturePolicyImportException exception) when (exception.Diagnostic is not null)
-        {
-            WritePolicyDiagnostic(options.Format, exception);
-            return CliExitCodes.InvalidArgumentsOrRuntimeError;
-        }
         catch (Exception ex)
         {
+            if (options.Format == "json" && PolicyDiagnosticOutputWriter.TryWriteJson(console, ex))
+            {
+                return CliExitCodes.InvalidArgumentsOrRuntimeError;
+            }
+
             console.Error.WriteLine($"Graph export error: {ex.Message}");
             return CliExitCodes.InvalidArgumentsOrRuntimeError;
         }
-    }
-
-    private void WritePolicyDiagnostic(string format, ArchitecturePolicyImportException exception)
-    {
-        if (format == "json")
-        {
-            PolicyDiagnosticOutputWriter.WriteJson(console, exception.Message, exception.Diagnostic!);
-            return;
-        }
-
-        console.Error.WriteLine($"Graph export error: {exception.Message}");
     }
 }
