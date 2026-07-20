@@ -51,6 +51,93 @@ public sealed partial class BaselineCommandHandlerTests
     }
 
     [Test]
+    public void BaselineMigrate_ConfigurationViolations_ReportDetailedErrorAndDoesNotWrite()
+    {
+        var runtime = new StubRuntime
+        {
+            MigrateOutcome = new BaselineMigrateOutcome(
+                false, null, 0, 0, 0, Array.Empty<BaselineMigrateEntryReport>(),
+                [CreateViolation("Source.Cfg", "Forbidden.Cfg")])
+        };
+        var fileSystem = new StubFileSystem("policy.yml", "baseline.yml");
+        var console = new RecordingConsole();
+
+        int result = new BaselineMigrateCommandHandler(runtime, console, fileSystem).Execute(
+            new BaselineMigrateCommandOptions("policy.yml", "baseline.yml", "out.yml", "strict", null, "human", Array.Empty<string>(), false, false));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(result, Is.EqualTo(CliExitCodes.InvalidArgumentsOrRuntimeError));
+            Assert.That(fileSystem.LastWritePath, Is.Null);
+            Assert.That(console.ErrorText, Does.Contain("baseline cannot be migrated"));
+            Assert.That(console.ErrorText, Does.Contain("Source.Cfg: Forbidden.Cfg"));
+        });
+    }
+
+    [Test]
+    public void BaselineMigrate_DryRunWithAmbiguousEntries_ReportsAmbiguousDryRunMessage()
+    {
+        var report = new List<BaselineMigrateEntryReport>
+        {
+            new("strict_cycles", "package-cycles", "Source.A", "Forbidden.A", "ambiguous", 2),
+        };
+        var runtime = new StubRuntime
+        {
+            MigrateOutcome = new BaselineMigrateOutcome(false, null, 0, 0, 1, report, Array.Empty<ArchitectureViolation>())
+        };
+        var fileSystem = new StubFileSystem("policy.yml", "baseline.yml");
+        var console = new RecordingConsole();
+
+        int result = new BaselineMigrateCommandHandler(runtime, console, fileSystem).Execute(
+            new BaselineMigrateCommandOptions("policy.yml", "baseline.yml", null, "all", null, "human", Array.Empty<string>(), true, false));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(result, Is.EqualTo(CliExitCodes.ValidationFailure));
+            Assert.That(fileSystem.LastWritePath, Is.Null);
+            Assert.That(console.OutputText, Does.Contain("Dry run: ambiguous entries found, no file would be written."));
+        });
+    }
+
+    [Test]
+    public void BaselineMigrate_OutOfScopeEntries_ExcludedFromDetailListButCountedInSummary()
+    {
+        var report = new List<BaselineMigrateEntryReport>
+        {
+            new("strict", "core-rule", "Source.A", "Forbidden.A", "matched", 1),
+            new("audit", "audit-rule", "Source.B", "Forbidden.B", "out_of_scope", 0),
+        };
+        var runtime = new StubRuntime
+        {
+            MigrateOutcome = new BaselineMigrateOutcome(true, "version: 2", 1, 0, 0, report, Array.Empty<ArchitectureViolation>())
+        };
+        var fileSystem = new StubFileSystem("policy.yml", "baseline.yml");
+
+        var jsonConsole = new RecordingConsole();
+        int jsonResult = new BaselineMigrateCommandHandler(runtime, jsonConsole, fileSystem).Execute(
+            new BaselineMigrateCommandOptions("policy.yml", "baseline.yml", "out.yml", "strict", null, "json", Array.Empty<string>(), false, false));
+
+        using JsonDocument json = JsonDocument.Parse(jsonConsole.OutputText);
+        Assert.Multiple(() =>
+        {
+            Assert.That(jsonResult, Is.EqualTo(CliExitCodes.Success));
+            Assert.That(json.RootElement.GetProperty("outOfScopeCount").GetInt32(), Is.EqualTo(1));
+        });
+
+        var humanConsole = new RecordingConsole();
+        int humanResult = new BaselineMigrateCommandHandler(runtime, humanConsole, fileSystem).Execute(
+            new BaselineMigrateCommandOptions("policy.yml", "baseline.yml", "out.yml", "strict", null, "human", Array.Empty<string>(), false, false));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(humanResult, Is.EqualTo(CliExitCodes.Success));
+            Assert.That(humanConsole.OutputText, Does.Contain("Out of scope (carried through unchanged): 1"));
+            // out_of_scope entries are counted in the summary but not listed in the per-entry detail.
+            Assert.That(humanConsole.OutputText, Does.Not.Contain("[out_of_scope]"));
+        });
+    }
+
+    [Test]
     public void BaselineMigrate_Ambiguous_DoesNotWriteAndFailsClosed()
     {
         var report = new List<BaselineMigrateEntryReport>

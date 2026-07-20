@@ -185,6 +185,47 @@ public sealed class ArchitectureBaselineGeneratorTests
     }
 
     [Test]
+    public void BuildFromEntries_Version2_EntryWithoutIdentity_DerivesFallbackIdentity()
+    {
+        // ArchitectureBaselineApplicationService.Migrate builds comparison entries without an
+        // Identity for out-of-scope carry-through entries, relying on BuildFromEntries itself to
+        // derive one — this is the entry-based (not candidate-based) fallback path.
+        var entry = new ArchitectureBaselineComparisonEntry(
+            "strict", "core-rule", "Src.Type", "Ref.Type", "carried through unchanged");
+
+        var baseline = _generator.BuildFromEntries(new[] { entry }, version: 2);
+
+        Assert.That(baseline.Version, Is.EqualTo(2));
+        var violation = baseline.Baseline.Strict[0].IgnoredViolations[0];
+        Assert.Multiple(() =>
+        {
+            Assert.That(violation.SourceType, Is.EqualTo("Src.Type"));
+            Assert.That(violation.ForbiddenReference, Is.EqualTo("Ref.Type"));
+            Assert.That(violation.Reason, Is.EqualTo("carried through unchanged"));
+            Assert.That(violation.IdentityVersion, Is.EqualTo(2));
+            Assert.That(violation.ContractFamily, Is.EqualTo("strict"));
+            Assert.That(violation.Occurrence, Is.EqualTo(0));
+        });
+    }
+
+    [Test]
+    public void BuildFromEntries_Version1_ProducesLegacyDocumentWithoutIdentityFields()
+    {
+        var entry = new ArchitectureBaselineComparisonEntry("strict", "core-rule", "Src.Type", "Ref.Type", "legacy reason");
+
+        var baseline = _generator.BuildFromEntries(new[] { entry }, version: 1);
+
+        Assert.That(baseline.Version, Is.EqualTo(1));
+        var violation = baseline.Baseline.Strict[0].IgnoredViolations[0];
+        Assert.Multiple(() =>
+        {
+            Assert.That(violation.SourceType, Is.EqualTo("Src.Type"));
+            Assert.That(violation.IdentityVersion, Is.Null);
+            Assert.That(violation.ContractFamily, Is.Null);
+        });
+    }
+
+    [Test]
     public void Generate_ReasonOverride_AppearsInAllEntries()
     {
         var policy = new ArchitectureContractDocument

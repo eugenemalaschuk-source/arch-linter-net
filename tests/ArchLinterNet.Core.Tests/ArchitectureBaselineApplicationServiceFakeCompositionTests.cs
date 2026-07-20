@@ -13,7 +13,7 @@ namespace ArchLinterNet.Core.Tests;
 
 // Fake-composition tests for baseline application-service orchestration.
 [TestFixture]
-public sealed class ArchitectureBaselineApplicationServiceFakeCompositionTests
+public sealed partial class ArchitectureBaselineApplicationServiceFakeCompositionTests
 {
     private static readonly string[] _knownRule = { "known-rule" };
 
