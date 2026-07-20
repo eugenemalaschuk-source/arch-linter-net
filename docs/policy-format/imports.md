@@ -147,6 +147,11 @@ validates path grammar before filesystem resolution, then checks the physical
 target, boundary, active cycle stack, and completed canonical identities before
 reading it. Symlink or junction escapes are rejected.
 
+Every imported source must be a readable regular file. On macOS, ArchLinterNet
+uses the native `getattrlist` object type and object identity metadata, so hard
+link aliases resolve to one source and special files such as named pipes are
+rejected before their contents are read.
+
 Supported graphs are bounded:
 
 - the root is depth 0;

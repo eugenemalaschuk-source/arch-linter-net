@@ -23,6 +23,14 @@ internal static class ArchitecturePolicySourceReader
                 location,
                 importChain: importChain);
         }
+        catch (DirectoryNotFoundException)
+        {
+            throw ArchitecturePolicyDiagnosticFactory.Exception(
+                ArchitecturePolicyImportErrorCategory.MissingFile,
+                $"Policy source file not found: {location.SourcePath}",
+                location,
+                importChain: importChain);
+        }
         catch (UnauthorizedAccessException)
         {
             throw Unreadable(location, importChain);

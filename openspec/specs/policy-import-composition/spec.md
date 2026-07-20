@@ -103,9 +103,10 @@ boundary SHALL be the selected root's own directory. Each import SHALL be made
 absolute, physically canonicalized, and verified to remain within that
 boundary before being read. Authored path casing SHALL exactly match the
 filesystem entry, and canonical boundary-relative portability identities SHALL
-be compared case-insensitively. On macOS, source identity SHALL be derived
-through managed canonical filesystem operations without a Darwin
-processor-specific unmanaged metadata layout.
+be compared case-insensitively. Every imported source SHALL be a readable
+regular file. On macOS, source identity and regular-file type SHALL be derived
+through the native `getattrlist` object metadata API, using a processor-neutral
+buffer layout.
 
 #### Scenario: Relative in-bound import for an architecture root
 - **WHEN** the selected root is `architecture/arch.yml`
@@ -126,9 +127,13 @@ processor-specific unmanaged metadata layout.
 - **WHEN** authored path casing differs from the on-disk path casing
 - **THEN** loading fails consistently, including on a case-insensitive filesystem
 
-#### Scenario: Intel macOS loads a valid imported policy
-- **WHEN** a macOS x86_64 host loads a valid root policy that imports one regular fragment
-- **THEN** loading succeeds without relying on a Darwin unmanaged metadata layout
+#### Scenario: macOS loads a valid imported policy on both supported architectures
+- **WHEN** a macOS x86_64 or arm64 host loads a valid root policy that imports one regular fragment
+- **THEN** loading succeeds using the native object metadata API
+
+#### Scenario: macOS rejects a special-file import before reading it
+- **WHEN** a policy imports a named pipe or another non-regular filesystem object
+- **THEN** loading fails with the `SourceShape` category without opening the object for content reading
 
 ### Requirement: Duplicate paths and cycles fail deterministically
 The resolver SHALL maintain an active import stack and a completed canonical-path set. Reaching a path already on the active stack SHALL be reported as a cycle; reaching a previously completed physical file or case-insensitive portability identity SHALL be reported as a duplicate import. The resolver SHALL NOT silently deduplicate either case.
@@ -502,4 +507,3 @@ The repository SHALL contain executable NUnit-backed fixtures that prove equival
 #### Scenario: Conflicting public fixtures load
 - **WHEN** the acceptance suite loads root-versus-fragment or fragment-versus-fragment duplicate definitions
 - **THEN** loading fails with a composition-conflict category identifying both participating sources
-

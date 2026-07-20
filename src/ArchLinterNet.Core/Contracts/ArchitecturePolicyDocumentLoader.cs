@@ -51,30 +51,24 @@ public sealed partial class ArchitecturePolicyDocumentLoader : IArchitecturePoli
 
     public ArchitectureContractDocument Load(string policyPath)
     {
-        ArchitecturePolicyRootPath resolvedRoot;
-        try
+        if (_fileSystem is ArchitectureFileSystem)
         {
-            resolvedRoot = _pathResolver.ResolveRoot(policyPath);
-        }
-        catch (ArchitecturePolicyImportException exception)
-        {
-            ArchitecturePolicySourceDescriptor unresolvedRoot =
-                ArchitecturePolicyProvenanceFactory.CreateRootDescriptor(_pathResolver, policyPath);
-            throw ArchitecturePolicyDiagnosticFactory.Enrich(
-                exception,
-                ArchitecturePolicyDiagnosticFactory.Location(unresolvedRoot));
+            try
+            {
+                _ = _pathResolver.ResolveRoot(policyPath);
+            }
+            catch (ArchitecturePolicyImportException exception)
+            {
+                ArchitecturePolicySourceDescriptor unresolvedRoot =
+                    ArchitecturePolicyProvenanceFactory.CreateRootDescriptor(_pathResolver, policyPath);
+                throw ArchitecturePolicyDiagnosticFactory.Enrich(
+                    exception,
+                    ArchitecturePolicyDiagnosticFactory.Location(unresolvedRoot));
+            }
         }
 
-        string rootSourcePath = Path.GetRelativePath(resolvedRoot.BoundaryPath, resolvedRoot.FullPath)
-            .Replace(Path.DirectorySeparatorChar, '/');
-        var rootDescriptor = new ArchitecturePolicySourceDescriptor(
-            rootSourcePath,
-            rootSourcePath,
-            ArchitecturePolicyDocumentRole.Root,
-            0,
-            null,
-            null,
-            new[] { rootSourcePath });
+        ArchitecturePolicySourceDescriptor rootDescriptor =
+            ArchitecturePolicyProvenanceFactory.CreateRootDescriptor(_pathResolver, policyPath);
         if (!_fileSystem.FileExists(policyPath))
         {
             throw ArchitecturePolicyDiagnosticFactory.Exception(

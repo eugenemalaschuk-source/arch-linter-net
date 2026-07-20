@@ -294,7 +294,37 @@ jobs:
       - name: Run imported-policy regressions
         run: >-
           dotnet test tests/ArchLinterNet.Core.Tests --no-restore
-          --filter "FullyQualifiedName~Load_RootWithOneRegularFragment_ComposesWithoutDarwinStatInterop|FullyQualifiedName~Load_HardLinkedImportAlias"
+          --filter "FullyQualifiedName~Load_RootWithOneRegularFragment_ComposesWithPlatformFileIdentity|FullyQualifiedName~Load_HardLinkedImportAlias|FullyQualifiedName~Load_NamedPipeImport|FullyQualifiedName~Load_NamedPipeRoot"
+
+  macos_arm64_policy_import_regression:
+    name: Apple Silicon macOS Policy Import Regression
+    if: github.event_name == 'pull_request'
+    runs-on: macos-14
+    timeout-minutes: 10
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
+        with:
+          persist-credentials: false
+
+      - name: Verify Apple Silicon macOS runner
+        run: test "$(uname -m)" = arm64
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Restore
+        run: make restore
+
+      - name: Run imported-policy regressions
+        run: >-
+          dotnet test tests/ArchLinterNet.Core.Tests --no-restore
+          --filter "FullyQualifiedName~Load_RootWithOneRegularFragment_ComposesWithPlatformFileIdentity|FullyQualifiedName~Load_HardLinkedImportAlias|FullyQualifiedName~Load_NamedPipeImport|FullyQualifiedName~Load_NamedPipeRoot"
 
   main_badge_refresh:
     name: Main Badge Refresh

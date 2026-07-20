@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using System.Runtime.InteropServices;
 using Microsoft.Win32.SafeHandles;
 
@@ -19,8 +20,8 @@ internal sealed class ArchitecturePolicyPathResolver : IArchitecturePolicyPathRe
             ? Path.GetDirectoryName(policyDirectory) ?? policyDirectory
             : policyDirectory;
         string exactRoot = ResolveExactPath(boundary, fullPath, rootPath);
-        string physicalBoundary = ResolvePhysicalPath(boundary, boundary);
-        string physicalRoot = ResolvePhysicalPath(boundary, exactRoot);
+        string physicalBoundary = ResolvePhysicalPath(boundary, boundary, rootPath);
+        string physicalRoot = ResolvePhysicalPath(boundary, exactRoot, rootPath);
         EnsureWithinBoundary(physicalBoundary, physicalRoot, rootPath);
         string fileIdentity = GetRegularFileIdentity(physicalRoot, rootPath);
 
@@ -37,7 +38,7 @@ internal sealed class ArchitecturePolicyPathResolver : IArchitecturePolicyPathRe
         EnsureWithinBoundary(root.BoundaryPath, candidate, importPath);
 
         string exactPath = ResolveExactPath(root.BoundaryPath, candidate, importPath);
-        string physicalPath = ResolvePhysicalPath(root.BoundaryPath, exactPath);
+        string physicalPath = ResolvePhysicalPath(root.BoundaryPath, exactPath, importPath);
         EnsureWithinBoundary(root.PhysicalBoundaryPath, physicalPath, importPath);
         string fileIdentity = GetRegularFileIdentity(physicalPath, importPath);
 
@@ -61,12 +62,8 @@ internal sealed class ArchitecturePolicyPathResolver : IArchitecturePolicyPathRe
 
         foreach (string segment in segments)
         {
-            if (!Directory.Exists(current))
-            {
-                throw Missing(authoredPath);
-            }
-
-            string? exact = Directory.EnumerateFileSystemEntries(current)
+            string[] entries = EnumerateEntries(current, authoredPath);
+            string? exact = entries
                 .FirstOrDefault(entry => string.Equals(Path.GetFileName(entry), segment, StringComparison.Ordinal));
             if (exact is not null)
             {
@@ -74,7 +71,7 @@ internal sealed class ArchitecturePolicyPathResolver : IArchitecturePolicyPathRe
                 continue;
             }
 
-            string? caseInsensitive = Directory.EnumerateFileSystemEntries(current)
+            string? caseInsensitive = entries
                 .FirstOrDefault(entry => string.Equals(
                     Path.GetFileName(entry),
                     segment,
@@ -89,36 +86,95 @@ internal sealed class ArchitecturePolicyPathResolver : IArchitecturePolicyPathRe
             throw Missing(authoredPath);
         }
 
-        if (!File.Exists(current))
+        return EnsureExistingPath(current, authoredPath);
+    }
+
+    private static string[] EnumerateEntries(string path, string authoredPath)
+    {
+        try
+        {
+            return Directory.EnumerateFileSystemEntries(path).ToArray();
+        }
+        catch (DirectoryNotFoundException)
         {
             throw Missing(authoredPath);
         }
-
-        return Path.GetFullPath(current);
+        catch (UnauthorizedAccessException)
+        {
+            throw Unreadable(authoredPath);
+        }
+        catch (IOException)
+        {
+            throw Unreadable(authoredPath);
+        }
     }
 
-    private static string ResolvePhysicalPath(string boundary, string path)
+    private static string EnsureExistingPath(string path, string authoredPath)
     {
-        string current = ResolveLink(new DirectoryInfo(Path.GetFullPath(boundary)));
-        string relative = Path.GetRelativePath(boundary, path);
-        if (relative == ".")
+        try
         {
-            return current;
+            _ = File.GetAttributes(path);
+            return Path.GetFullPath(path);
         }
-
-        string[] segments = relative.Split(
-            new[] { Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar },
-            StringSplitOptions.RemoveEmptyEntries);
-        for (int index = 0; index < segments.Length; index++)
+        catch (FileNotFoundException)
         {
-            string candidate = Path.Combine(current, segments[index]);
-            FileSystemInfo info = index == segments.Length - 1
-                ? new FileInfo(candidate)
-                : new DirectoryInfo(candidate);
-            current = ResolveLink(info);
+            throw Missing(authoredPath);
         }
+        catch (DirectoryNotFoundException)
+        {
+            throw Missing(authoredPath);
+        }
+        catch (UnauthorizedAccessException)
+        {
+            throw Unreadable(authoredPath);
+        }
+        catch (IOException)
+        {
+            throw Unreadable(authoredPath);
+        }
+    }
 
-        return Path.GetFullPath(current);
+    private static string ResolvePhysicalPath(string boundary, string path, string authoredPath)
+    {
+        try
+        {
+            string current = ResolveLink(new DirectoryInfo(Path.GetFullPath(boundary)));
+            string relative = Path.GetRelativePath(boundary, path);
+            if (relative == ".")
+            {
+                return current;
+            }
+
+            string[] segments = relative.Split(
+                new[] { Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar },
+                StringSplitOptions.RemoveEmptyEntries);
+            for (int index = 0; index < segments.Length; index++)
+            {
+                string candidate = Path.Combine(current, segments[index]);
+                FileSystemInfo info = index == segments.Length - 1
+                    ? new FileInfo(candidate)
+                    : new DirectoryInfo(candidate);
+                current = ResolveLink(info);
+            }
+
+            return Path.GetFullPath(current);
+        }
+        catch (FileNotFoundException)
+        {
+            throw Missing(authoredPath);
+        }
+        catch (DirectoryNotFoundException)
+        {
+            throw Missing(authoredPath);
+        }
+        catch (UnauthorizedAccessException)
+        {
+            throw Unreadable(authoredPath);
+        }
+        catch (IOException)
+        {
+            throw Unreadable(authoredPath);
+        }
     }
 
     private static string ResolveLink(FileSystemInfo info)
@@ -167,11 +223,19 @@ internal sealed class ArchitecturePolicyPathResolver : IArchitecturePolicyPathRe
             OpenExisting,
             FileAttributeNormal,
             IntPtr.Zero);
-        if (handle.IsInvalid
-            || GetFileType(handle) != FileTypeDisk
-            || !GetFileInformationByHandle(handle, out ByHandleFileInformation information))
+        if (handle.IsInvalid)
+        {
+            throw NativeFailure(authoredPath, Marshal.GetLastPInvokeError());
+        }
+
+        if (GetFileType(handle) != FileTypeDisk)
         {
             throw NotRegularFile(authoredPath);
+        }
+
+        if (!GetFileInformationByHandle(handle, out ByHandleFileInformation information))
+        {
+            throw NativeFailure(authoredPath, Marshal.GetLastPInvokeError());
         }
 
         ulong index = ((ulong)information.FileIndexHigh << 32) | information.FileIndexLow;
@@ -193,29 +257,34 @@ internal sealed class ArchitecturePolicyPathResolver : IArchitecturePolicyPathRe
         };
     }
 
+    [ExcludeFromCodeCoverage]
     private static string GetMacOSFileIdentity(string path, string authoredPath)
     {
         try
         {
-            if (!File.Exists(path)
-                || (File.GetAttributes(path) & FileAttributes.Directory) != 0)
-            {
-                throw NotRegularFile(authoredPath);
-            }
+            _ = File.GetAttributes(path);
         }
-        catch (IOException)
+        catch (FileNotFoundException)
         {
-            throw NotRegularFile(authoredPath);
+            throw Missing(authoredPath);
+        }
+        catch (DirectoryNotFoundException)
+        {
+            throw Missing(authoredPath);
         }
         catch (UnauthorizedAccessException)
         {
-            throw NotRegularFile(authoredPath);
+            throw Unreadable(authoredPath);
+        }
+        catch (IOException)
+        {
+            throw Unreadable(authoredPath);
         }
 
         var attributes = new DarwinAttributeList
         {
             BitmapCount = AttributeBitMapCount,
-            CommonAttributes = CommonDeviceAttribute | CommonFileIdAttribute,
+            CommonAttributes = CommonDeviceAttribute | CommonObjectTypeAttribute | CommonObjectIdAttribute,
         };
         if (GetAttributeList(
                 path,
@@ -224,16 +293,25 @@ internal sealed class ArchitecturePolicyPathResolver : IArchitecturePolicyPathRe
                 (nuint)Marshal.SizeOf<DarwinFileIdentityAttributes>(),
                 options: 0) != 0)
         {
+            throw NativeFailure(authoredPath, Marshal.GetLastPInvokeError());
+        }
+
+        if (identity.ObjectType != DarwinRegularFile)
+        {
             throw NotRegularFile(authoredPath);
         }
 
-        return $"darwin:{identity.Device:X8}:{identity.FileId:X16}";
+        return $"darwin:{identity.Device:X8}:{identity.ObjectNumber:X8}:{identity.ObjectGeneration:X8}";
     }
 
     private static string GetLinuxX64FileIdentity(string path, string authoredPath)
     {
-        if (StatLinuxX64(path, out LinuxX64Stat stat) != 0
-            || !IsRegularFile(stat.Mode))
+        if (StatLinuxX64(path, out LinuxX64Stat stat) != 0)
+        {
+            throw NativeFailure(authoredPath, Marshal.GetLastPInvokeError());
+        }
+
+        if (!IsRegularFile(stat.Mode))
         {
             throw NotRegularFile(authoredPath);
         }
@@ -243,8 +321,12 @@ internal sealed class ArchitecturePolicyPathResolver : IArchitecturePolicyPathRe
 
     private static string GetLinuxArm64FileIdentity(string path, string authoredPath)
     {
-        if (StatLinuxArm64(path, out LinuxArm64Stat stat) != 0
-            || !IsRegularFile(stat.Mode))
+        if (StatLinuxArm64(path, out LinuxArm64Stat stat) != 0)
+        {
+            throw NativeFailure(authoredPath, Marshal.GetLastPInvokeError());
+        }
+
+        if (!IsRegularFile(stat.Mode))
         {
             throw NotRegularFile(authoredPath);
         }
@@ -276,6 +358,23 @@ internal sealed class ArchitecturePolicyPathResolver : IArchitecturePolicyPathRe
             $"Policy import '{authoredPath}' must resolve to a readable regular file.");
     }
 
+    private static ArchitecturePolicyImportException Unreadable(string authoredPath)
+    {
+        return new ArchitecturePolicyImportException(
+            ArchitecturePolicyImportErrorCategory.UnreadableFile,
+            $"Policy import '{authoredPath}' is not readable.");
+    }
+
+    private static ArchitecturePolicyImportException NativeFailure(string authoredPath, int error)
+    {
+        return error switch
+        {
+            2 or 20 => Missing(authoredPath),
+            1 or 13 => Unreadable(authoredPath),
+            _ => NotRegularFile(authoredPath)
+        };
+    }
+
     private const uint GenericRead = 0x80000000;
     private const uint FileShareRead = 0x00000001;
     private const uint FileShareWrite = 0x00000002;
@@ -287,7 +386,9 @@ internal sealed class ArchitecturePolicyPathResolver : IArchitecturePolicyPathRe
     private const uint RegularFile = 0x8000;
     private const ushort AttributeBitMapCount = 5;
     private const uint CommonDeviceAttribute = 0x00000002;
-    private const uint CommonFileIdAttribute = 0x02000000;
+    private const uint CommonObjectTypeAttribute = 0x00000008;
+    private const uint CommonObjectIdAttribute = 0x00000020;
+    private const uint DarwinRegularFile = 1;
 
     [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
     private static extern SafeFileHandle CreateFile(
@@ -359,7 +460,9 @@ internal sealed class ArchitecturePolicyPathResolver : IArchitecturePolicyPathRe
     {
         public uint Length;
         public uint Device;
-        public ulong FileId;
+        public uint ObjectType;
+        public uint ObjectNumber;
+        public uint ObjectGeneration;
     }
 
     [StructLayout(LayoutKind.Sequential)]

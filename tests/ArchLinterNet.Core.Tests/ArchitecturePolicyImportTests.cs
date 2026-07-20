@@ -44,7 +44,7 @@ public sealed class ArchitecturePolicyImportTests
     }
 
     [Test]
-    public void Load_RootWithOneRegularFragment_ComposesWithoutDarwinStatInterop()
+    public void Load_RootWithOneRegularFragment_ComposesWithPlatformFileIdentity()
     {
         string root = Write("architecture/root.yml", RootYaml("layers.yml"));
         Write("architecture/layers.yml", LayersFragment());
@@ -82,6 +82,18 @@ public sealed class ArchitecturePolicyImportTests
         ArchitectureContractDocument single = new ArchitecturePolicyDocumentLoader().Load(monolithic);
 
         Assert.That(NormalizeBehavior(composed), Is.EqualTo(NormalizeBehavior(single)));
+    }
+
+    [Test]
+    public void Load_MonolithicVirtualPolicy_UsesInjectedFileSystem()
+    {
+        const string policyPath = "/virtual/architecture/root.yml";
+        var fileSystem = new FakeArchitectureFileSystem();
+        fileSystem.AddFile(policyPath, EffectiveRootYaml(), DateTime.UtcNow);
+
+        ArchitectureContractDocument document = new ArchitecturePolicyDocumentLoader(fileSystem).Load(policyPath);
+
+        Assert.That(document.Layers, Contains.Key("domain"));
     }
 
     [Test]
@@ -432,6 +444,60 @@ public sealed class ArchitecturePolicyImportTests
     }
 
     [Test]
+    public void Load_NamedPipeImport_ExposesSourceShapeWithoutReadingIt()
+    {
+        if (OperatingSystem.IsWindows())
+        {
+            Assert.Ignore("The regression fixture uses POSIX mkfifo.");
+        }
+
+        string root = Write("architecture/root.yml", RootYaml("pipe.yml"));
+        string pipe = Path.Combine(Path.GetDirectoryName(root)!, "pipe.yml");
+        Assert.That(CreateNamedPipeUnix(pipe, 0x180), Is.EqualTo(0));
+
+        ArchitecturePolicyImportException exception = Assert.Throws<ArchitecturePolicyImportException>(
+            () => new ArchitecturePolicyDocumentLoader().Load(root))!;
+
+        Assert.That(exception.Category, Is.EqualTo(ArchitecturePolicyImportErrorCategory.SourceShape));
+    }
+
+    [Test]
+    public void Load_NamedPipeRoot_ExposesSourceShapeWithoutReadingIt()
+    {
+        if (OperatingSystem.IsWindows())
+        {
+            Assert.Ignore("The regression fixture uses POSIX mkfifo.");
+        }
+
+        string pipe = Path.Combine(_temporaryDirectory, "architecture", "root.yml");
+        Directory.CreateDirectory(Path.GetDirectoryName(pipe)!);
+        Assert.That(CreateNamedPipeUnix(pipe, 0x180), Is.EqualTo(0));
+
+        ArchitecturePolicyImportException exception = Assert.Throws<ArchitecturePolicyImportException>(
+            () => new ArchitecturePolicyDocumentLoader().Load(pipe))!;
+
+        Assert.That(exception.Category, Is.EqualTo(ArchitecturePolicyImportErrorCategory.SourceShape));
+    }
+
+    [Test]
+    public void ImportErrorCategories_PreserveReleasedNumericValues()
+    {
+        Assert.Multiple(() =>
+        {
+            Assert.That((int)ArchitecturePolicyImportErrorCategory.PortablePath, Is.EqualTo(0));
+            Assert.That((int)ArchitecturePolicyImportErrorCategory.MissingFile, Is.EqualTo(1));
+            Assert.That((int)ArchitecturePolicyImportErrorCategory.OutOfBoundary, Is.EqualTo(2));
+            Assert.That((int)ArchitecturePolicyImportErrorCategory.PathCaseMismatch, Is.EqualTo(3));
+            Assert.That((int)ArchitecturePolicyImportErrorCategory.Cycle, Is.EqualTo(4));
+            Assert.That((int)ArchitecturePolicyImportErrorCategory.DuplicateImport, Is.EqualTo(5));
+            Assert.That((int)ArchitecturePolicyImportErrorCategory.GraphLimit, Is.EqualTo(6));
+            Assert.That((int)ArchitecturePolicyImportErrorCategory.SourceShape, Is.EqualTo(7));
+            Assert.That((int)ArchitecturePolicyImportErrorCategory.CompositionConflict, Is.EqualTo(8));
+            Assert.That((int)ArchitecturePolicyImportErrorCategory.UnreadableFile, Is.EqualTo(9));
+        });
+    }
+
+    [Test]
     public void PathResolver_DeclaresDistinctLinuxStatLayoutsForX64AndArm64WithoutDarwinInterop()
     {
         int x64ModeOffset = Marshal.OffsetOf<ArchitecturePolicyPathResolver.LinuxX64Stat>(
@@ -624,4 +690,7 @@ public sealed class ArchitecturePolicyImportTests
 
     [DllImport("libc", SetLastError = true, EntryPoint = "link")]
     private static extern int CreateHardLinkUnix(string existingFileName, string fileName);
+
+    [DllImport("libc", SetLastError = true, EntryPoint = "mkfifo")]
+    private static extern int CreateNamedPipeUnix(string pathName, uint mode);
 }

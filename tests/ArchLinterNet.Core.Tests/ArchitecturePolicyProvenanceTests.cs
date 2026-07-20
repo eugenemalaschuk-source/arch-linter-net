@@ -187,6 +187,24 @@ public sealed class ArchitecturePolicyProvenanceTests
     }
 
     [Test]
+    public void Load_RootRemovedBeforeRead_CarriesMissingFileDiagnostic()
+    {
+        string root = Write("architecture/root.yml", EffectiveRootYaml());
+
+        ArchitecturePolicyImportException exception = Assert.Throws<ArchitecturePolicyImportException>(
+            () => new ArchitecturePolicyDocumentLoader(
+                new ThrowingReadFileSystem(root, new DirectoryNotFoundException("Test-only missing policy source."))).Load(root))!;
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(exception.Category, Is.EqualTo(ArchitecturePolicyImportErrorCategory.MissingFile));
+            Assert.That(exception.Diagnostic!.Location!.Role, Is.EqualTo(ArchitecturePolicyDocumentRole.Root));
+            Assert.That(exception.Diagnostic.Location.SourcePath, Is.EqualTo("architecture/root.yml"));
+            Assert.That(exception.Diagnostic.ImportChain, Is.EqualTo(new[] { "architecture/root.yml" }));
+        });
+    }
+
+    [Test]
     public void Load_ImportCycle_CarriesNestedChainAndBothEdges()
     {
         string root = Write("architecture/root.yml", RootYaml("a.yml"));
@@ -609,10 +627,11 @@ public sealed class ArchitecturePolicyProvenanceTests
             """;
     }
 
-    private sealed class ThrowingReadFileSystem(string unreadablePath) : IArchitectureFileSystem
+    private sealed class ThrowingReadFileSystem(string unreadablePath, Exception? exception = null) : IArchitectureFileSystem
     {
         private readonly ArchitectureFileSystem _inner = ArchitectureFileSystem.Real;
         private readonly string _unreadablePath = Path.GetFullPath(unreadablePath);
+        private readonly Exception _exception = exception ?? new UnauthorizedAccessException("Test-only unreadable policy source.");
 
         public bool FileExists(string path) => _inner.FileExists(path);
 
@@ -620,7 +639,7 @@ public sealed class ArchitecturePolicyProvenanceTests
         {
             if (string.Equals(Path.GetFullPath(path), _unreadablePath, StringComparison.Ordinal))
             {
-                throw new UnauthorizedAccessException("Test-only unreadable policy source.");
+                throw _exception;
             }
 
             return _inner.ReadAllText(path);
