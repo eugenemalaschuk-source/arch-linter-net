@@ -359,17 +359,7 @@ internal sealed partial class ArchitecturePolicyPathResolver : IArchitecturePoli
     {
         if (OperatingSystem.IsMacOS())
         {
-            if (FStatDarwin(descriptor, out DarwinStat stat) != 0)
-            {
-                throw ClassifyUnixNativeFailure(authoredPath, Marshal.GetLastPInvokeError());
-            }
-
-            if (!IsRegularFile(stat.Mode))
-            {
-                throw NotRegularFile(authoredPath);
-            }
-
-            return $"darwin:{unchecked((uint)stat.Device):X8}:{stat.Inode:X16}";
+            return GetMacOSHandleIdentity(descriptor, authoredPath);
         }
 
         return RuntimeInformation.ProcessArchitecture switch
@@ -468,6 +458,32 @@ internal sealed partial class ArchitecturePolicyPathResolver : IArchitecturePoli
         };
         if (GetAttributeList(
                 path,
+                ref attributes,
+                out DarwinFileIdentityAttributes identity,
+                (nuint)Marshal.SizeOf<DarwinFileIdentityAttributes>(),
+                options: 0) != 0)
+        {
+            throw ClassifyUnixNativeFailure(authoredPath, Marshal.GetLastPInvokeError());
+        }
+
+        if (identity.ObjectType != DarwinRegularFile)
+        {
+            throw NotRegularFile(authoredPath);
+        }
+
+        return $"darwin:{identity.Device:X8}:{identity.FileId:X16}";
+    }
+
+    [ExcludeFromCodeCoverage]
+    private static string GetMacOSHandleIdentity(int descriptor, string authoredPath)
+    {
+        var attributes = new DarwinAttributeList
+        {
+            BitmapCount = AttributeBitMapCount,
+            CommonAttributes = CommonDeviceAttribute | CommonObjectTypeAttribute | CommonFileIdAttribute,
+        };
+        if (FGetAttributeList(
+                descriptor,
                 ref attributes,
                 out DarwinFileIdentityAttributes identity,
                 (nuint)Marshal.SizeOf<DarwinFileIdentityAttributes>(),
@@ -641,16 +657,20 @@ internal sealed partial class ArchitecturePolicyPathResolver : IArchitecturePoli
     [DllImport("libc", SetLastError = true, EntryPoint = "fstat")]
     private static extern int FStatLinuxArm64(int descriptor, out LinuxArm64Stat stat);
 
-    [SuppressMessage("Interoperability", "SYSLIB1054:Use LibraryImportAttribute instead of DllImportAttribute", Justification = "fstat uses an ABI-specific stat buffer unsupported by LibraryImport.")]
-    [DllImport("libc", SetLastError = true, EntryPoint = "fstat")]
-    private static extern int FStatDarwin(int descriptor, out DarwinStat stat);
-
     [LibraryImport("libc", EntryPoint = "open", SetLastError = true, StringMarshalling = StringMarshalling.Utf8)]
     private static partial int Open(string path, int flags);
 
     [LibraryImport("libc", EntryPoint = "getattrlist", SetLastError = true, StringMarshalling = StringMarshalling.Utf8)]
     private static partial int GetAttributeList(
         string path,
+        ref DarwinAttributeList attributes,
+        out DarwinFileIdentityAttributes attributeBuffer,
+        nuint attributeBufferSize,
+        uint options);
+
+    [LibraryImport("libc", EntryPoint = "fgetattrlist", SetLastError = true)]
+    private static partial int FGetAttributeList(
+        int descriptor,
         ref DarwinAttributeList attributes,
         out DarwinFileIdentityAttributes attributeBuffer,
         nuint attributeBufferSize,
@@ -696,17 +716,6 @@ internal sealed partial class ArchitecturePolicyPathResolver : IArchitecturePoli
         public uint Device;
         public uint ObjectType;
         public ulong FileId;
-    }
-
-    [StructLayout(LayoutKind.Sequential)]
-    private struct DarwinStat
-    {
-        public int Device;
-        public ushort Mode;
-        public ushort LinkCount;
-        public ulong Inode;
-        [MarshalAs(UnmanagedType.ByValArray, SizeConst = 128)]
-        public byte[] RemainingFields;
     }
 
     [StructLayout(LayoutKind.Sequential)]
