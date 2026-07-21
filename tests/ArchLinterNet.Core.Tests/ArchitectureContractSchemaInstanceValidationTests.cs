@@ -277,6 +277,46 @@ public sealed class ArchitectureContractSchemaInstanceValidationTests
         Assert.That(Validate(Yaml, "layer"), Is.False);
     }
 
+    [Test]
+    public void Layer_WithExclude_IsValid()
+    {
+        const string Yaml = "namespace: Product.Modules.*\nexclude:\n  - namespace: Product.Modules.*.Infrastructure\n  - namespace: Product.Modules.*.Persistence\n";
+
+        Assert.That(Validate(Yaml, "layer"), Is.True);
+    }
+
+    [Test]
+    public void Layer_ExcludeEntryWithNamespaceSuffix_IsValid()
+    {
+        const string Yaml = "namespace: Product.Modules.*\nexclude:\n  - namespace: Product.Modules\n    namespace_suffix: Generated\n";
+
+        Assert.That(Validate(Yaml, "layer"), Is.True);
+    }
+
+    [Test]
+    public void Layer_ExcludeEntryMissingNamespace_IsRejected()
+    {
+        const string Yaml = "namespace: Product.Modules.*\nexclude:\n  - namespace_suffix: Generated\n";
+
+        Assert.That(Validate(Yaml, "layer"), Is.False);
+    }
+
+    [Test]
+    public void Layer_ExcludeEntryUnknownProperty_IsRejected()
+    {
+        const string Yaml = "namespace: Product.Modules.*\nexclude:\n  - namespace: Product.Modules.Infrastructure\n    role: DomainLayer\n";
+
+        Assert.That(Validate(Yaml, "layer"), Is.False);
+    }
+
+    [Test]
+    public void Layer_WithoutExclude_IsStillValid()
+    {
+        const string Yaml = "namespace: Product.Modules.*\n";
+
+        Assert.That(Validate(Yaml, "layer"), Is.True);
+    }
+
     [TestCase("samples/policies/modular-monolith.yml")]
     [TestCase("samples/policies/unity-asmdef-boundaries.yml")]
     [TestCase("samples/policies/basic-clean-architecture.yml")]

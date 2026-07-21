@@ -1,33 +1,4 @@
-# Layer Contracts Specification
-
-## Purpose
-Evaluates inward-only layer ordering contracts, where each layer may only reference layers below it, with optional stable IDs.
-## Requirements
-### Requirement: Evaluate inward-only layer ordering
-The system SHALL verify that for each layer in the contract's layer list, types in that layer do not reference types in any layer listed earlier (inward direction).
-
-#### Scenario: No layer violations
-- **WHEN** layers are ordered `[A, B, C]` and types in B never reference types in A, and types in C never reference types in A or B
-- **THEN** the contract returns an empty violation list
-
-#### Scenario: Layer ordering violation
-- **WHEN** layers are ordered `[A, B, C]` and a type in layer B references a type in layer A
-- **THEN** a violation is returned indicating the inward reference
-
-#### Scenario: Self-layer references allowed
-- **WHEN** a type in layer B references another type in layer B
-- **THEN** no violation is reported for that reference
-
-### Requirement: Layer contract accepts optional id
-A layer contract SHALL accept an optional `id` field. When provided, violations from this contract SHALL include the contract ID.
-
-#### Scenario: Violation includes contract ID
-- **WHEN** a layer contract with `id: layer-order` produces a violation
-- **THEN** the violation SHALL have `ContractId == "layer-order"`
-
-#### Scenario: Violation without explicit ID
-- **WHEN** a layer contract without explicit `id` produces a violation
-- **THEN** the violation SHALL have `ContractId` set to the fallback ID derived from `name`
+## ADDED Requirements
 
 ### Requirement: Layer namespace selection supports subtractive exclusion
 A layer declared with `namespace` and/or `namespace_suffix` MAY also declare `exclude`, a list of entries using the same `namespace`/`namespace_suffix` glob shape. A namespace SHALL be considered part of the layer's scope only if it matches the layer's inclusion glob(s) AND matches none of the layer's `exclude` entries.
@@ -99,4 +70,3 @@ The shared layer-description text used to render a layer's scope in violation me
 - **GIVEN** a layer with only `namespace` and no `exclude` key
 - **WHEN** the layer's description is rendered
 - **THEN** the rendered text is identical to its pre-exclusion form
-

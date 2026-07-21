@@ -546,4 +546,70 @@ public sealed class PolicyConsistencyCheckTests
             Assert.That(first[i].Reason, Is.EqualTo(second[i].Reason));
         }
     }
+
+    [Test]
+    public void UnmatchedLayerExclusion_TypoedPattern_Detected()
+    {
+        var document = BaseDocument();
+        document.Layers["core"] = new ArchitectureLayer
+        {
+            Namespace = "ArchLinterNet.Core.Contracts.*",
+            Exclude = new List<ArchitectureLayerExclusion>
+            {
+                // Real sub-namespace under ArchLinterNet.Core.Contracts is "Families", not "Familias".
+                new() { Namespace = "ArchLinterNet.Core.Contracts.Familias" }
+            }
+        };
+        document.Contracts.StrictLayers = new List<ArchitectureLayerContract>
+        {
+            new() { Name = "noop", Layers = new List<string> { "core" } }
+        };
+
+        var runner = new ArchitectureContractRunner(CreateContext(), document);
+        var findings = runner.CheckPolicyConsistency();
+
+        var finding = findings.FirstOrDefault(f => f.CheckKind == "unmatched-layer-exclusion");
+        Assert.That(finding, Is.Not.Null);
+        Assert.That(finding!.Layers, Is.EquivalentTo(new[] { "core" }));
+        Assert.That(finding.Reason, Does.Contain("ArchLinterNet.Core.Contracts.Familias"));
+    }
+
+    [Test]
+    public void UnmatchedLayerExclusion_MatchingPattern_NotFlagged()
+    {
+        var document = BaseDocument();
+        document.Layers["core"] = new ArchitectureLayer
+        {
+            Namespace = "ArchLinterNet.Core.Contracts.*",
+            Exclude = new List<ArchitectureLayerExclusion>
+            {
+                new() { Namespace = "ArchLinterNet.Core.Contracts.Families" }
+            }
+        };
+        document.Contracts.StrictLayers = new List<ArchitectureLayerContract>
+        {
+            new() { Name = "noop", Layers = new List<string> { "core" } }
+        };
+
+        var runner = new ArchitectureContractRunner(CreateContext(), document);
+        var findings = runner.CheckPolicyConsistency();
+
+        Assert.That(findings.Any(f => f.CheckKind == "unmatched-layer-exclusion"), Is.False);
+    }
+
+    [Test]
+    public void UnmatchedLayerExclusion_NoExcludeEntries_NotFlagged()
+    {
+        var document = BaseDocument();
+        document.Layers["core"] = new ArchitectureLayer { Namespace = "ArchLinterNet.Core.Contracts.*" };
+        document.Contracts.StrictLayers = new List<ArchitectureLayerContract>
+        {
+            new() { Name = "noop", Layers = new List<string> { "core" } }
+        };
+
+        var runner = new ArchitectureContractRunner(CreateContext(), document);
+        var findings = runner.CheckPolicyConsistency();
+
+        Assert.That(findings.Any(f => f.CheckKind == "unmatched-layer-exclusion"), Is.False);
+    }
 }

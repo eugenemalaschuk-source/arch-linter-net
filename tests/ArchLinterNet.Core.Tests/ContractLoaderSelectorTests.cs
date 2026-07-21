@@ -429,4 +429,128 @@ contracts:
 
         Assert.That(ex.Message, Does.Contain("Layer 'core' contains unknown property 'selecter'"));
     }
+
+    [Test]
+    public void LoadFromPath_LayerExclude_LoadsSuccessfully()
+    {
+        string contractDir = Path.Combine(_tempDir, "architecture");
+        Directory.CreateDirectory(contractDir);
+        string contractPath = Path.Combine(contractDir, "dependencies.arch.yml");
+
+        File.WriteAllText(contractPath, """
+version: 1
+name: Layer Exclude
+layers:
+  core:
+    namespace: Test.Core.*
+    exclude:
+      - namespace: Test.Core.*.Generated
+analysis:
+  target_assemblies:
+    - Test.Core
+contracts:
+  strict: []
+  audit: []
+  strict_layers: []
+  audit_layers: []
+  strict_allow_only: []
+  audit_allow_only: []
+  strict_cycles: []
+  audit_cycles: []
+  strict_method_body: []
+  audit_method_body: []
+  strict_asmdef: []
+  audit_asmdef: []
+  strict_independence: []
+  audit_independence: []
+""");
+
+        ArchitectureContractDocument document = new ArchitecturePolicyDocumentLoader().Load(contractPath);
+
+        Assert.That(document.Layers["core"].Exclude, Has.Count.EqualTo(1));
+        Assert.That(document.Layers["core"].Exclude[0].Namespace, Is.EqualTo("Test.Core.*.Generated"));
+    }
+
+    [Test]
+    public void LoadFromPath_LayerExcludeUnknownProperty_ThrowsDeterministicValidationError()
+    {
+        string contractDir = Path.Combine(_tempDir, "architecture");
+        Directory.CreateDirectory(contractDir);
+        string contractPath = Path.Combine(contractDir, "dependencies.arch.yml");
+
+        File.WriteAllText(contractPath, """
+version: 1
+name: Layer Exclude Unknown Property
+layers:
+  core:
+    namespace: Test.Core.*
+    exclude:
+      - namespace: Test.Core.*.Generated
+        role: DomainLayer
+analysis:
+  target_assemblies:
+    - Test.Core
+contracts:
+  strict: []
+  audit: []
+  strict_layers: []
+  audit_layers: []
+  strict_allow_only: []
+  audit_allow_only: []
+  strict_cycles: []
+  audit_cycles: []
+  strict_method_body: []
+  audit_method_body: []
+  strict_asmdef: []
+  audit_asmdef: []
+  strict_independence: []
+  audit_independence: []
+""");
+
+        InvalidOperationException ex = Assert.Throws<InvalidOperationException>(() =>
+            new ArchitecturePolicyDocumentLoader().Load(contractPath))!;
+
+        Assert.That(ex.Message, Does.Contain("Layer 'core' exclude entry contains unknown property 'role'"));
+    }
+
+    [Test]
+    public void LoadFromPath_LayerExcludeMissingNamespace_ThrowsDeterministicValidationError()
+    {
+        string contractDir = Path.Combine(_tempDir, "architecture");
+        Directory.CreateDirectory(contractDir);
+        string contractPath = Path.Combine(contractDir, "dependencies.arch.yml");
+
+        File.WriteAllText(contractPath, """
+version: 1
+name: Layer Exclude Missing Namespace
+layers:
+  core:
+    namespace: Test.Core.*
+    exclude:
+      - namespace_suffix: Generated
+analysis:
+  target_assemblies:
+    - Test.Core
+contracts:
+  strict: []
+  audit: []
+  strict_layers: []
+  audit_layers: []
+  strict_allow_only: []
+  audit_allow_only: []
+  strict_cycles: []
+  audit_cycles: []
+  strict_method_body: []
+  audit_method_body: []
+  strict_asmdef: []
+  audit_asmdef: []
+  strict_independence: []
+  audit_independence: []
+""");
+
+        InvalidOperationException ex = Assert.Throws<InvalidOperationException>(() =>
+            new ArchitecturePolicyDocumentLoader().Load(contractPath))!;
+
+        Assert.That(ex.Message, Does.Contain("Layer 'core' exclude entry must declare 'namespace'"));
+    }
 }

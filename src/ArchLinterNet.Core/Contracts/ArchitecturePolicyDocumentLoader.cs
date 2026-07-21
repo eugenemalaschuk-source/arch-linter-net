@@ -234,6 +234,7 @@ public sealed partial class ArchitecturePolicyDocumentLoader : IArchitecturePoli
 
             ValidateLayerNodeKeys(layerNode, layerName);
             ValidateNamespaceValue(layerNode, layerName);
+            ValidateLayerExcludeEntries(layerNode, layerName);
 
             bool hasNamespace = TryGetNonNullChild(layerNode, "namespace", out _);
             bool hasNamespaceSuffix = TryGetNonNullChild(layerNode, "namespace_suffix", out _);
@@ -285,10 +286,66 @@ public sealed partial class ArchitecturePolicyDocumentLoader : IArchitecturePoli
                 && !string.Equals(scalar.Value, "namespace", StringComparison.Ordinal)
                 && !string.Equals(scalar.Value, "namespace_suffix", StringComparison.Ordinal)
                 && !string.Equals(scalar.Value, "external", StringComparison.Ordinal)
-                && !string.Equals(scalar.Value, "selector", StringComparison.Ordinal))
+                && !string.Equals(scalar.Value, "selector", StringComparison.Ordinal)
+                && !string.Equals(scalar.Value, "exclude", StringComparison.Ordinal))
             {
                 throw new InvalidOperationException(
                     $"Layer '{layerName}' contains unknown property '{scalar.Value}'.");
+            }
+        }
+    }
+
+    // Mirrors the selector-key check above: `exclude` entries accept only namespace/namespace_suffix
+    // (the same shape a layer itself uses for inclusion). An unrecognized key such as a typo'd
+    // "namespace_sufix" or an accidental "role" would otherwise be silently dropped by
+    // IgnoreUnmatchedProperties(), leaving the exclusion inert without any signal to the author.
+    private static void ValidateLayerExcludeEntries(YamlMappingNode layerNode, string layerName)
+    {
+        if (!TryGetChild(layerNode, "exclude", out YamlNode? excludeNode))
+        {
+            return;
+        }
+
+        if (excludeNode is not YamlSequenceNode excludeSequence)
+        {
+            throw new InvalidOperationException(
+                $"Layer '{layerName}' exclude must be a list of entries.");
+        }
+
+        foreach (YamlNode entryNode in excludeSequence.Children)
+        {
+            if (entryNode is not YamlMappingNode entryMapping)
+            {
+                throw new InvalidOperationException(
+                    $"Layer '{layerName}' exclude entries must be objects with a 'namespace' key.");
+            }
+
+            bool hasNamespace = false;
+
+            foreach ((YamlNode entryKeyNode, _) in entryMapping.Children)
+            {
+                if (entryKeyNode is not YamlScalarNode entryKeyScalar)
+                {
+                    continue;
+                }
+
+                if (string.Equals(entryKeyScalar.Value, "namespace", StringComparison.Ordinal))
+                {
+                    hasNamespace = true;
+                    continue;
+                }
+
+                if (!string.Equals(entryKeyScalar.Value, "namespace_suffix", StringComparison.Ordinal))
+                {
+                    throw new InvalidOperationException(
+                        $"Layer '{layerName}' exclude entry contains unknown property '{entryKeyScalar.Value}'.");
+                }
+            }
+
+            if (!hasNamespace)
+            {
+                throw new InvalidOperationException(
+                    $"Layer '{layerName}' exclude entry must declare 'namespace'.");
             }
         }
     }

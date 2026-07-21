@@ -112,6 +112,36 @@ public sealed class ArchitectureLayer
 
     [YamlMember(Alias = "selector")] public ArchitectureLayerSelector? Selector { get; set; }
 
+    // Namespaces matched by Namespace/NamespaceSuffix above are subtracted by any entry here:
+    // a namespace is in this layer's scope only if it matches the inclusion glob AND matches no
+    // Exclude entry. Empty by default, so layers with no `exclude:` key are byte-for-byte
+    // unchanged. See ArchitectureLayerResolver.MatchNamespace and openspec/specs/layer-contracts.
+    [YamlMember(Alias = "exclude")] public List<ArchitectureLayerExclusion> Exclude { get; set; } = new();
+
+    [YamlIgnore] private NamespaceGlobPattern? _cachedGlobPattern;
+
+    [YamlIgnore]
+    internal NamespaceGlobPattern GlobPattern =>
+        _cachedGlobPattern ??= NamespaceGlobPattern.Parse(Namespace);
+}
+
+public sealed class ArchitectureLayerExclusion
+{
+    private string _namespace = string.Empty;
+
+    [YamlMember(Alias = "namespace")]
+    public string Namespace
+    {
+        get => _namespace;
+        set
+        {
+            _namespace = value;
+            _cachedGlobPattern = null;
+        }
+    }
+
+    [YamlMember(Alias = "namespace_suffix")] public string NamespaceSuffix { get; set; } = string.Empty;
+
     [YamlIgnore] private NamespaceGlobPattern? _cachedGlobPattern;
 
     [YamlIgnore]

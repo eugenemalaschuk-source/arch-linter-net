@@ -24,6 +24,7 @@ public sealed partial class ArchitectureAnalysisSession
         findings.AddRange(FindProtectedImporterConflicts());
         findings.AddRange(FindLayerOverlaps());
         findings.AddRange(FindUnreachableContracts(descriptors));
+        findings.AddRange(FindUnmatchedLayerExclusions());
 
         return findings
             .OrderBy(f => f.CheckKind, StringComparer.Ordinal)
@@ -531,6 +532,91 @@ public sealed partial class ArchitectureAnalysisSession
         return findings
             .OrderBy(f => f.ContractName, StringComparer.Ordinal)
             .ThenBy(f => string.Join(",", f.Layers), StringComparer.Ordinal)
+            .ToList();
+    }
+
+    // An exclude entry that never subtracts anything from its layer's included scope is either
+    // dead configuration or, more often, a typo (e.g. "Persistnce" instead of "Persistence") that
+    // silently no-ops instead of narrowing the layer as the author intended. This mirrors the
+    // existing unmatched-ignored-violations precedent: report participation, don't just accept
+    // configuration that has zero observable effect.
+    private List<PolicyConsistencyDiagnostic> FindUnmatchedLayerExclusions()
+    {
+        List<(string LayerName, ArchitectureLayer Layer)> layersWithExclusions = Document.Layers
+            .Where(kvp => kvp.Value.Exclude.Count > 0 && !string.IsNullOrWhiteSpace(kvp.Value.Namespace))
+            .Select(kvp => (kvp.Key, kvp.Value))
+            .OrderBy(entry => entry.Key, StringComparer.Ordinal)
+            .ToList();
+
+        if (layersWithExclusions.Count == 0)
+        {
+            return new List<PolicyConsistencyDiagnostic>();
+        }
+
+        HashSet<(string LayerName, int ExclusionIndex)> matched = new();
+
+        foreach (System.Reflection.Assembly assembly in Context.TargetAssemblies.Distinct()
+                     .OrderBy(a => a.FullName, StringComparer.Ordinal))
+        {
+            foreach (Type type in Scanning.ArchitectureTypeScanner.GetLoadableTypes(assembly))
+            {
+                string namespaceName = ArchitectureTypeNames.SafeNamespace(type);
+
+                foreach ((string layerName, ArchitectureLayer layer) in layersWithExclusions)
+                {
+                    if (!ArchitectureLayerResolver.MatchNamespaceIncludeOnly(layer, namespaceName).Matched)
+                    {
+                        continue;
+                    }
+
+                    ArchitectureLayerExclusion? exclusion =
+                        ArchitectureLayerResolver.FindMatchingExclusion(layer, namespaceName);
+                    if (exclusion == null)
+                    {
+                        continue;
+                    }
+
+                    int exclusionIndex = layer.Exclude.IndexOf(exclusion);
+                    matched.Add((layerName, exclusionIndex));
+                }
+            }
+        }
+
+        List<PolicyConsistencyDiagnostic> findings = new();
+
+        foreach ((string layerName, ArchitectureLayer layer) in layersWithExclusions)
+        {
+            for (int i = 0; i < layer.Exclude.Count; i++)
+            {
+                if (matched.Contains((layerName, i)))
+                {
+                    continue;
+                }
+
+                ArchitectureLayerExclusion exclusion = layer.Exclude[i];
+                if (string.IsNullOrWhiteSpace(exclusion.Namespace))
+                {
+                    continue;
+                }
+
+                string exclusionDescription = string.IsNullOrEmpty(exclusion.NamespaceSuffix)
+                    ? $"'{exclusion.Namespace}'"
+                    : $"'{exclusion.Namespace}' (namespace_suffix: {exclusion.NamespaceSuffix})";
+
+                findings.Add(new PolicyConsistencyDiagnostic(
+                    "<policy-consistency>",
+                    null,
+                    "unmatched-layer-exclusion",
+                    $"Layer '{layerName}' declares exclude entry {exclusionDescription} " +
+                    "which matches no namespace within the layer's included scope.",
+                    Array.Empty<string>(),
+                    Array.Empty<string>(),
+                    new[] { layerName }));
+            }
+        }
+
+        return findings
+            .OrderBy(f => string.Join(",", f.Layers), StringComparer.Ordinal)
             .ToList();
     }
 
