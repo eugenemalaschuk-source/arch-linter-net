@@ -125,6 +125,40 @@ public sealed partial class ArchitectureCoverageSummaryTests
     }
 
     [Test]
+    public void BuildCoverageSummary_NamespaceScope_NamespaceIncludedThenExcludedByLayer_ClassifiedAsExcludedNotUncovered()
+    {
+        // Regression for PR #384 review: issue #356 requires coverage to distinguish "not
+        // included" from "included then excluded". AlphaGap is matched by "alpha_excluded"'s
+        // namespace pattern, then subtracted by that layer's own exclude entry - it must land in
+        // ExcludedItems (with a reason naming the layer/pattern), not ordinary UncoveredItems.
+        // ZetaGap, which no declared layer's pattern ever matches at all, stays genuinely
+        // Uncovered ("not included") - the two must not be conflated.
+        ArchitectureContractDocument document = CreateNamespaceDocument();
+        document.Layers["alpha_excluded"] = new ArchitectureLayer
+        {
+            Namespace = $"{FeatureRoot}.AlphaGap",
+            Exclude = new List<ArchitectureLayerExclusion>
+            {
+                new() { Namespace = $"{FeatureRoot}.AlphaGap" }
+            }
+        };
+        ArchitectureCoverageContract contract = CreateNamespaceContract();
+
+        ArchitectureContractRunner runner = new(CreateContext(typeof(ArchitectureCoverageSummaryTests)), document);
+        ArchitectureCoverageSummary summary = RequireSummary(runner.BuildCoverageSummary(contract));
+
+        ArchitectureCoverageSummaryExcludedItem excludedAlpha = summary.ExcludedItems
+            .Single(i => i.Item == $"{FeatureRoot}.AlphaGap");
+        Assert.Multiple(() =>
+        {
+            Assert.That(excludedAlpha.Reason, Does.Contain("alpha_excluded"));
+            Assert.That(excludedAlpha.Reason, Does.Contain("layer"));
+            Assert.That(summary.UncoveredItems.Select(i => i.Item), Does.Contain($"{FeatureRoot}.ZetaGap"));
+            Assert.That(summary.UncoveredItems.Select(i => i.Item), Does.Not.Contain($"{FeatureRoot}.AlphaGap"));
+        });
+    }
+
+    [Test]
     public void BuildCoverageSummary_NamespaceScope_EmptyRoot_ProducesZeroCountsWithoutError()
     {
         ArchitectureContractDocument document = CreateNamespaceDocument();

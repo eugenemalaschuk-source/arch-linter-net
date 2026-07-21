@@ -147,6 +147,14 @@ public sealed class ArchitectureLayerExclusion
     [YamlIgnore]
     internal NamespaceGlobPattern GlobPattern =>
         _cachedGlobPattern ??= NamespaceGlobPattern.Parse(Namespace);
+
+    // Populated once by LayerNamespacesValidator during ArchitecturePolicyDocumentLoader.Load via
+    // ArchitecturePolicyProvenanceIndex.TryGetLocation(path) at "layers/<name>/exclude/<index>" -
+    // mirrors ArchitectureLayerSelector.WhenLocation's idiom so JSON/SARIF/human diagnostics that
+    // name this exact exclude entry (e.g. unmatched-layer-exclusion) can attach a real, resolved
+    // source location instead of only the owning layer's location.
+    [YamlIgnore]
+    internal ArchitecturePolicySourceLocation? PolicyLocation { get; set; }
 }
 
 public sealed class ArchitectureLayerSelector

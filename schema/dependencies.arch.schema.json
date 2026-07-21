@@ -96,6 +96,10 @@
         {
           "if": { "required": ["namespace_suffix"] },
           "then": { "required": ["namespace"] }
+        },
+        {
+          "if": { "required": ["exclude"] },
+          "then": { "required": ["namespace"] }
         }
       ],
       "anyOf": [

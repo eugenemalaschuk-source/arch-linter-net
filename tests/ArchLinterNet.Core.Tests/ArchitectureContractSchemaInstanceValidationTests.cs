@@ -310,6 +310,16 @@ public sealed class ArchitectureContractSchemaInstanceValidationTests
     }
 
     [Test]
+    public void Layer_ExcludeOnSelectorOnlyLayer_IsRejected()
+    {
+        // Regression for PR #384 review: exclude entries are namespace-based and have nothing to
+        // subtract from on a purely role/metadata-matched (selector-only) layer.
+        const string Yaml = "selector:\n  role: DomainLayer\nexclude:\n  - namespace: MyApp.Domain.Generated\n";
+
+        Assert.That(Validate(Yaml, "layer"), Is.False);
+    }
+
+    [Test]
     public void Layer_WithoutExclude_IsStillValid()
     {
         const string Yaml = "namespace: Product.Modules.*\n";

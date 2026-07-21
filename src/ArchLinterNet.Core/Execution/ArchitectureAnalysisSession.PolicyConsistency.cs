@@ -569,15 +569,17 @@ public sealed partial class ArchitectureAnalysisSession
                         continue;
                     }
 
-                    ArchitectureLayerExclusion? exclusion =
-                        ArchitectureLayerResolver.FindMatchingExclusion(layer, namespaceName);
-                    if (exclusion == null)
+                    // Check every exclude entry independently (not just the first that matches):
+                    // overlapping patterns (e.g. a broad "Product.Modules.*.Infra*" alongside a
+                    // narrower "Product.Modules.Weather.Infrastructure") can both legitimately
+                    // match the same namespace, and each one that does must count as used.
+                    for (int i = 0; i < layer.Exclude.Count; i++)
                     {
-                        continue;
+                        if (ArchitectureLayerResolver.ExclusionMatches(layer.Exclude[i], namespaceName))
+                        {
+                            matched.Add((layerName, i));
+                        }
                     }
-
-                    int exclusionIndex = layer.Exclude.IndexOf(exclusion);
-                    matched.Add((layerName, exclusionIndex));
                 }
             }
         }
@@ -611,7 +613,10 @@ public sealed partial class ArchitectureAnalysisSession
                     "which matches no namespace within the layer's included scope.",
                     Array.Empty<string>(),
                     Array.Empty<string>(),
-                    new[] { layerName }));
+                    new[] { layerName })
+                {
+                    PolicyLocation = exclusion.PolicyLocation
+                });
             }
         }
 

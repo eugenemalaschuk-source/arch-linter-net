@@ -598,6 +598,34 @@ public sealed class PolicyConsistencyCheckTests
     }
 
     [Test]
+    public void UnmatchedLayerExclusion_OverlappingExcludeEntries_NeitherFlaggedUnmatched()
+    {
+        // Regression for PR #384 review: FindUnmatchedLayerExclusions must test every exclude
+        // entry independently, not stop at the first entry that matches a given namespace - a
+        // "first wins" scan would leave a later, still-matching entry looking unused even though
+        // it also matched. Two entries here match exactly the same namespaces.
+        var document = BaseDocument();
+        document.Layers["core"] = new ArchitectureLayer
+        {
+            Namespace = "ArchLinterNet.Core.Contracts.*",
+            Exclude = new List<ArchitectureLayerExclusion>
+            {
+                new() { Namespace = "ArchLinterNet.Core.Contracts.Families" },
+                new() { Namespace = "ArchLinterNet.Core.Contracts.Families" }
+            }
+        };
+        document.Contracts.StrictLayers = new List<ArchitectureLayerContract>
+        {
+            new() { Name = "noop", Layers = new List<string> { "core" } }
+        };
+
+        var runner = new ArchitectureContractRunner(CreateContext(), document);
+        var findings = runner.CheckPolicyConsistency();
+
+        Assert.That(findings.Any(f => f.CheckKind == "unmatched-layer-exclusion"), Is.False);
+    }
+
+    [Test]
     public void UnmatchedLayerExclusion_NoExcludeEntries_NotFlagged()
     {
         var document = BaseDocument();

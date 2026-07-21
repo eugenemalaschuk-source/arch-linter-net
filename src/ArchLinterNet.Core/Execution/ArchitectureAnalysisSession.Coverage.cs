@@ -73,6 +73,12 @@ public sealed partial class ArchitectureAnalysisSession
                 continue;
             }
 
+            if (TryFindLayerExclusionReason(inventory, entry.Namespace, out string exclusionReason))
+            {
+                excludedItems.Add(new ArchitectureCoverageSummaryExcludedItem(entry.Namespace, exclusionReason));
+                continue;
+            }
+
             uncoveredItems.Add(new ArchitectureCoverageSummaryEvidenceItem(entry.Namespace, entry.RepresentativeType));
         }
 

@@ -93,6 +93,46 @@ public sealed partial class ArchitectureAnalysisSession
                     namespaceName)));
     }
 
+    // Distinguishes "not included" (no declared layer's raw namespace pattern matches at all) from
+    // "included then excluded" (some layer's namespace/namespace_suffix pattern matches, but a
+    // layer.Exclude entry subtracted the namespace back out) - see issue #356's acceptance
+    // criteria. Only reached once IsCoveredByDeclaredLayers/IsCoveredByExpandedTemplates have both
+    // already returned false for namespaceName, so this never overrides a namespace that some
+    // other declared layer still legitimately covers.
+    private static bool TryFindLayerExclusionReason(
+        ArchitectureCoverageInventory inventory, string namespaceName, out string reason)
+    {
+        foreach (ArchitectureCoverageLayerEntry layerEntry in inventory.DeclaredLayers)
+        {
+            ArchitectureLayer layer = layerEntry.Layer;
+            if (layer.Exclude.Count == 0)
+            {
+                continue;
+            }
+
+            if (!ArchitectureLayerResolver.MatchNamespaceIncludeOnly(layer, namespaceName).Matched)
+            {
+                continue;
+            }
+
+            ArchitectureLayerExclusion? exclusion =
+                ArchitectureLayerResolver.FindMatchingExclusion(layer, namespaceName);
+            if (exclusion == null)
+            {
+                continue;
+            }
+
+            reason = string.IsNullOrEmpty(exclusion.NamespaceSuffix)
+                ? $"excluded by layer '{layerEntry.Name}' exclude entry '{exclusion.Namespace}'"
+                : $"excluded by layer '{layerEntry.Name}' exclude entry '{exclusion.Namespace}' " +
+                  $"(namespace_suffix: {exclusion.NamespaceSuffix})";
+            return true;
+        }
+
+        reason = string.Empty;
+        return false;
+    }
+
     private static bool MatchesNamespaceRoot(ArchitectureCoverageRoot root, string namespaceName)
     {
         if (string.IsNullOrWhiteSpace(root.Namespace))

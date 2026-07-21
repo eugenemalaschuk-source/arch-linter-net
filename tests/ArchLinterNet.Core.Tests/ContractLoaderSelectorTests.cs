@@ -553,4 +553,93 @@ contracts:
 
         Assert.That(ex.Message, Does.Contain("Layer 'core' exclude entry must declare 'namespace'"));
     }
+
+    [Test]
+    public void LoadFromPath_LayerExcludeWithoutNamespace_ThrowsDeterministicValidationError()
+    {
+        // Regression for PR #384 review: a selector-only layer declaring `exclude` loads
+        // successfully today (namespace-based exclude has nothing to subtract from), and must be
+        // rejected end to end, not just at the isolated schema/validator unit level.
+        string contractDir = Path.Combine(_tempDir, "architecture");
+        Directory.CreateDirectory(contractDir);
+        string contractPath = Path.Combine(contractDir, "dependencies.arch.yml");
+
+        File.WriteAllText(contractPath, """
+version: 1
+name: Layer Exclude Without Namespace
+layers:
+  core:
+    selector:
+      role: DomainLayer
+    exclude:
+      - namespace: Test.Core.Generated
+analysis:
+  target_assemblies:
+    - Test.Core
+contracts:
+  strict: []
+  audit: []
+  strict_layers: []
+  audit_layers: []
+  strict_allow_only: []
+  audit_allow_only: []
+  strict_cycles: []
+  audit_cycles: []
+  strict_method_body: []
+  audit_method_body: []
+  strict_asmdef: []
+  audit_asmdef: []
+  strict_independence: []
+  audit_independence: []
+""");
+
+        InvalidOperationException ex = Assert.Throws<InvalidOperationException>(() =>
+            new ArchitecturePolicyDocumentLoader().Load(contractPath))!;
+
+        Assert.That(ex.Message, Does.Contain("Layer 'core' exclude requires a non-empty namespace"));
+    }
+
+    [Test]
+    public void LoadFromPath_LayerExcludeInvalidGlob_ThrowsDeterministicValidationError()
+    {
+        // Regression for PR #384 review: an exclude entry with an unsupported glob (here '**')
+        // must fail eagerly at load time, not silently no-op or throw only if a scanned type
+        // happens to reach the match path.
+        string contractDir = Path.Combine(_tempDir, "architecture");
+        Directory.CreateDirectory(contractDir);
+        string contractPath = Path.Combine(contractDir, "dependencies.arch.yml");
+
+        File.WriteAllText(contractPath, """
+version: 1
+name: Layer Exclude Invalid Glob
+layers:
+  core:
+    namespace: Test.Core.*
+    exclude:
+      - namespace: Test.Core.**.Generated
+analysis:
+  target_assemblies:
+    - Test.Core
+contracts:
+  strict: []
+  audit: []
+  strict_layers: []
+  audit_layers: []
+  strict_allow_only: []
+  audit_allow_only: []
+  strict_cycles: []
+  audit_cycles: []
+  strict_method_body: []
+  audit_method_body: []
+  strict_asmdef: []
+  audit_asmdef: []
+  strict_independence: []
+  audit_independence: []
+""");
+
+        InvalidOperationException ex = Assert.Throws<InvalidOperationException>(() =>
+            new ArchitecturePolicyDocumentLoader().Load(contractPath))!;
+
+        Assert.That(ex.Message, Does.Contain("Recursive wildcard"));
+    }
 }

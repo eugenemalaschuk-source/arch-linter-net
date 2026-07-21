@@ -72,17 +72,7 @@ internal static class ArchitectureLayerResolver
     {
         foreach (ArchitectureLayerExclusion exclusion in layer.Exclude)
         {
-            if (string.IsNullOrWhiteSpace(exclusion.Namespace))
-            {
-                continue;
-            }
-
-            NamespaceGlobPattern pattern = exclusion.GlobPattern;
-            ArchitectureNamespaceMatch match = pattern.IsGlob
-                ? MatchGlob(exclusion.Namespace, exclusion.NamespaceSuffix, namespaceName, pattern)
-                : MatchLiteral(exclusion.Namespace, exclusion.NamespaceSuffix, namespaceName);
-
-            if (match.Matched)
+            if (ExclusionMatches(exclusion, namespaceName))
             {
                 return true;
             }
@@ -91,9 +81,30 @@ internal static class ArchitectureLayerResolver
         return false;
     }
 
+    // Whether a single exclude entry matches namespaceName, independent of any other entry on the
+    // same layer. Exposed so callers that need to know EVERY matching entry (not just the first,
+    // as FindMatchingExclusion below returns) - e.g. unmatched-exclusion detection with
+    // overlapping exclude patterns - can test each entry on its own rather than relying on a
+    // single "first wins" scan that would leave later-but-still-matching entries looking unused.
+    internal static bool ExclusionMatches(ArchitectureLayerExclusion exclusion, string namespaceName)
+    {
+        if (string.IsNullOrWhiteSpace(exclusion.Namespace))
+        {
+            return false;
+        }
+
+        NamespaceGlobPattern pattern = exclusion.GlobPattern;
+        ArchitectureNamespaceMatch match = pattern.IsGlob
+            ? MatchGlob(exclusion.Namespace, exclusion.NamespaceSuffix, namespaceName, pattern)
+            : MatchLiteral(exclusion.Namespace, exclusion.NamespaceSuffix, namespaceName);
+
+        return match.Matched;
+    }
+
     // Namespace matched by at least one exclude entry, or null when none matches. Used for
-    // unmatched-exclusion diagnostics and layer-description provenance so callers can name which
-    // exclude pattern participated instead of only knowing "excluded: yes/no".
+    // layer-description provenance, where only the fact that some entry decided the exclusion
+    // matters. Do NOT use this for "which entries were used" accounting - it stops at the first
+    // match, so overlapping entries after it would look unmatched even though they also match.
     internal static ArchitectureLayerExclusion? FindMatchingExclusion(ArchitectureLayer layer, string namespaceName)
     {
         foreach (ArchitectureLayerExclusion exclusion in layer.Exclude)
