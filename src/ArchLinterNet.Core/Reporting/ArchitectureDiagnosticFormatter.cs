@@ -248,6 +248,8 @@ public sealed partial class ArchitectureDiagnosticFormatter : IArchitectureDiagn
         DependencyDiagnostic d => d.SourceType,
         ConfigurationDiagnostic d => d.SourceType,
         ExternalDependencyDiagnostic d => d.SourceType,
+        PackageDependencyDiagnostic d => d.SourceType,
+        PackageAllowOnlyDiagnostic d => d.SourceType,
         TypePlacementDiagnostic d => d.SourceType,
         LayoutConventionDiagnostic d => d.SourceType,
         PublicApiSurfaceDiagnostic d => d.SourceType,
@@ -267,6 +269,8 @@ public sealed partial class ArchitectureDiagnosticFormatter : IArchitectureDiagn
         DependencyDiagnostic d => d.ForbiddenNamespace,
         ConfigurationDiagnostic d => d.ForbiddenNamespace,
         ExternalDependencyDiagnostic d => d.ForbiddenNamespace,
+        PackageDependencyDiagnostic d => d.ForbiddenNamespace,
+        PackageAllowOnlyDiagnostic d => d.ForbiddenNamespace,
         TypePlacementDiagnostic d => d.ForbiddenNamespace,
         LayoutConventionDiagnostic d => d.ForbiddenNamespace,
         PublicApiSurfaceDiagnostic d => d.ForbiddenNamespace,
@@ -286,6 +290,8 @@ public sealed partial class ArchitectureDiagnosticFormatter : IArchitectureDiagn
         DependencyDiagnostic d => d.ForbiddenReferences,
         ConfigurationDiagnostic d => d.ForbiddenReferences,
         ExternalDependencyDiagnostic d => d.ForbiddenReferences,
+        PackageDependencyDiagnostic d => d.ForbiddenReferences,
+        PackageAllowOnlyDiagnostic d => d.ForbiddenReferences,
         TypePlacementDiagnostic d => d.ForbiddenReferences,
         LayoutConventionDiagnostic d => d.ForbiddenReferences,
         PublicApiSurfaceDiagnostic d => d.ForbiddenReferences,
@@ -584,6 +590,16 @@ public sealed partial class ArchitectureDiagnosticFormatter : IArchitectureDiagn
         if (diagnostic is ExternalDependencyDiagnostic external)
         {
             obj["forbidden_external_group"] = external.ForbiddenExternalGroup;
+        }
+
+        if (diagnostic is PackageDependencyDiagnostic packageDependency)
+        {
+            obj["forbidden_package_group"] = packageDependency.ForbiddenPackageGroup;
+        }
+
+        if (diagnostic is PackageAllowOnlyDiagnostic packageAllowOnly)
+        {
+            obj["allowed_package_groups"] = packageAllowOnly.AllowedPackageGroups.ToArray();
         }
 
         if (diagnostic is TypePlacementDiagnostic typePlacement)

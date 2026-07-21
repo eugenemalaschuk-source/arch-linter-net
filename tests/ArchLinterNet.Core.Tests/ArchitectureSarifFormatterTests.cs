@@ -340,6 +340,25 @@ public sealed class ArchitectureSarifFormatterTests
     }
 
     [Test]
+    public void FormatResultAsSarif_PackageAllowOnlyViolation_LogicalLocationKindIsPackage()
+    {
+        var violations = new List<ArchitectureViolation>
+        {
+            new("package-allow-only-rule", "package-allow-only-rule", "MyApp.Csproj", "outside allowed package groups",
+                new[] { "Newtonsoft.Json" })
+            {
+                Payload = new PackageAllowOnlyPayload(new[] { "approved_infra" })
+            }
+        };
+
+        JsonElement root = Run("strict", violations);
+
+        JsonElement result = root.GetProperty("runs")[0].GetProperty("results")[0];
+        JsonElement logicalLocation = result.GetProperty("logicalLocations")[0];
+        Assert.That(logicalLocation.GetProperty("kind").GetString(), Is.EqualTo("package"));
+    }
+
+    [Test]
     public void FormatResultAsSarif_TypePlacementViolation_LogicalLocationKindIsType()
     {
         var violations = new List<ArchitectureViolation>
