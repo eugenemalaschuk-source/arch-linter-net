@@ -104,7 +104,10 @@ public sealed partial class ArchitectureAnalysisSession
                 contract.Id,
                 contract.Source,
                 "outside allowed package groups",
-                disallowedReferences));
+                disallowedReferences)
+            {
+                Payload = new PackageAllowOnlyPayload(contract.Allowed.ToArray())
+            });
         }
 
         executionContext.CollectUnmatchedIgnores(_unmatchedIgnoredViolations);

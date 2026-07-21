@@ -347,7 +347,7 @@ public sealed partial class ArchitectureSarifFormatter : IArchitectureSarifForma
         return diagnostic switch
         {
             DependencyDiagnostic or ConfigurationDiagnostic => "namespace",
-            PackageDependencyDiagnostic => "package",
+            PackageDependencyDiagnostic or PackageAllowOnlyDiagnostic => "package",
             _ => "type",
         };
     }
@@ -359,6 +359,7 @@ public sealed partial class ArchitectureSarifFormatter : IArchitectureSarifForma
             ConfigurationDiagnostic d => (d.SourceType, d.ForbiddenNamespace, d.ForbiddenReferences),
             ExternalDependencyDiagnostic d => (d.SourceType, d.ForbiddenNamespace, d.ForbiddenReferences),
             PackageDependencyDiagnostic d => (d.SourceType, d.ForbiddenNamespace, d.ForbiddenReferences),
+            PackageAllowOnlyDiagnostic d => (d.SourceType, d.ForbiddenNamespace, d.ForbiddenReferences),
             TypePlacementDiagnostic d => (d.SourceType, d.ForbiddenNamespace, d.ForbiddenReferences),
             LayoutConventionDiagnostic d => (d.SourceType, d.ForbiddenNamespace, d.ForbiddenReferences),
             PublicApiSurfaceDiagnostic d => (d.SourceType, d.ForbiddenNamespace, d.ForbiddenReferences),

@@ -11,6 +11,8 @@ public sealed class ArchitectureSarifFormatterTests
     private static readonly ArchitectureSarifFormatter _formatter = new();
     private static readonly string[] _ref1 = { "ref1" };
     private static readonly string[] _ref2 = { "ref2" };
+    private static readonly string[] _newtonsoftJsonReference = { "Newtonsoft.Json" };
+    private static readonly string[] _approvedInfraGroup = { "approved_infra" };
 
     private static JsonElement Run(
         string mode,
@@ -329,6 +331,25 @@ public sealed class ArchitectureSarifFormatterTests
             new("package-rule", "package-rule", "MyApp.Csproj", "forbidden-packages", new[] { "Newtonsoft.Json" })
             {
                 Payload = new PackageDependencyPayload("legacy-json")
+            }
+        };
+
+        JsonElement root = Run("strict", violations);
+
+        JsonElement result = root.GetProperty("runs")[0].GetProperty("results")[0];
+        JsonElement logicalLocation = result.GetProperty("logicalLocations")[0];
+        Assert.That(logicalLocation.GetProperty("kind").GetString(), Is.EqualTo("package"));
+    }
+
+    [Test]
+    public void FormatResultAsSarif_PackageAllowOnlyViolation_LogicalLocationKindIsPackage()
+    {
+        var violations = new List<ArchitectureViolation>
+        {
+            new("package-allow-only-rule", "package-allow-only-rule", "MyApp.Csproj", "outside allowed package groups",
+                _newtonsoftJsonReference)
+            {
+                Payload = new PackageAllowOnlyPayload(_approvedInfraGroup)
             }
         };
 

@@ -6,7 +6,7 @@ using NUnit.Framework;
 namespace ArchLinterNet.Core.Tests;
 
 [TestFixture]
-public sealed class ArchitectureDiagnosticFormatterTests
+public sealed partial class ArchitectureDiagnosticFormatterTests
 {
     private static readonly ArchitectureDiagnosticFormatter _formatter = new();
     private static readonly string[] _reference1 = ["ref1"];
