@@ -11,6 +11,8 @@ public sealed class ArchitectureSarifFormatterTests
     private static readonly ArchitectureSarifFormatter _formatter = new();
     private static readonly string[] _ref1 = { "ref1" };
     private static readonly string[] _ref2 = { "ref2" };
+    private static readonly string[] _newtonsoftJsonReference = { "Newtonsoft.Json" };
+    private static readonly string[] _approvedInfraGroup = { "approved_infra" };
 
     private static JsonElement Run(
         string mode,
@@ -345,9 +347,9 @@ public sealed class ArchitectureSarifFormatterTests
         var violations = new List<ArchitectureViolation>
         {
             new("package-allow-only-rule", "package-allow-only-rule", "MyApp.Csproj", "outside allowed package groups",
-                new[] { "Newtonsoft.Json" })
+                _newtonsoftJsonReference)
             {
-                Payload = new PackageAllowOnlyPayload(new[] { "approved_infra" })
+                Payload = new PackageAllowOnlyPayload(_approvedInfraGroup)
             }
         };
 

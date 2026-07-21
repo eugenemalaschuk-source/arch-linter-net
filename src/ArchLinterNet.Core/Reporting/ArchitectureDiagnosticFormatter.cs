@@ -582,84 +582,56 @@ public sealed partial class ArchitectureDiagnosticFormatter : IArchitectureDiagn
 
     private static void ApplyDiagnosticSpecificCiFields(ArchitectureDiagnostic diagnostic, Dictionary<string, object?> obj)
     {
-        if (diagnostic is DependencyDiagnostic dependency)
+        switch (diagnostic)
         {
-            ApplyDependencyCiFields(dependency, obj);
-        }
-
-        if (diagnostic is ExternalDependencyDiagnostic external)
-        {
-            obj["forbidden_external_group"] = external.ForbiddenExternalGroup;
-        }
-
-        if (diagnostic is PackageDependencyDiagnostic packageDependency)
-        {
-            obj["forbidden_package_group"] = packageDependency.ForbiddenPackageGroup;
-        }
-
-        if (diagnostic is PackageAllowOnlyDiagnostic packageAllowOnly)
-        {
-            obj["allowed_package_groups"] = packageAllowOnly.AllowedPackageGroups.ToArray();
-        }
-
-        if (diagnostic is TypePlacementDiagnostic typePlacement)
-        {
-            ApplyTypePlacementCiFields(typePlacement, obj);
-        }
-
-        if (diagnostic is LayoutConventionDiagnostic layoutConvention)
-        {
-            ApplyLayoutConventionCiFields(layoutConvention, obj);
-        }
-
-        if (diagnostic is PublicApiSurfaceDiagnostic publicApiSurface)
-        {
-            ApplyPublicApiSurfaceCiFields(publicApiSurface, obj);
-        }
-
-        if (diagnostic is AttributeUsageDiagnostic attributeUsage)
-        {
-            ApplyAttributeUsageCiFields(attributeUsage, obj);
-        }
-
-        if (diagnostic is InheritanceDiagnostic inheritance)
-        {
-            ApplyInheritanceCiFields(inheritance, obj);
-        }
-
-        if (diagnostic is InterfaceImplementationDiagnostic interfaceImplementation)
-        {
-            ApplyInterfaceImplementationCiFields(interfaceImplementation, obj);
-        }
-
-        if (diagnostic is CompositionDiagnostic composition)
-        {
-            ApplyCompositionCiFields(composition, obj);
-        }
-
-        if (diagnostic is ProjectMetadataDiagnostic projectMetadata)
-        {
-            ApplyProjectMetadataCiFields(projectMetadata, obj);
-        }
-
-        if (diagnostic is ConfigurationDiagnostic configuration)
-        {
-            ApplyConfigurationCiFields(configuration, obj);
-        }
-
-        if (diagnostic is ContextDependencyDiagnostic contextDependency)
-        {
-            ApplyContextDependencyCiFields(contextDependency, obj);
-        }
-
-        if (diagnostic is ContextAllowOnlyDiagnostic contextAllowOnly)
-        {
-            ApplyContextAllowOnlyCiFields(contextAllowOnly, obj);
-        }
-
-        if (diagnostic is PortBoundaryDiagnostic portBoundary)
-        {
-            ApplyPortBoundaryCiFields(portBoundary, obj);
+            case DependencyDiagnostic dependency:
+                ApplyDependencyCiFields(dependency, obj);
+                break;
+            case ExternalDependencyDiagnostic external:
+                obj["forbidden_external_group"] = external.ForbiddenExternalGroup;
+                break;
+            case PackageDependencyDiagnostic packageDependency:
+                obj["forbidden_package_group"] = packageDependency.ForbiddenPackageGroup;
+                break;
+            case PackageAllowOnlyDiagnostic packageAllowOnly:
+                obj["allowed_package_groups"] = packageAllowOnly.AllowedPackageGroups.ToArray();
+                break;
+            case TypePlacementDiagnostic typePlacement:
+                ApplyTypePlacementCiFields(typePlacement, obj);
+                break;
+            case LayoutConventionDiagnostic layoutConvention:
+                ApplyLayoutConventionCiFields(layoutConvention, obj);
+                break;
+            case PublicApiSurfaceDiagnostic publicApiSurface:
+                ApplyPublicApiSurfaceCiFields(publicApiSurface, obj);
+                break;
+            case AttributeUsageDiagnostic attributeUsage:
+                ApplyAttributeUsageCiFields(attributeUsage, obj);
+                break;
+            case InheritanceDiagnostic inheritance:
+                ApplyInheritanceCiFields(inheritance, obj);
+                break;
+            case InterfaceImplementationDiagnostic interfaceImplementation:
+                ApplyInterfaceImplementationCiFields(interfaceImplementation, obj);
+                break;
+            case CompositionDiagnostic composition:
+                ApplyCompositionCiFields(composition, obj);
+                break;
+            case ProjectMetadataDiagnostic projectMetadata:
+                ApplyProjectMetadataCiFields(projectMetadata, obj);
+                break;
+            case ConfigurationDiagnostic configuration:
+                ApplyConfigurationCiFields(configuration, obj);
+                break;
+            case ContextDependencyDiagnostic contextDependency:
+                ApplyContextDependencyCiFields(contextDependency, obj);
+                break;
+            case ContextAllowOnlyDiagnostic contextAllowOnly:
+                ApplyContextAllowOnlyCiFields(contextAllowOnly, obj);
+                break;
+            case PortBoundaryDiagnostic portBoundary:
+                ApplyPortBoundaryCiFields(portBoundary, obj);
+                break;
         }
     }
 
