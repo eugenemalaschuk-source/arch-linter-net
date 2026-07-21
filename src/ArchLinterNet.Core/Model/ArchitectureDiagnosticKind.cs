@@ -19,5 +19,6 @@ public enum ArchitectureDiagnosticKind
     ContextDependency,
     ContextAllowOnly,
     PortBoundary,
-    LayoutConvention
+    LayoutConvention,
+    PackageAllowOnly
 }
