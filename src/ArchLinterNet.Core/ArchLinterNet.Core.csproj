@@ -26,8 +26,10 @@
     <PackageReference Include="Microsoft.CodeAnalysis.VisualBasic" Version="4.14.0" />
     <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="9.0.0" />
     <!-- Pins Buildalyzer's transitive System.Security.Cryptography.Xml above the version flagged by
-         GHSA-37gx-xxp4-5rgx / GHSA-w3x6-4m5h-cxqf (CVE-2026-33116 EncryptedXml DoS). -->
-    <PackageReference Include="System.Security.Cryptography.Xml" Version="9.0.17" />
+         GHSA-37gx-xxp4-5rgx / GHSA-w3x6-4m5h-cxqf (CVE-2026-33116 EncryptedXml DoS), and above the
+         later 9.0.17 advisories (GHSA-cvvh-rhrc-wg4q, GHSA-g8r8-53c2-pm3f, GHSA-23rf-6693-g89p,
+         GHSA-8q5v-6pqq-x66h, GHSA-mmjf-rqrv-855v). -->
+    <PackageReference Include="System.Security.Cryptography.Xml" Version="9.0.18" />
   </ItemGroup>
 
   <ItemGroup>
