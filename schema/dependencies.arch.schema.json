@@ -98,7 +98,10 @@
           "then": { "required": ["namespace"] }
         },
         {
-          "if": { "required": ["exclude"] },
+          "if": {
+            "required": ["exclude"],
+            "properties": { "exclude": { "minItems": 1 } }
+          },
           "then": { "required": ["namespace"] }
         }
       ],

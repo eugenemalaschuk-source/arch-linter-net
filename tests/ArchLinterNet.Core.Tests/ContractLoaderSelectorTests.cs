@@ -642,4 +642,47 @@ contracts:
 
         Assert.That(ex.Message, Does.Contain("Recursive wildcard"));
     }
+
+    [Test]
+    public void LoadFromPath_SelectorOnlyLayerWithEmptyExclude_LoadsSuccessfully()
+    {
+        // Regression for PR #384 review: `exclude: []` has nothing to subtract and must not
+        // trigger the exclude-requires-namespace rejection, for monolithic policies exactly as
+        // for composed/imported ones (schema `exclude` conditional now requires `minItems: 1`).
+        string contractDir = Path.Combine(_tempDir, "architecture");
+        Directory.CreateDirectory(contractDir);
+        string contractPath = Path.Combine(contractDir, "dependencies.arch.yml");
+
+        File.WriteAllText(contractPath, """
+version: 1
+name: Selector Only Layer Empty Exclude
+layers:
+  core:
+    selector:
+      role: DomainLayer
+    exclude: []
+analysis:
+  target_assemblies:
+    - Test.Core
+contracts:
+  strict: []
+  audit: []
+  strict_layers: []
+  audit_layers: []
+  strict_allow_only: []
+  audit_allow_only: []
+  strict_cycles: []
+  audit_cycles: []
+  strict_method_body: []
+  audit_method_body: []
+  strict_asmdef: []
+  audit_asmdef: []
+  strict_independence: []
+  audit_independence: []
+""");
+
+        ArchitectureContractDocument document = new ArchitecturePolicyDocumentLoader().Load(contractPath);
+
+        Assert.That(document.Layers["core"].Exclude, Is.Empty);
+    }
 }

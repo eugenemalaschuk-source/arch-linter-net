@@ -33,6 +33,7 @@ public sealed partial class ArchitectureDiagnosticFormatter
     {
         var result = new Dictionary<string, object?> { ["item"] = item.Item, ["reason"] = item.Reason };
         if (!string.IsNullOrEmpty(item.Evidence)) result["evidence"] = item.Evidence;
+        if (item.PolicyLocation is not null) result["policy_location"] = FormatPolicyLocationForJson(item.PolicyLocation);
         return result;
     }
 }

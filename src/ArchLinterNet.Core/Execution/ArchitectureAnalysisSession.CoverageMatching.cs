@@ -100,7 +100,10 @@ public sealed partial class ArchitectureAnalysisSession
     // already returned false for namespaceName, so this never overrides a namespace that some
     // other declared layer still legitimately covers.
     private static bool TryFindLayerExclusionReason(
-        ArchitectureCoverageInventory inventory, string namespaceName, out string reason)
+        ArchitectureCoverageInventory inventory,
+        string namespaceName,
+        out string reason,
+        out ArchitecturePolicySourceLocation? policyLocation)
     {
         foreach (ArchitectureCoverageLayerEntry layerEntry in inventory.DeclaredLayers)
         {
@@ -126,10 +129,12 @@ public sealed partial class ArchitectureAnalysisSession
                 ? $"excluded by layer '{layerEntry.Name}' exclude entry '{exclusion.Namespace}'"
                 : $"excluded by layer '{layerEntry.Name}' exclude entry '{exclusion.Namespace}' " +
                   $"(namespace_suffix: {exclusion.NamespaceSuffix})";
+            policyLocation = exclusion.PolicyLocation;
             return true;
         }
 
         reason = string.Empty;
+        policyLocation = null;
         return false;
     }
 

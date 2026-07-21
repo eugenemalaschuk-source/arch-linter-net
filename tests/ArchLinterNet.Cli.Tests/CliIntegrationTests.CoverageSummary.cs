@@ -198,6 +198,38 @@ public partial class CliIntegrationTests
     }
 
     [Test]
+    public void CoverageSummary_JsonOutput_ExcludedItemIncludesTypedLayerExclusionProvenance()
+    {
+        // Regression for PR #384 review: a namespace excluded via a layer's `exclude` entry must
+        // carry typed provenance for the exact layers.<name>.exclude[<index>] element (not just a
+        // text reason), so JSON/Testing API consumers can locate the exact policy element -
+        // mirroring PolicyConsistencyDiagnostic.PolicyLocation for the unmatched-layer-exclusion
+        // finding.
+        string policy = Path.Combine(
+            _repoRoot, "tests", "ArchLinterNet.Cli.Tests", "TestPolicies", "coverage-layer-exclusion-provenance.yml");
+        var (exitCode, stdout, _) = RunCli("--policy", policy, "--format", "json");
+
+        Assert.That(exitCode, Is.EqualTo(0));
+
+        using var doc = JsonDocument.Parse(stdout);
+        JsonElement entry = FindSummaryEntry(doc.RootElement.GetProperty("coverage_summary"), "contracts-namespace-coverage");
+
+        JsonElement families = entry.GetProperty("excluded_items").EnumerateArray()
+            .First(item => item.GetProperty("item").GetString() == "ArchLinterNet.Core.Contracts.Families");
+
+        JsonElement policyLocation = families.GetProperty("policy_location");
+        string yamlPath = policyLocation.GetProperty("yaml_path").GetString()!;
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(families.GetProperty("reason").GetString(), Does.Contain("contracts"));
+            Assert.That(yamlPath, Does.Contain("exclude"));
+            Assert.That(yamlPath, Does.Contain("layers"));
+            Assert.That(policyLocation.GetProperty("line").GetInt32(), Is.GreaterThan(0));
+        });
+    }
+
+    [Test]
     public void CoverageSummary_ContractFilterIncludesSelectedCoverageContract_StillReportsSummary()
     {
         var (exitCode, stdout, _) = RunCli(

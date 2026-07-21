@@ -320,6 +320,18 @@ public sealed class ArchitectureContractSchemaInstanceValidationTests
     }
 
     [Test]
+    public void Layer_EmptyExcludeOnSelectorOnlyLayer_IsValid()
+    {
+        // Regression for PR #384 review: an empty `exclude: []` must not trigger the
+        // exclude-requires-namespace conditional - only a non-empty exclude list has anything to
+        // subtract, so composed/imported policies must accept the same `exclude: []` a monolithic
+        // policy's runtime validator already accepts (Exclude.Count > 0 check).
+        const string Yaml = "selector:\n  role: DomainLayer\nexclude: []\n";
+
+        Assert.That(Validate(Yaml, "layer"), Is.True);
+    }
+
+    [Test]
     public void Layer_WithoutExclude_IsStillValid()
     {
         const string Yaml = "namespace: Product.Modules.*\n";
