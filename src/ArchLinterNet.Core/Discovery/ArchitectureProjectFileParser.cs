@@ -30,7 +30,7 @@ internal sealed class ArchitectureProjectFileParser : IArchitectureProjectFilePa
 
         List<ArchitectureDiscoveredPackageReference> packageReferences =
             ParsePackageReferences(document, projectPath, fileSystem);
-        List<ArchitectureDiscoveredFrameworkReference> frameworkReferences = ParseFrameworkReferences(document);
+        List<ArchitectureDiscoveredFrameworkReference> frameworkReferences = ParseFrameworkReferences(document, projectPath);
         Dictionary<string, ArchitectureDiscoveredProjectProperty> properties =
             ParseProperties(document, projectPath, fileSystem);
         List<ArchitectureDiscoveredFriendAssembly> friendAssemblies = ParseFriendAssemblies(document, projectPath, fileSystem);
@@ -134,8 +134,10 @@ internal sealed class ArchitectureProjectFileParser : IArchitectureProjectFilePa
             .ToList();
     }
 
-    internal static List<ArchitectureDiscoveredFrameworkReference> ParseFrameworkReferences(XDocument document)
+    internal static List<ArchitectureDiscoveredFrameworkReference> ParseFrameworkReferences(XDocument document, string projectPath)
     {
+        string sourcePath = Path.GetFullPath(projectPath);
+
         return document.Descendants("FrameworkReference")
             .Select(element =>
             {
@@ -144,7 +146,7 @@ internal sealed class ArchitectureProjectFileParser : IArchitectureProjectFilePa
                 return (Include: include, Condition: string.IsNullOrWhiteSpace(condition) ? null : condition.Trim());
             })
             .Where(reference => !string.IsNullOrWhiteSpace(reference.Include))
-            .Select(reference => new ArchitectureDiscoveredFrameworkReference(reference.Include!.Trim(), reference.Condition))
+            .Select(reference => new ArchitectureDiscoveredFrameworkReference(reference.Include!.Trim(), reference.Condition, sourcePath))
             .ToList();
     }
 

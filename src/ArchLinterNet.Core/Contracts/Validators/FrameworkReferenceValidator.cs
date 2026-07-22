@@ -9,12 +9,14 @@ internal sealed class FrameworkReferenceValidator : IArchitecturePolicyDocumentV
     {
         HashSet<string> targetAssemblies = new(document.Analysis.TargetAssemblies, StringComparer.Ordinal);
 
-        foreach (ArchitectureFrameworkReferenceContract contract in document.Provenance.Track(
-                     document.Contracts.StrictFrameworkDependency.Concat(document.Contracts.AuditFrameworkDependency))
-                 .Where(contract => !targetAssemblies.Contains(contract.Source)))
+        ArchitectureFrameworkReferenceContract? invalid = document.Provenance.Track(
+                document.Contracts.StrictFrameworkDependency.Concat(document.Contracts.AuditFrameworkDependency))
+            .FirstOrDefault(contract => !targetAssemblies.Contains(contract.Source));
+
+        if (invalid != null)
         {
             throw new InvalidOperationException(
-                $"Framework dependency contract '{contract.Name}' references source '{contract.Source}' " +
+                $"Framework dependency contract '{invalid.Name}' references source '{invalid.Source}' " +
                 "that is not declared in 'analysis.target_assemblies'. The 'source' of a " +
                 "'strict_framework_dependency'/'audit_framework_dependency' contract must be a declared target assembly.");
         }

@@ -9,12 +9,14 @@ internal sealed class FrameworkReferenceAllowOnlyValidator : IArchitecturePolicy
     {
         HashSet<string> targetAssemblies = new(document.Analysis.TargetAssemblies, StringComparer.Ordinal);
 
-        foreach (ArchitectureFrameworkReferenceAllowOnlyContract contract in document.Provenance.Track(
-                     document.Contracts.StrictFrameworkAllowOnly.Concat(document.Contracts.AuditFrameworkAllowOnly))
-                 .Where(contract => !targetAssemblies.Contains(contract.Source)))
+        ArchitectureFrameworkReferenceAllowOnlyContract? invalid = document.Provenance.Track(
+                document.Contracts.StrictFrameworkAllowOnly.Concat(document.Contracts.AuditFrameworkAllowOnly))
+            .FirstOrDefault(contract => !targetAssemblies.Contains(contract.Source));
+
+        if (invalid != null)
         {
             throw new InvalidOperationException(
-                $"Framework allow-only contract '{contract.Name}' references source '{contract.Source}' " +
+                $"Framework allow-only contract '{invalid.Name}' references source '{invalid.Source}' " +
                 "that is not declared in 'analysis.target_assemblies'. The 'source' of a " +
                 "'strict_framework_allow_only'/'audit_framework_allow_only' contract must be a declared target assembly.");
         }
