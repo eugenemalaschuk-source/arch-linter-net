@@ -11,6 +11,12 @@ public partial class CliIntegrationTests
     private string RuleInputCoveragePolicy => Path.Combine(
         _repoRoot, "tests", "ArchLinterNet.Cli.Tests", "TestPolicies", "rule-input-coverage-policy.yml");
 
+    private static readonly string[] _overlappingExclusionSourceFiles =
+    {
+        "coverage-overlapping-layer-exclusion-root.yml",
+        "coverage-overlapping-layer-exclusion-fragment.yml"
+    };
+
     private static JsonElement FindSummaryEntry(JsonElement summaries, string contractId)
     {
         foreach (JsonElement entry in summaries.EnumerateArray())
@@ -195,6 +201,76 @@ public partial class CliIntegrationTests
         Assert.That(exitCode, Is.EqualTo(0));
         Assert.That(stdout, Does.Not.Contain("Coverage summary:"));
         Assert.That(stdout, Does.Not.Contain("Coverage findings:"));
+    }
+
+    [Test]
+    public void CoverageSummary_JsonOutput_ExcludedItemIncludesTypedLayerExclusionProvenance()
+    {
+        // Regression for PR #384 review: a namespace excluded via a layer's `exclude` entry must
+        // carry typed provenance for the exact layers.<name>.exclude[<index>] element (not just a
+        // text reason), so JSON/Testing API consumers can locate the exact policy element -
+        // mirroring PolicyConsistencyDiagnostic.PolicyLocation for the unmatched-layer-exclusion
+        // finding.
+        string policy = Path.Combine(
+            _repoRoot, "tests", "ArchLinterNet.Cli.Tests", "TestPolicies", "coverage-layer-exclusion-provenance.yml");
+        var (exitCode, stdout, _) = RunCli("--policy", policy, "--format", "json");
+
+        Assert.That(exitCode, Is.EqualTo(0));
+
+        using var doc = JsonDocument.Parse(stdout);
+        JsonElement entry = FindSummaryEntry(doc.RootElement.GetProperty("coverage_summary"), "contracts-namespace-coverage");
+
+        JsonElement families = entry.GetProperty("excluded_items").EnumerateArray()
+            .First(item => item.GetProperty("item").GetString() == "ArchLinterNet.Core.Contracts.Families");
+
+        JsonElement policyLocation = families.GetProperty("policy_location");
+        string yamlPath = policyLocation.GetProperty("yaml_path").GetString()!;
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(families.GetProperty("reason").GetString(), Does.Contain("contracts"));
+            Assert.That(yamlPath, Does.Contain("exclude"));
+            Assert.That(yamlPath, Does.Contain("layers"));
+            Assert.That(policyLocation.GetProperty("line").GetInt32(), Is.GreaterThan(0));
+        });
+    }
+
+    [Test]
+    public void CoverageSummary_JsonOutput_OverlappingLayerExclusionsAcrossImportedFragments_ReportsAllProvenance()
+    {
+        // Regression for final PR #384 review: when two independent layers - one declared in the
+        // root policy, one in an imported fragment - both exclude the same namespace, the excluded
+        // item must carry provenance for EVERY contributing exclude element, not just the first
+        // one found. Dropping all but the first silently loses provenance for the rest of the
+        // union-subtraction, especially across imported fragments where the first-found element
+        // may not even belong to the same file as the second.
+        string policy = Path.Combine(
+            _repoRoot, "tests", "ArchLinterNet.Cli.Tests", "TestPolicies",
+            "coverage-overlapping-layer-exclusion-root.yml");
+        var (exitCode, stdout, _) = RunCli("--policy", policy, "--format", "json");
+
+        Assert.That(exitCode, Is.EqualTo(0));
+
+        using var doc = JsonDocument.Parse(stdout);
+        JsonElement entry = FindSummaryEntry(doc.RootElement.GetProperty("coverage_summary"), "contracts-namespace-coverage");
+
+        JsonElement families = entry.GetProperty("excluded_items").EnumerateArray()
+            .First(item => item.GetProperty("item").GetString() == "ArchLinterNet.Core.Contracts.Families");
+
+        JsonElement policyLocation = families.GetProperty("policy_location");
+        JsonElement relatedLocations = families.GetProperty("related_policy_locations");
+        string primaryPath = policyLocation.GetProperty("source_path").GetString()!;
+        string relatedPath = relatedLocations[0].GetProperty("source_path").GetString()!;
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(families.GetProperty("reason").GetString(), Does.Contain("contracts_broad"));
+            Assert.That(families.GetProperty("reason").GetString(), Does.Contain("contracts_families_only"));
+            Assert.That(relatedLocations.GetArrayLength(), Is.EqualTo(1));
+            Assert.That(new[] { primaryPath, relatedPath },
+                Is.EquivalentTo(_overlappingExclusionSourceFiles),
+                "Provenance must name both the root and the imported fragment that each contributed an exclude entry.");
+        });
     }
 
     [Test]

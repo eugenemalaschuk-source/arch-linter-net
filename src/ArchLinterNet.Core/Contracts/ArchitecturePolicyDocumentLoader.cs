@@ -20,6 +20,8 @@ public sealed partial class ArchitecturePolicyDocumentLoader : IArchitecturePoli
     private const string WhenKey = "when";
     private const string ContractsKey = "contracts";
     private const string UnnamedContractName = "<unnamed>";
+    private const string NamespaceSuffixKey = "namespace_suffix";
+    private const string ExcludeKey = "exclude";
 
     private static readonly string[] _targetContextAllowedKeys = { "metadata" };
     private static readonly string[] _adapterBindingAllowedKeys = { "adapter", "expected_port", "allowed_contexts" };
@@ -234,9 +236,10 @@ public sealed partial class ArchitecturePolicyDocumentLoader : IArchitecturePoli
 
             ValidateLayerNodeKeys(layerNode, layerName);
             ValidateNamespaceValue(layerNode, layerName);
+            ValidateLayerExcludeEntries(layerNode, layerName);
 
             bool hasNamespace = TryGetNonNullChild(layerNode, "namespace", out _);
-            bool hasNamespaceSuffix = TryGetNonNullChild(layerNode, "namespace_suffix", out _);
+            bool hasNamespaceSuffix = TryGetNonNullChild(layerNode, NamespaceSuffixKey, out _);
             YamlNode? selectorNode = null;
             bool hasSelectorKey = TryGetChild(layerNode, "selector", out selectorNode);
 
@@ -283,12 +286,68 @@ public sealed partial class ArchitecturePolicyDocumentLoader : IArchitecturePoli
         {
             if (keyNode is YamlScalarNode scalar
                 && !string.Equals(scalar.Value, "namespace", StringComparison.Ordinal)
-                && !string.Equals(scalar.Value, "namespace_suffix", StringComparison.Ordinal)
+                && !string.Equals(scalar.Value, NamespaceSuffixKey, StringComparison.Ordinal)
                 && !string.Equals(scalar.Value, "external", StringComparison.Ordinal)
-                && !string.Equals(scalar.Value, "selector", StringComparison.Ordinal))
+                && !string.Equals(scalar.Value, "selector", StringComparison.Ordinal)
+                && !string.Equals(scalar.Value, ExcludeKey, StringComparison.Ordinal))
             {
                 throw new InvalidOperationException(
                     $"Layer '{layerName}' contains unknown property '{scalar.Value}'.");
+            }
+        }
+    }
+
+    // Mirrors the selector-key check above: `exclude` entries accept only namespace/namespace_suffix
+    // (the same shape a layer itself uses for inclusion). An unrecognized key such as a typo'd
+    // "namespace_sufix" or an accidental "role" would otherwise be silently dropped by
+    // IgnoreUnmatchedProperties(), leaving the exclusion inert without any signal to the author.
+    private static void ValidateLayerExcludeEntries(YamlMappingNode layerNode, string layerName)
+    {
+        if (!TryGetChild(layerNode, ExcludeKey, out YamlNode? excludeNode))
+        {
+            return;
+        }
+
+        if (excludeNode is not YamlSequenceNode excludeSequence)
+        {
+            throw new InvalidOperationException(
+                $"Layer '{layerName}' exclude must be a list of entries.");
+        }
+
+        foreach (YamlNode entryNode in excludeSequence.Children)
+        {
+            if (entryNode is not YamlMappingNode entryMapping)
+            {
+                throw new InvalidOperationException(
+                    $"Layer '{layerName}' exclude entries must be objects with a 'namespace' key.");
+            }
+
+            bool hasNamespace = false;
+
+            foreach ((YamlNode entryKeyNode, _) in entryMapping.Children)
+            {
+                if (entryKeyNode is not YamlScalarNode entryKeyScalar)
+                {
+                    continue;
+                }
+
+                if (string.Equals(entryKeyScalar.Value, "namespace", StringComparison.Ordinal))
+                {
+                    hasNamespace = true;
+                    continue;
+                }
+
+                if (!string.Equals(entryKeyScalar.Value, NamespaceSuffixKey, StringComparison.Ordinal))
+                {
+                    throw new InvalidOperationException(
+                        $"Layer '{layerName}' exclude entry contains unknown property '{entryKeyScalar.Value}'.");
+                }
+            }
+
+            if (!hasNamespace)
+            {
+                throw new InvalidOperationException(
+                    $"Layer '{layerName}' exclude entry must declare 'namespace'.");
             }
         }
     }
@@ -372,7 +431,7 @@ public sealed partial class ArchitecturePolicyDocumentLoader : IArchitecturePoli
             if (!TryGetChild(contract, "scope", out YamlNode? scopeNode)
                 || scopeNode is not YamlScalarNode scope
                 || !string.Equals(scope.Value, "semantic_role", StringComparison.Ordinal)
-                || !TryGetChild(contract, "exclude", out YamlNode? excludeNode)
+                || !TryGetChild(contract, ExcludeKey, out YamlNode? excludeNode)
                 || excludeNode is not YamlSequenceNode exclusions)
             {
                 continue;
@@ -387,7 +446,7 @@ public sealed partial class ArchitecturePolicyDocumentLoader : IArchitecturePoli
                 ValidateKnownKeys(exclusion, contractName, "semantic coverage exclusion",
                     new[]
                     {
-                        "namespace", "namespace_suffix", "project", "assembly", "contract_id", "between",
+                        "namespace", NamespaceSuffixKey, "project", "assembly", "contract_id", "between",
                         "role", "metadata", "reason"
                     });
             }
@@ -508,7 +567,7 @@ public sealed partial class ArchitecturePolicyDocumentLoader : IArchitecturePoli
             }
 
             ValidateContextualSelectorListKeys(contractNode, contractName, targetListKey, allowWhen: true);
-            ValidateContextualSelectorListKeys(contractNode, contractName, "exclude", allowWhen: true);
+            ValidateContextualSelectorListKeys(contractNode, contractName, ExcludeKey, allowWhen: true);
         }
     }
 
@@ -539,14 +598,14 @@ public sealed partial class ArchitecturePolicyDocumentLoader : IArchitecturePoli
             }
             ValidateContextualSelectorListKeys(entry, name, "allowed_seams");
             ValidateContextualSelectorListKeys(entry, name, "forbidden");
-            ValidateContextualSelectorListKeys(entry, name, "exclude");
+            ValidateContextualSelectorListKeys(entry, name, ExcludeKey);
             ValidateAdapterBindings(entry, name);
         }
     }
 
     private static void ValidatePortBoundaryContractNodeKeys(YamlMappingNode node, string contractName)
     {
-        string[] allowed = { "name", "id", "source", "target_context", "allowed_seams", "forbidden", "adapter_bindings", "exclude", "ignored_violations", "reason" };
+        string[] allowed = { "name", "id", "source", "target_context", "allowed_seams", "forbidden", "adapter_bindings", ExcludeKey, "ignored_violations", "reason" };
         ValidateKnownKeys(node, contractName, "port-boundary contract", allowed);
     }
 

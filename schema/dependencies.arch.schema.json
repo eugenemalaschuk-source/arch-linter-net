@@ -96,6 +96,13 @@
         {
           "if": { "required": ["namespace_suffix"] },
           "then": { "required": ["namespace"] }
+        },
+        {
+          "if": {
+            "required": ["exclude"],
+            "properties": { "exclude": { "minItems": 1 } }
+          },
+          "then": { "required": ["namespace"] }
         }
       ],
       "anyOf": [
@@ -120,6 +127,28 @@
         "selector": {
           "$ref": "#/$defs/selector",
           "description": "Matches types by discovered role and optional exact metadata in addition to an optional namespace constraint. When both are present, both constraints must match."
+        },
+        "exclude": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/layerExclusion" },
+          "default": [],
+          "description": "Subtracts matching namespaces from this layer's scope: result = union(namespace/namespace_suffix matches) - union(exclude matches). Reuses the same namespace glob grammar as namespace/namespace_suffix. A layer with no exclude entries is unaffected."
+        }
+      }
+    },
+    "layerExclusion": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["namespace"],
+      "properties": {
+        "namespace": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Namespace prefix or constrained glob pattern to subtract from the layer's matched scope. Same grammar as layer.namespace."
+        },
+        "namespace_suffix": {
+          "type": "string",
+          "description": "Optional namespace suffix constraint, matched after the exclusion's namespace prefix."
         }
       }
     },

@@ -1,0 +1,23 @@
+version: 1
+name: Test Coverage Layer Exclusion Provenance
+
+layers:
+  contracts:
+    namespace: ArchLinterNet.Core.Contracts.*
+    exclude:
+      - namespace: ArchLinterNet.Core.Contracts.Families
+
+analysis:
+  target_assemblies:
+    - ArchLinterNet.Core
+  coverage: warn
+
+contracts:
+  strict: []
+  strict_coverage:
+    - id: contracts-namespace-coverage
+      name: contracts-namespace-coverage
+      scope: namespace
+      roots:
+        - namespace: ArchLinterNet.Core.Contracts
+      reason: Contracts namespaces must be mapped or explicitly excluded.

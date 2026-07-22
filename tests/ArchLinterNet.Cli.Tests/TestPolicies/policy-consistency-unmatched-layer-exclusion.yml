@@ -1,0 +1,20 @@
+version: 1
+name: Test Policy Consistency Unmatched Layer Exclusion
+
+layers:
+  contracts:
+    namespace: ArchLinterNet.Core.Contracts.*
+    exclude:
+      # Typo: the real sub-namespace is "Families", not "Familias" - this entry must match no
+      # namespace within the layer's included scope and be reported as unmatched.
+      - namespace: ArchLinterNet.Core.Contracts.Familias
+
+analysis:
+  target_assemblies:
+    - ArchLinterNet.Core
+
+contracts:
+  strict:
+    - name: contracts-no-forbidden
+      source: contracts
+      forbidden: []

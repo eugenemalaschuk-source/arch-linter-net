@@ -81,6 +81,9 @@ layers:
     namespace: <string>          # Required — namespace pattern for matching types
     namespace_suffix: <string>   # Optional — suffix appended to namespace during matching
     external: <bool>             # Optional — suppress empty-layer config diagnostic
+    exclude:                     # Optional — subtracts matching namespaces from this layer
+      - namespace: <string>          # Required per entry — same glob grammar as namespace above
+        namespace_suffix: <string>   # Optional
 ```
 
 Each layer name must be a unique identifier used to reference the layer in contracts.
@@ -99,6 +102,15 @@ Glob semantics:
   position-fixed immediately after the full resolved namespace pattern.
 - `**`, `?`, character classes, partial-segment wildcards, bare `*`, and
   leading wildcard patterns such as `*.Features` are invalid.
+
+`exclude` subtracts matching namespaces from the layer's scope:
+`result = include - union(excludes)`. A namespace matches the layer only if it
+matches `namespace`/`namespace_suffix` and matches none of the `exclude`
+entries. Every contract family that references the layer by name (dependency,
+allow-only, external-dependency, protected, cycle, acyclic-sibling) observes
+the narrowed scope automatically. See
+[Layers, Namespace Patterns, and Semantic Selectors](../policy-format/layers-and-namespaces.md#excluding-namespaces-from-a-layer)
+for details and the unmatched-exclusion diagnostic.
 
 When `external: true`, the linter skips the `empty layer namespace` configuration
 check for that layer. Use this for namespaces whose assemblies may not be available
