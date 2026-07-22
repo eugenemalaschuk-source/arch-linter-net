@@ -166,4 +166,68 @@ public sealed partial class ArchitectureDiagnosticFormatterTests
         string sarifMessage = sarifResult.GetProperty("message").GetProperty("text").GetString()!;
         Assert.That(sarifMessage, Does.Contain("Microsoft.AspNetCore.App"));
     }
+
+    [Test]
+    public void FrameworkReferenceViolation_WithEvidence_HumanJsonAndSarifRenderStructuredFields()
+    {
+        var evidence = new[]
+        {
+            new FrameworkReferenceEvidence("Microsoft.AspNetCore.App", "net10.0", true, "/src/MyApp.Domain/MyApp.Domain.csproj"),
+        };
+        var violations = new List<ArchitectureViolation>
+        {
+            new("domain-no-aspnet", "domain-no-aspnet-id", "MyApp.Domain", "framework group 'forbidden_web'",
+                _frameworkDependencyReferences)
+            {
+                Payload = new FrameworkReferencePayload("forbidden_web", evidence)
+            }
+        };
+
+        string human = _formatter.FormatViolationsForHumans(violations);
+        Assert.That(human, Does.Contain("net10.0"));
+        Assert.That(human, Does.Contain("explicit"));
+
+        using JsonDocument jsonDocument = JsonDocument.Parse(_formatter.FormatResultForCiArtifacts(
+            "strict", false, violations, Array.Empty<string>()));
+        JsonElement jsonEvidence = jsonDocument.RootElement.GetProperty("violations")[0].GetProperty("evidence")[0];
+        Assert.That(jsonEvidence.GetProperty("framework_name").GetString(), Is.EqualTo("Microsoft.AspNetCore.App"));
+        Assert.That(jsonEvidence.GetProperty("target_framework").GetString(), Is.EqualTo("net10.0"));
+        Assert.That(jsonEvidence.GetProperty("explicit").GetBoolean(), Is.True);
+        Assert.That(jsonEvidence.GetProperty("source_path").GetString(), Is.EqualTo("/src/MyApp.Domain/MyApp.Domain.csproj"));
+
+        var sarifFormatter = new ArchitectureSarifFormatter();
+        using JsonDocument sarifDocument = JsonDocument.Parse(
+            sarifFormatter.FormatResultAsSarif("strict", violations, Array.Empty<string>(), "1.0.0"));
+        JsonElement sarifResult = sarifDocument.RootElement.GetProperty("runs")[0].GetProperty("results")[0];
+        JsonElement sarifEvidence = sarifResult.GetProperty("properties").GetProperty("evidence")[0];
+        Assert.That(sarifEvidence.GetProperty("framework_name").GetString(), Is.EqualTo("Microsoft.AspNetCore.App"));
+        Assert.That(sarifEvidence.GetProperty("target_framework").GetString(), Is.EqualTo("net10.0"));
+        Assert.That(sarifEvidence.GetProperty("explicit").GetBoolean(), Is.True);
+        Assert.That(sarifEvidence.GetProperty("source_path").GetString(), Is.EqualTo("/src/MyApp.Domain/MyApp.Domain.csproj"));
+    }
+
+    [Test]
+    public void FrameworkReferenceAllowOnlyViolation_WithImplicitEvidence_HumanOutputShowsImplicitClassification()
+    {
+        var evidence = new[]
+        {
+            new FrameworkReferenceEvidence("Microsoft.NETCore.App", "net10.0", false, "/src/MyApp.Domain/MyApp.Domain.csproj"),
+        };
+        var violations = new List<ArchitectureViolation>
+        {
+            new("domain-approved-only", "domain-approved-only-id", "MyApp.Domain", "outside allowed framework groups",
+                _frameworkAllowOnlyReferences)
+            {
+                Payload = new FrameworkReferenceAllowOnlyPayload(_frameworkAllowOnlyGroups, evidence)
+            }
+        };
+
+        string human = _formatter.FormatViolationsForHumans(violations);
+        Assert.That(human, Does.Contain("implicit"));
+
+        using JsonDocument jsonDocument = JsonDocument.Parse(_formatter.FormatResultForCiArtifacts(
+            "strict", false, violations, Array.Empty<string>()));
+        JsonElement jsonEvidence = jsonDocument.RootElement.GetProperty("violations")[0].GetProperty("evidence")[0];
+        Assert.That(jsonEvidence.GetProperty("explicit").GetBoolean(), Is.False);
+    }
 }
