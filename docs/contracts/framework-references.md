@@ -45,22 +45,29 @@ The `source` of every framework dependency/allow-only contract must be listed in
 
 ## Semantics
 
-Both families detect **direct, statically declared framework references only** — they parse each project's `.csproj` `FrameworkReference` items' `Include` and optional `Condition` attributes. `FrameworkReference` items carry no `Version` attribute, so there is no version resolution and no `dependency_depth` field — framework-reference governance has no transitive-dependency concept.
+Both families detect **direct, statically declared framework references only** — but resolve them through a **real, per-target-framework MSBuild design-time build** (via Buildalyzer), not raw XML parsing. This means:
+
+- `Condition` on both the `FrameworkReference` item itself and its containing `ItemGroup` is evaluated exactly as `dotnet build` would evaluate it, separately for each of the project's configured target frameworks.
+- Declarations contributed by imported `.props`/`.targets` files (including `Directory.Build.props` and SDK-injected targets) are included, since MSBuild's own evaluation processes them.
+- Every discovered reference is classified **explicit** (authored by the project or one of its imports) or **implicit** (SDK-injected, e.g. `Microsoft.NETCore.App`, via MSBuild's `IsImplicitlyDefined` item metadata).
+
+`FrameworkReference` items carry no `Version` attribute, so there is no version resolution and no `dependency_depth` field — framework-reference governance has no transitive-dependency concept.
 
 **Framework dependency**: for each framework group in `forbidden`, a violation is reported per matched `FrameworkReference`, aggregated into one violation per forbidden group naming every matched framework reference.
 
 **Framework allow-only**: a violation is reported once per source, listing every declared `FrameworkReference` that does not match any framework group in `allowed`, sorted by framework name with duplicates removed.
 
-Violations identify the source project/assembly, the forbidden framework group (for `framework_dependency`), and each matched framework reference by name; when the `FrameworkReference` item declares a `Condition`, the evidence includes that condition (e.g. `Microsoft.AspNetCore.App (Condition: '$(TargetFramework)'=='net10.0')`), so the same framework name declared under two different conditions in one project is distinguishable in output and baseline identity.
+Violations identify the source project/assembly, the forbidden framework group (for `framework_dependency`), and each matched framework reference by name and its real evaluated target framework (e.g. `Microsoft.AspNetCore.App (net10.0)`), so the same framework name applicable to two different target frameworks in one multi-targeted project is distinguishable in output and baseline identity. Structured evidence — framework name, target framework, explicit/implicit classification, and the declaring project's path — is carried separately from the human-formatted string, for JSON/SARIF/Testing API consumers.
 
 `ignored_violations` entries use the same `source_type`/`forbidden_reference`/`reason` shape as other contract families; here `source_type` holds the source assembly name and `forbidden_reference` holds the framework name.
 
 ## Configuration validation
 
-Two safety checks run as part of `CheckConfiguration` (the same pass that already validates `packages`/`external_dependencies` group references), so misconfiguration surfaces as a visible failure instead of a contract silently matching nothing:
+Three safety checks run as part of `CheckConfiguration` (the same pass that already validates `packages`/`external_dependencies` group references), so misconfiguration or an evaluation failure surfaces as a visible failure instead of a contract silently matching nothing:
 
 - **Unknown or unusable framework groups.** A framework group name referenced by a `forbidden`/`allowed` list that isn't declared in `framework_references`, or that is declared but has no non-empty `framework_names`/`framework_name_prefixes` matcher, is reported as an `unknown framework group`/`invalid framework group` configuration violation.
 - **Missing project metadata for `source`.** If a contract's `source` does not correspond to any project discovered via `analysis.solution`/`analysis.projects` (including when project discovery never ran because neither is configured), a `no project metadata discovered` configuration violation names the contract and its source.
+- **MSBuild evaluation failure (fail closed).** If the source project's real MSBuild design-time build does not succeed — for the whole project, or for any one of its configured target frameworks (e.g. that target framework isn't installed) — a `framework reference evaluation failed` configuration violation names the contract, the source, and which target framework could not be evaluated. The contract's own check never reports a false-clean result on the basis of data it could not actually evaluate.
 
 ## Framework reference contracts vs package dependency contracts vs external dependency contracts
 

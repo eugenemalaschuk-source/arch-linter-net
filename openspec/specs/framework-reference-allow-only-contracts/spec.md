@@ -1,7 +1,7 @@
 # framework-reference-allow-only-contracts Specification
 
 ## Purpose
-TBD - created by archiving change add-framework-reference-contracts. Update Purpose after archive.
+Evaluates strict and audit framework-reference allow-only contracts that restrict a named source project/assembly to only declaring `FrameworkReference`s matching an explicitly allowed set of declared framework groups, sharing the same real per-target-framework MSBuild evaluation, explicit/implicit classification, and fail-closed evaluation behavior as `framework-reference-contracts`.
 ## Requirements
 ### Requirement: Evaluate allow-only framework-reference contracts
 The system SHALL allow `contracts.strict_framework_allow_only`/`audit_framework_allow_only` entries to restrict a named source project/assembly to only declaring `FrameworkReference`s that match framework groups listed in the contract's `allowed` list.
@@ -61,11 +61,22 @@ Adding `framework_allow_only` contracts SHALL NOT change the behavior of existin
 - **THEN** each contract family evaluates independently and neither changes the other's violations
 
 ### Requirement: Framework allow-only contracts share configuration validation with framework dependency contracts
-Unknown/unusable framework groups referenced by a `framework_allow_only` contract's `allowed` list, and a `framework_allow_only` contract's `source` not resolving to any discovered project, SHALL be reported by the same `CheckConfiguration` checks described in the framework-reference-contracts specification's "Unknown or unusable framework groups are reported as configuration violations" and "Framework-reference dependency/allow-only contracts require discoverable project metadata for their source" requirements.
+Unknown/unusable framework groups referenced by a `framework_allow_only` contract's `allowed` list, a `framework_allow_only` contract's `source` not resolving to any discovered project, and its source project's MSBuild evaluation failing for the whole project or any configured target framework, SHALL be reported by the same `CheckConfiguration` checks described in the framework-reference-contracts specification's "Unknown or unusable framework groups are reported as configuration violations", "Framework-reference dependency/allow-only contracts require discoverable project metadata for their source", and "Framework-reference evaluation fails closed when MSBuild evaluation cannot succeed" requirements.
 
 #### Scenario: Unknown allowed group reported as configuration violation
 - **WHEN** a `framework_allow_only` contract's `allowed` list references a framework group name not declared in `framework_references`
 - **THEN** `CheckConfiguration` SHALL report a violation identifying that group name as an unknown framework group
+
+#### Scenario: Uninstalled or invalid target framework fails closed
+- **WHEN** a `framework_allow_only` contract's source project declares a target framework that cannot be built by the installed SDK
+- **THEN** `CheckConfiguration` SHALL report a violation naming the contract, the source project, and the target framework that failed to evaluate, and the contract's own check SHALL NOT report a false-clean result on the basis of unevaluated data
+
+### Requirement: Framework allow-only declarations are discovered through real per-target-framework MSBuild evaluation
+The system SHALL resolve a `framework_allow_only` contract's source project's `FrameworkReference` declarations using the same real, per-target-framework MSBuild design-time build (via Buildalyzer) as `framework_dependency` contracts, including `Condition` on both the `FrameworkReference` item and its containing `ItemGroup`, declarations from imported `.props`/`.targets`, and explicit-vs-implicit classification via `IsImplicitlyDefined` metadata.
+
+#### Scenario: Allow-only evaluation honors per-target-framework conditions
+- **WHEN** a multi-targeted project's `FrameworkReference` for a disallowed framework is conditioned to only one of its target frameworks
+- **THEN** the `framework_allow_only` contract SHALL report a violation only for that target framework, not for target frameworks where the condition does not apply
 
 ### Requirement: Framework allow-only diagnostics use a distinct typed diagnostic kind
 
@@ -81,9 +92,9 @@ Unknown/unusable framework groups referenced by a `framework_allow_only` contrac
 
 ### Requirement: Framework allow-only diagnostics render equivalent evidence in human, JSON, SARIF, and Testing API output
 
-Every `framework_allow_only` violation SHALL render the same source project and disallowed-framework evidence in human text, unified JSON, SARIF, and the `ArchLinterNet.Testing` API, with no adapter falling back to an empty or generic value for a field the underlying violation carries.
+Every `framework_allow_only` violation SHALL render the same source project, disallowed-framework, target framework, explicit/implicit classification, and declaring project path evidence in human text, unified JSON, SARIF, and the `ArchLinterNet.Testing` API, with no adapter falling back to an empty or generic value for a field the underlying violation carries.
 
-#### Scenario: Unified JSON shows allowed framework groups
+#### Scenario: Unified JSON shows allowed framework groups and structured evidence
 - **WHEN** a `framework_allow_only` violation is serialized to unified JSON
-- **THEN** the JSON object includes a field listing the contract's configured `allowed` framework group names, alongside non-empty source and forbidden-reference fields
+- **THEN** the JSON object includes a field listing the contract's configured `allowed` framework group names, alongside non-empty source and forbidden-reference fields, and an `evidence` array with per-reference `framework_name`, `target_framework`, `explicit`, and `source_path` fields
 

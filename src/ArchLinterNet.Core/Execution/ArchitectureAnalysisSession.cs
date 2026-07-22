@@ -354,6 +354,7 @@ public sealed partial class ArchitectureAnalysisSession
         AddPackageMetadataViolations(violations, collector);
         AddFrameworkGroupViolations(violations, collector);
         AddFrameworkMetadataViolations(violations, collector);
+        AddFrameworkEvaluationFailureViolations(violations, collector);
         AddProjectMetadataViolations(violations, collector);
 
         return violations;

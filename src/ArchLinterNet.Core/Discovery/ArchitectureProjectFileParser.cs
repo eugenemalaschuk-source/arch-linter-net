@@ -146,7 +146,8 @@ internal sealed class ArchitectureProjectFileParser : IArchitectureProjectFilePa
                 return (Include: include, Condition: string.IsNullOrWhiteSpace(condition) ? null : condition.Trim());
             })
             .Where(reference => !string.IsNullOrWhiteSpace(reference.Include))
-            .Select(reference => new ArchitectureDiscoveredFrameworkReference(reference.Include!.Trim(), reference.Condition, sourcePath))
+            .Select(reference => new ArchitectureDiscoveredFrameworkReference(
+                reference.Include!.Trim(), TargetFramework: string.Empty, Explicit: true, SourcePath: sourcePath, Condition: reference.Condition))
             .ToList();
     }
 

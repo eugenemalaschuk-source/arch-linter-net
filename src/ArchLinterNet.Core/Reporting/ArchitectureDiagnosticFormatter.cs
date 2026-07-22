@@ -396,6 +396,16 @@ public sealed partial class ArchitectureDiagnosticFormatter : IArchitectureDiagn
             context += FormatPortBoundaryContextForHumans(portBoundary);
         }
 
+        if (diagnostic is FrameworkReferenceDiagnostic { Evidence.Count: > 0 } frameworkDependency)
+        {
+            context += FormatFrameworkReferenceContextForHumans(frameworkDependency.Evidence);
+        }
+
+        if (diagnostic is FrameworkReferenceAllowOnlyDiagnostic { Evidence.Count: > 0 } frameworkAllowOnly)
+        {
+            context += FormatFrameworkReferenceContextForHumans(frameworkAllowOnly.Evidence);
+        }
+
         return context;
     }
 
@@ -604,9 +614,11 @@ public sealed partial class ArchitectureDiagnosticFormatter : IArchitectureDiagn
                 break;
             case FrameworkReferenceDiagnostic frameworkDependency:
                 obj["forbidden_framework_group"] = frameworkDependency.ForbiddenFrameworkGroup;
+                ApplyFrameworkReferenceEvidenceCiFields(frameworkDependency.Evidence, obj);
                 break;
             case FrameworkReferenceAllowOnlyDiagnostic frameworkAllowOnly:
                 obj["allowed_framework_groups"] = frameworkAllowOnly.AllowedFrameworkGroups.ToArray();
+                ApplyFrameworkReferenceEvidenceCiFields(frameworkAllowOnly.Evidence, obj);
                 break;
             case TypePlacementDiagnostic typePlacement:
                 ApplyTypePlacementCiFields(typePlacement, obj);

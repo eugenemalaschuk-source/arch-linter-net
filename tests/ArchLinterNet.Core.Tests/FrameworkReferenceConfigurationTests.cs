@@ -13,36 +13,78 @@ public sealed class FrameworkReferenceConfigurationTests
 {
     private const string SourceAssemblyName = "MyApp.Domain";
 
-    private static ArchitectureAnalysisContext CreateContext(ProjectDiscoveryResult? projectDiscovery = null)
+    private string _repoRoot = null!;
+
+    [SetUp]
+    public void SetUp()
     {
+        _repoRoot = Path.Combine(Path.GetTempPath(), $"arch-linter-framework-config-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(_repoRoot);
+    }
+
+    [TearDown]
+    public void TearDown()
+    {
+        if (Directory.Exists(_repoRoot))
+        {
+            Directory.Delete(_repoRoot, true);
+        }
+    }
+
+    private string CreateProject(string assemblyName, string itemGroupBody, string targetFramework = "net10.0")
+    {
+        string projectDir = Path.Combine(_repoRoot, assemblyName);
+        Directory.CreateDirectory(projectDir);
+        string projectPath = Path.Combine(projectDir, $"{assemblyName}.csproj");
+
+        File.WriteAllText(projectPath, $"""
+            <Project Sdk="Microsoft.NET.Sdk">
+              <PropertyGroup>
+                <TargetFramework>{targetFramework}</TargetFramework>
+              </PropertyGroup>
+              <ItemGroup>
+                {itemGroupBody}
+              </ItemGroup>
+            </Project>
+            """);
+
+        return projectPath;
+    }
+
+    private ArchitectureAnalysisContext CreateContext(params string[] projectAbsolutePaths)
+    {
+        if (projectAbsolutePaths.Length == 0)
+        {
+            return new ArchitectureAnalysisContext(
+                _repoRoot,
+                new[] { typeof(FrameworkReferenceConfigurationTests).Assembly },
+                Array.Empty<string>(),
+                Array.Empty<string>());
+        }
+
+        var document = new ArchitectureContractDocument
+        {
+            Analysis = new ArchitectureAnalysisConfiguration
+            {
+                Projects = projectAbsolutePaths.ToList()
+            }
+        };
+
+        ProjectDiscoveryResult discovery = new ArchitectureProjectDiscoveryService()
+            .ResolveFromDocument(document, _repoRoot, resolveAssemblyOutputs: false);
+
         return new ArchitectureAnalysisContext(
-            "/tmp",
+            _repoRoot,
             new[] { typeof(FrameworkReferenceConfigurationTests).Assembly },
             Array.Empty<string>(),
             Array.Empty<string>(),
-            projectDiscovery: projectDiscovery);
-    }
-
-    private static ProjectDiscoveryResult DiscoveryWithProject(
-        string assemblyName, params (string Name, string? Condition)[] frameworks)
-    {
-        var project = new ArchitectureDiscoveredProject(
-            $"src/{assemblyName}/{assemblyName}.csproj",
-            assemblyName,
-            new[] { "net10.0" },
-            Array.Empty<ArchitectureDiscoveredPackageReference>(),
-            frameworks.Select(f => new ArchitectureDiscoveredFrameworkReference(f.Name, f.Condition)).ToList());
-
-        return new ProjectDiscoveryResult(
-            Array.Empty<string>(), Array.Empty<string>(), Array.Empty<string>(), Array.Empty<ArchitectureProjectDiscoveryDiagnostic>())
-        {
-            DiscoveredProjects = new[] { project }
-        };
+            projectDiscovery: discovery);
     }
 
     [Test]
     public void CheckConfiguration_UnknownFrameworkGroup_ReturnsViolation()
     {
+        string projectPath = CreateProject(SourceAssemblyName, string.Empty);
         var document = new ArchitectureContractDocument
         {
             Version = 1,
@@ -57,8 +99,7 @@ public sealed class FrameworkReferenceConfigurationTests
             }
         };
 
-        var runner = new ArchitectureContractRunner(
-            CreateContext(DiscoveryWithProject(SourceAssemblyName, ("Microsoft.NETCore.App", null))), document);
+        var runner = new ArchitectureContractRunner(CreateContext(projectPath), document);
         List<ArchitectureViolation> violations = runner.CheckConfiguration();
 
         Assert.That(violations.Any(v =>
@@ -69,6 +110,7 @@ public sealed class FrameworkReferenceConfigurationTests
     [Test]
     public void CheckConfiguration_FrameworkGroupWithoutMatchers_ReturnsViolation()
     {
+        string projectPath = CreateProject(SourceAssemblyName, string.Empty);
         var document = new ArchitectureContractDocument
         {
             Version = 1,
@@ -84,8 +126,7 @@ public sealed class FrameworkReferenceConfigurationTests
             }
         };
 
-        var runner = new ArchitectureContractRunner(
-            CreateContext(DiscoveryWithProject(SourceAssemblyName)), document);
+        var runner = new ArchitectureContractRunner(CreateContext(projectPath), document);
         List<ArchitectureViolation> violations = runner.CheckConfiguration();
 
         Assert.That(violations.Any(v =>
@@ -96,6 +137,7 @@ public sealed class FrameworkReferenceConfigurationTests
     [Test]
     public void CheckConfiguration_KnownUsableFrameworkGroup_ReturnsNoConfigurationViolation()
     {
+        string projectPath = CreateProject(SourceAssemblyName, string.Empty);
         var document = new ArchitectureContractDocument
         {
             Version = 1,
@@ -114,8 +156,7 @@ public sealed class FrameworkReferenceConfigurationTests
             }
         };
 
-        var runner = new ArchitectureContractRunner(
-            CreateContext(DiscoveryWithProject(SourceAssemblyName, ("Microsoft.NETCore.App", null))), document);
+        var runner = new ArchitectureContractRunner(CreateContext(projectPath), document);
         List<ArchitectureViolation> violations = runner.CheckConfiguration();
 
         Assert.That(violations, Is.Empty);
@@ -142,7 +183,7 @@ public sealed class FrameworkReferenceConfigurationTests
             }
         };
 
-        var runner = new ArchitectureContractRunner(CreateContext(projectDiscovery: null), document);
+        var runner = new ArchitectureContractRunner(CreateContext(), document);
         List<ArchitectureViolation> violations = runner.CheckConfiguration();
 
         Assert.That(violations.Any(v =>
@@ -152,6 +193,7 @@ public sealed class FrameworkReferenceConfigurationTests
     [Test]
     public void CheckConfiguration_SourceNotAmongDiscoveredProjects_ReturnsMissingProjectMetadataViolation()
     {
+        string projectPath = CreateProject("SomeOtherAssembly", string.Empty);
         var document = new ArchitectureContractDocument
         {
             Version = 1,
@@ -170,8 +212,7 @@ public sealed class FrameworkReferenceConfigurationTests
             }
         };
 
-        var runner = new ArchitectureContractRunner(
-            CreateContext(DiscoveryWithProject("SomeOtherAssembly", ("Microsoft.NETCore.App", null))), document);
+        var runner = new ArchitectureContractRunner(CreateContext(projectPath), document);
         List<ArchitectureViolation> violations = runner.CheckConfiguration();
 
         Assert.That(violations.Any(v =>
@@ -181,6 +222,7 @@ public sealed class FrameworkReferenceConfigurationTests
     [Test]
     public void CheckConfiguration_FrameworkAllowOnly_UnknownFrameworkGroup_ReturnsViolation()
     {
+        string projectPath = CreateProject(SourceAssemblyName, string.Empty);
         var document = new ArchitectureContractDocument
         {
             Version = 1,
@@ -195,8 +237,7 @@ public sealed class FrameworkReferenceConfigurationTests
             }
         };
 
-        var runner = new ArchitectureContractRunner(
-            CreateContext(DiscoveryWithProject(SourceAssemblyName, ("Microsoft.NETCore.App", null))), document);
+        var runner = new ArchitectureContractRunner(CreateContext(projectPath), document);
         List<ArchitectureViolation> violations = runner.CheckConfiguration();
 
         Assert.That(violations.Any(v =>
@@ -207,6 +248,7 @@ public sealed class FrameworkReferenceConfigurationTests
     [Test]
     public void CheckConfiguration_SourceAmongDiscoveredProjects_ReturnsNoMissingMetadataViolation()
     {
+        string projectPath = CreateProject(SourceAssemblyName, string.Empty);
         var document = new ArchitectureContractDocument
         {
             Version = 1,
@@ -225,10 +267,40 @@ public sealed class FrameworkReferenceConfigurationTests
             }
         };
 
-        var runner = new ArchitectureContractRunner(
-            CreateContext(DiscoveryWithProject(SourceAssemblyName, ("Microsoft.NETCore.App", null))), document);
+        var runner = new ArchitectureContractRunner(CreateContext(projectPath), document);
         List<ArchitectureViolation> violations = runner.CheckConfiguration();
 
         Assert.That(violations.Any(v => v.ForbiddenNamespace == "no project metadata discovered"), Is.False);
+    }
+
+    [Test]
+    public void CheckConfiguration_ProjectTargetsUninstalledFramework_ReturnsEvaluationFailedViolation()
+    {
+        // Fail-closed regression: an MSBuild-evaluation-impossible project (bogus/uninstalled TFM)
+        // must surface as a configuration violation, not a silent pass.
+        string projectPath = CreateProject(SourceAssemblyName, string.Empty, targetFramework: "net1.0");
+        var document = new ArchitectureContractDocument
+        {
+            Version = 1,
+            Name = "Test",
+            FrameworkReferences = new Dictionary<string, ArchitectureFrameworkReferenceGroup>
+            {
+                ["forbidden_web"] = new() { FrameworkNames = { "Microsoft.AspNetCore.App" } }
+            },
+            Analysis = new ArchitectureAnalysisConfiguration { TargetAssemblies = new List<string> { SourceAssemblyName } },
+            Contracts = new ArchitectureContractGroups
+            {
+                StrictFrameworkDependency = new List<ArchitectureFrameworkReferenceContract>
+                {
+                    new() { Id = "domain-no-aspnet", Name = "domain-no-aspnet", Source = SourceAssemblyName, Forbidden = new List<string> { "forbidden_web" } }
+                }
+            }
+        };
+
+        var runner = new ArchitectureContractRunner(CreateContext(projectPath), document);
+        List<ArchitectureViolation> violations = runner.CheckConfiguration();
+
+        Assert.That(violations.Any(v =>
+            v.ContractId == "domain-no-aspnet" && v.ForbiddenNamespace == "framework reference evaluation failed"), Is.True);
     }
 }

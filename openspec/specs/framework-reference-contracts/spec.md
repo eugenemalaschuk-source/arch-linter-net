@@ -1,7 +1,7 @@
 # framework-reference-contracts Specification
 
 ## Purpose
-TBD - created by archiving change add-framework-reference-contracts. Update Purpose after archive.
+Evaluates strict and audit framework-reference dependency contracts that forbid a named source project/assembly from declaring a `FrameworkReference` matching one or more forbidden framework groups, using real per-target-framework MSBuild evaluation (via Buildalyzer) so that `Condition` on both the `FrameworkReference` item and its parent `ItemGroup`, declarations contributed by imported `.props`/`.targets`, and explicit-vs-SDK-implicit classification are all resolved with the same fidelity as an actual `dotnet build`, and evaluation failures fail closed rather than silently passing.
 ## Requirements
 ### Requirement: Declare named framework-reference groups
 The system SHALL allow policies to declare named framework-reference groups in a top-level `framework_references` section. Each group SHALL support `framework_names` (exact `FrameworkReference` `Include` matches) and `framework_name_prefixes` (dot-segment prefix matches) lists.
@@ -58,20 +58,50 @@ The system SHALL allow `contracts.audit_framework_dependency` entries to report 
 - **WHEN** an `audit_framework_dependency` contract's source project declares a `FrameworkReference` matching a forbidden framework group
 - **THEN** audit validation SHALL report a violation and strict-mode validation SHALL NOT fail because of it
 
-### Requirement: Framework-reference violations preserve condition and project occurrence identity
-Framework-reference violations SHALL identify the contract name, optional contract ID, source project, matched forbidden framework group, the matched `FrameworkReference` name, and the MSBuild `Condition` value (when present) under which the reference was declared, so that the same framework reference declared under two different conditions in the same project, or in two different projects, produces distinct violation identities.
+### Requirement: FrameworkReference declarations are discovered through real per-target-framework MSBuild evaluation
+The system SHALL discover a project's `FrameworkReference` declarations by running an actual MSBuild design-time build (via Buildalyzer) separately for each of the project's configured target frameworks, rather than by parsing the project file's raw XML. `Condition` on both the `FrameworkReference` item itself and its containing `ItemGroup` SHALL be resolved by this real MSBuild evaluation, and declarations contributed by imported `.props`/`.targets` files (including `Directory.Build.props` and SDK-injected targets) SHALL be included exactly as MSBuild itself would resolve them.
 
-#### Scenario: Violation includes condition context
-- **WHEN** `MyApp.Api` declares `FrameworkReference Include="Microsoft.AspNetCore.App"` under `Condition="'$(TargetFramework)'=='net10.0'"` and a `strict_framework_dependency` contract forbids that framework
-- **THEN** the violation's evidence SHALL identify `MyApp.Api` as the source and include the declared condition alongside the matched framework name
+#### Scenario: ItemGroup-level condition is honored per target framework
+- **WHEN** a multi-targeted project declares `<ItemGroup Condition="'$(TargetFramework)'=='net10.0'"><FrameworkReference Include="Microsoft.AspNetCore.App" /></ItemGroup>`
+- **THEN** the discovered `FrameworkReference` for `Microsoft.AspNetCore.App` SHALL apply only to the `net10.0` build, not to other configured target frameworks
+
+#### Scenario: Item-level condition is honored per target framework
+- **WHEN** a multi-targeted project declares a `FrameworkReference` item with its own `Condition` attribute scoping it to one target framework
+- **THEN** the discovered `FrameworkReference` SHALL apply only to the target framework(s) for which that condition evaluates true
+
+### Requirement: FrameworkReference evidence includes target framework, explicit/implicit classification, and declaring project location
+Every discovered `FrameworkReference` SHALL carry: the framework name, the specific target framework it was evaluated against, whether it is an explicitly authored declaration or an SDK-implicit one (via MSBuild's `IsImplicitlyDefined` item metadata), and the absolute path of the project file it was evaluated from.
+
+#### Scenario: SDK-implicit framework reference is classified as implicit
+- **WHEN** a project's MSBuild evaluation includes the SDK-injected `Microsoft.NETCore.App` framework reference (carrying `IsImplicitlyDefined=true` metadata)
+- **THEN** the discovered reference SHALL be classified as implicit, not explicit
+
+#### Scenario: Author-declared framework reference is classified as explicit
+- **WHEN** a project explicitly declares `<FrameworkReference Include="Microsoft.AspNetCore.App" />`
+- **THEN** the discovered reference SHALL be classified as explicit
+
+### Requirement: Framework-reference violations preserve project and target-framework occurrence identity
+Framework-reference violations SHALL identify the contract name, optional contract ID, source project, matched forbidden framework group, the matched `FrameworkReference` name, and the real evaluated target framework it applies to, so that the same framework name applicable to two different target frameworks in the same project, or declared in two different projects, produces distinct violation identities.
+
+#### Scenario: Violation includes target framework context
+- **WHEN** `MyApp.Api` has an evaluated `FrameworkReference` for `Microsoft.AspNetCore.App` applicable to `net10.0`, and a `strict_framework_dependency` contract forbids that framework
+- **THEN** the violation's evidence SHALL identify `MyApp.Api` as the source and include `net10.0` alongside the matched framework name
 
 #### Scenario: Same framework reference in two projects yields distinct identities
 - **WHEN** both `MyApp.Api` and `MyApp.Worker` declare `FrameworkReference Include="Microsoft.AspNetCore.App"` and both are covered by forbidding contracts
 - **THEN** the two resulting violations SHALL have distinct violation/baseline identities differing by source project
 
-#### Scenario: Same project, two conditions, yields distinct identities
-- **WHEN** `MyApp.Api` declares `FrameworkReference Include="Microsoft.AspNetCore.App"` twice under two different `Condition` values, both matching a forbidding contract
-- **THEN** the two resulting violations SHALL have distinct violation/baseline identities differing by condition
+#### Scenario: Same project, two target frameworks, yields distinct identities
+- **WHEN** `MyApp.Api` multi-targets two target frameworks and `Microsoft.AspNetCore.App` is applicable to only one of them via `Condition`
+- **THEN** the resulting violation's identity SHALL be scoped to that one target framework, distinct from what an occurrence under a different target framework would produce
+
+### Requirement: Framework-reference evaluation fails closed when MSBuild evaluation cannot succeed
+The system SHALL detect, during `CheckConfiguration`, any `framework_dependency`/`framework_allow_only` contract whose source project's MSBuild design-time build does not succeed for the whole project or for any of its configured target frameworks, and SHALL report a `<configuration>`-style violation identifying the contract, the source project, and the target framework (or the whole project) that could not be evaluated, rather than allowing the contract to silently evaluate as passing with no visible signal that framework-reference data could not be trusted.
+
+#### Scenario: Uninstalled or invalid target framework fails closed
+- **WHEN** a `framework_dependency`/`framework_allow_only` contract's source project declares a target framework that cannot be built by the installed SDK (e.g. not installed, or otherwise invalid)
+- **THEN** `CheckConfiguration` SHALL report a violation naming the contract, the source project, and the target framework that failed to evaluate
+- **AND** the contract's own check SHALL NOT report a false-clean (no-violation) result for that project on the basis of unevaluated data
 
 ### Requirement: Framework-reference contract accepts optional id and ignored_violations
 A framework-reference dependency contract SHALL accept an optional `id` field (with the same name-derived fallback used by other contract families) and an `ignored_violations` list using the `source_type`/`forbidden_reference`/`reason` shape, matched against the source project identifier and the forbidden framework name.
@@ -132,17 +162,17 @@ Adding `framework_references`/`framework_dependency` contracts SHALL NOT change 
 
 ### Requirement: Framework-reference diagnostics render equivalent evidence in human, JSON, SARIF, and Testing API output
 
-Every `strict_framework_dependency`/`audit_framework_dependency` violation SHALL render the same source project, forbidden-framework-group display, matched `FrameworkReference` name, and condition evidence in human text output, unified JSON output, SARIF output, and the `ArchLinterNet.Testing` API. No adapter SHALL fall back to an empty or generic value for a field the underlying violation carries.
+Every `strict_framework_dependency`/`audit_framework_dependency` violation SHALL render the same source project, forbidden-framework-group display, matched `FrameworkReference` name, target framework, explicit/implicit classification, and declaring project path evidence in human text output, unified JSON output, SARIF output, and the `ArchLinterNet.Testing` API. No adapter SHALL fall back to an empty or generic value for a field the underlying violation carries.
 
 #### Scenario: Human output shows framework evidence
-- **WHEN** a `strict_framework_dependency` contract produces a violation for source `MyApp.Api` against forbidden framework group `forbidden_web` matching `Microsoft.AspNetCore.App`
-- **THEN** the human-formatted line identifies `MyApp.Api` as the source and lists `Microsoft.AspNetCore.App` among the forbidden references
+- **WHEN** a `strict_framework_dependency` contract produces a violation for source `MyApp.Api` against forbidden framework group `forbidden_web` matching `Microsoft.AspNetCore.App` applicable to `net10.0`
+- **THEN** the human-formatted line identifies `MyApp.Api` as the source, lists `Microsoft.AspNetCore.App (net10.0)` among the forbidden references, and shows explicit/implicit classification
 
-#### Scenario: Unified JSON shows framework evidence
+#### Scenario: Unified JSON shows structured framework evidence
 - **WHEN** the same violation is serialized to unified JSON
-- **THEN** the JSON object's source and forbidden-reference fields are non-empty and match the human-formatted evidence, and the object includes a field naming the matched framework group
+- **THEN** the JSON object's source and forbidden-reference fields are non-empty and match the human-formatted evidence, the object includes a field naming the matched framework group, and an `evidence` array with per-reference `framework_name`, `target_framework`, `explicit`, and `source_path` fields
 
 #### Scenario: SARIF, human, JSON, and Testing API evidence are equivalent
 - **WHEN** the same violation is rendered as human text, unified JSON, SARIF, and through the Testing API's validation result
-- **THEN** all four identify the same source project and the same matched framework reference
+- **THEN** all four identify the same source project, the same matched framework reference, and the same target framework
 

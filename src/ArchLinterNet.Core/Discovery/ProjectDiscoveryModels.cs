@@ -2,7 +2,12 @@ namespace ArchLinterNet.Core.Discovery;
 
 public sealed record ArchitectureDiscoveredPackageReference(string PackageId, string? Version);
 
-public sealed record ArchitectureDiscoveredFrameworkReference(string FrameworkName, string? Condition, string? SourcePath = null);
+public sealed record ArchitectureDiscoveredFrameworkReference(
+    string FrameworkName,
+    string TargetFramework,
+    bool Explicit,
+    string SourcePath,
+    string? Condition = null);
 
 public sealed record ArchitectureDiscoveredProjectProperty(string Name, string Value, string SourcePath);
 

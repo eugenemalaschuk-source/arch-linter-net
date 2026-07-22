@@ -6,7 +6,8 @@ public sealed record FrameworkReferenceAllowOnlyDiagnostic(
     string SourceType,
     string ForbiddenNamespace,
     IReadOnlyCollection<string> ForbiddenReferences,
-    IReadOnlyCollection<string> AllowedFrameworkGroups)
+    IReadOnlyCollection<string> AllowedFrameworkGroups,
+    IReadOnlyCollection<FrameworkReferenceEvidence> Evidence)
     : ArchitectureDiagnostic(ContractName, ContractId)
 {
     public override ArchitectureDiagnosticKind Kind => ArchitectureDiagnosticKind.FrameworkReferenceAllowOnly;

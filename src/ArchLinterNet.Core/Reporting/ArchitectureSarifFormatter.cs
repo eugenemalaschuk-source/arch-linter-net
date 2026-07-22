@@ -155,7 +155,39 @@ public sealed partial class ArchitectureSarifFormatter : IArchitectureSarifForma
             json["relatedLocations"] = relatedLocations;
         }
 
+        Dictionary<string, object?>? properties = BuildProperties(diagnostic);
+        if (properties != null)
+        {
+            json["properties"] = properties;
+        }
+
         return new ResultEntry(ruleId, diagnostic.ContractName, sourceType, forbiddenNamespace, json);
+    }
+
+    private static Dictionary<string, object?>? BuildProperties(ArchitectureDiagnostic diagnostic)
+    {
+        IReadOnlyCollection<FrameworkReferenceEvidence>? evidence = diagnostic switch
+        {
+            FrameworkReferenceDiagnostic d => d.Evidence,
+            FrameworkReferenceAllowOnlyDiagnostic d => d.Evidence,
+            _ => null,
+        };
+
+        if (evidence == null || evidence.Count == 0)
+        {
+            return null;
+        }
+
+        return new Dictionary<string, object?>
+        {
+            ["evidence"] = evidence.Select(e => (object)new Dictionary<string, object?>
+            {
+                ["framework_name"] = e.FrameworkName,
+                ["target_framework"] = e.TargetFramework,
+                ["explicit"] = e.Explicit,
+                ["source_path"] = e.SourcePath,
+            }).ToArray(),
+        };
     }
 
     // CEL expression participation (violation-reporting/sarif-diagnostics-output capability): added
