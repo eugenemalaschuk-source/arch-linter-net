@@ -141,6 +141,14 @@ public sealed partial class ArchitectureSarifFormatter : IArchitectureSarifForma
             // logical (type-name) location it cannot resolve on disk.
             json["locations"] = BuildPhysicalLocations(matchedFilePath, Array.Empty<string>());
         }
+        else if (FirstFrameworkReferenceSourcePath(diagnostic) is { } frameworkSourcePath)
+        {
+            // Every matched FrameworkReference was evaluated from the same source project's .csproj -
+            // use that real, on-disk project-file location as a physical location (in addition to the
+            // structured evidence in `properties`) rather than only a generic logical (assembly-name)
+            // location.
+            json["locations"] = BuildPhysicalLocations(frameworkSourcePath, Array.Empty<string>());
+        }
         else
         {
             json["logicalLocations"] = BuildLogicalLocations(sourceType, LogicalLocationKindFor(diagnostic, forbiddenNamespace));
@@ -188,6 +196,18 @@ public sealed partial class ArchitectureSarifFormatter : IArchitectureSarifForma
                 ["source_path"] = e.SourcePath,
             }).ToArray(),
         };
+    }
+
+    private static string? FirstFrameworkReferenceSourcePath(ArchitectureDiagnostic diagnostic)
+    {
+        IReadOnlyCollection<FrameworkReferenceEvidence>? evidence = diagnostic switch
+        {
+            FrameworkReferenceDiagnostic d => d.Evidence,
+            FrameworkReferenceAllowOnlyDiagnostic d => d.Evidence,
+            _ => null,
+        };
+
+        return evidence?.FirstOrDefault()?.SourcePath;
     }
 
     // CEL expression participation (violation-reporting/sarif-diagnostics-output capability): added

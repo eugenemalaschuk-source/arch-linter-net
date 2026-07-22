@@ -186,6 +186,7 @@ public sealed partial class ArchitectureDiagnosticFormatterTests
         string human = _formatter.FormatViolationsForHumans(violations);
         Assert.That(human, Does.Contain("net10.0"));
         Assert.That(human, Does.Contain("explicit"));
+        Assert.That(human, Does.Contain("/src/MyApp.Domain/MyApp.Domain.csproj"));
 
         using JsonDocument jsonDocument = JsonDocument.Parse(_formatter.FormatResultForCiArtifacts(
             "strict", false, violations, Array.Empty<string>()));
@@ -204,6 +205,10 @@ public sealed partial class ArchitectureDiagnosticFormatterTests
         Assert.That(sarifEvidence.GetProperty("target_framework").GetString(), Is.EqualTo("net10.0"));
         Assert.That(sarifEvidence.GetProperty("explicit").GetBoolean(), Is.True);
         Assert.That(sarifEvidence.GetProperty("source_path").GetString(), Is.EqualTo("/src/MyApp.Domain/MyApp.Domain.csproj"));
+        Assert.That(
+            sarifResult.GetProperty("locations")[0].GetProperty("physicalLocation").GetProperty("artifactLocation").GetProperty("uri").GetString(),
+            Is.EqualTo("/src/MyApp.Domain/MyApp.Domain.csproj"),
+            "SourcePath must also be mapped to a SARIF physical location, not only properties.");
     }
 
     [Test]
