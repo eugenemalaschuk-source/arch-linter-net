@@ -11,6 +11,12 @@ public partial class CliIntegrationTests
     private string RuleInputCoveragePolicy => Path.Combine(
         _repoRoot, "tests", "ArchLinterNet.Cli.Tests", "TestPolicies", "rule-input-coverage-policy.yml");
 
+    private static readonly string[] _overlappingExclusionSourceFiles =
+    {
+        "coverage-overlapping-layer-exclusion-root.yml",
+        "coverage-overlapping-layer-exclusion-fragment.yml"
+    };
+
     private static JsonElement FindSummaryEntry(JsonElement summaries, string contractId)
     {
         foreach (JsonElement entry in summaries.EnumerateArray())
@@ -262,11 +268,7 @@ public partial class CliIntegrationTests
             Assert.That(families.GetProperty("reason").GetString(), Does.Contain("contracts_families_only"));
             Assert.That(relatedLocations.GetArrayLength(), Is.EqualTo(1));
             Assert.That(new[] { primaryPath, relatedPath },
-                Is.EquivalentTo(new[]
-                {
-                    "coverage-overlapping-layer-exclusion-root.yml",
-                    "coverage-overlapping-layer-exclusion-fragment.yml"
-                }),
+                Is.EquivalentTo(_overlappingExclusionSourceFiles),
                 "Provenance must name both the root and the imported fragment that each contributed an exclude entry.");
         });
     }
