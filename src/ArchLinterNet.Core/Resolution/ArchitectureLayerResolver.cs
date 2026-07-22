@@ -70,15 +70,7 @@ internal static class ArchitectureLayerResolver
     // match the same namespace.
     private static bool IsExcluded(ArchitectureLayer layer, string namespaceName)
     {
-        foreach (ArchitectureLayerExclusion exclusion in layer.Exclude)
-        {
-            if (ExclusionMatches(exclusion, namespaceName))
-            {
-                return true;
-            }
-        }
-
-        return false;
+        return layer.Exclude.Any(exclusion => ExclusionMatches(exclusion, namespaceName));
     }
 
     // Whether a single exclude entry matches namespaceName, independent of any other entry on the

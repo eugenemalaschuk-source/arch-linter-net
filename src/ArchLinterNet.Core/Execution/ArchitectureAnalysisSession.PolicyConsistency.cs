@@ -553,6 +553,21 @@ public sealed partial class ArchitectureAnalysisSession
             return new List<PolicyConsistencyDiagnostic>();
         }
 
+        HashSet<(string LayerName, int ExclusionIndex)> matched = CollectMatchedLayerExclusions(layersWithExclusions);
+
+        return layersWithExclusions
+            .SelectMany(entry => BuildUnmatchedExclusionFindings(entry.LayerName, entry.Layer, matched))
+            .OrderBy(f => string.Join(",", f.Layers), StringComparer.Ordinal)
+            .ToList();
+    }
+
+    // Scans every target-assembly type once, checking each exclude entry independently (not just
+    // the first that matches): overlapping patterns (e.g. a broad "Product.Modules.*.Infra*"
+    // alongside a narrower "Product.Modules.Weather.Infrastructure") can both legitimately match
+    // the same namespace, and each one that does must count as used.
+    private HashSet<(string LayerName, int ExclusionIndex)> CollectMatchedLayerExclusions(
+        List<(string LayerName, ArchitectureLayer Layer)> layersWithExclusions)
+    {
         HashSet<(string LayerName, int ExclusionIndex)> matched = new();
 
         foreach (System.Reflection.Assembly assembly in Context.TargetAssemblies.Distinct()
@@ -560,69 +575,74 @@ public sealed partial class ArchitectureAnalysisSession
         {
             foreach (Type type in Scanning.ArchitectureTypeScanner.GetLoadableTypes(assembly))
             {
-                string namespaceName = ArchitectureTypeNames.SafeNamespace(type);
-
-                foreach ((string layerName, ArchitectureLayer layer) in layersWithExclusions)
-                {
-                    if (!ArchitectureLayerResolver.MatchNamespaceIncludeOnly(layer, namespaceName).Matched)
-                    {
-                        continue;
-                    }
-
-                    // Check every exclude entry independently (not just the first that matches):
-                    // overlapping patterns (e.g. a broad "Product.Modules.*.Infra*" alongside a
-                    // narrower "Product.Modules.Weather.Infrastructure") can both legitimately
-                    // match the same namespace, and each one that does must count as used.
-                    for (int i = 0; i < layer.Exclude.Count; i++)
-                    {
-                        if (ArchitectureLayerResolver.ExclusionMatches(layer.Exclude[i], namespaceName))
-                        {
-                            matched.Add((layerName, i));
-                        }
-                    }
-                }
+                MarkMatchedLayerExclusions(ArchitectureTypeNames.SafeNamespace(type), layersWithExclusions, matched);
             }
         }
 
-        List<PolicyConsistencyDiagnostic> findings = new();
+        return matched;
+    }
 
+    private static void MarkMatchedLayerExclusions(
+        string namespaceName,
+        List<(string LayerName, ArchitectureLayer Layer)> layersWithExclusions,
+        HashSet<(string LayerName, int ExclusionIndex)> matched)
+    {
         foreach ((string layerName, ArchitectureLayer layer) in layersWithExclusions)
         {
+            if (!ArchitectureLayerResolver.MatchNamespaceIncludeOnly(layer, namespaceName).Matched)
+            {
+                continue;
+            }
+
             for (int i = 0; i < layer.Exclude.Count; i++)
             {
-                if (matched.Contains((layerName, i)))
+                if (ArchitectureLayerResolver.ExclusionMatches(layer.Exclude[i], namespaceName))
                 {
-                    continue;
+                    matched.Add((layerName, i));
                 }
-
-                ArchitectureLayerExclusion exclusion = layer.Exclude[i];
-                if (string.IsNullOrWhiteSpace(exclusion.Namespace))
-                {
-                    continue;
-                }
-
-                string exclusionDescription = string.IsNullOrEmpty(exclusion.NamespaceSuffix)
-                    ? $"'{exclusion.Namespace}'"
-                    : $"'{exclusion.Namespace}' (namespace_suffix: {exclusion.NamespaceSuffix})";
-
-                findings.Add(new PolicyConsistencyDiagnostic(
-                    "<policy-consistency>",
-                    null,
-                    "unmatched-layer-exclusion",
-                    $"Layer '{layerName}' declares exclude entry {exclusionDescription} " +
-                    "which matches no namespace within the layer's included scope.",
-                    Array.Empty<string>(),
-                    Array.Empty<string>(),
-                    new[] { layerName })
-                {
-                    PolicyLocation = exclusion.PolicyLocation
-                });
             }
         }
+    }
 
-        return findings
-            .OrderBy(f => string.Join(",", f.Layers), StringComparer.Ordinal)
-            .ToList();
+    private static IEnumerable<PolicyConsistencyDiagnostic> BuildUnmatchedExclusionFindings(
+        string layerName, ArchitectureLayer layer, HashSet<(string LayerName, int ExclusionIndex)> matched)
+    {
+        for (int i = 0; i < layer.Exclude.Count; i++)
+        {
+            if (matched.Contains((layerName, i)))
+            {
+                continue;
+            }
+
+            ArchitectureLayerExclusion exclusion = layer.Exclude[i];
+            if (string.IsNullOrWhiteSpace(exclusion.Namespace))
+            {
+                continue;
+            }
+
+            yield return CreateUnmatchedExclusionFinding(layerName, exclusion);
+        }
+    }
+
+    private static PolicyConsistencyDiagnostic CreateUnmatchedExclusionFinding(
+        string layerName, ArchitectureLayerExclusion exclusion)
+    {
+        string exclusionDescription = string.IsNullOrEmpty(exclusion.NamespaceSuffix)
+            ? $"'{exclusion.Namespace}'"
+            : $"'{exclusion.Namespace}' (namespace_suffix: {exclusion.NamespaceSuffix})";
+
+        return new PolicyConsistencyDiagnostic(
+            "<policy-consistency>",
+            null,
+            "unmatched-layer-exclusion",
+            $"Layer '{layerName}' declares exclude entry {exclusionDescription} " +
+            "which matches no namespace within the layer's included scope.",
+            Array.Empty<string>(),
+            Array.Empty<string>(),
+            new[] { layerName })
+        {
+            PolicyLocation = exclusion.PolicyLocation
+        };
     }
 
     private static bool IsStructurallyUnreachable(ArchitectureLayer layer)

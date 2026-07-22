@@ -13,6 +13,7 @@ public sealed class PolicyConsistencyCheckTests
 {
     private static readonly string[] _domainApplication = { "domain", "application" };
     private static readonly string[] _semanticLayers = { "semantic_a", "semantic_b" };
+    private static readonly string[] _coreLayer = { "core" };
 
     private static ArchitectureAnalysisContext CreateContext()
     {
@@ -570,7 +571,7 @@ public sealed class PolicyConsistencyCheckTests
 
         var finding = findings.FirstOrDefault(f => f.CheckKind == "unmatched-layer-exclusion");
         Assert.That(finding, Is.Not.Null);
-        Assert.That(finding!.Layers, Is.EquivalentTo(new[] { "core" }));
+        Assert.That(finding!.Layers, Is.EquivalentTo(_coreLayer));
         Assert.That(finding.Reason, Does.Contain("ArchLinterNet.Core.Contracts.Familias"));
     }
 

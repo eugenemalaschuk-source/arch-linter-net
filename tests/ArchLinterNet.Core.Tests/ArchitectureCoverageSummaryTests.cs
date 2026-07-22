@@ -13,6 +13,7 @@ public sealed partial class ArchitectureCoverageSummaryTests
 {
     private const string FeatureRoot = "ArchLinterNet.Core.Tests.NamespaceCoverageFixtures.Features";
     private const string RuleInputFixtureRoot = "ArchLinterNet.Core.Tests.RuleInputCoverageFixtures";
+    private static readonly string[] _someOtherContractId = { "some-other-contract-id" };
 
     private static ArchitectureAnalysisContext CreateContext(Type fixtureType)
     {

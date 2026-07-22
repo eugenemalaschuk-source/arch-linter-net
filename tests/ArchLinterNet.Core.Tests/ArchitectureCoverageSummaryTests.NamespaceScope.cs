@@ -126,7 +126,7 @@ public sealed partial class ArchitectureCoverageSummaryTests
         ArchitectureContractRunner runner = new(
             CreateContext(typeof(ArchitectureCoverageSummaryTests)),
             document,
-            selectedContractIds: new HashSet<string>(new[] { "some-other-contract-id" }, StringComparer.OrdinalIgnoreCase));
+            selectedContractIds: new HashSet<string>(_someOtherContractId, StringComparer.OrdinalIgnoreCase));
 
         ArchitectureCoverageSummary? summary = runner.BuildCoverageSummary(contract);
 
