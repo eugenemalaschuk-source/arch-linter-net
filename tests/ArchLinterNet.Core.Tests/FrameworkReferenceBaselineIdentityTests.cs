@@ -145,6 +145,93 @@ public sealed class FrameworkReferenceBaselineIdentityTests
     }
 
     [Test]
+    public void DuplicateActiveFrameworkReferenceForSameTargetFramework_FailsClosedInsteadOfProducingAmbiguousIdentity()
+    {
+        // Real, on-disk fixture: two FrameworkReference declarations of the same name, both with
+        // conditions that evaluate true for net10.0 by default (Configuration=Debug,
+        // SelfContained unset). Empirically confirmed: the .NET SDK itself rejects this as a hard
+        // MSBuild error ("Multiple FrameworkReference items for '<name>' were included in the
+        // project."), not a warning - so two simultaneously active declarations of the same
+        // framework for the same evaluated target framework can never reach identity/baseline code
+        // for a project that successfully builds. FrameworkName+TargetFramework is therefore already
+        // a genuinely unique key for any project MSBuild can evaluate; this fixture proves the
+        // fail-closed path (not a silent, ambiguous, Occurrence-only identity) is what a policy
+        // author actually observes instead.
+        const string SourceAssemblyName = "MyApp.Api";
+        string repoRoot = Path.Combine(Path.GetTempPath(), $"arch-linter-framework-dupcondition-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(repoRoot);
+        try
+        {
+            string projectDir = Path.Combine(repoRoot, SourceAssemblyName);
+            Directory.CreateDirectory(projectDir);
+            string projectPath = Path.Combine(projectDir, $"{SourceAssemblyName}.csproj");
+            File.WriteAllText(projectPath, """
+                <Project Sdk="Microsoft.NET.Sdk">
+                  <PropertyGroup>
+                    <TargetFrameworks>net10.0</TargetFrameworks>
+                  </PropertyGroup>
+                  <ItemGroup>
+                    <FrameworkReference Include="Microsoft.AspNetCore.App" Condition="'$(Configuration)'=='Debug'" />
+                  </ItemGroup>
+                  <ItemGroup>
+                    <FrameworkReference Include="Microsoft.AspNetCore.App" Condition="'$(SelfContained)'!='true'" />
+                  </ItemGroup>
+                </Project>
+                """);
+
+            var contract = new ArchitectureFrameworkReferenceContract
+            {
+                Id = "domain-no-aspnet",
+                Name = "Api must not reference ASP.NET Core",
+                Source = SourceAssemblyName,
+                Forbidden = new List<string> { "forbidden_web" }
+            };
+
+            var document = new ArchitectureContractDocument
+            {
+                Version = 1,
+                Name = "Test",
+                Layers = new Dictionary<string, ArchitectureLayer>(),
+                FrameworkReferences = new Dictionary<string, ArchitectureFrameworkReferenceGroup>
+                {
+                    ["forbidden_web"] = new() { FrameworkNames = { "Microsoft.AspNetCore.App" } }
+                },
+                Analysis = new ArchitectureAnalysisConfiguration
+                {
+                    TargetAssemblies = new List<string> { SourceAssemblyName },
+                    Projects = new List<string> { projectPath }
+                },
+                Contracts = new ArchitectureContractGroups
+                {
+                    StrictFrameworkDependency = new List<ArchitectureFrameworkReferenceContract> { contract }
+                }
+            };
+
+            ProjectDiscoveryResult discovery = new ArchitectureProjectDiscoveryService()
+                .ResolveFromDocument(document, repoRoot, resolveAssemblyOutputs: false);
+            var context = new ArchitectureAnalysisContext(
+                repoRoot, new[] { typeof(FrameworkReferenceBaselineIdentityTests).Assembly },
+                Array.Empty<string>(), Array.Empty<string>(), projectDiscovery: discovery);
+
+            var runner = new ArchitectureContractRunner(context, document);
+
+            List<ArchitectureViolation> violations = runner.Session.CheckFrameworkDependencyContract(contract);
+            List<ArchitectureViolation> configurationViolations = runner.CheckConfiguration();
+
+            Assert.That(violations, Is.Empty,
+                "An unevaluable project must report no false-clean data, never a fabricated violation.");
+            Assert.That(runner.BaselineCandidates, Is.Empty,
+                "No ambiguous baseline candidate should be produced for a project that failed to evaluate.");
+            Assert.That(configurationViolations.Any(v => v.ForbiddenNamespace == "framework reference evaluation failed"),
+                Is.True, "The duplicate-declaration build failure must surface as a fail-closed configuration violation.");
+        }
+        finally
+        {
+            Directory.Delete(repoRoot, true);
+        }
+    }
+
+    [Test]
     public void Compare_BaselineOnlyRecordsFirstCondition_SecondConditionRemainsNewNotFrozen()
     {
         // Mirrors the same-named-type-in-different-assembly regression pattern: a baseline that only

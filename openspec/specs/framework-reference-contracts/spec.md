@@ -95,6 +95,10 @@ Framework-reference violations SHALL identify the contract name, optional contra
 - **WHEN** `MyApp.Api` multi-targets two target frameworks and `Microsoft.AspNetCore.App` is applicable to only one of them via `Condition`
 - **THEN** the resulting violation's identity SHALL be scoped to that one target framework, distinct from what an occurrence under a different target framework would produce
 
+#### Scenario: Two simultaneously active declarations of the same framework for one target framework fail closed rather than producing an ambiguous identity
+- **WHEN** a project declares `FrameworkReference Include="Microsoft.AspNetCore.App"` twice with conditions that both evaluate true for the same target framework
+- **THEN** the project's MSBuild evaluation for that target framework SHALL fail (the .NET SDK itself rejects duplicate active `FrameworkReference` declarations for one build), and the contract's `CheckConfiguration` SHALL report a fail-closed evaluation-failure violation for that project/target framework, rather than the contract silently producing two violations distinguished only by call-order `Occurrence`
+
 ### Requirement: Framework-reference evaluation fails closed when MSBuild evaluation cannot succeed
 The system SHALL detect, during `CheckConfiguration`, any `framework_dependency`/`framework_allow_only` contract whose source project's MSBuild design-time build does not succeed for the whole project or for any of its configured target frameworks, and SHALL report a `<configuration>`-style violation identifying the contract, the source project, and the target framework (or the whole project) that could not be evaluated, rather than allowing the contract to silently evaluate as passing with no visible signal that framework-reference data could not be trusted.
 
@@ -166,7 +170,7 @@ Every `strict_framework_dependency`/`audit_framework_dependency` violation SHALL
 
 #### Scenario: Human output shows framework evidence
 - **WHEN** a `strict_framework_dependency` contract produces a violation for source `MyApp.Api` against forbidden framework group `forbidden_web` matching `Microsoft.AspNetCore.App` applicable to `net10.0`
-- **THEN** the human-formatted line identifies `MyApp.Api` as the source, lists `Microsoft.AspNetCore.App (net10.0)` among the forbidden references, and shows explicit/implicit classification
+- **THEN** the human-formatted line identifies `MyApp.Api` as the source, lists `Microsoft.AspNetCore.App (net10.0)` among the forbidden references, and shows explicit/implicit classification and the declaring project's `SourcePath`
 
 #### Scenario: Unified JSON shows structured framework evidence
 - **WHEN** the same violation is serialized to unified JSON

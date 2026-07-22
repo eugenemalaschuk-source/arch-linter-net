@@ -166,8 +166,16 @@ public sealed partial class ArchitectureAnalysisSession
     // unevaluated declarations captured by the lightweight XML parser during generic project
     // discovery. Prefers a raw declaration whose condition text mentions the reference's real
     // evaluated TargetFramework; falls back to the first declaration with a matching name; returns
-    // null when none is found. This is cosmetic evidence only - it is never authoritative and never
-    // part of violation identity.
+    // null when none is found. This is cosmetic evidence only.
+    //
+    // Two simultaneously active declarations of the SAME framework name for the SAME evaluated target
+    // framework cannot occur in a project that MSBuild actually builds: the .NET SDK itself rejects
+    // this ("Multiple FrameworkReference items for '<name>' were included in the project.", confirmed
+    // empirically) as a hard build error, which ArchitectureFrameworkReferenceEvaluator surfaces as an
+    // evaluation Failure - the fail-closed configuration violation, not a silent duplicate identity, is
+    // what a policy author actually sees for that project. FrameworkName+TargetFramework is therefore
+    // already a genuinely unique key for any project that builds; this lookup only needs to disambiguate
+    // which single raw declaration to display when a name appears once.
     private static string? FindBestEffortCondition(
         ArchitectureDiscoveredProject owningProject, ArchitectureDiscoveredFrameworkReference reference)
     {

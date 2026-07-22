@@ -12,7 +12,7 @@ public sealed partial class ArchitectureDiagnosticFormatter
     private static string FormatFrameworkReferenceContextForHumans(IReadOnlyCollection<FrameworkReferenceEvidence> evidence)
     {
         string entries = string.Join(", ", evidence.Select(e =>
-            $"{e.FrameworkName} ({e.TargetFramework}, {(e.Explicit ? "explicit" : "implicit")})"));
+            $"{e.FrameworkName} ({e.TargetFramework}, {(e.Explicit ? "explicit" : "implicit")}, {e.SourcePath})"));
         return $" [{entries}]";
     }
 
