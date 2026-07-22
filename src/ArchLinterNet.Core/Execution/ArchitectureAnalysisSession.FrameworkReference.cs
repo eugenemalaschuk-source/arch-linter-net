@@ -120,7 +120,7 @@ public sealed partial class ArchitectureAnalysisSession
     // CheckConfiguration to surface as fail-closed configuration violations; the contract check itself
     // simply sees no references for a project it could not evaluate, never a crash or a silent pass
     // that fabricates data.
-    private IReadOnlyList<ArchitectureDiscoveredFrameworkReference> ResolveFrameworkReferences(string sourceAssemblyName)
+    private ArchitectureDiscoveredFrameworkReference[] ResolveFrameworkReferences(string sourceAssemblyName)
     {
         ArchitectureDiscoveredProject? owningProject = FindDiscoveredProject(sourceAssemblyName);
 
@@ -186,7 +186,7 @@ public sealed partial class ArchitectureAnalysisSession
         return (tfmMatch ?? candidates[0]).Condition;
     }
 
-    private static IReadOnlyCollection<FrameworkReferenceEvidence> BuildEvidence(
+    private static FrameworkReferenceEvidence[] BuildEvidence(
         IEnumerable<ArchitectureDiscoveredFrameworkReference> references)
     {
         return references
