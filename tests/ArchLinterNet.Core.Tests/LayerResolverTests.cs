@@ -454,6 +454,100 @@ public sealed class LayerResolverTests
     }
 
     [Test]
+    public void LayerValidation_ExcludeOnSelectorOnlyLayer_IsRejected()
+    {
+        // Regression for PR #384 review: the schema allows `selector` + `exclude` without
+        // `namespace`, but exclude entries are namespace-based and have nothing to subtract from
+        // on a purely role/metadata-matched layer - this combination must fail loudly at load
+        // time instead of silently no-opping.
+        InvalidOperationException ex = Assert.Throws<InvalidOperationException>(() => new LayerNamespacesValidator().Validate(
+            new ArchitectureContractDocument
+            {
+                Layers = new Dictionary<string, ArchitectureLayer>
+                {
+                    ["domain"] = new()
+                    {
+                        Selector = new ArchitectureLayerSelector { Role = "DomainLayer" },
+                        Exclude = new List<ArchitectureLayerExclusion>
+                        {
+                            new() { Namespace = "MyApp.Domain.Generated" }
+                        }
+                    }
+                }
+            }))!;
+
+        Assert.That(ex.Message, Does.Contain("exclude requires a non-empty namespace"));
+    }
+
+    [Test]
+    public void LayerValidation_ExcludeEntryWithEmptyNamespace_IsRejected()
+    {
+        InvalidOperationException ex = Assert.Throws<InvalidOperationException>(() => new LayerNamespacesValidator().Validate(
+            new ArchitectureContractDocument
+            {
+                Layers = new Dictionary<string, ArchitectureLayer>
+                {
+                    ["domain"] = new()
+                    {
+                        Namespace = "MyApp.Domain",
+                        Exclude = new List<ArchitectureLayerExclusion>
+                        {
+                            new() { Namespace = "" }
+                        }
+                    }
+                }
+            }))!;
+
+        Assert.That(ex.Message, Does.Contain("exclude entry 0 must declare a non-empty namespace"));
+    }
+
+    [Test]
+    public void LayerValidation_ExcludeEntryWithInvalidGlob_IsRejected()
+    {
+        // A malformed exclude pattern (here: unsupported '**') must fail at load time, the same
+        // way a malformed layer.namespace already does via the eager `_ = layer.GlobPattern`
+        // check, instead of only surfacing when a scanned type happens to reach the match path.
+        InvalidOperationException ex = Assert.Throws<InvalidOperationException>(() => new LayerNamespacesValidator().Validate(
+            new ArchitectureContractDocument
+            {
+                Layers = new Dictionary<string, ArchitectureLayer>
+                {
+                    ["domain"] = new()
+                    {
+                        Namespace = "MyApp.Domain.*",
+                        Exclude = new List<ArchitectureLayerExclusion>
+                        {
+                            new() { Namespace = "MyApp.Domain.**.Generated" }
+                        }
+                    }
+                }
+            }))!;
+
+        Assert.That(ex.Message, Does.Contain("exclude entry 0"));
+        Assert.That(ex.Message, Does.Contain("Recursive wildcard"));
+    }
+
+    [Test]
+    public void LayerValidation_ValidExclude_DoesNotThrow()
+    {
+        Assert.DoesNotThrow(() => new LayerNamespacesValidator().Validate(
+            new ArchitectureContractDocument
+            {
+                Layers = new Dictionary<string, ArchitectureLayer>
+                {
+                    ["domain"] = new()
+                    {
+                        Namespace = "MyApp.Domain.*",
+                        Exclude = new List<ArchitectureLayerExclusion>
+                        {
+                            new() { Namespace = "MyApp.Domain.*.Generated" }
+                        }
+                    }
+                }
+            }));
+    }
+
+    [Test]
     public void LayerValidation_WithoutNamespaceOrSelector_IsRejected()
     {
         Assert.Throws<InvalidOperationException>(() => new LayerNamespacesValidator().Validate(

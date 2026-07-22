@@ -134,6 +134,47 @@ Does not match:
 
 - `MyApp.Features.Audio.Internal.Contracts`
 
+## Excluding namespaces from a layer
+
+A layer may declare `exclude`: a list of `namespace`/`namespace_suffix` entries
+subtracted from the layer's matched scope. A namespace belongs to the layer
+only if it matches `namespace`/`namespace_suffix` **and** matches none of the
+`exclude` entries — `result = include - union(excludes)`.
+
+```yaml
+layers:
+  modules_core:
+    namespace: Product.Modules.*
+    exclude:
+      - namespace: Product.Modules.*.Infrastructure
+      - namespace: Product.Modules.*.Persistence
+```
+
+This matches every namespace under `Product.Modules.*` except
+`Product.Modules.<Module>.Infrastructure` and `Product.Modules.<Module>.Persistence`
+(and their descendants). Every contract family that references a layer by
+name — dependency, allow-only, external-dependency, protected, cycle, and
+acyclic-sibling contracts — observes the narrowed scope automatically, with
+no exclusion configuration of its own.
+
+`exclude` entries use exactly the same namespace glob grammar as `namespace`
+and `namespace_suffix` above (whole-segment `*` wildcards, no `**`/`?`/character
+classes). A layer with no `exclude` key is unaffected — this is a purely
+additive capability with no migration required for existing policies.
+
+**Exclusions narrow legitimate scope.** Reach for `exclude` to express "this
+is genuinely out of the rule's intended scope," not to silence a rule against
+code that is actually in violation. Known debt that should eventually be
+fixed belongs in an [exact violation baseline](../guides/migration-baselines.md),
+not a layer exclusion — a baseline records what's wrong and tracks it toward
+zero; an exclusion declares the code was never in scope to begin with.
+
+An `exclude` entry that matches no namespace within its layer's included
+scope — most often a typo, such as `Product.Modules.*.Persistnce` instead of
+`Product.Modules.*.Persistence` — is reported as an `unmatched-layer-exclusion` policy-consistency finding
+(governed by `analysis.policy_consistency`), so a silently inert exclusion is
+visible instead of hiding a mistake.
+
 ## External layers
 
 When a layer references namespaces whose assemblies may not be present in the scan environment, set `external: true`:

@@ -173,6 +173,15 @@ public sealed class ArchitecturePolicyProvenanceIndex
 
     internal PolicyConsistencyDiagnostic Enrich(PolicyConsistencyDiagnostic diagnostic)
     {
+        // A check that already resolved its own precise element location (e.g.
+        // unmatched-layer-exclusion attaching the exact layers.<name>.exclude[<index>] location)
+        // takes precedence over this generic contract/layer-level fallback - otherwise the
+        // fallback below would clobber it with the coarser owning-layer location.
+        if (diagnostic.PolicyLocation is not null)
+        {
+            return diagnostic;
+        }
+
         List<ArchitecturePolicySourceLocation> locations = FindDiagnosticLocations(diagnostic);
         if (locations.Count == 0)
         {

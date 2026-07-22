@@ -1,0 +1,5 @@
+layers:
+  contracts_families_only:
+    namespace: ArchLinterNet.Core.Contracts.Families
+    exclude:
+      - namespace: ArchLinterNet.Core.Contracts.Families

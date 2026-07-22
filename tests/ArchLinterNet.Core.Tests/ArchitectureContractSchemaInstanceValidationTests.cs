@@ -277,6 +277,68 @@ public sealed class ArchitectureContractSchemaInstanceValidationTests
         Assert.That(Validate(Yaml, "layer"), Is.False);
     }
 
+    [Test]
+    public void Layer_WithExclude_IsValid()
+    {
+        const string Yaml = "namespace: Product.Modules.*\nexclude:\n  - namespace: Product.Modules.*.Infrastructure\n  - namespace: Product.Modules.*.Persistence\n";
+
+        Assert.That(Validate(Yaml, "layer"), Is.True);
+    }
+
+    [Test]
+    public void Layer_ExcludeEntryWithNamespaceSuffix_IsValid()
+    {
+        const string Yaml = "namespace: Product.Modules.*\nexclude:\n  - namespace: Product.Modules\n    namespace_suffix: Generated\n";
+
+        Assert.That(Validate(Yaml, "layer"), Is.True);
+    }
+
+    [Test]
+    public void Layer_ExcludeEntryMissingNamespace_IsRejected()
+    {
+        const string Yaml = "namespace: Product.Modules.*\nexclude:\n  - namespace_suffix: Generated\n";
+
+        Assert.That(Validate(Yaml, "layer"), Is.False);
+    }
+
+    [Test]
+    public void Layer_ExcludeEntryUnknownProperty_IsRejected()
+    {
+        const string Yaml = "namespace: Product.Modules.*\nexclude:\n  - namespace: Product.Modules.Infrastructure\n    role: DomainLayer\n";
+
+        Assert.That(Validate(Yaml, "layer"), Is.False);
+    }
+
+    [Test]
+    public void Layer_ExcludeOnSelectorOnlyLayer_IsRejected()
+    {
+        // Regression for PR #384 review: exclude entries are namespace-based and have nothing to
+        // subtract from on a purely role/metadata-matched (selector-only) layer.
+        const string Yaml = "selector:\n  role: DomainLayer\nexclude:\n  - namespace: MyApp.Domain.Generated\n";
+
+        Assert.That(Validate(Yaml, "layer"), Is.False);
+    }
+
+    [Test]
+    public void Layer_EmptyExcludeOnSelectorOnlyLayer_IsValid()
+    {
+        // Regression for PR #384 review: an empty `exclude: []` must not trigger the
+        // exclude-requires-namespace conditional - only a non-empty exclude list has anything to
+        // subtract, so composed/imported policies must accept the same `exclude: []` a monolithic
+        // policy's runtime validator already accepts (Exclude.Count > 0 check).
+        const string Yaml = "selector:\n  role: DomainLayer\nexclude: []\n";
+
+        Assert.That(Validate(Yaml, "layer"), Is.True);
+    }
+
+    [Test]
+    public void Layer_WithoutExclude_IsStillValid()
+    {
+        const string Yaml = "namespace: Product.Modules.*\n";
+
+        Assert.That(Validate(Yaml, "layer"), Is.True);
+    }
+
     [TestCase("samples/policies/modular-monolith.yml")]
     [TestCase("samples/policies/unity-asmdef-boundaries.yml")]
     [TestCase("samples/policies/basic-clean-architecture.yml")]

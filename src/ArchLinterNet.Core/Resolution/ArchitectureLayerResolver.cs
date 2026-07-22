@@ -34,6 +34,23 @@ internal static class ArchitectureLayerResolver
 
     public static ArchitectureNamespaceMatch MatchNamespace(ArchitectureLayer layer, string namespaceName)
     {
+        ArchitectureNamespaceMatch match = MatchNamespaceIncludeOnly(layer, namespaceName);
+
+        if (!match.Matched || layer.Exclude.Count == 0)
+        {
+            return match;
+        }
+
+        return IsExcluded(layer, namespaceName)
+            ? new ArchitectureNamespaceMatch(false, layer.Namespace, null)
+            : match;
+    }
+
+    // The include-side match only, ignoring Exclude entirely. Used by MatchNamespace above and by
+    // unmatched-exclusion detection, which needs to know whether a namespace falls within a layer's
+    // included scope independent of whether any exclude entry also matches it.
+    internal static ArchitectureNamespaceMatch MatchNamespaceIncludeOnly(ArchitectureLayer layer, string namespaceName)
+    {
         if (string.IsNullOrWhiteSpace(layer.Namespace))
         {
             return new ArchitectureNamespaceMatch(false, string.Empty, null);
@@ -41,12 +58,66 @@ internal static class ArchitectureLayerResolver
 
         NamespaceGlobPattern pattern = layer.GlobPattern;
 
-        if (!pattern.IsGlob)
+        return pattern.IsGlob
+            ? MatchGlob(layer.Namespace, layer.NamespaceSuffix, namespaceName, pattern)
+            : MatchLiteral(layer.Namespace, layer.NamespaceSuffix, namespaceName);
+    }
+
+    // result = union(includes) - union(excludes): an entry excludes namespaceName when it matches
+    // the exclusion's own namespace/namespace_suffix glob, using exactly the same matching logic
+    // (MatchLiteral/MatchGlob) the layer itself uses for inclusion. Excluding on the full
+    // namespaceName (not the layer's matched prefix) mirrors how a sibling declared layer would
+    // match the same namespace.
+    private static bool IsExcluded(ArchitectureLayer layer, string namespaceName)
+    {
+        return layer.Exclude.Any(exclusion => ExclusionMatches(exclusion, namespaceName));
+    }
+
+    // Whether a single exclude entry matches namespaceName, independent of any other entry on the
+    // same layer. Exposed so callers that need to know EVERY matching entry (not just the first,
+    // as FindMatchingExclusion below returns) - e.g. unmatched-exclusion detection with
+    // overlapping exclude patterns - can test each entry on its own rather than relying on a
+    // single "first wins" scan that would leave later-but-still-matching entries looking unused.
+    internal static bool ExclusionMatches(ArchitectureLayerExclusion exclusion, string namespaceName)
+    {
+        if (string.IsNullOrWhiteSpace(exclusion.Namespace))
         {
-            return MatchLiteral(layer, namespaceName);
+            return false;
         }
 
-        return MatchGlob(layer, namespaceName, pattern);
+        NamespaceGlobPattern pattern = exclusion.GlobPattern;
+        ArchitectureNamespaceMatch match = pattern.IsGlob
+            ? MatchGlob(exclusion.Namespace, exclusion.NamespaceSuffix, namespaceName, pattern)
+            : MatchLiteral(exclusion.Namespace, exclusion.NamespaceSuffix, namespaceName);
+
+        return match.Matched;
+    }
+
+    // Namespace matched by at least one exclude entry, or null when none matches. Used for
+    // layer-description provenance, where only the fact that some entry decided the exclusion
+    // matters. Do NOT use this for "which entries were used" accounting - it stops at the first
+    // match, so overlapping entries after it would look unmatched even though they also match.
+    internal static ArchitectureLayerExclusion? FindMatchingExclusion(ArchitectureLayer layer, string namespaceName)
+    {
+        foreach (ArchitectureLayerExclusion exclusion in layer.Exclude)
+        {
+            if (string.IsNullOrWhiteSpace(exclusion.Namespace))
+            {
+                continue;
+            }
+
+            NamespaceGlobPattern pattern = exclusion.GlobPattern;
+            ArchitectureNamespaceMatch match = pattern.IsGlob
+                ? MatchGlob(exclusion.Namespace, exclusion.NamespaceSuffix, namespaceName, pattern)
+                : MatchLiteral(exclusion.Namespace, exclusion.NamespaceSuffix, namespaceName);
+
+            if (match.Matched)
+            {
+                return exclusion;
+            }
+        }
+
+        return null;
     }
 
     public static string DescribeLayer(ArchitectureLayer layer)
@@ -57,12 +128,31 @@ internal static class ArchitectureLayerResolver
         }
 
         string namespaceDescription = DescribeNamespacePart(layer);
+
+        if (layer.Exclude.Count > 0)
+        {
+            string excludeDescription = string.Join(", ", layer.Exclude
+                .Where(e => !string.IsNullOrWhiteSpace(e.Namespace))
+                .Select(DescribeExclusion));
+            if (excludeDescription.Length > 0)
+            {
+                namespaceDescription = $"{namespaceDescription} (excluding {excludeDescription})";
+            }
+        }
+
         if (layer.Selector == null)
         {
             return namespaceDescription;
         }
 
         return $"{namespaceDescription} + {DescribeSelector(layer)}";
+    }
+
+    private static string DescribeExclusion(ArchitectureLayerExclusion exclusion)
+    {
+        return string.IsNullOrEmpty(exclusion.NamespaceSuffix)
+            ? exclusion.Namespace
+            : $"{exclusion.Namespace}.*.{exclusion.NamespaceSuffix}";
     }
 
     private static string DescribeNamespacePart(ArchitectureLayer layer)
@@ -161,30 +251,30 @@ internal static class ArchitectureLayerResolver
     }
 
     private static ArchitectureNamespaceMatch MatchLiteral(
-        ArchitectureLayer layer, string namespaceName)
+        string namespacePattern, string namespaceSuffix, string namespaceName)
     {
-        bool prefixMatch = MatchesPrefix(namespaceName, layer.Namespace);
+        bool prefixMatch = MatchesPrefix(namespaceName, namespacePattern);
 
         if (!prefixMatch)
         {
-            return new ArchitectureNamespaceMatch(false, layer.Namespace, null);
+            return new ArchitectureNamespaceMatch(false, namespacePattern, null);
         }
 
-        if (!string.IsNullOrEmpty(layer.NamespaceSuffix))
+        if (!string.IsNullOrEmpty(namespaceSuffix))
         {
-            if (!namespaceName.EndsWith("." + layer.NamespaceSuffix, StringComparison.Ordinal))
+            if (!namespaceName.EndsWith("." + namespaceSuffix, StringComparison.Ordinal))
             {
-                return new ArchitectureNamespaceMatch(false, layer.Namespace, null);
+                return new ArchitectureNamespaceMatch(false, namespacePattern, null);
             }
 
-            return new ArchitectureNamespaceMatch(true, layer.Namespace, null);
+            return new ArchitectureNamespaceMatch(true, namespacePattern, null);
         }
 
-        return new ArchitectureNamespaceMatch(true, layer.Namespace, null);
+        return new ArchitectureNamespaceMatch(true, namespacePattern, null);
     }
 
     private static ArchitectureNamespaceMatch MatchGlob(
-        ArchitectureLayer layer, string namespaceName, NamespaceGlobPattern pattern)
+        string namespacePattern, string namespaceSuffix, string namespaceName, NamespaceGlobPattern pattern)
     {
         ArchitectureNamespaceMatch baseMatch = pattern.Match(namespaceName);
 
@@ -193,35 +283,35 @@ internal static class ArchitectureLayerResolver
             return baseMatch;
         }
 
-        if (string.IsNullOrEmpty(layer.NamespaceSuffix))
+        if (string.IsNullOrEmpty(namespaceSuffix))
         {
             return baseMatch;
         }
 
         string[] nsSegments = namespaceName.Split('.');
-        string[] patternSegments = layer.Namespace.Split('.');
-        string[] suffixSegments = layer.NamespaceSuffix.Split('.');
+        string[] patternSegments = namespacePattern.Split('.');
+        string[] suffixSegments = namespaceSuffix.Split('.');
 
         int suffixIndex = patternSegments.Length;
         if (nsSegments.Length < suffixIndex + suffixSegments.Length)
         {
-            return new ArchitectureNamespaceMatch(false, layer.Namespace, null);
+            return new ArchitectureNamespaceMatch(false, namespacePattern, null);
         }
 
         for (int i = 0; i < suffixSegments.Length; i++)
         {
             if (nsSegments[suffixIndex + i] != suffixSegments[i])
             {
-                return new ArchitectureNamespaceMatch(false, layer.Namespace, null);
+                return new ArchitectureNamespaceMatch(false, namespacePattern, null);
             }
         }
 
         if (string.IsNullOrEmpty(baseMatch.MatchedNamespacePrefix))
         {
-            return new ArchitectureNamespaceMatch(false, layer.Namespace, null);
+            return new ArchitectureNamespaceMatch(false, namespacePattern, null);
         }
 
-        string resolvedPrefix = $"{baseMatch.MatchedNamespacePrefix}.{layer.NamespaceSuffix}";
+        string resolvedPrefix = $"{baseMatch.MatchedNamespacePrefix}.{namespaceSuffix}";
 
         return new ArchitectureNamespaceMatch(true, baseMatch.Pattern, resolvedPrefix);
     }

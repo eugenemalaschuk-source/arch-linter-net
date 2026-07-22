@@ -249,8 +249,7 @@ policy's `ignored_violations` lists before validation. The merge:
 - Reports an error if a baseline entry references a contract ID that doesn't
   exist in the policy (exit code 2)
 - Deduplicates and matches using the **same identity notion baseline
-  comparison uses** — version 1 entries by the exact `(source_type,
-  forbidden_reference)` pair, version 2 entries by the full structured
+  comparison uses** — version 1 entries by the exact `(source_type, forbidden_reference)` pair, version 2 entries by the full structured
   `ArchitectureViolationIdentity` (contract family, kind, source/target
   assembly, source/target type and member, and an occurrence discriminator).
   A version-2 entry's assembly/member/occurrence fields are exactly what

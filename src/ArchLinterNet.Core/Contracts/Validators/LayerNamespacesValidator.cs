@@ -1,5 +1,8 @@
 using System.Globalization;
 using ArchLinterNet.Core.Contracts;
+using ArchLinterNet.Core.Contracts.PolicyImports;
+using ArchLinterNet.Core.Model;
+using ArchLinterNet.Core.Resolution;
 
 namespace ArchLinterNet.Core.Contracts.Validators;
 
@@ -22,6 +25,15 @@ internal sealed class LayerNamespacesValidator : IArchitecturePolicyDocumentVali
                 throw new InvalidOperationException(
                     $"Layer '{name}' namespace_suffix requires a non-empty namespace.");
             }
+
+            if (layer.Exclude.Count > 0 && string.IsNullOrWhiteSpace(layer.Namespace))
+            {
+                throw new InvalidOperationException(
+                    $"Layer '{name}' exclude requires a non-empty namespace: a selector-only layer " +
+                    "has no namespace-matched scope for exclude entries to subtract from.");
+            }
+
+            ValidateExclude(document, name, layer);
 
             if (layer.Selector == null)
             {
@@ -66,6 +78,46 @@ internal sealed class LayerNamespacesValidator : IArchitecturePolicyDocumentVali
             {
                 _ = layer.GlobPattern;
             }
+        }
+    }
+
+    // Eagerly validates every exclude entry's namespace/glob at load time (mirroring the eager
+    // `_ = layer.GlobPattern` check above for the layer's own namespace) instead of leaving a
+    // malformed entry to surface only when a scanned type happens to reach it during matching -
+    // or never surface at all, silently no-opping. Also resolves and stores each entry's exact
+    // source location so JSON/SARIF/Testing API diagnostics (e.g. unmatched-layer-exclusion) can
+    // name the precise `layers.<name>.exclude[<index>]` element instead of only the owning layer.
+    private static void ValidateExclude(ArchitectureContractDocument document, string layerName, ArchitectureLayer layer)
+    {
+        string excludeListPath = ArchitecturePolicyProvenancePath.AppendProperty(
+            ArchitecturePolicyProvenancePath.AppendProperty(
+                ArchitecturePolicyProvenancePath.Property("layers"), layerName),
+            "exclude");
+
+        for (int index = 0; index < layer.Exclude.Count; index++)
+        {
+            ArchitectureLayerExclusion exclusion = layer.Exclude[index];
+            string exclusionPath = ArchitecturePolicyProvenancePath.AppendIndex(excludeListPath, index);
+            document.Provenance.SetValidationSubject(exclusionPath);
+
+            if (string.IsNullOrWhiteSpace(exclusion.Namespace))
+            {
+                throw new InvalidOperationException(
+                    $"Layer '{layerName}' exclude entry {index} must declare a non-empty namespace.");
+            }
+
+            try
+            {
+                _ = exclusion.GlobPattern;
+            }
+            catch (InvalidNamespacePatternException ex)
+            {
+                throw new InvalidOperationException(
+                    $"Layer '{layerName}' exclude entry {index}: {ex.Message}", ex);
+            }
+
+            document.Provenance.TryGetLocation(exclusionPath, out ArchitecturePolicySourceLocation? location);
+            exclusion.PolicyLocation = location;
         }
     }
 
