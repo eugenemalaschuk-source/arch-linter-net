@@ -126,7 +126,7 @@ public sealed partial class ArchitectureAnalysisSession
             .GroupBy(project => project.AssemblyName, StringComparer.Ordinal)
             .ToDictionary(
                 group => group.Key,
-                group => (IReadOnlyList<ArchitectureDiscoveredFrameworkReference>)group.First().FrameworkReferences,
+                group => group.First().FrameworkReferences,
                 StringComparer.Ordinal);
     }
 

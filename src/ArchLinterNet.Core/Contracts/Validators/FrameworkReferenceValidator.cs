@@ -10,15 +10,13 @@ internal sealed class FrameworkReferenceValidator : IArchitecturePolicyDocumentV
         HashSet<string> targetAssemblies = new(document.Analysis.TargetAssemblies, StringComparer.Ordinal);
 
         foreach (ArchitectureFrameworkReferenceContract contract in document.Provenance.Track(
-                     document.Contracts.StrictFrameworkDependency.Concat(document.Contracts.AuditFrameworkDependency)))
+                     document.Contracts.StrictFrameworkDependency.Concat(document.Contracts.AuditFrameworkDependency))
+                 .Where(contract => !targetAssemblies.Contains(contract.Source)))
         {
-            if (!targetAssemblies.Contains(contract.Source))
-            {
-                throw new InvalidOperationException(
-                    $"Framework dependency contract '{contract.Name}' references source '{contract.Source}' " +
-                    "that is not declared in 'analysis.target_assemblies'. The 'source' of a " +
-                    "'strict_framework_dependency'/'audit_framework_dependency' contract must be a declared target assembly.");
-            }
+            throw new InvalidOperationException(
+                $"Framework dependency contract '{contract.Name}' references source '{contract.Source}' " +
+                "that is not declared in 'analysis.target_assemblies'. The 'source' of a " +
+                "'strict_framework_dependency'/'audit_framework_dependency' contract must be a declared target assembly.");
         }
     }
 }
