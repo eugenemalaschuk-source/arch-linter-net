@@ -99,43 +99,60 @@ public sealed partial class ArchitectureAnalysisSession
     // criteria. Only reached once IsCoveredByDeclaredLayers/IsCoveredByExpandedTemplates have both
     // already returned false for namespaceName, so this never overrides a namespace that some
     // other declared layer still legitimately covers.
-    private static bool TryFindLayerExclusionReason(
+    //
+    // Collects EVERY exclude entry that independently matches namespaceName - not just the first -
+    // because overlapping patterns (a broad pattern in one layer/imported fragment plus a narrower
+    // one in another) can both legitimately subtract the same namespace, and dropping all but the
+    // first would silently lose provenance for the rest (PR #384 review). Order is deterministic
+    // (layer name, then exclude-list position) so JSON/Testing API output is stable across runs.
+    private static bool TryFindLayerExclusionReasons(
         ArchitectureCoverageInventory inventory,
         string namespaceName,
         out string reason,
-        out ArchitecturePolicySourceLocation? policyLocation)
+        out IReadOnlyList<ArchitecturePolicySourceLocation> policyLocations)
     {
-        foreach (ArchitectureCoverageLayerEntry layerEntry in inventory.DeclaredLayers)
+        List<(string LayerName, ArchitectureLayerExclusion Exclusion)> matches = inventory.DeclaredLayers
+            .OrderBy(entry => entry.Name, StringComparer.Ordinal)
+            .SelectMany(entry => FindMatchingExclusionsForLayer(entry, namespaceName))
+            .ToList();
+
+        if (matches.Count == 0)
         {
-            ArchitectureLayer layer = layerEntry.Layer;
-            if (layer.Exclude.Count == 0)
-            {
-                continue;
-            }
-
-            if (!ArchitectureLayerResolver.MatchNamespaceIncludeOnly(layer, namespaceName).Matched)
-            {
-                continue;
-            }
-
-            ArchitectureLayerExclusion? exclusion =
-                ArchitectureLayerResolver.FindMatchingExclusion(layer, namespaceName);
-            if (exclusion == null)
-            {
-                continue;
-            }
-
-            reason = string.IsNullOrEmpty(exclusion.NamespaceSuffix)
-                ? $"excluded by layer '{layerEntry.Name}' exclude entry '{exclusion.Namespace}'"
-                : $"excluded by layer '{layerEntry.Name}' exclude entry '{exclusion.Namespace}' " +
-                  $"(namespace_suffix: {exclusion.NamespaceSuffix})";
-            policyLocation = exclusion.PolicyLocation;
-            return true;
+            reason = string.Empty;
+            policyLocations = Array.Empty<ArchitecturePolicySourceLocation>();
+            return false;
         }
 
-        reason = string.Empty;
-        policyLocation = null;
-        return false;
+        reason = string.Join("; ", matches.Select(match => DescribeLayerExclusionMatch(match.LayerName, match.Exclusion)));
+        policyLocations = matches
+            .Select(match => match.Exclusion.PolicyLocation)
+            .Where(location => location is not null)
+            .Select(location => location!)
+            .ToList();
+        return true;
+    }
+
+    private static IEnumerable<(string LayerName, ArchitectureLayerExclusion Exclusion)> FindMatchingExclusionsForLayer(
+        ArchitectureCoverageLayerEntry layerEntry, string namespaceName)
+    {
+        ArchitectureLayer layer = layerEntry.Layer;
+        if (layer.Exclude.Count == 0
+            || !ArchitectureLayerResolver.MatchNamespaceIncludeOnly(layer, namespaceName).Matched)
+        {
+            return Array.Empty<(string, ArchitectureLayerExclusion)>();
+        }
+
+        return layer.Exclude
+            .Where(exclusion => ArchitectureLayerResolver.ExclusionMatches(exclusion, namespaceName))
+            .Select(exclusion => (layerEntry.Name, exclusion));
+    }
+
+    private static string DescribeLayerExclusionMatch(string layerName, ArchitectureLayerExclusion exclusion)
+    {
+        return string.IsNullOrEmpty(exclusion.NamespaceSuffix)
+            ? $"excluded by layer '{layerName}' exclude entry '{exclusion.Namespace}'"
+            : $"excluded by layer '{layerName}' exclude entry '{exclusion.Namespace}' " +
+              $"(namespace_suffix: {exclusion.NamespaceSuffix})";
     }
 
     private static bool MatchesNamespaceRoot(ArchitectureCoverageRoot root, string namespaceName)

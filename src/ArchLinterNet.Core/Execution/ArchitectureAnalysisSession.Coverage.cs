@@ -73,11 +73,12 @@ public sealed partial class ArchitectureAnalysisSession
                 continue;
             }
 
-            if (TryFindLayerExclusionReason(inventory, entry.Namespace, out string exclusionReason, out var exclusionLocation))
+            if (TryFindLayerExclusionReasons(inventory, entry.Namespace, out string exclusionReason, out var exclusionLocations))
             {
                 excludedItems.Add(new ArchitectureCoverageSummaryExcludedItem(entry.Namespace, exclusionReason)
                 {
-                    PolicyLocation = exclusionLocation
+                    PolicyLocation = exclusionLocations.Count > 0 ? exclusionLocations[0] : null,
+                    RelatedPolicyLocations = exclusionLocations.Count > 1 ? exclusionLocations.Skip(1).ToArray() : Array.Empty<ArchitecturePolicySourceLocation>()
                 });
                 continue;
             }

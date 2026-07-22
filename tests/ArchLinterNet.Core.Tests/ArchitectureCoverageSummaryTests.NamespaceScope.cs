@@ -103,6 +103,37 @@ public sealed partial class ArchitectureCoverageSummaryTests
     }
 
     [Test]
+    public void BuildCoverageSummary_NamespaceScope_OverlappingLayerExclusions_ReasonNamesEveryContributingLayer()
+    {
+        // Regression for final PR #384 review: two independent layers excluding the same
+        // namespace must both be named in the excluded item's reason - dropping all but the first
+        // match silently loses provenance for the rest of the union-subtraction.
+        ArchitectureContractDocument document = CreateNamespaceDocument();
+        document.Layers["alpha_excluded_a"] = new ArchitectureLayer
+        {
+            Namespace = $"{FeatureRoot}.AlphaGap",
+            Exclude = new List<ArchitectureLayerExclusion> { new() { Namespace = $"{FeatureRoot}.AlphaGap" } }
+        };
+        document.Layers["alpha_excluded_b"] = new ArchitectureLayer
+        {
+            Namespace = $"{FeatureRoot}.AlphaGap",
+            Exclude = new List<ArchitectureLayerExclusion> { new() { Namespace = $"{FeatureRoot}.AlphaGap" } }
+        };
+        ArchitectureCoverageContract contract = CreateNamespaceContract();
+
+        ArchitectureContractRunner runner = new(CreateContext(typeof(ArchitectureCoverageSummaryTests)), document);
+        ArchitectureCoverageSummary summary = RequireSummary(runner.BuildCoverageSummary(contract));
+
+        ArchitectureCoverageSummaryExcludedItem excludedAlpha = summary.ExcludedItems
+            .Single(i => i.Item == $"{FeatureRoot}.AlphaGap");
+        Assert.Multiple(() =>
+        {
+            Assert.That(excludedAlpha.Reason, Does.Contain("alpha_excluded_a"));
+            Assert.That(excludedAlpha.Reason, Does.Contain("alpha_excluded_b"));
+        });
+    }
+
+    [Test]
     public void BuildCoverageSummary_NamespaceScope_EmptyRoot_ProducesZeroCountsWithoutError()
     {
         ArchitectureContractDocument document = CreateNamespaceDocument();
