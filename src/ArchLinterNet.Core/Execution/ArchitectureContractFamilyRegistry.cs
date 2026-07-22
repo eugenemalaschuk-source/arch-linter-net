@@ -182,6 +182,44 @@ internal static class ArchitectureContractFamilyRegistry
             },
         },
         new(
+            "framework_dependency", "strict_framework_dependency", "audit_framework_dependency", true,
+            g => g.StrictFrameworkDependency, g => g.AuditFrameworkDependency,
+            (session, contract) => ArchitectureHandlerResult.FromViolations(
+                session.CheckFrameworkDependencyContract((ArchitectureFrameworkReferenceContract)contract)))
+        {
+            OwnedContractTypes = new[] { typeof(ArchitectureFrameworkReferenceContract) },
+            ConfigurationContributor = (session, collector, contract) =>
+            {
+                var c = (ArchitectureFrameworkReferenceContract)contract;
+                if (!session.IsContractSelected(c.Id))
+                {
+                    return;
+                }
+
+                collector.AddFrameworkGroupNames(c, c.Forbidden);
+                collector.AddFrameworkContractSource(c, c.Source);
+            },
+        },
+        new(
+            "framework_allow_only", "strict_framework_allow_only", "audit_framework_allow_only", true,
+            g => g.StrictFrameworkAllowOnly, g => g.AuditFrameworkAllowOnly,
+            (session, contract) => ArchitectureHandlerResult.FromViolations(
+                session.CheckFrameworkAllowOnlyContract((ArchitectureFrameworkReferenceAllowOnlyContract)contract)))
+        {
+            OwnedContractTypes = new[] { typeof(ArchitectureFrameworkReferenceAllowOnlyContract) },
+            ConfigurationContributor = (session, collector, contract) =>
+            {
+                var c = (ArchitectureFrameworkReferenceAllowOnlyContract)contract;
+                if (!session.IsContractSelected(c.Id))
+                {
+                    return;
+                }
+
+                collector.AddFrameworkGroupNames(c, c.Allowed);
+                collector.AddFrameworkContractSource(c, c.Source);
+            },
+        },
+        new(
             "project_metadata", "strict_project_metadata", "audit_project_metadata", true,
             g => g.StrictProjectMetadata, g => g.AuditProjectMetadata,
             (session, contract) => ArchitectureHandlerResult.FromViolations(

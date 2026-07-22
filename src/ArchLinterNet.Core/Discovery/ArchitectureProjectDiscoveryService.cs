@@ -204,6 +204,7 @@ public sealed class ArchitectureProjectDiscoveryService : IArchitectureProjectDi
             projectFile.AssemblyName,
             projectFile.TargetFrameworks,
             projectFile.PackageReferences,
+            projectFile.FrameworkReferences,
             projectFile.Properties.ToDictionary(
                 pair => pair.Key,
                 pair => pair.Value with { SourcePath = GetRelativePath(repositoryRoot, pair.Value.SourcePath) },

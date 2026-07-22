@@ -19,8 +19,8 @@ public sealed class ArchitectureContractFamilyBindingsTests
     {
         var familyIds = ArchitectureContractFamilyBindings.All.Select(b => b.FamilyId).ToList();
 
-        Assert.That(familyIds, Has.Count.EqualTo(29));
-        Assert.That(familyIds.Distinct(StringComparer.Ordinal).Count(), Is.EqualTo(29));
+        Assert.That(familyIds, Has.Count.EqualTo(31));
+        Assert.That(familyIds.Distinct(StringComparer.Ordinal).Count(), Is.EqualTo(31));
     }
 
     [Test]

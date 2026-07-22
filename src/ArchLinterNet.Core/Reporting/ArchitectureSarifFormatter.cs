@@ -348,6 +348,7 @@ public sealed partial class ArchitectureSarifFormatter : IArchitectureSarifForma
         {
             DependencyDiagnostic or ConfigurationDiagnostic => "namespace",
             PackageDependencyDiagnostic or PackageAllowOnlyDiagnostic => "package",
+            FrameworkReferenceDiagnostic or FrameworkReferenceAllowOnlyDiagnostic => "framework-reference",
             _ => "type",
         };
     }
@@ -360,6 +361,8 @@ public sealed partial class ArchitectureSarifFormatter : IArchitectureSarifForma
             ExternalDependencyDiagnostic d => (d.SourceType, d.ForbiddenNamespace, d.ForbiddenReferences),
             PackageDependencyDiagnostic d => (d.SourceType, d.ForbiddenNamespace, d.ForbiddenReferences),
             PackageAllowOnlyDiagnostic d => (d.SourceType, d.ForbiddenNamespace, d.ForbiddenReferences),
+            FrameworkReferenceDiagnostic d => (d.SourceType, d.ForbiddenNamespace, d.ForbiddenReferences),
+            FrameworkReferenceAllowOnlyDiagnostic d => (d.SourceType, d.ForbiddenNamespace, d.ForbiddenReferences),
             TypePlacementDiagnostic d => (d.SourceType, d.ForbiddenNamespace, d.ForbiddenReferences),
             LayoutConventionDiagnostic d => (d.SourceType, d.ForbiddenNamespace, d.ForbiddenReferences),
             PublicApiSurfaceDiagnostic d => (d.SourceType, d.ForbiddenNamespace, d.ForbiddenReferences),

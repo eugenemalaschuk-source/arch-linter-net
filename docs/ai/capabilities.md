@@ -48,6 +48,10 @@ focused local fragments and contains:
 | Contextual dependency | `strict_context_dependencies` | `audit_context_dependencies` | A source `(role, metadata)` selector's type must not reference a target matching a `forbidden` selector, compared directly against discovered role/metadata (no `layers.<name>` involved). |
 | Contextual allow-only | `strict_context_allow_only` | `audit_context_allow_only` | A source `(role, metadata)` selector's type may reference only targets matching an `allowed` selector; same selector shape and operator vocabulary as contextual dependency. |
 | Semantic port boundary | `strict_port_boundaries` | `audit_port_boundaries` | A selected source may reach a target context only through an explicit port or ACL seam; compiled adapter interface bindings can be checked. |
+| Package dependency | `strict_package_dependency` | `audit_package_dependency` | Source project/assembly does not declare a `PackageReference` matching a forbidden `packages` group. |
+| Package allow-only | `strict_package_allow_only` | `audit_package_allow_only` | Source project/assembly declares only `PackageReference`s matching an allowed `packages` group. |
+| Framework dependency | `strict_framework_dependency` | `audit_framework_dependency` | Source project/assembly does not declare a `FrameworkReference` matching a forbidden `framework_references` group. |
+| Framework allow-only | `strict_framework_allow_only` | `audit_framework_allow_only` | Source project/assembly declares only `FrameworkReference`s matching an allowed `framework_references` group. |
 
 ## Matching semantics
 

@@ -250,6 +250,8 @@ public sealed partial class ArchitectureDiagnosticFormatter : IArchitectureDiagn
         ExternalDependencyDiagnostic d => d.SourceType,
         PackageDependencyDiagnostic d => d.SourceType,
         PackageAllowOnlyDiagnostic d => d.SourceType,
+        FrameworkReferenceDiagnostic d => d.SourceType,
+        FrameworkReferenceAllowOnlyDiagnostic d => d.SourceType,
         TypePlacementDiagnostic d => d.SourceType,
         LayoutConventionDiagnostic d => d.SourceType,
         PublicApiSurfaceDiagnostic d => d.SourceType,
@@ -271,6 +273,8 @@ public sealed partial class ArchitectureDiagnosticFormatter : IArchitectureDiagn
         ExternalDependencyDiagnostic d => d.ForbiddenNamespace,
         PackageDependencyDiagnostic d => d.ForbiddenNamespace,
         PackageAllowOnlyDiagnostic d => d.ForbiddenNamespace,
+        FrameworkReferenceDiagnostic d => d.ForbiddenNamespace,
+        FrameworkReferenceAllowOnlyDiagnostic d => d.ForbiddenNamespace,
         TypePlacementDiagnostic d => d.ForbiddenNamespace,
         LayoutConventionDiagnostic d => d.ForbiddenNamespace,
         PublicApiSurfaceDiagnostic d => d.ForbiddenNamespace,
@@ -292,6 +296,8 @@ public sealed partial class ArchitectureDiagnosticFormatter : IArchitectureDiagn
         ExternalDependencyDiagnostic d => d.ForbiddenReferences,
         PackageDependencyDiagnostic d => d.ForbiddenReferences,
         PackageAllowOnlyDiagnostic d => d.ForbiddenReferences,
+        FrameworkReferenceDiagnostic d => d.ForbiddenReferences,
+        FrameworkReferenceAllowOnlyDiagnostic d => d.ForbiddenReferences,
         TypePlacementDiagnostic d => d.ForbiddenReferences,
         LayoutConventionDiagnostic d => d.ForbiddenReferences,
         PublicApiSurfaceDiagnostic d => d.ForbiddenReferences,
@@ -595,6 +601,12 @@ public sealed partial class ArchitectureDiagnosticFormatter : IArchitectureDiagn
                 break;
             case PackageAllowOnlyDiagnostic packageAllowOnly:
                 obj["allowed_package_groups"] = packageAllowOnly.AllowedPackageGroups.ToArray();
+                break;
+            case FrameworkReferenceDiagnostic frameworkDependency:
+                obj["forbidden_framework_group"] = frameworkDependency.ForbiddenFrameworkGroup;
+                break;
+            case FrameworkReferenceAllowOnlyDiagnostic frameworkAllowOnly:
+                obj["allowed_framework_groups"] = frameworkAllowOnly.AllowedFrameworkGroups.ToArray();
                 break;
             case TypePlacementDiagnostic typePlacement:
                 ApplyTypePlacementCiFields(typePlacement, obj);

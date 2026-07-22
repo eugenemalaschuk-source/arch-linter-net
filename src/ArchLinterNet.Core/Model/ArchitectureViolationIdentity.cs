@@ -40,6 +40,7 @@ public sealed record ArchitectureViolationIdentity(
                 or "assembly_independence" or "assembly_dependency" or "assembly_allow_only" => "dependency",
             "method_body" => "call",
             "package_dependency" or "package_allow_only" => "package",
+            "framework_dependency" or "framework_allow_only" => "package",
             "coverage" => "coverage",
             _ => "reference",
         };

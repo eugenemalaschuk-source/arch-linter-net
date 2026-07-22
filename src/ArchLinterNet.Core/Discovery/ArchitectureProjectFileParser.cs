@@ -30,6 +30,7 @@ internal sealed class ArchitectureProjectFileParser : IArchitectureProjectFilePa
 
         List<ArchitectureDiscoveredPackageReference> packageReferences =
             ParsePackageReferences(document, projectPath, fileSystem);
+        List<ArchitectureDiscoveredFrameworkReference> frameworkReferences = ParseFrameworkReferences(document);
         Dictionary<string, ArchitectureDiscoveredProjectProperty> properties =
             ParseProperties(document, projectPath, fileSystem);
         List<ArchitectureDiscoveredFriendAssembly> friendAssemblies = ParseFriendAssemblies(document, projectPath, fileSystem);
@@ -40,6 +41,7 @@ internal sealed class ArchitectureProjectFileParser : IArchitectureProjectFilePa
             resolvedAssemblyName,
             frameworks,
             packageReferences,
+            frameworkReferences,
             properties,
             friendAssemblies,
             projectReferences);
@@ -129,6 +131,20 @@ internal sealed class ArchitectureProjectFileParser : IArchitectureProjectFilePa
 
                 return new ArchitectureDiscoveredPackageReference(reference.PackageId, resolvedVersion);
             })
+            .ToList();
+    }
+
+    internal static List<ArchitectureDiscoveredFrameworkReference> ParseFrameworkReferences(XDocument document)
+    {
+        return document.Descendants("FrameworkReference")
+            .Select(element =>
+            {
+                string? include = element.Attribute(IncludeAttribute)?.Value;
+                string? condition = element.Attribute("Condition")?.Value;
+                return (Include: include, Condition: string.IsNullOrWhiteSpace(condition) ? null : condition.Trim());
+            })
+            .Where(reference => !string.IsNullOrWhiteSpace(reference.Include))
+            .Select(reference => new ArchitectureDiscoveredFrameworkReference(reference.Include!.Trim(), reference.Condition))
             .ToList();
     }
 
