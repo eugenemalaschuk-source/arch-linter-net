@@ -478,6 +478,9 @@ public sealed partial class ArchitectureDiagnosticFormatter : IArchitectureDiagn
     private static string FormatCompositionContextForHumans(CompositionDiagnostic composition)
     {
         return $" (matched_api: {composition.MatchedForbiddenApi}" +
+               (composition.SourceAssembly != null
+                   ? $", source_assembly: {composition.SourceAssembly}"
+                   : string.Empty) +
                (composition.SourceMember != null
                    ? $", source_member: {composition.SourceMember}"
                    : string.Empty) +
@@ -748,6 +751,9 @@ public sealed partial class ArchitectureDiagnosticFormatter : IArchitectureDiagn
 
         if (composition.MatchedForbiddenApi != null)
             obj["matched_forbidden_api"] = composition.MatchedForbiddenApi;
+
+        if (composition.SourceAssembly != null)
+            obj["source_assembly"] = composition.SourceAssembly;
 
         if (composition.ExpectedCompositionBoundary != null)
             obj["expected_composition_boundary"] = composition.ExpectedCompositionBoundary;

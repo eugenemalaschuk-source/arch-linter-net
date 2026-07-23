@@ -1,7 +1,9 @@
+using System.Linq;
 using ArchLinterNet.Core.Contracts;
 using ArchLinterNet.Core.Contracts.Families;
 using ArchLinterNet.Core.Execution;
 using ArchLinterNet.Core.Model;
+using ArchLinterNet.Core.Resolution;
 using ArchLinterNet.Core.Validation;
 using NUnit.Framework;
 using ArchitectureContractGroups = ArchLinterNet.Core.Contracts.Families.ArchitectureContractGroups;
@@ -384,6 +386,59 @@ public sealed class CompositionContractTests
     }
 
     [Test]
+    public void Composition_AllowedOnlyInTypesMissingAssemblyOrType_ThrowsActionableError()
+    {
+        string policyPath = WritePolicy("""
+            version: 1
+            name: Test
+            analysis:
+              target_assemblies: [ArchLinterNet.Core]
+            contracts:
+              strict_composition:
+                - name: incomplete-type-selector
+                  forbidden_apis: [System.IServiceProvider.GetService]
+                  allowed_only_in_types:
+                    - assembly: Host.Api
+                  reason: Missing 'type'.
+            """);
+
+        InvalidOperationException ex = Assert.Throws<InvalidOperationException>(() =>
+            new ArchitecturePolicyDocumentLoader().Load(policyPath))!;
+
+        Assert.That(ex.Message, Does.Contain("incomplete-type-selector"));
+        Assert.That(ex.Message, Does.Contain("allowed_only_in_types"));
+    }
+
+    [Test]
+    public void CheckCompositionContract_AllowedOnlyInTypes_ExemptsOnlyTheNamedTypeNotItsAssemblyOrNamespace()
+    {
+        var contract = new ArchitectureCompositionContract
+        {
+            Id = "assembly-type-selector",
+            Name = "assembly-type-selector",
+            ForbiddenApis = new List<string> { GetServiceApi },
+            AllowedOnlyInTypes = new List<ArchitectureCompositionTypeSelector>
+            {
+                new() { Assembly = AssemblyName, Type = "CompositionContractTestFixtures.OtherHost.Program" }
+            }
+        };
+        var document = CreateDocument(contract);
+        var runner = new ArchitectureContractRunner(CreateContext(), document);
+
+        var violations = runner.Session.CheckCompositionContract(contract);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(violations.Any(v =>
+                v.SourceType == "CompositionContractTestFixtures.OtherHost.Program"), Is.False,
+                "The explicitly allow-listed assembly+type pair must be exempt from scanning.");
+            Assert.That(violations.Any(v =>
+                v.SourceType == "CompositionContractTestFixtures.OtherHost.UnlistedSibling"), Is.True,
+                "A sibling type in the same namespace/assembly that isn't named by the selector must still be scanned.");
+        });
+    }
+
+    [Test]
     public void ValidateStrict_CompositionViolation_EndToEndThroughValidationService()
     {
         string policyPath = WritePolicy($"""
@@ -412,6 +467,142 @@ public sealed class CompositionContractTests
         Assert.That(outcome.Violations.Any(v =>
             v.SourceType == "CompositionContractTestFixtures.Application.ServiceLocatorLeak"
             && (v.Payload as CompositionPayload)?.MatchedForbiddenApi == GetServiceApi), Is.True);
+    }
+
+    [Test]
+    public void CheckCompositionContract_Violation_BaselineCandidateIsAssemblyAndMemberQualified()
+    {
+        var contract = new ArchitectureCompositionContract
+        {
+            Id = "service-locator-confined-to-composition",
+            Name = "service-locator-confined-to-composition",
+            ForbiddenApis = new List<string> { GetServiceApi },
+            AllowedOnlyInNamespaces = new List<string> { CompositionNamespace }
+        };
+        var document = CreateDocument(contract);
+        var runner = new ArchitectureContractRunner(CreateContext(), document);
+
+        runner.Session.CheckCompositionContract(contract);
+
+        ArchitectureBaselineCandidate candidate = runner.BaselineCandidates.Single(c =>
+            c.SourceType == "CompositionContractTestFixtures.Application.ServiceLocatorLeak");
+
+        Assert.That(candidate.Identity, Is.Not.Null);
+        Assert.Multiple(() =>
+        {
+            Assert.That(candidate.Identity!.ContractFamily, Is.EqualTo("composition"));
+            Assert.That(candidate.Identity.Kind, Is.EqualTo("call"));
+            Assert.That(candidate.Identity.SourceAssembly, Is.EqualTo(AssemblyName));
+            Assert.That(candidate.Identity.SourceMember,
+                Is.EqualTo("CompositionContractTestFixtures.Application.ServiceLocatorLeak.ResolveFromLocator"));
+            Assert.That(candidate.Identity.TargetMember, Is.EqualTo(GetServiceApi));
+        });
+    }
+
+    [Test]
+    public void IsIgnored_CompositionContract_SameNamedTypeDifferentAssembly_OnlyBaselinedAssemblySuppressed()
+    {
+        // Mirrors the P0 same-named-type-across-assemblies scenario already proven for
+        // strict/audit dependency contracts (#357) — issue #360 requires the same guarantee for
+        // strict_composition/audit_composition.
+        var ignoredViolations = new List<ArchitectureIgnoredViolation>
+        {
+            new()
+            {
+                SourceType = "Program",
+                ForbiddenReference = GetServiceApi,
+                Reason = "known debt",
+                IdentityVersion = 2,
+                ContractFamily = "composition",
+                Kind = "call",
+                SourceAssembly = "Host.A",
+                TargetMember = GetServiceApi,
+                Occurrence = 0,
+            },
+        };
+
+        var contextForA = new ArchitectureContractExecutionContext(
+            "contract-name", "contract-id", ignoredViolations,
+            enableUnmatchedIgnoreTracking: true, contractGroup: "strict_composition",
+            baselineCandidates: new List<ArchitectureBaselineCandidate>());
+        var contextForB = new ArchitectureContractExecutionContext(
+            "contract-name", "contract-id", ignoredViolations,
+            enableUnmatchedIgnoreTracking: true, contractGroup: "strict_composition",
+            baselineCandidates: new List<ArchitectureBaselineCandidate>());
+
+        bool ignoredA = contextForA.IsIgnored(
+            "Program", GetServiceApi, sourceAssembly: "Host.A", targetMember: GetServiceApi);
+        bool ignoredB = contextForB.IsIgnored(
+            "Program", GetServiceApi, sourceAssembly: "Host.B", targetMember: GetServiceApi);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(ignoredA, Is.True, "Host.A.Program was explicitly baselined and must be suppressed.");
+            Assert.That(ignoredB, Is.False,
+                "Host.B.Program shares source/target text but a different assembly — it must still be reported.");
+        });
+    }
+
+    [Test]
+    public void CheckCompositionContract_TwoCallsToSameApiInSameMember_BaseliningFirstDoesNotSuppressSecond()
+    {
+        // Regression test: the IL match list used to be Distinct()-ed by (method, pattern, matched
+        // member) before ever reaching IsIgnored/the occurrence counter, so two distinct call sites
+        // to the same forbidden API within the same source member collapsed into a single occurrence.
+        // Baselining "occurrence 0" therefore silently suppressed both real call sites, not just the
+        // first — this is exactly the "multiple occurrences inside one type remain distinct"
+        // acceptance criterion from issue #360.
+        const string RepeatedCallSourceType = "CompositionContractTestFixtures.Application.RepeatedCallLeak";
+        const string RepeatedCallSourceMember = "CompositionContractTestFixtures.Application.RepeatedCallLeak.ResolveTwice";
+
+        var contractNoBaseline = new ArchitectureCompositionContract
+        {
+            Id = "repeated-call",
+            Name = "repeated-call",
+            ForbiddenApis = new List<string> { GetServiceApi },
+            AllowedOnlyInNamespaces = new List<string> { CompositionNamespace }
+        };
+        var documentNoBaseline = CreateDocument(contractNoBaseline);
+        var runnerNoBaseline = new ArchitectureContractRunner(CreateContext(), documentNoBaseline);
+        runnerNoBaseline.Session.CheckCompositionContract(contractNoBaseline);
+
+        // Both raw call sites must reach the occurrence-tracking machinery even though only one
+        // violation is reported per (type, source member, matched API) tuple.
+        int candidateCount = runnerNoBaseline.BaselineCandidates
+            .Count(c => c.SourceType == RepeatedCallSourceType && c.Identity!.SourceMember == RepeatedCallSourceMember);
+        Assert.That(candidateCount, Is.EqualTo(2),
+            "Both distinct call sites must independently reach the baseline-candidate/occurrence machinery.");
+
+        var contractWithBaseline = new ArchitectureCompositionContract
+        {
+            Id = "repeated-call",
+            Name = "repeated-call",
+            ForbiddenApis = new List<string> { GetServiceApi },
+            AllowedOnlyInNamespaces = new List<string> { CompositionNamespace },
+            IgnoredViolations = new List<ArchitectureIgnoredViolation>
+            {
+                new()
+                {
+                    SourceType = RepeatedCallSourceType,
+                    ForbiddenReference = GetServiceApi,
+                    Reason = "baselined first occurrence",
+                    IdentityVersion = 2,
+                    ContractFamily = "composition",
+                    Kind = "call",
+                    SourceAssembly = AssemblyName,
+                    SourceMember = RepeatedCallSourceMember,
+                    TargetMember = GetServiceApi,
+                    Occurrence = 0,
+                }
+            }
+        };
+        var documentWithBaseline = CreateDocument(contractWithBaseline);
+        var runnerWithBaseline = new ArchitectureContractRunner(CreateContext(), documentWithBaseline);
+
+        var violations = runnerWithBaseline.Session.CheckCompositionContract(contractWithBaseline);
+
+        Assert.That(violations.Any(v => v.SourceType == RepeatedCallSourceType), Is.True,
+            "The second, un-baselined occurrence must still be reported even though the first occurrence was baselined.");
     }
 
     [Test]

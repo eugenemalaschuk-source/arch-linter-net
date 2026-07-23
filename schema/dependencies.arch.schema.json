@@ -1693,11 +1693,25 @@
             "allowed_only_in_namespaces": { "$ref": "#/$defs/stringList" },
             "allowed_only_in_projects": { "$ref": "#/$defs/stringList" },
             "allowed_only_in_assemblies": { "$ref": "#/$defs/stringList" },
+            "allowed_only_in_types": {
+              "type": "array",
+              "items": { "$ref": "#/$defs/compositionTypeSelector" },
+              "default": []
+            },
             "ignored_violations": { "$ref": "#/$defs/ignoredViolations" },
             "reason": { "type": "string" }
           }
         }
       ]
+    },
+    "compositionTypeSelector": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["assembly", "type"],
+      "properties": {
+        "assembly": { "type": "string", "minLength": 1 },
+        "type": { "type": "string", "minLength": 1 }
+      }
     },
     "layerTemplateContract": {
       "type": "object",

@@ -21,15 +21,27 @@ internal sealed class CompositionValidator : IArchitecturePolicyDocumentValidato
             bool hasAllowedOnlyExpectation = PolicyDocumentValidatorSupport.HasNonBlankEntry(contract.AllowedOnlyInLayers)
                 || PolicyDocumentValidatorSupport.HasNonBlankEntry(contract.AllowedOnlyInNamespaces)
                 || PolicyDocumentValidatorSupport.HasNonBlankEntry(contract.AllowedOnlyInProjects)
-                || PolicyDocumentValidatorSupport.HasNonBlankEntry(contract.AllowedOnlyInAssemblies);
+                || PolicyDocumentValidatorSupport.HasNonBlankEntry(contract.AllowedOnlyInAssemblies)
+                || contract.AllowedOnlyInTypes.Count > 0;
 
             if (!hasAllowedOnlyExpectation)
             {
                 throw new InvalidOperationException(
                     $"Composition contract '{contract.Name}' declares no " +
-                    "allowed_only_in_layers/allowed_only_in_namespaces/allowed_only_in_projects/allowed_only_in_assemblies " +
+                    "allowed_only_in_layers/allowed_only_in_namespaces/allowed_only_in_projects/allowed_only_in_assemblies/allowed_only_in_types " +
                     "composition boundary. Declare at least one, or every call site in the codebase would be " +
                     "considered outside the boundary.");
+            }
+
+            bool hasIncompleteTypeSelector = contract.AllowedOnlyInTypes.Any(typeSelector =>
+                string.IsNullOrWhiteSpace(typeSelector.Assembly) || string.IsNullOrWhiteSpace(typeSelector.Type));
+
+            if (hasIncompleteTypeSelector)
+            {
+                throw new InvalidOperationException(
+                    $"Composition contract '{contract.Name}' declares an 'allowed_only_in_types' entry " +
+                    "missing 'assembly' or 'type'. Both are required — a type selector without an assembly " +
+                    "or type identity cannot match anything.");
             }
         }
     }

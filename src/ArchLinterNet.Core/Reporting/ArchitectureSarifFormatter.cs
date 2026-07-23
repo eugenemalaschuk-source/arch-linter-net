@@ -174,6 +174,11 @@ public sealed partial class ArchitectureSarifFormatter : IArchitectureSarifForma
 
     private static Dictionary<string, object?>? BuildProperties(ArchitectureDiagnostic diagnostic)
     {
+        if (diagnostic is CompositionDiagnostic composition)
+        {
+            return BuildCompositionProperties(composition);
+        }
+
         IReadOnlyCollection<FrameworkReferenceEvidence>? evidence = diagnostic switch
         {
             FrameworkReferenceDiagnostic d => d.Evidence,
@@ -197,6 +202,35 @@ public sealed partial class ArchitectureSarifFormatter : IArchitectureSarifForma
                 ["configuration"] = e.Configuration,
             }).ToArray(),
         };
+    }
+
+    // Composition is the one non-FrameworkReference family whose per-violation identity carries
+    // structured evidence (source assembly/member, matched API) beyond the generic
+    // sourceType/forbiddenNamespace/references triple every family already gets via ExtractFields —
+    // exposed here so same-named types in different assemblies are distinguishable in SARIF, not
+    // just in human/--json/--explain output (issue #360).
+    private static Dictionary<string, object?>? BuildCompositionProperties(CompositionDiagnostic composition)
+    {
+        if (composition.SourceAssembly == null && composition.SourceMember == null
+            && composition.MatchedForbiddenApi == null && composition.ExpectedCompositionBoundary == null)
+        {
+            return null;
+        }
+
+        var properties = new Dictionary<string, object?>();
+        if (composition.SourceAssembly != null)
+            properties["source_assembly"] = composition.SourceAssembly;
+
+        if (composition.SourceMember != null)
+            properties["source_member"] = composition.SourceMember;
+
+        if (composition.MatchedForbiddenApi != null)
+            properties["matched_forbidden_api"] = composition.MatchedForbiddenApi;
+
+        if (composition.ExpectedCompositionBoundary != null)
+            properties["expected_composition_boundary"] = composition.ExpectedCompositionBoundary;
+
+        return properties;
     }
 
     private static string? FirstFrameworkReferenceSourcePath(ArchitectureDiagnostic diagnostic)
