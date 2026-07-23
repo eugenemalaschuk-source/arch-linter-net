@@ -11,11 +11,20 @@ public sealed partial class ArchitectureDiagnosticFormatter
 {
     private static string FormatFrameworkReferenceContextForHumans(IReadOnlyCollection<FrameworkReferenceEvidence> evidence)
     {
-        string entries = string.Join(", ", evidence.Select(e =>
-            string.IsNullOrEmpty(e.Configuration)
-                ? $"{e.FrameworkName} ({e.TargetFramework}, {(e.Explicit ? "explicit" : "implicit")}, {e.SourcePath})"
-                : $"{e.FrameworkName} ({e.TargetFramework}, {e.Configuration}, {(e.Explicit ? "explicit" : "implicit")}, {e.SourcePath})"));
+        string entries = string.Join(", ", evidence.Select(FormatFrameworkReferenceEvidenceEntry));
         return $" [{entries}]";
+    }
+
+    private static string FormatFrameworkReferenceEvidenceEntry(FrameworkReferenceEvidence evidence)
+    {
+        string classification = evidence.Explicit ? "explicit" : "implicit";
+
+        if (string.IsNullOrEmpty(evidence.Configuration))
+        {
+            return $"{evidence.FrameworkName} ({evidence.TargetFramework}, {classification}, {evidence.SourcePath})";
+        }
+
+        return $"{evidence.FrameworkName} ({evidence.TargetFramework}, {evidence.Configuration}, {classification}, {evidence.SourcePath})";
     }
 
     private static void ApplyFrameworkReferenceEvidenceCiFields(
