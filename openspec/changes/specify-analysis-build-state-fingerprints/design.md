@@ -1,105 +1,118 @@
 ## Context
 
-Issue #355 requires one approved **Analysis and build state** slice before #362 can implement deterministic preflight and explicit build preparation. The slice must also remain usable by the immutable analysis snapshot (#363), verified cache (#365), final acceptance corpus (#366), profiling (#374), and cooperative cancellation (#375).
+Issue #355 requires an approved **Analysis and build state** slice before #362 can implement deterministic preflight and explicit build preparation. The same identity model must also be consumed by #363 (immutable snapshot), #365 (verified cache), #366 (acceptance corpus), #374 (profiling), and #375 (cancellation).
 
-Today the repository has project discovery, MSBuild-backed Roslyn context resolution, assembly probing, and per-run session state, but no shared definition of:
+The repository already has project discovery, MSBuild-backed Roslyn context resolution, assembly probing, and per-run session state, but it does not define:
 
-- portable logical input identity;
-- expected output identity for a project/configuration/TFM/RID;
-- evidence that an existing PE/PDB was produced from the current effective inputs;
+- portable build-input identity;
+- policy-dependent analysis-input identity;
+- expected output identity for a selected project/configuration/TFM/RID;
+- evidence that an existing artifact was built from the current build inputs;
 - exact artifact identity for snapshot/cache reuse;
 - process-local snapshot ownership;
 - fail-closed build-state categories.
 
-A single hash cannot serve every purpose. A portable logical identity must ignore the absolute checkout location, while exact snapshot/cache reuse must distinguish different artifact bytes. Human diagnostics need local paths, timestamps, and searched locations, but those values are unstable and must not change portable equality.
+One hash cannot safely represent all of these concerns. In particular, changing an architecture policy must invalidate an analysis snapshot but must not make an unchanged assembly stale. Conversely, changing source, project, or relevant imported build content must invalidate previously verified artifacts even when timestamps appear current.
 
 ## Goals / Non-Goals
 
 **Goals:**
 
-- Define the identity layers and their versioned relationship before implementation.
-- Make configuration, TFM, RID, project graph, policy/configuration, source/compiler inputs, and verified artifacts explicit.
-- Make identical repository inputs portable across supported operating systems without relying on identical absolute checkout paths.
+- Define versioned, portable build and analysis fingerprint layers before implementation.
+- Separate build freshness from policy-dependent analysis identity.
+- Include configuration, TFM, RID, project graph, source/project/import content, compiler inputs, policy/configuration, and verified artifacts explicitly.
 - Reject missing, stale, mismatched, inconsistent, or unverifiable artifacts before any contract executes.
-- Accept an ordinary current .NET SDK build when compiler-produced evidence is sufficient; require an explicit preparation path when it is not.
-- Keep ordinary validation free of implicit build, restore, or network access.
+- Keep ordinary validation free of implicit build, restore, or network preparation.
 - Keep policy YAML unable to start or parameterize build execution.
-- Define CLI and Testing snapshot ownership/reuse consistently.
-- Give #362, #363, #365, #374, and #375 one compatible contract.
+- Define equivalent CLI and `ArchLinterNet.Testing` snapshot semantics.
+- Give downstream issues one contract that they must reuse rather than redefine.
 
 **Non-Goals:**
 
 - Implementing preflight, build orchestration, cache, profiling, or cancellation.
 - Replacing MSBuild or defining non-.NET build orchestration.
-- Making MSBuild evaluation or build execution a sandbox for untrusted repositories.
-- Defining public CLI spelling beyond the already-approved `--ensure-built` / `--no-restore` semantics; #362 may choose equivalent command grouping while preserving this behavior.
-- Publishing a new public policy field or allowing policy files to control preparation.
-- Treating timestamps as proof of freshness.
+- Treating MSBuild evaluation/build as a sandbox for untrusted repositories.
+- Publishing new public CLI/API/diagnostic behavior before #362/#363 implement it.
+- Treating timestamps or file size as proof of freshness.
 
 ## Decisions
 
-### 1. Use a versioned canonical fingerprint envelope
+### 1. Use a versioned canonical envelope
 
-Every persisted or machine-readable fingerprint uses the envelope identifier `analysis-build-state/v1`, SHA-256, lowercase hexadecimal digests, and canonical UTF-8 JSON. Object property names are serialized in ordinal lexicographic order. Arrays whose order has no semantic meaning are sorted by their declared canonical key before hashing; order-sensitive arrays retain their effective order and state that fact in their schema.
+Every persisted or machine-readable fingerprint uses envelope id `analysis-build-state/v1`, SHA-256, lowercase hexadecimal digests, and canonical UTF-8 JSON. Object properties are serialized in ordinal lexicographic order. Set-like arrays are sorted by a declared canonical key; semantically ordered arrays retain their effective order.
 
-The envelope carries both `logicalInputFingerprint` and `artifactSetFingerprint`. The completed `analysisSessionFingerprint` hashes the envelope version, tool analysis-semantics version, execution request, logical input fingerprint, and artifact set fingerprint.
+Repository paths use repository-relative `/`-separated keys. Absolute checkout paths, drive letters, UNC prefixes, current working directory, host temp paths, and CI-provider identifiers are excluded from stable identity.
 
-This split is intentional:
+Changing or reinterpreting an equality-affecting field requires a new versioned envelope or an explicitly compatible extension. Implementations must not silently change v1 equality.
 
-- two machines can produce the same logical input fingerprint from the same repository state even when checkout roots differ;
-- exact session/snapshot/cache reuse still requires the same verified artifact bytes and tool semantics;
-- nondeterministic builds may therefore share logical identity but have different artifact/session fingerprints.
+### 2. Define seven identity layers
 
-### 2. Define six identity layers
+1. **Project evaluation fingerprint** — one selected project under one configuration/TFM/platform/RID, including the selected effective MSBuild/compiler manifest and raw content digests for relevant project/import inputs.
+2. **Effective build-input fingerprint** — the selected project graph plus all project-evaluation fingerprints, source/generated/analyzer/reference input identities and content digests required to prove whether outputs are current.
+3. **Effective analysis-input fingerprint** — the build-input fingerprint plus effective policy/configuration provenance and content, selected condition set, requested analysis views, and analysis-affecting tool/schema versions.
+4. **Expected build-output identity** — project key, assembly name, output kind, configuration, TFM, platform, optional RID, and canonical output role/path.
+5. **Verified artifact fingerprint** — expected output identity plus exact SHA-256 digests for PE, associated PDB or receipt, reference assembly where applicable, and required first-party dependency artifacts.
+6. **Completed analysis-session fingerprint** — analysis-input fingerprint plus verified artifact-set fingerprint, execution request, and tool analysis-semantics version. It is published only after successful full preflight and snapshot construction.
+7. **Testing snapshot handle** — an opaque process-local ownership identifier for one snapshot instance. It is never serialized, persisted, or used as a cache key.
 
-1. **Project evaluation fingerprint** — one selected project under one configuration/TFM/RID. It describes the effective evaluated project/compiler manifest, not raw machine paths.
-2. **Effective analysis input fingerprint** — selected project graph, effective policy/configuration provenance, source/compiler inputs, project-evaluation fingerprints, requested condition set, and analysis-affecting tool/schema versions.
-3. **Expected build-output identity** — the logical output expected for a project/configuration/TFM/RID: project key, assembly name, output kind, target framework, RID, and canonical output role/path.
-4. **Verified artifact fingerprint** — expected output identity plus SHA-256 digests and verified metadata for the PE, associated PDB or build receipt, reference assembly where applicable, and required first-party dependency artifacts.
-5. **Completed analysis-session fingerprint** — effective analysis input fingerprint + verified artifact-set fingerprint + execution request + tool analysis-semantics version. It is not publishable until preflight and snapshot construction complete successfully.
-6. **Testing snapshot identity and ownership** — the completed session fingerprint identifies reusable content; a separate opaque process-local handle identifies one owned object instance. The handle is never serialized, persisted, or used as a cache key.
+Two machines with equivalent repository state can produce the same build/analysis fingerprints without identical checkout roots. Two nondeterministic builds may share build/analysis input identity but have different artifact and completed-session fingerprints.
 
-### 3. Stable identity uses repository-relative logical paths
+### 3. Normalize paths portably and fail closed on ambiguity
 
-For files inside the repository root, the stable path key is the repository-relative path with `/` separators and the repository/discovery spelling preserved. Equality and ordering are ordinal. Absolute checkout paths, drive letters, UNC prefixes, host temp paths, and current working directory are excluded.
+For repository files, stable identity uses the repository-relative spelling with `/` separators and ordinal comparison/order. The implementation resolves traversal and symlink/junction containment before fingerprinting.
 
-Before creating a key, the implementation resolves path traversal and symlink/junction containment. A path escaping the repository root is rejected as `unverifiable` unless a future explicitly versioned external-input contract permits it. Symlink identity includes the repository-relative link path, normalized link target text, and resolved content digest. Duplicate logical paths caused by case aliases on a case-insensitive file system are rejected rather than silently collapsed.
+A selected path that escapes the repository root is `unverifiable` unless a future version introduces an explicit typed external-input contract. A symlink identity includes its repository-relative link path, normalized link-target text, and resolved content digest. Case aliases that map to one host file are rejected instead of silently collapsed.
 
-Paths outside the repository that are legitimate SDK/package inputs use typed logical coordinates instead of absolute paths, for example SDK identity/version, NuGet package id/version/content hash, framework-reference name/version, or assembly identity/content hash.
+Legitimate SDK/package/framework inputs outside the repository use typed coordinates such as SDK identity/version, NuGet package id/version/content hash, framework-reference name/version, or assembly identity/content hash rather than machine-local absolute paths.
 
-### 4. Project evaluation fingerprints capture effective analysis-affecting inputs
+### 4. Build-input identity is conservative and content based
 
-The v1 project-evaluation manifest includes at minimum:
+The v1 project/build manifest includes at minimum:
 
-- canonical project path and selected graph edges;
-- configuration, target framework, platform, and optional RID;
-- project/import content digests for relevant MSBuild inputs;
-- assembly name, output type, target name/extension, expected output role, reference-assembly behavior, and deterministic/debug settings;
-- effective compiler options that can change emitted code or semantic analysis, including defines, language version, nullable, unsafe, checked, optimization, deterministic/path-map, and warning-as-error state where it affects compilation;
-- canonical `Compile`, generated-compile, analyzer-config, additional-file, analyzer/source-generator, project-reference, package-reference, and framework-reference manifests relevant to the selected build;
-- content digests or typed identities for every input whose content can affect the analyzed artifact.
+- canonical selected project graph and project-reference edges;
+- configuration, platform, target framework, and optional RID;
+- raw content digests for the selected project file and every relevant imported MSBuild file;
+- assembly name, output type, target name/extension, expected output role, reference-assembly behavior, deterministic/debug settings;
+- effective compiler options that can affect emitted code or semantic analysis, including defines, language version, nullable, unsafe, checked, optimization, deterministic/path-map, and relevant warning/error settings;
+- canonical compile/generated source items and their content digests;
+- analyzer configs, additional files, analyzers, source generators, and their identities/digests;
+- project, package, framework, SDK, reference-pack, and metadata-reference identities/digests relevant to the selected build.
 
-Environment variables, global properties, and SDK selection are included only when they affect the evaluated manifest; machine-local values that do not affect it are diagnostic evidence only. An implementation must not key the fingerprint from a hand-picked subset while silently ignoring other MSBuild/compiler inputs it discovers as analysis-affecting.
+Any selected source content change, project-file change, or relevant imported-build-input change changes the build-input fingerprint and invalidates prior artifact verification. This intentionally favors fail-closed correctness over trying to prove that a textual project/import edit was semantically harmless.
 
-A raw project/import file edit that leaves the effective manifest unchanged does not create a false stale state. A change that changes any effective field or digest necessarily changes the fingerprint.
+Environment variables and global properties are included when they affect project evaluation or build output. Secrets and unrelated environment values are never fingerprinted or displayed.
 
-### 5. Artifact verification requires an attestation, not timestamps
+### 5. Analysis identity adds policy without making the assembly stale
 
-The current effective analysis input fingerprint is compared against one of two authoritative attestations:
+The effective analysis-input fingerprint includes the effective build-input fingerprint plus:
 
-1. **ArchLinterNet build receipt v1** produced after a successful product-owned preparation. It records the exact effective input fingerprint, expected output identities, output digests, and build command category.
-2. **Equivalent compiler-produced evidence** for ordinary SDK builds. For v1 this means a matching PE plus a portable PDB (or equivalent supported compiler record) whose document checksums, compilation options, metadata-reference identities, and PE/PDB association are sufficient to reconstruct and compare the effective compilation manifest. PE metadata supplies assembly name, target-framework attribute, module MVID, assembly references, and debug-directory association. MVID is validation evidence; the PE/PDB SHA-256 digests are the exact artifact identity.
+- root policy and imported-fragment provenance and content digests;
+- effective composed configuration;
+- selected condition set;
+- requested validation/baseline/coverage views whose choice changes results;
+- tool, policy-schema, diagnostic-schema, and analysis-semantics versions that can change results.
 
-Timestamp and file size may help explain or short-circuit obviously stale candidates, but they never establish freshness and never appear in stable equality. If neither attestation is complete enough to prove the selected input/output relationship, the state is `unverifiable`, not current. The diagnostic recommends explicit preparation.
+A policy-only change therefore invalidates session/snapshot/cache identity but does not change artifact freshness. Artifact attestation is compared against the build-input fingerprint, never the policy-dependent analysis-input fingerprint.
 
-This permits default modern .NET SDK builds with portable PDB evidence to be accepted without repository-specific configuration, while fail-closing for copied PE files, stripped/unsupported debug evidence, opaque legacy builds, or incomplete outputs.
+### 6. Artifact verification requires authoritative attestation
 
-### 6. Distinct build-state categories have deterministic precedence
+An artifact is current only when the current effective build-input fingerprint is proven by one of these supported attestations:
 
-Preflight evaluates the complete selected graph before contract execution and reports typed per-project evidence. The primary category precedence is:
+1. **ArchLinterNet build receipt v1** emitted after successful explicit preparation. It records the build-input fingerprint, expected output identities, exact output digests, and preparation category.
+2. **Equivalent supported compiler-produced evidence** for ordinary builds. For v1 this may be a matching PE plus portable PDB/compiler records that actually contain enough supported evidence to compare current document checksums, compilation options, metadata-reference identities, target/output metadata, and PE/PDB association.
+
+Portable PDB presence alone is not sufficient. If the required compilation-option/reference records are absent, stripped, unsupported, or incomplete, the state is `unverifiable-artifact` and explicit preparation is recommended.
+
+PE metadata supplies assembly name, target-framework attribute, assembly references, MVID, and debug-directory association. MVID is validation evidence; PE/PDB SHA-256 digests are exact artifact identity.
+
+Timestamp and file size may support diagnostics or candidate selection, but they never establish freshness and never participate in stable equality.
+
+### 7. Build-state categories have deterministic precedence
+
+Preflight evaluates the complete selected graph before contract execution. Each project gets one stable primary category using this precedence:
 
 1. `cancelled`;
-2. `restore-required` or project-evaluation prerequisite failure;
+2. prerequisite failure / `restore-required`;
 3. `missing-artifact`;
 4. `wrong-configuration`;
 5. `wrong-target-framework`;
@@ -109,127 +122,106 @@ Preflight evaluates the complete selected graph before contract execution and re
 9. `unverifiable-artifact`;
 10. `current`.
 
-A result may carry secondary evidence, but the primary category is stable. Examples:
+Secondary evidence may be attached without changing the primary category. No contract executes unless every selected project is `current`.
 
-- an assembly found only under another evaluated configuration is `wrong-configuration`, not merely missing;
-- a PE whose target-framework metadata does not match the selected TFM is `wrong-target-framework`;
-- a copied assembly with the expected filename but wrong project/assembly identity is `wrong-project-output`;
-- a project reference whose resolved artifact digest/identity does not match the selected dependency graph is `inconsistent-dependency-artifact`;
-- current output metadata with mismatched source/PDB/compiler-input evidence is `stale-artifact`;
+Examples:
+
+- an output found only for another evaluated configuration is `wrong-configuration`;
+- mismatched target-framework metadata is `wrong-target-framework`;
+- a copied same-named assembly with the wrong project/output association is `wrong-project-output`;
+- a first-party reference that does not match the selected dependency graph is `inconsistent-dependency-artifact`;
+- attestation that proves different source/project/import/compiler inputs is `stale-artifact`;
 - insufficient evidence to compare is `unverifiable-artifact`.
 
-No contract family executes when any selected project is not `current`.
+### 8. Preparation is explicit, structured, and outside policy YAML
 
-### 7. Preparation is explicit, structured, and outside policy YAML
-
-Ordinary validation performs evaluation and verification only. It never runs `dotnet restore`, `dotnet build`, an MSBuild compile target, or a caller command.
+Ordinary validation performs evaluation, fingerprinting, prerequisite inspection, and verification only. It never runs restore, build/compile targets, a caller hook, or network-dependent preparation.
 
 Explicit ensure-built preparation:
 
-- is opt-in from the CLI/application caller;
+- is opt-in from the trusted CLI/application caller;
 - resolves the selected graph/configuration/TFM/RID first;
-- invokes one supported graph-level build operation, not one build per contract and not repeated builds per project when a solution/project graph can be built once;
+- invokes one supported graph-level build operation rather than building per contract;
 - uses an executable plus structured argv, never a shell command string;
-- stops distinctly on restore failure, build failure, cancellation, or incomplete receipt/evidence;
-- re-evaluates and re-verifies after the build before analysis;
-- analyzes only the post-build verified artifacts.
+- stops distinctly on restore failure, build failure, cancellation, or incomplete evidence;
+- emits or validates authoritative attestation;
+- re-evaluates and re-verifies after build;
+- analyzes only verified post-build artifacts.
 
-`--no-restore` is independent:
+`--no-restore` is independent. Without ensure-built it forbids prerequisite recovery that would require restore/network. With ensure-built it constrains the structured build invocation and never silently retries with restore.
 
-- without ensure-built, it forbids any prerequisite path that would require restore/network and returns `restore-required` with the exact recommended command;
-- with ensure-built, it passes the no-restore boundary to the supported build invocation and fails actionably when assets/prerequisites are absent;
-- it never means "silently use whatever output exists."
+An optional caller build hook may be accepted only from trusted CLI/application configuration as executable + argv. Typed placeholders may expand selected solution/project, configuration, TFM, or RID into individual argv values. Policy YAML, imported fragments, baselines, snapshots, receipts, and cache entries can never provide executable paths or arguments.
 
-A caller-supplied build hook, if implemented by #362, is accepted only from trusted CLI/application configuration as an executable and argv array. Policy YAML, imported fragments, baselines, snapshots, and cache entries cannot provide executable paths or arguments. Placeholders may expand only from typed selected inputs (project/solution path, configuration, TFM, RID) and are inserted as individual argv values.
+### 9. Offline behavior is deterministic
 
-### 8. Offline and restricted execution is deterministic
+Ordinary validation requires no network access. A prepared checkout with local SDK/reference packs, restored assets, and verifiable current artifacts can validate offline. Ensure-built without `--no-restore` may invoke restore and therefore may require network access; that boundary is stated before analysis. Ensure-built with `--no-restore` never falls back to restore.
 
-Ordinary validation does not require network access. A prepared checkout with local SDK/reference packs, restored assets, and verifiable current artifacts can validate offline. Ensure-built without `--no-restore` may invoke restore and therefore may require network access; that boundary is stated before analysis. Ensure-built with `--no-restore` never falls back to restore.
+MSBuild evaluation/build operates inside the repository trust boundary and is not a sandbox. Explicit ensure-built is a user decision to build the repository.
 
-The design does not claim MSBuild evaluation/build is safe for an untrusted repository. Evaluation and especially ensure-built operate inside the repository trust boundary. Explicit build remains a user decision.
+### 10. Snapshot publication closes the TOCTOU window
 
-### 9. Snapshot construction closes the TOCTOU window
-
-Verification and analysis use one immutable snapshot. After verification, the implementation either retains immutable bytes/metadata for the artifacts and source manifests used by analysis or re-hashes immediately when loading them into the snapshot. Any change between verification and snapshot materialization aborts with a failed preflight/session; it never yields a successful partial snapshot.
+Verification and analysis use one immutable snapshot. After verification, the implementation retains immutable bytes/metadata or re-hashes inputs while materializing the snapshot. Any change between verification and materialization aborts the session.
 
 The completed session fingerprint is published only after:
 
 - project evaluation and prerequisite checks succeed;
-- every selected artifact/dependency is current and verified;
-- immutable analysis inputs/indexes required by the snapshot are materialized or safely owned for lazy materialization;
+- every selected artifact and dependency is current and verified;
+- immutable inputs/indexes required by the snapshot are materialized or safely owned for lazy materialization;
 - cancellation has not been requested.
 
-CLI owns and disposes one snapshot per command. `ArchLinterNet.Testing` may expose an explicitly owned snapshot for multiple assertions; reuse requires the same completed session fingerprint, an undisposed snapshot, and compatible requested views. A cancelled, failed, disposed, or partial snapshot is never reusable.
+CLI owns one snapshot per command. `ArchLinterNet.Testing` may expose an explicitly owned snapshot for multiple compatible assertions. Reuse requires the same completed session fingerprint, an undisposed successful snapshot, and compatible requested views. Cancelled, failed, disposed, changed, or partial snapshots are never reusable or cacheable.
 
-### 10. Stable identity and evidence are separate
+### 11. Stable identity and evidence are separate
 
-Stable/cache equality fields:
+Stable build/analysis/session equality includes:
 
 - envelope/schema/tool analysis-semantics versions;
 - canonical repository-relative or typed logical coordinates;
 - configuration/TFM/platform/RID;
-- canonical effective project/compiler/policy/source manifests;
-- SHA-256 content digests;
+- raw relevant project/import/source/analyzer/reference content digests;
+- canonical effective project/compiler/policy manifests;
 - expected output identities;
 - verified artifact-set digests;
 - execution request fields that change results.
 
-Validation-only evidence:
+Validation-only evidence includes PE MVID/metadata details, attestation kind, containment result, searched candidates, competing configurations/TFMs, and build/restore exit category.
 
-- PE MVID and assembly metadata details already represented by the PE digest;
-- PDB/receipt attestation kind;
-- resolved symlink target and containment result;
-- searched candidate paths and discovered competing configurations/TFMs;
-- build/restore exit category.
+Display-only evidence includes absolute paths, timestamps, file sizes, exact local command rendering, elapsed timings, and host descriptions.
 
-Display-only evidence:
+Process/thread ids, random snapshot handles, current working directory, TTY/color state, output destinations, CI-provider identifiers, credentials, secrets, and raw untrusted command strings are excluded.
 
-- absolute local paths;
-- timestamps and file sizes;
-- exact local command rendering;
-- elapsed timings;
-- host OS/runtime descriptions.
+JSON/SARIF prefer repository-relative or typed logical locations and omit absolute paths by default. Human output may show a local absolute path when needed for an actionable command, clearly as evidence rather than identity.
 
-Intentionally excluded:
+### 12. Downstream issues consume this contract
 
-- process id, thread id, random snapshot handle, current working directory;
-- terminal/TTY/color state;
-- output destination paths;
-- GitHub Actions or other CI-provider identifiers;
-- credentials, environment secrets, and raw untrusted command strings.
-
-Machine-readable diagnostics and SARIF use repository-relative paths where possible. Absolute paths are omitted by default from JSON/SARIF; human output may show a local absolute path when needed for an actionable command, clearly as evidence rather than identity.
-
-### 11. Downstream issues consume the contract without redefining it
-
-- **#362** implements project evaluation, preflight categories, diagnostics, ordinary/ensure-built/no-restore behavior, attestation/receipt verification, and post-build re-verification.
-- **#363** constructs exactly one immutable snapshot after successful preflight and exposes completed session/snapshot identity and ownership.
-- **#365** uses the completed session fingerprint as an input to cache keys, while adding its own cache schema and trust-domain controls. Fingerprint equality alone is not cache authorization.
-- **#366** adds cross-platform fixtures for portable logical identity, all failure categories, copied/mismatched artifacts, offline/no-restore, and cancellation.
-- **#374** measures evaluation, hashing, verification, restore/build, and snapshot phases without making timings part of identity.
-- **#375** propagates cancellation through evaluation/build/hash/snapshot construction and forbids publication of successful partial identities.
+- **#362** implements fingerprints, preflight categories, diagnostics, ordinary/ensure-built/no-restore behavior, receipts/compiler evidence, and post-build re-verification.
+- **#363** creates exactly one immutable snapshot after successful preflight and exposes completed session identity and ownership.
+- **#365** uses the completed session fingerprint as a cache-key input while adding an independent cache schema and trust-domain controls. Fingerprint equality alone is not cache authorization.
+- **#366** adds cross-platform/adversarial fixtures for portability, all state categories, copied artifacts, source/project/import changes, offline/no-restore, and cancellation.
+- **#374** measures evaluation, hashing, verification, restore/build, and snapshot phases without making timings identity fields.
+- **#375** propagates cancellation through every phase and forbids successful partial identity publication.
 
 ## Risks / Trade-offs
 
-- **Portable PDB evidence is not available for every build.** Fail closed as `unverifiable-artifact` and recommend explicit ensure-built preparation that emits a receipt.
-- **Hashing source and artifact sets costs I/O.** #374 must measure it; #365 may cache only after the trust/invalidation design is approved. Timestamps may optimize candidate selection but never replace hashes/attestation.
-- **MSBuild input surfaces evolve.** The fingerprint envelope is versioned. Adding a newly recognized analysis-affecting field requires a version/schema change or an explicitly compatible extension; silently changing v1 equality is forbidden.
-- **Nondeterministic builds can produce different artifact fingerprints from the same logical inputs.** This is correct for exact reuse; logical equivalence remains separately visible.
-- **MSBuild evaluation/build can execute repository-controlled behavior.** The product documents the trust boundary and never lets policy YAML opt into execution. This is not a sandbox.
-- **Strict containment rejects some external linked source layouts.** v1 chooses fail-closed portability/security. A future version may add typed external-input declarations rather than accepting absolute paths implicitly.
+- **Compiler evidence is not universally available.** Fail closed as `unverifiable-artifact`; explicit preparation can emit a receipt.
+- **Hashing all relevant inputs costs I/O.** #374 must measure it; #365 may optimize only after its cache trust/invalidation design is approved. Timestamps may optimize candidate selection but never replace content identity.
+- **MSBuild input surfaces evolve.** Adding a newly recognized equality-affecting field requires versioning or explicit compatibility handling.
+- **Nondeterministic builds produce different artifact/session fingerprints.** This is correct for exact reuse; build/analysis input equivalence remains separately visible.
+- **MSBuild evaluation/build can execute repository-controlled behavior.** The trust boundary must be documented; policy YAML never opts into execution.
+- **Strict containment rejects some linked external-source layouts.** v1 chooses fail-closed portability/security; a future version may add typed external-input declarations.
 
 ## Migration Plan
 
 No existing public data is migrated by this design-only change.
 
-1. Merge and archive this OpenSpec slice after review.
-2. Implement #362 against `analysis-build-state/v1`, including typed diagnostics and receipts/equivalent evidence.
+1. Archive and publish this OpenSpec capability in the same PR after review of the design slice.
+2. Implement #362 against `analysis-build-state/v1`.
 3. Implement #363 snapshot ownership using the completed session fingerprint.
-4. Update public CLI/Testing/diagnostic schemas and the capability manifest only when implementation exists.
-5. Add cache/profiling/cancellation behavior in their own issues without changing v1 identity semantics silently.
+4. Update public CLI/Testing/diagnostic schemas and capability manifest only when executable behavior exists.
+5. Add cache/profiling/cancellation behavior in their own issues without silently changing v1 equality.
 
-Rollback before implementation is documentation-only. After downstream implementation ships, changing the fingerprint contract requires a versioned compatibility decision under #355.
+After downstream implementation ships, changing the fingerprint contract requires a versioned compatibility decision under #355.
 
 ## Open Questions
 
-- None blocking for v1. Exact public type names, command grouping, and serialized diagnostic field names belong to #362/#363, but they must preserve the categories, field roles, and identity semantics defined here.
+- None blocking for v1. Exact public type names, command grouping, and serialized diagnostic field names belong to #362/#363, but they must preserve the categories, field roles, and equality semantics defined here.
