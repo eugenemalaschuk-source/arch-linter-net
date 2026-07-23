@@ -250,11 +250,15 @@ public sealed class BuildStatePreflightTests
             downstreamPath, "Downstream", null, null, downstreamFingerprint,
             BuildStateCanonicalHasher.ComputeContentDigest(downstreamAssembly)));
 
-        string relativeUpstreamPath = Path.GetRelativePath(Path.GetDirectoryName(downstreamPath)!, upstreamPath);
+        // ArchitectureDiscoveredProjectReference.Path is produced by
+        // ArchitectureProjectDiscoveryService in exactly the same canonical form as every
+        // discovered project's own .Path (both go through the same GetRelativePath helper against
+        // the repository root) — a reference is looked up by comparing it directly against
+        // another project's .Path, not by combining it with a filesystem directory.
         ArchitectureDiscoveredProject downstreamProject = new(
             downstreamPath, "Downstream", new[] { "net10.0" })
         {
-            ProjectReferences = new[] { new ArchitectureDiscoveredProjectReference(relativeUpstreamPath, downstreamPath) }
+            ProjectReferences = new[] { new ArchitectureDiscoveredProjectReference(upstreamPath, downstreamPath) }
         };
         ArchitectureDiscoveredProject upstreamProject = new(upstreamPath, "Upstream", new[] { "net10.0" });
 
@@ -285,7 +289,7 @@ public sealed class BuildStatePreflightTests
 
         var service = new BuildStatePreparationService();
         BuildStatePreflightResult result = service.Prepare(new BuildStatePreflightRequest(
-            _repoRoot, discovery, new BuildStateResolvedAssemblies(Array.Empty<Assembly>(), Array.Empty<string>()),
+            _repoRoot, discovery, new BuildStateResolvedAssemblies(Array.Empty<Assembly>(), new[] { "Fixture" }),
             BuildPreparationMode.Ordinary, NoRestore: true));
 
         Assert.That(result.Blocked, Is.True);
@@ -344,6 +348,89 @@ public sealed class BuildStatePreflightTests
             "</PropertyGroup></Project>");
         File.WriteAllText(Path.Combine(projectDirectory, "Class1.cs"), "namespace EnsureBuiltFixture; public class C {}");
         return projectPath;
+    }
+
+    [Test]
+    public void SelectGraphRoots_AppReferencesLib_OnlyAppIsRoot()
+    {
+        // Mirrors the real repository-relative form ArchitectureProjectDiscoveryService produces
+        // for both a project's own .Path and its ProjectReferences' .Path (see
+        // ArchitectureProjectDiscoveryService.BuildDiscoveredProject / GetRelativePath) — both are
+        // relative to the repository root with forward slashes, not filesystem paths relative to
+        // the referencing project's own directory.
+        ArchitectureDiscoveredProject lib = new("src/Lib/Lib.csproj", "Lib", new[] { "net10.0" });
+        ArchitectureDiscoveredProject app = new("src/App/App.csproj", "App", new[] { "net10.0" })
+        {
+            ProjectReferences = new[] { new ArchitectureDiscoveredProjectReference("src/Lib/Lib.csproj", "src/App/App.csproj") }
+        };
+
+        ProjectDiscoveryResult discovery = new(
+            new[] { "App", "Lib" }, Array.Empty<string>(), Array.Empty<string>(),
+            Array.Empty<ArchitectureProjectDiscoveryDiagnostic>())
+        {
+            DiscoveredProjects = new[] { app, lib }
+        };
+
+        IReadOnlyList<ArchitectureDiscoveredProject> roots = BuildStatePreparationService.SelectGraphRoots(discovery);
+
+        Assert.That(roots, Has.Count.EqualTo(1));
+        Assert.That(roots.Single().Path, Is.EqualTo("src/App/App.csproj"));
+    }
+
+    [Test]
+    public void SelectGraphRoots_NoProjectIsReferenced_AllAreRoots()
+    {
+        ArchitectureDiscoveredProject a = new("src/A/A.csproj", "A", new[] { "net10.0" });
+        ArchitectureDiscoveredProject b = new("src/B/B.csproj", "B", new[] { "net10.0" });
+
+        ProjectDiscoveryResult discovery = new(
+            new[] { "A", "B" }, Array.Empty<string>(), Array.Empty<string>(),
+            Array.Empty<ArchitectureProjectDiscoveryDiagnostic>())
+        {
+            DiscoveredProjects = new[] { a, b }
+        };
+
+        IReadOnlyList<ArchitectureDiscoveredProject> roots = BuildStatePreparationService.SelectGraphRoots(discovery);
+
+        Assert.That(roots, Has.Count.EqualTo(2));
+    }
+
+    [Test]
+    [Category("Integration")]
+    [CancelAfter(180_000)]
+    public void Prepare_EnsureBuiltAfterSourceChange_OverwritesStaleReceiptAndReportsCurrent()
+    {
+        string projectPath = CreateRealBuildableProjectFixture("RebuildFixture");
+        ProjectDiscoveryResult discovery = SingleProjectDiscovery(projectPath, "RebuildFixture");
+        var service = new BuildStatePreparationService();
+
+        BuildStatePreflightResult firstBuild = service.Prepare(new BuildStatePreflightRequest(
+            _repoRoot, discovery, new BuildStateResolvedAssemblies(Array.Empty<Assembly>(), Array.Empty<string>()),
+            BuildPreparationMode.EnsureBuilt, RequestedConfiguration: "Debug"));
+        Assert.That(firstBuild.Diagnostics.Single().State, Is.EqualTo(BuildStatePreflightState.Current));
+
+        string assemblyPath = Path.Combine(
+            Path.GetDirectoryName(projectPath)!, "bin", "Debug", "net10.0", "RebuildFixture.dll");
+        BuildStateResolvedAssemblies builtResolution = new(new[] { LoadFakeAssembly(assemblyPath) }, Array.Empty<string>());
+
+        File.WriteAllText(
+            Path.Combine(Path.GetDirectoryName(projectPath)!, "Class1.cs"),
+            "namespace RebuildFixture; public class C { public int Changed; }");
+
+        BuildStatePreflightResult afterSourceChange = BuildStatePreflightEvaluator.Evaluate(new BuildStatePreflightRequest(
+            _repoRoot, discovery, builtResolution,
+            BuildPreparationMode.Ordinary, RequestedConfiguration: "Debug"));
+        Assert.That(afterSourceChange.Diagnostics.Single().State, Is.EqualTo(BuildStatePreflightState.StaleArtifact));
+
+        BuildStatePreflightResult secondBuild = service.Prepare(new BuildStatePreflightRequest(
+            _repoRoot, discovery, new BuildStateResolvedAssemblies(Array.Empty<Assembly>(), Array.Empty<string>()),
+            BuildPreparationMode.EnsureBuilt, RequestedConfiguration: "Debug"));
+
+        // Rebuilding after a source change must overwrite the now-stale receipt so a subsequent
+        // ordinary preflight check sees Current again, not the same StaleArtifact result it saw
+        // immediately before this rebuild.
+        Assert.That(secondBuild.Blocked, Is.False);
+        Assert.That(secondBuild.Diagnostics.Single().State, Is.EqualTo(BuildStatePreflightState.Current));
     }
 
     private string CreateProjectFixture(string assemblyName, string sourceContent)

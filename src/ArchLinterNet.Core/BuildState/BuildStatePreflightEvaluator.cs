@@ -39,7 +39,7 @@ public static class BuildStatePreflightEvaluator
         // preflight-blocked just for being discovered.
         foreach (ArchitectureDiscoveredProject project in discoveredProjects)
         {
-            if (!resolvedByName.ContainsKey(project.AssemblyName) && !missing.Contains(project.AssemblyName))
+            if (!IsRelevantToResolution(project, request.Resolution))
             {
                 continue;
             }
@@ -50,6 +50,16 @@ public static class BuildStatePreflightEvaluator
         ElevateInconsistentDependencyArtifacts(discoveredProjects, diagnosticsByProjectPath);
 
         return new BuildStatePreflightResult(diagnosticsByProjectPath.Values.ToArray());
+    }
+
+    // Shared with BuildStatePreparationService.CheckRestorePrerequisites so --no-restore checks
+    // exactly the same set of projects Evaluate() would otherwise preflight-block — a project
+    // discovered only to feed project-scope coverage, and never attempted by assembly resolution,
+    // must not be treated as requiring a restore either.
+    internal static bool IsRelevantToResolution(ArchitectureDiscoveredProject project, BuildStateResolvedAssemblies resolution)
+    {
+        return resolution.ResolvedAssemblies.Any(a => string.Equals(a.GetName().Name, project.AssemblyName, StringComparison.Ordinal))
+            || resolution.MissingAssemblyNames.Contains(project.AssemblyName, StringComparer.Ordinal);
     }
 
     private static BuildStatePreflightDiagnostic EvaluateProject(
@@ -231,9 +241,15 @@ public static class BuildStatePreflightEvaluator
                 continue;
             }
 
+            // ArchitectureDiscoveredProjectReference.Path is already repository-relative — the
+            // same canonical form ArchitectureProjectDiscoveryService gives every discovered
+            // project's own .Path (both go through the identical GetRelativePath helper) — so it
+            // is directly usable as the diagnosticsByProjectPath key with no further path
+            // combination. Combining it with an owner-relative directory here previously produced
+            // an absolute path that could never match a repo-relative dictionary key, silently
+            // disabling this check.
             bool hasBlockingDependency = project.ProjectReferences
-                .Select(reference => ResolveReferencedProjectPath(project.Path, reference.Path))
-                .Any(referencedPath => diagnosticsByProjectPath.TryGetValue(referencedPath, out BuildStatePreflightDiagnostic? dependency)
+                .Any(reference => diagnosticsByProjectPath.TryGetValue(reference.Path, out BuildStatePreflightDiagnostic? dependency)
                     && dependency.IsBlocking);
 
             if (hasBlockingDependency)
@@ -248,12 +264,6 @@ public static class BuildStatePreflightEvaluator
                 };
             }
         }
-    }
-
-    private static string ResolveReferencedProjectPath(string ownerProjectPath, string referencePath)
-    {
-        string ownerDirectory = Path.GetDirectoryName(Path.GetFullPath(ownerProjectPath)) ?? ".";
-        return Path.GetFullPath(Path.Combine(ownerDirectory, referencePath));
     }
 
     private static string? SafeAssemblyLocation(Assembly assembly)

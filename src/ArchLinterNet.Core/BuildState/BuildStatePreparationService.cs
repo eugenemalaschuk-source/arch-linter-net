@@ -46,7 +46,13 @@ public sealed class BuildStatePreparationService : IBuildStatePreparationService
         List<BuildStatePreflightDiagnostic> blocking = new();
         foreach (ArchitectureDiscoveredProject project in request.ProjectDiscovery.DiscoveredProjects)
         {
-            string? projectDirectory = Path.GetDirectoryName(Path.GetFullPath(project.Path));
+            if (!BuildStatePreflightEvaluator.IsRelevantToResolution(project, request.Resolution))
+            {
+                continue;
+            }
+
+            string? projectDirectory = Path.GetDirectoryName(
+                BuildStatePathResolution.ResolveAbsoluteProjectPath(request.RepositoryRoot, project.Path));
             string assetsPath = projectDirectory == null
                 ? string.Empty
                 : Path.Combine(projectDirectory, "obj", "project.assets.json");
@@ -104,25 +110,25 @@ public sealed class BuildStatePreparationService : IBuildStatePreparationService
     // built exactly once as a dependency of its root(s), and is never built a second time
     // directly. Falls back to building every discovered project only in the (unusual) case where
     // reference cycles or an incomplete graph leave no unreferenced root at all.
-    private static IReadOnlyList<ArchitectureDiscoveredProject> SelectGraphRoots(ProjectDiscoveryResult discovery)
+    // internal (not private) so BuildStatePreparationServiceGraphRootTests can verify path
+    // resolution directly against real (absolute) ArchitectureDiscoveredProjectReference.Path
+    // values without needing a real dotnet build.
+    internal static IReadOnlyList<ArchitectureDiscoveredProject> SelectGraphRoots(ProjectDiscoveryResult discovery)
     {
-        HashSet<string> referenced = new(StringComparer.Ordinal);
-        foreach (ArchitectureDiscoveredProject project in discovery.DiscoveredProjects)
-        {
-            string? ownerDirectory = Path.GetDirectoryName(Path.GetFullPath(project.Path));
-            if (ownerDirectory == null)
-            {
-                continue;
-            }
-
-            foreach (ArchitectureDiscoveredProjectReference reference in project.ProjectReferences)
-            {
-                referenced.Add(Path.GetFullPath(Path.Combine(ownerDirectory, reference.Path)));
-            }
-        }
+        // ArchitectureDiscoveredProjectReference.Path is already repository-relative — the same
+        // canonical form every discovered project's own .Path has (both are produced by
+        // ArchitectureProjectDiscoveryService's identical GetRelativePath helper) — so reference
+        // paths are directly comparable to project paths with no filesystem resolution at all.
+        // Combining a reference path with a filesystem directory here previously produced an
+        // absolute path that could never match another project's repo-relative .Path, so no
+        // project was ever recognized as referenced and every project was (wrongly) treated as
+        // its own root.
+        HashSet<string> referenced = new(
+            discovery.DiscoveredProjects.SelectMany(project => project.ProjectReferences.Select(reference => reference.Path)),
+            StringComparer.Ordinal);
 
         List<ArchitectureDiscoveredProject> roots = discovery.DiscoveredProjects
-            .Where(project => !referenced.Contains(Path.GetFullPath(project.Path)))
+            .Where(project => !referenced.Contains(project.Path))
             .ToList();
 
         return roots.Count > 0 ? roots : discovery.DiscoveredProjects.ToList();
@@ -135,7 +141,8 @@ public sealed class BuildStatePreparationService : IBuildStatePreparationService
 
         foreach (ArchitectureDiscoveredProject project in request.ProjectDiscovery.DiscoveredProjects)
         {
-            string? projectDirectory = Path.GetDirectoryName(Path.GetFullPath(project.Path));
+            string? projectDirectory = Path.GetDirectoryName(
+                BuildStatePathResolution.ResolveAbsoluteProjectPath(request.RepositoryRoot, project.Path));
             string? assemblyPath = projectDirectory == null
                 ? null
                 : FindBuiltAssembly(
@@ -305,7 +312,23 @@ public sealed class BuildStatePreparationService : IBuildStatePreparationService
 
         foreach (BuildStatePreflightDiagnostic diagnostic in evaluation.Diagnostics)
         {
-            if (diagnostic.State != BuildStatePreflightState.UnverifiableArtifact
+            // Write (or overwrite) a fresh receipt for every state where ExpectedOutputPath is
+            // confidently *this* project's own artifact — UnverifiableArtifact (freshly built, no
+            // receipt yet), StaleArtifact (a receipt already existed but had a stale fingerprint —
+            // restricting this to only UnverifiableArtifact meant a rebuild after a source change
+            // never got a new receipt written, so preflight kept reporting StaleArtifact even
+            // immediately after a successful --ensure-built rebuild), and WrongConfiguration/
+            // WrongTargetFramework (the artifact path itself already matched the request exactly —
+            // see FindBuiltAssembly — only the existing receipt's recorded metadata was wrong).
+            // WrongProjectOutput is deliberately excluded: it means the receipt at this path
+            // claims a *different* assembly's identity, a real name/path collision that
+            // overwriting would only mask rather than resolve. Current has nothing to update.
+            bool ownsExpectedOutput = diagnostic.State is BuildStatePreflightState.UnverifiableArtifact
+                or BuildStatePreflightState.StaleArtifact
+                or BuildStatePreflightState.WrongConfiguration
+                or BuildStatePreflightState.WrongTargetFramework;
+
+            if (!ownsExpectedOutput
                 || diagnostic.Evidence.ExpectedOutputPath == null
                 || !projectsByPath.TryGetValue(diagnostic.Evidence.ProjectPath, out ArchitectureDiscoveredProject? project))
             {

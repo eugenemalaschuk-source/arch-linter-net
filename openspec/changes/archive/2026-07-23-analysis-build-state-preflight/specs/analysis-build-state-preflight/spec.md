@@ -3,12 +3,20 @@
 ## Purpose
 TBD - created by archiving change analysis-build-state-preflight. Update Purpose after archive.
 ## Requirements
-### Requirement: Build-state preflight applies to project-graph-driven resolution
-Build-state preflight SHALL run only when the selected project graph itself drives assembly resolution — i.e. when the policy does not declare `analysis.target_assemblies`. When `analysis.target_assemblies` is configured, resolution runs against that fixed name list and a declared project list (if any) exists solely to feed project-scope coverage contracts; discovered projects have no necessary one-to-one correspondence to a resolved or missing assembly in that mode, so they SHALL NOT be preflight-blocked.
+### Requirement: Build-state preflight applies only to projects assembly resolution actually attempted
+Build-state preflight SHALL evaluate a discovered project only when assembly resolution actually attempted to resolve it — i.e. its assembly name appears in either the resolved-assemblies set or the missing-assemblies set produced by that resolution attempt. This applies uniformly whether resolution was driven by `analysis.target_assemblies` or by the discovered project graph itself; it is not gated on which one configured it. A policy may declare a project list solely to feed project-scope coverage contracts, independently of which assemblies get resolved — such projects have no necessary correspondence to a resolved/missing assembly and SHALL NOT be preflight-blocked merely for being discovered. Separately, when assembly resolution was not attempted at all (neither set populated — the project-scope-coverage-tolerant path deliberately defers to the coverage engine), preflight SHALL NOT run for that request.
 
-#### Scenario: target_assemblies-configured policy is not preflight-blocked
-- **WHEN** a policy declares `analysis.target_assemblies` explicitly, with or without a separate discovered project list feeding project-scope coverage
-- **THEN** build-state preflight does not run and validation proceeds using the existing assembly-resolution behavior unchanged
+#### Scenario: target_assemblies-configured policy with a matching discovered project is preflight-blocked
+- **WHEN** a policy declares `analysis.target_assemblies` naming an assembly that also corresponds to a discovered project (via `analysis.projects`), and that assembly's build output is missing
+- **THEN** build-state preflight blocks with a `missing-artifact` diagnostic for that project
+
+#### Scenario: a project list declared only for coverage is not preflight-blocked
+- **WHEN** a policy declares a project list that project-scope coverage contracts consume, and none of those project assembly names appear in `analysis.target_assemblies` or were otherwise attempted by resolution
+- **THEN** build-state preflight does not block on those projects, and coverage classifies them independently
+
+#### Scenario: resolution deliberately deferred to coverage is not preflight-blocked
+- **WHEN** no `analysis.target_assemblies` is configured and a project-scope coverage contract is active for the current mode, so assembly resolution is skipped entirely in favor of the coverage engine
+- **THEN** build-state preflight does not run for that request
 
 ### Requirement: Build-input and analysis-input fingerprint computation
 The system SHALL compute a build-input fingerprint and an analysis-input fingerprint for the selected project graph using a versioned canonical envelope (SHA-256 digest over sorted repository-relative content digests) consistent with the `analysis-build-state/v1` model defined in the `analysis-build-state-fingerprints` capability. v1 of this implementation computes the digest over the project file and relevant compiled/imported source content (`.cs`, `.csproj`, `.props`, `.targets`) rather than the capability's full granular manifest field set (SDK identity, per-compiler-option digests, analyzer/generator identities) — sufficient to detect any selected content change, per that capability's own allowance that v1 need not prove a change was semantically harmless. Granular manifest fields are a follow-up.

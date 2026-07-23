@@ -27,7 +27,12 @@ public static class BuildStateCanonicalHasher
         ArgumentException.ThrowIfNullOrWhiteSpace(projectPath);
         ArgumentException.ThrowIfNullOrWhiteSpace(repositoryRoot);
 
-        string projectDirectory = Path.GetDirectoryName(Path.GetFullPath(projectPath))
+        // ArchitectureDiscoveredProject.Path is repository-relative (see
+        // ArchitectureProjectDiscoveryService.BuildDiscoveredProject) — it must be resolved
+        // against repositoryRoot, not the current process's working directory, or this silently
+        // reads the wrong files (or none) whenever the process CWD differs from the repo root.
+        string absoluteProjectPath = BuildStatePathResolution.ResolveAbsoluteProjectPath(repositoryRoot, projectPath);
+        string projectDirectory = Path.GetDirectoryName(absoluteProjectPath)
             ?? throw new InvalidOperationException($"Cannot determine project directory for '{projectPath}'.");
 
         List<(string RepoRelativePath, byte[] Digest)> entries = new();
