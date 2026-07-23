@@ -12,5 +12,6 @@ public sealed record CompositionDiagnostic(
 
     public string? SourceMember { get; init; }
     public string? MatchedForbiddenApi { get; init; }
+    public string? SourceAssembly { get; init; }
     public string? ExpectedCompositionBoundary { get; init; }
 }
