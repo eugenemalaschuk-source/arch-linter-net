@@ -48,11 +48,28 @@ For forbidding calls scoped to a single named source layer (rather than an allow
 
 ### Composition boundary
 
-`allowed_only_in_layers`, `allowed_only_in_namespaces`, `allowed_only_in_projects`, and `allowed_only_in_assemblies` together form an allow-list: any type whose location does not satisfy **at least one** entry across all four lists is scanned for forbidden API calls. A type inside the boundary is never scanned — calling a forbidden API from inside the composition boundary is exactly what the boundary is for.
+`allowed_only_in_layers`, `allowed_only_in_namespaces`, `allowed_only_in_projects`, `allowed_only_in_assemblies`, and `allowed_only_in_types` together form an allow-list: any type whose location does not satisfy **at least one** entry across all five lists is scanned for forbidden API calls. A type inside the boundary is never scanned — calling a forbidden API from inside the composition boundary is exactly what the boundary is for.
 
-A contract must declare at least one entry across these four lists; a contract with none is rejected at policy load time (every call site in the codebase would otherwise be considered outside the boundary).
+A contract must declare at least one entry across these five lists; a contract with none is rejected at policy load time (every call site in the codebase would otherwise be considered outside the boundary).
 
 `allowed_only_in_projects` resolves each configured project name to its assembly name via project discovery — the same assembly-name-equivalence semantics documented for `type_placement`'s `must_reside_in_projects`.
+
+`allowed_only_in_types` is a direct assembly + type identity selector, narrower than `allowed_only_in_assemblies` (which allows every type in the named assembly) or `allowed_only_in_namespaces` (every type in the namespace). Each entry requires both `assembly` and `type` (the type's fully-qualified name) and is matched by exact string equality — no globbing, no semantic-role classification or attribute-based matching. Use it when a single global/top-level type, such as one host's `Program`, must be the composition boundary without also allowing the rest of its assembly or namespace:
+
+```yaml
+contracts:
+  strict_composition:
+    - id: api-host-composition-root
+      name: api-host-composition-root
+      allowed_only_in_types:
+        - assembly: Product.Api
+          type: Product.Api.Program
+      forbidden_apis:
+        - System.IServiceProvider.GetService
+      reason: Only Product.Api.Program may resolve services directly; the rest of Product.Api must go through DI.
+```
+
+In a multi-host solution with `Product.Api.Program`, `Product.Admin.Program`, and `Product.Web.Program`, each host gets its own `allowed_only_in_types` entry (or its own contract) — a sibling type in the same assembly or namespace that isn't named by an entry is still scanned, and a same-named `Program` type in a different assembly is a distinct entry entirely (see Violations below).
 
 ### Matching surface
 
@@ -73,7 +90,7 @@ Each violation identifies the calling type and source member outside the composi
 
 `ignored_violations` entries use the same `source_type`/`forbidden_reference`/`reason` shape as other contract families, matching the calling type and the matched forbidden API's fully-qualified name.
 
-Violation/baseline identity is assembly- and member-qualified: two same-named types in different assemblies (for example two `Program` types in two host assemblies) are never conflated, and two distinct forbidden-call occurrences — whether from different source members of the same type or from two separate call sites to the same forbidden API within the same source member — get distinct identities. Baselining one occurrence never suppresses an unrelated same-named or same-member occurrence elsewhere. The violating type's declaring assembly is also included as `source_assembly` in human, `--json`, and `--explain` output (`FormatCompositionContextForHumans`/`ApplyCompositionCiFields`), so two same-named types in different assemblies are visibly distinguishable, not just distinguishable at baseline-matching time. (SARIF does not currently carry this — or any other family's per-violation member/assembly detail beyond `FrameworkReference`'s bespoke evidence array; extending SARIF's `properties` bag to every diagnostic kind is a separate, broader change.)
+Violation/baseline identity is assembly- and member-qualified: two same-named types in different assemblies (for example two `Program` types in two host assemblies) are never conflated, and two distinct forbidden-call occurrences — whether from different source members of the same type or from two separate call sites to the same forbidden API within the same source member — get distinct identities. Baselining one occurrence never suppresses an unrelated same-named or same-member occurrence elsewhere. The violating type's declaring assembly is also included as `source_assembly` in human, `--json`, `--explain`, **and SARIF** output (`FormatCompositionContextForHumans`/`ApplyCompositionCiFields`/`ArchitectureSarifFormatter.BuildCompositionProperties`), so two same-named types in different assemblies are visibly distinguishable in every output format, not just at baseline-matching time.
 
 ## Non-goals
 

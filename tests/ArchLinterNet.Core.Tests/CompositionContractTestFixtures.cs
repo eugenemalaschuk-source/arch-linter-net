@@ -131,3 +131,28 @@ namespace CompositionContractTestFixtures.Application
         }
     }
 }
+
+// A namespace outside every namespace/layer/project/assembly boundary entry, used to exercise
+// allowed_only_in_types: only the specific type named by an assembly+type selector is exempted,
+// its sibling in the same namespace/assembly is not — proving the selector is type-granular, not
+// namespace- or assembly-wide (issue #360's assembly+type selector clarification).
+namespace CompositionContractTestFixtures.OtherHost
+{
+    using CompositionContractTestFixtures.Fakes;
+
+    public sealed class Program
+    {
+        public static object? ResolveFromLocator(IFakeServiceProvider provider)
+        {
+            return provider.GetService(typeof(object));
+        }
+    }
+
+    public sealed class UnlistedSibling
+    {
+        public static object? ResolveFromLocator(IFakeServiceProvider provider)
+        {
+            return provider.GetService(typeof(object));
+        }
+    }
+}

@@ -28,6 +28,14 @@ public sealed partial class ArchitectureAnalysisSession
             allowedAssemblyNames.Add(resolvedAssemblyName);
         }
 
+        // Direct assembly+type identity pairs — narrower than allowedAssemblyNames (which allows
+        // every type in the assembly). Keyed as "assembly|type" so a single global/top-level type
+        // (e.g. one host's Program) can be the composition boundary without allowing the rest of
+        // its assembly or namespace. See ArchitectureCompositionTypeSelector.
+        HashSet<string> allowedAssemblyTypePairs = new(
+            contract.AllowedOnlyInTypes.Select(selector => $"{selector.Assembly}|{selector.Type}"),
+            StringComparer.Ordinal);
+
         IReadOnlyList<ForbiddenCallPattern> patterns =
             ArchitectureForbiddenCallMatcher.NormalizePatterns(contract.ForbiddenApis);
 
@@ -43,16 +51,16 @@ public sealed partial class ArchitectureAnalysisSession
         {
             string actualNamespace = ArchitectureTypeNames.SafeNamespace(type);
             string actualAssemblyName = type.Assembly.GetName().Name ?? string.Empty;
+            string sourceType = ArchitectureTypeNames.SafeFullName(type);
 
             bool insideCompositionBoundary = IsAllowedLocation(
-                actualNamespace, actualAssemblyName, allowedLayers, contract.AllowedOnlyInNamespaces, allowedAssemblyNames);
+                    actualNamespace, actualAssemblyName, allowedLayers, contract.AllowedOnlyInNamespaces, allowedAssemblyNames)
+                || allowedAssemblyTypePairs.Contains($"{actualAssemblyName}|{sourceType}");
 
             if (insideCompositionBoundary)
             {
                 continue;
             }
-
-            string sourceType = ArchitectureTypeNames.SafeFullName(type);
 
             // IMPORTANT: do not Distinct() the raw IL matches before IsIgnored — each raw call site
             // (even one with an identical (method, pattern, matchedMember) shape to another call site
@@ -123,6 +131,12 @@ public sealed partial class ArchitectureAnalysisSession
         if (contract.AllowedOnlyInAssemblies.Count > 0)
         {
             parts.Add($"assemblies: [{string.Join(", ", contract.AllowedOnlyInAssemblies)}]");
+        }
+
+        if (contract.AllowedOnlyInTypes.Count > 0)
+        {
+            string types = string.Join(", ", contract.AllowedOnlyInTypes.Select(t => $"{t.Assembly}:{t.Type}"));
+            parts.Add($"types: [{types}]");
         }
 
         return string.Join("; ", parts);

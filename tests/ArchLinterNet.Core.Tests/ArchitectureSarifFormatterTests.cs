@@ -398,6 +398,37 @@ public sealed class ArchitectureSarifFormatterTests
     }
 
     [Test]
+    public void FormatResultAsSarif_CompositionViolation_PropertiesExposeSourceAssembly()
+    {
+        var violations = new List<ArchitectureViolation>
+        {
+            new("service-locator-confined-to-composition", "service-locator-confined-to-composition",
+                "Host.A.Program", "System.IServiceProvider.GetService", new[] { "System.IServiceProvider.GetService" })
+            {
+                Payload = new CompositionPayload(
+                    MatchedForbiddenApi: "System.IServiceProvider.GetService",
+                    SourceMember: "Host.A.Program.Main",
+                    SourceAssembly: "Host.A",
+                    ExpectedCompositionBoundary: "namespaces: [Host.Composition]")
+            }
+        };
+
+        JsonElement root = Run("strict", violations);
+
+        JsonElement result = root.GetProperty("runs")[0].GetProperty("results")[0];
+        JsonElement properties = result.GetProperty("properties");
+        Assert.Multiple(() =>
+        {
+            Assert.That(properties.GetProperty("source_assembly").GetString(), Is.EqualTo("Host.A"));
+            Assert.That(properties.GetProperty("source_member").GetString(), Is.EqualTo("Host.A.Program.Main"));
+            Assert.That(properties.GetProperty("matched_forbidden_api").GetString(),
+                Is.EqualTo("System.IServiceProvider.GetService"));
+            Assert.That(properties.GetProperty("expected_composition_boundary").GetString(),
+                Is.EqualTo("namespaces: [Host.Composition]"));
+        });
+    }
+
+    [Test]
     public void FormatResultAsSarif_TypePlacementViolation_LogicalLocationKindIsType()
     {
         var violations = new List<ArchitectureViolation>
