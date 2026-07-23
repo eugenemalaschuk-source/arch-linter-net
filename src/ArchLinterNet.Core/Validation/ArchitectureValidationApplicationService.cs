@@ -1,3 +1,4 @@
+using ArchLinterNet.Core.BuildState;
 using ArchLinterNet.Core.Contracts;
 using ArchLinterNet.Core.Execution;
 using ArchLinterNet.Core.Execution.Abstractions;
@@ -10,7 +11,8 @@ namespace ArchLinterNet.Core.Validation;
 public sealed class ArchitectureValidationApplicationService(
     IArchitectureRunnerSetupService runnerSetupService,
     IArchitectureContractHandlerRegistry handlerRegistry,
-    IArchitectureContractExecutor contractExecutor)
+    IArchitectureContractExecutor contractExecutor,
+    IBuildStatePreparationService buildStatePreparationService)
     : IArchitectureValidationApplicationService
 {
     private const string ErrorSeverity = "error";
@@ -30,6 +32,26 @@ public sealed class ArchitectureValidationApplicationService(
             string coverageConfig = loadAndSetup.CoverageConfig;
 
             IArchitectureContractRunner runner = loadAndSetup.Setup.Runner;
+
+            BuildStatePreflightResult preflight;
+            using (timing?.Measure("build_state_preflight"))
+                preflight = RunBuildStatePreflight(request, runner, loadAndSetup.Document);
+
+            if (preflight.Blocked)
+            {
+                return new ValidationOutcome(
+                    false, Array.Empty<ArchitectureViolation>(), Array.Empty<string>(),
+                    Array.Empty<ArchitectureViolation>(), coverageConfig,
+                    Array.Empty<ArchitectureUnmatchedIgnoredViolation>(), unmatchedConfig,
+                    Array.Empty<PolicyConsistencyDiagnostic>(), policyConsistencyConfig,
+                    Array.Empty<ArchitectureCoverageSummary>(), Array.Empty<ArchitectureClassificationConflict>(),
+                    Array.Empty<ArchitectureClassificationMetadataFailure>())
+                {
+                    PreflightDiagnostics = preflight.Diagnostics,
+                    PreflightBlocked = true
+                };
+            }
+
             List<ArchitectureViolation> allViolations = new();
 
             using (timing?.Measure("configuration_check"))
@@ -88,9 +110,60 @@ public sealed class ArchitectureValidationApplicationService(
             {
                 CycleFindings = execution.CycleFindings,
                 ClassificationRoles = classificationRoles,
-                ClassificationPathDeferred = classificationPathDeferred
+                ClassificationPathDeferred = classificationPathDeferred,
+                PreflightDiagnostics = preflight.Diagnostics
             };
         }
+    }
+
+    // Preflight only runs when project discovery produced a project graph — the fingerprint/
+    // receipt model this needs (ArchitectureDiscoveredProject.Path/AssemblyName) has no
+    // counterpart when target assemblies are configured directly via analysis.target_assemblies
+    // without project discovery.
+    private BuildStatePreflightResult RunBuildStatePreflight(
+        ValidationRequest request, IArchitectureContractRunner runner, ArchitectureContractDocument document)
+    {
+        Discovery.ProjectDiscoveryResult? discovery = runner.Session.Context.ProjectDiscovery;
+        if (discovery == null || discovery.DiscoveredProjects.Count == 0)
+        {
+            return new BuildStatePreflightResult(Array.Empty<BuildStatePreflightDiagnostic>());
+        }
+
+        // Build-state preflight only applies when the discovered project graph is itself what
+        // drives assembly resolution. When analysis.target_assemblies is explicitly configured,
+        // resolution runs against that fixed name list instead — a project list may still be
+        // declared solely to feed project-scope coverage contracts, independently of which
+        // assemblies get analyzed, so discovered projects have no necessary correspondence to a
+        // resolved/missing assembly here and must not be preflight-blocked.
+        if (document.Analysis.TargetAssemblies.Count > 0)
+        {
+            return new BuildStatePreflightResult(Array.Empty<BuildStatePreflightDiagnostic>());
+        }
+
+        BuildStateResolvedAssemblies resolution = new(
+            runner.Session.Context.TargetAssemblies,
+            runner.Session.Context.MissingAssemblyNames);
+
+        // Assembly resolution is skipped entirely (not merely unsuccessful) when only
+        // project-scope coverage contracts are selected — see
+        // ArchitectureRunnerSetupService.ShouldResolveAssemblyOutputs. That path deliberately lets
+        // the coverage engine classify unresolved projects as "unknown" instead of failing the
+        // run, so preflight must not reinterpret "resolution wasn't attempted" as "artifact
+        // missing". Resolution having populated neither resolved nor missing names is the signal
+        // that it never ran.
+        if (resolution.ResolvedAssemblies.Count == 0 && resolution.MissingAssemblyNames.Count == 0)
+        {
+            return new BuildStatePreflightResult(Array.Empty<BuildStatePreflightDiagnostic>());
+        }
+
+        return buildStatePreparationService.Prepare(new BuildStatePreflightRequest(
+            runner.Session.Context.RepositoryRoot,
+            discovery,
+            resolution,
+            request.PreparationMode,
+            request.NoRestore,
+            request.RequestedConfiguration,
+            request.RequestedTargetFramework));
     }
 
     private readonly record struct LoadAndSetupOutcome(

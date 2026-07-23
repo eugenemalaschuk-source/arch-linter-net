@@ -1,4 +1,5 @@
 using ArchLinterNet.Cli.Abstractions;
+using ArchLinterNet.Core.BuildState;
 using ArchLinterNet.Core.Composition;
 using ArchLinterNet.Core.Graph;
 using ArchLinterNet.Core.Model;
@@ -52,7 +53,8 @@ internal sealed class CliRuntime : ICliRuntime
         IReadOnlyCollection<ArchitectureClassificationConflict> classificationConflicts,
         IReadOnlyCollection<ArchitectureClassificationMetadataFailure> classificationMetadataFailures,
         IReadOnlyCollection<ArchitectureClassificationRoleFact> classificationRoles,
-        ArchitectureClassificationPathDeferredNotice? classificationPathDeferred)
+        ArchitectureClassificationPathDeferredNotice? classificationPathDeferred,
+        IReadOnlyCollection<BuildStatePreflightDiagnostic> preflightDiagnostics)
     {
         return ArchitectureDiagnosticFormatter.FormatResultForCiArtifacts(
             mode,
@@ -62,12 +64,18 @@ internal sealed class CliRuntime : ICliRuntime
             cycleFindings,
             classificationRoles,
             classificationPathDeferred,
+            preflightDiagnostics,
             coverageFindings,
             unmatchedIgnoredViolations,
             policyConsistencyFindings,
             coverageSummaries,
             classificationConflicts,
             classificationMetadataFailures);
+    }
+
+    public string FormatBuildStatePreflightForHumans(IReadOnlyCollection<BuildStatePreflightDiagnostic> diagnostics)
+    {
+        return _formatter.FormatBuildStatePreflightForHumans(diagnostics);
     }
 
     public string FormatResultAsSarif(

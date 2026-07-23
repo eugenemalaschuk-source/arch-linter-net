@@ -1,6 +1,7 @@
 using System.Text.Json;
 using ArchLinterNet.Cli.Abstractions;
 using ArchLinterNet.Cli.Commands;
+using ArchLinterNet.Core.BuildState;
 using ArchLinterNet.Core.Contracts;
 using ArchLinterNet.Core.Model;
 using ArchLinterNet.Core.Reporting;
@@ -121,6 +122,10 @@ internal sealed class ValidateCommandHandler(ICliRuntime runtime, ICliConsole co
             ContractIds = options.ContractIds.ToList(),
             BaselinePath = options.BaselinePath,
             EnforceUnmatchedIgnoredViolationsPolicy = true,
+            PreparationMode = options.EnsureBuilt ? BuildPreparationMode.EnsureBuilt : BuildPreparationMode.Ordinary,
+            NoRestore = options.NoRestore,
+            RequestedConfiguration = options.Configuration,
+            RequestedTargetFramework = options.TargetFramework,
         };
 
         ValidationOutcome outcome = runtime.Validate(request, timing);
@@ -138,7 +143,7 @@ internal sealed class ValidateCommandHandler(ICliRuntime runtime, ICliConsole co
                 outcome.UnmatchedIgnoredViolations,
                 outcome.PolicyConsistencyConfig == "off" ? Array.Empty<PolicyConsistencyDiagnostic>() : outcome.PolicyConsistencyFindings,
                 outcome.CoverageSummaries, outcome.ClassificationConflicts, outcome.ClassificationMetadataFailures,
-                outcome.ClassificationRoles, outcome.ClassificationPathDeferred));
+                outcome.ClassificationRoles, outcome.ClassificationPathDeferred, outcome.PreflightDiagnostics));
             return;
         }
 
@@ -217,6 +222,15 @@ internal sealed class ValidateCommandHandler(ICliRuntime runtime, ICliConsole co
 
     private void WriteHumanOutput(ValidationOutcome outcome)
     {
+        WriteOptionalSection(
+            outcome.PreflightDiagnostics.Count > 0,
+            () => runtime.FormatBuildStatePreflightForHumans(outcome.PreflightDiagnostics));
+
+        if (outcome.PreflightBlocked)
+        {
+            return;
+        }
+
         if (outcome.Passed)
         {
             console.Out.WriteLine("Architecture validation passed.");

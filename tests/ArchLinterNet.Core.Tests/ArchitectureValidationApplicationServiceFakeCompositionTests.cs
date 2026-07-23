@@ -1,3 +1,4 @@
+using ArchLinterNet.Core.BuildState;
 using ArchLinterNet.Core.Contracts;
 using ArchLinterNet.Core.Execution;
 using ArchLinterNet.Core.Execution.Abstractions;
@@ -164,7 +165,7 @@ public sealed class ArchitectureValidationApplicationServiceFakeCompositionTests
         var contractExecutor = new FakeContractExecutor();
 
         var applicationService = new ArchitectureValidationApplicationService(
-            runnerSetupService, handlerRegistry, contractExecutor);
+            runnerSetupService, handlerRegistry, contractExecutor, new BuildStatePreparationService());
 
         ValidationOutcome outcome = applicationService.Validate(
             new ValidationRequest { PolicyPath = "unused-by-fakes.arch.yml", Mode = "strict" });
@@ -213,7 +214,7 @@ public sealed class ArchitectureValidationApplicationServiceFakeCompositionTests
         };
 
         var applicationService = new ArchitectureValidationApplicationService(
-            runnerSetupService, handlerRegistry, contractExecutor);
+            runnerSetupService, handlerRegistry, contractExecutor, new BuildStatePreparationService());
 
         ValidationOutcome outcome = applicationService.Validate(
             new ValidationRequest { PolicyPath = "unused-by-fakes.arch.yml", Mode = "strict" });
@@ -232,7 +233,7 @@ public sealed class ArchitectureValidationApplicationServiceFakeCompositionTests
         var contractExecutor = new FakeContractExecutor();
 
         var applicationService = new ArchitectureValidationApplicationService(
-            runnerSetupService, handlerRegistry, contractExecutor);
+            runnerSetupService, handlerRegistry, contractExecutor, new BuildStatePreparationService());
 
         Assert.That(
             () => applicationService.Validate(

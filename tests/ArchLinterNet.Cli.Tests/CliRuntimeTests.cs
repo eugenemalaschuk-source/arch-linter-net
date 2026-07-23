@@ -1,4 +1,5 @@
 using ArchLinterNet.Cli.Infrastructure;
+using ArchLinterNet.Core.BuildState;
 using ArchLinterNet.Core.Model;
 using ArchLinterNet.Core.Reporting;
 using ArchLinterNet.Core.Validation;
@@ -48,7 +49,8 @@ public sealed class CliRuntimeTests
             Array.Empty<ArchitectureClassificationConflict>(),
             Array.Empty<ArchitectureClassificationMetadataFailure>(),
             Array.Empty<ArchitectureClassificationRoleFact>(),
-            notice);
+            notice,
+            Array.Empty<BuildStatePreflightDiagnostic>());
 
         Assert.That(result, Does.Contain("\"declared_entry_count\":1"));
     }

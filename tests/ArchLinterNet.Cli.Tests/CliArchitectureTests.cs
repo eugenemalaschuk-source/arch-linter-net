@@ -7,6 +7,7 @@ using ArchLinterNet.Cli.Commands.Explain;
 using ArchLinterNet.Cli.Commands.Graph;
 using ArchLinterNet.Cli.Commands.Validate;
 using ArchLinterNet.Cli.Infrastructure;
+using ArchLinterNet.Core.BuildState;
 using ArchLinterNet.Core.Contracts;
 using ArchLinterNet.Core.Graph;
 using ArchLinterNet.Core.Model;
@@ -361,7 +362,8 @@ public sealed class CliArchitectureTests
             IReadOnlyCollection<ArchitectureClassificationConflict> classificationConflicts,
             IReadOnlyCollection<ArchitectureClassificationMetadataFailure> classificationMetadataFailures,
             IReadOnlyCollection<ArchitectureClassificationRoleFact> classificationRoles,
-            ArchitectureClassificationPathDeferredNotice? classificationPathDeferred)
+            ArchitectureClassificationPathDeferredNotice? classificationPathDeferred,
+            IReadOnlyCollection<BuildStatePreflightDiagnostic> preflightDiagnostics)
         {
             throw new NotSupportedException();
         }
@@ -370,6 +372,11 @@ public sealed class CliArchitectureTests
             IReadOnlyCollection<ArchitectureClassificationConflict> conflicts,
             IReadOnlyCollection<ArchitectureClassificationMetadataFailure> metadataFailures,
             ArchitectureClassificationPathDeferredNotice? classificationPathDeferred)
+        {
+            throw new NotSupportedException();
+        }
+
+        public string FormatBuildStatePreflightForHumans(IReadOnlyCollection<BuildStatePreflightDiagnostic> diagnostics)
         {
             throw new NotSupportedException();
         }
