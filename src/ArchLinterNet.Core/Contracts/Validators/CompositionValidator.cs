@@ -33,15 +33,15 @@ internal sealed class CompositionValidator : IArchitecturePolicyDocumentValidato
                     "considered outside the boundary.");
             }
 
-            foreach (ArchitectureCompositionTypeSelector typeSelector in contract.AllowedOnlyInTypes)
+            bool hasIncompleteTypeSelector = contract.AllowedOnlyInTypes.Any(typeSelector =>
+                string.IsNullOrWhiteSpace(typeSelector.Assembly) || string.IsNullOrWhiteSpace(typeSelector.Type));
+
+            if (hasIncompleteTypeSelector)
             {
-                if (string.IsNullOrWhiteSpace(typeSelector.Assembly) || string.IsNullOrWhiteSpace(typeSelector.Type))
-                {
-                    throw new InvalidOperationException(
-                        $"Composition contract '{contract.Name}' declares an 'allowed_only_in_types' entry " +
-                        "missing 'assembly' or 'type'. Both are required — a type selector without an assembly " +
-                        "or type identity cannot match anything.");
-                }
+                throw new InvalidOperationException(
+                    $"Composition contract '{contract.Name}' declares an 'allowed_only_in_types' entry " +
+                    "missing 'assembly' or 'type'. Both are required — a type selector without an assembly " +
+                    "or type identity cannot match anything.");
             }
         }
     }

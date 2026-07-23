@@ -400,10 +400,11 @@ public sealed class ArchitectureSarifFormatterTests
     [Test]
     public void FormatResultAsSarif_CompositionViolation_PropertiesExposeSourceAssembly()
     {
+        string[] forbiddenReferences = { "System.IServiceProvider.GetService" };
         var violations = new List<ArchitectureViolation>
         {
             new("service-locator-confined-to-composition", "service-locator-confined-to-composition",
-                "Host.A.Program", "System.IServiceProvider.GetService", new[] { "System.IServiceProvider.GetService" })
+                "Host.A.Program", "System.IServiceProvider.GetService", forbiddenReferences)
             {
                 Payload = new CompositionPayload(
                     MatchedForbiddenApi: "System.IServiceProvider.GetService",
