@@ -12,6 +12,8 @@ It is intentionally excluded from the public MkDocs/GitHub Pages product site.
 
 - [Core architecture blueprint](core-architecture-blueprint.md) — target Core module graph, application/composition seams, and state-ownership rules for the architecture-health refactor (#132/#133).
 
+- [Analysis and build-state blueprint](analysis-build-state-blueprint.md) — portable fingerprint identity, artifact verification, explicit preparation, immutable snapshot ownership, and downstream constraints for #362/#363/#365/#374/#375 (#355/#387).
+
 - [CEL engine architecture blueprint](cel-engine-architecture.md) — processing pipeline, component ownership, extension-direction matrix, and prohibited shortcuts for the `ArchLinterNet.CEL` engine (#322/#324).
 
 - [CEL upstream corpus mining manifest](cel-corpus-mining-manifest.md) — provenance-aware classification of upstream CEL test corpora reviewed for parser/tokenizer hardening, and what was adapted or deferred (#338).
