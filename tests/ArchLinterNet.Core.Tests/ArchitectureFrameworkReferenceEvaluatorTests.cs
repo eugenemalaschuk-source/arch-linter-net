@@ -11,7 +11,7 @@ public sealed class ArchitectureFrameworkReferenceEvaluatorTests
     {
         string projectPath = Path.Combine(Path.GetTempPath(), $"does-not-exist-{Guid.NewGuid():N}.csproj");
 
-        ArchitectureFrameworkReferenceEvaluationResult result = new ArchitectureFrameworkReferenceEvaluator().Evaluate(projectPath);
+        ArchitectureFrameworkReferenceEvaluationResult result = new ArchitectureFrameworkReferenceEvaluator().Evaluate(projectPath, "Debug");
 
         Assert.That(result.Succeeded, Is.False);
         Assert.That(result.Failures, Has.Count.EqualTo(1));
@@ -30,7 +30,7 @@ public sealed class ArchitectureFrameworkReferenceEvaluatorTests
             File.WriteAllText(projectPath, "<Project Sdk=\"Microsoft.NET.Sdk\"><Unclosed>");
 
             ArchitectureFrameworkReferenceEvaluationResult result =
-                new ArchitectureFrameworkReferenceEvaluator().Evaluate(projectPath);
+                new ArchitectureFrameworkReferenceEvaluator().Evaluate(projectPath, "Debug");
 
             Assert.That(result.Succeeded, Is.False);
             Assert.That(result.Failures, Is.Not.Empty);

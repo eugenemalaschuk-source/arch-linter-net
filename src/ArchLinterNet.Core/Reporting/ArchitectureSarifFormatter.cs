@@ -194,6 +194,7 @@ public sealed partial class ArchitectureSarifFormatter : IArchitectureSarifForma
                 ["target_framework"] = e.TargetFramework,
                 ["explicit"] = e.Explicit,
                 ["source_path"] = e.SourcePath,
+                ["configuration"] = e.Configuration,
             }).ToArray(),
         };
     }

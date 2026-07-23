@@ -35,7 +35,8 @@ public sealed partial class ArchitectureAnalysisSession
             ArchitectureDiscoveredFrameworkReference[] matched = references
                 .Where(reference => ArchitectureFrameworkReferenceResolver.MatchesGroup(frameworkGroup, reference.FrameworkName))
                 .Where(reference => !executionContext.IsIgnored(
-                    contract.Source, reference.FrameworkName, targetMember: FormatFrameworkReference(reference)))
+                    contract.Source, reference.FrameworkName,
+                    targetMember: FormatFrameworkReference(reference), configuration: ResolvedBuildConfiguration))
                 .ToArray();
 
             string[] forbiddenReferences = matched
@@ -87,7 +88,8 @@ public sealed partial class ArchitectureAnalysisSession
             .Where(reference => !allowedGroups.Any(group =>
                 ArchitectureFrameworkReferenceResolver.MatchesGroup(group, reference.FrameworkName)))
             .Where(reference => !executionContext.IsIgnored(
-                contract.Source, reference.FrameworkName, targetMember: FormatFrameworkReference(reference)))
+                contract.Source, reference.FrameworkName,
+                targetMember: FormatFrameworkReference(reference), configuration: ResolvedBuildConfiguration))
             .ToArray();
 
         string[] disallowedReferences = disallowed
@@ -147,18 +149,28 @@ public sealed partial class ArchitectureAnalysisSession
             .FirstOrDefault(project => string.Equals(project.AssemblyName, assemblyName, StringComparison.Ordinal));
     }
 
+    // Matches analysis.configuration, defaulting to "Debug" exactly like project discovery's own
+    // output-path resolution (ArchitectureProjectDiscoveryService.TryResolveOutput) - so a policy
+    // targeting Release evaluates Release-conditioned FrameworkReference declarations, and a Debug
+    // baseline entry does not silently freeze a distinct Release occurrence of the same
+    // FrameworkName+TargetFramework, or vice versa.
+    private string ResolvedBuildConfiguration =>
+        string.IsNullOrWhiteSpace(Document.Analysis.Configuration) ? "Debug" : Document.Analysis.Configuration;
+
     private ArchitectureFrameworkReferenceEvaluationResult EvaluateFrameworkReferences(ArchitectureDiscoveredProject owningProject)
     {
         string projectAbsolutePath = Path.GetFullPath(Path.Combine(Context.RepositoryRoot, owningProject.Path));
+        string configuration = ResolvedBuildConfiguration;
+        string cacheKey = $"{projectAbsolutePath}|{configuration}";
 
-        if (_frameworkEvaluationCache.TryGetValue(projectAbsolutePath, out ArchitectureFrameworkReferenceEvaluationResult? cached))
+        if (_frameworkEvaluationCache.TryGetValue(cacheKey, out ArchitectureFrameworkReferenceEvaluationResult? cached))
         {
             return cached;
         }
 
         ArchitectureFrameworkReferenceEvaluationResult result =
-            new ArchitectureFrameworkReferenceEvaluator().Evaluate(projectAbsolutePath);
-        _frameworkEvaluationCache[projectAbsolutePath] = result;
+            new ArchitectureFrameworkReferenceEvaluator().Evaluate(projectAbsolutePath, configuration);
+        _frameworkEvaluationCache[cacheKey] = result;
         return result;
     }
 
@@ -194,12 +206,13 @@ public sealed partial class ArchitectureAnalysisSession
         return (tfmMatch ?? candidates[0]).Condition;
     }
 
-    private static FrameworkReferenceEvidence[] BuildEvidence(
+    private FrameworkReferenceEvidence[] BuildEvidence(
         IEnumerable<ArchitectureDiscoveredFrameworkReference> references)
     {
+        string configuration = ResolvedBuildConfiguration;
         return references
             .Select(reference => new FrameworkReferenceEvidence(
-                reference.FrameworkName, reference.TargetFramework, reference.Explicit, reference.SourcePath))
+                reference.FrameworkName, reference.TargetFramework, reference.Explicit, reference.SourcePath, configuration))
             .ToArray();
     }
 

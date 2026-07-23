@@ -12,7 +12,9 @@ public sealed partial class ArchitectureDiagnosticFormatter
     private static string FormatFrameworkReferenceContextForHumans(IReadOnlyCollection<FrameworkReferenceEvidence> evidence)
     {
         string entries = string.Join(", ", evidence.Select(e =>
-            $"{e.FrameworkName} ({e.TargetFramework}, {(e.Explicit ? "explicit" : "implicit")}, {e.SourcePath})"));
+            string.IsNullOrEmpty(e.Configuration)
+                ? $"{e.FrameworkName} ({e.TargetFramework}, {(e.Explicit ? "explicit" : "implicit")}, {e.SourcePath})"
+                : $"{e.FrameworkName} ({e.TargetFramework}, {e.Configuration}, {(e.Explicit ? "explicit" : "implicit")}, {e.SourcePath})"));
         return $" [{entries}]";
     }
 
@@ -30,6 +32,7 @@ public sealed partial class ArchitectureDiagnosticFormatter
             ["target_framework"] = e.TargetFramework,
             ["explicit"] = e.Explicit,
             ["source_path"] = e.SourcePath,
+            ["configuration"] = e.Configuration,
         }).ToArray();
     }
 }

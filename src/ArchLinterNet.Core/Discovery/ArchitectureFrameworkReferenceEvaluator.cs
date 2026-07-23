@@ -15,7 +15,7 @@ internal sealed class ArchitectureFrameworkReferenceEvaluator : IArchitectureFra
     private const string ImplicitlyDefinedMetadataKey = "IsImplicitlyDefined";
     private const string FrameworkReferenceItemName = "FrameworkReference";
 
-    public ArchitectureFrameworkReferenceEvaluationResult Evaluate(string projectAbsolutePath)
+    public ArchitectureFrameworkReferenceEvaluationResult Evaluate(string projectAbsolutePath, string configuration)
     {
         if (!File.Exists(projectAbsolutePath))
         {
@@ -33,6 +33,12 @@ internal sealed class ArchitectureFrameworkReferenceEvaluator : IArchitectureFra
                 return Failure(projectAbsolutePath, null,
                     $"Buildalyzer could not create a project analyzer for '{projectAbsolutePath}'.");
             }
+
+            // Matches analysis.configuration (defaulting to "Debug" the same way project discovery's
+            // output-path resolution already does) so a policy targeting Release sees Release-only
+            // FrameworkReference declarations (e.g. Condition="'$(Configuration)'=='Release'") instead
+            // of always evaluating against MSBuild's own Configuration default.
+            analyzer.SetGlobalProperty("Configuration", configuration);
 
             // Restore = true: empirically, a design-time build without a prior restore fails (no
             // project.assets.json) even for a project that declares no PackageReferences at all -

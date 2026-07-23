@@ -59,7 +59,7 @@ The system SHALL allow `contracts.audit_framework_dependency` entries to report 
 - **THEN** audit validation SHALL report a violation and strict-mode validation SHALL NOT fail because of it
 
 ### Requirement: FrameworkReference declarations are discovered through real per-target-framework MSBuild evaluation
-The system SHALL discover a project's `FrameworkReference` declarations by running an actual MSBuild design-time build (via Buildalyzer) separately for each of the project's configured target frameworks, rather than by parsing the project file's raw XML. `Condition` on both the `FrameworkReference` item itself and its containing `ItemGroup` SHALL be resolved by this real MSBuild evaluation, and declarations contributed by imported `.props`/`.targets` files (including `Directory.Build.props` and SDK-injected targets) SHALL be included exactly as MSBuild itself would resolve them.
+The system SHALL discover a project's `FrameworkReference` declarations by running an actual MSBuild design-time build (via Buildalyzer) separately for each of the project's configured target frameworks, with the MSBuild global property `Configuration` set to `analysis.configuration` (defaulting to `Debug`), rather than by parsing the project file's raw XML. `Condition` on both the `FrameworkReference` item itself and its containing `ItemGroup` SHALL be resolved by this real MSBuild evaluation — including conditions that depend on `$(Configuration)` — and declarations contributed by imported `.props`/`.targets` files (including `Directory.Build.props` and SDK-injected targets) SHALL be included exactly as MSBuild itself would resolve them.
 
 #### Scenario: ItemGroup-level condition is honored per target framework
 - **WHEN** a multi-targeted project declares `<ItemGroup Condition="'$(TargetFramework)'=='net10.0'"><FrameworkReference Include="Microsoft.AspNetCore.App" /></ItemGroup>`
@@ -80,8 +80,8 @@ Every discovered `FrameworkReference` SHALL carry: the framework name, the speci
 - **WHEN** a project explicitly declares `<FrameworkReference Include="Microsoft.AspNetCore.App" />`
 - **THEN** the discovered reference SHALL be classified as explicit
 
-### Requirement: Framework-reference violations preserve project and target-framework occurrence identity
-Framework-reference violations SHALL identify the contract name, optional contract ID, source project, matched forbidden framework group, the matched `FrameworkReference` name, and the real evaluated target framework it applies to, so that the same framework name applicable to two different target frameworks in the same project, or declared in two different projects, produces distinct violation identities.
+### Requirement: Framework-reference violations preserve project, target-framework, and build-configuration occurrence identity
+Framework-reference violations SHALL identify the contract name, optional contract ID, source project, matched forbidden framework group, the matched `FrameworkReference` name, the real evaluated target framework it applies to, and the MSBuild `Configuration` (`analysis.configuration`, defaulting to `Debug`) it was evaluated under, so that the same framework name applicable to two different target frameworks in the same project, declared in two different projects, or applicable only under one build configuration (e.g. `Condition="'$(Configuration)'=='Release'"`), produces distinct violation identities.
 
 #### Scenario: Violation includes target framework context
 - **WHEN** `MyApp.Api` has an evaluated `FrameworkReference` for `Microsoft.AspNetCore.App` applicable to `net10.0`, and a `strict_framework_dependency` contract forbids that framework
@@ -96,8 +96,12 @@ Framework-reference violations SHALL identify the contract name, optional contra
 - **THEN** the resulting violation's identity SHALL be scoped to that one target framework, distinct from what an occurrence under a different target framework would produce
 
 #### Scenario: Two simultaneously active declarations of the same framework for one target framework fail closed rather than producing an ambiguous identity
-- **WHEN** a project declares `FrameworkReference Include="Microsoft.AspNetCore.App"` twice with conditions that both evaluate true for the same target framework
+- **WHEN** a project declares `FrameworkReference Include="Microsoft.AspNetCore.App"` twice with conditions that both evaluate true for the same target framework under the same build `Configuration`
 - **THEN** the project's MSBuild evaluation for that target framework SHALL fail (the .NET SDK itself rejects duplicate active `FrameworkReference` declarations for one build), and the contract's `CheckConfiguration` SHALL report a fail-closed evaluation-failure violation for that project/target framework, rather than the contract silently producing two violations distinguished only by call-order `Occurrence`
+
+#### Scenario: Same project and target framework, mutually exclusive by Configuration, yields distinct identities
+- **WHEN** a project declares `FrameworkReference Include="Microsoft.AspNetCore.App"` conditioned to `Configuration=='Debug'` and again conditioned to `Configuration=='Release'`, both applicable to the same target framework, so only one is ever active in a given build
+- **THEN** the `Debug`-evaluated violation and the `Release`-evaluated violation SHALL have distinct violation/baseline identities differing by `Configuration`, and a baseline recorded under one `Configuration` SHALL NOT suppress (freeze) the occurrence evaluated under the other
 
 ### Requirement: Framework-reference evaluation fails closed when MSBuild evaluation cannot succeed
 The system SHALL detect, during `CheckConfiguration`, any `framework_dependency`/`framework_allow_only` contract whose source project's MSBuild design-time build does not succeed for the whole project or for any of its configured target frameworks, and SHALL report a `<configuration>`-style violation identifying the contract, the source project, and the target framework (or the whole project) that could not be evaluated, rather than allowing the contract to silently evaluate as passing with no visible signal that framework-reference data could not be trusted.

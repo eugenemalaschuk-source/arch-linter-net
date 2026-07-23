@@ -72,11 +72,15 @@ Unknown/unusable framework groups referenced by a `framework_allow_only` contrac
 - **THEN** `CheckConfiguration` SHALL report a violation naming the contract, the source project, and the target framework that failed to evaluate, and the contract's own check SHALL NOT report a false-clean result on the basis of unevaluated data
 
 ### Requirement: Framework allow-only declarations are discovered through real per-target-framework MSBuild evaluation
-The system SHALL resolve a `framework_allow_only` contract's source project's `FrameworkReference` declarations using the same real, per-target-framework MSBuild design-time build (via Buildalyzer) as `framework_dependency` contracts, including `Condition` on both the `FrameworkReference` item and its containing `ItemGroup`, declarations from imported `.props`/`.targets`, and explicit-vs-implicit classification via `IsImplicitlyDefined` metadata.
+The system SHALL resolve a `framework_allow_only` contract's source project's `FrameworkReference` declarations using the same real, per-target-framework MSBuild design-time build (via Buildalyzer, with the `Configuration` global property set to `analysis.configuration`) as `framework_dependency` contracts, including `Condition` on both the `FrameworkReference` item and its containing `ItemGroup` (including conditions depending on `$(Configuration)`), declarations from imported `.props`/`.targets`, and explicit-vs-implicit classification via `IsImplicitlyDefined` metadata.
 
 #### Scenario: Allow-only evaluation honors per-target-framework conditions
 - **WHEN** a multi-targeted project's `FrameworkReference` for a disallowed framework is conditioned to only one of its target frameworks
 - **THEN** the `framework_allow_only` contract SHALL report a violation only for that target framework, not for target frameworks where the condition does not apply
+
+#### Scenario: Allow-only violation identity distinguishes build configuration
+- **WHEN** a disallowed `FrameworkReference` is conditioned to only one of `Debug`/`Release` `Configuration`, for the same target framework
+- **THEN** the `framework_allow_only` violation's identity SHALL include that `Configuration`, distinct from what an occurrence under the other `Configuration` would produce
 
 ### Requirement: Framework allow-only diagnostics use a distinct typed diagnostic kind
 

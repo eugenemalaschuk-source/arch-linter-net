@@ -232,6 +232,149 @@ public sealed class FrameworkReferenceBaselineIdentityTests
     }
 
     [Test]
+    public void DebugAndReleaseConfiguration_SameFrameworkNameAndTargetFramework_ProduceDistinctIdentities()
+    {
+        // Real, on-disk fixture: two mutually-exclusive-by-Configuration FrameworkReference
+        // declarations of the SAME name, both applicable to the SAME target framework (net10.0) -
+        // exactly the valid scenario a duplicate-declaration build error does NOT cover, since only
+        // one is ever active per build. A baseline generated while analyzing under Debug must not
+        // silently freeze the Release occurrence (or vice versa): FrameworkName+TargetFramework alone
+        // cannot tell them apart, so Configuration must be part of live identity.
+        const string SourceAssemblyName = "MyApp.Api";
+        string repoRoot = Path.Combine(Path.GetTempPath(), $"arch-linter-framework-configs-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(repoRoot);
+        try
+        {
+            string projectDir = Path.Combine(repoRoot, SourceAssemblyName);
+            Directory.CreateDirectory(projectDir);
+            string projectPath = Path.Combine(projectDir, $"{SourceAssemblyName}.csproj");
+            File.WriteAllText(projectPath, """
+                <Project Sdk="Microsoft.NET.Sdk">
+                  <PropertyGroup>
+                    <TargetFrameworks>net10.0</TargetFrameworks>
+                  </PropertyGroup>
+                  <ItemGroup>
+                    <FrameworkReference Include="Microsoft.AspNetCore.App" Condition="'$(Configuration)'=='Debug'" />
+                  </ItemGroup>
+                  <ItemGroup>
+                    <FrameworkReference Include="Microsoft.AspNetCore.App" Condition="'$(Configuration)'=='Release'" />
+                  </ItemGroup>
+                </Project>
+                """);
+
+            ArchitectureBaselineCandidate CollectCandidate(string configuration)
+            {
+                var contract = new ArchitectureFrameworkReferenceContract
+                {
+                    Id = "domain-no-aspnet",
+                    Name = "Api must not reference ASP.NET Core",
+                    Source = SourceAssemblyName,
+                    Forbidden = new List<string> { "forbidden_web" }
+                };
+                var document = new ArchitectureContractDocument
+                {
+                    Version = 1,
+                    Name = "Test",
+                    Layers = new Dictionary<string, ArchitectureLayer>(),
+                    FrameworkReferences = new Dictionary<string, ArchitectureFrameworkReferenceGroup>
+                    {
+                        ["forbidden_web"] = new() { FrameworkNames = { "Microsoft.AspNetCore.App" } }
+                    },
+                    Analysis = new ArchitectureAnalysisConfiguration
+                    {
+                        TargetAssemblies = new List<string> { SourceAssemblyName },
+                        Projects = new List<string> { projectPath },
+                        Configuration = configuration,
+                    },
+                    Contracts = new ArchitectureContractGroups
+                    {
+                        StrictFrameworkDependency = new List<ArchitectureFrameworkReferenceContract> { contract }
+                    }
+                };
+
+                ProjectDiscoveryResult discovery = new ArchitectureProjectDiscoveryService()
+                    .ResolveFromDocument(document, repoRoot, resolveAssemblyOutputs: false);
+                var context = new ArchitectureAnalysisContext(
+                    repoRoot, new[] { typeof(FrameworkReferenceBaselineIdentityTests).Assembly },
+                    Array.Empty<string>(), Array.Empty<string>(), projectDiscovery: discovery);
+
+                var runner = new ArchitectureContractRunner(context, document);
+                List<ArchitectureViolation> violations = runner.Session.CheckFrameworkDependencyContract(contract);
+
+                Assert.That(violations, Has.Count.EqualTo(1),
+                    $"{configuration} build must see exactly one active FrameworkReference declaration.");
+                Assert.That(runner.BaselineCandidates, Has.Count.EqualTo(1));
+                return runner.BaselineCandidates[0];
+            }
+
+            ArchitectureBaselineCandidate debugCandidate = CollectCandidate("Debug");
+            ArchitectureBaselineCandidate releaseCandidate = CollectCandidate("Release");
+
+            ArchitectureViolationIdentity debugIdentity = debugCandidate.Identity!;
+            ArchitectureViolationIdentity releaseIdentity = releaseCandidate.Identity!;
+
+            Assert.That(debugIdentity.Configuration, Is.EqualTo("Debug"));
+            Assert.That(releaseIdentity.Configuration, Is.EqualTo("Release"));
+            Assert.That(debugIdentity, Is.Not.EqualTo(releaseIdentity));
+
+            // A baseline that only ever recorded the Debug occurrence must not freeze Release.
+            ArchitectureContractDocument policy = new()
+            {
+                Version = 1,
+                Name = "Test",
+                Contracts = new ArchitectureContractGroups
+                {
+                    StrictFrameworkDependency = new List<ArchitectureFrameworkReferenceContract>
+                    {
+                        new() { Id = "domain-no-aspnet", Name = "domain-no-aspnet", Source = SourceAssemblyName },
+                    },
+                },
+            };
+            ArchitectureBaselineDocument baseline = new()
+            {
+                Version = 2,
+                Baseline = new ArchitectureBaselineContractGroups
+                {
+                    StrictFrameworkDependency = new List<ArchitectureBaselineContractEntry>
+                    {
+                        new()
+                        {
+                            Id = "domain-no-aspnet",
+                            IgnoredViolations = new List<ArchitectureBaselineIgnoredViolation>
+                            {
+                                ArchitectureBaselineIgnoredViolation.FromIdentity(
+                                    debugIdentity, SourceAssemblyName, "Microsoft.AspNetCore.App (net10.0)", "known debt"),
+                            },
+                        },
+                    },
+                },
+            };
+
+            IReadOnlyList<ArchitectureBaselineCandidate> candidates =
+            [
+                new("strict_framework_dependency", "domain-no-aspnet", SourceAssemblyName,
+                    "Microsoft.AspNetCore.App (net10.0)", debugIdentity),
+                new("strict_framework_dependency", "domain-no-aspnet", SourceAssemblyName,
+                    "Microsoft.AspNetCore.App (net10.0)", releaseIdentity),
+            ];
+
+            ArchitectureBaselineComparisonResult result = ArchitectureBaselineComparer.Compare(
+                policy, baseline, candidates, mode: "all");
+
+            Assert.Multiple(() =>
+            {
+                Assert.That(result.Frozen, Has.Count.EqualTo(1));
+                Assert.That(result.New, Has.Count.EqualTo(1),
+                    "The Release occurrence must be reported as New, not silently frozen by the Debug baseline entry.");
+            });
+        }
+        finally
+        {
+            Directory.Delete(repoRoot, true);
+        }
+    }
+
+    [Test]
     public void Compare_BaselineOnlyRecordsFirstCondition_SecondConditionRemainsNewNotFrozen()
     {
         // Mirrors the same-named-type-in-different-assembly regression pattern: a baseline that only

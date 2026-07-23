@@ -4,4 +4,5 @@ public sealed record FrameworkReferenceEvidence(
     string FrameworkName,
     string TargetFramework,
     bool Explicit,
-    string SourcePath);
+    string SourcePath,
+    string? Configuration = null);
