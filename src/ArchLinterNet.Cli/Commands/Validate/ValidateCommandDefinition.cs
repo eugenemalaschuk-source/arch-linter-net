@@ -43,11 +43,11 @@ internal sealed class ValidateCommandDefinition(ValidateCommandHandler handler)
                                 (e.g. Debug, Release)
               --framework <tfm> Requested target framework for build-state preflight
           -f, --format <fmt>    Output format: human, json, or sarif (default: human)
-                                sarif covers violations and cycles only; coverage,
-                                unmatched-ignore, policy-consistency, and build-state
-                                preflight findings can still fail the run (exit code 1)
-                                without appearing in SARIF results — use --format json
-                                to see those
+                                sarif covers violations, cycles, and build-state
+                                preflight findings; coverage, unmatched-ignore, and
+                                policy-consistency findings can still fail the run
+                                (exit code 1) without appearing in SARIF results —
+                                use --format json to see those
               --json            Shortcut for --format json
           -h, --help            Show this help message
           -v, --version         Show version

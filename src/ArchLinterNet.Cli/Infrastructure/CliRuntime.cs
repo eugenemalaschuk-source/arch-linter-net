@@ -82,11 +82,12 @@ internal sealed class CliRuntime : ICliRuntime
         string mode,
         IReadOnlyCollection<ArchitectureViolation> violations,
         IReadOnlyCollection<string> cycles,
-        IReadOnlyCollection<ArchitectureCycleFinding> cycleFindings)
+        IReadOnlyCollection<ArchitectureCycleFinding> cycleFindings,
+        IReadOnlyCollection<BuildStatePreflightDiagnostic> preflightDiagnostics)
     {
         return cycleFindings.Count > 0
-            ? ArchitectureSarifFormatter.FormatResultAsSarif(mode, violations, cycleFindings, Version)
-            : _sarifFormatter.FormatResultAsSarif(mode, violations, cycles, Version);
+            ? ArchitectureSarifFormatter.FormatResultAsSarif(mode, violations, cycleFindings, preflightDiagnostics, Version)
+            : _sarifFormatter.FormatResultAsSarif(mode, violations, cycles, preflightDiagnostics, Version);
     }
 
     public string FormatViolationsForHumans(IReadOnlyCollection<ArchitectureViolation> violations)

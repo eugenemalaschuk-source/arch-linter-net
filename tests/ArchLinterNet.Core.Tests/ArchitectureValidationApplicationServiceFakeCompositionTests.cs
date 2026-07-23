@@ -1,5 +1,6 @@
 using ArchLinterNet.Core.BuildState;
 using ArchLinterNet.Core.Contracts;
+using ArchLinterNet.Core.Discovery;
 using ArchLinterNet.Core.Execution;
 using ArchLinterNet.Core.Execution.Abstractions;
 using ArchLinterNet.Core.Model;
@@ -23,7 +24,9 @@ public sealed class ArchitectureValidationApplicationServiceFakeCompositionTests
     {
         public bool LoadDocumentCalled { get; private set; }
 
-        public bool BuildRunnerCalled { get; private set; }
+        public bool BuildRunnerCalled => BuildRunnerCallCount > 0;
+
+        public int BuildRunnerCallCount { get; private set; }
 
         public ArchitectureContractDocument DocumentToReturn { get; set; } = new() { Version = 1, Name = "Fake" };
 
@@ -46,7 +49,7 @@ public sealed class ArchitectureValidationApplicationServiceFakeCompositionTests
             ValidationTiming? timing = null,
             string? mode = null)
         {
-            BuildRunnerCalled = true;
+            BuildRunnerCallCount++;
             return new ArchitectureRunnerSetup("/fake/repository/root", RunnerToReturn);
         }
     }
@@ -141,6 +144,133 @@ public sealed class ArchitectureValidationApplicationServiceFakeCompositionTests
         return new ArchitectureAnalysisSession(
             context, document, selectedContractIds: null, enableUnmatchedIgnoreTracking: true,
             preprocessorSymbols: null);
+    }
+
+    private static ArchitectureAnalysisSession CreateSessionWithDiscoveredProject(ArchitectureContractDocument document)
+    {
+        var discovery = new ProjectDiscoveryResult(
+            new[] { "Fixture" }, Array.Empty<string>(), Array.Empty<string>(),
+            Array.Empty<ArchitectureProjectDiscoveryDiagnostic>())
+        {
+            DiscoveredProjects = new[]
+            {
+                new ArchitectureDiscoveredProject("Fixture.csproj", "Fixture", new[] { "net10.0" })
+            }
+        };
+
+        var context = new ArchitectureAnalysisContext(
+            "/fake/repository/root",
+            Array.Empty<System.Reflection.Assembly>(),
+            new[] { "Fixture" },
+            Array.Empty<string>(),
+            projectDiscovery: discovery);
+
+        return new ArchitectureAnalysisSession(
+            context, document, selectedContractIds: null, enableUnmatchedIgnoreTracking: true,
+            preprocessorSymbols: null);
+    }
+
+    private sealed class FakeBuildStatePreparationService : IBuildStatePreparationService
+    {
+        public int PrepareCallCount { get; private set; }
+
+        public BuildStatePreflightResult ResultToReturn { get; set; } =
+            new(Array.Empty<BuildStatePreflightDiagnostic>());
+
+        public BuildStatePreflightResult Prepare(BuildStatePreflightRequest request)
+        {
+            PrepareCallCount++;
+            return ResultToReturn;
+        }
+    }
+
+    [Test]
+    public void Validate_BlockingPreflight_ShortCircuitsBeforeContractExecutionAndReportsPreflightOnly()
+    {
+        var document = new ArchitectureContractDocument
+        {
+            Version = 1,
+            Name = "Fake",
+            Analysis = new ArchitectureAnalysisConfiguration
+            {
+                UnmatchedIgnoredViolations = "off",
+                PolicyConsistency = "off",
+                Coverage = "off",
+            },
+        };
+
+        var runnerSetupService = new FakeRunnerSetupService { DocumentToReturn = document };
+        var runner = new FakeContractRunner(CreateSessionWithDiscoveredProject(document));
+        runnerSetupService.RunnerToReturn = runner;
+        var handlerRegistry = new FakeContractHandlerRegistry();
+        var contractExecutor = new FakeContractExecutor();
+
+        var blockingDiagnostic = new BuildStatePreflightDiagnostic(
+            "build-state-preflight", "Fixture.csproj", BuildStatePreflightState.MissingArtifact,
+            new BuildStatePreflightEvidence("Fixture.csproj", "Fixture"));
+        var preparationService = new FakeBuildStatePreparationService
+        {
+            ResultToReturn = new BuildStatePreflightResult(new[] { blockingDiagnostic })
+        };
+
+        var applicationService = new ArchitectureValidationApplicationService(
+            runnerSetupService, handlerRegistry, contractExecutor, preparationService);
+
+        ValidationOutcome outcome = applicationService.Validate(
+            new ValidationRequest { PolicyPath = "unused-by-fakes.arch.yml", Mode = "strict" });
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(outcome.Passed, Is.False);
+            Assert.That(outcome.PreflightBlocked, Is.True);
+            Assert.That(outcome.PreflightDiagnostics, Has.Count.EqualTo(1));
+            Assert.That(outcome.Violations, Is.Empty);
+            Assert.That(contractExecutor.WasCalled, Is.False);
+            Assert.That(runner.CheckConfigurationCalled, Is.False);
+        });
+    }
+
+    [Test]
+    public void Validate_EnsureBuiltWithNonBlockingPreflight_ReReadsRunnerSetupBeforeContractExecution()
+    {
+        var document = new ArchitectureContractDocument
+        {
+            Version = 1,
+            Name = "Fake",
+            Analysis = new ArchitectureAnalysisConfiguration
+            {
+                UnmatchedIgnoredViolations = "off",
+                PolicyConsistency = "off",
+                Coverage = "off",
+            },
+        };
+
+        var runnerSetupService = new FakeRunnerSetupService { DocumentToReturn = document };
+        var runner = new FakeContractRunner(CreateSessionWithDiscoveredProject(document));
+        runnerSetupService.RunnerToReturn = runner;
+        var handlerRegistry = new FakeContractHandlerRegistry();
+        var contractExecutor = new FakeContractExecutor();
+        var preparationService = new FakeBuildStatePreparationService();
+
+        var applicationService = new ArchitectureValidationApplicationService(
+            runnerSetupService, handlerRegistry, contractExecutor, preparationService);
+
+        ValidationOutcome outcome = applicationService.Validate(new ValidationRequest
+        {
+            PolicyPath = "unused-by-fakes.arch.yml",
+            Mode = "strict",
+            PreparationMode = BuildPreparationMode.EnsureBuilt,
+        });
+
+        Assert.Multiple(() =>
+        {
+            // Post-ensure-built, setup runs a second time (once during the initial LoadAndSetup,
+            // once more after a non-blocking preflight) so contract execution sees any assembly
+            // the build just produced rather than the stale pre-build resolution snapshot.
+            Assert.That(runnerSetupService.BuildRunnerCallCount, Is.EqualTo(2));
+            Assert.That(contractExecutor.WasCalled, Is.True);
+            Assert.That(outcome.PreflightBlocked, Is.False);
+        });
     }
 
     [Test]

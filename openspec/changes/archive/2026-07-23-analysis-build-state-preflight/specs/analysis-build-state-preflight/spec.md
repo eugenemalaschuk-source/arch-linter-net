@@ -1,5 +1,8 @@
-## ADDED Requirements
+# analysis-build-state-preflight Specification
 
+## Purpose
+TBD - created by archiving change analysis-build-state-preflight. Update Purpose after archive.
+## Requirements
 ### Requirement: Build-state preflight applies to project-graph-driven resolution
 Build-state preflight SHALL run only when the selected project graph itself drives assembly resolution — i.e. when the policy does not declare `analysis.target_assemblies`. When `analysis.target_assemblies` is configured, resolution runs against that fixed name list and a declared project list (if any) exists solely to feed project-scope coverage contracts; discovered projects have no necessary one-to-one correspondence to a resolved or missing assembly in that mode, so they SHALL NOT be preflight-blocked.
 
@@ -89,12 +92,16 @@ The system SHALL treat a valid ArchLinterNet build receipt (v1), binding the pro
 - **WHEN** a build receipt exists but its recorded build-input fingerprint does not match the freshly computed fingerprint
 - **THEN** the system emits a `stale-artifact` diagnostic and does not treat the receipt as valid
 
-### Requirement: Preflight diagnostics are normalized across human and JSON output
-The system SHALL render every preflight diagnostic through the existing typed diagnostic pipeline so human-readable and JSON output are projections of the same finding, with complete information in plain text without relying on color or TTY interactivity. Consistent with existing coverage/unmatched-ignore/policy-consistency findings, preflight diagnostics are not part of the `--format sarif` output in this change; `--format json` is authoritative for them.
+### Requirement: Preflight diagnostics are normalized across human, JSON, and SARIF output
+The system SHALL render every blocking preflight diagnostic through the existing typed diagnostic pipeline so human-readable, JSON, and SARIF output are projections of the same finding, with complete information in plain text without relying on color or TTY interactivity.
 
 #### Scenario: JSON output includes typed preflight diagnostics
 - **WHEN** validation is run with JSON output and a blocking preflight state occurs
 - **THEN** the JSON output includes a preflight diagnostic entry with project, state, and expected-versus-observed evidence fields
+
+#### Scenario: SARIF output includes typed preflight diagnostics
+- **WHEN** validation is run with SARIF output and a blocking preflight state occurs
+- **THEN** the SARIF output includes a result with a `build-state-preflight/<state>` rule id and a message naming the affected project and evidence
 
 #### Scenario: Human output is complete without color
 - **WHEN** validation is run in a non-interactive environment without color support
@@ -106,3 +113,4 @@ The `ArchLinterNet.Testing` API SHALL expose preflight diagnostics on the valida
 #### Scenario: Testing API surfaces a blocking preflight state
 - **WHEN** a Testing API caller validates a project graph with a missing artifact and does not call `WithEnsureBuilt()`
 - **THEN** the returned result's preflight diagnostics include a `missing-artifact` entry and no contract results are produced
+

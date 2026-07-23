@@ -149,7 +149,8 @@ internal sealed class ValidateCommandHandler(ICliRuntime runtime, ICliConsole co
 
         if (options.Format == "sarif")
         {
-            console.Out.WriteLine(runtime.FormatResultAsSarif(options.Mode, outcome.Violations, outcome.Cycles, outcome.CycleFindings));
+            console.Out.WriteLine(runtime.FormatResultAsSarif(
+                options.Mode, outcome.Violations, outcome.Cycles, outcome.CycleFindings, outcome.PreflightDiagnostics));
             return;
         }
 

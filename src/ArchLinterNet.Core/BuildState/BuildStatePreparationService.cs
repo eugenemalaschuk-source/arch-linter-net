@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Reflection;
+using System.Text;
 using ArchLinterNet.Core.Discovery;
 using ArchLinterNet.Core.Model;
 
@@ -72,7 +73,7 @@ public sealed class BuildStatePreparationService : IBuildStatePreparationService
 
     private static BuildStatePreflightResult EnsureBuilt(BuildStatePreflightRequest request)
     {
-        foreach (ArchitectureDiscoveredProject project in request.ProjectDiscovery.DiscoveredProjects)
+        foreach (ArchitectureDiscoveredProject project in SelectGraphRoots(request.ProjectDiscovery))
         {
             request.CancellationToken.ThrowIfCancellationRequested();
 
@@ -97,6 +98,36 @@ public sealed class BuildStatePreparationService : IBuildStatePreparationService
         return BuildStatePreflightEvaluator.Evaluate(postBuildRequest);
     }
 
+    // Building the whole selected graph once — not once per project — means invoking `dotnet
+    // build` only for projects that are not referenced by any other discovered project: MSBuild
+    // transitively builds each root's project references, so a referenced project already gets
+    // built exactly once as a dependency of its root(s), and is never built a second time
+    // directly. Falls back to building every discovered project only in the (unusual) case where
+    // reference cycles or an incomplete graph leave no unreferenced root at all.
+    private static IReadOnlyList<ArchitectureDiscoveredProject> SelectGraphRoots(ProjectDiscoveryResult discovery)
+    {
+        HashSet<string> referenced = new(StringComparer.Ordinal);
+        foreach (ArchitectureDiscoveredProject project in discovery.DiscoveredProjects)
+        {
+            string? ownerDirectory = Path.GetDirectoryName(Path.GetFullPath(project.Path));
+            if (ownerDirectory == null)
+            {
+                continue;
+            }
+
+            foreach (ArchitectureDiscoveredProjectReference reference in project.ProjectReferences)
+            {
+                referenced.Add(Path.GetFullPath(Path.Combine(ownerDirectory, reference.Path)));
+            }
+        }
+
+        List<ArchitectureDiscoveredProject> roots = discovery.DiscoveredProjects
+            .Where(project => !referenced.Contains(Path.GetFullPath(project.Path)))
+            .ToList();
+
+        return roots.Count > 0 ? roots : discovery.DiscoveredProjects.ToList();
+    }
+
     private static BuildStateResolvedAssemblies ResolveBuiltAssemblies(BuildStatePreflightRequest request)
     {
         List<Assembly> resolved = new();
@@ -107,7 +138,8 @@ public sealed class BuildStatePreparationService : IBuildStatePreparationService
             string? projectDirectory = Path.GetDirectoryName(Path.GetFullPath(project.Path));
             string? assemblyPath = projectDirectory == null
                 ? null
-                : FindBuiltAssembly(projectDirectory, project.AssemblyName, request.RequestedConfiguration);
+                : FindBuiltAssembly(
+                    projectDirectory, project.AssemblyName, request.RequestedConfiguration, request.RequestedTargetFramework);
 
             if (assemblyPath == null)
             {
@@ -121,7 +153,17 @@ public sealed class BuildStatePreparationService : IBuildStatePreparationService
         return new BuildStateResolvedAssemblies(resolved, missing);
     }
 
-    private static string? FindBuiltAssembly(string projectDirectory, string assemblyName, string? configuration)
+    // Standard SDK-style output layout is bin/<Configuration>/<TFM>/<AssemblyName>.dll. When the
+    // caller requested a specific configuration and/or target framework, only a candidate whose
+    // path segments match those exactly is acceptable — falling back to "the most recently
+    // written candidate" when a requested value doesn't match would silently accept output built
+    // for the wrong configuration/TFM as current, which is exactly the state this preflight
+    // exists to reject. A fallback to the newest candidate is only used when the caller placed no
+    // constraint on configuration/TFM at all, in which case there is no requested value to
+    // violate — ambiguity is intentionally accepted there since ordinary preflight has no
+    // request-vs-observed mismatch to check.
+    private static string? FindBuiltAssembly(
+        string projectDirectory, string assemblyName, string? configuration, string? targetFramework)
     {
         string binDirectory = Path.Combine(projectDirectory, "bin");
         if (!Directory.Exists(binDirectory))
@@ -135,19 +177,63 @@ public sealed class BuildStatePreparationService : IBuildStatePreparationService
             return null;
         }
 
-        if (configuration != null)
+        if (configuration == null && targetFramework == null)
         {
-            string? configurationMatch = candidates.FirstOrDefault(path =>
-                path.Contains(Path.DirectorySeparatorChar + configuration + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase));
-            if (configurationMatch != null)
+            return candidates.OrderByDescending(File.GetLastWriteTimeUtc).First();
+        }
+
+        return candidates.FirstOrDefault(path => MatchesRequestedOutputPath(
+            Path.GetRelativePath(binDirectory, path), configuration, targetFramework));
+    }
+
+    private static bool MatchesRequestedOutputPath(string relativePath, string? configuration, string? targetFramework)
+    {
+        string[] segments = relativePath.Split(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+
+        // segments: [Configuration, TargetFramework, ..., AssemblyName.dll] for the common
+        // non-RID-specific layout; require the leading segments to match when requested.
+        bool configurationMatches = configuration == null
+            || (segments.Length > 0 && string.Equals(segments[0], configuration, StringComparison.OrdinalIgnoreCase));
+        bool targetFrameworkMatches = targetFramework == null
+            || (segments.Length > 1 && string.Equals(segments[1], targetFramework, StringComparison.OrdinalIgnoreCase));
+
+        return configurationMatches && targetFrameworkMatches;
+    }
+
+    // Resolves an absolute path to the `dotnet` host executable rather than passing the bare
+    // command name to ProcessStartInfo — an unqualified executable name is resolved by searching
+    // PATH, which on some platforms/configurations can be influenced by an attacker-controlled
+    // directory ahead of the legitimate install (a PATH/executable-hijacking risk); an absolute
+    // path removes that ambiguity. Falls back to the bare command only if no absolute path can be
+    // determined, so this still works in environments where DOTNET_ROOT isn't set and PATH search
+    // is the only option (the same environments today's implicit-lookup behavior already relies
+    // on).
+    private static string ResolveDotnetExecutablePath()
+    {
+        string executableName = OperatingSystem.IsWindows() ? "dotnet.exe" : "dotnet";
+
+        string? dotnetRoot = Environment.GetEnvironmentVariable("DOTNET_ROOT")
+            ?? Environment.GetEnvironmentVariable("DOTNET_ROOT(x86)");
+        if (dotnetRoot != null)
+        {
+            string candidate = Path.Combine(dotnetRoot, executableName);
+            if (File.Exists(candidate))
             {
-                return configurationMatch;
+                return candidate;
             }
         }
 
-        return candidates
-            .OrderByDescending(File.GetLastWriteTimeUtc)
-            .First();
+        string? pathVariable = Environment.GetEnvironmentVariable("PATH");
+        foreach (string directory in (pathVariable ?? string.Empty).Split(Path.PathSeparator, StringSplitOptions.RemoveEmptyEntries))
+        {
+            string candidate = Path.Combine(directory, executableName);
+            if (File.Exists(candidate))
+            {
+                return candidate;
+            }
+        }
+
+        return executableName;
     }
 
     private static BuildStatePreflightDiagnostic? InvokeDotnetBuild(
@@ -165,7 +251,7 @@ public sealed class BuildStatePreparationService : IBuildStatePreparationService
             arguments.Add("--no-restore");
         }
 
-        ProcessStartInfo startInfo = new("dotnet")
+        ProcessStartInfo startInfo = new(ResolveDotnetExecutablePath())
         {
             UseShellExecute = false,
             RedirectStandardOutput = true,
@@ -178,8 +264,20 @@ public sealed class BuildStatePreparationService : IBuildStatePreparationService
         }
 
         using Process process = new() { StartInfo = startInfo };
+        StringBuilder stdOut = new();
+        StringBuilder stdErr = new();
+
+        // Both streams must be drained concurrently with the process running, not sequentially
+        // after Start() — `dotnet build` can write enough to either pipe to fill its OS buffer,
+        // and reading only one stream (or reading one fully before starting the other) blocks the
+        // child process on the unread pipe while this process blocks on ReadToEnd/WaitForExit,
+        // deadlocking both.
+        process.OutputDataReceived += (_, e) => { if (e.Data != null) { stdOut.AppendLine(e.Data); } };
+        process.ErrorDataReceived += (_, e) => { if (e.Data != null) { stdErr.AppendLine(e.Data); } };
+
         process.Start();
-        string stdErr = process.StandardError.ReadToEnd();
+        process.BeginOutputReadLine();
+        process.BeginErrorReadLine();
         process.WaitForExit();
 
         if (process.ExitCode == 0)
@@ -187,15 +285,16 @@ public sealed class BuildStatePreparationService : IBuildStatePreparationService
             return null;
         }
 
+        string combinedOutput = (stdOut.ToString() + stdErr).Trim();
         return new BuildStatePreflightDiagnostic(
             ContractName,
             project.Path,
-            BuildStatePreflightState.MissingArtifact,
+            BuildStatePreflightState.BuildFailed,
             new BuildStatePreflightEvidence(
                 project.Path,
                 project.AssemblyName,
                 BuildCommand: string.Join(' ', arguments.Prepend("dotnet")),
-                Detail: $"`dotnet build` failed with exit code {process.ExitCode}: {stdErr.Trim()}"));
+                Detail: $"`dotnet build` failed with exit code {process.ExitCode}: {combinedOutput}"));
     }
 
     private static void WriteReceiptsForCurrentArtifacts(
@@ -217,6 +316,11 @@ public sealed class BuildStatePreparationService : IBuildStatePreparationService
             string fingerprint = BuildStateCanonicalHasher.ComputeBuildInputFingerprint(project.Path, request.RepositoryRoot);
             string assemblyDigest = BuildStateCanonicalHasher.ComputeContentDigest(assemblyPath);
 
+            // The receipt's configuration/TFM record what was actually resolved for this build —
+            // ResolveBuiltAssemblies only accepted a candidate whose own output path matched a
+            // requested configuration/TFM (see FindBuiltAssembly/MatchesRequestedOutputPath), so
+            // recording the request values here is sound: any mismatch would already have made
+            // this project unresolved (missing), never reaching this receipt-writing step.
             BuildReceiptStore.Write(assemblyPath, new BuildReceiptV1(
                 project.Path,
                 project.AssemblyName,

@@ -35,7 +35,7 @@ public sealed class ArchitectureValidationApplicationService(
 
             BuildStatePreflightResult preflight;
             using (timing?.Measure("build_state_preflight"))
-                preflight = RunBuildStatePreflight(request, runner, loadAndSetup.Document);
+                preflight = RunBuildStatePreflight(request, runner);
 
             if (preflight.Blocked)
             {
@@ -50,6 +50,26 @@ public sealed class ArchitectureValidationApplicationService(
                     PreflightDiagnostics = preflight.Diagnostics,
                     PreflightBlocked = true
                 };
+            }
+
+            // --ensure-built may have just written new build output that the runner/session
+            // above — constructed during LoadAndSetup, before this build ran — cannot see: its
+            // ArchitectureAnalysisContext captured whatever assembly resolution found (or failed
+            // to find) at that earlier point in time. Re-running setup after a successful build
+            // re-discovers and re-resolves from the now-current filesystem state, so contract
+            // execution below actually analyzes the artifact preflight just verified rather than
+            // silently continuing to analyze stale or missing state from before the build.
+            if (request.PreparationMode == BuildPreparationMode.EnsureBuilt
+                && runner.Session.Context.ProjectDiscovery is { DiscoveredProjects.Count: > 0 })
+            {
+                using (timing?.Measure("post_ensure_built_reload"))
+                {
+                    loadAndSetup = LoadAndSetup(request, timing);
+                    unmatchedConfig = loadAndSetup.UnmatchedConfig;
+                    policyConsistencyConfig = loadAndSetup.PolicyConsistencyConfig;
+                    coverageConfig = loadAndSetup.CoverageConfig;
+                    runner = loadAndSetup.Setup.Runner;
+                }
             }
 
             List<ArchitectureViolation> allViolations = new();
@@ -120,22 +140,10 @@ public sealed class ArchitectureValidationApplicationService(
     // receipt model this needs (ArchitectureDiscoveredProject.Path/AssemblyName) has no
     // counterpart when target assemblies are configured directly via analysis.target_assemblies
     // without project discovery.
-    private BuildStatePreflightResult RunBuildStatePreflight(
-        ValidationRequest request, IArchitectureContractRunner runner, ArchitectureContractDocument document)
+    private BuildStatePreflightResult RunBuildStatePreflight(ValidationRequest request, IArchitectureContractRunner runner)
     {
         Discovery.ProjectDiscoveryResult? discovery = runner.Session.Context.ProjectDiscovery;
         if (discovery == null || discovery.DiscoveredProjects.Count == 0)
-        {
-            return new BuildStatePreflightResult(Array.Empty<BuildStatePreflightDiagnostic>());
-        }
-
-        // Build-state preflight only applies when the discovered project graph is itself what
-        // drives assembly resolution. When analysis.target_assemblies is explicitly configured,
-        // resolution runs against that fixed name list instead — a project list may still be
-        // declared solely to feed project-scope coverage contracts, independently of which
-        // assemblies get analyzed, so discovered projects have no necessary correspondence to a
-        // resolved/missing assembly here and must not be preflight-blocked.
-        if (document.Analysis.TargetAssemblies.Count > 0)
         {
             return new BuildStatePreflightResult(Array.Empty<BuildStatePreflightDiagnostic>());
         }

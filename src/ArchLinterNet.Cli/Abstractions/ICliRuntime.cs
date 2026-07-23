@@ -34,7 +34,8 @@ internal interface ICliRuntime
         string mode,
         IReadOnlyCollection<ArchitectureViolation> violations,
         IReadOnlyCollection<string> cycles,
-        IReadOnlyCollection<ArchitectureCycleFinding> cycleFindings);
+        IReadOnlyCollection<ArchitectureCycleFinding> cycleFindings,
+        IReadOnlyCollection<BuildStatePreflightDiagnostic> preflightDiagnostics);
 
     string FormatViolationsForHumans(IReadOnlyCollection<ArchitectureViolation> violations);
 

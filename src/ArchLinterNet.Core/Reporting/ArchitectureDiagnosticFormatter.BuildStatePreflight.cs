@@ -120,6 +120,7 @@ public sealed partial class ArchitectureDiagnosticFormatter
         BuildStatePreflightState.StaleArtifact => "stale-artifact",
         BuildStatePreflightState.UnverifiableArtifact => "unverifiable-artifact",
         BuildStatePreflightState.Current => "current",
+        BuildStatePreflightState.BuildFailed => "build-failed",
         _ => throw new ArgumentOutOfRangeException(nameof(state), state, null)
     };
 }

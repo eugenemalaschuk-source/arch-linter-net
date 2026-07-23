@@ -31,8 +31,19 @@ public static class BuildStatePreflightEvaluator
 
         Dictionary<string, BuildStatePreflightDiagnostic> diagnosticsByProjectPath = new(StringComparer.Ordinal);
 
+        // Only evaluate discovered projects that assembly resolution actually attempted to
+        // resolve (present in either the resolved or the missing name set). A policy may declare
+        // a project list solely to feed project-scope coverage contracts, independently of which
+        // assemblies analysis.target_assemblies actually resolves — such projects have no
+        // necessary correspondence to a resolved/missing assembly and must not be
+        // preflight-blocked just for being discovered.
         foreach (ArchitectureDiscoveredProject project in discoveredProjects)
         {
+            if (!resolvedByName.ContainsKey(project.AssemblyName) && !missing.Contains(project.AssemblyName))
+            {
+                continue;
+            }
+
             diagnosticsByProjectPath[project.Path] = EvaluateProject(project, request, resolvedByName, missing);
         }
 
@@ -44,92 +55,165 @@ public static class BuildStatePreflightEvaluator
     private static BuildStatePreflightDiagnostic EvaluateProject(
         ArchitectureDiscoveredProject project,
         BuildStatePreflightRequest request,
-        IReadOnlyDictionary<string, Assembly> resolvedByName,
+        Dictionary<string, Assembly> resolvedByName,
         HashSet<string> missing)
     {
-        if (request.CancellationToken.IsCancellationRequested)
+        return CheckCancellation(project, request)
+            ?? CheckRequestedTargetFrameworkAgainstProject(project, request)
+            ?? CheckArtifactPresence(project, request, resolvedByName, missing, out string? assemblyPath)
+            ?? CheckReceipt(project, request, assemblyPath!);
+    }
+
+    private static BuildStatePreflightDiagnostic? CheckCancellation(
+        ArchitectureDiscoveredProject project, BuildStatePreflightRequest request)
+    {
+        if (!request.CancellationToken.IsCancellationRequested)
         {
-            return Diagnostic(project, BuildStatePreflightState.Cancelled,
-                Evidence(project, detail: "Preflight evaluation was cancelled."));
+            return null;
         }
 
-        if (request.RequestedTargetFramework != null
-            && project.TargetFrameworks.Count > 0
-            && !project.TargetFrameworks.Contains(request.RequestedTargetFramework, StringComparer.OrdinalIgnoreCase))
+        return Diagnostic(project, BuildStatePreflightState.Cancelled,
+            Evidence(project) with { Detail = "Preflight evaluation was cancelled." });
+    }
+
+    // Rejects a target framework the project doesn't even declare, before looking at any build
+    // output — a cheap, purely-declarative check that doesn't need the resolved assembly.
+    private static BuildStatePreflightDiagnostic? CheckRequestedTargetFrameworkAgainstProject(
+        ArchitectureDiscoveredProject project, BuildStatePreflightRequest request)
+    {
+        if (request.RequestedTargetFramework == null
+            || project.TargetFrameworks.Count == 0
+            || project.TargetFrameworks.Contains(request.RequestedTargetFramework, StringComparer.OrdinalIgnoreCase))
         {
-            return Diagnostic(project, BuildStatePreflightState.WrongTargetFramework,
-                Evidence(project,
-                    requestedTfm: request.RequestedTargetFramework,
-                    observedTfm: string.Join(", ", project.TargetFrameworks)));
+            return null;
         }
+
+        return Diagnostic(project, BuildStatePreflightState.WrongTargetFramework,
+            Evidence(project) with
+            {
+                RequestedTargetFramework = request.RequestedTargetFramework,
+                ObservedTargetFramework = string.Join(", ", project.TargetFrameworks)
+            });
+    }
+
+    private static BuildStatePreflightDiagnostic? CheckArtifactPresence(
+        ArchitectureDiscoveredProject project,
+        BuildStatePreflightRequest request,
+        Dictionary<string, Assembly> resolvedByName,
+        HashSet<string> missing,
+        out string? assemblyPath)
+    {
+        assemblyPath = null;
 
         if (missing.Contains(project.AssemblyName) || !resolvedByName.TryGetValue(project.AssemblyName, out Assembly? assembly))
         {
-            return Diagnostic(project, BuildStatePreflightState.MissingArtifact,
-                Evidence(project, buildCommand: BuildCommand(project, request.RequestedConfiguration)));
+            return MissingArtifactDiagnostic(project, request);
         }
 
-        string? assemblyPath = SafeAssemblyLocation(assembly);
+        assemblyPath = SafeAssemblyLocation(assembly);
         if (string.IsNullOrEmpty(assemblyPath) || !File.Exists(assemblyPath))
         {
-            return Diagnostic(project, BuildStatePreflightState.MissingArtifact,
-                Evidence(project, buildCommand: BuildCommand(project, request.RequestedConfiguration)));
+            assemblyPath = null;
+            return MissingArtifactDiagnostic(project, request);
         }
 
+        return null;
+    }
+
+    private static BuildStatePreflightDiagnostic MissingArtifactDiagnostic(
+        ArchitectureDiscoveredProject project, BuildStatePreflightRequest request)
+    {
+        return Diagnostic(project, BuildStatePreflightState.MissingArtifact,
+            Evidence(project) with { BuildCommand = BuildCommand(project, request.RequestedConfiguration) });
+    }
+
+    private static BuildStatePreflightDiagnostic CheckReceipt(
+        ArchitectureDiscoveredProject project, BuildStatePreflightRequest request, string assemblyPath)
+    {
         if (!BuildReceiptStore.TryRead(assemblyPath, out BuildReceiptV1? receipt) || receipt is null)
         {
             return Diagnostic(project, BuildStatePreflightState.UnverifiableArtifact,
-                Evidence(project, expectedOutputPath: assemblyPath,
-                    detail: "No ArchLinterNet build receipt was found for this artifact. Run with --ensure-built " +
-                        "to build and verify it, or build via `dotnet build` and re-run with --ensure-built."));
+                Evidence(project) with
+                {
+                    ExpectedOutputPath = assemblyPath,
+                    Detail = "No ArchLinterNet build receipt was found for this artifact. Run with --ensure-built " +
+                        "to build and verify it, or build via `dotnet build` and re-run with --ensure-built."
+                });
         }
 
+        return CheckReceiptIdentity(project, request, assemblyPath, receipt)
+            ?? CheckReceiptFreshness(project, request, assemblyPath, receipt)
+            ?? Diagnostic(project, BuildStatePreflightState.Current, Evidence(project) with { ExpectedOutputPath = assemblyPath });
+    }
+
+    private static BuildStatePreflightDiagnostic? CheckReceiptIdentity(
+        ArchitectureDiscoveredProject project, BuildStatePreflightRequest request, string assemblyPath, BuildReceiptV1 receipt)
+    {
         if (!string.Equals(receipt.AssemblyName, project.AssemblyName, StringComparison.Ordinal))
         {
             return Diagnostic(project, BuildStatePreflightState.WrongProjectOutput,
-                Evidence(project, expectedOutputPath: assemblyPath,
-                    detail: $"Receipt identifies assembly '{receipt.AssemblyName}', expected '{project.AssemblyName}'."));
+                Evidence(project) with
+                {
+                    ExpectedOutputPath = assemblyPath,
+                    Detail = $"Receipt identifies assembly '{receipt.AssemblyName}', expected '{project.AssemblyName}'."
+                });
         }
 
         if (request.RequestedConfiguration != null && receipt.Configuration != null
             && !string.Equals(receipt.Configuration, request.RequestedConfiguration, StringComparison.OrdinalIgnoreCase))
         {
             return Diagnostic(project, BuildStatePreflightState.WrongConfiguration,
-                Evidence(project,
-                    requestedConfiguration: request.RequestedConfiguration,
-                    observedConfiguration: receipt.Configuration,
-                    expectedOutputPath: assemblyPath));
+                Evidence(project) with
+                {
+                    RequestedConfiguration = request.RequestedConfiguration,
+                    ObservedConfiguration = receipt.Configuration,
+                    ExpectedOutputPath = assemblyPath
+                });
         }
 
         if (request.RequestedTargetFramework != null && receipt.TargetFramework != null
             && !string.Equals(receipt.TargetFramework, request.RequestedTargetFramework, StringComparison.OrdinalIgnoreCase))
         {
             return Diagnostic(project, BuildStatePreflightState.WrongTargetFramework,
-                Evidence(project,
-                    requestedTfm: request.RequestedTargetFramework,
-                    observedTfm: receipt.TargetFramework,
-                    expectedOutputPath: assemblyPath));
+                Evidence(project) with
+                {
+                    RequestedTargetFramework = request.RequestedTargetFramework,
+                    ObservedTargetFramework = receipt.TargetFramework,
+                    ExpectedOutputPath = assemblyPath
+                });
         }
 
+        return null;
+    }
+
+    private static BuildStatePreflightDiagnostic? CheckReceiptFreshness(
+        ArchitectureDiscoveredProject project, BuildStatePreflightRequest request, string assemblyPath, BuildReceiptV1 receipt)
+    {
         string currentFingerprint = BuildStateCanonicalHasher.ComputeBuildInputFingerprint(project.Path, request.RepositoryRoot);
         if (!string.Equals(receipt.BuildInputFingerprint, currentFingerprint, StringComparison.Ordinal))
         {
             return Diagnostic(project, BuildStatePreflightState.StaleArtifact,
-                Evidence(project, expectedOutputPath: assemblyPath,
-                    buildCommand: BuildCommand(project, request.RequestedConfiguration),
-                    detail: "Selected source, project, or import content changed since the artifact was built."));
+                Evidence(project) with
+                {
+                    ExpectedOutputPath = assemblyPath,
+                    BuildCommand = BuildCommand(project, request.RequestedConfiguration),
+                    Detail = "Selected source, project, or import content changed since the artifact was built."
+                });
         }
 
         string currentAssemblyDigest = BuildStateCanonicalHasher.ComputeContentDigest(assemblyPath);
         if (!string.Equals(receipt.AssemblyContentDigest, currentAssemblyDigest, StringComparison.Ordinal))
         {
             return Diagnostic(project, BuildStatePreflightState.StaleArtifact,
-                Evidence(project, expectedOutputPath: assemblyPath,
-                    buildCommand: BuildCommand(project, request.RequestedConfiguration),
-                    detail: "The artifact on disk no longer matches the digest recorded in its build receipt."));
+                Evidence(project) with
+                {
+                    ExpectedOutputPath = assemblyPath,
+                    BuildCommand = BuildCommand(project, request.RequestedConfiguration),
+                    Detail = "The artifact on disk no longer matches the digest recorded in its build receipt."
+                });
         }
 
-        return Diagnostic(project, BuildStatePreflightState.Current, Evidence(project, expectedOutputPath: assemblyPath));
+        return null;
     }
 
     // A dependent project whose own artifact is otherwise current cannot be trusted if a project
@@ -190,27 +274,9 @@ public static class BuildStatePreflightEvaluator
         return $"dotnet build \"{project.Path}\"{configArg}";
     }
 
-    private static BuildStatePreflightEvidence Evidence(
-        ArchitectureDiscoveredProject project,
-        string? requestedConfiguration = null,
-        string? observedConfiguration = null,
-        string? requestedTfm = null,
-        string? observedTfm = null,
-        string? expectedOutputPath = null,
-        string? buildCommand = null,
-        string? detail = null)
+    private static BuildStatePreflightEvidence Evidence(ArchitectureDiscoveredProject project)
     {
-        return new BuildStatePreflightEvidence(
-            project.Path,
-            project.AssemblyName,
-            requestedConfiguration,
-            observedConfiguration,
-            requestedTfm,
-            observedTfm,
-            expectedOutputPath,
-            SearchedPaths: null,
-            buildCommand,
-            detail);
+        return new BuildStatePreflightEvidence(project.Path, project.AssemblyName);
     }
 
     private static BuildStatePreflightDiagnostic Diagnostic(

@@ -12,7 +12,15 @@ public static class BuildStateCanonicalHasher
 {
     // "compile" extensions relevant to build-input identity. Content outside these under a
     // project directory (e.g. markdown, generated bin/obj output) does not affect the digest.
-    private static readonly string[] _relevantExtensions = { ".cs", ".csproj", ".props", ".targets" };
+    private static readonly string[] _relevantExtensions =
+        { ".cs", ".csproj", ".props", ".targets", ".rsp", ".editorconfig" };
+
+    // Implicitly-imported MSBuild files that live above the project directory and are not
+    // discoverable by scanning under it — every selected source/project/import content change
+    // must invalidate the fingerprint, and these are relevant imported build inputs whenever
+    // present anywhere between the project and the repository root.
+    private static readonly string[] _ancestorImportFileNames =
+        { "Directory.Build.props", "Directory.Build.targets", "Directory.Build.rsp", "Directory.Packages.props" };
 
     public static string ComputeBuildInputFingerprint(string projectPath, string repositoryRoot)
     {
@@ -25,6 +33,13 @@ public static class BuildStateCanonicalHasher
         List<(string RepoRelativePath, byte[] Digest)> entries = new();
 
         foreach (string file in EnumerateRelevantFiles(projectDirectory))
+        {
+            string repoRelative = ToRepositoryRelativePath(file, repositoryRoot);
+            byte[] digest = SHA256.HashData(File.ReadAllBytes(file));
+            entries.Add((repoRelative, digest));
+        }
+
+        foreach (string file in EnumerateAncestorImportFiles(projectDirectory, repositoryRoot))
         {
             string repoRelative = ToRepositoryRelativePath(file, repositoryRoot);
             byte[] digest = SHA256.HashData(File.ReadAllBytes(file));
@@ -81,10 +96,36 @@ public static class BuildStateCanonicalHasher
         }
     }
 
+    private static IEnumerable<string> EnumerateAncestorImportFiles(string projectDirectory, string repositoryRoot)
+    {
+        string repositoryRootFull = Path.GetFullPath(repositoryRoot);
+        DirectoryInfo? current = new(Path.GetFullPath(projectDirectory));
+
+        while (current != null)
+        {
+            foreach (string fileName in _ancestorImportFileNames)
+            {
+                string candidate = Path.Combine(current.FullName, fileName);
+                if (File.Exists(candidate))
+                {
+                    yield return candidate;
+                }
+            }
+
+            if (string.Equals(current.FullName.TrimEnd(Path.DirectorySeparatorChar),
+                repositoryRootFull.TrimEnd(Path.DirectorySeparatorChar), StringComparison.OrdinalIgnoreCase))
+            {
+                yield break;
+            }
+
+            current = current.Parent;
+        }
+    }
+
     private static bool IsUnderBuildOutputDirectory(string file, string projectDirectory)
     {
         string relative = Path.GetRelativePath(projectDirectory, file);
-        string[] segments = relative.Split(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+        string[] segments = relative.Split(new[] { Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar });
         return segments.Length > 0
             && (string.Equals(segments[0], "bin", StringComparison.OrdinalIgnoreCase)
                 || string.Equals(segments[0], "obj", StringComparison.OrdinalIgnoreCase));

@@ -21,9 +21,26 @@ public sealed class BuildStatePreflightTests
     [TearDown]
     public void TearDown()
     {
-        if (Directory.Exists(_repoRoot))
+        if (!Directory.Exists(_repoRoot))
+        {
+            return;
+        }
+
+        try
         {
             Directory.Delete(_repoRoot, true);
+        }
+        catch (IOException)
+        {
+            // Best-effort cleanup: on Windows, Assembly.LoadFrom (used by
+            // BuildStatePreparationService.ResolveBuiltAssemblies, exercised by the
+            // ensure-built integration test below) keeps its backing .dll file locked for the
+            // lifetime of this process's default AssemblyLoadContext — the OS temp directory is
+            // cleaned up independently, so a leftover locked file here is not a test failure.
+        }
+        catch (UnauthorizedAccessException)
+        {
+            // See above.
         }
     }
 
@@ -180,7 +197,7 @@ public sealed class BuildStatePreflightTests
         ProjectDiscoveryResult discovery = SingleProjectDiscovery(projectPath, "Fixture", targetFramework: "net10.0");
 
         BuildStatePreflightResult result = BuildStatePreflightEvaluator.Evaluate(new BuildStatePreflightRequest(
-            _repoRoot, discovery, new BuildStateResolvedAssemblies(Array.Empty<Assembly>(), Array.Empty<string>()),
+            _repoRoot, discovery, new BuildStateResolvedAssemblies(Array.Empty<Assembly>(), new[] { "Fixture" }),
             BuildPreparationMode.Ordinary, RequestedTargetFramework: "net8.0"));
 
         Assert.That(result.Blocked, Is.True);
@@ -215,7 +232,7 @@ public sealed class BuildStatePreflightTests
         cts.Cancel();
 
         BuildStatePreflightResult result = BuildStatePreflightEvaluator.Evaluate(new BuildStatePreflightRequest(
-            _repoRoot, discovery, new BuildStateResolvedAssemblies(Array.Empty<Assembly>(), Array.Empty<string>()),
+            _repoRoot, discovery, new BuildStateResolvedAssemblies(Array.Empty<Assembly>(), new[] { "Fixture" }),
             BuildPreparationMode.Ordinary, CancellationToken: cts.Token));
 
         Assert.That(result.Blocked, Is.True);

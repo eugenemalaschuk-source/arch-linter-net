@@ -56,6 +56,51 @@ public sealed class CliRuntimeTests
     }
 
     [Test]
+    public void FormatBuildStatePreflightForHumans_ForwardsToFormatter()
+    {
+        var runtime = new CliRuntime();
+        var diagnostic = new BuildStatePreflightDiagnostic(
+            "build-state-preflight", "Fixture.csproj", BuildStatePreflightState.MissingArtifact,
+            new BuildStatePreflightEvidence("Fixture.csproj", "Fixture", BuildCommand: "dotnet build \"Fixture.csproj\""));
+
+        string result = runtime.FormatBuildStatePreflightForHumans(new[] { diagnostic });
+
+        Assert.That(result, Does.Contain("Build-state preflight:"));
+        Assert.That(result, Does.Contain("missing-artifact"));
+    }
+
+    [Test]
+    public void FormatResultAsSarif_NoCycleFindings_ForwardsPreflightDiagnosticsToInstanceFormatter()
+    {
+        var runtime = new CliRuntime();
+        var diagnostic = new BuildStatePreflightDiagnostic(
+            "build-state-preflight", "Fixture.csproj", BuildStatePreflightState.MissingArtifact,
+            new BuildStatePreflightEvidence("Fixture.csproj", "Fixture"));
+
+        string sarif = runtime.FormatResultAsSarif(
+            "strict", Array.Empty<ArchitectureViolation>(), Array.Empty<string>(),
+            Array.Empty<ArchitectureCycleFinding>(), new[] { diagnostic });
+
+        Assert.That(sarif, Does.Contain("build-state-preflight/missing-artifact"));
+    }
+
+    [Test]
+    public void FormatResultAsSarif_WithCycleFindings_ForwardsPreflightDiagnosticsToStaticFormatter()
+    {
+        var runtime = new CliRuntime();
+        var diagnostic = new BuildStatePreflightDiagnostic(
+            "build-state-preflight", "Fixture.csproj", BuildStatePreflightState.StaleArtifact,
+            new BuildStatePreflightEvidence("Fixture.csproj", "Fixture"));
+        var cycleFinding = new ArchitectureCycleFinding("cycle-contract", null, "A -> B -> A");
+
+        string sarif = runtime.FormatResultAsSarif(
+            "strict", Array.Empty<ArchitectureViolation>(), Array.Empty<string>(),
+            new[] { cycleFinding }, new[] { diagnostic });
+
+        Assert.That(sarif, Does.Contain("build-state-preflight/stale-artifact"));
+    }
+
+    [Test]
     public void MigrateBaseline_MissingBaselineFile_ForwardsToEngineAndThrows()
     {
         var runtime = new CliRuntime();
