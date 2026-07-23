@@ -62,7 +62,11 @@ public sealed partial class ArchitectureAnalysisSession
             foreach (ArchitectureIlForbiddenCallMatch match in matches)
             {
                 string matchedForbiddenApi = match.MatchedMember;
-                if (executionContext.IsIgnored(sourceType, matchedForbiddenApi))
+                if (executionContext.IsIgnored(
+                        sourceType, matchedForbiddenApi,
+                        sourceAssembly: actualAssemblyName,
+                        sourceMember: match.SourceMember,
+                        targetMember: matchedForbiddenApi))
                 {
                     continue;
                 }

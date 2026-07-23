@@ -1,7 +1,9 @@
+using System.Linq;
 using ArchLinterNet.Core.Contracts;
 using ArchLinterNet.Core.Contracts.Families;
 using ArchLinterNet.Core.Execution;
 using ArchLinterNet.Core.Model;
+using ArchLinterNet.Core.Resolution;
 using ArchLinterNet.Core.Validation;
 using NUnit.Framework;
 using ArchitectureContractGroups = ArchLinterNet.Core.Contracts.Families.ArchitectureContractGroups;
@@ -412,6 +414,80 @@ public sealed class CompositionContractTests
         Assert.That(outcome.Violations.Any(v =>
             v.SourceType == "CompositionContractTestFixtures.Application.ServiceLocatorLeak"
             && (v.Payload as CompositionPayload)?.MatchedForbiddenApi == GetServiceApi), Is.True);
+    }
+
+    [Test]
+    public void CheckCompositionContract_Violation_BaselineCandidateIsAssemblyAndMemberQualified()
+    {
+        var contract = new ArchitectureCompositionContract
+        {
+            Id = "service-locator-confined-to-composition",
+            Name = "service-locator-confined-to-composition",
+            ForbiddenApis = new List<string> { GetServiceApi },
+            AllowedOnlyInNamespaces = new List<string> { CompositionNamespace }
+        };
+        var document = CreateDocument(contract);
+        var runner = new ArchitectureContractRunner(CreateContext(), document);
+
+        runner.Session.CheckCompositionContract(contract);
+
+        ArchitectureBaselineCandidate candidate = runner.BaselineCandidates.Single(c =>
+            c.SourceType == "CompositionContractTestFixtures.Application.ServiceLocatorLeak");
+
+        Assert.That(candidate.Identity, Is.Not.Null);
+        Assert.Multiple(() =>
+        {
+            Assert.That(candidate.Identity!.ContractFamily, Is.EqualTo("composition"));
+            Assert.That(candidate.Identity.Kind, Is.EqualTo("call"));
+            Assert.That(candidate.Identity.SourceAssembly, Is.EqualTo(AssemblyName));
+            Assert.That(candidate.Identity.SourceMember,
+                Is.EqualTo("CompositionContractTestFixtures.Application.ServiceLocatorLeak.ResolveFromLocator"));
+            Assert.That(candidate.Identity.TargetMember, Is.EqualTo(GetServiceApi));
+        });
+    }
+
+    [Test]
+    public void IsIgnored_CompositionContract_SameNamedTypeDifferentAssembly_OnlyBaselinedAssemblySuppressed()
+    {
+        // Mirrors the P0 same-named-type-across-assemblies scenario already proven for
+        // strict/audit dependency contracts (#357) — issue #360 requires the same guarantee for
+        // strict_composition/audit_composition.
+        var ignoredViolations = new List<ArchitectureIgnoredViolation>
+        {
+            new()
+            {
+                SourceType = "Program",
+                ForbiddenReference = GetServiceApi,
+                Reason = "known debt",
+                IdentityVersion = 2,
+                ContractFamily = "composition",
+                Kind = "call",
+                SourceAssembly = "Host.A",
+                TargetMember = GetServiceApi,
+                Occurrence = 0,
+            },
+        };
+
+        var contextForA = new ArchitectureContractExecutionContext(
+            "contract-name", "contract-id", ignoredViolations,
+            enableUnmatchedIgnoreTracking: true, contractGroup: "strict_composition",
+            baselineCandidates: new List<ArchitectureBaselineCandidate>());
+        var contextForB = new ArchitectureContractExecutionContext(
+            "contract-name", "contract-id", ignoredViolations,
+            enableUnmatchedIgnoreTracking: true, contractGroup: "strict_composition",
+            baselineCandidates: new List<ArchitectureBaselineCandidate>());
+
+        bool ignoredA = contextForA.IsIgnored(
+            "Program", GetServiceApi, sourceAssembly: "Host.A", targetMember: GetServiceApi);
+        bool ignoredB = contextForB.IsIgnored(
+            "Program", GetServiceApi, sourceAssembly: "Host.B", targetMember: GetServiceApi);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(ignoredA, Is.True, "Host.A.Program was explicitly baselined and must be suppressed.");
+            Assert.That(ignoredB, Is.False,
+                "Host.B.Program shares source/target text but a different assembly — it must still be reported.");
+        });
     }
 
     [Test]

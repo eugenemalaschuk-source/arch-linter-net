@@ -73,6 +73,8 @@ Each violation identifies the calling type and source member outside the composi
 
 `ignored_violations` entries use the same `source_type`/`forbidden_reference`/`reason` shape as other contract families, matching the calling type and the matched forbidden API's fully-qualified name.
 
+Violation/baseline identity is assembly- and member-qualified: two same-named types in different assemblies (for example two `Program` types in two host assemblies) are never conflated, and two distinct forbidden-call occurrences from different source members of the same type get distinct identities. Baselining one occurrence never suppresses an unrelated same-named or same-member occurrence elsewhere.
+
 ## Non-goals
 
 - **Runtime DI resolution correctness is not validated.** The contract detects static call sites to selected APIs outside a declared boundary; it does not resolve, simulate, or verify runtime service registration or resolution, and it does not prove every service is registered correctly.

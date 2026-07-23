@@ -2,7 +2,6 @@
 
 ## Purpose
 Define the composition contract family that confines dependency-injection registration, service-locator resolution, and container Resolve/Register API calls to explicitly declared composition boundaries using static IL call-site detection.
-
 ## Requirements
 ### Requirement: Declare composition contracts
 The system SHALL allow `contracts.strict_composition` and `contracts.audit_composition` entries, each declaring at least one forbidden API selector (a non-empty `forbidden_apis`) and at least one allowed composition boundary selector (a non-empty `allowed_only_in_layers`, `allowed_only_in_namespaces`, `allowed_only_in_projects`, and/or `allowed_only_in_assemblies`).
@@ -61,7 +60,10 @@ The system SHALL allow `ignored_violations` entries on a `composition` contract 
 - **THEN** the system SHALL record that entry as an unmatched ignored violation
 
 ### Requirement: Emit deterministic composition diagnostics
+
 The system SHALL emit, for each composition violation, a diagnostic identifying the violating type, the violating source member, the matched forbidden API's fully-qualified name, the contract, and the expected composition boundary, with violations ordered deterministically by the violating type's fully-qualified name, then by matched API (ordinal), then by source member (ordinal), and at most one violation per (type, source member, matched API) tuple.
+
+Each composition violation's baseline/ignore identity (`ArchitectureViolationIdentity`) SHALL be qualified with the violating type's declaring assembly (`SourceAssembly`), the violating source member (`SourceMember`), and the matched forbidden API (`TargetMember`), and SHALL classify as `Kind: "call"`. Baselining or `ignored_violations` matching SHALL therefore distinguish two same-named types with the same simple name and namespace in different assemblies, and SHALL distinguish two distinct forbidden-call occurrences from different source members of the same type.
 
 #### Scenario: Diagnostic identifies the forbidden composition API usage
 - **WHEN** a type outside the allowed composition boundary calls a forbidden API
@@ -71,9 +73,18 @@ The system SHALL emit, for each composition violation, a diagnostic identifying 
 - **WHEN** the same policy is validated twice against the same assemblies with multiple composition violations
 - **THEN** the reported violations SHALL appear in the same order both times
 
+#### Scenario: Same-named types in different assemblies do not collide
+- **WHEN** two different assemblies each contain a type with the same simple name and namespace outside the composition boundary (e.g. two `Program` types), both calling the same forbidden API, and one occurrence is baselined
+- **THEN** the baseline entry SHALL suppress only the violation from its own source assembly; the same-named violation in the other assembly SHALL still be reported as new debt by `validate --baseline`
+
+#### Scenario: Distinct occurrences in one type each get a distinct identity
+- **WHEN** a single type outside the composition boundary calls two distinct forbidden APIs from two different source members, and only one occurrence's baseline entry is applied
+- **THEN** the other occurrence SHALL still be reported as a violation; baselining one SHALL NOT suppress the other
+
 ### Requirement: Composition contracts do not validate runtime dependency injection
 The system SHALL restrict composition contracts to static detection of forbidden API call sites. The system SHALL NOT attempt to resolve, simulate, or verify runtime service registration or resolution correctness.
 
 #### Scenario: Documentation states the runtime limitation
 - **WHEN** a user reads the composition contract documentation
 - **THEN** it SHALL state that runtime DI resolution correctness is not validated by this family
+
