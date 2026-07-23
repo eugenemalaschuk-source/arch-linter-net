@@ -37,6 +37,12 @@
       "additionalProperties": { "$ref": "#/$defs/packageGroup" },
       "default": {}
     },
+    "framework_references": {
+      "type": "object",
+      "description": "Named MSBuild FrameworkReference groups referenced by framework dependency and framework allow-only contracts.",
+      "additionalProperties": { "$ref": "#/$defs/frameworkReferenceGroup" },
+      "default": {}
+    },
     "legacy_runtime_layers": {
       "type": "array",
       "description": "Namespace prefixes used by dependency contracts with forbidden_legacy_runtime enabled.",
@@ -352,6 +358,38 @@
         "package_prefixes": {
           "$ref": "#/$defs/nonBlankStringList",
           "description": "NuGet package ID prefixes matched with exact or dot-segment child semantics (case-insensitively) against declared PackageReference items."
+        }
+      }
+    },
+    "frameworkReferenceGroup": {
+      "type": "object",
+      "additionalProperties": false,
+      "anyOf": [
+        {
+          "required": ["framework_names"],
+          "properties": {
+            "framework_names": {
+              "minItems": 1
+            }
+          }
+        },
+        {
+          "required": ["framework_name_prefixes"],
+          "properties": {
+            "framework_name_prefixes": {
+              "minItems": 1
+            }
+          }
+        }
+      ],
+      "properties": {
+        "framework_names": {
+          "$ref": "#/$defs/nonBlankStringList",
+          "description": "MSBuild FrameworkReference Include names matched exactly (case-insensitively) against declared FrameworkReference items."
+        },
+        "framework_name_prefixes": {
+          "$ref": "#/$defs/nonBlankStringList",
+          "description": "FrameworkReference Include name prefixes matched with exact or dot-segment child semantics (case-insensitively) against declared FrameworkReference items."
         }
       }
     },
@@ -802,6 +840,26 @@
         "audit_package_allow_only": {
           "type": "array",
           "items": { "$ref": "#/$defs/packageAllowOnlyContract" },
+          "default": []
+        },
+        "strict_framework_dependency": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/frameworkDependencyContract" },
+          "default": []
+        },
+        "audit_framework_dependency": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/frameworkDependencyContract" },
+          "default": []
+        },
+        "strict_framework_allow_only": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/frameworkAllowOnlyContract" },
+          "default": []
+        },
+        "audit_framework_allow_only": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/frameworkAllowOnlyContract" },
           "default": []
         },
         "audit_project_metadata": {
@@ -1305,6 +1363,32 @@
           "default": "direct",
           "description": "Evaluation depth for package allow-only checking. Only 'direct' (the default) is supported; there is no resolved package graph to walk transitively."
         },
+        "ignored_violations": { "$ref": "#/$defs/ignoredViolations" },
+        "reason": { "type": "string" }
+      }
+    },
+    "frameworkDependencyContract": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "source", "forbidden"],
+      "properties": {
+        "name": { "type": "string", "minLength": 1 },
+        "id": { "type": "string", "minLength": 1 },
+        "source": { "type": "string", "minLength": 1 },
+        "forbidden": { "$ref": "#/$defs/stringList" },
+        "ignored_violations": { "$ref": "#/$defs/ignoredViolations" },
+        "reason": { "type": "string" }
+      }
+    },
+    "frameworkAllowOnlyContract": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "source", "allowed"],
+      "properties": {
+        "name": { "type": "string", "minLength": 1 },
+        "id": { "type": "string", "minLength": 1 },
+        "source": { "type": "string", "minLength": 1 },
+        "allowed": { "$ref": "#/$defs/stringList" },
         "ignored_violations": { "$ref": "#/$defs/ignoredViolations" },
         "reason": { "type": "string" }
       }

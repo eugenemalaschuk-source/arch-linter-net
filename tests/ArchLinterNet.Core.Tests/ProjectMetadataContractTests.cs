@@ -38,6 +38,7 @@ public sealed class ProjectMetadataContractTests
             Path.GetFileNameWithoutExtension(path),
             new[] { "net10.0" },
             Array.Empty<ArchitectureDiscoveredPackageReference>(),
+            Array.Empty<ArchitectureDiscoveredFrameworkReference>(),
             properties.ToDictionary(
                 entry => entry.Key,
                 entry => new ArchitectureDiscoveredProjectProperty(entry.Key, entry.Value, entry.SourcePath),

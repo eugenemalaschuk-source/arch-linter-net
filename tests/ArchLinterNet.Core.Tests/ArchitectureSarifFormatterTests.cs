@@ -361,6 +361,43 @@ public sealed class ArchitectureSarifFormatterTests
     }
 
     [Test]
+    public void FormatResultAsSarif_FrameworkReferenceViolation_LogicalLocationKindIsFrameworkReference()
+    {
+        var violations = new List<ArchitectureViolation>
+        {
+            new("framework-rule", "framework-rule", "MyApp.Csproj", "forbidden-frameworks", new[] { "Microsoft.AspNetCore.App" })
+            {
+                Payload = new FrameworkReferencePayload("forbidden_web")
+            }
+        };
+
+        JsonElement root = Run("strict", violations);
+
+        JsonElement result = root.GetProperty("runs")[0].GetProperty("results")[0];
+        JsonElement logicalLocation = result.GetProperty("logicalLocations")[0];
+        Assert.That(logicalLocation.GetProperty("kind").GetString(), Is.EqualTo("framework-reference"));
+    }
+
+    [Test]
+    public void FormatResultAsSarif_FrameworkReferenceAllowOnlyViolation_LogicalLocationKindIsFrameworkReference()
+    {
+        var violations = new List<ArchitectureViolation>
+        {
+            new("framework-allow-only-rule", "framework-allow-only-rule", "MyApp.Csproj", "outside allowed framework groups",
+                new[] { "Microsoft.AspNetCore.App" })
+            {
+                Payload = new FrameworkReferenceAllowOnlyPayload(new[] { "approved_core" })
+            }
+        };
+
+        JsonElement root = Run("strict", violations);
+
+        JsonElement result = root.GetProperty("runs")[0].GetProperty("results")[0];
+        JsonElement logicalLocation = result.GetProperty("logicalLocations")[0];
+        Assert.That(logicalLocation.GetProperty("kind").GetString(), Is.EqualTo("framework-reference"));
+    }
+
+    [Test]
     public void FormatResultAsSarif_TypePlacementViolation_LogicalLocationKindIsType()
     {
         var violations = new List<ArchitectureViolation>

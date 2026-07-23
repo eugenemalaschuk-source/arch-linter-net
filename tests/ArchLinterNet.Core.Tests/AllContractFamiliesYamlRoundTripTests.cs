@@ -152,6 +152,22 @@ contracts:
     - name: package allow only audit rule
       source: Test.Core
       allowed: [Some.Package]
+  strict_framework_dependency:
+    - name: framework dependency strict rule
+      source: Test.Core
+      forbidden: [Some.Framework]
+  audit_framework_dependency:
+    - name: framework dependency audit rule
+      source: Test.Core
+      forbidden: [Some.Framework]
+  strict_framework_allow_only:
+    - name: framework allow only strict rule
+      source: Test.Core
+      allowed: [Some.Framework]
+  audit_framework_allow_only:
+    - name: framework allow only audit rule
+      source: Test.Core
+      allowed: [Some.Framework]
   strict_project_metadata:
     - name: project metadata strict rule
       projects: [src/Sample.csproj]
@@ -294,6 +310,10 @@ contracts:
         Assert.That(contracts.AuditPackageDependency, Has.Count.EqualTo(1));
         Assert.That(contracts.StrictPackageAllowOnly, Has.Count.EqualTo(1));
         Assert.That(contracts.AuditPackageAllowOnly, Has.Count.EqualTo(1));
+        Assert.That(contracts.StrictFrameworkDependency, Has.Count.EqualTo(1));
+        Assert.That(contracts.AuditFrameworkDependency, Has.Count.EqualTo(1));
+        Assert.That(contracts.StrictFrameworkAllowOnly, Has.Count.EqualTo(1));
+        Assert.That(contracts.AuditFrameworkAllowOnly, Has.Count.EqualTo(1));
         Assert.That(contracts.StrictProjectMetadata, Has.Count.EqualTo(1));
         Assert.That(contracts.AuditProjectMetadata, Has.Count.EqualTo(1));
         Assert.That(contracts.StrictProtected, Has.Count.EqualTo(1));
@@ -322,8 +342,8 @@ contracts:
         Assert.That(contracts.AuditCoverage, Has.Count.EqualTo(1));
 
         // AllStrict/AllAudit must reflect the populated groups too, excluding layer_template.
-        Assert.That(contracts.AllStrict.Count(), Is.EqualTo(25));
-        Assert.That(contracts.AllAudit.Count(), Is.EqualTo(25));
+        Assert.That(contracts.AllStrict.Count(), Is.EqualTo(27));
+        Assert.That(contracts.AllAudit.Count(), Is.EqualTo(27));
     }
 
     [Test]

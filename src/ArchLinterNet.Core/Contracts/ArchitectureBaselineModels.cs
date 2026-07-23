@@ -55,6 +55,10 @@ public sealed class ArchitectureBaselineContractGroups
     [YamlMember(Alias = "audit_package_dependency")] public List<ArchitectureBaselineContractEntry> AuditPackageDependency { get; set; } = new();
     [YamlMember(Alias = "strict_package_allow_only")] public List<ArchitectureBaselineContractEntry> StrictPackageAllowOnly { get; set; } = new();
     [YamlMember(Alias = "audit_package_allow_only")] public List<ArchitectureBaselineContractEntry> AuditPackageAllowOnly { get; set; } = new();
+    [YamlMember(Alias = "strict_framework_dependency")] public List<ArchitectureBaselineContractEntry> StrictFrameworkDependency { get; set; } = new();
+    [YamlMember(Alias = "audit_framework_dependency")] public List<ArchitectureBaselineContractEntry> AuditFrameworkDependency { get; set; } = new();
+    [YamlMember(Alias = "strict_framework_allow_only")] public List<ArchitectureBaselineContractEntry> StrictFrameworkAllowOnly { get; set; } = new();
+    [YamlMember(Alias = "audit_framework_allow_only")] public List<ArchitectureBaselineContractEntry> AuditFrameworkAllowOnly { get; set; } = new();
     [YamlMember(Alias = "strict_project_metadata")] public List<ArchitectureBaselineContractEntry> StrictProjectMetadata { get; set; } = new();
     [YamlMember(Alias = "audit_project_metadata")] public List<ArchitectureBaselineContractEntry> AuditProjectMetadata { get; set; } = new();
     [YamlMember(Alias = "strict_protected")] public List<ArchitectureBaselineContractEntry> StrictProtected { get; set; } = new();
@@ -105,6 +109,8 @@ public sealed class ArchitectureBaselineContractGroups
         "strict_assembly_allow_only", "audit_assembly_allow_only",
         "strict_package_dependency", "audit_package_dependency",
         "strict_package_allow_only", "audit_package_allow_only",
+        "strict_framework_dependency", "audit_framework_dependency",
+        "strict_framework_allow_only", "audit_framework_allow_only",
         "strict_project_metadata", "audit_project_metadata",
         "strict_protected", "audit_protected",
         "strict_external", "audit_external",
@@ -149,6 +155,10 @@ public sealed class ArchitectureBaselineContractGroups
             "audit_package_dependency" => AuditPackageDependency,
             "strict_package_allow_only" => StrictPackageAllowOnly,
             "audit_package_allow_only" => AuditPackageAllowOnly,
+            "strict_framework_dependency" => StrictFrameworkDependency,
+            "audit_framework_dependency" => AuditFrameworkDependency,
+            "strict_framework_allow_only" => StrictFrameworkAllowOnly,
+            "audit_framework_allow_only" => AuditFrameworkAllowOnly,
             "strict_project_metadata" => StrictProjectMetadata,
             "audit_project_metadata" => AuditProjectMetadata,
             "strict_protected" => StrictProtected,
@@ -212,6 +222,10 @@ public sealed class ArchitectureBaselineContractGroups
             case "audit_package_dependency": AuditPackageDependency = entries; break;
             case "strict_package_allow_only": StrictPackageAllowOnly = entries; break;
             case "audit_package_allow_only": AuditPackageAllowOnly = entries; break;
+            case "strict_framework_dependency": StrictFrameworkDependency = entries; break;
+            case "audit_framework_dependency": AuditFrameworkDependency = entries; break;
+            case "strict_framework_allow_only": StrictFrameworkAllowOnly = entries; break;
+            case "audit_framework_allow_only": AuditFrameworkAllowOnly = entries; break;
             case "strict_project_metadata": StrictProjectMetadata = entries; break;
             case "audit_project_metadata": AuditProjectMetadata = entries; break;
             case "strict_protected": StrictProtected = entries; break;

@@ -22,6 +22,8 @@ internal static class ArchitecturePolicyDocumentValidatorPipeline
         new AssemblyAllowOnlyValidator(),
         new PackageDependencyValidator(),
         new PackageAllowOnlyValidator(),
+        new FrameworkReferenceValidator(),
+        new FrameworkReferenceAllowOnlyValidator(),
         new ProjectMetadataValidator(),
         new TypePlacementValidator(),
         new LayoutConventionsValidator(),

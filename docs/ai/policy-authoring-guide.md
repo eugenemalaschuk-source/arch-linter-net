@@ -303,6 +303,39 @@ only make the contract more restrictive than intended, never less. Detection is
 type-level only (no method-body IL scanning yet, unlike `strict_external`). See
 [External allow-only contracts](../contracts/external-allow-only.md) for full semantics.
 
+## Use Framework References For Declared MSBuild `FrameworkReference` Governance
+
+When the goal is to forbid or allow-list a declared MSBuild `FrameworkReference`
+item (e.g. `Microsoft.AspNetCore.App`, `Microsoft.WindowsDesktop.App`) rather
+than an observed type reference, use a top-level `framework_references`
+section with `strict_framework_dependency`/`audit_framework_dependency` or
+`strict_framework_allow_only`/`audit_framework_allow_only`:
+
+```yaml
+framework_references:
+  forbidden_web:
+    framework_names:
+      - Microsoft.AspNetCore.App
+
+contracts:
+  strict_framework_dependency:
+    - id: domain-no-aspnetcore
+      name: domain-must-not-reference-aspnetcore
+      source: MyApp.Domain
+      forbidden: [forbidden_web]
+      reason: Domain must stay free of the ASP.NET Core shared framework.
+```
+
+`framework_references` group names live in their own namespace, separate from
+`packages` and `external_dependencies` — a group declared under one section is
+not visible to contracts belonging to another. There is no `dependency_depth`
+field on framework contracts: `FrameworkReference` has no transitive-dependency
+or version concept, and this is a pure declaration-level check (no Roslyn
+semantic analysis of framework API usage). Prefer `packages`/`package_dependency`
+for `PackageReference` items instead, and `external_dependencies`/`strict_external`
+when the goal is to catch observed type references in compiled code. See
+[Framework reference contracts](../contracts/framework-references.md).
+
 ## Use Type Placement For Where A Role Lives And How It's Named
 
 For the reviewed vocabulary of roles such as controllers, handlers, domain

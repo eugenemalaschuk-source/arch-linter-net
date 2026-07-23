@@ -49,10 +49,11 @@ internal sealed class ArchitectureContractExecutionContext
         string? sourceAssembly = null,
         string? targetAssembly = null,
         string? sourceMember = null,
-        string? targetMember = null)
+        string? targetMember = null,
+        string? configuration = null)
     {
         ArchitectureViolationIdentity? liveIdentity = BuildLiveIdentity(
-            sourceType, forbiddenReference, sourceAssembly, targetAssembly, sourceMember, targetMember);
+            sourceType, forbiddenReference, sourceAssembly, targetAssembly, sourceMember, targetMember, configuration);
 
         bool ignored = ArchitectureIgnoreMatcher.IsIgnored(sourceType, forbiddenReference, _ignoredViolations, _tracker, liveIdentity);
 
@@ -65,7 +66,8 @@ internal sealed class ArchitectureContractExecutionContext
     }
 
     private ArchitectureViolationIdentity? BuildLiveIdentity(
-        string sourceType, string forbiddenReference, string? sourceAssembly, string? targetAssembly, string? sourceMember, string? targetMember)
+        string sourceType, string forbiddenReference, string? sourceAssembly, string? targetAssembly, string? sourceMember,
+        string? targetMember, string? configuration = null)
     {
         if (ContractId == null || _contractGroup == null)
         {
@@ -92,7 +94,8 @@ internal sealed class ArchitectureContractExecutionContext
             targetAssembly,
             null,
             effectiveTargetMember,
-            0);
+            0,
+            configuration);
 
         int occurrence = _occurrenceCounters.TryGetValue(zeroed, out int count) ? count : 0;
         _occurrenceCounters[zeroed] = occurrence + 1;
