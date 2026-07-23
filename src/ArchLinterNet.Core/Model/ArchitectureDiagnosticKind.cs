@@ -20,5 +20,7 @@ public enum ArchitectureDiagnosticKind
     ContextAllowOnly,
     PortBoundary,
     LayoutConvention,
-    PackageAllowOnly
+    PackageAllowOnly,
+    FrameworkReference,
+    FrameworkReferenceAllowOnly
 }

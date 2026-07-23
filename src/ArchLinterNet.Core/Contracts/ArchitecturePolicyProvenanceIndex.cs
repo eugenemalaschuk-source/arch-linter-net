@@ -76,6 +76,12 @@ public sealed class ArchitecturePolicyProvenanceIndex
                 ArchitecturePolicyProvenancePath.Property("packages"), name), null, null);
         }
 
+        foreach ((string name, ArchitectureFrameworkReferenceGroup group) in document.FrameworkReferences)
+        {
+            BindOwner(group, ArchitecturePolicyProvenancePath.AppendProperty(
+                ArchitecturePolicyProvenancePath.Property("framework_references"), name), null, null);
+        }
+
         BindContracts(document);
     }
 

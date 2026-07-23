@@ -4,11 +4,11 @@
 Defines, per architecture contract family, its YAML group names, dispatch order, baseline capability, and contract accessors as an ordered descriptor registry — the extension point `ArchitectureContractCatalog` builds from instead of hand-written per-family wiring.
 ## Requirements
 ### Requirement: Contract family catalog metadata is defined by an ordered descriptor registry
-`ArchLinterNet.Core.Execution.ArchitectureContractFamilyRegistry` SHALL expose an ordered `IReadOnlyList<ArchitectureContractFamilyDescriptor>` (`All`) containing exactly one descriptor per contract family known to `ArchitectureContractCatalog`. Each descriptor SHALL carry: a family id, the strict YAML group name, the audit YAML group name, a baseline-capability flag, an accessor that extracts that family's strict contracts from an `ArchitectureContractGroups` instance, an accessor that extracts its audit contracts, and an informational list of the CLR types the family owns.
+`ArchLinterNet.Core.Execution.ArchitectureContractFamilyRegistry` SHALL expose an ordered `IReadOnlyList<ArchitectureContractFamilyDescriptor>` (`All`) containing exactly one descriptor per contract family known to `ArchitectureContractCatalog`, including the `framework_dependency` and `framework_allow_only` families. Each descriptor SHALL carry: a family id, the strict YAML group name, the audit YAML group name, a baseline-capability flag, an accessor that extracts that family's strict contracts from an `ArchitectureContractGroups` instance, an accessor that extracts its audit contracts, and an informational list of the CLR types the family owns.
 
-#### Scenario: Registry contains all 25 known families with no duplicates
+#### Scenario: Registry contains all 31 known families with no duplicates
 - **WHEN** `ArchitectureContractFamilyRegistry.All` is enumerated
-- **THEN** it SHALL contain exactly 25 descriptors, one per family (`dependency`, `layer`, `layer_template`, `allow_only`, `cycle`, `method_body`, `asmdef`, `independence`, `assembly_independence`, `assembly_dependency`, `assembly_allow_only`, `package_dependency`, `package_allow_only`, `project_metadata`, `protected`, `external`, `external_allow_only`, `acyclic_sibling`, `type_placement`, `public_api_surface`, `attribute_usage`, `inheritance`, `interface_implementation`, `composition`, `coverage`)
+- **THEN** it SHALL contain exactly 31 descriptors, one per family (`dependency`, `layer`, `layer_template`, `allow_only`, `cycle`, `method_body`, `asmdef`, `independence`, `assembly_independence`, `assembly_dependency`, `assembly_allow_only`, `package_dependency`, `package_allow_only`, `framework_dependency`, `framework_allow_only`, `project_metadata`, `protected`, `external`, `external_allow_only`, `acyclic_sibling`, `type_placement`, `layout_conventions`, `public_api_surface`, `attribute_usage`, `inheritance`, `interface_implementation`, `composition`, `coverage`, `context_dependency`, `context_allow_only`, `port_boundary`)
 - **AND** no two descriptors SHALL share the same family id
 
 #### Scenario: Registry order matches the historical executor dispatch order
@@ -27,7 +27,7 @@ Defines, per architecture contract family, its YAML group names, dispatch order,
 - **THEN** it SHALL return the result of `LayerTemplateExpander.Expand` applied to the corresponding `StrictLayerTemplates`/`AuditLayerTemplates` list, not the raw `ArchitectureLayerTemplateContract` list
 
 ### Requirement: Baseline capability is sourced from descriptor data
-`ArchitectureContractCatalog.BaselineCapableGroups` and `ResolveGroup` SHALL determine whether a family is baseline-capable by looking up that family's `ArchitectureContractFamilyDescriptor.IsBaselineCapable` flag in the registry, rather than a hardcoded family-name exclusion list.
+`ArchitectureContractCatalog.BaselineCapableGroups` and `ResolveGroup` SHALL determine whether a family is baseline-capable by looking up that family's `ArchitectureContractFamilyDescriptor.IsBaselineCapable` flag in the registry, rather than a hardcoded family-name exclusion list. The `framework_dependency` and `framework_allow_only` families SHALL be baseline-capable, consistent with `package_dependency` and `package_allow_only`.
 
 #### Scenario: asmdef and layer_template remain excluded from baseline capability
 - **WHEN** `ArchitectureContractCatalog.BaselineCapableGroups()` is called on a catalog built from a document containing `asmdef` and `layer_template` contracts
@@ -37,8 +37,12 @@ Defines, per architecture contract family, its YAML group names, dispatch order,
 - **WHEN** `ArchitectureContractCatalog.ResolveGroup` is called with an `ArchitectureAsmdefContract` instance from the catalog's source document
 - **THEN** it SHALL return `null`, matching current behavior
 
+#### Scenario: framework_dependency and framework_allow_only are baseline-capable
+- **WHEN** `ArchitectureContractCatalog.BaselineCapableGroups()` is called on a catalog built from a document containing `framework_dependency` and `framework_allow_only` contracts
+- **THEN** the groups associated with those two families SHALL appear in the result
+
 ### Requirement: Descriptor owns its family's checker and exposes an inert extension surface for future family decomposition
-`ArchitectureContractFamilyDescriptor` SHALL expose a `Checker` property of type `ArchitectureContractChecker` (a delegate taking an `ArchitectureAnalysisSession` and an `IArchitectureContract`, returning an `ArchitectureHandlerResult`); `ArchitectureContractHandlerRegistry` SHALL read and invoke it for every family during contract execution. `ArchitectureContractFamilyDescriptor` SHALL additionally expose a `ConfigurationContributor` property of type `ArchitectureConfigurationContributor?` (a delegate taking an `ArchitectureAnalysisSession`, an `ArchitectureConfigurationReferenceCollector`, and an `IArchitectureContract`, returning `void`), defaulting to `null`; `ArchitectureAnalysisSession.CheckConfiguration` SHALL invoke it, when non-null, once per contract instance of that family for the mode (strict/audit) being checked. `ArchitectureContractFamilyDescriptor` SHALL further expose an `OwnedContractTypes` property (`IReadOnlyList<Type>`) and an `AdditionalValidation` property (`Action<ArchitectureContractDocument>?`, defaulting to `null`); unlike `Checker` and `ConfigurationContributor`, both of these remain inert and unread by `ArchitectureContractCatalog.Build` or any other production code path.
+`ArchitectureContractFamilyDescriptor` SHALL expose a `Checker` property of type `ArchitectureContractChecker` (a delegate taking an `ArchitectureAnalysisSession` and an `IArchitectureContract`, returning an `ArchitectureHandlerResult`); `ArchitectureContractHandlerRegistry` SHALL read and invoke it for every family during contract execution, including `framework_dependency` and `framework_allow_only`. `ArchitectureContractFamilyDescriptor` SHALL additionally expose a `ConfigurationContributor` property of type `ArchitectureConfigurationContributor?` (a delegate taking an `ArchitectureAnalysisSession`, an `ArchitectureConfigurationReferenceCollector`, and an `IArchitectureContract`, returning `void`), defaulting to `null`; `ArchitectureAnalysisSession.CheckConfiguration` SHALL invoke it, when non-null, once per contract instance of that family for the mode (strict/audit) being checked, and the `framework_dependency`/`framework_allow_only` descriptors SHALL each have a non-null `ConfigurationContributor`. `ArchitectureContractFamilyDescriptor` SHALL further expose an `OwnedContractTypes` property (`IReadOnlyList<Type>`) and an `AdditionalValidation` property (`Action<ArchitectureContractDocument>?`, defaulting to `null`); unlike `Checker` and `ConfigurationContributor`, both of these remain inert and unread by `ArchitectureContractCatalog.Build` or any other production code path.
 
 #### Scenario: AdditionalValidation is never invoked
 - **WHEN** `ArchitectureContractCatalog.Build` processes any document, including one containing contracts for every family
@@ -52,9 +56,9 @@ Defines, per architecture contract family, its YAML group names, dispatch order,
 - **WHEN** `ArchitectureContractHandlerRegistry.Execute(family, session, contract)` is called for a family present in `ArchitectureContractFamilyRegistry.All`
 - **THEN** that family's descriptor's `Checker` delegate SHALL be invoked with the given `session` and `contract`, and its return value SHALL be returned unchanged
 
-#### Scenario: Sixteen descriptors carry a non-null ConfigurationContributor
+#### Scenario: Eighteen descriptors carry a non-null ConfigurationContributor
 - **WHEN** `ArchitectureContractFamilyRegistry.All` is enumerated
-- **THEN** the descriptors for `dependency`, `layer`, `allow_only`, `cycle`, `method_body`, `independence`, `protected`, `external`, `external_allow_only`, `package_dependency`, `package_allow_only`, `project_metadata`, `type_placement`, `attribute_usage`, `inheritance`, and `interface_implementation` SHALL each have a non-null `ConfigurationContributor`
+- **THEN** the descriptors for `dependency`, `layer`, `allow_only`, `cycle`, `method_body`, `independence`, `protected`, `external`, `external_allow_only`, `package_dependency`, `package_allow_only`, `framework_dependency`, `framework_allow_only`, `project_metadata`, `type_placement`, `attribute_usage`, `inheritance`, and `interface_implementation` SHALL each have a non-null `ConfigurationContributor`
 - **AND** every other family's descriptor (including `composition`) SHALL have `ConfigurationContributor` equal to `null`
 
 #### Scenario: ConfigurationContributor is invoked during configuration checking

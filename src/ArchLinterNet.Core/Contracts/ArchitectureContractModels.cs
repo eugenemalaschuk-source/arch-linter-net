@@ -25,6 +25,9 @@ public sealed class ArchitectureContractDocument
     [YamlMember(Alias = "packages")]
     public Dictionary<string, ArchitecturePackageGroup> Packages { get; set; } = new();
 
+    [YamlMember(Alias = "framework_references")]
+    public Dictionary<string, ArchitectureFrameworkReferenceGroup> FrameworkReferences { get; set; } = new();
+
     [YamlMember(Alias = "legacy_runtime_layers")]
     public List<string> LegacyRuntimeLayers { get; set; } = new();
 
@@ -199,6 +202,15 @@ public sealed class ArchitecturePackageGroup
 
     [YamlMember(Alias = "package_prefixes")]
     public List<string> PackagePrefixes { get; set; } = new();
+}
+
+public sealed class ArchitectureFrameworkReferenceGroup
+{
+    [YamlMember(Alias = "framework_names")]
+    public List<string> FrameworkNames { get; set; } = new();
+
+    [YamlMember(Alias = "framework_name_prefixes")]
+    public List<string> FrameworkNamePrefixes { get; set; } = new();
 }
 
 public sealed class ArchitectureIgnoredViolation

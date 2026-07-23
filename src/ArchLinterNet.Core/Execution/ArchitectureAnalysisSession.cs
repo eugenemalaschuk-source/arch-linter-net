@@ -352,6 +352,9 @@ public sealed partial class ArchitectureAnalysisSession
         AddExternalDependencyGroupViolations(violations, collector);
         AddPackageGroupViolations(violations, collector);
         AddPackageMetadataViolations(violations, collector);
+        AddFrameworkGroupViolations(violations, collector);
+        AddFrameworkMetadataViolations(violations, collector);
+        AddFrameworkEvaluationFailureViolations(violations, collector);
         AddProjectMetadataViolations(violations, collector);
 
         return violations;
@@ -633,6 +636,93 @@ public sealed partial class ArchitectureAnalysisSession
                 {
                     $"Contract '{contract.Name}' declares source '{source}', but no discovered project with that assembly name has package reference metadata available. " +
                     "Package dependency/allow-only contracts require analysis.solution or analysis.projects to be configured so project discovery can parse PackageReference items; " +
+                    "without it, this contract will never report a violation."
+                });
+            violations.Add(Document.Provenance.Enrich(violation, contract));
+        }
+    }
+
+    private void AddFrameworkGroupViolations(
+        List<ArchitectureViolation> violations, ArchitectureConfigurationReferenceCollector collector)
+    {
+        foreach ((string groupName, List<IArchitectureContract> referencingContracts) in
+                 collector.ReferencedFrameworkGroups)
+        {
+            if (!Document.FrameworkReferences.TryGetValue(groupName, out ArchitectureFrameworkReferenceGroup? group))
+            {
+                var violation = new ArchitectureViolation(
+                    ConfigurationSource,
+                    null,
+                    groupName,
+                    "unknown framework group",
+                    new[]
+                    {
+                        $"Framework group '{groupName}' is referenced by a contract but is not declared in framework_references."
+                    })
+                {
+                    Payload = new FrameworkReferencePayload(groupName)
+                };
+                violations.Add(Document.Provenance.Enrich(
+                    violation,
+                    referencingContracts.FirstOrDefault(),
+                    referencingContracts.Skip(1).Cast<object>()));
+
+                continue;
+            }
+
+            if (ArchitectureFrameworkReferenceResolver.HasUsableMatchers(group))
+            {
+                continue;
+            }
+
+            var invalidGroup = new ArchitectureViolation(
+                ConfigurationSource,
+                null,
+                groupName,
+                "invalid framework group",
+                new[]
+                {
+                    $"Framework group '{groupName}' must declare at least one non-empty framework_names or framework_name_prefixes matcher."
+                })
+            {
+                Payload = new FrameworkReferencePayload(groupName)
+            };
+            violations.Add(Document.Provenance.EnrichAtPath(
+                invalidGroup,
+                ArchitecturePolicyProvenancePath.AppendProperty(
+                    ArchitecturePolicyProvenancePath.Property("framework_references"), groupName)));
+        }
+    }
+
+    private void AddFrameworkMetadataViolations(
+        List<ArchitectureViolation> violations, ArchitectureConfigurationReferenceCollector collector)
+    {
+        if (collector.FrameworkContractSources.Count == 0)
+        {
+            return;
+        }
+
+        HashSet<string> projectsWithFrameworkData = new(
+            Context.ProjectDiscovery?.DiscoveredProjects.Select(project => project.AssemblyName) ?? Enumerable.Empty<string>(),
+            StringComparer.Ordinal);
+
+        foreach ((IArchitectureContract contract, string source) in collector.FrameworkContractSources
+                     .DistinctBy(entry => (entry.Contract, entry.Source)))
+        {
+            if (projectsWithFrameworkData.Contains(source))
+            {
+                continue;
+            }
+
+            var violation = new ArchitectureViolation(
+                contract.Name,
+                contract.Id,
+                source,
+                "no project metadata discovered",
+                new[]
+                {
+                    $"Contract '{contract.Name}' declares source '{source}', but no discovered project with that assembly name has project metadata available. " +
+                    "Framework dependency/allow-only contracts require analysis.solution or analysis.projects to be configured so project discovery can parse FrameworkReference items; " +
                     "without it, this contract will never report a violation."
                 });
             violations.Add(Document.Provenance.Enrich(violation, contract));

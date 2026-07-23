@@ -45,7 +45,7 @@ public sealed class ArchitecturePolicyImportSchemaTests
         JsonElement properties = schema.RootElement.GetProperty("properties");
         string[] expected =
         {
-            "imports", "layers", "external_dependencies", "packages", "legacy_runtime_layers",
+            "imports", "layers", "external_dependencies", "packages", "framework_references", "legacy_runtime_layers",
             "analysis", "contracts", "classification"
         };
 

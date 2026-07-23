@@ -45,7 +45,8 @@ public sealed partial class ArchitecturePolicyDocumentLoader
     // structuralPath.Count == 0 (the true document root) - matching by name alone anywhere in the tree would
     // let an author suppress when/opaque-checking for an entire fabricated subtree by nesting a bogus "layers"
     // (or "packages"/"external_dependencies") key at an unrelated, unapproved location.
-    private static readonly string[] _arbitraryNameGroupKeys = { "layers", "external_dependencies", "packages" };
+    private static readonly string[] _arbitraryNameGroupKeys =
+        { "layers", "external_dependencies", "packages", "framework_references" };
 
     private static void ValidateRawWhenFieldLocations(string yaml)
     {

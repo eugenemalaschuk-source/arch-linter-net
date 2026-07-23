@@ -13,7 +13,10 @@ internal sealed class ArchitectureConfigurationReferenceCollector
         new(StringComparer.Ordinal);
     private readonly Dictionary<string, List<IArchitectureContract>> _referencedPackageGroups =
         new(StringComparer.Ordinal);
+    private readonly Dictionary<string, List<IArchitectureContract>> _referencedFrameworkGroups =
+        new(StringComparer.Ordinal);
     private readonly List<(IArchitectureContract Contract, string Source)> _packageContractSources = new();
+    private readonly List<(IArchitectureContract Contract, string Source)> _frameworkContractSources = new();
     private readonly List<(IArchitectureContract Contract, string ProjectPath)> _projectMetadataContractProjects = new();
 
     public IReadOnlyDictionary<string, List<IArchitectureContract>> LayerReferencingContracts =>
@@ -25,8 +28,14 @@ internal sealed class ArchitectureConfigurationReferenceCollector
     public IReadOnlyDictionary<string, List<IArchitectureContract>> ReferencedPackageGroups =>
         _referencedPackageGroups;
 
+    public IReadOnlyDictionary<string, List<IArchitectureContract>> ReferencedFrameworkGroups =>
+        _referencedFrameworkGroups;
+
     public IReadOnlyList<(IArchitectureContract Contract, string Source)> PackageContractSources =>
         _packageContractSources;
+
+    public IReadOnlyList<(IArchitectureContract Contract, string Source)> FrameworkContractSources =>
+        _frameworkContractSources;
 
     public IReadOnlyList<(IArchitectureContract Contract, string ProjectPath)> ProjectMetadataContractProjects =>
         _projectMetadataContractProjects;
@@ -58,6 +67,19 @@ internal sealed class ArchitectureConfigurationReferenceCollector
     public void AddPackageContractSource(IArchitectureContract contract, string source)
     {
         _packageContractSources.Add((contract, source));
+    }
+
+    public void AddFrameworkGroupNames(IArchitectureContract contract, IEnumerable<string> names)
+    {
+        foreach (string name in names)
+        {
+            AddReference(_referencedFrameworkGroups, name, contract);
+        }
+    }
+
+    public void AddFrameworkContractSource(IArchitectureContract contract, string source)
+    {
+        _frameworkContractSources.Add((contract, source));
     }
 
     public void AddProjectMetadataProject(IArchitectureContract contract, string projectPath)

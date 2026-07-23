@@ -25,13 +25,13 @@ internal sealed partial class ArchitecturePolicySourceParser
 
     private static readonly HashSet<string> _allowedRootFields = new(StringComparer.Ordinal)
     {
-        "version", "name", ImportsField, "layers", "external_dependencies", "packages",
+        "version", "name", ImportsField, "layers", "external_dependencies", "packages", "framework_references",
         "legacy_runtime_layers", "analysis", "contracts", "classification"
     };
 
     private static readonly HashSet<string> _mergeableFields = new(StringComparer.Ordinal)
     {
-        "layers", "external_dependencies", "packages", "legacy_runtime_layers",
+        "layers", "external_dependencies", "packages", "framework_references", "legacy_runtime_layers",
         "analysis", "contracts", "classification"
     };
 

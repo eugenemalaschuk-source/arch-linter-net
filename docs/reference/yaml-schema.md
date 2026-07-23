@@ -137,6 +137,30 @@ project types. It does not statically analyze third-party internals and does
 not guarantee detection when external assemblies are unresolved enough that the
 current scanner cannot observe referenced type names.
 
+## `packages`
+
+Optional. Map of named NuGet package groups, referenced by `package_dependency`/`package_allow_only` contracts.
+
+```yaml
+packages:
+  <group-name>:
+    package_ids: [<string>]       # Optional — exact match, case-insensitive
+    package_prefixes: [<string>]  # Optional — exact or dot-segment child match, case-insensitive
+```
+
+## `framework_references`
+
+Optional. Map of named MSBuild `FrameworkReference` groups, referenced by `framework_dependency`/`framework_allow_only` contracts.
+
+```yaml
+framework_references:
+  <group-name>:
+    framework_names: [<string>]        # Optional — exact match, case-insensitive
+    framework_name_prefixes: [<string>] # Optional — exact or dot-segment child match, case-insensitive
+```
+
+Framework reference matching reads `FrameworkReference` items' `Include` and optional `Condition` attributes from each project's `.csproj`. `FrameworkReference` carries no `Version` attribute, so there is no version resolution and no `dependency_depth` field on framework contracts.
+
 ## `legacy_runtime_layers`
 
 Optional. List of namespace prefixes that are runtime-only or otherwise not
@@ -527,6 +551,39 @@ shape, with `source_type`/`forbidden_reference` holding assembly names for this 
 
 See [Assembly dependency contracts](../contracts/assembly-dependency.md) for the distinction
 from namespace/layer dependency contracts, assembly independence, and Unity `.asmdef` checks.
+
+### Framework dependency contract
+
+```yaml
+- id: <string>                  # Optional
+  name: <string>
+  source: <string>              # Required — source project/assembly name
+  forbidden: [<string>]         # Required — framework_references group names
+  ignored_violations: []        # Optional — baseline known violations
+  reason: <string>
+```
+
+`source` must appear in `analysis.target_assemblies`, or policy loading fails with an actionable
+error. There is no `dependency_depth` field — `FrameworkReference` has no transitive-dependency
+concept. `ignored_violations` reuses the `source_type`/`forbidden_reference`/`reason` shape, with
+`source_type` holding the source assembly name and `forbidden_reference` holding the framework
+name. See [Framework reference contracts](../contracts/framework-references.md).
+
+### Framework allow-only contract
+
+```yaml
+- id: <string>                  # Optional
+  name: <string>
+  source: <string>              # Required — source project/assembly name
+  allowed: [<string>]           # Required — framework_references group names
+  ignored_violations: []        # Optional — baseline known violations
+  reason: <string>
+```
+
+`source` must appear in `analysis.target_assemblies`, or policy loading fails with an actionable
+error. There is no `dependency_depth` field. A violation is reported once per source, listing
+every declared `FrameworkReference` not matching any group in `allowed`, sorted by framework name
+with duplicates removed. See [Framework reference contracts](../contracts/framework-references.md).
 
 ### Protected surface contract
 
