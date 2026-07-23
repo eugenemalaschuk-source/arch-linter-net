@@ -491,6 +491,68 @@ public sealed class CompositionContractTests
     }
 
     [Test]
+    public void CheckCompositionContract_TwoCallsToSameApiInSameMember_BaseliningFirstDoesNotSuppressSecond()
+    {
+        // Regression test: the IL match list used to be Distinct()-ed by (method, pattern, matched
+        // member) before ever reaching IsIgnored/the occurrence counter, so two distinct call sites
+        // to the same forbidden API within the same source member collapsed into a single occurrence.
+        // Baselining "occurrence 0" therefore silently suppressed both real call sites, not just the
+        // first — this is exactly the "multiple occurrences inside one type remain distinct"
+        // acceptance criterion from issue #360.
+        const string sourceType = "CompositionContractTestFixtures.Application.RepeatedCallLeak";
+        const string sourceMember = "CompositionContractTestFixtures.Application.RepeatedCallLeak.ResolveTwice";
+
+        var contractNoBaseline = new ArchitectureCompositionContract
+        {
+            Id = "repeated-call",
+            Name = "repeated-call",
+            ForbiddenApis = new List<string> { GetServiceApi },
+            AllowedOnlyInNamespaces = new List<string> { CompositionNamespace }
+        };
+        var documentNoBaseline = CreateDocument(contractNoBaseline);
+        var runnerNoBaseline = new ArchitectureContractRunner(CreateContext(), documentNoBaseline);
+        runnerNoBaseline.Session.CheckCompositionContract(contractNoBaseline);
+
+        // Both raw call sites must reach the occurrence-tracking machinery even though only one
+        // violation is reported per (type, source member, matched API) tuple.
+        int candidateCount = runnerNoBaseline.BaselineCandidates
+            .Count(c => c.SourceType == sourceType && c.Identity!.SourceMember == sourceMember);
+        Assert.That(candidateCount, Is.EqualTo(2),
+            "Both distinct call sites must independently reach the baseline-candidate/occurrence machinery.");
+
+        var contractWithBaseline = new ArchitectureCompositionContract
+        {
+            Id = "repeated-call",
+            Name = "repeated-call",
+            ForbiddenApis = new List<string> { GetServiceApi },
+            AllowedOnlyInNamespaces = new List<string> { CompositionNamespace },
+            IgnoredViolations = new List<ArchitectureIgnoredViolation>
+            {
+                new()
+                {
+                    SourceType = sourceType,
+                    ForbiddenReference = GetServiceApi,
+                    Reason = "baselined first occurrence",
+                    IdentityVersion = 2,
+                    ContractFamily = "composition",
+                    Kind = "call",
+                    SourceAssembly = AssemblyName,
+                    SourceMember = sourceMember,
+                    TargetMember = GetServiceApi,
+                    Occurrence = 0,
+                }
+            }
+        };
+        var documentWithBaseline = CreateDocument(contractWithBaseline);
+        var runnerWithBaseline = new ArchitectureContractRunner(CreateContext(), documentWithBaseline);
+
+        var violations = runnerWithBaseline.Session.CheckCompositionContract(contractWithBaseline);
+
+        Assert.That(violations.Any(v => v.SourceType == sourceType), Is.True,
+            "The second, un-baselined occurrence must still be reported even though the first occurrence was baselined.");
+    }
+
+    [Test]
     public void ValidateAudit_CompositionViolation_ReportsWithoutFailingStrictValidation()
     {
         string policyPath = WritePolicy($"""

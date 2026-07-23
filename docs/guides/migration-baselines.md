@@ -240,6 +240,30 @@ Migration is opt-in and on-demand: nothing about `validate`, `generate`,
 migrated. Version 1 files keep working with their existing behavior
 indefinitely.
 
+`baseline migrate` only upgrades **version 1** files — it refuses to run
+against a file that already declares `version: 2`. This matters when a
+contract family gains new structured-identity fields it didn't previously
+populate (for example, `strict_composition`/`audit_composition` gained
+`source_assembly` qualification): a `version: 2` baseline generated *before*
+that change carries entries with those fields left `null`, and those entries
+will no longer structurally match the richer identity the same violations now
+produce. There is no dedicated "re-qualify a version-2 file" command, because
+`migrate`'s job is specifically the version-1-to-2 identity upgrade. Instead:
+
+1. Run `baseline update --baseline old.yml --output new.yml` — every
+   currently-passing violation gets a fresh, fully-qualified entry added; the
+   stale, unqualified entries are preserved untouched (`update` never removes
+   anything).
+1. Run `baseline prune --baseline new.yml --output new.yml` — the stale
+   unqualified entries no longer match any current violation (their identity
+   is missing fields the live violation now has), so `prune` removes them and
+   reports them as `resolved`.
+
+The result is a `version: 2` file where every entry is qualified with the
+current identity shape. This two-step `update` + `prune` sequence is the
+general answer for "a family's identity got more precise since I last
+generated," not just for composition.
+
 ### Merge semantics
 
 When `--baseline <path>` is provided, the baseline entries are merged into the

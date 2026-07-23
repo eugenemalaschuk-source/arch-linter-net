@@ -3,6 +3,7 @@ namespace ArchLinterNet.Core.Model;
 public sealed record CompositionPayload(
     string? SourceMember = null,
     string? MatchedForbiddenApi = null,
+    string? SourceAssembly = null,
     string? ExpectedCompositionBoundary = null)
     : IArchitectureDiagnosticPayload
 {
@@ -14,6 +15,7 @@ public sealed record CompositionPayload(
             MatchedNamespacePrefixes = violation.MatchedNamespacePrefixes,
             SourceMember = SourceMember,
             MatchedForbiddenApi = MatchedForbiddenApi,
+            SourceAssembly = SourceAssembly,
             ExpectedCompositionBoundary = ExpectedCompositionBoundary
         };
 }

@@ -63,11 +63,13 @@ The system SHALL allow `ignored_violations` entries on a `composition` contract 
 
 The system SHALL emit, for each composition violation, a diagnostic identifying the violating type, the violating source member, the matched forbidden API's fully-qualified name, the contract, and the expected composition boundary, with violations ordered deterministically by the violating type's fully-qualified name, then by matched API (ordinal), then by source member (ordinal), and at most one violation per (type, source member, matched API) tuple.
 
-Each composition violation's baseline/ignore identity (`ArchitectureViolationIdentity`) SHALL be qualified with the violating type's declaring assembly (`SourceAssembly`), the violating source member (`SourceMember`), and the matched forbidden API (`TargetMember`), and SHALL classify as `Kind: "call"`. Baselining or `ignored_violations` matching SHALL therefore distinguish two same-named types with the same simple name and namespace in different assemblies, and SHALL distinguish two distinct forbidden-call occurrences from different source members of the same type.
+Each composition violation's baseline/ignore identity (`ArchitectureViolationIdentity`) SHALL be qualified with the violating type's declaring assembly (`SourceAssembly`), the violating source member (`SourceMember`), and the matched forbidden API (`TargetMember`), and SHALL classify as `Kind: "call"`. Baselining or `ignored_violations` matching SHALL therefore distinguish two same-named types with the same simple name and namespace in different assemblies, and SHALL distinguish two distinct forbidden-call occurrences — whether from different source members of the same type or from two separate call sites to the same forbidden API within the same source member. Occurrence discrimination SHALL be evaluated against every raw call site independently (never pre-deduplicated before the ignore/occurrence check), so that baselining one occurrence cannot silently suppress a second, distinct call site that happens to share the same matched API and source member.
+
+The violating type's declaring assembly SHALL also be included as `source_assembly` in human-readable, `--json`, and `--explain` diagnostic output for composition violations, so that two same-named types in different assemblies are visibly distinguishable, not only distinguishable at baseline-matching time. (SARIF output does not carry this — or any other contract family's per-violation member/assembly detail beyond `FrameworkReference`'s dedicated evidence array — extending SARIF's `properties` bag to every diagnostic kind is out of scope for this family.)
 
 #### Scenario: Diagnostic identifies the forbidden composition API usage
 - **WHEN** a type outside the allowed composition boundary calls a forbidden API
-- **THEN** the emitted diagnostic SHALL include the violating type's fully-qualified name, the violating source member, the matched forbidden API, and the expected composition boundary description
+- **THEN** the emitted diagnostic SHALL include the violating type's fully-qualified name, the violating type's declaring assembly, the violating source member, the matched forbidden API, and the expected composition boundary description
 
 #### Scenario: Repeated runs produce identical ordering
 - **WHEN** the same policy is validated twice against the same assemblies with multiple composition violations
@@ -80,6 +82,10 @@ Each composition violation's baseline/ignore identity (`ArchitectureViolationIde
 #### Scenario: Distinct occurrences in one type each get a distinct identity
 - **WHEN** a single type outside the composition boundary calls two distinct forbidden APIs from two different source members, and only one occurrence's baseline entry is applied
 - **THEN** the other occurrence SHALL still be reported as a violation; baselining one SHALL NOT suppress the other
+
+#### Scenario: Two calls to the same forbidden API within one source member remain distinct occurrences
+- **WHEN** a single source member outside the composition boundary calls the same forbidden API from two distinct IL call sites, and only the first occurrence's baseline entry is applied
+- **THEN** the second call site SHALL still be reported as a violation; baselining the first occurrence SHALL NOT suppress the second
 
 ### Requirement: Composition contracts do not validate runtime dependency injection
 The system SHALL restrict composition contracts to static detection of forbidden API call sites. The system SHALL NOT attempt to resolve, simulate, or verify runtime service registration or resolution correctness.

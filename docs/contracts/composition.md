@@ -73,7 +73,7 @@ Each violation identifies the calling type and source member outside the composi
 
 `ignored_violations` entries use the same `source_type`/`forbidden_reference`/`reason` shape as other contract families, matching the calling type and the matched forbidden API's fully-qualified name.
 
-Violation/baseline identity is assembly- and member-qualified: two same-named types in different assemblies (for example two `Program` types in two host assemblies) are never conflated, and two distinct forbidden-call occurrences from different source members of the same type get distinct identities. Baselining one occurrence never suppresses an unrelated same-named or same-member occurrence elsewhere.
+Violation/baseline identity is assembly- and member-qualified: two same-named types in different assemblies (for example two `Program` types in two host assemblies) are never conflated, and two distinct forbidden-call occurrences — whether from different source members of the same type or from two separate call sites to the same forbidden API within the same source member — get distinct identities. Baselining one occurrence never suppresses an unrelated same-named or same-member occurrence elsewhere. The violating type's declaring assembly is also included as `source_assembly` in human, `--json`, and `--explain` output (`FormatCompositionContextForHumans`/`ApplyCompositionCiFields`), so two same-named types in different assemblies are visibly distinguishable, not just distinguishable at baseline-matching time. (SARIF does not currently carry this — or any other family's per-violation member/assembly detail beyond `FrameworkReference`'s bespoke evidence array; extending SARIF's `properties` bag to every diagnostic kind is a separate, broader change.)
 
 ## Non-goals
 

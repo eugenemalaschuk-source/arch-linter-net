@@ -54,19 +54,30 @@ public sealed partial class ArchitectureAnalysisSession
 
             string sourceType = ArchitectureTypeNames.SafeFullName(type);
 
-            var matches = ArchitectureIlMethodBodyScanner.FindMatchDetailsForType(type, patterns, matchCache)
-                .Distinct()
+            // IMPORTANT: do not Distinct() the raw IL matches before IsIgnored — each raw call site
+            // (even one with an identical (method, pattern, matchedMember) shape to another call site
+            // in the same method) must independently reach IsIgnored so the occurrence counter/baseline
+            // candidate collection sees every distinct occurrence. Deduping first would collapse two
+            // genuinely distinct forbidden-call occurrences into a single check, so baselining the first
+            // would silently suppress the second too. Dedup for the reported violation *list* happens
+            // after, matching the "at most one violation per (type, source member, matched API) tuple"
+            // diagnostic contract without weakening occurrence discrimination underneath it.
+            var rawMatches = ArchitectureIlMethodBodyScanner.FindMatchDetailsForType(type, patterns, matchCache)
                 .OrderBy(match => match.MatchedMember, StringComparer.Ordinal)
                 .ThenBy(match => match.SourceMember, StringComparer.Ordinal);
 
-            foreach (ArchitectureIlForbiddenCallMatch match in matches)
+            HashSet<(string SourceMember, string MatchedApi)> reportedTuples = new();
+
+            foreach (ArchitectureIlForbiddenCallMatch match in rawMatches)
             {
                 string matchedForbiddenApi = match.MatchedMember;
-                if (executionContext.IsIgnored(
-                        sourceType, matchedForbiddenApi,
-                        sourceAssembly: actualAssemblyName,
-                        sourceMember: match.SourceMember,
-                        targetMember: matchedForbiddenApi))
+                bool ignored = executionContext.IsIgnored(
+                    sourceType, matchedForbiddenApi,
+                    sourceAssembly: actualAssemblyName,
+                    sourceMember: match.SourceMember,
+                    targetMember: matchedForbiddenApi);
+
+                if (ignored || !reportedTuples.Add((match.SourceMember, matchedForbiddenApi)))
                 {
                     continue;
                 }
@@ -81,6 +92,7 @@ public sealed partial class ArchitectureAnalysisSession
                     Payload = new CompositionPayload(
                         MatchedForbiddenApi: matchedForbiddenApi,
                         SourceMember: match.SourceMember,
+                        SourceAssembly: actualAssemblyName,
                         ExpectedCompositionBoundary: expectedCompositionBoundary)
                 });
             }

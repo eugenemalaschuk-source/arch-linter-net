@@ -117,4 +117,17 @@ namespace CompositionContractTestFixtures.Application
     {
         public static int Add(int a, int b) => a + b;
     }
+
+    // Two distinct IL call sites to the *same* forbidden API from the *same* source member —
+    // regression fixture for the occurrence-collapsing bug where the IL match list was
+    // Distinct()-ed before the ignore/occurrence check ran, so both call sites shared a single
+    // occurrence and baselining one silently suppressed the other.
+    public sealed class RepeatedCallLeak
+    {
+        public static void ResolveTwice(IFakeServiceProvider provider)
+        {
+            provider.GetService(typeof(object));
+            provider.GetService(typeof(string));
+        }
+    }
 }
