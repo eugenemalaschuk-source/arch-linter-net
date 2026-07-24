@@ -3,7 +3,7 @@ using ArchLinterNet.Core.Model;
 
 namespace ArchLinterNet.Core.Reporting;
 
-public interface IArchitectureDiagnosticFormatter
+public partial interface IArchitectureDiagnosticFormatter
 {
     string FormatViolationsForHumans(IReadOnlyCollection<ArchitectureViolation> violations);
 

@@ -30,4 +30,12 @@ public sealed record ValidationOutcome(
 
     public IReadOnlyCollection<ArchitectureCycleFinding> CycleFindings { get; init; } =
         Array.Empty<ArchitectureCycleFinding>();
+
+    // Non-empty only when build-state preflight ran (see ValidationRequest.PreparationMode).
+    // When PreflightBlocked is true, no contract executed and every other collection above is
+    // empty — Passed is false and the only findings are these preflight diagnostics.
+    public IReadOnlyCollection<BuildStatePreflightDiagnostic> PreflightDiagnostics { get; init; } =
+        Array.Empty<BuildStatePreflightDiagnostic>();
+
+    public bool PreflightBlocked { get; init; }
 }

@@ -5,7 +5,7 @@ using ArchLinterNet.Core.Model;
 
 namespace ArchLinterNet.Core.Reporting;
 
-public interface IArchitectureSarifFormatter
+public partial interface IArchitectureSarifFormatter
 {
     string FormatResultAsSarif(
         string mode,
@@ -42,7 +42,8 @@ public sealed partial class ArchitectureSarifFormatter : IArchitectureSarifForma
             mode,
             violations,
             cycles.Select(cycle => (Func<string, ResultEntry>)(level => BuildCycleEntry(cycle, level))),
-            toolVersion);
+            toolVersion,
+            Array.Empty<BuildStatePreflightDiagnostic>());
     }
 
     public static string FormatResultAsSarif(
@@ -56,14 +57,16 @@ public sealed partial class ArchitectureSarifFormatter : IArchitectureSarifForma
             violations,
             cycles.Select(cycle => (Func<string, ResultEntry>)(level =>
                 BuildCycleEntry(ArchitectureDiagnosticMapper.FromCycle(cycle), level))),
-            toolVersion);
+            toolVersion,
+            Array.Empty<BuildStatePreflightDiagnostic>());
     }
 
     private static string FormatResultAsSarifCore(
         string mode,
         IReadOnlyCollection<ArchitectureViolation> violations,
         IEnumerable<Func<string, ResultEntry>> cycleEntryFactories,
-        string toolVersion)
+        string toolVersion,
+        IReadOnlyCollection<BuildStatePreflightDiagnostic> preflightDiagnostics)
     {
         string level = mode == "strict" ? "error" : "warning";
 
@@ -71,6 +74,7 @@ public sealed partial class ArchitectureSarifFormatter : IArchitectureSarifForma
             .Select(ArchitectureDiagnosticMapper.FromViolation)
             .Select(diagnostic => BuildViolationEntry(diagnostic, level))
             .Concat(cycleEntryFactories.Select(factory => factory(level)))
+            .Concat(preflightDiagnostics.Where(d => d.IsBlocking).Select(BuildPreflightEntry))
             .OrderBy(e => e.RuleId, StringComparer.Ordinal)
             .ThenBy(e => e.SourceIdentifier, StringComparer.Ordinal)
             .ThenBy(e => e.Category, StringComparer.Ordinal)

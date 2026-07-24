@@ -20,7 +20,7 @@ public sealed partial class ArchitectureDiagnosticFormatter
         return BuildCiArtifactsJson(new CiArtifactsRequest(
             mode, passed, violations, cycles, null, coverageFindings, unmatched,
             policyConsistencyFindings, coverageSummaries, null, classificationConflicts, classificationMetadataFailures,
-            null));
+            null, null));
     }
 
     public static string FormatResultForCiArtifacts( // NOSONAR: additive cycle-diagnostics overload intentionally mirrors the public CI payload surface
@@ -39,7 +39,7 @@ public sealed partial class ArchitectureDiagnosticFormatter
         return BuildCiArtifactsJson(new CiArtifactsRequest(
             mode, passed, violations, cycles, null, coverageFindings, unmatched,
             policyConsistencyFindings, coverageSummaries, cycleFindings, classificationConflicts,
-            classificationMetadataFailures, null));
+            classificationMetadataFailures, null, null));
     }
 
     /// <summary>
@@ -62,7 +62,7 @@ public sealed partial class ArchitectureDiagnosticFormatter
         return BuildCiArtifactsJson(new CiArtifactsRequest(
             mode, passed, violations, cycles, classificationRoles, coverageFindings, unmatched,
             policyConsistencyFindings, coverageSummaries, null, classificationConflicts, classificationMetadataFailures,
-            null));
+            null, null));
     }
 
     public static string FormatResultForCiArtifacts( // NOSONAR: additive cycle-diagnostics overload intentionally mirrors the public CI payload surface
@@ -82,7 +82,7 @@ public sealed partial class ArchitectureDiagnosticFormatter
         return BuildCiArtifactsJson(new CiArtifactsRequest(
             mode, passed, violations, cycles, classificationRoles, coverageFindings, unmatched,
             policyConsistencyFindings, coverageSummaries, cycleFindings, classificationConflicts,
-            classificationMetadataFailures, null));
+            classificationMetadataFailures, null, null));
     }
 
     /// <summary>
@@ -106,7 +106,7 @@ public sealed partial class ArchitectureDiagnosticFormatter
         return BuildCiArtifactsJson(new CiArtifactsRequest(
             mode, passed, violations, cycles, classificationRoles, coverageFindings, unmatched,
             policyConsistencyFindings, coverageSummaries, null, classificationConflicts, classificationMetadataFailures,
-            classificationPathDeferred));
+            classificationPathDeferred, null));
     }
 
     public static string FormatResultForCiArtifacts( // NOSONAR: additive cycle-diagnostics overload intentionally mirrors the public CI payload surface
@@ -127,7 +127,58 @@ public sealed partial class ArchitectureDiagnosticFormatter
         return BuildCiArtifactsJson(new CiArtifactsRequest(
             mode, passed, violations, cycles, classificationRoles, coverageFindings, unmatched,
             policyConsistencyFindings, coverageSummaries, cycleFindings, classificationConflicts,
-            classificationMetadataFailures, classificationPathDeferred));
+            classificationMetadataFailures, classificationPathDeferred, null));
+    }
+
+    /// <summary>
+    /// Additive overload — see the matching declaration on <see cref="IArchitectureDiagnosticFormatter"/>
+    /// for why this exists alongside the classificationPathDeferred overload instead of extending it.
+    /// </summary>
+    public string FormatResultForCiArtifacts(
+        string mode,
+        bool passed,
+        IReadOnlyCollection<ArchitectureViolation> violations,
+        IReadOnlyCollection<string> cycles,
+        IReadOnlyCollection<ArchitectureClassificationRoleFact> classificationRoles,
+        ArchitectureClassificationPathDeferredNotice? classificationPathDeferred,
+        IReadOnlyCollection<BuildStatePreflightDiagnostic> preflightDiagnostics,
+        IReadOnlyCollection<ArchitectureViolation>? coverageFindings = null,
+        IReadOnlyCollection<ArchitectureUnmatchedIgnoredViolation>? unmatched = null,
+        IReadOnlyCollection<PolicyConsistencyDiagnostic>? policyConsistencyFindings = null,
+        IReadOnlyCollection<ArchitectureCoverageSummary>? coverageSummaries = null,
+        IReadOnlyCollection<ArchitectureClassificationConflict>? classificationConflicts = null,
+        IReadOnlyCollection<ArchitectureClassificationMetadataFailure>? classificationMetadataFailures = null)
+    {
+        return BuildCiArtifactsJson(new CiArtifactsRequest(
+            mode, passed, violations, cycles, classificationRoles, coverageFindings, unmatched,
+            policyConsistencyFindings, coverageSummaries, null, classificationConflicts, classificationMetadataFailures,
+            classificationPathDeferred, preflightDiagnostics));
+    }
+
+    /// <summary>
+    /// Additive static overload — mirrors the instance overload above but also carries cycle
+    /// diagnostics, for callers (CliRuntime) that already resolved <see cref="ArchitectureCycleFinding"/>.
+    /// </summary>
+    public static string FormatResultForCiArtifacts( // NOSONAR: additive cycle-diagnostics overload intentionally mirrors the public CI payload surface
+        string mode,
+        bool passed,
+        IReadOnlyCollection<ArchitectureViolation> violations,
+        IReadOnlyCollection<string> cycles,
+        IReadOnlyCollection<ArchitectureCycleFinding> cycleFindings,
+        IReadOnlyCollection<ArchitectureClassificationRoleFact> classificationRoles,
+        ArchitectureClassificationPathDeferredNotice? classificationPathDeferred,
+        IReadOnlyCollection<BuildStatePreflightDiagnostic> preflightDiagnostics,
+        IReadOnlyCollection<ArchitectureViolation>? coverageFindings = null,
+        IReadOnlyCollection<ArchitectureUnmatchedIgnoredViolation>? unmatched = null,
+        IReadOnlyCollection<PolicyConsistencyDiagnostic>? policyConsistencyFindings = null,
+        IReadOnlyCollection<ArchitectureCoverageSummary>? coverageSummaries = null,
+        IReadOnlyCollection<ArchitectureClassificationConflict>? classificationConflicts = null,
+        IReadOnlyCollection<ArchitectureClassificationMetadataFailure>? classificationMetadataFailures = null)
+    {
+        return BuildCiArtifactsJson(new CiArtifactsRequest(
+            mode, passed, violations, cycles, classificationRoles, coverageFindings, unmatched,
+            policyConsistencyFindings, coverageSummaries, cycleFindings, classificationConflicts,
+            classificationMetadataFailures, classificationPathDeferred, preflightDiagnostics));
     }
 
     // Bundles FormatResultForCiArtifacts's parameters into one value so the private builder below
@@ -146,7 +197,8 @@ public sealed partial class ArchitectureDiagnosticFormatter
         IReadOnlyCollection<ArchitectureCycleFinding>? CycleFindings,
         IReadOnlyCollection<ArchitectureClassificationConflict>? ClassificationConflicts,
         IReadOnlyCollection<ArchitectureClassificationMetadataFailure>? ClassificationMetadataFailures,
-        ArchitectureClassificationPathDeferredNotice? ClassificationPathDeferred);
+        ArchitectureClassificationPathDeferredNotice? ClassificationPathDeferred,
+        IReadOnlyCollection<BuildStatePreflightDiagnostic>? PreflightDiagnostics);
 
     private static string BuildCiArtifactsJson(CiArtifactsRequest request)
     {
@@ -200,7 +252,8 @@ public sealed partial class ArchitectureDiagnosticFormatter
                     policy_locations = request.ClassificationPathDeferred.PolicyLocations
                         .Select(FormatPolicyLocationForJson)
                         .ToArray()
-                }
+                },
+            preflight_diagnostics = BuildStatePreflightJson(request.PreflightDiagnostics)
         };
 
         return JsonSerializer.Serialize(payload);

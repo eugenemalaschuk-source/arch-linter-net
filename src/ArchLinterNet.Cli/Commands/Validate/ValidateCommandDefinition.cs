@@ -33,11 +33,21 @@ internal sealed class ValidateCommandDefinition(ValidateCommandHandler handler)
                                 otherwise empty symbol set)
               --baseline <path> Path to baseline file to merge with policy ignores
               --timings         Print phase-level timing report to stderr
+              --ensure-built    Build the selected project graph once, verify it via an
+                                ArchLinterNet build receipt, then validate (never implicit;
+                                opt-in only)
+              --no-restore      Fail closed with a restore-required diagnostic instead of
+                                restoring; combine with --ensure-built to build offline
+              --configuration <name>
+                                Requested build configuration for build-state preflight
+                                (e.g. Debug, Release)
+              --framework <tfm> Requested target framework for build-state preflight
           -f, --format <fmt>    Output format: human, json, or sarif (default: human)
-                                sarif covers violations and cycles only; coverage,
-                                unmatched-ignore, and policy-consistency findings can
-                                still fail the run (exit code 1) without appearing in
-                                SARIF results — use --format json to see those
+                                sarif covers violations, cycles, and build-state
+                                preflight findings; coverage, unmatched-ignore, and
+                                policy-consistency findings can still fail the run
+                                (exit code 1) without appearing in SARIF results —
+                                use --format json to see those
               --json            Shortcut for --format json
           -h, --help            Show this help message
           -v, --version         Show version
@@ -69,6 +79,10 @@ internal sealed class ValidateCommandDefinition(ValidateCommandHandler handler)
         Option<bool> auditOption = new("--audit");
         Option<bool> jsonOption = new("--json");
         Option<bool> timingsOption = new("--timings");
+        Option<bool> ensureBuiltOption = new("--ensure-built");
+        Option<bool> noRestoreOption = new("--no-restore");
+        Option<string> configurationOption = new("--configuration");
+        Option<string> targetFrameworkOption = new("--framework");
         Option<bool> helpOption = new("--help");
         helpOption.Aliases.Add("-h");
         Option<bool> versionOption = new("--version");
@@ -84,6 +98,10 @@ internal sealed class ValidateCommandDefinition(ValidateCommandHandler handler)
         command.Options.Add(auditOption);
         command.Options.Add(jsonOption);
         command.Options.Add(timingsOption);
+        command.Options.Add(ensureBuiltOption);
+        command.Options.Add(noRestoreOption);
+        command.Options.Add(configurationOption);
+        command.Options.Add(targetFrameworkOption);
         command.Options.Add(helpOption);
         command.Options.Add(versionOption);
 
@@ -94,6 +112,10 @@ internal sealed class ValidateCommandDefinition(ValidateCommandHandler handler)
             conditionSetOption,
             baselineOption,
             timingsOption,
+            ensureBuiltOption,
+            noRestoreOption,
+            configurationOption,
+            targetFrameworkOption,
             helpOption,
             versionOption)));
 
@@ -122,6 +144,10 @@ internal sealed class ValidateCommandDefinition(ValidateCommandHandler handler)
         Option<string> conditionSetOption,
         Option<string> baselineOption,
         Option<bool> timingsOption,
+        Option<bool> ensureBuiltOption,
+        Option<bool> noRestoreOption,
+        Option<string> configurationOption,
+        Option<string> targetFrameworkOption,
         Option<bool> helpOption,
         Option<bool> versionOption)
     {
@@ -137,7 +163,11 @@ internal sealed class ValidateCommandDefinition(ValidateCommandHandler handler)
             parseResult.GetValue(timingsOption),
             parseResult.GetValue(baselineOption),
             parseResult.GetValue(helpOption),
-            parseResult.GetValue(versionOption));
+            parseResult.GetValue(versionOption),
+            parseResult.GetValue(ensureBuiltOption),
+            parseResult.GetValue(noRestoreOption),
+            parseResult.GetValue(configurationOption),
+            parseResult.GetValue(targetFrameworkOption));
     }
 
     private static string ResolveMode(ParseResult parseResult)
