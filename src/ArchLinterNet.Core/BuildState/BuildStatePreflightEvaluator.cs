@@ -68,9 +68,12 @@ public static class BuildStatePreflightEvaluator
         Dictionary<string, Assembly> resolvedByName,
         HashSet<string> missing)
     {
+        BuildStatePreflightDiagnostic? artifactPresence =
+            CheckArtifactPresence(project, request, resolvedByName, missing, out string? assemblyPath);
+
         return CheckCancellation(project, request)
+            ?? artifactPresence
             ?? CheckRequestedTargetFrameworkAgainstProject(project, request)
-            ?? CheckArtifactPresence(project, request, resolvedByName, missing, out string? assemblyPath)
             ?? CheckReceipt(project, request, assemblyPath!);
     }
 

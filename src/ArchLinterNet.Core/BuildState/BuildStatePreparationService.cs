@@ -140,7 +140,7 @@ public sealed class BuildStatePreparationService : IBuildStatePreparationService
     // than one root, or invoke the process multiple times for disconnected trees.
     private static string WriteTemporaryGraphSolution(BuildStatePreflightRequest request)
     {
-        IEnumerable<string> projectEntries = request.ProjectDiscovery.DiscoveredProjects
+        IEnumerable<string> projectEntries = SelectRelevantProjectsWithTransitiveReferences(request)
             .Select(project => BuildStatePathResolution.ResolveAbsoluteProjectPath(request.RepositoryRoot, project.Path))
             .Distinct(StringComparer.Ordinal)
             .Select(absolutePath => $"    <Project Path=\"{System.Security.SecurityElement.Escape(absolutePath)}\" />");
@@ -154,6 +154,56 @@ public sealed class BuildStatePreparationService : IBuildStatePreparationService
         string path = Path.Combine(Path.GetTempPath(), $"archlinternet-ensure-built-{Guid.NewGuid():N}.slnx");
         File.WriteAllText(path, content);
         return path;
+    }
+
+    // A project discovered only to feed project-scope coverage (never attempted by assembly
+    // resolution — see BuildStatePreflightEvaluator.IsRelevantToResolution) has no business being
+    // part of the ensure-built build: it may not even be restorable/buildable on its own, and
+    // including it in the shared .slnx would fail the whole graph build for every relevant
+    // project too. Build only the relevant projects plus whatever they transitively reference —
+    // a relevant project's own dependency closure is still needed even if a referenced project
+    // itself isn't independently relevant.
+    private static IReadOnlyCollection<ArchitectureDiscoveredProject> SelectRelevantProjectsWithTransitiveReferences(
+        BuildStatePreflightRequest request)
+    {
+        ArchitectureDiscoveredProject[] seeds = request.ProjectDiscovery.DiscoveredProjects
+            .Where(project => BuildStatePreflightEvaluator.IsRelevantToResolution(project, request.Resolution))
+            .ToArray();
+
+        // The pre-build resolution snapshot can be empty-empty (nothing resolved, nothing missing
+        // yet) on a genuinely first-ever build — assembly resolution hasn't had anything to find
+        // or report missing. Relevance can't be determined from that snapshot in that case, so
+        // fall back to the full discovered set rather than building nothing.
+        if (seeds.Length == 0)
+        {
+            return request.ProjectDiscovery.DiscoveredProjects;
+        }
+
+        Dictionary<string, ArchitectureDiscoveredProject> byPath =
+            request.ProjectDiscovery.DiscoveredProjects.ToDictionary(p => p.Path, StringComparer.Ordinal);
+
+        Dictionary<string, ArchitectureDiscoveredProject> selected = new(StringComparer.Ordinal);
+        Queue<ArchitectureDiscoveredProject> pending = new(seeds);
+
+        while (pending.Count > 0)
+        {
+            ArchitectureDiscoveredProject project = pending.Dequeue();
+            if (!selected.TryAdd(project.Path, project))
+            {
+                continue;
+            }
+
+            foreach (ArchitectureDiscoveredProjectReference reference in project.ProjectReferences)
+            {
+                if (byPath.TryGetValue(reference.Path, out ArchitectureDiscoveredProject? referenced)
+                    && !selected.ContainsKey(referenced.Path))
+                {
+                    pending.Enqueue(referenced);
+                }
+            }
+        }
+
+        return selected.Values;
     }
 
     private static BuildStateResolvedAssemblies ResolveBuiltAssemblies(BuildStatePreflightRequest request)
@@ -272,73 +322,111 @@ public sealed class BuildStatePreparationService : IBuildStatePreparationService
         return executableName;
     }
 
+    private static void AddFrameworkArgument(List<string> arguments, string? requestedTargetFramework)
+    {
+        if (requestedTargetFramework != null)
+        {
+            arguments.Add("-f");
+            arguments.Add(requestedTargetFramework);
+        }
+    }
+
     private static BuildStatePreflightDiagnostic? InvokeGraphBuild(BuildStatePreflightRequest request)
     {
         string solutionPath = WriteTemporaryGraphSolution(request);
         try
         {
-            List<string> arguments = new() { "build", solutionPath, "--nologo" };
+            // Restore the solution once, up front, before building with --no-restore. Letting
+            // `dotnet build` restore inline lets MSBuild's parallel build nodes each restore the
+            // same referenced project concurrently (once as its own solution entry, once implicitly
+            // via a ProjectReference from another entry), racing to write the same
+            // obj/*.nuget.g.props file and failing with "file already exists".
+            if (!request.NoRestore)
+            {
+                // -m:1 disables MSBuild's parallel build nodes for this restore. Parallel nodes
+                // each restoring a different solution-listed project can still race on a project
+                // that's *also* reached transitively via another entry's ProjectReference (e.g. a
+                // referenced library listed both as its own solution entry and pulled in by the
+                // app that references it), writing the same obj/*.nuget.g.props file concurrently.
+                List<string> restoreArguments = new() { "restore", solutionPath, "--nologo", "-m:1" };
+                AddFrameworkArgument(restoreArguments, request.RequestedTargetFramework);
+                BuildStatePreflightDiagnostic? restoreFailure =
+                    RunDotnetCommand(request, solutionPath, restoreArguments, "restore");
+                if (restoreFailure != null)
+                {
+                    return restoreFailure;
+                }
+            }
+
+            List<string> arguments = new() { "build", solutionPath, "--nologo", "--no-restore" };
             if (request.RequestedConfiguration != null)
             {
                 arguments.Add("-c");
                 arguments.Add(request.RequestedConfiguration);
             }
 
-            if (request.NoRestore)
-            {
-                arguments.Add("--no-restore");
-            }
+            // Without -f, a multi-targeted project builds every TFM it declares — an unrelated
+            // TFM in that list (e.g. a Windows-only target on a non-Windows CI runner) can fail
+            // the whole graph build even though the caller only asked to validate one specific
+            // framework.
+            AddFrameworkArgument(arguments, request.RequestedTargetFramework);
 
-            ProcessStartInfo startInfo = new(ResolveDotnetExecutablePath())
-            {
-                UseShellExecute = false,
-                RedirectStandardOutput = true,
-                RedirectStandardError = true,
-                WorkingDirectory = request.RepositoryRoot,
-            };
-            foreach (string argument in arguments)
-            {
-                startInfo.ArgumentList.Add(argument);
-            }
-
-            using Process process = new() { StartInfo = startInfo };
-            StringBuilder stdOut = new();
-            StringBuilder stdErr = new();
-
-            // Both streams must be drained concurrently with the process running, not sequentially
-            // after Start() — `dotnet build` can write enough to either pipe to fill its OS buffer,
-            // and reading only one stream (or reading one fully before starting the other) blocks
-            // the child process on the unread pipe while this process blocks on
-            // ReadToEnd/WaitForExit, deadlocking both.
-            process.OutputDataReceived += (_, e) => { if (e.Data != null) { stdOut.AppendLine(e.Data); } };
-            process.ErrorDataReceived += (_, e) => { if (e.Data != null) { stdErr.AppendLine(e.Data); } };
-
-            process.Start();
-            process.BeginOutputReadLine();
-            process.BeginErrorReadLine();
-            process.WaitForExit();
-
-            if (process.ExitCode == 0)
-            {
-                return null;
-            }
-
-            string combinedOutput = (stdOut.ToString() + stdErr).Trim();
-            return new BuildStatePreflightDiagnostic(
-                ContractName,
-                request.RepositoryRoot,
-                BuildStatePreflightState.BuildFailed,
-                new BuildStatePreflightEvidence(
-                    request.RepositoryRoot,
-                    string.Join(", ", request.ProjectDiscovery.DiscoveredProjects.Select(p => p.AssemblyName)),
-                    BuildCommand: $"dotnet build \"{solutionPath}\"" +
-                        (request.RequestedConfiguration != null ? $" -c {request.RequestedConfiguration}" : string.Empty),
-                    Detail: $"`dotnet build` failed with exit code {process.ExitCode}: {combinedOutput}"));
+            return RunDotnetCommand(request, solutionPath, arguments, "build");
         }
         finally
         {
             File.Delete(solutionPath);
         }
+    }
+
+    private static BuildStatePreflightDiagnostic? RunDotnetCommand(
+        BuildStatePreflightRequest request, string solutionPath, List<string> arguments, string commandLabel)
+    {
+        ProcessStartInfo startInfo = new(ResolveDotnetExecutablePath())
+        {
+            UseShellExecute = false,
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+            WorkingDirectory = request.RepositoryRoot,
+        };
+        foreach (string argument in arguments)
+        {
+            startInfo.ArgumentList.Add(argument);
+        }
+
+        using Process process = new() { StartInfo = startInfo };
+        StringBuilder stdOut = new();
+        StringBuilder stdErr = new();
+
+        // Both streams must be drained concurrently with the process running, not sequentially
+        // after Start() — `dotnet build`/`dotnet restore` can write enough to either pipe to fill
+        // its OS buffer, and reading only one stream (or reading one fully before starting the
+        // other) blocks the child process on the unread pipe while this process blocks on
+        // ReadToEnd/WaitForExit, deadlocking both.
+        process.OutputDataReceived += (_, e) => { if (e.Data != null) { stdOut.AppendLine(e.Data); } };
+        process.ErrorDataReceived += (_, e) => { if (e.Data != null) { stdErr.AppendLine(e.Data); } };
+
+        process.Start();
+        process.BeginOutputReadLine();
+        process.BeginErrorReadLine();
+        process.WaitForExit();
+
+        if (process.ExitCode == 0)
+        {
+            return null;
+        }
+
+        string combinedOutput = (stdOut.ToString() + stdErr).Trim();
+        return new BuildStatePreflightDiagnostic(
+            ContractName,
+            request.RepositoryRoot,
+            BuildStatePreflightState.BuildFailed,
+            new BuildStatePreflightEvidence(
+                request.RepositoryRoot,
+                string.Join(", ", request.ProjectDiscovery.DiscoveredProjects.Select(p => p.AssemblyName)),
+                BuildCommand: $"dotnet {commandLabel} \"{solutionPath}\"" +
+                    (request.RequestedConfiguration != null ? $" -c {request.RequestedConfiguration}" : string.Empty),
+                Detail: $"`dotnet {commandLabel}` failed with exit code {process.ExitCode}: {combinedOutput}"));
     }
 
     private static void WriteReceiptsForCurrentArtifacts(

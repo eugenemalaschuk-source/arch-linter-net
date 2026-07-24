@@ -191,14 +191,32 @@ public sealed class BuildStatePreflightTests
     }
 
     [Test]
-    public void Evaluate_RequestedTargetFrameworkNotInProject_ReportsWrongTargetFramework()
+    public void Evaluate_RequestedTargetFrameworkNotInProjectButArtifactMissing_ReportsMissingArtifact()
     {
+        // Per the normative precedence order, missing-artifact is checked before
+        // wrong-target-framework — a project with no resolved assembly at all is reported as
+        // missing-artifact even if it also declares an incompatible target framework.
         string projectPath = CreateProjectFixture("Fixture", "class C {}");
         ProjectDiscoveryResult discovery = SingleProjectDiscovery(projectPath, "Fixture", targetFramework: "net10.0");
 
         BuildStatePreflightResult result = BuildStatePreflightEvaluator.Evaluate(new BuildStatePreflightRequest(
             _repoRoot, discovery, new BuildStateResolvedAssemblies(Array.Empty<Assembly>(), new[] { "Fixture" }),
             BuildPreparationMode.Ordinary, RequestedTargetFramework: "net8.0"));
+
+        Assert.That(result.Blocked, Is.True);
+        Assert.That(result.Diagnostics.Single().State, Is.EqualTo(BuildStatePreflightState.MissingArtifact));
+    }
+
+    [Test]
+    public void Evaluate_RequestedTargetFrameworkNotInProjectWithArtifactPresent_ReportsWrongTargetFramework()
+    {
+        string projectPath = CreateProjectFixture("Fixture", "class C {}");
+        string assemblyPath = CreateFakeAssemblyFile("Fixture");
+        ProjectDiscoveryResult discovery = SingleProjectDiscovery(projectPath, "Fixture", targetFramework: "net10.0");
+        BuildStateResolvedAssemblies resolution = SingleAssemblyResolution(assemblyPath);
+
+        BuildStatePreflightResult result = BuildStatePreflightEvaluator.Evaluate(new BuildStatePreflightRequest(
+            _repoRoot, discovery, resolution, BuildPreparationMode.Ordinary, RequestedTargetFramework: "net8.0"));
 
         Assert.That(result.Blocked, Is.True);
         Assert.That(result.Diagnostics.Single().State, Is.EqualTo(BuildStatePreflightState.WrongTargetFramework));
