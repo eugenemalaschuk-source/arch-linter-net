@@ -169,11 +169,15 @@ public sealed class BuildStatePreparationService : IBuildStatePreparationService
             .Where(project => BuildStatePreflightEvaluator.IsRelevantToResolution(project, request.Resolution))
             .ToArray();
 
-        // The pre-build resolution snapshot can be empty-empty (nothing resolved, nothing missing
-        // yet) on a genuinely first-ever build — assembly resolution hasn't had anything to find
-        // or report missing. Relevance can't be determined from that snapshot in that case, so
-        // fall back to the full discovered set rather than building nothing.
-        if (seeds.Length == 0)
+        // Fall back to the full discovered set only when the resolution snapshot itself is
+        // genuinely empty-empty (nothing resolved, nothing reported missing) — the signature of a
+        // first-ever build where assembly resolution hasn't had anything to find or report yet,
+        // so relevance can't be determined from it at all. `seeds.Length == 0` alone is the wrong
+        // condition: a *non-empty* resolution that simply matches none of the discovered projects
+        // (e.g. every discovered project is coverage-only) must NOT fall back to "build
+        // everything" — that would defeat the whole point of scoping the build to relevant
+        // projects and pull irrelevant coverage-only projects back in.
+        if (request.Resolution.ResolvedAssemblies.Count == 0 && request.Resolution.MissingAssemblyNames.Count == 0)
         {
             return request.ProjectDiscovery.DiscoveredProjects;
         }
@@ -278,7 +282,10 @@ public sealed class BuildStatePreparationService : IBuildStatePreparationService
 
     private static bool MatchesRequestedOutputPath(string relativePath, string? configuration, string? targetFramework)
     {
-        string[] segments = relativePath.Split(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+        // Array-form Split (not the two-char params overload) to avoid Sonar S3220: the params
+        // overload partially matches `Split(char separator, int count, StringSplitOptions)`,
+        // which is ambiguous-looking at a glance even though it resolves correctly today.
+        string[] segments = relativePath.Split(new[] { Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar });
 
         // segments: [Configuration, TargetFramework, ..., AssemblyName.dll] for the common
         // non-RID-specific layout; require the leading segments to match when requested.
@@ -358,8 +365,8 @@ public sealed class BuildStatePreparationService : IBuildStatePreparationService
                 // itself isn't framework-scoped anyway; it always resolves for every TFM the
                 // project(s) declare, regardless of which one is later requested for the build.
                 List<string> restoreArguments = new() { "restore", solutionPath, "--nologo", "-m:1" };
-                BuildStatePreflightDiagnostic? restoreFailure =
-                    RunDotnetCommand(request, solutionPath, restoreArguments, "restore");
+                BuildStatePreflightDiagnostic? restoreFailure = RunDotnetCommand(
+                    request, restoreArguments, "restore", BuildStatePreflightState.RestoreFailed);
                 if (restoreFailure != null)
                 {
                     return restoreFailure;
@@ -379,7 +386,7 @@ public sealed class BuildStatePreparationService : IBuildStatePreparationService
             // framework.
             AddFrameworkArgument(arguments, request.RequestedTargetFramework);
 
-            return RunDotnetCommand(request, solutionPath, arguments, "build");
+            return RunDotnetCommand(request, arguments, "build", BuildStatePreflightState.BuildFailed);
         }
         finally
         {
@@ -388,7 +395,7 @@ public sealed class BuildStatePreparationService : IBuildStatePreparationService
     }
 
     private static BuildStatePreflightDiagnostic? RunDotnetCommand(
-        BuildStatePreflightRequest request, string solutionPath, List<string> arguments, string commandLabel)
+        BuildStatePreflightRequest request, List<string> arguments, string commandLabel, BuildStatePreflightState failureState)
     {
         ProcessStartInfo startInfo = new(ResolveDotnetExecutablePath())
         {
@@ -425,17 +432,26 @@ public sealed class BuildStatePreparationService : IBuildStatePreparationService
         }
 
         string combinedOutput = (stdOut.ToString() + stdErr).Trim();
+
+        // Built directly from the same `arguments` list actually passed to ProcessStartInfo,
+        // rather than reconstructed from individual request fields — that reconstruction had
+        // drifted from the real argv (it showed a `-c` for restore, which never receives one, and
+        // omitted `-f`/`--no-restore` for build).
+        string actualCommand = "dotnet " + string.Join(' ', arguments.Select(QuoteIfNeeded));
+
         return new BuildStatePreflightDiagnostic(
             ContractName,
             request.RepositoryRoot,
-            BuildStatePreflightState.BuildFailed,
+            failureState,
             new BuildStatePreflightEvidence(
                 request.RepositoryRoot,
                 string.Join(", ", request.ProjectDiscovery.DiscoveredProjects.Select(p => p.AssemblyName)),
-                BuildCommand: $"dotnet {commandLabel} \"{solutionPath}\"" +
-                    (request.RequestedConfiguration != null ? $" -c {request.RequestedConfiguration}" : string.Empty),
+                BuildCommand: actualCommand,
                 Detail: $"`dotnet {commandLabel}` failed with exit code {process.ExitCode}: {combinedOutput}"));
     }
+
+    private static string QuoteIfNeeded(string argument) =>
+        argument.Contains(' ', StringComparison.Ordinal) ? $"\"{argument}\"" : argument;
 
     private static void WriteReceiptsForCurrentArtifacts(
         BuildStatePreflightRequest request, BuildStatePreflightResult evaluation)

@@ -130,7 +130,7 @@ public static class BuildStateCanonicalHasher
     private static bool IsUnderBuildOutputDirectory(string file, string projectDirectory)
     {
         string relative = Path.GetRelativePath(projectDirectory, file);
-        string[] segments = relative.Split(new[] { Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar });
+        string[] segments = relative.Split(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
         return segments.Length > 0
             && (string.Equals(segments[0], "bin", StringComparison.OrdinalIgnoreCase)
                 || string.Equals(segments[0], "obj", StringComparison.OrdinalIgnoreCase));

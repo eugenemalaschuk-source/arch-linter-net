@@ -121,6 +121,7 @@ public sealed partial class ArchitectureDiagnosticFormatter
         BuildStatePreflightState.UnverifiableArtifact => "unverifiable-artifact",
         BuildStatePreflightState.Current => "current",
         BuildStatePreflightState.BuildFailed => "build-failed",
+        BuildStatePreflightState.RestoreFailed => "restore-failed",
         _ => throw new ArgumentOutOfRangeException(nameof(state), state, null)
     };
 }
