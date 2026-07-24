@@ -349,6 +349,9 @@ public sealed class CliArchitectureTests
                 ClassificationMetadataFailures: Array.Empty<ArchitectureClassificationMetadataFailure>());
         }
 
+        public ArchitectureAnalysisSnapshot CreateSnapshot(AnalysisSnapshotRequest request, ValidationTiming? timing) =>
+            throw new NotSupportedException();
+
         public string FormatResultForCiArtifacts(
             string mode,
             bool passed,

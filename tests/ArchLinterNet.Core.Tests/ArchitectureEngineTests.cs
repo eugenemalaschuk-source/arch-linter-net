@@ -215,6 +215,9 @@ public sealed class ArchitectureEngineTests
                 ClassificationMetadataFailures: Array.Empty<ArchitectureClassificationMetadataFailure>());
         }
 
+        public ArchitectureAnalysisSnapshot CreateSnapshot(AnalysisSnapshotRequest request, ValidationTiming? timing = null) =>
+            throw new NotSupportedException();
+
         public void Dispose()
         {
             WasDisposed = true;
@@ -244,5 +247,8 @@ public sealed class ArchitectureEngineTests
             WasCalled = true;
             return Outcome;
         }
+
+        public ArchitectureAnalysisSnapshot CreateSnapshot(AnalysisSnapshotRequest request, ValidationTiming? timing = null) =>
+            throw new NotSupportedException();
     }
 }

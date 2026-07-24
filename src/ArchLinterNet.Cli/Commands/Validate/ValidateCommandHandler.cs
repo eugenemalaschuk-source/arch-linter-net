@@ -96,9 +96,9 @@ internal sealed class ValidateCommandHandler(ICliRuntime runtime, ICliConsole co
             return CliExitCodes.Success;
         }
 
-        if (options.Mode is not ("strict" or "audit"))
+        if (!TryParseModes(options.Mode, out _, out string? modeError))
         {
-            console.Error.WriteLine($"Invalid mode: {options.Mode}. Use 'strict' or 'audit'.");
+            console.Error.WriteLine(modeError);
             return CliExitCodes.InvalidArgumentsOrRuntimeError;
         }
 
@@ -111,13 +111,54 @@ internal sealed class ValidateCommandHandler(ICliRuntime runtime, ICliConsole co
         return null;
     }
 
+    // "strict,audit" (or any comma-separated combination) is parsed here, ahead of dispatch, so a
+    // single requested mode keeps its exact original single-call path below and only a genuinely
+    // combined request pays for building an ArchitectureAnalysisSnapshot.
+    private static bool TryParseModes(string rawMode, out IReadOnlyList<string> modes, out string? error)
+    {
+        List<string> parsed = rawMode.Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries).ToList();
+        if (parsed.Count == 0 || parsed.Any(mode => mode is not ("strict" or "audit")))
+        {
+            modes = Array.Empty<string>();
+            error = $"Invalid mode: {rawMode}. Use 'strict', 'audit', or a comma-separated combination of both.";
+            return false;
+        }
+
+        modes = parsed;
+        error = null;
+        return true;
+    }
+
     private int ExecuteValidation(ValidateCommandOptions options)
     {
+        TryParseModes(options.Mode, out IReadOnlyList<string> modes, out _);
+
+        return modes.Count == 1
+            ? ExecuteSingleMode(options, modes[0])
+            : ExecuteCombinedModes(options, modes);
+    }
+
+    private int ExecuteSingleMode(ValidateCommandOptions options, string mode)
+    {
         ValidationTiming? timing = options.TimingsEnabled ? new ValidationTiming() : null;
-        ValidationRequest request = new()
+        ValidationRequest request = BuildValidationRequest(options, mode);
+
+        ValidationOutcome outcome = runtime.Validate(request, timing);
+        WriteOutcome(options with { Mode = mode }, outcome);
+        timing?.WriteReport(console.Error);
+        return outcome.Passed ? CliExitCodes.Success : CliExitCodes.ValidationFailure;
+    }
+
+    // One ArchitectureAnalysisSnapshot serves every requested mode: policy composition, project
+    // discovery, and assembly loading happen once (inside runtime.CreateSnapshot), and each
+    // requested mode is evaluated against that same snapshot — see issue #363 /
+    // openspec/specs/analysis-snapshot/spec.md.
+    private int ExecuteCombinedModes(ValidateCommandOptions options, IReadOnlyList<string> modes)
+    {
+        ValidationTiming? timing = options.TimingsEnabled ? new ValidationTiming() : null;
+        AnalysisSnapshotRequest snapshotRequest = new()
         {
             PolicyPath = options.PolicyPath,
-            Mode = options.Mode,
             ConditionSetName = options.ConditionSetName,
             ContractIds = options.ContractIds.ToList(),
             BaselinePath = options.BaselinePath,
@@ -128,10 +169,35 @@ internal sealed class ValidateCommandHandler(ICliRuntime runtime, ICliConsole co
             RequestedTargetFramework = options.TargetFramework,
         };
 
-        ValidationOutcome outcome = runtime.Validate(request, timing);
-        WriteOutcome(options, outcome);
+        using ArchitectureAnalysisSnapshot snapshot = runtime.CreateSnapshot(snapshotRequest, timing);
+
+        bool allPassed = true;
+        foreach (string mode in modes)
+        {
+            ValidationOutcome outcome = snapshot.Evaluate(mode, timing);
+            WriteOutcome(options with { Mode = mode }, outcome);
+            allPassed &= outcome.Passed;
+        }
+
         timing?.WriteReport(console.Error);
-        return outcome.Passed ? CliExitCodes.Success : CliExitCodes.ValidationFailure;
+        return allPassed ? CliExitCodes.Success : CliExitCodes.ValidationFailure;
+    }
+
+    private static ValidationRequest BuildValidationRequest(ValidateCommandOptions options, string mode)
+    {
+        return new ValidationRequest
+        {
+            PolicyPath = options.PolicyPath,
+            Mode = mode,
+            ConditionSetName = options.ConditionSetName,
+            ContractIds = options.ContractIds.ToList(),
+            BaselinePath = options.BaselinePath,
+            EnforceUnmatchedIgnoredViolationsPolicy = true,
+            PreparationMode = options.EnsureBuilt ? BuildPreparationMode.EnsureBuilt : BuildPreparationMode.Ordinary,
+            NoRestore = options.NoRestore,
+            RequestedConfiguration = options.Configuration,
+            RequestedTargetFramework = options.TargetFramework,
+        };
     }
 
     private void WriteOutcome(ValidateCommandOptions options, ValidationOutcome outcome)

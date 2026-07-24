@@ -259,6 +259,41 @@ public partial class CliIntegrationTests
         Assert.That(auditExit, Is.EqualTo(modeExit));
     }
 
+    /* --mode strict,audit (issue #363: one snapshot serves every requested mode) */
+
+    [Test]
+    public void CombinedMode_ExitsZeroWhenBothModesPass()
+    {
+        var (exitCode, stdout, stderr) = RunCli("--policy", _passingPolicy, "--mode", "strict,audit");
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(exitCode, Is.EqualTo(0), $"stderr: {stderr}");
+            Assert.That(stdout, Does.Contain("passed"));
+        });
+    }
+
+    [Test]
+    public void CombinedMode_FailsWhenEitherRequestedModeFails()
+    {
+        var (combinedExit, _, _) = RunCli("--policy", _failingPolicy, "--mode", "strict,audit");
+        var (strictExit, _, _) = RunCli("--policy", _failingPolicy, "--mode", "strict");
+
+        Assert.That(combinedExit, Is.EqualTo(strictExit).And.Not.EqualTo(0));
+    }
+
+    [Test]
+    public void CombinedMode_InvalidModeInList_ReportsError()
+    {
+        var (exitCode, _, stderr) = RunCli("--policy", _passingPolicy, "--mode", "strict,bogus");
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(exitCode, Is.Not.EqualTo(0));
+            Assert.That(stderr, Does.Contain("Invalid mode"));
+        });
+    }
+
     [Test]
     public void ValidateModeFlags_RespectLeftToRightPrecedence()
     {
