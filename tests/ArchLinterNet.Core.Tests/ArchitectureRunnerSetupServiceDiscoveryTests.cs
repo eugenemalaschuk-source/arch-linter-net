@@ -125,8 +125,13 @@ public sealed class ArchitectureRunnerSetupServiceDiscoveryTests
     }
 
     [Test]
-    public void BuildRunner_NoTargetAssembliesAndDiscoveryYieldsNothing_ThrowsWithDiagnosticDetails()
+    public void BuildRunner_NoTargetAssembliesAndDiscoveredProjectHasNoOutput_ReportsItMissingInsteadOfThrowing()
     {
+        // A real project was discovered (analysis.projects) — it just has no build output. Build-
+        // state preflight (see #362) now needs this reported as missing so it can emit a typed
+        // diagnostic, instead of BuildRunner throwing an untyped configuration error here. The
+        // generic "define analysis.target_assemblies" error is now reserved for when discovery
+        // found no projects at all — see BuildRunner_NoTargetAssembliesAndNoProjectsDiscovered_Throws.
         string projectDir = Path.Combine(_repoRoot, "_noOutput");
         Directory.CreateDirectory(projectDir);
         File.WriteAllText(Path.Combine(projectDir, "_noOutput.csproj"), """
@@ -147,11 +152,30 @@ public sealed class ArchitectureRunnerSetupServiceDiscoveryTests
             }
         };
 
+        ArchitectureRunnerSetup setup = _runnerSetupService.BuildRunner(document, _policyPath);
+
+        Assert.That(setup.Runner.Session.Context.MissingAssemblyNames, Does.Contain("_noOutput"));
+    }
+
+    [Test]
+    public void BuildRunner_NoTargetAssembliesAndNoProjectsDiscovered_Throws()
+    {
+        // No target_assemblies and no discovered projects at all — genuinely nothing identifies
+        // what should be validated, so this remains a thrown configuration error.
+        var document = new ArchitectureContractDocument
+        {
+            Version = 1,
+            Name = "Test",
+            Analysis = new ArchitectureAnalysisConfiguration
+            {
+                Projects = new List<string> { Path.Combine(_repoRoot, "does-not-exist.csproj") }
+            }
+        };
+
         InvalidOperationException? exception = Assert.Throws<InvalidOperationException>(
             () => _runnerSetupService.BuildRunner(document, _policyPath));
 
         Assert.That(exception!.Message, Does.Contain("analysis.target_assemblies"));
-        Assert.That(exception.Message, Does.Contain("_noOutput"));
     }
 
     [Test]

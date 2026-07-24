@@ -161,15 +161,15 @@ PE metadata contributes assembly name, target-framework attribute, references, M
 Primary state precedence:
 
 1. `cancelled`
-2. prerequisite failure / `restore-required`
-3. `missing-artifact`
-4. `wrong-configuration`
-5. `wrong-target-framework`
-6. `wrong-project-output`
-7. `inconsistent-dependency-artifact`
-8. `stale-artifact`
-9. `unverifiable-artifact`
-10. `current`
+1. prerequisite failure / `restore-required`
+1. `missing-artifact`
+1. `wrong-configuration`
+1. `wrong-target-framework`
+1. `wrong-project-output`
+1. `inconsistent-dependency-artifact`
+1. `stale-artifact`
+1. `unverifiable-artifact`
+1. `current`
 
 The complete graph is checked before any contract executes. A project may carry secondary evidence, but exactly one stable primary state is emitted.
 
@@ -180,13 +180,13 @@ Ordinary validation may evaluate, hash, inspect prerequisites, and verify. It ma
 Ensure-built is explicit and must:
 
 1. evaluate the selected graph;
-2. construct a supported executable + argv invocation;
-3. build the graph once rather than per contract;
-4. preserve `--no-restore` when requested;
-5. stop distinctly on restore/build/cancellation failure;
-6. emit or obtain authoritative build attestation;
-7. re-evaluate and re-verify post-build;
-8. create the immutable snapshot only from verified post-build artifacts.
+1. construct a supported executable + argv invocation;
+1. build the graph once rather than per contract;
+1. preserve `--no-restore` when requested;
+1. stop distinctly on restore/build/cancellation failure;
+1. emit or obtain authoritative build attestation;
+1. re-evaluate and re-verify post-build;
+1. create the immutable snapshot only from verified post-build artifacts.
 
 An optional caller hook may be accepted only from trusted CLI/application configuration as executable + argv. Never use a shell command string. Never read executable/argument data from policy, imports, baseline, snapshot, receipt, or cache content.
 

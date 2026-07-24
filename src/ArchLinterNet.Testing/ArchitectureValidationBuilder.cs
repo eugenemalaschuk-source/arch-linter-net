@@ -1,3 +1,4 @@
+using ArchLinterNet.Core.BuildState;
 using ArchLinterNet.Core.Composition;
 using ArchLinterNet.Core.Reporting;
 using ArchLinterNet.Core.Validation;
@@ -15,6 +16,10 @@ public sealed class ArchitectureValidationBuilder
     private string? _baselinePath;
     private bool _enforceUnmatchedIgnoredViolationsPolicy;
     private bool _collectTimings;
+    private BuildPreparationMode _preparationMode = BuildPreparationMode.Ordinary;
+    private bool _noRestore;
+    private string? _requestedConfiguration;
+    private string? _requestedTargetFramework;
 
     public ArchitectureValidationBuilder(string policyPath)
     {
@@ -56,6 +61,20 @@ public sealed class ArchitectureValidationBuilder
         return this;
     }
 
+    public ArchitectureValidationBuilder WithEnsureBuilt(string? configuration = null, string? targetFramework = null)
+    {
+        _preparationMode = BuildPreparationMode.EnsureBuilt;
+        _requestedConfiguration = configuration;
+        _requestedTargetFramework = targetFramework;
+        return this;
+    }
+
+    public ArchitectureValidationBuilder WithNoRestore()
+    {
+        _noRestore = true;
+        return this;
+    }
+
     public ArchitectureValidationResult ValidateStrict()
     {
         return Validate(mode: "strict");
@@ -76,6 +95,10 @@ public sealed class ArchitectureValidationBuilder
             ContractIds = _contractIds,
             BaselinePath = _baselinePath,
             EnforceUnmatchedIgnoredViolationsPolicy = _enforceUnmatchedIgnoredViolationsPolicy,
+            PreparationMode = _preparationMode,
+            NoRestore = _noRestore,
+            RequestedConfiguration = _requestedConfiguration,
+            RequestedTargetFramework = _requestedTargetFramework,
         };
 
         ValidationTiming? timing = _collectTimings ? new ValidationTiming() : null;
@@ -94,7 +117,9 @@ public sealed class ArchitectureValidationBuilder
             outcome.CoverageSummaries,
             timing)
         {
-            CycleFindings = outcome.CycleFindings
+            CycleFindings = outcome.CycleFindings,
+            PreflightDiagnostics = outcome.PreflightDiagnostics,
+            PreflightBlocked = outcome.PreflightBlocked
         });
     }
 }

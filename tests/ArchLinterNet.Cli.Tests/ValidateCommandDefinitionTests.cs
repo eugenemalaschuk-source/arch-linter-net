@@ -2,6 +2,7 @@ using System.CommandLine;
 using System.Text;
 using ArchLinterNet.Cli.Abstractions;
 using ArchLinterNet.Cli.Commands.Validate;
+using ArchLinterNet.Core.BuildState;
 using ArchLinterNet.Core.Graph;
 using ArchLinterNet.Core.Model;
 using ArchLinterNet.Core.Reporting;
@@ -82,6 +83,31 @@ public sealed class ValidateCommandDefinitionTests
         Assert.That(runtime.LastRequest.ContractIds, Is.EquivalentTo(_ruleAandB));
         Assert.That(runtime.LastRequest.ConditionSetName, Is.EqualTo("ci"));
         Assert.That(runtime.LastRequest.BaselinePath, Is.EqualTo("baseline.yml"));
+    }
+
+    [Test]
+    public void CreateRootCommand_EnsureBuiltAndNoRestoreOptions_ArePropagated()
+    {
+        (RecordingRuntime runtime, _) = Run([
+            "--ensure-built",
+            "--no-restore",
+            "--configuration", "Release",
+            "--framework", "net10.0",
+        ]);
+
+        Assert.That(runtime.LastRequest!.PreparationMode, Is.EqualTo(BuildPreparationMode.EnsureBuilt));
+        Assert.That(runtime.LastRequest.NoRestore, Is.True);
+        Assert.That(runtime.LastRequest.RequestedConfiguration, Is.EqualTo("Release"));
+        Assert.That(runtime.LastRequest.RequestedTargetFramework, Is.EqualTo("net10.0"));
+    }
+
+    [Test]
+    public void CreateRootCommand_WithoutEnsureBuiltOrNoRestore_DefaultsToOrdinary()
+    {
+        (RecordingRuntime runtime, _) = Run([]);
+
+        Assert.That(runtime.LastRequest!.PreparationMode, Is.EqualTo(BuildPreparationMode.Ordinary));
+        Assert.That(runtime.LastRequest.NoRestore, Is.False);
     }
 
     [Test]
@@ -166,9 +192,12 @@ public sealed class ValidateCommandDefinitionTests
             IReadOnlyCollection<ArchitectureClassificationConflict> classificationConflicts,
             IReadOnlyCollection<ArchitectureClassificationMetadataFailure> classificationMetadataFailures,
             IReadOnlyCollection<ArchitectureClassificationRoleFact> classificationRoles,
-            ArchitectureClassificationPathDeferredNotice? classificationPathDeferred) => "formatted";
+            ArchitectureClassificationPathDeferredNotice? classificationPathDeferred,
+            IReadOnlyCollection<BuildStatePreflightDiagnostic> preflightDiagnostics) => "formatted";
 
-        public string FormatResultAsSarif(string mode, IReadOnlyCollection<ArchitectureViolation> violations, IReadOnlyCollection<string> cycles, IReadOnlyCollection<ArchitectureCycleFinding> cycleFindings) => "formatted";
+        public string FormatBuildStatePreflightForHumans(IReadOnlyCollection<BuildStatePreflightDiagnostic> diagnostics) => "formatted";
+
+        public string FormatResultAsSarif(string mode, IReadOnlyCollection<ArchitectureViolation> violations, IReadOnlyCollection<string> cycles, IReadOnlyCollection<ArchitectureCycleFinding> cycleFindings, IReadOnlyCollection<BuildStatePreflightDiagnostic> preflightDiagnostics) => "formatted";
         public string FormatViolationsForHumans(IReadOnlyCollection<ArchitectureViolation> violations) => "formatted";
         public string FormatCyclesForHumans(IReadOnlyCollection<string> cycles, IReadOnlyCollection<ArchitectureCycleFinding> cycleFindings) => "formatted";
         public string FormatPolicyConsistencyForHumans(IReadOnlyCollection<PolicyConsistencyDiagnostic> diagnostics) => "formatted";

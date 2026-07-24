@@ -62,6 +62,22 @@ public sealed class ArchitectureAssemblyResolutionService : IArchitectureAssembl
         if (resolveAssemblyOutputs && document.Analysis.TargetAssemblies.Count == 0
             && discovery.Diagnostics.Count > 0 && !projectCoverageCanReportUnresolvedProjects)
         {
+            // A real project graph was discovered (analysis.projects), it just didn't resolve to
+            // build output — report those assembly names as missing rather than throwing an
+            // untyped configuration error. This lets build-state preflight (see #362) produce a
+            // typed missing/stale-artifact diagnostic for a clean checkout even when no project-
+            // scope coverage contract is active to make resolution tolerant of it. Only throw the
+            // generic misconfiguration error when discovery found no projects at all — there is
+            // genuinely nothing to identify what should be validated in that case.
+            if (discovery.DiscoveredProjects.Count > 0)
+            {
+                string[] discoveredAssemblyNames = discovery.DiscoveredProjects
+                    .Select(project => project.AssemblyName)
+                    .Distinct(StringComparer.Ordinal)
+                    .ToArray();
+                return new ResolutionResult(Array.Empty<Assembly>(), discoveredAssemblyNames, Array.Empty<string>());
+            }
+
             string details = string.Join("; ", discovery.Diagnostics.Select(d => d.Message));
             throw new InvalidOperationException(
                 $"Architecture YAML must define analysis.target_assemblies. Project discovery did not resolve any assemblies: {details}");

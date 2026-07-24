@@ -1,3 +1,4 @@
+using ArchLinterNet.Core.BuildState;
 using ArchLinterNet.Core.Model;
 using ArchLinterNet.Core.Reporting;
 
@@ -19,6 +20,8 @@ public sealed class ArchitectureValidationResult
     public string UnmatchedIgnoredViolationsConfig { get; }
     public IReadOnlyCollection<ArchitectureCoverageSummary> CoverageSummaries { get; }
     public ValidationTiming? Timing { get; }
+    public IReadOnlyCollection<BuildStatePreflightDiagnostic> PreflightDiagnostics { get; }
+    public bool PreflightBlocked { get; }
 
     public ArchitectureValidationResult(ArchitectureValidationResultParams @params)
     {
@@ -34,6 +37,8 @@ public sealed class ArchitectureValidationResult
         UnmatchedIgnoredViolationsConfig = @params.UnmatchedIgnoredViolationsConfig;
         CoverageSummaries = @params.CoverageSummaries ?? Array.Empty<ArchitectureCoverageSummary>();
         Timing = @params.Timing;
+        PreflightDiagnostics = @params.PreflightDiagnostics ?? Array.Empty<BuildStatePreflightDiagnostic>();
+        PreflightBlocked = @params.PreflightBlocked;
     }
 
     public void ShouldPass()
@@ -49,6 +54,10 @@ public sealed class ArchitectureValidationResult
     private string BuildFailureMessage()
     {
         string message = $"Architecture validation failed.{Environment.NewLine}";
+
+        message += FormatFailureSection(
+            null,
+            PreflightDiagnostics.Count > 0 ? _formatter.FormatBuildStatePreflightForHumans(PreflightDiagnostics) : string.Empty);
 
         message += FormatFailureSection(
             "Violations:", Violations.Count > 0 ? _formatter.FormatViolationsForHumans(Violations) : string.Empty);
@@ -112,4 +121,6 @@ public sealed record ArchitectureValidationResultParams(
     ValidationTiming? Timing = null)
 {
     public IReadOnlyCollection<ArchitectureCycleFinding>? CycleFindings { get; init; }
+    public IReadOnlyCollection<BuildStatePreflightDiagnostic>? PreflightDiagnostics { get; init; }
+    public bool PreflightBlocked { get; init; }
 }

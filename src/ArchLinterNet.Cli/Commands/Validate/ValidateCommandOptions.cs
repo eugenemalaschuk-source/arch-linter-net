@@ -9,4 +9,8 @@ internal sealed record ValidateCommandOptions(
     bool TimingsEnabled,
     string? BaselinePath,
     bool ShowHelp,
-    bool ShowVersion);
+    bool ShowVersion,
+    bool EnsureBuilt = false,
+    bool NoRestore = false,
+    string? Configuration = null,
+    string? TargetFramework = null);
