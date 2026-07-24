@@ -354,17 +354,20 @@ public sealed class BuildStatePreparationService : IBuildStatePreparationService
             // obj/*.nuget.g.props file and failing with "file already exists".
             if (!request.NoRestore)
             {
-                // -m:1 disables MSBuild's parallel build nodes for this restore. Parallel nodes
-                // each restoring a different solution-listed project can still race on a project
-                // that's *also* reached transitively via another entry's ProjectReference (e.g. a
-                // referenced library listed both as its own solution entry and pulled in by the
-                // app that references it), writing the same obj/*.nuget.g.props file concurrently.
+                // --disable-parallel turns off NuGet's own internal per-project restore
+                // parallelism — the actual source of the race, independent of MSBuild's build-node
+                // count. -m:1 alone (limiting MSBuild nodes) was not sufficient: `dotnet restore`
+                // still restored a project reachable both as its own solution entry and
+                // transitively via another entry's ProjectReference concurrently on separate NuGet
+                // restore tasks, racing to write the same obj/*.nuget.g.props file. Keep -m:1 too,
+                // since it costs nothing here and removes MSBuild-node parallelism as a variable.
                 // No -f/--framework here: for `dotnet restore`, -f means --force (re-evaluate all
                 // dependencies), not framework selection — passing a TFM value would be
                 // misinterpreted as a stray positional argument and fail the restore. Restore
                 // itself isn't framework-scoped anyway; it always resolves for every TFM the
                 // project(s) declare, regardless of which one is later requested for the build.
-                List<string> restoreArguments = new() { "restore", solutionPath, "--nologo", "-m:1" };
+                List<string> restoreArguments =
+                    new() { "restore", solutionPath, "--nologo", "-m:1", "--disable-parallel" };
                 BuildStatePreflightDiagnostic? restoreFailure = RunDotnetCommand(
                     request, restoreArguments, "restore", BuildStatePreflightState.RestoreFailed);
                 if (restoreFailure != null)
