@@ -1,3 +1,4 @@
+using ArchLinterNet.Core.BuildState;
 using ArchLinterNet.Core.Graph;
 using ArchLinterNet.Core.Model;
 using ArchLinterNet.Core.Reporting;
@@ -26,13 +27,15 @@ internal interface ICliRuntime
         IReadOnlyCollection<ArchitectureClassificationConflict> classificationConflicts,
         IReadOnlyCollection<ArchitectureClassificationMetadataFailure> classificationMetadataFailures,
         IReadOnlyCollection<ArchitectureClassificationRoleFact> classificationRoles,
-        ArchitectureClassificationPathDeferredNotice? classificationPathDeferred);
+        ArchitectureClassificationPathDeferredNotice? classificationPathDeferred,
+        IReadOnlyCollection<BuildStatePreflightDiagnostic> preflightDiagnostics);
 
     string FormatResultAsSarif(
         string mode,
         IReadOnlyCollection<ArchitectureViolation> violations,
         IReadOnlyCollection<string> cycles,
-        IReadOnlyCollection<ArchitectureCycleFinding> cycleFindings);
+        IReadOnlyCollection<ArchitectureCycleFinding> cycleFindings,
+        IReadOnlyCollection<BuildStatePreflightDiagnostic> preflightDiagnostics);
 
     string FormatViolationsForHumans(IReadOnlyCollection<ArchitectureViolation> violations);
 
@@ -52,6 +55,8 @@ internal interface ICliRuntime
         IReadOnlyCollection<ArchitectureClassificationConflict> conflicts,
         IReadOnlyCollection<ArchitectureClassificationMetadataFailure> metadataFailures,
         ArchitectureClassificationPathDeferredNotice? classificationPathDeferred);
+
+    string FormatBuildStatePreflightForHumans(IReadOnlyCollection<BuildStatePreflightDiagnostic> diagnostics);
 
     BaselineGenerationOutcome GenerateBaseline(BaselineGenerationRequest request);
 

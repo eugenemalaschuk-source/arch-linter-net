@@ -22,5 +22,6 @@ public enum ArchitectureDiagnosticKind
     LayoutConvention,
     PackageAllowOnly,
     FrameworkReference,
-    FrameworkReferenceAllowOnly
+    FrameworkReferenceAllowOnly,
+    BuildStatePreflight
 }
