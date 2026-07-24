@@ -44,14 +44,13 @@ public sealed class BuildStatePreparationService : IBuildStatePreparationService
     // obj/project.assets.json is the same signal `dotnet build --no-restore` itself relies on.
     private static BuildStatePreflightResult CheckRestorePrerequisites(BuildStatePreflightRequest request)
     {
+        // Must match the same project set `--ensure-built` would actually build (relevant
+        // projects plus their transitive ProjectReference closure, not just the relevant seeds) —
+        // otherwise a missing restore on a transitively-referenced library surfaces late as a
+        // generic build-failed instead of this typed restore-required diagnostic.
         List<BuildStatePreflightDiagnostic> blocking = new();
-        foreach (ArchitectureDiscoveredProject project in request.ProjectDiscovery.DiscoveredProjects)
+        foreach (ArchitectureDiscoveredProject project in SelectRelevantProjectsWithTransitiveReferences(request))
         {
-            if (!BuildStatePreflightEvaluator.IsRelevantToResolution(project, request.Resolution))
-            {
-                continue;
-            }
-
             string? projectDirectory = Path.GetDirectoryName(
                 BuildStatePathResolution.ResolveAbsoluteProjectPath(request.RepositoryRoot, project.Path));
             string assetsPath = projectDirectory == null
@@ -211,7 +210,12 @@ public sealed class BuildStatePreparationService : IBuildStatePreparationService
         List<Assembly> resolved = new();
         List<string> missing = new();
 
-        foreach (ArchitectureDiscoveredProject project in request.ProjectDiscovery.DiscoveredProjects)
+        // Only the same set that was actually built (relevant + transitive closure) — a
+        // coverage-only project deliberately excluded from the .slnx build was never going to
+        // have build output, and re-adding it to MissingAssemblyNames here would make the
+        // evaluator treat it as relevant again (IsRelevantToResolution) and block the whole
+        // otherwise-successful build with missing-artifact.
+        foreach (ArchitectureDiscoveredProject project in SelectRelevantProjectsWithTransitiveReferences(request))
         {
             string? projectDirectory = Path.GetDirectoryName(
                 BuildStatePathResolution.ResolveAbsoluteProjectPath(request.RepositoryRoot, project.Path));
@@ -348,8 +352,12 @@ public sealed class BuildStatePreparationService : IBuildStatePreparationService
                 // that's *also* reached transitively via another entry's ProjectReference (e.g. a
                 // referenced library listed both as its own solution entry and pulled in by the
                 // app that references it), writing the same obj/*.nuget.g.props file concurrently.
+                // No -f/--framework here: for `dotnet restore`, -f means --force (re-evaluate all
+                // dependencies), not framework selection — passing a TFM value would be
+                // misinterpreted as a stray positional argument and fail the restore. Restore
+                // itself isn't framework-scoped anyway; it always resolves for every TFM the
+                // project(s) declare, regardless of which one is later requested for the build.
                 List<string> restoreArguments = new() { "restore", solutionPath, "--nologo", "-m:1" };
-                AddFrameworkArgument(restoreArguments, request.RequestedTargetFramework);
                 BuildStatePreflightDiagnostic? restoreFailure =
                     RunDotnetCommand(request, solutionPath, restoreArguments, "restore");
                 if (restoreFailure != null)
