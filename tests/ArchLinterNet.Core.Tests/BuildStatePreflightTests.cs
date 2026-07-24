@@ -224,6 +224,48 @@ public sealed class BuildStatePreflightTests
     }
 
     [Test]
+    public void Evaluate_ReceiptProjectPathMismatchesProject_ReportsWrongProjectOutput()
+    {
+        // Matching AssemblyName alone is not enough to prove a receipt belongs to this project —
+        // two different projects could share a simple assembly name, or a receipt could be
+        // stale/misplaced from another location. ProjectPath must match too.
+        string projectPath = CreateProjectFixture("Fixture", "class C {}");
+        string assemblyPath = CreateFakeAssemblyFile("Fixture");
+        BuildReceiptStore.Write(assemblyPath, new BuildReceiptV1(
+            "src/SomewhereElse/Fixture.csproj", "Fixture", "Debug", "net10.0", "irrelevant",
+            BuildStateCanonicalHasher.ComputeContentDigest(assemblyPath)));
+
+        ProjectDiscoveryResult discovery = SingleProjectDiscovery(projectPath, "Fixture");
+        BuildStateResolvedAssemblies resolution = SingleAssemblyResolution(assemblyPath);
+
+        BuildStatePreflightResult result = BuildStatePreflightEvaluator.Evaluate(new BuildStatePreflightRequest(
+            _repoRoot, discovery, resolution, BuildPreparationMode.Ordinary));
+
+        Assert.That(result.Blocked, Is.True);
+        Assert.That(result.Diagnostics.Single().State, Is.EqualTo(BuildStatePreflightState.WrongProjectOutput));
+    }
+
+    [Test]
+    public void Evaluate_ReceiptMissingConfigurationWhenRequested_ReportsWrongConfigurationNotWildcardMatch()
+    {
+        string projectPath = CreateProjectFixture("Fixture", "class C {}");
+        string assemblyPath = CreateFakeAssemblyFile("Fixture");
+        string fingerprint = BuildStateCanonicalHasher.ComputeBuildInputFingerprint(projectPath, _repoRoot);
+        BuildReceiptStore.Write(assemblyPath, new BuildReceiptV1(
+            projectPath, "Fixture", Configuration: null, TargetFramework: null, fingerprint,
+            BuildStateCanonicalHasher.ComputeContentDigest(assemblyPath)));
+
+        ProjectDiscoveryResult discovery = SingleProjectDiscovery(projectPath, "Fixture");
+        BuildStateResolvedAssemblies resolution = SingleAssemblyResolution(assemblyPath);
+
+        BuildStatePreflightResult result = BuildStatePreflightEvaluator.Evaluate(new BuildStatePreflightRequest(
+            _repoRoot, discovery, resolution, BuildPreparationMode.Ordinary, RequestedConfiguration: "Release"));
+
+        Assert.That(result.Blocked, Is.True);
+        Assert.That(result.Diagnostics.Single().State, Is.EqualTo(BuildStatePreflightState.WrongConfiguration));
+    }
+
+    [Test]
     public void Evaluate_CancellationRequested_ReportsCancelled()
     {
         string projectPath = CreateProjectFixture("Fixture", "class C {}");
@@ -302,7 +344,7 @@ public sealed class BuildStatePreflightTests
         string projectPath = CreateProjectFixture("Fixture", "class C {}");
         string objDirectory = Path.Combine(Path.GetDirectoryName(projectPath)!, "obj");
         Directory.CreateDirectory(objDirectory);
-        File.WriteAllText(Path.Combine(objDirectory, "project.assets.json"), "{}");
+        File.WriteAllText(Path.Combine(objDirectory, "project.assets.json"), """{"targets":{"net10.0":{}}}""");
 
         ProjectDiscoveryResult discovery = SingleProjectDiscovery(projectPath, "Fixture");
         BuildStateResolvedAssemblies resolution = new(Array.Empty<Assembly>(), new[] { "Fixture" });
@@ -314,6 +356,27 @@ public sealed class BuildStatePreflightTests
         // Restore prerequisites are satisfied, so preflight falls through to the ordinary
         // evaluator — the assembly is still missing, but for a different, more specific reason.
         Assert.That(result.Diagnostics.Single().State, Is.EqualTo(BuildStatePreflightState.MissingArtifact));
+    }
+
+    [Test]
+    public void Prepare_NoRestoreWithTriviallyEmptyAssetsFile_ReportsRestoreRequired()
+    {
+        // A real `dotnet restore` never produces a bare `{}` — an assets file with no "targets"
+        // object is not evidence of a completed restore and must not be accepted as one.
+        string projectPath = CreateProjectFixture("Fixture", "class C {}");
+        string objDirectory = Path.Combine(Path.GetDirectoryName(projectPath)!, "obj");
+        Directory.CreateDirectory(objDirectory);
+        File.WriteAllText(Path.Combine(objDirectory, "project.assets.json"), "{}");
+
+        ProjectDiscoveryResult discovery = SingleProjectDiscovery(projectPath, "Fixture");
+        BuildStateResolvedAssemblies resolution = new(Array.Empty<Assembly>(), new[] { "Fixture" });
+
+        var service = new BuildStatePreparationService();
+        BuildStatePreflightResult result = service.Prepare(new BuildStatePreflightRequest(
+            _repoRoot, discovery, resolution, BuildPreparationMode.Ordinary, NoRestore: true));
+
+        Assert.That(result.Blocked, Is.True);
+        Assert.That(result.Diagnostics.Single().State, Is.EqualTo(BuildStatePreflightState.RestoreRequired));
     }
 
     [Test]
@@ -329,7 +392,8 @@ public sealed class BuildStatePreflightTests
             _repoRoot, discovery, new BuildStateResolvedAssemblies(Array.Empty<Assembly>(), Array.Empty<string>()),
             BuildPreparationMode.EnsureBuilt, RequestedConfiguration: "Debug"));
 
-        Assert.That(result.Blocked, Is.False, () => string.Join("; ", result.Diagnostics.Select(d => d.Evidence.Detail)));
+        Assert.That(result.Blocked, Is.False,
+            () => string.Join(" | ", result.Diagnostics.Select(d => $"{d.State}: {d.Evidence.Detail}")));
         Assert.That(result.Diagnostics.Single().State, Is.EqualTo(BuildStatePreflightState.Current));
 
         string assemblyPath = Path.Combine(
@@ -351,53 +415,62 @@ public sealed class BuildStatePreflightTests
     }
 
     [Test]
-    public void SelectGraphRoots_AppReferencesLib_OnlyAppIsRoot()
+    [Category("Integration")]
+    [CancelAfter(180_000)]
+    public void Prepare_EnsureBuilt_MultiProjectGraphWithReference_BuildsBothViaSingleSolutionInvocation()
     {
-        // Mirrors the real repository-relative form ArchitectureProjectDiscoveryService produces
-        // for both a project's own .Path and its ProjectReferences' .Path (see
-        // ArchitectureProjectDiscoveryService.BuildDiscoveredProject / GetRelativePath) — both are
-        // relative to the repository root with forward slashes, not filesystem paths relative to
-        // the referencing project's own directory.
-        ArchitectureDiscoveredProject lib = new("src/Lib/Lib.csproj", "Lib", new[] { "net10.0" });
-        ArchitectureDiscoveredProject app = new("src/App/App.csproj", "App", new[] { "net10.0" })
+        // EnsureBuilt now builds the whole selected graph via one generated temporary .slnx
+        // solution and a single `dotnet build` invocation, instead of looping per discovered
+        // project — this proves App (which references Lib) and Lib both come out Current from
+        // that one build, including the shared/referenced project.
+        string libPath = CreateRealBuildableProjectFixture("GraphLib");
+        string appDir = Path.Combine(_repoRoot, "src", "GraphApp");
+        Directory.CreateDirectory(appDir);
+        string appPath = Path.Combine(appDir, "GraphApp.csproj");
+        File.WriteAllText(appPath, "<Project Sdk=\"Microsoft.NET.Sdk\"><PropertyGroup>" +
+            "<TargetFramework>net10.0</TargetFramework><OutputType>Exe</OutputType>" +
+            "</PropertyGroup><ItemGroup><ProjectReference Include=\"../GraphLib/GraphLib.csproj\" /></ItemGroup></Project>");
+        File.WriteAllText(Path.Combine(appDir, "Program.cs"), "System.Console.WriteLine(typeof(EnsureBuiltFixture.C));");
+
+        ArchitectureDiscoveredProject libProject = new(
+            Path.GetRelativePath(_repoRoot, libPath).Replace('\\', '/'), "GraphLib", new[] { "net10.0" });
+        ArchitectureDiscoveredProject appProject = new(
+            Path.GetRelativePath(_repoRoot, appPath).Replace('\\', '/'), "GraphApp", new[] { "net10.0" })
         {
-            ProjectReferences = new[] { new ArchitectureDiscoveredProjectReference("src/Lib/Lib.csproj", "src/App/App.csproj") }
+            ProjectReferences = new[]
+            {
+                new ArchitectureDiscoveredProjectReference(libProject.Path, Path.GetRelativePath(_repoRoot, appPath).Replace('\\', '/'))
+            }
         };
 
         ProjectDiscoveryResult discovery = new(
-            new[] { "App", "Lib" }, Array.Empty<string>(), Array.Empty<string>(),
+            new[] { "GraphApp", "GraphLib" }, Array.Empty<string>(), Array.Empty<string>(),
             Array.Empty<ArchitectureProjectDiscoveryDiagnostic>())
         {
-            DiscoveredProjects = new[] { app, lib }
+            DiscoveredProjects = new[] { appProject, libProject }
         };
 
-        IReadOnlyList<ArchitectureDiscoveredProject> roots = BuildStatePreparationService.SelectGraphRoots(discovery);
+        var service = new BuildStatePreparationService();
+        BuildStatePreflightResult result = service.Prepare(new BuildStatePreflightRequest(
+            _repoRoot, discovery, new BuildStateResolvedAssemblies(Array.Empty<Assembly>(), Array.Empty<string>()),
+            BuildPreparationMode.EnsureBuilt, RequestedConfiguration: "Debug"));
 
-        Assert.That(roots, Has.Count.EqualTo(1));
-        Assert.That(roots.Single().Path, Is.EqualTo("src/App/App.csproj"));
-    }
-
-    [Test]
-    public void SelectGraphRoots_NoProjectIsReferenced_AllAreRoots()
-    {
-        ArchitectureDiscoveredProject a = new("src/A/A.csproj", "A", new[] { "net10.0" });
-        ArchitectureDiscoveredProject b = new("src/B/B.csproj", "B", new[] { "net10.0" });
-
-        ProjectDiscoveryResult discovery = new(
-            new[] { "A", "B" }, Array.Empty<string>(), Array.Empty<string>(),
-            Array.Empty<ArchitectureProjectDiscoveryDiagnostic>())
-        {
-            DiscoveredProjects = new[] { a, b }
-        };
-
-        IReadOnlyList<ArchitectureDiscoveredProject> roots = BuildStatePreparationService.SelectGraphRoots(discovery);
-
-        Assert.That(roots, Has.Count.EqualTo(2));
+        Assert.That(result.Blocked, Is.False, () => string.Join("; ", result.Diagnostics.Select(d => d.Evidence.Detail)));
+        Assert.That(result.Diagnostics, Has.Count.EqualTo(2));
+        Assert.That(result.Diagnostics, Has.All.Matches<BuildStatePreflightDiagnostic>(
+            d => d.State == BuildStatePreflightState.Current));
     }
 
     [Test]
     [Category("Integration")]
     [CancelAfter(180_000)]
+    // On Windows, Assembly.LoadFrom (used by ResolveBuiltAssemblies so Assembly.Location stays
+    // populated for the evaluator) keeps an exclusive handle on the loaded .dll for the life of
+    // this process. This test calls Prepare(EnsureBuilt) twice against the same output path in
+    // one process, so the second dotnet build's file-copy step can fail to overwrite a file the
+    // first Prepare() call already loaded — a real, documented limitation (see
+    // BuildStatePreflightAssemblyReloadTests), not something to paper over with a retry here.
+    [Platform(Exclude = "Win", Reason = "Assembly.LoadFrom locks the .dll for the process lifetime; a second same-process rebuild can't overwrite it.")]
     public void Prepare_EnsureBuiltAfterSourceChange_OverwritesStaleReceiptAndReportsCurrent()
     {
         string projectPath = CreateRealBuildableProjectFixture("RebuildFixture");

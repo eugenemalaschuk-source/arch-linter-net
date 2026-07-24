@@ -1,3 +1,4 @@
+using ArchLinterNet.Core.BuildState;
 using ArchLinterNet.Core.Model;
 using ArchLinterNet.Core.Reporting;
 using ArchLinterNet.Core.Validation;
@@ -558,12 +559,14 @@ public sealed class CoverageContractReservedTests
     }
 
     [Test]
-    public void StrictMode_WithOnlyAuditProjectCoverageDeclaredAndUnresolvedProjects_StillThrows()
+    public void StrictMode_WithOnlyAuditProjectCoverageDeclaredAndUnresolvedProjects_PreflightBlocksInsteadOfThrowing()
     {
-        // The unresolved-project bypass in IArchitectureRunnerSetupService.BuildRunner is mode/selection
-        // aware: an audit_coverage-only scope: project contract can never run in strict mode (the
-        // executor only runs contracts ContractsFor("strict", ...) selects), so it must not relax
-        // the no-resolved-assemblies hard-fail for a strict-mode run.
+        // The unresolved-project coverage bypass in IArchitectureRunnerSetupService.BuildRunner is
+        // mode/selection aware: an audit_coverage-only scope: project contract can never run in
+        // strict mode, so it must not relax the no-resolved-assemblies path into silently passing.
+        // It no longer throws an untyped configuration error either — a real project was
+        // discovered (analysis.projects), it just has no build output, so build-state preflight
+        // (see #362) now reports that as a typed missing-artifact diagnostic instead.
         string relativeProjectPath = WriteUnresolvableProjectFixture();
         string policyPath = WritePolicy($"""
             version: 1
@@ -579,22 +582,26 @@ public sealed class CoverageContractReservedTests
                   reason: Every discovered project must be mapped or excluded.
             """);
 
-        InvalidOperationException ex = Assert.Throws<InvalidOperationException>(() =>
-            ArchitectureValidationService.Validate(new ValidationRequest
-            {
-                PolicyPath = policyPath,
-                Mode = "strict"
-            }))!;
+        ValidationOutcome outcome = ArchitectureValidationService.Validate(new ValidationRequest
+        {
+            PolicyPath = policyPath,
+            Mode = "strict"
+        });
 
-        Assert.That(ex.Message, Does.Contain("Architecture YAML must define analysis.target_assemblies"));
+        Assert.Multiple(() =>
+        {
+            Assert.That(outcome.PreflightBlocked, Is.True);
+            Assert.That(outcome.PreflightDiagnostics.Single().State, Is.EqualTo(BuildStatePreflightState.MissingArtifact));
+        });
     }
 
     [Test]
-    public void StrictMode_WithUnselectedProjectCoverageContractAndUnresolvedProjects_StillThrows()
+    public void StrictMode_WithUnselectedProjectCoverageContractAndUnresolvedProjects_PreflightBlocksInsteadOfThrowing()
     {
         // Same mode-awareness guarantee, but exercised through --contract selection instead of
         // mode: when a project-scope coverage contract exists but isn't among the selected
-        // contract IDs for this run, it can't run either, so the bypass must not apply.
+        // contract IDs for this run, it can't run either, so the bypass must not apply — preflight
+        // now reports the typed missing-artifact diagnostic instead of an untyped throw (see #362).
         string relativeProjectPath = WriteUnresolvableProjectFixture();
         string assemblyName = typeof(CoverageContractReservedTests).Assembly.GetName().Name!;
         string policyPath = WritePolicy($"""
@@ -622,14 +629,17 @@ public sealed class CoverageContractReservedTests
                   reason: Every discovered project must be mapped or excluded.
             """);
 
-        InvalidOperationException ex = Assert.Throws<InvalidOperationException>(() =>
-            ArchitectureValidationService.Validate(new ValidationRequest
-            {
-                PolicyPath = policyPath,
-                Mode = "strict",
-                ContractIds = new List<string> { "unrelated-rule" }
-            }))!;
+        ValidationOutcome outcome = ArchitectureValidationService.Validate(new ValidationRequest
+        {
+            PolicyPath = policyPath,
+            Mode = "strict",
+            ContractIds = new List<string> { "unrelated-rule" }
+        });
 
-        Assert.That(ex.Message, Does.Contain("Architecture YAML must define analysis.target_assemblies"));
+        Assert.Multiple(() =>
+        {
+            Assert.That(outcome.PreflightBlocked, Is.True);
+            Assert.That(outcome.PreflightDiagnostics.Single().State, Is.EqualTo(BuildStatePreflightState.MissingArtifact));
+        });
     }
 }

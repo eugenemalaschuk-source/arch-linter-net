@@ -169,7 +169,25 @@ public static class BuildStatePreflightEvaluator
                 });
         }
 
-        if (request.RequestedConfiguration != null && receipt.Configuration != null
+        // A matching AssemblyName alone does not prove the receipt belongs to *this* project —
+        // two different discovered projects (in different directories) could produce
+        // same-simple-named assemblies, or a receipt file could be stale/misplaced from an
+        // earlier layout. ProjectPath is part of the receipt's identity precisely to catch that.
+        if (!string.Equals(receipt.ProjectPath, project.Path, StringComparison.Ordinal))
+        {
+            return Diagnostic(project, BuildStatePreflightState.WrongProjectOutput,
+                Evidence(project) with
+                {
+                    ExpectedOutputPath = assemblyPath,
+                    Detail = $"Receipt identifies project '{receipt.ProjectPath}', expected '{project.Path}'."
+                });
+        }
+
+        // A receipt missing Configuration/TargetFramework when the caller requested a specific
+        // value is incomplete evidence, not a wildcard match — treating null as "matches anything
+        // requested" would let a receipt written without that information (or moved from a
+        // differently-configured build) pass through unverified.
+        if (request.RequestedConfiguration != null
             && !string.Equals(receipt.Configuration, request.RequestedConfiguration, StringComparison.OrdinalIgnoreCase))
         {
             return Diagnostic(project, BuildStatePreflightState.WrongConfiguration,
@@ -181,7 +199,7 @@ public static class BuildStatePreflightEvaluator
                 });
         }
 
-        if (request.RequestedTargetFramework != null && receipt.TargetFramework != null
+        if (request.RequestedTargetFramework != null
             && !string.Equals(receipt.TargetFramework, request.RequestedTargetFramework, StringComparison.OrdinalIgnoreCase))
         {
             return Diagnostic(project, BuildStatePreflightState.WrongTargetFramework,

@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.Reflection;
 using System.Text;
+using System.Text.Json;
 using ArchLinterNet.Core.Discovery;
 using ArchLinterNet.Core.Model;
 
@@ -57,7 +58,7 @@ public sealed class BuildStatePreparationService : IBuildStatePreparationService
                 ? string.Empty
                 : Path.Combine(projectDirectory, "obj", "project.assets.json");
 
-            if (projectDirectory != null && File.Exists(assetsPath))
+            if (projectDirectory != null && HasRestoredTargets(assetsPath))
             {
                 continue;
             }
@@ -77,17 +78,41 @@ public sealed class BuildStatePreparationService : IBuildStatePreparationService
         return new BuildStatePreflightResult(blocking);
     }
 
+    // A weaker signal than a real restore verification (it doesn't cross-check the assets file's
+    // recorded package identities/versions against the project's current PackageReferences, so a
+    // stale assets.json can still pass this and fail later inside `dotnet build --no-restore` as
+    // a generic build failure instead of this typed restore-required diagnostic — a known,
+    // documented limitation). It is a meaningful improvement over bare File.Exists, though: a
+    // trivially empty or corrupt assets file (e.g. `{}`) — which a real `dotnet restore` never
+    // produces — no longer passes as "restored".
+    private static bool HasRestoredTargets(string assetsPath)
+    {
+        if (!File.Exists(assetsPath))
+        {
+            return false;
+        }
+
+        try
+        {
+            using JsonDocument document = JsonDocument.Parse(File.ReadAllText(assetsPath));
+            return document.RootElement.TryGetProperty("targets", out JsonElement targets)
+                && targets.ValueKind == JsonValueKind.Object
+                && targets.EnumerateObject().Any();
+        }
+        catch (JsonException)
+        {
+            return false;
+        }
+    }
+
     private static BuildStatePreflightResult EnsureBuilt(BuildStatePreflightRequest request)
     {
-        foreach (ArchitectureDiscoveredProject project in SelectGraphRoots(request.ProjectDiscovery))
-        {
-            request.CancellationToken.ThrowIfCancellationRequested();
+        request.CancellationToken.ThrowIfCancellationRequested();
 
-            BuildStatePreflightDiagnostic? failure = InvokeDotnetBuild(project, request);
-            if (failure != null)
-            {
-                return new BuildStatePreflightResult(new[] { failure });
-            }
+        BuildStatePreflightDiagnostic? failure = InvokeGraphBuild(request);
+        if (failure != null)
+        {
+            return new BuildStatePreflightResult(new[] { failure });
         }
 
         // The caller's ResolutionResult snapshot predates this build and cannot see assemblies
@@ -104,34 +129,31 @@ public sealed class BuildStatePreparationService : IBuildStatePreparationService
         return BuildStatePreflightEvaluator.Evaluate(postBuildRequest);
     }
 
-    // Building the whole selected graph once — not once per project — means invoking `dotnet
-    // build` only for projects that are not referenced by any other discovered project: MSBuild
-    // transitively builds each root's project references, so a referenced project already gets
-    // built exactly once as a dependency of its root(s), and is never built a second time
-    // directly. Falls back to building every discovered project only in the (unusual) case where
-    // reference cycles or an incomplete graph leave no unreferenced root at all.
-    // internal (not private) so BuildStatePreparationServiceGraphRootTests can verify path
-    // resolution directly against real (absolute) ArchitectureDiscoveredProjectReference.Path
-    // values without needing a real dotnet build.
-    internal static IReadOnlyList<ArchitectureDiscoveredProject> SelectGraphRoots(ProjectDiscoveryResult discovery)
+    // Building the whole selected graph once — not once per project, and not once per independent
+    // root — means generating a single temporary .slnx solution file listing every discovered
+    // project and invoking `dotnet build` on it exactly once. A solution build shares one MSBuild
+    // graph across every listed entry point: a project referenced by more than one other listed
+    // project (or by more than one independent root) is still built exactly once, and multiple
+    // otherwise-unconnected project trees are covered by the same single invocation instead of one
+    // invocation per tree. This replaces an earlier per-project-root loop that invoked `dotnet
+    // build` once per unreferenced project and could still rebuild a dependency shared by more
+    // than one root, or invoke the process multiple times for disconnected trees.
+    private static string WriteTemporaryGraphSolution(BuildStatePreflightRequest request)
     {
-        // ArchitectureDiscoveredProjectReference.Path is already repository-relative — the same
-        // canonical form every discovered project's own .Path has (both are produced by
-        // ArchitectureProjectDiscoveryService's identical GetRelativePath helper) — so reference
-        // paths are directly comparable to project paths with no filesystem resolution at all.
-        // Combining a reference path with a filesystem directory here previously produced an
-        // absolute path that could never match another project's repo-relative .Path, so no
-        // project was ever recognized as referenced and every project was (wrongly) treated as
-        // its own root.
-        HashSet<string> referenced = new(
-            discovery.DiscoveredProjects.SelectMany(project => project.ProjectReferences.Select(reference => reference.Path)),
-            StringComparer.Ordinal);
+        IEnumerable<string> projectEntries = request.ProjectDiscovery.DiscoveredProjects
+            .Select(project => BuildStatePathResolution.ResolveAbsoluteProjectPath(request.RepositoryRoot, project.Path))
+            .Distinct(StringComparer.Ordinal)
+            .Select(absolutePath => $"    <Project Path=\"{System.Security.SecurityElement.Escape(absolutePath)}\" />");
 
-        List<ArchitectureDiscoveredProject> roots = discovery.DiscoveredProjects
-            .Where(project => !referenced.Contains(project.Path))
-            .ToList();
+        string content = "<Solution>" + Environment.NewLine
+            + "  <Folder Name=\"/build-state-preflight/\">" + Environment.NewLine
+            + string.Join(Environment.NewLine, projectEntries) + Environment.NewLine
+            + "  </Folder>" + Environment.NewLine
+            + "</Solution>" + Environment.NewLine;
 
-        return roots.Count > 0 ? roots : discovery.DiscoveredProjects.ToList();
+        string path = Path.Combine(Path.GetTempPath(), $"archlinternet-ensure-built-{Guid.NewGuid():N}.slnx");
+        File.WriteAllText(path, content);
+        return path;
     }
 
     private static BuildStateResolvedAssemblies ResolveBuiltAssemblies(BuildStatePreflightRequest request)
@@ -154,6 +176,13 @@ public sealed class BuildStatePreparationService : IBuildStatePreparationService
                 continue;
             }
 
+            // Assembly.LoadFrom (not Assembly.Load(byte[])) so the resulting Assembly.Location is
+            // populated — BuildStatePreflightEvaluator.CheckArtifactPresence reads it to locate
+            // the artifact/receipt. The trade-off is a known one: on Windows, LoadFrom keeps an
+            // exclusive handle/mapping on the file for the life of this process, so a *second*
+            // --ensure-built rebuild targeting the same output path within the same process can
+            // fail to overwrite it (MSB3026). See BuildStatePreflightAssemblyReloadTests and the
+            // Windows-excluded regression tests below for this documented limitation.
             resolved.Add(Assembly.LoadFrom(assemblyPath));
         }
 
@@ -243,65 +272,73 @@ public sealed class BuildStatePreparationService : IBuildStatePreparationService
         return executableName;
     }
 
-    private static BuildStatePreflightDiagnostic? InvokeDotnetBuild(
-        ArchitectureDiscoveredProject project, BuildStatePreflightRequest request)
+    private static BuildStatePreflightDiagnostic? InvokeGraphBuild(BuildStatePreflightRequest request)
     {
-        List<string> arguments = new() { "build", project.Path, "--nologo" };
-        if (request.RequestedConfiguration != null)
+        string solutionPath = WriteTemporaryGraphSolution(request);
+        try
         {
-            arguments.Add("-c");
-            arguments.Add(request.RequestedConfiguration);
+            List<string> arguments = new() { "build", solutionPath, "--nologo" };
+            if (request.RequestedConfiguration != null)
+            {
+                arguments.Add("-c");
+                arguments.Add(request.RequestedConfiguration);
+            }
+
+            if (request.NoRestore)
+            {
+                arguments.Add("--no-restore");
+            }
+
+            ProcessStartInfo startInfo = new(ResolveDotnetExecutablePath())
+            {
+                UseShellExecute = false,
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                WorkingDirectory = request.RepositoryRoot,
+            };
+            foreach (string argument in arguments)
+            {
+                startInfo.ArgumentList.Add(argument);
+            }
+
+            using Process process = new() { StartInfo = startInfo };
+            StringBuilder stdOut = new();
+            StringBuilder stdErr = new();
+
+            // Both streams must be drained concurrently with the process running, not sequentially
+            // after Start() — `dotnet build` can write enough to either pipe to fill its OS buffer,
+            // and reading only one stream (or reading one fully before starting the other) blocks
+            // the child process on the unread pipe while this process blocks on
+            // ReadToEnd/WaitForExit, deadlocking both.
+            process.OutputDataReceived += (_, e) => { if (e.Data != null) { stdOut.AppendLine(e.Data); } };
+            process.ErrorDataReceived += (_, e) => { if (e.Data != null) { stdErr.AppendLine(e.Data); } };
+
+            process.Start();
+            process.BeginOutputReadLine();
+            process.BeginErrorReadLine();
+            process.WaitForExit();
+
+            if (process.ExitCode == 0)
+            {
+                return null;
+            }
+
+            string combinedOutput = (stdOut.ToString() + stdErr).Trim();
+            return new BuildStatePreflightDiagnostic(
+                ContractName,
+                request.RepositoryRoot,
+                BuildStatePreflightState.BuildFailed,
+                new BuildStatePreflightEvidence(
+                    request.RepositoryRoot,
+                    string.Join(", ", request.ProjectDiscovery.DiscoveredProjects.Select(p => p.AssemblyName)),
+                    BuildCommand: $"dotnet build \"{solutionPath}\"" +
+                        (request.RequestedConfiguration != null ? $" -c {request.RequestedConfiguration}" : string.Empty),
+                    Detail: $"`dotnet build` failed with exit code {process.ExitCode}: {combinedOutput}"));
         }
-
-        if (request.NoRestore)
+        finally
         {
-            arguments.Add("--no-restore");
+            File.Delete(solutionPath);
         }
-
-        ProcessStartInfo startInfo = new(ResolveDotnetExecutablePath())
-        {
-            UseShellExecute = false,
-            RedirectStandardOutput = true,
-            RedirectStandardError = true,
-            WorkingDirectory = request.RepositoryRoot,
-        };
-        foreach (string argument in arguments)
-        {
-            startInfo.ArgumentList.Add(argument);
-        }
-
-        using Process process = new() { StartInfo = startInfo };
-        StringBuilder stdOut = new();
-        StringBuilder stdErr = new();
-
-        // Both streams must be drained concurrently with the process running, not sequentially
-        // after Start() — `dotnet build` can write enough to either pipe to fill its OS buffer,
-        // and reading only one stream (or reading one fully before starting the other) blocks the
-        // child process on the unread pipe while this process blocks on ReadToEnd/WaitForExit,
-        // deadlocking both.
-        process.OutputDataReceived += (_, e) => { if (e.Data != null) { stdOut.AppendLine(e.Data); } };
-        process.ErrorDataReceived += (_, e) => { if (e.Data != null) { stdErr.AppendLine(e.Data); } };
-
-        process.Start();
-        process.BeginOutputReadLine();
-        process.BeginErrorReadLine();
-        process.WaitForExit();
-
-        if (process.ExitCode == 0)
-        {
-            return null;
-        }
-
-        string combinedOutput = (stdOut.ToString() + stdErr).Trim();
-        return new BuildStatePreflightDiagnostic(
-            ContractName,
-            project.Path,
-            BuildStatePreflightState.BuildFailed,
-            new BuildStatePreflightEvidence(
-                project.Path,
-                project.AssemblyName,
-                BuildCommand: string.Join(' ', arguments.Prepend("dotnet")),
-                Detail: $"`dotnet build` failed with exit code {process.ExitCode}: {combinedOutput}"));
     }
 
     private static void WriteReceiptsForCurrentArtifacts(

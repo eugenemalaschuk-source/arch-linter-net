@@ -34,6 +34,11 @@ public sealed class BuildStatePreflightAssemblyReloadTests
     [Test]
     [Category("Integration")]
     [CancelAfter(180_000)]
+    // Two --ensure-built rebuilds of the same project in one process: on Windows this also hits
+    // the Assembly.LoadFrom file-lock limitation documented on
+    // Prepare_EnsureBuiltAfterSourceChange_OverwritesStaleReceiptAndReportsCurrent, on top of the
+    // in-process staleness this test exists to characterize — excluded there for the same reason.
+    [Platform(Exclude = "Win", Reason = "Assembly.LoadFrom locks the .dll for the process lifetime; a second same-process rebuild can't overwrite it.")]
     public void EnsureBuiltAfterStaleRebuild_ContractsSeeFreshTypeNotStaleType()
     {
         string projectDir = Path.Combine(_tempDir, "src", "ReloadFixture");
