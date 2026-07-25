@@ -266,7 +266,11 @@ public partial class CliIntegrationTests
     {
         var (exitCode, stdout, stderr) = RunCli("--policy", _passingPolicy, "--mode", "strict,audit");
 
-        Assert.That(exitCode, Is.EqualTo(0), $"stderr: {stderr}");
+        Assert.Multiple(() =>
+        {
+            Assert.That(exitCode, Is.EqualTo(0), $"stderr: {stderr}");
+            Assert.That(stdout, Does.Contain("passed"));
+        });
     }
 
     [Test]

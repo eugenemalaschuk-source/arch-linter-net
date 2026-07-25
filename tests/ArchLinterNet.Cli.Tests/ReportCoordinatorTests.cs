@@ -131,7 +131,7 @@ public sealed class ReportCoordinatorTests
     }
 
     [Test]
-    public void RouteCombinedOutcomes_MultipleModes_WritesCombinedHuman()
+    public void LegacyCombinedHuman_WritesEachModeSequentiallyWithoutHeaders()
     {
         var runtime = new CountingRuntime();
         var console = new CapturingConsole();
@@ -142,7 +142,8 @@ public sealed class ReportCoordinatorTests
         RouteResult result = coordinator.RouteCombinedOutcomes("human", outcomesByMode, Array.Empty<ReportSink>());
 
         Assert.That(result.Status, Is.EqualTo(ReportRouteStatus.AllSucceeded));
-        Assert.That(console.OutputText, Is.Empty);
+        Assert.That(console.OutputText, Does.Contain("Architecture validation passed."));
+        Assert.That(console.OutputText, Does.Not.Contain("=== Mode:"));
     }
 
     [Test]

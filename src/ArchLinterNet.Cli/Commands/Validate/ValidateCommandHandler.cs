@@ -35,7 +35,7 @@ internal sealed class ValidateCommandHandler
 
         try
         {
-            return ExecuteValidation(options);
+            return ExecuteValidation(options, errorFormat);
         }
         catch (Exception ex) when (TryGetPolicyDiagnostic(ex, out ArchitecturePolicyDiagnostic? diagnostic))
         {
@@ -74,6 +74,7 @@ internal sealed class ValidateCommandHandler
 
         if (format == "json" || format == "sarif")
         {
+            var uncommittedPaths = result.StagedPaths.Except(result.CommittedPaths).ToArray();
             _console.Error.WriteLine(JsonSerializer.Serialize(new
             {
                 kind = "architecture_execution_error",
@@ -81,7 +82,7 @@ internal sealed class ValidateCommandHandler
                 message,
                 failed_paths = result.FailedPaths,
                 committed_paths = result.CommittedPaths,
-                staged_paths = result.StagedPaths,
+                uncommitted_paths = uncommittedPaths,
                 errors = result.ErrorDetails,
             }));
             return;
@@ -90,7 +91,11 @@ internal sealed class ValidateCommandHandler
         _console.Error.WriteLine(message);
         if (result.StagedPaths.Count > 0)
         {
-            _console.Error.WriteLine($"  staged (uncommitted): {string.Join(", ", result.StagedPaths)}");
+            var uncommittedPaths = result.StagedPaths.Except(result.CommittedPaths).ToList();
+            if (uncommittedPaths.Count > 0)
+            {
+                _console.Error.WriteLine($"  uncommitted: {string.Join(", ", uncommittedPaths)}");
+            }
         }
         foreach (string detail in result.ErrorDetails)
         {
@@ -302,16 +307,16 @@ internal sealed class ValidateCommandHandler
         return true;
     }
 
-    private int ExecuteValidation(ValidateCommandOptions options)
+    private int ExecuteValidation(ValidateCommandOptions options, string errorFormat)
     {
         TryParseModes(options.Mode, out IReadOnlyList<string> modes, out _);
 
         return modes.Count == 1
-            ? ExecuteSingleMode(options, modes[0])
-            : ExecuteCombinedModes(options, modes);
+            ? ExecuteSingleMode(options, modes[0], errorFormat)
+            : ExecuteCombinedModes(options, modes, errorFormat);
     }
 
-    private int ExecuteSingleMode(ValidateCommandOptions options, string mode)
+    private int ExecuteSingleMode(ValidateCommandOptions options, string mode, string errorFormat)
     {
         ValidationTiming? timing = options.TimingsEnabled ? new ValidationTiming() : null;
         ValidationRequest request = BuildValidationRequest(options, mode);
@@ -329,7 +334,7 @@ internal sealed class ValidateCommandHandler
         timing?.WriteReport(_console.Error);
         if (result.Status != ReportRouteStatus.AllSucceeded)
         {
-            WriteOutputError(options.Format, result);
+            WriteOutputError(errorFormat, result);
             return CliExitCodes.InvalidArgumentsOrRuntimeError;
         }
 
@@ -340,7 +345,7 @@ internal sealed class ValidateCommandHandler
     // discovery, and assembly loading happen once (inside _runtime.CreateSnapshot), and each
     // requested mode is evaluated against that same snapshot — see issue #363 /
     // openspec/specs/analysis-snapshot/spec.md.
-    private int ExecuteCombinedModes(ValidateCommandOptions options, IReadOnlyList<string> modes)
+    private int ExecuteCombinedModes(ValidateCommandOptions options, IReadOnlyList<string> modes, string errorFormat)
     {
         ValidationTiming? timing = options.TimingsEnabled ? new ValidationTiming() : null;
         AnalysisSnapshotRequest snapshotRequest = new()
@@ -380,7 +385,7 @@ internal sealed class ValidateCommandHandler
         timing?.WriteReport(_console.Error);
         if (result.Status != ReportRouteStatus.AllSucceeded)
         {
-            WriteOutputError(options.Format, result);
+            WriteOutputError(errorFormat, result);
             return CliExitCodes.InvalidArgumentsOrRuntimeError;
         }
 

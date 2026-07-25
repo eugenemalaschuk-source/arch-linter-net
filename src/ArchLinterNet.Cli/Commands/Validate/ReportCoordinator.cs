@@ -62,12 +62,12 @@ internal sealed class ReportCoordinator
         bool isSingleMode,
         bool isReportMode)
     {
-        // Legacy combined human had no stdout output (pre-#364 behavior)
-        bool suppressLegacyCombinedHuman = !isReportMode && !isSingleMode && stdoutFormat == "human";
+        // Legacy combined human: write each mode sequentially (pre-#364 behavior)
+        bool legacyCombinedHuman = !isReportMode && !isSingleMode && stdoutFormat == "human";
 
-        string? neededHuman = StdoutOrAnySinkNeeds("human", stdoutFormat, additionalSinks, isReportMode, suppressLegacyCombinedHuman);
-        string? neededJson = StdoutOrAnySinkNeeds("json", stdoutFormat, additionalSinks, isReportMode, suppressLegacyCombinedHuman: false);
-        string? neededSarif = StdoutOrAnySinkNeeds("sarif", stdoutFormat, additionalSinks, isReportMode, suppressLegacyCombinedHuman: false);
+        string? neededHuman = StdoutOrAnySinkNeeds("human", stdoutFormat, additionalSinks, isReportMode);
+        string? neededJson = StdoutOrAnySinkNeeds("json", stdoutFormat, additionalSinks, isReportMode);
+        string? neededSarif = StdoutOrAnySinkNeeds("sarif", stdoutFormat, additionalSinks, isReportMode);
 
         string? humanContent = null;
         string? jsonContent = null;
@@ -75,9 +75,19 @@ internal sealed class ReportCoordinator
 
         if (neededHuman is not null)
         {
-            humanContent = isSingleMode
-                ? FormatSingleHuman(outcomesByMode[0].Mode, outcomesByMode[0].Outcome)
-                : FormatCombinedHuman(outcomesByMode);
+            if (legacyCombinedHuman)
+            {
+                foreach ((string mode, ValidationOutcome outcome) in outcomesByMode)
+                {
+                    _console.Out.WriteLine(FormatSingleHuman(mode, outcome));
+                }
+            }
+            else
+            {
+                humanContent = isSingleMode
+                    ? FormatSingleHuman(outcomesByMode[0].Mode, outcomesByMode[0].Outcome)
+                    : FormatCombinedHuman(outcomesByMode);
+            }
         }
 
         if (neededJson is not null)
@@ -94,7 +104,7 @@ internal sealed class ReportCoordinator
                 : FormatCombinedSarif(outcomesByMode);
         }
 
-        if (!isReportMode && !suppressLegacyCombinedHuman)
+        if (!isReportMode && !legacyCombinedHuman)
         {
             _console.Out.WriteLine(DispatchFormat(stdoutFormat, humanContent, jsonContent, sarifContent));
         }
@@ -146,6 +156,7 @@ internal sealed class ReportCoordinator
                 }
 
                 string tempPath = _fileSystem.WriteAllTextToTemp(sink.FilePath!, fileContent);
+                ValidateWrittenTempFile(tempPath, sink.Format);
                 pendingRenames.Add((tempPath, sink.FilePath!));
                 stagedPaths.Add(sink.FilePath!);
             }
@@ -199,16 +210,10 @@ internal sealed class ReportCoordinator
         string format,
         string stdoutFormat,
         IReadOnlyList<ReportSink> sinks,
-        bool isReportMode,
-        bool suppressLegacyCombinedHuman)
+        bool isReportMode)
     {
         if (!isReportMode && stdoutFormat == format)
         {
-            if (suppressLegacyCombinedHuman)
-            {
-                return null;
-            }
-
             return "stdout";
         }
 
@@ -229,6 +234,36 @@ internal sealed class ReportCoordinator
         {
             throw new InvalidOperationException(
                 $"Report content exceeds maximum size of {MaxReportBytes} bytes.");
+        }
+    }
+
+    private static void ValidateWrittenTempFile(string tempPath, string format)
+    {
+        if (!File.Exists(tempPath))
+        {
+            return;
+        }
+
+        long fileSize = new FileInfo(tempPath).Length;
+        if (fileSize > MaxReportBytes)
+        {
+            try { File.Delete(tempPath); } catch { }
+            throw new InvalidOperationException(
+                $"Report file exceeds maximum size of {MaxReportBytes} bytes.");
+        }
+
+        if (format is "json" or "sarif")
+        {
+            try
+            {
+                string fileContent = File.ReadAllText(tempPath);
+                _ = JsonNode.Parse(fileContent);
+            }
+            catch (Exception)
+            {
+                try { File.Delete(tempPath); } catch { }
+                throw;
+            }
         }
     }
 
