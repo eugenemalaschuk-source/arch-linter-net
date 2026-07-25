@@ -16,6 +16,8 @@ It is intentionally excluded from the public MkDocs/GitHub Pages product site.
 
 - [0.5.1 adoption-stabilization compatibility blueprint](adoption-stabilization-compatibility.md) — release-level identity, schemas, findings, output, cache, profiling, cancellation, support evidence, and final consistency contract for #354/#355.
 
+- [0.5.1 adoption-stabilization consistency audit](adoption-stabilization-consistency-audit.md) — current alignment, corrected conflicts, open child-owned reconciliation, and the final max-pass gate for #355.
+
 - [CEL engine architecture blueprint](cel-engine-architecture.md) — processing pipeline, component ownership, extension-direction matrix, and prohibited shortcuts for the `ArchLinterNet.CEL` engine (#322/#324).
 
 - [CEL upstream corpus mining manifest](cel-corpus-mining-manifest.md) — provenance-aware classification of upstream CEL test corpora reviewed for parser/tokenizer hardening, and what was adapted or deferred (#338).
