@@ -21,7 +21,7 @@ baseline:
   <contract-group>:
     - id: "<contract-id>"
       ignored_violations:
-        - identity_version: 2
+        - identity_version: 1
           contract_family: "<family>"
           kind: "<dependency|reference|call|package|framework|api_change|coverage>"
           source_assembly: "<assembly-name-or-null>"
@@ -358,4 +358,3 @@ Without `--dry-run`/`--check`, `baseline migrate` SHALL require `--output` to be
 #### Scenario: CLI help describes the migrate subcommand
 - **WHEN** user runs `arch-linter baseline --help`
 - **THEN** output SHALL include usage information for `baseline migrate`
-
