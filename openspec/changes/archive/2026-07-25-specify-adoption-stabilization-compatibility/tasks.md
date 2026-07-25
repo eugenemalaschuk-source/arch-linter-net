@@ -5,12 +5,14 @@
 - [x] 1.3 Define stable identity versus display evidence.
 - [x] 1.4 Define baseline/API snapshot lifecycle and normalized finding projections.
 - [x] 1.5 Define output, cache, profiling, concurrency, cancellation, policy-only, support, and security boundaries.
+- [x] 1.6 Reconcile the shipped baseline v2 example with violation `identity_version: 1`.
 
 ## 2. Architecture documentation
 
 - [x] 2.1 Add the internal compatibility blueprint.
 - [x] 2.2 Add the child design-slice/consumer matrix.
 - [x] 2.3 Link the blueprint from the internal documentation index.
+- [x] 2.4 Record the current consistency audit and open child-owned reconciliation points.
 
 ## 3. Backlog integration
 
