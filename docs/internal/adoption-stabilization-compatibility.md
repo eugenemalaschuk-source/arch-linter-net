@@ -305,11 +305,12 @@ Processing:
 2. sort and baseline-classify once;
 3. render each sink;
 4. validate bounded output;
-5. stage all file sinks in their destination directories;
-6. atomically commit the required file set;
-7. return one status without re-analysis.
+5. stage every file sink in its destination directory before changing any destination;
+6. atomically replace each destination, where supported, in deterministic order;
+7. if a later replacement fails, report typed `partial-output` evidence listing committed and uncommitted destinations without claiming global rollback;
+8. return one status without re-analysis.
 
-Standard streams are not globally atomic, so required file artifacts are staged before stream success is treated as final. Conflicting stream/path destinations and input overwrite are rejected before commit.
+There is no portable all-or-none transaction across independent output paths or filesystems. A pre-commit render/validation failure changes no destination; a mid-commit replacement failure is incomplete execution, exits 2, and exposes the exact partial state. Standard streams are also not transactional. Conflicting stream/path destinations and input overwrite are rejected before commit.
 
 ## Cache contract
 
@@ -460,6 +461,7 @@ Review questions:
 - Is every diagnostic family represented by `finding/v1` typed details?
 - Are baseline/API/cache/profile versions unambiguous?
 - Does every output sink consume one result?
+- Are per-file atomicity and partial multi-file failure reported honestly?
 - Do exit codes remain 0/1/2?
 - Is cache opt-in and untrusted?
 - Is sequential mode supported?
