@@ -53,9 +53,9 @@ Rejected: adapter-specific semantic reconstruction from messages or generic fiel
 
 ### 6. Multi-sink syntax
 
-Use repeatable `--output <format>=<destination>`. Preserve `--format` as the legacy one-sink form and reject mixing the two. Render once from one result; stage and atomically replace file sinks as a required set.
+Use repeatable `--output <format>=<destination>`. Preserve `--format` as the legacy one-sink form and reject mixing the two. Render and validate every file sink before changing destinations; replace each destination atomically where supported. Do not claim a global all-or-none transaction across independent paths/filesystems. A mid-commit failure returns typed partial-output evidence and never reruns validation.
 
-Rejected: multiple independent validation invocations or a shell-specific delimiter syntax.
+Rejected: multiple independent validation invocations, a shell-specific delimiter syntax, or an impossible cross-filesystem transactional guarantee.
 
 ### 7. Cache is opt-in and untrusted
 
