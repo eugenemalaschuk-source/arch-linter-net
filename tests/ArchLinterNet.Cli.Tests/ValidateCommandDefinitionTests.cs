@@ -118,6 +118,101 @@ public sealed class ValidateCommandDefinitionTests
         Assert.That(runtime.LastTiming, Is.Not.Null);
     }
 
+    [Test]
+    public void CreateRootCommand_ReportOption_AcceptsValidReportSink()
+    {
+        (RecordingRuntime runtime, RecordingConsole console) = Run(["--report", "json=results.json"]);
+
+        Assert.That(runtime.LastRequest, Is.Not.Null);
+        Assert.That(console.ErrorText, Is.Empty);
+    }
+
+    [Test]
+    public void CreateRootCommand_ReportOption_AcceptsMultipleSinks()
+    {
+        (RecordingRuntime runtime, RecordingConsole console) = Run([
+            "--report", "json=results.json",
+            "--report", "sarif=results.sarif",
+        ]);
+
+        Assert.That(runtime.LastRequest, Is.Not.Null);
+        Assert.That(console.ErrorText, Is.Empty);
+    }
+
+    [Test]
+    public void CreateRootCommand_ReportOption_AcceptsStderrDestination()
+    {
+        (RecordingRuntime runtime, RecordingConsole console) = Run([
+            "--report", "human=stderr",
+            "--report", "json=results.json",
+        ]);
+
+        Assert.That(runtime.LastRequest, Is.Not.Null);
+        Assert.That(console.ErrorText, Does.Contain("Architecture validation passed."));
+    }
+
+    [Test]
+    public void CreateRootCommand_ReportOption_RejectsInvalidFormat()
+    {
+        (RecordingRuntime runtime, RecordingConsole console) = Run(["--report", "xml=out.xml"]);
+
+        Assert.That(runtime.LastRequest, Is.Null);
+        Assert.That(console.ErrorText, Does.Contain("Invalid format"));
+    }
+
+    [Test]
+    public void CreateRootCommand_ReportOption_RejectsEmptyDestination()
+    {
+        (RecordingRuntime runtime, RecordingConsole console) = Run(["--report", "json="]);
+
+        Assert.That(runtime.LastRequest, Is.Null);
+        Assert.That(console.ErrorText, Does.Contain("Invalid --report"));
+    }
+
+    [Test]
+    public void CreateRootCommand_ReportOption_RejectsDuplicateDestinations()
+    {
+        (RecordingRuntime runtime, RecordingConsole console) = Run([
+            "--report", "json=results.json",
+            "--report", "sarif=results.json",
+        ]);
+
+        Assert.That(runtime.LastRequest, Is.Null);
+        Assert.That(console.ErrorText, Does.Contain("Duplicate"));
+    }
+
+    [Test]
+    public void CreateRootCommand_ReportOption_RejectsStdoutDestination()
+    {
+        (RecordingRuntime runtime, RecordingConsole console) = Run(["--report", "json=stdout"]);
+
+        Assert.That(runtime.LastRequest, Is.Null);
+        Assert.That(console.ErrorText, Does.Contain("Use --format"));
+    }
+
+    [Test]
+    public void CreateRootCommand_ReportOption_RejectsPolicyFileCollision()
+    {
+        (RecordingRuntime runtime, RecordingConsole console) = Run([
+            "--report", "json=architecture/dependencies.arch.yml",
+        ]);
+
+        Assert.That(runtime.LastRequest, Is.Null);
+        Assert.That(console.ErrorText, Does.Contain("matches an input file"));
+    }
+
+    [Test]
+    public void CreateRootCommand_ReportOption_RejectsBaselineFileCollision()
+    {
+        (RecordingRuntime runtime, RecordingConsole console) = Run([
+            "--baseline", "baseline.yml",
+            "--report", "json=baseline.yml",
+        ]);
+
+        Assert.That(runtime.LastRequest, Is.Null);
+        Assert.That(console.ErrorText, Does.Contain("matches an input file"));
+    }
+
     private static (RecordingRuntime Runtime, RecordingConsole Console) Run(string[] args, string format = "human")
     {
         var runtime = new RecordingRuntime();
@@ -140,6 +235,10 @@ public sealed class ValidateCommandDefinitionTests
     {
         public bool FileExists(string path) => exists;
         public void WriteAllText(string path, string contents) { }
+        public void WriteAllTextToTemp(string path, string contents) { }
+        public void RenameTempToTarget(string tempPath, string targetPath) { }
+        public void DeleteFile(string path) { }
+        public bool CanWriteToDirectory(string path) => true;
     }
 
     private sealed class RecordingConsole : ICliConsole

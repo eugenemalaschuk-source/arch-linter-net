@@ -532,6 +532,22 @@ public sealed partial class BaselineCommandHandlerTests
             LastWritePath = path;
             LastWriteContents = contents;
         }
+
+        public void WriteAllTextToTemp(string path, string contents)
+        {
+            LastWritePath = path;
+            LastWriteContents = contents;
+        }
+
+        public void RenameTempToTarget(string tempPath, string targetPath)
+        {
+        }
+
+        public void DeleteFile(string path)
+        {
+        }
+
+        public bool CanWriteToDirectory(string path) => true;
     }
 
     private sealed class RecordingConsole : ICliConsole

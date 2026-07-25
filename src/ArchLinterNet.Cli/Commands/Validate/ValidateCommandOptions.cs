@@ -13,4 +13,9 @@ internal sealed record ValidateCommandOptions(
     bool EnsureBuilt = false,
     bool NoRestore = false,
     string? Configuration = null,
-    string? TargetFramework = null);
+    string? TargetFramework = null)
+{
+    public IReadOnlyList<ReportSink> AdditionalSinks { get; init; } = Array.Empty<ReportSink>();
+
+    public string? ReportParseError { get; init; }
+}

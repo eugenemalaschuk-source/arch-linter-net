@@ -8,6 +8,7 @@ internal sealed class ValidateCommandDefinition(ValidateCommandHandler handler)
     private const string StrictMode = "strict";
     private const string AuditMode = "audit";
     private const string HumanFormat = "human";
+    private const string ReportOptionName = "--report";
 
     public const string HelpText =
         """
@@ -42,13 +43,19 @@ internal sealed class ValidateCommandDefinition(ValidateCommandHandler handler)
                                 Requested build configuration for build-state preflight
                                 (e.g. Debug, Release)
               --framework <tfm> Requested target framework for build-state preflight
-          -f, --format <fmt>    Output format: human, json, or sarif (default: human)
+          -f, --format <fmt>    Stdout output format: human, json, or sarif
+                                (default: human). See --report for additional
+                                output destinations.
                                 sarif covers violations, cycles, and build-state
                                 preflight findings; coverage, unmatched-ignore, and
                                 policy-consistency findings can still fail the run
                                 (exit code 1) without appearing in SARIF results —
                                 use --format json to see those
               --json            Shortcut for --format json
+              --report <val>    Additional output sink in format=destination
+                                form. Destination is stdout, stderr, or a file
+                                path. Repeatable: --report json=ci.json
+                                --report sarif=ci.sarif
           -h, --help            Show this help message
           -v, --version         Show version
 
@@ -78,6 +85,7 @@ internal sealed class ValidateCommandDefinition(ValidateCommandHandler handler)
         Option<bool> strictOption = new("--strict");
         Option<bool> auditOption = new("--audit");
         Option<bool> jsonOption = new("--json");
+        Option<string[]> reportOption = new("--report") { AllowMultipleArgumentsPerToken = true };
         Option<bool> timingsOption = new("--timings");
         Option<bool> ensureBuiltOption = new("--ensure-built");
         Option<bool> noRestoreOption = new("--no-restore");
@@ -97,6 +105,7 @@ internal sealed class ValidateCommandDefinition(ValidateCommandHandler handler)
         command.Options.Add(strictOption);
         command.Options.Add(auditOption);
         command.Options.Add(jsonOption);
+        command.Options.Add(reportOption);
         command.Options.Add(timingsOption);
         command.Options.Add(ensureBuiltOption);
         command.Options.Add(noRestoreOption);
@@ -111,6 +120,7 @@ internal sealed class ValidateCommandDefinition(ValidateCommandHandler handler)
             contractOption,
             conditionSetOption,
             baselineOption,
+            reportOption,
             timingsOption,
             ensureBuiltOption,
             noRestoreOption,
@@ -143,6 +153,7 @@ internal sealed class ValidateCommandDefinition(ValidateCommandHandler handler)
         Option<string[]> contractOption,
         Option<string> conditionSetOption,
         Option<string> baselineOption,
+        Option<string[]> reportOption,
         Option<bool> timingsOption,
         Option<bool> ensureBuiltOption,
         Option<bool> noRestoreOption,
@@ -153,6 +164,17 @@ internal sealed class ValidateCommandDefinition(ValidateCommandHandler handler)
     {
         string mode = ResolveMode(parseResult);
         string format = ResolveFormat(parseResult);
+        IReadOnlyList<ReportSink> additionalSinks = Array.Empty<ReportSink>();
+        string? reportParseError = null;
+
+        try
+        {
+            additionalSinks = ParseReportSinks(parseResult.GetValue(reportOption));
+        }
+        catch (InvalidOperationException ex)
+        {
+            reportParseError = ex.Message;
+        }
 
         return new ValidateCommandOptions(
             parseResult.GetValue(policyOption) ?? "architecture/dependencies.arch.yml",
@@ -167,7 +189,11 @@ internal sealed class ValidateCommandDefinition(ValidateCommandHandler handler)
             parseResult.GetValue(ensureBuiltOption),
             parseResult.GetValue(noRestoreOption),
             parseResult.GetValue(configurationOption),
-            parseResult.GetValue(targetFrameworkOption));
+            parseResult.GetValue(targetFrameworkOption))
+        {
+            AdditionalSinks = additionalSinks,
+            ReportParseError = reportParseError,
+        };
     }
 
     private static string ResolveMode(ParseResult parseResult)
@@ -272,6 +298,57 @@ internal sealed class ValidateCommandDefinition(ValidateCommandHandler handler)
         }
 
         return token;
+    }
+
+    private static IReadOnlyList<ReportSink> ParseReportSinks(string[]? rawValues)
+    {
+        if (rawValues is null || rawValues.Length == 0)
+        {
+            return Array.Empty<ReportSink>();
+        }
+
+        List<ReportSink> sinks = new(rawValues.Length);
+        HashSet<string> destinations = new(StringComparer.Ordinal);
+        foreach (string raw in rawValues)
+        {
+            int eqIndex = raw.IndexOf('=');
+            if (eqIndex <= 0 || eqIndex >= raw.Length - 1)
+            {
+                throw new InvalidOperationException(
+                    $"Invalid --report value: '{raw}'. Use format=destination (e.g. json=results.json).");
+            }
+
+            string format = raw[..eqIndex];
+            string destination = raw[(eqIndex + 1)..];
+
+            if (format is not ("human" or "json" or "sarif"))
+            {
+                throw new InvalidOperationException(
+                    $"Invalid format in --report: '{format}'. Use human, json, or sarif.");
+            }
+
+            if (!destinations.Add(destination))
+            {
+                throw new InvalidOperationException(
+                    $"Duplicate --report destination: '{destination}'.");
+            }
+
+            if (string.Equals(destination, "stdout", StringComparison.Ordinal))
+            {
+                throw new InvalidOperationException(
+                    $"Invalid --report destination: 'stdout'. Use --format to select stdout output format.");
+            }
+
+            ReportSink sink = destination switch
+            {
+                "stderr" => new ReportSink(format, ReportDestinationType.Stderr),
+                _ => new ReportSink(format, ReportDestinationType.File, destination),
+            };
+
+            sinks.Add(sink);
+        }
+
+        return sinks;
     }
 
     private static bool IsOption(string token, params string[] names)

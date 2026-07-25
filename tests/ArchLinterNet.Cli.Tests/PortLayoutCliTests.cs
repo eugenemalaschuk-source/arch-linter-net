@@ -117,7 +117,7 @@ public sealed class PortLayoutCliTests
     {
         var runtime = new CliRuntime();
         var console = new RecordingConsole();
-        var handler = new ValidateCommandHandler(runtime, console);
+        var handler = new ValidateCommandHandler(runtime, console, null!);
 
         int exitCode = handler.Execute(new ValidateCommandOptions(
             policyPath, mode, format, Array.Empty<string>(), null,

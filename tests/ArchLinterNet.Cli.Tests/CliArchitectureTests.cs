@@ -61,7 +61,7 @@ public sealed class CliArchitectureTests
     {
         FakeCliRuntime runtime = new();
         FakeCliConsole console = new();
-        ValidateCommandHandler handler = new(runtime, console);
+        ValidateCommandHandler handler = new(runtime, console, null!);
 
         int exitCode = handler.Execute(new ValidateCommandOptions(
             "policy.yml",
@@ -102,7 +102,7 @@ public sealed class CliArchitectureTests
                 new ArchitecturePolicyDiagnostic(ArchitecturePolicyDiagnosticKind.SourceShape, location, [], source.ImportChain))
         };
         FakeCliConsole console = new();
-        ValidateCommandHandler handler = new(runtime, console);
+        ValidateCommandHandler handler = new(runtime, console, null!);
 
         int exitCode = handler.Execute(new ValidateCommandOptions(
             "policy.yml", "strict", "json", [], null, false, null, false, false));
@@ -135,7 +135,7 @@ public sealed class CliArchitectureTests
                 "Contextual selector (role: DomainLayer) 'when' expression failed to evaluate: missing key")
         };
         FakeCliConsole console = new();
-        ValidateCommandHandler handler = new(runtime, console);
+        ValidateCommandHandler handler = new(runtime, console, null!);
 
         int exitCode = handler.Execute(new ValidateCommandOptions(
             "policy.yml", "strict", "json", [], null, false, null, false, false));
@@ -157,7 +157,7 @@ public sealed class CliArchitectureTests
             ExceptionToThrow = new InvalidOperationException("'when' expression failed to evaluate: missing key")
         };
         FakeCliConsole console = new();
-        ValidateCommandHandler handler = new(runtime, console);
+        ValidateCommandHandler handler = new(runtime, console, null!);
 
         int exitCode = handler.Execute(new ValidateCommandOptions(
             "policy.yml", "strict", "sarif", [], null, false, null, false, false));
@@ -186,7 +186,7 @@ public sealed class CliArchitectureTests
                 new ArchitecturePolicyDiagnostic(ArchitecturePolicyDiagnosticKind.SourceShape, location, [], source.ImportChain))
         };
         FakeCliConsole console = new();
-        ValidateCommandHandler handler = new(runtime, console);
+        ValidateCommandHandler handler = new(runtime, console, null!);
 
         int exitCode = handler.Execute(new ValidateCommandOptions(
             "policy.yml", "strict", "sarif", [], null, false, null, false, false));
@@ -219,9 +219,9 @@ public sealed class CliArchitectureTests
         FakeCliConsole sarifConsole = new();
         FakeCliConsole humanConsole = new();
 
-        _ = new ValidateCommandHandler(runtime, sarifConsole).Execute(new ValidateCommandOptions(
+        _ = new ValidateCommandHandler(runtime, sarifConsole, null!).Execute(new ValidateCommandOptions(
             "policy.yml", "strict", "sarif", [], null, false, null, false, false));
-        _ = new ValidateCommandHandler(runtime, humanConsole).Execute(new ValidateCommandOptions(
+        _ = new ValidateCommandHandler(runtime, humanConsole, null!).Execute(new ValidateCommandOptions(
             "policy.yml", "strict", "human", [], null, false, null, false, false));
 
         using JsonDocument document = JsonDocument.Parse(sarifConsole.StdOut);
@@ -286,7 +286,7 @@ public sealed class CliArchitectureTests
                 new ArchitecturePolicyDiagnostic(ArchitecturePolicyDiagnosticKind.CompositionConflict, primary, [related], root.ImportChain))
         };
         FakeCliConsole console = new();
-        ValidateCommandHandler handler = new(runtime, console);
+        ValidateCommandHandler handler = new(runtime, console, null!);
 
         handler.Execute(new ValidateCommandOptions("policy.yml", "strict", "sarif", [], null, false, null, false, false));
 
@@ -473,5 +473,19 @@ public sealed class CliArchitectureTests
         public void WriteAllText(string path, string contents)
         {
         }
+
+        public void WriteAllTextToTemp(string path, string contents)
+        {
+        }
+
+        public void RenameTempToTarget(string tempPath, string targetPath)
+        {
+        }
+
+        public void DeleteFile(string path)
+        {
+        }
+
+        public bool CanWriteToDirectory(string path) => true;
     }
 }
