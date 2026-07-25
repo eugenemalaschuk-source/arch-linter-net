@@ -401,7 +401,7 @@ public sealed class CoverageContractReservedTests
             """;
         string policyPath = WritePolicy(Yaml);
 
-        InvalidOperationException ex = Assert.Throws<InvalidOperationException>(() =>
+        InvalidOperationException ex = Assert.Catch<InvalidOperationException>(() =>
             ArchitectureValidationService.Validate(new ValidationRequest
             {
                 PolicyPath = policyPath,

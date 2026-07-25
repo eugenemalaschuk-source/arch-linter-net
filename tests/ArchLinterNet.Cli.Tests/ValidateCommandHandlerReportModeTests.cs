@@ -474,10 +474,15 @@ public sealed class ValidateCommandHandlerReportModeTests
             Assert.That(exitCode, Is.EqualTo(CliExitCodes.InvalidArgumentsOrRuntimeError));
             Assert.That(console.StdOut, Is.Empty);
             using JsonDocument document = JsonDocument.Parse(console.StdErr);
-            Assert.That(document.RootElement.GetProperty("output_status").GetString(), Is.EqualTo("output-failed"));
-            Assert.That(document.RootElement.GetProperty("failed_paths").EnumerateArray()
+            Assert.That(document.RootElement.GetProperty("version").GetString(), Is.EqualTo("2.1.0"));
+            JsonElement routingResult = document.RootElement.GetProperty("runs").EnumerateArray().Last()
+                .GetProperty("results")[0];
+            Assert.That(routingResult.GetProperty("ruleId").GetString(), Is.EqualTo("architecture-output"));
+            JsonElement properties = routingResult.GetProperty("properties");
+            Assert.That(properties.GetProperty("output_status").GetString(), Is.EqualTo("output-failed"));
+            Assert.That(properties.GetProperty("failed_paths").EnumerateArray()
                 .Select(path => path.GetString()), Does.Contain("<stdout>"));
-            Assert.That(document.RootElement.GetProperty("errors").GetArrayLength(), Is.GreaterThan(0));
+            Assert.That(properties.GetProperty("errors").GetArrayLength(), Is.GreaterThan(0));
         });
     }
 
