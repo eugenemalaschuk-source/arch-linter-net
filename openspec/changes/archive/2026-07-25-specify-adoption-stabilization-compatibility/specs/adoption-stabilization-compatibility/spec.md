@@ -179,15 +179,19 @@ All 0.5.1 tasks SHALL reuse `analysis-build-state/v1` for build-input, analysis-
 ### Requirement: Multi-sink output syntax and commit semantics are fixed
 The 0.5.1 CLI SHALL accept repeatable `--output <format>=<destination>` options, where `format` is `human`, `json`, or `sarif`, and `destination` is `stdout`, `stderr`, or a caller-provided file path. Existing single-format `--format <format>` usage SHALL remain supported as one sink to its legacy standard stream; combining `--format` with `--output` SHALL be rejected as ambiguous.
 
-All sinks SHALL consume one normalized result. File sinks SHALL be rendered to bounded temporary files in the destination directory, validated, and atomically replaced only after every required file sink is ready. Input policy, baseline, snapshot, schema, and receipt paths SHALL not be overwritten. Duplicate/conflicting standard-stream destinations SHALL be rejected unless their ordering is explicitly deterministic and documented.
+All sinks SHALL consume one normalized result. Every file sink SHALL be rendered to a bounded temporary file in its destination directory and validated before the first destination is changed. Each destination SHALL then be replaced atomically where the host filesystem supports atomic same-directory replacement. Multi-file all-or-none commit SHALL NOT be claimed across independent paths or filesystems. If a replacement fails after another destination has already committed, the command SHALL report typed `partial-output` evidence identifying committed and uncommitted destinations, exit `2`, and SHALL NOT rerun validation. Input policy, baseline, snapshot, schema, and receipt paths SHALL not be overwritten. Duplicate/conflicting standard-stream destinations SHALL be rejected unless their ordering is explicitly deterministic and documented.
 
 #### Scenario: Human plus JSON plus SARIF
 - **WHEN** one invocation requests `human=stderr`, `json=report.json`, and `sarif=report.sarif`
 - **THEN** policy loading, project evaluation, assembly scanning, baseline comparison, and contract execution occur once
 
-#### Scenario: One required output cannot be committed
-- **WHEN** a required file sink fails validation or atomic replacement
-- **THEN** no other pending file sink is committed, the command exits `2` with `output-failed`, and validation is not rerun
+#### Scenario: Rendering or validation fails before commit
+- **WHEN** any required file sink fails rendering, size checks, or validation before destination replacement begins
+- **THEN** no file destination is changed, the command exits `2` with `output-failed`, and validation is not rerun
+
+#### Scenario: A later atomic replacement fails
+- **WHEN** all sinks were staged successfully but replacing a later destination fails after an earlier destination committed
+- **THEN** the command exits `2`, reports `partial-output` with the exact committed and uncommitted destinations, does not claim global rollback, and does not rerun validation
 
 ### Requirement: Cache defaults and trust boundary are safe
 Analysis cache v1 SHALL be disabled unless the caller selects `--cache auto` or `--cache <path>`. `auto` SHALL resolve to the platform user-cache directory under `ArchLinterNet/0.5.1/analysis-cache/v1`, never inside policy-controlled content. Cache entries SHALL be scoped by workspace/trust-domain identity, completed-session fingerprint, tool/schema versions, and applicable requested views; SHALL be content-addressed and integrity checked; and SHALL be treated as untrusted until all identity, containment, and digest checks pass.
