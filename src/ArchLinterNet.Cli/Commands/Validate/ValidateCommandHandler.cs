@@ -64,6 +64,14 @@ internal sealed class ValidateCommandHandler
             }
         }
 
+        foreach (ReportSink sink in options.AdditionalSinks)
+        {
+            if (sink.Format is "json" or "sarif")
+            {
+                return sink.Format;
+            }
+        }
+
         return "human";
     }
 
@@ -74,7 +82,6 @@ internal sealed class ValidateCommandHandler
 
         if (format == "json" || format == "sarif")
         {
-            var uncommittedPaths = result.StagedPaths.Except(result.CommittedPaths).ToArray();
             _console.Error.WriteLine(JsonSerializer.Serialize(new
             {
                 kind = "architecture_execution_error",
@@ -82,20 +89,16 @@ internal sealed class ValidateCommandHandler
                 message,
                 failed_paths = result.FailedPaths,
                 committed_paths = result.CommittedPaths,
-                uncommitted_paths = uncommittedPaths,
+                uncommitted_paths = result.UncommittedPaths,
                 errors = result.ErrorDetails,
             }));
             return;
         }
 
         _console.Error.WriteLine(message);
-        if (result.StagedPaths.Count > 0)
+        if (result.UncommittedPaths.Count > 0)
         {
-            var uncommittedPaths = result.StagedPaths.Except(result.CommittedPaths).ToList();
-            if (uncommittedPaths.Count > 0)
-            {
-                _console.Error.WriteLine($"  uncommitted: {string.Join(", ", uncommittedPaths)}");
-            }
+            _console.Error.WriteLine($"  uncommitted: {string.Join(", ", result.UncommittedPaths)}");
         }
         foreach (string detail in result.ErrorDetails)
         {
@@ -280,6 +283,12 @@ internal sealed class ValidateCommandHandler
             if (sink.DestinationType != ReportDestinationType.File || sink.FilePath is null)
             {
                 continue;
+            }
+
+            if (sink.FilePath.EndsWith(".archlinternet-receipt.json", StringComparison.OrdinalIgnoreCase))
+            {
+                _console.Error.WriteLine($"Cannot write report to '{sink.FilePath}': build receipt path is read-only.");
+                return false;
             }
 
             if (!_fileSystem.CanWriteToDirectory(sink.FilePath))

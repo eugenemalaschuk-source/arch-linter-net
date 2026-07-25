@@ -234,6 +234,28 @@ public sealed class ValidateCommandDefinitionTests
         Assert.That(console.ErrorText, Does.Contain("matches an input file"));
     }
 
+    [Test]
+    public void CreateRootCommand_ReportOption_RejectsBuildReceiptFileCollision()
+    {
+        (RecordingRuntime runtime, RecordingConsole console) = Run([
+            "--report", "json=bin/Debug/net10.0/MyApp.archlinternet-receipt.json",
+        ]);
+
+        Assert.That(runtime.LastRequest, Is.Null);
+        Assert.That(console.ErrorText, Does.Contain("build receipt path is read-only"));
+    }
+
+    [Test]
+    public void CreateRootCommand_ReportOption_RejectsBuildReceiptCaseInsensitive()
+    {
+        (RecordingRuntime runtime, RecordingConsole console) = Run([
+            "--report", "json=bin/MyApp.ARCHLINTERNET-RECEIPT.JSON",
+        ]);
+
+        Assert.That(runtime.LastRequest, Is.Null);
+        Assert.That(console.ErrorText, Does.Contain("build receipt path is read-only"));
+    }
+
     private static (RecordingRuntime Runtime, RecordingConsole Console) Run(string[] args, string format = "human")
     {
         var runtime = new RecordingRuntime();

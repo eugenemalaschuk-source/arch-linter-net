@@ -19,6 +19,7 @@ internal readonly record struct RouteResult(
     IReadOnlyList<string> FailedPaths,
     IReadOnlyList<string> CommittedPaths,
     IReadOnlyList<string> StagedPaths,
+    IReadOnlyList<string> UncommittedPaths,
     IReadOnlyList<string> ErrorDetails);
 
 internal sealed class ReportCoordinator
@@ -156,7 +157,6 @@ internal sealed class ReportCoordinator
                 }
 
                 string tempPath = _fileSystem.WriteAllTextToTemp(sink.FilePath!, fileContent);
-                ValidateWrittenTempFile(tempPath, sink.Format);
                 pendingRenames.Add((tempPath, sink.FilePath!));
                 stagedPaths.Add(sink.FilePath!);
             }
@@ -196,14 +196,20 @@ internal sealed class ReportCoordinator
 
         if (failedPaths.Count == 0)
         {
-            return new RouteResult(ReportRouteStatus.AllSucceeded, Array.Empty<string>(), committedPaths, stagedPaths, Array.Empty<string>());
+            return new RouteResult(ReportRouteStatus.AllSucceeded, Array.Empty<string>(), committedPaths, stagedPaths, Array.Empty<string>(), Array.Empty<string>());
         }
+
+        var allFileSinks = additionalSinks
+            .Where(s => s.DestinationType == ReportDestinationType.File)
+            .Select(s => s.FilePath!)
+            .ToArray();
+        var uncommittedPaths = allFileSinks.Except(committedPaths).ToArray();
 
         ReportRouteStatus status = committedPaths.Count > 0
             ? ReportRouteStatus.PartialOutput
             : ReportRouteStatus.OutputFailed;
 
-        return new RouteResult(status, failedPaths, committedPaths, stagedPaths, errorDetails);
+        return new RouteResult(status, failedPaths, committedPaths, stagedPaths, uncommittedPaths, errorDetails);
     }
 
     private static string? StdoutOrAnySinkNeeds(
@@ -234,36 +240,6 @@ internal sealed class ReportCoordinator
         {
             throw new InvalidOperationException(
                 $"Report content exceeds maximum size of {MaxReportBytes} bytes.");
-        }
-    }
-
-    private static void ValidateWrittenTempFile(string tempPath, string format)
-    {
-        if (!File.Exists(tempPath))
-        {
-            return;
-        }
-
-        long fileSize = new FileInfo(tempPath).Length;
-        if (fileSize > MaxReportBytes)
-        {
-            try { File.Delete(tempPath); } catch { }
-            throw new InvalidOperationException(
-                $"Report file exceeds maximum size of {MaxReportBytes} bytes.");
-        }
-
-        if (format is "json" or "sarif")
-        {
-            try
-            {
-                string fileContent = File.ReadAllText(tempPath);
-                _ = JsonNode.Parse(fileContent);
-            }
-            catch (Exception)
-            {
-                try { File.Delete(tempPath); } catch { }
-                throw;
-            }
         }
     }
 

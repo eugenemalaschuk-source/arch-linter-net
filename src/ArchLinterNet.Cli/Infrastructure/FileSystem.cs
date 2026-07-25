@@ -25,6 +25,16 @@ internal sealed class FileSystem : IFileSystem
 
         string tempPath = absolutePath + "." + Guid.NewGuid().ToString("N") + ".tmp";
         File.WriteAllText(tempPath, contents);
+
+        long fileSize = new FileInfo(tempPath).Length;
+        const long MaxReportFileSize = 100L * 1024 * 1024;
+        if (fileSize > MaxReportFileSize)
+        {
+            try { File.Delete(tempPath); } catch { }
+            throw new InvalidOperationException(
+                $"Report file exceeds maximum size of {MaxReportFileSize} bytes.");
+        }
+
         return tempPath;
     }
 
