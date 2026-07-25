@@ -58,64 +58,113 @@ public sealed class ArchitectureValidationApplicationService(
     private ArchitectureAnalysisSnapshot CreateSnapshotCore(
         AnalysisSnapshotRequest request, string? modeHint, ValidationTiming? timing)
     {
-        ComposedPolicy policy;
-        using (timing?.Measure("policy_composition"))
-            policy = ComposeDocument(request, modeHint, timing);
-
-        ArchitectureRunnerSetup setup;
-        using (timing?.Measure("load_and_setup"))
-            setup = BuildRunnerFor(policy, request, modeHint, timing);
-
-        int projectGraphEvaluations = 1;
-        int assemblyLoads = setup.AssemblyLoads;
-        IArchitectureContractRunner runner = setup.Runner;
-
-        BuildStatePreflightResult preflight;
-        using (timing?.Measure("build_state_preflight"))
-            preflight = RunBuildStatePreflight(request, runner);
-
-        // --ensure-built may have just written new build output that the runner/session above —
-        // built from assembly resolution that ran before this build — cannot see: its
-        // ArchitectureAnalysisContext captured whatever resolution found (or failed to find) at
-        // that earlier point in time. Rebuilding the runner/session after a successful build
-        // re-discovers and re-resolves from the now-current filesystem state, so every mode
-        // evaluated against this snapshot actually analyzes the artifacts preflight just verified.
-        // Only project discovery/assembly resolution/session construction are redone here — the
-        // policy document composed above (policy load, baseline merge, severity validation,
-        // contract-ID selection) does not depend on build output and is intentionally reused
-        // rather than recomposed, so policy composition still happens exactly once regardless of
-        // whether ensure-built triggers this rebuild. This rebuild is part of building the one
-        // snapshot, not per-mode work, so it runs at most once regardless of how many modes are
-        // later evaluated.
-        if (!preflight.Blocked
-            && request.PreparationMode == BuildPreparationMode.EnsureBuilt
-            && runner.Session.Context.ProjectDiscovery is { DiscoveredProjects.Count: > 0 })
+        ArchitectureContractDocument? document = null;
+        ArchitectureRunnerSetup? setup = null;
+        try
         {
-            using (timing?.Measure("post_ensure_built_reload"))
-                setup = BuildRunnerFor(policy, request, modeHint, timing, loadPostBuildArtifacts: true);
-            projectGraphEvaluations = 2;
-            assemblyLoads += setup.AssemblyLoads;
-            runner = setup.Runner;
-        }
+            ComposedPolicy policy;
+            using (timing?.Measure("policy_composition"))
+            {
+                try
+                {
+                    document = runnerSetupService.LoadDocument(request.PolicyPath, request.BaselinePath, timing);
+                }
+                catch (ArchitecturePolicyImportException ex)
+                {
+                    throw new ArchitecturePolicyLoadException(ex.Message, ex.Diagnostic, ex.Category.ToString(), ex);
+                }
 
-        return new ArchitectureAnalysisSnapshot(
-            policy.Document,
-            setup,
-            preflight,
-            policy.UnmatchedConfig,
-            policy.PolicyConsistencyConfig,
-            policy.CoverageConfig,
-            request.EnforceUnmatchedIgnoredViolationsPolicy,
-            request.IncludeAsmdefContracts,
-            contractExecutor,
-            handlerRegistry,
-            policyCompositions: 1,
-            projectGraphEvaluations: projectGraphEvaluations,
-            assemblyLoads: assemblyLoads,
-            // Only a snapshot meant to serve any/all requested modes (modeHint null) needs the
-            // per-mode re-check in Evaluate — a single-mode snapshot (modeHint set) already
-            // validated its one mode's contract IDs exactly as before this change, above.
-            requestedContractIds: modeHint == null ? request.ContractIds : null);
+                // This can reject an invalid severity or contract ID after the policy/imports
+                // (and optional baseline) were loaded. Keep it inside the provenance-aware try
+                // so an error report cannot overwrite one of those already-consumed inputs.
+                policy = ComposeDocument(document, request, modeHint);
+            }
+
+            using (timing?.Measure("load_and_setup"))
+                setup = BuildRunnerFor(policy, request, modeHint, timing);
+
+            int projectGraphEvaluations = 1;
+            int assemblyLoads = setup.AssemblyLoads;
+            IArchitectureContractRunner runner = setup.Runner;
+
+            BuildStatePreflightResult preflight;
+            using (timing?.Measure("build_state_preflight"))
+                preflight = RunBuildStatePreflight(request, runner);
+
+            // --ensure-built may have just written new build output that the runner/session above —
+            // built from assembly resolution that ran before this build — cannot see: its
+            // ArchitectureAnalysisContext captured whatever resolution found (or failed to find) at
+            // that earlier point in time. Rebuilding the runner/session after a successful build
+            // re-discovers and re-resolves from the now-current filesystem state, so every mode
+            // evaluated against this snapshot actually analyzes the artifacts preflight just verified.
+            // Only project discovery/assembly resolution/session construction are redone here — the
+            // policy document composed above (policy load, baseline merge, severity validation,
+            // contract-ID selection) does not depend on build output and is intentionally reused
+            // rather than recomposed, so policy composition still happens exactly once regardless of
+            // whether ensure-built triggers this rebuild. This rebuild is part of building the one
+            // snapshot, not per-mode work, so it runs at most once regardless of how many modes are
+            // later evaluated.
+            if (!preflight.Blocked
+                && request.PreparationMode == BuildPreparationMode.EnsureBuilt
+                && runner.Session.Context.ProjectDiscovery is { DiscoveredProjects.Count: > 0 })
+            {
+                using (timing?.Measure("post_ensure_built_reload"))
+                    setup = BuildRunnerFor(policy, request, modeHint, timing, loadPostBuildArtifacts: true);
+                projectGraphEvaluations = 2;
+                assemblyLoads += setup.AssemblyLoads;
+                runner = setup.Runner;
+            }
+
+            return new ArchitectureAnalysisSnapshot(
+                policy.Document,
+                setup,
+                preflight,
+                policy.UnmatchedConfig,
+                policy.PolicyConsistencyConfig,
+                policy.CoverageConfig,
+                request.EnforceUnmatchedIgnoredViolationsPolicy,
+                request.IncludeAsmdefContracts,
+                contractExecutor,
+                handlerRegistry,
+                policyCompositions: 1,
+                projectGraphEvaluations: projectGraphEvaluations,
+                assemblyLoads: assemblyLoads,
+                // Only a snapshot meant to serve any/all requested modes (modeHint null) needs the
+                // per-mode re-check in Evaluate — a single-mode snapshot (modeHint set) already
+                // validated its one mode's contract IDs exactly as before this change, above.
+                requestedContractIds: modeHint == null ? request.ContractIds : null);
+        }
+        catch (Exception ex) when (document is not null
+            && ex is not ArchitecturePolicyLoadException and not ArchitecturePolicyValidationException)
+        {
+            string repositoryRoot = setup?.RepositoryRoot
+                ?? Path.GetDirectoryName(Path.GetFullPath(request.PolicyPath))
+                ?? Environment.CurrentDirectory;
+            HashSet<string> policyInputPaths = new(StringComparer.OrdinalIgnoreCase)
+            {
+                Path.GetFullPath(request.PolicyPath),
+            };
+            if (request.BaselinePath is not null)
+            {
+                policyInputPaths.Add(Path.GetFullPath(request.BaselinePath));
+            }
+            foreach (ArchitecturePolicySourceDescriptor source in document.Provenance.Sources)
+            {
+                policyInputPaths.Add(Path.GetFullPath(Path.Combine(repositoryRoot, source.SourcePath)));
+            }
+            IReadOnlyList<string> resolvedAssemblyPaths = setup?.Runner.Session.Context.TargetAssemblies
+                .Select(assembly => assembly.Location)
+                .Where(path => !string.IsNullOrEmpty(path))
+                .Select(Path.GetFullPath)
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToArray()
+                ?? Array.Empty<string>();
+            IReadOnlyList<string> discoveredProjectPaths =
+                setup?.Runner.Session.Context.DiscoveredProjectPaths ?? Array.Empty<string>();
+
+            throw new ArchitectureAnalysisEvaluationException(
+                ex.Message, ex, policyInputPaths.ToArray(), resolvedAssemblyPaths, discoveredProjectPaths);
+        }
     }
 
     // Preflight only runs when project discovery produced a project graph — the fingerprint/
@@ -171,11 +220,9 @@ public sealed class ArchitectureValidationApplicationService(
     // later (see CreateSnapshot) and the specific mode for the single-mode Validate path, so
     // contract-ID selection validates against exactly the same catalog it did before this change
     // for single-mode callers.
-    private ComposedPolicy ComposeDocument(AnalysisSnapshotRequest request, string? modeHint, ValidationTiming? timing)
+    private ComposedPolicy ComposeDocument(
+        ArchitectureContractDocument document, AnalysisSnapshotRequest request, string? modeHint)
     {
-        ArchitectureContractDocument document =
-            runnerSetupService.LoadDocument(request.PolicyPath, request.BaselinePath, timing);
-
         string unmatchedConfig = document.Analysis.UnmatchedIgnoredViolations;
         if (request.EnforceUnmatchedIgnoredViolationsPolicy)
         {

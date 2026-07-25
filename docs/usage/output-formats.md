@@ -53,7 +53,7 @@ Shortcut:
 arch-linter-net --strict --json > architecture-violations.json
 ```
 
-JSON output is written to stdout. When `--timings` is also enabled, timings are written to stderr so stdout remains parseable.
+JSON output is written to stdout by default. Use `--report json=<path>` to write JSON to a file while routing a different format to stdout. When `--timings` is also enabled, timings are written to stderr so stdout remains parseable.
 
 Current JSON output is a single top-level object with these arrays:
 
@@ -156,7 +156,7 @@ Use SARIF output to feed violations into GitHub code scanning or other standard 
 arch-linter-net --mode strict --format sarif > architecture-violations.sarif
 ```
 
-SARIF output is a single SARIF 2.1.0 document (`version: "2.1.0"`, with a `$schema` pointing at the SARIF 2.1.0 schema) containing one `run`:
+SARIF output is a single SARIF 2.1.0 document (`version: "2.1.0"`, with a `$schema` pointing at the SARIF 2.1.0 schema) containing one `run`. Use `--report sarif=<path>` to write SARIF to a file directly instead of redirecting stdout (also works in PowerShell):
 
 - `tool.driver.name` identifies the CLI, and `tool.driver.rules` lists every contract ID that produced a result, deduplicated by rule ID.
 - Each `result.ruleId` is the violating contract's ID (or a normalized fallback derived from its name when no ID is set).
@@ -169,7 +169,7 @@ SARIF output is a single SARIF 2.1.0 document (`version: "2.1.0"`, with a `$sche
 
 ```yaml
 - name: Validate architecture
-  run: arch-linter-net --strict --json > architecture-violations.json
+  run: arch-linter-net --strict --report json=architecture-violations.json
 
 - name: Upload architecture violations
   if: failure()
@@ -185,5 +185,23 @@ For audit runs, keep the job non-blocking and always upload the artifact:
 - name: Architecture audit
   if: always()
   continue-on-error: true
-  run: arch-linter-net --audit --json > architecture-audit.json
+  run: arch-linter-net --audit --report json=architecture-audit.json
+```
+
+For combined strict + audit with multi-sink output:
+
+```yaml
+- name: Validate architecture (strict + audit)
+  run: arch-linter-net --mode strict,audit \
+    --report json=architecture-results.json \
+    --report sarif=architecture-results.sarif
+
+- name: Upload architecture results
+  if: always()
+  uses: actions/upload-artifact@v4
+  with:
+    name: architecture-results
+    path: |
+      architecture-results.json
+      architecture-results.sarif
 ```

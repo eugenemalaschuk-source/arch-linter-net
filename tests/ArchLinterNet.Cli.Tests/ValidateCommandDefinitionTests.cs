@@ -48,7 +48,7 @@ public sealed class ValidateCommandDefinitionTests
     {
         (_, RecordingConsole console) = Run(args, format: expectedFormat);
 
-        Assert.That(console.OutputText, Does.Contain(expectedFormat == "human" ? "Architecture validation passed." : "formatted"));
+        Assert.That(console.OutputText, Does.Contain(expectedFormat == "human" ? "Architecture validation passed." : "{"));
     }
 
     [Test]
@@ -118,9 +118,170 @@ public sealed class ValidateCommandDefinitionTests
         Assert.That(runtime.LastTiming, Is.Not.Null);
     }
 
-    private static (RecordingRuntime Runtime, RecordingConsole Console) Run(string[] args, string format = "human")
+    [Test]
+    public void CreateRootCommand_ReportOption_AcceptsValidReportSink()
+    {
+        (RecordingRuntime runtime, RecordingConsole console) = Run(["--report", "json=results.json"]);
+
+        Assert.That(runtime.LastRequest, Is.Not.Null);
+        Assert.That(console.ErrorText, Is.Empty);
+    }
+
+    [Test]
+    public void CreateRootCommand_ReportOption_AcceptsMultipleSinks()
+    {
+        (RecordingRuntime runtime, RecordingConsole console) = Run([
+            "--report", "json=results.json",
+            "--report", "sarif=results.sarif",
+        ]);
+
+        Assert.That(runtime.LastRequest, Is.Not.Null);
+        Assert.That(console.ErrorText, Is.Empty);
+    }
+
+    [Test]
+    public void CreateRootCommand_ReportOption_AcceptsStderrDestination()
+    {
+        (RecordingRuntime runtime, RecordingConsole console) = Run([
+            "--report", "human=stderr",
+            "--report", "json=results.json",
+        ]);
+
+        Assert.That(runtime.LastRequest, Is.Not.Null);
+        Assert.That(console.ErrorText, Does.Contain("Architecture validation passed."));
+    }
+
+    [Test]
+    public void CreateRootCommand_ReportOption_RejectsInvalidFormat()
+    {
+        (RecordingRuntime runtime, RecordingConsole console) = Run(["--report", "xml=out.xml"]);
+
+        Assert.That(runtime.LastRequest, Is.Null);
+        Assert.That(console.ErrorText, Does.Contain("Invalid format"));
+    }
+
+    [Test]
+    public void CreateRootCommand_ReportOption_RejectsEmptyDestination()
+    {
+        (RecordingRuntime runtime, RecordingConsole console) = Run(["--report", "json="]);
+
+        Assert.That(runtime.LastRequest, Is.Null);
+        Assert.That(console.ErrorText, Does.Contain("Invalid --report"));
+    }
+
+    [Test]
+    public void CreateRootCommand_ReportOption_RejectsDuplicateDestinations()
+    {
+        (RecordingRuntime runtime, RecordingConsole console) = Run([
+            "--report", "json=results.json",
+            "--report", "sarif=results.json",
+        ]);
+
+        Assert.That(runtime.LastRequest, Is.Null);
+        Assert.That(console.ErrorText, Does.Contain("Duplicate"));
+    }
+
+    [Test]
+    public void CreateRootCommand_ReportOption_RejectsExplicitFormatWithReport()
+    {
+        (RecordingRuntime runtime, RecordingConsole console) = Run(["--report", "json=stdout", "--format", "json"]);
+
+        Assert.That(runtime.LastRequest, Is.Null);
+        Assert.That(console.ErrorText, Does.Contain("cannot be combined with --report"));
+    }
+
+    [Test]
+    public void CreateRootCommand_ReportOption_AcceptsReportSinksWithoutExplicitFormat()
+    {
+        (RecordingRuntime runtime, RecordingConsole console) = Run(["--report", "json=stdout"]);
+
+        Assert.That(runtime.LastRequest, Is.Not.Null);
+        Assert.That(console.ErrorText, Is.Empty);
+    }
+
+    [Test]
+    public void CreateRootCommand_ReportOption_RejectsDuplicateNormalizedPaths()
+    {
+        (RecordingRuntime runtime, RecordingConsole console) = Run([
+            "--report", "json=results.json",
+            "--report", "sarif=./results.json",
+        ]);
+
+        Assert.That(runtime.LastRequest, Is.Null);
+        Assert.That(console.ErrorText, Does.Contain("Duplicate"));
+    }
+
+    [Test]
+    public void CreateRootCommand_ReportOption_RejectsPolicyFileCollision()
+    {
+        (RecordingRuntime runtime, RecordingConsole console) = Run([
+            "--report", "json=architecture/dependencies.arch.yml",
+        ]);
+
+        Assert.That(runtime.LastRequest, Is.Null);
+        Assert.That(console.ErrorText, Does.Contain("matches an input file"));
+    }
+
+    [Test]
+    public void CreateRootCommand_ReportOption_RejectsBaselineFileCollision()
+    {
+        (RecordingRuntime runtime, RecordingConsole console) = Run([
+            "--baseline", "baseline.yml",
+            "--report", "json=baseline.yml",
+        ]);
+
+        Assert.That(runtime.LastRequest, Is.Null);
+        Assert.That(console.ErrorText, Does.Contain("matches an input file"));
+    }
+
+    [Test]
+    public void CreateRootCommand_ReportOption_AllowsReceiptLookingPathNeverActuallyLoaded()
+    {
+        // A destination that merely *looks* like a receipt path, but was never consulted during
+        // this run (ResolvedAssemblyPathsToReturn is empty), is a legitimate user choice and must
+        // not be blocked just because of its suffix.
+        (RecordingRuntime runtime, RecordingConsole console) = Run([
+            "--report", "json=bin/Debug/net10.0/MyApp.archlinternet-receipt.json",
+        ]);
+
+        Assert.That(runtime.LastRequest, Is.Not.Null);
+        Assert.That(console.ErrorText, Is.Empty);
+    }
+
+    [Test]
+    public void CreateRootCommand_ReportOption_RejectsActualReceiptFileCollision()
+    {
+        string assemblyPath = Path.GetFullPath("bin/Debug/net10.0/MyApp.dll");
+
+        (RecordingRuntime runtime, RecordingConsole console) = Run(
+            ["--report", "json=bin/Debug/net10.0/MyApp.dll.archlinternet-receipt.json"],
+            resolvedAssemblyPaths: [assemblyPath]);
+
+        Assert.That(runtime.LastRequest, Is.Not.Null);
+        Assert.That(console.ErrorText, Does.Contain("matches a build artifact or receipt loaded during this run"));
+    }
+
+    [Test]
+    public void CreateRootCommand_ReportOption_RejectsLoadedAssemblyFileCollision()
+    {
+        string assemblyPath = Path.GetFullPath("bin/Debug/net10.0/MyApp.dll");
+
+        (RecordingRuntime runtime, RecordingConsole console) = Run(
+            ["--report", "json=bin/Debug/net10.0/MyApp.dll"],
+            resolvedAssemblyPaths: [assemblyPath]);
+
+        Assert.That(runtime.LastRequest, Is.Not.Null);
+        Assert.That(console.ErrorText, Does.Contain("matches a build artifact or receipt loaded during this run"));
+    }
+
+    private static (RecordingRuntime Runtime, RecordingConsole Console) Run(
+        string[] args, string format = "human", IReadOnlyList<string>? resolvedAssemblyPaths = null)
     {
         var runtime = new RecordingRuntime();
+        if (resolvedAssemblyPaths is not null)
+        {
+            runtime.ResolvedAssemblyPathsToReturn = resolvedAssemblyPaths;
+        }
         var console = new RecordingConsole();
         var fileSystem = new RecordingFileSystem(true);
         RootCommand command = new ValidateCommandModule().CreateRootCommand(runtime, console, fileSystem);
@@ -139,7 +300,12 @@ public sealed class ValidateCommandDefinitionTests
     private sealed class RecordingFileSystem(bool exists) : IFileSystem
     {
         public bool FileExists(string path) => exists;
+        public string ReadAllText(string path) => "{}";
         public void WriteAllText(string path, string contents) { }
+        public string WriteAllTextToTemp(string targetPath, string contents) => targetPath + ".tmp";
+        public void RenameTempToTarget(string tempPath, string targetPath) { }
+        public void DeleteFile(string path) { }
+        public bool CanWriteToDirectory(string path) => true;
     }
 
     private sealed class RecordingConsole : ICliConsole
@@ -157,6 +323,10 @@ public sealed class ValidateCommandDefinitionTests
         public string Version => "1.2.3";
         public ValidationRequest? LastRequest { get; private set; }
         public ValidationTiming? LastTiming { get; private set; }
+        public IReadOnlyCollection<BuildStatePreflightDiagnostic> PreflightDiagnosticsToReturn { get; set; } =
+            Array.Empty<BuildStatePreflightDiagnostic>();
+        public IReadOnlyList<string> ResolvedAssemblyPathsToReturn { get; set; } =
+            Array.Empty<string>();
 
         public bool TryParseGraphLevel(string value, out ArchitectureGraphLevel level) => throw new NotSupportedException();
 
@@ -176,7 +346,11 @@ public sealed class ValidateCommandDefinitionTests
                 "off",
                 Array.Empty<ArchitectureCoverageSummary>(),
                 Array.Empty<ArchitectureClassificationConflict>(),
-                Array.Empty<ArchitectureClassificationMetadataFailure>());
+                Array.Empty<ArchitectureClassificationMetadataFailure>())
+            {
+                PreflightDiagnostics = PreflightDiagnosticsToReturn,
+                ResolvedAssemblyPaths = ResolvedAssemblyPathsToReturn,
+            };
         }
 
         public ArchitectureAnalysisSnapshot CreateSnapshot(AnalysisSnapshotRequest request, ValidationTiming? timing) =>
@@ -196,11 +370,11 @@ public sealed class ValidateCommandDefinitionTests
             IReadOnlyCollection<ArchitectureClassificationMetadataFailure> classificationMetadataFailures,
             IReadOnlyCollection<ArchitectureClassificationRoleFact> classificationRoles,
             ArchitectureClassificationPathDeferredNotice? classificationPathDeferred,
-            IReadOnlyCollection<BuildStatePreflightDiagnostic> preflightDiagnostics) => "formatted";
+            IReadOnlyCollection<BuildStatePreflightDiagnostic> preflightDiagnostics) => "{}";
 
         public string FormatBuildStatePreflightForHumans(IReadOnlyCollection<BuildStatePreflightDiagnostic> diagnostics) => "formatted";
 
-        public string FormatResultAsSarif(string mode, IReadOnlyCollection<ArchitectureViolation> violations, IReadOnlyCollection<string> cycles, IReadOnlyCollection<ArchitectureCycleFinding> cycleFindings, IReadOnlyCollection<BuildStatePreflightDiagnostic> preflightDiagnostics) => "formatted";
+        public string FormatResultAsSarif(string mode, IReadOnlyCollection<ArchitectureViolation> violations, IReadOnlyCollection<string> cycles, IReadOnlyCollection<ArchitectureCycleFinding> cycleFindings, IReadOnlyCollection<BuildStatePreflightDiagnostic> preflightDiagnostics) => "{\"version\":\"2.1.0\",\"runs\":[]}";
         public string FormatViolationsForHumans(IReadOnlyCollection<ArchitectureViolation> violations) => "formatted";
         public string FormatCyclesForHumans(IReadOnlyCollection<string> cycles, IReadOnlyCollection<ArchitectureCycleFinding> cycleFindings) => "formatted";
         public string FormatPolicyConsistencyForHumans(IReadOnlyCollection<PolicyConsistencyDiagnostic> diagnostics) => "formatted";

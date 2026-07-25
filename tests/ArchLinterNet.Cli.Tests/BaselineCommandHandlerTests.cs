@@ -527,11 +527,30 @@ public sealed partial class BaselineCommandHandlerTests
 
         public bool FileExists(string path) => _existingPaths.Contains(path);
 
+        public string ReadAllText(string path) => string.Empty;
+
         public void WriteAllText(string path, string contents)
         {
             LastWritePath = path;
             LastWriteContents = contents;
         }
+
+        public string WriteAllTextToTemp(string targetPath, string contents)
+        {
+            LastWritePath = targetPath;
+            LastWriteContents = contents;
+            return targetPath + ".tmp";
+        }
+
+        public void RenameTempToTarget(string tempPath, string targetPath)
+        {
+        }
+
+        public void DeleteFile(string path)
+        {
+        }
+
+        public bool CanWriteToDirectory(string path) => true;
     }
 
     private sealed class RecordingConsole : ICliConsole

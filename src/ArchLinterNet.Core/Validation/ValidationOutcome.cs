@@ -38,4 +38,26 @@ public sealed record ValidationOutcome(
         Array.Empty<BuildStatePreflightDiagnostic>();
 
     public bool PreflightBlocked { get; init; }
+
+    // All source file paths in the policy import graph, including the root document.
+    // Populated by ArchitectureAnalysisSnapshot after policy loading.
+    public IReadOnlyList<string> PolicyImportPaths { get; init; } =
+        Array.Empty<string>();
+
+    // Every target assembly file path actually resolved for this analysis, independent of
+    // whether build-state preflight ran for it. Preflight diagnostics are skipped entirely when
+    // project discovery found no projects (see
+    // ArchitectureValidationApplicationService.RunBuildStatePreflight), but
+    // analysis.target_assemblies configured directly can still resolve assemblies in that case —
+    // this is the complete inventory, PreflightDiagnostics is not.
+    public IReadOnlyList<string> ResolvedAssemblyPaths { get; init; } =
+        Array.Empty<string>();
+
+    // Every project file (.csproj) discovered while building this analysis, independent of
+    // whether that project's assembly ultimately resolved. Populated by ArchitectureAnalysisSnapshot
+    // from the same project-discovery pass build-state preflight and assembly resolution both
+    // consume — a genuinely consumed input, protected the same way policy imports and resolved
+    // assemblies are.
+    public IReadOnlyList<string> DiscoveredProjectPaths { get; init; } =
+        Array.Empty<string>();
 }

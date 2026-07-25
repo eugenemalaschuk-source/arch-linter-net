@@ -30,6 +30,14 @@ public sealed class ArchitectureAnalysisContext : IDisposable
         AssemblyProbingPaths = assemblyProbingPaths ?? Array.Empty<string>();
         DiscoveryDiagnostics = discoveryDiagnostics ?? Array.Empty<ArchitectureProjectDiscoveryDiagnostic>();
         ProjectDiscovery = projectDiscovery;
+        // Expose the canonical project files consumed by discovery without making callers in
+        // Core.Validation depend on Core.Discovery's result/model types. Hosts use this inventory
+        // to ensure a report target cannot overwrite an input that was read for this analysis.
+        DiscoveredProjectPaths = projectDiscovery?.DiscoveredProjects
+            .Select(project => Path.GetFullPath(Path.Combine(repositoryRoot, project.Path)))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToArray()
+            ?? Array.Empty<string>();
         _isolatedLoadScope = isolatedLoadScope;
     }
 
@@ -44,6 +52,8 @@ public sealed class ArchitectureAnalysisContext : IDisposable
     public IReadOnlyCollection<ArchitectureProjectDiscoveryDiagnostic> DiscoveryDiagnostics { get; }
 
     public ProjectDiscoveryResult? ProjectDiscovery { get; }
+
+    public IReadOnlyList<string> DiscoveredProjectPaths { get; }
 
     public void Dispose()
     {
