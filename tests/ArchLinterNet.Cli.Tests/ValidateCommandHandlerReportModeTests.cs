@@ -450,6 +450,38 @@ public sealed class ValidateCommandHandlerReportModeTests
     }
 
     [Test]
+    public void ValidateHandler_ReportMode_FailedStdoutPreventsNormalSarifStderrAndFallsBackWithDiagnostics()
+    {
+        FakeCliRuntime runtime = new();
+        FakeCliConsole console = new(outputWriteFailures: 1);
+        FakeFileSystem fileSystem = new(exists: true);
+        ValidateCommandHandler handler = new(runtime, console, fileSystem);
+
+        ValidateCommandOptions options = new(
+            "policy.yml", "strict", "human", [], null, false, null, false, false)
+        {
+            AdditionalSinks =
+            [
+                new ReportSink("json", ReportDestinationType.Stdout, null),
+                new ReportSink("sarif", ReportDestinationType.Stderr, null),
+            ],
+        };
+
+        int exitCode = handler.Execute(options);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(exitCode, Is.EqualTo(CliExitCodes.InvalidArgumentsOrRuntimeError));
+            Assert.That(console.StdOut, Is.Empty);
+            using JsonDocument document = JsonDocument.Parse(console.StdErr);
+            Assert.That(document.RootElement.GetProperty("output_status").GetString(), Is.EqualTo("output-failed"));
+            Assert.That(document.RootElement.GetProperty("failed_paths").EnumerateArray()
+                .Select(path => path.GetString()), Does.Contain("<stdout>"));
+            Assert.That(document.RootElement.GetProperty("errors").GetArrayLength(), Is.GreaterThan(0));
+        });
+    }
+
+    [Test]
     public void ValidateHandler_ReportMode_ErrorFileFailureReplacesDeferredStderrWithOneDiagnostic()
     {
         // The policy error itself is only emitted after its file sink stages. If that staging
@@ -637,38 +669,50 @@ public sealed class ValidateCommandHandlerReportModeTests
         public ArchitectureExplainOutcome Explain(ArchitectureExplainRequest request) => throw new NotSupportedException();
     }
 
-    private sealed class FakeCliConsole(int errorWriteFailures = 0) : ICliConsole
+    private sealed class FakeCliConsole(int errorWriteFailures = 0, int outputWriteFailures = 0) : ICliConsole
     {
         private readonly StringBuilder _stdout = new();
         private readonly StringBuilder _stderr = new();
         private int _errorWriteFailuresRemaining = errorWriteFailures;
+        private int _outputWriteFailuresRemaining = outputWriteFailures;
 
-        public TextWriter Out => new StringWriter(_stdout);
+        public TextWriter Out => new FailingStringWriter(_stdout, this, isError: false);
 
-        public TextWriter Error => new FailingStringWriter(_stderr, this);
+        public TextWriter Error => new FailingStringWriter(_stderr, this, isError: true);
 
         public string StdOut => _stdout.ToString();
 
         public string StdErr => _stderr.ToString();
 
-        private bool ConsumeErrorWriteFailure()
+        private bool ConsumeWriteFailure(bool isError)
         {
-            if (_errorWriteFailuresRemaining == 0)
+            if (isError)
+            {
+                if (_errorWriteFailuresRemaining == 0)
+                {
+                    return false;
+                }
+
+                _errorWriteFailuresRemaining--;
+                return true;
+            }
+
+            if (_outputWriteFailuresRemaining == 0)
             {
                 return false;
             }
 
-            _errorWriteFailuresRemaining--;
+            _outputWriteFailuresRemaining--;
             return true;
         }
 
-        private sealed class FailingStringWriter(StringBuilder builder, FakeCliConsole owner) : StringWriter(builder)
+        private sealed class FailingStringWriter(StringBuilder builder, FakeCliConsole owner, bool isError) : StringWriter(builder)
         {
             public override void WriteLine(string? value)
             {
-                if (owner.ConsumeErrorWriteFailure())
+                if (owner.ConsumeWriteFailure(isError))
                 {
-                    throw new IOException("stderr is closed");
+                    throw new IOException(isError ? "stderr is closed" : "stdout is closed");
                 }
 
                 base.WriteLine(value);

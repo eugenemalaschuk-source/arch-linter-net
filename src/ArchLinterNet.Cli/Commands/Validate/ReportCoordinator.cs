@@ -214,7 +214,10 @@ internal sealed class ReportCoordinator
                 .Where(sink => sink.DestinationType != ReportDestinationType.File)
                 .OrderBy(sink => sink.DestinationType == ReportDestinationType.Stdout ? 0 : 1))
             {
-                WriteStreamSink(sink, contentByFormat, failedPaths, errorDetails, deliveredStreamPaths);
+                if (!WriteStreamSink(sink, contentByFormat, failedPaths, errorDetails, deliveredStreamPaths))
+                {
+                    break;
+                }
             }
         }
 
@@ -260,7 +263,7 @@ internal sealed class ReportCoordinator
         }
     }
 
-    private void WriteStreamSink(
+    private bool WriteStreamSink(
         ReportSink sink,
         IReadOnlyDictionary<string, string> contentByFormat,
         List<string> failedPaths,
@@ -269,18 +272,20 @@ internal sealed class ReportCoordinator
     {
         if (!contentByFormat.TryGetValue(sink.Format, out string? content))
         {
-            return;
+            return true;
         }
 
         try
         {
             WriteToStream(sink.DestinationType, content);
             deliveredStreamPaths.Add(StreamFailureMarker(sink.DestinationType));
+            return true;
         }
         catch (Exception ex)
         {
             failedPaths.Add(StreamFailureMarker(sink.DestinationType));
             errorDetails.Add(ex.Message);
+            return false;
         }
     }
 
