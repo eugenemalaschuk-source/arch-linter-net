@@ -6,7 +6,7 @@ Normative target: `openspec/specs/adoption-stabilization-compatibility/spec.md`.
 
 ## Result
 
-The release-level architecture is coherent enough to become the shared source of truth. One already-shipped specification conflict and two design-source defects were corrected in this change. Remaining differences are implementation gaps explicitly owned by open child issues; they block #355 closure and the 0.5.1 release gate, not publication of the design contract.
+The release-level architecture is coherent enough to become the shared source of truth. One already-shipped specification conflict, two design-source defects, and one normative coverage gap were corrected in this change. Remaining differences are implementation gaps explicitly owned by open child issues; they block #355 closure and the 0.5.1 release gate, not publication of the design contract.
 
 ## Corrected during this pass
 
@@ -37,6 +37,19 @@ The first draft implied an all-or-none commit for multiple independent report fi
 
 The corrected contract stages and validates every file first, uses atomic same-directory replacement per destination where supported, and reports typed `partial-output` evidence if a later replacement fails after an earlier one committed. It never claims global rollback or reruns validation.
 
+### Shipped policy-expression families are normative inputs
+
+The first draft listed FrameworkReference and composition-root work only in the ownership matrix. That was insufficient for #355 because a future source-set or normalized-finding implementation could still weaken their already-shipped identity/evidence model.
+
+The compatibility spec now explicitly preserves:
+
+- FrameworkReference as a first-class family rather than a fake package;
+- explicit/SDK-implicit classification, project, configuration, TFM, declaration evidence, contract identity, provenance, and fail-closed project/MSBuild evaluation;
+- assembly-qualified composition source/member/project/occurrence identity;
+- distinct identities for same-named roots in different assemblies;
+- the non-goals of runtime DI inspection, application execution, and semantic data-flow analysis;
+- small-policy defaults when these families and source sets are unused.
+
 ## Already aligned on main
 
 ### CLI status compatibility
@@ -50,6 +63,10 @@ The shipped baseline schema reads document versions 1 and 2, keeps v1 legacy sem
 ### Analysis/build-state authority
 
 `analysis-build-state/v1` already separates build inputs, analysis inputs, verified artifacts, completed sessions, and process-local snapshot ownership. #355 reuses it rather than defining another fingerprint or cache key model.
+
+### FrameworkReference and composition foundations
+
+The shipped framework-reference capabilities already use real per-TFM/configuration project evaluation, preserve explicit/implicit and project evidence, and fail closed when trustworthy metadata is unavailable. The shipped composition capability already carries assembly-aware identity and typed evidence. #355 treats those capabilities as authoritative and constrains later expansion/reporting work not to weaken them.
 
 ### Policy schema compatibility
 
@@ -83,11 +100,11 @@ Must document one coherent policy/baseline/API/schema/report/status model for PO
 
 ### #368 / #369 — optional inputs and deterministic expansion
 
-Must share exact contract/input/source-instance identity, provenance, zero-match behavior, overlap normalization, and the include-minus-exclude selector algebra. Expansion must not silently enlarge the analysis graph.
+Must share exact contract/input/source-instance identity, provenance, zero-match behavior, overlap normalization, and the include-minus-exclude selector algebra. Expansion must not silently enlarge the analysis graph or weaken shipped FrameworkReference/composition identity and evidence.
 
 ### #370 — safe baseline authoring
 
-Must align generate/migrate/update/prune/diff/verify on exact identity, preview, atomic writes, reviewed metadata preservation, and the shared lifecycle vocabulary: `new`, `matched`, `resolved`, `stale`, `changed`, `ambiguous`, and `configuration-error`. Existing implementation text that still describes legacy tuple comparison is transitional and must be reconciled by this slice.
+Must align generate/migrate/update/prune/diff/verify on exact identity, preview, atomic writes, reviewed metadata preservation, and the shared lifecycle vocabulary: `new`, `matched`, `resolved`, `stale`, `changed`, `ambiguous`, and `configuration-error`. The current shipped use of `stale` for resolved debt and implementation text that still describes legacy tuple comparison are transitional and must be explicitly migrated/reconciled by this slice.
 
 ### #371 — assembly-free policy tooling
 
@@ -125,6 +142,7 @@ The already-merged #362 implementation documents narrower v1 fingerprint coverag
 |---|---|
 | Release-level compatibility source | defined |
 | Analysis/build-state slice | approved and implemented with documented limitations |
+| FrameworkReference/composition compatibility | explicit and authoritative |
 | Shipped baseline identity-version consistency | corrected |
 | CLI report/artifact option namespace | reconciled |
 | Multi-file commit semantics | made implementable and honest |
