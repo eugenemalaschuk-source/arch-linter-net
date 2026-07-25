@@ -96,10 +96,10 @@ public sealed class CliArchitectureTests
         ArchitecturePolicySourceLocation location = new(source, "$", 1, 1, null, null);
         FakeCliRuntime runtime = new()
         {
-            ExceptionToThrow = new ArchitecturePolicyImportException(
-                ArchitecturePolicyImportErrorCategory.SourceShape,
+            ExceptionToThrow = new ArchitecturePolicyLoadException(
                 "Invalid namespace.",
-                new ArchitecturePolicyDiagnostic(ArchitecturePolicyDiagnosticKind.SourceShape, location, [], source.ImportChain))
+                new ArchitecturePolicyDiagnostic(ArchitecturePolicyDiagnosticKind.SourceShape, location, [], source.ImportChain),
+                ArchitecturePolicyImportErrorCategory.SourceShape.ToString())
         };
         FakeCliConsole console = new();
         ValidateCommandHandler handler = new(runtime, console, null!);
@@ -180,10 +180,10 @@ public sealed class CliArchitectureTests
         ArchitecturePolicySourceLocation location = new(source, "$", 1, 1, null, null);
         FakeCliRuntime runtime = new()
         {
-            ExceptionToThrow = new ArchitecturePolicyImportException(
-                ArchitecturePolicyImportErrorCategory.SourceShape,
+            ExceptionToThrow = new ArchitecturePolicyLoadException(
                 "Root policy is not a valid mapping document.",
-                new ArchitecturePolicyDiagnostic(ArchitecturePolicyDiagnosticKind.SourceShape, location, [], source.ImportChain))
+                new ArchitecturePolicyDiagnostic(ArchitecturePolicyDiagnosticKind.SourceShape, location, [], source.ImportChain),
+                ArchitecturePolicyImportErrorCategory.SourceShape.ToString())
         };
         FakeCliConsole console = new();
         ValidateCommandHandler handler = new(runtime, console, null!);
@@ -207,14 +207,14 @@ public sealed class CliArchitectureTests
             "architecture/root.yml", "architecture/fragment.yml", ArchitecturePolicyDocumentRole.Fragment,
             1, "architecture/root.yml", "fragment.yml", ["architecture/root.yml", "architecture/fragment.yml"]);
         ArchitecturePolicySourceLocation location = new(source, "imports[0]", 2, 3, null, null);
-        var exception = new ArchitecturePolicyImportException(
-            ArchitecturePolicyImportErrorCategory.PathCaseMismatch,
+        var exception = new ArchitecturePolicyLoadException(
             "Policy import 'fragment.yml' does not match on-disk casing.",
             new ArchitecturePolicyDiagnostic(
                 ArchitecturePolicyDiagnosticKind.ImportResolution,
                 location,
                 [],
-                source.ImportChain));
+                source.ImportChain),
+            ArchitecturePolicyImportErrorCategory.PathCaseMismatch.ToString());
         FakeCliRuntime runtime = new() { ExceptionToThrow = exception };
         FakeCliConsole sarifConsole = new();
         FakeCliConsole humanConsole = new();
@@ -244,14 +244,14 @@ public sealed class CliArchitectureTests
             1, "architecture/root.yml", "fragment.yml", ["architecture/root.yml", "architecture/fragment.yml"]);
         FakeCliRuntime runtime = new()
         {
-            ExceptionToThrow = new ArchitecturePolicyImportException(
-                ArchitecturePolicyImportErrorCategory.MissingFile,
+            ExceptionToThrow = new ArchitecturePolicyLoadException(
                 "Policy source file not found: architecture/fragment.yml",
                 new ArchitecturePolicyDiagnostic(
                     ArchitecturePolicyDiagnosticKind.ImportResolution,
                     new ArchitecturePolicySourceLocation(source, "imports[0]", 2, 1, null, null),
                     [],
-                    source.ImportChain))
+                    source.ImportChain),
+                ArchitecturePolicyImportErrorCategory.MissingFile.ToString())
         };
         FakeCliConsole console = new();
 
@@ -280,10 +280,10 @@ public sealed class CliArchitectureTests
         ArchitecturePolicySourceLocation related = new(fragment, "layers.domain", 4, 1, null, null);
         FakeCliRuntime runtime = new()
         {
-            ExceptionToThrow = new ArchitecturePolicyImportException(
-                ArchitecturePolicyImportErrorCategory.CompositionConflict,
+            ExceptionToThrow = new ArchitecturePolicyLoadException(
                 "Duplicate layer.",
-                new ArchitecturePolicyDiagnostic(ArchitecturePolicyDiagnosticKind.CompositionConflict, primary, [related], root.ImportChain))
+                new ArchitecturePolicyDiagnostic(ArchitecturePolicyDiagnosticKind.CompositionConflict, primary, [related], root.ImportChain),
+                ArchitecturePolicyImportErrorCategory.CompositionConflict.ToString())
         };
         FakeCliConsole console = new();
         ValidateCommandHandler handler = new(runtime, console, null!);
@@ -324,10 +324,10 @@ public sealed class CliArchitectureTests
         ArchitecturePolicySourceLocation location = new(source, "$", 1, 1, null, null);
         FakeCliRuntime runtime = new()
         {
-            ExceptionToThrow = new ArchitecturePolicyImportException(
-                ArchitecturePolicyImportErrorCategory.SourceShape,
+            ExceptionToThrow = new ArchitecturePolicyLoadException(
                 "Invalid namespace.",
-                new ArchitecturePolicyDiagnostic(ArchitecturePolicyDiagnosticKind.SourceShape, location, [], source.ImportChain))
+                new ArchitecturePolicyDiagnostic(ArchitecturePolicyDiagnosticKind.SourceShape, location, [], source.ImportChain),
+                ArchitecturePolicyImportErrorCategory.SourceShape.ToString())
         };
         FakeCliConsole console = new();
         FakeFileSystem fileSystem = new(exists: true);
@@ -439,6 +439,157 @@ public sealed class CliArchitectureTests
         });
     }
 
+    [Test]
+    public void ValidateHandler_ReportMode_OutputErrorSarifIsRealSarifNotJsonShape()
+    {
+        FakeCliRuntime runtime = new();
+        FakeCliConsole console = new();
+        FakeFileSystem fileSystem = new(exists: true);
+        fileSystem.FailOnWrite.Add("broken.sarif");
+        ValidateCommandHandler handler = new(runtime, console, fileSystem);
+
+        ValidateCommandOptions options = new(
+            "policy.yml", "strict", "human", [], null, false, null, false, false)
+        {
+            AdditionalSinks = [new ReportSink("sarif", ReportDestinationType.File, "broken.sarif")],
+        };
+
+        int exitCode = handler.Execute(options);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(exitCode, Is.EqualTo(CliExitCodes.InvalidArgumentsOrRuntimeError));
+            using JsonDocument document = JsonDocument.Parse(console.StdErr);
+            Assert.That(document.RootElement.GetProperty("version").GetString(), Is.EqualTo("2.1.0"));
+            JsonElement result = document.RootElement.GetProperty("runs")[0].GetProperty("results")[0];
+            Assert.That(result.GetProperty("ruleId").GetString(), Is.EqualTo("architecture-output"));
+            Assert.That(result.GetProperty("properties").GetProperty("output_status").GetString(),
+                Is.EqualTo("output-failed"));
+            Assert.That(console.StdErr, Does.Not.Contain("architecture_execution_error"));
+        });
+    }
+
+    [Test]
+    public void ValidateHandler_ReportMode_OutputErrorIncludesUnderlyingValidationResult()
+    {
+        FakeCliRuntime runtime = new()
+        {
+            ForcedOutcome = new ValidationOutcome(
+                false,
+                new[] { new ArchitectureViolation("rule-a", null, "pkg-a", "pkg-b", Array.Empty<string>()) },
+                Array.Empty<string>(), Array.Empty<ArchitectureViolation>(), "off",
+                Array.Empty<ArchitectureUnmatchedIgnoredViolation>(), "off",
+                Array.Empty<PolicyConsistencyDiagnostic>(), "off",
+                Array.Empty<ArchitectureCoverageSummary>(),
+                Array.Empty<ArchitectureClassificationConflict>(),
+                Array.Empty<ArchitectureClassificationMetadataFailure>()),
+        };
+        FakeCliConsole console = new();
+        FakeFileSystem fileSystem = new(exists: true);
+        fileSystem.FailOnWrite.Add("broken.txt");
+        ValidateCommandHandler handler = new(runtime, console, fileSystem);
+
+        ValidateCommandOptions options = new(
+            "policy.yml", "strict", "human", [], null, false, null, false, false)
+        {
+            AdditionalSinks =
+            [
+                new ReportSink("human", ReportDestinationType.File, "broken.txt"),
+                new ReportSink("human", ReportDestinationType.Stderr, null),
+            ],
+        };
+
+        int exitCode = handler.Execute(options);
+
+        Assert.Multiple(() =>
+        {
+            // An output-routing failure must not swallow whether the underlying validation
+            // itself passed or failed — the exit code alone (2, not 1) can't convey that.
+            Assert.That(exitCode, Is.EqualTo(CliExitCodes.InvalidArgumentsOrRuntimeError));
+            Assert.That(console.StdErr, Does.Contain("validation result"));
+            Assert.That(console.StdErr, Does.Contain("strict=failed"));
+            Assert.That(console.StdErr, Does.Contain("1 violation"));
+        });
+    }
+
+    [Test]
+    public void ValidateHandler_ReportMode_PolicyErrorDoesNotOverwriteFailedImportFragment()
+    {
+        // A --report destination that matches the exact file this import failure involves must
+        // not receive the error document — that would overwrite the fragment that just failed
+        // to import with unrelated error JSON.
+        ArchitecturePolicySourceDescriptor source = new(
+            "architecture/root.yml", "architecture/fragment.yml", ArchitecturePolicyDocumentRole.Fragment,
+            1, "architecture/root.yml", "fragment.yml", ["architecture/root.yml", "architecture/fragment.yml"]);
+        ArchitecturePolicySourceLocation location = new(source, "imports[0]", 2, 1, null, null);
+        FakeCliRuntime runtime = new()
+        {
+            ExceptionToThrow = new ArchitecturePolicyLoadException(
+                "Policy source file not found: architecture/fragment.yml",
+                new ArchitecturePolicyDiagnostic(
+                    ArchitecturePolicyDiagnosticKind.ImportResolution, location, [], source.ImportChain),
+                ArchitecturePolicyImportErrorCategory.MissingFile.ToString()),
+        };
+        FakeCliConsole console = new();
+        FakeFileSystem fileSystem = new(exists: true);
+        ValidateCommandHandler handler = new(runtime, console, fileSystem);
+
+        ValidateCommandOptions options = new(
+            "policy.yml", "strict", "human", [], null, false, null, false, false)
+        {
+            AdditionalSinks = [new ReportSink("json", ReportDestinationType.File, "architecture/fragment.yml")],
+        };
+
+        int exitCode = handler.Execute(options);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(exitCode, Is.EqualTo(CliExitCodes.InvalidArgumentsOrRuntimeError));
+            Assert.That(fileSystem.CommittedPaths, Is.Empty);
+            Assert.That(console.StdErr, Does.Contain("matches a policy file involved in this import failure"));
+        });
+    }
+
+    [Test]
+    public void ValidateHandler_ReportMode_ErrorReportWriteFailureSurfacesEvidence()
+    {
+        // RouteErrorToAllSinks's result must not be discarded: when the error report itself
+        // fails to reach its file sink, that failure needs its own typed evidence, not silence.
+        ArchitecturePolicySourceDescriptor source = new(
+            "architecture/root.yml", "architecture/root.yml", ArchitecturePolicyDocumentRole.Root,
+            0, null, null, ["architecture/root.yml"]);
+        ArchitecturePolicySourceLocation location = new(source, "$", 1, 1, null, null);
+        FakeCliRuntime runtime = new()
+        {
+            ExceptionToThrow = new ArchitecturePolicyLoadException(
+                "Invalid namespace.",
+                new ArchitecturePolicyDiagnostic(ArchitecturePolicyDiagnosticKind.SourceShape, location, [], source.ImportChain),
+                ArchitecturePolicyImportErrorCategory.SourceShape.ToString()),
+        };
+        FakeCliConsole console = new();
+        FakeFileSystem fileSystem = new(exists: true);
+        fileSystem.FailOnWrite.Add("unwritable.json");
+        ValidateCommandHandler handler = new(runtime, console, fileSystem);
+
+        ValidateCommandOptions options = new(
+            "policy.yml", "strict", "human", [], null, false, null, false, false)
+        {
+            AdditionalSinks = [new ReportSink("json", ReportDestinationType.File, "unwritable.json")],
+        };
+
+        int exitCode = handler.Execute(options);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(exitCode, Is.EqualTo(CliExitCodes.InvalidArgumentsOrRuntimeError));
+            // The original diagnostic still reaches the user (on stderr, since its file sink
+            // failed) alongside typed evidence of the routing failure itself.
+            Assert.That(console.StdErr, Does.Contain("architecture_policy_error"));
+            Assert.That(console.StdErr, Does.Contain("Report output failed"));
+            Assert.That(console.StdErr, Does.Contain("unwritable.json"));
+        });
+    }
+
     private sealed class FakeCliRuntime : ICliRuntime
     {
         public string Version => "1.2.3";
@@ -446,6 +597,8 @@ public sealed class CliArchitectureTests
         public ValidationRequest? LastValidationRequest { get; private set; }
 
         public Exception? ExceptionToThrow { get; init; }
+
+        public ValidationOutcome? ForcedOutcome { get; init; }
 
         public bool TryParseGraphLevel(string value, out ArchitectureGraphLevel level)
         {
@@ -459,6 +612,11 @@ public sealed class CliArchitectureTests
             if (ExceptionToThrow is not null)
             {
                 throw ExceptionToThrow;
+            }
+
+            if (ForcedOutcome is not null)
+            {
+                return ForcedOutcome;
             }
 
             return new ValidationOutcome(
@@ -518,19 +676,19 @@ public sealed class CliArchitectureTests
             IReadOnlyCollection<ArchitectureCycleFinding> cycleFindings,
             IReadOnlyCollection<BuildStatePreflightDiagnostic> preflightDiagnostics)
         {
-            throw new NotSupportedException();
+            return "{\"version\":\"2.1.0\",\"runs\":[]}";
         }
 
         public string FormatViolationsForHumans(IReadOnlyCollection<ArchitectureViolation> violations)
         {
-            throw new NotSupportedException();
+            return $"{violations.Count} violation(s)";
         }
 
         public string FormatCyclesForHumans(
             IReadOnlyCollection<string> cycles,
             IReadOnlyCollection<ArchitectureCycleFinding> cycleFindings)
         {
-            throw new NotSupportedException();
+            return $"{cycles.Count} cycle(s)";
         }
 
         public string FormatPolicyConsistencyForHumans(IReadOnlyCollection<PolicyConsistencyDiagnostic> diagnostics)

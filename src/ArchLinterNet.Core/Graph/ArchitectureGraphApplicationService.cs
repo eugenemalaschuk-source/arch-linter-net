@@ -34,7 +34,15 @@ public sealed class ArchitectureGraphApplicationService(
         ArchitectureGraphRequest request,
         out List<ArchitectureViolation> violations)
     {
-        ArchitectureContractDocument document = runnerSetupService.LoadDocument(request.PolicyPath);
+        ArchitectureContractDocument document;
+        try
+        {
+            document = runnerSetupService.LoadDocument(request.PolicyPath);
+        }
+        catch (ArchitecturePolicyImportException ex)
+        {
+            throw new ArchitecturePolicyLoadException(ex.Message, ex.Diagnostic, ex.Category.ToString(), ex);
+        }
 
         HashSet<string>? selectedIds = request.ContractIds is { Count: > 0 }
             ? new HashSet<string>(request.ContractIds, StringComparer.OrdinalIgnoreCase)

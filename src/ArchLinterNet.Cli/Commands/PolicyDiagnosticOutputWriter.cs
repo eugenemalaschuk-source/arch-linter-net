@@ -1,6 +1,5 @@
 using System.Text.Json;
 using ArchLinterNet.Cli.Abstractions;
-using ArchLinterNet.Core.Contracts;
 using ArchLinterNet.Core.Model;
 using ArchLinterNet.Core.Reporting;
 
@@ -12,7 +11,7 @@ internal static class PolicyDiagnosticOutputWriter
     {
         (ArchitecturePolicyDiagnostic? Diagnostic, string? Category) policyError = exception switch
         {
-            ArchitecturePolicyImportException importException => (importException.Diagnostic, importException.Category.ToString()),
+            ArchitecturePolicyLoadException loadException => (loadException.Diagnostic, loadException.Category),
             ArchitecturePolicyValidationException validationException => (validationException.Diagnostic, null),
             _ => (null, null),
         };
@@ -54,7 +53,7 @@ internal static class PolicyDiagnosticOutputWriter
     {
         ArchitecturePolicyDiagnostic? diagnostic = exception switch
         {
-            ArchitecturePolicyImportException importException => importException.Diagnostic,
+            ArchitecturePolicyLoadException loadException => loadException.Diagnostic,
             ArchitecturePolicyValidationException validationException => validationException.Diagnostic,
             _ => null,
         };

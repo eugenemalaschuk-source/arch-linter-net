@@ -43,4 +43,13 @@ public sealed record ValidationOutcome(
     // Populated by ArchitectureAnalysisSnapshot after policy loading.
     public IReadOnlyList<string> PolicyImportPaths { get; init; } =
         Array.Empty<string>();
+
+    // Every target assembly file path actually resolved for this analysis, independent of
+    // whether build-state preflight ran for it. Preflight diagnostics are skipped entirely when
+    // project discovery found no projects (see
+    // ArchitectureValidationApplicationService.RunBuildStatePreflight), but
+    // analysis.target_assemblies configured directly can still resolve assemblies in that case —
+    // this is the complete inventory, PreflightDiagnostics is not.
+    public IReadOnlyList<string> ResolvedAssemblyPaths { get; init; } =
+        Array.Empty<string>();
 }

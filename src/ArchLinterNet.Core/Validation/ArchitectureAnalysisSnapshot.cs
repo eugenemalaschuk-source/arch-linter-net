@@ -1,3 +1,4 @@
+using System.Reflection;
 using ArchLinterNet.Core.BuildState;
 using ArchLinterNet.Core.Contracts;
 using ArchLinterNet.Core.Execution;
@@ -166,7 +167,8 @@ public sealed class ArchitectureAnalysisSnapshot : IDisposable
         {
             PreflightDiagnostics = _preflight.Diagnostics,
             PreflightBlocked = true,
-            PolicyImportPaths = GetPolicyImportPaths()
+            PolicyImportPaths = GetPolicyImportPaths(),
+            ResolvedAssemblyPaths = GetResolvedAssemblyPaths()
         };
     }
 
@@ -244,7 +246,8 @@ public sealed class ArchitectureAnalysisSnapshot : IDisposable
             ClassificationRoles = classificationRoles,
             ClassificationPathDeferred = classificationPathDeferred,
             PreflightDiagnostics = _preflight.Diagnostics,
-            PolicyImportPaths = GetPolicyImportPaths()
+            PolicyImportPaths = GetPolicyImportPaths(),
+            ResolvedAssemblyPaths = GetResolvedAssemblyPaths()
         };
     }
 
@@ -254,6 +257,34 @@ public sealed class ArchitectureAnalysisSnapshot : IDisposable
             .Select(source => Path.GetFullPath(Path.Combine(_repositoryRoot, source.SourcePath)))
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .ToList();
+    }
+
+    private IReadOnlyList<string> GetResolvedAssemblyPaths()
+    {
+        IArchitectureContractRunner? runner = _setup?.Runner;
+        if (runner is null)
+        {
+            return Array.Empty<string>();
+        }
+
+        return runner.Session.Context.TargetAssemblies
+            .Select(SafeAssemblyLocation)
+            .Where(path => !string.IsNullOrEmpty(path))
+            .Select(path => Path.GetFullPath(path!))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+    }
+
+    private static string? SafeAssemblyLocation(Assembly assembly)
+    {
+        try
+        {
+            return assembly.Location;
+        }
+        catch (NotSupportedException)
+        {
+            return null;
+        }
     }
 
     private IReadOnlyList<ArchitectureUnmatchedIgnoredViolation> ResolveUnmatchedIgnoredViolations(

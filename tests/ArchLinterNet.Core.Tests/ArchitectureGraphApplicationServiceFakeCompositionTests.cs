@@ -42,6 +42,39 @@ public sealed class ArchitectureGraphApplicationServiceFakeCompositionTests
         Assert.That(contractExecutor.ModesReceived, Is.Empty);
     }
 
+    // Graph/Explain are hosted from the CLI just like Validate, and are equally forbidden from
+    // depending on ArchLinterNet.Core.Contracts — the seam must translate a policy-import failure
+    // here too, not just on the validation path.
+    [Test]
+    public void BuildGraph_PolicyImportFailure_IsTranslatedToSeamSafeException()
+    {
+        ArchitecturePolicySourceDescriptor source = new(
+            "root.yml", "root.yml", ArchitecturePolicyDocumentRole.Root, 0, null, null, ["root.yml"]);
+        ArchitecturePolicyDiagnostic diagnostic = new(
+            ArchitecturePolicyDiagnosticKind.ImportResolution,
+            new ArchitecturePolicySourceLocation(source, "$", 1, 1, null, null),
+            [],
+            source.ImportChain);
+        var runnerSetupService = new FakeRunnerSetupService
+        {
+            ExceptionToThrowFromLoadDocument = new ArchitecturePolicyImportException(
+                ArchitecturePolicyImportErrorCategory.MissingFile, "Root policy file not found: root.yml", diagnostic),
+        };
+        var (handlerRegistry, contractExecutor) = CreateExecutionFakes();
+
+        var service = new ArchitectureGraphApplicationService(runnerSetupService, handlerRegistry, contractExecutor);
+
+        ArchitecturePolicyLoadException? caught = Assert.Throws<ArchitecturePolicyLoadException>(() =>
+            service.BuildGraph(new ArchitectureGraphRequest { PolicyPath = "root.yml", Mode = "strict" }));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(caught!.Message, Is.EqualTo("Root policy file not found: root.yml"));
+            Assert.That(caught.Category, Is.EqualTo("MissingFile"));
+            Assert.That(caught.Diagnostic, Is.SameAs(diagnostic));
+        });
+    }
+
     [Test]
     public void BuildGraph_StrictMode_NoContractIds_ExecutesStrictOnlyAndBuildsGraph()
     {
@@ -222,10 +255,17 @@ public sealed class ArchitectureGraphApplicationServiceFakeCompositionTests
 
         public IArchitectureContractRunner RunnerToReturn { get; set; } = null!;
 
+        public ArchitecturePolicyImportException? ExceptionToThrowFromLoadDocument { get; set; }
+
         public ArchitectureContractDocument LoadDocument(
             string policyPath, string? baselinePath = null, ValidationTiming? timing = null)
         {
             LoadDocumentCalled = true;
+            if (ExceptionToThrowFromLoadDocument is not null)
+            {
+                throw ExceptionToThrowFromLoadDocument;
+            }
+
             return DocumentToReturn;
         }
 

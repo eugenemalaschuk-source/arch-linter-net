@@ -2,7 +2,6 @@ using System.Text.Json;
 using ArchLinterNet.Cli.Abstractions;
 using ArchLinterNet.Cli.Commands;
 using ArchLinterNet.Core.BuildState;
-using ArchLinterNet.Core.Contracts;
 using ArchLinterNet.Core.Model;
 using ArchLinterNet.Core.Reporting;
 using ArchLinterNet.Core.Validation;
@@ -79,7 +78,15 @@ internal sealed class ValidateCommandHandler
     // stdout/stderr sinks are eligible destinations for this diagnostic — a File sink either just
     // failed (writing here would only fail again) or already committed valid report content that
     // this must not overwrite. See ReportCoordinator.TryRouteErrorToStreamSinks.
-    private void WriteOutputError(ValidateCommandOptions options, string format, RouteResult result)
+    //
+    // outcomesByMode carries the underlying validation result (pass/fail, violation/cycle counts)
+    // so it still reaches the user even when every sink that would have carried the full report
+    // failed — an output-routing failure must not silently swallow the validation outcome itself.
+    private void WriteOutputError(
+        ValidateCommandOptions options,
+        string format,
+        RouteResult result,
+        IReadOnlyList<(string Mode, ValidationOutcome Outcome)> outcomesByMode)
     {
         string status = result.Status == ReportRouteStatus.PartialOutput ? "partial-output" : "output-failed";
         string humanMessage = FormatOutputError(status, result);
@@ -87,9 +94,12 @@ internal sealed class ValidateCommandHandler
         Dictionary<string, string> contentByFormat = new();
         foreach (string neededFormat in NeededErrorFormats(options, format))
         {
-            contentByFormat[neededFormat] = neededFormat is "json" or "sarif"
-                ? BuildOutputErrorJsonText(status, humanMessage, result)
-                : BuildOutputErrorHumanText(humanMessage, result);
+            contentByFormat[neededFormat] = neededFormat switch
+            {
+                "json" => BuildOutputErrorJsonText(status, humanMessage, result, outcomesByMode),
+                "sarif" => BuildOutputErrorSarifText(status, humanMessage, result, outcomesByMode),
+                _ => BuildOutputErrorHumanText(humanMessage, result, outcomesByMode),
+            };
         }
 
         WriteErrorContent(options, format, contentByFormat, allowFileSinks: false);
@@ -110,7 +120,9 @@ internal sealed class ValidateCommandHandler
         return sb.ToString();
     }
 
-    private static string BuildOutputErrorJsonText(string status, string message, RouteResult result)
+    private static string BuildOutputErrorJsonText(
+        string status, string message, RouteResult result,
+        IReadOnlyList<(string Mode, ValidationOutcome Outcome)> outcomesByMode)
     {
         return JsonSerializer.Serialize(new
         {
@@ -121,12 +133,50 @@ internal sealed class ValidateCommandHandler
             committed_paths = result.CommittedPaths,
             uncommitted_paths = result.UncommittedPaths,
             errors = result.ErrorDetails,
+            validation_results = BuildValidationOutcomeSummaries(outcomesByMode),
         });
     }
 
-    private static string BuildOutputErrorHumanText(string message, RouteResult result)
+    private static string BuildOutputErrorSarifText(
+        string status, string message, RouteResult result,
+        IReadOnlyList<(string Mode, ValidationOutcome Outcome)> outcomesByMode)
+    {
+        return JsonSerializer.Serialize(new
+        {
+            version = "2.1.0",
+            runs = new[]
+            {
+                new
+                {
+                    tool = new { driver = new { name = "arch-linter-net" } },
+                    results = new[]
+                    {
+                        new
+                        {
+                            ruleId = "architecture-output",
+                            message = new { text = message },
+                            properties = new
+                            {
+                                output_status = status,
+                                failed_paths = result.FailedPaths,
+                                committed_paths = result.CommittedPaths,
+                                uncommitted_paths = result.UncommittedPaths,
+                                errors = result.ErrorDetails,
+                                validation_results = BuildValidationOutcomeSummaries(outcomesByMode),
+                            },
+                            locations = Array.Empty<object>(),
+                        },
+                    },
+                },
+            },
+        });
+    }
+
+    private static string BuildOutputErrorHumanText(
+        string message, RouteResult result, IReadOnlyList<(string Mode, ValidationOutcome Outcome)> outcomesByMode)
     {
         var sb = new System.Text.StringBuilder(message);
+        sb.Append($"\n  validation result: {BuildValidationOutcomeSummaryText(outcomesByMode)}");
         if (result.UncommittedPaths.Count > 0)
         {
             sb.Append($"\n  uncommitted: {string.Join(", ", result.UncommittedPaths)}");
@@ -136,6 +186,28 @@ internal sealed class ValidateCommandHandler
             sb.Append($"\n  {detail}");
         }
         return sb.ToString();
+    }
+
+    private static object[] BuildValidationOutcomeSummaries(
+        IReadOnlyList<(string Mode, ValidationOutcome Outcome)> outcomesByMode)
+    {
+        return outcomesByMode
+            .Select(o => (object)new
+            {
+                mode = o.Mode,
+                passed = o.Outcome.Passed,
+                violation_count = o.Outcome.Violations.Count,
+                cycle_count = o.Outcome.Cycles.Count,
+            })
+            .ToArray();
+    }
+
+    private static string BuildValidationOutcomeSummaryText(
+        IReadOnlyList<(string Mode, ValidationOutcome Outcome)> outcomesByMode)
+    {
+        return string.Join(", ", outcomesByMode.Select(o => o.Outcome.Passed
+            ? $"{o.Mode}=passed"
+            : $"{o.Mode}=failed ({o.Outcome.Violations.Count} violation(s), {o.Outcome.Cycles.Count} cycle(s))"));
     }
 
     // Catches every error that isn't a structured ArchitecturePolicyDiagnostic — including an
@@ -234,7 +306,18 @@ internal sealed class ValidateCommandHandler
 
         if (allowFileSinks)
         {
-            _coordinator.RouteErrorToAllSinks(options.AdditionalSinks, contentByFormat);
+            RouteResult errorRouteResult = _coordinator.RouteErrorToAllSinks(options.AdditionalSinks, contentByFormat);
+            if (errorRouteResult.Status != ReportRouteStatus.AllSucceeded)
+            {
+                // Writing the error report itself failed on at least one sink — the diagnostic
+                // would otherwise vanish silently. Surface both the diagnostic that couldn't be
+                // fully delivered and typed evidence of which destinations committed/failed.
+                _console.Error.WriteLine(contentByFormat[errorFormat]);
+                _console.Error.WriteLine(FormatOutputError(
+                    errorRouteResult.Status == ReportRouteStatus.PartialOutput ? "partial-output" : "output-failed",
+                    errorRouteResult));
+            }
+
             return;
         }
 
@@ -357,23 +440,19 @@ internal sealed class ValidateCommandHandler
     // Guards the exact set of build receipts and assemblies this run actually loaded, not every
     // path that happens to end in the receipt suffix — a --report destination that merely *looks*
     // like a receipt path (but was never read as one) is a legitimate user choice, and one that IS
-    // a real input must be protected regardless of what its name looks like. Evidence.ExpectedOutputPath
-    // is only populated once BuildReceiptStore.TryRead was actually attempted for that path (see
-    // BuildStatePreflightEvaluator.CheckReceipt / CheckArtifactPresence), so it names precisely the
-    // assemblies (and, by construction, their receipts) this invocation consulted.
+    // a real input must be protected regardless of what its name looks like. Sourced from
+    // outcome.ResolvedAssemblyPaths rather than PreflightDiagnostics: preflight is skipped entirely
+    // when project discovery finds no projects (see
+    // ArchitectureValidationApplicationService.RunBuildStatePreflight), but analysis.target_assemblies
+    // configured directly can still resolve assemblies in that case — ResolvedAssemblyPaths is the
+    // complete inventory regardless of whether a project-based preflight diagnostic exists for it.
     private static string? FindReceiptFileCollision(
         ValidateCommandOptions options,
-        IReadOnlyCollection<BuildStatePreflightDiagnostic> preflightDiagnostics)
+        IReadOnlyList<string> resolvedAssemblyPaths)
     {
         HashSet<string> loadedPaths = new(StringComparer.OrdinalIgnoreCase);
-        foreach (BuildStatePreflightDiagnostic diagnostic in preflightDiagnostics)
+        foreach (string assemblyPath in resolvedAssemblyPaths)
         {
-            string? assemblyPath = diagnostic.Evidence.ExpectedOutputPath;
-            if (assemblyPath is null)
-            {
-                continue;
-            }
-
             loadedPaths.Add(Path.GetFullPath(assemblyPath));
             loadedPaths.Add(Path.GetFullPath(BuildReceiptStore.ReceiptPathFor(assemblyPath)));
         }
@@ -451,7 +530,7 @@ internal sealed class ValidateCommandHandler
             return CliExitCodes.InvalidArgumentsOrRuntimeError;
         }
 
-        string? receiptCollision = FindReceiptFileCollision(options, outcome.PreflightDiagnostics);
+        string? receiptCollision = FindReceiptFileCollision(options, outcome.ResolvedAssemblyPaths);
         if (receiptCollision is not null)
         {
             _console.Error.WriteLine(receiptCollision);
@@ -462,7 +541,7 @@ internal sealed class ValidateCommandHandler
         timing?.WriteReport(_console.Error);
         if (result.Status != ReportRouteStatus.AllSucceeded)
         {
-            WriteOutputError(options, errorFormat, result);
+            WriteOutputError(options, errorFormat, result, new[] { (mode, outcome) });
             return CliExitCodes.InvalidArgumentsOrRuntimeError;
         }
 
@@ -509,7 +588,7 @@ internal sealed class ValidateCommandHandler
             return CliExitCodes.InvalidArgumentsOrRuntimeError;
         }
 
-        string? receiptCollision = FindReceiptFileCollision(options, outcomesByMode[0].Outcome.PreflightDiagnostics);
+        string? receiptCollision = FindReceiptFileCollision(options, outcomesByMode[0].Outcome.ResolvedAssemblyPaths);
         if (receiptCollision is not null)
         {
             _console.Error.WriteLine(receiptCollision);
@@ -521,7 +600,7 @@ internal sealed class ValidateCommandHandler
         timing?.WriteReport(_console.Error);
         if (result.Status != ReportRouteStatus.AllSucceeded)
         {
-            WriteOutputError(options, errorFormat, result);
+            WriteOutputError(options, errorFormat, result, outcomesByMode);
             return CliExitCodes.InvalidArgumentsOrRuntimeError;
         }
 
@@ -549,7 +628,7 @@ internal sealed class ValidateCommandHandler
     {
         diagnostic = exception switch
         {
-            ArchitecturePolicyImportException importException => importException.Diagnostic,
+            ArchitecturePolicyLoadException loadException => loadException.Diagnostic,
             ArchitecturePolicyValidationException validationException => validationException.Diagnostic,
             _ => null,
         };
@@ -562,25 +641,71 @@ internal sealed class ValidateCommandHandler
     private void WritePolicyDiagnostic(
         ValidateCommandOptions options, string format, Exception exception, ArchitecturePolicyDiagnostic diagnostic)
     {
-        ArchitecturePolicyImportErrorCategory? category = (exception as ArchitecturePolicyImportException)?.Category;
+        string? category = (exception as ArchitecturePolicyLoadException)?.Category;
         string message = exception.Message;
+
+        // A policy-import failure names the very file(s) it failed to load in its own
+        // diagnostic — a --report file sink pointed at one of those paths would otherwise get
+        // this error document written over the fragment that just failed to import. Routing to
+        // file sinks is safe for pre-outcome errors in general (nothing legitimate has been
+        // produced yet for this invocation to clobber), but not when the destination IS one of
+        // the inputs that just failed.
+        string? fileCollision = FindPolicyDiagnosticFileCollision(options, diagnostic);
+        if (fileCollision is not null)
+        {
+            message = $"{message} ({fileCollision})";
+        }
 
         Dictionary<string, string> contentByFormat = new();
         foreach (string neededFormat in NeededErrorFormats(options, format))
         {
             contentByFormat[neededFormat] = neededFormat switch
             {
-                "json" => PolicyDiagnosticOutputWriter.BuildJsonText(message, diagnostic, category?.ToString()),
+                "json" => PolicyDiagnosticOutputWriter.BuildJsonText(message, diagnostic, category),
                 "sarif" => BuildPolicyDiagnosticSarifText(message, diagnostic, category),
                 _ => PolicyDiagnosticOutputWriter.BuildHumanText("Architecture validation error", message, diagnostic),
             };
         }
 
-        WriteErrorContent(options, format, contentByFormat, allowFileSinks: true);
+        WriteErrorContent(options, format, contentByFormat, allowFileSinks: fileCollision is null);
+    }
+
+    private static string? FindPolicyDiagnosticFileCollision(ValidateCommandOptions options, ArchitecturePolicyDiagnostic diagnostic)
+    {
+        HashSet<string> involvedPaths = new(StringComparer.OrdinalIgnoreCase);
+        if (diagnostic.Location is not null)
+        {
+            involvedPaths.Add(Path.GetFullPath(diagnostic.Location.SourcePath));
+        }
+
+        foreach (ArchitecturePolicySourceLocation related in diagnostic.RelatedLocations)
+        {
+            involvedPaths.Add(Path.GetFullPath(related.SourcePath));
+        }
+
+        foreach (string importPath in diagnostic.ImportChain)
+        {
+            involvedPaths.Add(Path.GetFullPath(importPath));
+        }
+
+        foreach (ReportSink sink in options.AdditionalSinks)
+        {
+            if (sink.DestinationType != ReportDestinationType.File || sink.FilePath is null)
+            {
+                continue;
+            }
+
+            if (involvedPaths.Contains(Path.GetFullPath(sink.FilePath)))
+            {
+                return $"--report destination '{sink.FilePath}' matches a policy file involved in this import failure";
+            }
+        }
+
+        return null;
     }
 
     private static string BuildPolicyDiagnosticSarifText(
-        string message, ArchitecturePolicyDiagnostic diagnostic, ArchitecturePolicyImportErrorCategory? category)
+        string message, ArchitecturePolicyDiagnostic diagnostic, string? category)
     {
         object[] relatedLocations = ArchitectureSarifFormatter.FormatPolicyLocationsForSarif(
             diagnostic.Location,
@@ -600,7 +725,7 @@ internal sealed class ValidateCommandHandler
                         {
                             ruleId = "architecture-policy",
                             message = new { text = message },
-                            properties = new { error_category = category?.ToString(), import_chain = diagnostic.ImportChain },
+                            properties = new { error_category = category, import_chain = diagnostic.ImportChain },
                             locations = diagnostic.Location is null ? Array.Empty<object>() : new object[]
                             {
                                 new

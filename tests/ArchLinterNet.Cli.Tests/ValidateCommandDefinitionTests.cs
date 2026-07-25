@@ -238,7 +238,7 @@ public sealed class ValidateCommandDefinitionTests
     public void CreateRootCommand_ReportOption_AllowsReceiptLookingPathNeverActuallyLoaded()
     {
         // A destination that merely *looks* like a receipt path, but was never consulted during
-        // this run (PreflightDiagnosticsToReturn is empty), is a legitimate user choice and must
+        // this run (ResolvedAssemblyPathsToReturn is empty), is a legitimate user choice and must
         // not be blocked just because of its suffix.
         (RecordingRuntime runtime, RecordingConsole console) = Run([
             "--report", "json=bin/Debug/net10.0/MyApp.archlinternet-receipt.json",
@@ -252,13 +252,10 @@ public sealed class ValidateCommandDefinitionTests
     public void CreateRootCommand_ReportOption_RejectsActualReceiptFileCollision()
     {
         string assemblyPath = Path.GetFullPath("bin/Debug/net10.0/MyApp.dll");
-        BuildStatePreflightDiagnostic diagnostic = new(
-            "build-state-preflight", null, BuildStatePreflightState.Current,
-            new BuildStatePreflightEvidence("MyApp/MyApp.csproj", "MyApp", ExpectedOutputPath: assemblyPath));
 
         (RecordingRuntime runtime, RecordingConsole console) = Run(
             ["--report", "json=bin/Debug/net10.0/MyApp.dll.archlinternet-receipt.json"],
-            preflightDiagnostics: [diagnostic]);
+            resolvedAssemblyPaths: [assemblyPath]);
 
         Assert.That(runtime.LastRequest, Is.Not.Null);
         Assert.That(console.ErrorText, Does.Contain("matches a build artifact or receipt loaded during this run"));
@@ -268,25 +265,22 @@ public sealed class ValidateCommandDefinitionTests
     public void CreateRootCommand_ReportOption_RejectsLoadedAssemblyFileCollision()
     {
         string assemblyPath = Path.GetFullPath("bin/Debug/net10.0/MyApp.dll");
-        BuildStatePreflightDiagnostic diagnostic = new(
-            "build-state-preflight", null, BuildStatePreflightState.Current,
-            new BuildStatePreflightEvidence("MyApp/MyApp.csproj", "MyApp", ExpectedOutputPath: assemblyPath));
 
         (RecordingRuntime runtime, RecordingConsole console) = Run(
             ["--report", "json=bin/Debug/net10.0/MyApp.dll"],
-            preflightDiagnostics: [diagnostic]);
+            resolvedAssemblyPaths: [assemblyPath]);
 
         Assert.That(runtime.LastRequest, Is.Not.Null);
         Assert.That(console.ErrorText, Does.Contain("matches a build artifact or receipt loaded during this run"));
     }
 
     private static (RecordingRuntime Runtime, RecordingConsole Console) Run(
-        string[] args, string format = "human", IReadOnlyCollection<BuildStatePreflightDiagnostic>? preflightDiagnostics = null)
+        string[] args, string format = "human", IReadOnlyList<string>? resolvedAssemblyPaths = null)
     {
         var runtime = new RecordingRuntime();
-        if (preflightDiagnostics is not null)
+        if (resolvedAssemblyPaths is not null)
         {
-            runtime.PreflightDiagnosticsToReturn = preflightDiagnostics;
+            runtime.ResolvedAssemblyPathsToReturn = resolvedAssemblyPaths;
         }
         var console = new RecordingConsole();
         var fileSystem = new RecordingFileSystem(true);
@@ -331,6 +325,8 @@ public sealed class ValidateCommandDefinitionTests
         public ValidationTiming? LastTiming { get; private set; }
         public IReadOnlyCollection<BuildStatePreflightDiagnostic> PreflightDiagnosticsToReturn { get; set; } =
             Array.Empty<BuildStatePreflightDiagnostic>();
+        public IReadOnlyList<string> ResolvedAssemblyPathsToReturn { get; set; } =
+            Array.Empty<string>();
 
         public bool TryParseGraphLevel(string value, out ArchitectureGraphLevel level) => throw new NotSupportedException();
 
@@ -353,6 +349,7 @@ public sealed class ValidateCommandDefinitionTests
                 Array.Empty<ArchitectureClassificationMetadataFailure>())
             {
                 PreflightDiagnostics = PreflightDiagnosticsToReturn,
+                ResolvedAssemblyPaths = ResolvedAssemblyPathsToReturn,
             };
         }
 

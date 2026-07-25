@@ -60,7 +60,16 @@ public sealed class ArchitectureValidationApplicationService(
     {
         ComposedPolicy policy;
         using (timing?.Measure("policy_composition"))
-            policy = ComposeDocument(request, modeHint, timing);
+        {
+            try
+            {
+                policy = ComposeDocument(request, modeHint, timing);
+            }
+            catch (ArchitecturePolicyImportException ex)
+            {
+                throw new ArchitecturePolicyLoadException(ex.Message, ex.Diagnostic, ex.Category.ToString(), ex);
+            }
+        }
 
         ArchitectureRunnerSetup setup;
         using (timing?.Measure("load_and_setup"))
