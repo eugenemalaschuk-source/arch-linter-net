@@ -46,6 +46,35 @@ public sealed class ArchitectureRunnerSetupService(
         ValidationTiming? timing = null,
         string? mode = null)
     {
+        return BuildRunnerCore(document, policyPath, conditionSetName, preprocessorSymbols, selectedContractIds,
+            enableUnmatchedIgnoreTracking, timing, mode, loadPostBuildArtifacts: false);
+    }
+
+    public ArchitectureRunnerSetup BuildRunnerForPostBuild(
+        ArchitectureContractDocument document,
+        string policyPath,
+        string? conditionSetName = null,
+        IReadOnlyList<string>? preprocessorSymbols = null,
+        HashSet<string>? selectedContractIds = null,
+        bool enableUnmatchedIgnoreTracking = true,
+        ValidationTiming? timing = null,
+        string? mode = null)
+    {
+        return BuildRunnerCore(document, policyPath, conditionSetName, preprocessorSymbols, selectedContractIds,
+            enableUnmatchedIgnoreTracking, timing, mode, loadPostBuildArtifacts: true);
+    }
+
+    private ArchitectureRunnerSetup BuildRunnerCore(
+        ArchitectureContractDocument document,
+        string policyPath,
+        string? conditionSetName,
+        IReadOnlyList<string>? preprocessorSymbols,
+        HashSet<string>? selectedContractIds,
+        bool enableUnmatchedIgnoreTracking,
+        ValidationTiming? timing,
+        string? mode,
+        bool loadPostBuildArtifacts)
+    {
         string repositoryRoot;
         using (timing?.Measure("root_resolution", indent: 1))
             repositoryRoot = repositoryRootResolver.ResolveFrom(policyPath);
@@ -64,11 +93,29 @@ public sealed class ArchitectureRunnerSetupService(
         using (timing?.Measure("assembly_resolution", indent: 1))
         {
             bool resolveAssemblyOutputs = ShouldResolveAssemblyOutputs(document, mode, selectedContractIds);
+            if (loadPostBuildArtifacts)
+            {
+                // Explicit target_assemblies normally keep discovery from probing project output.
+                // After ensure-built, however, the freshly built project outputs are authoritative
+                // for this snapshot and must be available to the isolated resolver below.
+                resolveAssemblyOutputs = true;
+            }
             ProjectDiscoveryResult discovery = projectDiscoveryService.ResolveAndApply(
                 document, repositoryRoot, resolveAssemblyOutputs);
 
-            ResolutionResult resolution = assemblyResolutionService.Resolve(
-                document, repositoryRoot, discovery, resolveAssemblyOutputs, mode, selectedContractIds);
+            if (loadPostBuildArtifacts && discovery.AssemblySearchPaths.Count > 0)
+            {
+                document.Analysis.AssemblySearchPaths = document.Analysis.AssemblySearchPaths
+                    .Concat(discovery.AssemblySearchPaths)
+                    .Distinct(StringComparer.OrdinalIgnoreCase)
+                    .ToList();
+            }
+
+            ResolutionResult resolution = loadPostBuildArtifacts
+                ? assemblyResolutionService.ResolvePostBuild(
+                    document, repositoryRoot, discovery, resolveAssemblyOutputs, mode, selectedContractIds)
+                : assemblyResolutionService.Resolve(
+                    document, repositoryRoot, discovery, resolveAssemblyOutputs, mode, selectedContractIds);
 
             ProjectDiscoveryResult? attemptedDiscovery = ReferenceEquals(discovery, ProjectDiscoveryResult.Empty)
                 ? null
@@ -76,9 +123,9 @@ public sealed class ArchitectureRunnerSetupService(
 
             ArchitectureAnalysisContext context = CreateAnalysisContext(repositoryRoot, resolution, discovery, attemptedDiscovery);
             runner = CreateRunner(context, document, selectedContractIds, enableUnmatchedIgnoreTracking, symbols);
-        }
 
-        return new ArchitectureRunnerSetup(repositoryRoot, runner);
+            return new ArchitectureRunnerSetup(repositoryRoot, runner) { AssemblyLoads = resolution.AssemblyLoads };
+        }
     }
 
     private static bool ShouldResolveAssemblyOutputs(
@@ -120,7 +167,8 @@ public sealed class ArchitectureRunnerSetupService(
         ProjectDiscoveryResult? attemptedDiscovery)
     {
         return new ArchitectureAnalysisContext(repositoryRoot, resolution.ResolvedAssemblies,
-            resolution.MissingAssemblyNames, resolution.AssemblyProbingPaths, discovery.Diagnostics, attemptedDiscovery);
+            resolution.MissingAssemblyNames, resolution.AssemblyProbingPaths, discovery.Diagnostics, attemptedDiscovery,
+            resolution.IsolatedLoadScope);
     }
 
     private static ArchitectureContractRunner CreateRunner(

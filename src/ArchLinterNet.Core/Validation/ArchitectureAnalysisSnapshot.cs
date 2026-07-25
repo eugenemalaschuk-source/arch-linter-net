@@ -28,6 +28,7 @@ public sealed class ArchitectureAnalysisSnapshot : IDisposable
     private readonly IArchitectureContractExecutor _contractExecutor;
     private readonly IArchitectureContractHandlerRegistry _handlerRegistry;
     private readonly IReadOnlyCollection<string>? _requestedContractIds;
+    private readonly object _gate = new();
     private readonly Dictionary<string, ValidationOutcome> _evaluatedModes = new(StringComparer.Ordinal);
     private ArchitectureAnalysisSnapshotCounters _counters;
     private bool _disposed;
@@ -45,6 +46,7 @@ public sealed class ArchitectureAnalysisSnapshot : IDisposable
         IArchitectureContractHandlerRegistry handlerRegistry,
         int policyCompositions,
         int projectGraphEvaluations,
+        int assemblyLoads,
         IReadOnlyCollection<string>? requestedContractIds = null)
     {
         _document = document;
@@ -63,7 +65,7 @@ public sealed class ArchitectureAnalysisSnapshot : IDisposable
         {
             PolicyCompositions = policyCompositions,
             ProjectGraphEvaluations = projectGraphEvaluations,
-            AssemblyLoads = setup.Runner.Session.Context.TargetAssemblies.Count
+            AssemblyLoads = assemblyLoads
         };
     }
 
@@ -76,9 +78,27 @@ public sealed class ArchitectureAnalysisSnapshot : IDisposable
     // A blocked preflight is a failed session: no mode may execute contracts against it.
     public bool Failed => _preflight.Blocked;
 
-    public ArchitectureAnalysisSnapshotCounters Counters => _counters;
+    public ArchitectureAnalysisSnapshotCounters Counters
+    {
+        get
+        {
+            lock (_gate)
+            {
+                return _counters;
+            }
+        }
+    }
 
-    public bool IsDisposed => _disposed;
+    public bool IsDisposed
+    {
+        get
+        {
+            lock (_gate)
+            {
+                return _disposed;
+            }
+        }
+    }
 
     public ValidationOutcome Evaluate(string mode, ValidationTiming? timing = null)
     {
@@ -87,27 +107,30 @@ public sealed class ArchitectureAnalysisSnapshot : IDisposable
             throw new ArgumentException($"Invalid mode: {mode}. Use 'strict' or 'audit'.", nameof(mode));
         }
 
-        ObjectDisposedException.ThrowIf(_disposed, this);
-
-        if (_evaluatedModes.TryGetValue(mode, out ValidationOutcome? cached))
+        lock (_gate)
         {
-            return cached;
+            ObjectDisposedException.ThrowIf(_disposed, this);
+
+            if (_evaluatedModes.TryGetValue(mode, out ValidationOutcome? cached))
+            {
+                return cached;
+            }
+
+            // A snapshot meant to serve any/all requested modes validates a --contract-id filter
+            // against the union of strict and audit IDs at construction time (see
+            // ArchitectureValidationApplicationService.ResolveSelectedContractIds) — that only rejects
+            // an ID unknown to every mode. An ID valid in one mode but not this one would otherwise
+            // silently match nothing when this mode's contracts execute, instead of failing the same
+            // way an independent single-mode Validate call for this mode would. Re-validating here,
+            // per mode, keeps combined execution semantically equivalent to separate runs.
+            EnsureRequestedContractIdsAreKnownForMode(mode);
+
+            ValidationOutcome outcome = _preflight.Blocked ? BuildBlockedOutcome() : EvaluateCore(mode, timing);
+
+            _evaluatedModes[mode] = outcome;
+            _counters = _counters with { ModesEvaluated = _evaluatedModes.Count };
+            return outcome;
         }
-
-        // A snapshot meant to serve any/all requested modes validates a --contract-id filter
-        // against the union of strict and audit IDs at construction time (see
-        // ArchitectureValidationApplicationService.ResolveSelectedContractIds) — that only rejects
-        // an ID unknown to every mode. An ID valid in one mode but not this one would otherwise
-        // silently match nothing when this mode's contracts execute, instead of failing the same
-        // way an independent single-mode Validate call for this mode would. Re-validating here,
-        // per mode, keeps combined execution semantically equivalent to separate runs.
-        EnsureRequestedContractIdsAreKnownForMode(mode);
-
-        ValidationOutcome outcome = _preflight.Blocked ? BuildBlockedOutcome() : EvaluateCore(mode, timing);
-
-        _evaluatedModes[mode] = outcome;
-        _counters = _counters with { ModesEvaluated = _evaluatedModes.Count };
-        return outcome;
     }
 
     private void EnsureRequestedContractIdsAreKnownForMode(string mode)
@@ -253,7 +276,16 @@ public sealed class ArchitectureAnalysisSnapshot : IDisposable
 
     public void Dispose()
     {
-        _disposed = true;
-        _evaluatedModes.Clear();
+        lock (_gate)
+        {
+            if (_disposed)
+            {
+                return;
+            }
+
+            _disposed = true;
+            _evaluatedModes.Clear();
+            _setup.Runner.Session.Context.Dispose();
+        }
     }
 }

@@ -48,6 +48,15 @@ public sealed class ArchitectureAnalysisSnapshotTests
             BuildRunnerCallCount++;
             return new ArchitectureRunnerSetup("/fake/repository/root", RunnerToReturn);
         }
+
+        public ArchitectureRunnerSetup BuildRunnerForPostBuild(
+            ArchitectureContractDocument document, string policyPath, string? conditionSetName = null,
+            IReadOnlyList<string>? preprocessorSymbols = null, HashSet<string>? selectedContractIds = null,
+            bool enableUnmatchedIgnoreTracking = true, ValidationTiming? timing = null, string? mode = null)
+        {
+            return BuildRunner(document, policyPath, conditionSetName, preprocessorSymbols, selectedContractIds,
+                enableUnmatchedIgnoreTracking, timing, mode);
+        }
     }
 
     private sealed class FakeContractRunner(ArchitectureAnalysisSession session) : IArchitectureContractRunner
@@ -90,7 +99,13 @@ public sealed class ArchitectureAnalysisSnapshotTests
 
     private sealed class CountingContractExecutor : IArchitectureContractExecutor
     {
+        private int _activeExecutions;
+
         public Dictionary<string, int> CallCountByMode { get; } = new(StringComparer.Ordinal);
+
+        public int MaxConcurrentExecutions { get; private set; }
+
+        public bool DelayExecution { get; set; }
 
         // When set for a mode, Execute actually runs this real ArchitectureDependencyContract
         // against the session (via ArchitectureAnalysisSession.CheckContract) instead of
@@ -106,17 +121,31 @@ public sealed class ArchitectureAnalysisSnapshotTests
             bool includeAsmdefContracts = true,
             ValidationTiming? timing = null)
         {
-            CallCountByMode[mode] = CallCountByMode.GetValueOrDefault(mode) + 1;
+            int concurrent = Interlocked.Increment(ref _activeExecutions);
+            MaxConcurrentExecutions = Math.Max(MaxConcurrentExecutions, concurrent);
+            try
+            {
+                if (DelayExecution)
+                {
+                    Thread.Sleep(50);
+                }
 
-            List<ArchitectureViolation> violations = ContractByMode.TryGetValue(mode, out ArchitectureDependencyContract? contract)
-                ? session.CheckContract(contract)
-                : new List<ArchitectureViolation>();
+                CallCountByMode[mode] = CallCountByMode.GetValueOrDefault(mode) + 1;
 
-            return new ArchitectureContractExecutionResult(
-                violations,
-                Array.Empty<string>(),
-                Array.Empty<ArchitectureViolation>(),
-                Array.Empty<ArchitectureCoverageSummary>());
+                List<ArchitectureViolation> violations = ContractByMode.TryGetValue(mode, out ArchitectureDependencyContract? contract)
+                    ? session.CheckContract(contract)
+                    : new List<ArchitectureViolation>();
+
+                return new ArchitectureContractExecutionResult(
+                    violations,
+                    Array.Empty<string>(),
+                    Array.Empty<ArchitectureViolation>(),
+                    Array.Empty<ArchitectureCoverageSummary>());
+            }
+            finally
+            {
+                Interlocked.Decrement(ref _activeExecutions);
+            }
         }
     }
 
@@ -217,6 +246,26 @@ public sealed class ArchitectureAnalysisSnapshotTests
     }
 
     [Test]
+    public async Task Evaluate_ConcurrentModes_SerializesSessionAccess()
+    {
+        Fixture fixture = CreateFixture();
+        fixture.ContractExecutor.DelayExecution = true;
+
+        using ArchitectureAnalysisSnapshot snapshot = fixture.ApplicationService.CreateSnapshot(CreateSnapshotRequest());
+
+        await Task.WhenAll(
+            Task.Run(() => snapshot.Evaluate("strict")),
+            Task.Run(() => snapshot.Evaluate("audit")));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(fixture.ContractExecutor.MaxConcurrentExecutions, Is.EqualTo(1));
+            Assert.That(fixture.ContractExecutor.CallCountByMode, Has.Count.EqualTo(2));
+            Assert.That(snapshot.Counters.ModesEvaluated, Is.EqualTo(2));
+        });
+    }
+
+    [Test]
     public void Evaluate_AfterDispose_ThrowsObjectDisposedException()
     {
         Fixture fixture = CreateFixture();
@@ -291,6 +340,22 @@ public sealed class ArchitectureAnalysisSnapshotTests
             Assert.That(snapshot.Counters.AssemblyLoads, Is.EqualTo(0));
             Assert.That(snapshot.Counters.ModesEvaluated, Is.EqualTo(2));
         });
+    }
+
+    [Test]
+    public void Counters_AssemblyAlreadyPresentInRunnerContext_DoesNotCountAsSnapshotLoad()
+    {
+        Fixture fixture = CreateFixture();
+        ArchitectureAnalysisContext context = new(
+            "/fake/repository/root", new[] { typeof(ArchitectureAnalysisSnapshotTests).Assembly },
+            Array.Empty<string>(), Array.Empty<string>());
+        fixture.RunnerSetupService.RunnerToReturn = new FakeContractRunner(new ArchitectureAnalysisSession(
+            context, fixture.RunnerSetupService.DocumentToReturn, selectedContractIds: null,
+            enableUnmatchedIgnoreTracking: true, preprocessorSymbols: null));
+
+        using ArchitectureAnalysisSnapshot snapshot = fixture.ApplicationService.CreateSnapshot(CreateSnapshotRequest());
+
+        Assert.That(snapshot.Counters.AssemblyLoads, Is.EqualTo(0));
     }
 
     // Regression test for a PR #390 review defect: --ensure-built triggers a second BuildRunner

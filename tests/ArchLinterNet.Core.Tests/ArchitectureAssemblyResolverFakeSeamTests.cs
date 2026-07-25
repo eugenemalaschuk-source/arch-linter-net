@@ -32,6 +32,7 @@ public sealed class ArchitectureAssemblyResolverFakeSeamTests
 
         Assert.That(result.ResolvedAssemblies, Has.Member(thisAssembly));
         Assert.That(result.MissingAssemblyNames, Is.Empty);
+        Assert.That(result.AssemblyLoads, Is.EqualTo(0));
         Assert.That(fakeAssemblyLoader.LoadWasCalled, Is.False);
         Assert.That(fakeAssemblyLoader.LoadFromWasCalled, Is.False);
     }

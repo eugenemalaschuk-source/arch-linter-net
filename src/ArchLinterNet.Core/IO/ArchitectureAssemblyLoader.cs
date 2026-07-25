@@ -1,4 +1,5 @@
 using System.Reflection;
+using System.Runtime.Loader;
 using ArchLinterNet.Core.IO.Abstractions;
 
 namespace ArchLinterNet.Core.IO;
@@ -20,5 +21,59 @@ public sealed class ArchitectureAssemblyLoader : IArchitectureAssemblyLoader
     public Assembly LoadFrom(string path)
     {
         return Assembly.LoadFrom(path);
+    }
+
+    public IArchitectureAssemblyLoadScope CreateIsolatedLoadScope(IReadOnlyList<string> probingPaths)
+    {
+        return new IsolatedAssemblyLoadScope(probingPaths);
+    }
+
+    private sealed class IsolatedAssemblyLoadScope : AssemblyLoadContext, IArchitectureAssemblyLoadScope
+    {
+        private readonly IReadOnlyList<string> _probingPaths;
+
+        public IsolatedAssemblyLoadScope(IReadOnlyList<string> probingPaths)
+            : base(isCollectible: true)
+        {
+            _probingPaths = probingPaths;
+        }
+
+        public Assembly LoadFrom(string path)
+        {
+            return LoadAssemblyFromStream(path);
+        }
+
+        protected override Assembly? Load(AssemblyName assemblyName)
+        {
+            string? simpleName = assemblyName.Name;
+            if (string.IsNullOrWhiteSpace(simpleName))
+            {
+                return null;
+            }
+
+            string? candidate = _probingPaths
+                .Select(path => Path.Combine(path, $"{simpleName}.dll"))
+                .FirstOrDefault(File.Exists);
+
+            return candidate == null ? null : LoadAssemblyFromStream(candidate);
+        }
+
+        public void Dispose()
+        {
+            Unload();
+        }
+
+        private Assembly LoadAssemblyFromStream(string path)
+        {
+            using FileStream assemblyStream = File.OpenRead(path);
+            string pdbPath = Path.ChangeExtension(path, ".pdb");
+            if (!File.Exists(pdbPath))
+            {
+                return LoadFromStream(assemblyStream);
+            }
+
+            using FileStream pdbStream = File.OpenRead(pdbPath);
+            return LoadFromStream(assemblyStream, pdbStream);
+        }
     }
 }

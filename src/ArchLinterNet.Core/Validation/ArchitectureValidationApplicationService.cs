@@ -67,6 +67,7 @@ public sealed class ArchitectureValidationApplicationService(
             setup = BuildRunnerFor(policy, request, modeHint, timing);
 
         int projectGraphEvaluations = 1;
+        int assemblyLoads = setup.AssemblyLoads;
         IArchitectureContractRunner runner = setup.Runner;
 
         BuildStatePreflightResult preflight;
@@ -91,8 +92,9 @@ public sealed class ArchitectureValidationApplicationService(
             && runner.Session.Context.ProjectDiscovery is { DiscoveredProjects.Count: > 0 })
         {
             using (timing?.Measure("post_ensure_built_reload"))
-                setup = BuildRunnerFor(policy, request, modeHint, timing);
+                setup = BuildRunnerFor(policy, request, modeHint, timing, loadPostBuildArtifacts: true);
             projectGraphEvaluations = 2;
+            assemblyLoads += setup.AssemblyLoads;
             runner = setup.Runner;
         }
 
@@ -109,6 +111,7 @@ public sealed class ArchitectureValidationApplicationService(
             handlerRegistry,
             policyCompositions: 1,
             projectGraphEvaluations: projectGraphEvaluations,
+            assemblyLoads: assemblyLoads,
             // Only a snapshot meant to serve any/all requested modes (modeHint null) needs the
             // per-mode re-check in Evaluate — a single-mode snapshot (modeHint set) already
             // validated its one mode's contract IDs exactly as before this change, above.
@@ -202,17 +205,19 @@ public sealed class ArchitectureValidationApplicationService(
     // build output (from --ensure-built) can change — reusing the same ComposedPolicy across two
     // calls means the policy document itself is never recomposed.
     private ArchitectureRunnerSetup BuildRunnerFor(
-        ComposedPolicy policy, AnalysisSnapshotRequest request, string? modeHint, ValidationTiming? timing)
+        ComposedPolicy policy,
+        AnalysisSnapshotRequest request,
+        string? modeHint,
+        ValidationTiming? timing,
+        bool loadPostBuildArtifacts = false)
     {
-        return runnerSetupService.BuildRunner(
-            policy.Document,
-            request.PolicyPath,
-            request.ConditionSetName,
-            request.PreprocessorSymbols,
-            policy.SelectedContractIds,
-            policy.EnableUnmatchedIgnoreTracking,
-            timing,
-            modeHint);
+        return loadPostBuildArtifacts
+            ? runnerSetupService.BuildRunnerForPostBuild(
+                policy.Document, request.PolicyPath, request.ConditionSetName, request.PreprocessorSymbols,
+                policy.SelectedContractIds, policy.EnableUnmatchedIgnoreTracking, timing, modeHint)
+            : runnerSetupService.BuildRunner(
+                policy.Document, request.PolicyPath, request.ConditionSetName, request.PreprocessorSymbols,
+                policy.SelectedContractIds, policy.EnableUnmatchedIgnoreTracking, timing, modeHint);
     }
 
     private static void EnsureValidSeverityConfig(string value, string settingName)

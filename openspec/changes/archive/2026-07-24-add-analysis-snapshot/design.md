@@ -9,7 +9,7 @@ The analysis-build-state blueprint (`docs/internal/analysis-build-state-blueprin
 ## Goals / Non-Goals
 
 **Goals**
-- One composed policy + one project-graph evaluation + one assembly load serves every requested `strict`/`audit` view (coverage included) for one session.
+- One composed policy serves every requested `strict`/`audit` view (coverage included) for one session; ordinary/no-restore uses one project-graph pass, while successful `--ensure-built` uses an additional post-build pass.
 - Existing single-mode `Validate` behavior, results, and performance are unchanged (implemented on top of the new primitive, not alongside it).
 - Explicit, simple ownership/disposal model for CLI (one snapshot per command) and Testing API (opt-in shared snapshot across assertions).
 - Typed counters (`ArchitectureAnalysisSnapshotCounters`) record composition/evaluation counts without printing infrastructure.
@@ -31,15 +31,15 @@ The analysis-build-state blueprint (`docs/internal/analysis-build-state-blueprin
 Alternative considered: reuse `ValidationRequest` with a nullable `Mode` and a separate `Modes` list. Rejected — it weakens the existing required-`Mode` single-mode contract and complicates `Validate`'s existing validation of `request.Mode`.
 
 ### Decision: `ArchitectureAnalysisSnapshot` owns setup once; `Evaluate(mode)` is memoized
-`CreateSnapshot` runs exactly the composition/discovery/resolution/session-construction/preflight sequence `LoadAndSetup` + `RunBuildStatePreflight` already perform today (unchanged logic, just extracted so it runs once and is retained on the snapshot instead of being recomputed). `Evaluate(mode)` runs the per-mode sequence (configuration check, policy-consistency check, contract execution, unmatched-ignored resolution, coverage filtering, classification checks) — extracted verbatim from `Validate`'s current mode-specific tail — and caches the `ValidationOutcome` per mode so a repeated `Evaluate("strict")` on the same snapshot does not re-run contract execution.
+`CreateSnapshot` composes the policy once, then runs setup and build-state preflight. After a successful `--ensure-built`, it runs one additional discovery/resolution/session-construction pass while reusing that composed policy. This pass loads exact post-build paths through one collectible, isolated loading scope, so it cannot return a same-simple-name assembly previously loaded into the default context. `Evaluate(mode)` runs the per-mode sequence (configuration check, policy-consistency check, contract execution, unmatched-ignored resolution, coverage filtering, classification checks) and caches the `ValidationOutcome` per mode so a repeated `Evaluate("strict")` on the same snapshot does not re-run contract execution. Evaluation and disposal are serialized because the shared session contains mutable unmatched-ignore tracking and lazy indexes.
 
 `Validate(ValidationRequest)` becomes `using var snapshot = CreateSnapshot(AnalysisSnapshotRequest.From(request)); return snapshot.Evaluate(request.Mode, timing);` — the existing `--ensure-built` re-setup-after-build behavior stays inside `CreateSnapshot` (it's part of one session's setup, not mode-specific), so single-mode timing and results are unchanged.
 
 ### Decision: blocked preflight snapshots short-circuit every mode
 When build-state preflight blocks (as today), `CreateSnapshot` stores the blocked `BuildStatePreflightResult` and `Evaluate(mode)` returns the same blocked `ValidationOutcome` shape the current code returns for any requested mode, without touching contract execution — matching the "invalid build state is a failed session" requirement without introducing new failure types.
 
-### Decision: `IDisposable` with a disposed flag, no unmanaged resources
-Nothing the snapshot owns today (session, indexes, runner) implements `IDisposable` itself. `ArchitectureAnalysisSnapshot.Dispose()` sets an internal flag and clears cached outcomes; `Evaluate` after disposal throws `ObjectDisposedException`. This matches the `ArchitectureEngine` precedent (`src/ArchLinterNet.Core/Composition/ArchitectureEngine.cs`) of implementing `IDisposable` for explicit lifetime even when the underlying resources are managed-only, and keeps the door open for future unmanaged/pooled resources without a breaking API change.
+### Decision: serialized `IDisposable` releases the isolated post-build scope
+`ArchitectureAnalysisSnapshot.Dispose()` serializes with `Evaluate`, sets its terminal disposed state, clears cached outcomes, and releases the final context's isolated assembly-loading scope when one exists. `Evaluate` after disposal throws `ObjectDisposedException`. This keeps post-build target assemblies isolated for the snapshot lifetime without leaking their loading context after disposal.
 
 ### Decision: Testing API adds an explicit shared-snapshot entry point, existing methods unchanged
 `ArchitectureValidationBuilder.ValidateStrict()`/`ValidateAudit()` keep their current independent-run behavior (backward compatible — the issue's "ordinary single-mode validation stays simple" requirement). A new method returns a small disposable wrapper bound to one `ArchitectureAnalysisSnapshot`, exposing `ValidateStrict()`/`ValidateAudit()` that evaluate against the shared snapshot. Callers who want the sharing benefit opt in explicitly with a `using` block; callers who don't, pay no API-surface cost.
@@ -49,7 +49,7 @@ Nothing the snapshot owns today (session, indexes, runner) implements `IDisposab
 
 ## Risks / Trade-offs
 
-- **Risk:** extracting the per-mode tail of `Validate` into a reusable method could subtly change control flow (e.g. which `document`/`runner` instance is read after the `--ensure-built` re-setup). Mitigation: the extraction is verbatim — the same local variables (`loadAndSetup`, `runner`, configs) are captured by the snapshot at the end of `CreateSnapshot`, and `Evaluate` reads only from the snapshot's stored setup, never re-derives it.
+- **Risk:** the post-build pass could accidentally resolve a previously loaded assembly by simple name. Mitigation: it resolves only the verified output paths through a shared collectible loading scope, retained until snapshot disposal.
 - **Risk:** file-size lint (`ArchitectureAnalysisSession.cs` main file is already 795/800 lines; several partials are near 800). Mitigation: all new logic lives in new files (`ArchitectureAnalysisSnapshot.cs`, `AnalysisSnapshotRequest.cs`, `ArchitectureAnalysisSnapshotCounters.cs`); no session partial grows.
 - **Trade-off:** counters are intentionally minimal (composition/evaluation counts only, no timings) — full profiling is explicitly deferred to #374 per the blueprint's downstream map, so counters here are typed but coarse.
 
