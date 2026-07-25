@@ -19,6 +19,13 @@ internal sealed class PublicApiSurfaceValidator : IArchitecturePolicyDocumentVal
                     "A contract with nothing to scan is a configuration error; declare at least one target assembly.");
             }
 
+            if (!PublicApiComparisonModes.All.Contains(contract.ApiComparison, StringComparer.Ordinal))
+            {
+                throw new InvalidOperationException(
+                    $"Public API surface contract '{contract.Name}' declares 'api_comparison: {contract.ApiComparison}'. " +
+                    $"Supported values are {string.Join(" and ", PublicApiComparisonModes.All.Select(mode => $"'{mode}'"))}.");
+            }
+
             string? invalidAssembly = contract.Assemblies.FirstOrDefault(a => !targetAssemblies.Contains(a));
             if (invalidAssembly != null)
             {

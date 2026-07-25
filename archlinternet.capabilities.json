@@ -115,8 +115,8 @@
       "kind": "public-api-surface",
       "strictGroup": "strict_public_api_surface",
       "auditGroup": "audit_public_api_surface",
-      "fields": ["name", "id", "assemblies", "declared_api", "forbid_public_constants_unless_declared", "allowed_public_constants", "ignored_violations", "reason"],
-      "validates": "An assembly's exported (public/protected/protected-internal) types and directly-declared members match a normalized signature allowlist (declared_api). assemblies must be non-empty. Undeclared exported types/members are violations. forbid_public_constants_unless_declared adds an independent, stricter check: an exported const field is forbidden unless its fully-qualified name is in allowed_public_constants, even if its full signature is already in declared_api. Detects only undeclared additions, not removed/changed signatures; not a substitute for binary/package compatibility validation."
+      "fields": ["name", "id", "assemblies", "declared_api", "api_snapshot", "api_comparison", "forbid_public_constants_unless_declared", "allowed_public_constants", "ignored_violations", "reason"],
+      "validates": "An assembly's exported (public/protected/protected-internal) types and directly-declared members match a normalized signature allowlist, declared inline via declared_api and/or through a reviewed snapshot file via api_snapshot (repository-local, resolved and parsed at policy load time). assemblies must be non-empty. Undeclared exported types/members are violations. api_comparison: exact additionally reports declared signatures that no longer exist (removals) and declared members whose normalized signature changed, correlated by declaration kind, qualified name, and parameter count so a re-signed member reports once as a change; the default additions_only reports undeclared additions only. forbid_public_constants_unless_declared adds an independent, stricter check: an exported const field is forbidden unless its fully-qualified name is in allowed_public_constants, even if its full signature is already declared. Not a substitute for binary/package compatibility validation."
     },
     {
       "kind": "attribute-usage",

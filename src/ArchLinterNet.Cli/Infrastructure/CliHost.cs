@@ -65,7 +65,7 @@ internal sealed class CliHost(ICliRootCommandFactory rootCommandFactory, ICliCon
 
     private static bool IsTopLevelCommand(string arg)
     {
-        return arg is "baseline" or "graph" or "explain";
+        return arg is "baseline" or "graph" or "explain" or "public-api";
     }
 
     private void WriteParseErrors(ParseResult parseResult)
@@ -120,6 +120,7 @@ internal sealed class CliHost(ICliRootCommandFactory rootCommandFactory, ICliCon
             "diff" => "Run 'arch-linter-net baseline diff --help' for usage information.",
             "verify" => "Run 'arch-linter-net baseline verify --help' for usage information.",
             "baseline" or "generate" => "Run 'arch-linter-net baseline --help' for usage information.",
+            "public-api" or "capture" => "Run 'arch-linter-net public-api --help' for usage information.",
             _ => "Run with --help for usage information.",
         };
     }

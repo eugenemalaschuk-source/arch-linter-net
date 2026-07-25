@@ -1,6 +1,15 @@
+using ArchLinterNet.Core.Model;
 using YamlDotNet.Serialization;
 
 namespace ArchLinterNet.Core.Contracts.Families;
+
+public static class PublicApiComparisonModes
+{
+    public const string AdditionsOnly = "additions_only";
+    public const string Exact = "exact";
+
+    public static readonly IReadOnlyList<string> All = new[] { AdditionsOnly, Exact };
+}
 
 public sealed partial class ArchitectureContractGroups
 {
@@ -20,6 +29,18 @@ public sealed class ArchitecturePublicApiSurfaceContract : IArchitectureContract
     [YamlMember(Alias = "assemblies")] public List<string> Assemblies { get; set; } = new();
 
     [YamlMember(Alias = "declared_api")] public List<string> DeclaredApi { get; set; } = new();
+
+    // Path to a reviewed public API snapshot file, resolved relative to the policy boundary at
+    // load time. Its entries are unioned with DeclaredApi to form the declared surface.
+    [YamlMember(Alias = "api_snapshot")] public string? ApiSnapshot { get; set; }
+
+    [YamlMember(Alias = "api_comparison")]
+    public string ApiComparison { get; set; } = PublicApiComparisonModes.AdditionsOnly;
+
+    // Populated by the policy loader from ApiSnapshot; never authored in YAML.
+    [YamlIgnore]
+    public IReadOnlyList<PublicApiSnapshotEntry> ResolvedSnapshotEntries { get; set; } =
+        Array.Empty<PublicApiSnapshotEntry>();
 
     [YamlMember(Alias = "forbid_public_constants_unless_declared")]
     public bool ForbidPublicConstantsUnlessDeclared { get; set; }

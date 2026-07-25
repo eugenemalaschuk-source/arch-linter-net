@@ -57,6 +57,8 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<IBuildStatePreparationService, BuildStatePreparationService>();
         services.AddSingleton<IArchitectureValidationApplicationService, ArchitectureValidationApplicationService>();
         services.AddSingleton<IArchitectureBaselineApplicationService, ArchitectureBaselineApplicationService>();
+        services.AddSingleton<IPublicApiSnapshotStore, PublicApiSnapshotStore>();
+        services.AddSingleton<IArchitecturePublicApiApplicationService, ArchitecturePublicApiApplicationService>();
         services.AddSingleton<IAsmdefValidationService, AsmdefValidationService>();
         services.AddSingleton<IArchitectureGraphFormatter, ArchitectureGraphFormatter>();
         services.AddSingleton<IArchitectureGraphApplicationService, ArchitectureGraphApplicationService>();

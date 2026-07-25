@@ -167,6 +167,26 @@ internal sealed class CliRuntime : ICliRuntime
         return _engine.MigrateBaseline(request);
     }
 
+    public PublicApiCaptureOutcome CapturePublicApi(PublicApiCaptureRequest request)
+    {
+        return _engine.CapturePublicApi(request);
+    }
+
+    public PublicApiDiffOutcome DiffPublicApi(PublicApiDiffRequest request)
+    {
+        return _engine.DiffPublicApi(request);
+    }
+
+    public PublicApiUpdateOutcome UpdatePublicApi(PublicApiUpdateRequest request)
+    {
+        return _engine.UpdatePublicApi(request);
+    }
+
+    public PublicApiMigrateOutcome MigratePublicApi(PublicApiMigrateRequest request)
+    {
+        return _engine.MigratePublicApi(request);
+    }
+
     public ArchitectureGraphOutcome BuildGraph(ArchitectureGraphRequest request)
     {
         return _engine.BuildGraph(request);

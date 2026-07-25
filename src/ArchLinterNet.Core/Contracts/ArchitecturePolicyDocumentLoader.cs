@@ -133,6 +133,10 @@ public sealed partial class ArchitecturePolicyDocumentLoader : IArchitecturePoli
         provenance.Bind(document);
         document.ClassificationPathDeferred = DetectClassificationPathDeferred(yaml, provenance);
 
+        // Reviewed API snapshots are resolved before the validator pipeline so that a contract's
+        // declared surface is complete by the time any validator inspects it.
+        PublicApiSnapshotResolver.Resolve(document, policyPath, _fileSystem);
+
         foreach (IArchitecturePolicyDocumentValidator validator in ArchitecturePolicyDocumentValidatorPipeline.All)
         {
             provenance.ResetValidationSubject();
