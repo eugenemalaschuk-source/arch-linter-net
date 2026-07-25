@@ -312,6 +312,133 @@ public sealed class CliArchitectureTests
         });
     }
 
+    [Test]
+    public void ValidateHandler_ReportMode_PolicyErrorRoutesJsonToFileSink()
+    {
+        // Regression coverage for the report-mode error routing gap: a policy load failure occurs
+        // before any outcome exists, so with --report json=out.json configured the JSON-shaped
+        // error document must land in out.json itself, not on process stdout.
+        ArchitecturePolicySourceDescriptor source = new(
+            "architecture/root.yml", "architecture/root.yml", ArchitecturePolicyDocumentRole.Root,
+            0, null, null, ["architecture/root.yml"]);
+        ArchitecturePolicySourceLocation location = new(source, "$", 1, 1, null, null);
+        FakeCliRuntime runtime = new()
+        {
+            ExceptionToThrow = new ArchitecturePolicyImportException(
+                ArchitecturePolicyImportErrorCategory.SourceShape,
+                "Invalid namespace.",
+                new ArchitecturePolicyDiagnostic(ArchitecturePolicyDiagnosticKind.SourceShape, location, [], source.ImportChain))
+        };
+        FakeCliConsole console = new();
+        FakeFileSystem fileSystem = new(exists: true);
+        ValidateCommandHandler handler = new(runtime, console, fileSystem);
+
+        ValidateCommandOptions options = new(
+            "policy.yml", "strict", "human", [], null, false, null, false, false)
+        {
+            AdditionalSinks = [new ReportSink("json", ReportDestinationType.File, "out.json")],
+        };
+
+        int exitCode = handler.Execute(options);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(exitCode, Is.EqualTo(CliExitCodes.InvalidArgumentsOrRuntimeError));
+            Assert.That(fileSystem.CommittedPaths, Does.Contain("out.json"));
+            Assert.That(console.StdOut, Is.Empty);
+            Assert.That(console.StdErr, Is.Empty);
+        });
+    }
+
+    [Test]
+    public void ValidateHandler_ReportMode_ExecutionErrorRoutesToFileAndStreamSinks()
+    {
+        FakeCliRuntime runtime = new()
+        {
+            ExceptionToThrow = new InvalidOperationException("'when' expression failed to evaluate: boom")
+        };
+        FakeCliConsole console = new();
+        FakeFileSystem fileSystem = new(exists: true);
+        ValidateCommandHandler handler = new(runtime, console, fileSystem);
+
+        ValidateCommandOptions options = new(
+            "policy.yml", "strict", "human", [], null, false, null, false, false)
+        {
+            AdditionalSinks =
+            [
+                new ReportSink("json", ReportDestinationType.File, "err.json"),
+                new ReportSink("human", ReportDestinationType.Stderr, null),
+            ],
+        };
+
+        int exitCode = handler.Execute(options);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(exitCode, Is.EqualTo(CliExitCodes.InvalidArgumentsOrRuntimeError));
+            Assert.That(fileSystem.CommittedPaths, Does.Contain("err.json"));
+            Assert.That(console.StdErr, Does.Contain("boom"));
+            Assert.That(console.StdOut, Is.Empty);
+        });
+    }
+
+    [Test]
+    public void ValidateHandler_ReportMode_OutputErrorFallsBackToStderrWhenNoStreamSink()
+    {
+        // Post-outcome failures cannot safely be written into a File sink (it either just failed,
+        // or already committed a legitimate report that must not be overwritten), so with only a
+        // File sink configured, the operational diagnostic falls back to process stderr.
+        FakeCliRuntime runtime = new();
+        FakeCliConsole console = new();
+        FakeFileSystem fileSystem = new(exists: true);
+        fileSystem.FailOnWrite.Add("broken.txt");
+        ValidateCommandHandler handler = new(runtime, console, fileSystem);
+
+        ValidateCommandOptions options = new(
+            "policy.yml", "strict", "human", [], null, false, null, false, false)
+        {
+            AdditionalSinks = [new ReportSink("human", ReportDestinationType.File, "broken.txt")],
+        };
+
+        int exitCode = handler.Execute(options);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(exitCode, Is.EqualTo(CliExitCodes.InvalidArgumentsOrRuntimeError));
+            Assert.That(console.StdErr, Does.Contain("Report output failed"));
+            Assert.That(fileSystem.CommittedPaths, Is.Empty);
+        });
+    }
+
+    [Test]
+    public void ValidateHandler_ReportMode_OutputErrorRoutesToStderrSinkWhenPresent()
+    {
+        FakeCliRuntime runtime = new();
+        FakeCliConsole console = new();
+        FakeFileSystem fileSystem = new(exists: true);
+        fileSystem.FailOnWrite.Add("broken.txt");
+        ValidateCommandHandler handler = new(runtime, console, fileSystem);
+
+        ValidateCommandOptions options = new(
+            "policy.yml", "strict", "human", [], null, false, null, false, false)
+        {
+            AdditionalSinks =
+            [
+                new ReportSink("human", ReportDestinationType.File, "broken.txt"),
+                new ReportSink("human", ReportDestinationType.Stderr, null),
+            ],
+        };
+
+        int exitCode = handler.Execute(options);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(exitCode, Is.EqualTo(CliExitCodes.InvalidArgumentsOrRuntimeError));
+            Assert.That(console.StdErr, Does.Contain("Report output failed"));
+            Assert.That(fileSystem.CommittedPaths, Is.Empty);
+        });
+    }
+
     private sealed class FakeCliRuntime : ICliRuntime
     {
         public string Version => "1.2.3";
@@ -465,9 +592,20 @@ public sealed class CliArchitectureTests
 
     private sealed class FakeFileSystem(bool exists) : IFileSystem
     {
+        private readonly Dictionary<string, string> _tempContents = new();
+
+        public HashSet<string> FailOnWrite { get; } = new();
+
+        public List<string> CommittedPaths { get; } = new();
+
         public bool FileExists(string path)
         {
-            return exists;
+            return _tempContents.ContainsKey(path) || exists;
+        }
+
+        public string ReadAllText(string path)
+        {
+            return _tempContents.TryGetValue(path, out string? content) ? content : string.Empty;
         }
 
         public void WriteAllText(string path, string contents)
@@ -476,15 +614,24 @@ public sealed class CliArchitectureTests
 
         public string WriteAllTextToTemp(string targetPath, string contents)
         {
-            return targetPath + ".tmp";
+            if (FailOnWrite.Contains(targetPath))
+            {
+                throw new IOException($"Cannot write to {targetPath}");
+            }
+
+            string tempPath = targetPath + ".tmp";
+            _tempContents[tempPath] = contents;
+            return tempPath;
         }
 
         public void RenameTempToTarget(string tempPath, string targetPath)
         {
+            CommittedPaths.Add(targetPath);
         }
 
         public void DeleteFile(string path)
         {
+            _tempContents.Remove(path);
         }
 
         public bool CanWriteToDirectory(string path) => true;

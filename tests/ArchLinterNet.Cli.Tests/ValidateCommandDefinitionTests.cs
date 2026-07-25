@@ -235,30 +235,59 @@ public sealed class ValidateCommandDefinitionTests
     }
 
     [Test]
-    public void CreateRootCommand_ReportOption_RejectsBuildReceiptFileCollision()
+    public void CreateRootCommand_ReportOption_AllowsReceiptLookingPathNeverActuallyLoaded()
     {
+        // A destination that merely *looks* like a receipt path, but was never consulted during
+        // this run (PreflightDiagnosticsToReturn is empty), is a legitimate user choice and must
+        // not be blocked just because of its suffix.
         (RecordingRuntime runtime, RecordingConsole console) = Run([
             "--report", "json=bin/Debug/net10.0/MyApp.archlinternet-receipt.json",
         ]);
 
-        Assert.That(runtime.LastRequest, Is.Null);
-        Assert.That(console.ErrorText, Does.Contain("build receipt path is read-only"));
+        Assert.That(runtime.LastRequest, Is.Not.Null);
+        Assert.That(console.ErrorText, Is.Empty);
     }
 
     [Test]
-    public void CreateRootCommand_ReportOption_RejectsBuildReceiptCaseInsensitive()
+    public void CreateRootCommand_ReportOption_RejectsActualReceiptFileCollision()
     {
-        (RecordingRuntime runtime, RecordingConsole console) = Run([
-            "--report", "json=bin/MyApp.ARCHLINTERNET-RECEIPT.JSON",
-        ]);
+        string assemblyPath = Path.GetFullPath("bin/Debug/net10.0/MyApp.dll");
+        BuildStatePreflightDiagnostic diagnostic = new(
+            "build-state-preflight", null, BuildStatePreflightState.Current,
+            new BuildStatePreflightEvidence("MyApp/MyApp.csproj", "MyApp", ExpectedOutputPath: assemblyPath));
 
-        Assert.That(runtime.LastRequest, Is.Null);
-        Assert.That(console.ErrorText, Does.Contain("build receipt path is read-only"));
+        (RecordingRuntime runtime, RecordingConsole console) = Run(
+            ["--report", "json=bin/Debug/net10.0/MyApp.dll.archlinternet-receipt.json"],
+            preflightDiagnostics: [diagnostic]);
+
+        Assert.That(runtime.LastRequest, Is.Not.Null);
+        Assert.That(console.ErrorText, Does.Contain("matches a build artifact or receipt loaded during this run"));
     }
 
-    private static (RecordingRuntime Runtime, RecordingConsole Console) Run(string[] args, string format = "human")
+    [Test]
+    public void CreateRootCommand_ReportOption_RejectsLoadedAssemblyFileCollision()
+    {
+        string assemblyPath = Path.GetFullPath("bin/Debug/net10.0/MyApp.dll");
+        BuildStatePreflightDiagnostic diagnostic = new(
+            "build-state-preflight", null, BuildStatePreflightState.Current,
+            new BuildStatePreflightEvidence("MyApp/MyApp.csproj", "MyApp", ExpectedOutputPath: assemblyPath));
+
+        (RecordingRuntime runtime, RecordingConsole console) = Run(
+            ["--report", "json=bin/Debug/net10.0/MyApp.dll"],
+            preflightDiagnostics: [diagnostic]);
+
+        Assert.That(runtime.LastRequest, Is.Not.Null);
+        Assert.That(console.ErrorText, Does.Contain("matches a build artifact or receipt loaded during this run"));
+    }
+
+    private static (RecordingRuntime Runtime, RecordingConsole Console) Run(
+        string[] args, string format = "human", IReadOnlyCollection<BuildStatePreflightDiagnostic>? preflightDiagnostics = null)
     {
         var runtime = new RecordingRuntime();
+        if (preflightDiagnostics is not null)
+        {
+            runtime.PreflightDiagnosticsToReturn = preflightDiagnostics;
+        }
         var console = new RecordingConsole();
         var fileSystem = new RecordingFileSystem(true);
         RootCommand command = new ValidateCommandModule().CreateRootCommand(runtime, console, fileSystem);
@@ -277,6 +306,7 @@ public sealed class ValidateCommandDefinitionTests
     private sealed class RecordingFileSystem(bool exists) : IFileSystem
     {
         public bool FileExists(string path) => exists;
+        public string ReadAllText(string path) => "{}";
         public void WriteAllText(string path, string contents) { }
         public string WriteAllTextToTemp(string targetPath, string contents) => targetPath + ".tmp";
         public void RenameTempToTarget(string tempPath, string targetPath) { }
@@ -299,6 +329,8 @@ public sealed class ValidateCommandDefinitionTests
         public string Version => "1.2.3";
         public ValidationRequest? LastRequest { get; private set; }
         public ValidationTiming? LastTiming { get; private set; }
+        public IReadOnlyCollection<BuildStatePreflightDiagnostic> PreflightDiagnosticsToReturn { get; set; } =
+            Array.Empty<BuildStatePreflightDiagnostic>();
 
         public bool TryParseGraphLevel(string value, out ArchitectureGraphLevel level) => throw new NotSupportedException();
 
@@ -318,7 +350,10 @@ public sealed class ValidateCommandDefinitionTests
                 "off",
                 Array.Empty<ArchitectureCoverageSummary>(),
                 Array.Empty<ArchitectureClassificationConflict>(),
-                Array.Empty<ArchitectureClassificationMetadataFailure>());
+                Array.Empty<ArchitectureClassificationMetadataFailure>())
+            {
+                PreflightDiagnostics = PreflightDiagnosticsToReturn,
+            };
         }
 
         public ArchitectureAnalysisSnapshot CreateSnapshot(AnalysisSnapshotRequest request, ValidationTiming? timing) =>

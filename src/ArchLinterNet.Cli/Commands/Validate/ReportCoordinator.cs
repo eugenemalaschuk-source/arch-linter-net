@@ -110,6 +110,71 @@ internal sealed class ReportCoordinator
             _console.Out.WriteLine(DispatchFormat(stdoutFormat, humanContent, jsonContent, sarifContent));
         }
 
+        Dictionary<string, string> contentByFormat = new();
+        if (humanContent is not null)
+        {
+            contentByFormat["human"] = humanContent;
+        }
+        if (jsonContent is not null)
+        {
+            contentByFormat["json"] = jsonContent;
+        }
+        if (sarifContent is not null)
+        {
+            contentByFormat["sarif"] = sarifContent;
+        }
+
+        return DistributeToSinks(additionalSinks, contentByFormat);
+    }
+
+    // Routes error content (policy load failures, unexpected runtime errors) to every configured
+    // sink whose format matches — file, stdout, and stderr alike. Safe to use for these errors
+    // specifically because they occur before any legitimate report content has been produced for
+    // this invocation, so there is nothing at the destination for the error content to clobber.
+    public RouteResult RouteErrorToAllSinks(
+        IReadOnlyList<ReportSink> additionalSinks,
+        IReadOnlyDictionary<string, string> contentByFormat)
+    {
+        return DistributeToSinks(additionalSinks, contentByFormat);
+    }
+
+    // Routes error content that describes an output-routing failure itself (some sinks already
+    // committed legitimate report content, others failed). Only stdout/stderr sinks are honored
+    // here — writing to a File sink would either re-fail (the sink that just failed) or overwrite
+    // a sink that already committed a valid report. Returns false when no stream sink matched, so
+    // the caller can fall back to the process's own stderr.
+    public bool TryRouteErrorToStreamSinks(
+        IReadOnlyList<ReportSink> additionalSinks,
+        IReadOnlyDictionary<string, string> contentByFormat)
+    {
+        bool wroteAny = false;
+        foreach (ReportSink sink in additionalSinks)
+        {
+            if (sink.DestinationType == ReportDestinationType.File
+                || !contentByFormat.TryGetValue(sink.Format, out string? content))
+            {
+                continue;
+            }
+
+            if (sink.DestinationType == ReportDestinationType.Stderr)
+            {
+                _console.Error.WriteLine(content);
+            }
+            else
+            {
+                _console.Out.WriteLine(content);
+            }
+
+            wroteAny = true;
+        }
+
+        return wroteAny;
+    }
+
+    private RouteResult DistributeToSinks(
+        IReadOnlyList<ReportSink> additionalSinks,
+        IReadOnlyDictionary<string, string> contentByFormat)
+    {
         List<string> failedPaths = new();
         List<string> committedPaths = new();
         List<string> stagedPaths = new();
@@ -118,16 +183,13 @@ internal sealed class ReportCoordinator
 
         foreach (ReportSink sink in additionalSinks)
         {
+            if (!contentByFormat.TryGetValue(sink.Format, out string? content))
+            {
+                continue;
+            }
+
             if (sink.DestinationType is ReportDestinationType.Stdout or ReportDestinationType.Stderr)
             {
-                string content = sink.Format switch
-                {
-                    "human" => humanContent!,
-                    "json" => jsonContent!,
-                    "sarif" => sarifContent!,
-                    _ => string.Empty,
-                };
-
                 if (sink.DestinationType == ReportDestinationType.Stderr)
                 {
                     _console.Error.WriteLine(content);
@@ -140,23 +202,16 @@ internal sealed class ReportCoordinator
                 continue;
             }
 
-            string fileContent = sink.Format switch
-            {
-                "human" => humanContent!,
-                "json" => jsonContent!,
-                "sarif" => sarifContent!,
-                _ => string.Empty,
-            };
-
             try
             {
-                ValidateContentSize(fileContent);
+                ValidateContentSize(content);
                 if (sink.Format is "json" or "sarif")
                 {
-                    _ = JsonNode.Parse(fileContent);
+                    _ = JsonNode.Parse(content);
                 }
 
-                string tempPath = _fileSystem.WriteAllTextToTemp(sink.FilePath!, fileContent);
+                string tempPath = _fileSystem.WriteAllTextToTemp(sink.FilePath!, content);
+                ValidateWrittenTempFile(tempPath, sink.Format);
                 pendingRenames.Add((tempPath, sink.FilePath!));
                 stagedPaths.Add(sink.FilePath!);
             }
@@ -200,7 +255,7 @@ internal sealed class ReportCoordinator
         }
 
         var allFileSinks = additionalSinks
-            .Where(s => s.DestinationType == ReportDestinationType.File)
+            .Where(s => s.DestinationType == ReportDestinationType.File && contentByFormat.ContainsKey(s.Format))
             .Select(s => s.FilePath!)
             .ToArray();
         var uncommittedPaths = allFileSinks.Except(committedPaths).ToArray();
@@ -210,6 +265,36 @@ internal sealed class ReportCoordinator
             : ReportRouteStatus.OutputFailed;
 
         return new RouteResult(status, failedPaths, committedPaths, stagedPaths, uncommittedPaths, errorDetails);
+    }
+
+    // Re-validates the bytes actually landed on disk rather than trusting the in-memory string that
+    // was handed to WriteAllTextToTemp — catches truncated/corrupted writes (disk full, concurrent
+    // modification) before the content is ever renamed into the target path. A missing temp file is
+    // a hard failure (not a silent no-op): letting it through here would mean phase 2 discovers the
+    // gap mid-rename, after other sinks in the same batch have already committed, producing partial
+    // output instead of the clean all-or-nothing failure this staging phase is supposed to guarantee.
+    private void ValidateWrittenTempFile(string tempPath, string format)
+    {
+        if (!_fileSystem.FileExists(tempPath))
+        {
+            throw new InvalidOperationException($"Temp report file was not created: {tempPath}");
+        }
+
+        try
+        {
+            string writtenContent = _fileSystem.ReadAllText(tempPath);
+            ValidateContentSize(writtenContent);
+
+            if (format is "json" or "sarif")
+            {
+                _ = JsonNode.Parse(writtenContent);
+            }
+        }
+        catch (Exception)
+        {
+            try { _fileSystem.DeleteFile(tempPath); } catch { }
+            throw;
+        }
     }
 
     private static string? StdoutOrAnySinkNeeds(

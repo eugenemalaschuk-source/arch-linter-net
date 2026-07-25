@@ -527,6 +527,8 @@ public sealed partial class BaselineCommandHandlerTests
 
         public bool FileExists(string path) => _existingPaths.Contains(path);
 
+        public string ReadAllText(string path) => string.Empty;
+
         public void WriteAllText(string path, string contents)
         {
             LastWritePath = path;

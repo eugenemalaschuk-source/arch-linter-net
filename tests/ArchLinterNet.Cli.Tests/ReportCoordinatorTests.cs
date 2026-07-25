@@ -387,6 +387,128 @@ public sealed class ReportCoordinatorTests
         Assert.That(fileSystem.TempPaths, Does.Contain("report.sarif"));
     }
 
+    [Test]
+    public void PostWriteTempFileMissing_FailsBeforeAnyRename()
+    {
+        var runtime = new CountingRuntime();
+        var console = new CapturingConsole();
+        var fileSystem = new StubFileSystem();
+        var coordinator = new ReportCoordinator(runtime, console, fileSystem);
+
+        var sinks = new[]
+        {
+            new ReportSink("json", ReportDestinationType.File, "good.json"),
+            new ReportSink("sarif", ReportDestinationType.File, "vanished.sarif"),
+        };
+        fileSystem.MakeUnwritable("vanished.sarif", phase: StubFileSystem.FailPhase.PostWriteMissing);
+
+        RouteResult result = coordinator.RouteSingleOutcome("human", "strict", PassedOutcome, sinks);
+
+        // The temp file for vanished.sarif is reported missing during staging (phase 1), so phase 2
+        // never runs for either sink — good.json must not have been committed despite writing fine.
+        Assert.That(result.Status, Is.EqualTo(ReportRouteStatus.OutputFailed));
+        Assert.That(result.FailedPaths, Does.Contain("vanished.sarif"));
+        Assert.That(result.CommittedPaths, Is.Empty);
+        Assert.That(fileSystem.TargetPaths, Is.Empty);
+    }
+
+    [Test]
+    public void PostWriteTempFileCorrupted_FailsBeforeAnyRename()
+    {
+        var runtime = new CountingRuntime();
+        var console = new CapturingConsole();
+        var fileSystem = new StubFileSystem();
+        var coordinator = new ReportCoordinator(runtime, console, fileSystem);
+
+        var sinks = new[]
+        {
+            new ReportSink("json", ReportDestinationType.File, "good.json"),
+            new ReportSink("sarif", ReportDestinationType.File, "corrupted.sarif"),
+        };
+        fileSystem.MakeUnwritable("corrupted.sarif", phase: StubFileSystem.FailPhase.PostWriteCorrupt);
+
+        RouteResult result = coordinator.RouteSingleOutcome("human", "strict", PassedOutcome, sinks);
+
+        Assert.That(result.Status, Is.EqualTo(ReportRouteStatus.OutputFailed));
+        Assert.That(result.FailedPaths, Does.Contain("corrupted.sarif"));
+        Assert.That(result.CommittedPaths, Is.Empty);
+        Assert.That(fileSystem.TargetPaths, Is.Empty);
+    }
+
+    [Test]
+    public void RouteErrorToAllSinks_WritesToFileStdoutAndStderr()
+    {
+        var runtime = new CountingRuntime();
+        var console = new CapturingConsole();
+        var fileSystem = new StubFileSystem();
+        var coordinator = new ReportCoordinator(runtime, console, fileSystem);
+
+        var sinks = new[]
+        {
+            new ReportSink("json", ReportDestinationType.File, "error.json"),
+            new ReportSink("human", ReportDestinationType.Stderr, null),
+        };
+        var contentByFormat = new Dictionary<string, string>
+        {
+            ["json"] = "{\"kind\":\"architecture_policy_error\"}",
+            ["human"] = "Architecture validation error: bad policy",
+        };
+
+        RouteResult result = coordinator.RouteErrorToAllSinks(sinks, contentByFormat);
+
+        Assert.That(result.Status, Is.EqualTo(ReportRouteStatus.AllSucceeded));
+        Assert.That(fileSystem.TargetPaths, Does.Contain("error.json"));
+        Assert.That(console.ErrorText, Does.Contain("bad policy"));
+        Assert.That(console.OutputText, Is.Empty);
+    }
+
+    [Test]
+    public void TryRouteErrorToStreamSinks_IgnoresFileSinksAndReturnsFalseWhenNoneMatch()
+    {
+        var runtime = new CountingRuntime();
+        var console = new CapturingConsole();
+        var fileSystem = new StubFileSystem();
+        var coordinator = new ReportCoordinator(runtime, console, fileSystem);
+
+        var sinks = new[] { new ReportSink("json", ReportDestinationType.File, "out.json") };
+        var contentByFormat = new Dictionary<string, string> { ["json"] = "{\"kind\":\"x\"}" };
+
+        bool wrote = coordinator.TryRouteErrorToStreamSinks(sinks, contentByFormat);
+
+        Assert.That(wrote, Is.False);
+        Assert.That(fileSystem.TempPaths, Is.Empty);
+        Assert.That(console.OutputText, Is.Empty);
+        Assert.That(console.ErrorText, Is.Empty);
+    }
+
+    [Test]
+    public void TryRouteErrorToStreamSinks_WritesOnlyToMatchingStreamSinks()
+    {
+        var runtime = new CountingRuntime();
+        var console = new CapturingConsole();
+        var fileSystem = new StubFileSystem();
+        var coordinator = new ReportCoordinator(runtime, console, fileSystem);
+
+        var sinks = new[]
+        {
+            new ReportSink("json", ReportDestinationType.File, "out.json"),
+            new ReportSink("sarif", ReportDestinationType.Stdout, null),
+            new ReportSink("human", ReportDestinationType.Stderr, null),
+        };
+        var contentByFormat = new Dictionary<string, string>
+        {
+            ["sarif"] = "{\"version\":\"2.1.0\"}",
+            ["human"] = "Report output failed (output-failed)",
+        };
+
+        bool wrote = coordinator.TryRouteErrorToStreamSinks(sinks, contentByFormat);
+
+        Assert.That(wrote, Is.True);
+        Assert.That(fileSystem.TempPaths, Is.Empty);
+        Assert.That(console.OutputText, Does.Contain("2.1.0"));
+        Assert.That(console.ErrorText, Does.Contain("output-failed"));
+    }
+
     private sealed class CapturingConsole : ICliConsole
     {
         private readonly StringBuilder _output = new();
@@ -399,10 +521,11 @@ public sealed class ReportCoordinatorTests
 
     private sealed class StubFileSystem : IFileSystem
     {
-        public enum FailPhase { Write, Rename }
+        public enum FailPhase { Write, Rename, PostWriteMissing, PostWriteCorrupt }
 
         private readonly record struct FailEntry(string Path, FailPhase Phase);
         private readonly HashSet<FailEntry> _failOn = new();
+        private readonly Dictionary<string, string> _tempContents = new();
 
         public List<string> TempPaths { get; } = new();
         public List<string> TargetPaths { get; } = new();
@@ -410,7 +533,9 @@ public sealed class ReportCoordinatorTests
         public void MakeUnwritable(string path, FailPhase phase = FailPhase.Write) =>
             _failOn.Add(new FailEntry(path, phase));
 
-        public bool FileExists(string path) => false;
+        public bool FileExists(string path) => _tempContents.ContainsKey(path);
+
+        public string ReadAllText(string path) => _tempContents.TryGetValue(path, out string? content) ? content : string.Empty;
 
         public void WriteAllText(string path, string contents) { }
 
@@ -422,7 +547,21 @@ public sealed class ReportCoordinatorTests
             }
 
             TempPaths.Add(targetPath);
-            return targetPath + ".tmp";
+            string tempPath = targetPath + ".tmp";
+
+            // Simulates a temp file that WriteAllTextToTemp reports as created but that never
+            // actually landed on disk (or landed with different bytes) — exercises the post-write
+            // existence/content re-validation independently of the caller's pre-write checks.
+            if (_failOn.Contains(new FailEntry(targetPath, FailPhase.PostWriteMissing)))
+            {
+                return tempPath;
+            }
+
+            _tempContents[tempPath] = _failOn.Contains(new FailEntry(targetPath, FailPhase.PostWriteCorrupt))
+                ? "not valid json"
+                : contents;
+
+            return tempPath;
         }
 
         public void RenameTempToTarget(string tempPath, string targetPath)
@@ -438,6 +577,7 @@ public sealed class ReportCoordinatorTests
 
         public void DeleteFile(string path)
         {
+            _tempContents.Remove(path);
         }
 
         public bool CanWriteToDirectory(string path) => !_failOn.Contains(new FailEntry(path, FailPhase.Write));
@@ -446,6 +586,7 @@ public sealed class ReportCoordinatorTests
     private sealed class FailingFileSystem : IFileSystem
     {
         public bool FileExists(string path) => false;
+        public string ReadAllText(string path) => string.Empty;
         public void WriteAllText(string path, string contents) { }
         public string WriteAllTextToTemp(string targetPath, string contents) => throw new IOException("Disk full");
         public void RenameTempToTarget(string tempPath, string targetPath) { }
