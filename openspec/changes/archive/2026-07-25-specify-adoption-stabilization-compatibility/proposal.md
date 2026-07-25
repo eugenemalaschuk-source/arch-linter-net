@@ -13,6 +13,7 @@ The Analysis and build state slice is already approved through #387 and `analysi
 - Fix the 0.5.1 schema/version registry for policy, fragment, baseline, API snapshot, finding, build state, cache, profiling, and the registry itself.
 - Separate stable identity from display/diagnostic evidence.
 - Define exact baseline/API lifecycle and typed finding projections.
+- Make shipped FrameworkReference and assembly-aware composition contracts explicit compatibility inputs whose exact identity/evidence cannot be weakened by source-set expansion or normalized reporting.
 - Define validation-only multi-sink `--report` syntax while preserving command-specific artifact `--output` semantics.
 - Define implementable per-file atomic replacement and explicit `partial-output` evidence instead of a false multi-file transaction.
 - Define cache defaults/trust, profiling checkpoints, bounded concurrency, cancellation, policy-only tooling, and support evidence.
