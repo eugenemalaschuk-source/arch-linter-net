@@ -64,7 +64,7 @@ The CLI SHALL preserve exactly three numeric exit-code categories for 0.5.1:
 - `1`: command completed and a validation, baseline, diff, or verification gate failed;
 - `2`: command could not complete because of invalid arguments, malformed or unsupported input, preparation/preflight/runtime failure, required-output failure, or cancellation.
 
-Machine-readable output SHALL additionally expose a typed status category so callers do not need more numeric codes to distinguish `invalid-input`, `configuration-error`, `preflight-failed`, `build-failed`, `output-failed`, `cancelled`, or other completion states.
+Machine-readable output SHALL additionally expose a typed status category so callers do not need more numeric codes to distinguish `invalid-input`, `configuration-error`, `preflight-failed`, `build-failed`, `output-failed`, `partial-output`, `cancelled`, or other completion states.
 
 #### Scenario: Architecture violation is found
 - **WHEN** validation completes normally and the selected gate fails because of findings
@@ -120,7 +120,17 @@ Display messages, reasons, rendered selectors, absolute paths, line/column, time
 - **THEN** its canonical identity remains unchanged
 
 ### Requirement: Baseline lifecycle is safe and reviewable
-Baseline writers SHALL emit `version: 2` and preserve canonical exact identity. Generate, migrate, update, prune, diff, and verify SHALL share one lifecycle model with typed statuses at least `new`, `matched`, `resolved`, `stale`, `changed`, `ambiguous`, and `configuration-error`. Existing files SHALL not be overwritten without explicit intent; update/prune SHALL preview changes and use atomic replacement. Reviewed reasons and metadata SHALL be preserved when safe round-trip is supported, otherwise the command SHALL stop with an actionable diagnostic and leave the original unchanged.
+Baseline writers SHALL emit `version: 2` and preserve canonical exact identity. Generate, migrate, update, prune, diff, and verify SHALL share one lifecycle vocabulary:
+
+- `new`: a current finding has no exact baseline entry;
+- `matched`: an entry and current finding have equal canonical identity;
+- `resolved`: a valid, evaluable baseline identity has no current finding;
+- `stale`: the entry references a contract, family, source instance, schema, or identity form that is no longer valid/evaluable, distinct from resolved debt;
+- `changed`: a deterministic predecessor/successor relationship can be shown but canonical identity differs, so the entry does not suppress until explicitly reviewed;
+- `ambiguous`: more than one candidate could correspond to an entry and the tool refuses to guess;
+- `configuration-error`: malformed, unsupported, or inconsistent input prevents safe classification.
+
+Existing files SHALL not be overwritten without explicit intent; update/prune SHALL preview changes and use atomic replacement. Reviewed reasons and metadata SHALL be preserved when safe round-trip is supported, otherwise the command SHALL stop with an actionable diagnostic and leave the original unchanged. `changed`, `stale`, `ambiguous`, and `configuration-error` SHALL never silently suppress a current finding.
 
 CI guidance SHALL verify baselines but SHALL NOT automatically approve or write new debt.
 
@@ -182,14 +192,18 @@ All 0.5.1 tasks SHALL reuse `analysis-build-state/v1` for build-input, analysis-
 - **WHEN** policy content changes but build inputs and artifacts do not
 - **THEN** analysis/session identity changes while artifact freshness remains unchanged
 
-### Requirement: Multi-sink output syntax and commit semantics are fixed
-The 0.5.1 CLI SHALL accept repeatable `--output <format>=<destination>` options, where `format` is `human`, `json`, or `sarif`, and `destination` is `stdout`, `stderr`, or a caller-provided file path. Existing single-format `--format <format>` usage SHALL remain supported as one sink to its legacy standard stream; combining `--format` with `--output` SHALL be rejected as ambiguous.
+### Requirement: Multi-sink validation report syntax and commit semantics are fixed
+The root validation command SHALL accept repeatable `--report <format>=<destination>` options, where `format` is `human`, `json`, or `sarif`, and `destination` is `stdout`, `stderr`, or a caller-provided file path. Existing validation `--format <format>` and `--json` usage SHALL remain supported as one-sink legacy forms; combining either legacy form with `--report` SHALL be rejected as ambiguous. Existing command-specific `--output <path>` options used to create baseline, API snapshot, graph, or other artifacts SHALL retain their existing meaning and SHALL NOT be reused for report routing.
 
-All sinks SHALL consume one normalized result. Every file sink SHALL be rendered to a bounded temporary file in its destination directory and validated before the first destination is changed. Each destination SHALL then be replaced atomically where the host filesystem supports atomic same-directory replacement. Multi-file all-or-none commit SHALL NOT be claimed across independent paths or filesystems. If a replacement fails after another destination has already committed, the command SHALL report typed `partial-output` evidence identifying committed and uncommitted destinations, exit `2`, and SHALL NOT rerun validation. Input policy, baseline, snapshot, schema, and receipt paths SHALL not be overwritten. Duplicate/conflicting standard-stream destinations SHALL be rejected unless their ordering is explicitly deterministic and documented.
+All report sinks SHALL consume one normalized result. Every file sink SHALL be rendered to a bounded temporary file in its destination directory and validated before the first destination is changed. Each destination SHALL then be replaced atomically where the host filesystem supports atomic same-directory replacement. Multi-file all-or-none commit SHALL NOT be claimed across independent paths or filesystems. If a replacement fails after another destination has already committed, the command SHALL report typed `partial-output` evidence identifying committed and uncommitted destinations, exit `2`, and SHALL NOT rerun validation. Input policy, baseline, snapshot, schema, and receipt paths SHALL not be overwritten. Duplicate/conflicting standard-stream destinations SHALL be rejected unless their ordering is explicitly deterministic and documented.
 
 #### Scenario: Human plus JSON plus SARIF
-- **WHEN** one invocation requests `human=stderr`, `json=report.json`, and `sarif=report.sarif`
+- **WHEN** one validation invocation requests `--report human=stderr`, `--report json=report.json`, and `--report sarif=report.sarif`
 - **THEN** policy loading, project evaluation, assembly scanning, baseline comparison, and contract execution occur once
+
+#### Scenario: Existing artifact output option remains unambiguous
+- **WHEN** a user runs `baseline generate --output baseline.yml`
+- **THEN** `--output` remains the baseline artifact destination and is never interpreted as a validation report sink
 
 #### Scenario: Rendering or validation fails before commit
 - **WHEN** any required file sink fails rendering, size checks, or validation before destination replacement begins
