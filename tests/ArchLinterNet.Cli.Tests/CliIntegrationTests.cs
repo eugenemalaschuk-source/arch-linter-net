@@ -259,6 +259,86 @@ public partial class CliIntegrationTests
         Assert.That(auditExit, Is.EqualTo(modeExit));
     }
 
+    /* --mode strict,audit (issue #363: one snapshot serves every requested mode) */
+
+    [Test]
+    public void CombinedMode_ExitsZeroWhenBothModesPass()
+    {
+        var (exitCode, stdout, stderr) = RunCli("--policy", _passingPolicy, "--mode", "strict,audit");
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(exitCode, Is.EqualTo(0), $"stderr: {stderr}");
+            Assert.That(stdout, Does.Contain("passed"));
+        });
+    }
+
+    [Test]
+    public void CombinedMode_FailsWhenEitherRequestedModeFails()
+    {
+        var (combinedExit, _, _) = RunCli("--policy", _failingPolicy, "--mode", "strict,audit");
+        var (strictExit, _, _) = RunCli("--policy", _failingPolicy, "--mode", "strict");
+
+        Assert.That(combinedExit, Is.EqualTo(strictExit).And.Not.EqualTo(0));
+    }
+
+    [Test]
+    public void CombinedMode_InvalidModeInList_ReportsError()
+    {
+        var (exitCode, _, stderr) = RunCli("--policy", _passingPolicy, "--mode", "strict,bogus");
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(exitCode, Is.Not.EqualTo(0));
+            Assert.That(stderr, Does.Contain("Invalid mode"));
+        });
+    }
+
+    // Regression test for a PR #390 review defect: --format json for a combined multi-mode run
+    // used to write each mode's JSON object on stdout back-to-back, producing two concatenated
+    // root objects — not something a normal JSON parser can consume as one document. Parsing
+    // stdout as a single JSON document (and finding one "results" entry per requested mode) is the
+    // actual regression check; the earlier combined-mode tests only checked exit code and a
+    // substring, which would not have caught this.
+    [Test]
+    public void CombinedMode_JsonFormat_ProducesOneParseableDocumentWithOneResultPerMode()
+    {
+        var (exitCode, stdout, stderr) = RunCli("--policy", _passingPolicy, "--mode", "strict,audit", "--format", "json");
+
+        Assert.That(exitCode, Is.EqualTo(0), $"stderr: {stderr}");
+
+        using JsonDocument document = JsonDocument.Parse(stdout);
+        JsonElement results = document.RootElement.GetProperty("results");
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(results.ValueKind, Is.EqualTo(JsonValueKind.Array));
+            Assert.That(results.GetArrayLength(), Is.EqualTo(2));
+        });
+    }
+
+    // Same defect as above, for --format sarif: two concatenated SARIF documents on stdout instead
+    // of one. SARIF natively supports multiple runs in one document, so the fix merges each mode's
+    // "runs" entries into one { "version", "runs": [...] } document instead of emitting one
+    // document per mode.
+    [Test]
+    public void CombinedMode_SarifFormat_ProducesOneParseableDocumentWithOneRunPerMode()
+    {
+        var (exitCode, stdout, stderr) = RunCli("--policy", _passingPolicy, "--mode", "strict,audit", "--format", "sarif");
+
+        Assert.That(exitCode, Is.EqualTo(0), $"stderr: {stderr}");
+
+        using JsonDocument document = JsonDocument.Parse(stdout);
+        JsonElement runs = document.RootElement.GetProperty("runs");
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(document.RootElement.GetProperty("version").GetString(), Is.EqualTo("2.1.0"));
+            Assert.That(runs.ValueKind, Is.EqualTo(JsonValueKind.Array));
+            Assert.That(runs.GetArrayLength(), Is.EqualTo(2));
+        });
+    }
+
     [Test]
     public void ValidateModeFlags_RespectLeftToRightPrecedence()
     {

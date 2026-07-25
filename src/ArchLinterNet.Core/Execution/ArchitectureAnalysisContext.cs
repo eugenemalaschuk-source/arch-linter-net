@@ -1,17 +1,22 @@
 using System.Reflection;
 using ArchLinterNet.Core.Discovery;
+using ArchLinterNet.Core.IO.Abstractions;
 
 namespace ArchLinterNet.Core.Execution;
 
-public sealed class ArchitectureAnalysisContext
+public sealed class ArchitectureAnalysisContext : IDisposable
 {
+    private readonly IArchitectureAssemblyLoadScope? _isolatedLoadScope;
+    private bool _disposed;
+
     public ArchitectureAnalysisContext(
         string repositoryRoot,
         IReadOnlyCollection<Assembly> targetAssemblies,
         IReadOnlyCollection<string> missingAssemblyNames,
         IReadOnlyCollection<string> assemblyProbingPaths,
         IReadOnlyCollection<ArchitectureProjectDiscoveryDiagnostic>? discoveryDiagnostics = null,
-        ProjectDiscoveryResult? projectDiscovery = null)
+        ProjectDiscoveryResult? projectDiscovery = null,
+        IArchitectureAssemblyLoadScope? isolatedLoadScope = null)
     {
         if (string.IsNullOrWhiteSpace(repositoryRoot))
         {
@@ -25,6 +30,7 @@ public sealed class ArchitectureAnalysisContext
         AssemblyProbingPaths = assemblyProbingPaths ?? Array.Empty<string>();
         DiscoveryDiagnostics = discoveryDiagnostics ?? Array.Empty<ArchitectureProjectDiscoveryDiagnostic>();
         ProjectDiscovery = projectDiscovery;
+        _isolatedLoadScope = isolatedLoadScope;
     }
 
     public string RepositoryRoot { get; }
@@ -38,4 +44,15 @@ public sealed class ArchitectureAnalysisContext
     public IReadOnlyCollection<ArchitectureProjectDiscoveryDiagnostic> DiscoveryDiagnostics { get; }
 
     public ProjectDiscoveryResult? ProjectDiscovery { get; }
+
+    public void Dispose()
+    {
+        if (_disposed)
+        {
+            return;
+        }
+
+        _disposed = true;
+        _isolatedLoadScope?.Dispose();
+    }
 }

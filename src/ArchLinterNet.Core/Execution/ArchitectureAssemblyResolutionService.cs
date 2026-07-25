@@ -16,6 +16,15 @@ public interface IArchitectureAssemblyResolutionService
         bool resolveAssemblyOutputs,
         string? mode,
         HashSet<string>? selectedContractIds);
+
+    // The post-ensure-built pass must not reuse a same-simple-name assembly from the process.
+    ResolutionResult ResolvePostBuild(
+        ArchitectureContractDocument document,
+        string repositoryRoot,
+        ProjectDiscoveryResult discovery,
+        bool resolveAssemblyOutputs,
+        string? mode,
+        HashSet<string>? selectedContractIds);
 }
 
 public sealed class ArchitectureAssemblyResolutionService : IArchitectureAssemblyResolutionService
@@ -48,6 +57,32 @@ public sealed class ArchitectureAssemblyResolutionService : IArchitectureAssembl
         bool resolveAssemblyOutputs,
         string? mode,
         HashSet<string>? selectedContractIds)
+    {
+        return Resolve(document, repositoryRoot, discovery, resolveAssemblyOutputs, mode, selectedContractIds,
+            forceIsolatedLoading: false, exactPostBuildAssemblyPaths: null);
+    }
+
+    public ResolutionResult ResolvePostBuild(
+        ArchitectureContractDocument document,
+        string repositoryRoot,
+        ProjectDiscoveryResult discovery,
+        bool resolveAssemblyOutputs,
+        string? mode,
+        HashSet<string>? selectedContractIds)
+    {
+        return Resolve(document, repositoryRoot, discovery, resolveAssemblyOutputs, mode, selectedContractIds,
+            forceIsolatedLoading: true, exactPostBuildAssemblyPaths: discovery.ResolvedAssemblyPaths);
+    }
+
+    private ResolutionResult Resolve(
+        ArchitectureContractDocument document,
+        string repositoryRoot,
+        ProjectDiscoveryResult discovery,
+        bool resolveAssemblyOutputs,
+        string? mode,
+        HashSet<string>? selectedContractIds,
+        bool forceIsolatedLoading,
+        IReadOnlyDictionary<string, string>? exactPostBuildAssemblyPaths)
     {
         // A scope: project coverage contract needs every discovered project to reach
         // CheckProjectCoverageContract — including ones whose build output is missing, stale,
@@ -90,14 +125,16 @@ public sealed class ArchitectureAssemblyResolutionService : IArchitectureAssembl
 
         return document.Analysis.TargetAssemblies.Count == 0 && projectCoverageCanReportUnresolvedProjects
             ? new ResolutionResult(Array.Empty<Assembly>(), Array.Empty<string>(), Array.Empty<string>())
-            : ResolveFromDocument(document, repositoryRoot, _fileSystem, _environment, _assemblyLoader);
+            : ResolveFromDocument(document, repositoryRoot, _fileSystem, _environment, _assemblyLoader,
+                forceIsolatedLoading, exactPostBuildAssemblyPaths, discovery.AssemblySearchPaths);
     }
 
     public ResolutionResult ResolveFromDocument(
         ArchitectureContractDocument document,
         string? repositoryRoot = null)
     {
-        return ResolveFromDocument(document, repositoryRoot, _fileSystem, _environment, _assemblyLoader);
+        return ResolveFromDocument(document, repositoryRoot, _fileSystem, _environment, _assemblyLoader,
+            forceIsolatedLoading: false, exactPostBuildAssemblyPaths: null, additionalProbingPaths: null);
     }
 
     private static ResolutionResult ResolveFromDocument(
@@ -105,7 +142,10 @@ public sealed class ArchitectureAssemblyResolutionService : IArchitectureAssembl
         string? repositoryRoot,
         IArchitectureFileSystem fileSystem,
         IArchitectureEnvironment environment,
-        IArchitectureAssemblyLoader assemblyLoader)
+        IArchitectureAssemblyLoader assemblyLoader,
+        bool forceIsolatedLoading,
+        IReadOnlyDictionary<string, string>? exactPostBuildAssemblyPaths,
+        IReadOnlyCollection<string>? additionalProbingPaths)
     {
         ArgumentNullException.ThrowIfNull(document);
 
@@ -117,16 +157,27 @@ public sealed class ArchitectureAssemblyResolutionService : IArchitectureAssembl
 
         List<Assembly> assemblies = new(names.Count);
         List<string> missing = new();
+        int assemblyLoads = 0;
 
-        IReadOnlyList<string> probingPaths = ResolveProbingPaths(document, repositoryRoot, fileSystem, environment);
+        IReadOnlyList<string> probingPaths = ResolveProbingPaths(document, repositoryRoot, fileSystem, environment)
+            .Concat(additionalProbingPaths ?? Array.Empty<string>())
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+        IReadOnlyDictionary<string, string> exactPaths = exactPostBuildAssemblyPaths
+            ?? new Dictionary<string, string>(StringComparer.Ordinal);
+        IArchitectureAssemblyLoadScope? isolatedLoadScope = forceIsolatedLoading
+            ? assemblyLoader.CreateIsolatedLoadScope(probingPaths, exactPaths)
+            : null;
 
         foreach (string name in names.Where(value => !string.IsNullOrWhiteSpace(value))
                      .Distinct(StringComparer.Ordinal))
         {
             try
             {
-                Assembly assembly = ResolveByName(name.Trim(), probingPaths, fileSystem, assemblyLoader);
-                assemblies.Add(assembly);
+                ResolvedAssembly resolved = ResolveByName(
+                    name.Trim(), probingPaths, fileSystem, assemblyLoader, isolatedLoadScope, exactPaths);
+                assemblies.Add(resolved.Assembly);
+                assemblyLoads += resolved.WasLoaded ? 1 : 0;
             }
             catch (InvalidOperationException)
             {
@@ -134,26 +185,47 @@ public sealed class ArchitectureAssemblyResolutionService : IArchitectureAssembl
             }
         }
 
-        return new ResolutionResult(assemblies, missing, probingPaths.ToArray());
+        return new ResolutionResult(assemblies, missing, probingPaths.ToArray(), assemblyLoads, isolatedLoadScope);
     }
 
-    private static Assembly ResolveByName(
+    private static ResolvedAssembly ResolveByName(
         string assemblyName,
         IReadOnlyList<string> probingPaths,
         IArchitectureFileSystem fileSystem,
-        IArchitectureAssemblyLoader assemblyLoader)
+        IArchitectureAssemblyLoader assemblyLoader,
+        IArchitectureAssemblyLoadScope? isolatedLoadScope,
+        IReadOnlyDictionary<string, string> exactPostBuildAssemblyPaths)
     {
-        Assembly? alreadyLoaded = assemblyLoader.GetLoadedAssemblies()
+        if (isolatedLoadScope != null)
+        {
+            if (!exactPostBuildAssemblyPaths.TryGetValue(assemblyName, out string? exactPath))
+            {
+                throw new InvalidOperationException(
+                    $"No verified post-build artifact was discovered for target assembly '{assemblyName}'.");
+            }
+
+            if (!fileSystem.FileExists(exactPath))
+            {
+                throw new InvalidOperationException(
+                    $"Verified post-build artifact '{exactPath}' for target assembly '{assemblyName}' no longer exists.");
+            }
+
+            return new ResolvedAssembly(isolatedLoadScope.LoadFrom(exactPath), WasLoaded: true);
+        }
+
+        HashSet<Assembly> loadedBeforeResolution = assemblyLoader.GetLoadedAssemblies().ToHashSet();
+        Assembly? alreadyLoaded = loadedBeforeResolution
             .FirstOrDefault(assembly => string.Equals(assembly.GetName().Name, assemblyName, StringComparison.Ordinal));
 
         if (alreadyLoaded != null)
         {
-            return alreadyLoaded;
+            return new ResolvedAssembly(alreadyLoaded, WasLoaded: false);
         }
 
         try
         {
-            return assemblyLoader.Load(new AssemblyName(assemblyName));
+            Assembly assembly = assemblyLoader.Load(new AssemblyName(assemblyName));
+            return new ResolvedAssembly(assembly, WasLoaded: !loadedBeforeResolution.Contains(assembly));
         }
         catch
         {
@@ -167,7 +239,10 @@ public sealed class ArchitectureAssemblyResolutionService : IArchitectureAssembl
 
                 try
                 {
-                    return assemblyLoader.LoadFrom(candidate);
+                    bool wasLoadedBeforePathProbe = assemblyLoader.GetLoadedAssemblies()
+                        .Any(loaded => string.Equals(loaded.GetName().Name, assemblyName, StringComparison.Ordinal));
+                    Assembly assembly = assemblyLoader.LoadFrom(candidate);
+                    return new ResolvedAssembly(assembly, WasLoaded: !wasLoadedBeforePathProbe);
                 }
                 catch
                 {
@@ -315,4 +390,8 @@ public sealed class ArchitectureAssemblyResolutionService : IArchitectureAssembl
 public sealed record ResolutionResult(
     IReadOnlyCollection<Assembly> ResolvedAssemblies,
     IReadOnlyCollection<string> MissingAssemblyNames,
-    IReadOnlyCollection<string> AssemblyProbingPaths);
+    IReadOnlyCollection<string> AssemblyProbingPaths,
+    int AssemblyLoads = 0,
+    IArchitectureAssemblyLoadScope? IsolatedLoadScope = null);
+
+internal sealed record ResolvedAssembly(Assembly Assembly, bool WasLoaded);

@@ -40,6 +40,11 @@ internal sealed class CliRuntime : ICliRuntime
         return _engine.Validate(request, timing);
     }
 
+    public ArchitectureAnalysisSnapshot CreateSnapshot(AnalysisSnapshotRequest request, ValidationTiming? timing)
+    {
+        return _engine.CreateSnapshot(request, timing);
+    }
+
     public string FormatResultForCiArtifacts(
         string mode,
         bool passed,
