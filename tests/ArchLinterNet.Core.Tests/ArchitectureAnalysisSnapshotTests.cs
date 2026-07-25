@@ -254,6 +254,26 @@ public sealed class ArchitectureAnalysisSnapshotTests
     }
 
     [Test]
+    public void CreateSnapshot_InvalidSeverityAfterPolicyLoad_IsWrappedWithInputProvenance()
+    {
+        Fixture fixture = CreateFixture();
+        fixture.RunnerSetupService.DocumentToReturn.Analysis.UnmatchedIgnoredViolations = "invalid";
+
+        ArchitectureAnalysisEvaluationException? exception = Assert.Throws<ArchitectureAnalysisEvaluationException>(
+            () => fixture.ApplicationService.CreateSnapshot(CreateSnapshotRequest() with
+            {
+                EnforceUnmatchedIgnoredViolationsPolicy = true,
+            }));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(exception!.Message, Does.Contain("Invalid analysis.unmatched_ignored_violations"));
+            Assert.That(exception.InnerException, Is.TypeOf<InvalidOperationException>());
+            Assert.That(exception.PolicyImportPaths, Does.Contain(Path.GetFullPath("unused-by-fakes.arch.yml")));
+        });
+    }
+
+    [Test]
     public void Evaluate_CalledTwiceForSameMode_MemoizesAndDoesNotReexecuteContracts()
     {
         Fixture fixture = CreateFixture();

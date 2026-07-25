@@ -118,12 +118,11 @@ public sealed class ValidateCommandHandlerReportModeTests
     }
 
     [Test]
-    public void ValidateHandler_ReportMode_OutputErrorDoesNotDoubleWriteOccupiedStderr()
+    public void ValidateHandler_ReportMode_FileFailureReplacesDeferredStderrReportWithOneDiagnostic()
     {
-        // A --report ... =stderr sink already receives the complete real report during the
-        // initial routing pass, regardless of what a different (file) sink later does. Writing
-        // the output-error notice there too would leave two documents on one machine-readable
-        // stream, so it must be skipped once stderr is claimed this way.
+        // File sinks now complete phase 1 before a normal stream document is emitted. Therefore a
+        // failed file sink can replace the deferred stderr report with one output-failure document
+        // rather than leaving stderr with a successful-looking report and exit code 2.
         FakeCliRuntime runtime = new();
         FakeCliConsole console = new();
         FakeFileSystem fileSystem = new(exists: true);
@@ -146,7 +145,9 @@ public sealed class ValidateCommandHandlerReportModeTests
         {
             Assert.That(exitCode, Is.EqualTo(CliExitCodes.InvalidArgumentsOrRuntimeError));
             Assert.That(console.StdErr, Does.Contain("Architecture validation passed."));
-            Assert.That(console.StdErr, Does.Not.Contain("Report output failed"));
+            Assert.That(console.StdErr, Does.Contain("Report output failed"));
+            Assert.That(System.Text.RegularExpressions.Regex.Matches(console.StdErr, "Architecture validation passed.").Count,
+                Is.EqualTo(1));
             Assert.That(fileSystem.CommittedPaths, Is.Empty);
         });
     }
@@ -415,14 +416,12 @@ public sealed class ValidateCommandHandlerReportModeTests
     }
 
     [Test]
-    public void ValidateHandler_ReportMode_FailedStderrSinkStillReceivesRoutingDiagnosticOnRetry()
+    public void ValidateHandler_ReportMode_FileFailureReplacesDeferredJsonStderrWithOutputDiagnostic()
     {
         FakeCliRuntime runtime = new();
-        // The first stderr write is the configured report sink and fails. The error fallback
-        // must not treat the mere presence of that sink as proof a document was delivered.
-        FakeCliConsole console = new(errorWriteFailures: 1);
+        FakeCliConsole console = new();
         FakeFileSystem fileSystem = new(exists: true);
-        fileSystem.FailOnWrite.Add("broken.json");
+        fileSystem.FailOnWrite.Add("broken.sarif");
         ValidateCommandHandler handler = new(runtime, console, fileSystem);
 
         ValidateCommandOptions options = new(
@@ -430,7 +429,7 @@ public sealed class ValidateCommandHandlerReportModeTests
         {
             AdditionalSinks =
             [
-                new ReportSink("json", ReportDestinationType.File, "broken.json"),
+                new ReportSink("sarif", ReportDestinationType.File, "broken.sarif"),
                 new ReportSink("json", ReportDestinationType.Stderr, null),
             ],
         };
@@ -443,17 +442,19 @@ public sealed class ValidateCommandHandlerReportModeTests
             using JsonDocument document = JsonDocument.Parse(console.StdErr);
             Assert.That(document.RootElement.GetProperty("output_status").GetString(), Is.EqualTo("output-failed"));
             Assert.That(document.RootElement.GetProperty("failed_paths").EnumerateArray()
-                .Select(path => path.GetString()), Does.Contain("<stderr>"));
+                .Select(path => path.GetString()), Does.Contain("broken.sarif"));
+            Assert.That(document.RootElement.GetProperty("uncommitted_paths").EnumerateArray()
+                .Select(path => path.GetString()), Does.Contain("broken.sarif"));
             Assert.That(document.RootElement.GetProperty("errors").GetArrayLength(), Is.GreaterThan(0));
         });
     }
 
     [Test]
-    public void ValidateHandler_ReportMode_ErrorReportWriteFailureDoesNotDoubleWriteOccupiedStderr()
+    public void ValidateHandler_ReportMode_ErrorFileFailureReplacesDeferredStderrWithOneDiagnostic()
     {
-        // A --report json=stderr sink already receives the error document as an ordinary
-        // destination (RouteErrorToAllSinks treats stream and file sinks the same way) — a
-        // *different* file sink failing must not trigger a second write on top of it.
+        // The policy error itself is only emitted after its file sink stages. If that staging
+        // fails, stderr receives one enriched JSON fallback, not the bare error followed by a
+        // second document.
         ArchitecturePolicySourceDescriptor source = new(
             "architecture/root.yml", "architecture/root.yml", ArchitecturePolicyDocumentRole.Root,
             0, null, null, ["architecture/root.yml"]);
@@ -485,9 +486,10 @@ public sealed class ValidateCommandHandlerReportModeTests
         Assert.Multiple(() =>
         {
             Assert.That(exitCode, Is.EqualTo(CliExitCodes.InvalidArgumentsOrRuntimeError));
-            int occurrences = System.Text.RegularExpressions.Regex.Matches(console.StdErr, "architecture_policy_error").Count;
-            Assert.That(occurrences, Is.EqualTo(1));
-            Assert.That(console.StdErr, Does.Not.Contain("Report output failed"));
+            using JsonDocument document = JsonDocument.Parse(console.StdErr);
+            Assert.That(document.RootElement.GetProperty("kind").GetString(), Is.EqualTo("architecture_policy_error"));
+            Assert.That(document.RootElement.GetProperty("output_status").GetString(), Is.EqualTo("output-failed"));
+            Assert.That(document.RootElement.GetProperty("failed_paths")[0].GetString(), Is.EqualTo("unwritable.json"));
         });
     }
 

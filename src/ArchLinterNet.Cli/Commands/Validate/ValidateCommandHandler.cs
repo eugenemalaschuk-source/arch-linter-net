@@ -237,7 +237,7 @@ internal sealed class ValidateCommandHandler
         {
             RouteResult errorRouteResult = _coordinator.RouteErrorToAllSinks(options.AdditionalSinks, contentByFormat);
             if (errorRouteResult.Status != ReportRouteStatus.AllSucceeded
-                && CanUseStderrFallback(options, errorRouteResult))
+                && CanUseStderrFallback(errorRouteResult))
             {
                 WriteErrorRoutingFailureFallback(errorFormat, contentByFormat[errorFormat], errorRouteResult);
             }
@@ -249,16 +249,15 @@ internal sealed class ValidateCommandHandler
         // document to a stream that successfully received it. A configured stderr sink that
         // itself failed is different: no document reached that channel, so it remains a valid
         // fallback target for the routing diagnostic.
-        if (priorOutputResult is not null && CanUseStderrFallback(options, priorOutputResult.Value))
+        if (priorOutputResult is not null && CanUseStderrFallback(priorOutputResult.Value))
         {
             TryWriteToStderr(contentByFormat[errorFormat]);
         }
     }
 
-    private static bool CanUseStderrFallback(ValidateCommandOptions options, RouteResult result)
+    private static bool CanUseStderrFallback(RouteResult result)
     {
-        return !options.AdditionalSinks.Any(sink => sink.DestinationType == ReportDestinationType.Stderr)
-            || result.FailedPaths.Contains("<stderr>", StringComparer.Ordinal);
+        return !result.DeliveredStreamPaths.Contains("<stderr>", StringComparer.Ordinal);
     }
 
     // A failed file error sink must not turn a machine-readable stderr fallback into two

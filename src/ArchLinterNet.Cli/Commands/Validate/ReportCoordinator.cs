@@ -20,7 +20,8 @@ internal readonly record struct RouteResult(
     IReadOnlyList<string> CommittedPaths,
     IReadOnlyList<string> StagedPaths,
     IReadOnlyList<string> UncommittedPaths,
-    IReadOnlyList<string> ErrorDetails);
+    IReadOnlyList<string> ErrorDetails,
+    IReadOnlyList<string> DeliveredStreamPaths);
 
 internal sealed class ReportCoordinator
 {
@@ -187,11 +188,15 @@ internal sealed class ReportCoordinator
         List<string> failedPaths = new();
         List<string> stagedPaths = new();
         List<string> errorDetails = new();
+        List<string> deliveredStreamPaths = new();
         List<(string TempPath, string TargetPath)> pendingRenames = new();
 
-        foreach (ReportSink sink in additionalSinks)
+        // Do not emit a normal stream document until every file artifact is committed. Otherwise
+        // a later file-stage/commit failure leaves a successful --report ...=stderr stream
+        // carrying only a normal report while the process exits 2 with no output_status evidence.
+        foreach (ReportSink sink in additionalSinks.Where(sink => sink.DestinationType == ReportDestinationType.File))
         {
-            StageSink(sink, contentByFormat, failedPaths, stagedPaths, errorDetails, pendingRenames);
+            StageFileSink(sink, contentByFormat, failedPaths, stagedPaths, errorDetails, pendingRenames);
         }
 
         List<string> committedPaths = new();
@@ -199,18 +204,30 @@ internal sealed class ReportCoordinator
         {
             CommitPendingRenames(pendingRenames, committedPaths, failedPaths, errorDetails);
         }
-        else
+
+        if (failedPaths.Count == 0)
         {
-            foreach ((string tempPath, string _) in pendingRenames)
+            // Stderr is last so a failed stdout never leaves a successful stderr report that
+            // hides the same invocation's output failure. A failed stderr is retried by the
+            // handler with the enriched fallback document.
+            foreach (ReportSink sink in additionalSinks
+                .Where(sink => sink.DestinationType != ReportDestinationType.File)
+                .OrderBy(sink => sink.DestinationType == ReportDestinationType.Stdout ? 0 : 1))
             {
-                DeleteTempFileBestEffort(tempPath);
+                WriteStreamSink(sink, contentByFormat, failedPaths, errorDetails, deliveredStreamPaths);
             }
         }
 
-        return BuildRouteResult(additionalSinks, contentByFormat, failedPaths, committedPaths, stagedPaths, errorDetails);
+        if (failedPaths.Count > 0 && committedPaths.Count == 0)
+        {
+            DeletePendingTemps(pendingRenames);
+        }
+
+        return BuildRouteResult(
+            additionalSinks, contentByFormat, failedPaths, committedPaths, stagedPaths, errorDetails, deliveredStreamPaths);
     }
 
-    private void StageSink(
+    private void StageFileSink(
         ReportSink sink,
         IReadOnlyDictionary<string, string> contentByFormat,
         List<string> failedPaths,
@@ -220,26 +237,6 @@ internal sealed class ReportCoordinator
     {
         if (!contentByFormat.TryGetValue(sink.Format, out string? content))
         {
-            return;
-        }
-
-        if (sink.DestinationType is ReportDestinationType.Stdout or ReportDestinationType.Stderr)
-        {
-            // A write failure here (broken pipe, closed handle) must join the same
-            // failedPaths/errorDetails bookkeeping a file-sink failure does — otherwise it
-            // propagates uncaught past this loop, skipping phase 2 cleanup and leaving whatever
-            // was already staged by earlier sinks in this same batch on disk as orphaned .tmp
-            // files.
-            try
-            {
-                WriteToStream(sink.DestinationType, content);
-            }
-            catch (Exception ex)
-            {
-                failedPaths.Add(StreamFailureMarker(sink.DestinationType));
-                errorDetails.Add(ex.Message);
-            }
-
             return;
         }
 
@@ -259,6 +256,30 @@ internal sealed class ReportCoordinator
         catch (Exception ex)
         {
             failedPaths.Add(sink.FilePath!);
+            errorDetails.Add(ex.Message);
+        }
+    }
+
+    private void WriteStreamSink(
+        ReportSink sink,
+        IReadOnlyDictionary<string, string> contentByFormat,
+        List<string> failedPaths,
+        List<string> errorDetails,
+        List<string> deliveredStreamPaths)
+    {
+        if (!contentByFormat.TryGetValue(sink.Format, out string? content))
+        {
+            return;
+        }
+
+        try
+        {
+            WriteToStream(sink.DestinationType, content);
+            deliveredStreamPaths.Add(StreamFailureMarker(sink.DestinationType));
+        }
+        catch (Exception ex)
+        {
+            failedPaths.Add(StreamFailureMarker(sink.DestinationType));
             errorDetails.Add(ex.Message);
         }
     }
@@ -319,17 +340,28 @@ internal sealed class ReportCoordinator
         }
     }
 
+    private void DeletePendingTemps(IEnumerable<(string TempPath, string TargetPath)> pendingRenames)
+    {
+        foreach ((string tempPath, string _) in pendingRenames)
+        {
+            DeleteTempFileBestEffort(tempPath);
+        }
+    }
+
     private static RouteResult BuildRouteResult(
         IReadOnlyList<ReportSink> additionalSinks,
         IReadOnlyDictionary<string, string> contentByFormat,
         List<string> failedPaths,
         List<string> committedPaths,
         List<string> stagedPaths,
-        List<string> errorDetails)
+        List<string> errorDetails,
+        List<string> deliveredStreamPaths)
     {
         if (failedPaths.Count == 0)
         {
-            return new RouteResult(ReportRouteStatus.AllSucceeded, Array.Empty<string>(), committedPaths, stagedPaths, Array.Empty<string>(), Array.Empty<string>());
+            return new RouteResult(
+                ReportRouteStatus.AllSucceeded, Array.Empty<string>(), committedPaths, stagedPaths,
+                Array.Empty<string>(), Array.Empty<string>(), deliveredStreamPaths);
         }
 
         var allFileSinks = additionalSinks
@@ -342,7 +374,8 @@ internal sealed class ReportCoordinator
             ? ReportRouteStatus.PartialOutput
             : ReportRouteStatus.OutputFailed;
 
-        return new RouteResult(status, failedPaths, committedPaths, stagedPaths, uncommittedPaths, errorDetails);
+        return new RouteResult(
+            status, failedPaths, committedPaths, stagedPaths, uncommittedPaths, errorDetails, deliveredStreamPaths);
     }
 
     // Re-validates the bytes actually landed on disk rather than trusting the in-memory string that
