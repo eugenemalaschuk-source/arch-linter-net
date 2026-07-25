@@ -1,3 +1,4 @@
+using System.Reflection;
 using ArchLinterNet.Core.BuildState;
 using ArchLinterNet.Core.Contracts;
 using ArchLinterNet.Core.Execution;
@@ -116,20 +117,41 @@ public sealed class ArchitectureAnalysisSnapshot : IDisposable
                 return cached;
             }
 
-            // A snapshot meant to serve any/all requested modes validates a --contract-id filter
-            // against the union of strict and audit IDs at construction time (see
-            // ArchitectureValidationApplicationService.ResolveSelectedContractIds) — that only rejects
-            // an ID unknown to every mode. An ID valid in one mode but not this one would otherwise
-            // silently match nothing when this mode's contracts execute, instead of failing the same
-            // way an independent single-mode Validate call for this mode would. Re-validating here,
-            // per mode, keeps combined execution semantically equivalent to separate runs.
-            EnsureRequestedContractIdsAreKnownForMode(mode);
+            try
+            {
+                // A snapshot meant to serve any/all requested modes validates a --contract-id filter
+                // against the union of strict and audit IDs at construction time (see
+                // ArchitectureValidationApplicationService.ResolveSelectedContractIds) — that only rejects
+                // an ID unknown to every mode. An ID valid in one mode but not this one would otherwise
+                // silently match nothing when this mode's contracts execute, instead of failing the same
+                // way an independent single-mode Validate call for this mode would. Re-validating here,
+                // per mode, keeps combined execution semantically equivalent to separate runs.
+                EnsureRequestedContractIdsAreKnownForMode(mode);
 
-            ValidationOutcome outcome = _preflight.Blocked ? BuildBlockedOutcome() : EvaluateCore(mode, timing);
+                ValidationOutcome outcome = _preflight.Blocked ? BuildBlockedOutcome() : EvaluateCore(mode, timing);
 
-            _evaluatedModes[mode] = outcome;
-            _counters = _counters with { ModesEvaluated = _evaluatedModes.Count };
-            return outcome;
+                _evaluatedModes[mode] = outcome;
+                _counters = _counters with { ModesEvaluated = _evaluatedModes.Count };
+                return outcome;
+            }
+            catch (Exception ex) when (ex is not ArchitecturePolicyValidationException)
+            {
+                // ArchitecturePolicyValidationException is excluded — it's already seam-safe
+                // (ArchLinterNet.Core.Model) and already carries its own Diagnostic, which hosts
+                // pattern-match on directly for structured formatting; wrapping it here would only
+                // hide that shape behind .InnerException for no benefit.
+                //
+                // Policy composition and assembly resolution already succeeded by this point (this
+                // snapshot was built from them) — attach that already-known provenance to whatever
+                // else fails during evaluation itself (contract execution, expression evaluation) so
+                // a host reporting the exception via a file sink can avoid overwriting one of those
+                // inputs with the error document, the same way a policy-load failure's own
+                // diagnostic already protects its inputs. ArchitectureAnalysisEvaluationException
+                // derives from InvalidOperationException, so callers matching on that (or on
+                // .Message) keep working unchanged.
+                throw new ArchitectureAnalysisEvaluationException(
+                    ex.Message, ex, GetPolicyImportPaths(), GetResolvedAssemblyPaths(), GetDiscoveredProjectPaths());
+            }
         }
     }
 
@@ -165,7 +187,10 @@ public sealed class ArchitectureAnalysisSnapshot : IDisposable
             Array.Empty<ArchitectureClassificationMetadataFailure>())
         {
             PreflightDiagnostics = _preflight.Diagnostics,
-            PreflightBlocked = true
+            PreflightBlocked = true,
+            PolicyImportPaths = GetPolicyImportPaths(),
+            ResolvedAssemblyPaths = GetResolvedAssemblyPaths(),
+            DiscoveredProjectPaths = GetDiscoveredProjectPaths()
         };
     }
 
@@ -242,8 +267,52 @@ public sealed class ArchitectureAnalysisSnapshot : IDisposable
             CycleFindings = execution.CycleFindings,
             ClassificationRoles = classificationRoles,
             ClassificationPathDeferred = classificationPathDeferred,
-            PreflightDiagnostics = _preflight.Diagnostics
+            PreflightDiagnostics = _preflight.Diagnostics,
+            PolicyImportPaths = GetPolicyImportPaths(),
+            ResolvedAssemblyPaths = GetResolvedAssemblyPaths(),
+            DiscoveredProjectPaths = GetDiscoveredProjectPaths()
         };
+    }
+
+    private IReadOnlyList<string> GetPolicyImportPaths()
+    {
+        return _document.Provenance.Sources
+            .Select(source => Path.GetFullPath(Path.Combine(_repositoryRoot, source.SourcePath)))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+    }
+
+    private IReadOnlyList<string> GetResolvedAssemblyPaths()
+    {
+        IArchitectureContractRunner? runner = _setup?.Runner;
+        if (runner is null)
+        {
+            return Array.Empty<string>();
+        }
+
+        return runner.Session.Context.TargetAssemblies
+            .Select(SafeAssemblyLocation)
+            .Where(path => !string.IsNullOrEmpty(path))
+            .Select(path => Path.GetFullPath(path!))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+    }
+
+    private IReadOnlyList<string> GetDiscoveredProjectPaths()
+    {
+        return _setup?.Runner.Session.Context.DiscoveredProjectPaths ?? Array.Empty<string>();
+    }
+
+    private static string? SafeAssemblyLocation(Assembly assembly)
+    {
+        try
+        {
+            return assembly.Location;
+        }
+        catch (NotSupportedException)
+        {
+            return null;
+        }
     }
 
     private IReadOnlyList<ArchitectureUnmatchedIgnoredViolation> ResolveUnmatchedIgnoredViolations(

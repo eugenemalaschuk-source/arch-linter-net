@@ -28,6 +28,8 @@ public sealed class ArchitectureAnalysisSnapshotTests
 
         public IArchitectureContractRunner RunnerToReturn { get; set; } = null!;
 
+        public Exception? ExceptionToThrowFromBuildRunner { get; set; }
+
         public ArchitectureContractDocument LoadDocument(
             string policyPath, string? baselinePath = null, ValidationTiming? timing = null)
         {
@@ -46,6 +48,11 @@ public sealed class ArchitectureAnalysisSnapshotTests
             string? mode = null)
         {
             BuildRunnerCallCount++;
+            if (ExceptionToThrowFromBuildRunner is not null)
+            {
+                throw ExceptionToThrowFromBuildRunner;
+            }
+
             return new ArchitectureRunnerSetup("/fake/repository/root", RunnerToReturn);
         }
 
@@ -226,6 +233,43 @@ public sealed class ArchitectureAnalysisSnapshotTests
             Assert.That(fixture.RunnerSetupService.BuildRunnerCallCount, Is.EqualTo(1));
             Assert.That(fixture.ContractExecutor.CallCountByMode.GetValueOrDefault("strict"), Is.EqualTo(1));
             Assert.That(fixture.ContractExecutor.CallCountByMode.GetValueOrDefault("audit"), Is.EqualTo(1));
+        });
+    }
+
+    [Test]
+    public void CreateSnapshot_SetupFailureAfterPolicyComposition_CarriesConsumedPolicyProvenance()
+    {
+        Fixture fixture = CreateFixture();
+        fixture.RunnerSetupService.ExceptionToThrowFromBuildRunner = new InvalidOperationException("project discovery failed");
+
+        ArchitectureAnalysisEvaluationException? exception = Assert.Throws<ArchitectureAnalysisEvaluationException>(
+            () => fixture.ApplicationService.CreateSnapshot(CreateSnapshotRequest()));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(exception!.Message, Is.EqualTo("project discovery failed"));
+            Assert.That(exception.InnerException, Is.TypeOf<InvalidOperationException>());
+            Assert.That(exception.PolicyImportPaths, Does.Contain(Path.GetFullPath("unused-by-fakes.arch.yml")));
+        });
+    }
+
+    [Test]
+    public void CreateSnapshot_InvalidSeverityAfterPolicyLoad_IsWrappedWithInputProvenance()
+    {
+        Fixture fixture = CreateFixture();
+        fixture.RunnerSetupService.DocumentToReturn.Analysis.UnmatchedIgnoredViolations = "invalid";
+
+        ArchitectureAnalysisEvaluationException? exception = Assert.Throws<ArchitectureAnalysisEvaluationException>(
+            () => fixture.ApplicationService.CreateSnapshot(CreateSnapshotRequest() with
+            {
+                EnforceUnmatchedIgnoredViolationsPolicy = true,
+            }));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(exception!.Message, Does.Contain("Invalid analysis.unmatched_ignored_violations"));
+            Assert.That(exception.InnerException, Is.TypeOf<InvalidOperationException>());
+            Assert.That(exception.PolicyImportPaths, Does.Contain(Path.GetFullPath("unused-by-fakes.arch.yml")));
         });
     }
 
@@ -469,8 +513,11 @@ public sealed class ArchitectureAnalysisSnapshotTests
         Assert.DoesNotThrow(() => snapshot.Evaluate("strict"));
 
         // Evaluating "audit" — which has no contract with this ID — must throw the same
-        // "Unknown contract IDs" error an independent Validate(audit) call for this ID would.
-        InvalidOperationException? ex = Assert.Throws<InvalidOperationException>(() => snapshot.Evaluate("audit"));
+        // "Unknown contract IDs" error an independent Validate(audit) call for this ID would,
+        // wrapped in the seam-safe ArchitectureAnalysisEvaluationException (a InvalidOperationException
+        // subtype) that carries the policy/assembly provenance already known by this point.
+        ArchitectureAnalysisEvaluationException? ex =
+            Assert.Throws<ArchitectureAnalysisEvaluationException>(() => snapshot.Evaluate("audit"));
         Assert.That(ex!.Message, Does.Contain("Unknown contract IDs"));
     }
 

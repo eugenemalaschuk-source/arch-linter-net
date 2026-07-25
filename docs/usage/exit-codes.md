@@ -33,7 +33,10 @@ Exit code `2` means the run could not be trusted as normal validation. Examples:
 - invalid `analysis.coverage`, `analysis.policy_consistency`, or `analysis.unmatched_ignored_violations` value;
 - unsupported coverage scope such as `project` or `assembly`;
 - baseline references a contract ID that does not exist in the policy;
-- required target assemblies cannot be resolved when configuration treats that as fatal.
+- required target assemblies cannot be resolved when configuration treats that as fatal;
+- `--report` destination is not writable, collides with an input file, or has an invalid format.
+
+When a `--report` file sink fails, the validation result is still reported. The exit code is `2` with a typed status: `output-failed` if no file sinks wrote, or `partial-output` if some sinks succeeded and some failed. The error is written to stderr (human format) or as a JSON error with `output_status` field (json/sarif format).
 
 CI should fail closed on exit code `2`.
 

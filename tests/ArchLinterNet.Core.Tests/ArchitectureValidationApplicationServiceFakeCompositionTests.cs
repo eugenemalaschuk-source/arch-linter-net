@@ -32,10 +32,17 @@ public sealed class ArchitectureValidationApplicationServiceFakeCompositionTests
 
         public IArchitectureContractRunner RunnerToReturn { get; set; } = null!;
 
+        public ArchitecturePolicyImportException? ExceptionToThrowFromLoadDocument { get; set; }
+
         public ArchitectureContractDocument LoadDocument(
             string policyPath, string? baselinePath = null, ValidationTiming? timing = null)
         {
             LoadDocumentCalled = true;
+            if (ExceptionToThrowFromLoadDocument is not null)
+            {
+                throw ExceptionToThrowFromLoadDocument;
+            }
+
             return DocumentToReturn;
         }
 
@@ -381,5 +388,42 @@ public sealed class ArchitectureValidationApplicationServiceFakeCompositionTests
 
         Assert.That(runnerSetupService.LoadDocumentCalled, Is.False);
         Assert.That(contractExecutor.WasCalled, Is.False);
+    }
+
+    // Hosts (CLI, Testing) are architecturally forbidden from depending on ArchLinterNet.Core.Contracts
+    // (see the cli-must-use-validation-application-seam / testing-must-use-validation-application-seam
+    // contracts), so a policy-import failure must never reach a caller as the raw
+    // ArchitecturePolicyImportException — the seam translates it into ArchitecturePolicyLoadException
+    // (ArchLinterNet.Core.Model) right here, before it can propagate past this application service.
+    [Test]
+    public void Validate_PolicyImportFailure_IsTranslatedToSeamSafeException()
+    {
+        ArchitecturePolicySourceDescriptor source = new(
+            "root.yml", "root.yml", ArchitecturePolicyDocumentRole.Root, 0, null, null, ["root.yml"]);
+        ArchitecturePolicyDiagnostic diagnostic = new(
+            ArchitecturePolicyDiagnosticKind.ImportResolution,
+            new ArchitecturePolicySourceLocation(source, "$", 1, 1, null, null),
+            [],
+            source.ImportChain);
+        var runnerSetupService = new FakeRunnerSetupService
+        {
+            ExceptionToThrowFromLoadDocument = new ArchitecturePolicyImportException(
+                ArchitecturePolicyImportErrorCategory.MissingFile, "Root policy file not found: root.yml", diagnostic),
+        };
+        var handlerRegistry = new FakeContractHandlerRegistry();
+        var contractExecutor = new FakeContractExecutor();
+
+        var applicationService = new ArchitectureValidationApplicationService(
+            runnerSetupService, handlerRegistry, contractExecutor, new BuildStatePreparationService());
+
+        ArchitecturePolicyLoadException? caught = Assert.Throws<ArchitecturePolicyLoadException>(() =>
+            applicationService.Validate(new ValidationRequest { PolicyPath = "root.yml", Mode = "strict" }));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(caught!.Message, Is.EqualTo("Root policy file not found: root.yml"));
+            Assert.That(caught.Category, Is.EqualTo("MissingFile"));
+            Assert.That(caught.Diagnostic, Is.SameAs(diagnostic));
+        });
     }
 }

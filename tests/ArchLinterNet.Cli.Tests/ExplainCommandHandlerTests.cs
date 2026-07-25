@@ -15,19 +15,19 @@ namespace ArchLinterNet.Cli.Tests;
 [TestFixture]
 public sealed class ExplainCommandHandlerTests
 {
-    private static ArchitecturePolicyImportException PolicyException()
+    private static ArchitecturePolicyLoadException PolicyException()
     {
         ArchitecturePolicySourceDescriptor source = new(
             "architecture/root.yml", "architecture/root.yml", ArchitecturePolicyDocumentRole.Root,
             0, null, null, ["architecture/root.yml"]);
-        return new ArchitecturePolicyImportException(
-            ArchitecturePolicyImportErrorCategory.MissingFile,
+        return new ArchitecturePolicyLoadException(
             "Root policy file not found: architecture/root.yml",
             new ArchitecturePolicyDiagnostic(
                 ArchitecturePolicyDiagnosticKind.ImportResolution,
                 new ArchitecturePolicySourceLocation(source, "$", 1, 1, null, null),
                 [],
-                source.ImportChain));
+                source.ImportChain),
+            ArchitecturePolicyImportErrorCategory.MissingFile.ToString());
     }
 
     // ── Helpers ──────────────────────────────────────────────────────────────
@@ -86,7 +86,7 @@ public sealed class ExplainCommandHandlerTests
     [Test]
     public void TypedPolicyFailure_BypassesFileExistsAndWritesJson()
     {
-        ArchitecturePolicyImportException exception = PolicyException();
+        ArchitecturePolicyLoadException exception = PolicyException();
         var runtime = new ExplainStubRuntime { ThrowException = exception };
         var console = new RecordingCliConsole();
         int result = Handler(runtime, console).Execute(Options(format: "json"));
@@ -105,14 +105,14 @@ public sealed class ExplainCommandHandlerTests
         ArchitecturePolicySourceDescriptor source = new(
             "architecture/root.yml", "architecture/fragment.yml", ArchitecturePolicyDocumentRole.Fragment,
             1, "architecture/root.yml", "fragment.yml", ["architecture/root.yml", "architecture/fragment.yml"]);
-        var exception = new ArchitecturePolicyImportException(
-            ArchitecturePolicyImportErrorCategory.MissingFile,
+        var exception = new ArchitecturePolicyLoadException(
             "Policy source file not found: architecture/fragment.yml",
             new ArchitecturePolicyDiagnostic(
                 ArchitecturePolicyDiagnosticKind.ImportResolution,
                 new ArchitecturePolicySourceLocation(source, "imports[0]", 2, 1, null, null),
                 [],
-                source.ImportChain));
+                source.ImportChain),
+            ArchitecturePolicyImportErrorCategory.MissingFile.ToString());
         var runtime = new ExplainStubRuntime { ThrowException = exception };
         var console = new RecordingCliConsole();
 

@@ -148,7 +148,7 @@ contracts:
   strict_independence: []
 ");
 
-        var ex = Assert.Throws<InvalidOperationException>(() =>
+        var ex = Assert.Catch<InvalidOperationException>(() =>
             ArchitectureAssertions
                 .FromPolicy(contractPath)
                 .WithConditionSet("nonexistent")

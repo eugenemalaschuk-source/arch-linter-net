@@ -1,6 +1,5 @@
 using System.Text.Json;
 using ArchLinterNet.Cli.Abstractions;
-using ArchLinterNet.Core.Contracts;
 using ArchLinterNet.Core.Model;
 using ArchLinterNet.Core.Reporting;
 
@@ -12,7 +11,7 @@ internal static class PolicyDiagnosticOutputWriter
     {
         (ArchitecturePolicyDiagnostic? Diagnostic, string? Category) policyError = exception switch
         {
-            ArchitecturePolicyImportException importException => (importException.Diagnostic, importException.Category.ToString()),
+            ArchitecturePolicyLoadException loadException => (loadException.Diagnostic, loadException.Category),
             ArchitecturePolicyValidationException validationException => (validationException.Diagnostic, null),
             _ => (null, null),
         };
@@ -31,7 +30,15 @@ internal static class PolicyDiagnosticOutputWriter
         ArchitecturePolicyDiagnostic diagnostic,
         string? category = null)
     {
-        console.Out.WriteLine(JsonSerializer.Serialize(new
+        console.Out.WriteLine(BuildJsonText(message, diagnostic, category));
+    }
+
+    public static string BuildJsonText(
+        string message,
+        ArchitecturePolicyDiagnostic diagnostic,
+        string? category = null)
+    {
+        return JsonSerializer.Serialize(new
         {
             kind = "architecture_policy_error",
             message,
@@ -39,14 +46,14 @@ internal static class PolicyDiagnosticOutputWriter
             policy_location = diagnostic.Location is null ? null : ArchitectureDiagnosticFormatter.FormatPolicyLocationForJson(diagnostic.Location),
             related_policy_locations = diagnostic.RelatedLocations.Select(ArchitectureDiagnosticFormatter.FormatPolicyLocationForJson),
             import_chain = diagnostic.ImportChain,
-        }));
+        });
     }
 
     public static bool TryWriteHuman(ICliConsole console, string prefix, Exception exception)
     {
         ArchitecturePolicyDiagnostic? diagnostic = exception switch
         {
-            ArchitecturePolicyImportException importException => importException.Diagnostic,
+            ArchitecturePolicyLoadException loadException => loadException.Diagnostic,
             ArchitecturePolicyValidationException validationException => validationException.Diagnostic,
             _ => null,
         };
@@ -65,13 +72,23 @@ internal static class PolicyDiagnosticOutputWriter
         string message,
         ArchitecturePolicyDiagnostic diagnostic)
     {
+        console.Error.WriteLine(BuildHumanText(prefix, message, diagnostic));
+    }
+
+    public static string BuildHumanText(
+        string prefix,
+        string message,
+        ArchitecturePolicyDiagnostic diagnostic)
+    {
         string location = diagnostic.Location is null
             ? string.Empty
             : $" (policy: {diagnostic.Location.SourcePath}:{diagnostic.Location.YamlPath}; root: {diagnostic.Location.RootPath})";
-        console.Error.WriteLine($"{prefix}: {message}{location}");
+        string text = $"{prefix}: {message}{location}";
         if (diagnostic.ImportChain.Count > 0)
         {
-            console.Error.WriteLine($"Import chain: {string.Join(" -> ", diagnostic.ImportChain)}");
+            text += $"\nImport chain: {string.Join(" -> ", diagnostic.ImportChain)}";
         }
+
+        return text;
     }
 }

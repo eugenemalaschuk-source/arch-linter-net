@@ -592,7 +592,9 @@ public sealed class TypePlacementContractTests
                   reason: Placeholder with a dangling must_reside_in_layers entry and no coverage deferral.
             """);
 
-        InvalidOperationException ex = Assert.Throws<InvalidOperationException>(() =>
+        // Only caught during evaluate-time configuration checking, so it surfaces wrapped in the
+        // seam-safe ArchitectureAnalysisEvaluationException (an InvalidOperationException subtype).
+        ArchitectureAnalysisEvaluationException ex = Assert.Throws<ArchitectureAnalysisEvaluationException>(() =>
             ArchitectureValidationService.Validate(new ValidationRequest
             {
                 PolicyPath = policyPath,

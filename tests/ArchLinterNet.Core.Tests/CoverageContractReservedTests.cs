@@ -144,7 +144,7 @@ public sealed class CoverageContractReservedTests
                   reason: Reserved for a later issue.
             """);
 
-        InvalidOperationException ex = Assert.Throws<InvalidOperationException>(() =>
+        InvalidOperationException ex = Assert.Catch<InvalidOperationException>(() =>
             ArchitectureValidationService.Validate(new ValidationRequest
             {
                 PolicyPath = policyPath,
@@ -174,7 +174,7 @@ public sealed class CoverageContractReservedTests
                   reason: Invalid namespace coverage root.
             """);
 
-        InvalidOperationException ex = Assert.Throws<InvalidOperationException>(() =>
+        InvalidOperationException ex = Assert.Catch<InvalidOperationException>(() =>
             ArchitectureValidationService.Validate(new ValidationRequest
             {
                 PolicyPath = policyPath,
@@ -401,7 +401,7 @@ public sealed class CoverageContractReservedTests
             """;
         string policyPath = WritePolicy(Yaml);
 
-        InvalidOperationException ex = Assert.Throws<InvalidOperationException>(() =>
+        InvalidOperationException ex = Assert.Catch<InvalidOperationException>(() =>
             ArchitectureValidationService.Validate(new ValidationRequest
             {
                 PolicyPath = policyPath,

@@ -61,7 +61,7 @@ public sealed class CliArchitectureTests
     {
         FakeCliRuntime runtime = new();
         FakeCliConsole console = new();
-        ValidateCommandHandler handler = new(runtime, console);
+        ValidateCommandHandler handler = new(runtime, console, null!);
 
         int exitCode = handler.Execute(new ValidateCommandOptions(
             "policy.yml",
@@ -96,13 +96,13 @@ public sealed class CliArchitectureTests
         ArchitecturePolicySourceLocation location = new(source, "$", 1, 1, null, null);
         FakeCliRuntime runtime = new()
         {
-            ExceptionToThrow = new ArchitecturePolicyImportException(
-                ArchitecturePolicyImportErrorCategory.SourceShape,
+            ExceptionToThrow = new ArchitecturePolicyLoadException(
                 "Invalid namespace.",
-                new ArchitecturePolicyDiagnostic(ArchitecturePolicyDiagnosticKind.SourceShape, location, [], source.ImportChain))
+                new ArchitecturePolicyDiagnostic(ArchitecturePolicyDiagnosticKind.SourceShape, location, [], source.ImportChain),
+                ArchitecturePolicyImportErrorCategory.SourceShape.ToString())
         };
         FakeCliConsole console = new();
-        ValidateCommandHandler handler = new(runtime, console);
+        ValidateCommandHandler handler = new(runtime, console, null!);
 
         int exitCode = handler.Execute(new ValidateCommandOptions(
             "policy.yml", "strict", "json", [], null, false, null, false, false));
@@ -135,7 +135,7 @@ public sealed class CliArchitectureTests
                 "Contextual selector (role: DomainLayer) 'when' expression failed to evaluate: missing key")
         };
         FakeCliConsole console = new();
-        ValidateCommandHandler handler = new(runtime, console);
+        ValidateCommandHandler handler = new(runtime, console, null!);
 
         int exitCode = handler.Execute(new ValidateCommandOptions(
             "policy.yml", "strict", "json", [], null, false, null, false, false));
@@ -157,7 +157,7 @@ public sealed class CliArchitectureTests
             ExceptionToThrow = new InvalidOperationException("'when' expression failed to evaluate: missing key")
         };
         FakeCliConsole console = new();
-        ValidateCommandHandler handler = new(runtime, console);
+        ValidateCommandHandler handler = new(runtime, console, null!);
 
         int exitCode = handler.Execute(new ValidateCommandOptions(
             "policy.yml", "strict", "sarif", [], null, false, null, false, false));
@@ -180,13 +180,13 @@ public sealed class CliArchitectureTests
         ArchitecturePolicySourceLocation location = new(source, "$", 1, 1, null, null);
         FakeCliRuntime runtime = new()
         {
-            ExceptionToThrow = new ArchitecturePolicyImportException(
-                ArchitecturePolicyImportErrorCategory.SourceShape,
+            ExceptionToThrow = new ArchitecturePolicyLoadException(
                 "Root policy is not a valid mapping document.",
-                new ArchitecturePolicyDiagnostic(ArchitecturePolicyDiagnosticKind.SourceShape, location, [], source.ImportChain))
+                new ArchitecturePolicyDiagnostic(ArchitecturePolicyDiagnosticKind.SourceShape, location, [], source.ImportChain),
+                ArchitecturePolicyImportErrorCategory.SourceShape.ToString())
         };
         FakeCliConsole console = new();
-        ValidateCommandHandler handler = new(runtime, console);
+        ValidateCommandHandler handler = new(runtime, console, null!);
 
         int exitCode = handler.Execute(new ValidateCommandOptions(
             "policy.yml", "strict", "sarif", [], null, false, null, false, false));
@@ -207,21 +207,21 @@ public sealed class CliArchitectureTests
             "architecture/root.yml", "architecture/fragment.yml", ArchitecturePolicyDocumentRole.Fragment,
             1, "architecture/root.yml", "fragment.yml", ["architecture/root.yml", "architecture/fragment.yml"]);
         ArchitecturePolicySourceLocation location = new(source, "imports[0]", 2, 3, null, null);
-        var exception = new ArchitecturePolicyImportException(
-            ArchitecturePolicyImportErrorCategory.PathCaseMismatch,
+        var exception = new ArchitecturePolicyLoadException(
             "Policy import 'fragment.yml' does not match on-disk casing.",
             new ArchitecturePolicyDiagnostic(
                 ArchitecturePolicyDiagnosticKind.ImportResolution,
                 location,
                 [],
-                source.ImportChain));
+                source.ImportChain),
+            ArchitecturePolicyImportErrorCategory.PathCaseMismatch.ToString());
         FakeCliRuntime runtime = new() { ExceptionToThrow = exception };
         FakeCliConsole sarifConsole = new();
         FakeCliConsole humanConsole = new();
 
-        _ = new ValidateCommandHandler(runtime, sarifConsole).Execute(new ValidateCommandOptions(
+        _ = new ValidateCommandHandler(runtime, sarifConsole, null!).Execute(new ValidateCommandOptions(
             "policy.yml", "strict", "sarif", [], null, false, null, false, false));
-        _ = new ValidateCommandHandler(runtime, humanConsole).Execute(new ValidateCommandOptions(
+        _ = new ValidateCommandHandler(runtime, humanConsole, null!).Execute(new ValidateCommandOptions(
             "policy.yml", "strict", "human", [], null, false, null, false, false));
 
         using JsonDocument document = JsonDocument.Parse(sarifConsole.StdOut);
@@ -244,14 +244,14 @@ public sealed class CliArchitectureTests
             1, "architecture/root.yml", "fragment.yml", ["architecture/root.yml", "architecture/fragment.yml"]);
         FakeCliRuntime runtime = new()
         {
-            ExceptionToThrow = new ArchitecturePolicyImportException(
-                ArchitecturePolicyImportErrorCategory.MissingFile,
+            ExceptionToThrow = new ArchitecturePolicyLoadException(
                 "Policy source file not found: architecture/fragment.yml",
                 new ArchitecturePolicyDiagnostic(
                     ArchitecturePolicyDiagnosticKind.ImportResolution,
                     new ArchitecturePolicySourceLocation(source, "imports[0]", 2, 1, null, null),
                     [],
-                    source.ImportChain))
+                    source.ImportChain),
+                ArchitecturePolicyImportErrorCategory.MissingFile.ToString())
         };
         FakeCliConsole console = new();
 
@@ -280,13 +280,13 @@ public sealed class CliArchitectureTests
         ArchitecturePolicySourceLocation related = new(fragment, "layers.domain", 4, 1, null, null);
         FakeCliRuntime runtime = new()
         {
-            ExceptionToThrow = new ArchitecturePolicyImportException(
-                ArchitecturePolicyImportErrorCategory.CompositionConflict,
+            ExceptionToThrow = new ArchitecturePolicyLoadException(
                 "Duplicate layer.",
-                new ArchitecturePolicyDiagnostic(ArchitecturePolicyDiagnosticKind.CompositionConflict, primary, [related], root.ImportChain))
+                new ArchitecturePolicyDiagnostic(ArchitecturePolicyDiagnosticKind.CompositionConflict, primary, [related], root.ImportChain),
+                ArchitecturePolicyImportErrorCategory.CompositionConflict.ToString())
         };
         FakeCliConsole console = new();
-        ValidateCommandHandler handler = new(runtime, console);
+        ValidateCommandHandler handler = new(runtime, console, null!);
 
         handler.Execute(new ValidateCommandOptions("policy.yml", "strict", "sarif", [], null, false, null, false, false));
 
@@ -312,6 +312,9 @@ public sealed class CliArchitectureTests
         });
     }
 
+    // --report sink error-routing coverage (policy/execution/output errors) lives in
+    // ValidateCommandHandlerReportModeTests — split out to stay under the file-size lint threshold.
+
     private sealed class FakeCliRuntime : ICliRuntime
     {
         public string Version => "1.2.3";
@@ -319,6 +322,8 @@ public sealed class CliArchitectureTests
         public ValidationRequest? LastValidationRequest { get; private set; }
 
         public Exception? ExceptionToThrow { get; init; }
+
+        public ValidationOutcome? ForcedOutcome { get; init; }
 
         public bool TryParseGraphLevel(string value, out ArchitectureGraphLevel level)
         {
@@ -332,6 +337,11 @@ public sealed class CliArchitectureTests
             if (ExceptionToThrow is not null)
             {
                 throw ExceptionToThrow;
+            }
+
+            if (ForcedOutcome is not null)
+            {
+                return ForcedOutcome;
             }
 
             return new ValidationOutcome(
@@ -391,19 +401,19 @@ public sealed class CliArchitectureTests
             IReadOnlyCollection<ArchitectureCycleFinding> cycleFindings,
             IReadOnlyCollection<BuildStatePreflightDiagnostic> preflightDiagnostics)
         {
-            throw new NotSupportedException();
+            return "{\"version\":\"2.1.0\",\"runs\":[]}";
         }
 
         public string FormatViolationsForHumans(IReadOnlyCollection<ArchitectureViolation> violations)
         {
-            throw new NotSupportedException();
+            return $"{violations.Count} violation(s)";
         }
 
         public string FormatCyclesForHumans(
             IReadOnlyCollection<string> cycles,
             IReadOnlyCollection<ArchitectureCycleFinding> cycleFindings)
         {
-            throw new NotSupportedException();
+            return $"{cycles.Count} cycle(s)";
         }
 
         public string FormatPolicyConsistencyForHumans(IReadOnlyCollection<PolicyConsistencyDiagnostic> diagnostics)
@@ -465,13 +475,48 @@ public sealed class CliArchitectureTests
 
     private sealed class FakeFileSystem(bool exists) : IFileSystem
     {
+        private readonly Dictionary<string, string> _tempContents = new();
+
+        public HashSet<string> FailOnWrite { get; } = new();
+
+        public List<string> CommittedPaths { get; } = new();
+
         public bool FileExists(string path)
         {
-            return exists;
+            return _tempContents.ContainsKey(path) || exists;
+        }
+
+        public string ReadAllText(string path)
+        {
+            return _tempContents.TryGetValue(path, out string? content) ? content : string.Empty;
         }
 
         public void WriteAllText(string path, string contents)
         {
         }
+
+        public string WriteAllTextToTemp(string targetPath, string contents)
+        {
+            if (FailOnWrite.Contains(targetPath))
+            {
+                throw new IOException($"Cannot write to {targetPath}");
+            }
+
+            string tempPath = targetPath + ".tmp";
+            _tempContents[tempPath] = contents;
+            return tempPath;
+        }
+
+        public void RenameTempToTarget(string tempPath, string targetPath)
+        {
+            CommittedPaths.Add(targetPath);
+        }
+
+        public void DeleteFile(string path)
+        {
+            _tempContents.Remove(path);
+        }
+
+        public bool CanWriteToDirectory(string path) => true;
     }
 }

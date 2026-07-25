@@ -509,7 +509,10 @@ public sealed class InterfaceImplementationContractTests
                   reason: Placeholder with a dangling allowed_only_in_layers entry and no coverage deferral.
             """);
 
-        InvalidOperationException ex = Assert.Throws<InvalidOperationException>(() =>
+        // This dangling reference is only caught during evaluate-time configuration checking (not
+        // upfront policy validation), so it surfaces wrapped in the seam-safe
+        // ArchitectureAnalysisEvaluationException (an InvalidOperationException subtype).
+        ArchitectureAnalysisEvaluationException ex = Assert.Throws<ArchitectureAnalysisEvaluationException>(() =>
             ArchitectureValidationService.Validate(new ValidationRequest
             {
                 PolicyPath = policyPath,

@@ -23,19 +23,19 @@ public sealed class CliHandlerCoverageTests
     private static readonly string[] _versionArgs = ["--version"];
     private static readonly string[] _graphUnknownOptionArgs = ["graph", "--unknown"];
 
-    private static ArchitecturePolicyImportException PolicyException()
+    private static ArchitecturePolicyLoadException PolicyException()
     {
         ArchitecturePolicySourceDescriptor source = new(
             "architecture/root.yml", "architecture/root.yml", ArchitecturePolicyDocumentRole.Root,
             0, null, null, ["architecture/root.yml"]);
-        return new ArchitecturePolicyImportException(
-            ArchitecturePolicyImportErrorCategory.MissingFile,
+        return new ArchitecturePolicyLoadException(
             "Root policy file not found: architecture/root.yml",
             new ArchitecturePolicyDiagnostic(
                 ArchitecturePolicyDiagnosticKind.ImportResolution,
                 new ArchitecturePolicySourceLocation(source, "$", 1, 1, null, null),
                 [],
-                source.ImportChain));
+                source.ImportChain),
+            ArchitecturePolicyImportErrorCategory.MissingFile.ToString());
     }
 
     [TestCase("invalid", "namespace", "json", "Invalid mode")]

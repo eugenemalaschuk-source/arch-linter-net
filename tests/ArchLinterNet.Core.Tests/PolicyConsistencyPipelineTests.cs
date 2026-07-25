@@ -115,7 +115,7 @@ public sealed class PolicyConsistencyPipelineTests
         string policyPath = WritePolicy(
             string.Format(DuplicateIdPolicyTemplate, "policy_consistency: nonsense"));
 
-        Assert.Throws<InvalidOperationException>(() => ArchitectureValidationService.Validate(new ValidationRequest
+        Assert.Catch<InvalidOperationException>(() => ArchitectureValidationService.Validate(new ValidationRequest
         {
             PolicyPath = policyPath,
             Mode = "strict"

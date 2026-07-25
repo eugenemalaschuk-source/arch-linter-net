@@ -30,8 +30,9 @@ dotnet run --project src/ArchLinterNet.Cli --
 | `--contract <id>` | Run only the contract with the given ID. May be repeated. | |
 | `--condition-set <name>` | Use a named condition set from `analysis.condition_sets` for Roslyn source analysis. | policy `default_condition_set`, otherwise empty |
 | `--baseline <path>` | Path to baseline YAML file to merge with policy ignores. | |
-| `-f`, `--format <fmt>` | Output format: `human`, `json`, or `sarif`. `human` and `json` include a coverage summary (counts + exclusions) for any coverage contracts that ran; `sarif` covers violations and cycles only — see [Output Formats](../usage/output-formats.md). | `human` |
+| `-f`, `--format <fmt>` | Output format for stdout: `human`, `json`, or `sarif`. Use `--report` to route additional formats to other destinations. `human` and `json` include a coverage summary (counts + exclusions) for any coverage contracts that ran; `sarif` covers violations and cycles only — see [Output Formats](../usage/output-formats.md). | `human` |
 | `--json` | Shortcut for `--format json` | |
+| `--report <format>=<destination>` | Repeatable. Route a format (`human`, `json`, `sarif`) to a destination (`stdout`, `stderr`, or a file path). Multiple `--report` flags are allowed. Format strings are computed once and dispatched to all requesting sinks. | |
 | `--timings` | Print phase-level timing report to stderr. | |
 | `-h`, `--help` | Show help message. | |
 | `-v`, `--version` | Show version. | |
@@ -61,6 +62,40 @@ arch-linter-net --strict --json > architecture-violations.json
 ```bash
 arch-linter-net --strict --format sarif > architecture-violations.sarif
 ```
+
+### Multi-sink output
+
+```bash
+# Human to stdout, JSON to a file, SARIF to a file
+arch-linter-net --strict --report json=results.json --report sarif=results.sarif
+
+# JSON to stdout, human to stderr
+arch-linter-net --format json --report human=stderr
+
+# Human to stdout, JSON and SARIF files
+arch-linter-net --strict --report json=ci-report.json --report sarif=ci-report.sarif
+```
+
+```powershell
+# PowerShell: human to stdout, JSON to a file with explicit format
+arch-linter-net --strict --report json=results.json
+
+# PowerShell: JSON to stdout, SARIF to a file
+arch-linter-net --format json --report sarif=ci-report.sarif
+```
+
+### Multi-mode combined output
+
+```bash
+arch-linter-net --mode strict,audit --report json=combined-results.json --report sarif=combined-results.sarif
+```
+
+```powershell
+# PowerShell: combined strict+audit with JSON and SARIF files
+arch-linter-net --mode strict,audit --report json=combined-results.json --report sarif=combined-results.sarif
+```
+
+Combined JSON contains one result per mode; combined SARIF merges runs into a single document.
 
 ### Run selected contracts
 

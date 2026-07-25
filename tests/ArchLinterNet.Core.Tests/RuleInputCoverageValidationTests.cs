@@ -1,3 +1,4 @@
+using ArchLinterNet.Core.Model;
 using ArchLinterNet.Core.Validation;
 using NUnit.Framework;
 
@@ -325,7 +326,9 @@ public sealed class RuleInputCoverageValidationTests
         // silently passing.
         string policyPath = WritePolicy(BuildDanglingLayerPolicy("audit_coverage", referencedRuleGroup: "strict"));
 
-        Assert.Throws<InvalidOperationException>(() =>
+        // Only caught during evaluate-time configuration checking, so it surfaces wrapped in the
+        // seam-safe ArchitectureAnalysisEvaluationException (an InvalidOperationException subtype).
+        Assert.Throws<ArchitectureAnalysisEvaluationException>(() =>
             ArchitectureValidationService.Validate(new ValidationRequest
             {
                 PolicyPath = policyPath,
@@ -354,7 +357,9 @@ public sealed class RuleInputCoverageValidationTests
                   reason: Placeholder with a dangling forbidden layer.
             """);
 
-        Assert.Throws<InvalidOperationException>(() =>
+        // Only caught during evaluate-time configuration checking, so it surfaces wrapped in the
+        // seam-safe ArchitectureAnalysisEvaluationException (an InvalidOperationException subtype).
+        Assert.Throws<ArchitectureAnalysisEvaluationException>(() =>
             ArchitectureValidationService.Validate(new ValidationRequest
             {
                 PolicyPath = policyPath,

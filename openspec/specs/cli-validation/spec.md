@@ -38,7 +38,8 @@ The CLI SHALL accept a `--mode` (or `-m`) flag with values `strict` or `audit`. 
 - **THEN** the behavior SHALL be identical to `--mode audit`
 
 ### Requirement: CLI supports human and JSON output formats
-The CLI SHALL accept a `--format` (or `-f`) flag with values `human`, `json`, or `sarif`. Human format SHALL produce readable terminal output. JSON format SHALL produce structured JSON suitable for CI artifact capture. SARIF format SHALL produce a SARIF 2.1.0 document suitable for code-scanning viewers.
+
+The CLI SHALL accept a `--format` (or `-f`) flag with values `human`, `json`, or `sarif`. The `--format` flag SHALL select which format is written to stdout. The CLI SHALL additionally accept a repeatable `--report <format>=<destination>` flag to route additional formats to other destinations. Human format SHALL produce readable terminal output. JSON format SHALL produce structured JSON suitable for CI artifact capture. SARIF format SHALL produce a SARIF 2.1.0 document suitable for code-scanning viewers.
 
 #### Scenario: Human output format
 - **WHEN** the CLI is invoked with `--format human`
@@ -59,6 +60,10 @@ The CLI SHALL accept a `--format` (or `-f`) flag with values `human`, `json`, or
 #### Scenario: Invalid format still rejected
 - **WHEN** the CLI is invoked with `--format xml`
 - **THEN** exit code 2 SHALL be returned with an error message listing the valid values `human`, `json`, and `sarif`
+
+#### Scenario: --format json with --report sarif
+- **WHEN** the CLI is invoked with `--format json --report sarif=report.sarif`
+- **THEN** JSON SHALL appear on stdout AND a SARIF document SHALL be written to `report.sarif`
 
 ### Requirement: CLI returns correct exit codes
 The CLI SHALL return exit code 0 when all contracts pass, exit code 1 when any contract fails, and exit code 2 on runtime errors (invalid arguments, missing file, policy parse error).
