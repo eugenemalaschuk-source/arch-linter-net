@@ -4,7 +4,7 @@
 Let one composed policy, one project-graph evaluation, and one assembly load serve every requested `strict`/`audit` validation view (coverage included, via the existing `strict_coverage`/`audit_coverage` families) for one session, instead of every mode independently repeating that setup — while keeping ordinary single-mode validation exactly as simple and behaviorally unchanged as it was before this capability existed.
 ## Requirements
 ### Requirement: Snapshot composes policy once and evaluates the project graph as few times as build state requires
-The system SHALL provide `ArchitectureAnalysisSnapshot`, constructed via `IArchitectureValidationApplicationService.CreateSnapshot(AnalysisSnapshotRequest, ValidationTiming?)`, which composes the effective policy exactly once for the snapshot's lifetime and runs build-state preflight exactly once. Ordinary and no-restore preparation evaluate the selected project graph and resolve/load target assemblies exactly once. Explicit `--ensure-built` preparation SHALL evaluate the project graph and resolve/load target assemblies a second time after a successful build, using an isolated loading scope from the verified post-build output paths; it SHALL NOT reuse a same-simple-name assembly already loaded in the process. The policy document composed at the start of `CreateSnapshot` SHALL be reused for that second pass rather than recomposed.
+The system SHALL provide `ArchitectureAnalysisSnapshot`, constructed via `IArchitectureValidationApplicationService.CreateSnapshot(AnalysisSnapshotRequest, ValidationTiming?)`, which composes the effective policy exactly once for the snapshot's lifetime and runs build-state preflight exactly once. Ordinary and no-restore preparation evaluate the selected project graph and resolve/load target assemblies exactly once. Explicit `--ensure-built` preparation SHALL evaluate the project graph and resolve/load target assemblies a second time after a successful build, loading every target from its exact verified post-build output path in an isolated scope; it SHALL NOT reuse a same-simple-name assembly already loaded in the process or choose a target through environment/policy probing precedence. The policy document composed at the start of `CreateSnapshot` SHALL be reused for that second pass rather than recomposed.
 
 #### Scenario: Creating a snapshot performs setup once for ordinary preparation
 - **WHEN** `CreateSnapshot` is called for a policy and selected projects without `--ensure-built`
@@ -76,11 +76,15 @@ The system SHALL validate a `--contract-id`/`ContractIds` filter on a snapshot m
 - **THEN** both paths accept or reject each requested mode identically
 
 ### Requirement: Snapshot disposal is explicit and terminal
-The system SHALL implement `IDisposable` on `ArchitectureAnalysisSnapshot`. After `Dispose()` is called, any subsequent `Evaluate` call SHALL throw `ObjectDisposedException`, and the snapshot SHALL NOT be reused.
+The system SHALL implement `IDisposable` on `ArchitectureAnalysisSnapshot`. After `Dispose()` is called, any subsequent `Evaluate` call SHALL throw `ObjectDisposedException`, and the snapshot SHALL NOT be reused. The public snapshot API SHALL NOT expose the mutable runner, session, or target-assembly context; disposal SHALL release the snapshot's references to those objects so a collectible post-build loading scope can be collected.
 
 #### Scenario: Evaluating a disposed snapshot throws
 - **WHEN** `Evaluate(mode)` is called on a snapshot after `Dispose()` has been called
 - **THEN** the call throws `ObjectDisposedException` instead of returning a result
+
+#### Scenario: Mutable runner state cannot bypass the snapshot lifecycle
+- **WHEN** a consumer holds an `ArchitectureAnalysisSnapshot`
+- **THEN** it can evaluate modes and inspect immutable snapshot facts, but cannot obtain the mutable contract runner or session directly
 
 ### Requirement: Testing API exposes an explicitly owned shared snapshot
 The system SHALL let `ArchLinterNet.Testing` consumers explicitly obtain one owned `ArchitectureAnalysisSnapshot`-backed object from `ArchitectureValidationBuilder` and evaluate `strict`/`audit` against it, while `ArchitectureValidationBuilder.ValidateStrict()`/`ValidateAudit()` continue to perform independent, non-shared runs as before this change.

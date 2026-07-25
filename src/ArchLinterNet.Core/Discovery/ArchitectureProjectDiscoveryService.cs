@@ -120,12 +120,14 @@ public sealed class ArchitectureProjectDiscoveryService : IArchitectureProjectDi
         List<string> assemblySearchPaths = new();
         List<string> sourceRoots = new();
         List<ArchitectureDiscoveredProject> discoveredProjects = new();
+        Dictionary<string, string> resolvedAssemblyPaths = new(StringComparer.Ordinal);
 
         foreach (string projectPath in projectPaths.Distinct(StringComparer.OrdinalIgnoreCase))
         {
             ProcessProjectPath(
                 projectPath, analysis, repositoryRoot, resolveAssemblyOutputs,
-                diagnostics, targetAssemblyNames, assemblySearchPaths, sourceRoots, discoveredProjects);
+                diagnostics, targetAssemblyNames, assemblySearchPaths, sourceRoots, discoveredProjects,
+                resolvedAssemblyPaths);
         }
 
         return new ProjectDiscoveryResult(
@@ -134,7 +136,8 @@ public sealed class ArchitectureProjectDiscoveryService : IArchitectureProjectDi
             sourceRoots.Distinct(StringComparer.OrdinalIgnoreCase).ToArray(),
             diagnostics)
         {
-            DiscoveredProjects = discoveredProjects
+            DiscoveredProjects = discoveredProjects,
+            ResolvedAssemblyPaths = resolvedAssemblyPaths
         };
     }
 
@@ -147,7 +150,8 @@ public sealed class ArchitectureProjectDiscoveryService : IArchitectureProjectDi
         List<string> targetAssemblyNames,
         List<string> assemblySearchPaths,
         List<string> sourceRoots,
-        List<ArchitectureDiscoveredProject> discoveredProjects)
+        List<ArchitectureDiscoveredProject> discoveredProjects,
+        Dictionary<string, string> resolvedAssemblyPaths)
     {
         if (!_fileSystem.FileExists(projectPath))
         {
@@ -194,6 +198,7 @@ public sealed class ArchitectureProjectDiscoveryService : IArchitectureProjectDi
 
         targetAssemblyNames.Add(projectFile.AssemblyName);
         assemblySearchPaths.Add(outputDirectory);
+        resolvedAssemblyPaths[projectFile.AssemblyName] = Path.Combine(outputDirectory, $"{projectFile.AssemblyName}.dll");
     }
 
     private static ArchitectureDiscoveredProject BuildDiscoveredProject(

@@ -103,14 +103,6 @@ public sealed class ArchitectureRunnerSetupService(
             ProjectDiscoveryResult discovery = projectDiscoveryService.ResolveAndApply(
                 document, repositoryRoot, resolveAssemblyOutputs);
 
-            if (loadPostBuildArtifacts && discovery.AssemblySearchPaths.Count > 0)
-            {
-                document.Analysis.AssemblySearchPaths = document.Analysis.AssemblySearchPaths
-                    .Concat(discovery.AssemblySearchPaths)
-                    .Distinct(StringComparer.OrdinalIgnoreCase)
-                    .ToList();
-            }
-
             ResolutionResult resolution = loadPostBuildArtifacts
                 ? assemblyResolutionService.ResolvePostBuild(
                     document, repositoryRoot, discovery, resolveAssemblyOutputs, mode, selectedContractIds)

@@ -41,7 +41,11 @@ public sealed class BuildStatePreflightAssemblyReloadTests
         string projectPath = Path.Combine(projectDir, "ReloadFixture.csproj");
         File.WriteAllText(projectPath, "<Project Sdk=\"Microsoft.NET.Sdk\"><PropertyGroup>" +
             "<TargetFramework>net10.0</TargetFramework></PropertyGroup></Project>");
-        File.WriteAllText(Path.Combine(projectDir, "Class1.cs"), "namespace ReloadFixture; public class MarkerV1 {}");
+        File.WriteAllText(Path.Combine(projectDir, "Class1.cs"),
+            "namespace ReloadFixture; public class MarkerV1 : System.Exception {}");
+
+        string staleDirectory = Path.Combine(_tempDir, "stale");
+        Directory.CreateDirectory(staleDirectory);
 
         string policyPath = Path.Combine(_tempDir, "dependencies.arch.yml");
         File.WriteAllText(policyPath, """
@@ -51,6 +55,13 @@ public sealed class BuildStatePreflightAssemblyReloadTests
             analysis:
               target_assemblies: [ReloadFixture]
               projects: ["src/ReloadFixture/ReloadFixture.csproj"]
+              assembly_search_paths: ["stale"]
+            contracts:
+              strict_inheritance:
+                - name: fresh-artifact-must-not-inherit-exception
+                  source_namespaces: [ReloadFixture]
+                  forbidden_base_types: [System.Exception]
+                  reason: Proves the post-build snapshot did not load the stale copy.
             """);
 
         // First ensure-built produces MarkerV1 and leaves a same-simple-name assembly reachable
@@ -64,7 +75,10 @@ public sealed class BuildStatePreflightAssemblyReloadTests
         });
         Assert.That(firstOutcome.PreflightBlocked, Is.False, () => string.Join("; ", firstOutcome.PreflightDiagnostics.Select(d => d.Evidence.Detail)));
 
-        // Change the source so the rebuilt assembly's exported type set changes.
+        string firstOutputPath = Path.Combine(projectDir, "bin", "Debug", "net10.0", "ReloadFixture.dll");
+        File.Copy(firstOutputPath, Path.Combine(staleDirectory, "ReloadFixture.dll"));
+
+        // Build a clean artifact whose contract result differs from the competing stale copy.
         File.WriteAllText(Path.Combine(projectDir, "Class1.cs"), "namespace ReloadFixture; public class MarkerV2 {}");
 
         using ArchitectureEngine engine = new ArchitectureEngineBuilder().AddArchLinterNetCore().Build();
@@ -79,11 +93,5 @@ public sealed class BuildStatePreflightAssemblyReloadTests
         Assert.That(secondOutcome.PreflightBlocked, Is.False,
             () => string.Join("; ", secondOutcome.PreflightDiagnostics.Select(d => d.Evidence.Detail)));
         Assert.That(secondOutcome.Passed, Is.True, () => string.Join("; ", secondOutcome.Violations));
-
-        System.Reflection.Assembly reloadedAssembly = snapshot.Runner.Session.Context.TargetAssemblies.Single();
-        string[] typeNames = reloadedAssembly.GetTypes().Select(t => t.Name).ToArray();
-
-        Assert.That(typeNames, Does.Contain("MarkerV2"));
-        Assert.That(typeNames, Does.Not.Contain("MarkerV1"));
     }
 }

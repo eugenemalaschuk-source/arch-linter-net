@@ -277,6 +277,12 @@ public sealed class ArchitectureAnalysisSnapshotTests
     }
 
     [Test]
+    public void PublicApi_DoesNotExposeMutableRunner()
+    {
+        Assert.That(typeof(ArchitectureAnalysisSnapshot).GetProperty("Runner"), Is.Null);
+    }
+
+    [Test]
     public void Evaluate_BlockedPreflight_ShortCircuitsEveryModeWithoutExecutingContracts()
     {
         Fixture fixture = CreateFixture();

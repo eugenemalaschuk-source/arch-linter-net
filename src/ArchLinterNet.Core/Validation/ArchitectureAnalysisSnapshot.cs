@@ -18,7 +18,8 @@ public sealed class ArchitectureAnalysisSnapshot : IDisposable
     private const string ErrorSeverity = "error";
 
     private readonly ArchitectureContractDocument _document;
-    private readonly ArchitectureRunnerSetup _setup;
+    private readonly string _repositoryRoot;
+    private ArchitectureRunnerSetup? _setup;
     private readonly BuildStatePreflightResult _preflight;
     private readonly string _unmatchedConfig;
     private readonly string _policyConsistencyConfig;
@@ -51,6 +52,7 @@ public sealed class ArchitectureAnalysisSnapshot : IDisposable
     {
         _document = document;
         _setup = setup;
+        _repositoryRoot = setup.RepositoryRoot;
         _preflight = preflight;
         _unmatchedConfig = unmatchedConfig;
         _policyConsistencyConfig = policyConsistencyConfig;
@@ -69,9 +71,7 @@ public sealed class ArchitectureAnalysisSnapshot : IDisposable
         };
     }
 
-    public IArchitectureContractRunner Runner => _setup.Runner;
-
-    public string RepositoryRoot => _setup.RepositoryRoot;
+    public string RepositoryRoot => _repositoryRoot;
 
     public BuildStatePreflightResult Preflight => _preflight;
 
@@ -171,7 +171,8 @@ public sealed class ArchitectureAnalysisSnapshot : IDisposable
 
     private ValidationOutcome EvaluateCore(string mode, ValidationTiming? timing)
     {
-        IArchitectureContractRunner runner = _setup.Runner;
+        IArchitectureContractRunner runner = _setup?.Runner
+            ?? throw new ObjectDisposedException(nameof(ArchitectureAnalysisSnapshot));
         List<ArchitectureViolation> allViolations = new();
 
         // ArchitectureAnalysisSession.UnmatchedIgnoredViolations is one mutable list that every
@@ -285,7 +286,9 @@ public sealed class ArchitectureAnalysisSnapshot : IDisposable
 
             _disposed = true;
             _evaluatedModes.Clear();
-            _setup.Runner.Session.Context.Dispose();
+            ArchitectureRunnerSetup? setup = _setup;
+            _setup = null;
+            setup?.Runner.Session.Context.Dispose();
         }
     }
 }

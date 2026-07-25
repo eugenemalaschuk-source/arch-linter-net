@@ -10,5 +10,7 @@ public interface IArchitectureAssemblyLoader
 
     Assembly LoadFrom(string path);
 
-    IArchitectureAssemblyLoadScope CreateIsolatedLoadScope(IReadOnlyList<string> probingPaths);
+    IArchitectureAssemblyLoadScope CreateIsolatedLoadScope(
+        IReadOnlyList<string> probingPaths,
+        IReadOnlyDictionary<string, string> exactAssemblyPaths);
 }

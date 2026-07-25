@@ -23,19 +23,25 @@ public sealed class ArchitectureAssemblyLoader : IArchitectureAssemblyLoader
         return Assembly.LoadFrom(path);
     }
 
-    public IArchitectureAssemblyLoadScope CreateIsolatedLoadScope(IReadOnlyList<string> probingPaths)
+    public IArchitectureAssemblyLoadScope CreateIsolatedLoadScope(
+        IReadOnlyList<string> probingPaths,
+        IReadOnlyDictionary<string, string> exactAssemblyPaths)
     {
-        return new IsolatedAssemblyLoadScope(probingPaths);
+        return new IsolatedAssemblyLoadScope(probingPaths, exactAssemblyPaths);
     }
 
     private sealed class IsolatedAssemblyLoadScope : AssemblyLoadContext, IArchitectureAssemblyLoadScope
     {
         private readonly IReadOnlyList<string> _probingPaths;
+        private readonly IReadOnlyDictionary<string, string> _exactAssemblyPaths;
 
-        public IsolatedAssemblyLoadScope(IReadOnlyList<string> probingPaths)
+        public IsolatedAssemblyLoadScope(
+            IReadOnlyList<string> probingPaths,
+            IReadOnlyDictionary<string, string> exactAssemblyPaths)
             : base(isCollectible: true)
         {
             _probingPaths = probingPaths;
+            _exactAssemblyPaths = exactAssemblyPaths;
         }
 
         public Assembly LoadFrom(string path)
@@ -51,9 +57,11 @@ public sealed class ArchitectureAssemblyLoader : IArchitectureAssemblyLoader
                 return null;
             }
 
-            string? candidate = _probingPaths
-                .Select(path => Path.Combine(path, $"{simpleName}.dll"))
-                .FirstOrDefault(File.Exists);
+            string? candidate = _exactAssemblyPaths.TryGetValue(simpleName, out string? exactPath)
+                ? exactPath
+                : _probingPaths
+                    .Select(path => Path.Combine(path, $"{simpleName}.dll"))
+                    .FirstOrDefault(File.Exists);
 
             return candidate == null ? null : LoadAssemblyFromStream(candidate);
         }
