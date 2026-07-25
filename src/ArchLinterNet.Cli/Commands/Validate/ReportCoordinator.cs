@@ -105,7 +105,7 @@ internal sealed class ReportCoordinator
                 : FormatCombinedHuman(outcomesByMode);
         }
 
-        foreach ((string mode, ValidationOutcome outcome) in outcomesByMode)
+        foreach ((_, ValidationOutcome outcome) in outcomesByMode)
         {
             _console.Out.WriteLine(FormatSingleHuman(outcome));
         }
