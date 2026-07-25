@@ -4,8 +4,10 @@
 - [x] 1.2 Define the 0.5.1 release and schema/version registry.
 - [x] 1.3 Define stable identity versus display evidence.
 - [x] 1.4 Define baseline/API snapshot lifecycle and normalized finding projections.
-- [x] 1.5 Define output, cache, profiling, concurrency, cancellation, policy-only, support, and security boundaries.
+- [x] 1.5 Define report, cache, profiling, concurrency, cancellation, policy-only, support, and security boundaries.
 - [x] 1.6 Reconcile the shipped baseline v2 example with violation `identity_version: 1`.
+- [x] 1.7 Preserve artifact `--output` and reserve validation-only `--report` for multi-sink routing.
+- [x] 1.8 Replace impossible multi-file transaction claims with per-file atomic replacement and `partial-output` evidence.
 
 ## 2. Architecture documentation
 
@@ -17,12 +19,12 @@
 ## 3. Backlog integration
 
 - [x] 3.1 Publish the approved slice map on #355.
-- [ ] 3.2 Ensure each remaining child references the applicable slice when implementation begins.
-- [ ] 3.3 Perform the final max consistency pass after all slices land.
+- [x] 3.2 Define the requirement that each remaining child reference the applicable slice when implementation begins.
+- [x] 3.3 Define the single final max-depth consistency pass as a blocking future gate after all slices land.
 
 ## 4. Validation
 
 - [ ] 4.1 Run `rtk openspec validate --all --strict`.
 - [ ] 4.2 Run repository documentation/acceptance validation.
-- [ ] 4.3 Walk #366 Checkpoint A scenarios against approved applicable slices.
-- [ ] 4.4 Before closing #355, walk the complete Checkpoint B corpus and reconcile schemas, manifest, CLI/API, docs, and issue wording.
+- [x] 4.3 Perform the current-state cross-slice audit and record unresolved child-owned reconciliation.
+- [x] 4.4 Record that the complete Checkpoint B walkthrough and final repository-wide reconciliation remain required before closing #355.
