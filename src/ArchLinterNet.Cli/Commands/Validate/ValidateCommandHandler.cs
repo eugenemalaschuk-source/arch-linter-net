@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using ArchLinterNet.Cli.Abstractions;
 using ArchLinterNet.Cli.Commands;
 using ArchLinterNet.Core.BuildState;
@@ -172,15 +173,62 @@ internal sealed class ValidateCommandHandler(ICliRuntime runtime, ICliConsole co
         using ArchitectureAnalysisSnapshot snapshot = runtime.CreateSnapshot(snapshotRequest, timing);
 
         bool allPassed = true;
+        List<(string Mode, ValidationOutcome Outcome)> outcomesByMode = new();
         foreach (string mode in modes)
         {
             ValidationOutcome outcome = snapshot.Evaluate(mode, timing);
-            WriteOutcome(options with { Mode = mode }, outcome);
+            outcomesByMode.Add((mode, outcome));
             allPassed &= outcome.Passed;
         }
 
+        WriteCombinedOutcome(options, outcomesByMode);
+
         timing?.WriteReport(console.Error);
         return allPassed ? CliExitCodes.Success : CliExitCodes.ValidationFailure;
+    }
+
+    // A combined multi-mode CLI run must still emit exactly one valid machine-readable document —
+    // a normal JSON/SARIF parser cannot consume two root objects concatenated on stdout. For
+    // --format json, each mode's existing per-mode object is merged into one { "results": [...] }
+    // document. For --format sarif, SARIF already supports multiple runs in one document, so each
+    // mode's "runs" entries are merged into one { "version", "runs": [...] } document instead of
+    // two separate SARIF documents. --format human still writes each mode's section sequentially,
+    // since it is read by a person, not parsed.
+    private void WriteCombinedOutcome(ValidateCommandOptions options, IReadOnlyList<(string Mode, ValidationOutcome Outcome)> outcomesByMode)
+    {
+        if (options.Format == "json")
+        {
+            JsonNode combined = new JsonObject
+            {
+                ["results"] = new JsonArray(outcomesByMode
+                    .Select(entry => (JsonNode?)JsonNode.Parse(FormatJson(entry.Mode, entry.Outcome)))
+                    .ToArray())
+            };
+            console.Out.WriteLine(combined.ToJsonString());
+            return;
+        }
+
+        if (options.Format == "sarif")
+        {
+            JsonArray runs = new();
+            foreach ((string mode, ValidationOutcome outcome) in outcomesByMode)
+            {
+                JsonNode? document = JsonNode.Parse(FormatSarif(mode, outcome));
+                foreach (JsonNode? run in document?["runs"]?.AsArray() ?? new JsonArray())
+                {
+                    runs.Add(run?.DeepClone());
+                }
+            }
+
+            JsonNode combined = new JsonObject { ["version"] = "2.1.0", ["runs"] = runs };
+            console.Out.WriteLine(combined.ToJsonString());
+            return;
+        }
+
+        foreach ((string mode, ValidationOutcome outcome) in outcomesByMode)
+        {
+            WriteOutcome(options with { Mode = mode }, outcome);
+        }
     }
 
     private static ValidationRequest BuildValidationRequest(ValidateCommandOptions options, string mode)
@@ -204,23 +252,33 @@ internal sealed class ValidateCommandHandler(ICliRuntime runtime, ICliConsole co
     {
         if (options.Format == "json")
         {
-            console.Out.WriteLine(runtime.FormatResultForCiArtifacts(
-                options.Mode, outcome.Passed, outcome.Violations, outcome.Cycles, outcome.CycleFindings, outcome.CoverageFindings,
-                outcome.UnmatchedIgnoredViolations,
-                outcome.PolicyConsistencyConfig == "off" ? Array.Empty<PolicyConsistencyDiagnostic>() : outcome.PolicyConsistencyFindings,
-                outcome.CoverageSummaries, outcome.ClassificationConflicts, outcome.ClassificationMetadataFailures,
-                outcome.ClassificationRoles, outcome.ClassificationPathDeferred, outcome.PreflightDiagnostics));
+            console.Out.WriteLine(FormatJson(options.Mode, outcome));
             return;
         }
 
         if (options.Format == "sarif")
         {
-            console.Out.WriteLine(runtime.FormatResultAsSarif(
-                options.Mode, outcome.Violations, outcome.Cycles, outcome.CycleFindings, outcome.PreflightDiagnostics));
+            console.Out.WriteLine(FormatSarif(options.Mode, outcome));
             return;
         }
 
         WriteHumanOutput(outcome);
+    }
+
+    private string FormatJson(string mode, ValidationOutcome outcome)
+    {
+        return runtime.FormatResultForCiArtifacts(
+            mode, outcome.Passed, outcome.Violations, outcome.Cycles, outcome.CycleFindings, outcome.CoverageFindings,
+            outcome.UnmatchedIgnoredViolations,
+            outcome.PolicyConsistencyConfig == "off" ? Array.Empty<PolicyConsistencyDiagnostic>() : outcome.PolicyConsistencyFindings,
+            outcome.CoverageSummaries, outcome.ClassificationConflicts, outcome.ClassificationMetadataFailures,
+            outcome.ClassificationRoles, outcome.ClassificationPathDeferred, outcome.PreflightDiagnostics);
+    }
+
+    private string FormatSarif(string mode, ValidationOutcome outcome)
+    {
+        return runtime.FormatResultAsSarif(
+            mode, outcome.Violations, outcome.Cycles, outcome.CycleFindings, outcome.PreflightDiagnostics);
     }
 
     private static bool TryGetPolicyDiagnostic(Exception exception, out ArchitecturePolicyDiagnostic? diagnostic)

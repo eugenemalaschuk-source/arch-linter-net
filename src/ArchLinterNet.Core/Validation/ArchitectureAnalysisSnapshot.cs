@@ -27,6 +27,7 @@ public sealed class ArchitectureAnalysisSnapshot : IDisposable
     private readonly bool _includeAsmdefContracts;
     private readonly IArchitectureContractExecutor _contractExecutor;
     private readonly IArchitectureContractHandlerRegistry _handlerRegistry;
+    private readonly IReadOnlyCollection<string>? _requestedContractIds;
     private readonly Dictionary<string, ValidationOutcome> _evaluatedModes = new(StringComparer.Ordinal);
     private ArchitectureAnalysisSnapshotCounters _counters;
     private bool _disposed;
@@ -41,7 +42,10 @@ public sealed class ArchitectureAnalysisSnapshot : IDisposable
         bool enforceUnmatchedIgnoredViolationsPolicy,
         bool includeAsmdefContracts,
         IArchitectureContractExecutor contractExecutor,
-        IArchitectureContractHandlerRegistry handlerRegistry)
+        IArchitectureContractHandlerRegistry handlerRegistry,
+        int policyCompositions,
+        int projectGraphEvaluations,
+        IReadOnlyCollection<string>? requestedContractIds = null)
     {
         _document = document;
         _setup = setup;
@@ -53,11 +57,12 @@ public sealed class ArchitectureAnalysisSnapshot : IDisposable
         _includeAsmdefContracts = includeAsmdefContracts;
         _contractExecutor = contractExecutor;
         _handlerRegistry = handlerRegistry;
+        _requestedContractIds = requestedContractIds;
 
         _counters = new ArchitectureAnalysisSnapshotCounters
         {
-            PolicyCompositions = 1,
-            ProjectGraphEvaluations = 1,
+            PolicyCompositions = policyCompositions,
+            ProjectGraphEvaluations = projectGraphEvaluations,
             AssemblyLoads = setup.Runner.Session.Context.TargetAssemblies.Count
         };
     }
@@ -89,11 +94,41 @@ public sealed class ArchitectureAnalysisSnapshot : IDisposable
             return cached;
         }
 
+        // A snapshot meant to serve any/all requested modes validates a --contract-id filter
+        // against the union of strict and audit IDs at construction time (see
+        // ArchitectureValidationApplicationService.ResolveSelectedContractIds) — that only rejects
+        // an ID unknown to every mode. An ID valid in one mode but not this one would otherwise
+        // silently match nothing when this mode's contracts execute, instead of failing the same
+        // way an independent single-mode Validate call for this mode would. Re-validating here,
+        // per mode, keeps combined execution semantically equivalent to separate runs.
+        EnsureRequestedContractIdsAreKnownForMode(mode);
+
         ValidationOutcome outcome = _preflight.Blocked ? BuildBlockedOutcome() : EvaluateCore(mode, timing);
 
         _evaluatedModes[mode] = outcome;
         _counters = _counters with { ModesEvaluated = _evaluatedModes.Count };
         return outcome;
+    }
+
+    private void EnsureRequestedContractIdsAreKnownForMode(string mode)
+    {
+        if (_requestedContractIds is not { Count: > 0 })
+        {
+            return;
+        }
+
+        ArchitectureContractCatalog catalog = ArchitectureContractCatalog.Build(_document);
+        HashSet<string> availableIds = catalog.AvailableContractIds(mode);
+        List<string> unknownIds = _requestedContractIds
+            .Where(id => !availableIds.Contains(id))
+            .ToList();
+
+        if (unknownIds.Count > 0)
+        {
+            throw new InvalidOperationException(
+                $"Unknown contract IDs: {string.Join(", ", unknownIds)}{Environment.NewLine}" +
+                $"Available IDs in {mode} mode: {string.Join(", ", availableIds.OrderBy(id => id))}");
+        }
     }
 
     private ValidationOutcome BuildBlockedOutcome()
@@ -115,6 +150,15 @@ public sealed class ArchitectureAnalysisSnapshot : IDisposable
     {
         IArchitectureContractRunner runner = _setup.Runner;
         List<ArchitectureViolation> allViolations = new();
+
+        // ArchitectureAnalysisSession.UnmatchedIgnoredViolations is one mutable list that every
+        // contract check across every mode appends to as it runs against the session shared by
+        // this snapshot — it is never cleared between modes. Recording the count here and slicing
+        // from it after this mode's checks run (see ResolveUnmatchedIgnoredViolations) isolates
+        // each mode's reported unmatched-ignore diagnostics to what that mode's own checks added,
+        // regardless of evaluation order or how many other modes were evaluated on this snapshot
+        // before or after.
+        int unmatchedStartIndex = runner.UnmatchedIgnoredViolations.Count;
 
         using (timing?.Measure("configuration_check"))
             allViolations.AddRange(runner.CheckConfiguration(strict: mode == "strict"));
@@ -143,7 +187,7 @@ public sealed class ArchitectureAnalysisSnapshot : IDisposable
         IReadOnlyList<ArchitectureUnmatchedIgnoredViolation> unmatched;
         using (timing?.Measure("post_processing"))
         {
-            unmatched = ResolveUnmatchedIgnoredViolations(runner);
+            unmatched = ResolveUnmatchedIgnoredViolations(runner, unmatchedStartIndex);
         }
 
         unmatched = FilterUnmatchedForDisabledCoverage(unmatched);
@@ -179,14 +223,17 @@ public sealed class ArchitectureAnalysisSnapshot : IDisposable
     }
 
     private IReadOnlyList<ArchitectureUnmatchedIgnoredViolation> ResolveUnmatchedIgnoredViolations(
-        IArchitectureContractRunner runner)
+        IArchitectureContractRunner runner, int unmatchedStartIndex)
     {
         if (!_enforceUnmatchedIgnoredViolationsPolicy || _unmatchedConfig == "off")
         {
             return Array.Empty<ArchitectureUnmatchedIgnoredViolation>();
         }
 
-        return runner.UnmatchedIgnoredViolations;
+        IReadOnlyList<ArchitectureUnmatchedIgnoredViolation> all = runner.UnmatchedIgnoredViolations;
+        return unmatchedStartIndex >= all.Count
+            ? Array.Empty<ArchitectureUnmatchedIgnoredViolation>()
+            : all.Skip(unmatchedStartIndex).ToList();
     }
 
     // See ArchitectureValidationApplicationService.FilterUnmatchedForDisabledCoverage for why this
