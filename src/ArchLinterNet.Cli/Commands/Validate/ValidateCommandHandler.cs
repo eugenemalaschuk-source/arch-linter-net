@@ -10,6 +10,10 @@ namespace ArchLinterNet.Cli.Commands.Validate;
 
 internal sealed class ValidateCommandHandler
 {
+    private const string FormatHuman = "human";
+    private const string FormatJson = "json";
+    private const string FormatSarif = "sarif";
+
     private readonly ICliRuntime _runtime;
     private readonly ICliConsole _console;
     private readonly IFileSystem _fileSystem;
@@ -48,30 +52,23 @@ internal sealed class ValidateCommandHandler
         }
     }
 
-    private string ResolveEffectiveFormat(ValidateCommandOptions options)
+    private static string ResolveEffectiveFormat(ValidateCommandOptions options)
     {
         if (options.IsFormatExplicit || options.AdditionalSinks.Count == 0)
         {
             return options.Format;
         }
 
-        foreach (ReportSink sink in options.AdditionalSinks)
+        ReportSink? stdoutSink = options.AdditionalSinks
+            .FirstOrDefault(sink => sink.DestinationType == ReportDestinationType.Stdout);
+        if (stdoutSink is not null)
         {
-            if (sink.DestinationType == ReportDestinationType.Stdout)
-            {
-                return sink.Format;
-            }
+            return stdoutSink.Format;
         }
 
-        foreach (ReportSink sink in options.AdditionalSinks)
-        {
-            if (sink.Format is "json" or "sarif")
-            {
-                return sink.Format;
-            }
-        }
-
-        return "human";
+        ReportSink? structuredSink = options.AdditionalSinks
+            .FirstOrDefault(sink => sink.Format is FormatJson or FormatSarif);
+        return structuredSink?.Format ?? FormatHuman;
     }
 
     // Post-outcome failure: some sinks may have already committed a legitimate report. Only
@@ -96,8 +93,8 @@ internal sealed class ValidateCommandHandler
         {
             contentByFormat[neededFormat] = neededFormat switch
             {
-                "json" => BuildOutputErrorJsonText(status, humanMessage, result, outcomesByMode),
-                "sarif" => BuildOutputErrorSarifText(status, humanMessage, result, outcomesByMode),
+                FormatJson => BuildOutputErrorJsonText(status, humanMessage, result, outcomesByMode),
+                FormatSarif => BuildOutputErrorSarifText(status, humanMessage, result, outcomesByMode),
                 _ => BuildOutputErrorHumanText(humanMessage, result, outcomesByMode),
             };
         }
@@ -226,8 +223,8 @@ internal sealed class ValidateCommandHandler
         {
             contentByFormat[neededFormat] = neededFormat switch
             {
-                "json" => BuildExecutionErrorJsonText(message),
-                "sarif" => BuildExecutionErrorSarifText(message),
+                FormatJson => BuildExecutionErrorJsonText(message),
+                FormatSarif => BuildExecutionErrorSarifText(message),
                 _ => $"Architecture validation error: {message}",
             };
         }
@@ -292,7 +289,7 @@ internal sealed class ValidateCommandHandler
         if (options.AdditionalSinks.Count == 0)
         {
             string content = contentByFormat[errorFormat];
-            if (errorFormat == "human")
+            if (errorFormat == FormatHuman)
             {
                 _console.Error.WriteLine(content);
             }
@@ -349,7 +346,7 @@ internal sealed class ValidateCommandHandler
             return CliExitCodes.InvalidArgumentsOrRuntimeError;
         }
 
-        if (options.Format is not ("human" or "json" or "sarif"))
+        if (options.Format is not (FormatHuman or FormatJson or FormatSarif))
         {
             _console.Error.WriteLine($"Invalid format: {options.Format}. Use 'human', 'json', or 'sarif'.");
             return CliExitCodes.InvalidArgumentsOrRuntimeError;
@@ -425,12 +422,11 @@ internal sealed class ValidateCommandHandler
             }
 
             string sinkFullPath = Path.GetFullPath(sink.FilePath);
-            foreach (string importPath in policyImportPaths)
+            string? matchedImportPath = policyImportPaths
+                .FirstOrDefault(importPath => string.Equals(sinkFullPath, importPath, StringComparison.OrdinalIgnoreCase));
+            if (matchedImportPath is not null)
             {
-                if (string.Equals(sinkFullPath, importPath, StringComparison.OrdinalIgnoreCase))
-                {
-                    return $"--report destination '{sink.FilePath}' matches imported policy file '{importPath}'";
-                }
+                return $"--report destination '{sink.FilePath}' matches imported policy file '{matchedImportPath}'";
             }
         }
 
@@ -661,8 +657,8 @@ internal sealed class ValidateCommandHandler
         {
             contentByFormat[neededFormat] = neededFormat switch
             {
-                "json" => PolicyDiagnosticOutputWriter.BuildJsonText(message, diagnostic, category),
-                "sarif" => BuildPolicyDiagnosticSarifText(message, diagnostic, category),
+                FormatJson => PolicyDiagnosticOutputWriter.BuildJsonText(message, diagnostic, category),
+                FormatSarif => BuildPolicyDiagnosticSarifText(message, diagnostic, category),
                 _ => PolicyDiagnosticOutputWriter.BuildHumanText("Architecture validation error", message, diagnostic),
             };
         }

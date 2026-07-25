@@ -25,6 +25,9 @@ internal readonly record struct RouteResult(
 internal sealed class ReportCoordinator
 {
     private const int MaxReportBytes = 100 * 1024 * 1024;
+    private const string FormatHuman = "human";
+    private const string FormatJson = "json";
+    private const string FormatSarif = "sarif";
 
     private readonly ICliRuntime _runtime;
     private readonly ICliConsole _console;
@@ -64,67 +67,85 @@ internal sealed class ReportCoordinator
         bool isReportMode)
     {
         // Legacy combined human: write each mode sequentially (pre-#364 behavior)
-        bool legacyCombinedHuman = !isReportMode && !isSingleMode && stdoutFormat == "human";
+        bool legacyCombinedHuman = !isReportMode && !isSingleMode && stdoutFormat == FormatHuman;
 
-        string? neededHuman = StdoutOrAnySinkNeeds("human", stdoutFormat, additionalSinks, isReportMode);
-        string? neededJson = StdoutOrAnySinkNeeds("json", stdoutFormat, additionalSinks, isReportMode);
-        string? neededSarif = StdoutOrAnySinkNeeds("sarif", stdoutFormat, additionalSinks, isReportMode);
-
-        string? humanContent = null;
-        string? jsonContent = null;
-        string? sarifContent = null;
-
-        if (neededHuman is not null)
-        {
-            if (legacyCombinedHuman)
-            {
-                foreach ((string mode, ValidationOutcome outcome) in outcomesByMode)
-                {
-                    _console.Out.WriteLine(FormatSingleHuman(mode, outcome));
-                }
-            }
-            else
-            {
-                humanContent = isSingleMode
-                    ? FormatSingleHuman(outcomesByMode[0].Mode, outcomesByMode[0].Outcome)
-                    : FormatCombinedHuman(outcomesByMode);
-            }
-        }
-
-        if (neededJson is not null)
-        {
-            jsonContent = isSingleMode
-                ? FormatSingleJson(outcomesByMode[0].Mode, outcomesByMode[0].Outcome)
-                : FormatCombinedJson(outcomesByMode);
-        }
-
-        if (neededSarif is not null)
-        {
-            sarifContent = isSingleMode
-                ? FormatSingleSarif(outcomesByMode[0].Mode, outcomesByMode[0].Outcome)
-                : FormatCombinedSarif(outcomesByMode);
-        }
+        string? humanContent = ResolveHumanContent(
+            StdoutOrAnySinkNeeds(FormatHuman, stdoutFormat, additionalSinks, isReportMode),
+            legacyCombinedHuman, isSingleMode, outcomesByMode);
+        string? jsonContent = ResolveStructuredContent(
+            StdoutOrAnySinkNeeds(FormatJson, stdoutFormat, additionalSinks, isReportMode),
+            isSingleMode, outcomesByMode, FormatSingleJson, FormatCombinedJson);
+        string? sarifContent = ResolveStructuredContent(
+            StdoutOrAnySinkNeeds(FormatSarif, stdoutFormat, additionalSinks, isReportMode),
+            isSingleMode, outcomesByMode, FormatSingleSarif, FormatCombinedSarif);
 
         if (!isReportMode && !legacyCombinedHuman)
         {
             _console.Out.WriteLine(DispatchFormat(stdoutFormat, humanContent, jsonContent, sarifContent));
         }
 
+        return DistributeToSinks(additionalSinks, BuildContentByFormat(humanContent, jsonContent, sarifContent));
+    }
+
+    private string? ResolveHumanContent(
+        string? neededHuman,
+        bool legacyCombinedHuman,
+        bool isSingleMode,
+        IReadOnlyList<(string Mode, ValidationOutcome Outcome)> outcomesByMode)
+    {
+        if (neededHuman is null)
+        {
+            return null;
+        }
+
+        if (!legacyCombinedHuman)
+        {
+            return isSingleMode
+                ? FormatSingleHuman(outcomesByMode[0].Outcome)
+                : FormatCombinedHuman(outcomesByMode);
+        }
+
+        foreach ((string mode, ValidationOutcome outcome) in outcomesByMode)
+        {
+            _console.Out.WriteLine(FormatSingleHuman(outcome));
+        }
+
+        return null;
+    }
+
+    private static string? ResolveStructuredContent(
+        string? needed,
+        bool isSingleMode,
+        IReadOnlyList<(string Mode, ValidationOutcome Outcome)> outcomesByMode,
+        Func<string, ValidationOutcome, string> formatSingle,
+        Func<IReadOnlyList<(string Mode, ValidationOutcome Outcome)>, string> formatCombined)
+    {
+        if (needed is null)
+        {
+            return null;
+        }
+
+        return isSingleMode
+            ? formatSingle(outcomesByMode[0].Mode, outcomesByMode[0].Outcome)
+            : formatCombined(outcomesByMode);
+    }
+
+    private static Dictionary<string, string> BuildContentByFormat(string? humanContent, string? jsonContent, string? sarifContent)
+    {
         Dictionary<string, string> contentByFormat = new();
         if (humanContent is not null)
         {
-            contentByFormat["human"] = humanContent;
+            contentByFormat[FormatHuman] = humanContent;
         }
         if (jsonContent is not null)
         {
-            contentByFormat["json"] = jsonContent;
+            contentByFormat[FormatJson] = jsonContent;
         }
         if (sarifContent is not null)
         {
-            contentByFormat["sarif"] = sarifContent;
+            contentByFormat[FormatSarif] = sarifContent;
         }
-
-        return DistributeToSinks(additionalSinks, contentByFormat);
+        return contentByFormat;
     }
 
     // Routes error content (policy load failures, unexpected runtime errors) to every configured
@@ -156,15 +177,7 @@ internal sealed class ReportCoordinator
                 continue;
             }
 
-            if (sink.DestinationType == ReportDestinationType.Stderr)
-            {
-                _console.Error.WriteLine(content);
-            }
-            else
-            {
-                _console.Out.WriteLine(content);
-            }
-
+            WriteToStream(sink.DestinationType, content);
             wroteAny = true;
         }
 
@@ -176,79 +189,129 @@ internal sealed class ReportCoordinator
         IReadOnlyDictionary<string, string> contentByFormat)
     {
         List<string> failedPaths = new();
-        List<string> committedPaths = new();
         List<string> stagedPaths = new();
         List<string> errorDetails = new();
         List<(string TempPath, string TargetPath)> pendingRenames = new();
 
         foreach (ReportSink sink in additionalSinks)
         {
-            if (!contentByFormat.TryGetValue(sink.Format, out string? content))
-            {
-                continue;
-            }
-
-            if (sink.DestinationType is ReportDestinationType.Stdout or ReportDestinationType.Stderr)
-            {
-                if (sink.DestinationType == ReportDestinationType.Stderr)
-                {
-                    _console.Error.WriteLine(content);
-                }
-                else
-                {
-                    _console.Out.WriteLine(content);
-                }
-
-                continue;
-            }
-
-            try
-            {
-                ValidateContentSize(content);
-                if (sink.Format is "json" or "sarif")
-                {
-                    _ = JsonNode.Parse(content);
-                }
-
-                string tempPath = _fileSystem.WriteAllTextToTemp(sink.FilePath!, content);
-                ValidateWrittenTempFile(tempPath, sink.Format);
-                pendingRenames.Add((tempPath, sink.FilePath!));
-                stagedPaths.Add(sink.FilePath!);
-            }
-            catch (Exception ex)
-            {
-                failedPaths.Add(sink.FilePath!);
-                errorDetails.Add(ex.Message);
-            }
+            StageSink(sink, contentByFormat, failedPaths, stagedPaths, errorDetails, pendingRenames);
         }
 
-        bool phase1AllSucceeded = failedPaths.Count == 0;
-
-        if (phase1AllSucceeded)
+        List<string> committedPaths = new();
+        if (failedPaths.Count == 0)
         {
-            foreach ((string tempPath, string targetPath) in pendingRenames)
-            {
-                try
-                {
-                    _fileSystem.RenameTempToTarget(tempPath, targetPath);
-                    committedPaths.Add(targetPath);
-                }
-                catch (Exception ex)
-                {
-                    failedPaths.Add(targetPath);
-                    errorDetails.Add(ex.Message);
-                    try { _fileSystem.DeleteFile(tempPath); } catch { }
-                }
-            }
+            CommitPendingRenames(pendingRenames, committedPaths, failedPaths, errorDetails);
         }
         else
         {
             foreach ((string tempPath, string _) in pendingRenames)
             {
-                try { _fileSystem.DeleteFile(tempPath); } catch { }
+                DeleteTempFileBestEffort(tempPath);
             }
         }
 
+        return BuildRouteResult(additionalSinks, contentByFormat, failedPaths, committedPaths, stagedPaths, errorDetails);
+    }
+
+    private void StageSink(
+        ReportSink sink,
+        IReadOnlyDictionary<string, string> contentByFormat,
+        List<string> failedPaths,
+        List<string> stagedPaths,
+        List<string> errorDetails,
+        List<(string TempPath, string TargetPath)> pendingRenames)
+    {
+        if (!contentByFormat.TryGetValue(sink.Format, out string? content))
+        {
+            return;
+        }
+
+        if (sink.DestinationType is ReportDestinationType.Stdout or ReportDestinationType.Stderr)
+        {
+            WriteToStream(sink.DestinationType, content);
+            return;
+        }
+
+        try
+        {
+            ValidateContentSize(content);
+            if (sink.Format is FormatJson or FormatSarif)
+            {
+                _ = JsonNode.Parse(content);
+            }
+
+            string tempPath = _fileSystem.WriteAllTextToTemp(sink.FilePath!, content);
+            ValidateWrittenTempFile(tempPath, sink.Format);
+            pendingRenames.Add((tempPath, sink.FilePath!));
+            stagedPaths.Add(sink.FilePath!);
+        }
+        catch (Exception ex)
+        {
+            failedPaths.Add(sink.FilePath!);
+            errorDetails.Add(ex.Message);
+        }
+    }
+
+    private void WriteToStream(ReportDestinationType destinationType, string content)
+    {
+        if (destinationType == ReportDestinationType.Stderr)
+        {
+            _console.Error.WriteLine(content);
+        }
+        else
+        {
+            _console.Out.WriteLine(content);
+        }
+    }
+
+    // Phase 2 only runs once every staged sink is already known-good (StageSink validated each
+    // temp file before adding it here), so a failure at this point is a genuine OS-level rename
+    // fault, not a precondition this coordinator could have caught earlier.
+    private void CommitPendingRenames(
+        List<(string TempPath, string TargetPath)> pendingRenames,
+        List<string> committedPaths,
+        List<string> failedPaths,
+        List<string> errorDetails)
+    {
+        foreach ((string tempPath, string targetPath) in pendingRenames)
+        {
+            try
+            {
+                _fileSystem.RenameTempToTarget(tempPath, targetPath);
+                committedPaths.Add(targetPath);
+            }
+            catch (Exception ex)
+            {
+                failedPaths.Add(targetPath);
+                errorDetails.Add(ex.Message);
+                DeleteTempFileBestEffort(tempPath);
+            }
+        }
+    }
+
+    private void DeleteTempFileBestEffort(string tempPath)
+    {
+        // Cleanup only — a failure here just leaves a stray .tmp file behind, which doesn't
+        // change the RouteResult already being returned for this invocation.
+        try
+        {
+            _fileSystem.DeleteFile(tempPath);
+        }
+        catch
+        {
+            // Deliberately swallowed — see comment above.
+        }
+    }
+
+    private static RouteResult BuildRouteResult(
+        IReadOnlyList<ReportSink> additionalSinks,
+        IReadOnlyDictionary<string, string> contentByFormat,
+        List<string> failedPaths,
+        List<string> committedPaths,
+        List<string> stagedPaths,
+        List<string> errorDetails)
+    {
         if (failedPaths.Count == 0)
         {
             return new RouteResult(ReportRouteStatus.AllSucceeded, Array.Empty<string>(), committedPaths, stagedPaths, Array.Empty<string>(), Array.Empty<string>());
@@ -285,14 +348,14 @@ internal sealed class ReportCoordinator
             string writtenContent = _fileSystem.ReadAllText(tempPath);
             ValidateContentSize(writtenContent);
 
-            if (format is "json" or "sarif")
+            if (format is FormatJson or FormatSarif)
             {
                 _ = JsonNode.Parse(writtenContent);
             }
         }
         catch (Exception)
         {
-            try { _fileSystem.DeleteFile(tempPath); } catch { }
+            DeleteTempFileBestEffort(tempPath);
             throw;
         }
     }
@@ -328,7 +391,7 @@ internal sealed class ReportCoordinator
         }
     }
 
-    private string FormatSingleHuman(string mode, ValidationOutcome outcome)
+    private string FormatSingleHuman(ValidationOutcome outcome)
     {
         var sb = new StringBuilder();
         AppendHumanSection(sb, outcome);
@@ -429,7 +492,7 @@ internal sealed class ReportCoordinator
 
     private string FormatSingleJson(string mode, ValidationOutcome outcome)
     {
-        return FormatJson(mode, outcome);
+        return FormatJsonContent(mode, outcome);
     }
 
     private string FormatCombinedJson(IReadOnlyList<(string Mode, ValidationOutcome Outcome)> outcomesByMode)
@@ -437,7 +500,7 @@ internal sealed class ReportCoordinator
         JsonArray results = new();
         foreach ((string mode, ValidationOutcome outcome) in outcomesByMode)
         {
-            results.Add(JsonNode.Parse(FormatJson(mode, outcome)));
+            results.Add(JsonNode.Parse(FormatJsonContent(mode, outcome)));
         }
 
         return new JsonObject { ["results"] = results }.ToJsonString();
@@ -445,7 +508,7 @@ internal sealed class ReportCoordinator
 
     private string FormatSingleSarif(string mode, ValidationOutcome outcome)
     {
-        return FormatSarif(mode, outcome);
+        return FormatSarifContent(mode, outcome);
     }
 
     private string FormatCombinedSarif(IReadOnlyList<(string Mode, ValidationOutcome Outcome)> outcomesByMode)
@@ -453,7 +516,7 @@ internal sealed class ReportCoordinator
         JsonArray runs = new();
         foreach ((string mode, ValidationOutcome outcome) in outcomesByMode)
         {
-            JsonNode? document = JsonNode.Parse(FormatSarif(mode, outcome));
+            JsonNode? document = JsonNode.Parse(FormatSarifContent(mode, outcome));
             foreach (JsonNode? run in document?["runs"]?.AsArray() ?? new JsonArray())
             {
                 runs.Add(run?.DeepClone());
@@ -463,7 +526,7 @@ internal sealed class ReportCoordinator
         return new JsonObject { ["version"] = "2.1.0", ["runs"] = runs }.ToJsonString();
     }
 
-    private string FormatJson(string mode, ValidationOutcome outcome)
+    private string FormatJsonContent(string mode, ValidationOutcome outcome)
     {
         return _runtime.FormatResultForCiArtifacts(
             mode, outcome.Passed, outcome.Violations, outcome.Cycles, outcome.CycleFindings, outcome.CoverageFindings,
@@ -473,7 +536,7 @@ internal sealed class ReportCoordinator
             outcome.ClassificationRoles, outcome.ClassificationPathDeferred, outcome.PreflightDiagnostics);
     }
 
-    private string FormatSarif(string mode, ValidationOutcome outcome)
+    private string FormatSarifContent(string mode, ValidationOutcome outcome)
     {
         return _runtime.FormatResultAsSarif(
             mode, outcome.Violations, outcome.Cycles, outcome.CycleFindings, outcome.PreflightDiagnostics);
@@ -487,9 +550,9 @@ internal sealed class ReportCoordinator
     {
         return format switch
         {
-            "human" => humanContent ?? string.Empty,
-            "json" => jsonContent ?? string.Empty,
-            "sarif" => sarifContent ?? string.Empty,
+            FormatHuman => humanContent ?? string.Empty,
+            FormatJson => jsonContent ?? string.Empty,
+            FormatSarif => sarifContent ?? string.Empty,
             _ => string.Empty,
         };
     }

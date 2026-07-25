@@ -35,7 +35,9 @@ internal sealed class FileSystem : IFileSystem
         const long MaxReportFileSize = 100L * 1024 * 1024;
         if (fileSize > MaxReportFileSize)
         {
-            try { File.Delete(tempPath); } catch { }
+            // The InvalidOperationException below is what the caller acts on regardless of
+            // whether this best-effort cleanup of the oversized temp file succeeds.
+            DeleteBestEffort(tempPath);
             throw new InvalidOperationException(
                 $"Report file exceeds maximum size of {MaxReportFileSize} bytes.");
         }
@@ -83,8 +85,23 @@ internal sealed class FileSystem : IFileSystem
         }
         catch
         {
-            try { File.Delete(probePath); } catch { }
+            // The false return already communicates the write failure regardless of whether this
+            // best-effort cleanup of the probe file succeeds.
+            DeleteBestEffort(probePath);
             return false;
+        }
+    }
+
+    private static void DeleteBestEffort(string path)
+    {
+        try
+        {
+            File.Delete(path);
+        }
+        catch
+        {
+            // Deliberately swallowed — this is a best-effort cleanup path, not the operation the
+            // caller cares about the result of.
         }
     }
 }

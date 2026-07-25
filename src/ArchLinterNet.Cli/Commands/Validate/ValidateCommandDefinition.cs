@@ -8,7 +8,6 @@ internal sealed class ValidateCommandDefinition(ValidateCommandHandler handler)
     private const string StrictMode = "strict";
     private const string AuditMode = "audit";
     private const string HumanFormat = "human";
-    private const string ReportOptionName = "--report";
 
     public const string HelpText =
         """
