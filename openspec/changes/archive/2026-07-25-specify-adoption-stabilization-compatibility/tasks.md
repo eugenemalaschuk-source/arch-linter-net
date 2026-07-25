@@ -8,6 +8,7 @@
 - [x] 1.6 Reconcile the shipped baseline v2 example with violation `identity_version: 1`.
 - [x] 1.7 Preserve artifact `--output` and reserve validation-only `--report` for multi-sink routing.
 - [x] 1.8 Replace impossible multi-file transaction claims with per-file atomic replacement and `partial-output` evidence.
+- [x] 1.9 Make shipped framework-reference and assembly-aware composition contracts explicit compatibility inputs.
 
 ## 2. Architecture documentation
 
