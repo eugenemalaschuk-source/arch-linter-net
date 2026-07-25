@@ -6,7 +6,7 @@ Normative target: `openspec/specs/adoption-stabilization-compatibility/spec.md`.
 
 ## Result
 
-The release-level architecture is coherent enough to become the shared source of truth. One already-shipped specification conflict was corrected in this change. Remaining differences are implementation gaps explicitly owned by open child issues; they block #355 closure and the 0.5.1 release gate, not publication of the design contract.
+The release-level architecture is coherent enough to become the shared source of truth. One already-shipped specification conflict and two design-source defects were corrected in this change. Remaining differences are implementation gaps explicitly owned by open child issues; they block #355 closure and the 0.5.1 release gate, not publication of the design contract.
 
 ## Corrected during this pass
 
@@ -20,18 +20,28 @@ The release-level architecture is coherent enough to become the shared source of
 
 The example is corrected to `identity_version: 1`, and the archived change contains a matching `MODIFIED` delta.
 
-This distinction is now explicit:
-
 ```text
 baseline document version = 2
 violation identity version = 1
 ```
 
+### Report routing does not reuse artifact output
+
+The first draft reused `--output <format>=<destination>` for multi-sink validation reports. Existing baseline and other artifact-producing commands already own `--output <path>`. Reusing it would create two incompatible meanings in the same CLI.
+
+The approved validation-only syntax is now repeatable `--report <format>=<destination>`. Existing validation `--format`/`--json` remain one-sink compatibility forms, while command-specific `--output <path>` remains an artifact destination.
+
+### Multi-file output is not falsely transactional
+
+The first draft implied an all-or-none commit for multiple independent report files. No portable filesystem primitive can guarantee that across arbitrary paths or filesystems.
+
+The corrected contract stages and validates every file first, uses atomic same-directory replacement per destination where supported, and reports typed `partial-output` evidence if a later replacement fails after an earlier one committed. It never claims global rollback or reruns validation.
+
 ## Already aligned on main
 
 ### CLI status compatibility
 
-`CliExitCodes` already exposes exactly 0/1/2. The compatibility contract preserves these numeric categories and reserves typed machine-readable completion categories for finer distinctions.
+`CliExitCodes` already exposes exactly 0/1/2. The compatibility contract preserves these numeric categories and reserves typed machine-readable completion categories for finer distinctions, including `output-failed`, `partial-output`, and `cancelled`.
 
 ### Baseline compatibility
 
@@ -55,9 +65,9 @@ The compatibility blueprint remains under `docs/internal/` and is intentionally 
 
 Must publish one immutable normalized result with explicit ownership, successful/full-graph completion, compatible requested views, disposal semantics, and reuse governed by `analysis-build-state/v1`. It must not create a second session identity model.
 
-### #364 — multi-sink output
+### #364 — multi-sink validation reports
 
-Must implement repeatable `--output <format>=<destination>`, retain legacy one-sink `--format`, render from one normalized result, and prove that sink count does not increase policy loads, project evaluations, scans, or contract executions.
+Must implement repeatable `--report <format>=<destination>`, retain legacy one-sink validation `--format`/`--json`, preserve command-specific artifact `--output <path>`, render from one normalized result, and prove that sink count does not increase policy loads, project evaluations, scans, or contract executions. File destinations use pre-staging, per-file atomic replacement where supported, and honest `partial-output` evidence rather than a false global transaction.
 
 ### #365 — verified cache
 
@@ -69,7 +79,7 @@ Checkpoint A remains internal evidence. Checkpoint B must execute the complete u
 
 ### #367 — migration and entrypoints
 
-Must document one coherent policy/baseline/API/schema/output/status model for POSIX, PowerShell, generic CI, and Testing without making GitHub Actions normative.
+Must document one coherent policy/baseline/API/schema/report/status model for POSIX, PowerShell, generic CI, and Testing without making GitHub Actions normative.
 
 ### #368 / #369 — optional inputs and deterministic expansion
 
@@ -77,7 +87,7 @@ Must share exact contract/input/source-instance identity, provenance, zero-match
 
 ### #370 — safe baseline authoring
 
-Must align generate/migrate/update/prune/diff/verify on exact identity, preview, atomic writes, reviewed metadata preservation, and typed lifecycle statuses. Existing implementation text that still describes legacy tuple comparison is transitional and must be reconciled by this slice.
+Must align generate/migrate/update/prune/diff/verify on exact identity, preview, atomic writes, reviewed metadata preservation, and the shared lifecycle vocabulary: `new`, `matched`, `resolved`, `stale`, `changed`, `ambiguous`, and `configuration-error`. Existing implementation text that still describes legacy tuple comparison is transitional and must be reconciled by this slice.
 
 ### #371 — assembly-free policy tooling
 
@@ -99,11 +109,11 @@ Must publish `analysis-profile/v1`, deterministic counters and stable phase name
 
 ### #375 — bounded concurrency and cancellation
 
-Must preserve sequential/parallel semantic equivalence, implement the approved default maximum parallelism, propagate cancellation across every phase, and prevent partial publication.
+Must preserve sequential/parallel semantic equivalence, implement the approved default maximum parallelism, propagate cancellation across every phase, and prevent partial publication from being reported as successful.
 
 ### #94 — public API snapshots
 
-Must implement `api-snapshot/v1` capture/diff/update/exact semantics with structural assembly/type/member identity, deterministic ordering, explicit overwrite, and atomic replacement.
+Must implement `api-snapshot/v1` capture/diff/update/exact semantics with structural assembly/type/member identity, deterministic ordering, explicit overwrite, and atomic replacement per snapshot destination.
 
 ## Known implementation limitations that remain visible
 
@@ -116,6 +126,8 @@ The already-merged #362 implementation documents narrower v1 fingerprint coverag
 | Release-level compatibility source | defined |
 | Analysis/build-state slice | approved and implemented with documented limitations |
 | Shipped baseline identity-version consistency | corrected |
+| CLI report/artifact option namespace | reconciled |
+| Multi-file commit semantics | made implementable and honest |
 | Child slice ownership | mapped |
 | OpenSpec strict validation | pending CI/local execution |
 | Repository acceptance | pending CI/local execution |
@@ -131,10 +143,10 @@ Do not incrementally declare #355 consistent after each child PR. Each child sho
 - internal blueprints;
 - packaged schemas and compatibility manifest;
 - code-level identities and public models;
-- CLI help, exit/status/output behavior, and Testing API;
+- CLI help, exit/status/report/artifact behavior, and Testing API;
 - migration and public documentation;
 - capability claims;
 - issue wording and dependency maps;
 - the complete #366 Checkpoint B corpus.
 
-Any incompatible version, identity field, lifecycle status, ownership rule, output syntax, cache trust rule, phase name, cancellation boundary, or support claim blocks closure and release.
+Any incompatible version, identity field, lifecycle status, ownership rule, report syntax, artifact-option meaning, cache trust rule, phase name, cancellation boundary, or support claim blocks closure and release.
