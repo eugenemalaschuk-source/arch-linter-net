@@ -239,7 +239,8 @@ internal sealed class ValidateCommandHandler
             if (errorRouteResult.Status != ReportRouteStatus.AllSucceeded
                 && CanUseStderrFallback(errorRouteResult))
             {
-                WriteErrorRoutingFailureFallback(errorFormat, contentByFormat[errorFormat], errorRouteResult);
+                string fallbackFormat = ResolveStderrFallbackFormat(options, errorFormat, contentByFormat);
+                WriteErrorRoutingFailureFallback(fallbackFormat, contentByFormat[fallbackFormat], errorRouteResult);
             }
 
             return;
@@ -249,10 +250,30 @@ internal sealed class ValidateCommandHandler
         // document to a stream that successfully received it. A configured stderr sink that
         // itself failed is different: no document reached that channel, so it remains a valid
         // fallback target for the routing diagnostic.
-        if (priorOutputResult is not null && CanUseStderrFallback(priorOutputResult.Value))
+        if (priorOutputResult is null)
         {
-            TryWriteToStderr(contentByFormat[errorFormat]);
+            // A collision prevented error routing before any configured stream was written, so
+            // stderr is idle even when a --report file sink was requested.
+            string fallbackFormat = ResolveStderrFallbackFormat(options, errorFormat, contentByFormat);
+            TryWriteToStderr(contentByFormat[fallbackFormat]);
         }
+        else if (CanUseStderrFallback(priorOutputResult.Value))
+        {
+            string fallbackFormat = ResolveStderrFallbackFormat(options, errorFormat, contentByFormat);
+            TryWriteToStderr(contentByFormat[fallbackFormat]);
+        }
+    }
+
+    private static string ResolveStderrFallbackFormat(
+        ValidateCommandOptions options,
+        string defaultFormat,
+        IReadOnlyDictionary<string, string> contentByFormat)
+    {
+        return options.AdditionalSinks
+            .FirstOrDefault(sink => sink.DestinationType == ReportDestinationType.Stderr
+                && contentByFormat.ContainsKey(sink.Format))
+            ?.Format
+            ?? defaultFormat;
     }
 
     private static bool CanUseStderrFallback(RouteResult result)

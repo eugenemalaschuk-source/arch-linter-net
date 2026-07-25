@@ -177,7 +177,7 @@ public class Non_debugClass
         string policyPath = Path.Combine(_tempDir, "invalid-default.arch.yml");
         File.WriteAllText(policyPath, yaml);
 
-        var ex = Assert.Throws<InvalidOperationException>(() => ArchitectureValidator.Validate(policyPath));
+        var ex = Assert.Catch<InvalidOperationException>(() => ArchitectureValidator.Validate(policyPath));
         Assert.That(ex!.Message, Does.Contain("non_existent_set"));
     }
 

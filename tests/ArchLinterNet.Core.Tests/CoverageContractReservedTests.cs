@@ -144,7 +144,7 @@ public sealed class CoverageContractReservedTests
                   reason: Reserved for a later issue.
             """);
 
-        InvalidOperationException ex = Assert.Throws<InvalidOperationException>(() =>
+        InvalidOperationException ex = Assert.Catch<InvalidOperationException>(() =>
             ArchitectureValidationService.Validate(new ValidationRequest
             {
                 PolicyPath = policyPath,

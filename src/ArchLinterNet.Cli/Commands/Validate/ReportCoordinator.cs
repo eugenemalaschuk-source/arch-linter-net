@@ -191,8 +191,8 @@ internal sealed class ReportCoordinator
         List<string> deliveredStreamPaths = new();
         List<(string TempPath, string TargetPath)> pendingRenames = new();
 
-        // Do not emit a normal stream document until every file artifact is committed. Otherwise
-        // a later file-stage/commit failure leaves a successful --report ...=stderr stream
+        // Do not emit a normal stream document until every file artifact passed staging. Otherwise
+        // a later file-stage failure leaves a successful --report ...=stderr stream
         // carrying only a normal report while the process exits 2 with no output_status evidence.
         foreach (ReportSink sink in additionalSinks.Where(sink => sink.DestinationType == ReportDestinationType.File))
         {
@@ -200,11 +200,6 @@ internal sealed class ReportCoordinator
         }
 
         List<string> committedPaths = new();
-        if (failedPaths.Count == 0)
-        {
-            CommitPendingRenames(pendingRenames, committedPaths, failedPaths, errorDetails);
-        }
-
         if (failedPaths.Count == 0)
         {
             // Stderr is last so a failed stdout never leaves a successful stderr report that
@@ -221,7 +216,11 @@ internal sealed class ReportCoordinator
             }
         }
 
-        if (failedPaths.Count > 0 && committedPaths.Count == 0)
+        if (failedPaths.Count == 0)
+        {
+            CommitPendingRenames(pendingRenames, committedPaths, failedPaths, errorDetails);
+        }
+        else
         {
             DeletePendingTemps(pendingRenames);
         }
