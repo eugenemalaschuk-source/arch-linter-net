@@ -32,7 +32,7 @@ The hierarchy is compositional, not substitutive:
 - API snapshot v1 owns public API exactness; it does not reuse display signatures as identity.
 - cache v1 consumes completed-session identity plus independent trust and integrity controls.
 - profiling v1 measures work but never changes identity.
-- output adapters consume one normalized result and never re-run analysis.
+- report adapters consume one normalized result and never re-run analysis.
 - the packaged registry maps every public document to its exact 0.5.1 schema resource.
 
 ## Design-slice map
@@ -45,7 +45,7 @@ The hierarchy is compositional, not substitutive:
 | Package/framework/composition typed evidence | #358, #359, #360 | #364, #373 |
 | Analysis/build state fingerprints | #387 / `analysis-build-state-fingerprints` | #362, #363, #365, #374, #375 |
 | Immutable analysis snapshot | #363 | #364, #365, #374, #375 |
-| Multi-sink output | #364 | #366, #367 |
+| Multi-sink validation reports | #364 | #366, #367 |
 | Verified cache | #365 | #366, #374, #375 |
 | Acceptance and release gate | #366 | all slices |
 | Migration and entrypoints | #367 | all public surfaces |
@@ -100,11 +100,13 @@ Unversioned schema URLs may point users to the current release, but tooling must
 
 ## Compatibility matrix
 
-| 0.5.0 surface | 0.5.1 behavior |
+| Existing surface | 0.5.1 behavior |
 |---|---|
 | Policy `version: 1` | preserved unless a documented correctness fix applies |
 | Single-source contracts | remain valid; no source-set configuration required |
-| `--format <format>` | preserved as one legacy sink |
+| Validation `--format <format>` / `--json` | preserved as one legacy report sink |
+| Command-specific `--output <path>` | preserved as artifact destination, never report routing |
+| New validation `--report <format>=<destination>` | additive, repeatable report routing |
 | Baseline `version: 1` | read with legacy semantics; never silently reinterpreted |
 | Existing baseline v2 | exact current fields remain valid; newly qualified families use reviewable update/prune |
 | Existing CLI exit codes | remain 0/1/2 |
@@ -143,7 +145,7 @@ The following are evidence or presentation only:
 - line/column;
 - timestamps and file size;
 - timings and allocation/resource metrics;
-- output destination;
+- report destination;
 - CI provider;
 - TTY/color/hyperlink state;
 - process-local object handles;
@@ -201,11 +203,23 @@ Optional-empty state is not a baseline entry and must not suppress real violatio
 - writer output deterministic;
 - v1 reader preserved;
 - migrate is explicit and fail-closed on ambiguity;
-- update/prune are previewable and atomic;
+- update/prune are previewable and atomic per destination file;
 - reviewed reasons/metadata survive when safe round-trip is supported;
 - CI verifies but does not auto-approve debt.
 
-Lifecycle statuses are shared across human and machine output rather than inferred from messages.
+Lifecycle status semantics:
+
+| Status | Meaning |
+|---|---|
+| `new` | current finding has no exact baseline entry |
+| `matched` | baseline entry and finding have equal canonical identity |
+| `resolved` | valid/evaluable baseline identity has no current finding |
+| `stale` | contract, family, source instance, schema, or identity form is no longer valid/evaluable |
+| `changed` | deterministic predecessor/successor exists but identity differs; no suppression until review |
+| `ambiguous` | multiple candidates exist and the tool refuses to guess |
+| `configuration-error` | malformed, unsupported, or inconsistent input prevents safe classification |
+
+`changed`, `stale`, `ambiguous`, and `configuration-error` never silently suppress current findings.
 
 ### API snapshot v1
 
@@ -216,7 +230,7 @@ assembly -> namespace -> containing type chain -> type/member kind
 generic arity + signature types + relevant modifiers
 ```
 
-Capture writes a complete candidate. Diff is read-only. Update is explicit and atomic. Exact validation uses canonical identity, not display strings.
+Capture writes a complete candidate. Diff is read-only. Update is explicit and atomic for the snapshot destination. Exact validation uses canonical identity, not display strings.
 
 ## Normalized finding model
 
@@ -273,11 +287,11 @@ Consequences:
 - ordinary validation never builds/restores;
 - explicit preparation is caller-controlled;
 - a cancelled/failed/partial snapshot is never reusable;
-- cache/profile/output may observe a session but cannot redefine it.
+- cache/profile/reporting may observe a session but cannot redefine it.
 
 Known implementation limitations from child tasks must remain documented as limitations, not silently weaken this normative model.
 
-## CLI output and status
+## CLI reporting and status
 
 ### Exit codes
 
@@ -287,30 +301,30 @@ Known implementation limitations from child tasks must remain documented as limi
 2 command incomplete or cancelled
 ```
 
-Typed machine status explains the category. Adding many numeric codes in 0.5.1 would break existing shell usage and is unnecessary.
+Typed machine status explains the category, including `output-failed` and `partial-output`. Adding many numeric codes in 0.5.1 would break existing shell usage and is unnecessary.
 
-### Multi-sink syntax
+### Multi-sink validation report syntax
 
 ```text
---output human=stderr
---output json=artifacts/architecture.json
---output sarif=artifacts/architecture.sarif
+--report human=stderr
+--report json=artifacts/architecture.json
+--report sarif=artifacts/architecture.sarif
 ```
 
-`--format json` remains the compatible one-sink form. It cannot be combined with `--output`.
+Validation `--format json` and `--json` remain compatible one-sink forms. They cannot be combined with `--report`. Existing command-specific `--output <path>` options continue to create artifacts such as baselines or API snapshots and are never interpreted as report routing.
 
 Processing:
 
 1. produce one immutable normalized result;
 2. sort and baseline-classify once;
-3. render each sink;
+3. render each requested report;
 4. validate bounded output;
-5. stage every file sink in its destination directory before changing any destination;
+5. stage every file report in its destination directory before changing any destination;
 6. atomically replace each destination, where supported, in deterministic order;
 7. if a later replacement fails, report typed `partial-output` evidence listing committed and uncommitted destinations without claiming global rollback;
 8. return one status without re-analysis.
 
-There is no portable all-or-none transaction across independent output paths or filesystems. A pre-commit render/validation failure changes no destination; a mid-commit replacement failure is incomplete execution, exits 2, and exposes the exact partial state. Standard streams are also not transactional. Conflicting stream/path destinations and input overwrite are rejected before commit.
+There is no portable all-or-none transaction across independent report paths or filesystems. A pre-commit render/validation failure changes no destination; a mid-commit replacement failure is incomplete execution, exits 2, and exposes the exact partial state. Standard streams are also not transactional. Conflicting stream/path destinations and input overwrite are rejected before commit.
 
 ## Cache contract
 
@@ -382,7 +396,7 @@ Parallel execution must equal sequential execution in:
 - output schema;
 - exit category.
 
-Cancellation crosses every phase. It wins if observed before successful publication or commit. No partial snapshot/cache/profile/baseline/snapshot/output set may be presented as successful.
+Cancellation crosses every phase. It wins if observed before successful publication or commit. No partial snapshot/cache/profile/baseline/API snapshot/report set may be presented as successful.
 
 ## Policy-only tooling
 
@@ -413,7 +427,7 @@ Checkpoint B must include representative executable evidence for:
 |---|---|
 | 0.5.0 upgrade | policy compatibility, baseline migration/update, format guidance |
 | Greenfield small project | minimal config and no opt-in large-solution features |
-| Ordinary multi-project | project/TFM/config identity and multi-sink output |
+| Ordinary multi-project | project/TFM/config identity and multi-sink reporting |
 | Large multi-host | same-named types, expansion, bounded concurrency, cache/profile |
 | CLI | Bash/POSIX and PowerShell status/argument forwarding |
 | Generic CI | non-TTY, no provider-specific semantics |
@@ -430,7 +444,7 @@ Every child implementation must consider:
 - malicious policy/baseline/snapshot/cache/receipt/schema content;
 - command/argument injection;
 - policy-controlled execution attempts;
-- output overwrite and disclosure;
+- report/artifact overwrite and disclosure;
 - cache poisoning/cross-workspace reuse;
 - TOCTOU between verification and use;
 - oversized/deep documents and output;
@@ -460,12 +474,13 @@ Review questions:
 - Is there exactly one snapshot/build-state model?
 - Is every diagnostic family represented by `finding/v1` typed details?
 - Are baseline/API/cache/profile versions unambiguous?
-- Does every output sink consume one result?
+- Does every report sink consume one result?
+- Are `--report` and artifact `--output` unambiguous?
 - Are per-file atomicity and partial multi-file failure reported honestly?
 - Do exit codes remain 0/1/2?
 - Is cache opt-in and untrusted?
 - Is sequential mode supported?
-- Can cancellation publish nothing partial?
+- Can cancellation publish nothing partial as successful?
 - Are small defaults still small?
 - Are platform/offline/non-TTY claims executable?
 - Does every child reference the applicable slice?
