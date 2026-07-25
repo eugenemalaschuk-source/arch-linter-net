@@ -24,6 +24,12 @@ public sealed class ArchitectureEngine : IDisposable, IAsyncDisposable
             .Validate(request, timing);
     }
 
+    public ArchitectureAnalysisSnapshot CreateSnapshot(AnalysisSnapshotRequest request, ValidationTiming? timing = null)
+    {
+        return _serviceProvider.GetRequiredService<IArchitectureValidationApplicationService>()
+            .CreateSnapshot(request, timing);
+    }
+
     public BaselineGenerationOutcome GenerateBaseline(BaselineGenerationRequest request)
     {
         return _serviceProvider.GetRequiredService<IArchitectureBaselineApplicationService>()

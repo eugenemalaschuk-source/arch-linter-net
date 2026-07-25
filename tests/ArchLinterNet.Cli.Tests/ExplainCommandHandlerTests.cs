@@ -525,6 +525,7 @@ public sealed class ExplainCommandHandlerTests
         }
 
         public ValidationOutcome Validate(ValidationRequest request, ValidationTiming? timing) => throw new NotSupportedException();
+        public ArchitectureAnalysisSnapshot CreateSnapshot(AnalysisSnapshotRequest request, ValidationTiming? timing) => throw new NotSupportedException();
         public ArchitectureGraphOutcome BuildGraph(ArchitectureGraphRequest request) => new(_emptyGraph);
         public string FormatGraphAsJson(ArchitectureDependencyGraph graph) => "{}";
         public string FormatGraphAsDot(ArchitectureDependencyGraph graph) => "digraph G {}";

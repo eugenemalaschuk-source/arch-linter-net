@@ -179,6 +179,9 @@ public sealed class ValidateCommandDefinitionTests
                 Array.Empty<ArchitectureClassificationMetadataFailure>());
         }
 
+        public ArchitectureAnalysisSnapshot CreateSnapshot(AnalysisSnapshotRequest request, ValidationTiming? timing) =>
+            throw new NotSupportedException();
+
         public string FormatResultForCiArtifacts(
             string mode,
             bool passed,

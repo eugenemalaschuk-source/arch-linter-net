@@ -85,6 +85,31 @@ public sealed class ArchitectureValidationBuilder
         return Validate(mode: "audit");
     }
 
+    // Explicit opt-in for callers who want strict/audit (and, via each mode's own coverage
+    // families, coverage) served from one composed policy/project-graph/assembly-load instead of
+    // one independent Validate call per mode — see openspec/specs/analysis-snapshot/spec.md,
+    // "Testing API exposes an explicitly owned shared snapshot". ValidateStrict()/ValidateAudit()
+    // above are unaffected and keep performing independent runs.
+    public ArchitectureValidationSnapshotSession CreateSnapshot()
+    {
+        AnalysisSnapshotRequest request = new()
+        {
+            PolicyPath = _policyPath,
+            ConditionSetName = _conditionSetName,
+            ContractIds = _contractIds,
+            BaselinePath = _baselinePath,
+            EnforceUnmatchedIgnoredViolationsPolicy = _enforceUnmatchedIgnoredViolationsPolicy,
+            PreparationMode = _preparationMode,
+            NoRestore = _noRestore,
+            RequestedConfiguration = _requestedConfiguration,
+            RequestedTargetFramework = _requestedTargetFramework,
+        };
+
+        ValidationTiming? timing = _collectTimings ? new ValidationTiming() : null;
+        ArchitectureAnalysisSnapshot snapshot = _engine.Value.CreateSnapshot(request, timing);
+        return new ArchitectureValidationSnapshotSession(snapshot, timing);
+    }
+
     private ArchitectureValidationResult Validate(string mode)
     {
         ValidationRequest request = new()
@@ -104,22 +129,6 @@ public sealed class ArchitectureValidationBuilder
         ValidationTiming? timing = _collectTimings ? new ValidationTiming() : null;
         ValidationOutcome outcome = _engine.Value.Validate(request, timing);
 
-        return new ArchitectureValidationResult(new ArchitectureValidationResultParams(
-            outcome.Passed,
-            outcome.Violations,
-            outcome.Cycles,
-            outcome.PolicyConsistencyFindings,
-            outcome.PolicyConsistencyConfig,
-            outcome.CoverageFindings,
-            outcome.CoverageConfig,
-            outcome.UnmatchedIgnoredViolations,
-            outcome.UnmatchedIgnoredViolationsConfig,
-            outcome.CoverageSummaries,
-            timing)
-        {
-            CycleFindings = outcome.CycleFindings,
-            PreflightDiagnostics = outcome.PreflightDiagnostics,
-            PreflightBlocked = outcome.PreflightBlocked
-        });
+        return ArchitectureValidationResultMapper.ToResult(outcome, timing);
     }
 }

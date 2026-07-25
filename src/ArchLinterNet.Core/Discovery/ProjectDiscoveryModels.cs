@@ -62,6 +62,12 @@ public sealed record ProjectDiscoveryResult(
     public IReadOnlyCollection<ArchitectureDiscoveredProject> DiscoveredProjects { get; init; } =
         Array.Empty<ArchitectureDiscoveredProject>();
 
+    // Exact artifact identities discovered from the selected graph. Post-build snapshot loading
+    // uses these paths directly rather than treating the output directories as another generic
+    // probing location where an older policy/environment copy could win by precedence.
+    public IReadOnlyDictionary<string, string> ResolvedAssemblyPaths { get; init; } =
+        new Dictionary<string, string>(StringComparer.Ordinal);
+
     public static readonly ProjectDiscoveryResult Empty = new(
         Array.Empty<string>(), Array.Empty<string>(), Array.Empty<string>(),
         Array.Empty<ArchitectureProjectDiscoveryDiagnostic>());

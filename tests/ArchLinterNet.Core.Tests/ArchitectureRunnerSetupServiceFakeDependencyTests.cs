@@ -60,6 +60,17 @@ public sealed class ArchitectureRunnerSetupServiceFakeDependencyTests
                 new[] { "fake-missing-assembly-marker" },
                 new[] { "fake-probing-path-marker" });
         }
+
+        public ResolutionResult ResolvePostBuild(
+            ArchitectureContractDocument document,
+            string repositoryRoot,
+            ProjectDiscoveryResult discovery,
+            bool resolveAssemblyOutputs,
+            string? mode,
+            HashSet<string>? selectedContractIds)
+        {
+            return Resolve(document, repositoryRoot, discovery, resolveAssemblyOutputs, mode, selectedContractIds);
+        }
     }
 
     [Test]

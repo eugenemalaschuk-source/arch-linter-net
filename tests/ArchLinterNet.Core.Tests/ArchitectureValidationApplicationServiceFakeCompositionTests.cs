@@ -52,6 +52,15 @@ public sealed class ArchitectureValidationApplicationServiceFakeCompositionTests
             BuildRunnerCallCount++;
             return new ArchitectureRunnerSetup("/fake/repository/root", RunnerToReturn);
         }
+
+        public ArchitectureRunnerSetup BuildRunnerForPostBuild(
+            ArchitectureContractDocument document, string policyPath, string? conditionSetName = null,
+            IReadOnlyList<string>? preprocessorSymbols = null, HashSet<string>? selectedContractIds = null,
+            bool enableUnmatchedIgnoreTracking = true, ValidationTiming? timing = null, string? mode = null)
+        {
+            return BuildRunner(document, policyPath, conditionSetName, preprocessorSymbols, selectedContractIds,
+                enableUnmatchedIgnoreTracking, timing, mode);
+        }
     }
 
     private sealed class FakeContractRunner : IArchitectureContractRunner

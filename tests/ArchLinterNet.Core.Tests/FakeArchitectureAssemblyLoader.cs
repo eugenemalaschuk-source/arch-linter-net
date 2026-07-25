@@ -33,4 +33,11 @@ internal sealed class FakeArchitectureAssemblyLoader : IArchitectureAssemblyLoad
         LoadFromWasCalled = true;
         throw new InvalidOperationException($"Fake loader refuses to load '{path}' from disk.");
     }
+
+    public IArchitectureAssemblyLoadScope CreateIsolatedLoadScope(
+        IReadOnlyList<string> probingPaths,
+        IReadOnlyDictionary<string, string> exactAssemblyPaths)
+    {
+        throw new InvalidOperationException("Fake loader does not support isolated assembly loading.");
+    }
 }
