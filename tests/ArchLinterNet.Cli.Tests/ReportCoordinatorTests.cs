@@ -142,6 +142,22 @@ public sealed class ReportCoordinatorTests
         RouteResult result = coordinator.RouteCombinedOutcomes("human", outcomesByMode, Array.Empty<ReportSink>());
 
         Assert.That(result.Status, Is.EqualTo(ReportRouteStatus.AllSucceeded));
+        Assert.That(console.OutputText, Is.Empty);
+    }
+
+    [Test]
+    public void RouteCombinedOutcomes_ReportModeWithHumanStdout_WritesCombinedHuman()
+    {
+        var runtime = new CountingRuntime();
+        var console = new CapturingConsole();
+        var fileSystem = new StubFileSystem();
+        var coordinator = new ReportCoordinator(runtime, console, fileSystem);
+
+        var outcomesByMode = new[] { ("strict", PassedOutcome), ("audit", FailedOutcome) };
+        var sinks = new[] { new ReportSink("human", ReportDestinationType.Stdout, null) };
+        RouteResult result = coordinator.RouteCombinedOutcomes("human", outcomesByMode, sinks);
+
+        Assert.That(result.Status, Is.EqualTo(ReportRouteStatus.AllSucceeded));
         Assert.That(console.OutputText, Does.Contain("=== Mode: strict ==="));
         Assert.That(console.OutputText, Does.Contain("=== Mode: audit ==="));
     }
@@ -278,17 +294,16 @@ public sealed class ReportCoordinatorTests
 
         public void WriteAllText(string path, string contents) { }
 
-        public void WriteAllTextToTemp(string path, string contents)
+        public string WriteAllTextToTemp(string targetPath, string contents)
         {
-            if (_failOn.Contains(new FailEntry(path, FailPhase.Write)))
+            if (_failOn.Contains(new FailEntry(targetPath, FailPhase.Write)))
             {
-                throw new IOException($"Cannot write to {path}");
+                throw new IOException($"Cannot write to {targetPath}");
             }
 
-            TempPaths.Add(path);
+            TempPaths.Add(targetPath);
+            return targetPath + ".tmp";
         }
-
-        public string ResolveTempPath(string path) => path + ".tmp";
 
         public void RenameTempToTarget(string tempPath, string targetPath)
         {
@@ -312,8 +327,7 @@ public sealed class ReportCoordinatorTests
     {
         public bool FileExists(string path) => false;
         public void WriteAllText(string path, string contents) { }
-        public void WriteAllTextToTemp(string path, string contents) => throw new IOException("Disk full");
-        public string ResolveTempPath(string path) => path + ".tmp";
+        public string WriteAllTextToTemp(string targetPath, string contents) => throw new IOException("Disk full");
         public void RenameTempToTarget(string tempPath, string targetPath) { }
         public void DeleteFile(string path) { }
         public bool CanWriteToDirectory(string path) => true;

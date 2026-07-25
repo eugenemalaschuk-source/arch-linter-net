@@ -256,8 +256,7 @@ public sealed class ValidateCommandDefinitionTests
     {
         public bool FileExists(string path) => exists;
         public void WriteAllText(string path, string contents) { }
-        public void WriteAllTextToTemp(string path, string contents) { }
-        public string ResolveTempPath(string path) => path + ".tmp";
+        public string WriteAllTextToTemp(string targetPath, string contents) => targetPath + ".tmp";
         public void RenameTempToTarget(string tempPath, string targetPath) { }
         public void DeleteFile(string path) { }
         public bool CanWriteToDirectory(string path) => true;

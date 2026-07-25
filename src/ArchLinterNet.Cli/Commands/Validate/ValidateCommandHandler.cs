@@ -31,20 +31,40 @@ internal sealed class ValidateCommandHandler
             return immediateResult.Value;
         }
 
+        string errorFormat = ResolveEffectiveFormat(options);
+
         try
         {
             return ExecuteValidation(options);
         }
         catch (Exception ex) when (TryGetPolicyDiagnostic(ex, out ArchitecturePolicyDiagnostic? diagnostic))
         {
-            WritePolicyDiagnostic(options.Format, ex, diagnostic!);
+            WritePolicyDiagnostic(errorFormat, ex, diagnostic!);
             return CliExitCodes.InvalidArgumentsOrRuntimeError;
         }
         catch (Exception ex)
         {
-            WriteExecutionError(options.Format, ex.Message);
+            WriteExecutionError(errorFormat, ex.Message);
             return CliExitCodes.InvalidArgumentsOrRuntimeError;
         }
+    }
+
+    private string ResolveEffectiveFormat(ValidateCommandOptions options)
+    {
+        if (options.IsFormatExplicit || options.AdditionalSinks.Count == 0)
+        {
+            return options.Format;
+        }
+
+        foreach (ReportSink sink in options.AdditionalSinks)
+        {
+            if (sink.DestinationType == ReportDestinationType.Stdout)
+            {
+                return sink.Format;
+            }
+        }
+
+        return "human";
     }
 
     private void WriteOutputError(string format, RouteResult result)
@@ -61,12 +81,17 @@ internal sealed class ValidateCommandHandler
                 message,
                 failed_paths = result.FailedPaths,
                 committed_paths = result.CommittedPaths,
+                staged_paths = result.StagedPaths,
                 errors = result.ErrorDetails,
             }));
             return;
         }
 
         _console.Error.WriteLine(message);
+        if (result.StagedPaths.Count > 0)
+        {
+            _console.Error.WriteLine($"  staged (uncommitted): {string.Join(", ", result.StagedPaths)}");
+        }
         foreach (string detail in result.ErrorDetails)
         {
             _console.Error.WriteLine($"  {detail}");

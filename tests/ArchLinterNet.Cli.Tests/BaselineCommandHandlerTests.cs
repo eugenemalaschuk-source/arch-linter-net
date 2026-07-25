@@ -533,17 +533,16 @@ public sealed partial class BaselineCommandHandlerTests
             LastWriteContents = contents;
         }
 
-        public void WriteAllTextToTemp(string path, string contents)
+        public string WriteAllTextToTemp(string targetPath, string contents)
         {
-            LastWritePath = path;
+            LastWritePath = targetPath;
             LastWriteContents = contents;
+            return targetPath + ".tmp";
         }
 
         public void RenameTempToTarget(string tempPath, string targetPath)
         {
         }
-
-        public string ResolveTempPath(string path) => path + ".tmp";
 
         public void DeleteFile(string path)
         {

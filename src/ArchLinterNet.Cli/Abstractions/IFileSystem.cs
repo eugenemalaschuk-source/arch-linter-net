@@ -6,9 +6,7 @@ internal interface IFileSystem
 
     void WriteAllText(string path, string contents);
 
-    void WriteAllTextToTemp(string path, string contents);
-
-    string ResolveTempPath(string path);
+    string WriteAllTextToTemp(string targetPath, string contents);
 
     void RenameTempToTarget(string tempPath, string targetPath);
 

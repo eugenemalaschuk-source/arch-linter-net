@@ -14,26 +14,23 @@ internal sealed class FileSystem : IFileSystem
         File.WriteAllText(path, contents);
     }
 
-    public void WriteAllTextToTemp(string path, string contents)
+    public string WriteAllTextToTemp(string targetPath, string contents)
     {
-        string absolutePath = Path.GetFullPath(path);
+        string absolutePath = Path.GetFullPath(targetPath);
         string? directory = Path.GetDirectoryName(absolutePath);
         if (!string.IsNullOrEmpty(directory) && !Directory.Exists(directory))
         {
             Directory.CreateDirectory(directory);
         }
 
-        File.WriteAllText(absolutePath + ".tmp", contents);
+        string tempPath = absolutePath + "." + Guid.NewGuid().ToString("N") + ".tmp";
+        File.WriteAllText(tempPath, contents);
+        return tempPath;
     }
 
     public void RenameTempToTarget(string tempPath, string targetPath)
     {
         File.Move(tempPath, targetPath, overwrite: true);
-    }
-
-    public string ResolveTempPath(string path)
-    {
-        return Path.GetFullPath(path) + ".tmp";
     }
 
     public void DeleteFile(string path)

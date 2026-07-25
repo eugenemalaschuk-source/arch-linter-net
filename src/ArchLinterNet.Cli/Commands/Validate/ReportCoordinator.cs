@@ -18,6 +18,7 @@ internal readonly record struct RouteResult(
     ReportRouteStatus Status,
     IReadOnlyList<string> FailedPaths,
     IReadOnlyList<string> CommittedPaths,
+    IReadOnlyList<string> StagedPaths,
     IReadOnlyList<string> ErrorDetails);
 
 internal sealed class ReportCoordinator
@@ -61,9 +62,12 @@ internal sealed class ReportCoordinator
         bool isSingleMode,
         bool isReportMode)
     {
-        string? neededHuman = StdoutOrAnySinkNeeds("human", stdoutFormat, additionalSinks, isReportMode);
-        string? neededJson = StdoutOrAnySinkNeeds("json", stdoutFormat, additionalSinks, isReportMode);
-        string? neededSarif = StdoutOrAnySinkNeeds("sarif", stdoutFormat, additionalSinks, isReportMode);
+        // Legacy combined human had no stdout output (pre-#364 behavior)
+        bool suppressLegacyCombinedHuman = !isReportMode && !isSingleMode && stdoutFormat == "human";
+
+        string? neededHuman = StdoutOrAnySinkNeeds("human", stdoutFormat, additionalSinks, isReportMode, suppressLegacyCombinedHuman);
+        string? neededJson = StdoutOrAnySinkNeeds("json", stdoutFormat, additionalSinks, isReportMode, suppressLegacyCombinedHuman: false);
+        string? neededSarif = StdoutOrAnySinkNeeds("sarif", stdoutFormat, additionalSinks, isReportMode, suppressLegacyCombinedHuman: false);
 
         string? humanContent = null;
         string? jsonContent = null;
@@ -90,13 +94,14 @@ internal sealed class ReportCoordinator
                 : FormatCombinedSarif(outcomesByMode);
         }
 
-        if (!isReportMode)
+        if (!isReportMode && !suppressLegacyCombinedHuman)
         {
             _console.Out.WriteLine(DispatchFormat(stdoutFormat, humanContent, jsonContent, sarifContent));
         }
 
         List<string> failedPaths = new();
         List<string> committedPaths = new();
+        List<string> stagedPaths = new();
         List<string> errorDetails = new();
         List<(string TempPath, string TargetPath)> pendingRenames = new();
 
@@ -134,10 +139,15 @@ internal sealed class ReportCoordinator
 
             try
             {
-                ValidateBoundedOutput(sink.Format, fileContent);
-                _fileSystem.WriteAllTextToTemp(sink.FilePath!, fileContent);
-                string tempPath = _fileSystem.ResolveTempPath(sink.FilePath!);
+                ValidateContentSize(fileContent);
+                if (sink.Format is "json" or "sarif")
+                {
+                    _ = JsonNode.Parse(fileContent);
+                }
+
+                string tempPath = _fileSystem.WriteAllTextToTemp(sink.FilePath!, fileContent);
                 pendingRenames.Add((tempPath, sink.FilePath!));
+                stagedPaths.Add(sink.FilePath!);
             }
             catch (Exception ex)
             {
@@ -175,24 +185,30 @@ internal sealed class ReportCoordinator
 
         if (failedPaths.Count == 0)
         {
-            return new RouteResult(ReportRouteStatus.AllSucceeded, Array.Empty<string>(), committedPaths, Array.Empty<string>());
+            return new RouteResult(ReportRouteStatus.AllSucceeded, Array.Empty<string>(), committedPaths, stagedPaths, Array.Empty<string>());
         }
 
         ReportRouteStatus status = committedPaths.Count > 0
             ? ReportRouteStatus.PartialOutput
             : ReportRouteStatus.OutputFailed;
 
-        return new RouteResult(status, failedPaths, committedPaths, errorDetails);
+        return new RouteResult(status, failedPaths, committedPaths, stagedPaths, errorDetails);
     }
 
     private static string? StdoutOrAnySinkNeeds(
         string format,
         string stdoutFormat,
         IReadOnlyList<ReportSink> sinks,
-        bool isReportMode)
+        bool isReportMode,
+        bool suppressLegacyCombinedHuman)
     {
         if (!isReportMode && stdoutFormat == format)
         {
+            if (suppressLegacyCombinedHuman)
+            {
+                return null;
+            }
+
             return "stdout";
         }
 
@@ -207,17 +223,12 @@ internal sealed class ReportCoordinator
         return null;
     }
 
-    private static void ValidateBoundedOutput(string format, string content)
+    private static void ValidateContentSize(string content)
     {
-        if (content.Length > MaxReportBytes)
+        if (Encoding.UTF8.GetByteCount(content) > MaxReportBytes)
         {
             throw new InvalidOperationException(
                 $"Report content exceeds maximum size of {MaxReportBytes} bytes.");
-        }
-
-        if (format is "json" or "sarif")
-        {
-            _ = JsonNode.Parse(content);
         }
     }
 
