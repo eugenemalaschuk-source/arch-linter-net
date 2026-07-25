@@ -71,60 +71,85 @@ public sealed class ArchitectureValidationApplicationService(
             }
         }
 
-        ArchitectureRunnerSetup setup;
-        using (timing?.Measure("load_and_setup"))
-            setup = BuildRunnerFor(policy, request, modeHint, timing);
-
-        int projectGraphEvaluations = 1;
-        int assemblyLoads = setup.AssemblyLoads;
-        IArchitectureContractRunner runner = setup.Runner;
-
-        BuildStatePreflightResult preflight;
-        using (timing?.Measure("build_state_preflight"))
-            preflight = RunBuildStatePreflight(request, runner);
-
-        // --ensure-built may have just written new build output that the runner/session above —
-        // built from assembly resolution that ran before this build — cannot see: its
-        // ArchitectureAnalysisContext captured whatever resolution found (or failed to find) at
-        // that earlier point in time. Rebuilding the runner/session after a successful build
-        // re-discovers and re-resolves from the now-current filesystem state, so every mode
-        // evaluated against this snapshot actually analyzes the artifacts preflight just verified.
-        // Only project discovery/assembly resolution/session construction are redone here — the
-        // policy document composed above (policy load, baseline merge, severity validation,
-        // contract-ID selection) does not depend on build output and is intentionally reused
-        // rather than recomposed, so policy composition still happens exactly once regardless of
-        // whether ensure-built triggers this rebuild. This rebuild is part of building the one
-        // snapshot, not per-mode work, so it runs at most once regardless of how many modes are
-        // later evaluated.
-        if (!preflight.Blocked
-            && request.PreparationMode == BuildPreparationMode.EnsureBuilt
-            && runner.Session.Context.ProjectDiscovery is { DiscoveredProjects.Count: > 0 })
+        ArchitectureRunnerSetup? setup = null;
+        try
         {
-            using (timing?.Measure("post_ensure_built_reload"))
-                setup = BuildRunnerFor(policy, request, modeHint, timing, loadPostBuildArtifacts: true);
-            projectGraphEvaluations = 2;
-            assemblyLoads += setup.AssemblyLoads;
-            runner = setup.Runner;
-        }
+            using (timing?.Measure("load_and_setup"))
+                setup = BuildRunnerFor(policy, request, modeHint, timing);
 
-        return new ArchitectureAnalysisSnapshot(
-            policy.Document,
-            setup,
-            preflight,
-            policy.UnmatchedConfig,
-            policy.PolicyConsistencyConfig,
-            policy.CoverageConfig,
-            request.EnforceUnmatchedIgnoredViolationsPolicy,
-            request.IncludeAsmdefContracts,
-            contractExecutor,
-            handlerRegistry,
-            policyCompositions: 1,
-            projectGraphEvaluations: projectGraphEvaluations,
-            assemblyLoads: assemblyLoads,
-            // Only a snapshot meant to serve any/all requested modes (modeHint null) needs the
-            // per-mode re-check in Evaluate — a single-mode snapshot (modeHint set) already
-            // validated its one mode's contract IDs exactly as before this change, above.
-            requestedContractIds: modeHint == null ? request.ContractIds : null);
+            int projectGraphEvaluations = 1;
+            int assemblyLoads = setup.AssemblyLoads;
+            IArchitectureContractRunner runner = setup.Runner;
+
+            BuildStatePreflightResult preflight;
+            using (timing?.Measure("build_state_preflight"))
+                preflight = RunBuildStatePreflight(request, runner);
+
+            // --ensure-built may have just written new build output that the runner/session above —
+            // built from assembly resolution that ran before this build — cannot see: its
+            // ArchitectureAnalysisContext captured whatever resolution found (or failed to find) at
+            // that earlier point in time. Rebuilding the runner/session after a successful build
+            // re-discovers and re-resolves from the now-current filesystem state, so every mode
+            // evaluated against this snapshot actually analyzes the artifacts preflight just verified.
+            // Only project discovery/assembly resolution/session construction are redone here — the
+            // policy document composed above (policy load, baseline merge, severity validation,
+            // contract-ID selection) does not depend on build output and is intentionally reused
+            // rather than recomposed, so policy composition still happens exactly once regardless of
+            // whether ensure-built triggers this rebuild. This rebuild is part of building the one
+            // snapshot, not per-mode work, so it runs at most once regardless of how many modes are
+            // later evaluated.
+            if (!preflight.Blocked
+                && request.PreparationMode == BuildPreparationMode.EnsureBuilt
+                && runner.Session.Context.ProjectDiscovery is { DiscoveredProjects.Count: > 0 })
+            {
+                using (timing?.Measure("post_ensure_built_reload"))
+                    setup = BuildRunnerFor(policy, request, modeHint, timing, loadPostBuildArtifacts: true);
+                projectGraphEvaluations = 2;
+                assemblyLoads += setup.AssemblyLoads;
+                runner = setup.Runner;
+            }
+
+            return new ArchitectureAnalysisSnapshot(
+                policy.Document,
+                setup,
+                preflight,
+                policy.UnmatchedConfig,
+                policy.PolicyConsistencyConfig,
+                policy.CoverageConfig,
+                request.EnforceUnmatchedIgnoredViolationsPolicy,
+                request.IncludeAsmdefContracts,
+                contractExecutor,
+                handlerRegistry,
+                policyCompositions: 1,
+                projectGraphEvaluations: projectGraphEvaluations,
+                assemblyLoads: assemblyLoads,
+                // Only a snapshot meant to serve any/all requested modes (modeHint null) needs the
+                // per-mode re-check in Evaluate — a single-mode snapshot (modeHint set) already
+                // validated its one mode's contract IDs exactly as before this change, above.
+                requestedContractIds: modeHint == null ? request.ContractIds : null);
+        }
+        catch (Exception ex) when (ex is not ArchitecturePolicyLoadException and not ArchitecturePolicyValidationException)
+        {
+            string repositoryRoot = setup?.RepositoryRoot
+                ?? Path.GetDirectoryName(Path.GetFullPath(request.PolicyPath))
+                ?? Environment.CurrentDirectory;
+            IReadOnlyList<string> policyImportPaths = policy.Document.Provenance.Sources
+                .Select(source => Path.GetFullPath(Path.Combine(repositoryRoot, source.SourcePath)))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToArray();
+            IReadOnlyList<string> resolvedAssemblyPaths = setup?.Runner.Session.Context.TargetAssemblies
+                .Select(assembly => assembly.Location)
+                .Where(path => !string.IsNullOrEmpty(path))
+                .Select(Path.GetFullPath)
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToArray()
+                ?? Array.Empty<string>();
+            IReadOnlyList<string> discoveredProjectPaths =
+                setup?.Runner.Session.Context.DiscoveredProjectPaths ?? Array.Empty<string>();
+
+            throw new ArchitectureAnalysisEvaluationException(
+                ex.Message, ex, policyImportPaths, resolvedAssemblyPaths, discoveredProjectPaths);
+        }
     }
 
     // Preflight only runs when project discovery produced a project graph — the fingerprint/

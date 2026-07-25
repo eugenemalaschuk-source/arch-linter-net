@@ -1,25 +1,26 @@
 namespace ArchLinterNet.Core.Model;
 
-// Wraps any exception thrown while evaluating an already-built ArchitectureAnalysisSnapshot
-// (contract execution, expression evaluation, etc. — see
-// ArchitectureAnalysisSnapshot.Evaluate) with the policy-import and resolved-assembly paths this
-// invocation had already loaded by that point. Hosts that report this exception via a --report
-// file sink need that inventory to avoid overwriting one of those inputs with the error document,
-// the same way a policy-load failure's own diagnostic already protects its inputs.
+// Wraps a failure that occurs after policy composition but before an outcome is available — either
+// while creating/evaluating an ArchitectureAnalysisSnapshot. It carries the exact inputs already
+// consumed at that point so hosts cannot overwrite one with a --report error document.
 public sealed class ArchitectureAnalysisEvaluationException : InvalidOperationException
 {
     public ArchitectureAnalysisEvaluationException(
         string message,
         Exception innerException,
         IReadOnlyList<string> policyImportPaths,
-        IReadOnlyList<string> resolvedAssemblyPaths)
+        IReadOnlyList<string> resolvedAssemblyPaths,
+        IReadOnlyList<string>? discoveredProjectPaths = null)
         : base(message, innerException)
     {
         PolicyImportPaths = policyImportPaths;
         ResolvedAssemblyPaths = resolvedAssemblyPaths;
+        DiscoveredProjectPaths = discoveredProjectPaths ?? Array.Empty<string>();
     }
 
     public IReadOnlyList<string> PolicyImportPaths { get; }
 
     public IReadOnlyList<string> ResolvedAssemblyPaths { get; }
+
+    public IReadOnlyList<string> DiscoveredProjectPaths { get; }
 }

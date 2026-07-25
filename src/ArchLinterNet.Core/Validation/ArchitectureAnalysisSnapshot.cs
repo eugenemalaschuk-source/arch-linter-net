@@ -150,7 +150,7 @@ public sealed class ArchitectureAnalysisSnapshot : IDisposable
                 // derives from InvalidOperationException, so callers matching on that (or on
                 // .Message) keep working unchanged.
                 throw new ArchitectureAnalysisEvaluationException(
-                    ex.Message, ex, GetPolicyImportPaths(), GetResolvedAssemblyPaths());
+                    ex.Message, ex, GetPolicyImportPaths(), GetResolvedAssemblyPaths(), GetDiscoveredProjectPaths());
             }
         }
     }
@@ -300,20 +300,7 @@ public sealed class ArchitectureAnalysisSnapshot : IDisposable
 
     private IReadOnlyList<string> GetDiscoveredProjectPaths()
     {
-        IArchitectureContractRunner? runner = _setup?.Runner;
-        Discovery.ProjectDiscoveryResult? discovery = runner?.Session.Context.ProjectDiscovery;
-        if (discovery is null)
-        {
-            return Array.Empty<string>();
-        }
-
-        // ArchitectureDiscoveredProject.Path is already repository-root-relative (see
-        // ArchitectureProjectDiscoveryService.GetRelativePath) — the same combine ArchitecturePolicyDocumentLoader
-        // provenance sources use in GetPolicyImportPaths above.
-        return discovery.DiscoveredProjects
-            .Select(project => Path.GetFullPath(Path.Combine(_repositoryRoot, project.Path)))
-            .Distinct(StringComparer.OrdinalIgnoreCase)
-            .ToList();
+        return _setup?.Runner.Session.Context.DiscoveredProjectPaths ?? Array.Empty<string>();
     }
 
     private static string? SafeAssemblyLocation(Assembly assembly)

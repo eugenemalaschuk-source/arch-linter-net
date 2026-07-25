@@ -28,6 +28,8 @@ public sealed class ArchitectureAnalysisSnapshotTests
 
         public IArchitectureContractRunner RunnerToReturn { get; set; } = null!;
 
+        public Exception? ExceptionToThrowFromBuildRunner { get; set; }
+
         public ArchitectureContractDocument LoadDocument(
             string policyPath, string? baselinePath = null, ValidationTiming? timing = null)
         {
@@ -46,6 +48,11 @@ public sealed class ArchitectureAnalysisSnapshotTests
             string? mode = null)
         {
             BuildRunnerCallCount++;
+            if (ExceptionToThrowFromBuildRunner is not null)
+            {
+                throw ExceptionToThrowFromBuildRunner;
+            }
+
             return new ArchitectureRunnerSetup("/fake/repository/root", RunnerToReturn);
         }
 
@@ -226,6 +233,23 @@ public sealed class ArchitectureAnalysisSnapshotTests
             Assert.That(fixture.RunnerSetupService.BuildRunnerCallCount, Is.EqualTo(1));
             Assert.That(fixture.ContractExecutor.CallCountByMode.GetValueOrDefault("strict"), Is.EqualTo(1));
             Assert.That(fixture.ContractExecutor.CallCountByMode.GetValueOrDefault("audit"), Is.EqualTo(1));
+        });
+    }
+
+    [Test]
+    public void CreateSnapshot_SetupFailureAfterPolicyComposition_CarriesConsumedPolicyProvenance()
+    {
+        Fixture fixture = CreateFixture();
+        fixture.RunnerSetupService.ExceptionToThrowFromBuildRunner = new InvalidOperationException("project discovery failed");
+
+        ArchitectureAnalysisEvaluationException? exception = Assert.Throws<ArchitectureAnalysisEvaluationException>(
+            () => fixture.ApplicationService.CreateSnapshot(CreateSnapshotRequest()));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(exception!.Message, Is.EqualTo("project discovery failed"));
+            Assert.That(exception.InnerException, Is.TypeOf<InvalidOperationException>());
+            Assert.That(exception.PolicyImportPaths, Is.Empty);
         });
     }
 

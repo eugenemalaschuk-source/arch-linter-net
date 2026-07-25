@@ -265,6 +265,41 @@ public sealed class ValidateCommandHandlerReportModeTests
     }
 
     [Test]
+    public void ValidateHandler_ReportMode_DoesNotOverwriteDiscoveredProjectFile()
+    {
+        string projectPath = Path.GetFullPath("src/App/App.csproj");
+        FakeCliRuntime runtime = new()
+        {
+            ForcedOutcome = new ValidationOutcome(
+                true, Array.Empty<ArchitectureViolation>(), Array.Empty<string>(), Array.Empty<ArchitectureViolation>(), "off",
+                Array.Empty<ArchitectureUnmatchedIgnoredViolation>(), "off", Array.Empty<PolicyConsistencyDiagnostic>(), "off",
+                Array.Empty<ArchitectureCoverageSummary>(), Array.Empty<ArchitectureClassificationConflict>(),
+                Array.Empty<ArchitectureClassificationMetadataFailure>())
+            {
+                DiscoveredProjectPaths = [projectPath],
+            },
+        };
+        FakeCliConsole console = new();
+        FakeFileSystem fileSystem = new(exists: true);
+        ValidateCommandHandler handler = new(runtime, console, fileSystem);
+
+        ValidateCommandOptions options = new(
+            "policy.yml", "strict", "human", [], null, false, null, false, false)
+        {
+            AdditionalSinks = [new ReportSink("json", ReportDestinationType.File, "src/App/App.csproj")],
+        };
+
+        int exitCode = handler.Execute(options);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(exitCode, Is.EqualTo(CliExitCodes.InvalidArgumentsOrRuntimeError));
+            Assert.That(fileSystem.CommittedPaths, Is.Empty);
+            Assert.That(console.StdErr, Does.Contain("matches a project file loaded during this run"));
+        });
+    }
+
+    [Test]
     public void ValidateHandler_ReportMode_PolicyErrorDoesNotOverwriteFailedImportFragment()
     {
         // A --report destination that matches the exact file this import failure involves must
@@ -370,11 +405,46 @@ public sealed class ValidateCommandHandlerReportModeTests
         Assert.Multiple(() =>
         {
             Assert.That(exitCode, Is.EqualTo(CliExitCodes.InvalidArgumentsOrRuntimeError));
-            // The original diagnostic still reaches the user (on stderr, since its file sink
-            // failed) alongside typed evidence of the routing failure itself.
-            Assert.That(console.StdErr, Does.Contain("architecture_policy_error"));
-            Assert.That(console.StdErr, Does.Contain("Report output failed"));
-            Assert.That(console.StdErr, Does.Contain("unwritable.json"));
+            // The fallback remains one valid JSON document; a second human line would corrupt a
+            // file-only JSON report consumer's stderr stream.
+            using JsonDocument document = JsonDocument.Parse(console.StdErr);
+            Assert.That(document.RootElement.GetProperty("kind").GetString(), Is.EqualTo("architecture_policy_error"));
+            Assert.That(document.RootElement.GetProperty("output_status").GetString(), Is.EqualTo("output-failed"));
+            Assert.That(document.RootElement.GetProperty("failed_paths")[0].GetString(), Is.EqualTo("unwritable.json"));
+        });
+    }
+
+    [Test]
+    public void ValidateHandler_ReportMode_FailedStderrSinkStillReceivesRoutingDiagnosticOnRetry()
+    {
+        FakeCliRuntime runtime = new();
+        // The first stderr write is the configured report sink and fails. The error fallback
+        // must not treat the mere presence of that sink as proof a document was delivered.
+        FakeCliConsole console = new(errorWriteFailures: 1);
+        FakeFileSystem fileSystem = new(exists: true);
+        fileSystem.FailOnWrite.Add("broken.json");
+        ValidateCommandHandler handler = new(runtime, console, fileSystem);
+
+        ValidateCommandOptions options = new(
+            "policy.yml", "strict", "human", [], null, false, null, false, false)
+        {
+            AdditionalSinks =
+            [
+                new ReportSink("json", ReportDestinationType.File, "broken.json"),
+                new ReportSink("json", ReportDestinationType.Stderr, null),
+            ],
+        };
+
+        int exitCode = handler.Execute(options);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(exitCode, Is.EqualTo(CliExitCodes.InvalidArgumentsOrRuntimeError));
+            using JsonDocument document = JsonDocument.Parse(console.StdErr);
+            Assert.That(document.RootElement.GetProperty("output_status").GetString(), Is.EqualTo("output-failed"));
+            Assert.That(document.RootElement.GetProperty("failed_paths").EnumerateArray()
+                .Select(path => path.GetString()), Does.Contain("<stderr>"));
+            Assert.That(document.RootElement.GetProperty("errors").GetArrayLength(), Is.GreaterThan(0));
         });
     }
 
@@ -565,18 +635,43 @@ public sealed class ValidateCommandHandlerReportModeTests
         public ArchitectureExplainOutcome Explain(ArchitectureExplainRequest request) => throw new NotSupportedException();
     }
 
-    private sealed class FakeCliConsole : ICliConsole
+    private sealed class FakeCliConsole(int errorWriteFailures = 0) : ICliConsole
     {
         private readonly StringBuilder _stdout = new();
         private readonly StringBuilder _stderr = new();
+        private int _errorWriteFailuresRemaining = errorWriteFailures;
 
         public TextWriter Out => new StringWriter(_stdout);
 
-        public TextWriter Error => new StringWriter(_stderr);
+        public TextWriter Error => new FailingStringWriter(_stderr, this);
 
         public string StdOut => _stdout.ToString();
 
         public string StdErr => _stderr.ToString();
+
+        private bool ConsumeErrorWriteFailure()
+        {
+            if (_errorWriteFailuresRemaining == 0)
+            {
+                return false;
+            }
+
+            _errorWriteFailuresRemaining--;
+            return true;
+        }
+
+        private sealed class FailingStringWriter(StringBuilder builder, FakeCliConsole owner) : StringWriter(builder)
+        {
+            public override void WriteLine(string? value)
+            {
+                if (owner.ConsumeErrorWriteFailure())
+                {
+                    throw new IOException("stderr is closed");
+                }
+
+                base.WriteLine(value);
+            }
+        }
     }
 
     private sealed class FakeFileSystem(bool exists) : IFileSystem

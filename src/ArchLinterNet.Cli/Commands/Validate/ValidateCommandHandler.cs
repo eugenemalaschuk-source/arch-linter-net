@@ -1,5 +1,4 @@
 using System.Text.Json;
-using System.Text.Json.Nodes;
 using ArchLinterNet.Cli.Abstractions;
 using ArchLinterNet.Cli.Commands;
 using ArchLinterNet.Core.BuildState;
@@ -96,13 +95,13 @@ internal sealed class ValidateCommandHandler
             string reportContent = _coordinator.RenderReportContent(neededFormat, isSingleMode, outcomesByMode);
             contentByFormat[neededFormat] = neededFormat switch
             {
-                FormatJson => BuildOutputErrorJsonText(status, humanMessage, result, reportContent),
-                FormatSarif => BuildOutputErrorSarifText(status, humanMessage, result, reportContent),
-                _ => BuildOutputErrorHumanText(humanMessage, result, reportContent),
+                FormatJson => ReportErrorContentFormatter.BuildOutputErrorJsonText(status, humanMessage, result, reportContent),
+                FormatSarif => ReportErrorContentFormatter.BuildOutputErrorSarifText(status, humanMessage, result, reportContent),
+                _ => ReportErrorContentFormatter.BuildOutputErrorHumanText(humanMessage, result, reportContent),
             };
         }
 
-        WriteErrorContent(options, format, contentByFormat, allowFileSinks: false);
+        WriteErrorContent(options, format, contentByFormat, allowFileSinks: false, priorOutputResult: result);
     }
 
     private static string FormatOutputError(string status, RouteResult result)
@@ -116,72 +115,6 @@ internal sealed class ValidateCommandHandler
         if (result.CommittedPaths.Count > 0)
         {
             sb.Append($", committed={string.Join(", ", result.CommittedPaths)}");
-        }
-        return sb.ToString();
-    }
-
-    private static string BuildOutputErrorJsonText(string status, string message, RouteResult result, string reportJson)
-    {
-        return JsonSerializer.Serialize(new
-        {
-            kind = "architecture_execution_error",
-            output_status = status,
-            message,
-            failed_paths = result.FailedPaths,
-            committed_paths = result.CommittedPaths,
-            uncommitted_paths = result.UncommittedPaths,
-            errors = result.ErrorDetails,
-            report = JsonNode.Parse(reportJson),
-        });
-    }
-
-    // Merges the real report's SARIF runs with one additional synthetic run describing the
-    // routing failure itself, rather than nesting the report under the failure — a SARIF consumer
-    // that only reads top-level runs still sees every real finding, not just a summary of them.
-    private static string BuildOutputErrorSarifText(string status, string message, RouteResult result, string reportSarif)
-    {
-        JsonArray runs = JsonNode.Parse(reportSarif)?["runs"]?.AsArray() is JsonArray reportRuns
-            ? new JsonArray(reportRuns.Select(run => run?.DeepClone()).ToArray())
-            : new JsonArray();
-
-        runs.Add(new JsonObject
-        {
-            ["tool"] = new JsonObject { ["driver"] = new JsonObject { ["name"] = "arch-linter-net" } },
-            ["results"] = new JsonArray(new JsonObject
-            {
-                ["ruleId"] = "architecture-output",
-                ["message"] = new JsonObject { ["text"] = message },
-                ["properties"] = new JsonObject
-                {
-                    ["output_status"] = status,
-                    ["failed_paths"] = ToJsonArray(result.FailedPaths),
-                    ["committed_paths"] = ToJsonArray(result.CommittedPaths),
-                    ["uncommitted_paths"] = ToJsonArray(result.UncommittedPaths),
-                    ["errors"] = ToJsonArray(result.ErrorDetails),
-                },
-                ["locations"] = new JsonArray(),
-            }),
-        });
-
-        return new JsonObject { ["version"] = "2.1.0", ["runs"] = runs }.ToJsonString();
-    }
-
-    private static JsonArray ToJsonArray(IReadOnlyList<string> values)
-    {
-        return new JsonArray(values.Select(value => (JsonNode)value).ToArray());
-    }
-
-    private static string BuildOutputErrorHumanText(string message, RouteResult result, string reportHuman)
-    {
-        var sb = new System.Text.StringBuilder(message);
-        sb.Append('\n').Append(reportHuman);
-        if (result.UncommittedPaths.Count > 0)
-        {
-            sb.Append($"\n  uncommitted: {string.Join(", ", result.UncommittedPaths)}");
-        }
-        foreach (string detail in result.ErrorDetails)
-        {
-            sb.Append($"\n  {detail}");
         }
         return sb.ToString();
     }
@@ -209,6 +142,7 @@ internal sealed class ValidateCommandHandler
         string? fileCollision = exception is ArchitectureAnalysisEvaluationException evaluationException
             ? FindImportFileCollision(options, evaluationException.PolicyImportPaths)
                 ?? FindReceiptFileCollision(options, evaluationException.ResolvedAssemblyPaths)
+                ?? FindDiscoveredProjectFileCollision(options, evaluationException.DiscoveredProjectPaths)
             : null;
         if (fileCollision is not null)
         {
@@ -281,7 +215,8 @@ internal sealed class ValidateCommandHandler
         ValidateCommandOptions options,
         string errorFormat,
         IReadOnlyDictionary<string, string> contentByFormat,
-        bool allowFileSinks)
+        bool allowFileSinks,
+        RouteResult? priorOutputResult = null)
     {
         if (options.AdditionalSinks.Count == 0)
         {
@@ -301,38 +236,59 @@ internal sealed class ValidateCommandHandler
         if (allowFileSinks)
         {
             RouteResult errorRouteResult = _coordinator.RouteErrorToAllSinks(options.AdditionalSinks, contentByFormat);
-            // A stderr sink already received this exact content as part of RouteErrorToAllSinks
-            // (it treats stream sinks and file sinks uniformly) — writing it again here would
-            // duplicate a document on that stream. Only surface the escalation when stderr is a
-            // genuinely idle channel this invocation never claimed.
-            if (errorRouteResult.Status != ReportRouteStatus.AllSucceeded && !IsStreamOccupied(options, ReportDestinationType.Stderr))
+            if (errorRouteResult.Status != ReportRouteStatus.AllSucceeded
+                && CanUseStderrFallback(options, errorRouteResult))
             {
-                // Writing the error report itself failed on at least one sink — the diagnostic
-                // would otherwise vanish silently. Surface both the diagnostic that couldn't be
-                // fully delivered and typed evidence of which destinations committed/failed.
-                _console.Error.WriteLine(contentByFormat[errorFormat]);
-                _console.Error.WriteLine(FormatOutputError(
-                    errorRouteResult.Status == ReportRouteStatus.PartialOutput ? "partial-output" : "output-failed",
-                    errorRouteResult));
+                WriteErrorRoutingFailureFallback(errorFormat, contentByFormat[errorFormat], errorRouteResult);
             }
 
             return;
         }
 
-        // Post-outcome: every configured stream sink already carries the complete real report
-        // from the original routing pass — every sink's format gets written there unconditionally
-        // regardless of what later fails — so writing this notice there too would break that
-        // stream's single-document guarantee for machine consumers. Stderr is the only remaining
-        // channel, and only when no --report sink already claims it for this invocation.
-        if (!IsStreamOccupied(options, ReportDestinationType.Stderr))
+        // Post-outcome stream sinks already carry the complete report. Do not add a second
+        // document to a stream that successfully received it. A configured stderr sink that
+        // itself failed is different: no document reached that channel, so it remains a valid
+        // fallback target for the routing diagnostic.
+        if (priorOutputResult is not null && CanUseStderrFallback(options, priorOutputResult.Value))
         {
-            _console.Error.WriteLine(contentByFormat[errorFormat]);
+            TryWriteToStderr(contentByFormat[errorFormat]);
         }
     }
 
-    private static bool IsStreamOccupied(ValidateCommandOptions options, ReportDestinationType destinationType)
+    private static bool CanUseStderrFallback(ValidateCommandOptions options, RouteResult result)
     {
-        return options.AdditionalSinks.Any(sink => sink.DestinationType == destinationType);
+        return !options.AdditionalSinks.Any(sink => sink.DestinationType == ReportDestinationType.Stderr)
+            || result.FailedPaths.Contains("<stderr>", StringComparer.Ordinal);
+    }
+
+    // A failed file error sink must not turn a machine-readable stderr fallback into two
+    // concatenated documents. Reformat its already-built error document as one JSON/SARIF/human
+    // document that also carries the routing failure evidence.
+    private void WriteErrorRoutingFailureFallback(string format, string originalContent, RouteResult routeResult)
+    {
+        string status = routeResult.Status == ReportRouteStatus.PartialOutput ? "partial-output" : "output-failed";
+        string message = FormatOutputError(status, routeResult);
+        string fallbackContent = format switch
+        {
+            FormatJson => ReportErrorContentFormatter.BuildErrorRoutingFailureJsonText(status, originalContent, routeResult),
+            FormatSarif => ReportErrorContentFormatter.BuildOutputErrorSarifText(status, message, routeResult, originalContent),
+            _ => ReportErrorContentFormatter.BuildOutputErrorHumanText(message, routeResult, originalContent),
+        };
+
+        TryWriteToStderr(fallbackContent);
+    }
+
+    private void TryWriteToStderr(string content)
+    {
+        try
+        {
+            _console.Error.WriteLine(content);
+        }
+        catch (Exception)
+        {
+            // A closed stderr cannot be repaired by another write. The coordinator already
+            // recorded the original stream failure; avoid masking the validation exit code.
+        }
     }
 
     private int? TryWriteImmediateResponse(ValidateCommandOptions options)
@@ -478,6 +434,26 @@ internal sealed class ValidateCommandHandler
         return null;
     }
 
+    private static string? FindDiscoveredProjectFileCollision(
+        ValidateCommandOptions options,
+        IReadOnlyList<string> discoveredProjectPaths)
+    {
+        HashSet<string> loadedProjectPaths = new(
+            discoveredProjectPaths.Select(Path.GetFullPath), StringComparer.OrdinalIgnoreCase);
+
+        foreach (ReportSink sink in options.AdditionalSinks)
+        {
+            if (sink.DestinationType == ReportDestinationType.File
+                && sink.FilePath is not null
+                && loadedProjectPaths.Contains(Path.GetFullPath(sink.FilePath)))
+            {
+                return $"--report destination '{sink.FilePath}' matches a project file loaded during this run";
+            }
+        }
+
+        return null;
+    }
+
     private bool PreValidateReportDestinations(ValidateCommandOptions options)
     {
         foreach (ReportSink sink in options.AdditionalSinks)
@@ -542,6 +518,13 @@ internal sealed class ValidateCommandHandler
             return CliExitCodes.InvalidArgumentsOrRuntimeError;
         }
 
+        string? projectCollision = FindDiscoveredProjectFileCollision(options, outcome.DiscoveredProjectPaths);
+        if (projectCollision is not null)
+        {
+            _console.Error.WriteLine(projectCollision);
+            return CliExitCodes.InvalidArgumentsOrRuntimeError;
+        }
+
         RouteResult result = _coordinator.RouteSingleOutcome(options.Format, mode, outcome, options.AdditionalSinks);
         timing?.WriteReport(_console.Error);
         if (result.Status != ReportRouteStatus.AllSucceeded)
@@ -597,6 +580,14 @@ internal sealed class ValidateCommandHandler
         if (receiptCollision is not null)
         {
             _console.Error.WriteLine(receiptCollision);
+            return CliExitCodes.InvalidArgumentsOrRuntimeError;
+        }
+
+        string? projectCollision = FindDiscoveredProjectFileCollision(
+            options, outcomesByMode[0].Outcome.DiscoveredProjectPaths);
+        if (projectCollision is not null)
+        {
+            _console.Error.WriteLine(projectCollision);
             return CliExitCodes.InvalidArgumentsOrRuntimeError;
         }
 
