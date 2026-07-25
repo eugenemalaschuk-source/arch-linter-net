@@ -268,6 +268,125 @@ public sealed class ReportCoordinatorTests
         Assert.That(result.FailedPaths, Is.EquivalentTo(new[] { "bad.json" }));
     }
 
+    [Test]
+    public void ReportMode_StdoutSink_WritesFormatToStdout()
+    {
+        var runtime = new CountingRuntime();
+        var console = new CapturingConsole();
+        var fileSystem = new StubFileSystem();
+        var coordinator = new ReportCoordinator(runtime, console, fileSystem);
+
+        var sinks = new[] { new ReportSink("json", ReportDestinationType.Stdout, null) };
+        RouteResult result = coordinator.RouteSingleOutcome("human", "strict", PassedOutcome, sinks);
+
+        Assert.That(result.Status, Is.EqualTo(ReportRouteStatus.AllSucceeded));
+        Assert.That(console.OutputText, Does.Contain("kind"));
+    }
+
+    [Test]
+    public void ReportMode_StderrAndFileSinks_RouteToRespectiveDestinations()
+    {
+        var runtime = new CountingRuntime();
+        var console = new CapturingConsole();
+        var fileSystem = new StubFileSystem();
+        var coordinator = new ReportCoordinator(runtime, console, fileSystem);
+
+        var sinks = new[]
+        {
+            new ReportSink("human", ReportDestinationType.Stderr, null),
+            new ReportSink("json", ReportDestinationType.File, "results.json"),
+        };
+        RouteResult result = coordinator.RouteSingleOutcome("human", "strict", PassedOutcome, sinks);
+
+        Assert.That(result.Status, Is.EqualTo(ReportRouteStatus.AllSucceeded));
+        Assert.That(console.OutputText, Is.Empty);
+        Assert.That(console.ErrorText, Does.Contain("Architecture validation passed."));
+        Assert.That(fileSystem.TempPaths, Does.Contain("results.json"));
+    }
+
+    [Test]
+    public void Phase2Failure_TracksCommittedAndUncommitted()
+    {
+        var runtime = new CountingRuntime();
+        var console = new CapturingConsole();
+        var fileSystem = new StubFileSystem();
+        var coordinator = new ReportCoordinator(runtime, console, fileSystem);
+
+        var sinks = new[]
+        {
+            new ReportSink("json", ReportDestinationType.File, "first.json"),
+            new ReportSink("sarif", ReportDestinationType.File, "second.sarif"),
+        };
+        fileSystem.MakeUnwritable("second.sarif", phase: StubFileSystem.FailPhase.Rename);
+
+        RouteResult result = coordinator.RouteSingleOutcome("human", "strict", PassedOutcome, sinks);
+
+        Assert.That(result.Status, Is.EqualTo(ReportRouteStatus.PartialOutput));
+        Assert.That(result.CommittedPaths, Does.Contain("first.json"));
+        Assert.That(result.FailedPaths, Does.Contain("second.sarif"));
+        Assert.That(result.StagedPaths, Is.EquivalentTo(new[] { "first.json", "second.sarif" }));
+    }
+
+    [Test]
+    public void SarifFileSink_ValidatesJsonBeforeWrite()
+    {
+        var runtime = new InvalidJsonRuntime();
+        var console = new CapturingConsole();
+        var fileSystem = new StubFileSystem();
+        var coordinator = new ReportCoordinator(runtime, console, fileSystem);
+
+        var sinks = new[] { new ReportSink("sarif", ReportDestinationType.File, "results.sarif") };
+
+        var result = coordinator.RouteSingleOutcome("human", "strict", PassedOutcome, sinks);
+        Assert.That(result.Status, Is.EqualTo(ReportRouteStatus.OutputFailed));
+        Assert.That(result.FailedPaths, Does.Contain("results.sarif"));
+    }
+
+    [Test]
+    public void ReportMode_AllFileSinksFail_ReturnsOutputFailedWithStagedPaths()
+    {
+        var runtime = new CountingRuntime();
+        var console = new CapturingConsole();
+        var fileSystem = new StubFileSystem();
+        var coordinator = new ReportCoordinator(runtime, console, fileSystem);
+
+        var sinks = new[]
+        {
+            new ReportSink("json", ReportDestinationType.File, "a.json"),
+            new ReportSink("sarif", ReportDestinationType.File, "b.sarif"),
+        };
+        fileSystem.MakeUnwritable("a.json", phase: StubFileSystem.FailPhase.Write);
+        fileSystem.MakeUnwritable("b.sarif", phase: StubFileSystem.FailPhase.Write);
+
+        RouteResult result = coordinator.RouteSingleOutcome("human", "strict", PassedOutcome, sinks);
+
+        Assert.That(result.Status, Is.EqualTo(ReportRouteStatus.OutputFailed));
+        Assert.That(result.StagedPaths, Is.Empty);
+        Assert.That(result.CommittedPaths, Is.Empty);
+    }
+
+    [Test]
+    public void ReportMode_SingleModeAllSinkTypes_CompletesSuccessfully()
+    {
+        var runtime = new CountingRuntime();
+        var console = new CapturingConsole();
+        var fileSystem = new StubFileSystem();
+        var coordinator = new ReportCoordinator(runtime, console, fileSystem);
+
+        var sinks = new[]
+        {
+            new ReportSink("json", ReportDestinationType.Stdout, null),
+            new ReportSink("human", ReportDestinationType.Stderr, null),
+            new ReportSink("sarif", ReportDestinationType.File, "report.sarif"),
+        };
+        RouteResult result = coordinator.RouteSingleOutcome("human", "strict", PassedOutcome, sinks);
+
+        Assert.That(result.Status, Is.EqualTo(ReportRouteStatus.AllSucceeded));
+        Assert.That(console.OutputText, Does.Contain("kind"));
+        Assert.That(console.ErrorText, Does.Contain("Architecture validation passed."));
+        Assert.That(fileSystem.TempPaths, Does.Contain("report.sarif"));
+    }
+
     private sealed class CapturingConsole : ICliConsole
     {
         private readonly StringBuilder _output = new();
@@ -392,6 +511,65 @@ public sealed class ReportCoordinatorTests
             IReadOnlyCollection<ArchitectureClassificationMetadataFailure> metadataFailures,
             ArchitectureClassificationPathDeferredNotice? classificationPathDeferred) => "classifications";
 
+        public bool TryParseGraphLevel(string value, out ArchitectureGraphLevel level) => throw new NotSupportedException();
+        public BaselineGenerationOutcome GenerateBaseline(BaselineGenerationRequest request) => throw new NotSupportedException();
+        public BaselineUpdateOutcome UpdateBaseline(BaselineUpdateRequest request) => throw new NotSupportedException();
+        public BaselinePruneOutcome PruneBaseline(BaselinePruneRequest request) => throw new NotSupportedException();
+        public BaselineDiffOutcome DiffBaseline(BaselineDiffRequest request) => throw new NotSupportedException();
+        public BaselineVerifyOutcome VerifyBaseline(BaselineVerifyRequest request) => throw new NotSupportedException();
+        public BaselineMigrateOutcome MigrateBaseline(BaselineMigrateRequest request) => throw new NotSupportedException();
+        public ArchitectureGraphOutcome BuildGraph(ArchitectureGraphRequest request) => throw new NotSupportedException();
+        public string FormatGraphAsJson(ArchitectureDependencyGraph graph) => throw new NotSupportedException();
+        public string FormatGraphAsDot(ArchitectureDependencyGraph graph) => throw new NotSupportedException();
+        public string FormatGraphAsMermaid(ArchitectureDependencyGraph graph) => throw new NotSupportedException();
+        public ArchitectureExplainOutcome Explain(ArchitectureExplainRequest request) => throw new NotSupportedException();
+    }
+
+    private sealed class InvalidJsonRuntime : ICliRuntime
+    {
+        public string Version => "1.2.3";
+        public ValidationOutcome Validate(ValidationRequest request, ValidationTiming? timing) => throw new NotSupportedException();
+        public ArchitectureAnalysisSnapshot CreateSnapshot(AnalysisSnapshotRequest request, ValidationTiming? timing) => throw new NotSupportedException();
+
+        public string FormatResultForCiArtifacts(
+            string mode, bool passed,
+            IReadOnlyCollection<ArchitectureViolation> violations,
+            IReadOnlyCollection<string> cycles,
+            IReadOnlyCollection<ArchitectureCycleFinding> cycleFindings,
+            IReadOnlyCollection<ArchitectureViolation> coverageFindings,
+            IReadOnlyList<ArchitectureUnmatchedIgnoredViolation> unmatchedIgnoredViolations,
+            IReadOnlyCollection<PolicyConsistencyDiagnostic> policyConsistencyFindings,
+            IReadOnlyCollection<ArchitectureCoverageSummary> coverageSummaries,
+            IReadOnlyCollection<ArchitectureClassificationConflict> classificationConflicts,
+            IReadOnlyCollection<ArchitectureClassificationMetadataFailure> classificationMetadataFailures,
+            IReadOnlyCollection<ArchitectureClassificationRoleFact> classificationRoles,
+            ArchitectureClassificationPathDeferredNotice? classificationPathDeferred,
+            IReadOnlyCollection<BuildStatePreflightDiagnostic> preflightDiagnostics)
+        {
+            return "{\"kind\":\"validation\",\"passed\":true}";
+        }
+
+        public string FormatResultAsSarif(
+            string mode,
+            IReadOnlyCollection<ArchitectureViolation> violations,
+            IReadOnlyCollection<string> cycles,
+            IReadOnlyCollection<ArchitectureCycleFinding> cycleFindings,
+            IReadOnlyCollection<BuildStatePreflightDiagnostic> preflightDiagnostics)
+        {
+            return "not valid sarif json at all";
+        }
+
+        public string FormatBuildStatePreflightForHumans(IReadOnlyCollection<BuildStatePreflightDiagnostic> diagnostics) => string.Empty;
+        public string FormatViolationsForHumans(IReadOnlyCollection<ArchitectureViolation> violations) => string.Empty;
+        public string FormatCyclesForHumans(IReadOnlyCollection<string> cycles, IReadOnlyCollection<ArchitectureCycleFinding> cycleFindings) => string.Empty;
+        public string FormatPolicyConsistencyForHumans(IReadOnlyCollection<PolicyConsistencyDiagnostic> diagnostics) => string.Empty;
+        public string FormatUnmatchedForHumans(IReadOnlyList<ArchitectureUnmatchedIgnoredViolation> unmatchedViolations) => string.Empty;
+        public string FormatCoverageForHumans(IReadOnlyCollection<ArchitectureViolation> coverageFindings) => string.Empty;
+        public string FormatCoverageSummaryForHumans(IReadOnlyCollection<ArchitectureCoverageSummary> coverageSummaries) => string.Empty;
+        public string FormatClassificationFactsForHumans(
+            IReadOnlyCollection<ArchitectureClassificationConflict> conflicts,
+            IReadOnlyCollection<ArchitectureClassificationMetadataFailure> metadataFailures,
+            ArchitectureClassificationPathDeferredNotice? classificationPathDeferred) => string.Empty;
         public bool TryParseGraphLevel(string value, out ArchitectureGraphLevel level) => throw new NotSupportedException();
         public BaselineGenerationOutcome GenerateBaseline(BaselineGenerationRequest request) => throw new NotSupportedException();
         public BaselineUpdateOutcome UpdateBaseline(BaselineUpdateRequest request) => throw new NotSupportedException();
