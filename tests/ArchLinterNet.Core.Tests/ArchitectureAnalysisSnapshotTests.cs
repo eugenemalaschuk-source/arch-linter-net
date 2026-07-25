@@ -469,8 +469,11 @@ public sealed class ArchitectureAnalysisSnapshotTests
         Assert.DoesNotThrow(() => snapshot.Evaluate("strict"));
 
         // Evaluating "audit" — which has no contract with this ID — must throw the same
-        // "Unknown contract IDs" error an independent Validate(audit) call for this ID would.
-        InvalidOperationException? ex = Assert.Throws<InvalidOperationException>(() => snapshot.Evaluate("audit"));
+        // "Unknown contract IDs" error an independent Validate(audit) call for this ID would,
+        // wrapped in the seam-safe ArchitectureAnalysisEvaluationException (a InvalidOperationException
+        // subtype) that carries the policy/assembly provenance already known by this point.
+        ArchitectureAnalysisEvaluationException? ex =
+            Assert.Throws<ArchitectureAnalysisEvaluationException>(() => snapshot.Evaluate("audit"));
         Assert.That(ex!.Message, Does.Contain("Unknown contract IDs"));
     }
 

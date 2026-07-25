@@ -148,6 +148,27 @@ internal sealed class ReportCoordinator
         return contentByFormat;
     }
 
+    // Re-renders the full report for one format from an already-computed outcome — the contract
+    // execution and analysis this reads from already happened; this only re-serializes it. Used to
+    // embed the complete normalized findings into an output-routing-error document, so a sink
+    // failure never reduces what reaches the user to bare pass/fail counts.
+    public string RenderReportContent(
+        string format, bool isSingleMode, IReadOnlyList<(string Mode, ValidationOutcome Outcome)> outcomesByMode)
+    {
+        return format switch
+        {
+            FormatJson => isSingleMode
+                ? FormatSingleJson(outcomesByMode[0].Mode, outcomesByMode[0].Outcome)
+                : FormatCombinedJson(outcomesByMode),
+            FormatSarif => isSingleMode
+                ? FormatSingleSarif(outcomesByMode[0].Mode, outcomesByMode[0].Outcome)
+                : FormatCombinedSarif(outcomesByMode),
+            _ => isSingleMode
+                ? FormatSingleHuman(outcomesByMode[0].Outcome)
+                : FormatCombinedHuman(outcomesByMode),
+        };
+    }
+
     // Routes error content (policy load failures, unexpected runtime errors) to every configured
     // sink whose format matches — file, stdout, and stderr alike. Safe to use for these errors
     // specifically because they occur before any legitimate report content has been produced for
@@ -157,31 +178,6 @@ internal sealed class ReportCoordinator
         IReadOnlyDictionary<string, string> contentByFormat)
     {
         return DistributeToSinks(additionalSinks, contentByFormat);
-    }
-
-    // Routes error content that describes an output-routing failure itself (some sinks already
-    // committed legitimate report content, others failed). Only stdout/stderr sinks are honored
-    // here — writing to a File sink would either re-fail (the sink that just failed) or overwrite
-    // a sink that already committed a valid report. Returns false when no stream sink matched, so
-    // the caller can fall back to the process's own stderr.
-    public bool TryRouteErrorToStreamSinks(
-        IReadOnlyList<ReportSink> additionalSinks,
-        IReadOnlyDictionary<string, string> contentByFormat)
-    {
-        bool wroteAny = false;
-        foreach (ReportSink sink in additionalSinks)
-        {
-            if (sink.DestinationType == ReportDestinationType.File
-                || !contentByFormat.TryGetValue(sink.Format, out string? content))
-            {
-                continue;
-            }
-
-            WriteToStream(sink.DestinationType, content);
-            wroteAny = true;
-        }
-
-        return wroteAny;
     }
 
     private RouteResult DistributeToSinks(
@@ -229,7 +225,21 @@ internal sealed class ReportCoordinator
 
         if (sink.DestinationType is ReportDestinationType.Stdout or ReportDestinationType.Stderr)
         {
-            WriteToStream(sink.DestinationType, content);
+            // A write failure here (broken pipe, closed handle) must join the same
+            // failedPaths/errorDetails bookkeeping a file-sink failure does — otherwise it
+            // propagates uncaught past this loop, skipping phase 2 cleanup and leaving whatever
+            // was already staged by earlier sinks in this same batch on disk as orphaned .tmp
+            // files.
+            try
+            {
+                WriteToStream(sink.DestinationType, content);
+            }
+            catch (Exception ex)
+            {
+                failedPaths.Add(StreamFailureMarker(sink.DestinationType));
+                errorDetails.Add(ex.Message);
+            }
+
             return;
         }
 
@@ -263,6 +273,11 @@ internal sealed class ReportCoordinator
         {
             _console.Out.WriteLine(content);
         }
+    }
+
+    private static string StreamFailureMarker(ReportDestinationType destinationType)
+    {
+        return destinationType == ReportDestinationType.Stderr ? "<stderr>" : "<stdout>";
     }
 
     // Phase 2 only runs once every staged sink is already known-good (StageSink validated each

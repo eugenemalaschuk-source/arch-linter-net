@@ -463,50 +463,36 @@ public sealed class ReportCoordinatorTests
     }
 
     [Test]
-    public void TryRouteErrorToStreamSinks_IgnoresFileSinksAndReturnsFalseWhenNoneMatch()
+    public void StreamWriteFailure_IsCaughtLikeAFileFailure_AndDoesNotAbortStaging()
     {
+        // A broken stdout/stderr write (closed handle, broken pipe) must not propagate uncaught —
+        // that would skip phase 2 entirely and leave whatever an earlier sink in the same batch
+        // already staged as an orphaned .tmp file.
         var runtime = new CountingRuntime();
-        var console = new CapturingConsole();
-        var fileSystem = new StubFileSystem();
-        var coordinator = new ReportCoordinator(runtime, console, fileSystem);
-
-        var sinks = new[] { new ReportSink("json", ReportDestinationType.File, "out.json") };
-        var contentByFormat = new Dictionary<string, string> { ["json"] = "{\"kind\":\"x\"}" };
-
-        bool wrote = coordinator.TryRouteErrorToStreamSinks(sinks, contentByFormat);
-
-        Assert.That(wrote, Is.False);
-        Assert.That(fileSystem.TempPaths, Is.Empty);
-        Assert.That(console.OutputText, Is.Empty);
-        Assert.That(console.ErrorText, Is.Empty);
-    }
-
-    [Test]
-    public void TryRouteErrorToStreamSinks_WritesOnlyToMatchingStreamSinks()
-    {
-        var runtime = new CountingRuntime();
-        var console = new CapturingConsole();
+        var console = new ThrowingConsole();
         var fileSystem = new StubFileSystem();
         var coordinator = new ReportCoordinator(runtime, console, fileSystem);
 
         var sinks = new[]
         {
-            new ReportSink("json", ReportDestinationType.File, "out.json"),
-            new ReportSink("sarif", ReportDestinationType.Stdout, null),
+            new ReportSink("json", ReportDestinationType.File, "good.json"),
             new ReportSink("human", ReportDestinationType.Stderr, null),
         };
-        var contentByFormat = new Dictionary<string, string>
-        {
-            ["sarif"] = "{\"version\":\"2.1.0\"}",
-            ["human"] = "Report output failed (output-failed)",
-        };
 
-        bool wrote = coordinator.TryRouteErrorToStreamSinks(sinks, contentByFormat);
+        RouteResult result = coordinator.RouteSingleOutcome("human", "strict", PassedOutcome, sinks);
 
-        Assert.That(wrote, Is.True);
-        Assert.That(fileSystem.TempPaths, Is.Empty);
-        Assert.That(console.OutputText, Does.Contain("2.1.0"));
-        Assert.That(console.ErrorText, Does.Contain("output-failed"));
+        Assert.That(result.Status, Is.EqualTo(ReportRouteStatus.OutputFailed));
+        Assert.That(result.FailedPaths, Does.Contain("<stderr>"));
+        Assert.That(result.ErrorDetails, Does.Contain("stream closed"));
+        // The json file sink was staged before the stderr write failed; phase 1 failing must
+        // discard that staged temp rather than commit it, and must not throw.
+        Assert.That(result.CommittedPaths, Is.Empty);
+    }
+
+    private sealed class ThrowingConsole : ICliConsole
+    {
+        public TextWriter Out { get; } = new StringWriter();
+        public TextWriter Error => throw new InvalidOperationException("stream closed");
     }
 
     private sealed class CapturingConsole : ICliConsole

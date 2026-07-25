@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using ArchLinterNet.Cli.Abstractions;
 using ArchLinterNet.Cli.Commands;
 using ArchLinterNet.Core.BuildState;
@@ -47,7 +48,7 @@ internal sealed class ValidateCommandHandler
         }
         catch (Exception ex)
         {
-            WriteExecutionError(options, errorFormat, ex.Message);
+            WriteExecutionError(options, errorFormat, ex);
             return CliExitCodes.InvalidArgumentsOrRuntimeError;
         }
     }
@@ -74,15 +75,16 @@ internal sealed class ValidateCommandHandler
     // Post-outcome failure: some sinks may have already committed a legitimate report. Only
     // stdout/stderr sinks are eligible destinations for this diagnostic — a File sink either just
     // failed (writing here would only fail again) or already committed valid report content that
-    // this must not overwrite. See ReportCoordinator.TryRouteErrorToStreamSinks.
+    // this must not overwrite. See WriteErrorContent's IsStreamOccupied fallback policy.
     //
-    // outcomesByMode carries the underlying validation result (pass/fail, violation/cycle counts)
-    // so it still reaches the user even when every sink that would have carried the full report
-    // failed — an output-routing failure must not silently swallow the validation outcome itself.
+    // Embeds the full, already-computed report (via ReportCoordinator.RenderReportContent) rather
+    // than a bare pass/fail summary, so an output-routing failure never reduces what reaches the
+    // user to less than the complete normalized findings.
     private void WriteOutputError(
         ValidateCommandOptions options,
         string format,
         RouteResult result,
+        bool isSingleMode,
         IReadOnlyList<(string Mode, ValidationOutcome Outcome)> outcomesByMode)
     {
         string status = result.Status == ReportRouteStatus.PartialOutput ? "partial-output" : "output-failed";
@@ -91,11 +93,12 @@ internal sealed class ValidateCommandHandler
         Dictionary<string, string> contentByFormat = new();
         foreach (string neededFormat in NeededErrorFormats(options, format))
         {
+            string reportContent = _coordinator.RenderReportContent(neededFormat, isSingleMode, outcomesByMode);
             contentByFormat[neededFormat] = neededFormat switch
             {
-                FormatJson => BuildOutputErrorJsonText(status, humanMessage, result, outcomesByMode),
-                FormatSarif => BuildOutputErrorSarifText(status, humanMessage, result, outcomesByMode),
-                _ => BuildOutputErrorHumanText(humanMessage, result, outcomesByMode),
+                FormatJson => BuildOutputErrorJsonText(status, humanMessage, result, reportContent),
+                FormatSarif => BuildOutputErrorSarifText(status, humanMessage, result, reportContent),
+                _ => BuildOutputErrorHumanText(humanMessage, result, reportContent),
             };
         }
 
@@ -117,9 +120,7 @@ internal sealed class ValidateCommandHandler
         return sb.ToString();
     }
 
-    private static string BuildOutputErrorJsonText(
-        string status, string message, RouteResult result,
-        IReadOnlyList<(string Mode, ValidationOutcome Outcome)> outcomesByMode)
+    private static string BuildOutputErrorJsonText(string status, string message, RouteResult result, string reportJson)
     {
         return JsonSerializer.Serialize(new
         {
@@ -130,50 +131,50 @@ internal sealed class ValidateCommandHandler
             committed_paths = result.CommittedPaths,
             uncommitted_paths = result.UncommittedPaths,
             errors = result.ErrorDetails,
-            validation_results = BuildValidationOutcomeSummaries(outcomesByMode),
+            report = JsonNode.Parse(reportJson),
         });
     }
 
-    private static string BuildOutputErrorSarifText(
-        string status, string message, RouteResult result,
-        IReadOnlyList<(string Mode, ValidationOutcome Outcome)> outcomesByMode)
+    // Merges the real report's SARIF runs with one additional synthetic run describing the
+    // routing failure itself, rather than nesting the report under the failure — a SARIF consumer
+    // that only reads top-level runs still sees every real finding, not just a summary of them.
+    private static string BuildOutputErrorSarifText(string status, string message, RouteResult result, string reportSarif)
     {
-        return JsonSerializer.Serialize(new
+        JsonArray runs = JsonNode.Parse(reportSarif)?["runs"]?.AsArray() is JsonArray reportRuns
+            ? new JsonArray(reportRuns.Select(run => run?.DeepClone()).ToArray())
+            : new JsonArray();
+
+        runs.Add(new JsonObject
         {
-            version = "2.1.0",
-            runs = new[]
+            ["tool"] = new JsonObject { ["driver"] = new JsonObject { ["name"] = "arch-linter-net" } },
+            ["results"] = new JsonArray(new JsonObject
             {
-                new
+                ["ruleId"] = "architecture-output",
+                ["message"] = new JsonObject { ["text"] = message },
+                ["properties"] = new JsonObject
                 {
-                    tool = new { driver = new { name = "arch-linter-net" } },
-                    results = new[]
-                    {
-                        new
-                        {
-                            ruleId = "architecture-output",
-                            message = new { text = message },
-                            properties = new
-                            {
-                                output_status = status,
-                                failed_paths = result.FailedPaths,
-                                committed_paths = result.CommittedPaths,
-                                uncommitted_paths = result.UncommittedPaths,
-                                errors = result.ErrorDetails,
-                                validation_results = BuildValidationOutcomeSummaries(outcomesByMode),
-                            },
-                            locations = Array.Empty<object>(),
-                        },
-                    },
+                    ["output_status"] = status,
+                    ["failed_paths"] = ToJsonArray(result.FailedPaths),
+                    ["committed_paths"] = ToJsonArray(result.CommittedPaths),
+                    ["uncommitted_paths"] = ToJsonArray(result.UncommittedPaths),
+                    ["errors"] = ToJsonArray(result.ErrorDetails),
                 },
-            },
+                ["locations"] = new JsonArray(),
+            }),
         });
+
+        return new JsonObject { ["version"] = "2.1.0", ["runs"] = runs }.ToJsonString();
     }
 
-    private static string BuildOutputErrorHumanText(
-        string message, RouteResult result, IReadOnlyList<(string Mode, ValidationOutcome Outcome)> outcomesByMode)
+    private static JsonArray ToJsonArray(IReadOnlyList<string> values)
+    {
+        return new JsonArray(values.Select(value => (JsonNode)value).ToArray());
+    }
+
+    private static string BuildOutputErrorHumanText(string message, RouteResult result, string reportHuman)
     {
         var sb = new System.Text.StringBuilder(message);
-        sb.Append($"\n  validation result: {BuildValidationOutcomeSummaryText(outcomesByMode)}");
+        sb.Append('\n').Append(reportHuman);
         if (result.UncommittedPaths.Count > 0)
         {
             sb.Append($"\n  uncommitted: {string.Join(", ", result.UncommittedPaths)}");
@@ -185,28 +186,6 @@ internal sealed class ValidateCommandHandler
         return sb.ToString();
     }
 
-    private static object[] BuildValidationOutcomeSummaries(
-        IReadOnlyList<(string Mode, ValidationOutcome Outcome)> outcomesByMode)
-    {
-        return outcomesByMode
-            .Select(o => (object)new
-            {
-                mode = o.Mode,
-                passed = o.Outcome.Passed,
-                violation_count = o.Outcome.Violations.Count,
-                cycle_count = o.Outcome.Cycles.Count,
-            })
-            .ToArray();
-    }
-
-    private static string BuildValidationOutcomeSummaryText(
-        IReadOnlyList<(string Mode, ValidationOutcome Outcome)> outcomesByMode)
-    {
-        return string.Join(", ", outcomesByMode.Select(o => o.Outcome.Passed
-            ? $"{o.Mode}=passed"
-            : $"{o.Mode}=failed ({o.Outcome.Violations.Count} violation(s), {o.Outcome.Cycles.Count} cycle(s))"));
-    }
-
     // Catches every error that isn't a structured ArchitecturePolicyDiagnostic — including an
     // expression evaluation failure thrown deep inside contract checking (e.g.
     // ArchitectureExpressionFactService.Evaluate for a `when` predicate), which happens well after
@@ -215,9 +194,27 @@ internal sealed class ValidateCommandHandler
     // asked for; this emits the same "unexpected error" shape on stdout that format expects, with no
     // location (none is available at this point) rather than silently degrading to plain text.
     // Occurs before any legitimate report content exists for this invocation, so — unlike
-    // WriteOutputError — it is safe to route into every configured sink, including files.
-    private void WriteExecutionError(ValidateCommandOptions options, string format, string message)
+    // WriteOutputError — routing into a file sink is safe in general. The exception may still
+    // name files this invocation actually consumed (see the ArchitectureAnalysisEvaluationException
+    // check below), which needs the same protection a policy-load failure's own diagnostic gets.
+    private void WriteExecutionError(ValidateCommandOptions options, string format, Exception exception)
     {
+        string message = exception.Message;
+
+        // A generic execution failure (contract execution, expression evaluation) can happen after
+        // policy and assembly loading already succeeded. ArchitectureAnalysisEvaluationException
+        // carries whatever provenance was already known at that point — protect those files from
+        // being overwritten by this error document the same way a policy-load failure's own
+        // diagnostic protects its inputs (see FindPolicyDiagnosticFileCollision).
+        string? fileCollision = exception is ArchitectureAnalysisEvaluationException evaluationException
+            ? FindImportFileCollision(options, evaluationException.PolicyImportPaths)
+                ?? FindReceiptFileCollision(options, evaluationException.ResolvedAssemblyPaths)
+            : null;
+        if (fileCollision is not null)
+        {
+            message = $"{message} ({fileCollision})";
+        }
+
         Dictionary<string, string> contentByFormat = new();
         foreach (string neededFormat in NeededErrorFormats(options, format))
         {
@@ -229,7 +226,7 @@ internal sealed class ValidateCommandHandler
             };
         }
 
-        WriteErrorContent(options, format, contentByFormat, allowFileSinks: true);
+        WriteErrorContent(options, format, contentByFormat, allowFileSinks: fileCollision is null);
     }
 
     private static string BuildExecutionErrorJsonText(string message)
@@ -304,7 +301,11 @@ internal sealed class ValidateCommandHandler
         if (allowFileSinks)
         {
             RouteResult errorRouteResult = _coordinator.RouteErrorToAllSinks(options.AdditionalSinks, contentByFormat);
-            if (errorRouteResult.Status != ReportRouteStatus.AllSucceeded)
+            // A stderr sink already received this exact content as part of RouteErrorToAllSinks
+            // (it treats stream sinks and file sinks uniformly) — writing it again here would
+            // duplicate a document on that stream. Only surface the escalation when stderr is a
+            // genuinely idle channel this invocation never claimed.
+            if (errorRouteResult.Status != ReportRouteStatus.AllSucceeded && !IsStreamOccupied(options, ReportDestinationType.Stderr))
             {
                 // Writing the error report itself failed on at least one sink — the diagnostic
                 // would otherwise vanish silently. Surface both the diagnostic that couldn't be
@@ -318,12 +319,20 @@ internal sealed class ValidateCommandHandler
             return;
         }
 
-        if (_coordinator.TryRouteErrorToStreamSinks(options.AdditionalSinks, contentByFormat))
+        // Post-outcome: every configured stream sink already carries the complete real report
+        // from the original routing pass — every sink's format gets written there unconditionally
+        // regardless of what later fails — so writing this notice there too would break that
+        // stream's single-document guarantee for machine consumers. Stderr is the only remaining
+        // channel, and only when no --report sink already claims it for this invocation.
+        if (!IsStreamOccupied(options, ReportDestinationType.Stderr))
         {
-            return;
+            _console.Error.WriteLine(contentByFormat[errorFormat]);
         }
+    }
 
-        _console.Error.WriteLine(contentByFormat[errorFormat]);
+    private static bool IsStreamOccupied(ValidateCommandOptions options, ReportDestinationType destinationType)
+    {
+        return options.AdditionalSinks.Any(sink => sink.DestinationType == destinationType);
     }
 
     private int? TryWriteImmediateResponse(ValidateCommandOptions options)
@@ -537,7 +546,7 @@ internal sealed class ValidateCommandHandler
         timing?.WriteReport(_console.Error);
         if (result.Status != ReportRouteStatus.AllSucceeded)
         {
-            WriteOutputError(options, errorFormat, result, new[] { (mode, outcome) });
+            WriteOutputError(options, errorFormat, result, isSingleMode: true, new[] { (mode, outcome) });
             return CliExitCodes.InvalidArgumentsOrRuntimeError;
         }
 
@@ -596,7 +605,7 @@ internal sealed class ValidateCommandHandler
         timing?.WriteReport(_console.Error);
         if (result.Status != ReportRouteStatus.AllSucceeded)
         {
-            WriteOutputError(options, errorFormat, result, outcomesByMode);
+            WriteOutputError(options, errorFormat, result, isSingleMode: false, outcomesByMode);
             return CliExitCodes.InvalidArgumentsOrRuntimeError;
         }
 

@@ -52,4 +52,12 @@ public sealed record ValidationOutcome(
     // this is the complete inventory, PreflightDiagnostics is not.
     public IReadOnlyList<string> ResolvedAssemblyPaths { get; init; } =
         Array.Empty<string>();
+
+    // Every project file (.csproj) discovered while building this analysis, independent of
+    // whether that project's assembly ultimately resolved. Populated by ArchitectureAnalysisSnapshot
+    // from the same project-discovery pass build-state preflight and assembly resolution both
+    // consume — a genuinely consumed input, protected the same way policy imports and resolved
+    // assemblies are.
+    public IReadOnlyList<string> DiscoveredProjectPaths { get; init; } =
+        Array.Empty<string>();
 }
