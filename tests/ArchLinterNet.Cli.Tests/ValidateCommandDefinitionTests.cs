@@ -48,7 +48,7 @@ public sealed class ValidateCommandDefinitionTests
     {
         (_, RecordingConsole console) = Run(args, format: expectedFormat);
 
-        Assert.That(console.OutputText, Does.Contain(expectedFormat == "human" ? "Architecture validation passed." : "formatted"));
+        Assert.That(console.OutputText, Does.Contain(expectedFormat == "human" ? "Architecture validation passed." : "{"));
     }
 
     [Test]
@@ -182,21 +182,21 @@ public sealed class ValidateCommandDefinitionTests
     }
 
     [Test]
-    public void CreateRootCommand_ReportOption_AcceptsStdoutDestinationWhenFormatMatches()
+    public void CreateRootCommand_ReportOption_RejectsExplicitFormatWithReport()
     {
         (RecordingRuntime runtime, RecordingConsole console) = Run(["--report", "json=stdout", "--format", "json"]);
 
-        Assert.That(runtime.LastRequest, Is.Not.Null);
-        Assert.That(console.ErrorText, Is.Empty);
+        Assert.That(runtime.LastRequest, Is.Null);
+        Assert.That(console.ErrorText, Does.Contain("cannot be combined with --report"));
     }
 
     [Test]
-    public void CreateRootCommand_ReportOption_RejectsStdoutDestinationWhenFormatDiffers()
+    public void CreateRootCommand_ReportOption_AcceptsReportSinksWithoutExplicitFormat()
     {
-        (RecordingRuntime runtime, RecordingConsole console) = Run(["--report", "json=stdout", "--format", "human"]);
+        (RecordingRuntime runtime, RecordingConsole console) = Run(["--report", "json=stdout"]);
 
-        Assert.That(runtime.LastRequest, Is.Null);
-        Assert.That(console.ErrorText, Does.Contain("conflicts with --format"));
+        Assert.That(runtime.LastRequest, Is.Not.Null);
+        Assert.That(console.ErrorText, Is.Empty);
     }
 
     [Test]
@@ -317,11 +317,11 @@ public sealed class ValidateCommandDefinitionTests
             IReadOnlyCollection<ArchitectureClassificationMetadataFailure> classificationMetadataFailures,
             IReadOnlyCollection<ArchitectureClassificationRoleFact> classificationRoles,
             ArchitectureClassificationPathDeferredNotice? classificationPathDeferred,
-            IReadOnlyCollection<BuildStatePreflightDiagnostic> preflightDiagnostics) => "formatted";
+            IReadOnlyCollection<BuildStatePreflightDiagnostic> preflightDiagnostics) => "{}";
 
         public string FormatBuildStatePreflightForHumans(IReadOnlyCollection<BuildStatePreflightDiagnostic> diagnostics) => "formatted";
 
-        public string FormatResultAsSarif(string mode, IReadOnlyCollection<ArchitectureViolation> violations, IReadOnlyCollection<string> cycles, IReadOnlyCollection<ArchitectureCycleFinding> cycleFindings, IReadOnlyCollection<BuildStatePreflightDiagnostic> preflightDiagnostics) => "formatted";
+        public string FormatResultAsSarif(string mode, IReadOnlyCollection<ArchitectureViolation> violations, IReadOnlyCollection<string> cycles, IReadOnlyCollection<ArchitectureCycleFinding> cycleFindings, IReadOnlyCollection<BuildStatePreflightDiagnostic> preflightDiagnostics) => "{\"version\":\"2.1.0\",\"runs\":[]}";
         public string FormatViolationsForHumans(IReadOnlyCollection<ArchitectureViolation> violations) => "formatted";
         public string FormatCyclesForHumans(IReadOnlyCollection<string> cycles, IReadOnlyCollection<ArchitectureCycleFinding> cycleFindings) => "formatted";
         public string FormatPolicyConsistencyForHumans(IReadOnlyCollection<PolicyConsistencyDiagnostic> diagnostics) => "formatted";

@@ -163,7 +163,7 @@ internal sealed class ValidateCommandDefinition(ValidateCommandHandler handler)
         Option<bool> versionOption)
     {
         string mode = ResolveMode(parseResult);
-        string format = ResolveFormat(parseResult);
+        string format = ResolveFormat(parseResult, out bool isFormatExplicit);
         IReadOnlyList<ReportSink> additionalSinks = Array.Empty<ReportSink>();
         string? reportParseError = null;
 
@@ -191,6 +191,7 @@ internal sealed class ValidateCommandDefinition(ValidateCommandHandler handler)
             parseResult.GetValue(configurationOption),
             parseResult.GetValue(targetFrameworkOption))
         {
+            IsFormatExplicit = isFormatExplicit,
             AdditionalSinks = additionalSinks,
             ReportParseError = reportParseError,
         };
@@ -231,9 +232,10 @@ internal sealed class ValidateCommandDefinition(ValidateCommandHandler handler)
         return mode;
     }
 
-    private static string ResolveFormat(ParseResult parseResult)
+    private static string ResolveFormat(ParseResult parseResult, out bool isExplicit)
     {
         string format = HumanFormat;
+        isExplicit = false;
         bool expectFormatValue = false;
 
         foreach (string token in EnumerateTokenValues(parseResult))
@@ -248,12 +250,14 @@ internal sealed class ValidateCommandDefinition(ValidateCommandHandler handler)
             if (IsOption(token, "--format", "-f"))
             {
                 expectFormatValue = true;
+                isExplicit = true;
                 continue;
             }
 
             if (IsOption(token, "--json"))
             {
                 format = "json";
+                isExplicit = true;
             }
         }
 
@@ -308,7 +312,7 @@ internal sealed class ValidateCommandDefinition(ValidateCommandHandler handler)
         }
 
         List<ReportSink> sinks = new(rawValues.Length);
-        HashSet<string> destinations = new(StringComparer.Ordinal);
+        HashSet<string> destinations = new(StringComparer.OrdinalIgnoreCase);
         foreach (string raw in rawValues)
         {
             int eqIndex = raw.IndexOf('=');

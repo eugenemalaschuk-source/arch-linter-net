@@ -15,6 +15,8 @@ internal sealed record ValidateCommandOptions(
     string? Configuration = null,
     string? TargetFramework = null)
 {
+    public bool IsFormatExplicit { get; init; }
+
     public IReadOnlyList<ReportSink> AdditionalSinks { get; init; } = Array.Empty<ReportSink>();
 
     public string? ReportParseError { get; init; }

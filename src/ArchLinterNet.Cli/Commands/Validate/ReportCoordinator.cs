@@ -17,10 +17,13 @@ internal enum ReportRouteStatus
 internal readonly record struct RouteResult(
     ReportRouteStatus Status,
     IReadOnlyList<string> FailedPaths,
+    IReadOnlyList<string> CommittedPaths,
     IReadOnlyList<string> ErrorDetails);
 
 internal sealed class ReportCoordinator
 {
+    private const int MaxReportBytes = 100 * 1024 * 1024;
+
     private readonly ICliRuntime _runtime;
     private readonly ICliConsole _console;
     private readonly IFileSystem _fileSystem;
@@ -38,7 +41,8 @@ internal sealed class ReportCoordinator
         ValidationOutcome outcome,
         IReadOnlyList<ReportSink> additionalSinks)
     {
-        return RouteOutcomes(stdoutFormat, new[] { (mode, outcome) }, additionalSinks, isSingleMode: true);
+        bool isReportMode = additionalSinks.Count > 0;
+        return RouteOutcomes(stdoutFormat, new[] { (mode, outcome) }, additionalSinks, isSingleMode: true, isReportMode);
     }
 
     public RouteResult RouteCombinedOutcomes(
@@ -46,18 +50,20 @@ internal sealed class ReportCoordinator
         IReadOnlyList<(string Mode, ValidationOutcome Outcome)> outcomesByMode,
         IReadOnlyList<ReportSink> additionalSinks)
     {
-        return RouteOutcomes(stdoutFormat, outcomesByMode, additionalSinks, isSingleMode: false);
+        bool isReportMode = additionalSinks.Count > 0;
+        return RouteOutcomes(stdoutFormat, outcomesByMode, additionalSinks, isSingleMode: false, isReportMode);
     }
 
     private RouteResult RouteOutcomes(
         string stdoutFormat,
         IReadOnlyList<(string Mode, ValidationOutcome Outcome)> outcomesByMode,
         IReadOnlyList<ReportSink> additionalSinks,
-        bool isSingleMode)
+        bool isSingleMode,
+        bool isReportMode)
     {
-        string? neededHuman = StdoutOrAnySinkNeeds("human", stdoutFormat, additionalSinks);
-        string? neededJson = StdoutOrAnySinkNeeds("json", stdoutFormat, additionalSinks);
-        string? neededSarif = StdoutOrAnySinkNeeds("sarif", stdoutFormat, additionalSinks);
+        string? neededHuman = StdoutOrAnySinkNeeds("human", stdoutFormat, additionalSinks, isReportMode);
+        string? neededJson = StdoutOrAnySinkNeeds("json", stdoutFormat, additionalSinks, isReportMode);
+        string? neededSarif = StdoutOrAnySinkNeeds("sarif", stdoutFormat, additionalSinks, isReportMode);
 
         string? humanContent = null;
         string? jsonContent = null;
@@ -84,15 +90,19 @@ internal sealed class ReportCoordinator
                 : FormatCombinedSarif(outcomesByMode);
         }
 
-        _console.Out.WriteLine(DispatchFormat(stdoutFormat, humanContent, jsonContent, sarifContent));
+        if (!isReportMode)
+        {
+            _console.Out.WriteLine(DispatchFormat(stdoutFormat, humanContent, jsonContent, sarifContent));
+        }
 
         List<string> failedPaths = new();
+        List<string> committedPaths = new();
         List<string> errorDetails = new();
         List<(string TempPath, string TargetPath)> pendingRenames = new();
 
         foreach (ReportSink sink in additionalSinks)
         {
-            if (sink.DestinationType == ReportDestinationType.Stdout || sink.DestinationType == ReportDestinationType.Stderr)
+            if (sink.DestinationType is ReportDestinationType.Stdout or ReportDestinationType.Stderr)
             {
                 string content = sink.Format switch
                 {
@@ -105,6 +115,10 @@ internal sealed class ReportCoordinator
                 if (sink.DestinationType == ReportDestinationType.Stderr)
                 {
                     _console.Error.WriteLine(content);
+                }
+                else
+                {
+                    _console.Out.WriteLine(content);
                 }
 
                 continue;
@@ -120,6 +134,7 @@ internal sealed class ReportCoordinator
 
             try
             {
+                ValidateBoundedOutput(sink.Format, fileContent);
                 _fileSystem.WriteAllTextToTemp(sink.FilePath!, fileContent);
                 string tempPath = _fileSystem.ResolveTempPath(sink.FilePath!);
                 pendingRenames.Add((tempPath, sink.FilePath!));
@@ -140,6 +155,7 @@ internal sealed class ReportCoordinator
                 try
                 {
                     _fileSystem.RenameTempToTarget(tempPath, targetPath);
+                    committedPaths.Add(targetPath);
                 }
                 catch (Exception ex)
                 {
@@ -159,22 +175,23 @@ internal sealed class ReportCoordinator
 
         if (failedPaths.Count == 0)
         {
-            return new RouteResult(ReportRouteStatus.AllSucceeded, Array.Empty<string>(), Array.Empty<string>());
+            return new RouteResult(ReportRouteStatus.AllSucceeded, Array.Empty<string>(), committedPaths, Array.Empty<string>());
         }
 
-        ReportRouteStatus status = phase1AllSucceeded
+        ReportRouteStatus status = committedPaths.Count > 0
             ? ReportRouteStatus.PartialOutput
             : ReportRouteStatus.OutputFailed;
 
-        return new RouteResult(status, failedPaths, errorDetails);
+        return new RouteResult(status, failedPaths, committedPaths, errorDetails);
     }
 
     private static string? StdoutOrAnySinkNeeds(
         string format,
         string stdoutFormat,
-        IReadOnlyList<ReportSink> sinks)
+        IReadOnlyList<ReportSink> sinks,
+        bool isReportMode)
     {
-        if (stdoutFormat == format)
+        if (!isReportMode && stdoutFormat == format)
         {
             return "stdout";
         }
@@ -188,6 +205,20 @@ internal sealed class ReportCoordinator
         }
 
         return null;
+    }
+
+    private static void ValidateBoundedOutput(string format, string content)
+    {
+        if (content.Length > MaxReportBytes)
+        {
+            throw new InvalidOperationException(
+                $"Report content exceeds maximum size of {MaxReportBytes} bytes.");
+        }
+
+        if (format is "json" or "sarif")
+        {
+            _ = JsonNode.Parse(content);
+        }
     }
 
     private string FormatSingleHuman(string mode, ValidationOutcome outcome)
@@ -214,7 +245,7 @@ internal sealed class ReportCoordinator
             }
             AppendHumanSection(sb, outcome);
         }
-        return sb.ToString();
+        return sb.ToString().TrimEnd();
     }
 
     private void AppendHumanSection(StringBuilder sb, ValidationOutcome outcome)

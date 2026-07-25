@@ -89,7 +89,7 @@ public sealed class ReportCoordinatorTests
         RouteResult result = coordinator.RouteSingleOutcome("human", "strict", PassedOutcome, sinks);
 
         Assert.That(result.Status, Is.EqualTo(ReportRouteStatus.AllSucceeded));
-        Assert.That(console.OutputText, Does.Contain("Architecture validation passed."));
+        Assert.That(console.OutputText, Is.Empty);
         Assert.That(console.ErrorText, Does.Contain("Architecture validation passed."));
     }
 
@@ -181,7 +181,6 @@ public sealed class ReportCoordinatorTests
         Assert.That(result.Status, Is.EqualTo(ReportRouteStatus.OutputFailed));
         Assert.That(result.FailedPaths, Does.Contain("output.json"));
         Assert.That(result.ErrorDetails, Is.Not.Empty);
-        Assert.That(console.OutputText, Does.Contain("Architecture validation passed."));
     }
 
     [Test]

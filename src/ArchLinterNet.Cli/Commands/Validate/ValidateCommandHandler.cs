@@ -50,7 +50,7 @@ internal sealed class ValidateCommandHandler
     private void WriteOutputError(string format, RouteResult result)
     {
         string status = result.Status == ReportRouteStatus.PartialOutput ? "partial-output" : "output-failed";
-        string message = $"Report output failed ({status}): {string.Join(", ", result.FailedPaths)}";
+        string message = FormatOutputError(status, result);
 
         if (format == "json" || format == "sarif")
         {
@@ -60,6 +60,7 @@ internal sealed class ValidateCommandHandler
                 output_status = status,
                 message,
                 failed_paths = result.FailedPaths,
+                committed_paths = result.CommittedPaths,
                 errors = result.ErrorDetails,
             }));
             return;
@@ -70,6 +71,21 @@ internal sealed class ValidateCommandHandler
         {
             _console.Error.WriteLine($"  {detail}");
         }
+    }
+
+    private static string FormatOutputError(string status, RouteResult result)
+    {
+        var sb = new System.Text.StringBuilder();
+        sb.Append($"Report output failed ({status})");
+        if (result.FailedPaths.Count > 0)
+        {
+            sb.Append($": failed={string.Join(", ", result.FailedPaths)}");
+        }
+        if (result.CommittedPaths.Count > 0)
+        {
+            sb.Append($", committed={string.Join(", ", result.CommittedPaths)}");
+        }
+        return sb.ToString();
     }
 
     // Catches every error that isn't a structured ArchitecturePolicyDiagnostic — including an
@@ -151,10 +167,11 @@ internal sealed class ValidateCommandHandler
             return CliExitCodes.InvalidArgumentsOrRuntimeError;
         }
 
-        string? stdoutConflict = FindStdoutConflict(options);
-        if (stdoutConflict is not null)
+        if (options.IsFormatExplicit && options.AdditionalSinks.Count > 0)
         {
-            _console.Error.WriteLine(stdoutConflict);
+            _console.Error.WriteLine(
+                "--format/--json cannot be combined with --report. " +
+                "Use --report <format>=stdout to route output to stdout.");
             return CliExitCodes.InvalidArgumentsOrRuntimeError;
         }
 
@@ -168,25 +185,6 @@ internal sealed class ValidateCommandHandler
         if (!PreValidateReportDestinations(options))
         {
             return CliExitCodes.InvalidArgumentsOrRuntimeError;
-        }
-
-        return null;
-    }
-
-    private static string? FindStdoutConflict(ValidateCommandOptions options)
-    {
-        foreach (ReportSink sink in options.AdditionalSinks)
-        {
-            if (sink.DestinationType != ReportDestinationType.Stdout)
-            {
-                continue;
-            }
-
-            if (!string.Equals(sink.Format, options.Format, StringComparison.Ordinal))
-            {
-                return $"--report {sink.Format}=stdout conflicts with --format {options.Format}. " +
-                    $"Use --format {sink.Format} to send {sink.Format} to stdout.";
-            }
         }
 
         return null;
