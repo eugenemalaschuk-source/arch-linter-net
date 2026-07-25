@@ -8,6 +8,8 @@ internal interface IFileSystem
 
     void WriteAllTextToTemp(string path, string contents);
 
+    string ResolveTempPath(string path);
+
     void RenameTempToTarget(string tempPath, string targetPath);
 
     void DeleteFile(string path);

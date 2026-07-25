@@ -543,6 +543,8 @@ public sealed partial class BaselineCommandHandlerTests
         {
         }
 
+        public string ResolveTempPath(string path) => path + ".tmp";
+
         public void DeleteFile(string path)
         {
         }

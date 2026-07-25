@@ -182,12 +182,33 @@ public sealed class ValidateCommandDefinitionTests
     }
 
     [Test]
-    public void CreateRootCommand_ReportOption_AcceptsStdoutDestinationAsNoOp()
+    public void CreateRootCommand_ReportOption_AcceptsStdoutDestinationWhenFormatMatches()
     {
-        (RecordingRuntime runtime, RecordingConsole console) = Run(["--report", "json=stdout"]);
+        (RecordingRuntime runtime, RecordingConsole console) = Run(["--report", "json=stdout", "--format", "json"]);
 
         Assert.That(runtime.LastRequest, Is.Not.Null);
         Assert.That(console.ErrorText, Is.Empty);
+    }
+
+    [Test]
+    public void CreateRootCommand_ReportOption_RejectsStdoutDestinationWhenFormatDiffers()
+    {
+        (RecordingRuntime runtime, RecordingConsole console) = Run(["--report", "json=stdout", "--format", "human"]);
+
+        Assert.That(runtime.LastRequest, Is.Null);
+        Assert.That(console.ErrorText, Does.Contain("conflicts with --format"));
+    }
+
+    [Test]
+    public void CreateRootCommand_ReportOption_RejectsDuplicateNormalizedPaths()
+    {
+        (RecordingRuntime runtime, RecordingConsole console) = Run([
+            "--report", "json=results.json",
+            "--report", "sarif=./results.json",
+        ]);
+
+        Assert.That(runtime.LastRequest, Is.Null);
+        Assert.That(console.ErrorText, Does.Contain("Duplicate"));
     }
 
     [Test]
@@ -236,6 +257,7 @@ public sealed class ValidateCommandDefinitionTests
         public bool FileExists(string path) => exists;
         public void WriteAllText(string path, string contents) { }
         public void WriteAllTextToTemp(string path, string contents) { }
+        public string ResolveTempPath(string path) => path + ".tmp";
         public void RenameTempToTarget(string tempPath, string targetPath) { }
         public void DeleteFile(string path) { }
         public bool CanWriteToDirectory(string path) => true;

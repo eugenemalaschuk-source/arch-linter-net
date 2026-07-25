@@ -14,7 +14,10 @@ internal enum ReportRouteStatus
     OutputFailed,
 }
 
-internal readonly record struct RouteResult(ReportRouteStatus Status, IReadOnlyList<string> FailedPaths);
+internal readonly record struct RouteResult(
+    ReportRouteStatus Status,
+    IReadOnlyList<string> FailedPaths,
+    IReadOnlyList<string> ErrorDetails);
 
 internal sealed class ReportCoordinator
 {
@@ -83,12 +86,13 @@ internal sealed class ReportCoordinator
 
         _console.Out.WriteLine(DispatchFormat(stdoutFormat, humanContent, jsonContent, sarifContent));
 
-        // Phase 1: write stderr sinks immediately, write temp files for all file sinks
         List<string> failedPaths = new();
+        List<string> errorDetails = new();
         List<(string TempPath, string TargetPath)> pendingRenames = new();
+
         foreach (ReportSink sink in additionalSinks)
         {
-            if (sink.DestinationType == ReportDestinationType.Stderr)
+            if (sink.DestinationType == ReportDestinationType.Stdout || sink.DestinationType == ReportDestinationType.Stderr)
             {
                 string content = sink.Format switch
                 {
@@ -98,33 +102,38 @@ internal sealed class ReportCoordinator
                     _ => string.Empty,
                 };
 
-                _console.Error.WriteLine(content);
+                if (sink.DestinationType == ReportDestinationType.Stderr)
+                {
+                    _console.Error.WriteLine(content);
+                }
+
+                continue;
             }
-            else if (sink.DestinationType == ReportDestinationType.File)
-            {
-                string content = sink.Format switch
-                {
-                    "human" => humanContent!,
-                    "json" => jsonContent!,
-                    "sarif" => sarifContent!,
-                    _ => string.Empty,
-                };
 
-                try
-                {
-                    _fileSystem.WriteAllTextToTemp(sink.FilePath!, content);
-                    pendingRenames.Add((sink.FilePath! + ".tmp", sink.FilePath!));
-                }
-                catch (Exception ex)
-                {
-                    _console.Error.WriteLine($"Failed to write report to '{sink.FilePath}': {ex.Message}");
-                    failedPaths.Add(sink.FilePath!);
-                }
+            string fileContent = sink.Format switch
+            {
+                "human" => humanContent!,
+                "json" => jsonContent!,
+                "sarif" => sarifContent!,
+                _ => string.Empty,
+            };
+
+            try
+            {
+                _fileSystem.WriteAllTextToTemp(sink.FilePath!, fileContent);
+                string tempPath = _fileSystem.ResolveTempPath(sink.FilePath!);
+                pendingRenames.Add((tempPath, sink.FilePath!));
+            }
+            catch (Exception ex)
+            {
+                failedPaths.Add(sink.FilePath!);
+                errorDetails.Add(ex.Message);
             }
         }
 
-        // Phase 2: rename all temps to targets (only if Phase 1 had no failures)
-        if (failedPaths.Count == 0)
+        bool phase1AllSucceeded = failedPaths.Count == 0;
+
+        if (phase1AllSucceeded)
         {
             foreach ((string tempPath, string targetPath) in pendingRenames)
             {
@@ -134,16 +143,14 @@ internal sealed class ReportCoordinator
                 }
                 catch (Exception ex)
                 {
-                    _console.Error.WriteLine($"Failed to write report to '{targetPath}': {ex.Message}");
                     failedPaths.Add(targetPath);
+                    errorDetails.Add(ex.Message);
                     try { _fileSystem.DeleteFile(tempPath); } catch { }
                 }
             }
         }
         else
         {
-            // One or more temp writes failed — clean up any temps that were written,
-            // skip Phase 2 entirely so no target files are created.
             foreach ((string tempPath, string _) in pendingRenames)
             {
                 try { _fileSystem.DeleteFile(tempPath); } catch { }
@@ -152,15 +159,14 @@ internal sealed class ReportCoordinator
 
         if (failedPaths.Count == 0)
         {
-            return new RouteResult(ReportRouteStatus.AllSucceeded, Array.Empty<string>());
+            return new RouteResult(ReportRouteStatus.AllSucceeded, Array.Empty<string>(), Array.Empty<string>());
         }
 
-        int totalFileSinks = additionalSinks.Count(s => s.DestinationType == ReportDestinationType.File);
-        return new RouteResult(
-            failedPaths.Count < totalFileSinks
-                ? ReportRouteStatus.PartialOutput
-                : ReportRouteStatus.OutputFailed,
-            failedPaths);
+        ReportRouteStatus status = phase1AllSucceeded
+            ? ReportRouteStatus.PartialOutput
+            : ReportRouteStatus.OutputFailed;
+
+        return new RouteResult(status, failedPaths, errorDetails);
     }
 
     private static string? StdoutOrAnySinkNeeds(
@@ -202,7 +208,10 @@ internal sealed class ReportCoordinator
                 sb.AppendLine();
             }
             first = false;
-            sb.AppendLine($"=== Mode: {mode} ===");
+            if (outcomesByMode.Count > 1)
+            {
+                sb.AppendLine($"=== Mode: {mode} ===");
+            }
             AppendHumanSection(sb, outcome);
         }
         return sb.ToString();

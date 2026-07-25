@@ -327,13 +327,14 @@ internal sealed class ValidateCommandDefinition(ValidateCommandHandler handler)
                     $"Invalid format in --report: '{format}'. Use human, json, or sarif.");
             }
 
-            if (string.Equals(destination, "stdout", StringComparison.Ordinal))
+            string dedupKey = destination switch
             {
-                // stdout sinks are redundant with --format output; skip silently
-                continue;
-            }
+                "stdout" => "stdout",
+                "stderr" => "stderr",
+                _ => Path.GetFullPath(destination),
+            };
 
-            if (!destinations.Add(destination))
+            if (!destinations.Add(dedupKey))
             {
                 throw new InvalidOperationException(
                     $"Duplicate --report destination: '{destination}'.");
@@ -341,6 +342,7 @@ internal sealed class ValidateCommandDefinition(ValidateCommandHandler handler)
 
             ReportSink sink = destination switch
             {
+                "stdout" => new ReportSink(format, ReportDestinationType.Stdout),
                 "stderr" => new ReportSink(format, ReportDestinationType.Stderr),
                 _ => new ReportSink(format, ReportDestinationType.File, destination),
             };

@@ -24,13 +24,16 @@ internal sealed class FileSystem : IFileSystem
         }
 
         File.WriteAllText(absolutePath + ".tmp", contents);
-
-        File.WriteAllText(path + ".tmp", contents);
     }
 
     public void RenameTempToTarget(string tempPath, string targetPath)
     {
         File.Move(tempPath, targetPath, overwrite: true);
+    }
+
+    public string ResolveTempPath(string path)
+    {
+        return Path.GetFullPath(path) + ".tmp";
     }
 
     public void DeleteFile(string path)

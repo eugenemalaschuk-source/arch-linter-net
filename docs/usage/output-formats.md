@@ -156,7 +156,7 @@ Use SARIF output to feed violations into GitHub code scanning or other standard 
 arch-linter-net --mode strict --format sarif > architecture-violations.sarif
 ```
 
-SARIF output is a single SARIF 2.1.0 document (`version: "2.1.0"`, with a `$schema` pointing at the SARIF 2.1.0 schema) containing one `run`. Use `--report sarif=<path>` to write SARIF to a file directly instead of redirecting stdout:
+SARIF output is a single SARIF 2.1.0 document (`version: "2.1.0"`, with a `$schema` pointing at the SARIF 2.1.0 schema) containing one `run`. Use `--report sarif=<path>` to write SARIF to a file directly instead of redirecting stdout (also works in PowerShell):
 
 - `tool.driver.name` identifies the CLI, and `tool.driver.rules` lists every contract ID that produced a result, deduplicated by rule ID.
 - Each `result.ruleId` is the violating contract's ID (or a normalized fallback derived from its name when no ID is set).

@@ -60,11 +60,16 @@ internal sealed class ValidateCommandHandler
                 output_status = status,
                 message,
                 failed_paths = result.FailedPaths,
+                errors = result.ErrorDetails,
             }));
             return;
         }
 
         _console.Error.WriteLine(message);
+        foreach (string detail in result.ErrorDetails)
+        {
+            _console.Error.WriteLine($"  {detail}");
+        }
     }
 
     // Catches every error that isn't a structured ArchitecturePolicyDiagnostic — including an
@@ -146,6 +151,13 @@ internal sealed class ValidateCommandHandler
             return CliExitCodes.InvalidArgumentsOrRuntimeError;
         }
 
+        string? stdoutConflict = FindStdoutConflict(options);
+        if (stdoutConflict is not null)
+        {
+            _console.Error.WriteLine(stdoutConflict);
+            return CliExitCodes.InvalidArgumentsOrRuntimeError;
+        }
+
         string? reportCollision = FindReportFileCollision(options);
         if (reportCollision is not null)
         {
@@ -156,6 +168,25 @@ internal sealed class ValidateCommandHandler
         if (!PreValidateReportDestinations(options))
         {
             return CliExitCodes.InvalidArgumentsOrRuntimeError;
+        }
+
+        return null;
+    }
+
+    private static string? FindStdoutConflict(ValidateCommandOptions options)
+    {
+        foreach (ReportSink sink in options.AdditionalSinks)
+        {
+            if (sink.DestinationType != ReportDestinationType.Stdout)
+            {
+                continue;
+            }
+
+            if (!string.Equals(sink.Format, options.Format, StringComparison.Ordinal))
+            {
+                return $"--report {sink.Format}=stdout conflicts with --format {options.Format}. " +
+                    $"Use --format {sink.Format} to send {sink.Format} to stdout.";
+            }
         }
 
         return null;

@@ -76,9 +76,22 @@ arch-linter-net --format json --report human=stderr
 arch-linter-net --strict --report json=ci-report.json --report sarif=ci-report.sarif
 ```
 
+```powershell
+# PowerShell: human to stdout, JSON to a file with explicit format
+arch-linter-net --strict --report json=results.json
+
+# PowerShell: JSON to stdout, SARIF to a file
+arch-linter-net --format json --report sarif=ci-report.sarif
+```
+
 ### Multi-mode combined output
 
 ```bash
+arch-linter-net --mode strict,audit --report json=combined-results.json --report sarif=combined-results.sarif
+```
+
+```powershell
+# PowerShell: combined strict+audit with JSON and SARIF files
 arch-linter-net --mode strict,audit --report json=combined-results.json --report sarif=combined-results.sarif
 ```
 

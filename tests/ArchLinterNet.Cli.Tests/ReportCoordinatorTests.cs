@@ -39,9 +39,10 @@ public sealed class ReportCoordinatorTests
         var fileSystem = new StubFileSystem();
         var coordinator = new ReportCoordinator(runtime, console, fileSystem);
 
-        RouteResult result = coordinator.RouteSingleOutcome("human", "strict", PassedOutcome, Array.Empty<ReportSink>());
+        RouteResult result = coordinator.RouteSingleOutcome("human", "strict", PassedOutcome, []);
 
         Assert.That(result.Status, Is.EqualTo(ReportRouteStatus.AllSucceeded));
+        Assert.That(result.FailedPaths, Is.Empty);
         Assert.That(console.OutputText, Does.Contain("Architecture validation passed."));
         Assert.That(console.ErrorText, Is.Empty);
     }
@@ -179,12 +180,12 @@ public sealed class ReportCoordinatorTests
 
         Assert.That(result.Status, Is.EqualTo(ReportRouteStatus.OutputFailed));
         Assert.That(result.FailedPaths, Does.Contain("output.json"));
-        Assert.That(console.ErrorText, Does.Contain("Failed to write report"));
+        Assert.That(result.ErrorDetails, Is.Not.Empty);
         Assert.That(console.OutputText, Does.Contain("Architecture validation passed."));
     }
 
     [Test]
-    public void RouteSingleOutcome_OneFileSinkFailsPartial_ReturnsPartialOutput()
+    public void RouteSingleOutcome_OneFileSinkFailsPhase2_ReturnsPartialOutput()
     {
         var runtime = new CountingRuntime();
         var console = new CapturingConsole();
@@ -196,13 +197,59 @@ public sealed class ReportCoordinatorTests
             new ReportSink("json", ReportDestinationType.File, "good.json"),
             new ReportSink("sarif", ReportDestinationType.File, "bad.sarif"),
         };
-        fileSystem.MakeUnwritable("bad.sarif");
+        fileSystem.MakeUnwritable("bad.sarif", phase: StubFileSystem.FailPhase.Rename);
 
         RouteResult result = coordinator.RouteSingleOutcome("human", "strict", PassedOutcome, sinks);
 
         Assert.That(result.Status, Is.EqualTo(ReportRouteStatus.PartialOutput));
         Assert.That(result.FailedPaths, Does.Contain("bad.sarif"));
         Assert.That(result.FailedPaths, Does.Not.Contain("good.json"));
+    }
+
+    [Test]
+    public void RouteSingleOutcome_TempWriteFailsForAll_ReturnsOutputFailed()
+    {
+        var runtime = new CountingRuntime();
+        var console = new CapturingConsole();
+        var fileSystem = new StubFileSystem();
+        var coordinator = new ReportCoordinator(runtime, console, fileSystem);
+
+        var sinks = new[]
+        {
+            new ReportSink("json", ReportDestinationType.File, "one.json"),
+            new ReportSink("sarif", ReportDestinationType.File, "two.sarif"),
+        };
+        fileSystem.MakeUnwritable("one.json", phase: StubFileSystem.FailPhase.Write);
+        fileSystem.MakeUnwritable("two.sarif", phase: StubFileSystem.FailPhase.Write);
+
+        RouteResult result = coordinator.RouteSingleOutcome("human", "strict", PassedOutcome, sinks);
+
+        Assert.That(result.Status, Is.EqualTo(ReportRouteStatus.OutputFailed));
+        Assert.That(result.FailedPaths, Is.EquivalentTo(new[] { "one.json", "two.sarif" }));
+    }
+
+    [Test]
+    public void RouteSingleOutcome_FirstTempWriteFailsAllRenamesSkipped_ReturnsOutputFailed()
+    {
+        var runtime = new CountingRuntime();
+        var console = new CapturingConsole();
+        var fileSystem = new StubFileSystem();
+        var coordinator = new ReportCoordinator(runtime, console, fileSystem);
+
+        var sinks = new[]
+        {
+            new ReportSink("json", ReportDestinationType.File, "bad.json"),
+            new ReportSink("sarif", ReportDestinationType.File, "good.sarif"),
+        };
+        fileSystem.MakeUnwritable("bad.json", phase: StubFileSystem.FailPhase.Write);
+
+        RouteResult result = coordinator.RouteSingleOutcome("human", "strict", PassedOutcome, sinks);
+
+        // Phase 1: bad.json fails, good.sarif temp written.
+        // Phase 2: skipped entirely.
+        // No file was renamed → no output published → OutputFailed, not PartialOutput.
+        Assert.That(result.Status, Is.EqualTo(ReportRouteStatus.OutputFailed));
+        Assert.That(result.FailedPaths, Is.EquivalentTo(new[] { "bad.json" }));
     }
 
     private sealed class CapturingConsole : ICliConsole
@@ -217,12 +264,16 @@ public sealed class ReportCoordinatorTests
 
     private sealed class StubFileSystem : IFileSystem
     {
-        private readonly HashSet<string> _unwritablePaths = new(StringComparer.Ordinal);
+        public enum FailPhase { Write, Rename }
+
+        private readonly record struct FailEntry(string Path, FailPhase Phase);
+        private readonly HashSet<FailEntry> _failOn = new();
 
         public List<string> TempPaths { get; } = new();
         public List<string> TargetPaths { get; } = new();
 
-        public void MakeUnwritable(string path) => _unwritablePaths.Add(path);
+        public void MakeUnwritable(string path, FailPhase phase = FailPhase.Write) =>
+            _failOn.Add(new FailEntry(path, phase));
 
         public bool FileExists(string path) => false;
 
@@ -230,7 +281,7 @@ public sealed class ReportCoordinatorTests
 
         public void WriteAllTextToTemp(string path, string contents)
         {
-            if (_unwritablePaths.Contains(path))
+            if (_failOn.Contains(new FailEntry(path, FailPhase.Write)))
             {
                 throw new IOException($"Cannot write to {path}");
             }
@@ -238,10 +289,12 @@ public sealed class ReportCoordinatorTests
             TempPaths.Add(path);
         }
 
+        public string ResolveTempPath(string path) => path + ".tmp";
+
         public void RenameTempToTarget(string tempPath, string targetPath)
         {
             string original = tempPath.EndsWith(".tmp") ? tempPath[..^4] : tempPath;
-            if (_unwritablePaths.Contains(original))
+            if (_failOn.Contains(new FailEntry(original, FailPhase.Rename)))
             {
                 throw new IOException($"Cannot rename to {targetPath}");
             }
@@ -253,7 +306,7 @@ public sealed class ReportCoordinatorTests
         {
         }
 
-        public bool CanWriteToDirectory(string path) => !_unwritablePaths.Contains(path);
+        public bool CanWriteToDirectory(string path) => !_failOn.Contains(new FailEntry(path, FailPhase.Write));
     }
 
     private sealed class FailingFileSystem : IFileSystem
@@ -261,6 +314,7 @@ public sealed class ReportCoordinatorTests
         public bool FileExists(string path) => false;
         public void WriteAllText(string path, string contents) { }
         public void WriteAllTextToTemp(string path, string contents) => throw new IOException("Disk full");
+        public string ResolveTempPath(string path) => path + ".tmp";
         public void RenameTempToTarget(string tempPath, string targetPath) { }
         public void DeleteFile(string path) { }
         public bool CanWriteToDirectory(string path) => true;
