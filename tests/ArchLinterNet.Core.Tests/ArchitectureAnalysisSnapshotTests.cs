@@ -249,7 +249,7 @@ public sealed class ArchitectureAnalysisSnapshotTests
         {
             Assert.That(exception!.Message, Is.EqualTo("project discovery failed"));
             Assert.That(exception.InnerException, Is.TypeOf<InvalidOperationException>());
-            Assert.That(exception.PolicyImportPaths, Is.Empty);
+            Assert.That(exception.PolicyImportPaths, Does.Contain(Path.GetFullPath("unused-by-fakes.arch.yml")));
         });
     }
 

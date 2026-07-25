@@ -174,7 +174,7 @@ public sealed class CoverageContractReservedTests
                   reason: Invalid namespace coverage root.
             """);
 
-        InvalidOperationException ex = Assert.Throws<InvalidOperationException>(() =>
+        InvalidOperationException ex = Assert.Catch<InvalidOperationException>(() =>
             ArchitectureValidationService.Validate(new ValidationRequest
             {
                 PolicyPath = policyPath,
