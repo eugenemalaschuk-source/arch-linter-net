@@ -91,6 +91,31 @@ A zero-match selector/set SHALL fail closed unless the exact contract input is d
 - **WHEN** a small policy uses the existing single-source form
 - **THEN** it requires no source-set, glob, cache, profiling, or concurrency configuration
 
+### Requirement: Shipped framework-reference and composition governance remains authoritative
+The 0.5.1 compatibility envelope SHALL compose with the shipped `framework-reference-contracts`, `framework-reference-allow-only-contracts`, and `composition-contracts` capabilities without reclassifying a `FrameworkReference` as a package or reducing a composition source to display-only type text.
+
+Framework-reference findings SHALL preserve the framework name, explicit-versus-SDK-implicit classification, source project/assembly, evaluated build configuration, target framework, declaration/project-file evidence, contract identity, and policy provenance supported by the shipped capability. Scoped project/MSBuild evaluation that cannot be completed SHALL fail closed rather than produce a clean result. Policies without framework-reference contracts SHALL retain existing behavior and require no new project-metadata configuration.
+
+Composition findings SHALL preserve assembly-qualified source type/member identity, source project where available, semantic role/contract identity, exact occurrence, and policy provenance. Same-named composition roots in different assemblies and multiple occurrences in one source type SHALL remain distinct. Composition governance SHALL NOT require runtime dependency-injection inspection, application execution, or semantic data-flow analysis.
+
+Reusable source-set expansion MAY feed these contract source selectors only after resolving each concrete source to an already-selected project/assembly identity. Expansion SHALL NOT weaken the family-specific exact identity or typed evidence required by the shipped capabilities.
+
+#### Scenario: Same framework reference exists in different project contexts
+- **WHEN** the same framework name is active in two projects, target frameworks, or build configurations
+- **THEN** each applicable finding remains distinct by project/configuration/TFM identity and baselining one does not suppress the other
+
+#### Scenario: Framework metadata cannot be evaluated
+- **WHEN** a scoped framework-reference contract cannot obtain trustworthy project/MSBuild metadata for one source context
+- **THEN** validation reports a typed fail-closed configuration/evaluation finding and does not report that context as clean
+
+#### Scenario: Same-named composition roots exist in two assemblies
+- **WHEN** two assemblies each contain a same-named `Program` or registration type covered by composition governance
+- **THEN** their finding and baseline identities remain distinct by source assembly/project identity
+
+#### Scenario: New governance families are unused
+- **WHEN** a policy declares neither framework-reference nor composition contracts and uses no source sets
+- **THEN** 0.5.1 preserves the existing small-policy behavior without requiring project discovery or expansion configuration solely for these capabilities
+
 ### Requirement: Planned-empty rule inputs are first-class lifecycle state
 The policy schema SHALL allow an exact contract input to be declared intentionally optional with a mandatory non-empty reason and authored provenance. The declaration SHALL suppress only the matching `empty-input` coverage debt, SHALL remain visible as typed `optional-empty` state, and SHALL automatically become ordinary populated coverage when matching code appears. Stale or unknown contract/input references SHALL fail closed.
 
