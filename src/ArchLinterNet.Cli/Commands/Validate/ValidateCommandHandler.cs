@@ -192,6 +192,28 @@ internal sealed class ValidateCommandHandler
         return null;
     }
 
+    private static string? FindImportFileCollision(ValidateCommandOptions options, IReadOnlyList<string> policyImportPaths)
+    {
+        foreach (ReportSink sink in options.AdditionalSinks)
+        {
+            if (sink.DestinationType != ReportDestinationType.File || sink.FilePath is null)
+            {
+                continue;
+            }
+
+            string sinkFullPath = Path.GetFullPath(sink.FilePath);
+            foreach (string importPath in policyImportPaths)
+            {
+                if (string.Equals(sinkFullPath, importPath, StringComparison.OrdinalIgnoreCase))
+                {
+                    return $"--report destination '{sink.FilePath}' matches imported policy file '{importPath}'";
+                }
+            }
+        }
+
+        return null;
+    }
+
     private bool PreValidateReportDestinations(ValidateCommandOptions options)
     {
         foreach (ReportSink sink in options.AdditionalSinks)
@@ -241,6 +263,14 @@ internal sealed class ValidateCommandHandler
         ValidationRequest request = BuildValidationRequest(options, mode);
 
         ValidationOutcome outcome = _runtime.Validate(request, timing);
+
+        string? importCollision = FindImportFileCollision(options, outcome.PolicyImportPaths);
+        if (importCollision is not null)
+        {
+            _console.Error.WriteLine(importCollision);
+            return CliExitCodes.InvalidArgumentsOrRuntimeError;
+        }
+
         RouteResult result = _coordinator.RouteSingleOutcome(options.Format, mode, outcome, options.AdditionalSinks);
         timing?.WriteReport(_console.Error);
         if (result.Status != ReportRouteStatus.AllSucceeded)
@@ -281,6 +311,14 @@ internal sealed class ValidateCommandHandler
             ValidationOutcome outcome = snapshot.Evaluate(mode, timing);
             outcomesByMode.Add((mode, outcome));
             allPassed &= outcome.Passed;
+        }
+
+        // All modes share the same policy document; check imports from first outcome
+        string? importCollision = FindImportFileCollision(options, outcomesByMode[0].Outcome.PolicyImportPaths);
+        if (importCollision is not null)
+        {
+            _console.Error.WriteLine(importCollision);
+            return CliExitCodes.InvalidArgumentsOrRuntimeError;
         }
 
         RouteResult result = _coordinator.RouteCombinedOutcomes(options.Format, outcomesByMode, options.AdditionalSinks);

@@ -123,17 +123,29 @@ internal sealed class ReportCoordinator
             }
         }
 
-        // Phase 2: rename all temps to targets
-        foreach ((string tempPath, string targetPath) in pendingRenames)
+        // Phase 2: rename all temps to targets (only if Phase 1 had no failures)
+        if (failedPaths.Count == 0)
         {
-            try
+            foreach ((string tempPath, string targetPath) in pendingRenames)
             {
-                _fileSystem.RenameTempToTarget(tempPath, targetPath);
+                try
+                {
+                    _fileSystem.RenameTempToTarget(tempPath, targetPath);
+                }
+                catch (Exception ex)
+                {
+                    _console.Error.WriteLine($"Failed to write report to '{targetPath}': {ex.Message}");
+                    failedPaths.Add(targetPath);
+                    try { _fileSystem.DeleteFile(tempPath); } catch { }
+                }
             }
-            catch (Exception ex)
+        }
+        else
+        {
+            // One or more temp writes failed — clean up any temps that were written,
+            // skip Phase 2 entirely so no target files are created.
+            foreach ((string tempPath, string _) in pendingRenames)
             {
-                _console.Error.WriteLine($"Failed to write report to '{targetPath}': {ex.Message}");
-                failedPaths.Add(targetPath);
                 try { _fileSystem.DeleteFile(tempPath); } catch { }
             }
         }
@@ -176,7 +188,7 @@ internal sealed class ReportCoordinator
     {
         var sb = new StringBuilder();
         AppendHumanSection(sb, outcome);
-        return sb.ToString();
+        return sb.ToString().TrimEnd();
     }
 
     private string FormatCombinedHuman(IReadOnlyList<(string Mode, ValidationOutcome Outcome)> outcomesByMode)
@@ -198,7 +210,12 @@ internal sealed class ReportCoordinator
 
     private void AppendHumanSection(StringBuilder sb, ValidationOutcome outcome)
     {
-        sb.AppendLine(FormatHumanPreflight(outcome));
+        string preflight = FormatHumanPreflight(outcome);
+        if (!string.IsNullOrEmpty(preflight))
+        {
+            sb.AppendLine(preflight);
+        }
+
         if (outcome.PreflightBlocked)
         {
             return;

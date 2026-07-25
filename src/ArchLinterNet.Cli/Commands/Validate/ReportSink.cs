@@ -2,6 +2,7 @@ namespace ArchLinterNet.Cli.Commands.Validate;
 
 internal enum ReportDestinationType
 {
+    Stdout,
     Stderr,
     File
 }

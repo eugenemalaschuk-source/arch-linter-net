@@ -327,16 +327,16 @@ internal sealed class ValidateCommandDefinition(ValidateCommandHandler handler)
                     $"Invalid format in --report: '{format}'. Use human, json, or sarif.");
             }
 
+            if (string.Equals(destination, "stdout", StringComparison.Ordinal))
+            {
+                // stdout sinks are redundant with --format output; skip silently
+                continue;
+            }
+
             if (!destinations.Add(destination))
             {
                 throw new InvalidOperationException(
                     $"Duplicate --report destination: '{destination}'.");
-            }
-
-            if (string.Equals(destination, "stdout", StringComparison.Ordinal))
-            {
-                throw new InvalidOperationException(
-                    $"Invalid --report destination: 'stdout'. Use --format to select stdout output format.");
             }
 
             ReportSink sink = destination switch

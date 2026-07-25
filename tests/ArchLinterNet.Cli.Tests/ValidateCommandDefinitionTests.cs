@@ -182,12 +182,12 @@ public sealed class ValidateCommandDefinitionTests
     }
 
     [Test]
-    public void CreateRootCommand_ReportOption_RejectsStdoutDestination()
+    public void CreateRootCommand_ReportOption_AcceptsStdoutDestinationAsNoOp()
     {
         (RecordingRuntime runtime, RecordingConsole console) = Run(["--report", "json=stdout"]);
 
-        Assert.That(runtime.LastRequest, Is.Null);
-        Assert.That(console.ErrorText, Does.Contain("Use --format"));
+        Assert.That(runtime.LastRequest, Is.Not.Null);
+        Assert.That(console.ErrorText, Is.Empty);
     }
 
     [Test]

@@ -165,7 +165,8 @@ public sealed class ArchitectureAnalysisSnapshot : IDisposable
             Array.Empty<ArchitectureClassificationMetadataFailure>())
         {
             PreflightDiagnostics = _preflight.Diagnostics,
-            PreflightBlocked = true
+            PreflightBlocked = true,
+            PolicyImportPaths = GetPolicyImportPaths()
         };
     }
 
@@ -242,8 +243,17 @@ public sealed class ArchitectureAnalysisSnapshot : IDisposable
             CycleFindings = execution.CycleFindings,
             ClassificationRoles = classificationRoles,
             ClassificationPathDeferred = classificationPathDeferred,
-            PreflightDiagnostics = _preflight.Diagnostics
+            PreflightDiagnostics = _preflight.Diagnostics,
+            PolicyImportPaths = GetPolicyImportPaths()
         };
+    }
+
+    private IReadOnlyList<string> GetPolicyImportPaths()
+    {
+        return _document.Provenance.Sources
+            .Select(source => Path.GetFullPath(Path.Combine(_repositoryRoot, source.SourcePath)))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
     }
 
     private IReadOnlyList<ArchitectureUnmatchedIgnoredViolation> ResolveUnmatchedIgnoredViolations(

@@ -16,11 +16,14 @@ internal sealed class FileSystem : IFileSystem
 
     public void WriteAllTextToTemp(string path, string contents)
     {
-        string? directory = Path.GetDirectoryName(path);
+        string absolutePath = Path.GetFullPath(path);
+        string? directory = Path.GetDirectoryName(absolutePath);
         if (!string.IsNullOrEmpty(directory) && !Directory.Exists(directory))
         {
             Directory.CreateDirectory(directory);
         }
+
+        File.WriteAllText(absolutePath + ".tmp", contents);
 
         File.WriteAllText(path + ".tmp", contents);
     }
@@ -40,7 +43,7 @@ internal sealed class FileSystem : IFileSystem
         string? directory = Path.GetDirectoryName(path);
         if (string.IsNullOrEmpty(directory))
         {
-            return false;
+            directory = Directory.GetCurrentDirectory();
         }
 
         if (!Directory.Exists(directory))

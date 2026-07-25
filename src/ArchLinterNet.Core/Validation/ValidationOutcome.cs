@@ -38,4 +38,9 @@ public sealed record ValidationOutcome(
         Array.Empty<BuildStatePreflightDiagnostic>();
 
     public bool PreflightBlocked { get; init; }
+
+    // All source file paths in the policy import graph, including the root document.
+    // Populated by ArchitectureAnalysisSnapshot after policy loading.
+    public IReadOnlyList<string> PolicyImportPaths { get; init; } =
+        Array.Empty<string>();
 }
