@@ -53,11 +53,24 @@ public static class BaselineCommentInspector
         // A file that is nothing but comments and blank lines has no content to anchor against, so
         // every line is header.
         var unanchorable = new List<int>();
+        int blockScalarIndent = -1;
         for (int index = headerLineCount; index < lines.Count; index++)
         {
-            if (FindCommentColumn(lines[index].Content) >= 0)
+            string line = lines[index].Content;
+            if (IsBlockScalarContent(line, blockScalarIndent))
+            {
+                continue;
+            }
+
+            blockScalarIndent = -1;
+            if (FindCommentColumn(line) >= 0)
             {
                 unanchorable.Add(index + 1);
+            }
+
+            if (DeclaresBlockScalar(line))
+            {
+                blockScalarIndent = BlockScalarIndentation(line);
             }
         }
 
@@ -117,6 +130,57 @@ public static class BaselineCommentInspector
     private static bool OpensCommentToken(string line, int index)
     {
         return index == 0 || char.IsWhiteSpace(line[index - 1]);
+    }
+
+    private static bool IsBlockScalarContent(string line, int blockScalarIndent)
+    {
+        return blockScalarIndent >= 0 && (line.AsSpan().IsWhiteSpace() || IndentationOf(line) > blockScalarIndent);
+    }
+
+    private static bool DeclaresBlockScalar(string line)
+    {
+        int comment = FindCommentColumn(line);
+        ReadOnlySpan<char> content = (comment < 0 ? line : line[..comment]).AsSpan().TrimEnd();
+        int separator = content.IndexOf(':');
+        if (separator < 0)
+        {
+            return false;
+        }
+
+        ReadOnlySpan<char> indicator = content[(separator + 1)..].TrimStart();
+        if (indicator.IsEmpty || indicator[0] is not ('|' or '>'))
+        {
+            return false;
+        }
+
+        for (int index = 1; index < indicator.Length; index++)
+        {
+            if (indicator[index] is not ('+' or '-' or >= '0' and <= '9'))
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private static int IndentationOf(string line)
+    {
+        int indentation = 0;
+        while (indentation < line.Length && char.IsWhiteSpace(line[indentation]))
+        {
+            indentation++;
+        }
+
+        return indentation;
+    }
+
+    private static int BlockScalarIndentation(string line)
+    {
+        int indentation = IndentationOf(line);
+        return line.AsSpan(indentation).StartsWith("- ", StringComparison.Ordinal)
+            ? indentation + 2
+            : indentation;
     }
 
     /// <summary>

@@ -92,6 +92,36 @@ internal sealed class BaselineWriteGate(ICliConsole console, IFileSystem fileSys
         return true;
     }
 
+    /// <summary>
+    /// Copies an already-reviewed source document through the same overwrite and atomic-rename gate.
+    /// Used for a no-op prune so a separate destination preserves the source's exact bytes.
+    /// </summary>
+    public bool TryCopySource(Request request, string sourcePath, out Disposition disposition)
+    {
+        disposition = Disposition.Preview;
+
+        if (request.OutputPath == null || request.DryRun)
+        {
+            return TryApply(request, out disposition);
+        }
+
+        if (request.CommentDiagnostic != null)
+        {
+            console.Error.WriteLine(request.CommentDiagnostic);
+            return false;
+        }
+
+        if (!TryConfirmOverwriteIntent(request))
+        {
+            return false;
+        }
+
+        string tempPath = fileSystem.CopyFileToTemp(sourcePath, request.OutputPath);
+        fileSystem.RenameTempToTarget(tempPath, request.OutputPath);
+        disposition = Disposition.Written;
+        return true;
+    }
+
     private bool TryConfirmOverwriteIntent(Request request)
     {
         if (request.Force || !fileSystem.FileExists(request.OutputPath!))

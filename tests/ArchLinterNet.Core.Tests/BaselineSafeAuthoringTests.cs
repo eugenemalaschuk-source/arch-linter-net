@@ -257,6 +257,15 @@ public sealed class BaselineSafeAuthoringTests
     }
 
     [Test]
+    public void CommentInspector_HashInsideBlockScalar_IsNotAComment()
+    {
+        BaselineCommentInspection inspection = BaselineCommentInspector.Inspect(
+            "version: 2\nbaseline:\n  strict:\n    - id: rule\n      ignored_violations:\n        - reason: |-\n            accepted debt # reviewed\n          source_type: Src\n");
+
+        Assert.That(inspection.CanRoundTrip, Is.True);
+    }
+
+    [Test]
     public void CommentInspector_Refusal_NamesLinesAndTheDryRunPathForward()
     {
         string refusal = BaselineCommentInspector.DescribeRefusal("baseline update", "baseline.yml", [3, 5]);

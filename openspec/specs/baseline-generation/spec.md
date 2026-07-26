@@ -93,9 +93,9 @@ The baseline file SHALL NOT be validated against the main policy schema. It SHAL
 - **WHEN** user runs `arch-linter validate --config policy.yml --baseline baseline.yml` against code with a baseline on a subset of violations
 - **THEN** violations present in the baseline SHALL NOT be reported; violations NOT in the baseline SHALL still fail validation
 
-#### Scenario: Baseline entries go stale when violations are fixed
+#### Scenario: Baseline entries are resolved when violations are fixed
 - **WHEN** user fixes a violation that has a baseline entry, then runs validation
-- **THEN** the fixed violation SHALL NOT be reported, and the stale baseline entry SHALL be reported as an unmatched ignored violation (governed by `unmatched_ignored_violations` config)
+- **THEN** the fixed violation SHALL NOT be reported, and the resolved baseline entry SHALL be reported as an unmatched ignored violation (governed by `unmatched_ignored_violations` config)
 
 #### Scenario: Baseline merges with manual ignores without duplicates
 - **WHEN** user runs validation with both policy manual ignores and baseline ignores for the same contract
@@ -103,7 +103,7 @@ The baseline file SHALL NOT be validated against the main policy schema. It SHAL
 
 #### Scenario: Baseline validation fails with unknown contract ID
 - **WHEN** baseline references a `contract_id` that does not exist in the loaded policy document
-- **THEN** validation SHALL report an error and exit with a non-zero code, listing the unknown IDs
+- **THEN** validation SHALL report an error and exit with a non-zero code, listing the unknown IDs; baseline lifecycle commands SHALL classify the entry as `stale`
 
 #### Scenario: Legacy version 1 baseline files load and match unchanged
 - **WHEN** user runs `validate --baseline` with an existing `version: 1` baseline file that has not been migrated

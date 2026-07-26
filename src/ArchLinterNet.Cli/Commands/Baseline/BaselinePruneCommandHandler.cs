@@ -64,6 +64,19 @@ internal sealed class BaselinePruneCommandHandler(ICliRuntime runtime, ICliConso
                 // BOM or original encoding even when the text is unchanged.
                 disposition = BaselineWriteGate.Disposition.Unchanged;
             }
+            else if (outcome.IsNoOp && !options.Write.DryRun && options.OutputPath != null)
+            {
+                BaselineWriteGate gate = new(console, fileSystem);
+                if (!gate.TryCopySource(
+                        new BaselineWriteGate.Request(
+                            "baseline prune", options.OutputPath, options.Write.DryRun, options.Write.Force,
+                            outcome.Yaml!, outcome.CommentDiagnostic, options.BaselinePath, !json),
+                        options.BaselinePath,
+                        out disposition))
+                {
+                    return CliExitCodes.InvalidArgumentsOrRuntimeError;
+                }
+            }
             else
             {
                 BaselineWriteGate gate = new(console, fileSystem);

@@ -10,6 +10,11 @@ internal interface IFileSystem
 
     string WriteAllTextToTemp(string targetPath, string contents);
 
+    string CopyFileToTemp(string sourcePath, string targetPath)
+    {
+        return WriteAllTextToTemp(targetPath, ReadAllText(sourcePath));
+    }
+
     void RenameTempToTarget(string tempPath, string targetPath);
 
     void DeleteFile(string path);

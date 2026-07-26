@@ -188,4 +188,32 @@ baseline:
                 File.Delete(baselinePath);
         }
     }
+
+    [Test]
+    public void BaselinePrune_NothingToRemove_CopiesTheInputBytesToSeparateOutput()
+    {
+        string baselinePath = Path.Combine(Path.GetTempPath(), $"baseline-{Guid.NewGuid():N}.yml");
+        string outputPath = Path.Combine(Path.GetTempPath(), $"pruned-{Guid.NewGuid():N}.yml");
+        byte[] original = [0xEF, 0xBB, 0xBF, .. System.Text.Encoding.UTF8.GetBytes("version: 2\r\nbaseline:\r\n  strict: []\r\n")];
+        try
+        {
+            File.WriteAllBytes(baselinePath, original);
+
+            var (exitCode, _, stderr) = RunCli("baseline", "prune",
+                "--config", _passingPolicy, "--baseline", baselinePath, "--output", outputPath);
+
+            Assert.Multiple(() =>
+            {
+                Assert.That(exitCode, Is.EqualTo(0), $"Baseline prune failed, stderr: {stderr}");
+                Assert.That(File.ReadAllBytes(outputPath), Is.EqualTo(original));
+            });
+        }
+        finally
+        {
+            if (File.Exists(baselinePath))
+                File.Delete(baselinePath);
+            if (File.Exists(outputPath))
+                File.Delete(outputPath);
+        }
+    }
 }
