@@ -188,7 +188,7 @@ public sealed class BaselineSafeAuthoringTests
         {
             Assert.That(inspection.CanRoundTrip, Is.False);
             Assert.That(inspection.UnanchorableCommentLines, Is.EqualTo(_twoUnanchorableCommentLines));
-            Assert.That(inspection.Header, Is.EqualTo("# header" + Environment.NewLine));
+            Assert.That(inspection.Header, Is.EqualTo("# header\n"));
         });
     }
 
@@ -261,6 +261,16 @@ public sealed class BaselineSafeAuthoringTests
     {
         BaselineCommentInspection inspection = BaselineCommentInspector.Inspect(
             "version: 2\nbaseline:\n  strict:\n    - id: rule\n      ignored_violations:\n        - reason: |-\n            accepted debt # reviewed\n          source_type: Src\n");
+
+        Assert.That(inspection.CanRoundTrip, Is.True);
+    }
+
+    [TestCase("\"", TestName = "double-quoted scalar")]
+    [TestCase("'", TestName = "single-quoted scalar")]
+    public void CommentInspector_HashInsideMultilineQuotedScalar_IsNotAComment(string quote)
+    {
+        BaselineCommentInspection inspection = BaselineCommentInspector.Inspect(
+            "version: 2\nreason: " + quote + "accepted debt\n  # reviewed\n  still accepted" + quote + "\n");
 
         Assert.That(inspection.CanRoundTrip, Is.True);
     }

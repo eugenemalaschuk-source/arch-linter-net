@@ -54,6 +54,7 @@ public static class BaselineCommentInspector
         // every line is header.
         var unanchorable = new List<int>();
         int blockScalarIndent = -1;
+        QuoteState quotes = default;
         for (int index = headerLineCount; index < lines.Count; index++)
         {
             string line = lines[index].Content;
@@ -63,7 +64,7 @@ public static class BaselineCommentInspector
             }
 
             blockScalarIndent = -1;
-            if (FindCommentColumn(line) >= 0)
+            if (FindCommentColumn(line, ref quotes) >= 0)
             {
                 unanchorable.Add(index + 1);
             }
@@ -106,7 +107,11 @@ public static class BaselineCommentInspector
     private static int FindCommentColumn(string line)
     {
         QuoteState quotes = default;
+        return FindCommentColumn(line, ref quotes);
+    }
 
+    private static int FindCommentColumn(string line, ref QuoteState quotes)
+    {
         for (int index = 0; index < line.Length; index++)
         {
             if (quotes.Consume(line, index))
