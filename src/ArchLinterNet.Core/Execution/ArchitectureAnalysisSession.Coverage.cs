@@ -111,6 +111,7 @@ public sealed partial class ArchitectureAnalysisSession
         List<ArchitectureCoverageSummaryEvidenceItem> staleItems = new();
         List<ArchitectureCoverageSummaryEvidenceItem> unknownItems = new();
         List<ArchitectureCoverageSummaryEvidenceItem> coveredItems = new();
+        List<ArchitectureCoverageSummaryOptionalEmptyItem> optionalEmptyItems = new();
 
         foreach (string referencedContractId in contract.ContractIds.OrderBy(id => id, StringComparer.Ordinal))
         {
@@ -130,13 +131,15 @@ public sealed partial class ArchitectureAnalysisSession
                 continue;
             }
 
-            IReadOnlyList<string> referencedLayerNames = GetReferencedLayerNames(descriptor.Contract)
-                .Distinct(StringComparer.Ordinal)
-                .OrderBy(name => name, StringComparer.Ordinal)
+            IReadOnlyList<ArchitectureRuleInputReference> referencedInputs = ArchitectureRuleInputReferences.For(descriptor.Contract)
+                .Distinct()
+                .OrderBy(reference => reference.Input, StringComparer.Ordinal)
+                .ThenBy(reference => reference.Layer, StringComparer.Ordinal)
                 .ToList();
 
-            foreach (string layerName in referencedLayerNames)
+            foreach (ArchitectureRuleInputReference input in referencedInputs)
             {
+                string layerName = input.Layer;
                 if (!Document.Layers.TryGetValue(layerName, out ArchitectureLayer? layer))
                 {
                     unknownItems.Add(new ArchitectureCoverageSummaryEvidenceItem(referencedContractId, layerName));
@@ -148,6 +151,20 @@ public sealed partial class ArchitectureAnalysisSession
 
                 if (!matchesAnyCode)
                 {
+                    ArchitectureOptionalRuleInput? optionalInput = FindOptionalInput(contract, referencedContractId, input);
+                    if (optionalInput is not null)
+                    {
+                        optionalEmptyItems.Add(new ArchitectureCoverageSummaryOptionalEmptyItem(
+                            referencedContractId + ":" + input.Input + ":" + layerName, optionalInput.Reason, layerName)
+                        {
+                            ContractId = referencedContractId,
+                            Input = input.Input,
+                            Layer = layerName,
+                            PolicyLocation = optionalInput.PolicyLocation
+                        });
+                        continue;
+                    }
+
                     staleItems.Add(new ArchitectureCoverageSummaryEvidenceItem(referencedContractId, layerName));
                     continue;
                 }
@@ -160,12 +177,18 @@ public sealed partial class ArchitectureAnalysisSession
             contract.Name,
             contract.Id,
             contract.Scope,
-            new ArchitectureCoverageSummaryCounts(coveredItems.Count, excludedItems.Count, 0, staleItems.Count, unknownItems.Count),
+            new ArchitectureCoverageSummaryCounts(coveredItems.Count, excludedItems.Count, 0, staleItems.Count, unknownItems.Count)
+            {
+                OptionalEmpty = optionalEmptyItems.Count
+            },
             excludedItems,
             Array.Empty<ArchitectureCoverageSummaryEvidenceItem>(),
             staleItems,
             unknownItems,
-            coveredItems);
+            coveredItems)
+        {
+            OptionalEmptyItems = optionalEmptyItems
+        };
     }
 
     private ArchitectureCoverageSummary BuildAssemblyCoverageSummary(ArchitectureCoverageContract contract)
@@ -437,12 +460,13 @@ public sealed partial class ArchitectureAnalysisSession
         ArchitectureContractExecutionContext executionContext,
         List<ArchitectureViolation> findings)
     {
-        IReadOnlyList<string> referencedLayerNames = GetReferencedLayerNames(descriptor.Contract)
-            .Distinct(StringComparer.Ordinal)
+        IReadOnlyList<ArchitectureRuleInputReference> referencedInputs = ArchitectureRuleInputReferences.For(descriptor.Contract)
+            .Distinct()
             .ToList();
 
-        foreach (string layerName in referencedLayerNames)
+        foreach (ArchitectureRuleInputReference input in referencedInputs)
         {
+            string layerName = input.Layer;
             if (!Document.Layers.TryGetValue(layerName, out ArchitectureLayer? layer))
             {
                 if (!executionContext.IsIgnored(referencedContractId, layerName))
@@ -461,7 +485,9 @@ public sealed partial class ArchitectureAnalysisSession
             bool matchesAnyCode = inventory.Namespaces.Any(entry =>
                 ArchitectureLayerResolver.MatchesNamespace(layer, entry.Namespace));
 
-            if (!matchesAnyCode && !executionContext.IsIgnored(referencedContractId, layerName))
+            if (!matchesAnyCode
+                && FindOptionalInput(contract, referencedContractId, input) is null
+                && !executionContext.IsIgnored(referencedContractId, layerName))
             {
                 findings.Add(new ArchitectureViolation(
                     contract.Name,
@@ -471,6 +497,15 @@ public sealed partial class ArchitectureAnalysisSession
                     new[] { layerName }));
             }
         }
+    }
+
+    private static ArchitectureOptionalRuleInput? FindOptionalInput(
+        ArchitectureCoverageContract contract, string contractId, ArchitectureRuleInputReference input)
+    {
+        return contract.OptionalInputs.SingleOrDefault(optional =>
+            string.Equals(optional.ContractId, contractId, StringComparison.OrdinalIgnoreCase)
+            && string.Equals(optional.Input, input.Input, StringComparison.Ordinal)
+            && string.Equals(optional.Layer, input.Layer, StringComparison.Ordinal));
     }
 
     private List<ArchitectureViolation> CheckAssemblyCoverageContract(ArchitectureCoverageContract contract)

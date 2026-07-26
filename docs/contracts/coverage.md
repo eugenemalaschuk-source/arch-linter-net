@@ -60,6 +60,10 @@ A `scope: rule_input` contract resolves each entry in `contract_ids` to its refe
 
 ## What counts as covered
 
+### Planned-empty rule inputs
+
+Use `optional_inputs` only for a reviewed, exact planned-empty input. Each entry names the selected `contract_id`, its layer-bearing `input` field, the exact `layer`, and a non-empty `reason`. The coverage summary reports an empty matching input as `optional-empty`; it becomes covered automatically once matching code appears. The declaration cannot suppress an undeclared layer or any other input in the same contract.
+
 A namespace under `roots` is considered covered when at least one of these is true:
 
 - it matches a declared layer;
@@ -83,30 +87,32 @@ In human output, findings appear in a separate `Coverage findings:` section. In 
 
 ## Coverage summary
 
-Alongside the raw findings, `validate` reports a deterministic coverage summary for every coverage contract that ran, independent of `analysis.coverage` severity (it is reported even when `coverage: warn` or `coverage: off`). The summary buckets each in-scope item into exactly one of five counts:
+Alongside the raw findings, `validate` reports a deterministic coverage summary for every coverage contract that ran, independent of `analysis.coverage` severity (it is reported even when `coverage: warn` or `coverage: off`). The summary buckets each in-scope item into exactly one of six counts:
 
 | Count | `scope: namespace` | `scope: project`/`scope: assembly` | `scope: dependency_edge` | `scope: rule_input` |
 |-------|---------------------|-------------------------------------|---------------------------|------------------------|
 | `covered` | namespace matched a declared layer, namespace-glob layer, or expanded layer template | project/assembly has at least one matching type | observed edge's pair is governed by an existing dependency, layer, independence, or expanded-template contract | referenced layer exists and currently matches code |
 | `excluded` | namespace matched an `exclude` rule | project/assembly matched an `exclude` rule | observed edge's pair matched an `exclude` rule | referenced contract ID matched an `exclude` rule |
 | `uncovered` | namespace matched none of the above (`"uncovered namespace"` finding) | no matching type found (`"uncovered project"`/`"uncovered assembly"` finding) | pair is not governed and not excluded (`"uncovered dependency edge"` finding) | always `0` — this scope reports `stale`/`unknown` instead |
-| `stale` | always `0` — this scope reports `uncovered` instead | always `0` | always `0` | referenced layer exists but currently matches zero namespaces (`"empty-input"` finding) |
+| `stale` | always `0` — this scope reports `uncovered` instead | always `0` | always `0` | referenced layer exists but currently matches zero namespaces and is not an exact reviewed `optional_inputs` declaration (`"empty-input"` finding) |
 | `unknown` | always `0` | `scope: project` only — discovered project could not be resolved to a target assembly (`"unresolved project"` finding); always `0` for `scope: assembly` | always `0` | referenced field names a layer that isn't declared at all (`"unresolved"` finding) |
+| `optional-empty` | always `0` | always `0` | always `0` | exact reviewed `optional_inputs` declaration currently matches zero namespaces; it transitions to `covered` when matching code appears |
 
-Each excluded item is reported with its `reason` text from the contract's `exclude` entry. Each covered/uncovered/stale/unknown item is reported with evidence — a representative type for namespace/project/assembly coverage, the source/target namespace pair plus a representative source type for dependency-edge coverage, or the dangling/empty layer name for rule-input coverage — and is kept in a bucket-specific list (`covered_items` for every scope; `uncovered_items` for namespace/project/assembly/dependency-edge coverage, `unknown_items` additionally for project coverage, `stale_items`/`unknown_items` for rule-input coverage) rather than a single combined list, since `stale` and `unknown` mean different things and must stay distinguishable by a reviewer or downstream tooling. `covered_items` is the only list naming units found covered by positive evidence — downstream tooling (such as a CI new-code coverage report) should never infer "covered" from a unit's mere absence from the other lists.
+Each excluded item is reported with its `reason` text from the contract's `exclude` entry. Each covered/uncovered/stale/unknown item is reported with evidence — a representative type for namespace/project/assembly coverage, the source/target namespace pair plus a representative source type for dependency-edge coverage, or the dangling/empty layer name for rule-input coverage. Exact `optional-empty` items additionally retain their contract/input/layer identity, review reason, and policy provenance. Evidence is kept in bucket-specific lists (`covered_items` for every scope; `uncovered_items` for namespace/project/assembly/dependency-edge coverage, `unknown_items` additionally for project coverage, `stale_items`/`unknown_items` for ordinary rule-input coverage, and `optional_empty_items` for reviewed planned-empty inputs) rather than a single combined list. `covered_items` is the only list naming units found covered by positive evidence — downstream tooling (such as a CI new-code coverage report) should never infer "covered" from a unit's mere absence from the other lists.
 
-In human output, the summary appears in a `Coverage summary:` section, one line per contract, after `Coverage findings:`, with each evidence sub-line explicitly labeled `uncovered:`, `stale:`, or `unknown:`:
+In human output, the summary appears in a `Coverage summary:` section, one line per contract, after `Coverage findings:`, with each evidence sub-line explicitly labeled `uncovered:`, `stale:`, `unknown:`, or `optional-empty:`:
 
 ```
 Coverage summary:
-- [validation-namespace-coverage] [validation-namespace-coverage] scope: namespace covered=0 excluded=0 uncovered=1 stale=0 unknown=0
+- [validation-namespace-coverage] [validation-namespace-coverage] scope: namespace covered=0 excluded=0 uncovered=1 stale=0 unknown=0 optional-empty=0
     uncovered: ArchLinterNet.Core.Validation (ArchLinterNet.Core.Validation.ArchitectureBaselineService)
-- [rule-input-coverage] [rule-input-coverage] scope: rule_input covered=2 excluded=0 uncovered=0 stale=1 unknown=1
+- [rule-input-coverage] [rule-input-coverage] scope: rule_input covered=2 excluded=0 uncovered=0 stale=1 unknown=1 optional-empty=1
     stale: ghost-rule (ghost)
     unknown: typo-rule (does_not_exist_layer)
+    optional-empty: future-rule:forbidden:future (Future module is planned.; future)
 ```
 
-In JSON output, the summary appears as a top-level `coverage_summary` array, additive to (not nested inside) `coverage_findings`. Every entry always includes all four evidence arrays (`covered_items`, `uncovered_items`, `stale_items`, `unknown_items`); only the ones relevant to the contract's scope are ever non-empty (besides `covered_items`, which is populated whenever a unit is found covered, for every scope) — namespace, project, assembly, and dependency-edge coverage populate `uncovered_items` (project coverage additionally populates `unknown_items` for unresolved projects), rule-input coverage only populates `stale_items`/`unknown_items`:
+In JSON output, the summary appears as a top-level `coverage_summary` array, additive to (not nested inside) `coverage_findings`. Every entry always includes all six evidence arrays (`excluded_items`, `covered_items`, `uncovered_items`, `stale_items`, `unknown_items`, `optional_empty_items`); only the ones relevant to the contract's scope are ever non-empty (besides `covered_items`, which is populated whenever a unit is found covered, for every scope) — namespace, project, assembly, and dependency-edge coverage populate `uncovered_items` (project coverage additionally populates `unknown_items` for unresolved projects), ordinary rule-input gaps populate `stale_items`/`unknown_items`, and exact reviewed planned-empty inputs populate `optional_empty_items`:
 
 ```json
 {
@@ -115,20 +121,21 @@ In JSON output, the summary appears as a top-level `coverage_summary` array, add
       "contract": "validation-namespace-coverage",
       "contract_id": "validation-namespace-coverage",
       "scope": "namespace",
-      "counts": { "covered": 0, "excluded": 0, "uncovered": 1, "stale": 0, "unknown": 0 },
+      "counts": { "covered": 0, "excluded": 0, "uncovered": 1, "stale": 0, "unknown": 0, "optional_empty": 0 },
       "excluded_items": [],
       "uncovered_items": [
         { "item": "ArchLinterNet.Core.Validation", "evidence": "ArchLinterNet.Core.Validation.ArchitectureBaselineService" }
       ],
       "stale_items": [],
       "unknown_items": [],
-      "covered_items": []
+      "covered_items": [],
+      "optional_empty_items": []
     },
     {
       "contract": "rule-input-coverage",
       "contract_id": "rule-input-coverage",
       "scope": "rule_input",
-      "counts": { "covered": 2, "excluded": 0, "uncovered": 0, "stale": 1, "unknown": 1 },
+      "counts": { "covered": 2, "excluded": 0, "uncovered": 0, "stale": 1, "unknown": 1, "optional_empty": 1 },
       "excluded_items": [],
       "uncovered_items": [],
       "stale_items": [{ "item": "ghost-rule", "evidence": "ghost" }],
@@ -136,6 +143,16 @@ In JSON output, the summary appears as a top-level `coverage_summary` array, add
       "covered_items": [
         { "item": "core-validation:core_validation", "evidence": "core_validation" },
         { "item": "core-validation:core_execution", "evidence": "core_execution" }
+      ],
+      "optional_empty_items": [
+        {
+          "item": "future-rule:forbidden:future",
+          "contract_id": "future-rule",
+          "input": "forbidden",
+          "layer": "future",
+          "reason": "Future module is planned.",
+          "evidence": "future"
+        }
       ]
     }
   ]

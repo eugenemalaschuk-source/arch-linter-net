@@ -643,4 +643,58 @@ public sealed class RuleInputCoverageValidationTests
 
         Assert.That(ex.Message, Does.Contain("without a 'contract_id' matcher"));
     }
+
+    [Test]
+    public void RuleInputCoverage_OptionalInputWithStaleIdentity_ThrowsActionableError()
+    {
+        string optionalInput =
+            $"      optional_inputs:{Environment.NewLine}" +
+            $"        - contract_id: video-to-ghost-rule{Environment.NewLine}" +
+            $"          input: allowed{Environment.NewLine}" +
+            $"          layer: ghost{Environment.NewLine}" +
+            $"          reason: Planned input.{Environment.NewLine}";
+        string policyPath = WritePolicy(
+            BuildPolicy("strict_coverage", referencedRuleGroup: "strict", extraExclude: optionalInput));
+
+        InvalidOperationException ex = Assert.Throws<InvalidOperationException>(() =>
+            ArchitectureValidationService.Validate(new ValidationRequest { PolicyPath = policyPath, Mode = "strict" }))!;
+
+        Assert.That(ex.Message, Does.Contain("stale optional input 'video-to-ghost-rule:allowed:ghost'"));
+    }
+
+    [Test]
+    public void RuleInputCoverage_OptionalInputWithBlankReason_ThrowsActionableError()
+    {
+        string optionalInput =
+            $"      optional_inputs:{Environment.NewLine}" +
+            $"        - contract_id: video-to-ghost-rule{Environment.NewLine}" +
+            $"          input: forbidden{Environment.NewLine}" +
+            $"          layer: ghost{Environment.NewLine}" +
+            $"          reason: ' '{Environment.NewLine}";
+        string policyPath = WritePolicy(
+            BuildPolicy("strict_coverage", referencedRuleGroup: "strict", extraExclude: optionalInput));
+
+        InvalidOperationException ex = Assert.Throws<InvalidOperationException>(() =>
+            ArchitectureValidationService.Validate(new ValidationRequest { PolicyPath = policyPath, Mode = "strict" }))!;
+
+        Assert.That(ex.Message, Does.Contain("without non-empty contract_id, input, layer, and reason"));
+    }
+
+    [Test]
+    public void RuleInputCoverage_DuplicateOptionalInput_ThrowsActionableError()
+    {
+        string entry =
+            $"        - contract_id: video-to-ghost-rule{Environment.NewLine}" +
+            $"          input: forbidden{Environment.NewLine}" +
+            $"          layer: ghost{Environment.NewLine}" +
+            $"          reason: Planned input.{Environment.NewLine}";
+        string optionalInputs = $"      optional_inputs:{Environment.NewLine}" + entry + entry;
+        string policyPath = WritePolicy(
+            BuildPolicy("strict_coverage", referencedRuleGroup: "strict", extraExclude: optionalInputs));
+
+        InvalidOperationException ex = Assert.Throws<InvalidOperationException>(() =>
+            ArchitectureValidationService.Validate(new ValidationRequest { PolicyPath = policyPath, Mode = "strict" }))!;
+
+        Assert.That(ex.Message, Does.Contain("duplicate optional input 'video-to-ghost-rule:forbidden:ghost'"));
+    }
 }

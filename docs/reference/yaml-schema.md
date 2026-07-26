@@ -798,6 +798,11 @@ contracts:
       name: rule-input-coverage
       scope: rule_input
       contract_ids: [cli-must-not-depend-on-testing]
+      optional_inputs:
+        - contract_id: cli-must-not-depend-on-testing
+          input: forbidden
+          layer: future_cli_extension
+          reason: The planned extension is intentionally declared before its implementation.
       reason: Flag rules whose source/target layers stop matching any code.
 ```
 

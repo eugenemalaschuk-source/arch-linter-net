@@ -294,6 +294,7 @@ public sealed class ArchitecturePolicyProvenanceIndex
                 UpdateContractMetadata(effectivePath, family, contract.Id);
                 _contracts.Add(new ContractEntry(group, effectivePath, contract));
                 BindIgnoredViolations(contract, effectivePath, family, contract.Id);
+                BindOptionalRuleInputs(contract, effectivePath);
                 index++;
             }
         }
@@ -337,6 +338,24 @@ public sealed class ArchitecturePolicyProvenanceIndex
             }
 
             index++;
+        }
+    }
+
+    private void BindOptionalRuleInputs(IArchitectureContract contract, string effectivePath)
+    {
+        if (contract is not ArchitectureCoverageContract coverageContract)
+        {
+            return;
+        }
+
+        for (int index = 0; index < coverageContract.OptionalInputs.Count; index++)
+        {
+            ArchitectureOptionalRuleInput optionalInput = coverageContract.OptionalInputs[index];
+            string path = ArchitecturePolicyProvenancePath.AppendIndex(
+                ArchitecturePolicyProvenancePath.AppendProperty(effectivePath, "optional_inputs"),
+                index);
+            BindOwner(optionalInput, path, null, coverageContract.Id);
+            optionalInput.PolicyLocation = LocationFor(optionalInput);
         }
     }
 
