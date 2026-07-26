@@ -121,7 +121,9 @@ public sealed class ArchitectureEngineTests
             Assert.That(outcome.MatchedCount, Is.EqualTo(0));
             Assert.That(outcome.StaleCount, Is.EqualTo(0));
             Assert.That(outcome.AmbiguousCount, Is.EqualTo(0));
-            Assert.That(outcome.Yaml, Is.Null, "dry-run must never produce output to write.");
+            // Dry run produces the proposal so it can be previewed; the CLI write gate is what keeps
+            // it off disk.
+            Assert.That(outcome.Yaml, Is.Not.Null, "dry-run must be able to preview the proposed document.");
         });
     }
 

@@ -23,9 +23,9 @@ public partial class CliIntegrationTests
             {
                 Assert.That(exitCode, Is.EqualTo(0), $"Diff should succeed, stderr: {stderr}");
                 Assert.That(stdout, Does.Contain("New (unbaselined) violations: 0"));
-                Assert.That(stdout, Does.Contain("Resolved (stale) baseline entries: 0"));
-                Assert.That(stdout, Does.Contain("Configuration errors (unknown contract id): 0"));
-                Assert.That(stdout, Does.Not.Contain("Existing (frozen) baseline entries: 0"));
+                Assert.That(stdout, Does.Contain("Resolved baseline entries (debt fixed): 0"));
+                Assert.That(stdout, Does.Contain("Stale baseline entries (contract no longer valid): 0"));
+                Assert.That(stdout, Does.Not.Contain("Matched baseline entries: 0"));
             });
         }
         finally
@@ -63,8 +63,8 @@ baseline:
             Assert.Multiple(() =>
             {
                 Assert.That(exitCode, Is.EqualTo(0), $"Diff should succeed, stderr: {stderr}");
-                Assert.That(stdout, Does.Contain("Resolved (stale) baseline entries: 1"));
-                Assert.That(stdout, Does.Contain("Configuration errors (unknown contract id): 1"));
+                Assert.That(stdout, Does.Contain("Resolved baseline entries (debt fixed): 1"));
+                Assert.That(stdout, Does.Contain("Stale baseline entries (contract no longer valid): 1"));
                 Assert.That(stdout, Does.Contain("Fake.Source -> Fake.Target"));
                 Assert.That(stdout, Does.Contain("totally-unknown-id"));
             });
@@ -105,7 +105,7 @@ baseline:
             Assert.Multiple(() =>
             {
                 Assert.That(exitCode, Is.EqualTo(0), $"Diff should succeed, stderr: {stderr}");
-                Assert.That(stdout, Does.Contain("Resolved (stale) baseline entries: 1"));
+                Assert.That(stdout, Does.Contain("Resolved baseline entries (debt fixed): 1"));
                 Assert.That(stdout, Does.Contain("Fake.Source -> Fake.Target"));
                 Assert.That(stdout, Does.Not.Contain("Fake.Source2"));
             });

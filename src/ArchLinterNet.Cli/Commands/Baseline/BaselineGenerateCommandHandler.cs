@@ -1,3 +1,4 @@
+using System.Text.Json;
 using ArchLinterNet.Cli.Abstractions;
 using ArchLinterNet.Core.Model;
 using ArchLinterNet.Core.Validation;
@@ -20,12 +21,6 @@ internal sealed class BaselineGenerateCommandHandler(ICliRuntime runtime, ICliCo
             return CliExitCodes.InvalidArgumentsOrRuntimeError;
         }
 
-        if (options.OutputPath == null)
-        {
-            console.Error.WriteLine("--output is required for baseline generate.");
-            return CliExitCodes.InvalidArgumentsOrRuntimeError;
-        }
-
         if (!fileSystem.FileExists(options.PolicyPath))
         {
             console.Error.WriteLine($"Policy file not found: {options.PolicyPath}");
@@ -39,19 +34,38 @@ internal sealed class BaselineGenerateCommandHandler(ICliRuntime runtime, ICliCo
                 PolicyPath = options.PolicyPath,
                 Mode = options.Mode,
                 ConditionSetName = options.ConditionSetName,
-                Reason = options.Reason,
+                Reason = options.Reasons.Reason,
+                ReasonForContract = options.Reasons.ReasonForContract,
+                ReasonForFamily = options.Reasons.ReasonForFamily,
                 ContractIds = options.ContractIds.ToList(),
             });
 
             if (!outcome.Succeeded)
             {
-                WriteConfigurationViolations("generated", outcome.ConfigurationViolations);
+                if (outcome.Error != null)
+                {
+                    console.Error.WriteLine(outcome.Error);
+                }
+                else
+                {
+                    WriteConfigurationViolations(outcome.ConfigurationViolations);
+                }
+
                 return CliExitCodes.InvalidArgumentsOrRuntimeError;
             }
 
-            fileSystem.WriteAllText(options.OutputPath, outcome.Yaml!);
-            console.Out.WriteLine($"Generated baseline with {outcome.CandidateCount} violation entries.");
-            console.Out.WriteLine($"Output: {options.OutputPath}");
+            bool json = options.Format == "json";
+            BaselineWriteGate gate = new(console, fileSystem);
+            if (!gate.TryApply(
+                    new BaselineWriteGate.Request(
+                        "baseline generate", options.OutputPath, options.Write.DryRun, options.Write.Force,
+                        outcome.Yaml!, CommentDiagnostic: null, InPlacePath: null, EmitProposalToStdout: !json),
+                    out BaselineWriteGate.Disposition disposition))
+            {
+                return CliExitCodes.InvalidArgumentsOrRuntimeError;
+            }
+
+            Report(options, outcome, disposition);
             return CliExitCodes.Success;
         }
         catch (Exception ex)
@@ -61,9 +75,45 @@ internal sealed class BaselineGenerateCommandHandler(ICliRuntime runtime, ICliCo
         }
     }
 
-    private void WriteConfigurationViolations(string verb, IReadOnlyCollection<ArchitectureViolation> violations)
+    private void Report(
+        BaselineGenerateCommandOptions options,
+        BaselineGenerationOutcome outcome,
+        BaselineWriteGate.Disposition disposition)
     {
-        console.Error.WriteLine($"Configuration violations detected — baseline cannot be {verb}:");
+        if (options.Format == "json")
+        {
+            bool written = disposition == BaselineWriteGate.Disposition.Written;
+            console.Out.WriteLine(JsonSerializer.Serialize(new
+            {
+                status = BaselineWriteGate.StatusFor(disposition, "generated"),
+                dryRun = disposition == BaselineWriteGate.Disposition.DryRun,
+                output = options.OutputPath,
+                candidateCount = outcome.CandidateCount,
+                counts = BaselineLifecycleFormatter.Counts(outcome.Entries),
+                entries = BaselineLifecycleFormatter.EntriesForJson(outcome.Entries),
+                proposedContent = written ? null : outcome.Yaml,
+            }));
+            return;
+        }
+
+        // A stdout preview already is the document; adding a summary after it would corrupt the YAML
+        // for anything that redirected it.
+        if (disposition == BaselineWriteGate.Disposition.Preview)
+        {
+            return;
+        }
+
+        console.Out.WriteLine($"Generated baseline with {outcome.CandidateCount} violation entries.");
+        console.Out.WriteLine(BaselineLifecycleFormatter.FormatForHumans(outcome.Entries));
+        if (disposition == BaselineWriteGate.Disposition.Written)
+        {
+            console.Out.WriteLine($"Output: {options.OutputPath}");
+        }
+    }
+
+    private void WriteConfigurationViolations(IReadOnlyCollection<ArchitectureViolation> violations)
+    {
+        console.Error.WriteLine("Configuration violations detected — baseline cannot be generated:");
         foreach (ArchitectureViolation violation in violations)
         {
             console.Error.WriteLine($"  {violation.SourceType}: {violation.ForbiddenNamespace}");

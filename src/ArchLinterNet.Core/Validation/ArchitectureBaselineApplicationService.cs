@@ -20,7 +20,18 @@ public sealed class ArchitectureBaselineApplicationService(
 
     public BaselineGenerationOutcome Generate(BaselineGenerationRequest request)
     {
-        (ArchitectureContractDocument document, IReadOnlyList<ArchitectureBaselineCandidate>? candidates, List<ArchitectureViolation> configViolations) =
+        if (!BaselineReasonMap.TryParse(
+                request.ReasonForContract, request.ReasonForFamily, request.Reason,
+                out BaselineReasonMap reasonMap, out string? reasonError))
+        {
+            return new BaselineGenerationOutcome(
+                Succeeded: false, Yaml: null, CandidateCount: 0, ConfigurationViolations: Array.Empty<ArchitectureViolation>())
+            {
+                Error = reasonError,
+            };
+        }
+
+        (_, IReadOnlyList<ArchitectureBaselineCandidate>? candidates, List<ArchitectureViolation> configViolations) =
             CollectCandidates(request.PolicyPath, request.Mode, request.ConditionSetName, request.ContractIds);
 
         if (candidates == null)
@@ -29,18 +40,34 @@ public sealed class ArchitectureBaselineApplicationService(
                 Succeeded: false, Yaml: null, CandidateCount: 0, ConfigurationViolations: configViolations);
         }
 
-        ArchitectureBaselineDocument baseline = baselineGenerator.Generate(document, candidates, request.Reason);
-        string yaml = baselineGenerator.Serialize(baseline);
+        BaselineWritePlan plan = BaselineWritePlanner.PlanGenerate(candidates, reasonMap);
+        ArchitectureBaselineDocument baseline = baselineGenerator.BuildFromEntries(
+            plan.OutputEntries, ArchitectureViolationIdentity.CurrentVersion);
 
         return new BaselineGenerationOutcome(
             Succeeded: true,
-            Yaml: yaml,
+            Yaml: baselineGenerator.Serialize(baseline),
             CandidateCount: candidates.Count,
-            ConfigurationViolations: Array.Empty<ArchitectureViolation>());
+            ConfigurationViolations: Array.Empty<ArchitectureViolation>())
+        {
+            Entries = plan.LifecycleEntries,
+        };
     }
 
     public BaselineUpdateOutcome Update(BaselineUpdateRequest request)
     {
+        if (!BaselineReasonMap.TryParse(
+                request.ReasonForContract, request.ReasonForFamily, request.Reason,
+                out BaselineReasonMap reasonMap, out string? reasonError))
+        {
+            return new BaselineUpdateOutcome(
+                Succeeded: false, Yaml: null, PreservedCount: 0, NewCount: 0,
+                ConfigurationViolations: Array.Empty<ArchitectureViolation>())
+            {
+                Error = reasonError,
+            };
+        }
+
         (ArchitectureContractDocument document, IReadOnlyList<ArchitectureBaselineCandidate>? candidates, List<ArchitectureViolation> configViolations) =
             CollectCandidates(request.PolicyPath, request.Mode, request.ConditionSetName, request.ContractIds);
 
@@ -54,27 +81,21 @@ public sealed class ArchitectureBaselineApplicationService(
         ArchitectureBaselineComparisonResult comparison = ArchitectureBaselineComparer.Compare(
             document, existingBaseline, candidates, request.Mode, request.ContractIds);
 
-        var newEntries = comparison.New
-            .Select(e => e with { Reason = request.Reason })
-            .ToList();
+        BaselineWritePlan plan = BaselineWritePlanner.PlanUpdate(comparison, reasonMap);
+        ArchitectureBaselineDocument updated = baselineGenerator.BuildFromEntries(plan.OutputEntries, existingBaseline.Version);
 
-        List<ArchitectureBaselineComparisonEntry> entries = new(comparison.Frozen.Count + comparison.Resolved.Count
-            + comparison.ConfigurationErrors.Count + newEntries.Count + comparison.OutOfScope.Count);
-        entries.AddRange(comparison.Frozen);
-        entries.AddRange(comparison.Resolved);
-        entries.AddRange(comparison.ConfigurationErrors);
-        entries.AddRange(newEntries);
-        entries.AddRange(comparison.OutOfScope);
-
-        ArchitectureBaselineDocument updated = baselineGenerator.BuildFromEntries(entries, existingBaseline.Version);
-        string yaml = baselineGenerator.Serialize(updated);
+        BaselineCommentInspection comments = InspectComments(request.BaselinePath);
 
         return new BaselineUpdateOutcome(
             Succeeded: true,
-            Yaml: yaml,
+            Yaml: comments.Header + baselineGenerator.Serialize(updated),
             PreservedCount: comparison.Frozen.Count,
-            NewCount: newEntries.Count,
-            ConfigurationViolations: Array.Empty<ArchitectureViolation>());
+            NewCount: comparison.New.Count,
+            ConfigurationViolations: Array.Empty<ArchitectureViolation>())
+        {
+            Entries = plan.LifecycleEntries,
+            CommentDiagnostic = DescribeCommentRefusal("baseline update", request.BaselinePath, comments),
+        };
     }
 
     public BaselinePruneOutcome Prune(BaselinePruneRequest request)
@@ -92,23 +113,38 @@ public sealed class ArchitectureBaselineApplicationService(
         ArchitectureBaselineComparisonResult comparison = ArchitectureBaselineComparer.Compare(
             document, existingBaseline, candidates, request.Mode, request.ContractIds);
 
-        List<ArchitectureBaselineComparisonEntry> survivors = new(comparison.Frozen.Count + comparison.OutOfScope.Count);
-        survivors.AddRange(comparison.Frozen);
-        survivors.AddRange(comparison.OutOfScope);
-
-        ArchitectureBaselineDocument pruned = baselineGenerator.BuildFromEntries(survivors, existingBaseline.Version);
-        string yaml = baselineGenerator.Serialize(pruned);
+        BaselineWritePlan plan = BaselineWritePlanner.PlanPrune(comparison);
 
         List<BaselineRemovedEntry> removed = comparison.Resolved
-            .Select(e => new BaselineRemovedEntry(e, "resolved"))
-            .Concat(comparison.ConfigurationErrors.Select(e => new BaselineRemovedEntry(e, "configuration-error")))
+            .Select(e => new BaselineRemovedEntry(e, BaselineEntryLifecycleNames.Resolved))
+            .Concat(comparison.ConfigurationErrors.Select(
+                e => new BaselineRemovedEntry(e, BaselineEntryLifecycleNames.Stale)))
             .ToList();
+
+        string rawBaseline = baselineLoadingService.ReadRawText(request.BaselinePath);
+        BaselineCommentInspection comments = BaselineCommentInspector.Inspect(rawBaseline);
+
+        // Nothing to remove means the input already is the answer. Reserializing it would be a
+        // no-op prune that still rewrote quoting, line endings, or blank-line placement — the file
+        // has to come back byte-for-byte identical.
+        string yaml = plan.RemovesNothing
+            ? rawBaseline
+            : comments.Header + baselineGenerator.Serialize(
+                baselineGenerator.BuildFromEntries(plan.OutputEntries, existingBaseline.Version));
 
         return new BaselinePruneOutcome(
             Succeeded: true,
             Yaml: yaml,
             RemovedEntries: removed,
-            ConfigurationViolations: Array.Empty<ArchitectureViolation>());
+            ConfigurationViolations: Array.Empty<ArchitectureViolation>())
+        {
+            Entries = plan.LifecycleEntries,
+            IsNoOp = plan.RemovesNothing,
+            // A no-op prune rewrites nothing, so unpreservable comments cannot be lost by it either.
+            CommentDiagnostic = plan.RemovesNothing
+                ? null
+                : DescribeCommentRefusal("baseline prune", request.BaselinePath, comments),
+        };
     }
 
     public BaselineDiffOutcome Diff(BaselineDiffRequest request)
@@ -137,7 +173,11 @@ public sealed class ArchitectureBaselineApplicationService(
             Frozen: comparison.Frozen,
             Resolved: comparison.Resolved,
             ConfigurationErrors: comparison.ConfigurationErrors,
-            ConfigurationViolations: Array.Empty<ArchitectureViolation>());
+            ConfigurationViolations: Array.Empty<ArchitectureViolation>())
+        {
+            Ambiguous = comparison.Ambiguous,
+            Entries = BaselineWritePlanner.Report(comparison),
+        };
     }
 
     public BaselineVerifyOutcome Verify(BaselineVerifyRequest request)
@@ -161,7 +201,11 @@ public sealed class ArchitectureBaselineApplicationService(
         ArchitectureBaselineComparisonResult comparison = ArchitectureBaselineComparer.Compare(
             document, existingBaseline, candidates, request.Mode, request.ContractIds);
 
-        bool inSync = comparison.Resolved.Count == 0 && comparison.ConfigurationErrors.Count == 0;
+        // Ambiguity is out-of-sync too: one entry standing in for several distinct violations
+        // suppresses more than it was reviewed for.
+        bool inSync = comparison.Resolved.Count == 0
+            && comparison.ConfigurationErrors.Count == 0
+            && comparison.Ambiguous.Count == 0;
 
         return new BaselineVerifyOutcome(
             Succeeded: true,
@@ -170,7 +214,11 @@ public sealed class ArchitectureBaselineApplicationService(
             Frozen: comparison.Frozen,
             Resolved: comparison.Resolved,
             ConfigurationErrors: comparison.ConfigurationErrors,
-            ConfigurationViolations: Array.Empty<ArchitectureViolation>());
+            ConfigurationViolations: Array.Empty<ArchitectureViolation>())
+        {
+            Ambiguous = comparison.Ambiguous,
+            Entries = BaselineWritePlanner.Report(comparison),
+        };
     }
 
     public BaselineMigrateOutcome Migrate(BaselineMigrateRequest request)
@@ -232,7 +280,10 @@ public sealed class ArchitectureBaselineApplicationService(
                         matched++;
                         ArchitectureBaselineCandidate candidate = matches[0];
                         migratedEntries.Add(new ArchitectureBaselineComparisonEntry(
-                            groupName, entry.Id, candidate.SourceType, candidate.ForbiddenReference, ignore.Reason, candidate.Identity));
+                            groupName, entry.Id, candidate.SourceType, candidate.ForbiddenReference, ignore.Reason, candidate.Identity)
+                        {
+                            Issue = ignore.Issue,
+                        });
                         report.Add(new BaselineMigrateEntryReport(
                             groupName, entry.Id, ignore.SourceType, ignore.ForbiddenReference, "matched", 1));
                     }
@@ -252,18 +303,28 @@ public sealed class ArchitectureBaselineApplicationService(
             }
         }
 
-        bool canWrite = !request.DryRun && ambiguous == 0;
-        string? yaml = null;
-        if (canWrite)
-        {
-            ArchitectureBaselineDocument migrated = baselineGenerator.BuildFromEntries(
-                migratedEntries, version: ArchitectureViolationIdentity.CurrentVersion);
-            yaml = baselineGenerator.Serialize(migrated);
-        }
+        // A dry run must show the deterministic portion of the migration even when ambiguities
+        // make the result unsafe to write. The caller keeps the write gate closed in that case.
+        bool writable = ambiguous == 0;
+        ArchitectureBaselineDocument migrated = baselineGenerator.BuildFromEntries(
+            migratedEntries, version: ArchitectureViolationIdentity.CurrentVersion);
+        string yaml = baselineGenerator.Serialize(migrated);
 
-        bool succeeded = request.DryRun ? ambiguous == 0 : canWrite;
+        return new BaselineMigrateOutcome(writable, yaml, matched, stale, ambiguous, report, Array.Empty<ArchitectureViolation>());
+    }
 
-        return new BaselineMigrateOutcome(succeeded, yaml, matched, stale, ambiguous, report, Array.Empty<ArchitectureViolation>());
+    private BaselineCommentInspection InspectComments(string baselinePath)
+    {
+        return BaselineCommentInspector.Inspect(baselineLoadingService.ReadRawText(baselinePath));
+    }
+
+    // Reported rather than thrown: classification and `--dry-run` reporting stay available on a file
+    // whose comments block an in-place rewrite, which is what makes the refusal actionable.
+    private static string? DescribeCommentRefusal(string command, string baselinePath, BaselineCommentInspection comments)
+    {
+        return comments.CanRoundTrip
+            ? null
+            : BaselineCommentInspector.DescribeRefusal(command, baselinePath, comments.UnanchorableCommentLines);
     }
 
     private static BaselineMigrateOutcome Fail(string error)

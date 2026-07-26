@@ -1,3 +1,4 @@
+using System.Text.Json;
 using ArchLinterNet.Cli.Abstractions;
 using ArchLinterNet.Core.Model;
 using ArchLinterNet.Core.Validation;
@@ -26,12 +27,6 @@ internal sealed class BaselineUpdateCommandHandler(ICliRuntime runtime, ICliCons
             return CliExitCodes.InvalidArgumentsOrRuntimeError;
         }
 
-        if (options.OutputPath == null)
-        {
-            console.Error.WriteLine("--output is required for baseline update.");
-            return CliExitCodes.InvalidArgumentsOrRuntimeError;
-        }
-
         if (!fileSystem.FileExists(options.PolicyPath))
         {
             console.Error.WriteLine($"Policy file not found: {options.PolicyPath}");
@@ -52,25 +47,88 @@ internal sealed class BaselineUpdateCommandHandler(ICliRuntime runtime, ICliCons
                 BaselinePath = options.BaselinePath,
                 Mode = options.Mode,
                 ConditionSetName = options.ConditionSetName,
-                Reason = options.Reason,
+                Reason = options.Reasons.Reason,
+                ReasonForContract = options.Reasons.ReasonForContract,
+                ReasonForFamily = options.Reasons.ReasonForFamily,
                 ContractIds = options.ContractIds.ToList(),
             });
 
             if (!outcome.Succeeded)
             {
-                WriteConfigurationViolations(outcome.ConfigurationViolations);
+                if (outcome.Error != null)
+                {
+                    console.Error.WriteLine(outcome.Error);
+                }
+                else
+                {
+                    WriteConfigurationViolations(outcome.ConfigurationViolations);
+                }
+
                 return CliExitCodes.InvalidArgumentsOrRuntimeError;
             }
 
-            fileSystem.WriteAllText(options.OutputPath, outcome.Yaml!);
-            console.Out.WriteLine($"Updated baseline: preserved {outcome.PreservedCount}, added {outcome.NewCount} new entries.");
-            console.Out.WriteLine($"Output: {options.OutputPath}");
+            bool json = options.Format == "json";
+            BaselineWriteGate gate = new(console, fileSystem);
+            if (!gate.TryApply(
+                    new BaselineWriteGate.Request(
+                        "baseline update", options.OutputPath, options.Write.DryRun, options.Write.Force,
+                        outcome.Yaml!, outcome.CommentDiagnostic, options.BaselinePath, !json),
+                    out BaselineWriteGate.Disposition disposition))
+            {
+                return CliExitCodes.InvalidArgumentsOrRuntimeError;
+            }
+
+            Report(options, outcome, disposition);
             return CliExitCodes.Success;
         }
         catch (Exception ex)
         {
             console.Error.WriteLine($"Baseline update error: {ex.Message}");
             return CliExitCodes.InvalidArgumentsOrRuntimeError;
+        }
+    }
+
+    private void Report(
+        BaselineUpdateCommandOptions options,
+        BaselineUpdateOutcome outcome,
+        BaselineWriteGate.Disposition disposition)
+    {
+        if (options.Format == "json")
+        {
+            bool written = disposition == BaselineWriteGate.Disposition.Written;
+            console.Out.WriteLine(JsonSerializer.Serialize(new
+            {
+                status = BaselineWriteGate.StatusFor(disposition, "updated"),
+                dryRun = disposition == BaselineWriteGate.Disposition.DryRun,
+                output = options.OutputPath,
+                preservedCount = outcome.PreservedCount,
+                newCount = outcome.NewCount,
+                commentDiagnostic = outcome.CommentDiagnostic,
+                counts = BaselineLifecycleFormatter.Counts(outcome.Entries),
+                entries = BaselineLifecycleFormatter.EntriesForJson(outcome.Entries),
+                proposedContent = written ? null : outcome.Yaml,
+            }));
+            return;
+        }
+
+        if (disposition == BaselineWriteGate.Disposition.Preview)
+        {
+            return;
+        }
+
+        console.Out.WriteLine($"Updated baseline: preserved {outcome.PreservedCount}, added {outcome.NewCount} new entries.");
+        console.Out.WriteLine(BaselineLifecycleFormatter.FormatForHumans(outcome.Entries));
+
+        // Surfaced even on a dry run: the run that would actually write is the one this blocks, and the
+        // reviewer needs to know before they drop --dry-run.
+        if (outcome.CommentDiagnostic != null)
+        {
+            console.Out.WriteLine(outcome.CommentDiagnostic);
+        }
+
+        if (disposition == BaselineWriteGate.Disposition.Written)
+        {
+            console.Out.WriteLine($"Output: {options.OutputPath}");
         }
     }
 

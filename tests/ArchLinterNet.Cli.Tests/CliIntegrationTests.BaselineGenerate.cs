@@ -57,16 +57,74 @@ public partial class CliIntegrationTests
     }
 
     [Test]
-    public void BaselineGenerate_MissingOutput_ExitsTwo()
+    public void BaselineGenerate_MissingOutput_PreviewsToStdout()
     {
-        var (exitCode, _, stderr) = RunCli("baseline", "generate",
+        var (exitCode, stdout, stderr) = RunCli("baseline", "generate",
             "--config", _passingPolicy);
 
         Assert.Multiple(() =>
         {
-            Assert.That(exitCode, Is.EqualTo(2));
-            Assert.That(stderr, Does.Contain("--output"));
+            Assert.That(exitCode, Is.EqualTo(0), $"Baseline generate failed, stderr: {stderr}");
+            Assert.That(stdout, Does.Contain("version: 2"));
         });
+    }
+
+    [Test]
+    public void BaselineGenerate_ExistingOutput_RequiresForce()
+    {
+        string outputPath = Path.Combine(Path.GetTempPath(), $"baseline-{Guid.NewGuid():N}.yml");
+        try
+        {
+            File.WriteAllText(outputPath, "# reviewed baseline\nversion: 2\nbaseline: {}\n");
+
+            var (exitCode, _, stderr) = RunCli("baseline", "generate",
+                "--config", _passingPolicy, "--output", outputPath);
+
+            Assert.Multiple(() =>
+            {
+                Assert.That(exitCode, Is.EqualTo(2));
+                Assert.That(stderr, Does.Contain("--force"));
+                Assert.That(File.ReadAllText(outputPath), Does.StartWith("# reviewed baseline"));
+            });
+
+            var (forcedExit, _, forcedStderr) = RunCli("baseline", "generate",
+                "--config", _passingPolicy, "--output", outputPath, "--force");
+
+            Assert.Multiple(() =>
+            {
+                Assert.That(forcedExit, Is.EqualTo(0), $"Forced generate failed, stderr: {forcedStderr}");
+                Assert.That(File.ReadAllText(outputPath), Does.Not.StartWith("# reviewed baseline"));
+            });
+        }
+        finally
+        {
+            if (File.Exists(outputPath))
+                File.Delete(outputPath);
+        }
+    }
+
+    [Test]
+    public void BaselineGenerate_DryRun_LeavesOutputUntouched()
+    {
+        string outputPath = Path.Combine(Path.GetTempPath(), $"baseline-{Guid.NewGuid():N}.yml");
+        try
+        {
+            var (exitCode, stdout, stderr) = RunCli("baseline", "generate",
+                "--config", _passingPolicy, "--output", outputPath, "--dry-run");
+
+            Assert.Multiple(() =>
+            {
+                Assert.That(exitCode, Is.EqualTo(0), $"Baseline generate dry run failed, stderr: {stderr}");
+                Assert.That(stdout, Does.Contain("Dry run"));
+                Assert.That(stdout, Does.Contain("version: 2"));
+                Assert.That(File.Exists(outputPath), Is.False);
+            });
+        }
+        finally
+        {
+            if (File.Exists(outputPath))
+                File.Delete(outputPath);
+        }
     }
 
     [Test]

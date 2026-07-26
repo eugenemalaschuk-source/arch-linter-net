@@ -56,7 +56,7 @@ baseline:
             {
                 Assert.That(exitCode, Is.EqualTo(1), $"Verify should fail on stale entry, stderr: {stderr}");
                 Assert.That(stdout, Does.Contain("Baseline is out of sync."));
-                Assert.That(stdout, Does.Contain("Resolved (stale) baseline entries: 1"));
+                Assert.That(stdout, Does.Contain("Resolved baseline entries (debt fixed): 1"));
             });
         }
         finally
@@ -89,7 +89,7 @@ baseline:
             Assert.Multiple(() =>
             {
                 Assert.That(exitCode, Is.EqualTo(1), $"Verify should fail on unknown contract id, stderr: {stderr}");
-                Assert.That(stdout, Does.Contain("Configuration errors (unknown contract id): 1"));
+                Assert.That(stdout, Does.Contain("Stale baseline entries (contract no longer valid): 1"));
             });
         }
         finally

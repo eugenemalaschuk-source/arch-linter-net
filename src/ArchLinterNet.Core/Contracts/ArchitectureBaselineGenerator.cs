@@ -53,7 +53,8 @@ internal sealed class ArchitectureBaselineGenerator : IArchitectureBaselineGener
             {
                 SourceType = entry.SourceType,
                 ForbiddenReference = entry.ForbiddenReference,
-                Reason = entry.Reason ?? "generated baseline"
+                Reason = entry.Reason ?? "generated baseline",
+                Issue = entry.Issue
             };
 
             string key = $"{entry.SourceType}|{entry.ForbiddenReference}";
@@ -97,7 +98,7 @@ internal sealed class ArchitectureBaselineGenerator : IArchitectureBaselineGener
             var groupEntries = GetOrAddGroup(entriesByGroup, entry.ContractGroup);
             var violations = GetOrAddContract(groupEntries, entry.ContractId);
             violations.Add(ArchitectureBaselineIgnoredViolation.FromIdentity(
-                identity, entry.SourceType, entry.ForbiddenReference, entry.Reason ?? "generated baseline"));
+                identity, entry.SourceType, entry.ForbiddenReference, entry.Reason ?? "generated baseline", entry.Issue));
         }
 
         PopulateGroups(baseline, entriesByGroup);

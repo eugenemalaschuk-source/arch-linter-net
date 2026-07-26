@@ -130,6 +130,8 @@ internal sealed class FakeBaselineGenerator : IArchitectureBaselineGenerator
 {
     public bool WasCalled { get; private set; }
 
+    public bool BuildFromEntriesWasCalled { get; private set; }
+
     public string ReasonReceived { get; private set; } = string.Empty;
 
     public string YamlToReturn { get; set; } = "fake-baseline-yaml";
@@ -148,7 +150,7 @@ internal sealed class FakeBaselineGenerator : IArchitectureBaselineGenerator
 
     public ArchitectureBaselineDocument BuildFromEntries(IReadOnlyList<ArchitectureBaselineComparisonEntry> entries, int version = 2)
     {
-        WasCalled = true;
+        BuildFromEntriesWasCalled = true;
         EntriesReceived = entries;
         return new ArchitectureBaselineDocument { Version = version };
     }
@@ -168,9 +170,17 @@ internal sealed class FakeBaselineLoadingService : IArchitectureBaselineLoadingS
     {
     }
 
+    /// <summary>The raw file text update/prune inspect for comments they must preserve or refuse.</summary>
+    public string RawTextToReturn { get; set; } = "version: 1\nbaseline: {}\n";
+
     public ArchitectureBaselineDocument Load(string baselinePath)
     {
         return DocumentToReturn;
+    }
+
+    public string ReadRawText(string baselinePath)
+    {
+        return RawTextToReturn;
     }
 }
 

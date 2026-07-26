@@ -56,25 +56,18 @@ internal sealed class BaselineVerifyCommandHandler(ICliRuntime runtime, ICliCons
                 return CliExitCodes.InvalidArgumentsOrRuntimeError;
             }
 
+            BaselineDiffCommandHandler.BaselineComparisonReport report = new(
+                outcome.New, outcome.Frozen, outcome.Resolved, outcome.Ambiguous, outcome.ConfigurationErrors,
+                outcome.Entries);
+
             if (options.Format == "json")
             {
-                console.Out.WriteLine(JsonSerializer.Serialize(new
-                {
-                    inSync = outcome.InSync,
-                    @new = outcome.New.Select(e => BaselineDiffCommandHandler.FormatEntryForJson(e, "new")),
-                    frozen = outcome.Frozen.Select(e => BaselineDiffCommandHandler.FormatEntryForJson(e, "matched")),
-                    resolved = outcome.Resolved.Select(e => BaselineDiffCommandHandler.FormatEntryForJson(e, "stale")),
-                    configurationErrors = outcome.ConfigurationErrors.Select(
-                        e => BaselineDiffCommandHandler.FormatEntryForJson(e, "configuration_error")),
-                }));
+                console.Out.WriteLine(JsonSerializer.Serialize(
+                    BaselineDiffCommandHandler.BuildJsonPayload(report, outcome.InSync)));
             }
             else
             {
-                console.Out.WriteLine(BaselineDiffCommandHandler.FormatBaselineComparisonForHumans(
-                    outcome.New,
-                    outcome.Frozen,
-                    outcome.Resolved,
-                    outcome.ConfigurationErrors));
+                console.Out.WriteLine(BaselineDiffCommandHandler.FormatBaselineComparisonForHumans(report));
                 console.Out.WriteLine(outcome.InSync ? "Baseline is in sync." : "Baseline is out of sync.");
             }
 

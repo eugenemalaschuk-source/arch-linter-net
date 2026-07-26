@@ -136,4 +136,84 @@ baseline:
             Assert.That(stdout, Does.Contain("--baseline"));
         });
     }
+
+    [Test]
+    public void BaselinePrune_NothingToRemove_ReproducesTheInputByteForByte()
+    {
+        string baselinePath = Path.Combine(Path.GetTempPath(), $"baseline-{Guid.NewGuid():N}.yml");
+        // Deliberately quirky: CRLF endings, a quoted scalar, and a blank line the serializer would
+        // not reproduce. A no-op prune must not touch any of it.
+        const string Original = "# reviewed baseline\r\nversion: 2\r\n\r\nbaseline:\r\n  strict: []\r\n";
+        try
+        {
+            File.WriteAllText(baselinePath, Original);
+
+            var (exitCode, _, stderr) = RunCli("baseline", "prune",
+                "--config", _passingPolicy, "--baseline", baselinePath, "--output", baselinePath);
+
+            Assert.Multiple(() =>
+            {
+                Assert.That(exitCode, Is.EqualTo(0), $"Baseline prune failed, stderr: {stderr}");
+                Assert.That(File.ReadAllText(baselinePath), Is.EqualTo(Original));
+            });
+        }
+        finally
+        {
+            if (File.Exists(baselinePath))
+                File.Delete(baselinePath);
+        }
+    }
+
+    [Test]
+    public void BaselinePrune_NothingToRemove_DoesNotRewriteTheInputEncoding()
+    {
+        string baselinePath = Path.Combine(Path.GetTempPath(), $"baseline-{Guid.NewGuid():N}.yml");
+        byte[] original = [0xEF, 0xBB, 0xBF, .. System.Text.Encoding.UTF8.GetBytes("version: 2\r\nbaseline:\r\n  strict: []\r\n")];
+        try
+        {
+            File.WriteAllBytes(baselinePath, original);
+
+            var (exitCode, _, stderr) = RunCli("baseline", "prune",
+                "--config", _passingPolicy, "--baseline", baselinePath, "--output", baselinePath);
+
+            Assert.Multiple(() =>
+            {
+                Assert.That(exitCode, Is.EqualTo(0), $"Baseline prune failed, stderr: {stderr}");
+                Assert.That(File.ReadAllBytes(baselinePath), Is.EqualTo(original));
+            });
+        }
+        finally
+        {
+            if (File.Exists(baselinePath))
+                File.Delete(baselinePath);
+        }
+    }
+
+    [Test]
+    public void BaselinePrune_NothingToRemove_CopiesTheInputBytesToSeparateOutput()
+    {
+        string baselinePath = Path.Combine(Path.GetTempPath(), $"baseline-{Guid.NewGuid():N}.yml");
+        string outputPath = Path.Combine(Path.GetTempPath(), $"pruned-{Guid.NewGuid():N}.yml");
+        byte[] original = [0xEF, 0xBB, 0xBF, .. System.Text.Encoding.UTF8.GetBytes("version: 2\r\nbaseline:\r\n  strict: []\r\n")];
+        try
+        {
+            File.WriteAllBytes(baselinePath, original);
+
+            var (exitCode, _, stderr) = RunCli("baseline", "prune",
+                "--config", _passingPolicy, "--baseline", baselinePath, "--output", outputPath);
+
+            Assert.Multiple(() =>
+            {
+                Assert.That(exitCode, Is.EqualTo(0), $"Baseline prune failed, stderr: {stderr}");
+                Assert.That(File.ReadAllBytes(outputPath), Is.EqualTo(original));
+            });
+        }
+        finally
+        {
+            if (File.Exists(baselinePath))
+                File.Delete(baselinePath);
+            if (File.Exists(outputPath))
+                File.Delete(outputPath);
+        }
+    }
 }

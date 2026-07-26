@@ -164,7 +164,7 @@ arch-linter-net baseline prune \
   --baseline architecture/baseline.arch.yml \
   --output architecture/baseline.arch.yml
 
-# Read-only report of new/existing/resolved/configuration-error entries
+# Read-only report of new/matched/resolved/stale/ambiguous entries
 arch-linter-net baseline diff \
   --config architecture/dependencies.arch.yml \
   --baseline architecture/baseline.arch.yml
