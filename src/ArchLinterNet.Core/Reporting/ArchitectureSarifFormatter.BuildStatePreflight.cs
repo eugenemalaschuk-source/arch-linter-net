@@ -23,6 +23,41 @@ public sealed partial class ArchitectureSarifFormatter
         IReadOnlyCollection<ArchitectureViolation> violations,
         IReadOnlyCollection<string> cycles,
         IReadOnlyCollection<BuildStatePreflightDiagnostic> preflightDiagnostics,
+        IReadOnlyCollection<ArchitectureCoverageSummary> coverageSummaries,
+        string toolVersion)
+    {
+        return FormatResultAsSarifCore(
+            mode,
+            violations,
+            cycles.Select(cycle => (Func<string, ResultEntry>)(level => BuildCycleEntry(cycle, level))),
+            toolVersion,
+            preflightDiagnostics,
+            coverageSummaries);
+    }
+
+    public static string FormatResultAsSarif(
+        string mode,
+        IReadOnlyCollection<ArchitectureViolation> violations,
+        IReadOnlyCollection<ArchitectureCycleFinding> cycles,
+        IReadOnlyCollection<BuildStatePreflightDiagnostic> preflightDiagnostics,
+        IReadOnlyCollection<ArchitectureCoverageSummary> coverageSummaries,
+        string toolVersion)
+    {
+        return FormatResultAsSarifCore(
+            mode,
+            violations,
+            cycles.Select(cycle => (Func<string, ResultEntry>)(level =>
+                BuildCycleEntry(ArchitectureDiagnosticMapper.FromCycle(cycle), level))),
+            toolVersion,
+            preflightDiagnostics,
+            coverageSummaries);
+    }
+
+    public string FormatResultAsSarif(
+        string mode,
+        IReadOnlyCollection<ArchitectureViolation> violations,
+        IReadOnlyCollection<string> cycles,
+        IReadOnlyCollection<BuildStatePreflightDiagnostic> preflightDiagnostics,
         string toolVersion)
     {
         return FormatResultAsSarifCore(

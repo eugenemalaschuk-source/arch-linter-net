@@ -37,7 +37,8 @@ internal interface ICliRuntime
         IReadOnlyCollection<ArchitectureViolation> violations,
         IReadOnlyCollection<string> cycles,
         IReadOnlyCollection<ArchitectureCycleFinding> cycleFindings,
-        IReadOnlyCollection<BuildStatePreflightDiagnostic> preflightDiagnostics);
+        IReadOnlyCollection<BuildStatePreflightDiagnostic> preflightDiagnostics,
+        IReadOnlyCollection<ArchitectureCoverageSummary> coverageSummaries);
 
     string FormatViolationsForHumans(IReadOnlyCollection<ArchitectureViolation> violations);
 

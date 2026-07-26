@@ -666,35 +666,7 @@ public sealed partial class ArchitectureAnalysisSession
     }
 
     private static IEnumerable<string> GetReferencedLayerNames(IArchitectureContract contract)
-        => GetRuleInputReferences(contract).Select(reference => reference.Layer);
-
-    internal static IEnumerable<ArchitectureRuleInputReference> GetRuleInputReferences(IArchitectureContract contract)
-    {
-        return contract switch
-        {
-            ArchitectureDependencyContract c => One("source", c.Source).Concat(Many("forbidden", c.Forbidden)),
-            ArchitectureAllowOnlyContract c => One("source", c.Source).Concat(Many("allowed", c.Allowed)),
-            ArchitectureCycleContract c => Many("layers", c.Layers),
-            ArchitectureMethodBodyContract c => One("source", c.Source),
-            ArchitectureIndependenceContract c => Many("layers", c.Layers),
-            ArchitectureLayerContract c => Many("layers", c.Layers),
-            ArchitectureProtectedContract c => Many("protected", c.Protected).Concat(Many("allowed_importers", c.AllowedImporters)),
-            ArchitectureExternalDependencyContract c => One("source", c.Source),
-            ArchitectureExternalAllowOnlyContract c => One("source", c.Source),
-            ArchitectureTypePlacementContract c => Many("types_matching.layer", GetTypePlacementReferencedLayerNames(c)),
-            ArchitectureAttributeUsageContract c => Many("attribute_layers", GetAttributeUsageReferencedLayerNames(c)),
-            ArchitectureInheritanceContract c => Many("source_layers", c.SourceLayers),
-            ArchitectureInterfaceImplementationContract c => Many("interface_layers", GetInterfaceImplementationReferencedLayerNames(c)),
-            ArchitectureCompositionContract c => Many("allowed_only_in_layers", c.AllowedOnlyInLayers),
-            _ => Array.Empty<ArchitectureRuleInputReference>()
-        };
-    }
-
-    private static IEnumerable<ArchitectureRuleInputReference> One(string input, string layer) =>
-        string.IsNullOrWhiteSpace(layer) ? Array.Empty<ArchitectureRuleInputReference>() : new[] { new ArchitectureRuleInputReference(input, layer) };
-
-    private static IEnumerable<ArchitectureRuleInputReference> Many(string input, IEnumerable<string> layers) =>
-        layers.Where(layer => !string.IsNullOrWhiteSpace(layer)).Select(layer => new ArchitectureRuleInputReference(input, layer));
+        => ArchitectureRuleInputReferences.For(contract).Select(reference => reference.Layer);
 
     // Shared by GetReferencedLayerNames (dangling-layer deferral, policy-consistency) and
     // CheckConfiguration's own layer collection, so a typo'd layer name in either

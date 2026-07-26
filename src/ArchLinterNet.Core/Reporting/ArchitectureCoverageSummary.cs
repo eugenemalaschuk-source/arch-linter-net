@@ -7,8 +7,10 @@ public sealed record ArchitectureCoverageSummaryCounts(
     int Excluded,
     int Uncovered,
     int Stale,
-    int Unknown,
-    int OptionalEmpty = 0);
+    int Unknown)
+{
+    public int OptionalEmpty { get; init; }
+}
 
 public sealed record ArchitectureCoverageSummaryExcludedItem(string Item, string Reason)
 {

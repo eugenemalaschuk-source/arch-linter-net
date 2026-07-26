@@ -224,7 +224,10 @@ public sealed partial class ArchitectureDiagnosticFormatter : IArchitectureDiagn
 
         var optionalEmptyLines = summary.OptionalEmptyItems
             .OrderBy(item => item.Item, StringComparer.Ordinal)
-            .Select(item => $"    optional-empty: {item.Item} ({item.Reason}; {item.Evidence})");
+            .Select(item => $"    optional-empty: {item.Item} ({item.Reason}; {item.Evidence})" +
+                (item.PolicyLocation is null
+                    ? string.Empty
+                    : $" (policy: {item.PolicyLocation.SourcePath}:{item.PolicyLocation.YamlPath})"));
 
         return string.Join(
             Environment.NewLine,

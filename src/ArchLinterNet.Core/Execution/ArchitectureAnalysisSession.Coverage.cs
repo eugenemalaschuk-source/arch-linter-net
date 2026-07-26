@@ -131,7 +131,7 @@ public sealed partial class ArchitectureAnalysisSession
                 continue;
             }
 
-            IReadOnlyList<ArchitectureRuleInputReference> referencedInputs = GetRuleInputReferences(descriptor.Contract)
+            IReadOnlyList<ArchitectureRuleInputReference> referencedInputs = ArchitectureRuleInputReferences.For(descriptor.Contract)
                 .Distinct()
                 .OrderBy(reference => reference.Input, StringComparer.Ordinal)
                 .ThenBy(reference => reference.Layer, StringComparer.Ordinal)
@@ -174,7 +174,10 @@ public sealed partial class ArchitectureAnalysisSession
             contract.Name,
             contract.Id,
             contract.Scope,
-            new ArchitectureCoverageSummaryCounts(coveredItems.Count, excludedItems.Count, 0, staleItems.Count, unknownItems.Count, optionalEmptyItems.Count),
+            new ArchitectureCoverageSummaryCounts(coveredItems.Count, excludedItems.Count, 0, staleItems.Count, unknownItems.Count)
+            {
+                OptionalEmpty = optionalEmptyItems.Count
+            },
             excludedItems,
             Array.Empty<ArchitectureCoverageSummaryEvidenceItem>(),
             staleItems,
@@ -454,7 +457,7 @@ public sealed partial class ArchitectureAnalysisSession
         ArchitectureContractExecutionContext executionContext,
         List<ArchitectureViolation> findings)
     {
-        IReadOnlyList<ArchitectureRuleInputReference> referencedInputs = GetRuleInputReferences(descriptor.Contract)
+        IReadOnlyList<ArchitectureRuleInputReference> referencedInputs = ArchitectureRuleInputReferences.For(descriptor.Contract)
             .Distinct()
             .ToList();
 

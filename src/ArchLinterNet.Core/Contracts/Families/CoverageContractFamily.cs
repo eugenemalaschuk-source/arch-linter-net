@@ -63,6 +63,43 @@ public sealed class ArchitectureOptionalRuleInput
 
 internal sealed record ArchitectureRuleInputReference(string Input, string Layer);
 
+internal static class ArchitectureRuleInputReferences
+{
+    public static IEnumerable<ArchitectureRuleInputReference> For(IArchitectureContract contract)
+    {
+        return contract switch
+        {
+            ArchitectureDependencyContract c => One("source", c.Source).Concat(Many("forbidden", c.Forbidden)),
+            ArchitectureAllowOnlyContract c => One("source", c.Source).Concat(Many("allowed", c.Allowed)),
+            ArchitectureCycleContract c => Many("layers", c.Layers),
+            ArchitectureMethodBodyContract c => One("source", c.Source),
+            ArchitectureIndependenceContract c => Many("layers", c.Layers),
+            ArchitectureLayerContract c => Many("layers", c.Layers),
+            ArchitectureProtectedContract c => Many("protected", c.Protected).Concat(Many("allowed_importers", c.AllowedImporters)),
+            ArchitectureExternalDependencyContract c => One("source", c.Source),
+            ArchitectureExternalAllowOnlyContract c => One("source", c.Source),
+            ArchitectureTypePlacementContract c => One("types_matching.layer", c.TypesMatching.Layer)
+                .Concat(Many("must_reside_in_layers", c.MustResideInLayers)),
+            ArchitectureAttributeUsageContract c => Many("allowed_only_in_layers", c.AllowedOnlyInLayers)
+                .Concat(Many("forbidden_in_layers", c.ForbiddenInLayers)),
+            ArchitectureInheritanceContract c => Many("source_layers", c.SourceLayers),
+            ArchitectureInterfaceImplementationContract c => Many("allowed_only_in_layers", c.AllowedOnlyInLayers)
+                .Concat(Many("forbidden_in_layers", c.ForbiddenInLayers)),
+            ArchitectureCompositionContract c => Many("allowed_only_in_layers", c.AllowedOnlyInLayers),
+            _ => Array.Empty<ArchitectureRuleInputReference>()
+        };
+    }
+
+    private static IEnumerable<ArchitectureRuleInputReference> One(string input, string layer) =>
+        string.IsNullOrWhiteSpace(layer)
+            ? Array.Empty<ArchitectureRuleInputReference>()
+            : new[] { new ArchitectureRuleInputReference(input, layer) };
+
+    private static IEnumerable<ArchitectureRuleInputReference> Many(string input, IEnumerable<string> layers) =>
+        layers.Where(layer => !string.IsNullOrWhiteSpace(layer))
+            .Select(layer => new ArchitectureRuleInputReference(input, layer));
+}
+
 public sealed class ArchitectureCoverageContract : IArchitectureContract
 {
     [YamlMember(Alias = "name")] public string Name { get; set; } = string.Empty;
