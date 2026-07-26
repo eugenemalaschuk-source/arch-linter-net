@@ -19,8 +19,15 @@ public static class ArchitectureBaselineComparer
         var configurationErrors = new List<ArchitectureBaselineComparisonEntry>();
         var outOfScope = new List<ArchitectureBaselineComparisonEntry>();
 
+        // Baseline entries carry the exact contract id a finding carries, which for an expanded
+        // contract is the derived per-source instance id. Selecting the authored id the policy
+        // author wrote must therefore also select every instance it produced, or `--contract
+        // <authored-id>` silently matches no entry. Entry identity itself stays exact.
         HashSet<string>? selectedIds = selectedContractIds is { Count: > 0 }
-            ? new HashSet<string>(selectedContractIds, StringComparer.OrdinalIgnoreCase)
+            ? new HashSet<string>(
+                selectedContractIds.SelectMany(id =>
+                    new[] { id }.Concat(policyDocument.SourceExpansion.InstanceIdsFor(id))),
+                StringComparer.OrdinalIgnoreCase)
             : null;
 
         Dictionary<string, Dictionary<string, string>> canonicalIdsByGroup =

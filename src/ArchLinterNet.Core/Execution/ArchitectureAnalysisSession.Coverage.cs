@@ -150,7 +150,7 @@ public sealed partial class ArchitectureAnalysisSession
 
                 if (!matchesAnyCode)
                 {
-                    ArchitectureOptionalRuleInput? optionalInput = FindOptionalInput(contract, referencedContractId, input);
+                    ArchitectureOptionalRuleInput? optionalInput = FindOptionalInput(contract, authoredContractId, referencedContractId, input);
                     if (optionalInput is not null)
                     {
                         optionalEmptyItems.Add(new ArchitectureCoverageSummaryOptionalEmptyItem(
@@ -474,7 +474,7 @@ public sealed partial class ArchitectureAnalysisSession
             }
 
             AddRuleInputCoverageFindingsForContract(
-                contract, referencedContractId, descriptor, inventory, executionContext, findings);
+                contract, authoredContractId, referencedContractId, descriptor, inventory, executionContext, findings);
         }
 
         executionContext.CollectUnmatchedIgnores(_unmatchedIgnoredViolations);
@@ -487,6 +487,7 @@ public sealed partial class ArchitectureAnalysisSession
 
     private void AddRuleInputCoverageFindingsForContract(
         ArchitectureCoverageContract contract,
+        string authoredContractId,
         string referencedContractId,
         ArchitectureContractDescriptor descriptor,
         ArchitectureCoverageInventory inventory,
@@ -519,7 +520,7 @@ public sealed partial class ArchitectureAnalysisSession
                 ArchitectureLayerResolver.MatchesNamespace(layer, entry.Namespace));
 
             if (!matchesAnyCode
-                && FindOptionalInput(contract, referencedContractId, input) is null
+                && FindOptionalInput(contract, authoredContractId, referencedContractId, input) is null
                 && !executionContext.IsIgnored(referencedContractId, layerName))
             {
                 findings.Add(new ArchitectureViolation(
@@ -532,11 +533,18 @@ public sealed partial class ArchitectureAnalysisSession
         }
     }
 
+    // An optional_inputs entry names the id the author wrote, which for an expanded contract is the
+    // authored id rather than the derived per-source instance id the rest of this pass works with.
+    // Matching either keeps the declaration usable without weakening its exact input/layer identity.
     private static ArchitectureOptionalRuleInput? FindOptionalInput(
-        ArchitectureCoverageContract contract, string contractId, ArchitectureRuleInputReference input)
+        ArchitectureCoverageContract contract,
+        string authoredContractId,
+        string resolvedContractId,
+        ArchitectureRuleInputReference input)
     {
-        return contract.OptionalInputs.SingleOrDefault(optional =>
-            string.Equals(optional.ContractId, contractId, StringComparison.OrdinalIgnoreCase)
+        return contract.OptionalInputs.FirstOrDefault(optional =>
+            (string.Equals(optional.ContractId, resolvedContractId, StringComparison.OrdinalIgnoreCase)
+                || string.Equals(optional.ContractId, authoredContractId, StringComparison.OrdinalIgnoreCase))
             && string.Equals(optional.Input, input.Input, StringComparison.Ordinal)
             && string.Equals(optional.Layer, input.Layer, StringComparison.Ordinal));
     }

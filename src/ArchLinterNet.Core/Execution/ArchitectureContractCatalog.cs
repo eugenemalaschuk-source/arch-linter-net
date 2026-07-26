@@ -10,7 +10,14 @@ public sealed record ArchitectureContractDescriptor(
     string Family,
     string Name,
     string? Id,
-    IArchitectureContract Contract);
+    IArchitectureContract Contract)
+{
+    // The id the policy author wrote for a contract that source-set expansion replaced with
+    // per-source instances; null for every ordinary contract. Id-acceptance surfaces must offer it
+    // alongside Id, because a request naming the authored id is rejected as unknown long before
+    // ArchitectureAnalysisSession.IsContractSelected ever sees the contract.
+    public string? AuthoredId { get; init; }
+}
 
 public sealed class ArchitectureContractCatalog
 {
@@ -46,7 +53,10 @@ public sealed class ArchitectureContractCatalog
 
             foreach (T contract in contracts)
             {
-                descriptors.Add(new ArchitectureContractDescriptor(group, mode, family, contract.Name, contract.Id, contract));
+                descriptors.Add(new ArchitectureContractDescriptor(group, mode, family, contract.Name, contract.Id, contract)
+                {
+                    AuthoredId = (contract as IArchitectureSourceExpandableContract)?.ExpansionOrigin?.AuthoredContractId
+                });
                 document.Provenance.BindCatalogContract(group, family, contract);
             }
         }
@@ -102,9 +112,19 @@ public sealed class ArchitectureContractCatalog
 
         foreach (ArchitectureContractDescriptor descriptor in _descriptors)
         {
-            if (descriptor.Mode == mode && descriptor.Id != null)
+            if (descriptor.Mode != mode)
+            {
+                continue;
+            }
+
+            if (descriptor.Id != null)
             {
                 ids.Add(descriptor.Id);
+            }
+
+            if (descriptor.AuthoredId != null)
+            {
+                ids.Add(descriptor.AuthoredId);
             }
         }
 
@@ -132,9 +152,19 @@ public sealed class ArchitectureContractCatalog
 
         foreach (ArchitectureContractDescriptor descriptor in _descriptors)
         {
-            if (descriptor.Group == group && descriptor.Id != null)
+            if (descriptor.Group != group)
+            {
+                continue;
+            }
+
+            if (descriptor.Id != null)
             {
                 ids.Add(descriptor.Id);
+            }
+
+            if (descriptor.AuthoredId != null)
+            {
+                ids.Add(descriptor.AuthoredId);
             }
         }
 

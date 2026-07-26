@@ -79,13 +79,29 @@ public sealed class ArchitectureSourceExpansionInventory
 
     // Instance ids produced by the authored contract id, used so contract selection and rule-input
     // coverage `contract_ids` keep accepting the authored id after expansion derived new ids.
+    //
+    // Spans every expansion carrying this authored id, not just the first: duplicate ids are
+    // rejected only within one contract type and mode group, so the same authored id legitimately
+    // exists in, say, both `strict_external` and `audit_package_dependency`. Returning one group's
+    // instances would silently cover only part of what the author referenced.
     public IReadOnlyList<string> InstanceIdsFor(string authoredContractId)
     {
-        ArchitectureContractExpansion? match = Contracts.FirstOrDefault(expansion =>
-            string.Equals(expansion.AuthoredContractId, authoredContractId, StringComparison.OrdinalIgnoreCase));
+        return Contracts
+            .Where(expansion =>
+                string.Equals(expansion.AuthoredContractId, authoredContractId, StringComparison.OrdinalIgnoreCase))
+            .SelectMany(expansion => expansion.Instances.Select(instance => instance.ContractId))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+    }
 
-        return match is null
-            ? Array.Empty<string>()
-            : match.Instances.Select(instance => instance.ContractId).ToArray();
+    // Authored ids that produced at least one instance, so id-acceptance surfaces (contract
+    // selection, baseline known-id sets) can offer the id the author actually wrote.
+    public IReadOnlyList<string> AuthoredContractIds()
+    {
+        return Contracts
+            .Where(expansion => expansion.Instances.Count > 0)
+            .Select(expansion => expansion.AuthoredContractId)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
     }
 }
