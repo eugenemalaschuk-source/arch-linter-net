@@ -3,8 +3,14 @@ using System.Runtime.CompilerServices;
 
 namespace ArchLinterNet.Core.Scanning;
 
+// Signature is the legacy `declared_api` identity (kind + name + parameter/member types).
+// ExactSignature adds the deterministic detail suffix that identity deliberately drops — constant
+// values, accessor shape, static/ref/out/in, sealed/abstract, enum underlying type, generic
+// constraints — and is what a reviewed snapshot records. Keeping both is what lets an existing
+// inline allowlist and an exact snapshot coexist on the same contract.
 internal readonly record struct ArchitectureExportedApiEntry(
     string Signature,
+    string ExactSignature,
     string DeclaringTypeName,
     string AssemblyName,
     string Visibility,
@@ -36,8 +42,12 @@ internal static class ArchitecturePublicApiSurfaceScanner
             }
 
             string typeName = ArchitectureTypeNames.SafeFullName(type);
+            string typeSignature = NormalizeType(type);
             yield return new ArchitectureExportedApiEntry(
-                NormalizeType(type), typeName, assemblyName, TypeVisibility(type), false, null);
+                typeSignature,
+                ArchitecturePublicApiSignatureDetails.Compose(
+                    typeSignature, ArchitecturePublicApiSignatureDetails.ForType(type)),
+                typeName, assemblyName, TypeVisibility(type), false, null);
 
             foreach (ArchitectureExportedApiEntry member in GetExportedMembers(type, assemblyName))
             {
@@ -130,7 +140,10 @@ internal static class ArchitecturePublicApiSurfaceScanner
             if (signature != null)
             {
                 yield return new ArchitectureExportedApiEntry(
-                    signature, declaringTypeName, assemblyName, MemberVisibility(ctor), false, null);
+                    signature,
+                    ArchitecturePublicApiSignatureDetails.Compose(
+                        signature, ArchitecturePublicApiSignatureDetails.ForMethod(ctor)),
+                    declaringTypeName, assemblyName, MemberVisibility(ctor), false, null);
             }
         }
     }
@@ -154,7 +167,10 @@ internal static class ArchitecturePublicApiSurfaceScanner
             if (signature != null)
             {
                 yield return new ArchitectureExportedApiEntry(
-                    signature, declaringTypeName, assemblyName, MemberVisibility(method), false, null);
+                    signature,
+                    ArchitecturePublicApiSignatureDetails.Compose(
+                        signature, ArchitecturePublicApiSignatureDetails.ForMethod(method)),
+                    declaringTypeName, assemblyName, MemberVisibility(method), false, null);
             }
         }
     }
@@ -178,7 +194,10 @@ internal static class ArchitecturePublicApiSurfaceScanner
             if (signature != null)
             {
                 yield return new ArchitectureExportedApiEntry(
-                    signature, declaringTypeName, assemblyName, AccessorVisibility(property.GetMethod, property.SetMethod), false, null);
+                    signature,
+                    ArchitecturePublicApiSignatureDetails.Compose(
+                        signature, ArchitecturePublicApiSignatureDetails.ForProperty(property)),
+                    declaringTypeName, assemblyName, AccessorVisibility(property.GetMethod, property.SetMethod), false, null);
             }
         }
     }
@@ -208,7 +227,10 @@ internal static class ArchitecturePublicApiSurfaceScanner
             string signature = $"{kind} {declaringTypeName}.{field.Name}: {fieldTypeName}";
             string? constQualifiedName = isConst ? $"{declaringTypeName}.{field.Name}" : null;
             yield return new ArchitectureExportedApiEntry(
-                signature, declaringTypeName, assemblyName, MemberVisibility(field), isConst, constQualifiedName);
+                signature,
+                ArchitecturePublicApiSignatureDetails.Compose(
+                    signature, ArchitecturePublicApiSignatureDetails.ForField(field)),
+                declaringTypeName, assemblyName, MemberVisibility(field), isConst, constQualifiedName);
         }
     }
 
@@ -229,8 +251,11 @@ internal static class ArchitecturePublicApiSurfaceScanner
                 continue;
             }
 
+            string eventSignature = $"event {declaringTypeName}.{evt.Name}: {eventTypeName}";
             yield return new ArchitectureExportedApiEntry(
-                $"event {declaringTypeName}.{evt.Name}: {eventTypeName}",
+                eventSignature,
+                ArchitecturePublicApiSignatureDetails.Compose(
+                    eventSignature, ArchitecturePublicApiSignatureDetails.ForEvent(evt)),
                 declaringTypeName, assemblyName, MemberVisibility(evt.AddMethod!), false, null);
         }
     }

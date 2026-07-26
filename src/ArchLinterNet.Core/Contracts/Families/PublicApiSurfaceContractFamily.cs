@@ -42,6 +42,17 @@ public sealed class ArchitecturePublicApiSurfaceContract : IArchitectureContract
     public IReadOnlyList<PublicApiSnapshotEntry> ResolvedSnapshotEntries { get; set; } =
         Array.Empty<PublicApiSnapshotEntry>();
 
+    // Absolute, boundary-checked path of ApiSnapshot. Every read and write must target this path
+    // rather than re-resolving the authored string against the process working directory.
+    [YamlIgnore]
+    public string? ResolvedSnapshotPath { get; set; }
+
+    // Set when the snapshot is missing, unparsable, or owned by another contract. Recorded rather
+    // than thrown so the first `public-api capture` can still load the policy that declares the
+    // snapshot it is about to create; validation turns this into a violation.
+    [YamlIgnore]
+    public string? ApiSnapshotError { get; set; }
+
     [YamlMember(Alias = "forbid_public_constants_unless_declared")]
     public bool ForbidPublicConstantsUnlessDeclared { get; set; }
 

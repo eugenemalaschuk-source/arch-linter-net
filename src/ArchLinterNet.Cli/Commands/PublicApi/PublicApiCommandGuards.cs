@@ -1,5 +1,6 @@
 using ArchLinterNet.Cli.Abstractions;
 using ArchLinterNet.Core.Model;
+using ArchLinterNet.Core.Validation;
 
 namespace ArchLinterNet.Cli.Commands.PublicApi;
 
@@ -15,6 +16,7 @@ internal static class PublicApiCommandGuards
         string? contractId,
         string format,
         string commandName,
+        IReadOnlyList<string> supportedFormats,
         out int exitCode)
     {
         exitCode = CliExitCodes.InvalidArgumentsOrRuntimeError;
@@ -25,10 +27,10 @@ internal static class PublicApiCommandGuards
             return false;
         }
 
-        if (!PublicApiOptionsFactory.SupportedFormats.Contains(format, StringComparer.Ordinal))
+        if (!supportedFormats.Contains(format, StringComparer.Ordinal))
         {
             console.Error.WriteLine(
-                $"Invalid format: {format}. Use {string.Join(", ", PublicApiOptionsFactory.SupportedFormats)}.");
+                $"Invalid format for public-api {commandName}: {format}. Use {string.Join(", ", supportedFormats)}.");
             return false;
         }
 
@@ -40,6 +42,15 @@ internal static class PublicApiCommandGuards
 
         exitCode = CliExitCodes.Success;
         return true;
+    }
+
+    // The 0.5.1 contract reserves exit code 1 for a completed gate that found drift and 2 for any
+    // operation that did not complete (invalid input, unusable snapshot, blocked preflight).
+    public static int ExitCodeFor(PublicApiFailureKind failureKind)
+    {
+        return failureKind == PublicApiFailureKind.Drift
+            ? CliExitCodes.ValidationFailure
+            : CliExitCodes.InvalidArgumentsOrRuntimeError;
     }
 
     public static void WriteError(

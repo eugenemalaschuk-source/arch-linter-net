@@ -7,7 +7,12 @@ internal static class PublicApiOptionsFactory
 {
     public const string DefaultPolicyPath = "architecture/dependencies.arch.yml";
 
+    // Only `diff` produces a pure finding set, which is the one shape SARIF can represent. capture,
+    // update, and migrate report an operation outcome (status, destination, proposed content) that
+    // has no SARIF equivalent, so they reject `sarif` instead of silently emitting human text.
     public static readonly IReadOnlyList<string> SupportedFormats = new[] { "human", "json", "sarif" };
+
+    public static readonly IReadOnlyList<string> OperationFormats = new[] { "human", "json" };
 
     public static Option<string> CreatePolicyOption()
     {

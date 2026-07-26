@@ -1,4 +1,6 @@
+using System.Text.Json;
 using ArchLinterNet.Cli.Abstractions;
+using ArchLinterNet.Core.Model;
 using ArchLinterNet.Core.Validation;
 
 namespace ArchLinterNet.Cli.Commands.PublicApi;
@@ -16,7 +18,8 @@ internal sealed class PublicApiUpdateCommandHandler(ICliRuntime runtime, ICliCon
         }
 
         if (!PublicApiCommandGuards.TryValidateCommon(
-                console, fileSystem, options.PolicyPath, options.ContractId, options.Format, CommandName, out int exitCode))
+                console, fileSystem, options.PolicyPath, options.ContractId, options.Format, CommandName,
+                PublicApiOptionsFactory.OperationFormats, out int exitCode))
         {
             return exitCode;
         }
@@ -41,22 +44,25 @@ internal sealed class PublicApiUpdateCommandHandler(ICliRuntime runtime, ICliCon
             if (!outcome.Succeeded)
             {
                 PublicApiCommandGuards.WriteError(console, CommandName, outcome.Error!, outcome.PreflightDiagnostics);
-                return CliExitCodes.InvalidArgumentsOrRuntimeError;
+                return PublicApiCommandGuards.ExitCodeFor(outcome.FailureKind);
             }
 
-            console.Out.WriteLine(PublicApiDeltaFormatter.Format(
-                runtime, options.Format, options.ContractId!, outcome.Delta));
+            // Core validated and read the boundary-resolved destination; writing the raw
+            // cwd-relative string here would update a different file and still report success.
+            string destination = outcome.ResolvedSnapshotPath!;
 
-            if (options.DryRun)
+            if (!options.DryRun)
             {
-                console.Out.WriteLine($"Dry run: '{options.SnapshotPath}' was not modified. Proposed content:");
-                console.Out.WriteLine(outcome.Snapshot!);
-                return CliExitCodes.Success;
+                string tempPath = fileSystem.WriteAllTextToTemp(destination, outcome.Snapshot!);
+                fileSystem.RenameTempToTarget(tempPath, destination);
             }
 
-            string tempPath = fileSystem.WriteAllTextToTemp(options.SnapshotPath, outcome.Snapshot!);
-            fileSystem.RenameTempToTarget(tempPath, options.SnapshotPath);
-            console.Out.WriteLine($"Updated: {options.SnapshotPath}");
+            // One document per invocation: for `json` the delta, status, destination, and proposed
+            // content are all fields of a single object, so stdout stays parsable end to end.
+            console.Out.WriteLine(options.Format == "json"
+                ? FormatAsJson(outcome, destination, options.DryRun)
+                : FormatForHumans(outcome, destination, options.DryRun));
+
             return CliExitCodes.Success;
         }
         catch (Exception ex)
@@ -64,5 +70,53 @@ internal sealed class PublicApiUpdateCommandHandler(ICliRuntime runtime, ICliCon
             console.Error.WriteLine($"public-api update error: {ex.Message}");
             return CliExitCodes.InvalidArgumentsOrRuntimeError;
         }
+    }
+
+    private string FormatForHumans(PublicApiUpdateOutcome outcome, string destination, bool dryRun)
+    {
+        List<string> lines = new()
+        {
+            PublicApiDeltaFormatter.Format(runtime, "human", "update", outcome.Delta),
+        };
+
+        if (dryRun)
+        {
+            lines.Add($"Dry run: '{destination}' was not modified. Proposed content:");
+            lines.Add(outcome.Snapshot!);
+        }
+        else
+        {
+            lines.Add($"Updated: {destination}");
+        }
+
+        return string.Join(Environment.NewLine, lines);
+    }
+
+    private static string FormatAsJson(PublicApiUpdateOutcome outcome, string destination, bool dryRun)
+    {
+        return JsonSerializer.Serialize(new
+        {
+            status = dryRun ? "dry-run" : "updated",
+            dryRun,
+            snapshotPath = destination,
+            delta = new
+            {
+                added = outcome.Delta.Added.Select(Describe),
+                removed = outcome.Delta.Removed.Select(Describe),
+                changed = outcome.Delta.Changed.Select(Describe),
+            },
+            proposedSnapshot = outcome.Snapshot,
+        });
+    }
+
+    private static object Describe(PublicApiDeltaEntry entry)
+    {
+        return new
+        {
+            api_delta_kind = entry.Kind.ToString().ToLowerInvariant(),
+            assembly = entry.AssemblyName,
+            api_signature = entry.Signature,
+            previous_api_signature = entry.PreviousSignature,
+        };
     }
 }

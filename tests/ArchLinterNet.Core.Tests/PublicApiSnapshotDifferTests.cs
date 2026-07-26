@@ -124,6 +124,72 @@ public sealed class PublicApiSnapshotDifferTests
         });
     }
 
+    // Two assemblies may legitimately export the same fully qualified signature. Without assembly
+    // qualification, removing it from one is masked by the copy in the other.
+    [Test]
+    public void Diff_SameSignatureInAnotherAssembly_DoesNotMaskARemoval()
+    {
+        PublicApiDelta delta = PublicApiSnapshotDiffer.Diff(
+            new[]
+            {
+                new PublicApiSnapshotEntry("Acme.One", "class Shared.Thing"),
+                new PublicApiSnapshotEntry("Acme.Two", "class Shared.Thing"),
+            },
+            new[] { new PublicApiSnapshotEntry("Acme.Two", "class Shared.Thing") });
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(delta.Removed, Has.Count.EqualTo(1));
+            Assert.That(delta.Removed[0].AssemblyName, Is.EqualTo("Acme.One"));
+            Assert.That(delta.Changed, Is.Empty);
+        });
+    }
+
+    [Test]
+    public void Diff_SameIdentityInDifferentAssemblies_IsNotPairedAsAChange()
+    {
+        PublicApiDelta delta = PublicApiSnapshotDiffer.Diff(
+            new[] { new PublicApiSnapshotEntry("Acme.One", "method Shared.Thing.Do(): System.Void") },
+            new[] { new PublicApiSnapshotEntry("Acme.Two", "method Shared.Thing.Do(): System.Int32") });
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(delta.Changed, Is.Empty);
+            Assert.That(delta.Removed, Has.Count.EqualTo(1));
+            Assert.That(delta.Added, Has.Count.EqualTo(1));
+        });
+    }
+
+    // Legacy inline `declared_api` entries have no assembly, so they must match any assembly rather
+    // than failing to match every one of them.
+    [Test]
+    public void Diff_WildcardDeclaredEntryMatchesAnyAssembly()
+    {
+        PublicApiDelta delta = PublicApiSnapshotDiffer.Diff(
+            new[] { new PublicApiSnapshotEntry(PublicApiSnapshotDiffer.WildcardAssembly, "class Shared.Thing") },
+            new[] { new PublicApiSnapshotEntry("Acme.One", "class Shared.Thing") });
+
+        Assert.That(delta.HasChanges, Is.False);
+    }
+
+    [Test]
+    public void Diff_WildcardDeclaredEntryIsBoundToTheAssemblyThatChangedIt()
+    {
+        PublicApiDelta delta = PublicApiSnapshotDiffer.Diff(
+            new[]
+            {
+                new PublicApiSnapshotEntry(
+                    PublicApiSnapshotDiffer.WildcardAssembly, "method Shared.Thing.Do(): System.Void"),
+            },
+            new[] { new PublicApiSnapshotEntry("Acme.One", "method Shared.Thing.Do(): System.Int32") });
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(delta.Changed, Has.Count.EqualTo(1));
+            Assert.That(delta.Changed[0].AssemblyName, Is.EqualTo("Acme.One"));
+        });
+    }
+
     [Test]
     public void Diff_OrderingIsDeterministicRegardlessOfInputOrder()
     {

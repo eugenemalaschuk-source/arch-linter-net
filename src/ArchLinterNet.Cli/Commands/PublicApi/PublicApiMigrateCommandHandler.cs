@@ -17,7 +17,8 @@ internal sealed class PublicApiMigrateCommandHandler(ICliRuntime runtime, ICliCo
         }
 
         if (!PublicApiCommandGuards.TryValidateCommon(
-                console, fileSystem, options.PolicyPath, options.ContractId, options.Format, CommandName, out int exitCode))
+                console, fileSystem, options.PolicyPath, options.ContractId, options.Format, CommandName,
+                PublicApiOptionsFactory.OperationFormats, out int exitCode))
         {
             return exitCode;
         }
@@ -43,26 +44,32 @@ internal sealed class PublicApiMigrateCommandHandler(ICliRuntime runtime, ICliCo
             {
                 PublicApiCommandGuards.WriteError(console, CommandName, outcome.Error!, outcome.PreflightDiagnostics);
                 WriteDrift(outcome);
-                return CliExitCodes.ValidationFailure;
+
+                // Only refused migration drift is a completed gate reporting a finding; an unknown
+                // contract, an unsafe path, or blocked preflight never completed at all.
+                return PublicApiCommandGuards.ExitCodeFor(outcome.FailureKind);
             }
+
+            string destination = outcome.ResolvedOutputPath!;
 
             if (!options.DryRun)
             {
-                string tempPath = fileSystem.WriteAllTextToTemp(options.OutputPath, outcome.Snapshot!);
-                fileSystem.RenameTempToTarget(tempPath, options.OutputPath);
+                string tempPath = fileSystem.WriteAllTextToTemp(destination, outcome.Snapshot!);
+                fileSystem.RenameTempToTarget(tempPath, destination);
             }
 
             console.Out.WriteLine(options.Format == "json"
                 ? JsonSerializer.Serialize(new
                 {
+                    status = options.DryRun ? "dry-run" : "migrated",
                     contractId = options.ContractId,
-                    output = options.DryRun ? null : options.OutputPath,
+                    output = options.DryRun ? null : destination,
                     dryRun = options.DryRun,
                     acceptedDrift = outcome.HasDrift,
                     staleDeclarations = outcome.StaleDeclarations,
                     undeclaredSurface = outcome.UndeclaredSurface,
                 })
-                : FormatForHumans(outcome, options));
+                : FormatForHumans(outcome, options, destination));
 
             return CliExitCodes.Success;
         }
@@ -73,7 +80,8 @@ internal sealed class PublicApiMigrateCommandHandler(ICliRuntime runtime, ICliCo
         }
     }
 
-    private static string FormatForHumans(PublicApiMigrateOutcome outcome, PublicApiMigrateCommandOptions options)
+    private static string FormatForHumans(
+        PublicApiMigrateOutcome outcome, PublicApiMigrateCommandOptions options, string destination)
     {
         List<string> lines = new()
         {
@@ -85,8 +93,8 @@ internal sealed class PublicApiMigrateCommandHandler(ICliRuntime runtime, ICliCo
         lines.AddRange(outcome.UndeclaredSurface.Select(signature => $"  [undeclared] {signature}"));
 
         lines.Add(options.DryRun
-            ? $"Dry run: '{options.OutputPath}' was not written."
-            : $"Output: {options.OutputPath}");
+            ? $"Dry run: '{destination}' was not written."
+            : $"Output: {destination}");
 
         if (!options.DryRun)
         {

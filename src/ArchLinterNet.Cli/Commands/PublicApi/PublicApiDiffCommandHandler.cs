@@ -16,7 +16,8 @@ internal sealed class PublicApiDiffCommandHandler(ICliRuntime runtime, ICliConso
         }
 
         if (!PublicApiCommandGuards.TryValidateCommon(
-                console, fileSystem, options.PolicyPath, options.ContractId, options.Format, CommandName, out int exitCode))
+                console, fileSystem, options.PolicyPath, options.ContractId, options.Format, CommandName,
+                PublicApiOptionsFactory.SupportedFormats, out int exitCode))
         {
             return exitCode;
         }
@@ -40,7 +41,7 @@ internal sealed class PublicApiDiffCommandHandler(ICliRuntime runtime, ICliConso
             if (!outcome.Succeeded)
             {
                 PublicApiCommandGuards.WriteError(console, CommandName, outcome.Error!, outcome.PreflightDiagnostics);
-                return CliExitCodes.InvalidArgumentsOrRuntimeError;
+                return PublicApiCommandGuards.ExitCodeFor(outcome.FailureKind);
             }
 
             console.Out.WriteLine(PublicApiDeltaFormatter.Format(

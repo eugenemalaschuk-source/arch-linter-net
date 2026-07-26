@@ -1,4 +1,5 @@
 using System.Text;
+using System.Text.Json;
 using ArchLinterNet.Cli;
 using ArchLinterNet.Cli.Abstractions;
 using ArchLinterNet.Cli.Commands.PublicApi;
@@ -39,7 +40,7 @@ public sealed class PublicApiCommandHandlerTests
         RecordingConsole console = new();
         StubRuntime runtime = new()
         {
-            CaptureOutcome = new PublicApiCaptureOutcome(true, CapturedSnapshot, 12, Array.Empty<BuildStatePreflightDiagnostic>()),
+            CaptureOutcome = new PublicApiCaptureOutcome(true, CapturedSnapshot, 12, SnapshotPath, Array.Empty<BuildStatePreflightDiagnostic>()),
         };
 
         int exitCode = new PublicApiCaptureCommandHandler(runtime, console, fileSystem).Execute(
@@ -61,7 +62,7 @@ public sealed class PublicApiCommandHandlerTests
         RecordingConsole console = new();
         StubRuntime runtime = new()
         {
-            CaptureOutcome = new PublicApiCaptureOutcome(true, CapturedSnapshot, 12, Array.Empty<BuildStatePreflightDiagnostic>()),
+            CaptureOutcome = new PublicApiCaptureOutcome(true, CapturedSnapshot, 12, SnapshotPath, Array.Empty<BuildStatePreflightDiagnostic>()),
         };
 
         int exitCode = new PublicApiCaptureCommandHandler(runtime, console, fileSystem).Execute(
@@ -81,7 +82,7 @@ public sealed class PublicApiCommandHandlerTests
         StubFileSystem fileSystem = new(PolicyPath, SnapshotPath) { ReadContents = "different" };
         StubRuntime runtime = new()
         {
-            CaptureOutcome = new PublicApiCaptureOutcome(true, CapturedSnapshot, 12, Array.Empty<BuildStatePreflightDiagnostic>()),
+            CaptureOutcome = new PublicApiCaptureOutcome(true, CapturedSnapshot, 12, SnapshotPath, Array.Empty<BuildStatePreflightDiagnostic>()),
         };
 
         int exitCode = new PublicApiCaptureCommandHandler(runtime, new RecordingConsole(), fileSystem).Execute(
@@ -101,7 +102,7 @@ public sealed class PublicApiCommandHandlerTests
         RecordingConsole console = new();
         StubRuntime runtime = new()
         {
-            CaptureOutcome = new PublicApiCaptureOutcome(true, CapturedSnapshot, 12, Array.Empty<BuildStatePreflightDiagnostic>()),
+            CaptureOutcome = new PublicApiCaptureOutcome(true, CapturedSnapshot, 12, SnapshotPath, Array.Empty<BuildStatePreflightDiagnostic>()),
         };
 
         int exitCode = new PublicApiCaptureCommandHandler(runtime, console, fileSystem).Execute(
@@ -141,7 +142,7 @@ public sealed class PublicApiCommandHandlerTests
         Assert.Multiple(() =>
         {
             Assert.That(exitCode, Is.EqualTo(CliExitCodes.InvalidArgumentsOrRuntimeError));
-            Assert.That(console.ErrorText, Does.Contain("Invalid format: xml"));
+            Assert.That(console.ErrorText, Does.Contain("Invalid format for public-api capture: xml"));
         });
     }
 
@@ -153,7 +154,7 @@ public sealed class PublicApiCommandHandlerTests
         StubRuntime runtime = new()
         {
             CaptureOutcome = new PublicApiCaptureOutcome(
-                false, null, 0,
+                false, null, 0, null,
                 new[]
                 {
                     new BuildStatePreflightDiagnostic(
@@ -182,7 +183,7 @@ public sealed class PublicApiCommandHandlerTests
         StubRuntime runtime = new()
         {
             DiffOutcome = new PublicApiDiffOutcome(
-                true, true, PublicApiDelta.Empty, Array.Empty<BuildStatePreflightDiagnostic>()),
+                true, true, PublicApiDelta.Empty, SnapshotPath, Array.Empty<BuildStatePreflightDiagnostic>()),
         };
 
         int exitCode = new PublicApiDiffCommandHandler(runtime, console, new StubFileSystem(PolicyPath)).Execute(
@@ -202,7 +203,7 @@ public sealed class PublicApiCommandHandlerTests
         StubRuntime runtime = new()
         {
             DiffOutcome = new PublicApiDiffOutcome(
-                true, false, DriftDelta(), Array.Empty<BuildStatePreflightDiagnostic>()),
+                true, false, DriftDelta(), SnapshotPath, Array.Empty<BuildStatePreflightDiagnostic>()),
         };
 
         int exitCode = new PublicApiDiffCommandHandler(runtime, console, new StubFileSystem(PolicyPath)).Execute(
@@ -238,7 +239,7 @@ public sealed class PublicApiCommandHandlerTests
         StubRuntime runtime = new()
         {
             UpdateOutcome = new PublicApiUpdateOutcome(
-                true, CapturedSnapshot, DriftDelta(), true, Array.Empty<BuildStatePreflightDiagnostic>()),
+                true, CapturedSnapshot, DriftDelta(), true, SnapshotPath, Array.Empty<BuildStatePreflightDiagnostic>()),
         };
 
         int exitCode = new PublicApiUpdateCommandHandler(runtime, console, fileSystem).Execute(
@@ -260,7 +261,7 @@ public sealed class PublicApiCommandHandlerTests
         StubRuntime runtime = new()
         {
             UpdateOutcome = new PublicApiUpdateOutcome(
-                true, CapturedSnapshot, DriftDelta(), false, Array.Empty<BuildStatePreflightDiagnostic>()),
+                true, CapturedSnapshot, DriftDelta(), false, SnapshotPath, Array.Empty<BuildStatePreflightDiagnostic>()),
         };
 
         int exitCode = new PublicApiUpdateCommandHandler(runtime, new RecordingConsole(), fileSystem).Execute(
@@ -281,8 +282,8 @@ public sealed class PublicApiCommandHandlerTests
         StubRuntime runtime = new()
         {
             UpdateOutcome = new PublicApiUpdateOutcome(
-                false, null, PublicApiDelta.Empty, false, Array.Empty<BuildStatePreflightDiagnostic>(),
-                "declares its surface inline via 'declared_api'"),
+                false, null, PublicApiDelta.Empty, false, null, Array.Empty<BuildStatePreflightDiagnostic>(),
+                "declares its surface inline via 'declared_api'", PublicApiFailureKind.InvalidInput),
         };
 
         int exitCode = new PublicApiUpdateCommandHandler(runtime, console, fileSystem).Execute(
@@ -307,8 +308,9 @@ public sealed class PublicApiCommandHandlerTests
                 false, null,
                 new[] { "class Acme.Gone" },
                 new[] { "class Acme.New" },
+                SnapshotPath,
                 Array.Empty<BuildStatePreflightDiagnostic>(),
-                "has 1 stale inline declaration(s)"),
+                "has 1 stale inline declaration(s)", PublicApiFailureKind.Drift),
         };
 
         int exitCode = new PublicApiMigrateCommandHandler(runtime, console, fileSystem).Execute(
@@ -334,6 +336,7 @@ public sealed class PublicApiCommandHandlerTests
                 true, CapturedSnapshot,
                 new[] { "class Acme.Gone" },
                 Array.Empty<string>(),
+                SnapshotPath,
                 Array.Empty<BuildStatePreflightDiagnostic>()),
         };
 
@@ -357,7 +360,7 @@ public sealed class PublicApiCommandHandlerTests
         StubRuntime runtime = new()
         {
             MigrateOutcome = new PublicApiMigrateOutcome(
-                true, CapturedSnapshot, Array.Empty<string>(), Array.Empty<string>(),
+                true, CapturedSnapshot, Array.Empty<string>(), Array.Empty<string>(), SnapshotPath,
                 Array.Empty<BuildStatePreflightDiagnostic>()),
         };
 
@@ -369,6 +372,182 @@ public sealed class PublicApiCommandHandlerTests
             Assert.That(exitCode, Is.EqualTo(CliExitCodes.Success));
             Assert.That(fileSystem.LastWritePath, Is.Null);
             Assert.That(console.OutputText, Does.Contain("was not written"));
+        });
+    }
+
+    // Core resolves the destination against the policy boundary; the handler must probe and write
+    // that path, not the raw --output string, or a --force run could replace an unrelated file.
+    [Test]
+    public void Capture_WritesToTheResolvedDestinationNotTheAuthoredPath()
+    {
+        const string Resolved = "/repo/architecture/api/module-api.txt";
+        StubFileSystem fileSystem = new(PolicyPath);
+        StubRuntime runtime = new()
+        {
+            CaptureOutcome = new PublicApiCaptureOutcome(
+                true, CapturedSnapshot, 12, Resolved, Array.Empty<BuildStatePreflightDiagnostic>()),
+        };
+
+        int exitCode = new PublicApiCaptureCommandHandler(runtime, new RecordingConsole(), fileSystem).Execute(
+            new PublicApiCaptureCommandOptions(PolicyPath, ContractId, "../escape.txt", null, "human", false, false));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(exitCode, Is.EqualTo(CliExitCodes.Success));
+            Assert.That(fileSystem.LastWritePath, Is.EqualTo(Resolved));
+        });
+    }
+
+    [Test]
+    public void Capture_RejectsSarifBecauseItHasNoFindingSetToRepresent()
+    {
+        RecordingConsole console = new();
+
+        int exitCode = new PublicApiCaptureCommandHandler(new StubRuntime(), console, new StubFileSystem(PolicyPath)).Execute(
+            new PublicApiCaptureCommandOptions(PolicyPath, ContractId, SnapshotPath, null, "sarif", false, false));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(exitCode, Is.EqualTo(CliExitCodes.InvalidArgumentsOrRuntimeError));
+            Assert.That(console.ErrorText, Does.Contain("Invalid format for public-api capture: sarif"));
+        });
+    }
+
+    [Test]
+    public void Update_RejectsSarif()
+    {
+        RecordingConsole console = new();
+
+        int exitCode = new PublicApiUpdateCommandHandler(new StubRuntime(), console, new StubFileSystem(PolicyPath)).Execute(
+            new PublicApiUpdateCommandOptions(PolicyPath, ContractId, SnapshotPath, null, "sarif", false, false));
+
+        Assert.That(exitCode, Is.EqualTo(CliExitCodes.InvalidArgumentsOrRuntimeError));
+    }
+
+    [Test]
+    public void Migrate_RejectsSarif()
+    {
+        RecordingConsole console = new();
+
+        int exitCode = new PublicApiMigrateCommandHandler(new StubRuntime(), console, new StubFileSystem(PolicyPath)).Execute(
+            new PublicApiMigrateCommandOptions(PolicyPath, ContractId, SnapshotPath, null, "sarif", false, false, false));
+
+        Assert.That(exitCode, Is.EqualTo(CliExitCodes.InvalidArgumentsOrRuntimeError));
+    }
+
+    // Machine output must be one parsable document: appending human prose after a JSON payload was
+    // the defect this guards against.
+    [Test]
+    public void Update_JsonOutputIsOneParsableDocumentEvenInDryRun()
+    {
+        StubFileSystem fileSystem = new(PolicyPath, SnapshotPath);
+        RecordingConsole console = new();
+        StubRuntime runtime = new()
+        {
+            UpdateOutcome = new PublicApiUpdateOutcome(
+                true, CapturedSnapshot, DriftDelta(), true, SnapshotPath, Array.Empty<BuildStatePreflightDiagnostic>()),
+        };
+
+        int exitCode = new PublicApiUpdateCommandHandler(runtime, console, fileSystem).Execute(
+            new PublicApiUpdateCommandOptions(PolicyPath, ContractId, SnapshotPath, null, "json", true, false));
+
+        using JsonDocument document = JsonDocument.Parse(console.OutputText);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(exitCode, Is.EqualTo(CliExitCodes.Success));
+            Assert.That(document.RootElement.GetProperty("status").GetString(), Is.EqualTo("dry-run"));
+            Assert.That(document.RootElement.GetProperty("snapshotPath").GetString(), Is.EqualTo(SnapshotPath));
+            Assert.That(document.RootElement.GetProperty("proposedSnapshot").GetString(), Is.EqualTo(CapturedSnapshot));
+            Assert.That(
+                document.RootElement.GetProperty("delta").GetProperty("changed")[0]
+                    .GetProperty("previous_api_signature").GetString(),
+                Is.EqualTo("method Acme.Thing.Do(): System.Void"));
+            Assert.That(fileSystem.LastWritePath, Is.Null);
+        });
+    }
+
+    [Test]
+    public void Migrate_JsonOutputIsOneParsableDocument()
+    {
+        StubFileSystem fileSystem = new(PolicyPath);
+        RecordingConsole console = new();
+        StubRuntime runtime = new()
+        {
+            MigrateOutcome = new PublicApiMigrateOutcome(
+                true, CapturedSnapshot, new[] { "class Acme.Gone" }, Array.Empty<string>(), SnapshotPath,
+                Array.Empty<BuildStatePreflightDiagnostic>()),
+        };
+
+        int exitCode = new PublicApiMigrateCommandHandler(runtime, console, fileSystem).Execute(
+            new PublicApiMigrateCommandOptions(PolicyPath, ContractId, SnapshotPath, null, "json", true, false, false));
+
+        using JsonDocument document = JsonDocument.Parse(console.OutputText);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(exitCode, Is.EqualTo(CliExitCodes.Success));
+            Assert.That(document.RootElement.GetProperty("status").GetString(), Is.EqualTo("migrated"));
+            Assert.That(document.RootElement.GetProperty("acceptedDrift").GetBoolean(), Is.True);
+        });
+    }
+
+    // Only refused migration drift is a completed gate; everything else never completed and must
+    // return 2 so CI can tell "reviewed surface drifted" from "the command could not run".
+    [Test]
+    public void Migrate_NonDriftFailureReturnsExitCodeTwo()
+    {
+        RecordingConsole console = new();
+        StubRuntime runtime = new()
+        {
+            MigrateOutcome = new PublicApiMigrateOutcome(
+                false, null, Array.Empty<string>(), Array.Empty<string>(), null,
+                Array.Empty<BuildStatePreflightDiagnostic>(),
+                "Unknown public API surface contract 'absent'.", PublicApiFailureKind.InvalidInput),
+        };
+
+        int exitCode = new PublicApiMigrateCommandHandler(runtime, console, new StubFileSystem(PolicyPath)).Execute(
+            new PublicApiMigrateCommandOptions(PolicyPath, "absent", SnapshotPath, null, "human", false, false, false));
+
+        Assert.That(exitCode, Is.EqualTo(CliExitCodes.InvalidArgumentsOrRuntimeError));
+    }
+
+    [Test]
+    public void Diff_NonDriftFailureReturnsExitCodeTwo()
+    {
+        RecordingConsole console = new();
+        StubRuntime runtime = new()
+        {
+            DiffOutcome = new PublicApiDiffOutcome(
+                false, false, PublicApiDelta.Empty, null, Array.Empty<BuildStatePreflightDiagnostic>(),
+                "Public API snapshot not found: x.", PublicApiFailureKind.InvalidInput),
+        };
+
+        int exitCode = new PublicApiDiffCommandHandler(runtime, console, new StubFileSystem(PolicyPath)).Execute(
+            new PublicApiDiffCommandOptions(PolicyPath, ContractId, SnapshotPath, null, "human", false));
+
+        Assert.That(exitCode, Is.EqualTo(CliExitCodes.InvalidArgumentsOrRuntimeError));
+    }
+
+    [Test]
+    public void Update_WritesToTheResolvedDestinationNotTheAuthoredPath()
+    {
+        const string Resolved = "/repo/architecture/api/module-api.txt";
+        StubFileSystem fileSystem = new(PolicyPath, SnapshotPath);
+        StubRuntime runtime = new()
+        {
+            UpdateOutcome = new PublicApiUpdateOutcome(
+                true, CapturedSnapshot, PublicApiDelta.Empty, false, Resolved,
+                Array.Empty<BuildStatePreflightDiagnostic>()),
+        };
+
+        int exitCode = new PublicApiUpdateCommandHandler(runtime, new RecordingConsole(), fileSystem).Execute(
+            new PublicApiUpdateCommandOptions(PolicyPath, ContractId, "api/module-api.txt", null, "human", false, false));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(exitCode, Is.EqualTo(CliExitCodes.Success));
+            Assert.That(fileSystem.LastWritePath, Is.EqualTo(Resolved));
         });
     }
 

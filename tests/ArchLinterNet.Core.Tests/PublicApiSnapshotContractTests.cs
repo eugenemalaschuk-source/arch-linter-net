@@ -119,25 +119,82 @@ public sealed class PublicApiSnapshotContractTests
             Is.EqualTo(new[] { $"class {CleanDeclaredTypeName}" }));
     }
 
+    // Loading must survive a not-yet-created snapshot, otherwise the very `public-api capture` that
+    // creates it could never load the policy declaring it. The error is recorded, then reported as a
+    // violation during validation.
     [Test]
-    public void Load_MissingSnapshotFile_Throws()
+    public void Load_MissingSnapshotFile_RecordsAnErrorInsteadOfThrowing()
     {
         string policyPath = WritePolicy(PolicyYaml(AssemblyName, "absent.txt", "additions_only"));
 
-        Assert.That(
-            () => new ArchitecturePolicyDocumentLoader().Load(policyPath),
-            Throws.InvalidOperationException.With.Message.Contains("does not exist"));
+        ArchitectureContractDocument document = new ArchitecturePolicyDocumentLoader().Load(policyPath);
+
+        Assert.That(document.Contracts.StrictPublicApiSurface[0].ApiSnapshotError, Does.Contain("does not exist"));
     }
 
     [Test]
-    public void Load_UnparsableSnapshot_Throws()
+    public void Load_UnparsableSnapshot_RecordsAnErrorInsteadOfThrowing()
     {
         File.WriteAllText(Path.Combine(_tempDir, "broken.txt"), "@format wrong\n");
         string policyPath = WritePolicy(PolicyYaml(AssemblyName, "broken.txt", "additions_only"));
 
+        ArchitectureContractDocument document = new ArchitecturePolicyDocumentLoader().Load(policyPath);
+
+        Assert.That(document.Contracts.StrictPublicApiSurface[0].ApiSnapshotError, Does.Contain("unsupported format"));
+    }
+
+    [Test]
+    public void Check_UnusableSnapshot_ReportsOneViolationInsteadOfTheWholeSurface()
+    {
+        var contract = new ArchitecturePublicApiSurfaceContract
+        {
+            Name = "surface",
+            Assemblies = new List<string> { AssemblyName },
+            ApiSnapshot = "absent.txt",
+            ApiSnapshotError = "references a public API snapshot 'absent.txt' that does not exist.",
+        };
+
+        List<ArchitectureViolation> violations = Check(contract);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(violations, Has.Count.EqualTo(1));
+            Assert.That((violations[0].Payload as PublicApiSurfacePayload)?.ApiDeltaKind, Is.EqualTo("snapshot-unusable"));
+        });
+    }
+
+    [Test]
+    public void Load_SnapshotCapturedForAnotherContract_IsRejected()
+    {
+        string path = Path.Combine(_tempDir, "surface.txt");
+        File.WriteAllText(path, PublicApiSnapshotFormat.Serialize(new PublicApiSnapshotDocument(
+            PublicApiSnapshotFormat.CurrentVersion,
+            "some-other-contract",
+            new[] { new PublicApiSnapshotEntry(AssemblyName, $"class {CleanDeclaredTypeName}") })));
+        string policyPath = WritePolicy(PolicyYaml(AssemblyName, "surface.txt", "additions_only"));
+
+        ArchitectureContractDocument document = new ArchitecturePolicyDocumentLoader().Load(policyPath);
+
         Assert.That(
-            () => new ArchitecturePolicyDocumentLoader().Load(policyPath),
-            Throws.InvalidOperationException.With.Message.Contains("unsupported format"));
+            document.Contracts.StrictPublicApiSurface[0].ApiSnapshotError,
+            Does.Contain("captured for contract 'some-other-contract'"));
+    }
+
+    [Test]
+    public void Load_SnapshotDescribingAnUndeclaredAssembly_IsRejected()
+    {
+        string path = Path.Combine(_tempDir, "surface.txt");
+        File.WriteAllText(path, PublicApiSnapshotFormat.Serialize(new PublicApiSnapshotDocument(
+            PublicApiSnapshotFormat.CurrentVersion,
+            "surface",
+            new[] { new PublicApiSnapshotEntry("Some.Other.Assembly", $"class {CleanDeclaredTypeName}") })));
+        string policyPath = WritePolicy(PolicyYaml(AssemblyName, "surface.txt", "additions_only"));
+
+        ArchitectureContractDocument document = new ArchitecturePolicyDocumentLoader().Load(policyPath);
+
+        Assert.That(
+            document.Contracts.StrictPublicApiSurface[0].ApiSnapshotError,
+            Does.Contain("Some.Other.Assembly"));
     }
 
     [Test]
@@ -180,13 +237,66 @@ public sealed class PublicApiSnapshotContractTests
         {
             Name = "surface",
             Assemblies = new List<string> { AssemblyName },
+            ApiSnapshot = "surface.txt",
             ResolvedSnapshotEntries = new[]
             {
-                new PublicApiSnapshotEntry(AssemblyName, $"class {CleanDeclaredTypeName}"),
+                new PublicApiSnapshotEntry(AssemblyName, $"class {CleanDeclaredTypeName} [sealed]"),
             },
         };
 
-        Assert.That(PayloadFor(Check(contract), $"class {CleanDeclaredTypeName}"), Is.Null);
+        Assert.That(PayloadFor(Check(contract), $"class {CleanDeclaredTypeName} [sealed]"), Is.Null);
+    }
+
+    // Without assembly qualification, a same-named export in another assembly would satisfy this
+    // contract's declaration and hide the real one.
+    [Test]
+    public void Check_SnapshotEntryFromAnotherAssemblyDoesNotSatisfyTheDeclaration()
+    {
+        var contract = new ArchitecturePublicApiSurfaceContract
+        {
+            Name = "surface",
+            Assemblies = new List<string> { AssemblyName },
+            ApiSnapshot = "surface.txt",
+            ResolvedSnapshotEntries = new[]
+            {
+                new PublicApiSnapshotEntry("Some.Other.Assembly", $"class {CleanDeclaredTypeName} [sealed]"),
+            },
+        };
+
+        Assert.That(PayloadFor(Check(contract), $"class {CleanDeclaredTypeName} [sealed]"), Is.Not.Null);
+    }
+
+    // The captured grammar carries a constant's value, so changing 1 to 2 is a real delta rather
+    // than a byte-identical snapshot.
+    [Test]
+    public void Check_ExactMode_ConstantValueChangeIsReportedAsChanged()
+    {
+        var contract = new ArchitecturePublicApiSurfaceContract
+        {
+            Name = "surface",
+            Assemblies = new List<string> { AssemblyName },
+            ApiSnapshot = "surface.txt",
+            ApiComparison = PublicApiComparisonModes.Exact,
+            ResolvedSnapshotEntries = new[]
+            {
+                new PublicApiSnapshotEntry(
+                    AssemblyName,
+                    "const PublicApiSurfaceContractTestFixtures.ConstantHolder.DeclaredConst: System.String " +
+                    "[value:\"something-else\"]"),
+            },
+        };
+
+        PublicApiSurfacePayload? changed = Check(contract)
+            .Select(violation => violation.Payload as PublicApiSurfacePayload)
+            .FirstOrDefault(payload => payload?.ApiDeltaKind == "changed"
+                && payload.UndeclaredApiSignature!.Contains("ConstantHolder.DeclaredConst", StringComparison.Ordinal));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(changed, Is.Not.Null);
+            Assert.That(changed!.PreviousApiSignature, Does.Contain("value:\"something-else\""));
+            Assert.That(changed.UndeclaredApiSignature, Does.Contain("value:\"declared\""));
+        });
     }
 
     [Test]

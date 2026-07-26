@@ -18,13 +18,17 @@ internal static class PublicApiHelpTexts
           --policy <path>          Policy file (default: architecture/dependencies.arch.yml).
           --contract <id>          Required. Id of a strict/audit public API surface contract.
           --condition-set <name>   Condition set to resolve preprocessor symbols with.
-          --format <fmt>           human (default), json, or sarif.
+          --format <fmt>           human (default) or json. `diff` also accepts sarif.
           -h, --help               Show help.
+
+        Paths are repository-local: relative, non-rooted, and inside the policy boundary (the
+        policy's directory, or its parent when the policy lives in an `architecture/` folder). The
+        policy file itself is never a valid snapshot destination.
 
         Exit codes:
           0  success / snapshot in sync
-          1  API drift detected (diff), or unaccepted drift during migrate
-          2  invalid arguments, unusable build state, or runtime error
+          1  a completed gate found drift (diff drift, or unaccepted migrate drift)
+          2  invalid arguments, unusable snapshot, blocked build state, or runtime error
 
         Run 'arch-linter-net public-api <subcommand> --help' for subcommand details.
         """;
@@ -39,6 +43,10 @@ internal static class PublicApiHelpTexts
         Options:
           --output <path>   Required. Repository-local snapshot path to write.
           --force           Replace an existing snapshot whose content differs.
+
+        The snapshot records constant and enum values, accessor shape, static/ref/out/in, sealed and
+        abstract state, enum underlying type, and generic constraints in addition to the signature,
+        so a changed constant value or a widened property is a visible diff rather than a no-op.
 
         Capture refuses to overwrite an existing, differing snapshot without --force: a snapshot is
         a reviewed artifact, and replacing one silently would hide an unreviewed surface change.
@@ -65,7 +73,7 @@ internal static class PublicApiHelpTexts
         the lines that actually moved.
 
         Options:
-          --snapshot <path>     Required. Repository-local snapshot path to update.
+          --snapshot <path>     Required. Must resolve to the contract's own `api_snapshot`.
           --dry-run, --check    Report the delta and print the proposed file content without writing.
 
         Updating a contract that declares its surface inline via 'declared_api' is refused: a YAML

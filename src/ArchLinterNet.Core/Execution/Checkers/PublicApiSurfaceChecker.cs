@@ -20,7 +20,34 @@ internal static class PublicApiSurfaceChecker
     {
         List<ArchitectureViolation> violations = new();
 
-        HashSet<string> declaredApi = new(DeclaredSignatures(contract), StringComparer.Ordinal);
+        // A missing, unparsable, or foreign snapshot is deliberately not a policy-load failure (see
+        // PublicApiSnapshotResolver), so validation is where it has to become loud. Reporting the
+        // whole surface as undeclared instead would bury the actual cause in noise.
+        if (contract.ApiSnapshotError != null)
+        {
+            violations.Add(new ArchitectureViolation(
+                contract.Name,
+                contract.Id,
+                contract.Name,
+                "public API snapshot",
+                new[] { contract.ApiSnapshotError })
+            {
+                Payload = new PublicApiSurfacePayload(
+                    UndeclaredApiSignature: contract.ApiSnapshotError,
+                    ApiDeltaKind: "snapshot-unusable"),
+            });
+            return violations;
+        }
+
+        // The reviewed snapshot records the exact grammar (base signature plus the detail suffix
+        // carrying constant values, accessor shape, static/ref/out/in, sealed/abstract, generic
+        // constraints). A contract with only an inline `declared_api` list keeps comparing against
+        // the legacy identity grammar, which is what keeps existing policies working unchanged.
+        bool exactGrammar = !string.IsNullOrWhiteSpace(contract.ApiSnapshot);
+
+        HashSet<string> inlineDeclared = new(contract.DeclaredApi, StringComparer.Ordinal);
+        HashSet<(string Assembly, string Signature)> snapshotDeclared = new(
+            contract.ResolvedSnapshotEntries.Select(entry => (entry.AssemblyName, entry.Signature)));
         HashSet<string> allowedPublicConstants = new(contract.AllowedPublicConstants, StringComparer.Ordinal);
 
         Dictionary<string, List<ArchitectureExportedApiEntry>> scannedByAssembly =
@@ -34,9 +61,13 @@ internal static class PublicApiSurfaceChecker
             && scannedByAssembly.Count == contract.Assemblies.Distinct(StringComparer.Ordinal).Count();
 
         PublicApiDelta delta = exact
-            ? PublicApiSnapshotDiffer.Diff(DeclaredEntries(contract), ActualEntries(scannedByAssembly))
+            ? PublicApiSnapshotDiffer.Diff(
+                DeclaredEntries(contract, scannedByAssembly, exactGrammar),
+                ActualEntries(scannedByAssembly, exactGrammar))
             : PublicApiDelta.Empty;
-        HashSet<string> addedSignatures = new(delta.Added.Select(entry => entry.Signature), StringComparer.Ordinal);
+
+        HashSet<(string Assembly, string Signature)> addedKeys = new(
+            delta.Added.Select(entry => (entry.AssemblyName, entry.Signature)));
 
         foreach (string assemblyName in contract.Assemblies)
         {
@@ -49,9 +80,13 @@ internal static class PublicApiSurfaceChecker
 
             foreach (ArchitectureExportedApiEntry entry in scanned)
             {
+                string projected = exactGrammar ? entry.ExactSignature : entry.Signature;
+
                 bool undeclared = exact
-                    ? addedSignatures.Contains(entry.Signature)
-                    : !declaredApi.Contains(entry.Signature);
+                    ? addedKeys.Contains((entry.AssemblyName, projected))
+                    : !snapshotDeclared.Contains((entry.AssemblyName, projected))
+                        && !inlineDeclared.Contains(entry.Signature);
+
                 bool forbiddenConstant = contract.ForbidPublicConstantsUnlessDeclared
                     && entry.IsConst
                     && entry.ConstQualifiedName != null
@@ -69,7 +104,9 @@ internal static class PublicApiSurfaceChecker
                          .OrderBy(v => v.Entry.DeclaringTypeName, StringComparer.Ordinal)
                          .ThenBy(v => v.Entry.Signature, StringComparer.Ordinal))
             {
-                if (executionContext.IsIgnored(entry.DeclaringTypeName, entry.Signature))
+                string reported = exactGrammar ? entry.ExactSignature : entry.Signature;
+                if (executionContext.IsIgnored(entry.DeclaringTypeName, entry.Signature)
+                    || executionContext.IsIgnored(entry.DeclaringTypeName, reported))
                 {
                     continue;
                 }
@@ -79,10 +116,10 @@ internal static class PublicApiSurfaceChecker
                     contract.Id,
                     entry.DeclaringTypeName,
                     "public API surface",
-                    new[] { entry.Signature })
+                    new[] { reported })
                 {
                     Payload = new PublicApiSurfacePayload(
-                        UndeclaredApiSignature: entry.Signature,
+                        UndeclaredApiSignature: reported,
                         ForbiddenPublicConstant: forbiddenConstant ? true : null,
                         ApiAssemblyName: entry.AssemblyName,
                         ApiVisibility: entry.Visibility,
@@ -150,28 +187,48 @@ internal static class PublicApiSurfaceChecker
         return scanned;
     }
 
-    private static IEnumerable<string> DeclaredSignatures(ArchitecturePublicApiSurfaceContract contract)
+    // Inline `declared_api` entries carry no assembly attribution, so they enter the differ as
+    // wildcards. Under the exact grammar they are also written in the legacy identity grammar, so an
+    // inline entry that still has a live counterpart is lifted to that counterpart's exact signature
+    // — otherwise every inline entry on a snapshot-backed contract would look removed.
+    private static IReadOnlyList<PublicApiSnapshotEntry> DeclaredEntries(
+        ArchitecturePublicApiSurfaceContract contract,
+        Dictionary<string, List<ArchitectureExportedApiEntry>> scannedByAssembly,
+        bool exactGrammar)
     {
-        return contract.DeclaredApi.Concat(contract.ResolvedSnapshotEntries.Select(entry => entry.Signature));
-    }
+        List<PublicApiSnapshotEntry> declared = new(contract.ResolvedSnapshotEntries);
 
-    // Inline `declared_api` entries carry no assembly attribution, so they resolve to the empty
-    // assembly name. Correlation is by signature identity, which never depends on the assembly, so
-    // this only affects how a removal is attributed in the reported delta.
-    private static IReadOnlyList<PublicApiSnapshotEntry> DeclaredEntries(ArchitecturePublicApiSurfaceContract contract)
-    {
-        return contract.DeclaredApi
-            .Select(signature => new PublicApiSnapshotEntry(string.Empty, signature))
-            .Concat(contract.ResolvedSnapshotEntries)
-            .ToList();
+        Dictionary<string, ArchitectureExportedApiEntry> byBaseSignature = new(StringComparer.Ordinal);
+        if (exactGrammar)
+        {
+            foreach (ArchitectureExportedApiEntry entry in scannedByAssembly.Values.SelectMany(entries => entries))
+            {
+                byBaseSignature.TryAdd(entry.Signature, entry);
+            }
+        }
+
+        foreach (string signature in contract.DeclaredApi)
+        {
+            if (exactGrammar && byBaseSignature.TryGetValue(signature, out ArchitectureExportedApiEntry live))
+            {
+                declared.Add(new PublicApiSnapshotEntry(live.AssemblyName, live.ExactSignature));
+                continue;
+            }
+
+            declared.Add(new PublicApiSnapshotEntry(PublicApiSnapshotDiffer.WildcardAssembly, signature));
+        }
+
+        return declared;
     }
 
     private static IReadOnlyList<PublicApiSnapshotEntry> ActualEntries(
-        Dictionary<string, List<ArchitectureExportedApiEntry>> scannedByAssembly)
+        Dictionary<string, List<ArchitectureExportedApiEntry>> scannedByAssembly,
+        bool exactGrammar)
     {
         return scannedByAssembly.Values
             .SelectMany(entries => entries)
-            .Select(entry => new PublicApiSnapshotEntry(entry.AssemblyName, entry.Signature))
+            .Select(entry => new PublicApiSnapshotEntry(
+                entry.AssemblyName, exactGrammar ? entry.ExactSignature : entry.Signature))
             .ToList();
     }
 }

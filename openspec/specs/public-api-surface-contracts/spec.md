@@ -116,13 +116,17 @@ The system SHALL allow a `public_api_surface` contract to declare `api_snapshot`
 - **WHEN** a contract declares both `declared_api` entries and an `api_snapshot`
 - **THEN** the declared surface SHALL be the union of both, and neither source alone SHALL cause an otherwise declared member to be reported
 
-#### Scenario: Missing snapshot file fails policy loading
+#### Scenario: Missing snapshot is reported at validation, not at load
 - **WHEN** a contract declares an `api_snapshot` path that does not exist
-- **THEN** policy loading SHALL fail with an error identifying the contract and the missing path, rather than treating the contract as declaring nothing
+- **THEN** policy loading SHALL succeed and strict validation SHALL report a violation identifying the contract and the missing path, rather than treating the contract as declaring nothing
 
-#### Scenario: Unparsable snapshot fails policy loading
+#### Scenario: Unparsable snapshot is reported at validation, not at load
 - **WHEN** a contract's `api_snapshot` file cannot be parsed
-- **THEN** policy loading SHALL fail with the parse error and the contract name
+- **THEN** policy loading SHALL succeed and strict validation SHALL report a violation carrying the parse error and the contract name
+
+#### Scenario: An unusable snapshot does not report the whole surface as undeclared
+- **WHEN** a contract's snapshot is missing, unparsable, or owned by another contract
+- **THEN** validation SHALL report exactly one violation for the unusable snapshot, and SHALL NOT additionally report every exported member as undeclared
 
 #### Scenario: Non-repository-local snapshot path fails policy loading
 - **WHEN** a contract declares an `api_snapshot` path that is absolute or escapes the policy boundary

@@ -186,9 +186,18 @@ surface is reviewed as a file diff instead of a hand-maintained inline `declared
 
 All four subcommands take `--policy` (default `architecture/dependencies.arch.yml`,
 aliased `--config`), a required `--contract <id>` naming a strict or audit public API
-surface contract, an optional `--condition-set`, and `--format human|json|sarif`. Build-state
-preflight runs first: a missing, stale, or wrong-target-framework assembly fails the command
-before anything is captured or written.
+surface contract, an optional `--condition-set`, and `--format`. Build-state preflight runs
+first: a missing, stale, or wrong-target-framework assembly fails the command before anything
+is captured or written.
+
+`--format human|json` is supported everywhere; `diff` additionally accepts `sarif`, because it
+is the one subcommand whose output is a pure finding set. `capture`, `update`, and `migrate`
+reject `sarif` rather than silently emitting human text, and their `json` output is a single
+parsable document (status, destination, delta, proposed content) with no prose appended.
+
+Every path is resolved against the policy boundary before any read or write, so an absolute
+path, a `../` escape, or the policy file itself is refused — and the resolved destination is
+what actually gets written, even when the command runs from outside the repository root.
 
 ```bash
 # Write the current exported surface to a reviewed snapshot
@@ -225,7 +234,11 @@ Safety rules worth knowing before wiring this into a pipeline:
 - `migrate` refuses to write while the inline list differs from the live surface, listing every
   stale inline entry and every undeclared exported member. Pass `--accept-drift` to record the
   live surface deliberately; the drift is still reported.
-- `diff` returns exit code 1 on any drift, `2` on invalid arguments or unusable build state.
+- Exit code `1` means a completed gate found drift (`diff` drift, or unaccepted `migrate` drift).
+  Exit code `2` means the operation never completed: invalid arguments, unknown contract, unusable
+  snapshot, unsafe path, or blocked build state.
+- `update --snapshot` must resolve to the contract's own `api_snapshot`; pointing it at another
+  file is refused rather than leaving the policy pointing at a stale snapshot.
 
 ## Related pages
 

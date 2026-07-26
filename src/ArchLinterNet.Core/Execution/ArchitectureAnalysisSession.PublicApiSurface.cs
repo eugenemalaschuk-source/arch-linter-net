@@ -45,8 +45,11 @@ public sealed partial class ArchitectureAnalysisSession
                 continue;
             }
 
+            // A snapshot records the exact grammar (base signature plus the detail suffix), because
+            // an identity-only capture cannot tell a changed constant value, accessor shape, or
+            // ref/out direction from no change at all.
             entries.AddRange(ArchitecturePublicApiSurfaceScanner.GetExportedSurface(targetAssembly)
-                .Select(entry => new PublicApiSnapshotEntry(entry.AssemblyName, entry.Signature)));
+                .Select(entry => new PublicApiSnapshotEntry(entry.AssemblyName, entry.ExactSignature)));
         }
 
         missingAssemblies = missing;

@@ -12,7 +12,12 @@ namespace ArchLinterNet.Core.Validation;
 // Application seam for the reviewed public API snapshot workflow, mirroring
 // ArchitectureBaselineApplicationService: Core resolves the policy, verifies build state, captures
 // the surface, and returns content plus a structured delta; the host writes files.
-public sealed class ArchitecturePublicApiApplicationService(
+//
+// Every artifact path is resolved here, against the policy boundary, and returned on the outcome.
+// The host must use that resolved path: resolving the authored string again in the host would
+// silently target a different file whenever the process working directory is not the repository
+// root (for example with an absolute --policy).
+public sealed partial class ArchitecturePublicApiApplicationService(
     IArchitectureRunnerSetupService runnerSetupService,
     IBuildStatePreparationService buildStatePreparationService,
     IPublicApiSnapshotStore snapshotStore)
@@ -23,12 +28,19 @@ public sealed class ArchitecturePublicApiApplicationService(
         SurfaceResolution resolution = ResolveSurface(request.PolicyPath, request.ContractId, request.ConditionSetName);
         if (resolution.Error != null)
         {
-            return new PublicApiCaptureOutcome(false, null, 0, resolution.PreflightDiagnostics, resolution.Error);
+            return new PublicApiCaptureOutcome(
+                false, null, 0, null, resolution.PreflightDiagnostics, resolution.Error, resolution.FailureKind);
+        }
+
+        if (!TryResolveDestination(request.PolicyPath, request.OutputPath, out string? destination, out string? pathError))
+        {
+            return new PublicApiCaptureOutcome(
+                false, null, 0, null, resolution.PreflightDiagnostics, pathError, PublicApiFailureKind.InvalidInput);
         }
 
         string snapshot = Serialize(request.ContractId, resolution.Entries);
         return new PublicApiCaptureOutcome(
-            true, snapshot, DistinctCount(resolution.Entries), resolution.PreflightDiagnostics);
+            true, snapshot, DistinctCount(resolution.Entries), destination, resolution.PreflightDiagnostics);
     }
 
     public PublicApiDiffOutcome Diff(PublicApiDiffRequest request)
@@ -37,17 +49,21 @@ public sealed class ArchitecturePublicApiApplicationService(
         if (resolution.Error != null)
         {
             return new PublicApiDiffOutcome(
-                false, false, PublicApiDelta.Empty, resolution.PreflightDiagnostics, resolution.Error);
+                false, false, PublicApiDelta.Empty, null, resolution.PreflightDiagnostics,
+                resolution.Error, resolution.FailureKind);
         }
 
-        if (!TryReadSnapshot(request.PolicyPath, request.SnapshotPath, out IReadOnlyList<PublicApiSnapshotEntry> declared, out string? error))
+        SnapshotRead read = ReadSnapshot(request.PolicyPath, request.SnapshotPath, resolution.Contract!);
+        if (read.Error != null)
         {
             return new PublicApiDiffOutcome(
-                false, false, PublicApiDelta.Empty, resolution.PreflightDiagnostics, error);
+                false, false, PublicApiDelta.Empty, read.ResolvedPath, resolution.PreflightDiagnostics,
+                read.Error, PublicApiFailureKind.InvalidInput);
         }
 
-        PublicApiDelta delta = PublicApiSnapshotDiffer.Diff(declared, resolution.Entries);
-        return new PublicApiDiffOutcome(true, !delta.HasChanges, delta, resolution.PreflightDiagnostics);
+        PublicApiDelta delta = PublicApiSnapshotDiffer.Diff(read.Entries, resolution.Entries);
+        return new PublicApiDiffOutcome(
+            true, !delta.HasChanges, delta, read.ResolvedPath, resolution.PreflightDiagnostics);
     }
 
     public PublicApiUpdateOutcome Update(PublicApiUpdateRequest request)
@@ -56,31 +72,60 @@ public sealed class ArchitecturePublicApiApplicationService(
         if (resolution.Error != null)
         {
             return new PublicApiUpdateOutcome(
-                false, null, PublicApiDelta.Empty, request.DryRun, resolution.PreflightDiagnostics, resolution.Error);
+                false, null, PublicApiDelta.Empty, request.DryRun, null, resolution.PreflightDiagnostics,
+                resolution.Error, resolution.FailureKind);
         }
+
+        ArchitecturePublicApiSurfaceContract contract = resolution.Contract!;
 
         // Updating an inline `declared_api` list in place would require rewriting the policy YAML,
         // which cannot preserve surrounding comments through a round-trip. Refusing is the honest
         // branch: the reviewed content is never silently reformatted or stripped.
-        if (string.IsNullOrWhiteSpace(resolution.Contract!.ApiSnapshot))
+        if (string.IsNullOrWhiteSpace(contract.ApiSnapshot))
         {
             return new PublicApiUpdateOutcome(
-                false, null, PublicApiDelta.Empty, request.DryRun, resolution.PreflightDiagnostics,
+                false, null, PublicApiDelta.Empty, request.DryRun, null, resolution.PreflightDiagnostics,
                 $"Contract '{request.ContractId}' declares its surface inline via 'declared_api' and has no " +
                 "'api_snapshot'. Updating an inline declaration in place is refused because a YAML round-trip " +
                 "cannot preserve the surrounding policy comments. Run 'arch-linter-net public-api migrate' to " +
-                "move this contract onto a reviewed snapshot file first.");
+                "move this contract onto a reviewed snapshot file first.",
+                PublicApiFailureKind.InvalidInput);
         }
 
-        if (!TryReadSnapshot(request.PolicyPath, request.SnapshotPath, out IReadOnlyList<PublicApiSnapshotEntry> declared, out string? error))
+        if (!TryResolveDestination(request.PolicyPath, request.SnapshotPath, out string? destination, out string? pathError))
         {
             return new PublicApiUpdateOutcome(
-                false, null, PublicApiDelta.Empty, request.DryRun, resolution.PreflightDiagnostics, error);
+                false, null, PublicApiDelta.Empty, request.DryRun, null, resolution.PreflightDiagnostics,
+                pathError, PublicApiFailureKind.InvalidInput);
         }
 
-        PublicApiDelta delta = PublicApiSnapshotDiffer.Diff(declared, resolution.Entries);
+        // Writing anywhere other than the contract's own declared snapshot would leave the policy
+        // pointing at a stale file while reporting success against a different one.
+        if (contract.ResolvedSnapshotPath != null
+            && !string.Equals(destination, contract.ResolvedSnapshotPath, StringComparison.OrdinalIgnoreCase))
+        {
+            return new PublicApiUpdateOutcome(
+                false, null, PublicApiDelta.Empty, request.DryRun, destination, resolution.PreflightDiagnostics,
+                $"--snapshot '{request.SnapshotPath}' does not resolve to the snapshot declared by contract " +
+                $"'{request.ContractId}' ('{contract.ApiSnapshot}'). Update always rewrites the contract's own " +
+                "reviewed snapshot.",
+                PublicApiFailureKind.InvalidInput);
+        }
+
+        // The contract's snapshot may legitimately not exist yet on a first update after capture;
+        // an unreadable or foreign one, however, must not be silently replaced.
+        if (contract.ApiSnapshotError != null && !IsMissingSnapshot(contract))
+        {
+            return new PublicApiUpdateOutcome(
+                false, null, PublicApiDelta.Empty, request.DryRun, destination, resolution.PreflightDiagnostics,
+                $"Contract '{request.ContractId}' {contract.ApiSnapshotError}",
+                PublicApiFailureKind.InvalidInput);
+        }
+
+        PublicApiDelta delta = PublicApiSnapshotDiffer.Diff(contract.ResolvedSnapshotEntries, resolution.Entries);
         string snapshot = Serialize(request.ContractId, resolution.Entries);
-        return new PublicApiUpdateOutcome(true, snapshot, delta, request.DryRun, resolution.PreflightDiagnostics);
+        return new PublicApiUpdateOutcome(
+            true, snapshot, delta, request.DryRun, destination, resolution.PreflightDiagnostics);
     }
 
     public PublicApiMigrateOutcome Migrate(PublicApiMigrateRequest request)
@@ -89,69 +134,106 @@ public sealed class ArchitecturePublicApiApplicationService(
         if (resolution.Error != null)
         {
             return new PublicApiMigrateOutcome(
-                false, null, Array.Empty<string>(), Array.Empty<string>(), resolution.PreflightDiagnostics, resolution.Error);
+                false, null, Array.Empty<string>(), Array.Empty<string>(), null,
+                resolution.PreflightDiagnostics, resolution.Error, resolution.FailureKind);
         }
 
-        // Path safety is enforced for the destination too: migrate writes a new reviewed artifact,
-        // so it must land inside the same boundary a policy-declared snapshot would.
-        try
-        {
-            snapshotStore.ResolvePath(request.PolicyPath, request.OutputPath);
-        }
-        catch (InvalidOperationException exception)
+        if (!TryResolveDestination(request.PolicyPath, request.OutputPath, out string? destination, out string? pathError))
         {
             return new PublicApiMigrateOutcome(
-                false, null, Array.Empty<string>(), Array.Empty<string>(), resolution.PreflightDiagnostics, exception.Message);
+                false, null, Array.Empty<string>(), Array.Empty<string>(), null,
+                resolution.PreflightDiagnostics, pathError, PublicApiFailureKind.InvalidInput);
         }
 
-        HashSet<string> actual = new(resolution.Entries.Select(entry => entry.Signature), StringComparer.Ordinal);
+        HashSet<string> actualExact = new(resolution.Entries.Select(entry => entry.Signature), StringComparer.Ordinal);
+        HashSet<string> actualBase = new(
+            resolution.Entries.Select(entry => Scanning.ArchitecturePublicApiSignatureDetails.StripDetails(entry.Signature)),
+            StringComparer.Ordinal);
         HashSet<string> inline = new(resolution.Contract!.DeclaredApi, StringComparer.Ordinal);
 
-        IReadOnlyList<string> stale = inline.Where(signature => !actual.Contains(signature))
+        // The inline list is written in the legacy identity grammar, so it is compared against the
+        // stripped form of the captured exact signatures — otherwise every entry would look stale
+        // purely because the snapshot grammar carries more detail.
+        IReadOnlyList<string> stale = inline.Where(signature => !actualBase.Contains(signature))
             .OrderBy(signature => signature, StringComparer.Ordinal).ToArray();
-        IReadOnlyList<string> undeclared = actual.Where(signature => !inline.Contains(signature))
+        IReadOnlyList<string> undeclared = actualExact
+            .Where(signature => !inline.Contains(Scanning.ArchitecturePublicApiSignatureDetails.StripDetails(signature)))
             .OrderBy(signature => signature, StringComparer.Ordinal).ToArray();
 
         bool hasDrift = stale.Count > 0 || undeclared.Count > 0;
         if (hasDrift && !request.AcceptDrift)
         {
             return new PublicApiMigrateOutcome(
-                false, null, stale, undeclared, resolution.PreflightDiagnostics,
+                false, null, stale, undeclared, destination, resolution.PreflightDiagnostics,
                 $"Contract '{request.ContractId}' has {stale.Count} stale inline declaration(s) and " +
                 $"{undeclared.Count} undeclared exported member(s). Migrating now would silently accept that " +
                 "drift as reviewed. Fix the surface, or re-run with drift acceptance to record the live " +
-                "surface deliberately.");
+                "surface deliberately.",
+                PublicApiFailureKind.Drift);
         }
 
         return new PublicApiMigrateOutcome(
-            true, Serialize(request.ContractId, resolution.Entries), stale, undeclared, resolution.PreflightDiagnostics);
+            true, Serialize(request.ContractId, resolution.Entries), stale, undeclared, destination,
+            resolution.PreflightDiagnostics);
     }
 
-    private bool TryReadSnapshot(
-        string policyPath,
-        string snapshotPath,
-        out IReadOnlyList<PublicApiSnapshotEntry> entries,
-        out string? error)
+    private static bool IsMissingSnapshot(ArchitecturePublicApiSurfaceContract contract)
     {
-        entries = Array.Empty<PublicApiSnapshotEntry>();
+        return contract.ApiSnapshotError?.Contains("does not exist", StringComparison.Ordinal) == true;
+    }
+
+    // The policy (and any imported policy source) must never be a snapshot destination: a --force
+    // write would otherwise replace the very file that defines the contract.
+    private bool TryResolveDestination(
+        string policyPath, string authoredPath, out string? destination, out string? error)
+    {
+        destination = null;
+
         try
         {
-            string resolved = snapshotStore.ResolvePath(policyPath, snapshotPath);
-            if (!snapshotStore.Exists(resolved))
-            {
-                error = $"Public API snapshot not found: {snapshotPath}. " +
-                    "Run 'arch-linter-net public-api capture' to create it.";
-                return false;
-            }
-
-            entries = snapshotStore.Read(resolved, snapshotPath).Entries;
-            error = null;
-            return true;
+            destination = snapshotStore.ResolvePath(policyPath, authoredPath);
         }
         catch (InvalidOperationException exception)
         {
             error = exception.Message;
             return false;
+        }
+
+        if (string.Equals(destination, Path.GetFullPath(policyPath), StringComparison.OrdinalIgnoreCase))
+        {
+            error = $"Refusing to use the policy file '{policyPath}' as a public API snapshot path.";
+            destination = null;
+            return false;
+        }
+
+        error = null;
+        return true;
+    }
+
+    private SnapshotRead ReadSnapshot(
+        string policyPath, string snapshotPath, ArchitecturePublicApiSurfaceContract contract)
+    {
+        string? resolved = null;
+        try
+        {
+            resolved = snapshotStore.ResolvePath(policyPath, snapshotPath);
+            if (!snapshotStore.Exists(resolved))
+            {
+                return SnapshotRead.Failed(
+                    resolved,
+                    $"Public API snapshot not found: {snapshotPath}. " +
+                    "Run 'arch-linter-net public-api capture' to create it.");
+            }
+
+            PublicApiSnapshotDocument document = snapshotStore.Read(resolved, snapshotPath);
+            string? ownershipError = PublicApiSnapshotResolver.ValidateOwnership(document, contract, snapshotPath);
+            return ownershipError == null
+                ? new SnapshotRead(document.Entries, resolved, null)
+                : SnapshotRead.Failed(resolved, $"Contract '{contract.Id ?? contract.Name}' {ownershipError}");
+        }
+        catch (InvalidOperationException exception)
+        {
+            return SnapshotRead.Failed(resolved, exception.Message);
         }
     }
 
@@ -166,103 +248,14 @@ public sealed class ArchitecturePublicApiApplicationService(
         return entries.Select(entry => (entry.AssemblyName, entry.Signature)).Distinct().Count();
     }
 
-    private SurfaceResolution ResolveSurface(string policyPath, string contractId, string? conditionSetName)
-    {
-        ArchitectureContractDocument document = runnerSetupService.LoadDocument(policyPath);
-
-        ArchitecturePublicApiSurfaceContract? contract = document.Contracts.StrictPublicApiSurface
-            .Concat(document.Contracts.AuditPublicApiSurface)
-            .FirstOrDefault(candidate => string.Equals(candidate.Id, contractId, StringComparison.OrdinalIgnoreCase));
-
-        if (contract == null)
-        {
-            IEnumerable<string> available = document.Contracts.StrictPublicApiSurface
-                .Concat(document.Contracts.AuditPublicApiSurface)
-                .Select(candidate => candidate.Id)
-                .Where(id => id != null)
-                .OrderBy(id => id, StringComparer.Ordinal)!;
-
-            string availableText = available.Any() ? string.Join(", ", available) : "(none)";
-            return SurfaceResolution.Failed(
-                $"Unknown public API surface contract '{contractId}'. Available contract ids: {availableText}.");
-        }
-
-        ArchitectureRunnerSetup setup = runnerSetupService.BuildRunner(document, policyPath, conditionSetName);
-        try
-        {
-            BuildStatePreflightResult preflight = RunBuildStatePreflight(setup.Runner);
-            if (preflight.Blocked)
-            {
-                return SurfaceResolution.Failed(
-                    "Build state preflight is blocked; the exported surface cannot be captured from artifacts " +
-                    "that are missing, stale, or built for a different target framework.",
-                    preflight.Diagnostics);
-            }
-
-            IReadOnlyList<PublicApiSnapshotEntry> entries = setup.Runner.Session.CapturePublicApiSurface(
-                contract, out IReadOnlyList<string> missingAssemblies);
-
-            if (missingAssemblies.Count > 0)
-            {
-                return SurfaceResolution.Failed(
-                    $"Contract '{contractId}' targets assemblies that could not be resolved: " +
-                    $"{string.Join(", ", missingAssemblies)}. Build the solution before capturing its public API.",
-                    preflight.Diagnostics);
-            }
-
-            return new SurfaceResolution(contract, entries, preflight.Diagnostics, null);
-        }
-        finally
-        {
-            // Unlike validation, this seam owns its runner for the length of one operation. The
-            // captured entries are plain strings, so releasing the isolated assembly load scope
-            // here costs nothing and avoids holding target assemblies loaded after the CLI returns.
-            setup.Runner.Session.Context.Dispose();
-        }
-    }
-
-    // Mirrors ArchitectureValidationApplicationService.RunBuildStatePreflight: preflight only has
-    // the fingerprint/receipt inputs it needs when project discovery produced a project graph, and
-    // "resolution never ran" (neither resolved nor missing names) must not be read as "artifact
-    // missing".
-    private BuildStatePreflightResult RunBuildStatePreflight(IArchitectureContractRunner runner)
-    {
-        Discovery.ProjectDiscoveryResult? discovery = runner.Session.Context.ProjectDiscovery;
-        if (discovery == null || discovery.DiscoveredProjects.Count == 0)
-        {
-            return new BuildStatePreflightResult(Array.Empty<BuildStatePreflightDiagnostic>());
-        }
-
-        BuildStateResolvedAssemblies resolution = new(
-            runner.Session.Context.TargetAssemblies,
-            runner.Session.Context.MissingAssemblyNames);
-
-        if (resolution.ResolvedAssemblies.Count == 0 && resolution.MissingAssemblyNames.Count == 0)
-        {
-            return new BuildStatePreflightResult(Array.Empty<BuildStatePreflightDiagnostic>());
-        }
-
-        return buildStatePreparationService.Prepare(new BuildStatePreflightRequest(
-            runner.Session.Context.RepositoryRoot,
-            discovery,
-            resolution,
-            BuildPreparationMode.Ordinary));
-    }
-
-    private sealed record SurfaceResolution(
-        ArchitecturePublicApiSurfaceContract? Contract,
+    private sealed record SnapshotRead(
         IReadOnlyList<PublicApiSnapshotEntry> Entries,
-        IReadOnlyCollection<BuildStatePreflightDiagnostic> PreflightDiagnostics,
+        string? ResolvedPath,
         string? Error)
     {
-        public static SurfaceResolution Failed(
-            string error, IReadOnlyCollection<BuildStatePreflightDiagnostic>? diagnostics = null)
+        public static SnapshotRead Failed(string? resolvedPath, string error)
         {
-            return new SurfaceResolution(
-                null,
-                Array.Empty<PublicApiSnapshotEntry>(),
-                diagnostics ?? Array.Empty<BuildStatePreflightDiagnostic>(),
-                error);
+            return new SnapshotRead(Array.Empty<PublicApiSnapshotEntry>(), resolvedPath, error);
         }
     }
 }
