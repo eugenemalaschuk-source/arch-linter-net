@@ -304,6 +304,32 @@ internal static class ArchitectureSourceSetExpander
 
         private ArchitectureSourceSetResolution ResolveDeclaration(string name, ArchitectureSourceSet set)
         {
+            RequireUsableDeclaration(name, set);
+
+            SortedSet<string> resolved = new(StringComparer.Ordinal);
+            AddMembers(name, set, resolved);
+            AddGlobMatches(name, set, resolved);
+
+            if (resolved.Count == 0 && !set.Optional)
+            {
+                throw new InvalidOperationException(
+                    $"Source set '{name}' resolved to no source. Declare at least one usable member " +
+                    "or glob, or declare the set 'optional: true' with a reason.");
+            }
+
+            return new ArchitectureSourceSetResolution(
+                name,
+                set.Kind,
+                resolved.ToArray(),
+                set.Optional,
+                set.Reason)
+            {
+                PolicyLocation = _document.Provenance.LocationForSourceSet(name)
+            };
+        }
+
+        private static void RequireUsableDeclaration(string name, ArchitectureSourceSet set)
+        {
             if (set.Members.Count == 0 && set.Globs.Count == 0)
             {
                 throw new InvalidOperationException(
@@ -325,9 +351,10 @@ internal static class ArchitectureSourceSetExpander
                     "explicit 'members' only, because project identities are paths rather than " +
                     "dotted names.");
             }
+        }
 
-            SortedSet<string> resolved = new(StringComparer.Ordinal);
-
+        private void AddMembers(string name, ArchitectureSourceSet set, SortedSet<string> resolved)
+        {
             foreach (string member in set.Members.Where(value => !string.IsNullOrWhiteSpace(value)))
             {
                 if (!IsInUniverse(set.Kind, member))
@@ -341,7 +368,10 @@ internal static class ArchitectureSourceSetExpander
                 resolved.Add(member);
                 _selectors.TryAdd((name, member), member);
             }
+        }
 
+        private void AddGlobMatches(string name, ArchitectureSourceSet set, SortedSet<string> resolved)
+        {
             IReadOnlyList<string> universe = Universe(set.Kind);
 
             foreach (string glob in set.Globs.Where(value => !string.IsNullOrWhiteSpace(value)))
@@ -354,45 +384,22 @@ internal static class ArchitectureSourceSetExpander
                 }
 
                 NamespaceGlobPattern pattern = NamespaceGlobPattern.Parse(glob);
-                bool matchedAny = false;
+                string[] matches = universe.Where(candidate => pattern.Match(candidate).Matched).ToArray();
 
-                foreach (string candidate in universe)
-                {
-                    if (!pattern.Match(candidate).Matched)
-                    {
-                        continue;
-                    }
-
-                    matchedAny = true;
-                    resolved.Add(candidate);
-                    _selectors.TryAdd((name, candidate), glob);
-                }
-
-                if (!matchedAny && !set.Optional)
+                if (matches.Length == 0 && !set.Optional)
                 {
                     throw new InvalidOperationException(
                         $"Source set '{name}' declares glob '{glob}' that matches nothing in " +
                         $"{UniverseName(set.Kind)}. Fix the glob, or declare the set " +
                         "'optional: true' with a reason if the absence is intentional.");
                 }
-            }
 
-            if (resolved.Count == 0 && !set.Optional)
-            {
-                throw new InvalidOperationException(
-                    $"Source set '{name}' resolved to no source. Declare at least one usable member " +
-                    "or glob, or declare the set 'optional: true' with a reason.");
+                foreach (string candidate in matches)
+                {
+                    resolved.Add(candidate);
+                    _selectors.TryAdd((name, candidate), glob);
+                }
             }
-
-            return new ArchitectureSourceSetResolution(
-                name,
-                set.Kind,
-                resolved.ToArray(),
-                set.Optional,
-                set.Reason)
-            {
-                PolicyLocation = _document.Provenance.LocationForSourceSet(name)
-            };
         }
 
         private bool IsInUniverse(ArchitectureSourceSetKind kind, string value)

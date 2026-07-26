@@ -81,14 +81,11 @@ public sealed class ArchitectureSourceExpansionInventory
     // coverage `contract_ids` keep accepting the authored id after expansion derived new ids.
     public IReadOnlyList<string> InstanceIdsFor(string authoredContractId)
     {
-        foreach (ArchitectureContractExpansion expansion in Contracts)
-        {
-            if (string.Equals(expansion.AuthoredContractId, authoredContractId, StringComparison.OrdinalIgnoreCase))
-            {
-                return expansion.Instances.Select(instance => instance.ContractId).ToArray();
-            }
-        }
+        ArchitectureContractExpansion? match = Contracts.FirstOrDefault(expansion =>
+            string.Equals(expansion.AuthoredContractId, authoredContractId, StringComparison.OrdinalIgnoreCase));
 
-        return Array.Empty<string>();
+        return match is null
+            ? Array.Empty<string>()
+            : match.Instances.Select(instance => instance.ContractId).ToArray();
     }
 }
