@@ -64,12 +64,13 @@ public static class BaselineCommentInspector
             }
 
             blockScalarIndent = -1;
+            bool startedInsideQuotedScalar = quotes.InsideScalar;
             if (FindCommentColumn(line, ref quotes) >= 0)
             {
                 unanchorable.Add(index + 1);
             }
 
-            if (DeclaresBlockScalar(line))
+            if (!startedInsideQuotedScalar && !quotes.InsideScalar && DeclaresBlockScalar(line))
             {
                 blockScalarIndent = BlockScalarIndentation(line);
             }

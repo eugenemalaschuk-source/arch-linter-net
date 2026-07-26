@@ -276,6 +276,15 @@ public sealed class BaselineSafeAuthoringTests
     }
 
     [Test]
+    public void CommentInspector_BlockScalarSyntaxInsideMultilineQuotedScalar_DoesNotHideATrailingComment()
+    {
+        BaselineCommentInspection inspection = BaselineCommentInspector.Inspect(
+            "reason: \"accepted\n  note: |\n    still accepted\" # reviewed\nsource_type: Src\n");
+
+        Assert.That(inspection.UnanchorableCommentLines, Is.EqualTo([3]));
+    }
+
+    [Test]
     public void CommentInspector_Refusal_NamesLinesAndTheDryRunPathForward()
     {
         string refusal = BaselineCommentInspector.DescribeRefusal("baseline update", "baseline.yml", [3, 5]);
