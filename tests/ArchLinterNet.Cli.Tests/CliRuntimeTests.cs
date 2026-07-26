@@ -1,5 +1,6 @@
 using ArchLinterNet.Cli.Infrastructure;
 using ArchLinterNet.Core.BuildState;
+using ArchLinterNet.Core.Contracts;
 using ArchLinterNet.Core.Model;
 using ArchLinterNet.Core.Reporting;
 using ArchLinterNet.Core.Validation;
@@ -110,6 +111,61 @@ public sealed class CliRuntimeTests
             PolicyPath = "unused-nonexistent-policy.yml",
             BaselinePath = Path.Combine(Path.GetTempPath(), $"nonexistent-{Guid.NewGuid():N}.yml"),
             DryRun = true,
+        }));
+    }
+
+    // The four public-api methods are thin one-line forwards to ArchitectureEngine, same shape as
+    // MigrateBaseline above: a nonexistent policy path is enough to prove the request actually
+    // reaches the real engine (via ArchitecturePolicyDocumentLoader) instead of a stub.
+    [Test]
+    public void CapturePublicApi_MissingPolicyFile_ForwardsToEngineAndThrows()
+    {
+        var runtime = new CliRuntime();
+
+        Assert.Throws<ArchitecturePolicyImportException>(() => runtime.CapturePublicApi(new PublicApiCaptureRequest
+        {
+            PolicyPath = Path.Combine(Path.GetTempPath(), $"nonexistent-{Guid.NewGuid():N}.yml"),
+            ContractId = "unused",
+            OutputPath = "unused.txt",
+        }));
+    }
+
+    [Test]
+    public void DiffPublicApi_MissingPolicyFile_ForwardsToEngineAndThrows()
+    {
+        var runtime = new CliRuntime();
+
+        Assert.Throws<ArchitecturePolicyImportException>(() => runtime.DiffPublicApi(new PublicApiDiffRequest
+        {
+            PolicyPath = Path.Combine(Path.GetTempPath(), $"nonexistent-{Guid.NewGuid():N}.yml"),
+            ContractId = "unused",
+            SnapshotPath = "unused.txt",
+        }));
+    }
+
+    [Test]
+    public void UpdatePublicApi_MissingPolicyFile_ForwardsToEngineAndThrows()
+    {
+        var runtime = new CliRuntime();
+
+        Assert.Throws<ArchitecturePolicyImportException>(() => runtime.UpdatePublicApi(new PublicApiUpdateRequest
+        {
+            PolicyPath = Path.Combine(Path.GetTempPath(), $"nonexistent-{Guid.NewGuid():N}.yml"),
+            ContractId = "unused",
+            SnapshotPath = "unused.txt",
+        }));
+    }
+
+    [Test]
+    public void MigratePublicApi_MissingPolicyFile_ForwardsToEngineAndThrows()
+    {
+        var runtime = new CliRuntime();
+
+        Assert.Throws<ArchitecturePolicyImportException>(() => runtime.MigratePublicApi(new PublicApiMigrateRequest
+        {
+            PolicyPath = Path.Combine(Path.GetTempPath(), $"nonexistent-{Guid.NewGuid():N}.yml"),
+            ContractId = "unused",
+            OutputPath = "unused.txt",
         }));
     }
 }

@@ -21,6 +21,10 @@ Captured entries SHALL use the exact grammar: the identity signature followed by
 - **WHEN** an exported property gains a setter, or an accessor's visibility widens
 - **THEN** the captured snapshot SHALL differ from the previously reviewed one
 
+#### Scenario: Dispatch modifier change on a property or event is visible in the snapshot
+- **WHEN** an exported property or event's own abstract/virtual/override/sealed-override shape changes while its accessors are otherwise unchanged
+- **THEN** the captured snapshot SHALL differ from the previously reviewed one
+
 #### Scenario: Parameter direction change is visible in the snapshot
 - **WHEN** an `out` parameter becomes a `ref` parameter of the same type
 - **THEN** the captured snapshot SHALL differ from the previously reviewed one
@@ -36,6 +40,10 @@ Captured entries SHALL use the exact grammar: the identity signature followed by
 #### Scenario: Serialization is host independent
 - **WHEN** a snapshot is serialized on any host operating system
 - **THEN** every line SHALL be terminated with a single LF character and the document SHALL end with a trailing newline
+
+#### Scenario: A constant value containing the detail-suffix delimiter does not corrupt parsing
+- **WHEN** a captured constant's value contains a literal `[` or `]` character
+- **THEN** the character SHALL be escaped in the captured value, and stripping the detail suffix from that entry SHALL recover exactly the base signature
 
 #### Scenario: Unsupported version is rejected
 - **WHEN** a snapshot declares `@version 2`
@@ -246,6 +254,26 @@ The system SHALL verify that a snapshot's `@contract` directive matches the cont
 - **WHEN** `public-api update` is given a snapshot path that does not resolve to the contract's own `api_snapshot`
 - **THEN** the operation SHALL fail without writing
 
+### Requirement: A snapshot's unusable reason is typed, not inferred from its message
+
+The system SHALL classify why a snapshot is unusable (missing, unparsable, or a foreign owner) as typed data, and SHALL NOT determine that classification by matching a substring of the human-readable error message.
+
+#### Scenario: A corrupt snapshot whose path mentions "does not exist" is not treated as missing
+- **WHEN** an existing snapshot fails to parse or fails ownership validation, and its authored path or resolved path text happens to contain the phrase used in the missing-snapshot message
+- **THEN** the system SHALL still classify it as a parse or ownership failure, and update SHALL still refuse to replace it
+
+### Requirement: Path identity respects the actual filesystem, not an assumption from the host OS
+
+The system SHALL determine whether two differently-cased paths name the same file by consulting the filesystem, not by assuming case sensitivity from the operating system alone.
+
+#### Scenario: A case-sensitive filesystem on any host is respected
+- **WHEN** `update` compares a `--snapshot` destination against the contract's declared snapshot path and the two differ only by case
+- **THEN** the system SHALL treat them as the same file only when the filesystem itself resolves both spellings to an existing file, regardless of host operating system
+
+#### Scenario: Neither path exists yet
+- **WHEN** the two differently-cased paths being compared do not yet exist on disk
+- **THEN** the system SHALL require an exact match rather than assume they are the same file
+
 ### Requirement: Operation outcomes carry a typed failure category
 
 The system SHALL distinguish a completed gate that found drift from an operation that did not complete, and hosts SHALL map only the former to a drift exit code.
@@ -265,6 +293,10 @@ The system SHALL emit exactly one parsable document per invocation for machine f
 #### Scenario: JSON update output is one document
 - **WHEN** `public-api update --format json` runs, including in dry-run mode
 - **THEN** stdout SHALL parse as a single JSON document carrying status, destination, delta, and proposed content, with no additional prose
+
+#### Scenario: JSON dry-run output still reports the destination
+- **WHEN** `public-api migrate --format json --dry-run` runs
+- **THEN** the JSON document SHALL report the destination that would have been written, not a null destination, with `dryRun: true` signaling that nothing was actually written
 
 #### Scenario: Unsupported SARIF request is rejected
 - **WHEN** `sarif` is requested for capture, update, or migrate

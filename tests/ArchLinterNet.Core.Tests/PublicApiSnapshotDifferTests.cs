@@ -127,6 +127,25 @@ public sealed class PublicApiSnapshotDifferTests
         });
     }
 
+    // A string constant's value can legitimately contain " [" or a trailing "]" — the detail-suffix
+    // escaping in ArchitecturePublicApiSignatureDetails.Quote() keeps the identity parser from being
+    // confused by it, so a retyped/revalued bracket-containing constant still correlates as one
+    // change rather than a garbled add/remove pair.
+    [Test]
+    public void Diff_StringConstantValueContainingEscapedBrackets_CorrelatesAsOneChange()
+    {
+        PublicApiDelta delta = PublicApiSnapshotDiffer.Diff(
+            Entries("const Acme.Module.Thing.Label: System.String [value:\"foo \\[bar\\]\"]"),
+            Entries("const Acme.Module.Thing.Label: System.String [value:\"foo \\[baz\\]\"]"));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(delta.Added, Is.Empty);
+            Assert.That(delta.Removed, Is.Empty);
+            Assert.That(delta.Changed, Has.Count.EqualTo(1));
+        });
+    }
+
     [Test]
     public void Diff_EnumMemberAddedAndConstantRetyped_AreReportedSeparately()
     {

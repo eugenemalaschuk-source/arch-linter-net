@@ -29,6 +29,7 @@ internal static class PublicApiSnapshotResolver
                      .Concat(document.Contracts.AuditPublicApiSurface))
         {
             contract.ApiSnapshotError = null;
+            contract.ApiSnapshotErrorKind = PublicApiSnapshotErrorKind.None;
             contract.ResolvedSnapshotEntries = Array.Empty<PublicApiSnapshotEntry>();
 
             string? authoredPath = contract.ApiSnapshot;
@@ -49,6 +50,7 @@ internal static class PublicApiSnapshotResolver
                     $"references a public API snapshot '{authoredPath}' that does not exist " +
                     $"(resolved to '{resolvedPath}'). Run 'arch-linter-net public-api capture " +
                     $"--contract {contract.Id ?? contract.Name} --output {authoredPath}' to create it.";
+                contract.ApiSnapshotErrorKind = PublicApiSnapshotErrorKind.Missing;
                 continue;
             }
 
@@ -61,10 +63,15 @@ internal static class PublicApiSnapshotResolver
                 {
                     contract.ResolvedSnapshotEntries = snapshot.Entries;
                 }
+                else
+                {
+                    contract.ApiSnapshotErrorKind = PublicApiSnapshotErrorKind.OwnershipError;
+                }
             }
             catch (InvalidOperationException exception)
             {
                 contract.ApiSnapshotError = exception.Message;
+                contract.ApiSnapshotErrorKind = PublicApiSnapshotErrorKind.ParseError;
             }
         }
     }

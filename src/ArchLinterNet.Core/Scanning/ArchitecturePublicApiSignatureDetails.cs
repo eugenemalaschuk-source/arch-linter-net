@@ -108,19 +108,7 @@ internal static class ArchitecturePublicApiSignatureDetails
 
             if (method is MethodInfo methodInfo)
             {
-                if (methodInfo.IsAbstract)
-                {
-                    details.Add("abstract");
-                }
-                else if (methodInfo.IsVirtual && !IsOverride(methodInfo))
-                {
-                    details.Add("virtual");
-                }
-
-                if (IsOverride(methodInfo))
-                {
-                    details.Add(methodInfo.IsFinal ? "sealed override" : "override");
-                }
+                AddDispatchModifiers(details, methodInfo);
             }
 
             AddParameterModifiers(method, details);
@@ -146,7 +134,12 @@ internal static class ArchitecturePublicApiSignatureDetails
     // widening a `protected set` to `public set`, changes what callers may do. The property's own
     // overall visibility is exactly the most-open accessor's, which AccessorToken already renders,
     // so unlike ForType/ForMethod/ForField/ForEvent this needs no separate visibility detail: a
-    // narrowing at the property level is a narrowing of at least one accessor token.
+    // narrowing at the property level is a narrowing of at least one accessor token. Dispatch
+    // modifiers (abstract/virtual/override/sealed override), by contrast, apply to the property
+    // declaration as a whole in C# — both accessors of an override move together — so the getter
+    // (falling back to the setter for a get-less property) is read as the one representative
+    // accessor for that purpose, the same way the base signature already treats the property as one
+    // declaration rather than two.
     public static List<string> ForProperty(PropertyInfo property)
     {
         List<string> details = new();
@@ -160,6 +153,8 @@ internal static class ArchitecturePublicApiSignatureDetails
             {
                 details.Add(StaticModifier);
             }
+
+            AddDispatchModifiers(details, getter ?? setter);
 
             if (getter != null)
             {
@@ -232,6 +227,8 @@ internal static class ArchitecturePublicApiSignatureDetails
             {
                 details.Add(StaticModifier);
             }
+
+            AddDispatchModifiers(details, evt.AddMethod);
         }
         catch (TypeLoadException)
         {
@@ -254,6 +251,32 @@ internal static class ArchitecturePublicApiSignatureDetails
         if (!string.Equals(visibility, PublicVisibilityToken, StringComparison.Ordinal))
         {
             details.Add($"visibility:{visibility}");
+        }
+    }
+
+    // Shared by ForMethod, ForProperty, and ForEvent: a method's abstract/virtual/override/sealed
+    // override shape is dropped by the legacy identity signature just like visibility is, so an
+    // override silently becoming non-overridable (or vice versa) would otherwise be invisible —
+    // this applies to property and event accessors exactly as it does to ordinary methods.
+    private static void AddDispatchModifiers(List<string> details, MethodInfo? accessor)
+    {
+        if (accessor == null)
+        {
+            return;
+        }
+
+        if (accessor.IsAbstract)
+        {
+            details.Add("abstract");
+        }
+        else if (accessor.IsVirtual && !IsOverride(accessor))
+        {
+            details.Add("virtual");
+        }
+
+        if (IsOverride(accessor))
+        {
+            details.Add(accessor.IsFinal ? "sealed override" : "override");
         }
     }
 
@@ -446,6 +469,13 @@ internal static class ArchitecturePublicApiSignatureDetails
         };
     }
 
+    // `[` and `]` are escaped in addition to the usual quoting characters because StripDetails
+    // (here and the duplicated copy in PublicApiSignatureIdentity) locates the detail suffix by
+    // searching for the *last* " [" / trailing "]" in the whole signature. An unescaped bracket
+    // inside a quoted constant value — e.g. a string constant whose value is "foo [bar]" — would
+    // otherwise be indistinguishable from the real outer delimiter and truncate the signature mid
+    // value. Escaping means the outer delimiter is the only unescaped " [" / trailing "]" in the
+    // string, so the naive last-occurrence search stays correct without needing a full parser.
     private static string Quote(string text)
     {
         StringBuilder builder = new(text.Length + 2);
@@ -468,6 +498,12 @@ internal static class ArchitecturePublicApiSignatureDetails
                     break;
                 case '\t':
                     builder.Append("\\t");
+                    break;
+                case '[':
+                    builder.Append("\\[");
+                    break;
+                case ']':
+                    builder.Append("\\]");
                     break;
                 default:
                     builder.Append(character);

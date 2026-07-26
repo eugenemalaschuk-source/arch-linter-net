@@ -104,6 +104,8 @@ public sealed partial class PublicApiCommandHandlerTests
         public ArchitectureAnalysisSnapshot CreateSnapshot(AnalysisSnapshotRequest request, ValidationTiming? timing) =>
             throw new NotSupportedException();
 
+        // Also routed through the real Core formatters, mirroring CliRuntime, so `diff --format
+        // json|sarif` exercises the same serialization the CLI actually ships instead of a stub.
         public string FormatResultForCiArtifacts(
             string mode,
             bool passed,
@@ -118,14 +120,20 @@ public sealed partial class PublicApiCommandHandlerTests
             IReadOnlyCollection<ArchitectureClassificationMetadataFailure> classificationMetadataFailures,
             IReadOnlyCollection<ArchitectureClassificationRoleFact> classificationRoles,
             ArchitectureClassificationPathDeferredNotice? classificationPathDeferred,
-            IReadOnlyCollection<BuildStatePreflightDiagnostic> preflightDiagnostics) => throw new NotSupportedException();
+            IReadOnlyCollection<BuildStatePreflightDiagnostic> preflightDiagnostics) =>
+            ArchitectureDiagnosticFormatter.FormatResultForCiArtifacts(
+                mode, passed, violations, cycles, cycleFindings, classificationRoles,
+                classificationPathDeferred, preflightDiagnostics, coverageFindings,
+                unmatchedIgnoredViolations, policyConsistencyFindings, coverageSummaries,
+                classificationConflicts, classificationMetadataFailures);
 
         public string FormatResultAsSarif(
             string mode,
             IReadOnlyCollection<ArchitectureViolation> violations,
             IReadOnlyCollection<string> cycles,
             IReadOnlyCollection<ArchitectureCycleFinding> cycleFindings,
-            IReadOnlyCollection<BuildStatePreflightDiagnostic> preflightDiagnostics) => throw new NotSupportedException();
+            IReadOnlyCollection<BuildStatePreflightDiagnostic> preflightDiagnostics) =>
+            new ArchitectureSarifFormatter().FormatResultAsSarif(mode, violations, cycles, preflightDiagnostics, Version);
 
         public string FormatCyclesForHumans(
             IReadOnlyCollection<string> cycles,

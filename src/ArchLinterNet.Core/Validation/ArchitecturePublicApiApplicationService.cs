@@ -176,21 +176,39 @@ public sealed partial class ArchitecturePublicApiApplicationService(
             resolution.PreflightDiagnostics);
     }
 
+    // Typed, not a substring match against the human-readable message: an existing, corrupt
+    // snapshot could legitimately be named in a way that contains "does not exist", which would
+    // misclassify a ParseError/OwnershipError as the recoverable Missing state and let update
+    // silently replace a file it should have refused to touch.
     private static bool IsMissingSnapshot(ArchitecturePublicApiSurfaceContract contract)
     {
-        return contract.ApiSnapshotError?.Contains("does not exist", StringComparison.Ordinal) == true;
+        return contract.ApiSnapshotErrorKind == PublicApiSnapshotErrorKind.Missing;
     }
 
-    // File-path identity is OS-dependent: NTFS and APFS-default are case-insensitive, but ext4 (the
-    // common Linux filesystem) is not. `OrdinalIgnoreCase` everywhere would treat 'api/Surface.txt'
-    // and 'api/surface.txt' as the same file on Linux even though the filesystem sees two distinct
-    // ones — silently updating the wrong file while reporting success on the right one.
-    internal static bool PathsMatch(string first, string second)
+    // File-path identity cannot be inferred from the OS alone: the default HFS+/APFS format is
+    // case-insensitive, but macOS explicitly supports formatting a volume as case-sensitive APFS,
+    // and ext4 (the common Linux filesystem) is always case-sensitive. Assuming every macOS host is
+    // case-insensitive would treat 'Surface.txt' and 'surface.txt' as the same file on a
+    // case-sensitive install and silently update the wrong one.
+    //
+    // `second` is the reference path the caller already trusts (the policy file, or the contract's
+    // declared snapshot). When it exists, the real filesystem is asked whether `first`'s casing also
+    // resolves to it: if both report existing, this filesystem folds the two spellings onto one
+    // file. When `second` does not exist yet (for example a snapshot before its first capture),
+    // there is nothing to probe, so the safe default is to require an exact match.
+    internal bool PathsMatch(string first, string second)
     {
-        StringComparison comparison = OperatingSystem.IsWindows() || OperatingSystem.IsMacOS()
-            ? StringComparison.OrdinalIgnoreCase
-            : StringComparison.Ordinal;
-        return string.Equals(first, second, comparison);
+        if (string.Equals(first, second, StringComparison.Ordinal))
+        {
+            return true;
+        }
+
+        if (!string.Equals(first, second, StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
+        return snapshotStore.Exists(second) && snapshotStore.Exists(first);
     }
 
     // The policy (and any imported policy source) must never be a snapshot destination: a --force

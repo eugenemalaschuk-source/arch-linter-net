@@ -11,6 +11,19 @@ public static class PublicApiComparisonModes
     public static readonly IReadOnlyList<string> All = new[] { AdditionsOnly, Exact };
 }
 
+// Why a snapshot is unusable, as typed data rather than a substring of ApiSnapshotError's message.
+// Consumers that need to branch on the reason (for example, "missing" is the one recoverable state
+// a first `public-api capture` must be able to run through) must never parse the human-readable
+// message: an existing, corrupt file could legitimately be named in a way that contains the phrase
+// another error uses, which would misclassify it under text matching.
+public enum PublicApiSnapshotErrorKind
+{
+    None,
+    Missing,
+    ParseError,
+    OwnershipError,
+}
+
 public sealed partial class ArchitectureContractGroups
 {
     [YamlMember(Alias = "strict_public_api_surface")]
@@ -52,6 +65,9 @@ public sealed class ArchitecturePublicApiSurfaceContract : IArchitectureContract
     // snapshot it is about to create; validation turns this into a violation.
     [YamlIgnore]
     public string? ApiSnapshotError { get; set; }
+
+    [YamlIgnore]
+    public PublicApiSnapshotErrorKind ApiSnapshotErrorKind { get; set; } = PublicApiSnapshotErrorKind.None;
 
     [YamlMember(Alias = "forbid_public_constants_unless_declared")]
     public bool ForbidPublicConstantsUnlessDeclared { get; set; }

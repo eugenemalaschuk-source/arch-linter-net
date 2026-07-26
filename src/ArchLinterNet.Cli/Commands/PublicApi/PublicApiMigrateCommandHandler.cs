@@ -92,14 +92,16 @@ internal sealed class PublicApiMigrateCommandHandler(ICliRuntime runtime, ICliCo
     private static string FormatAsJson(
         PublicApiMigrateOutcome outcome, PublicApiMigrateCommandOptions options, string destination)
     {
-        string? output = options.DryRun ? null : destination;
         string status = options.DryRun ? "dry-run" : "migrated";
 
+        // `output` always names the destination, dry-run or not — matching capture/update's JSON —
+        // since a dry-run still has to tell the caller what it *would* have written. `dryRun`, not a
+        // null-vs-non-null `output`, is what signals whether anything was actually written.
         return JsonSerializer.Serialize(new
         {
             status,
             contractId = options.ContractId,
-            output,
+            output = destination,
             dryRun = options.DryRun,
             acceptedDrift = outcome.HasDrift,
             staleDeclarations = outcome.StaleDeclarations,

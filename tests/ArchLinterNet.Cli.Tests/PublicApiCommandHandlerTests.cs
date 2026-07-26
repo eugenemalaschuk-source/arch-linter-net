@@ -213,6 +213,50 @@ public sealed partial class PublicApiCommandHandlerTests
     }
 
     [Test]
+    public void Diff_JsonFormat_EmitsOneParsableCiArtifactDocument()
+    {
+        RecordingConsole console = new();
+        StubRuntime runtime = new()
+        {
+            DiffOutcome = new PublicApiDiffOutcome(
+                true, false, DriftDelta(), SnapshotPath, Array.Empty<BuildStatePreflightDiagnostic>()),
+        };
+
+        int exitCode = new PublicApiDiffCommandHandler(runtime, console, new StubFileSystem(PolicyPath)).Execute(
+            new PublicApiDiffCommandOptions(PolicyPath, ContractId, SnapshotPath, null, "json", false));
+
+        using JsonDocument document = JsonDocument.Parse(console.OutputText);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(exitCode, Is.EqualTo(CliExitCodes.ValidationFailure));
+            Assert.That(document.RootElement.GetProperty("passed").GetBoolean(), Is.False);
+        });
+    }
+
+    [Test]
+    public void Diff_SarifFormat_EmitsParsableSarifDocument()
+    {
+        RecordingConsole console = new();
+        StubRuntime runtime = new()
+        {
+            DiffOutcome = new PublicApiDiffOutcome(
+                true, false, DriftDelta(), SnapshotPath, Array.Empty<BuildStatePreflightDiagnostic>()),
+        };
+
+        int exitCode = new PublicApiDiffCommandHandler(runtime, console, new StubFileSystem(PolicyPath)).Execute(
+            new PublicApiDiffCommandOptions(PolicyPath, ContractId, SnapshotPath, null, "sarif", false));
+
+        using JsonDocument document = JsonDocument.Parse(console.OutputText);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(exitCode, Is.EqualTo(CliExitCodes.ValidationFailure));
+            Assert.That(document.RootElement.GetProperty("runs")[0].GetProperty("results").GetArrayLength(), Is.EqualTo(3));
+        });
+    }
+
+    [Test]
     public void Diff_MissingSnapshotOption_FailsWithExitCodeTwo()
     {
         RecordingConsole console = new();
@@ -553,6 +597,35 @@ public sealed partial class PublicApiCommandHandlerTests
             Assert.That(exitCode, Is.EqualTo(CliExitCodes.Success));
             Assert.That(document.RootElement.GetProperty("status").GetString(), Is.EqualTo("migrated"));
             Assert.That(document.RootElement.GetProperty("acceptedDrift").GetBoolean(), Is.True);
+        });
+    }
+
+    // A dry run still has to tell the caller what it *would* have written; only "dryRun: true"
+    // signals that nothing was actually written, not a null "output".
+    [Test]
+    public void Migrate_DryRunJsonOutput_StillReportsTheDestination()
+    {
+        StubFileSystem fileSystem = new(PolicyPath);
+        RecordingConsole console = new();
+        StubRuntime runtime = new()
+        {
+            MigrateOutcome = new PublicApiMigrateOutcome(
+                true, CapturedSnapshot, Array.Empty<string>(), Array.Empty<string>(), SnapshotPath,
+                Array.Empty<BuildStatePreflightDiagnostic>()),
+        };
+
+        int exitCode = new PublicApiMigrateCommandHandler(runtime, console, fileSystem).Execute(
+            new PublicApiMigrateCommandOptions(PolicyPath, ContractId, SnapshotPath, null, "json", false, false, true, false));
+
+        using JsonDocument document = JsonDocument.Parse(console.OutputText);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(exitCode, Is.EqualTo(CliExitCodes.Success));
+            Assert.That(document.RootElement.GetProperty("status").GetString(), Is.EqualTo("dry-run"));
+            Assert.That(document.RootElement.GetProperty("dryRun").GetBoolean(), Is.True);
+            Assert.That(document.RootElement.GetProperty("output").GetString(), Is.EqualTo(SnapshotPath));
+            Assert.That(fileSystem.LastWritePath, Is.Null);
         });
     }
 

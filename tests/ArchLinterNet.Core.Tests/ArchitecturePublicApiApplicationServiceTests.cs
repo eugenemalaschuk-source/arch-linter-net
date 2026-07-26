@@ -377,6 +377,7 @@ public sealed class ArchitecturePublicApiApplicationServiceTests
     {
         ArchitecturePublicApiSurfaceContract contract = Contract(apiSnapshot: SnapshotPath);
         contract.ApiSnapshotError = "references a public API snapshot 'x' that does not exist (resolved to 'y').";
+        contract.ApiSnapshotErrorKind = PublicApiSnapshotErrorKind.Missing;
 
         PublicApiUpdateOutcome outcome = Service(Document(contract), new FakePublicApiSnapshotStore()).Update(
             new PublicApiUpdateRequest
@@ -394,6 +395,7 @@ public sealed class ArchitecturePublicApiApplicationServiceTests
     {
         ArchitecturePublicApiSurfaceContract contract = Contract(apiSnapshot: SnapshotPath);
         contract.ApiSnapshotError = "has a public API snapshot 'x' captured for contract 'other'.";
+        contract.ApiSnapshotErrorKind = PublicApiSnapshotErrorKind.OwnershipError;
 
         PublicApiUpdateOutcome outcome = Service(Document(contract), new FakePublicApiSnapshotStore()).Update(
             new PublicApiUpdateRequest
@@ -409,6 +411,33 @@ public sealed class ArchitecturePublicApiApplicationServiceTests
             Assert.That(outcome.Snapshot, Is.Null);
             Assert.That(outcome.FailureKind, Is.EqualTo(PublicApiFailureKind.InvalidInput));
             Assert.That(outcome.Error, Does.Contain("captured for contract 'other'"));
+        });
+    }
+
+    // The bug this regresses: classifying "missing" by searching ApiSnapshotError's text for "does
+    // not exist" would treat a file whose NAME happens to contain that phrase as recoverably
+    // missing, even when the real problem is a parse or ownership failure — letting update silently
+    // replace an existing, corrupt snapshot instead of refusing.
+    [Test]
+    public void Update_CorruptSnapshotNamedLikeTheMissingMessage_IsStillRefused()
+    {
+        ArchitecturePublicApiSurfaceContract contract = Contract(apiSnapshot: SnapshotPath);
+        contract.ApiSnapshotError =
+            "Invalid public API snapshot 'this-file-does-not-exist-but-is-real.txt': unsupported format 'garbage'.";
+        contract.ApiSnapshotErrorKind = PublicApiSnapshotErrorKind.ParseError;
+
+        PublicApiUpdateOutcome outcome = Service(Document(contract), new FakePublicApiSnapshotStore()).Update(
+            new PublicApiUpdateRequest
+            {
+                PolicyPath = PolicyPath,
+                ContractId = ContractId,
+                SnapshotPath = SnapshotPath,
+            });
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(outcome.Succeeded, Is.False);
+            Assert.That(outcome.Snapshot, Is.Null);
         });
     }
 
@@ -562,28 +591,55 @@ public sealed class ArchitecturePublicApiApplicationServiceTests
         Assert.That(outcome.Error, Does.Contain("Unknown public API surface contract"));
     }
 
-    // On Windows and macOS's default (case-insensitive) filesystems, 'api/Surface.txt' and
-    // 'api/surface.txt' name the same file. On Linux's common ext4 they do not: treating them as
-    // equal there would let update silently rewrite a different file than it just read and diffed
-    // against, while reporting success against the path the caller actually asked for.
-    [Test]
-    public void PathsMatch_CaseDifference_IsOsAware()
-    {
-        bool expectCaseInsensitive = OperatingSystem.IsWindows() || OperatingSystem.IsMacOS();
-
-        bool matches = ArchitecturePublicApiApplicationService.PathsMatch(
-            "/repo/architecture/api/Surface.txt", "/repo/architecture/api/surface.txt");
-
-        Assert.That(matches, Is.EqualTo(expectCaseInsensitive));
-    }
-
+    // Case sensitivity is a property of the actual filesystem, not the OS: HFS+/APFS default to
+    // case-insensitive, but macOS explicitly supports a case-sensitive APFS variant, and guessing
+    // from OperatingSystem would treat 'Surface.txt' and 'surface.txt' as one file on a
+    // case-sensitive host, silently updating the wrong one.
     [Test]
     public void PathsMatch_IdenticalPaths_AlwaysMatch()
     {
+        var service = Service(Document(Contract()), new FakePublicApiSnapshotStore());
+
         Assert.That(
-            ArchitecturePublicApiApplicationService.PathsMatch(
-                "/repo/architecture/api/surface.txt", "/repo/architecture/api/surface.txt"),
+            service.PathsMatch("/repo/architecture/api/surface.txt", "/repo/architecture/api/surface.txt"),
             Is.True);
+    }
+
+    [Test]
+    public void PathsMatch_CaseDifference_BothPathsExistOnDisk_Matches()
+    {
+        const string First = "/repo/architecture/api/Surface.txt";
+        const string Second = "/repo/architecture/api/surface.txt";
+        var store = new FakePublicApiSnapshotStore { ExistingPaths = new HashSet<string> { First, Second } };
+        var service = Service(Document(Contract()), store);
+
+        // A case-insensitive filesystem reports both spellings of the same file as existing.
+        Assert.That(service.PathsMatch(First, Second), Is.True);
+    }
+
+    [Test]
+    public void PathsMatch_CaseDifference_OnlyTheKnownPathExistsOnDisk_DoesNotMatch()
+    {
+        const string First = "/repo/architecture/api/Surface.txt";
+        const string Second = "/repo/architecture/api/surface.txt";
+        var store = new FakePublicApiSnapshotStore { ExistingPaths = new HashSet<string> { Second } };
+        var service = Service(Document(Contract()), store);
+
+        // A case-sensitive filesystem only resolves the exact spelling that was actually written.
+        Assert.That(service.PathsMatch(First, Second), Is.False);
+    }
+
+    [Test]
+    public void PathsMatch_CaseDifference_NeitherPathExistsYet_RequiresExactMatch()
+    {
+        const string First = "/repo/architecture/api/Surface.txt";
+        const string Second = "/repo/architecture/api/surface.txt";
+        var store = new FakePublicApiSnapshotStore { ExistingPaths = new HashSet<string>() };
+        var service = Service(Document(Contract()), store);
+
+        // Nothing exists to probe (for example, a snapshot before its first capture) — the safe
+        // default is to require an exact match rather than assume the two spellings are the same.
+        Assert.That(service.PathsMatch(First, Second), Is.False);
     }
 
     private sealed class FakePublicApiSnapshotStore : IPublicApiSnapshotStore
@@ -591,6 +647,10 @@ public sealed class ArchitecturePublicApiApplicationServiceTests
         public IReadOnlyList<PublicApiSnapshotEntry> Entries { get; set; } = Array.Empty<PublicApiSnapshotEntry>();
 
         public bool Exists { get; set; } = true;
+
+        // When set, overrides the blanket Exists flag with per-path control, needed for the
+        // PathsMatch tests where the two candidate paths must be allowed to disagree.
+        public HashSet<string>? ExistingPaths { get; set; }
 
         public string? ResolveError { get; set; }
 
@@ -603,7 +663,7 @@ public sealed class ArchitecturePublicApiApplicationServiceTests
                 : throw new InvalidOperationException(ResolveError);
         }
 
-        bool IPublicApiSnapshotStore.Exists(string resolvedPath) => Exists;
+        bool IPublicApiSnapshotStore.Exists(string resolvedPath) => ExistingPaths?.Contains(resolvedPath) ?? Exists;
 
         public PublicApiSnapshotDocument Read(string resolvedPath, string authoredPath)
         {
