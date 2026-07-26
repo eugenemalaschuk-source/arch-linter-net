@@ -223,34 +223,43 @@ internal static class PublicApiSurfaceChecker
     }
 
     // Inline `declared_api` entries carry no assembly attribution, so they enter the differ as
-    // wildcards. Under the exact grammar they are also written in the legacy identity grammar, so an
-    // inline entry that still has a live counterpart is lifted to that counterpart's exact signature
-    // — otherwise every inline entry on a snapshot-backed contract would look removed.
-    private static List<PublicApiSnapshotEntry> DeclaredEntries(
+    // wildcards (PublicApiSnapshotDiffer.WildcardAssembly) — that is the spec's stated semantics for
+    // an unattributed entry, and it must survive this step. Under the exact grammar the live surface
+    // is written in a richer grammar than the legacy `declared_api` text, so a wildcard entry is
+    // lifted to the live exact-signature text or it would text-compare unequal to every actual entry
+    // and look removed. Lifting to a *specific assembly* would be wrong: two assemblies can
+    // legitimately export the same base signature (possibly with different exact detail, e.g.
+    // different visibility), and the wildcard must still match whichever of them the caller meant —
+    // so every distinct live exact variant for that base signature becomes its own wildcard entry.
+    // Internal (not private) specifically so it is directly unit-testable: constructing a real
+    // duplicate export of the same base signature across two distinct loaded assemblies is not
+    // practical in a unit test, and this is where the actual attribution logic lives.
+    internal static List<PublicApiSnapshotEntry> DeclaredEntries(
         ArchitecturePublicApiSurfaceContract contract,
         Dictionary<string, List<ArchitectureExportedApiEntry>> scannedByAssembly,
         bool exactGrammar)
     {
         List<PublicApiSnapshotEntry> declared = new(contract.ResolvedSnapshotEntries);
 
-        Dictionary<string, ArchitectureExportedApiEntry> byBaseSignature = new(StringComparer.Ordinal);
-        if (exactGrammar)
-        {
-            foreach (ArchitectureExportedApiEntry entry in scannedByAssembly.Values.SelectMany(entries => entries))
-            {
-                byBaseSignature.TryAdd(entry.Signature, entry);
-            }
-        }
+        ILookup<string, string> exactVariantsByBaseSignature = exactGrammar
+            ? scannedByAssembly.Values
+                .SelectMany(entries => entries)
+                .ToLookup(entry => entry.Signature, entry => entry.ExactSignature, StringComparer.Ordinal)
+            : Enumerable.Empty<ArchitectureExportedApiEntry>()
+                .ToLookup(entry => entry.Signature, entry => entry.ExactSignature, StringComparer.Ordinal);
 
         foreach (string signature in contract.DeclaredApi)
         {
-            if (exactGrammar && byBaseSignature.TryGetValue(signature, out ArchitectureExportedApiEntry live))
+            string[] liveVariants = exactVariantsByBaseSignature[signature].Distinct(StringComparer.Ordinal).ToArray();
+
+            if (liveVariants.Length == 0)
             {
-                declared.Add(new PublicApiSnapshotEntry(live.AssemblyName, live.ExactSignature));
+                declared.Add(new PublicApiSnapshotEntry(PublicApiSnapshotDiffer.WildcardAssembly, signature));
                 continue;
             }
 
-            declared.Add(new PublicApiSnapshotEntry(PublicApiSnapshotDiffer.WildcardAssembly, signature));
+            declared.AddRange(liveVariants.Select(
+                variant => new PublicApiSnapshotEntry(PublicApiSnapshotDiffer.WildcardAssembly, variant)));
         }
 
         return declared;

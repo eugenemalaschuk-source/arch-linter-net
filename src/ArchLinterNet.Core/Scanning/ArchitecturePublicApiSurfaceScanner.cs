@@ -43,11 +43,12 @@ internal static class ArchitecturePublicApiSurfaceScanner
 
             string typeName = ArchitectureTypeNames.SafeFullName(type);
             string typeSignature = NormalizeType(type);
+            string typeVisibility = TypeVisibility(type);
             yield return new ArchitectureExportedApiEntry(
                 typeSignature,
                 ArchitecturePublicApiSignatureDetails.Compose(
-                    typeSignature, ArchitecturePublicApiSignatureDetails.ForType(type)),
-                typeName, assemblyName, TypeVisibility(type), false, null);
+                    typeSignature, ArchitecturePublicApiSignatureDetails.ForType(type, typeVisibility)),
+                typeName, assemblyName, typeVisibility, false, null);
 
             foreach (ArchitectureExportedApiEntry member in GetExportedMembers(type, assemblyName))
             {
@@ -139,11 +140,12 @@ internal static class ArchitecturePublicApiSurfaceScanner
             string? signature = TryNormalizeMethodLike(type, ctor, "ctor", includeName: false);
             if (signature != null)
             {
+                string visibility = MemberVisibility(ctor);
                 yield return new ArchitectureExportedApiEntry(
                     signature,
                     ArchitecturePublicApiSignatureDetails.Compose(
-                        signature, ArchitecturePublicApiSignatureDetails.ForMethod(ctor)),
-                    declaringTypeName, assemblyName, MemberVisibility(ctor), false, null);
+                        signature, ArchitecturePublicApiSignatureDetails.ForMethod(ctor, visibility)),
+                    declaringTypeName, assemblyName, visibility, false, null);
             }
         }
     }
@@ -166,11 +168,12 @@ internal static class ArchitecturePublicApiSurfaceScanner
             string? signature = TryNormalizeMethodLike(type, method, "method", includeName: true);
             if (signature != null)
             {
+                string visibility = MemberVisibility(method);
                 yield return new ArchitectureExportedApiEntry(
                     signature,
                     ArchitecturePublicApiSignatureDetails.Compose(
-                        signature, ArchitecturePublicApiSignatureDetails.ForMethod(method)),
-                    declaringTypeName, assemblyName, MemberVisibility(method), false, null);
+                        signature, ArchitecturePublicApiSignatureDetails.ForMethod(method, visibility)),
+                    declaringTypeName, assemblyName, visibility, false, null);
             }
         }
     }
@@ -226,11 +229,12 @@ internal static class ArchitecturePublicApiSurfaceScanner
             string kind = isConst ? "const" : "field";
             string signature = $"{kind} {declaringTypeName}.{field.Name}: {fieldTypeName}";
             string? constQualifiedName = isConst ? $"{declaringTypeName}.{field.Name}" : null;
+            string fieldVisibility = MemberVisibility(field);
             yield return new ArchitectureExportedApiEntry(
                 signature,
                 ArchitecturePublicApiSignatureDetails.Compose(
-                    signature, ArchitecturePublicApiSignatureDetails.ForField(field)),
-                declaringTypeName, assemblyName, MemberVisibility(field), isConst, constQualifiedName);
+                    signature, ArchitecturePublicApiSignatureDetails.ForField(field, fieldVisibility)),
+                declaringTypeName, assemblyName, fieldVisibility, isConst, constQualifiedName);
         }
     }
 
@@ -252,11 +256,12 @@ internal static class ArchitecturePublicApiSurfaceScanner
             }
 
             string eventSignature = $"event {declaringTypeName}.{evt.Name}: {eventTypeName}";
+            string eventVisibility = MemberVisibility(evt.AddMethod!);
             yield return new ArchitectureExportedApiEntry(
                 eventSignature,
                 ArchitecturePublicApiSignatureDetails.Compose(
-                    eventSignature, ArchitecturePublicApiSignatureDetails.ForEvent(evt)),
-                declaringTypeName, assemblyName, MemberVisibility(evt.AddMethod!), false, null);
+                    eventSignature, ArchitecturePublicApiSignatureDetails.ForEvent(evt, eventVisibility)),
+                declaringTypeName, assemblyName, eventVisibility, false, null);
         }
     }
 

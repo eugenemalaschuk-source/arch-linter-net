@@ -33,5 +33,6 @@ internal sealed record PublicApiMigrateCommandOptions(
     string? ConditionSetName,
     string Format,
     bool AcceptDrift,
+    bool Force,
     bool DryRun,
     bool ShowHelp);

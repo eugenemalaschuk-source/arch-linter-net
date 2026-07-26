@@ -7,7 +7,11 @@ Let a large exported API surface be governed as a reviewed file diff instead of 
 
 The system SHALL define a versioned public API snapshot text format carrying `@format`, `@version`, `@contract`, and `@assembly` directives followed by one normalized signature per line. Serialization SHALL order assemblies and signatures ordinal, collapse duplicates, use LF line endings with a trailing newline, and SHALL NOT embed timestamps, file paths, machine names, or tool version stamps.
 
-Captured entries SHALL use the exact grammar: the identity signature followed by a deterministic detail suffix carrying constant and enum member values, enum underlying type, accessor shape and accessor visibility, static/abstract/virtual/override/sealed/readonly modifiers, `ref`/`out`/`in`/`params` parameter direction, and generic constraints.
+Captured entries SHALL use the exact grammar: the identity signature followed by a deterministic detail suffix carrying the declaration's own exported visibility, constant and enum member values, enum underlying type, accessor shape and accessor visibility, static/abstract/virtual/override/sealed/readonly modifiers, `ref`/`out`/`in`/`params` parameter direction, and generic constraints.
+
+#### Scenario: Visibility narrowing is visible in the snapshot
+- **WHEN** an exported method, constructor, field, event, or nested type's own visibility narrows (for example `public` to `protected`) while every other part of its declaration stays the same
+- **THEN** the captured snapshot SHALL differ from the previously reviewed one, and exact validation SHALL report the member as changed
 
 #### Scenario: Constant value change is visible in the snapshot
 - **WHEN** an exported `const` field's value changes while its declaration is otherwise unchanged
@@ -53,7 +57,11 @@ Captured entries SHALL use the exact grammar: the identity signature followed by
 
 The system SHALL compute a structured delta between a declared public API surface and an actual public API surface, separating additions, removals, and changed signatures. A member present on both sides under the same identity key (assembly, declaration kind, fully qualified name including generic arity, and parameter count) but with a different normalized signature SHALL be reported as a changed signature, not as an unrelated addition and removal.
 
-A declared entry with no assembly attribution (an inline `declared_api` entry) SHALL act as a wildcard matching any assembly.
+A declared entry with no assembly attribution (an inline `declared_api` entry) SHALL act as a wildcard matching any assembly. When an inline declaration is projected into the exact grammar for comparison, and more than one assembly exports a distinct exact-grammar variant of that declaration, the projection SHALL preserve wildcard matching for every distinct variant rather than attributing the declaration to one specific assembly.
+
+#### Scenario: Duplicate export across assemblies does not produce a false addition
+- **WHEN** an inline-declared signature is legitimately exported by two assemblies with different exact-grammar detail (for example, differing visibility), and the contract targets both assemblies
+- **THEN** the delta SHALL NOT report either assembly's export as an addition
 
 #### Scenario: Added signature is reported as an addition
 - **WHEN** the actual surface contains a normalized signature absent from the declared surface, with no declared entry sharing its identity key
@@ -149,7 +157,7 @@ The system SHALL provide a `public-api update` operation that rewrites a snapsho
 
 ### Requirement: Migrate an inline declaration to a snapshot without accepting drift
 
-The system SHALL provide a `public-api migrate` operation that converts a contract's inline `declared_api` list into a snapshot file, classifying every inline entry that is absent from the live surface and every live entry that is absent from the inline list, and SHALL refuse to write while such drift is unacknowledged.
+The system SHALL provide a `public-api migrate` operation that converts a contract's inline `declared_api` list into a snapshot file, classifying every inline entry that is absent from the live surface and every live entry that is absent from the inline list, and SHALL refuse to write while such drift is unacknowledged. Migrate SHALL NOT overwrite an existing destination file whose content differs unless overwriting is explicitly requested, mirroring capture's no-silent-overwrite guarantee — a destination is repository-local and could otherwise be another contract's reviewed snapshot.
 
 #### Scenario: Clean inline list migrates
 - **WHEN** a contract's inline `declared_api` list exactly matches the live exported surface
@@ -166,6 +174,14 @@ The system SHALL provide a `public-api migrate` operation that converts a contra
 #### Scenario: Dry-run migration writes nothing
 - **WHEN** migrate is run in dry-run mode
 - **THEN** it SHALL report the drift and the destination it would have written, and SHALL NOT write any file
+
+#### Scenario: Migrate refuses to silently overwrite an existing destination
+- **WHEN** migrate targets an existing file whose content differs from the migrated snapshot and overwriting was not explicitly requested
+- **THEN** the operation SHALL fail without writing
+
+#### Scenario: Migrate over an identical destination succeeds
+- **WHEN** migrate targets an existing file whose content is byte-identical to the migrated snapshot
+- **THEN** the operation SHALL succeed without rewriting the file
 
 ### Requirement: Fail on unusable build state before capture, diff, update, and migrate
 
@@ -196,6 +212,10 @@ The system SHALL resolve every artifact path once, in the application seam, and 
 #### Scenario: Resolved destination is what gets written
 - **WHEN** the process working directory is not the repository root
 - **THEN** the file written SHALL be the boundary-resolved destination, not the authored string resolved against the working directory
+
+#### Scenario: Path identity comparison is OS-aware
+- **WHEN** update compares a `--snapshot` destination against the contract's declared snapshot path
+- **THEN** the comparison SHALL use the file-name case sensitivity of the host filesystem, so two differently-cased paths are treated as the same file only on a case-insensitive host
 
 #### Scenario: Absolute snapshot path is rejected
 - **WHEN** a policy declares an absolute `api_snapshot` path

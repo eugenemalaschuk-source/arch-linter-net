@@ -299,6 +299,40 @@ public sealed class PublicApiSnapshotContractTests
         });
     }
 
+    // Exported visibility (public/protected/protected internal) is dropped by the legacy identity
+    // grammar entirely — a narrowing that leaves everything else about a declaration unchanged would
+    // otherwise be an invisible, byte-identical snapshot.
+    [Test]
+    public void Check_ExactMode_VisibilityNarrowingIsReportedAsChanged()
+    {
+        string baseSignature =
+            "method PublicApiSurfaceContractTestFixtures.VisibilityHolder.ProtectedMethod(): System.Void";
+        var contract = new ArchitecturePublicApiSurfaceContract
+        {
+            Name = "surface",
+            Assemblies = new List<string> { AssemblyName },
+            ApiSnapshot = "surface.txt",
+            ApiComparison = PublicApiComparisonModes.Exact,
+            ResolvedSnapshotEntries = new[]
+            {
+                // Reviewed while the member was still public: public visibility is left implicit.
+                new PublicApiSnapshotEntry(AssemblyName, $"{baseSignature} [static]"),
+            },
+        };
+
+        PublicApiSurfacePayload? changed = Check(contract)
+            .Select(violation => violation.Payload as PublicApiSurfacePayload)
+            .FirstOrDefault(payload => payload?.ApiDeltaKind == "changed"
+                && payload.UndeclaredApiSignature!.Contains("ProtectedMethod", StringComparison.Ordinal));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(changed, Is.Not.Null);
+            Assert.That(changed!.PreviousApiSignature, Is.EqualTo($"{baseSignature} [static]"));
+            Assert.That(changed.UndeclaredApiSignature, Is.EqualTo($"{baseSignature} [visibility:protected, static]"));
+        });
+    }
+
     [Test]
     public void Check_AdditionsOnlyMode_DoesNotReportRemovedDeclaration()
     {

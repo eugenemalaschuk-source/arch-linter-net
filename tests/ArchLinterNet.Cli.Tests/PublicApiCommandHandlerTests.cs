@@ -1,19 +1,15 @@
-using System.Text;
 using System.Text.Json;
 using ArchLinterNet.Cli;
-using ArchLinterNet.Cli.Abstractions;
 using ArchLinterNet.Cli.Commands.PublicApi;
 using ArchLinterNet.Core.BuildState;
-using ArchLinterNet.Core.Graph;
 using ArchLinterNet.Core.Model;
-using ArchLinterNet.Core.Reporting;
 using ArchLinterNet.Core.Validation;
 using NUnit.Framework;
 
 namespace ArchLinterNet.Cli.Tests;
 
 [TestFixture]
-public sealed class PublicApiCommandHandlerTests
+public sealed partial class PublicApiCommandHandlerTests
 {
     private const string PolicyPath = "architecture/dependencies.arch.yml";
     private const string SnapshotPath = "architecture/api/module-api.txt";
@@ -314,7 +310,7 @@ public sealed class PublicApiCommandHandlerTests
         };
 
         int exitCode = new PublicApiMigrateCommandHandler(runtime, console, fileSystem).Execute(
-            new PublicApiMigrateCommandOptions(PolicyPath, ContractId, SnapshotPath, null, "human", false, false, false));
+            new PublicApiMigrateCommandOptions(PolicyPath, ContractId, SnapshotPath, null, "human", false, false, false, false));
 
         Assert.Multiple(() =>
         {
@@ -341,7 +337,7 @@ public sealed class PublicApiCommandHandlerTests
         };
 
         int exitCode = new PublicApiMigrateCommandHandler(runtime, console, fileSystem).Execute(
-            new PublicApiMigrateCommandOptions(PolicyPath, ContractId, SnapshotPath, null, "human", true, false, false));
+            new PublicApiMigrateCommandOptions(PolicyPath, ContractId, SnapshotPath, null, "human", true, false, false, false));
 
         Assert.Multiple(() =>
         {
@@ -349,6 +345,74 @@ public sealed class PublicApiCommandHandlerTests
             Assert.That(fileSystem.LastWriteContents, Is.EqualTo(CapturedSnapshot));
             Assert.That(console.OutputText, Does.Contain("[stale] class Acme.Gone"));
             Assert.That(console.OutputText, Does.Contain($"api_snapshot: {SnapshotPath}"));
+        });
+    }
+
+    // migrate writes a brand-new reviewed artifact, exactly like capture, so it must not silently
+    // destroy an existing file — another contract's reviewed snapshot, or any other repository-local
+    // file the caller pointed --output at by mistake.
+    [Test]
+    public void Migrate_RefusesToOverwriteDifferingExistingDestinationWithoutForce()
+    {
+        StubFileSystem fileSystem = new(PolicyPath, SnapshotPath) { ReadContents = "someone else's reviewed snapshot" };
+        RecordingConsole console = new();
+        StubRuntime runtime = new()
+        {
+            MigrateOutcome = new PublicApiMigrateOutcome(
+                true, CapturedSnapshot, Array.Empty<string>(), Array.Empty<string>(), SnapshotPath,
+                Array.Empty<BuildStatePreflightDiagnostic>()),
+        };
+
+        int exitCode = new PublicApiMigrateCommandHandler(runtime, console, fileSystem).Execute(
+            new PublicApiMigrateCommandOptions(PolicyPath, ContractId, SnapshotPath, null, "human", false, false, false, false));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(exitCode, Is.EqualTo(CliExitCodes.InvalidArgumentsOrRuntimeError));
+            Assert.That(fileSystem.LastWritePath, Is.Null);
+            Assert.That(console.ErrorText, Does.Contain("already exists and differs"));
+        });
+    }
+
+    [Test]
+    public void Migrate_ForceReplacesDifferingExistingDestination()
+    {
+        StubFileSystem fileSystem = new(PolicyPath, SnapshotPath) { ReadContents = "someone else's reviewed snapshot" };
+        StubRuntime runtime = new()
+        {
+            MigrateOutcome = new PublicApiMigrateOutcome(
+                true, CapturedSnapshot, Array.Empty<string>(), Array.Empty<string>(), SnapshotPath,
+                Array.Empty<BuildStatePreflightDiagnostic>()),
+        };
+
+        int exitCode = new PublicApiMigrateCommandHandler(runtime, new RecordingConsole(), fileSystem).Execute(
+            new PublicApiMigrateCommandOptions(PolicyPath, ContractId, SnapshotPath, null, "human", false, true, false, false));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(exitCode, Is.EqualTo(CliExitCodes.Success));
+            Assert.That(fileSystem.LastWriteContents, Is.EqualTo(CapturedSnapshot));
+        });
+    }
+
+    [Test]
+    public void Migrate_IdenticalExistingDestinationSucceedsWithoutWriting()
+    {
+        StubFileSystem fileSystem = new(PolicyPath, SnapshotPath) { ReadContents = CapturedSnapshot };
+        StubRuntime runtime = new()
+        {
+            MigrateOutcome = new PublicApiMigrateOutcome(
+                true, CapturedSnapshot, Array.Empty<string>(), Array.Empty<string>(), SnapshotPath,
+                Array.Empty<BuildStatePreflightDiagnostic>()),
+        };
+
+        int exitCode = new PublicApiMigrateCommandHandler(runtime, new RecordingConsole(), fileSystem).Execute(
+            new PublicApiMigrateCommandOptions(PolicyPath, ContractId, SnapshotPath, null, "human", false, false, false, false));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(exitCode, Is.EqualTo(CliExitCodes.Success));
+            Assert.That(fileSystem.LastWritePath, Is.Null);
         });
     }
 
@@ -365,7 +429,7 @@ public sealed class PublicApiCommandHandlerTests
         };
 
         int exitCode = new PublicApiMigrateCommandHandler(runtime, console, fileSystem).Execute(
-            new PublicApiMigrateCommandOptions(PolicyPath, ContractId, SnapshotPath, null, "human", false, true, false));
+            new PublicApiMigrateCommandOptions(PolicyPath, ContractId, SnapshotPath, null, "human", false, false, true, false));
 
         Assert.Multiple(() =>
         {
@@ -430,7 +494,7 @@ public sealed class PublicApiCommandHandlerTests
         RecordingConsole console = new();
 
         int exitCode = new PublicApiMigrateCommandHandler(new StubRuntime(), console, new StubFileSystem(PolicyPath)).Execute(
-            new PublicApiMigrateCommandOptions(PolicyPath, ContractId, SnapshotPath, null, "sarif", false, false, false));
+            new PublicApiMigrateCommandOptions(PolicyPath, ContractId, SnapshotPath, null, "sarif", false, false, false, false));
 
         Assert.That(exitCode, Is.EqualTo(CliExitCodes.InvalidArgumentsOrRuntimeError));
     }
@@ -480,7 +544,7 @@ public sealed class PublicApiCommandHandlerTests
         };
 
         int exitCode = new PublicApiMigrateCommandHandler(runtime, console, fileSystem).Execute(
-            new PublicApiMigrateCommandOptions(PolicyPath, ContractId, SnapshotPath, null, "json", true, false, false));
+            new PublicApiMigrateCommandOptions(PolicyPath, ContractId, SnapshotPath, null, "json", true, false, false, false));
 
         using JsonDocument document = JsonDocument.Parse(console.OutputText);
 
@@ -507,7 +571,7 @@ public sealed class PublicApiCommandHandlerTests
         };
 
         int exitCode = new PublicApiMigrateCommandHandler(runtime, console, new StubFileSystem(PolicyPath)).Execute(
-            new PublicApiMigrateCommandOptions(PolicyPath, "absent", SnapshotPath, null, "human", false, false, false));
+            new PublicApiMigrateCommandOptions(PolicyPath, "absent", SnapshotPath, null, "human", false, false, false, false));
 
         Assert.That(exitCode, Is.EqualTo(CliExitCodes.InvalidArgumentsOrRuntimeError));
     }
@@ -565,7 +629,7 @@ public sealed class PublicApiCommandHandlerTests
         int update = new PublicApiUpdateCommandHandler(runtime, console, fileSystem).Execute(
             new PublicApiUpdateCommandOptions(PolicyPath, null, null, null, "human", false, true));
         int migrate = new PublicApiMigrateCommandHandler(runtime, console, fileSystem).Execute(
-            new PublicApiMigrateCommandOptions(PolicyPath, null, null, null, "human", false, false, true));
+            new PublicApiMigrateCommandOptions(PolicyPath, null, null, null, "human", false, false, false, true));
 
         Assert.Multiple(() =>
         {
@@ -573,169 +637,5 @@ public sealed class PublicApiCommandHandlerTests
             Assert.That(console.OutputText, Does.Contain("public-api capture"));
             Assert.That(console.OutputText, Does.Contain("public-api migrate"));
         });
-    }
-
-    private sealed class StubFileSystem(params string[] existingPaths) : IFileSystem
-    {
-        private readonly HashSet<string> _existingPaths = new(existingPaths, StringComparer.Ordinal);
-
-        public string? LastWritePath { get; private set; }
-
-        public string? LastWriteContents { get; private set; }
-
-        public string ReadContents { get; init; } = string.Empty;
-
-        public bool FileExists(string path) => _existingPaths.Contains(path);
-
-        public string ReadAllText(string path) => ReadContents;
-
-        public void WriteAllText(string path, string contents)
-        {
-            LastWritePath = path;
-            LastWriteContents = contents;
-        }
-
-        public string WriteAllTextToTemp(string targetPath, string contents)
-        {
-            LastWritePath = targetPath;
-            LastWriteContents = contents;
-            return targetPath + ".tmp";
-        }
-
-        public void RenameTempToTarget(string tempPath, string targetPath)
-        {
-        }
-
-        public void DeleteFile(string path)
-        {
-        }
-
-        public bool CanWriteToDirectory(string path) => true;
-    }
-
-    private sealed class RecordingConsole : ICliConsole
-    {
-        private readonly StringBuilder _output = new();
-        private readonly StringBuilder _error = new();
-
-        public RecordingConsole()
-        {
-            Out = new StringWriter(_output);
-            Error = new StringWriter(_error);
-        }
-
-        public TextWriter Out { get; }
-
-        public TextWriter Error { get; }
-
-        public string OutputText => _output.ToString();
-
-        public string ErrorText => _error.ToString();
-    }
-
-    private sealed class StubRuntime : ICliRuntime
-    {
-        public PublicApiCaptureOutcome? CaptureOutcome { get; init; }
-
-        public PublicApiDiffOutcome? DiffOutcome { get; init; }
-
-        public PublicApiUpdateOutcome? UpdateOutcome { get; init; }
-
-        public PublicApiMigrateOutcome? MigrateOutcome { get; init; }
-
-        public string Version => "1.0.0";
-
-        public PublicApiCaptureOutcome CapturePublicApi(PublicApiCaptureRequest request) =>
-            CaptureOutcome ?? throw new NotSupportedException();
-
-        public PublicApiDiffOutcome DiffPublicApi(PublicApiDiffRequest request) =>
-            DiffOutcome ?? throw new NotSupportedException();
-
-        public PublicApiUpdateOutcome UpdatePublicApi(PublicApiUpdateRequest request) =>
-            UpdateOutcome ?? throw new NotSupportedException();
-
-        public PublicApiMigrateOutcome MigratePublicApi(PublicApiMigrateRequest request) =>
-            MigrateOutcome ?? throw new NotSupportedException();
-
-        // The delta formatter routes human output through the real Core formatter, so this stub
-        // uses it too: the assertions above then exercise the same rendering the CLI ships.
-        public string FormatViolationsForHumans(IReadOnlyCollection<ArchitectureViolation> violations) =>
-            new ArchitectureDiagnosticFormatter().FormatViolationsForHumans(violations);
-
-        public bool TryParseGraphLevel(string value, out ArchitectureGraphLevel level) => throw new NotSupportedException();
-
-        public ValidationOutcome Validate(ValidationRequest request, ValidationTiming? timing) => throw new NotSupportedException();
-
-        public ArchitectureAnalysisSnapshot CreateSnapshot(AnalysisSnapshotRequest request, ValidationTiming? timing) =>
-            throw new NotSupportedException();
-
-        public string FormatResultForCiArtifacts(
-            string mode,
-            bool passed,
-            IReadOnlyCollection<ArchitectureViolation> violations,
-            IReadOnlyCollection<string> cycles,
-            IReadOnlyCollection<ArchitectureCycleFinding> cycleFindings,
-            IReadOnlyCollection<ArchitectureViolation> coverageFindings,
-            IReadOnlyList<ArchitectureUnmatchedIgnoredViolation> unmatchedIgnoredViolations,
-            IReadOnlyCollection<PolicyConsistencyDiagnostic> policyConsistencyFindings,
-            IReadOnlyCollection<ArchitectureCoverageSummary> coverageSummaries,
-            IReadOnlyCollection<ArchitectureClassificationConflict> classificationConflicts,
-            IReadOnlyCollection<ArchitectureClassificationMetadataFailure> classificationMetadataFailures,
-            IReadOnlyCollection<ArchitectureClassificationRoleFact> classificationRoles,
-            ArchitectureClassificationPathDeferredNotice? classificationPathDeferred,
-            IReadOnlyCollection<BuildStatePreflightDiagnostic> preflightDiagnostics) => throw new NotSupportedException();
-
-        public string FormatResultAsSarif(
-            string mode,
-            IReadOnlyCollection<ArchitectureViolation> violations,
-            IReadOnlyCollection<string> cycles,
-            IReadOnlyCollection<ArchitectureCycleFinding> cycleFindings,
-            IReadOnlyCollection<BuildStatePreflightDiagnostic> preflightDiagnostics) => throw new NotSupportedException();
-
-        public string FormatCyclesForHumans(
-            IReadOnlyCollection<string> cycles,
-            IReadOnlyCollection<ArchitectureCycleFinding> cycleFindings) => throw new NotSupportedException();
-
-        public string FormatPolicyConsistencyForHumans(IReadOnlyCollection<PolicyConsistencyDiagnostic> diagnostics) =>
-            throw new NotSupportedException();
-
-        public string FormatUnmatchedForHumans(IReadOnlyList<ArchitectureUnmatchedIgnoredViolation> unmatchedViolations) =>
-            throw new NotSupportedException();
-
-        public string FormatCoverageForHumans(IReadOnlyCollection<ArchitectureViolation> coverageFindings) =>
-            throw new NotSupportedException();
-
-        public string FormatCoverageSummaryForHumans(IReadOnlyCollection<ArchitectureCoverageSummary> coverageSummaries) =>
-            throw new NotSupportedException();
-
-        public string FormatClassificationFactsForHumans(
-            IReadOnlyCollection<ArchitectureClassificationConflict> conflicts,
-            IReadOnlyCollection<ArchitectureClassificationMetadataFailure> metadataFailures,
-            ArchitectureClassificationPathDeferredNotice? classificationPathDeferred) => throw new NotSupportedException();
-
-        public string FormatBuildStatePreflightForHumans(IReadOnlyCollection<BuildStatePreflightDiagnostic> diagnostics) =>
-            throw new NotSupportedException();
-
-        public BaselineGenerationOutcome GenerateBaseline(BaselineGenerationRequest request) => throw new NotSupportedException();
-
-        public BaselineUpdateOutcome UpdateBaseline(BaselineUpdateRequest request) => throw new NotSupportedException();
-
-        public BaselinePruneOutcome PruneBaseline(BaselinePruneRequest request) => throw new NotSupportedException();
-
-        public BaselineDiffOutcome DiffBaseline(BaselineDiffRequest request) => throw new NotSupportedException();
-
-        public BaselineVerifyOutcome VerifyBaseline(BaselineVerifyRequest request) => throw new NotSupportedException();
-
-        public BaselineMigrateOutcome MigrateBaseline(BaselineMigrateRequest request) => throw new NotSupportedException();
-
-        public ArchitectureGraphOutcome BuildGraph(ArchitectureGraphRequest request) => throw new NotSupportedException();
-
-        public string FormatGraphAsJson(ArchitectureDependencyGraph graph) => throw new NotSupportedException();
-
-        public string FormatGraphAsDot(ArchitectureDependencyGraph graph) => throw new NotSupportedException();
-
-        public string FormatGraphAsMermaid(ArchitectureDependencyGraph graph) => throw new NotSupportedException();
-
-        public ArchitectureExplainOutcome Explain(ArchitectureExplainRequest request) => throw new NotSupportedException();
     }
 }

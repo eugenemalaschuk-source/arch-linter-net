@@ -18,6 +18,7 @@ internal sealed class MigratePublicApiSubcommandModule : IPublicApiSubcommandMod
         Option<string> conditionSetOption = new("--condition-set");
         Option<string> formatOption = PublicApiOptionsFactory.CreateFormatOption();
         Option<bool> acceptDriftOption = new("--accept-drift");
+        Option<bool> forceOption = new("--force");
         Option<bool> dryRunOption = new("--dry-run");
         dryRunOption.Aliases.Add("--check");
         Option<bool> helpOption = PublicApiOptionsFactory.CreateHelpOption();
@@ -28,6 +29,7 @@ internal sealed class MigratePublicApiSubcommandModule : IPublicApiSubcommandMod
         command.Options.Add(conditionSetOption);
         command.Options.Add(formatOption);
         command.Options.Add(acceptDriftOption);
+        command.Options.Add(forceOption);
         command.Options.Add(dryRunOption);
         command.Options.Add(helpOption);
 
@@ -38,6 +40,7 @@ internal sealed class MigratePublicApiSubcommandModule : IPublicApiSubcommandMod
             parseResult.GetValue(conditionSetOption),
             PublicApiOptionsFactory.GetFormat(parseResult, formatOption),
             parseResult.GetValue(acceptDriftOption),
+            parseResult.GetValue(forceOption),
             parseResult.GetValue(dryRunOption),
             parseResult.GetValue(helpOption))));
 

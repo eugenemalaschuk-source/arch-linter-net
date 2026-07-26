@@ -101,8 +101,7 @@ public sealed partial class ArchitecturePublicApiApplicationService(
 
         // Writing anywhere other than the contract's own declared snapshot would leave the policy
         // pointing at a stale file while reporting success against a different one.
-        if (contract.ResolvedSnapshotPath != null
-            && !string.Equals(destination, contract.ResolvedSnapshotPath, StringComparison.OrdinalIgnoreCase))
+        if (contract.ResolvedSnapshotPath != null && !PathsMatch(destination!, contract.ResolvedSnapshotPath))
         {
             return new PublicApiUpdateOutcome(
                 false, null, PublicApiDelta.Empty, request.DryRun, destination, resolution.PreflightDiagnostics,
@@ -182,6 +181,18 @@ public sealed partial class ArchitecturePublicApiApplicationService(
         return contract.ApiSnapshotError?.Contains("does not exist", StringComparison.Ordinal) == true;
     }
 
+    // File-path identity is OS-dependent: NTFS and APFS-default are case-insensitive, but ext4 (the
+    // common Linux filesystem) is not. `OrdinalIgnoreCase` everywhere would treat 'api/Surface.txt'
+    // and 'api/surface.txt' as the same file on Linux even though the filesystem sees two distinct
+    // ones — silently updating the wrong file while reporting success on the right one.
+    internal static bool PathsMatch(string first, string second)
+    {
+        StringComparison comparison = OperatingSystem.IsWindows() || OperatingSystem.IsMacOS()
+            ? StringComparison.OrdinalIgnoreCase
+            : StringComparison.Ordinal;
+        return string.Equals(first, second, comparison);
+    }
+
     // The policy (and any imported policy source) must never be a snapshot destination: a --force
     // write would otherwise replace the very file that defines the contract.
     private bool TryResolveDestination(
@@ -199,7 +210,7 @@ public sealed partial class ArchitecturePublicApiApplicationService(
             return false;
         }
 
-        if (string.Equals(destination, Path.GetFullPath(policyPath), StringComparison.OrdinalIgnoreCase))
+        if (PathsMatch(destination, Path.GetFullPath(policyPath)))
         {
             error = $"Refusing to use the policy file '{policyPath}' as a public API snapshot path.";
             destination = null;

@@ -16,6 +16,7 @@ internal static class ArchitecturePublicApiSignatureDetails
 {
     private const string StaticModifier = "static";
     private const string UnavailableConstant = "<unavailable>";
+    private const string PublicVisibilityToken = "public";
 
     public static string Compose(string baseSignature, IReadOnlyList<string> details)
     {
@@ -35,9 +36,10 @@ internal static class ArchitecturePublicApiSignatureDetails
         return open < 0 ? signature : signature[..open];
     }
 
-    public static List<string> ForType(Type type)
+    public static List<string> ForType(Type type, string visibility)
     {
         List<string> details = new();
+        AddVisibility(details, visibility);
 
         try
         {
@@ -92,9 +94,10 @@ internal static class ArchitecturePublicApiSignatureDetails
         return details;
     }
 
-    public static List<string> ForMethod(MethodBase method)
+    public static List<string> ForMethod(MethodBase method, string visibility)
     {
         List<string> details = new();
+        AddVisibility(details, visibility);
 
         try
         {
@@ -140,7 +143,10 @@ internal static class ArchitecturePublicApiSignatureDetails
     }
 
     // Accessor shape is part of the contract a consumer compiles against: adding a setter, or
-    // widening a `protected set` to `public set`, changes what callers may do.
+    // widening a `protected set` to `public set`, changes what callers may do. The property's own
+    // overall visibility is exactly the most-open accessor's, which AccessorToken already renders,
+    // so unlike ForType/ForMethod/ForField/ForEvent this needs no separate visibility detail: a
+    // narrowing at the property level is a narrowing of at least one accessor token.
     public static List<string> ForProperty(PropertyInfo property)
     {
         List<string> details = new();
@@ -180,9 +186,10 @@ internal static class ArchitecturePublicApiSignatureDetails
     // A constant's *value* is the API: consumers inline it at compile time, so changing `1` to `2`
     // is a breaking change that leaves the declaration textually identical. Enum members reflect as
     // literal fields, so this is also what makes an enum value change detectable.
-    public static List<string> ForField(FieldInfo field)
+    public static List<string> ForField(FieldInfo field, string visibility)
     {
         List<string> details = new();
+        AddVisibility(details, visibility);
 
         try
         {
@@ -214,9 +221,10 @@ internal static class ArchitecturePublicApiSignatureDetails
         return details;
     }
 
-    public static List<string> ForEvent(EventInfo evt)
+    public static List<string> ForEvent(EventInfo evt, string visibility)
     {
         List<string> details = new();
+        AddVisibility(details, visibility);
 
         try
         {
@@ -235,6 +243,18 @@ internal static class ArchitecturePublicApiSignatureDetails
         }
 
         return details;
+    }
+
+    // A declaration's exported visibility (public/protected/protected internal) is dropped by the
+    // legacy identity signature entirely, so a narrowing from public to protected would otherwise
+    // leave the exact snapshot byte-identical. Public is the overwhelmingly common case and is left
+    // implicit, so existing all-public snapshots do not grow a redundant detail on every entry.
+    private static void AddVisibility(List<string> details, string visibility)
+    {
+        if (!string.Equals(visibility, PublicVisibilityToken, StringComparison.Ordinal))
+        {
+            details.Add($"visibility:{visibility}");
+        }
     }
 
     private static string AccessorToken(string name, MethodInfo accessor)

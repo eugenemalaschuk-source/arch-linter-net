@@ -55,7 +55,22 @@ internal sealed class PublicApiMigrateCommandHandler(ICliRuntime runtime, ICliCo
 
             string destination = outcome.ResolvedOutputPath!;
 
-            if (!options.DryRun)
+            // migrate writes a brand-new reviewed artifact, same as capture: it must not silently
+            // destroy an existing file — another contract's snapshot, or anything else repository-
+            // local except the policy itself (TryResolveDestination already refuses that one).
+            bool exists = fileSystem.FileExists(destination);
+            bool identical = exists && string.Equals(
+                fileSystem.ReadAllText(destination), outcome.Snapshot, StringComparison.Ordinal);
+
+            if (!options.DryRun && exists && !identical && !options.Force)
+            {
+                console.Error.WriteLine(
+                    $"'{destination}' already exists and differs from the migrated snapshot. Re-run with " +
+                    "--force to replace it, or point --output at a new file.");
+                return CliExitCodes.InvalidArgumentsOrRuntimeError;
+            }
+
+            if (!options.DryRun && !identical)
             {
                 string tempPath = fileSystem.WriteAllTextToTemp(destination, outcome.Snapshot!);
                 fileSystem.RenameTempToTarget(tempPath, destination);

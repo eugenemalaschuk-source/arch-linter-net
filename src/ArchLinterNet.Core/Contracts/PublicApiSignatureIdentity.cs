@@ -42,14 +42,22 @@ internal static class PublicApiSignatureIdentity
 
     private static (string Kind, string Name, int ParameterCount) Decompose(string signature)
     {
-        int kindSeparator = signature.IndexOf(' ', StringComparison.Ordinal);
+        // Identity is computed purely from the legacy base grammar — kind, name, parameter count —
+        // so the exact-grammar detail suffix (constant values, generic constraints like `new()`,
+        // etc.) is stripped first. Without this, a detail suffix's own parentheses — e.g. `new()` in
+        // `[where0:class new()]` — would corrupt the parameter-list scan below: `LastIndexOf(')')`
+        // would land on the detail suffix's closing paren instead of the parameter list's, and a
+        // zero-parameter method would parse as having a parameter.
+        string baseSignature = StripDetailSuffix(signature);
+
+        int kindSeparator = baseSignature.IndexOf(' ', StringComparison.Ordinal);
         if (kindSeparator < 0)
         {
-            return (signature, string.Empty, NoParameterList);
+            return (baseSignature, string.Empty, NoParameterList);
         }
 
-        string kind = signature[..kindSeparator];
-        string remainder = signature[(kindSeparator + 1)..];
+        string kind = baseSignature[..kindSeparator];
+        string remainder = baseSignature[(kindSeparator + 1)..];
 
         int openParen = remainder.IndexOf('(', StringComparison.Ordinal);
         if (openParen < 0)
@@ -59,7 +67,10 @@ internal static class PublicApiSignatureIdentity
             return (kind, StripMemberType(remainder), NoParameterList);
         }
 
-        int closeParen = remainder.LastIndexOf(')');
+        // The base grammar's own rendering never contains a literal parenthesis anywhere else
+        // (arrays/generics use brackets, by-ref/pointer use `&`/`*`), so with the detail suffix
+        // already stripped, the parameter list's closing paren is simply the next one.
+        int closeParen = remainder.IndexOf(')', openParen);
         if (closeParen < openParen)
         {
             return (kind, StripMemberType(remainder), NoParameterList);
@@ -68,6 +79,21 @@ internal static class PublicApiSignatureIdentity
         string name = remainder[..openParen];
         string parameters = remainder[(openParen + 1)..closeParen];
         return (kind, name, CountParameters(parameters));
+    }
+
+    // Mirrors ArchitecturePublicApiSignatureDetails.StripDetails. Duplicated rather than shared
+    // because Core.Contracts must not depend on Core.Scanning (Scanning internals are a protected
+    // layer importable only from Core itself) — the logic is a few lines and both copies exist to
+    // keep that boundary intact.
+    private static string StripDetailSuffix(string signature)
+    {
+        if (signature.Length == 0 || signature[^1] != ']')
+        {
+            return signature;
+        }
+
+        int open = signature.LastIndexOf(" [", StringComparison.Ordinal);
+        return open < 0 ? signature : signature[..open];
     }
 
     private static string StripMemberType(string remainder)

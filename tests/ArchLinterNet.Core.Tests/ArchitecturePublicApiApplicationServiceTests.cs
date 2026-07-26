@@ -562,6 +562,30 @@ public sealed class ArchitecturePublicApiApplicationServiceTests
         Assert.That(outcome.Error, Does.Contain("Unknown public API surface contract"));
     }
 
+    // On Windows and macOS's default (case-insensitive) filesystems, 'api/Surface.txt' and
+    // 'api/surface.txt' name the same file. On Linux's common ext4 they do not: treating them as
+    // equal there would let update silently rewrite a different file than it just read and diffed
+    // against, while reporting success against the path the caller actually asked for.
+    [Test]
+    public void PathsMatch_CaseDifference_IsOsAware()
+    {
+        bool expectCaseInsensitive = OperatingSystem.IsWindows() || OperatingSystem.IsMacOS();
+
+        bool matches = ArchitecturePublicApiApplicationService.PathsMatch(
+            "/repo/architecture/api/Surface.txt", "/repo/architecture/api/surface.txt");
+
+        Assert.That(matches, Is.EqualTo(expectCaseInsensitive));
+    }
+
+    [Test]
+    public void PathsMatch_IdenticalPaths_AlwaysMatch()
+    {
+        Assert.That(
+            ArchitecturePublicApiApplicationService.PathsMatch(
+                "/repo/architecture/api/surface.txt", "/repo/architecture/api/surface.txt"),
+            Is.True);
+    }
+
     private sealed class FakePublicApiSnapshotStore : IPublicApiSnapshotStore
     {
         public IReadOnlyList<PublicApiSnapshotEntry> Entries { get; set; } = Array.Empty<PublicApiSnapshotEntry>();

@@ -106,6 +106,27 @@ public sealed class PublicApiSnapshotDifferTests
         Assert.That(delta.Changed, Has.Count.EqualTo(1));
     }
 
+    // The identity parser finds a method's parameter list by locating its closing paren. A
+    // zero-parameter generic method's exact signature ends with `(): ... [where0:class new()]` —
+    // the detail suffix's own `new()` contains a closing paren *after* the true parameter-list
+    // paren. A naive last-closing-paren search would swallow everything up to that one as "the
+    // parameter list" and misparse a 0-parameter method as having one, splitting one changed
+    // constraint into an unrelated addition plus removal instead of a single change.
+    [Test]
+    public void Diff_GenericConstraintChangeOnZeroParameterMethod_IsOneChangeNotAddPlusRemove()
+    {
+        PublicApiDelta delta = PublicApiSnapshotDiffer.Diff(
+            Entries("method Acme.Module.Thing.Do`1(): System.Void [where0:class]"),
+            Entries("method Acme.Module.Thing.Do`1(): System.Void [where0:class new()]"));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(delta.Added, Is.Empty);
+            Assert.That(delta.Removed, Is.Empty);
+            Assert.That(delta.Changed, Has.Count.EqualTo(1));
+        });
+    }
+
     [Test]
     public void Diff_EnumMemberAddedAndConstantRetyped_AreReportedSeparately()
     {

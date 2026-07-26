@@ -88,10 +88,15 @@ internal static class PublicApiHelpTexts
         Options:
           --output <path>       Required. Repository-local snapshot path to write.
           --accept-drift        Record the live surface even though it differs from the inline list.
+          --force                Replace an existing destination file whose content differs.
           --dry-run, --check    Report the drift without writing.
 
         Migration refuses to write while the inline list differs from the live surface, so a
         migration can never silently bless surface that was never reviewed. Every stale inline entry
         and undeclared exported member is listed, whether or not drift is accepted.
+
+        Like capture, migrate never overwrites an existing, differing destination without --force: a
+        snapshot is a reviewed artifact, and migrate could otherwise silently destroy another
+        contract's reviewed snapshot.
         """;
 }
