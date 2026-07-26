@@ -15,6 +15,8 @@ public sealed class ArchitecturePolicyProvenanceIndex
     private readonly List<ContractEntry> _contracts = new();
     private readonly Dictionary<string, ArchitecturePolicySourceLocation> _layers =
         new(StringComparer.Ordinal);
+    private readonly Dictionary<string, ArchitecturePolicySourceLocation> _sourceSets =
+        new(StringComparer.Ordinal);
     private ArchitecturePolicySourceLocation? _currentValidationLocation;
 
     internal ArchitecturePolicyProvenanceIndex(
@@ -48,6 +50,7 @@ public sealed class ArchitecturePolicyProvenanceIndex
         _owners.Clear();
         _contracts.Clear();
         _layers.Clear();
+        _sourceSets.Clear();
 
         BindOwner(document, ArchitecturePolicyProvenancePath.Root, null, null);
         BindOwner(document.Analysis, ArchitecturePolicyProvenancePath.Property("analysis"), null, null);
@@ -61,6 +64,17 @@ public sealed class ArchitecturePolicyProvenanceIndex
             if (_nodes.TryGetValue(path, out ArchitecturePolicySourceLocation? location))
             {
                 _layers[name] = location;
+            }
+        }
+
+        foreach ((string name, ArchitectureSourceSet set) in document.SourceSets)
+        {
+            string path = ArchitecturePolicyProvenancePath.AppendProperty(
+                ArchitecturePolicyProvenancePath.Property("source_sets"), name);
+            BindOwner(set, path, null, null);
+            if (_nodes.TryGetValue(path, out ArchitecturePolicySourceLocation? location))
+            {
+                _sourceSets[name] = location;
             }
         }
 
@@ -261,6 +275,34 @@ public sealed class ArchitecturePolicyProvenanceIndex
     internal ArchitecturePolicySourceLocation? LocationForLayer(string name)
     {
         return _layers.GetValueOrDefault(name);
+    }
+
+    internal ArchitecturePolicySourceLocation? LocationForSourceSet(string name)
+    {
+        return _sourceSets.GetValueOrDefault(name);
+    }
+
+    // Aliases a contract instance produced by ArchitectureSourceSetExpander onto its authored
+    // contract's location, so an expanded instance reports the exact authored (and, for composed
+    // policies, imported-fragment) location rather than no location at all. Mirrors what
+    // BindCatalogContract does for expanded layer templates.
+    internal void BindExpandedContract(
+        IArchitectureContract authored,
+        IArchitectureContract expanded,
+        string group)
+    {
+        if (!_owners.TryGetValue(authored, out ArchitecturePolicySourceLocation? location))
+        {
+            return;
+        }
+
+        _owners[expanded] = location with { ContractId = expanded.Id };
+
+        ContractEntry? entry = _contracts.FirstOrDefault(candidate => ReferenceEquals(candidate.Contract, authored));
+        if (entry is not null)
+        {
+            _contracts.Add(new ContractEntry(group, entry.EffectivePath, expanded));
+        }
     }
 
     private void BindContracts(ArchitectureContractDocument document)

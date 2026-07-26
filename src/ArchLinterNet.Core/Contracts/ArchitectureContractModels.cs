@@ -28,6 +28,9 @@ public sealed class ArchitectureContractDocument
     [YamlMember(Alias = "framework_references")]
     public Dictionary<string, ArchitectureFrameworkReferenceGroup> FrameworkReferences { get; set; } = new();
 
+    [YamlMember(Alias = "source_sets")]
+    public Dictionary<string, ArchitectureSourceSet> SourceSets { get; set; } = new();
+
     [YamlMember(Alias = "legacy_runtime_layers")]
     public List<string> LegacyRuntimeLayers { get; set; } = new();
 
@@ -47,6 +50,13 @@ public sealed class ArchitectureContractDocument
     [YamlIgnore]
     public ArchitecturePolicyProvenanceIndex Provenance { get; internal set; } =
         ArchitecturePolicyProvenanceIndex.Empty;
+
+    // Deterministic record of what `source_sets` resolved to and which contract instances were
+    // expanded from which authored contract. Populated once by ArchitectureSourceSetExpander during
+    // ArchitecturePolicyDocumentLoader.Load, and empty for every policy that declares no set.
+    [YamlIgnore]
+    public ArchitectureSourceExpansionInventory SourceExpansion { get; internal set; } =
+        ArchitectureSourceExpansionInventory.Empty;
 }
 
 public sealed class ArchitectureAnalysisConfiguration

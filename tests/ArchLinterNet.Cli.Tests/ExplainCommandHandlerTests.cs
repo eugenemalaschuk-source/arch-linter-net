@@ -13,7 +13,7 @@ using NUnit.Framework;
 namespace ArchLinterNet.Cli.Tests;
 
 [TestFixture]
-public sealed class ExplainCommandHandlerTests
+public sealed partial class ExplainCommandHandlerTests
 {
     private static ArchitecturePolicyLoadException PolicyException()
     {
@@ -437,6 +437,7 @@ public sealed class ExplainCommandHandlerTests
             Assert.That(item.GetProperty("layer").GetString(), Is.EqualTo("future"));
         });
     }
+
 
     // ── JSON format — path, no CEL ────────────────────────────────────────────
 

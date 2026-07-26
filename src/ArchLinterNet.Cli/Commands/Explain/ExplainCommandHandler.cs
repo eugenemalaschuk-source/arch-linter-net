@@ -78,7 +78,40 @@ internal sealed class ExplainCommandHandler(ICliRuntime runtime, ICliConsole con
                                 ["yamlPath"] = item.PolicyLocation.YamlPath
                             }
                         }).ToArray()
-                    }).ToArray()
+                    }).ToArray(),
+                    ["sourceSetExpansion"] = new Dictionary<string, object?>
+                    {
+                        ["sets"] = outcome.SourceExpansion.Sets.Select(set => new Dictionary<string, object?>
+                        {
+                            ["name"] = set.Name,
+                            ["kind"] = set.Kind.ToString().ToLowerInvariant(),
+                            ["resolvedSources"] = set.ResolvedSources,
+                            ["optional"] = set.Optional,
+                            ["reason"] = set.Reason,
+                            ["policyLocation"] = FormatPolicyLocation(set.PolicyLocation)
+                        }).ToArray(),
+                        ["contracts"] = outcome.SourceExpansion.Contracts.Select(expansion => new Dictionary<string, object?>
+                        {
+                            ["group"] = expansion.Group,
+                            ["authoredContractId"] = expansion.AuthoredContractId,
+                            ["authoredContractName"] = expansion.AuthoredContractName,
+                            ["kind"] = expansion.Kind == ArchitectureContractExpansionKind.FanOut
+                                ? "fan_out"
+                                : "inline_union",
+                            ["selectorField"] = expansion.SelectorField,
+                            ["sourceSets"] = expansion.SetNames,
+                            ["optionalEmpty"] = expansion.OptionalEmpty,
+                            ["optionalReason"] = expansion.OptionalReason,
+                            ["policyLocation"] = FormatPolicyLocation(expansion.PolicyLocation),
+                            ["instances"] = expansion.Instances.Select(instance => new Dictionary<string, object?>
+                            {
+                                ["contractId"] = instance.ContractId,
+                                ["source"] = instance.Source,
+                                ["sourceSet"] = instance.SetName,
+                                ["selector"] = instance.Selector
+                            }).ToArray()
+                        }).ToArray()
+                    }
                 };
 
                 if (outcome.ExpressionParticipation.Count > 0)
@@ -139,6 +172,30 @@ internal sealed class ExplainCommandHandler(ICliRuntime runtime, ICliConsole con
                         : $" (policy: {optionalInput.PolicyLocation.SourcePath}:{optionalInput.PolicyLocation.YamlPath})";
                     console.Out.WriteLine($"Optional empty input: {optionalInput.Item} ({optionalInput.Reason}){policy}");
                 }
+
+                foreach (ArchitectureContractExpansion expansion in outcome.SourceExpansion.Contracts)
+                {
+                    string policy = expansion.PolicyLocation is null
+                        ? string.Empty
+                        : $" (policy: {expansion.PolicyLocation.SourcePath}:{expansion.PolicyLocation.YamlPath})";
+
+                    if (expansion.OptionalEmpty)
+                    {
+                        console.Out.WriteLine(
+                            $"Source expansion: [{expansion.AuthoredContractId}] optional-empty ({expansion.OptionalReason}){policy}");
+                        continue;
+                    }
+
+                    foreach (ArchitectureExpandedContractInstance instance in expansion.Instances)
+                    {
+                        string set = instance.SetName is null ? "sources" : $"set '{instance.SetName}'";
+                        string selectorField = expansion.SelectorField is null ? string.Empty :
+                            $" ({expansion.SelectorField})";
+                        console.Out.WriteLine(
+                            $"Source expansion: [{expansion.AuthoredContractId}]{selectorField} {set} -> {instance.Source} " +
+                            $"(selector: {instance.Selector}; id: {instance.ContractId}){policy}");
+                    }
+                }
             }
 
             return CliExitCodes.Success;
@@ -159,4 +216,13 @@ internal sealed class ExplainCommandHandler(ICliRuntime runtime, ICliConsole con
             return CliExitCodes.InvalidArgumentsOrRuntimeError;
         }
     }
+
+    private static Dictionary<string, object?>? FormatPolicyLocation(ArchitecturePolicySourceLocation? location) =>
+        location is null
+            ? null
+            : new Dictionary<string, object?>
+            {
+                ["sourcePath"] = location.SourcePath,
+                ["yamlPath"] = location.YamlPath
+            };
 }

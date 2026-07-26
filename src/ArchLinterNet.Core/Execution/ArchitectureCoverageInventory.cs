@@ -1,6 +1,7 @@
 using ArchLinterNet.Core.Contracts;
 using ArchLinterNet.Core.Contracts.Families;
 using ArchLinterNet.Core.Discovery;
+using ArchLinterNet.Core.Model;
 using ArchLinterNet.Core.Scanning;
 
 namespace ArchLinterNet.Core.Execution;
@@ -23,6 +24,7 @@ public sealed class ArchitectureCoverageInventory
         ArchitectureReferenceGraph referenceGraph,
         IReadOnlyList<ArchitectureCoverageLayerEntry> declaredLayers,
         IReadOnlyList<ArchitectureLayerContract> expandedLayerTemplates,
+        ArchitectureSourceExpansionInventory sourceExpansion,
         ProjectDiscoveryResult? projectDiscovery)
     {
         Namespaces = namespaces;
@@ -30,6 +32,7 @@ public sealed class ArchitectureCoverageInventory
         _referenceGraph = referenceGraph;
         DeclaredLayers = declaredLayers;
         ExpandedLayerTemplates = expandedLayerTemplates;
+        SourceExpansion = sourceExpansion;
         ProjectDiscovery = projectDiscovery;
         _dependencyEdges = new Lazy<IReadOnlyList<ArchitectureCoverageDependencyEdge>>(BuildDependencyEdges);
     }
@@ -39,6 +42,11 @@ public sealed class ArchitectureCoverageInventory
     public IReadOnlyList<ArchitectureCoverageLayerEntry> DeclaredLayers { get; }
 
     public IReadOnlyList<ArchitectureLayerContract> ExpandedLayerTemplates { get; }
+
+    // The policy's resolved source-set expansion, carried alongside expanded layer templates so a
+    // coverage consumer can prove which sources each authored contract resolved to without
+    // re-running expansion.
+    public ArchitectureSourceExpansionInventory SourceExpansion { get; }
 
     public ProjectDiscoveryResult? ProjectDiscovery { get; }
 
@@ -77,6 +85,7 @@ public sealed class ArchitectureCoverageInventory
             session.ReferenceGraph,
             declaredLayers,
             expandedTemplates,
+            document.SourceExpansion,
             projectDiscovery);
     }
 

@@ -16,4 +16,9 @@ public sealed record ArchitectureExplainOutcome(
 
     public IReadOnlyCollection<ArchitectureCoverageSummary> CoverageSummaries { get; init; } =
         Array.Empty<ArchitectureCoverageSummary>();
+
+    // The policy's resolved source-set expansion, so `explain` can name the authored contract, the
+    // set that produced each instance, the concrete source, and the authored fragment location.
+    public Model.ArchitectureSourceExpansionInventory SourceExpansion { get; init; } =
+        Model.ArchitectureSourceExpansionInventory.Empty;
 }
