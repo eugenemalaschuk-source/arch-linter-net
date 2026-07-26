@@ -290,6 +290,13 @@ public sealed class ArchitectureBaselineIgnoredViolation
 
     [YamlMember(Alias = "reason")] public string Reason { get; set; } = string.Empty;
 
+    /// <summary>
+    /// Optional tracking reference for the accepted debt (an issue id, ticket URL, or similar).
+    /// Informational only: it never participates in identity, matching, or deduplication, and every
+    /// lifecycle command carries it through verbatim on entries it retains.
+    /// </summary>
+    [YamlMember(Alias = "issue")] public string? Issue { get; set; }
+
     [YamlMember(Alias = "identity_version")] public int? IdentityVersion { get; set; }
 
     [YamlMember(Alias = "contract_family")] public string? ContractFamily { get; set; }
@@ -332,13 +339,18 @@ public sealed class ArchitectureBaselineIgnoredViolation
     }
 
     public static ArchitectureBaselineIgnoredViolation FromIdentity(
-        ArchitectureViolationIdentity identity, string sourceTypeDisplay, string forbiddenReferenceDisplay, string reason)
+        ArchitectureViolationIdentity identity,
+        string sourceTypeDisplay,
+        string forbiddenReferenceDisplay,
+        string reason,
+        string? issue = null)
     {
         return new ArchitectureBaselineIgnoredViolation
         {
             SourceType = sourceTypeDisplay,
             ForbiddenReference = forbiddenReferenceDisplay,
             Reason = reason,
+            Issue = issue,
             IdentityVersion = identity.IdentityVersion,
             ContractFamily = identity.ContractFamily,
             Kind = identity.Kind,

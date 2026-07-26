@@ -45,6 +45,20 @@ internal sealed class FileSystem : IFileSystem
         return tempPath;
     }
 
+    public string CopyFileToTemp(string sourcePath, string targetPath)
+    {
+        string absolutePath = Path.GetFullPath(targetPath);
+        string? directory = Path.GetDirectoryName(absolutePath);
+        if (!string.IsNullOrEmpty(directory) && !Directory.Exists(directory))
+        {
+            Directory.CreateDirectory(directory);
+        }
+
+        string tempPath = absolutePath + "." + Guid.NewGuid().ToString("N") + ".tmp";
+        File.Copy(sourcePath, tempPath);
+        return tempPath;
+    }
+
     public void RenameTempToTarget(string tempPath, string targetPath)
     {
         File.Move(tempPath, targetPath, overwrite: true);

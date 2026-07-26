@@ -797,6 +797,11 @@
           "type": "string",
           "minLength": 1,
           "description": "Human-readable migration reason or issue reference. Never participates in matching."
+        },
+        "issue": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Optional tracking reference for the accepted debt (issue id, ticket URL, or similar). Informational only: it never participates in identity, matching, or deduplication, and lifecycle commands carry it through verbatim on entries they retain."
         }
       }
     },
@@ -826,6 +831,11 @@
           "type": "string",
           "minLength": 1,
           "description": "Human-readable migration reason or issue reference. Never participates in matching."
+        },
+        "issue": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Optional tracking reference for the accepted debt (issue id, ticket URL, or similar). Informational only: it never participates in identity, matching, or deduplication, and lifecycle commands carry it through verbatim on entries they retain."
         },
         "identity_version": {
           "type": "integer",

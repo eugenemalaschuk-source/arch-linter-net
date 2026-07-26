@@ -87,6 +87,32 @@ For existing repositories with known debt:
 
 The baseline should be reviewed like code and cleaned up as violations are fixed.
 
+### CI reads baselines; it never writes them
+
+CI runs only the read-only baseline commands:
+
+```yaml
+- name: Verify the baseline is still in sync
+  run: dotnet arch-linter-net baseline verify \
+    --policy architecture/dependencies.arch.yml \
+    --baseline architecture/baseline.arch.yml
+```
+
+`baseline verify` exits non-zero when the baseline has drifted — stale entries whose violation is
+gone, entries that now match more than one violation, or entries naming a contract the policy no
+longer has. `baseline diff` reports the same comparison without gating.
+
+Do **not** wire `baseline generate`, `baseline update`, `baseline prune`, or `baseline migrate` into
+a workflow that runs on every push, and do not commit their output automatically. A baseline is a
+record of debt somebody accepted; a job that regenerates it turns every new violation into
+pre-approved debt and removes the review step the file exists to create. Run those commands locally,
+review the diff, and commit it like any other change. `--dry-run` prints exactly what would change,
+which is the form worth pasting into a pull request description.
+
+If you want CI to *notice* that a baseline is out of date rather than fix it, add
+`baseline verify` as above, or `baseline update --dry-run --json` as a reporting step whose output is
+uploaded as an artifact — neither writes a file.
+
 ## Baseline debt semantics in the coverage gate
 
 When architecture coverage is wired into CI as a quality gate (see the `architecture-coverage` steps in this repository's `.github/workflows/ci.yml`, which run after the existing acceptance gate against the same already-built solution), baseline entries change how findings are reported, not whether they exist:

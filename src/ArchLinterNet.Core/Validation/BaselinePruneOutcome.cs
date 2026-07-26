@@ -9,4 +9,16 @@ public sealed record BaselinePruneOutcome(
     bool Succeeded,
     string? Yaml,
     IReadOnlyList<BaselineRemovedEntry> RemovedEntries,
-    IReadOnlyCollection<ArchitectureViolation> ConfigurationViolations);
+    IReadOnlyCollection<ArchitectureViolation> ConfigurationViolations)
+{
+    public IReadOnlyList<BaselineLifecycleEntry> Entries { get; init; } =
+        Array.Empty<BaselineLifecycleEntry>();
+
+    /// <summary>See <see cref="BaselineUpdateOutcome.CommentDiagnostic"/>.</summary>
+    public string? CommentDiagnostic { get; init; }
+
+    /// <summary>True when prune leaves its input document unchanged.</summary>
+    public bool IsNoOp { get; init; }
+
+    public string? Error { get; init; }
+}

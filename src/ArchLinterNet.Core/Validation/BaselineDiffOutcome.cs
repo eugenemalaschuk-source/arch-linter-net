@@ -9,4 +9,12 @@ public sealed record BaselineDiffOutcome(
     IReadOnlyList<ArchitectureBaselineComparisonEntry> Frozen,
     IReadOnlyList<ArchitectureBaselineComparisonEntry> Resolved,
     IReadOnlyList<ArchitectureBaselineComparisonEntry> ConfigurationErrors,
-    IReadOnlyCollection<ArchitectureViolation> ConfigurationViolations);
+    IReadOnlyCollection<ArchitectureViolation> ConfigurationViolations)
+{
+    public IReadOnlyList<ArchitectureBaselineComparisonEntry> Ambiguous { get; init; } =
+        Array.Empty<ArchitectureBaselineComparisonEntry>();
+
+    /// <summary>Every entry in the shared lifecycle vocabulary, for one-shape reporting.</summary>
+    public IReadOnlyList<BaselineLifecycleEntry> Entries { get; init; } =
+        Array.Empty<BaselineLifecycleEntry>();
+}
