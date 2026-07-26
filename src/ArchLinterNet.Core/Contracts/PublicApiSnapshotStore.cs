@@ -19,11 +19,13 @@ public sealed class PublicApiSnapshotStore(IArchitectureFileSystem fileSystem) :
 
     // Two paths merely both existing does not prove they are the same file: a case-sensitive
     // filesystem can legitimately hold "Surface.txt" and "surface.txt" as two distinct entries.
-    // The only reliable signal is what the directory itself actually contains: enumerate its real
-    // entries and count how many case-insensitively match the shared filename. Exactly one such
-    // entry means both spellings resolve to it (a case-insensitive filesystem, or a case-sensitive
-    // one that only ever stored the file under one of the two spellings); two means the filesystem
-    // is genuinely holding both as separate files; zero means neither exists.
+    // Conversely, "exactly one real entry matches either spelling" does not prove it either: on a
+    // case-sensitive filesystem holding only "surface.txt", a query for "Surface.txt" still counts
+    // as one case-insensitive match against that entry even though "Surface.txt" does not itself
+    // exist — a case-sensitive FileExists("Surface.txt") correctly fails, and only that failure
+    // reveals it. Both signals are required together: the directory listing rules out two distinct
+    // real entries, and an exact-case existence check on *both* spellings rules out a lone entry
+    // whose casing only happens to match one of them.
     public bool IsSameFile(string first, string second)
     {
         if (string.Equals(first, second, StringComparison.Ordinal))
@@ -45,7 +47,7 @@ public sealed class PublicApiSnapshotStore(IArchitectureFileSystem fileSystem) :
             .EnumerateFiles(secondDirectory, "*", SearchOption.TopDirectoryOnly)
             .Count(entry => string.Equals(Path.GetFileName(entry), sharedName, StringComparison.OrdinalIgnoreCase));
 
-        return matchingEntries == 1;
+        return matchingEntries == 1 && fileSystem.FileExists(first) && fileSystem.FileExists(second);
     }
 
     public PublicApiSnapshotDocument Read(string resolvedPath, string authoredPath)

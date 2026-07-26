@@ -606,28 +606,52 @@ public sealed class ArchitecturePublicApiApplicationServiceTests
     }
 
     [Test]
-    public void PathsMatch_CaseDifference_OneRealEntryBacksBothSpellings_Matches()
+    public void PathsMatch_CaseDifference_CaseInsensitiveFilesystem_Matches()
     {
         const string First = "/repo/architecture/api/Surface.txt";
         const string Second = "/repo/architecture/api/surface.txt";
-        // A case-insensitive filesystem stores the file once; the directory listing reports it
-        // under whichever single casing it was actually written with.
-        var store = new FakePublicApiSnapshotStore { DirectoryEntries = new HashSet<string> { Second } };
+        // A case-insensitive filesystem stores the file once, but resolves either spelling to it.
+        var store = new FakePublicApiSnapshotStore
+        {
+            DirectoryEntries = new HashSet<string> { Second },
+            CaseSensitiveFileSystem = false,
+        };
         var service = Service(Document(Contract()), store);
 
         Assert.That(service.PathsMatch(First, Second), Is.True);
     }
 
-    // The exact bug this regresses: both spellings existing does NOT prove they are the same file.
-    // A case-sensitive filesystem can legitimately hold "Surface.txt" and "surface.txt" as two
-    // distinct directory entries — the directory listing is the only way to tell them apart from
-    // one file that merely answers Exists() for both spellings.
+    // The exact bug this regresses: on a case-sensitive filesystem holding only "surface.txt", a
+    // query for "Surface.txt" still counts as one case-insensitive match against that entry — the
+    // directory listing alone cannot tell "one file, either spelling resolves" apart from "one file,
+    // only its own spelling resolves". Only an exact-case existence check on both paths does.
+    [Test]
+    public void PathsMatch_CaseDifference_CaseSensitiveFilesystemWithOnlyOneSpellingWritten_DoesNotMatch()
+    {
+        const string First = "/repo/architecture/api/Surface.txt";
+        const string Second = "/repo/architecture/api/surface.txt";
+        var store = new FakePublicApiSnapshotStore
+        {
+            DirectoryEntries = new HashSet<string> { Second },
+            CaseSensitiveFileSystem = true,
+        };
+        var service = Service(Document(Contract()), store);
+
+        Assert.That(service.PathsMatch(First, Second), Is.False);
+    }
+
+    // Both spellings existing does NOT prove they are the same file either: a case-sensitive
+    // filesystem can legitimately hold "Surface.txt" and "surface.txt" as two distinct entries.
     [Test]
     public void PathsMatch_CaseDifference_BothSpellingsAreDistinctRealEntries_DoesNotMatch()
     {
         const string First = "/repo/architecture/api/Surface.txt";
         const string Second = "/repo/architecture/api/surface.txt";
-        var store = new FakePublicApiSnapshotStore { DirectoryEntries = new HashSet<string> { First, Second } };
+        var store = new FakePublicApiSnapshotStore
+        {
+            DirectoryEntries = new HashSet<string> { First, Second },
+            CaseSensitiveFileSystem = true,
+        };
         var service = Service(Document(Contract()), store);
 
         Assert.That(service.PathsMatch(First, Second), Is.False);
@@ -656,6 +680,10 @@ public sealed class ArchitecturePublicApiApplicationServiceTests
         // "not modeling this", falling back to the blanket Exists flag for plain existence checks.
         public HashSet<string>? DirectoryEntries { get; set; }
 
+        // Mirrors what the real filesystem's FileExists does: a case-sensitive one only resolves
+        // the exact spelling that was actually written; a case-insensitive one resolves either.
+        public bool CaseSensitiveFileSystem { get; set; }
+
         public string? ResolveError { get; set; }
 
         public string? ReadError { get; set; }
@@ -667,11 +695,26 @@ public sealed class ArchitecturePublicApiApplicationServiceTests
                 : throw new InvalidOperationException(ResolveError);
         }
 
-        bool IPublicApiSnapshotStore.Exists(string resolvedPath) => DirectoryEntries?.Contains(resolvedPath) ?? Exists;
+        bool IPublicApiSnapshotStore.Exists(string resolvedPath) => ExistsAt(resolvedPath);
 
-        // Mirrors the real store's algorithm at fake-directory-listing granularity: exactly one
-        // modeled entry matching either spelling means both resolve to the same file; more than one
-        // means the fake is modeling two genuinely distinct entries.
+        private bool ExistsAt(string path)
+        {
+            if (DirectoryEntries == null)
+            {
+                return Exists;
+            }
+
+            StringComparison comparison = CaseSensitiveFileSystem
+                ? StringComparison.Ordinal
+                : StringComparison.OrdinalIgnoreCase;
+            return DirectoryEntries.Any(entry => string.Equals(entry, path, comparison));
+        }
+
+        // Mirrors the real store's algorithm: exactly one modeled entry matching either spelling
+        // case-insensitively rules out two distinct entries, but is not sufficient on its own — a
+        // case-sensitive filesystem with only one spelling written also produces exactly one such
+        // match. Only an exact-case existence check (ExistsAt, itself case-sensitivity-aware) on
+        // *both* candidate spellings can tell those two situations apart.
         bool IPublicApiSnapshotStore.IsSameFile(string first, string second)
         {
             if (string.Equals(first, second, StringComparison.Ordinal))
@@ -688,7 +731,7 @@ public sealed class ArchitecturePublicApiApplicationServiceTests
                 string.Equals(entry, first, StringComparison.OrdinalIgnoreCase)
                 || string.Equals(entry, second, StringComparison.OrdinalIgnoreCase));
 
-            return matches == 1;
+            return matches == 1 && ExistsAt(first) && ExistsAt(second);
         }
 
         public PublicApiSnapshotDocument Read(string resolvedPath, string authoredPath)

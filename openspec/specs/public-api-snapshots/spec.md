@@ -272,15 +272,19 @@ The system SHALL classify why a snapshot is unusable (missing, unparsable, or a 
 
 ### Requirement: Path identity respects the actual filesystem, not an assumption from the host OS or from existence alone
 
-The system SHALL determine whether two differently-cased paths name the same file by consulting what the filesystem actually stores at that location, not by assuming case sensitivity from the operating system, and not by treating both paths merely existing as proof of identity.
+The system SHALL determine whether two differently-cased paths name the same file by consulting what the filesystem actually stores at that location, not by assuming case sensitivity from the operating system, and not by treating a directory listing or a bare existence check alone as sufficient proof of identity — a case-sensitive filesystem holding only one of the two spellings still produces exactly one case-insensitive directory match, so the identity check SHALL also confirm that both spellings independently resolve via an exact-case existence check before treating them as the same file.
 
 #### Scenario: A case-sensitive filesystem on any host is respected
 - **WHEN** `update` compares a `--snapshot` destination against the contract's declared snapshot path and the two differ only by case
-- **THEN** the system SHALL treat them as the same file only when the filesystem's directory listing contains exactly one entry matching either spelling, regardless of host operating system
+- **THEN** the system SHALL treat them as the same file only when the filesystem's directory listing contains exactly one entry matching either spelling AND an exact-case existence check confirms both spellings independently resolve, regardless of host operating system
 
 #### Scenario: Two distinct case-variant files are not treated as the same file
 - **WHEN** the differently-cased paths both exist as separate directory entries (a case-sensitive filesystem holding both "Surface.txt" and "surface.txt")
 - **THEN** the system SHALL treat them as different files
+
+#### Scenario: A case-sensitive filesystem with only one spelling written is not treated as a match
+- **WHEN** only one spelling of a differently-cased pair exists on a case-sensitive filesystem, so the directory listing shows exactly one entry matching either spelling case-insensitively
+- **THEN** the system SHALL still treat the two paths as different, because an exact-case existence check on the spelling that was not written fails
 
 #### Scenario: Neither path exists yet
 - **WHEN** the two differently-cased paths being compared do not yet exist on disk
