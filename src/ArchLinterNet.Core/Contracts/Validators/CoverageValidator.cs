@@ -256,7 +256,7 @@ internal sealed class CoverageValidator : IArchitecturePolicyDocumentValidator
             .Where(referenced => referenced.Id is not null)
             .ToDictionary(referenced => referenced.Id!, StringComparer.OrdinalIgnoreCase);
 
-        foreach (ArchitectureOptionalRuleInput optionalInput in contract.OptionalInputs)
+        foreach (ArchitectureOptionalRuleInput optionalInput in document.Provenance.Track(contract.OptionalInputs))
         {
             if (string.IsNullOrWhiteSpace(optionalInput.ContractId)
                 || string.IsNullOrWhiteSpace(optionalInput.Input)

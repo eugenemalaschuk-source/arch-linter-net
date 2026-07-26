@@ -157,6 +157,9 @@ public sealed partial class ArchitectureAnalysisSession
                         optionalEmptyItems.Add(new ArchitectureCoverageSummaryOptionalEmptyItem(
                             referencedContractId + ":" + input.Input + ":" + layerName, optionalInput.Reason, layerName)
                         {
+                            ContractId = referencedContractId,
+                            Input = input.Input,
+                            Layer = layerName,
                             PolicyLocation = optionalInput.PolicyLocation
                         });
                         continue;

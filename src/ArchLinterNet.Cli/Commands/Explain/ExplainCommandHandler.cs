@@ -67,6 +67,9 @@ internal sealed class ExplainCommandHandler(ICliRuntime runtime, ICliConsole con
                         ["optionalEmptyItems"] = summary.OptionalEmptyItems.Select(item => new Dictionary<string, object?>
                         {
                             ["item"] = item.Item,
+                            ["contractId"] = item.ContractId,
+                            ["input"] = item.Input,
+                            ["layer"] = item.Layer,
                             ["reason"] = item.Reason,
                             ["evidence"] = item.Evidence,
                             ["policyLocation"] = item.PolicyLocation is null ? null : new Dictionary<string, object?>

@@ -88,6 +88,22 @@ internal sealed class CliRuntime : ICliRuntime
         IReadOnlyCollection<ArchitectureViolation> violations,
         IReadOnlyCollection<string> cycles,
         IReadOnlyCollection<ArchitectureCycleFinding> cycleFindings,
+        IReadOnlyCollection<BuildStatePreflightDiagnostic> preflightDiagnostics)
+    {
+        return FormatResultAsSarif(
+            mode,
+            violations,
+            cycles,
+            cycleFindings,
+            preflightDiagnostics,
+            Array.Empty<ArchitectureCoverageSummary>());
+    }
+
+    public string FormatResultAsSarif(
+        string mode,
+        IReadOnlyCollection<ArchitectureViolation> violations,
+        IReadOnlyCollection<string> cycles,
+        IReadOnlyCollection<ArchitectureCycleFinding> cycleFindings,
         IReadOnlyCollection<BuildStatePreflightDiagnostic> preflightDiagnostics,
         IReadOnlyCollection<ArchitectureCoverageSummary> coverageSummaries)
     {

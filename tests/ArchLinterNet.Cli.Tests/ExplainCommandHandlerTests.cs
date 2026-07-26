@@ -364,6 +364,47 @@ public sealed class ExplainCommandHandlerTests
         });
     }
 
+    [Test]
+    public void Json_OptionalEmptyCoverage_EmitsTypedIdentity()
+    {
+        var summary = new ArchitectureCoverageSummary(
+            "coverage", "coverage-id", "rule_input",
+            new ArchitectureCoverageSummaryCounts(0, 0, 0, 0, 0) { OptionalEmpty = 1 },
+            [], [], [], [], [])
+        {
+            OptionalEmptyItems =
+            [
+                new ArchitectureCoverageSummaryOptionalEmptyItem(
+                    "rule:forbidden:future", "Future module is planned.", "future")
+                {
+                    ContractId = "rule",
+                    Input = "forbidden",
+                    Layer = "future"
+                }
+            ]
+        };
+        var runtime = new ExplainStubRuntime
+        {
+            Outcome = new ArchitectureExplainOutcome("A", "B", ["A", "B"], ["rule"])
+            {
+                CoverageSummaries = new[] { summary }
+            }
+        };
+        var console = new RecordingCliConsole();
+
+        Handler(runtime, console).Execute(Options(format: "json"));
+
+        using JsonDocument document = JsonDocument.Parse(console.OutputText);
+        JsonElement item = document.RootElement.GetProperty("coverageSummary")[0]
+            .GetProperty("optionalEmptyItems")[0];
+        Assert.Multiple(() =>
+        {
+            Assert.That(item.GetProperty("contractId").GetString(), Is.EqualTo("rule"));
+            Assert.That(item.GetProperty("input").GetString(), Is.EqualTo("forbidden"));
+            Assert.That(item.GetProperty("layer").GetString(), Is.EqualTo("future"));
+        });
+    }
+
     // ── JSON format — path, no CEL ────────────────────────────────────────────
 
     [Test]

@@ -41,6 +41,12 @@ public sealed record ArchitectureCoverageSummaryEvidenceItem(string Item, string
 
 public sealed record ArchitectureCoverageSummaryOptionalEmptyItem(string Item, string Reason, string Evidence)
 {
+    public string ContractId { get; init; } = string.Empty;
+
+    public string Input { get; init; } = string.Empty;
+
+    public string Layer { get; init; } = string.Empty;
+
     public ArchitecturePolicySourceLocation? PolicyLocation { get; init; }
 }
 

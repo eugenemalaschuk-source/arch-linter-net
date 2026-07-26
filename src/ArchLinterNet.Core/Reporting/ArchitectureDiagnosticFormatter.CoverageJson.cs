@@ -29,6 +29,9 @@ public sealed partial class ArchitectureDiagnosticFormatter
                     var result = new Dictionary<string, object?>
                     {
                         ["item"] = item.Item,
+                        ["contract_id"] = item.ContractId,
+                        ["input"] = item.Input,
+                        ["layer"] = item.Layer,
                         ["reason"] = item.Reason,
                         ["evidence"] = item.Evidence
                     };

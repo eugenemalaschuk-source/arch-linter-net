@@ -50,6 +50,45 @@ public sealed class ArchitectureSarifFormatterTests
     }
 
     [Test]
+    public void FormatResultAsSarif_OptionalEmptyCoverage_PreservesTypedIdentity()
+    {
+        var summary = new ArchitectureCoverageSummary(
+            "coverage", "coverage-id", "rule_input",
+            new ArchitectureCoverageSummaryCounts(0, 0, 0, 0, 0) { OptionalEmpty = 1 },
+            [], [], [], [], [])
+        {
+            OptionalEmptyItems =
+            [
+                new ArchitectureCoverageSummaryOptionalEmptyItem(
+                    "rule:forbidden:future", "Future module is planned.", "future")
+                {
+                    ContractId = "rule",
+                    Input = "forbidden",
+                    Layer = "future"
+                }
+            ]
+        };
+
+        string json = _formatter.FormatResultAsSarif(
+            "strict",
+            Array.Empty<ArchitectureViolation>(),
+            Array.Empty<string>(),
+            Array.Empty<BuildStatePreflightDiagnostic>(),
+            new[] { summary },
+            "1.2.3");
+        using JsonDocument document = JsonDocument.Parse(json);
+        JsonElement item = document.RootElement.GetProperty("runs")[0].GetProperty("properties")
+            .GetProperty("coverage_summary")[0].GetProperty("optional_empty_items")[0];
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(item.GetProperty("contract_id").GetString(), Is.EqualTo("rule"));
+            Assert.That(item.GetProperty("input").GetString(), Is.EqualTo("forbidden"));
+            Assert.That(item.GetProperty("layer").GetString(), Is.EqualTo("future"));
+        });
+    }
+
+    [Test]
     public void FormatResultAsSarif_ContractWithId_UsesIdAsRuleId()
     {
         var violations = new List<ArchitectureViolation>

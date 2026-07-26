@@ -135,6 +135,9 @@ public sealed partial class ArchitectureSarifFormatter : IArchitectureSarifForma
                     .Select(item => (object)new Dictionary<string, object?>
                     {
                         ["item"] = item.Item,
+                        ["contract_id"] = item.ContractId,
+                        ["input"] = item.Input,
+                        ["layer"] = item.Layer,
                         ["reason"] = item.Reason,
                         ["evidence"] = item.Evidence,
                         ["policy_location"] = item.PolicyLocation is null ? null : new Dictionary<string, object?>

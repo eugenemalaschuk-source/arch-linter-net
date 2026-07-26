@@ -190,4 +190,49 @@ public sealed class RuleInputCoverageContractTests
             first.Select(f => (f.SourceType, f.ForbiddenNamespace, Reference: f.ForbiddenReferences.Single())),
             Is.EqualTo(second.Select(f => (f.SourceType, f.ForbiddenNamespace, Reference: f.ForbiddenReferences.Single()))));
     }
+
+    [Test]
+    public void RuleInputReferences_FieldAwareFamilies_PreserveActualInputNames()
+    {
+        var typePlacement = new ArchitectureTypePlacementContract
+        {
+            TypesMatching = new ArchitectureTypeMatcher { Layer = "selector-layer" },
+            MustResideInLayers = { "placement-layer" }
+        };
+        var attributeUsage = new ArchitectureAttributeUsageContract
+        {
+            AllowedOnlyInLayers = { "attribute-allowed" },
+            ForbiddenInLayers = { "attribute-forbidden" }
+        };
+        var interfaceImplementation = new ArchitectureInterfaceImplementationContract
+        {
+            AllowedOnlyInLayers = { "interface-allowed" },
+            ForbiddenInLayers = { "interface-forbidden" }
+        };
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(
+                ArchitectureRuleInputReferences.For(typePlacement).Select(reference => (reference.Input, reference.Layer)),
+                Is.EquivalentTo(new[]
+                {
+                    ("types_matching.layer", "selector-layer"),
+                    ("must_reside_in_layers", "placement-layer")
+                }));
+            Assert.That(
+                ArchitectureRuleInputReferences.For(attributeUsage).Select(reference => (reference.Input, reference.Layer)),
+                Is.EquivalentTo(new[]
+                {
+                    ("allowed_only_in_layers", "attribute-allowed"),
+                    ("forbidden_in_layers", "attribute-forbidden")
+                }));
+            Assert.That(
+                ArchitectureRuleInputReferences.For(interfaceImplementation).Select(reference => (reference.Input, reference.Layer)),
+                Is.EquivalentTo(new[]
+                {
+                    ("allowed_only_in_layers", "interface-allowed"),
+                    ("forbidden_in_layers", "interface-forbidden")
+                }));
+        });
+    }
 }

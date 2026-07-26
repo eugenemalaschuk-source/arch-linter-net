@@ -87,7 +87,7 @@ public sealed class ArchitectureGraphApplicationService(
 
         if (includeStrict)
         {
-            Execution.ArchitectureContractExecutionResult strictExecution =
+            ArchitectureContractExecutionResult strictExecution =
                 contractExecutor.Execute(runner.Session, ModeStrict, handlerRegistry, includeAsmdefContracts: false);
             violations.AddRange(strictExecution.Violations);
             coverageSummaries = coverageSummaries.Concat(strictExecution.CoverageSummaries).ToArray();
@@ -95,7 +95,7 @@ public sealed class ArchitectureGraphApplicationService(
 
         if (includeAudit)
         {
-            Execution.ArchitectureContractExecutionResult auditExecution =
+            ArchitectureContractExecutionResult auditExecution =
                 contractExecutor.Execute(runner.Session, ModeAudit, handlerRegistry, includeAsmdefContracts: false);
             violations.AddRange(auditExecution.Violations);
             coverageSummaries = coverageSummaries.Concat(auditExecution.CoverageSummaries).ToArray();

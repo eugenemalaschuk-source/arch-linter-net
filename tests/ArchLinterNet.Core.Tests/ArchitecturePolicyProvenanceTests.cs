@@ -563,6 +563,44 @@ public sealed class ArchitecturePolicyProvenanceTests
     }
 
     [Test]
+    public void Load_ImportedInvalidOptionalInput_ReportsExactOptionalItemLocation()
+    {
+        string root = Write("architecture/root.yml", RootYaml("optional.yml"));
+        Write(
+            "architecture/optional.yml",
+            LayersFragment() + """
+                contracts:
+                  strict:
+                    - id: application-rule
+                      name: application-rule
+                      source: application
+                      forbidden: [domain]
+                      reason: Application stays outside domain internals.
+                  strict_coverage:
+                    - id: rule-input-coverage
+                      name: rule-input-coverage
+                      scope: rule_input
+                      contract_ids: [application-rule]
+                      optional_inputs:
+                        - contract_id: application-rule
+                          input: allowed
+                          layer: domain
+                          reason: Invalid field identity for provenance coverage.
+                      reason: Every rule input remains intentional.
+                """);
+
+        ArchitecturePolicyValidationException ex = Assert.Throws<ArchitecturePolicyValidationException>(
+            () => new ArchitecturePolicyDocumentLoader().Load(root))!;
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(ex.Diagnostic.Location!.SourcePath, Is.EqualTo("architecture/optional.yml"));
+            Assert.That(ex.Diagnostic.Location.YamlPath,
+                Is.EqualTo("contracts.strict_coverage[0].optional_inputs[0]"));
+        });
+    }
+
+    [Test]
     public void Load_RenamedEquivalentGraph_ChangesPathsButNotSemanticProvenance()
     {
         ArchitectureContractDocument first = LoadEquivalent("first/architecture/root.yml", "part.yml");

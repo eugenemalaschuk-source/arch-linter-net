@@ -179,6 +179,39 @@ public sealed partial class ArchitectureCoverageSummaryTests
         {
             ("video-to-ghost-rule:forbidden:ghost", "The future video integration has not been created.", "ghost")
         }));
+        ArchitectureCoverageSummaryOptionalEmptyItem optionalItem = summary.OptionalEmptyItems.Single();
+        Assert.Multiple(() =>
+        {
+            Assert.That(optionalItem.ContractId, Is.EqualTo("video-to-ghost-rule"));
+            Assert.That(optionalItem.Input, Is.EqualTo("forbidden"));
+            Assert.That(optionalItem.Layer, Is.EqualTo("ghost"));
+        });
+    }
+
+    [Test]
+    public void BuildCoverageSummary_RuleInputScope_OptionalInputWithMatchingCode_TransitionsToCovered()
+    {
+        ArchitectureContractDocument document = CreateRuleInputDocument();
+        ArchitectureCoverageContract contract = CreateRuleInputContract(new[] { "audio-rule" });
+        contract.OptionalInputs.Add(new ArchitectureOptionalRuleInput
+        {
+            ContractId = "audio-rule",
+            Input = "forbidden",
+            Layer = "video",
+            Reason = "This declaration remains valid while the implementation is introduced."
+        });
+
+        ArchitectureContractRunner runner = new(CreateContext(typeof(ArchitectureCoverageSummaryTests)), document);
+
+        ArchitectureCoverageSummary summary = RequireSummary(runner.BuildCoverageSummary(contract));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(summary.Counts.OptionalEmpty, Is.Zero);
+            Assert.That(summary.OptionalEmptyItems, Is.Empty);
+            Assert.That(summary.CoveredItems, Has.Some.Matches<ArchitectureCoverageSummaryEvidenceItem>(
+                item => item.Item == "audio-rule:video"));
+        });
     }
 
     [Test]
