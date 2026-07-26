@@ -295,7 +295,9 @@ public sealed partial class ArchitectureBaselineApplicationServiceFakeCompositio
 
         Assert.That(outcome.RemovedEntries, Has.Count.EqualTo(2));
         Assert.That(outcome.RemovedEntries.Single(r => r.Entry.SourceType == "SrcB").RemovalReason, Is.EqualTo("resolved"));
-        Assert.That(outcome.RemovedEntries.Single(r => r.Entry.SourceType == "SrcC").RemovalReason, Is.EqualTo("configuration"));
+        // An entry naming a contract the policy no longer has is `stale` in the shared vocabulary:
+        // it references a contract that is no longer valid, as distinct from resolved debt.
+        Assert.That(outcome.RemovedEntries.Single(r => r.Entry.SourceType == "SrcC").RemovalReason, Is.EqualTo("stale"));
     }
 
     [Test]
@@ -503,12 +505,15 @@ public sealed partial class ArchitectureBaselineApplicationServiceFakeCompositio
             ContractIds = _knownRule,
         });
 
-        Assert.That(outcome.Succeeded, Is.True);
-        Assert.That(outcome.RemovedEntries, Is.Empty);
-        var entries = baselineGenerator.EntriesReceived!;
-        Assert.That(entries, Has.Count.EqualTo(2));
-        Assert.That(entries.Single(e => e.ContractId == "known-rule").SourceType, Is.EqualTo("SrcA"));
-        Assert.That(entries.Single(e => e.ContractId == "other-rule").SourceType, Is.EqualTo("SrcX"));
+        Assert.Multiple(() =>
+        {
+            Assert.That(outcome.Succeeded, Is.True);
+            Assert.That(outcome.RemovedEntries, Is.Empty);
+            // Nothing removed, so both the in-scope and the out-of-scope entry survive by the input
+            // document being handed back verbatim rather than reserialized.
+            Assert.That(outcome.Yaml, Is.EqualTo(baselineLoadingService.RawTextToReturn));
+            Assert.That(baselineGenerator.EntriesReceived, Is.Null);
+        });
     }
 
     private static ArchitectureContractDocument CreateDocumentWithStrictAndAuditRules()
@@ -623,10 +628,14 @@ public sealed partial class ArchitectureBaselineApplicationServiceFakeCompositio
             Mode = "strict",
         });
 
-        Assert.That(outcome.Succeeded, Is.True);
-        Assert.That(outcome.RemovedEntries, Is.Empty);
-        var entries = baselineGenerator.EntriesReceived!;
-        Assert.That(entries, Has.Count.EqualTo(2));
-        Assert.That(entries.Single(e => e.ContractGroup == "audit").SourceType, Is.EqualTo("SrcY"));
+        Assert.Multiple(() =>
+        {
+            Assert.That(outcome.Succeeded, Is.True);
+            Assert.That(outcome.RemovedEntries, Is.Empty);
+            // Nothing was removed, so the out-of-scope audit entry is preserved the strongest way
+            // available: the input document is handed back untouched, never reserialized.
+            Assert.That(outcome.Yaml, Is.EqualTo(baselineLoadingService.RawTextToReturn));
+            Assert.That(baselineGenerator.EntriesReceived, Is.Null);
+        });
     }
 }

@@ -62,17 +62,29 @@ internal sealed class BaselineMigrateCommandHandler(ICliRuntime runtime, ICliCon
                 return CliExitCodes.InvalidArgumentsOrRuntimeError;
             }
 
-            if (outcome.Yaml != null && options.OutputPath != null)
+            // Migrate writes a reviewed file like every other baseline command, so it goes through the
+            // same gate: preview, explicit overwrite intent, atomic replacement. Ambiguity still blocks
+            // the write outright, upstream of the gate.
+            bool wrote = false;
+            if (outcome.Yaml != null)
             {
-                // Temp-then-rename, so a failed write cannot leave a half-migrated file where a
-                // reviewed baseline used to be.
-                string tempPath = fileSystem.WriteAllTextToTemp(options.OutputPath, outcome.Yaml);
-                fileSystem.RenameTempToTarget(tempPath, options.OutputPath);
+                BaselineWriteGate gate = new(console, fileSystem);
+                if (!gate.TryApply(
+                        new BaselineWriteGate.Request(
+                            "baseline migrate", options.OutputPath, options.DryRun, options.Force,
+                            outcome.Yaml, CommentDiagnostic: null, InPlacePath: null,
+                            EmitProposalToStdout: options.Format != "json"),
+                        out BaselineWriteGate.Disposition disposition))
+                {
+                    return CliExitCodes.InvalidArgumentsOrRuntimeError;
+                }
+
+                wrote = disposition == BaselineWriteGate.Disposition.Written;
             }
 
             console.Out.WriteLine(options.Format == "json"
-                ? FormatAsJson(outcome, options.OutputPath, options.DryRun)
-                : FormatForHumans(outcome, options.OutputPath, options.DryRun));
+                ? FormatAsJson(outcome, options.OutputPath, options.DryRun, wrote)
+                : FormatForHumans(outcome, options.OutputPath, options.DryRun, wrote));
 
             if (outcome.AmbiguousCount > 0)
             {
@@ -97,7 +109,7 @@ internal sealed class BaselineMigrateCommandHandler(ICliRuntime runtime, ICliCon
         }
     }
 
-    private static string FormatForHumans(BaselineMigrateOutcome outcome, string? outputPath, bool dryRun)
+    private static string FormatForHumans(BaselineMigrateOutcome outcome, string? outputPath, bool dryRun, bool wrote)
     {
         List<string> lines =
         [
@@ -118,11 +130,11 @@ internal sealed class BaselineMigrateCommandHandler(ICliRuntime runtime, ICliCon
                 ? "Dry run: ambiguous entries found, no file would be written."
                 : "Dry run: no file written.");
         }
-        else if (outputPath != null && outcome.Yaml != null)
+        else if (wrote)
         {
             lines.Add($"Output: {outputPath}");
         }
-        else
+        else if (outcome.AmbiguousCount > 0)
         {
             lines.Add("No file written: ambiguous entries must be resolved first.");
         }
@@ -130,12 +142,15 @@ internal sealed class BaselineMigrateCommandHandler(ICliRuntime runtime, ICliCon
         return string.Join(Environment.NewLine, lines);
     }
 
-    private static string FormatAsJson(BaselineMigrateOutcome outcome, string? outputPath, bool dryRun)
+    private static string FormatAsJson(BaselineMigrateOutcome outcome, string? outputPath, bool dryRun, bool wrote)
     {
         return JsonSerializer.Serialize(new
         {
             dryRun,
-            output = !dryRun && outcome.Yaml != null ? outputPath : null,
+            output = wrote ? outputPath : null,
+            // The proposal travels in the document under --dry-run (and whenever no file was written),
+            // so a review run can see exactly what would land.
+            proposedContent = wrote ? null : outcome.Yaml,
             matchedCount = outcome.MatchedCount,
             staleCount = outcome.StaleCount,
             ambiguousCount = outcome.AmbiguousCount,

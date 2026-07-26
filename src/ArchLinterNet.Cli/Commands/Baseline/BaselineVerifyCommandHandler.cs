@@ -57,7 +57,8 @@ internal sealed class BaselineVerifyCommandHandler(ICliRuntime runtime, ICliCons
             }
 
             BaselineDiffCommandHandler.BaselineComparisonReport report = new(
-                outcome.New, outcome.Frozen, outcome.Resolved, outcome.Ambiguous, outcome.ConfigurationErrors);
+                outcome.New, outcome.Frozen, outcome.Resolved, outcome.Ambiguous, outcome.ConfigurationErrors,
+                outcome.Entries);
 
             if (options.Format == "json")
             {

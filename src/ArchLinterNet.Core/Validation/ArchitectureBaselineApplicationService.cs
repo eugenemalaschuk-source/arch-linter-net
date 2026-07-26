@@ -114,24 +114,35 @@ public sealed class ArchitectureBaselineApplicationService(
             document, existingBaseline, candidates, request.Mode, request.ContractIds);
 
         BaselineWritePlan plan = BaselineWritePlanner.PlanPrune(comparison);
-        ArchitectureBaselineDocument pruned = baselineGenerator.BuildFromEntries(plan.OutputEntries, existingBaseline.Version);
 
         List<BaselineRemovedEntry> removed = comparison.Resolved
             .Select(e => new BaselineRemovedEntry(e, BaselineEntryLifecycleNames.Resolved))
             .Concat(comparison.ConfigurationErrors.Select(
-                e => new BaselineRemovedEntry(e, BaselineEntryLifecycleNames.Configuration)))
+                e => new BaselineRemovedEntry(e, BaselineEntryLifecycleNames.Stale)))
             .ToList();
 
-        BaselineCommentInspection comments = InspectComments(request.BaselinePath);
+        string rawBaseline = baselineLoadingService.ReadRawText(request.BaselinePath);
+        BaselineCommentInspection comments = BaselineCommentInspector.Inspect(rawBaseline);
+
+        // Nothing to remove means the input already is the answer. Reserializing it would be a
+        // no-op prune that still rewrote quoting, line endings, or blank-line placement — the file
+        // has to come back byte-for-byte identical.
+        string yaml = plan.RemovesNothing
+            ? rawBaseline
+            : comments.Header + baselineGenerator.Serialize(
+                baselineGenerator.BuildFromEntries(plan.OutputEntries, existingBaseline.Version));
 
         return new BaselinePruneOutcome(
             Succeeded: true,
-            Yaml: comments.Header + baselineGenerator.Serialize(pruned),
+            Yaml: yaml,
             RemovedEntries: removed,
             ConfigurationViolations: Array.Empty<ArchitectureViolation>())
         {
             Entries = plan.LifecycleEntries,
-            CommentDiagnostic = DescribeCommentRefusal("baseline prune", request.BaselinePath, comments),
+            // A no-op prune rewrites nothing, so unpreservable comments cannot be lost by it either.
+            CommentDiagnostic = plan.RemovesNothing
+                ? null
+                : DescribeCommentRefusal("baseline prune", request.BaselinePath, comments),
         };
     }
 
@@ -164,6 +175,7 @@ public sealed class ArchitectureBaselineApplicationService(
             ConfigurationViolations: Array.Empty<ArchitectureViolation>())
         {
             Ambiguous = comparison.Ambiguous,
+            Entries = BaselineWritePlanner.Report(comparison),
         };
     }
 
@@ -204,6 +216,7 @@ public sealed class ArchitectureBaselineApplicationService(
             ConfigurationViolations: Array.Empty<ArchitectureViolation>())
         {
             Ambiguous = comparison.Ambiguous,
+            Entries = BaselineWritePlanner.Report(comparison),
         };
     }
 
@@ -289,18 +302,19 @@ public sealed class ArchitectureBaselineApplicationService(
             }
         }
 
-        bool canWrite = !request.DryRun && ambiguous == 0;
+        // The proposed document is produced whenever the classification permits one, including under
+        // --dry-run: a dry run whose whole purpose is review has to be able to show what it would
+        // write. Whether it reaches disk is the caller's decision, gated separately.
+        bool writable = ambiguous == 0;
         string? yaml = null;
-        if (canWrite)
+        if (writable)
         {
             ArchitectureBaselineDocument migrated = baselineGenerator.BuildFromEntries(
                 migratedEntries, version: ArchitectureViolationIdentity.CurrentVersion);
             yaml = baselineGenerator.Serialize(migrated);
         }
 
-        bool succeeded = request.DryRun ? ambiguous == 0 : canWrite;
-
-        return new BaselineMigrateOutcome(succeeded, yaml, matched, stale, ambiguous, report, Array.Empty<ArchitectureViolation>());
+        return new BaselineMigrateOutcome(writable, yaml, matched, stale, ambiguous, report, Array.Empty<ArchitectureViolation>());
     }
 
     private BaselineCommentInspection InspectComments(string baselinePath)

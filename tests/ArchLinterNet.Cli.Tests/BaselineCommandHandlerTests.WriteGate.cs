@@ -115,7 +115,8 @@ public sealed partial class BaselineCommandHandlerTests
             {
                 Entries = [new BaselineLifecycleEntry(
                     CreateEntry("strict", "rule-a", "Src.A", "Ref.A", "generated baseline"),
-                    BaselineEntryLifecycle.Added)],
+                    BaselineEntryLifecycle.New,
+                    BaselineEntryDisposition.Added)],
             }
         };
         var console = new RecordingConsole();
@@ -133,7 +134,8 @@ public sealed partial class BaselineCommandHandlerTests
             Assert.That(result, Is.EqualTo(CliExitCodes.Success));
             Assert.That(json.RootElement.GetProperty("status").GetString(), Is.EqualTo("dry-run"));
             Assert.That(json.RootElement.GetProperty("proposedContent").GetString(), Is.EqualTo("version: 2"));
-            Assert.That(json.RootElement.GetProperty("counts").GetProperty("added").GetInt32(), Is.EqualTo(1));
+            Assert.That(json.RootElement.GetProperty("counts").GetProperty("new").GetInt32(), Is.EqualTo(1));
+            Assert.That(json.RootElement.GetProperty("entries")[0].GetProperty("disposition").GetString(), Is.EqualTo("added"));
             Assert.That(fileSystem.RenameCount, Is.Zero);
         });
     }
@@ -210,12 +212,12 @@ public sealed partial class BaselineCommandHandlerTests
     [Test]
     public void BaselineUpdate_UnpreservableComments_RefusesWriteButDryRunStillReports()
     {
-        const string diagnostic = "Baseline 'baseline.yml' has comments that cannot be safely preserved: line(s) 4. Re-run with --dry-run";
+        const string Diagnostic = "Baseline 'baseline.yml' has comments that cannot be safely preserved: line(s) 4. Re-run with --dry-run";
         var runtime = new StubRuntime
         {
             UpdateOutcome = new BaselineUpdateOutcome(true, "version: 2", 1, 0, Array.Empty<ArchitectureViolation>())
             {
-                CommentDiagnostic = diagnostic,
+                CommentDiagnostic = Diagnostic,
             }
         };
         var refusalConsole = new RecordingConsole();
@@ -261,7 +263,8 @@ public sealed partial class BaselineCommandHandlerTests
                 true, "version: 2", [new BaselineRemovedEntry(resolved, BaselineEntryLifecycleNames.Resolved)],
                 Array.Empty<ArchitectureViolation>())
             {
-                Entries = [new BaselineLifecycleEntry(resolved, BaselineEntryLifecycle.Resolved)],
+                Entries = [new BaselineLifecycleEntry(
+                    resolved, BaselineEntryLifecycle.Resolved, BaselineEntryDisposition.Removed)],
             }
         };
         var console = new RecordingConsole();
@@ -277,6 +280,104 @@ public sealed partial class BaselineCommandHandlerTests
             Assert.That(result, Is.EqualTo(CliExitCodes.Success));
             Assert.That(console.OutputText, Does.Contain("Dry run"));
             Assert.That(console.OutputText, Does.Contain("resolved: 1"));
+            Assert.That(console.OutputText, Does.Contain("[removed]"));
+            Assert.That(fileSystem.RenameCount, Is.Zero);
+        });
+    }
+
+    [Test]
+    public void BaselineMigrate_ExistingOutputWithoutForce_RefusesAndDoesNotWrite()
+    {
+        var runtime = new StubRuntime
+        {
+            MigrateOutcome = new BaselineMigrateOutcome(
+                true, "version: 2", 1, 0, 0, Array.Empty<BaselineMigrateEntryReport>(), Array.Empty<ArchitectureViolation>())
+        };
+        var console = new RecordingConsole();
+        var fileSystem = new StubFileSystem("policy.yml", "legacy.yml", "migrated.yml");
+
+        int result = new BaselineMigrateCommandHandler(runtime, console, fileSystem).Execute(
+            new BaselineMigrateCommandOptions(
+                "policy.yml", "legacy.yml", "migrated.yml", null, "human", DryRun: false, Force: false, ShowHelp: false));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(result, Is.EqualTo(CliExitCodes.InvalidArgumentsOrRuntimeError));
+            Assert.That(console.ErrorText, Does.Contain("--force"));
+            Assert.That(fileSystem.RenameCount, Is.Zero);
+        });
+    }
+
+    [Test]
+    public void BaselineMigrate_DryRun_ShowsTheProposedDocumentAndWritesNothing()
+    {
+        var runtime = new StubRuntime
+        {
+            MigrateOutcome = new BaselineMigrateOutcome(
+                true, "version: 2\nbaseline: {}\n", 1, 0, 0, Array.Empty<BaselineMigrateEntryReport>(),
+                Array.Empty<ArchitectureViolation>())
+        };
+        var console = new RecordingConsole();
+        var fileSystem = new StubFileSystem("policy.yml", "legacy.yml");
+
+        int result = new BaselineMigrateCommandHandler(runtime, console, fileSystem).Execute(
+            new BaselineMigrateCommandOptions(
+                "policy.yml", "legacy.yml", "migrated.yml", null, "human", DryRun: true, Force: false, ShowHelp: false));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(result, Is.EqualTo(CliExitCodes.Success));
+            Assert.That(console.OutputText, Does.Contain("Dry run"));
+            Assert.That(console.OutputText, Does.Contain("version: 2"));
+            Assert.That(fileSystem.RenameCount, Is.Zero);
+        });
+    }
+
+    [Test]
+    public void BaselineMigrate_DryRunWithJson_CarriesTheProposalInTheDocument()
+    {
+        var runtime = new StubRuntime
+        {
+            MigrateOutcome = new BaselineMigrateOutcome(
+                true, "version: 2", 1, 0, 0, Array.Empty<BaselineMigrateEntryReport>(), Array.Empty<ArchitectureViolation>())
+        };
+        var console = new RecordingConsole();
+
+        int result = new BaselineMigrateCommandHandler(runtime, console, new StubFileSystem("policy.yml", "legacy.yml")).Execute(
+            new BaselineMigrateCommandOptions(
+                "policy.yml", "legacy.yml", "migrated.yml", null, "json", DryRun: true, Force: false, ShowHelp: false));
+
+        using JsonDocument json = JsonDocument.Parse(console.OutputText);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(result, Is.EqualTo(CliExitCodes.Success));
+            Assert.That(json.RootElement.GetProperty("proposedContent").GetString(), Is.EqualTo("version: 2"));
+            Assert.That(json.RootElement.GetProperty("output").ValueKind, Is.EqualTo(JsonValueKind.Null));
+        });
+    }
+
+    [Test]
+    public void BaselineUpdate_CaseVariantOutputPath_IsNotTreatedAsTheInPlaceDestination()
+    {
+        var runtime = new StubRuntime
+        {
+            UpdateOutcome = new BaselineUpdateOutcome(true, "version: 2", 1, 0, Array.Empty<ArchitectureViolation>())
+        };
+        var console = new RecordingConsole();
+        // On a case-sensitive filesystem these are two different files, so replacing the second one
+        // must still require --force rather than riding in on the in-place exemption.
+        var fileSystem = new StubFileSystem("policy.yml", "baseline.yml", "BASELINE.yml");
+
+        int result = new BaselineUpdateCommandHandler(runtime, console, fileSystem).Execute(
+            new BaselineUpdateCommandOptions(
+                "policy.yml", "baseline.yml", "BASELINE.yml", _reasons, "all", null, "human", _write,
+                Array.Empty<string>(), false));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(result, Is.EqualTo(CliExitCodes.InvalidArgumentsOrRuntimeError));
+            Assert.That(console.ErrorText, Does.Contain("--force"));
             Assert.That(fileSystem.RenameCount, Is.Zero);
         });
     }
@@ -302,6 +403,7 @@ public sealed partial class BaselineCommandHandlerTests
                 Array.Empty<ArchitectureViolation>())
             {
                 Ambiguous = [ambiguous],
+                Entries = [new BaselineLifecycleEntry(ambiguous, BaselineEntryLifecycle.Ambiguous)],
             }
         };
         var console = new RecordingConsole();

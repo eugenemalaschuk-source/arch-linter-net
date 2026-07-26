@@ -26,35 +26,53 @@ Non-Goals:
 
 ## Decisions
 
-### One lifecycle enum, distinct write and report vocabularies
+### One lifecycle vocabulary, taken from the authoritative capability
 
-`BaselineEntryLifecycle` lives in `ArchLinterNet.Core.Model` with one canonical lowercase wire name per value:
+The vocabulary is not ours to invent. `adoption-stabilization-compatibility` already fixes it for the
+whole tool, and every baseline subcommand must classify into exactly these seven values:
 
-| Value | Wire name | Meaning |
-| --- | --- | --- |
-| `New` | `new` | current violation with no baseline entry (report vocabulary) |
-| `Added` | `added` | that violation materialized as a new entry by this write |
-| `Existing` | `existing` | baseline entry that still matches exactly one current candidate (report vocabulary) |
-| `Kept` | `kept` | that entry carried into the output byte-for-byte |
-| `Changed` | `changed` | that entry carried into the output with a non-identity field regenerated |
-| `Stale` | `stale` | entry matching no current candidate that this operation did not remove |
-| `Resolved` | `resolved` | entry matching no current candidate that this operation removed |
-| `Ambiguous` | `ambiguous` | entry correlating to more than one current candidate |
-| `Configuration` | `configuration` | entry whose contract id does not exist in the policy |
+| Value | Meaning |
+| --- | --- |
+| `new` | a current finding has no exact baseline entry |
+| `matched` | an entry and a current finding have equal canonical identity |
+| `resolved` | a valid, evaluable entry has no current finding — the debt was fixed |
+| `stale` | the entry references a contract, family, source, schema, or identity form no longer valid or evaluable |
+| `changed` | a predecessor/successor relationship is derivable but canonical identity differs, so the entry does not suppress |
+| `ambiguous` | more than one candidate could correspond to the entry |
+| `configuration-error` | malformed, unsupported, or inconsistent input prevents safe classification |
 
-The split between report and write names is deliberate: `new`/`existing` describe what comparison found, `added`/`kept`/`changed` describe what a write did with it, and `resolved`/`stale` distinguish removal from retention of the same underlying condition. That is why `update` reports the same disappeared entry as `stale` (it retains it) while `prune` reports it as `resolved` (it removes it) — one model, two truthful outcomes, no renaming of categories per command. `stale` keeps the wire value today's `diff`/`verify` JSON already emits for a no-longer-matching entry, so no existing consumer breaks; `resolved` is the value only a removing write can produce.
+`BaselineEntryLifecycle` in `Core.Model` is exactly these seven, and `BaselineEntryLifecycleNames.All`
+is asserted against the literal list in a test, so a future command cannot quietly add an eighth.
 
-The `counts` object always carries all nine keys so a consumer can read one shape from every subcommand, with `0` where the operation cannot produce that value.
+Two consequences fall out of the definitions and are worth stating, because the obvious
+implementation gets both wrong:
 
-`Changed` covers the case where structured identity still matches but the display text regenerated from the live candidate differs from what the file recorded. `reason` and `issue` are never a source of `Changed`, because they are preserved verbatim for any carried-through entry.
+- **Disposition is a separate axis.** `update` retains a fixed-debt entry and `prune` removes it, but
+  both are looking at the same `resolved` classification. Encoding that difference in the status would
+  fork the vocabulary — which is precisely what a consumer branching on `status` cannot absorb. So
+  entries carry a `disposition` of `reported`/`added`/`retained`/`removed` alongside `status`, and
+  `--json` exposes both plus a boolean `suppresses`.
+- **Display text is not identity, so refreshing it is `matched`, not `changed`.** `changed` is defined
+  as canonical identity *differing*, and carries the requirement that such an entry must not suppress
+  until reviewed. An entry whose identity still matches while its `forbidden_reference` string
+  re-renders is fully matched; calling it `changed` would both misreport it and imply it stops
+  suppressing. `changed` is therefore reserved for a genuine predecessor/successor relation, which this
+  slice does not compute and consequently never emits — the vocabulary is shared in full, but no value
+  is fabricated for a relation the tool cannot demonstrate.
 
-Rejected alternative: a single flat set of five statuses. It cannot express "the entry disappeared and I kept it" versus "the entry disappeared and I deleted it" without the consumer knowing which command ran, which is exactly the coupling the shared model exists to remove.
+An entry naming a contract id the policy no longer has is `stale`, not `configuration-error`: it
+"references a contract that is no longer valid or evaluable", which is the definition. This reconciles
+the transitional wording the consistency audit flagged — the shipped baseline-generation spec called
+that case a configuration error and used `stale` for resolved debt, both of which this slice migrates.
+
+`configuration-error` covers input that cannot be classified at all (a malformed reason mapping, an
+unsupported `version`). Those surface as command-level errors rather than per-entry statuses today.
 
 ### Ambiguity is a comparison result, not a migrate-only concept
 
 `ArchitectureBaselineComparer` counts matching candidates instead of short-circuiting on the first. Zero matches keeps its current meaning; exactly one is `Existing`; more than one is `Ambiguous`. A version-2 entry's structured identity normally determines at most one candidate, so in practice ambiguity surfaces for version-1 documents, whose legacy pair is precisely the under-specified identity the exact-identity work introduced structured fields to replace.
 
-`verify` fails on `Ambiguous` alongside `Stale` and `Configuration`. An entry that suppresses more than one distinct violation is broadening the ratchet, which is the same failure `migrate` already refuses to write through; a gate that reported it and exited zero would let it persist indefinitely. `diff` stays a report and still exits zero.
+`verify` fails on `Ambiguous` alongside `Resolved` and `Stale`. An entry that suppresses more than one distinct violation is broadening the ratchet, which is the same failure `migrate` already refuses to write through; a gate that reported it and exited zero would let it persist indefinitely. `diff` stays a report and still exits zero.
 
 `update` and `prune` carry ambiguous entries through untouched rather than rewriting or removing them. Rewriting would have to pick one of several identities (silent broadening or silent narrowing); removing would delete accepted debt. Carrying through plus reporting leaves the decision with the reviewer, consistent with `migrate`'s fail-closed stance.
 

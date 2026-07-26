@@ -50,20 +50,23 @@ internal static class BaselineHelpTexts
 
         Run 'arch-linter-net baseline <subcommand> --help' for subcommand-specific options.
 
-        Entry lifecycle (shared by human and JSON output):
-          new           current violation with no baseline entry
-          added         a new violation this run recorded as a baseline entry
-          existing      baseline entry matching exactly one current violation
-          kept          an existing entry carried through unchanged
-          changed       an existing entry whose display text was regenerated
-          stale         entry matching no current violation, retained
-          resolved      entry matching no current violation, removed
-          ambiguous     entry matching more than one current violation
-          configuration entry whose contract id is not in the policy
+        Entry lifecycle (one shared vocabulary, human and JSON):
+          new                 a current finding has no exact baseline entry
+          matched             entry and finding have equal canonical identity
+          resolved            valid entry, no current finding — the debt was fixed
+          stale               entry references a contract/identity form no longer
+                              valid or evaluable
+          changed             predecessor/successor shown but identity differs, so
+                              the entry does not suppress until reviewed
+          ambiguous           more than one candidate could correspond to the entry
+          configuration-error input cannot be safely classified
+
+        Only `matched` suppresses a finding. What a command did with an entry is
+        reported separately as its disposition: reported, added, retained, removed.
 
         Exit codes:
           0   Command completed successfully
-          1   Baseline verify found stale, ambiguous, or configuration entries
+          1   Baseline verify found resolved, stale, or ambiguous entries
           2   Runtime error (invalid arguments, file not found, config violations, etc.)
         """;
 
@@ -102,9 +105,10 @@ internal static class BaselineHelpTexts
 
         Entries carried over keep their reason and issue metadata verbatim; reason
         mapping only ever applies to entries this run adds. A leading comment header
-        in the existing file is preserved. Comments sitting next to entries cannot be
-        re-anchored: the run reports their line numbers and refuses to write, and
-        --dry-run prints the proposed document for a manual merge.
+        in the existing file is preserved. Comments elsewhere — including one trailing
+        a value, like `reason: debt # reviewed by Alice` — cannot be re-anchored: the
+        run reports their line numbers and refuses to write, and --dry-run prints the
+        proposed document for a manual merge.
 
         Exit codes:
           0   Baseline updated successfully (or previewed)
@@ -137,9 +141,11 @@ internal static class BaselineHelpTexts
           --json              Report removed entries and the lifecycle report as JSON
           -h, --help          Show this help message
 
-        Only entries that match no current violation are removed. An entry matching
-        more than one current violation is reported as ambiguous and retained, never
-        removed. Comment handling matches 'baseline update'.
+        Only entries that match no current violation are removed (`resolved`), along
+        with entries naming a contract the policy no longer has (`stale`). An entry
+        matching more than one current violation is reported as ambiguous and
+        retained, never removed. A prune with nothing to remove reproduces its input
+        byte-for-byte. Comment handling matches 'baseline update'.
 
         Exit codes:
           0   Baseline pruned successfully (or previewed)
@@ -193,7 +199,7 @@ internal static class BaselineHelpTexts
 
         Exit codes:
           0   Baseline is in sync
-          1   Baseline is out of sync (stale, ambiguous, or configuration entries found)
+          1   Baseline is out of sync (resolved, stale, or ambiguous entries found)
           2   Runtime error (invalid arguments, file not found, config violations, etc.)
         """;
 
@@ -222,7 +228,9 @@ internal static class BaselineHelpTexts
           --baseline <path>   Path to the legacy version 1 baseline file to migrate (required)
           --output <path>     Path to write the migrated version 2 baseline file
                               (required unless --dry-run/--check; must differ from --baseline)
-          --dry-run, --check  Report classification without writing any file
+          --dry-run, --check  Report classification and the proposed document without
+                              writing any file
+          --force             Replace an existing --output file
           --condition-set <name>
                               Use a named condition set from analysis.condition_sets
           --json              Output the migration report as JSON

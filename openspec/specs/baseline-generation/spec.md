@@ -240,25 +240,25 @@ When a `strict_coverage`/`audit_coverage` baseline entry's `(source_type, forbid
 ### Requirement: User can update a baseline from current violations while preserving existing entries
 
 The system SHALL provide a `baseline update` CLI subcommand that reads an existing baseline file and the current codebase's violations, and writes a new baseline that:
-- retains, unchanged, every existing baseline entry whose identity still matches a current violation, including its original `reason` and `issue` text verbatim;
-- adds new entries, deterministically, for current violations that have no matching existing baseline entry, using the resolved reason mapping for new entries only;
-- leaves entries with no matching current violation (`stale`), entries correlating to more than one current candidate (`ambiguous`), and entries referencing unknown contract ids (`configuration`) untouched in the output — `update` SHALL NOT remove them.
+- retains, unchanged, every existing baseline entry whose identity still matches a current violation (`matched`), including its original `reason` and `issue` text verbatim;
+- adds new entries, deterministically, for current violations that have no matching existing baseline entry (`new`), using the resolved reason mapping for new entries only;
+- leaves entries with no matching current violation (`resolved`), entries correlating to more than one current candidate (`ambiguous`), and entries referencing unknown contract ids (`stale`) untouched in the output — `update` SHALL NOT remove them.
 
 `baseline update` SHALL accept `--policy`/`--config`, `--baseline` (existing baseline file to update), `--output`, `--mode` (strict/audit/all), `--condition-set`, `--contract` (repeatable), `--reason`, `--reason-for-contract`, `--reason-for-family`, `--dry-run`, `--force`, and `--json`, consistent with `baseline generate`.
 
-`baseline update` SHALL report each affected entry with its lifecycle value (`added`, `kept`, `changed`, `stale`, `ambiguous`, `configuration`) in both human-readable and `--json` output, so the proposed change is reviewable before it is applied.
+`baseline update` SHALL report each affected entry with its lifecycle value and disposition in both human-readable and `--json` output, so the proposed change is reviewable before it is applied.
 
 #### Scenario: Update preserves reason on still-valid entries
 - **WHEN** user runs `baseline update` against a baseline containing an entry with a custom `reason` whose violation is still present in the current codebase
-- **THEN** the updated baseline SHALL contain that entry with the identical `reason` text, unchanged, and the entry SHALL be reported as `kept`
+- **THEN** the updated baseline SHALL contain that entry with the identical `reason` text, unchanged, and the entry SHALL be reported with `status: matched` and `disposition: retained`
 
 #### Scenario: Update adds new violations deterministically
 - **WHEN** user runs `baseline update` against a baseline and the current codebase has a new violation not present in the baseline
-- **THEN** the updated baseline SHALL contain a new entry for that violation using the resolved reason, reported as `added`
+- **THEN** the updated baseline SHALL contain a new entry for that violation using the resolved reason, reported with `status: new` and `disposition: added`
 
 #### Scenario: Update does not remove stale entries
 - **WHEN** user runs `baseline update` against a baseline containing an entry whose violation has been fixed in the current codebase
-- **THEN** the updated baseline SHALL still contain that entry unchanged, reported as `stale` (removal is handled by `baseline prune`, not `baseline update`)
+- **THEN** the updated baseline SHALL still contain that entry unchanged, reported with `status: resolved` and `disposition: retained` (removal is handled by `baseline prune`, not `baseline update`)
 
 #### Scenario: Update carries an ambiguous entry through without broadening it
 - **WHEN** user runs `baseline update` against a `version: 1` baseline entry whose legacy pair correlates to more than one current violation candidate
@@ -268,7 +268,7 @@ The system SHALL provide a `baseline update` CLI subcommand that reads an existi
 
 The system SHALL provide a `baseline prune` CLI subcommand that reads an existing baseline file and the current codebase's violations, removes:
 - entries whose identity no longer matches any current violation (`resolved`), and
-- entries whose contract id does not exist in the current policy (`configuration`),
+- entries whose contract id does not exist in the current policy (`stale`),
 
 writes the pruned baseline to `--output` (or stdout when `--output` is omitted), and reports every entry with its lifecycle value in both human-readable and `--json` output.
 
@@ -284,11 +284,13 @@ writes the pruned baseline to `--output` (or stdout when `--output` is omitted),
 
 #### Scenario: Prune removes entries with unknown contract ids and reports it
 - **WHEN** user runs `baseline prune` against a baseline containing an entry whose contract id does not exist in the current policy
-- **THEN** the pruned baseline SHALL NOT contain that entry, and the command output SHALL list it with lifecycle `configuration`
+- **THEN** the pruned baseline SHALL NOT contain that entry, and the command output SHALL list it with lifecycle `stale`
 
 #### Scenario: Prune leaves frozen entries untouched
 - **WHEN** user runs `baseline prune` against a baseline where every entry still matches a current violation
-- **THEN** the pruned baseline SHALL be identical to the input baseline, and no entries SHALL be reported as removed
+- **THEN** the pruned baseline SHALL be byte-for-byte identical to the input baseline — including quoting, line endings, and blank lines — and no entries SHALL be reported as removed
+
+A prune that removes no entry SHALL reproduce its input document verbatim rather than reserializing it, so a no-op prune cannot alter formatting.
 
 #### Scenario: Prune previews removals before writing
 - **WHEN** user runs `baseline prune --dry-run` against a baseline containing resolved entries
@@ -300,7 +302,7 @@ writes the pruned baseline to `--output` (or stdout when `--output` is omitted),
 
 ### Requirement: User can diff a baseline against current violations
 
-The system SHALL provide a `baseline diff` CLI subcommand that compares an existing baseline file against the current codebase's violations without writing any file, and reports each violation/entry with an explicit structured lifecycle `status` drawn from the shared lifecycle model: `new`, `existing`, `stale`, `ambiguous`, or `configuration`.
+The system SHALL provide a `baseline diff` CLI subcommand that compares an existing baseline file against the current codebase's violations without writing any file, and reports each violation/entry with an explicit structured lifecycle `status` drawn from the shared lifecycle model: `new`, `matched`, `resolved`, `stale`, or `ambiguous`.
 
 The `status` field SHALL be present, using these exact values, in `--json` output, so consumers can branch on `status` without parsing display text. Each `--json` entry SHALL additionally carry the entry's canonical structured identity — every `ArchitectureViolationIdentity` field plus its canonical string form — for version-2 documents, and `null` where a version-1 document has no structured identity. `--json` output SHALL include a `counts` object keyed by lifecycle wire name. Human-readable output SHALL continue to group entries under labeled sections corresponding to each status. (Baseline comparison does not currently produce SARIF output or a dedicated Testing API surface — this requirement applies to the CLI human/JSON output that exists today. Extending SARIF/Testing API to baseline comparison results is out of scope for this change.)
 
@@ -312,11 +314,11 @@ The `status` field SHALL be present, using these exact values, in `--json` outpu
 
 #### Scenario: Diff reports an ambiguous entry separately from a matched one
 - **WHEN** user runs `baseline diff` against a baseline containing one entry that matches exactly one current violation and one entry that matches more than one
-- **THEN** the first SHALL be reported with `status: existing` and the second with `status: ambiguous`, and the command SHALL exit with code 0
+- **THEN** the first SHALL be reported with `status: matched` and the second with `status: ambiguous`, and the command SHALL exit with code 0
 
 #### Scenario: Diff on a fully synchronized baseline reports no drift
 - **WHEN** user runs `baseline diff` against a baseline where every entry matches a current violation and every current violation has a baseline entry
-- **THEN** the output SHALL report zero `new`, zero `stale`, zero `ambiguous`, and zero `configuration` entries, and SHALL exit with code 0
+- **THEN** the output SHALL report zero `new`, zero `resolved`, zero `stale`, and zero `ambiguous` entries, and SHALL exit with code 0
 
 #### Scenario: Diff JSON exposes canonical identity
 - **WHEN** user runs `baseline diff --json` against a `version: 2` baseline
@@ -324,7 +326,7 @@ The `status` field SHALL be present, using these exact values, in `--json` outpu
 
 ### Requirement: User can verify a baseline is synchronized with current validation results
 
-The system SHALL provide a `baseline verify` CLI subcommand that performs the same comparison as `baseline diff`, without writing any file, and exits with a non-zero code if any `stale`, `ambiguous`, or `configuration` entries are found (the baseline is out of sync), and exits 0 otherwise. `baseline verify` SHALL NOT fail due to `new` debt — new, unbaselined violations are the concern of `validate`, not `baseline verify`.
+The system SHALL provide a `baseline verify` CLI subcommand that performs the same comparison as `baseline diff`, without writing any file, and exits with a non-zero code if any `resolved`, `stale`, or `ambiguous` entries are found (the baseline is out of sync), and exits 0 otherwise. `baseline verify` SHALL NOT fail due to `new` debt — new, unbaselined violations are the concern of `validate`, not `baseline verify`.
 
 An `ambiguous` entry fails verification because an entry that suppresses more than one distinct violation broadens the ratchet — the same condition `baseline migrate` refuses to write through.
 
@@ -340,7 +342,7 @@ An `ambiguous` entry fails verification because an entry that suppresses more th
 
 #### Scenario: Verify fails when baseline references an unknown contract id
 - **WHEN** user runs `baseline verify` against a baseline containing an entry whose contract id does not exist in the current policy
-- **THEN** the command SHALL exit with a non-zero code, and the entry SHALL be reported with `status: configuration`
+- **THEN** the command SHALL exit with a non-zero code, and the entry SHALL be reported with `status: resolved`
 
 #### Scenario: Verify fails when a baseline entry is ambiguous
 - **WHEN** user runs `baseline verify` against a baseline entry that correlates to more than one current violation candidate
@@ -352,7 +354,7 @@ An `ambiguous` entry fails verification because an entry that suppresses more th
 
 #### Scenario: Verify JSON reports lifecycle counts
 - **WHEN** user runs `baseline verify --json`
-- **THEN** the output SHALL include a `counts` object reporting `new`, `existing`, `resolved`, `stale`, `ambiguous`, and `configuration` counts with canonical identities on each entry
+- **THEN** the output SHALL include a `counts` object reporting `new`, `matched`, `resolved`, `stale`, `changed`, `ambiguous`, and `configuration-error` counts with canonical identities on each entry
 
 ### Requirement: User can migrate a legacy baseline file to structured identity
 
@@ -368,6 +370,8 @@ For each legacy entry, scoped only to its own contract id (to find candidates be
 `baseline migrate` SHALL accept `--policy`/`--config`, `--baseline` (required, the legacy file to migrate), `--output` (the destination path for the migrated file), `--condition-set`, `--dry-run`/`--check` (aliases for a report-only run), and `--json`.
 
 `baseline migrate` SHALL NOT write to a path equal to the resolved `--baseline` input path under any circumstance.
+
+`baseline migrate` SHALL pass through the same write gate as `generate`/`update`/`prune`: it SHALL refuse to replace an existing `--output` file without `--force`, and it SHALL write atomically so a failed write leaves the destination unchanged. Its `--dry-run`/`--check` run SHALL produce and report the proposed migrated document, so the classification report can be reviewed together with the content it would write.
 
 Without `--dry-run`/`--check`, `baseline migrate` SHALL require `--output` to be provided and SHALL refuse to run without it. If any entries classify as `ambiguous`, a non-dry-run run SHALL NOT write the output file and SHALL exit with a non-zero code, reporting every ambiguous entry so it can be resolved manually.
 
@@ -385,9 +389,13 @@ Without `--dry-run`/`--check`, `baseline migrate` SHALL require `--output` to be
 - **WHEN** a legacy baseline entry's `(source_type, forbidden_reference)` pair matches more than one current violation candidate
 - **THEN** a non-dry-run `baseline migrate` run SHALL exit with a non-zero code, SHALL NOT write the `--output` file, and SHALL list every ambiguous entry with `status: ambiguous` in its report
 
-#### Scenario: Dry-run reports without writing
+#### Scenario: Dry-run reports the proposed document without writing
 - **WHEN** user runs `baseline migrate --baseline legacy.yml --dry-run`
-- **THEN** no file SHALL be written, the command SHALL report the classification (`matched`/`stale`/`ambiguous`) of every entry, and SHALL exit non-zero only if any entry is `ambiguous`
+- **THEN** no file SHALL be written, the command SHALL report the classification (`matched`/`stale`/`ambiguous`) of every entry together with the proposed migrated document, and SHALL exit non-zero only if any entry is `ambiguous`
+
+#### Scenario: Migrate refuses to replace an existing output without force
+- **WHEN** user runs `baseline migrate --baseline legacy.yml --output migrated.yml` and `migrated.yml` already exists
+- **THEN** the command SHALL exit with a non-zero code, SHALL leave `migrated.yml` unchanged, and SHALL report that `--force` is required
 
 #### Scenario: Migrate has no --mode/--contract options
 - **WHEN** user runs `baseline migrate` with a `--mode` or `--contract` flag
@@ -415,27 +423,43 @@ Without `--dry-run`/`--check`, `baseline migrate` SHALL require `--output` to be
 
 ### Requirement: Baseline entry lifecycle is a single shared model
 
-The system SHALL classify every baseline entry and every current violation candidate considered by a `baseline` subcommand into exactly one lifecycle value, using these canonical wire names in all `--json` output and the same words in human-readable output:
+The system SHALL classify every baseline entry and every current violation candidate considered by a `baseline` subcommand into exactly one value of the lifecycle vocabulary fixed by the `adoption-stabilization-compatibility` capability, using these canonical wire names in all `--json` output and the same words in human-readable output:
 
-- `new`: a current violation with no matching baseline entry;
-- `added`: a `new` violation that this operation materialized as a baseline entry;
-- `existing`: a baseline entry that matches exactly one current violation candidate;
-- `kept`: an `existing` entry that this operation carried into the output unchanged, including its `reason` and `issue` metadata verbatim;
-- `changed`: an `existing` entry that this operation carried into the output with a non-identity display field regenerated from the current candidate;
-- `stale`: a baseline entry matching no current candidate that this operation did not remove — retained in a written output, or reported by a read-only command;
-- `resolved`: a baseline entry matching no current candidate that this operation removed from the output;
-- `ambiguous`: a baseline entry that correlates to more than one current violation candidate;
-- `configuration`: a baseline entry whose contract id does not exist in the current policy.
+- `new`: a current finding has no exact baseline entry;
+- `matched`: an entry and a current finding have equal canonical identity;
+- `resolved`: a valid, evaluable baseline identity has no current finding;
+- `stale`: the entry references a contract, family, source instance, schema, or identity form that is no longer valid or evaluable, distinct from resolved debt;
+- `changed`: a deterministic predecessor/successor relationship can be shown but canonical identity differs, so the entry does not suppress until explicitly reviewed;
+- `ambiguous`: more than one candidate could correspond to an entry and the tool refuses to guess;
+- `configuration-error`: malformed, unsupported, or inconsistent input prevents safe classification.
 
-`reason` and `issue` SHALL NOT cause a `changed` classification — an entry that is carried through SHALL keep both fields verbatim, so `changed` only ever reports a regenerated display field.
+These seven values are the entire vocabulary. A subcommand SHALL NOT introduce an additional status value, and SHALL NOT reuse one of these for a condition other than the one defined above.
+
+Only `matched` SHALL be treated as an entry that suppresses a current finding. `changed`, `stale`, `ambiguous`, and `configuration-error` SHALL NOT silently suppress a current finding.
+
+An entry whose contract id no longer exists in the policy SHALL classify as `stale`, since it references a contract that is no longer valid or evaluable; `configuration-error` is reserved for input that cannot be safely classified at all.
+
+Regenerating an entry's display text (`source_type`/`forbidden_reference`) while its canonical identity is unchanged SHALL classify as `matched`, not `changed`: display text is not identity. `changed` requires that canonical identity actually differ, which is why a `changed` entry does not suppress.
+
+What a subcommand *did* with an entry SHALL be reported separately from its lifecycle value, as a disposition of exactly one of `reported`, `added`, `retained`, or `removed`, so that `update` and `prune` can act differently on the same classification without either renaming it. `--json` output SHALL expose `status`, `disposition`, and a boolean `suppresses` per entry.
+
+An entry carried through by `update` or `prune` SHALL keep its `reason` and `issue` metadata verbatim.
 
 `baseline generate`, `update`, `prune`, `diff`, and `verify` SHALL report lifecycle counts, and their `--json` output SHALL expose those counts as a `counts` object carrying every lifecycle wire name, with `0` for values the invoked operation cannot produce (for example `resolved` is always `0` for the read-only `diff` and `verify`, which remove nothing).
 
 `baseline migrate` keeps its own `matched`/`stale`/`ambiguous` classification and its `matchedCount`/`staleCount`/`ambiguousCount` fields, as specified in its own requirement: it classifies legacy entries for a one-time identity upgrade rather than dispositioning entries of an already-current baseline, and `matched` there means "rewritten with structured identity", which no lifecycle value denotes. Its `stale` and `ambiguous` carry the same meaning as the shared model's.
 
-#### Scenario: Update and prune describe the same disappeared entry with distinct lifecycle values
+#### Scenario: Update and prune describe the same disappeared entry with one status and distinct dispositions
 - **WHEN** a baseline entry no longer matches any current violation, and the user runs `baseline update` and then `baseline prune` against it
-- **THEN** `update` SHALL report the entry as `stale` and retain it in the output, and `prune` SHALL report the entry as `resolved` and remove it from the output
+- **THEN** both SHALL report the entry with `status: resolved`; `update` SHALL report `disposition: retained` and keep it in the output, and `prune` SHALL report `disposition: removed` and drop it from the output
+
+#### Scenario: Only a matched entry is reported as suppressing
+- **WHEN** any baseline subcommand reports entries classified `changed`, `stale`, `ambiguous`, or `configuration-error`
+- **THEN** each SHALL be reported with `suppresses: false`, and only `matched` entries SHALL be reported with `suppresses: true`
+
+#### Scenario: Regenerated display text stays matched
+- **WHEN** `baseline update` carries through an entry whose canonical identity still matches a current finding but whose display text the current finding now renders differently
+- **THEN** the entry SHALL be reported with `status: matched`, not `changed`
 
 #### Scenario: JSON lifecycle counts are present for every write and report subcommand
 - **WHEN** user runs `baseline generate`, `update`, `prune`, `diff`, or `verify` with `--json`
@@ -461,7 +485,7 @@ A `--dry-run` run SHALL exit 0 when classification completes successfully, regar
 
 `baseline generate` SHALL refuse to write when the resolved `--output` path already exists, and SHALL exit with a non-zero code reporting that `--force` is required to replace it and that `--dry-run` can be used to review the proposal first. With `--force`, `baseline generate` SHALL replace the file.
 
-`baseline update` and `baseline prune` SHALL write without `--force` when the resolved `--output` path equals the resolved `--baseline` path, because naming the same file as both input and output is itself the statement of in-place intent and the written content is derived from that file. When `--output` names a different path that already exists, `baseline update` and `baseline prune` SHALL require `--force` on the same terms as `generate`.
+The in-place exemption SHALL be decided by a case-sensitive comparison of the resolved paths, because on a case-sensitive filesystem `baseline.yml` and `BASELINE.yml` are different files and a case-insensitive match would grant permission to replace a file the author never named. `baseline update` and `baseline prune` SHALL write without `--force` when the resolved `--output` path equals the resolved `--baseline` path, because naming the same file as both input and output is itself the statement of in-place intent and the written content is derived from that file. When `--output` names a different path that already exists, `baseline update` and `baseline prune` SHALL require `--force` on the same terms as `generate`.
 
 #### Scenario: Generate refuses to replace an existing file
 - **WHEN** user runs `baseline generate --config policy.yml --output baseline.yml` and `baseline.yml` already exists
@@ -487,7 +511,7 @@ Every baseline subcommand that writes a file SHALL write the content to a tempor
 
 `baseline update` and `baseline prune` SHALL preserve, verbatim and in position, the leading block of comment and blank lines that precedes the first non-comment line of the existing baseline file, re-emitting it above the regenerated document.
 
-When the existing baseline file contains a comment line at or after its first non-comment line, `baseline update` and `baseline prune` SHALL NOT write any file, SHALL exit with a non-zero code, and SHALL report an actionable diagnostic that names the 1-based line numbers of the comments that cannot be safely round-tripped and states that `--dry-run` produces the proposed document for a manual merge.
+A comment is any `#` that opens a YAML comment token, whether it begins a line or trails content on it (`reason: legacy debt # reviewed by Alice`). A `#` inside a quoted scalar, or one appearing mid-token, is not a comment. When the existing baseline file contains a comment at or after its first non-comment line — leading or trailing — `baseline update` and `baseline prune` SHALL NOT write any file, SHALL exit with a non-zero code, and SHALL report an actionable diagnostic that names the 1-based line numbers of the comments that cannot be safely round-tripped and states that `--dry-run` produces the proposed document for a manual merge.
 
 `--dry-run` SHALL still classify and report against such a file, so the refusal always has a path forward.
 
@@ -498,6 +522,14 @@ When the existing baseline file contains a comment line at or after its first no
 #### Scenario: Interior comments are reported instead of silently dropped
 - **WHEN** user runs `baseline update` against a baseline file that carries a comment line next to one of its `ignored_violations` entries
 - **THEN** no file SHALL be written, the command SHALL exit with a non-zero code, and the diagnostic SHALL name that comment's line number and point at `--dry-run`
+
+#### Scenario: A trailing comment on a content line is reported
+- **WHEN** user runs `baseline update` against a baseline whose entry reads `reason: legacy debt # reviewed by Alice`
+- **THEN** no file SHALL be written and the diagnostic SHALL name that line, rather than the rewrite silently discarding the trailing comment
+
+#### Scenario: A hash inside a quoted scalar is not a comment
+- **WHEN** a baseline entry's value is a quoted scalar containing `#`, and no other comment appears after the first content line
+- **THEN** `baseline update` SHALL proceed and write normally
 
 ### Requirement: Baseline entries carry preserved issue metadata
 

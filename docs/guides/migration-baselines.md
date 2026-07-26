@@ -155,33 +155,49 @@ Every writing command previews:
 - add `--json` to get the same report as one machine-readable document, with the proposal in
   `proposedContent`.
 
-`generate` refuses to replace an existing `--output` file: pass `--force` once you have reviewed the
-proposal. `update` and `prune` writing back to the same path they read (`--output` equal to
-`--baseline`) is the normal in-place step and needs no flag — naming the same file twice is the
-statement of intent. Writing over some *other* existing file requires `--force`.
+`generate` and `migrate` refuse to replace an existing `--output` file: pass `--force` once you have
+reviewed the proposal. `update` and `prune` writing back to the same path they read (`--output` equal
+to `--baseline`) is the normal in-place step and needs no flag — naming the same file twice is the
+statement of intent. Writing over some *other* existing file requires `--force`. That comparison is
+case-sensitive: on a case-sensitive filesystem `baseline.yml` and `BASELINE.yml` are different files,
+so a case-variant spelling asks for `--force` rather than being assumed to be the same destination.
 
 Writes are atomic (temp file, then rename), so a failed write leaves the original baseline
-byte-for-byte intact.
+byte-for-byte intact. A `prune` with nothing to remove goes further and hands back its input
+document verbatim, so a no-op prune cannot reflow quoting, line endings, or blank lines.
 
 ### Entry lifecycle
 
-Human and JSON output of every baseline subcommand use one vocabulary, so a single entry can be
-followed across commands:
+Every baseline subcommand classifies entries with one shared vocabulary — the same one the
+`adoption-stabilization-compatibility` capability fixes for the whole tool — so a single entry can be
+followed across commands, and across output formats:
 
-| Value | Meaning |
+| Status | Meaning |
 | --- | --- |
-| `new` | current violation with no baseline entry |
-| `added` | that violation recorded as a baseline entry by this run |
-| `existing` | baseline entry matching exactly one current violation |
-| `kept` | an existing entry carried through unchanged, reason and issue verbatim |
-| `changed` | an existing entry whose display text was regenerated from the live violation |
-| `stale` | entry matching no current violation, retained (what `update` does with it) |
-| `resolved` | entry matching no current violation, removed (what `prune` does with it) |
-| `ambiguous` | entry matching **more than one** current violation |
-| `configuration` | entry naming a contract id the policy no longer has |
+| `new` | a current finding has no exact baseline entry |
+| `matched` | an entry and a current finding have equal canonical identity |
+| `resolved` | a valid, evaluable entry has no current finding — the debt was fixed |
+| `stale` | the entry references a contract, family, source, schema, or identity form that is no longer valid or evaluable |
+| `changed` | a predecessor/successor relationship is derivable but canonical identity differs, so the entry does not suppress until reviewed |
+| `ambiguous` | more than one candidate could correspond to the entry, and the tool refuses to guess |
+| `configuration-error` | malformed, unsupported, or inconsistent input prevents safe classification |
 
-`--json` output carries a `counts` object keyed by these names (values the command cannot produce are
-reported as `0`) and, for `diff`/`verify`, the full canonical structured identity of each entry.
+**Only `matched` suppresses a finding.** `changed`, `stale`, `ambiguous`, and `configuration-error`
+never silently suppress one — each entry's JSON carries `suppresses` so this is readable without
+inferring it from the status.
+
+What a command *did* with an entry is a separate axis, reported as its **disposition**: `reported`
+(read-only), `added`, `retained`, or `removed`. This is how `update` and `prune` act differently on
+the same classification without either renaming it — a fixed violation is `resolved` in both, and only
+the disposition differs (`retained` vs `removed`).
+
+`--json` output carries a `counts` object keyed by the seven status names (values the command cannot
+produce are reported as `0`), a flat `entries` list in the shared vocabulary, and the full canonical
+structured identity of each entry.
+
+Display text is not identity: when an entry's canonical identity still matches but the live finding
+renders `forbidden_reference` differently, the entry stays `matched` and its display text is
+refreshed. `changed` is reserved for a genuine identity difference, which is why it does not suppress.
 
 **Ambiguous** is the one worth understanding. Under version 1, identity is the
 `(source_type, forbidden_reference)` pair, so a single entry can correspond to several distinct
@@ -189,6 +205,10 @@ violations — two same-named types in different assemblies, or two forbidden ca
 an entry suppresses more than it was reviewed for. `verify` fails on it, `update` and `prune` carry it
 through untouched rather than guessing which identity to keep, and `migrate` is the command that
 resolves it.
+
+**Stale vs resolved** are easy to conflate: `resolved` means the entry is fine and the debt is gone;
+`stale` means the debt may well remain but the entry can no longer be evaluated — most often because
+it names a contract id the policy no longer has.
 
 ### Comments and issue metadata
 
@@ -223,6 +243,9 @@ would move your note onto the wrong entry. So `update`/`prune` refuse to write s
 exact line numbers, and point at `--dry-run`, which still prints the proposed document so you can
 merge the comments in by hand. Moving those notes into the header block (or into each entry's `reason`
 /`issue`) makes the file updatable in place from then on.
+
+This covers a comment **trailing** a value, not just one on its own line — `reason: legacy debt # reviewed by Alice` is reviewed content the serializer would drop, so it blocks the rewrite too. A `#`
+inside a quoted scalar is not a comment and does not block anything.
 
 ### Per-contract and per-family reasons
 
@@ -340,12 +363,14 @@ against candidates from the same contract ID):
   intend to keep with a fresh `baseline generate --contract <id>` pass, or by
   accepting the new, disambiguated entries as new debt).
 
-Run `--dry-run`/`--check` first to see the classification report without
-writing anything — useful as its own CI gate (exit code 1 if any entries are
-ambiguous, 0 otherwise). Once the report is clean, drop `--dry-run` and
-provide `--output` to write the migrated file. `baseline migrate` never
-writes to the same path as `--baseline` — pick a distinct `--output`, review
-it, then swap it in for the original file yourself.
+Run `--dry-run`/`--check` first to see the classification report **and the proposed
+migrated document** without writing anything — useful as its own CI gate (exit
+code 1 if any entries are ambiguous, 0 otherwise). Once the report is clean,
+drop `--dry-run` and provide `--output` to write the migrated file; add
+`--force` if that file already exists. `baseline migrate` never writes to the
+same path as `--baseline` — pick a distinct `--output`, review it, then swap it
+in for the original file yourself. Like the other writing subcommands, it
+replaces the destination atomically.
 
 Unlike every other `baseline` subcommand, `migrate` does not accept
 `--mode`/`--contract` — it always classifies **every** entry in the file. A

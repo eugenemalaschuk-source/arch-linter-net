@@ -57,7 +57,8 @@ internal sealed class BaselineDiffCommandHandler(ICliRuntime runtime, ICliConsol
             }
 
             BaselineComparisonReport report = new(
-                outcome.New, outcome.Frozen, outcome.Resolved, outcome.Ambiguous, outcome.ConfigurationErrors);
+                outcome.New, outcome.Frozen, outcome.Resolved, outcome.Ambiguous, outcome.ConfigurationErrors,
+                outcome.Entries);
 
             console.Out.WriteLine(options.Format == "json"
                 ? FormatBaselineComparisonAsJson(report)
@@ -85,32 +86,23 @@ internal sealed class BaselineDiffCommandHandler(ICliRuntime runtime, ICliConsol
     /// One read-only comparison, in the shared lifecycle vocabulary. `diff` and `verify` project the
     /// identical shape so a consumer can switch between them without changing how it reads the output.
     /// </summary>
+    /// <param name="Matched">Entries whose canonical identity equals exactly one current finding.</param>
+    /// <param name="Resolved">Valid, evaluable entries with no current finding — the debt was fixed.</param>
+    /// <param name="Stale">
+    /// Entries referencing a contract that is no longer valid or evaluable. Kept as its own category
+    /// rather than folded into `resolved`, which means the opposite: the entry is fine, the debt is gone.
+    /// </param>
+    /// <param name="LifecycleEntries">
+    /// The same entries in the shared vocabulary, classified once by Core so human and JSON output
+    /// cannot disagree about a status.
+    /// </param>
     internal sealed record BaselineComparisonReport(
         IReadOnlyList<ArchitectureBaselineComparisonEntry> New,
-        IReadOnlyList<ArchitectureBaselineComparisonEntry> Existing,
-        IReadOnlyList<ArchitectureBaselineComparisonEntry> Stale,
+        IReadOnlyList<ArchitectureBaselineComparisonEntry> Matched,
+        IReadOnlyList<ArchitectureBaselineComparisonEntry> Resolved,
         IReadOnlyList<ArchitectureBaselineComparisonEntry> Ambiguous,
-        IReadOnlyList<ArchitectureBaselineComparisonEntry> Configuration)
-    {
-        public IReadOnlyList<BaselineLifecycleEntry> LifecycleEntries()
-        {
-            List<BaselineLifecycleEntry> entries = new();
-            Append(entries, New, BaselineEntryLifecycle.New);
-            Append(entries, Existing, BaselineEntryLifecycle.Existing);
-            Append(entries, Stale, BaselineEntryLifecycle.Stale);
-            Append(entries, Ambiguous, BaselineEntryLifecycle.Ambiguous);
-            Append(entries, Configuration, BaselineEntryLifecycle.Configuration);
-            return entries;
-        }
-
-        private static void Append(
-            List<BaselineLifecycleEntry> target,
-            IReadOnlyList<ArchitectureBaselineComparisonEntry> source,
-            BaselineEntryLifecycle lifecycle)
-        {
-            target.AddRange(source.Select(e => new BaselineLifecycleEntry(e, lifecycle)));
-        }
-    }
+        IReadOnlyList<ArchitectureBaselineComparisonEntry> Stale,
+        IReadOnlyList<BaselineLifecycleEntry> LifecycleEntries);
 
     internal static string FormatBaselineComparisonForHumans(BaselineComparisonReport report)
     {
@@ -120,14 +112,14 @@ internal sealed class BaselineDiffCommandHandler(ICliRuntime runtime, ICliConsol
         ];
 
         AppendEntryLines(lines, report.New);
-        lines.Add($"Existing (frozen) baseline entries: {report.Existing.Count}");
-        AppendEntryLines(lines, report.Existing);
-        lines.Add($"Resolved (stale) baseline entries: {report.Stale.Count}");
-        AppendEntryLines(lines, report.Stale);
+        lines.Add($"Matched baseline entries: {report.Matched.Count}");
+        AppendEntryLines(lines, report.Matched);
+        lines.Add($"Resolved baseline entries (debt fixed): {report.Resolved.Count}");
+        AppendEntryLines(lines, report.Resolved);
         lines.Add($"Ambiguous baseline entries (match more than one violation): {report.Ambiguous.Count}");
         AppendEntryLines(lines, report.Ambiguous);
-        lines.Add($"Configuration errors (unknown contract id): {report.Configuration.Count}");
-        AppendEntryLines(lines, report.Configuration);
+        lines.Add($"Stale baseline entries (contract no longer valid): {report.Stale.Count}");
+        AppendEntryLines(lines, report.Stale);
         return string.Join(Environment.NewLine, lines);
     }
 
@@ -153,14 +145,17 @@ internal sealed class BaselineDiffCommandHandler(ICliRuntime runtime, ICliConsol
         return new
         {
             inSync,
-            counts = BaselineLifecycleFormatter.Counts(report.LifecycleEntries()),
+            counts = BaselineLifecycleFormatter.Counts(report.LifecycleEntries),
+            // `entries` is the shape to read: one flat list in the shared vocabulary. The per-category
+            // keys below are kept for existing consumers, and their historical names (`frozen`,
+            // `configurationErrors`) no longer decide the status — `status` does.
+            entries = BaselineLifecycleFormatter.EntriesForJson(report.LifecycleEntries),
             @new = report.New.Select(e => BaselineLifecycleFormatter.EntryForJson(e, BaselineEntryLifecycle.New)),
-            // `frozen` keeps its historical key while its status value moves to the shared `existing`.
-            frozen = report.Existing.Select(e => BaselineLifecycleFormatter.EntryForJson(e, BaselineEntryLifecycle.Existing)),
-            resolved = report.Stale.Select(e => BaselineLifecycleFormatter.EntryForJson(e, BaselineEntryLifecycle.Stale)),
+            frozen = report.Matched.Select(e => BaselineLifecycleFormatter.EntryForJson(e, BaselineEntryLifecycle.Matched)),
+            resolved = report.Resolved.Select(e => BaselineLifecycleFormatter.EntryForJson(e, BaselineEntryLifecycle.Resolved)),
             ambiguous = report.Ambiguous.Select(e => BaselineLifecycleFormatter.EntryForJson(e, BaselineEntryLifecycle.Ambiguous)),
-            configurationErrors = report.Configuration.Select(
-                e => BaselineLifecycleFormatter.EntryForJson(e, BaselineEntryLifecycle.Configuration)),
+            configurationErrors = report.Stale.Select(
+                e => BaselineLifecycleFormatter.EntryForJson(e, BaselineEntryLifecycle.Stale)),
         };
     }
 }

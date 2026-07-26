@@ -19,4 +19,8 @@ public sealed record BaselineVerifyOutcome(
     /// </summary>
     public IReadOnlyList<ArchitectureBaselineComparisonEntry> Ambiguous { get; init; } =
         Array.Empty<ArchitectureBaselineComparisonEntry>();
+
+    /// <summary>Every entry in the shared lifecycle vocabulary, for one-shape reporting.</summary>
+    public IReadOnlyList<BaselineLifecycleEntry> Entries { get; init; } =
+        Array.Empty<BaselineLifecycleEntry>();
 }

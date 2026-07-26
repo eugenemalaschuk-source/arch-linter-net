@@ -15,13 +15,21 @@ namespace ArchLinterNet.Core.Validation;
 /// </param>
 internal sealed record BaselineWritePlan(
     IReadOnlyList<ArchitectureBaselineComparisonEntry> OutputEntries,
-    IReadOnlyList<BaselineLifecycleEntry> LifecycleEntries);
+    IReadOnlyList<BaselineLifecycleEntry> LifecycleEntries)
+{
+    /// <summary>
+    /// True when the plan leaves the document's entry set exactly as it was read. A prune with nothing
+    /// to remove must reproduce its input byte-for-byte, which means not reserializing at all.
+    /// </summary>
+    public bool RemovesNothing => LifecycleEntries.All(e => e.Disposition != BaselineEntryDisposition.Removed);
+
+    public bool AddsNothing => LifecycleEntries.All(e => e.Disposition != BaselineEntryDisposition.Added);
+}
 
 /// <summary>
-/// Turns one comparison result into the proposed document and its lifecycle report. Kept separate
-/// from the application service so `update` and `prune` provably agree on how a given classification
-/// maps to a disposition — the same entry must not be `stale` in one command's report and something
-/// else in the other's for the same underlying condition.
+/// Maps one comparison result onto the shared lifecycle vocabulary plus a per-entry disposition, and
+/// onto the entries composing the proposed document. Kept in one place so `update` and `prune` cannot
+/// drift into classifying the same condition differently — they differ only in disposition.
 /// </summary>
 internal static class BaselineWritePlanner
 {
@@ -48,7 +56,11 @@ internal static class BaselineWritePlanner
                 candidate.Identity);
 
             output.Add(entry);
-            lifecycle.Add(new BaselineLifecycleEntry(entry, BaselineEntryLifecycle.Added));
+
+            // Every finding a fresh generate records had no prior entry, so each is `new` — recorded
+            // by this run, which is the disposition, not a different classification.
+            lifecycle.Add(new BaselineLifecycleEntry(
+                entry, BaselineEntryLifecycle.New, BaselineEntryDisposition.Added));
         }
 
         return new BaselineWritePlan(output, lifecycle);
@@ -63,28 +75,26 @@ internal static class BaselineWritePlanner
 
         foreach (ArchitectureBaselineComparisonEntry entry in comparison.Frozen)
         {
-            // Identity still matches, so the entry stays — but if the live candidate now renders a
-            // different display string, the emitted entry adopts it and says so, rather than keeping
-            // stale display text that no longer describes the violation it suppresses.
-            bool displayDrifted = entry.CurrentForbiddenReference != null
-                && !string.Equals(entry.CurrentForbiddenReference, entry.ForbiddenReference, StringComparison.Ordinal);
-
-            ArchitectureBaselineComparisonEntry emitted = displayDrifted
-                ? entry with { ForbiddenReference = entry.CurrentForbiddenReference! }
+            // Canonical identity is equal, so this is `matched` — including when only the display text
+            // regenerated. Display text is not identity, so a drifting `forbidden_reference` string is
+            // not the `changed` classification, which is reserved for an entry whose canonical identity
+            // actually differs from its successor's and which therefore must not suppress.
+            ArchitectureBaselineComparisonEntry emitted = entry.CurrentForbiddenReference != null
+                ? entry with { ForbiddenReference = entry.CurrentForbiddenReference }
                 : entry;
 
             output.Add(emitted);
             lifecycle.Add(new BaselineLifecycleEntry(
-                emitted, displayDrifted ? BaselineEntryLifecycle.Changed : BaselineEntryLifecycle.Kept));
+                emitted, BaselineEntryLifecycle.Matched, BaselineEntryDisposition.Retained));
         }
 
-        // Update never removes: entries whose violation is gone stay as `stale` (that is `prune`'s
-        // job), entries that correlate to several candidates stay untouched rather than being
-        // rewritten into one guessed identity, and unknown-contract entries stay as configuration
-        // findings rather than being silently discarded.
-        AddAll(output, lifecycle, comparison.Resolved, BaselineEntryLifecycle.Stale);
-        AddAll(output, lifecycle, comparison.Ambiguous, BaselineEntryLifecycle.Ambiguous);
-        AddAll(output, lifecycle, comparison.ConfigurationErrors, BaselineEntryLifecycle.Configuration);
+        // Update never removes: an entry whose debt is fixed (`resolved`), one that can no longer be
+        // evaluated against its contract (`stale`), and one correlating to several candidates
+        // (`ambiguous`) are all carried through untouched. Removal is `prune`'s job, and rewriting an
+        // ambiguous entry would mean guessing which identity the author meant.
+        Append(output, lifecycle, comparison.Resolved, BaselineEntryLifecycle.Resolved, BaselineEntryDisposition.Retained);
+        Append(output, lifecycle, comparison.Ambiguous, BaselineEntryLifecycle.Ambiguous, BaselineEntryDisposition.Retained);
+        Append(output, lifecycle, comparison.ConfigurationErrors, BaselineEntryLifecycle.Stale, BaselineEntryDisposition.Retained);
 
         foreach (ArchitectureBaselineComparisonEntry entry in comparison.New)
         {
@@ -94,7 +104,8 @@ internal static class BaselineWritePlanner
             };
 
             output.Add(added);
-            lifecycle.Add(new BaselineLifecycleEntry(added, BaselineEntryLifecycle.Added));
+            lifecycle.Add(new BaselineLifecycleEntry(
+                added, BaselineEntryLifecycle.New, BaselineEntryDisposition.Added));
         }
 
         output.AddRange(comparison.OutOfScope);
@@ -107,41 +118,58 @@ internal static class BaselineWritePlanner
         var output = new List<ArchitectureBaselineComparisonEntry>();
         var lifecycle = new List<BaselineLifecycleEntry>();
 
-        // Prune only removes, so a still-matching entry is emitted exactly as it was read — display
-        // text included. A pruned file with nothing to remove is byte-identical to its input.
-        AddAll(output, lifecycle, comparison.Frozen, BaselineEntryLifecycle.Kept);
-        AddAll(output, lifecycle, comparison.Ambiguous, BaselineEntryLifecycle.Ambiguous);
+        // Prune only removes, so a still-matching entry is emitted exactly as read — display text
+        // included. That is what lets a prune with nothing to remove reproduce its input verbatim.
+        Append(output, lifecycle, comparison.Frozen, BaselineEntryLifecycle.Matched, BaselineEntryDisposition.Retained);
+        Append(output, lifecycle, comparison.Ambiguous, BaselineEntryLifecycle.Ambiguous, BaselineEntryDisposition.Retained);
 
-        // Removals are reported but not emitted.
-        AppendReportOnly(lifecycle, comparison.Resolved, BaselineEntryLifecycle.Resolved);
-        AppendReportOnly(lifecycle, comparison.ConfigurationErrors, BaselineEntryLifecycle.Configuration);
+        // Removed: reported but not emitted.
+        AppendReportOnly(lifecycle, comparison.Resolved, BaselineEntryLifecycle.Resolved, BaselineEntryDisposition.Removed);
+        AppendReportOnly(lifecycle, comparison.ConfigurationErrors, BaselineEntryLifecycle.Stale, BaselineEntryDisposition.Removed);
 
         output.AddRange(comparison.OutOfScope);
 
         return new BaselineWritePlan(output, lifecycle);
     }
 
-    private static void AddAll(
+    /// <summary>
+    /// Read-only classification for `diff`/`verify`: same vocabulary, no disposition, since nothing is
+    /// written.
+    /// </summary>
+    public static IReadOnlyList<BaselineLifecycleEntry> Report(ArchitectureBaselineComparisonResult comparison)
+    {
+        var lifecycle = new List<BaselineLifecycleEntry>();
+        AppendReportOnly(lifecycle, comparison.New, BaselineEntryLifecycle.New, BaselineEntryDisposition.Reported);
+        AppendReportOnly(lifecycle, comparison.Frozen, BaselineEntryLifecycle.Matched, BaselineEntryDisposition.Reported);
+        AppendReportOnly(lifecycle, comparison.Resolved, BaselineEntryLifecycle.Resolved, BaselineEntryDisposition.Reported);
+        AppendReportOnly(lifecycle, comparison.Ambiguous, BaselineEntryLifecycle.Ambiguous, BaselineEntryDisposition.Reported);
+        AppendReportOnly(lifecycle, comparison.ConfigurationErrors, BaselineEntryLifecycle.Stale, BaselineEntryDisposition.Reported);
+        return lifecycle;
+    }
+
+    private static void Append(
         List<ArchitectureBaselineComparisonEntry> output,
         List<BaselineLifecycleEntry> lifecycle,
         IReadOnlyList<ArchitectureBaselineComparisonEntry> entries,
-        BaselineEntryLifecycle value)
+        BaselineEntryLifecycle value,
+        BaselineEntryDisposition disposition)
     {
         foreach (ArchitectureBaselineComparisonEntry entry in entries)
         {
             output.Add(entry);
-            lifecycle.Add(new BaselineLifecycleEntry(entry, value));
+            lifecycle.Add(new BaselineLifecycleEntry(entry, value, disposition));
         }
     }
 
     private static void AppendReportOnly(
         List<BaselineLifecycleEntry> lifecycle,
         IReadOnlyList<ArchitectureBaselineComparisonEntry> entries,
-        BaselineEntryLifecycle value)
+        BaselineEntryLifecycle value,
+        BaselineEntryDisposition disposition)
     {
         foreach (ArchitectureBaselineComparisonEntry entry in entries)
         {
-            lifecycle.Add(new BaselineLifecycleEntry(entry, value));
+            lifecycle.Add(new BaselineLifecycleEntry(entry, value, disposition));
         }
     }
 }

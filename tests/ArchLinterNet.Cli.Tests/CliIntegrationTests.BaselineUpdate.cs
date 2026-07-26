@@ -168,10 +168,10 @@ public partial class CliIntegrationTests
     public void BaselineUpdate_InteriorComments_RefusesAndReportsLines()
     {
         string baselinePath = Path.Combine(Path.GetTempPath(), $"baseline-{Guid.NewGuid():N}.yml");
-        const string original = "version: 2\n# a note about the entry below\nbaseline: {}\n";
+        const string Original = "version: 2\n# a note about the entry below\nbaseline: {}\n";
         try
         {
-            File.WriteAllText(baselinePath, original);
+            File.WriteAllText(baselinePath, Original);
 
             var (exitCode, _, stderr) = RunCli("baseline", "update",
                 "--config", _passingPolicy, "--baseline", baselinePath, "--output", baselinePath);
@@ -181,7 +181,7 @@ public partial class CliIntegrationTests
                 Assert.That(exitCode, Is.EqualTo(2));
                 Assert.That(stderr, Does.Contain("line(s) 2"));
                 Assert.That(stderr, Does.Contain("--dry-run"));
-                Assert.That(File.ReadAllText(baselinePath), Is.EqualTo(original));
+                Assert.That(File.ReadAllText(baselinePath), Is.EqualTo(Original));
             });
 
             var (dryRunExit, dryRunStdout, dryRunStderr) = RunCli("baseline", "update",
@@ -191,7 +191,7 @@ public partial class CliIntegrationTests
             {
                 Assert.That(dryRunExit, Is.EqualTo(0), $"Dry run failed, stderr: {dryRunStderr}");
                 Assert.That(dryRunStdout, Does.Contain("version: 2"));
-                Assert.That(File.ReadAllText(baselinePath), Is.EqualTo(original));
+                Assert.That(File.ReadAllText(baselinePath), Is.EqualTo(Original));
             });
         }
         finally

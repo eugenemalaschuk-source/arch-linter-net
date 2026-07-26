@@ -100,7 +100,7 @@ public sealed partial class ArchitectureBaselineApplicationServiceFakeCompositio
     }
 
     [Test]
-    public void Migrate_DryRun_ReportsWithoutProducingYaml()
+    public void Migrate_DryRun_ProducesThePreviewableProposalWithoutWriting()
     {
         (var runnerSetupService, var contractExecutor, var baselineGenerator, var baselineLoadingService) =
             CreateMixedScenarioCollaborators();
@@ -118,9 +118,10 @@ public sealed partial class ArchitectureBaselineApplicationServiceFakeCompositio
         Assert.Multiple(() =>
         {
             Assert.That(outcome.Succeeded, Is.True);
-            Assert.That(outcome.Yaml, Is.Null, "dry-run must never produce output to write.");
+            // A dry run whose purpose is review has to be able to show the document it would write;
+            // whether it reaches disk is the write gate's decision, not this one's.
+            Assert.That(outcome.Yaml, Is.Not.Null, "dry-run must be able to preview the proposed document.");
             Assert.That(outcome.MatchedCount, Is.EqualTo(1));
-            Assert.That(baselineGenerator.WasCalled, Is.False, "dry-run must not invoke the generator.");
         });
     }
 

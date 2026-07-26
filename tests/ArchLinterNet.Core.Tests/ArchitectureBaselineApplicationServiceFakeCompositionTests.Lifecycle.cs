@@ -15,7 +15,7 @@ namespace ArchLinterNet.Core.Tests;
 public sealed partial class ArchitectureBaselineApplicationServiceFakeCompositionTests
 {
     [Test]
-    public void Update_ClassifiesKeptStaleAmbiguousAndAddedEntries()
+    public void Update_ClassifiesMatchedResolvedAmbiguousAndNewEntries()
     {
         BaselineUpdateOutcome outcome = RunLifecycleUpdate(new BaselineUpdateRequest
         {
@@ -32,15 +32,30 @@ public sealed partial class ArchitectureBaselineApplicationServiceFakeCompositio
         Assert.Multiple(() =>
         {
             Assert.That(outcome.Succeeded, Is.True);
-            Assert.That(bySource[BaselineEntryLifecycle.Kept], Is.EqualTo(new[] { "SrcKept" }));
-            Assert.That(bySource[BaselineEntryLifecycle.Stale], Is.EqualTo(new[] { "SrcStale" }));
+            Assert.That(bySource[BaselineEntryLifecycle.Matched], Is.EqualTo(new[] { "SrcKept" }));
+            Assert.That(bySource[BaselineEntryLifecycle.Resolved], Is.EqualTo(new[] { "SrcStale" }));
             Assert.That(bySource[BaselineEntryLifecycle.Ambiguous], Is.EqualTo(new[] { "SrcAmbiguous" }));
-            Assert.That(bySource[BaselineEntryLifecycle.Added], Is.EqualTo(new[] { "SrcNew" }));
+            Assert.That(bySource[BaselineEntryLifecycle.New], Is.EqualTo(new[] { "SrcNew" }));
+
+            // Update retains everything; only the disposition distinguishes a carried-through entry
+            // from a newly recorded one.
+            Assert.That(
+                outcome.Entries.Single(e => e.Entry.SourceType == "SrcStale").Disposition,
+                Is.EqualTo(BaselineEntryDisposition.Retained));
+            Assert.That(
+                outcome.Entries.Single(e => e.Entry.SourceType == "SrcNew").Disposition,
+                Is.EqualTo(BaselineEntryDisposition.Added));
+
+            // Only `matched` may count as suppressing a finding.
+            Assert.That(
+                outcome.Entries.Where(e => BaselineEntryLifecycleNames.Suppresses(e.Lifecycle))
+                    .Select(e => e.Entry.SourceType),
+                Is.EqualTo(new[] { "SrcKept" }));
         });
     }
 
     [Test]
-    public void Update_KeptEntry_RetainsReasonAndIssueMetadataVerbatim()
+    public void Update_MatchedEntry_RetainsReasonAndIssueMetadataVerbatim()
     {
         var generator = new FakeBaselineGenerator();
         RunLifecycleUpdate(
@@ -66,7 +81,7 @@ public sealed partial class ArchitectureBaselineApplicationServiceFakeCompositio
     }
 
     [Test]
-    public void Update_AddedEntry_UsesTheMappedReasonForItsFamily()
+    public void Update_NewEntry_UsesTheMappedReasonForItsFamily()
     {
         var generator = new FakeBaselineGenerator();
         RunLifecycleUpdate(
@@ -161,6 +176,9 @@ public sealed partial class ArchitectureBaselineApplicationServiceFakeCompositio
             Assert.That(
                 outcome.Entries.Single(e => e.Entry.SourceType == "SrcStale").Lifecycle,
                 Is.EqualTo(BaselineEntryLifecycle.Resolved));
+            Assert.That(
+                outcome.Entries.Single(e => e.Entry.SourceType == "SrcStale").Disposition,
+                Is.EqualTo(BaselineEntryDisposition.Removed));
             Assert.That(
                 outcome.Entries.Single(e => e.Entry.SourceType == "SrcAmbiguous").Lifecycle,
                 Is.EqualTo(BaselineEntryLifecycle.Ambiguous));

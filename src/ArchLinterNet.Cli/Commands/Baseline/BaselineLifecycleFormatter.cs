@@ -30,12 +30,10 @@ internal static class BaselineLifecycleFormatter
         return counts;
     }
 
-    public static object EntryForJson(ArchitectureBaselineComparisonEntry entry, BaselineEntryLifecycle lifecycle)
-    {
-        return EntryForJson(entry, BaselineEntryLifecycleNames.WireName(lifecycle));
-    }
-
-    public static object EntryForJson(ArchitectureBaselineComparisonEntry entry, string status)
+    public static object EntryForJson(
+        ArchitectureBaselineComparisonEntry entry,
+        BaselineEntryLifecycle lifecycle,
+        BaselineEntryDisposition disposition = BaselineEntryDisposition.Reported)
     {
         return new
         {
@@ -45,7 +43,12 @@ internal static class BaselineLifecycleFormatter
             forbiddenReference = entry.ForbiddenReference,
             reason = entry.Reason,
             issue = entry.Issue,
-            status,
+            // `status` is the shared lifecycle vocabulary and nothing else. What the command did with
+            // the entry is `disposition`, and whether the entry suppresses a finding is `suppresses` —
+            // three separate questions a consumer would otherwise have to infer from one string.
+            status = BaselineEntryLifecycleNames.WireName(lifecycle),
+            disposition = BaselineEntryDispositionNames.WireName(disposition),
+            suppresses = BaselineEntryLifecycleNames.Suppresses(lifecycle),
             identity = IdentityForJson(entry.Identity),
         };
     }
@@ -82,7 +85,7 @@ internal static class BaselineLifecycleFormatter
 
     public static IEnumerable<object> EntriesForJson(IEnumerable<BaselineLifecycleEntry> entries)
     {
-        return entries.Select(e => EntryForJson(e.Entry, e.Lifecycle));
+        return entries.Select(e => EntryForJson(e.Entry, e.Lifecycle, e.Disposition));
     }
 
     /// <summary>
@@ -107,7 +110,7 @@ internal static class BaselineLifecycleFormatter
             lines.Add($"{name}: {matching.Count}");
             foreach (BaselineLifecycleEntry entry in matching)
             {
-                lines.Add(Describe(entry.Entry));
+                lines.Add($"{Describe(entry.Entry)} [{BaselineEntryDispositionNames.WireName(entry.Disposition)}]");
             }
         }
 

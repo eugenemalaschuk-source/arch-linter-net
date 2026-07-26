@@ -73,4 +73,5 @@ internal sealed record BaselineMigrateCommandOptions(
     string? ConditionSetName,
     string Format,
     bool DryRun,
+    bool Force,
     bool ShowHelp);

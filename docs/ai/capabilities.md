@@ -137,15 +137,18 @@ Baselines are frozen debt, not a way to hide new violations.
 
 Baseline writes are reviewable, not automatic. `generate`, `update`, and `prune`
 accept `--dry-run` (report only) and print the proposed document to stdout when
-`--output` is omitted; `generate` refuses to replace an existing output file
-without `--force`; every write is atomic. `update`/`prune` preserve a leading
+`--output` is omitted; `generate` and `migrate` refuse to replace an existing output
+file without `--force`; every write is atomic, and a no-op `prune` reproduces its
+input byte-for-byte. `update`/`prune` preserve a leading
 comment header plus each entry's `reason` and optional `issue` metadata, and
 refuse to rewrite a file whose comments sit next to entries. Newly added entries
 can take per-contract or per-family reasons via `--reason-for-contract` and
 `--reason-for-family`; carried-over entries keep their recorded reason. All
-subcommands report one entry lifecycle (`new`, `added`, `existing`, `kept`,
-`changed`, `stale`, `resolved`, `ambiguous`, `configuration`) in human and JSON
-output. `baseline verify` is the only baseline command intended for CI — never
+subcommands report one entry lifecycle — `new`, `matched`, `resolved`, `stale`,
+`changed`, `ambiguous`, `configuration-error`, the vocabulary fixed by the
+`adoption-stabilization-compatibility` capability — plus a separate disposition
+(`reported`/`added`/`retained`/`removed`) in human and JSON output. Only
+`matched` suppresses a finding. `baseline verify` is the only baseline command intended for CI — never
 regenerate or update a baseline automatically.
 
 ## Not supported

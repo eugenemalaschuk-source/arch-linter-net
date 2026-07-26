@@ -136,4 +136,31 @@ baseline:
             Assert.That(stdout, Does.Contain("--baseline"));
         });
     }
+
+    [Test]
+    public void BaselinePrune_NothingToRemove_ReproducesTheInputByteForByte()
+    {
+        string baselinePath = Path.Combine(Path.GetTempPath(), $"baseline-{Guid.NewGuid():N}.yml");
+        // Deliberately quirky: CRLF endings, a quoted scalar, and a blank line the serializer would
+        // not reproduce. A no-op prune must not touch any of it.
+        const string Original = "# reviewed baseline\r\nversion: 2\r\n\r\nbaseline:\r\n  strict: []\r\n";
+        try
+        {
+            File.WriteAllText(baselinePath, Original);
+
+            var (exitCode, _, stderr) = RunCli("baseline", "prune",
+                "--config", _passingPolicy, "--baseline", baselinePath, "--output", baselinePath);
+
+            Assert.Multiple(() =>
+            {
+                Assert.That(exitCode, Is.EqualTo(0), $"Baseline prune failed, stderr: {stderr}");
+                Assert.That(File.ReadAllText(baselinePath), Is.EqualTo(Original));
+            });
+        }
+        finally
+        {
+            if (File.Exists(baselinePath))
+                File.Delete(baselinePath);
+        }
+    }
 }

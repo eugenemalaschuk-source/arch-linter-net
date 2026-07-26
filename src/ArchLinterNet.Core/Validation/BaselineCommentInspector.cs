@@ -29,9 +29,14 @@ public sealed record BaselineCommentInspection(
 /// <remarks>
 /// This is deliberately a line-level inspection rather than a YAML round-trip: guessing where an
 /// interior comment belongs in a regenerated document risks moving a reviewer's note onto the wrong
-/// entry, which is worse than refusing. A <c>#</c> inside a quoted scalar would be read here as a
-/// comment; the consequence is a refusal to rewrite in place, never a silent loss, and baseline files
-/// are generated documents where that shape does not occur.
+/// entry, which is worse than refusing.
+/// <para>
+/// A comment is any <c>#</c> that starts a comment token in YAML — whether it begins the line or
+/// trails content on it (<c>reason: legacy debt # reviewed by Alice</c>). Both forms are reviewed
+/// content the serializer would drop, so both block an in-place rewrite. <c>#</c> inside a quoted
+/// scalar is not a comment and is correctly ignored; a <c>#</c> in an unquoted scalar with no
+/// preceding space is likewise not a comment token.
+/// </para>
 /// </remarks>
 public static class BaselineCommentInspector
 {
@@ -50,7 +55,7 @@ public static class BaselineCommentInspector
         var unanchorable = new List<int>();
         for (int index = headerLineCount; index < lines.Length; index++)
         {
-            if (IsComment(lines[index]))
+            if (FindCommentColumn(lines[index]) >= 0)
             {
                 unanchorable.Add(index + 1);
             }
@@ -83,6 +88,54 @@ public static class BaselineCommentInspector
             "position for a comment that sits next to an entry. " +
             $"Re-run with --dry-run to print the proposed document, merge those comments into it by hand, " +
             "or move them into the file's leading header block and re-run.";
+    }
+
+    /// <summary>
+    /// Column of the first comment token on the line, or -1 when there is none. Tracks quoting so a
+    /// <c>#</c> inside a scalar is not mistaken for a comment, and requires a leading space for a
+    /// trailing comment, as YAML does.
+    /// </summary>
+    private static int FindCommentColumn(string line)
+    {
+        bool inSingleQuote = false;
+        bool inDoubleQuote = false;
+
+        for (int index = 0; index < line.Length; index++)
+        {
+            char current = line[index];
+
+            if (current == '\'' && !inDoubleQuote)
+            {
+                inSingleQuote = !inSingleQuote;
+                continue;
+            }
+
+            if (current == '"' && !inSingleQuote)
+            {
+                // A backslash-escaped quote inside a double-quoted scalar does not close it.
+                bool escaped = index > 0 && line[index - 1] == '\\';
+                if (!escaped)
+                {
+                    inDoubleQuote = !inDoubleQuote;
+                }
+
+                continue;
+            }
+
+            if (current != '#' || inSingleQuote || inDoubleQuote)
+            {
+                continue;
+            }
+
+            // '#' opens a comment at the start of a line's content, or when preceded by whitespace.
+            // Mid-token (`a#b`) it is an ordinary character.
+            if (index == 0 || char.IsWhiteSpace(line[index - 1]))
+            {
+                return index;
+            }
+        }
+
+        return -1;
     }
 
     private static bool IsComment(string line)

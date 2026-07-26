@@ -121,9 +121,14 @@ internal sealed class BaselineWriteGate(ICliConsole console, IFileSystem fileSys
         };
     }
 
+    // Case-sensitive, because this comparison *grants* permission to overwrite: on a case-sensitive
+    // filesystem `baseline.yml` and `BASELINE.yml` are two different files, and treating them as one
+    // would let a run replace a file the author never named without --force. A case-variant spelling
+    // of the genuinely-same file therefore asks for --force, which is the harmless direction to err in.
+    // (The mirror-image check in Core's migrate — "refuse when --output *is* the source" — is
+    // deliberately case-insensitive, since there fail-closed means catching more collisions.)
     private static bool SamePath(string left, string right)
     {
-        return string.Equals(
-            Path.GetFullPath(left), Path.GetFullPath(right), StringComparison.OrdinalIgnoreCase);
+        return string.Equals(Path.GetFullPath(left), Path.GetFullPath(right), StringComparison.Ordinal);
     }
 }

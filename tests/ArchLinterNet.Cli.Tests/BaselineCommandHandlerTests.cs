@@ -321,6 +321,9 @@ public sealed partial class BaselineCommandHandlerTests
         var runtime = new StubRuntime
         {
             DiffOutcome = new BaselineDiffOutcome(true, [newEntry], [frozenEntry], [resolvedEntry], [configErrorEntry], Array.Empty<ArchitectureViolation>())
+            {
+                Entries = BuildLifecycleReport(newEntry, frozenEntry, resolvedEntry, configErrorEntry),
+            }
         };
 
         var jsonConsole = new RecordingConsole();
@@ -335,10 +338,10 @@ public sealed partial class BaselineCommandHandlerTests
             Assert.That(runtime.DiffRequest!.ContractIds, Is.EqualTo(_contractIds));
             Assert.That(json.RootElement.GetProperty("new")[0].GetProperty("contractId").GetString(), Is.EqualTo("contract-b"));
             Assert.That(json.RootElement.GetProperty("new")[0].GetProperty("status").GetString(), Is.EqualTo("new"));
-            Assert.That(json.RootElement.GetProperty("frozen")[0].GetProperty("status").GetString(), Is.EqualTo("existing"));
-            Assert.That(json.RootElement.GetProperty("resolved")[0].GetProperty("status").GetString(), Is.EqualTo("stale"));
-            Assert.That(json.RootElement.GetProperty("configurationErrors")[0].GetProperty("status").GetString(), Is.EqualTo("configuration"));
-            Assert.That(json.RootElement.GetProperty("counts").GetProperty("existing").GetInt32(), Is.EqualTo(1));
+            Assert.That(json.RootElement.GetProperty("frozen")[0].GetProperty("status").GetString(), Is.EqualTo("matched"));
+            Assert.That(json.RootElement.GetProperty("resolved")[0].GetProperty("status").GetString(), Is.EqualTo("resolved"));
+            Assert.That(json.RootElement.GetProperty("configurationErrors")[0].GetProperty("status").GetString(), Is.EqualTo("stale"));
+            Assert.That(json.RootElement.GetProperty("counts").GetProperty("matched").GetInt32(), Is.EqualTo(1));
         });
 
         var humanConsole = new RecordingConsole();
@@ -415,6 +418,9 @@ public sealed partial class BaselineCommandHandlerTests
                 [resolvedEntry],
                 [configErrorEntry],
                 Array.Empty<ArchitectureViolation>())
+            {
+                Entries = BuildLifecycleReport(newEntry, frozenEntry, resolvedEntry, configErrorEntry),
+            }
         };
 
         var jsonConsole = new RecordingConsole();
@@ -430,10 +436,10 @@ public sealed partial class BaselineCommandHandlerTests
             Assert.That(json.RootElement.GetProperty("inSync").GetBoolean(), Is.False);
             Assert.That(json.RootElement.GetProperty("new")[0].GetProperty("sourceType").GetString(), Is.EqualTo("Source.G"));
             Assert.That(json.RootElement.GetProperty("new")[0].GetProperty("status").GetString(), Is.EqualTo("new"));
-            Assert.That(json.RootElement.GetProperty("frozen")[0].GetProperty("status").GetString(), Is.EqualTo("existing"));
-            Assert.That(json.RootElement.GetProperty("resolved")[0].GetProperty("status").GetString(), Is.EqualTo("stale"));
-            Assert.That(json.RootElement.GetProperty("configurationErrors")[0].GetProperty("status").GetString(), Is.EqualTo("configuration"));
-            Assert.That(json.RootElement.GetProperty("counts").GetProperty("existing").GetInt32(), Is.EqualTo(1));
+            Assert.That(json.RootElement.GetProperty("frozen")[0].GetProperty("status").GetString(), Is.EqualTo("matched"));
+            Assert.That(json.RootElement.GetProperty("resolved")[0].GetProperty("status").GetString(), Is.EqualTo("resolved"));
+            Assert.That(json.RootElement.GetProperty("configurationErrors")[0].GetProperty("status").GetString(), Is.EqualTo("stale"));
+            Assert.That(json.RootElement.GetProperty("counts").GetProperty("matched").GetInt32(), Is.EqualTo(1));
         });
 
         runtime.VerifyOutcome = runtime.VerifyOutcome with { InSync = true };
@@ -504,6 +510,25 @@ public sealed partial class BaselineCommandHandlerTests
     private static ArchitectureViolation CreateViolation(string sourceType, string forbiddenNamespace)
     {
         return new ArchitectureViolation("contract", "rule", sourceType, forbiddenNamespace, ["ref"]);
+    }
+
+    /// <summary>
+    /// The lifecycle report Core would attach, so counts in these handler tests come from the same
+    /// single source the real outcomes use.
+    /// </summary>
+    private static IReadOnlyList<BaselineLifecycleEntry> BuildLifecycleReport(
+        ArchitectureBaselineComparisonEntry newEntry,
+        ArchitectureBaselineComparisonEntry matchedEntry,
+        ArchitectureBaselineComparisonEntry resolvedEntry,
+        ArchitectureBaselineComparisonEntry unknownContractEntry)
+    {
+        return
+        [
+            new BaselineLifecycleEntry(newEntry, BaselineEntryLifecycle.New),
+            new BaselineLifecycleEntry(matchedEntry, BaselineEntryLifecycle.Matched),
+            new BaselineLifecycleEntry(resolvedEntry, BaselineEntryLifecycle.Resolved),
+            new BaselineLifecycleEntry(unknownContractEntry, BaselineEntryLifecycle.Stale),
+        ];
     }
 
     private static ArchitectureBaselineComparisonEntry CreateEntry(

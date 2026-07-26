@@ -177,6 +177,56 @@ public sealed class BaselineSafeAuthoringTests
     }
 
     [Test]
+    public void LifecycleNames_AreExactlyTheSharedVocabulary()
+    {
+        // Fixed by the adoption-stabilization-compatibility capability. A command inventing its own
+        // status word is the compatibility break this guards against.
+        Assert.That(
+            BaselineEntryLifecycleNames.All,
+            Is.EqualTo(new[] { "new", "matched", "resolved", "stale", "changed", "ambiguous", "configuration-error" }));
+    }
+
+    [Test]
+    public void LifecycleNames_OnlyMatchedSuppressesAFinding()
+    {
+        BaselineEntryLifecycle[] nonSuppressing =
+        [
+            BaselineEntryLifecycle.New,
+            BaselineEntryLifecycle.Resolved,
+            BaselineEntryLifecycle.Stale,
+            BaselineEntryLifecycle.Changed,
+            BaselineEntryLifecycle.Ambiguous,
+            BaselineEntryLifecycle.ConfigurationError,
+        ];
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(BaselineEntryLifecycleNames.Suppresses(BaselineEntryLifecycle.Matched), Is.True);
+            foreach (BaselineEntryLifecycle lifecycle in nonSuppressing)
+            {
+                Assert.That(BaselineEntryLifecycleNames.Suppresses(lifecycle), Is.False, lifecycle.ToString());
+            }
+        });
+    }
+
+    [TestCase("reason: legacy debt # reviewed by Alice", true, TestName = "trailing comment after content")]
+    [TestCase("  forbidden_reference: Infra.Db   # keep until Q4", true, TestName = "trailing comment after indented content")]
+    [TestCase("reason: \"contains # inside double quotes\"", false, TestName = "hash inside a double-quoted scalar")]
+    [TestCase("reason: 'contains # inside single quotes'", false, TestName = "hash inside a single-quoted scalar")]
+    [TestCase("source_type: MyApp.Tagged#1", false, TestName = "hash mid-token is not a comment")]
+    public void CommentInspector_TrailingComments_AreDetectedButQuotedHashesAreNot(string contentLine, bool expectRefusal)
+    {
+        BaselineCommentInspection inspection = BaselineCommentInspector.Inspect(
+            "version: 2\n" + contentLine + "\n");
+
+        Assert.That(inspection.CanRoundTrip, Is.EqualTo(!expectRefusal));
+        if (expectRefusal)
+        {
+            Assert.That(inspection.UnanchorableCommentLines, Is.EqualTo(new[] { 2 }));
+        }
+    }
+
+    [Test]
     public void CommentInspector_NoComments_HasNoHeaderAndRoundTrips()
     {
         BaselineCommentInspection inspection = BaselineCommentInspector.Inspect("version: 2\nbaseline: {}\n");

@@ -5,12 +5,12 @@ Baseline authoring is the one place where the tool writes a reviewed, human-owne
 ## What Changes
 
 - Add `--dry-run` and stdout preview to `generate`, `update`, and `prune` so every write can be reviewed before it happens; omitting `--output` writes the proposed document to stdout instead of a file.
-- Add one shared baseline entry lifecycle model (`new`, `added`, `existing`, `kept`, `changed`, `resolved`, `stale`, `ambiguous`, `configuration`) used by human and JSON output of every baseline subcommand, so `update`/`prune` previews and `diff`/`verify` reports describe the same entry with the same word.
-- Require explicit overwrite intent: `generate` refuses to replace an existing `--output` file without `--force`; in-place `update`/`prune` (`--output` equal to `--baseline`) remain the documented flow and stay allowed.
+- Adopt the authoritative lifecycle vocabulary from `adoption-stabilization-compatibility` (`new`, `matched`, `resolved`, `stale`, `changed`, `ambiguous`, `configuration-error`) in the human and JSON output of every baseline subcommand, with a separate `disposition` axis (`reported`/`added`/`retained`/`removed`) so `update` and `prune` can act differently on one classification without renaming it, and a `suppresses` flag so only `matched` ever reads as suppressing a finding.
+- Require explicit overwrite intent through one shared write gate used by `generate`, `update`, `prune`, and `migrate`: replacing an existing `--output` file needs `--force`, while in-place `update`/`prune` (`--output` equal to `--baseline`, compared case-sensitively) remains the documented flow.
 - Preserve the reviewed leading comment header and per-entry `issue` metadata across `update`/`prune`; when the existing file carries comments that cannot be safely round-tripped, refuse to write and report an actionable diagnostic naming the offending lines and the `--dry-run` path to a manual merge.
-- Make every baseline write atomic (temp file plus rename), so a failed write never damages the original file.
+- Make every baseline write atomic (temp file plus rename), so a failed write never damages the original file, and make a no-op `prune` reproduce its input byte-for-byte instead of reserializing it.
 - Add per-contract and per-family reason mapping (`--reason-for-contract`, `--reason-for-family`) applied to newly added entries only; entries carried through keep their `reason` and `issue` verbatim.
-- Report lifecycle counts and the canonical structured identity of every entry in `diff --json` and `verify --json`, including an `ambiguous` classification for a baseline entry that correlates to more than one current candidate; `verify` fails closed on ambiguity.
+- Report lifecycle counts and the canonical structured identity of every entry in `diff --json` and `verify --json`, including an `ambiguous` classification for a baseline entry that correlates to more than one current candidate; `verify` fails closed on `resolved`, `stale`, and `ambiguous`.
 - Document the distinct roles of `generate`, `migrate`, `update`, `prune`, and `verify`, and state that CI runs read-only baseline commands only.
 
 ## Capabilities
