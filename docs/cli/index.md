@@ -11,6 +11,10 @@ arch-linter-net baseline update --config <path> --baseline <path> --output <path
 arch-linter-net baseline prune --config <path> --baseline <path> --output <path> [options]
 arch-linter-net baseline diff --config <path> --baseline <path> [options]
 arch-linter-net baseline verify --config <path> --baseline <path> [options]
+arch-linter-net public-api capture --policy <path> --contract <id> --output <path> [options]
+arch-linter-net public-api diff --policy <path> --contract <id> --snapshot <path> [options]
+arch-linter-net public-api update --policy <path> --contract <id> --snapshot <path> [options]
+arch-linter-net public-api migrate --policy <path> --contract <id> --output <path> [options]
 ```
 
 During repository development, replace `arch-linter-net` with:
@@ -173,6 +177,68 @@ arch-linter-net baseline verify \
 
 See [Migration baselines](../guides/migration-baselines.md) for the full
 lifecycle walkthrough.
+
+## public-api
+
+`public-api` manages the reviewed snapshot behind a
+[public API surface contract](../contracts/public-api-surface.md), so a large exported
+surface is reviewed as a file diff instead of a hand-maintained inline `declared_api` list.
+
+All four subcommands take `--policy` (default `architecture/dependencies.arch.yml`,
+aliased `--config`), a required `--contract <id>` naming a strict or audit public API
+surface contract, an optional `--condition-set`, and `--format`. Build-state preflight runs
+first: a missing, stale, or wrong-target-framework assembly fails the command before anything
+is captured or written.
+
+`--format human|json` is supported everywhere; `diff` additionally accepts `sarif`, because it
+is the one subcommand whose output is a pure finding set. `capture`, `update`, and `migrate`
+reject `sarif` rather than silently emitting human text, and their `json` output is a single
+parsable document (status, destination, delta, proposed content) with no prose appended.
+
+Every path is resolved against the policy boundary before any read or write, so an absolute
+path, a `../` escape, or the policy file itself is refused — and the resolved destination is
+what actually gets written, even when the command runs from outside the repository root.
+
+```bash
+# Write the current exported surface to a reviewed snapshot
+arch-linter-net public-api capture \
+  --policy architecture/dependencies.arch.yml \
+  --contract module-api \
+  --output architecture/api/module-api.txt
+
+# CI gate: exit 1 when the live surface drifted from the snapshot
+arch-linter-net public-api diff \
+  --contract module-api \
+  --snapshot architecture/api/module-api.txt
+
+# Review the proposed snapshot change without writing it
+arch-linter-net public-api update \
+  --contract module-api \
+  --snapshot architecture/api/module-api.txt \
+  --dry-run
+
+# Convert an existing inline declared_api list into a snapshot
+arch-linter-net public-api migrate \
+  --contract module-api \
+  --output architecture/api/module-api.txt
+```
+
+Safety rules worth knowing before wiring this into a pipeline:
+
+- `capture` refuses to overwrite an existing snapshot whose content differs unless `--force`
+  is passed; capturing over a byte-identical file succeeds and reports that it is already current.
+- `update` writes only when not in `--dry-run`, and reports the structured delta either way.
+  Unchanged entries are rewritten exactly as before, so the file diff shows only real movement.
+- `update` against a contract that declares its surface inline (no `api_snapshot`) is refused:
+  rewriting the policy YAML cannot preserve the surrounding comments safely. Run `migrate` first.
+- `migrate` refuses to write while the inline list differs from the live surface, listing every
+  stale inline entry and every undeclared exported member. Pass `--accept-drift` to record the
+  live surface deliberately; the drift is still reported.
+- Exit code `1` means a completed gate found drift (`diff` drift, or unaccepted `migrate` drift).
+  Exit code `2` means the operation never completed: invalid arguments, unknown contract, unusable
+  snapshot, unsafe path, or blocked build state.
+- `update --snapshot` must resolve to the contract's own `api_snapshot`; pointing it at another
+  file is refused rather than leaving the policy pointing at a stale snapshot.
 
 ## Related pages
 

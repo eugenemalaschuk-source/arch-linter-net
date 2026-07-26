@@ -138,6 +138,180 @@ namespace PublicApiSurfaceContractTestFixtures
         {
         }
     }
+
+    public abstract class OpenAbstractType
+    {
+    }
+
+    public static class StaticUtilityType
+    {
+        public static void Do()
+        {
+        }
+    }
+
+    public readonly struct ReadOnlyStructType
+    {
+        public readonly int Value;
+    }
+
+    public interface IConstrainedInterface<T>
+        where T : class, new()
+    {
+    }
+
+    public class ConstrainedGenericType<T>
+        where T : struct
+    {
+    }
+
+    public class VirtualMethodHolder
+    {
+        public virtual void DoWork()
+        {
+        }
+    }
+
+    public abstract class AbstractMethodHolder : VirtualMethodHolder
+    {
+        public abstract void DoOtherWork();
+    }
+
+    public class OverrideMethodHolder : VirtualMethodHolder
+    {
+        public override void DoWork()
+        {
+        }
+    }
+
+    public class SealedOverrideMethodHolder : VirtualMethodHolder
+    {
+        public sealed override void DoWork()
+        {
+        }
+    }
+
+    public static class ParameterModifierHolder
+    {
+        public static void TakeRef(ref int value)
+        {
+        }
+
+        public static void TakeOut(out int value)
+        {
+            value = 0;
+        }
+
+        public static void TakeIn(in int value)
+        {
+        }
+
+        public static void TakeParams(params int[] values)
+        {
+        }
+    }
+
+    public static class GenericMethodConstraintHolder
+    {
+        public static void Do<T>()
+            where T : class, new()
+        {
+        }
+    }
+
+    public class PropertyVariantHolder
+    {
+        public static int StaticProperty { get; set; }
+
+        public int InitOnlyProperty { get; init; }
+
+        public int PublicGetProtectedSetProperty { get; protected set; }
+
+        public int PublicGetProtectedInternalSetProperty { get; protected internal set; }
+    }
+
+    public class FieldVariantHolder
+    {
+        public FieldVariantHolder()
+        {
+            ReadOnlyField = 0;
+        }
+
+        public static int StaticField;
+
+        public readonly int ReadOnlyField;
+    }
+
+    public class EventVariantHolder
+    {
+        public static event EventHandler? StaticEvent;
+    }
+
+    public class VirtualPropertyHolder
+    {
+        public virtual int Value { get; set; }
+    }
+
+    public class OverridePropertyHolder : VirtualPropertyHolder
+    {
+        public override int Value { get; set; }
+    }
+
+    public class VirtualEventHolder
+    {
+        public virtual event EventHandler? Changed
+        {
+            add
+            {
+            }
+
+            remove
+            {
+            }
+        }
+    }
+
+    public class AccessorVisibilityHolder
+    {
+        public int PrivateSetProperty { get; private set; }
+
+        public int PrivateProtectedSetProperty { get; private protected set; }
+
+        public int InternalSetProperty { get; internal set; }
+    }
+
+    public static class RefStructConstraintHolder
+    {
+        public static void Do<T>()
+            where T : allows ref struct
+        {
+        }
+    }
+
+    public class OverrideEventHolder : VirtualEventHolder
+    {
+        public override event EventHandler? Changed
+        {
+            add
+            {
+            }
+
+            remove
+            {
+            }
+        }
+    }
+
+    public static class ConstantVariantHolder
+    {
+        public const bool BoolConst = true;
+        public const char CharConst = 'x';
+        public const float FloatConst = 1.5f;
+        public const double DoubleConst = 2.5d;
+        public const int IntConst = 42;
+        public const string EscapedStringConst = "line1\nline2\t\"quoted\"\\backslash";
+        public const string BracketConst = "foo [bar]";
+    }
 }
 
 #pragma warning restore CS0649
