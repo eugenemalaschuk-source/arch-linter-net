@@ -113,12 +113,11 @@ public sealed partial class ArchitectureAnalysisSession
         List<ArchitectureCoverageSummaryEvidenceItem> coveredItems = new();
         List<ArchitectureCoverageSummaryOptionalEmptyItem> optionalEmptyItems = new();
 
-        foreach (string referencedContractId in contract.ContractIds.OrderBy(id => id, StringComparer.Ordinal))
+        foreach ((string authoredContractId, string referencedContractId) in ResolveReferencedContractIds(contract)
+                     .OrderBy(pair => pair.ResolvedId, StringComparer.Ordinal))
         {
             ArchitectureCoverageExclusion? matchedExclusion = contract.Exclude
-                .FirstOrDefault(exclusion =>
-                    !string.IsNullOrWhiteSpace(exclusion.ContractId)
-                    && string.Equals(exclusion.ContractId, referencedContractId, StringComparison.OrdinalIgnoreCase));
+                .FirstOrDefault(exclusion => MatchesExcludedContractId(exclusion, authoredContractId, referencedContractId));
 
             if (matchedExclusion != null)
             {
@@ -151,7 +150,7 @@ public sealed partial class ArchitectureAnalysisSession
 
                 if (!matchesAnyCode)
                 {
-                    ArchitectureOptionalRuleInput? optionalInput = FindOptionalInput(contract, referencedContractId, input);
+                    ArchitectureOptionalRuleInput? optionalInput = FindOptionalInput(contract, authoredContractId, referencedContractId, input);
                     if (optionalInput is not null)
                     {
                         optionalEmptyItems.Add(new ArchitectureCoverageSummaryOptionalEmptyItem(
@@ -409,6 +408,39 @@ public sealed partial class ArchitectureAnalysisSession
         return findings;
     }
 
+    // Source-set expansion derives per-instance contract ids ("<authored-id>/<source>"), so a
+    // coverage contract that references the authored id an author actually wrote must resolve to
+    // every instance it produced. Contracts that were never expanded resolve to themselves.
+    private IEnumerable<(string AuthoredId, string ResolvedId)> ResolveReferencedContractIds(
+        ArchitectureCoverageContract contract)
+    {
+        foreach (string referencedContractId in contract.ContractIds)
+        {
+            IReadOnlyList<string> instanceIds = Document.SourceExpansion.InstanceIdsFor(referencedContractId);
+
+            if (instanceIds.Count == 0)
+            {
+                yield return (referencedContractId, referencedContractId);
+                continue;
+            }
+
+            foreach (string instanceId in instanceIds)
+            {
+                yield return (referencedContractId, instanceId);
+            }
+        }
+    }
+
+    private static bool MatchesExcludedContractId(
+        ArchitectureCoverageExclusion exclusion,
+        string authoredContractId,
+        string resolvedContractId)
+    {
+        return !string.IsNullOrWhiteSpace(exclusion.ContractId)
+            && (string.Equals(exclusion.ContractId, resolvedContractId, StringComparison.OrdinalIgnoreCase)
+                || string.Equals(exclusion.ContractId, authoredContractId, StringComparison.OrdinalIgnoreCase));
+    }
+
     private List<ArchitectureViolation> CheckRuleInputCoverageContract(ArchitectureCoverageContract contract)
     {
         ArchitectureCoverageInventory inventory = BuildCoverageInventory(Document);
@@ -428,9 +460,10 @@ public sealed partial class ArchitectureAnalysisSession
 
         List<ArchitectureViolation> findings = new();
 
-        foreach (string referencedContractId in contract.ContractIds)
+        foreach ((string authoredContractId, string referencedContractId) in ResolveReferencedContractIds(contract))
         {
-            if (excludedContractIds.Contains(referencedContractId))
+            if (excludedContractIds.Contains(referencedContractId)
+                || excludedContractIds.Contains(authoredContractId))
             {
                 continue;
             }
@@ -441,7 +474,7 @@ public sealed partial class ArchitectureAnalysisSession
             }
 
             AddRuleInputCoverageFindingsForContract(
-                contract, referencedContractId, descriptor, inventory, executionContext, findings);
+                contract, authoredContractId, referencedContractId, descriptor, inventory, executionContext, findings);
         }
 
         executionContext.CollectUnmatchedIgnores(_unmatchedIgnoredViolations);
@@ -454,6 +487,7 @@ public sealed partial class ArchitectureAnalysisSession
 
     private void AddRuleInputCoverageFindingsForContract(
         ArchitectureCoverageContract contract,
+        string authoredContractId,
         string referencedContractId,
         ArchitectureContractDescriptor descriptor,
         ArchitectureCoverageInventory inventory,
@@ -486,7 +520,7 @@ public sealed partial class ArchitectureAnalysisSession
                 ArchitectureLayerResolver.MatchesNamespace(layer, entry.Namespace));
 
             if (!matchesAnyCode
-                && FindOptionalInput(contract, referencedContractId, input) is null
+                && FindOptionalInput(contract, authoredContractId, referencedContractId, input) is null
                 && !executionContext.IsIgnored(referencedContractId, layerName))
             {
                 findings.Add(new ArchitectureViolation(
@@ -499,11 +533,18 @@ public sealed partial class ArchitectureAnalysisSession
         }
     }
 
+    // An optional_inputs entry names the id the author wrote, which for an expanded contract is the
+    // authored id rather than the derived per-source instance id the rest of this pass works with.
+    // Matching either keeps the declaration usable without weakening its exact input/layer identity.
     private static ArchitectureOptionalRuleInput? FindOptionalInput(
-        ArchitectureCoverageContract contract, string contractId, ArchitectureRuleInputReference input)
+        ArchitectureCoverageContract contract,
+        string authoredContractId,
+        string resolvedContractId,
+        ArchitectureRuleInputReference input)
     {
-        return contract.OptionalInputs.SingleOrDefault(optional =>
-            string.Equals(optional.ContractId, contractId, StringComparison.OrdinalIgnoreCase)
+        return contract.OptionalInputs.FirstOrDefault(optional =>
+            (string.Equals(optional.ContractId, resolvedContractId, StringComparison.OrdinalIgnoreCase)
+                || string.Equals(optional.ContractId, authoredContractId, StringComparison.OrdinalIgnoreCase))
             && string.Equals(optional.Input, input.Input, StringComparison.Ordinal)
             && string.Equals(optional.Layer, input.Layer, StringComparison.Ordinal));
     }

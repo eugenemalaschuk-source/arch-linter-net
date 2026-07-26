@@ -4,6 +4,7 @@ using ArchLinterNet.Core.Contracts.Families;
 using ArchLinterNet.Core.Discovery;
 using ArchLinterNet.Core.Execution;
 using ArchLinterNet.Core.Execution.Abstractions;
+using ArchLinterNet.Core.Model;
 using ArchLinterNet.Core.Resolution;
 using ArchLinterNet.Core.Validation;
 using NUnit.Framework;
@@ -108,6 +109,45 @@ public sealed class ArchitectureCoverageInventoryTests
 
         Assert.That(expansion.Exhaustive, Is.True);
         Assert.That(expansion.ContainerNamespace, Is.EqualTo(AlphaNamespace));
+    }
+
+    [Test]
+    public void Build_ExposesResolvedSourceSetExpansion()
+    {
+        ArchitectureContractDocument document = CreateDocument();
+        document.SourceExpansion = new ArchitectureSourceExpansionInventory(
+            [
+                new ArchitectureSourceSetResolution(
+                    "modules",
+                    ArchitectureSourceSetKind.Assembly,
+                    ["Acme.Modules.Billing", "Acme.Modules.Orders"],
+                    false,
+                    string.Empty)
+            ],
+            [
+                new ArchitectureContractExpansion(
+                    "strict_package_dependency",
+                    "modules-no-infrastructure",
+                    "modules avoid infrastructure",
+                    ["modules"],
+                    [
+                        new ArchitectureExpandedContractInstance(
+                            "modules-no-infrastructure/acme-modules-billing",
+                            "Acme.Modules.Billing",
+                            "modules",
+                            "Acme.Modules.*")
+                    ])
+            ]);
+
+        ArchitectureCoverageInventory inventory = ArchitectureCoverageInventory.Build(document, CreateSession());
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(inventory.SourceExpansion.Sets.Single().ResolvedSources,
+                Is.EqualTo(new[] { "Acme.Modules.Billing", "Acme.Modules.Orders" }));
+            Assert.That(inventory.SourceExpansion.Contracts.Single().AuthoredContractId,
+                Is.EqualTo("modules-no-infrastructure"));
+        });
     }
 
     [Test]

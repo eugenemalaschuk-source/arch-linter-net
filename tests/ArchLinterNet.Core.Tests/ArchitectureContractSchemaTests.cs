@@ -117,6 +117,48 @@ public sealed class ArchitectureContractSchemaTests
         Assert.That(anyOf[3].GetProperty("properties").GetProperty("forbidden_project_references").GetProperty("minItems").GetInt32(), Is.EqualTo(1));
     }
 
+    [Test]
+    public void Schema_ProjectMetadataSourceSelector_AcceptsProjectsOrProjectSets()
+    {
+        JsonElement schema = LoadSchema();
+        JsonElement allOf = schema.GetProperty("$defs")
+            .GetProperty("projectMetadataContract")
+            .GetProperty("allOf");
+
+        // Appended last on purpose: the expectation branch stays at allOf[1] for the assertions above.
+        JsonElement selector = allOf[allOf.GetArrayLength() - 1].GetProperty("anyOf");
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(selector[0].GetProperty("required")[0].GetString(), Is.EqualTo("projects"));
+            Assert.That(selector[1].GetProperty("required")[0].GetString(), Is.EqualTo("project_sets"));
+            Assert.That(
+                allOf[1].GetProperty("required").EnumerateArray().Select(entry => entry.GetString()),
+                Is.EqualTo(new[] { "name" }));
+        });
+    }
+
+    [Test]
+    public void Schema_Analysis_DeclaresProjectDiscoveryAndBuildSelectors()
+    {
+        JsonElement properties = LoadSchema().GetProperty("$defs").GetProperty("analysis").GetProperty("properties");
+
+        // The analysis anyOf already offers `solution` and `projects` branches, so these must be
+        // declared properties — additionalProperties is false and a `kind: project` source set
+        // resolves its members against analysis.projects.
+        Assert.Multiple(() =>
+        {
+            foreach (string key in new[]
+                     {
+                         "solution", "projects", "project_include", "project_exclude",
+                         "configuration", "target_framework"
+                     })
+            {
+                Assert.That(properties.TryGetProperty(key, out _), Is.True, $"analysis.{key} must be declared");
+            }
+        });
+    }
+
     // Regression coverage for the semantic-classification-model design
     // (openspec/changes/archive/2026-07-10-design-semantic-classification-model): schema acceptance only,
     // no extraction/matching engine exists yet. See design.md for the reviewed shape.

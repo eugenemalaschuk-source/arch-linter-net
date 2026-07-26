@@ -13,4 +13,6 @@ public sealed record ArchitectureGraphOutcome(ArchitectureDependencyGraph Graph)
     internal IReadOnlyDictionary<(string Source, string Target), IReadOnlyList<ArchitectureViolation>>? EdgeViolations { get; init; }
 
     internal IReadOnlyCollection<ArchitectureCoverageSummary>? CoverageSummaries { get; init; }
+
+    internal Model.ArchitectureSourceExpansionInventory? SourceExpansion { get; init; }
 }

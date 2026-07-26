@@ -19,6 +19,11 @@ public sealed class ArchitectureProjectMetadataContract : IArchitectureContract
 
     [YamlMember(Alias = "projects")] public List<string> Projects { get; set; } = new();
 
+    // Named `project`-kind source sets whose resolved members are unioned into Projects at load
+    // time. This family's selector is already a list, so a set is inlined rather than fanned out
+    // into per-source contract instances (see design.md Decision 4).
+    [YamlMember(Alias = "project_sets")] public List<string> ProjectSets { get; set; } = new();
+
     [YamlMember(Alias = "required_properties")]
     public Dictionary<string, string> RequiredProperties { get; set; } = new(StringComparer.OrdinalIgnoreCase);
 

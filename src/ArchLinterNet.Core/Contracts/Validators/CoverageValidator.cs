@@ -1,5 +1,6 @@
 using ArchLinterNet.Core.Contracts;
 using ArchLinterNet.Core.Contracts.Families;
+using ArchLinterNet.Core.Model;
 
 namespace ArchLinterNet.Core.Contracts.Validators;
 
@@ -252,9 +253,24 @@ internal sealed class CoverageValidator : IArchitecturePolicyDocumentValidator
 
         HashSet<string> selectedContractIds = new(contract.ContractIds, StringComparer.OrdinalIgnoreCase);
         HashSet<string> optionalIdentityKeys = new(StringComparer.OrdinalIgnoreCase);
-        Dictionary<string, IArchitectureContract> contractsById = CollectLayerBearingContracts(document)
-            .Where(referenced => referenced.Id is not null)
-            .ToDictionary(referenced => referenced.Id!, StringComparer.OrdinalIgnoreCase);
+        // Keyed by the derived instance id and, for an expanded contract, additionally by the
+        // authored id an optional_inputs entry would actually name — one authored id can map to
+        // several instances, so an optional input matches when any instance carries that input.
+        Dictionary<string, List<IArchitectureContract>> contractsById = new(StringComparer.OrdinalIgnoreCase);
+        foreach (IArchitectureContract referenced in CollectLayerBearingContracts(document))
+        {
+            if (referenced.Id is null)
+            {
+                continue;
+            }
+
+            AddContractAlias(contractsById, referenced.Id, referenced);
+
+            if ((referenced as IArchitectureSourceExpandableContract)?.ExpansionOrigin is { } origin)
+            {
+                AddContractAlias(contractsById, origin.AuthoredContractId, referenced);
+            }
+        }
 
         foreach (ArchitectureOptionalRuleInput optionalInput in document.Provenance.Track(contract.OptionalInputs))
         {
@@ -268,15 +284,16 @@ internal sealed class CoverageValidator : IArchitecturePolicyDocumentValidator
             }
 
             if (!selectedContractIds.Contains(optionalInput.ContractId)
-                || !contractsById.TryGetValue(optionalInput.ContractId, out IArchitectureContract? referencedContract))
+                || !contractsById.TryGetValue(optionalInput.ContractId, out List<IArchitectureContract>? referencedContracts))
             {
                 throw new InvalidOperationException(
                     $"Rule-input coverage contract '{contract.Name}' has an optional input for unknown or unselected contract ID '{optionalInput.ContractId}'.");
             }
 
-            bool matchesInput = ArchitectureRuleInputReferences.For(referencedContract).Any(reference =>
-                string.Equals(reference.Input, optionalInput.Input, StringComparison.Ordinal)
-                && string.Equals(reference.Layer, optionalInput.Layer, StringComparison.Ordinal));
+            bool matchesInput = referencedContracts.Any(referencedContract =>
+                ArchitectureRuleInputReferences.For(referencedContract).Any(reference =>
+                    string.Equals(reference.Input, optionalInput.Input, StringComparison.Ordinal)
+                    && string.Equals(reference.Layer, optionalInput.Layer, StringComparison.Ordinal)));
             if (!matchesInput)
             {
                 throw new InvalidOperationException(
@@ -474,11 +491,37 @@ internal sealed class CoverageValidator : IArchitecturePolicyDocumentValidator
     // nor the field values resolve the way rule-input coverage expects. Referencing one of these
     // families is therefore rejected below as an unknown contract ID rather than silently
     // producing zero findings.
+    private static void AddContractAlias(
+        Dictionary<string, List<IArchitectureContract>> contractsById,
+        string id,
+        IArchitectureContract contract)
+    {
+        if (!contractsById.TryGetValue(id, out List<IArchitectureContract>? aliased))
+        {
+            aliased = new List<IArchitectureContract>();
+            contractsById[id] = aliased;
+        }
+
+        aliased.Add(contract);
+    }
+
     private static HashSet<string> CollectLayerBearingContractIds(ArchitectureContractDocument document)
     {
-        return new HashSet<string>(
+        HashSet<string> ids = new(
             CollectLayerBearingContracts(document).Select(contract => contract.Id).Where(id => !string.IsNullOrEmpty(id))!,
             StringComparer.OrdinalIgnoreCase);
+
+        // Source-set expansion replaces a supported layer-bearing contract with per-instance ids.
+        // Preserve its authored id only when an expanded executable contract participates in this
+        // pipeline. The inventory also records package/framework fan-out and project-metadata
+        // inline unions, none of which ArchitectureRuleInputReferences or the coverage executor
+        // support; accepting their authored ids would make rule-input coverage false-green.
+        ids.UnionWith(CollectLayerBearingContracts(document)
+            .OfType<IArchitectureSourceExpandableContract>()
+            .Select(contract => contract.ExpansionOrigin?.AuthoredContractId)
+            .Where(id => !string.IsNullOrEmpty(id))!);
+
+        return ids;
     }
 
     private static IEnumerable<IArchitectureContract> CollectLayerBearingContracts(ArchitectureContractDocument document)

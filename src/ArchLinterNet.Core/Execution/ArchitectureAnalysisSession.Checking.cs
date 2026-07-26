@@ -634,7 +634,7 @@ public sealed partial class ArchitectureAnalysisSession
 
     public List<ArchitectureViolation> CheckExternalContract(ArchitectureExternalDependencyContract contract)
     {
-        if (!IsContractSelected(contract.Id) || IsDanglingButCoveredByRuleInputCoverage(contract))
+        if (!IsContractSelected(contract) || IsDanglingButCoveredByRuleInputCoverage(contract))
         {
             return new List<ArchitectureViolation>();
         }
@@ -671,7 +671,7 @@ public sealed partial class ArchitectureAnalysisSession
 
     public List<ArchitectureViolation> CheckExternalAllowOnlyContract(ArchitectureExternalAllowOnlyContract contract)
     {
-        if (!IsContractSelected(contract.Id) || IsDanglingButCoveredByRuleInputCoverage(contract))
+        if (!IsContractSelected(contract) || IsDanglingButCoveredByRuleInputCoverage(contract))
         {
             return new List<ArchitectureViolation>();
         }

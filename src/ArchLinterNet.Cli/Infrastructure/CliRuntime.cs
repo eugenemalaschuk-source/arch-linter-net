@@ -61,6 +61,30 @@ internal sealed class CliRuntime : ICliRuntime
         ArchitectureClassificationPathDeferredNotice? classificationPathDeferred,
         IReadOnlyCollection<BuildStatePreflightDiagnostic> preflightDiagnostics)
     {
+        return FormatResultForCiArtifacts(
+            mode, passed, violations, cycles, cycleFindings, coverageFindings, unmatchedIgnoredViolations,
+            policyConsistencyFindings, coverageSummaries, classificationConflicts, classificationMetadataFailures,
+            classificationRoles, classificationPathDeferred, preflightDiagnostics,
+            ArchitectureSourceExpansionInventory.Empty);
+    }
+
+    public string FormatResultForCiArtifacts( // NOSONAR: each parameter represents a semantically distinct section of the CI artifact payload; grouping would obscure the data contract
+        string mode,
+        bool passed,
+        IReadOnlyCollection<ArchitectureViolation> violations,
+        IReadOnlyCollection<string> cycles,
+        IReadOnlyCollection<ArchitectureCycleFinding> cycleFindings,
+        IReadOnlyCollection<ArchitectureViolation> coverageFindings,
+        IReadOnlyList<ArchitectureUnmatchedIgnoredViolation> unmatchedIgnoredViolations,
+        IReadOnlyCollection<PolicyConsistencyDiagnostic> policyConsistencyFindings,
+        IReadOnlyCollection<ArchitectureCoverageSummary> coverageSummaries,
+        IReadOnlyCollection<ArchitectureClassificationConflict> classificationConflicts,
+        IReadOnlyCollection<ArchitectureClassificationMetadataFailure> classificationMetadataFailures,
+        IReadOnlyCollection<ArchitectureClassificationRoleFact> classificationRoles,
+        ArchitectureClassificationPathDeferredNotice? classificationPathDeferred,
+        IReadOnlyCollection<BuildStatePreflightDiagnostic> preflightDiagnostics,
+        ArchitectureSourceExpansionInventory sourceExpansion)
+    {
         return ArchitectureDiagnosticFormatter.FormatResultForCiArtifacts(
             mode,
             passed,
@@ -70,6 +94,7 @@ internal sealed class CliRuntime : ICliRuntime
             classificationRoles,
             classificationPathDeferred,
             preflightDiagnostics,
+            sourceExpansion,
             coverageFindings,
             unmatchedIgnoredViolations,
             policyConsistencyFindings,
@@ -107,9 +132,30 @@ internal sealed class CliRuntime : ICliRuntime
         IReadOnlyCollection<BuildStatePreflightDiagnostic> preflightDiagnostics,
         IReadOnlyCollection<ArchitectureCoverageSummary> coverageSummaries)
     {
+        return FormatResultAsSarif(
+            mode,
+            violations,
+            cycles,
+            cycleFindings,
+            preflightDiagnostics,
+            coverageSummaries,
+            ArchitectureSourceExpansionInventory.Empty);
+    }
+
+    public string FormatResultAsSarif(
+        string mode,
+        IReadOnlyCollection<ArchitectureViolation> violations,
+        IReadOnlyCollection<string> cycles,
+        IReadOnlyCollection<ArchitectureCycleFinding> cycleFindings,
+        IReadOnlyCollection<BuildStatePreflightDiagnostic> preflightDiagnostics,
+        IReadOnlyCollection<ArchitectureCoverageSummary> coverageSummaries,
+        ArchitectureSourceExpansionInventory sourceExpansion)
+    {
         return cycleFindings.Count > 0
-            ? ArchitectureSarifFormatter.FormatResultAsSarif(mode, violations, cycleFindings, preflightDiagnostics, coverageSummaries, Version)
-            : _sarifFormatter.FormatResultAsSarif(mode, violations, cycles, preflightDiagnostics, coverageSummaries, Version);
+            ? ArchitectureSarifFormatter.FormatResultAsSarif(
+                mode, violations, cycleFindings, preflightDiagnostics, coverageSummaries, sourceExpansion, Version)
+            : _sarifFormatter.FormatResultAsSarif(
+                mode, violations, cycles, preflightDiagnostics, coverageSummaries, sourceExpansion, Version);
     }
 
     public string FormatViolationsForHumans(IReadOnlyCollection<ArchitectureViolation> violations)

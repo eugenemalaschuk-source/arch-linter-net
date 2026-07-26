@@ -31,6 +31,12 @@ public sealed class ArchitectureCompositionContract : IArchitectureContract
     [YamlMember(Alias = "allowed_only_in_assemblies")]
     public List<string> AllowedOnlyInAssemblies { get; set; } = new();
 
+    // Named `assembly`-kind source sets whose resolved members are unioned into
+    // AllowedOnlyInAssemblies at load time, so several hosts can share one reviewed composition
+    // boundary without duplicating the contract (see design.md Decision 4).
+    [YamlMember(Alias = "allowed_only_in_assembly_sets")]
+    public List<string> AllowedOnlyInAssemblySets { get; set; } = new();
+
     // Direct assembly + type identity selector — narrower than allowed_only_in_assemblies (which
     // allows every type in the named assembly) or allowed_only_in_namespaces (every type in the
     // namespace). Exists specifically so a single global/top-level type such as a host's `Program`

@@ -37,7 +37,8 @@ public sealed class ArchitectureExplainApplicationService(IArchitectureGraphAppl
         return outcome with
         {
             ExpressionParticipation = CollectExpressionParticipation(outcome.Path, edgeViolations),
-            CoverageSummaries = graphOutcome.CoverageSummaries ?? Array.Empty<Reporting.ArchitectureCoverageSummary>()
+            CoverageSummaries = graphOutcome.CoverageSummaries ?? Array.Empty<Reporting.ArchitectureCoverageSummary>(),
+            SourceExpansion = graphOutcome.SourceExpansion ?? Model.ArchitectureSourceExpansionInventory.Empty
         };
     }
 

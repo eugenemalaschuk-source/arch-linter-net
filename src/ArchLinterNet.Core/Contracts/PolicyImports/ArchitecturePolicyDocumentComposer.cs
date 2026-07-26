@@ -7,7 +7,7 @@ internal sealed class ArchitecturePolicyDocumentComposer
 {
     private static readonly HashSet<string> _keyedSections = new(StringComparer.Ordinal)
     {
-        "layers", "external_dependencies", "packages", "framework_references"
+        "layers", "external_dependencies", "packages", "framework_references", "source_sets"
     };
 
     private readonly Dictionary<string, Declaration> _declarations = new(StringComparer.Ordinal);

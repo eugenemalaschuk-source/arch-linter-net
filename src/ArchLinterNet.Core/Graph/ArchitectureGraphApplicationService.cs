@@ -33,7 +33,8 @@ public sealed class ArchitectureGraphApplicationService(
         return new ArchitectureGraphOutcome(graph)
         {
             EdgeViolations = edgeViolations,
-            CoverageSummaries = coverageSummaries
+            CoverageSummaries = coverageSummaries,
+            SourceExpansion = session.Document.SourceExpansion
         };
     }
 

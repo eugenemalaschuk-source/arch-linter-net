@@ -60,4 +60,9 @@ public sealed record ValidationOutcome(
     // assemblies are.
     public IReadOnlyList<string> DiscoveredProjectPaths { get; init; } =
         Array.Empty<string>();
+
+    // The loaded policy's resolved source-set expansion, so JSON and SARIF consumers can prove
+    // which sources each authored contract expanded to. Empty for policies that declare no set.
+    public Model.ArchitectureSourceExpansionInventory SourceExpansion { get; init; } =
+        Model.ArchitectureSourceExpansionInventory.Empty;
 }

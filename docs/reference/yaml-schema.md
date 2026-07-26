@@ -161,6 +161,67 @@ framework_references:
 
 Framework reference matching reads `FrameworkReference` items' `Include` and optional `Condition` attributes from each project's `.csproj`. `FrameworkReference` carries no `Version` attribute, so there is no version resolution and no `dependency_depth` field on framework contracts.
 
+## `source_sets`
+
+Optional. Map of named, reusable source sets so one reviewed contract can target many assemblies,
+layers, or projects without copy-pasting nearly identical contracts.
+
+```yaml
+source_sets:
+  <set-name>:
+    kind: assembly              # Optional — assembly (default) | layer | project
+    members: [<string>]         # Optional — explicit members
+    globs: [<string>]           # Optional — dot-segment globs; not valid for kind: project
+    optional: false             # Optional — when true, resolving to nothing is an accepted state
+    reason: <string>            # Required when optional is true
+```
+
+`kind` fixes both the identity domain and the declared policy input a glob resolves against:
+
+| `kind` | member identity | glob universe |
+| --- | --- | --- |
+| `assembly` | target assembly name | `analysis.target_assemblies` |
+| `layer` | declared `layers` key | `layers` keys |
+| `project` | project path | `analysis.projects` (explicit `members` only) |
+
+A set never widens analysis: every resolved source must already be a declared policy input. Globs use
+the same constrained dot-segment syntax as layer namespaces (`*` is a complete segment, at least one
+leading literal segment, no regular expressions, no `**`, no partial-segment wildcards).
+
+Contracts reference sets in two shapes:
+
+- **Fan-out** — `sources:` and `source_sets:` on `package_dependency`, `package_allow_only`,
+  `framework_dependency`, `framework_allow_only`, `external`, and `external_allow_only` contracts
+  replace `source:` and expand the contract into one instance per resolved source. Each instance
+  keeps its own diagnostics and baseline identity under the derived id
+  `<authored-id>/<normalized-source>`; `--contract` selection and rule-input coverage `contract_ids`
+  still accept the authored id.
+- **Inline union** — `project_sets:` on project metadata contracts and
+  `allowed_only_in_assembly_sets:` on composition contracts union resolved members into the
+  contract's existing list field without producing extra contract instances. A project metadata
+  contract satisfies its source requirement with `projects`, `project_sets`, or both.
+
+```yaml
+source_sets:
+  module_assemblies:
+    kind: assembly
+    globs: ["Acme.Modules.*"]
+
+contracts:
+  strict_package_dependency:
+    - name: modules avoid infrastructure packages
+      id: modules-no-infrastructure
+      source_sets: [module_assemblies]
+      forbidden: [infrastructure]
+```
+
+Expansion is deterministic (deduplicated and ordinally ordered), bounded at 500 instances per
+authored contract, and fails closed on an unknown set, a mismatched `kind`, a member outside its
+declared input, a glob with no declared universe, a zero-match selector, or a contract that declares
+both `source` and `sources`/`source_sets`. The single exception is a set declaring `optional: true`
+with a `reason`: contracts referencing only such sets expand to zero instances and are reported as
+optional-empty in `explain`, JSON, and SARIF output rather than disappearing silently.
+
 ## `legacy_runtime_layers`
 
 Optional. List of namespace prefixes that are runtime-only or otherwise not

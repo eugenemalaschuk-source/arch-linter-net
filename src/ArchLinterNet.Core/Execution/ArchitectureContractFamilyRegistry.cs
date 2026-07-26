@@ -153,7 +153,7 @@ internal static class ArchitectureContractFamilyRegistry
             ConfigurationContributor = (session, collector, contract) =>
             {
                 var c = (ArchitecturePackageDependencyContract)contract;
-                if (!session.IsContractSelected(c.Id))
+                if (!session.IsContractSelected(c))
                 {
                     return;
                 }
@@ -172,7 +172,7 @@ internal static class ArchitectureContractFamilyRegistry
             ConfigurationContributor = (session, collector, contract) =>
             {
                 var c = (ArchitecturePackageAllowOnlyContract)contract;
-                if (!session.IsContractSelected(c.Id))
+                if (!session.IsContractSelected(c))
                 {
                     return;
                 }
@@ -191,7 +191,7 @@ internal static class ArchitectureContractFamilyRegistry
             ConfigurationContributor = (session, collector, contract) =>
             {
                 var c = (ArchitectureFrameworkReferenceContract)contract;
-                if (!session.IsContractSelected(c.Id))
+                if (!session.IsContractSelected(c))
                 {
                     return;
                 }
@@ -210,7 +210,7 @@ internal static class ArchitectureContractFamilyRegistry
             ConfigurationContributor = (session, collector, contract) =>
             {
                 var c = (ArchitectureFrameworkReferenceAllowOnlyContract)contract;
-                if (!session.IsContractSelected(c.Id))
+                if (!session.IsContractSelected(c))
                 {
                     return;
                 }

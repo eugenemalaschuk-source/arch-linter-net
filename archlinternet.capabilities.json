@@ -26,6 +26,25 @@
     },
     "unsupported": ["regular expressions", "wildcards in layer namespace definitions", "assembly-only layer definitions"]
   },
+  "sourceSets": {
+    "declaration": "Document-level source_sets.<name> with kind (assembly | layer | project), explicit members, constrained globs, and an optional/reason pair.",
+    "globUniverse": {
+      "assembly": "analysis.target_assemblies",
+      "layer": "declared layers keys",
+      "project": "not supported — project sets accept explicit members only"
+    },
+    "expansion": "Contracts referencing sets through sources/source_sets expand into one instance per resolved source, deduplicated and ordinally ordered, with instance id '<authored-id>/<normalized-source>' and a retained expansion origin (authored contract id, set name, exact selector). List-shaped fields use project_sets and allowed_only_in_assembly_sets, which union resolved members into the existing list instead of fanning out.",
+    "failClosed": [
+      "unknown set reference",
+      "set kind that does not match the referencing field",
+      "member outside the declared policy input for its kind",
+      "glob whose kind-specific universe is empty",
+      "glob or set that resolves to nothing and is not declared optional with a reason",
+      "expansion above 500 instances for one authored contract",
+      "declaring both source and sources/source_sets on the same contract"
+    ],
+    "unsupported": ["regular expressions", "partial-segment wildcards", "recursive '**' wildcards", "globs for kind: project"]
+  },
   "contractFamilies": [
     {
       "kind": "dependency",
@@ -87,8 +106,8 @@
       "kind": "external-dependency",
       "strictGroup": "strict_external",
       "auditGroup": "audit_external",
-      "fields": ["name", "source", "forbidden", "ignored_violations", "reason"],
-      "validates": "A source layer does not reference forbidden vendor/framework dependency groups declared in external_dependencies."
+      "fields": ["name", "source", "sources", "source_sets", "forbidden", "ignored_violations", "reason"],
+      "validates": "A source layer does not reference forbidden vendor/framework dependency groups declared in external_dependencies. sources/source_sets (layer-kind sets) expand one authored contract into one instance per resolved source layer instead of declaring an exact source."
     },
     {
       "kind": "layer-template",
@@ -143,7 +162,7 @@
       "kind": "composition",
       "strictGroup": "strict_composition",
       "auditGroup": "audit_composition",
-      "fields": ["name", "id", "forbidden_apis", "allowed_only_in_layers", "allowed_only_in_namespaces", "allowed_only_in_projects", "allowed_only_in_assemblies", "ignored_violations", "reason"],
+      "fields": ["name", "id", "forbidden_apis", "allowed_only_in_layers", "allowed_only_in_namespaces", "allowed_only_in_projects", "allowed_only_in_assemblies", "allowed_only_in_assembly_sets", "ignored_violations", "reason"],
       "validates": "A type residing outside a declared composition boundary (allowed_only_in_layers/namespaces/projects/assemblies) does not call a forbidden composition-root/service-locator API (matched with the same call-pattern vocabulary as method-body contracts: exact member names, Type.Member names, fully qualified members, and namespace/type prefixes via forbidden_apis). Requires at least one forbidden_apis selector and at least one allowed_only_in_* composition boundary selector. Reflection/IL-based static detection of call sites only: does NOT validate runtime dependency-injection resolution and does not prove every service is registered correctly."
     },
     {

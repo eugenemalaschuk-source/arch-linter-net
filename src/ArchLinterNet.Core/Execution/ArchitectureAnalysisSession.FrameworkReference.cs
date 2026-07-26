@@ -14,7 +14,7 @@ public sealed partial class ArchitectureAnalysisSession
 
     public List<ArchitectureViolation> CheckFrameworkDependencyContract(ArchitectureFrameworkReferenceContract contract)
     {
-        if (!IsContractSelected(contract.Id))
+        if (!IsContractSelected(contract))
         {
             return new List<ArchitectureViolation>();
         }
@@ -67,7 +67,7 @@ public sealed partial class ArchitectureAnalysisSession
 
     public List<ArchitectureViolation> CheckFrameworkAllowOnlyContract(ArchitectureFrameworkReferenceAllowOnlyContract contract)
     {
-        if (!IsContractSelected(contract.Id))
+        if (!IsContractSelected(contract))
         {
             return new List<ArchitectureViolation>();
         }

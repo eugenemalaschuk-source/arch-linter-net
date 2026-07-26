@@ -215,24 +215,6 @@ public sealed partial class ArchitectureAnalysisSession
         _ruleInputCoveredContractIdsForMode = CollectRuleInputCoveredContractIds(mode == "strict");
     }
 
-    // A contract whose layer-bearing field names a layer absent from `layers` would otherwise
-    // throw via ArchitectureLayerResolver.ResolveLayer the moment its check runs. When a
-    // rule_input coverage contract that will actually execute this request already tracks this
-    // contract's ID, defer entirely to that coverage contract's "unresolved" finding instead of
-    // crashing — mirroring CheckConfiguration's "empty layer namespace" deferral for the same
-    // contract_ids-tracked relationship.
-    private bool IsDanglingButCoveredByRuleInputCoverage(IArchitectureContract contract)
-    {
-        if (contract.Id == null
-            || _ruleInputCoveredContractIdsForMode == null
-            || !_ruleInputCoveredContractIdsForMode.Contains(contract.Id))
-        {
-            return false;
-        }
-
-        return GetReferencedLayerNames(contract).Any(layerName => !Document.Layers.ContainsKey(layerName));
-    }
-
     public IEnumerable<ArchitectureDependencyContract> StrictContracts()
     {
         return Document.Contracts.Strict;
@@ -431,12 +413,12 @@ public sealed partial class ArchitectureAnalysisSession
         foreach ((string layerName, List<IArchitectureContract> referencingContracts) in
                  collector.LayerReferencingContracts)
         {
-            HashSet<string> referencingContractIds = referencingContracts
-                .Select(contract => contract.Id)
-                .OfType<string>()
-                .ToHashSet(StringComparer.OrdinalIgnoreCase);
-            bool isFullyOwnedByRuleInputCoverage = referencingContractIds.Count > 0
-                && referencingContractIds.All(ruleInputCoveredContractIds.Contains);
+            List<string[]> referencingContractIdAliases = referencingContracts
+                .Select(ContractIdAliases)
+                .Where(aliases => aliases.Length > 0)
+                .ToList();
+            bool isFullyOwnedByRuleInputCoverage = referencingContractIdAliases.Count > 0
+                && referencingContractIdAliases.All(aliases => aliases.Any(ruleInputCoveredContractIds.Contains));
 
             // A dangling layer name referenced exclusively by contracts a rule_input coverage
             // contract tracks defers to that coverage contract's own "unresolved" finding

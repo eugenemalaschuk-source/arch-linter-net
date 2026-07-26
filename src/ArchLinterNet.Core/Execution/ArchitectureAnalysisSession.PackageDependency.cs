@@ -10,7 +10,7 @@ public sealed partial class ArchitectureAnalysisSession
 {
     public List<ArchitectureViolation> CheckPackageDependencyContract(ArchitecturePackageDependencyContract contract)
     {
-        if (!IsContractSelected(contract.Id))
+        if (!IsContractSelected(contract))
         {
             return new List<ArchitectureViolation>();
         }
@@ -65,7 +65,7 @@ public sealed partial class ArchitectureAnalysisSession
 
     public List<ArchitectureViolation> CheckPackageAllowOnlyContract(ArchitecturePackageAllowOnlyContract contract)
     {
-        if (!IsContractSelected(contract.Id))
+        if (!IsContractSelected(contract))
         {
             return new List<ArchitectureViolation>();
         }
