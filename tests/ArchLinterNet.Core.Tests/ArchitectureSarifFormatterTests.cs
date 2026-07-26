@@ -52,6 +52,28 @@ public sealed class ArchitectureSarifFormatterTests
     }
 
     [Test]
+    public void BaselineComparisonSarif_OrdersEqualDisplayEntriesByCanonicalIdentity()
+    {
+        ArchitectureBaselineComparisonEntry first = CreateBaselineComparisonEntry(occurrence: 1);
+        ArchitectureBaselineComparisonEntry second = CreateBaselineComparisonEntry(occurrence: 0);
+        string firstOrder = ArchitectureBaselineSarifFormatter.Format(
+            [new BaselineLifecycleEntry(first, BaselineEntryLifecycle.New), new BaselineLifecycleEntry(second, BaselineEntryLifecycle.New)], "1.2.3");
+        string secondOrder = ArchitectureBaselineSarifFormatter.Format(
+            [new BaselineLifecycleEntry(second, BaselineEntryLifecycle.New), new BaselineLifecycleEntry(first, BaselineEntryLifecycle.New)], "1.2.3");
+
+        Assert.That(firstOrder, Is.EqualTo(secondOrder));
+    }
+
+    private static ArchitectureBaselineComparisonEntry CreateBaselineComparisonEntry(int occurrence)
+    {
+        return new ArchitectureBaselineComparisonEntry(
+            "strict_method_body", "rule", "App.Service", "Infra.Client.Call", "debt",
+            new ArchitectureViolationIdentity(
+                2, "method_body", "call", "rule", "App", "App.Service", "Run",
+                "Infra", "Infra.Client", "Call", occurrence));
+    }
+
+    [Test]
     public void FormatResultAsSarif_Envelope_HasVersionSchemaAndToolName()
     {
         JsonElement root = Run("strict", Array.Empty<ArchitectureViolation>());

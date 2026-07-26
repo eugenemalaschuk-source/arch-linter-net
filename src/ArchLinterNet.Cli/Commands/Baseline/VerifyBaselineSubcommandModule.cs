@@ -36,10 +36,15 @@ internal sealed class VerifyBaselineSubcommandModule : IBaselineSubcommandModule
             parseResult.GetValue(baselineOption),
             parseResult.GetValue(modeOption) ?? "all",
             parseResult.GetValue(conditionSetOption),
-            parseResult.GetValue(jsonOption) ? "json" : parseResult.GetValue(formatOption) ?? "human",
+            ResolveFormat(parseResult.GetValue(jsonOption), parseResult.GetValue(formatOption)),
             parseResult.GetValue(contractOption) ?? Array.Empty<string>(),
             parseResult.GetValue(helpOption))));
 
         return command;
+    }
+
+    private static string ResolveFormat(bool jsonRequested, string? format)
+    {
+        return jsonRequested && format is not null ? "conflict" : jsonRequested ? "json" : format ?? "human";
     }
 }

@@ -14,6 +14,7 @@ public static class ArchitectureBaselineSarifFormatter
         var ordered = entries.OrderBy(entry => entry.Entry.ContractId, StringComparer.Ordinal)
             .ThenBy(entry => entry.Entry.SourceType, StringComparer.Ordinal)
             .ThenBy(entry => entry.Entry.ForbiddenReference, StringComparer.Ordinal)
+            .ThenBy(entry => CanonicalIdentitySortKey(entry.Entry), StringComparer.Ordinal)
             .ThenBy(entry => BaselineEntryLifecycleNames.WireName(entry.Lifecycle), StringComparer.Ordinal)
             .ToArray();
         object[] rules = ordered.Select(entry => entry.Entry.ContractId).Distinct(StringComparer.Ordinal)
@@ -40,6 +41,24 @@ public static class ArchitectureBaselineSarifFormatter
                 ["results"] = results,
             } },
         });
+    }
+
+    private static string CanonicalIdentitySortKey(ArchitectureBaselineComparisonEntry entry)
+    {
+        ArchitectureViolationIdentity? identity = entry.Identity;
+        return string.Join('\u001F',
+            identity?.IdentityVersion.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? string.Empty,
+            identity?.ContractFamily ?? string.Empty,
+            identity?.Kind ?? string.Empty,
+            identity?.ContractId ?? entry.ContractId,
+            identity?.SourceAssembly ?? string.Empty,
+            identity?.SourceType ?? entry.SourceType,
+            identity?.SourceMember ?? string.Empty,
+            identity?.TargetAssembly ?? string.Empty,
+            identity?.TargetType ?? string.Empty,
+            identity?.TargetMember ?? string.Empty,
+            identity?.Occurrence.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? string.Empty,
+            identity?.Configuration ?? string.Empty);
     }
 
     private static Dictionary<string, object?> BuildResult(BaselineLifecycleEntry lifecycle)
