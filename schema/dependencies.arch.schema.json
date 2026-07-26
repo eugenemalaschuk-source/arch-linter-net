@@ -725,6 +725,32 @@
           "$ref": "#/$defs/stringList",
           "description": "Source roots used by method-body Roslyn scanning."
         },
+        "solution": {
+          "type": "string",
+          "description": "Path to a .sln or .slnx file used for project discovery."
+        },
+        "projects": {
+          "$ref": "#/$defs/stringList",
+          "description": "Explicit .csproj paths used for project discovery. Also the universe a 'kind: project' source set resolves against."
+        },
+        "project_include": {
+          "$ref": "#/$defs/stringList",
+          "description": "Glob patterns narrowing solution-discovered projects."
+        },
+        "project_exclude": {
+          "$ref": "#/$defs/stringList",
+          "description": "Glob patterns removing solution-discovered projects."
+        },
+        "configuration": {
+          "type": "string",
+          "default": "Debug",
+          "description": "Build configuration used to locate project outputs."
+        },
+        "target_framework": {
+          "type": "string",
+          "default": "",
+          "description": "Disambiguates output selection for multi-targeted projects."
+        },
         "unmatched_ignored_violations": {
           "type": "string",
           "enum": ["error", "warn", "off"],
@@ -1473,7 +1499,7 @@
         {
           "type": "object",
           "additionalProperties": false,
-          "required": ["name", "projects"],
+          "required": ["name"],
           "anyOf": [
             {
               "required": ["required_properties"],
@@ -1503,6 +1529,12 @@
             "ignored_violations": { "$ref": "#/$defs/ignoredViolations" },
             "reason": { "type": "string" }
           }
+        },
+        {
+          "anyOf": [
+            { "required": ["projects"] },
+            { "required": ["project_sets"] }
+          ]
         }
       ]
     },

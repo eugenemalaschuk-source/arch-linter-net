@@ -198,7 +198,8 @@ Contracts reference sets in two shapes:
   still accept the authored id.
 - **Inline union** — `project_sets:` on project metadata contracts and
   `allowed_only_in_assembly_sets:` on composition contracts union resolved members into the
-  contract's existing list field without producing extra contract instances.
+  contract's existing list field without producing extra contract instances. A project metadata
+  contract satisfies its source requirement with `projects`, `project_sets`, or both.
 
 ```yaml
 source_sets:

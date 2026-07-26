@@ -51,6 +51,7 @@ internal static class ArchitectureSourceSetExpander
         foreach (ArchitectureProjectMetadataContract contract in groups.StrictProjectMetadata
                      .Concat(groups.AuditProjectMetadata))
         {
+            document.Provenance.SetValidationSubject(contract);
             contract.Projects = InlineSets(
                 resolver,
                 contract.Name,
@@ -63,6 +64,7 @@ internal static class ArchitectureSourceSetExpander
         foreach (ArchitectureCompositionContract contract in groups.StrictComposition
                      .Concat(groups.AuditComposition))
         {
+            document.Provenance.SetValidationSubject(contract);
             contract.AllowedOnlyInAssemblies = InlineSets(
                 resolver,
                 contract.Name,
@@ -71,6 +73,8 @@ internal static class ArchitectureSourceSetExpander
                 contract.AllowedOnlyInAssemblies,
                 contract.AllowedOnlyInAssemblySets);
         }
+
+        document.Provenance.ResetValidationSubject();
 
         document.SourceExpansion = new ArchitectureSourceExpansionInventory(
             resolver.Resolutions,
@@ -91,6 +95,8 @@ internal static class ArchitectureSourceSetExpander
             return;
         }
 
+        RequireUniqueAuthoredIds(document, contracts);
+
         List<TContract> expanded = new();
 
         foreach (TContract contract in contracts)
@@ -105,6 +111,38 @@ internal static class ArchitectureSourceSetExpander
         }
 
         assign(expanded);
+    }
+
+    // Expansion derives per-instance ids ("<authored-id>/<source>") before DuplicateIdValidator
+    // runs, so two contracts sharing one authored id would otherwise become distinct instance ids
+    // and stop being reported as duplicates — silently splitting one reviewed identity in two and
+    // making authored-id selection and rule-input coverage resolve only one of them. The authored
+    // ids are still intact here, so the same rule DuplicateIdValidator enforces is applied first.
+    private static void RequireUniqueAuthoredIds<TContract>(
+        ArchitectureContractDocument document,
+        List<TContract> contracts)
+        where TContract : class, IArchitectureContract
+    {
+        string[] duplicates = contracts
+            .Select(contract => contract.Id)
+            .Where(id => !string.IsNullOrEmpty(id))
+            .GroupBy(id => id!, StringComparer.OrdinalIgnoreCase)
+            .Where(group => group.Count() > 1)
+            .Select(group => group.Key)
+            .ToArray();
+
+        if (duplicates.Length == 0)
+        {
+            return;
+        }
+
+        document.Provenance.SetValidationSubject(
+            contracts.First(contract =>
+                string.Equals(contract.Id, duplicates[0], StringComparison.OrdinalIgnoreCase)));
+
+        throw new InvalidOperationException(
+            $"Duplicate contract IDs found: {string.Join(", ", duplicates)}. Each contract ID must be " +
+            "unique within its contract type and mode group.");
     }
 
     private static IEnumerable<TContract> ExpandContract<TContract>(
@@ -122,6 +160,10 @@ internal static class ArchitectureSourceSetExpander
                 "'sources'/'source_sets'. Declare exactly one source selector: an exact 'source', " +
                 "or the multi-source 'sources'/'source_sets' form.");
         }
+
+        // Every throw below is enriched by ArchitecturePolicyDocumentLoader with the current
+        // validation subject's location, so point it at the authored contract before resolving.
+        document.Provenance.SetValidationSubject(contract);
 
         string authoredId = contract.Id ?? ArchitecturePolicyDocumentLoader.NormalizeToContractId(contract.Name);
 
@@ -250,10 +292,15 @@ internal static class ArchitectureSourceSetExpander
             // policy error whether or not a contract happens to reference it.
             foreach ((string name, ArchitectureSourceSet set) in document.SourceSets)
             {
+                // Point diagnostics at the authored `source_sets.<name>` node — including its
+                // originating fragment for a composed policy — before it can throw.
+                document.Provenance.SetValidationSubject(set);
                 ArchitectureSourceSetResolution resolution = ResolveDeclaration(name, set);
                 _resolutions[name] = resolution;
                 _ordered.Add(resolution);
             }
+
+            document.Provenance.ResetValidationSubject();
         }
 
         public IReadOnlyList<ArchitectureSourceSetResolution> Resolutions => _ordered;

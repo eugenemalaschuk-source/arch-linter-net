@@ -257,6 +257,243 @@ public sealed class SourceSetExpansionFamilyTests
         });
     }
 
+    [Test]
+    public void DuplicateAuthoredContractIds_AreStillRejectedAfterExpansion()
+    {
+        InvalidOperationException exception = Assert.Throws<InvalidOperationException>(() => Load($"""
+            version: 1
+            name: Test
+            analysis:
+              target_assemblies: [Acme.Modules.Billing, Acme.Modules.Orders]
+            packages:
+              infrastructure:
+                package_ids: [Acme.Infrastructure]
+            contracts:
+              strict_package_dependency:
+                - name: billing avoids infrastructure
+                  id: modules-no-infrastructure
+                  sources: [Acme.Modules.Billing]
+                  forbidden: [infrastructure]
+                - name: orders avoids infrastructure
+                  id: modules-no-infrastructure
+                  sources: [Acme.Modules.Orders]
+                  forbidden: [infrastructure]
+            """))!;
+
+        Assert.That(exception.Message,
+            Does.Contain("Duplicate contract IDs found: modules-no-infrastructure"));
+    }
+
+    [Test]
+    public void DuplicateAuthoredIdAcrossExpandedAndExactContracts_IsRejected()
+    {
+        InvalidOperationException exception = Assert.Throws<InvalidOperationException>(() => Load($"""
+            version: 1
+            name: Test
+            analysis:
+              target_assemblies: [Acme.Modules.Billing, Acme.Modules.Orders]
+            packages:
+              infrastructure:
+                package_ids: [Acme.Infrastructure]
+            contracts:
+              strict_package_dependency:
+                - name: billing avoids infrastructure
+                  id: modules-no-infrastructure
+                  source: Acme.Modules.Billing
+                  forbidden: [infrastructure]
+                - name: orders avoids infrastructure
+                  id: modules-no-infrastructure
+                  sources: [Acme.Modules.Orders]
+                  forbidden: [infrastructure]
+            """))!;
+
+        Assert.That(exception.Message,
+            Does.Contain("Duplicate contract IDs found: modules-no-infrastructure"));
+    }
+
+    [Test]
+    public void DistinctAuthoredIds_ExpandWithoutDuplicateDiagnostics()
+    {
+        ArchitectureContractDocument document = Load($"""
+            version: 1
+            name: Test
+            analysis:
+              target_assemblies: [Acme.Modules.Billing, Acme.Modules.Orders]
+            source_sets:
+              modules:
+                globs: ["Acme.Modules.*"]
+            packages:
+              infrastructure:
+                package_ids: [Acme.Infrastructure]
+            contracts:
+              strict_package_dependency:
+                - name: modules avoid infrastructure
+                  id: modules-no-infrastructure
+                  source_sets: [modules]
+                  forbidden: [infrastructure]
+                - name: modules avoid legacy infrastructure
+                  id: modules-no-legacy-infrastructure
+                  source_sets: [modules]
+                  forbidden: [infrastructure]
+            """);
+
+        Assert.That(document.Contracts.StrictPackageDependency.Select(c => c.Id), Is.EqualTo(new[]
+        {
+            "modules-no-infrastructure/acme-modules-billing",
+            "modules-no-infrastructure/acme-modules-orders",
+            "modules-no-legacy-infrastructure/acme-modules-billing",
+            "modules-no-legacy-infrastructure/acme-modules-orders"
+        }));
+    }
+
+    [Test]
+    public void ProjectMetadataContractWithOnlyProjectSets_PassesComposedPolicySchemaValidation()
+    {
+        Write("architecture/parts/projects.yml", """
+            source_sets:
+              module_projects:
+                kind: project
+                members: [src/Acme.Modules.Orders/Acme.Modules.Orders.csproj]
+            contracts:
+              strict_project_metadata:
+                - name: modules are packable
+                  id: modules-packable
+                  project_sets: [module_projects]
+                  required_properties:
+                    IsPackable: "true"
+            """);
+
+        string root = Write("architecture/root.yml", """
+            version: 1
+            name: Test
+            imports:
+              - parts/projects.yml
+            layers:
+              domain:
+                namespace: Acme.Domain
+            analysis:
+              target_assemblies: [Acme.Host]
+              projects:
+                - src/Acme.Modules.Orders/Acme.Modules.Orders.csproj
+            """);
+
+        ArchitectureContractDocument document = new ArchitecturePolicyDocumentLoader().Load(root);
+
+        Assert.That(document.Contracts.StrictProjectMetadata.Single().Projects,
+            Is.EqualTo(new[] { "src/Acme.Modules.Orders/Acme.Modules.Orders.csproj" }));
+    }
+
+    [Test]
+    public void ProjectMetadataContractWithNeitherProjectsNorSets_IsRejectedBySchema()
+    {
+        Write("architecture/parts/projects.yml", """
+            contracts:
+              strict_project_metadata:
+                - name: modules are packable
+                  id: modules-packable
+                  required_properties:
+                    IsPackable: "true"
+            """);
+
+        string root = Write("architecture/root.yml", """
+            version: 1
+            name: Test
+            imports:
+              - parts/projects.yml
+            layers:
+              domain:
+                namespace: Acme.Domain
+            analysis:
+              target_assemblies: [Acme.Host]
+            """);
+
+        ArchitecturePolicyImportException exception = Assert.Throws<ArchitecturePolicyImportException>(() =>
+            new ArchitecturePolicyDocumentLoader().Load(root))!;
+
+        Assert.That(exception.Message, Does.Contain("does not satisfy the effective policy schema"));
+    }
+
+    [Test]
+    public void ImportedZeroMatchSet_ReportsAuthoredFragmentLocation()
+    {
+        Write("architecture/parts/modules.yml", """
+            source_sets:
+              module_assemblies:
+                globs: ["Acme.Modules.*"]
+            packages:
+              infrastructure:
+                package_ids: [Acme.Infrastructure]
+            contracts:
+              strict_package_dependency:
+                - name: modules avoid infrastructure
+                  id: modules-no-infrastructure
+                  source_sets: [module_assemblies]
+                  forbidden: [infrastructure]
+            """);
+
+        string root = Write("architecture/root.yml", """
+            version: 1
+            name: Test
+            imports:
+              - parts/modules.yml
+            layers:
+              domain:
+                namespace: Acme.Domain
+            analysis:
+              target_assemblies: [Acme.Host]
+            """);
+
+        ArchitecturePolicyValidationException exception = Assert.Throws<ArchitecturePolicyValidationException>(() =>
+            new ArchitecturePolicyDocumentLoader().Load(root))!;
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(exception.Message, Does.Contain("matches nothing"));
+            Assert.That(exception.Message, Does.Contain("architecture/parts/modules.yml"));
+            Assert.That(exception.Diagnostic.Location!.SourcePath, Is.EqualTo("architecture/parts/modules.yml"));
+            Assert.That(exception.Diagnostic.Location.YamlPath, Does.Contain("source_sets"));
+        });
+    }
+
+    [Test]
+    public void ImportedUnknownSetReference_ReportsAuthoredContractLocation()
+    {
+        Write("architecture/parts/modules.yml", """
+            packages:
+              infrastructure:
+                package_ids: [Acme.Infrastructure]
+            contracts:
+              strict_package_dependency:
+                - name: modules avoid infrastructure
+                  id: modules-no-infrastructure
+                  source_sets: [missing_set]
+                  forbidden: [infrastructure]
+            """);
+
+        string root = Write("architecture/root.yml", """
+            version: 1
+            name: Test
+            imports:
+              - parts/modules.yml
+            layers:
+              domain:
+                namespace: Acme.Domain
+            analysis:
+              target_assemblies: [Acme.Host]
+            """);
+
+        ArchitecturePolicyValidationException exception = Assert.Throws<ArchitecturePolicyValidationException>(() =>
+            new ArchitecturePolicyDocumentLoader().Load(root))!;
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(exception.Message, Does.Contain("unknown source set 'missing_set'"));
+            Assert.That(exception.Diagnostic.Location!.SourcePath, Is.EqualTo("architecture/parts/modules.yml"));
+            Assert.That(exception.Diagnostic.Location.YamlPath,
+                Does.Contain("contracts.strict_package_dependency[0]"));
+        });
+    }
+
     private ArchitectureContractDocument Load(string yaml)
     {
         string path = Write("dependencies.arch.yml", yaml);
