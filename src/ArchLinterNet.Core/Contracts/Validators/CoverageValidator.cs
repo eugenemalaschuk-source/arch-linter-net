@@ -1,5 +1,6 @@
 using ArchLinterNet.Core.Contracts;
 using ArchLinterNet.Core.Contracts.Families;
+using ArchLinterNet.Core.Model;
 
 namespace ArchLinterNet.Core.Contracts.Validators;
 
@@ -476,9 +477,19 @@ internal sealed class CoverageValidator : IArchitecturePolicyDocumentValidator
     // producing zero findings.
     private static HashSet<string> CollectLayerBearingContractIds(ArchitectureContractDocument document)
     {
-        return new HashSet<string>(
+        HashSet<string> ids = new(
             CollectLayerBearingContracts(document).Select(contract => contract.Id).Where(id => !string.IsNullOrEmpty(id))!,
             StringComparer.OrdinalIgnoreCase);
+
+        // Source-set expansion replaces an authored contract with per-instance ids. The authored id
+        // is what a policy author wrote and stays referenceable; execution resolves it back to
+        // every instance (see ArchitectureAnalysisSession.ResolveReferencedContractIds).
+        foreach (ArchitectureContractExpansion expansion in document.SourceExpansion.Contracts)
+        {
+            ids.Add(expansion.AuthoredContractId);
+        }
+
+        return ids;
     }
 
     private static IEnumerable<IArchitectureContract> CollectLayerBearingContracts(ArchitectureContractDocument document)

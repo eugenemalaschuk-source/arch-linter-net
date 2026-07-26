@@ -67,7 +67,8 @@ public sealed partial class ArchitectureSarifFormatter : IArchitectureSarifForma
         IEnumerable<Func<string, ResultEntry>> cycleEntryFactories,
         string toolVersion,
         IReadOnlyCollection<BuildStatePreflightDiagnostic> preflightDiagnostics,
-        IReadOnlyCollection<ArchitectureCoverageSummary>? coverageSummaries = null)
+        IReadOnlyCollection<ArchitectureCoverageSummary>? coverageSummaries = null,
+        Model.ArchitectureSourceExpansionInventory? sourceExpansion = null)
     {
         string level = mode == "strict" ? "error" : "warning";
 
@@ -113,7 +114,9 @@ public sealed partial class ArchitectureSarifFormatter : IArchitectureSarifForma
                     ["results"] = results,
                     ["properties"] = new Dictionary<string, object?>
                     {
-                        ["coverage_summary"] = FormatCoverageSummaries(coverageSummaries ?? Array.Empty<ArchitectureCoverageSummary>())
+                        ["coverage_summary"] = FormatCoverageSummaries(coverageSummaries ?? Array.Empty<ArchitectureCoverageSummary>()),
+                        ["source_set_expansion"] = FormatSourceExpansion(
+                            sourceExpansion ?? Model.ArchitectureSourceExpansionInventory.Empty)
                     },
                 },
             },

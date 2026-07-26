@@ -137,6 +137,24 @@ public sealed partial class ArchitecturePolicyDocumentLoader : IArchitecturePoli
         // declared surface is complete by the time any validator inspects it.
         PublicApiSnapshotResolver.Resolve(document, policyPath, _fileSystem);
 
+        // Source sets expand after provenance binding (so expanded instances can be aliased onto
+        // their authored location) and before validation (so every validator, and everything
+        // downstream, sees ordinary single-source contracts).
+        try
+        {
+            ArchitectureSourceSetExpander.Expand(document);
+        }
+        catch (InvalidOperationException exception)
+        {
+            Exception enriched = provenance.EnrichValidationException(exception);
+            if (ReferenceEquals(enriched, exception))
+            {
+                throw;
+            }
+
+            throw enriched;
+        }
+
         foreach (IArchitecturePolicyDocumentValidator validator in ArchitecturePolicyDocumentValidatorPipeline.All)
         {
             provenance.ResetValidationSubject();

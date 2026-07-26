@@ -48,6 +48,37 @@ internal interface ICliRuntime
         IReadOnlyCollection<ArchitectureCoverageSummary> coverageSummaries) =>
         FormatResultAsSarif(mode, violations, cycles, cycleFindings, preflightDiagnostics);
 
+    string FormatResultAsSarif(
+        string mode,
+        IReadOnlyCollection<ArchitectureViolation> violations,
+        IReadOnlyCollection<string> cycles,
+        IReadOnlyCollection<ArchitectureCycleFinding> cycleFindings,
+        IReadOnlyCollection<BuildStatePreflightDiagnostic> preflightDiagnostics,
+        IReadOnlyCollection<ArchitectureCoverageSummary> coverageSummaries,
+        ArchitectureSourceExpansionInventory sourceExpansion) =>
+        FormatResultAsSarif(mode, violations, cycles, cycleFindings, preflightDiagnostics, coverageSummaries);
+
+    string FormatResultForCiArtifacts( // NOSONAR: each parameter represents a semantically distinct section of the CI artifact payload; grouping would obscure the data contract
+        string mode,
+        bool passed,
+        IReadOnlyCollection<ArchitectureViolation> violations,
+        IReadOnlyCollection<string> cycles,
+        IReadOnlyCollection<ArchitectureCycleFinding> cycleFindings,
+        IReadOnlyCollection<ArchitectureViolation> coverageFindings,
+        IReadOnlyList<ArchitectureUnmatchedIgnoredViolation> unmatchedIgnoredViolations,
+        IReadOnlyCollection<PolicyConsistencyDiagnostic> policyConsistencyFindings,
+        IReadOnlyCollection<ArchitectureCoverageSummary> coverageSummaries,
+        IReadOnlyCollection<ArchitectureClassificationConflict> classificationConflicts,
+        IReadOnlyCollection<ArchitectureClassificationMetadataFailure> classificationMetadataFailures,
+        IReadOnlyCollection<ArchitectureClassificationRoleFact> classificationRoles,
+        ArchitectureClassificationPathDeferredNotice? classificationPathDeferred,
+        IReadOnlyCollection<BuildStatePreflightDiagnostic> preflightDiagnostics,
+        ArchitectureSourceExpansionInventory sourceExpansion) =>
+        FormatResultForCiArtifacts(
+            mode, passed, violations, cycles, cycleFindings, coverageFindings, unmatchedIgnoredViolations,
+            policyConsistencyFindings, coverageSummaries, classificationConflicts, classificationMetadataFailures,
+            classificationRoles, classificationPathDeferred, preflightDiagnostics);
+
     string FormatViolationsForHumans(IReadOnlyCollection<ArchitectureViolation> violations);
 
     string FormatCyclesForHumans(

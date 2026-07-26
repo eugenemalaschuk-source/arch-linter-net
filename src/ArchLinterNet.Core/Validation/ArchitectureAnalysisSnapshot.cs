@@ -190,7 +190,8 @@ public sealed class ArchitectureAnalysisSnapshot : IDisposable
             PreflightBlocked = true,
             PolicyImportPaths = GetPolicyImportPaths(),
             ResolvedAssemblyPaths = GetResolvedAssemblyPaths(),
-            DiscoveredProjectPaths = GetDiscoveredProjectPaths()
+            DiscoveredProjectPaths = GetDiscoveredProjectPaths(),
+            SourceExpansion = _document.SourceExpansion
         };
     }
 
@@ -270,7 +271,8 @@ public sealed class ArchitectureAnalysisSnapshot : IDisposable
             PreflightDiagnostics = _preflight.Diagnostics,
             PolicyImportPaths = GetPolicyImportPaths(),
             ResolvedAssemblyPaths = GetResolvedAssemblyPaths(),
-            DiscoveredProjectPaths = GetDiscoveredProjectPaths()
+            DiscoveredProjectPaths = GetDiscoveredProjectPaths(),
+            SourceExpansion = _document.SourceExpansion
         };
     }
 

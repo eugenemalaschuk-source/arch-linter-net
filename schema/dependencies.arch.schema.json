@@ -43,6 +43,12 @@
       "additionalProperties": { "$ref": "#/$defs/frameworkReferenceGroup" },
       "default": {}
     },
+    "source_sets": {
+      "type": "object",
+      "description": "Named reusable source sets referenced by contracts through 'sources'/'source_sets', 'project_sets', or 'allowed_only_in_assembly_sets'.",
+      "additionalProperties": { "$ref": "#/$defs/sourceSet" },
+      "default": {}
+    },
     "legacy_runtime_layers": {
       "type": "array",
       "description": "Namespace prefixes used by dependency contracts with forbidden_legacy_runtime enabled.",
@@ -62,6 +68,46 @@
         "type": "string",
         "minLength": 1,
         "pattern": "^(?![~/])(?!.*(?:\\\\|\\$\\{|\\$\\(|%[^%]*%|[<>:\"|?*]|\\p{Cc}))(?!.*(?:^|/)(?:CON|PRN|AUX|NUL|COM[1-9\\u00B9\\u00B2\\u00B3]|LPT[1-9\\u00B9\\u00B2\\u00B3])(?:\\.|/|$))(?!.*(?:^|/)[^/]*[. ](?:/|$))(?:\\.{1,2}|[^/]+)(?:/(?:\\.{1,2}|[^/]+))*$"
+      }
+    },
+    "sourceSet": {
+      "type": "object",
+      "additionalProperties": false,
+      "anyOf": [
+        { "required": ["members"] },
+        { "required": ["globs"] }
+      ],
+      "allOf": [
+        {
+          "if": { "properties": { "optional": { "const": true } }, "required": ["optional"] },
+          "then": { "required": ["reason"] }
+        },
+        {
+          "if": { "properties": { "kind": { "const": "project" } }, "required": ["kind"] },
+          "then": { "not": { "required": ["globs"] } }
+        }
+      ],
+      "properties": {
+        "kind": {
+          "type": "string",
+          "enum": ["assembly", "layer", "project"],
+          "default": "assembly",
+          "description": "Identity domain of this set's members. It also fixes the declared policy input its globs resolve against: 'analysis.target_assemblies' for assembly, 'layers' keys for layer, and 'analysis.projects' for project."
+        },
+        "members": {
+          "$ref": "#/$defs/nonBlankStringList",
+          "description": "Explicit members. Each must be declared in the policy input for this set's kind."
+        },
+        "globs": {
+          "$ref": "#/$defs/nonBlankStringList",
+          "description": "Constrained dotted-segment globs ('*' as a complete segment, at least one leading literal segment). Not valid for 'kind: project'."
+        },
+        "optional": {
+          "type": "boolean",
+          "default": false,
+          "description": "When true, resolving to no source is an accepted, reported state instead of a load error. Requires 'reason'."
+        },
+        "reason": { "type": "string", "minLength": 1 }
       }
     },
     "stringList": {
@@ -1332,11 +1378,18 @@
     "packageDependencyContract": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["name", "source", "forbidden"],
+      "required": ["name", "forbidden"],
+      "anyOf": [
+        { "required": ["source"] },
+        { "required": ["sources"] },
+        { "required": ["source_sets"] }
+      ],
       "properties": {
         "name": { "type": "string", "minLength": 1 },
         "id": { "type": "string", "minLength": 1 },
         "source": { "type": "string", "minLength": 1 },
+        "sources": { "$ref": "#/$defs/nonBlankStringList" },
+        "source_sets": { "$ref": "#/$defs/nonBlankStringList" },
         "forbidden": { "$ref": "#/$defs/stringList" },
         "dependency_depth": {
           "type": "string",
@@ -1351,11 +1404,18 @@
     "packageAllowOnlyContract": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["name", "source", "allowed"],
+      "required": ["name", "allowed"],
+      "anyOf": [
+        { "required": ["source"] },
+        { "required": ["sources"] },
+        { "required": ["source_sets"] }
+      ],
       "properties": {
         "name": { "type": "string", "minLength": 1 },
         "id": { "type": "string", "minLength": 1 },
         "source": { "type": "string", "minLength": 1 },
+        "sources": { "$ref": "#/$defs/nonBlankStringList" },
+        "source_sets": { "$ref": "#/$defs/nonBlankStringList" },
         "allowed": { "$ref": "#/$defs/stringList" },
         "dependency_depth": {
           "type": "string",
@@ -1370,11 +1430,18 @@
     "frameworkDependencyContract": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["name", "source", "forbidden"],
+      "required": ["name", "forbidden"],
+      "anyOf": [
+        { "required": ["source"] },
+        { "required": ["sources"] },
+        { "required": ["source_sets"] }
+      ],
       "properties": {
         "name": { "type": "string", "minLength": 1 },
         "id": { "type": "string", "minLength": 1 },
         "source": { "type": "string", "minLength": 1 },
+        "sources": { "$ref": "#/$defs/nonBlankStringList" },
+        "source_sets": { "$ref": "#/$defs/nonBlankStringList" },
         "forbidden": { "$ref": "#/$defs/stringList" },
         "ignored_violations": { "$ref": "#/$defs/ignoredViolations" },
         "reason": { "type": "string" }
@@ -1383,11 +1450,18 @@
     "frameworkAllowOnlyContract": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["name", "source", "allowed"],
+      "required": ["name", "allowed"],
+      "anyOf": [
+        { "required": ["source"] },
+        { "required": ["sources"] },
+        { "required": ["source_sets"] }
+      ],
       "properties": {
         "name": { "type": "string", "minLength": 1 },
         "id": { "type": "string", "minLength": 1 },
         "source": { "type": "string", "minLength": 1 },
+        "sources": { "$ref": "#/$defs/nonBlankStringList" },
+        "source_sets": { "$ref": "#/$defs/nonBlankStringList" },
         "allowed": { "$ref": "#/$defs/stringList" },
         "ignored_violations": { "$ref": "#/$defs/ignoredViolations" },
         "reason": { "type": "string" }
@@ -1421,6 +1495,7 @@
             "name": { "type": "string", "minLength": 1 },
             "id": { "type": "string", "minLength": 1 },
             "projects": { "$ref": "#/$defs/nonBlankStringList" },
+            "project_sets": { "$ref": "#/$defs/nonBlankStringList" },
             "required_properties": { "$ref": "#/$defs/scalarMap" },
             "forbidden_properties": { "$ref": "#/$defs/scalarMap" },
             "allowed_friend_assemblies": { "$ref": "#/$defs/nonBlankStringList" },
@@ -1456,11 +1531,18 @@
         {
           "type": "object",
           "additionalProperties": false,
-          "required": ["name", "source", "forbidden"],
+          "required": ["name", "forbidden"],
+          "anyOf": [
+            { "required": ["source"] },
+            { "required": ["sources"] },
+            { "required": ["source_sets"] }
+          ],
           "properties": {
             "name": { "type": "string", "minLength": 1 },
             "id": { "type": "string", "minLength": 1 },
             "source": { "type": "string", "minLength": 1 },
+            "sources": { "$ref": "#/$defs/nonBlankStringList" },
+            "source_sets": { "$ref": "#/$defs/nonBlankStringList" },
             "forbidden": { "$ref": "#/$defs/stringList" },
             "ignored_violations": { "$ref": "#/$defs/ignoredViolations" },
             "reason": { "type": "string" }
@@ -1474,11 +1556,18 @@
         {
           "type": "object",
           "additionalProperties": false,
-          "required": ["name", "source", "allowed"],
+          "required": ["name", "allowed"],
+          "anyOf": [
+            { "required": ["source"] },
+            { "required": ["sources"] },
+            { "required": ["source_sets"] }
+          ],
           "properties": {
             "name": { "type": "string", "minLength": 1 },
             "id": { "type": "string", "minLength": 1 },
             "source": { "type": "string", "minLength": 1 },
+            "sources": { "$ref": "#/$defs/nonBlankStringList" },
+            "source_sets": { "$ref": "#/$defs/nonBlankStringList" },
             "allowed": { "$ref": "#/$defs/stringList" },
             "allowed_types": { "$ref": "#/$defs/stringList" },
             "ignored_violations": { "$ref": "#/$defs/ignoredViolations" },
@@ -1704,6 +1793,7 @@
             "allowed_only_in_namespaces": { "$ref": "#/$defs/stringList" },
             "allowed_only_in_projects": { "$ref": "#/$defs/stringList" },
             "allowed_only_in_assemblies": { "$ref": "#/$defs/stringList" },
+            "allowed_only_in_assembly_sets": { "$ref": "#/$defs/nonBlankStringList" },
             "allowed_only_in_types": {
               "type": "array",
               "items": { "$ref": "#/$defs/compositionTypeSelector" },

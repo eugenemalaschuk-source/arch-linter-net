@@ -438,6 +438,93 @@ public sealed class ExplainCommandHandlerTests
         });
     }
 
+    [Test]
+    public void Json_SourceSetExpansion_EmitsAuthoredSetAndResolvedSource()
+    {
+        var runtime = new ExplainStubRuntime
+        {
+            Outcome = new ArchitectureExplainOutcome("A", "B", ["A", "B"], ["rule"])
+            {
+                SourceExpansion = Expansion()
+            }
+        };
+        var console = new RecordingCliConsole();
+
+        Handler(runtime, console).Execute(Options(format: "json"));
+
+        using JsonDocument document = JsonDocument.Parse(console.OutputText);
+        JsonElement expansion = document.RootElement.GetProperty("sourceSetExpansion");
+        JsonElement contract = expansion.GetProperty("contracts")[0];
+        JsonElement instance = contract.GetProperty("instances")[0];
+        Assert.Multiple(() =>
+        {
+            Assert.That(expansion.GetProperty("sets")[0].GetProperty("name").GetString(), Is.EqualTo("modules"));
+            Assert.That(contract.GetProperty("authoredContractId").GetString(), Is.EqualTo("modules-no-infrastructure"));
+            Assert.That(instance.GetProperty("source").GetString(), Is.EqualTo("Acme.Modules.Orders"));
+            Assert.That(instance.GetProperty("sourceSet").GetString(), Is.EqualTo("modules"));
+            Assert.That(instance.GetProperty("selector").GetString(), Is.EqualTo("Acme.Modules.*"));
+            Assert.That(contract.GetProperty("policyLocation").GetProperty("sourcePath").GetString(),
+                Is.EqualTo("architecture/parts/modules.yml"));
+        });
+    }
+
+    [Test]
+    public void Human_SourceSetExpansion_NamesSetSourceAndFragment()
+    {
+        var runtime = new ExplainStubRuntime
+        {
+            Outcome = new ArchitectureExplainOutcome("A", "B", ["A", "B"], ["rule"])
+            {
+                SourceExpansion = Expansion()
+            }
+        };
+        var console = new RecordingCliConsole();
+
+        Handler(runtime, console).Execute(Options(format: "human"));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(console.OutputText, Does.Contain("[modules-no-infrastructure] set 'modules' -> Acme.Modules.Orders"));
+            Assert.That(console.OutputText, Does.Contain("architecture/parts/modules.yml"));
+        });
+    }
+
+    private static ArchitectureSourceExpansionInventory Expansion()
+    {
+        ArchitecturePolicySourceDescriptor fragment = new(
+            "architecture/parts/modules.yml", "architecture/parts/modules.yml",
+            ArchitecturePolicyDocumentRole.Fragment, 1, null, null,
+            ["architecture/root.yml", "architecture/parts/modules.yml"]);
+        ArchitecturePolicySourceLocation location = new(
+            fragment, "contracts.strict_package_dependency[0]", 3, 5, null, null);
+
+        return new ArchitectureSourceExpansionInventory(
+            [
+                new ArchitectureSourceSetResolution(
+                    "modules", ArchitectureSourceSetKind.Assembly, ["Acme.Modules.Orders"], false, string.Empty)
+                {
+                    PolicyLocation = location
+                }
+            ],
+            [
+                new ArchitectureContractExpansion(
+                    "strict_package_dependency",
+                    "modules-no-infrastructure",
+                    "modules avoid infrastructure",
+                    ["modules"],
+                    [
+                        new ArchitectureExpandedContractInstance(
+                            "modules-no-infrastructure/acme-modules-orders",
+                            "Acme.Modules.Orders",
+                            "modules",
+                            "Acme.Modules.*")
+                    ])
+                {
+                    PolicyLocation = location
+                }
+            ]);
+    }
+
     // ── JSON format — path, no CEL ────────────────────────────────────────────
 
     [Test]

@@ -13,6 +13,7 @@ focused local fragments and contains:
 - `imports`: optional ordered relative paths to partial policy fragments.
 - `layers`: named namespace-prefix, constrained glob, or selector-backed layer definitions.
 - `external_dependencies`: named vendor/framework dependency groups.
+- `source_sets`: named reusable assembly/layer/project sets referenced by contracts.
 - `legacy_runtime_layers`: optional namespace prefixes used by dependency contracts.
 - `analysis`: target assemblies, assembly search paths, optional source roots, condition sets, and default condition set.
 - `contracts`: strict and audit contract groups.
@@ -34,8 +35,8 @@ focused local fragments and contains:
 | Assembly allow-only | `strict_assembly_allow_only` | `audit_assembly_allow_only` | Source assembly directly references only itself and explicitly allowed declared assemblies. |
 | Project metadata | `strict_project_metadata` | `audit_project_metadata` | Selected discovered projects preserve required metadata, restrict friend assemblies, and avoid forbidden project references. |
 | Protected surface | `strict_protected` | `audit_protected` | Protected layers are referenced only by explicitly allowed importers. |
-| External dependency | `strict_external` | `audit_external` | Source layer does not reference forbidden vendor/framework dependency groups. |
-| External allow-only | `strict_external_allow_only` | `audit_external_allow_only` | Source layer references only explicitly allowed vendor/framework dependency groups. |
+| External dependency | `strict_external` | `audit_external` | Source layer does not reference forbidden vendor/framework dependency groups. Supports `sources`/`source_sets` expansion. |
+| External allow-only | `strict_external_allow_only` | `audit_external_allow_only` | Source layer references only explicitly allowed vendor/framework dependency groups. Supports `sources`/`source_sets` expansion. |
 | Layer template | `strict_layer_templates` | `audit_layer_templates` | Reusable layer order applied to multiple containers. |
 | Type placement | `strict_type_placement` | `audit_type_placement` | A selected architectural role resides in a declared layer/namespace/project/assembly and/or carries a declared naming suffix/prefix. |
 | Layout conventions | `strict_layout_conventions` | `audit_layout_conventions` | Declared types in source files selected by folder/namespace segment and/or file-name prefix/suffix satisfy a required/forbidden type kind, required/forbidden naming, file-name-matches-primary-type, and/or matching-interface counterpart expectation. |
@@ -52,6 +53,27 @@ focused local fragments and contains:
 | Package allow-only | `strict_package_allow_only` | `audit_package_allow_only` | Source project/assembly declares only `PackageReference`s matching an allowed `packages` group. |
 | Framework dependency | `strict_framework_dependency` | `audit_framework_dependency` | Source project/assembly does not declare a `FrameworkReference` matching a forbidden `framework_references` group. |
 | Framework allow-only | `strict_framework_allow_only` | `audit_framework_allow_only` | Source project/assembly declares only `FrameworkReference`s matching an allowed `framework_references` group. |
+
+## Reusable source sets
+
+Declare `source_sets.<name>` at document level with a `kind` (`assembly`, `layer`, or `project`),
+explicit `members`, constrained `globs`, and an optional `optional: true` plus `reason`. A set never
+widens analysis: `assembly` globs resolve only against `analysis.target_assemblies`, `layer` globs
+only against declared `layers` keys, and `project` sets accept explicit `members` only.
+
+Package dependency, package allow-only, framework dependency, framework allow-only, external
+dependency, and external allow-only contracts may declare `sources`/`source_sets` instead of
+`source`. Each authored contract then expands into one instance per resolved source, with the derived
+id `<authored-id>/<normalized-source>` and its own diagnostics and baseline identity; the authored id
+remains valid for `--contract` selection and rule-input coverage `contract_ids`. Project metadata
+contracts use `project_sets` and composition contracts use `allowed_only_in_assembly_sets`, which
+union resolved members into the existing list field instead of fanning out.
+
+Expansion is deterministic, bounded at 500 instances per authored contract, and fails closed on an
+unknown set, mismatched `kind`, out-of-input member, glob with no declared universe, zero-match
+selector, or a contract declaring both `source` and `sources`/`source_sets`. Only a set declaring
+`optional: true` with a `reason` may resolve to nothing; that state is reported through `explain`,
+JSON, and SARIF rather than silently dropping the contract.
 
 ## Matching semantics
 

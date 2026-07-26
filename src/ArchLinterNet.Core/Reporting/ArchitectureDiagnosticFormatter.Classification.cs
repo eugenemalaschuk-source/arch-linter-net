@@ -198,7 +198,12 @@ public sealed partial class ArchitectureDiagnosticFormatter
         IReadOnlyCollection<ArchitectureClassificationConflict>? ClassificationConflicts,
         IReadOnlyCollection<ArchitectureClassificationMetadataFailure>? ClassificationMetadataFailures,
         ArchitectureClassificationPathDeferredNotice? ClassificationPathDeferred,
-        IReadOnlyCollection<BuildStatePreflightDiagnostic>? PreflightDiagnostics);
+        IReadOnlyCollection<BuildStatePreflightDiagnostic>? PreflightDiagnostics)
+    {
+        // Init-only rather than a 15th positional parameter, so every existing positional call site
+        // above stays unchanged; only the source-expansion overload sets it.
+        public Model.ArchitectureSourceExpansionInventory? SourceExpansion { get; init; }
+    }
 
     private static string BuildCiArtifactsJson(CiArtifactsRequest request)
     {
@@ -253,7 +258,9 @@ public sealed partial class ArchitectureDiagnosticFormatter
                         .Select(FormatPolicyLocationForJson)
                         .ToArray()
                 },
-            preflight_diagnostics = BuildStatePreflightJson(request.PreflightDiagnostics)
+            preflight_diagnostics = BuildStatePreflightJson(request.PreflightDiagnostics),
+            source_set_expansion = ArchitectureSarifFormatter.FormatSourceExpansion(
+                request.SourceExpansion ?? Model.ArchitectureSourceExpansionInventory.Empty)
         };
 
         return JsonSerializer.Serialize(payload);
