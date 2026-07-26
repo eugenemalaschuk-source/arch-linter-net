@@ -666,26 +666,7 @@ public sealed partial class ArchitectureAnalysisSession
     }
 
     private static IEnumerable<string> GetReferencedLayerNames(IArchitectureContract contract)
-    {
-        return contract switch
-        {
-            ArchitectureDependencyContract c => new[] { c.Source }.Concat(c.Forbidden),
-            ArchitectureAllowOnlyContract c => new[] { c.Source }.Concat(c.Allowed),
-            ArchitectureCycleContract c => c.Layers,
-            ArchitectureMethodBodyContract c => new[] { c.Source },
-            ArchitectureIndependenceContract c => c.Layers,
-            ArchitectureLayerContract c => c.Layers,
-            ArchitectureProtectedContract c => c.Protected.Concat(c.AllowedImporters),
-            ArchitectureExternalDependencyContract c => new[] { c.Source },
-            ArchitectureExternalAllowOnlyContract c => new[] { c.Source },
-            ArchitectureTypePlacementContract c => GetTypePlacementReferencedLayerNames(c),
-            ArchitectureAttributeUsageContract c => GetAttributeUsageReferencedLayerNames(c),
-            ArchitectureInheritanceContract c => c.SourceLayers,
-            ArchitectureInterfaceImplementationContract c => GetInterfaceImplementationReferencedLayerNames(c),
-            ArchitectureCompositionContract c => c.AllowedOnlyInLayers,
-            _ => Array.Empty<string>()
-        };
-    }
+        => ArchitectureRuleInputReferences.For(contract).Select(reference => reference.Layer);
 
     // Shared by GetReferencedLayerNames (dangling-layer deferral, policy-consistency) and
     // CheckConfiguration's own layer collection, so a typo'd layer name in either

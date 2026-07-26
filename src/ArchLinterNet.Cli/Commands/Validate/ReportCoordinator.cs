@@ -591,7 +591,8 @@ internal sealed class ReportCoordinator
     private string FormatSarifContent(string mode, ValidationOutcome outcome)
     {
         return _runtime.FormatResultAsSarif(
-            mode, outcome.Violations, outcome.Cycles, outcome.CycleFindings, outcome.PreflightDiagnostics);
+            mode, outcome.Violations, outcome.Cycles, outcome.CycleFindings, outcome.PreflightDiagnostics,
+            outcome.CoverageSummaries);
     }
 
     private static string DispatchFormat(

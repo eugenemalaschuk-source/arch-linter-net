@@ -1,4 +1,5 @@
 using ArchLinterNet.Core.Model;
+using ArchLinterNet.Core.Reporting;
 
 namespace ArchLinterNet.Core.Graph;
 
@@ -10,4 +11,6 @@ public sealed record ArchitectureGraphOutcome(ArchitectureDependencyGraph Graph)
     // available" and returns an empty ExpressionParticipation list — correct behaviour since
     // only the concrete service runs a real contract-execution pass.
     internal IReadOnlyDictionary<(string Source, string Target), IReadOnlyList<ArchitectureViolation>>? EdgeViolations { get; init; }
+
+    internal IReadOnlyCollection<ArchitectureCoverageSummary>? CoverageSummaries { get; init; }
 }

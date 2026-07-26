@@ -189,6 +189,39 @@ public sealed class ExplainCommandHandlerTests
     // ── Human format — path without CEL ──────────────────────────────────────
 
     [Test]
+    public void Human_NoPath_PrintsOptionalEmptyCoverage()
+    {
+        var summary = new ArchitectureCoverageSummary(
+            "coverage", "coverage-id", "rule_input",
+            new ArchitectureCoverageSummaryCounts(0, 0, 0, 0, 0) { OptionalEmpty = 1 },
+            [], [], [], [], [])
+        {
+            OptionalEmptyItems =
+            [
+                new ArchitectureCoverageSummaryOptionalEmptyItem(
+                    "rule:forbidden:future", "Future module is planned.", "future")
+            ]
+        };
+        var runtime = new ExplainStubRuntime
+        {
+            Outcome = new ArchitectureExplainOutcome("NS.A", "NS.B", null, Array.Empty<string>())
+            {
+                CoverageSummaries = new[] { summary }
+            }
+        };
+        var console = new RecordingCliConsole();
+
+        Handler(runtime, console).Execute(Options(format: "human"));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(console.OutputText, Does.Contain("No dependency path found"));
+            Assert.That(console.OutputText, Does.Contain("Optional empty input: rule:forbidden:future"));
+            Assert.That(console.OutputText, Does.Contain("Future module is planned."));
+        });
+    }
+
+    [Test]
     public void Human_PathNoCel_PrintsPathAndContractIds()
     {
         var runtime = new ExplainStubRuntime
@@ -361,6 +394,47 @@ public sealed class ExplainCommandHandlerTests
             Assert.That(doc.RootElement.GetProperty("target").GetString(), Is.EqualTo("NS.B"));
             Assert.That(doc.RootElement.GetProperty("path").ValueKind, Is.EqualTo(JsonValueKind.Null));
             Assert.That(doc.RootElement.TryGetProperty("expressionParticipation", out _), Is.False);
+        });
+    }
+
+    [Test]
+    public void Json_OptionalEmptyCoverage_EmitsTypedIdentity()
+    {
+        var summary = new ArchitectureCoverageSummary(
+            "coverage", "coverage-id", "rule_input",
+            new ArchitectureCoverageSummaryCounts(0, 0, 0, 0, 0) { OptionalEmpty = 1 },
+            [], [], [], [], [])
+        {
+            OptionalEmptyItems =
+            [
+                new ArchitectureCoverageSummaryOptionalEmptyItem(
+                    "rule:forbidden:future", "Future module is planned.", "future")
+                {
+                    ContractId = "rule",
+                    Input = "forbidden",
+                    Layer = "future"
+                }
+            ]
+        };
+        var runtime = new ExplainStubRuntime
+        {
+            Outcome = new ArchitectureExplainOutcome("A", "B", ["A", "B"], ["rule"])
+            {
+                CoverageSummaries = new[] { summary }
+            }
+        };
+        var console = new RecordingCliConsole();
+
+        Handler(runtime, console).Execute(Options(format: "json"));
+
+        using JsonDocument document = JsonDocument.Parse(console.OutputText);
+        JsonElement item = document.RootElement.GetProperty("coverageSummary")[0]
+            .GetProperty("optionalEmptyItems")[0];
+        Assert.Multiple(() =>
+        {
+            Assert.That(item.GetProperty("contractId").GetString(), Is.EqualTo("rule"));
+            Assert.That(item.GetProperty("input").GetString(), Is.EqualTo("forbidden"));
+            Assert.That(item.GetProperty("layer").GetString(), Is.EqualTo("future"));
         });
     }
 

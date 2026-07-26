@@ -1833,6 +1833,21 @@
         }
       }
     },
+    "optionalRuleInput": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["contract_id", "input", "layer", "reason"],
+      "properties": {
+        "contract_id": { "type": "string", "minLength": 1 },
+        "input": { "type": "string", "minLength": 1 },
+        "layer": { "type": "string", "minLength": 1 },
+        "reason": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Required justification for this exact planned-empty rule input."
+        }
+      }
+    },
     "coverageSemanticRoleExclusion": {
       "type": "object",
       "additionalProperties": false,
@@ -1885,6 +1900,12 @@
               "type": "array",
               "description": "Excluded units, each carrying a required reason. Item shape depends on scope: namespace uses coverageNamespaceExclusion, project uses coverageProjectExclusion, assembly uses coverageAssemblyExclusion, rule_input uses coverageContractIdExclusion. Not valid for scope: dependency_edge (no exclusion shape defined for that scope yet)."
             },
+            "optional_inputs": {
+              "type": "array",
+              "items": { "$ref": "#/$defs/optionalRuleInput" },
+              "default": [],
+              "description": "Exact planned-empty rule inputs. Valid only for scope: rule_input."
+            },
             "reason": {
               "type": "string",
               "minLength": 1,
@@ -1901,7 +1922,7 @@
               "roots": { "items": { "$ref": "#/$defs/coverageNamespaceRoot" } },
               "exclude": { "items": { "$ref": "#/$defs/coverageNamespaceExclusion" }, "default": [] }
             },
-            "not": { "anyOf": [{ "required": ["between"] }, { "required": ["contract_ids"] }] }
+            "not": { "anyOf": [{ "required": ["between"] }, { "required": ["contract_ids"] }, { "required": ["optional_inputs"] }] }
           }
         },
         {
@@ -1912,7 +1933,7 @@
               "roots": { "items": { "$ref": "#/$defs/coverageDiscoveryRoot" } },
               "exclude": { "items": { "$ref": "#/$defs/coverageProjectExclusion" }, "default": [] }
             },
-            "not": { "anyOf": [{ "required": ["between"] }, { "required": ["contract_ids"] }] }
+            "not": { "anyOf": [{ "required": ["between"] }, { "required": ["contract_ids"] }, { "required": ["optional_inputs"] }] }
           }
         },
         {
@@ -1923,14 +1944,14 @@
               "roots": { "items": { "$ref": "#/$defs/coverageDiscoveryRoot" } },
               "exclude": { "items": { "$ref": "#/$defs/coverageAssemblyExclusion" }, "default": [] }
             },
-            "not": { "anyOf": [{ "required": ["between"] }, { "required": ["contract_ids"] }] }
+            "not": { "anyOf": [{ "required": ["between"] }, { "required": ["contract_ids"] }, { "required": ["optional_inputs"] }] }
           }
         },
         {
           "if": { "properties": { "scope": { "const": "dependency_edge" } }, "required": ["scope"] },
           "then": {
             "required": ["between"],
-            "not": { "anyOf": [{ "required": ["roots"] }, { "required": ["contract_ids"] }, { "required": ["exclude"] }] }
+            "not": { "anyOf": [{ "required": ["roots"] }, { "required": ["contract_ids"] }, { "required": ["exclude"] }, { "required": ["optional_inputs"] }] }
           }
         },
         {
@@ -1938,7 +1959,8 @@
           "then": {
             "required": ["contract_ids"],
             "properties": {
-              "exclude": { "items": { "$ref": "#/$defs/coverageContractIdExclusion" }, "default": [] }
+              "exclude": { "items": { "$ref": "#/$defs/coverageContractIdExclusion" }, "default": [] },
+              "optional_inputs": { "items": { "$ref": "#/$defs/optionalRuleInput" }, "default": [] }
             },
             "not": { "anyOf": [{ "required": ["roots"] }, { "required": ["between"] }] }
           }
@@ -1950,7 +1972,7 @@
               "roots": { "items": { "$ref": "#/$defs/coverageNamespaceRoot" } },
               "exclude": { "items": { "$ref": "#/$defs/coverageSemanticRoleExclusion" }, "default": [] }
             },
-            "not": { "anyOf": [{ "required": ["between"] }, { "required": ["contract_ids"] }] }
+            "not": { "anyOf": [{ "required": ["between"] }, { "required": ["contract_ids"] }, { "required": ["optional_inputs"] }] }
           }
         }
       ]

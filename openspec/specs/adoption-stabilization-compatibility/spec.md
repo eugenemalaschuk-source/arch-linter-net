@@ -3,9 +3,7 @@
 ## Purpose
 
 Define the single, versioned compatibility and architecture contract for ArchLinterNet 0.5.1 across policy authoring, exact identity, baselines, API snapshots, diagnostics, build state, output, cache, profiling, cancellation, packaged schemas, and supported execution environments.
-
 ## Requirements
-
 ### Requirement: One public 0.5.1 release boundary
 The system SHALL expose one public stabilization release boundary, `0.5.1`, governed by compatibility envelope `adoption-stabilization/v1`. Checkpoint A is internal integration evidence only; only the complete Checkpoint B contract and acceptance corpus may authorize publishing 0.5.1.
 
@@ -320,3 +318,11 @@ The pass SHALL verify at minimum that:
 #### Scenario: All slices are implemented
 - **WHEN** the final consistency pass and #366 Checkpoint B both succeed
 - **THEN** #355 may close and the 0.5.1 release may be authorized
+
+### Requirement: Planned-empty rule inputs are implemented as schema-backed coverage state
+The implementation SHALL provide the planned-empty rule-input lifecycle required by this capability's compatibility contract: exact input identity, mandatory reason, provenance, typed output, automatic covered transition, and fail-closed stale or unknown identities.
+
+#### Scenario: Compatibility lifecycle is preserved
+- **WHEN** a policy moves from a planned-empty input to matching code
+- **THEN** the same declaration produces optional-empty before the code exists and covered state after it exists
+

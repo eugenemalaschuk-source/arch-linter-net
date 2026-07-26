@@ -15,13 +15,29 @@ public sealed partial class ArchitectureDiagnosticFormatter
                 ["excluded"] = summary.Counts.Excluded,
                 ["uncovered"] = summary.Counts.Uncovered,
                 ["stale"] = summary.Counts.Stale,
-                ["unknown"] = summary.Counts.Unknown
+                ["unknown"] = summary.Counts.Unknown,
+                ["optional_empty"] = summary.Counts.OptionalEmpty
             },
             ["excluded_items"] = summary.ExcludedItems.OrderBy(item => item.Item, StringComparer.Ordinal).Select(ToExcludedItemJson).ToArray(),
             ["uncovered_items"] = ToEvidenceItemsJson(summary.UncoveredItems),
             ["stale_items"] = ToEvidenceItemsJson(summary.StaleItems),
             ["unknown_items"] = ToEvidenceItemsJson(summary.UnknownItems),
-            ["covered_items"] = ToEvidenceItemsJson(summary.CoveredItems)
+            ["covered_items"] = ToEvidenceItemsJson(summary.CoveredItems),
+            ["optional_empty_items"] = summary.OptionalEmptyItems.OrderBy(item => item.Item, StringComparer.Ordinal)
+                .Select(item =>
+                {
+                    var result = new Dictionary<string, object?>
+                    {
+                        ["item"] = item.Item,
+                        ["contract_id"] = item.ContractId,
+                        ["input"] = item.Input,
+                        ["layer"] = item.Layer,
+                        ["reason"] = item.Reason,
+                        ["evidence"] = item.Evidence
+                    };
+                    if (item.PolicyLocation is not null) result["policy_location"] = FormatPolicyLocationForJson(item.PolicyLocation);
+                    return result;
+                }).ToArray()
         };
     }
 

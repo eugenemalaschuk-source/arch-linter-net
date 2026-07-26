@@ -22,17 +22,25 @@ public sealed class ArchitectureGraphApplicationService(
             throw new ArgumentException($"Invalid mode: {request.Mode}. Use 'strict', 'audit', or 'all'.", nameof(request));
         }
 
-        ArchitectureAnalysisSession session = BuildSession(request, out List<ArchitectureViolation> violations);
+        ArchitectureAnalysisSession session = BuildSession(
+            request,
+            out List<ArchitectureViolation> violations,
+            out IReadOnlyCollection<Reporting.ArchitectureCoverageSummary> coverageSummaries);
 
         ArchitectureDependencyGraph graph = ArchitectureDependencyGraphBuilder.Build(
             session, request.Level, violations,
             out IReadOnlyDictionary<(string Source, string Target), IReadOnlyList<ArchitectureViolation>> edgeViolations);
-        return new ArchitectureGraphOutcome(graph) { EdgeViolations = edgeViolations };
+        return new ArchitectureGraphOutcome(graph)
+        {
+            EdgeViolations = edgeViolations,
+            CoverageSummaries = coverageSummaries
+        };
     }
 
     internal ArchitectureAnalysisSession BuildSession(
         ArchitectureGraphRequest request,
-        out List<ArchitectureViolation> violations)
+        out List<ArchitectureViolation> violations,
+        out IReadOnlyCollection<Reporting.ArchitectureCoverageSummary> coverageSummaries)
     {
         ArchitectureContractDocument document;
         try
@@ -71,6 +79,7 @@ public sealed class ArchitectureGraphApplicationService(
         IArchitectureContractRunner runner = setup.Runner;
 
         violations = new List<ArchitectureViolation>();
+        coverageSummaries = Array.Empty<Reporting.ArchitectureCoverageSummary>();
         violations.AddRange(runner.CheckConfiguration(strict: request.Mode != ModeAudit));
 
         bool includeStrict = request.Mode is ModeStrict or "all";
@@ -78,16 +87,18 @@ public sealed class ArchitectureGraphApplicationService(
 
         if (includeStrict)
         {
-            violations.AddRange(
-                contractExecutor.Execute(runner.Session, ModeStrict, handlerRegistry, includeAsmdefContracts: false)
-                    .Violations);
+            ArchitectureContractExecutionResult strictExecution =
+                contractExecutor.Execute(runner.Session, ModeStrict, handlerRegistry, includeAsmdefContracts: false);
+            violations.AddRange(strictExecution.Violations);
+            coverageSummaries = coverageSummaries.Concat(strictExecution.CoverageSummaries).ToArray();
         }
 
         if (includeAudit)
         {
-            violations.AddRange(
-                contractExecutor.Execute(runner.Session, ModeAudit, handlerRegistry, includeAsmdefContracts: false)
-                    .Violations);
+            ArchitectureContractExecutionResult auditExecution =
+                contractExecutor.Execute(runner.Session, ModeAudit, handlerRegistry, includeAsmdefContracts: false);
+            violations.AddRange(auditExecution.Violations);
+            coverageSummaries = coverageSummaries.Concat(auditExecution.CoverageSummaries).ToArray();
         }
 
         return runner.Session;

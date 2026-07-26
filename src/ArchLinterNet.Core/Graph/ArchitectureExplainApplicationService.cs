@@ -34,7 +34,11 @@ public sealed class ArchitectureExplainApplicationService(IArchitectureGraphAppl
             graphOutcome.EdgeViolations ?? new Dictionary<(string, string), IReadOnlyList<ArchitectureViolation>>();
 
         ArchitectureExplainOutcome outcome = FindShortestPath(graphOutcome.Graph, request.Source, request.Target);
-        return outcome with { ExpressionParticipation = CollectExpressionParticipation(outcome.Path, edgeViolations) };
+        return outcome with
+        {
+            ExpressionParticipation = CollectExpressionParticipation(outcome.Path, edgeViolations),
+            CoverageSummaries = graphOutcome.CoverageSummaries ?? Array.Empty<Reporting.ArchitectureCoverageSummary>()
+        };
     }
 
     // Attributes CEL `when` predicate results to the resolved path's hops, using the exact

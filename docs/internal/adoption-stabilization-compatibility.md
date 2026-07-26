@@ -316,13 +316,13 @@ Validation `--format json` and `--json` remain compatible one-sink forms. They c
 Processing:
 
 1. produce one immutable normalized result;
-2. sort and baseline-classify once;
-3. render each requested report;
-4. validate bounded output;
-5. stage every file report in its destination directory before changing any destination;
-6. atomically replace each destination, where supported, in deterministic order;
-7. if a later replacement fails, report typed `partial-output` evidence listing committed and uncommitted destinations without claiming global rollback;
-8. return one status without re-analysis.
+1. sort and baseline-classify once;
+1. render each requested report;
+1. validate bounded output;
+1. stage every file report in its destination directory before changing any destination;
+1. atomically replace each destination, where supported, in deterministic order;
+1. if a later replacement fails, report typed `partial-output` evidence listing committed and uncommitted destinations without claiming global rollback;
+1. return one status without re-analysis.
 
 There is no portable all-or-none transaction across independent report paths or filesystems. A pre-commit render/validation failure changes no destination; a mid-commit replacement failure is incomplete execution, exits 2, and exposes the exact partial state. Standard streams are also not transactional. Conflicting stream/path destinations and input overwrite are rejected before commit.
 
@@ -372,8 +372,8 @@ It does not enter finding/session identity.
 #374 must record:
 
 1. pre-cache/pre-parallel checkpoint;
-2. post-cache checkpoint;
-3. post-parallel/cancellation checkpoint.
+1. post-cache checkpoint;
+1. post-parallel/cancellation checkpoint.
 
 Acceptance gates schema and counters. Wall-clock numbers inform decisions but are not universal pass/fail thresholds.
 
@@ -459,14 +459,14 @@ The final #355 pass is deliberately one max-depth review, after slice work has l
 Review inputs:
 
 1. this spec and blueprint;
-2. all child OpenSpec capabilities;
-3. archived design histories;
-4. `schema/0.5.1` registry/resources;
-5. capability manifest;
-6. CLI help and Testing API;
-7. migration/public docs;
-8. #366 Checkpoint B scenarios;
-9. issue descriptions and dependency wording.
+1. all child OpenSpec capabilities;
+1. archived design histories;
+1. `schema/0.5.1` registry/resources;
+1. capability manifest;
+1. CLI help and Testing API;
+1. migration/public docs;
+1. #366 Checkpoint B scenarios;
+1. issue descriptions and dependency wording.
 
 Review questions:
 

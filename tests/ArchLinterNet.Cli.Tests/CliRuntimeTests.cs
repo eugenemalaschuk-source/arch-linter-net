@@ -102,6 +102,40 @@ public sealed class CliRuntimeTests
     }
 
     [Test]
+    public void FormatResultAsSarif_WithCoverageSummary_ForwardsTypedOptionalIdentity()
+    {
+        var runtime = new CliRuntime();
+        var summary = new ArchitectureCoverageSummary(
+            "coverage", "coverage-id", "rule_input",
+            new ArchitectureCoverageSummaryCounts(0, 0, 0, 0, 0) { OptionalEmpty = 1 },
+            [], [], [], [], [])
+        {
+            OptionalEmptyItems =
+            [
+                new ArchitectureCoverageSummaryOptionalEmptyItem(
+                    "rule:forbidden:future", "Future module is planned.", "future")
+                {
+                    ContractId = "rule",
+                    Input = "forbidden",
+                    Layer = "future"
+                }
+            ]
+        };
+
+        string sarif = runtime.FormatResultAsSarif(
+            "strict",
+            Array.Empty<ArchitectureViolation>(),
+            Array.Empty<string>(),
+            Array.Empty<ArchitectureCycleFinding>(),
+            Array.Empty<BuildStatePreflightDiagnostic>(),
+            new[] { summary });
+
+        Assert.That(sarif, Does.Contain("\"contract_id\":\"rule\""));
+        Assert.That(sarif, Does.Contain("\"input\":\"forbidden\""));
+        Assert.That(sarif, Does.Contain("\"layer\":\"future\""));
+    }
+
+    [Test]
     public void MigrateBaseline_MissingBaselineFile_ForwardsToEngineAndThrows()
     {
         var runtime = new CliRuntime();

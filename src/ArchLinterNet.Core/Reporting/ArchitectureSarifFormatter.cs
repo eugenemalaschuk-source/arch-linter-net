@@ -66,7 +66,8 @@ public sealed partial class ArchitectureSarifFormatter : IArchitectureSarifForma
         IReadOnlyCollection<ArchitectureViolation> violations,
         IEnumerable<Func<string, ResultEntry>> cycleEntryFactories,
         string toolVersion,
-        IReadOnlyCollection<BuildStatePreflightDiagnostic> preflightDiagnostics)
+        IReadOnlyCollection<BuildStatePreflightDiagnostic> preflightDiagnostics,
+        IReadOnlyCollection<ArchitectureCoverageSummary>? coverageSummaries = null)
     {
         string level = mode == "strict" ? "error" : "warning";
 
@@ -110,11 +111,44 @@ public sealed partial class ArchitectureSarifFormatter : IArchitectureSarifForma
                         },
                     },
                     ["results"] = results,
+                    ["properties"] = new Dictionary<string, object?>
+                    {
+                        ["coverage_summary"] = FormatCoverageSummaries(coverageSummaries ?? Array.Empty<ArchitectureCoverageSummary>())
+                    },
                 },
             },
         };
 
         return JsonSerializer.Serialize(payload);
+    }
+
+    private static object[] FormatCoverageSummaries(IReadOnlyCollection<ArchitectureCoverageSummary> summaries)
+    {
+        return summaries.OrderBy(summary => summary.ContractId ?? summary.ContractName, StringComparer.Ordinal)
+            .Select(summary => (object)new Dictionary<string, object?>
+            {
+                ["contract"] = summary.ContractName,
+                ["contract_id"] = summary.ContractId,
+                ["scope"] = summary.Scope,
+                ["optional_empty_items"] = summary.OptionalEmptyItems
+                    .OrderBy(item => item.Item, StringComparer.Ordinal)
+                    .Select(item => (object)new Dictionary<string, object?>
+                    {
+                        ["item"] = item.Item,
+                        ["contract_id"] = item.ContractId,
+                        ["input"] = item.Input,
+                        ["layer"] = item.Layer,
+                        ["reason"] = item.Reason,
+                        ["evidence"] = item.Evidence,
+                        ["policy_location"] = item.PolicyLocation is null ? null : new Dictionary<string, object?>
+                        {
+                            ["source_path"] = item.PolicyLocation.SourcePath,
+                            ["yaml_path"] = item.PolicyLocation.YamlPath,
+                            ["line"] = item.PolicyLocation.Line,
+                            ["column"] = item.PolicyLocation.Column
+                        }
+                    }).ToArray()
+            }).ToArray();
     }
 
     private static ResultEntry BuildViolationEntry(ArchitectureDiagnostic diagnostic, string level)

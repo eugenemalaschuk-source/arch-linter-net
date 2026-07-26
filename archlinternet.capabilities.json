@@ -147,6 +147,13 @@
       "validates": "A type residing outside a declared composition boundary (allowed_only_in_layers/namespaces/projects/assemblies) does not call a forbidden composition-root/service-locator API (matched with the same call-pattern vocabulary as method-body contracts: exact member names, Type.Member names, fully qualified members, and namespace/type prefixes via forbidden_apis). Requires at least one forbidden_apis selector and at least one allowed_only_in_* composition boundary selector. Reflection/IL-based static detection of call sites only: does NOT validate runtime dependency-injection resolution and does not prove every service is registered correctly."
     },
     {
+      "kind": "coverage",
+      "strictGroup": "strict_coverage",
+      "auditGroup": "audit_coverage",
+      "fields": ["name", "id", "scope", "roots", "between", "contract_ids", "exclude", "optional_inputs[].contract_id", "optional_inputs[].input", "optional_inputs[].layer", "optional_inputs[].reason", "ignored_violations", "reason"],
+      "validates": "Coverage contracts classify namespace, project, assembly, dependency-edge, semantic-role, and rule-input inventory. For scope: rule_input, optional_inputs identifies exactly one contract field and layer with a required reason. An exact empty match is reported as typed optional-empty state with contract_id/input/layer identity and authored provenance; populated inputs transition to ordinary covered state, while stale, unknown, and unrelated empty inputs still fail closed."
+    },
+    {
       "kind": "context-dependency",
       "strictGroup": "strict_context_dependencies",
       "auditGroup": "audit_context_dependencies",
