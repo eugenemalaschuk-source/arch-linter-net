@@ -139,6 +139,7 @@ public sealed class ArchitectureBaselineApplicationService(
             ConfigurationViolations: Array.Empty<ArchitectureViolation>())
         {
             Entries = plan.LifecycleEntries,
+            IsNoOp = plan.RemovesNothing,
             // A no-op prune rewrites nothing, so unpreservable comments cannot be lost by it either.
             CommentDiagnostic = plan.RemovesNothing
                 ? null
@@ -302,17 +303,12 @@ public sealed class ArchitectureBaselineApplicationService(
             }
         }
 
-        // The proposed document is produced whenever the classification permits one, including under
-        // --dry-run: a dry run whose whole purpose is review has to be able to show what it would
-        // write. Whether it reaches disk is the caller's decision, gated separately.
+        // A dry run must show the deterministic portion of the migration even when ambiguities
+        // make the result unsafe to write. The caller keeps the write gate closed in that case.
         bool writable = ambiguous == 0;
-        string? yaml = null;
-        if (writable)
-        {
-            ArchitectureBaselineDocument migrated = baselineGenerator.BuildFromEntries(
-                migratedEntries, version: ArchitectureViolationIdentity.CurrentVersion);
-            yaml = baselineGenerator.Serialize(migrated);
-        }
+        ArchitectureBaselineDocument migrated = baselineGenerator.BuildFromEntries(
+            migratedEntries, version: ArchitectureViolationIdentity.CurrentVersion);
+        string yaml = baselineGenerator.Serialize(migrated);
 
         return new BaselineMigrateOutcome(writable, yaml, matched, stale, ambiguous, report, Array.Empty<ArchitectureViolation>());
     }

@@ -42,10 +42,10 @@ public static class BaselineCommentInspector
 {
     public static BaselineCommentInspection Inspect(string yaml)
     {
-        string[] lines = yaml.Replace("\r\n", "\n", StringComparison.Ordinal).Split('\n');
+        List<YamlLine> lines = SplitLines(yaml);
 
         int headerLineCount = 0;
-        while (headerLineCount < lines.Length && IsCommentOrBlank(lines[headerLineCount]))
+        while (headerLineCount < lines.Count && IsCommentOrBlank(lines[headerLineCount].Content))
         {
             headerLineCount++;
         }
@@ -53,25 +53,20 @@ public static class BaselineCommentInspector
         // A file that is nothing but comments and blank lines has no content to anchor against, so
         // every line is header.
         var unanchorable = new List<int>();
-        for (int index = headerLineCount; index < lines.Length; index++)
+        for (int index = headerLineCount; index < lines.Count; index++)
         {
-            if (FindCommentColumn(lines[index]) >= 0)
+            if (FindCommentColumn(lines[index].Content) >= 0)
             {
                 unanchorable.Add(index + 1);
             }
         }
 
-        // Trailing blank lines of the leading block are separator, not content worth re-emitting, and
-        // a leading block with no comment in it at all is just whitespace — neither is a header.
-        int headerEnd = headerLineCount;
-        while (headerEnd > 0 && !IsComment(lines[headerEnd - 1]))
-        {
-            headerEnd--;
-        }
-
-        string header = headerEnd == 0
+        // The leading block belongs to the reviewer. Preserve it byte-for-byte, including its line
+        // endings and separator blanks; a blank-only prefix is not a comment header.
+        bool hasLeadingComment = lines.Take(headerLineCount).Any(line => IsComment(line.Content));
+        string header = !hasLeadingComment
             ? string.Empty
-            : string.Join(Environment.NewLine, lines.Take(headerEnd)) + Environment.NewLine;
+            : yaml[..lines[headerLineCount - 1].End];
 
         return new BaselineCommentInspection(header, unanchorable);
     }
@@ -97,39 +92,16 @@ public static class BaselineCommentInspector
     /// </summary>
     private static int FindCommentColumn(string line)
     {
-        bool inSingleQuote = false;
-        bool inDoubleQuote = false;
+        QuoteState quotes = default;
 
         for (int index = 0; index < line.Length; index++)
         {
-            char current = line[index];
-
-            if (current == '\'' && !inDoubleQuote)
-            {
-                inSingleQuote = !inSingleQuote;
-                continue;
-            }
-
-            if (current == '"' && !inSingleQuote)
-            {
-                // A backslash-escaped quote inside a double-quoted scalar does not close it.
-                bool escaped = index > 0 && line[index - 1] == '\\';
-                if (!escaped)
-                {
-                    inDoubleQuote = !inDoubleQuote;
-                }
-
-                continue;
-            }
-
-            if (current != '#' || inSingleQuote || inDoubleQuote)
+            if (quotes.Consume(line, index))
             {
                 continue;
             }
 
-            // '#' opens a comment at the start of a line's content, or when preceded by whitespace.
-            // Mid-token (`a#b`) it is an ordinary character.
-            if (index == 0 || char.IsWhiteSpace(line[index - 1]))
+            if (line[index] == '#' && !quotes.InsideScalar && OpensCommentToken(line, index))
             {
                 return index;
             }
@@ -137,6 +109,90 @@ public static class BaselineCommentInspector
 
         return -1;
     }
+
+    /// <summary>
+    /// A <c>#</c> opens a comment only at the start of a line or after whitespace; mid-token
+    /// (<c>Tagged#1</c>) it is an ordinary character.
+    /// </summary>
+    private static bool OpensCommentToken(string line, int index)
+    {
+        return index == 0 || char.IsWhiteSpace(line[index - 1]);
+    }
+
+    /// <summary>
+    /// Tracks whether the scan is inside a single- or double-quoted scalar, keeping that bookkeeping
+    /// out of the comment search itself.
+    /// </summary>
+    private struct QuoteState
+    {
+        private bool _single;
+        private bool _double;
+
+        public bool InsideScalar => _single || _double;
+
+        /// <summary>
+        /// Consumes a quote character, updating state. Returns true when the character was a quote and
+        /// the caller should move on.
+        /// </summary>
+        public bool Consume(string line, int index)
+        {
+            char current = line[index];
+
+            if (current == '\'' && !_double)
+            {
+                _single = !_single;
+                return true;
+            }
+
+            if (current != '"' || _single)
+            {
+                return false;
+            }
+
+            // A quote is escaped only when preceded by an odd run of backslashes. In particular,
+            // two backslashes encode one literal slash and the following quote closes the scalar.
+            if (!IsEscaped(line, index))
+            {
+                _double = !_double;
+            }
+
+            return true;
+        }
+
+        private static bool IsEscaped(string line, int index)
+        {
+            int backslashCount = 0;
+            for (int cursor = index - 1; cursor >= 0 && line[cursor] == '\\'; cursor--)
+            {
+                backslashCount++;
+            }
+
+            return backslashCount % 2 != 0;
+        }
+    }
+
+    private static List<YamlLine> SplitLines(string yaml)
+    {
+        var lines = new List<YamlLine>();
+        int start = 0;
+        while (start < yaml.Length)
+        {
+            int newline = yaml.IndexOf('\n', start);
+            int end = newline < 0 ? yaml.Length : newline + 1;
+            int contentEnd = newline < 0 ? end : newline;
+            if (contentEnd > start && yaml[contentEnd - 1] == '\r')
+            {
+                contentEnd--;
+            }
+
+            lines.Add(new YamlLine(yaml[start..contentEnd], end));
+            start = end;
+        }
+
+        return lines;
+    }
+
+    private readonly record struct YamlLine(string Content, int End);
 
     private static bool IsComment(string line)
     {

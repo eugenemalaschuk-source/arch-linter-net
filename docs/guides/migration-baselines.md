@@ -124,7 +124,7 @@ explicitly run `baseline migrate` (below).
 1. **Merge** — run `arch-linter-net --policy ... --baseline baseline.yml --mode strict` to enforce boundaries going forward
 1. **Update** — run `baseline update` to add newly-introduced debt while preserving the `reason` text on entries that are still valid, without hand-editing YAML
 1. **Prune** — run `baseline prune` to remove entries whose violation has been fixed or whose contract ID no longer exists, and see exactly what was removed
-1. **Diff** — run `baseline diff` at any time to see new/existing/stale/ambiguous/configuration entries without changing the file
+1. **Diff** — run `baseline diff` at any time to see `new`, `matched`, `resolved`, `stale`, `ambiguous`, and `configuration-error` entries without changing the file
 1. **Verify** — run `baseline verify` in CI to fail the build if the baseline has drifted out of sync (stale, ambiguous, or unknown-contract entries), keeping the baseline honest over time
 1. **Migrate** — run `baseline migrate` once, on demand, to deterministically upgrade an existing version 1 baseline to version 2's structured identity
 
@@ -282,7 +282,7 @@ arch-linter-net baseline update \
 Entries whose identity still matches a current violation are kept unchanged,
 including their original `reason` and `issue`. New violations are appended using
 the resolved reason (see per-contract and per-family reasons above). Entries that
-no longer match any violation are reported as `stale` and left in place —
+no longer match any violation are reported as `resolved` and left in place —
 `update` never removes entries; that is `prune`'s job. Ambiguous entries are
 carried through untouched rather than rewritten into one guessed identity.
 
@@ -297,7 +297,7 @@ arch-linter-net baseline prune \
 
 Removes baseline entries that no longer match any current violation (`resolved`)
 or that reference a contract ID that no longer exists in the policy
-(`configuration`), and reports exactly what was removed and why. Add `--json` to
+(`stale`), and reports exactly what was removed and why. Add `--json` to
 get the removed-entry list and lifecycle report as structured data, or
 `--dry-run` to see the removals before committing to them.
 
@@ -314,8 +314,8 @@ arch-linter-net baseline diff \
 ```
 
 Read-only comparison of the baseline against current violations, reporting every
-entry with its lifecycle value: **new**, **existing**, **stale**, **ambiguous**,
-and **configuration**. Never writes a file, and always exits 0 — it is a report,
+entry with its lifecycle value: **new**, **matched**, **resolved**, **stale**,
+**ambiguous**, and **configuration-error**. Never writes a file, and always exits 0 — it is a report,
 not a gate. `--json` adds lifecycle counts and each entry's canonical structured
 identity.
 
@@ -327,8 +327,8 @@ arch-linter-net baseline verify \
   --baseline baseline.yml
 ```
 
-Runs the same comparison as `diff` but exits non-zero if any **stale**,
-**ambiguous**, or **configuration** entries are found — intended as a CI gate
+Runs the same comparison as `diff` but exits non-zero if any **resolved**, **stale**,
+or **ambiguous** entries are found — intended as a CI gate
 that keeps a baseline from silently accumulating stale debt or broadening what it
 suppresses. It does not fail on new, unbaselined violations (that's `validate`'s
 job). This is the only baseline command that belongs in CI; see

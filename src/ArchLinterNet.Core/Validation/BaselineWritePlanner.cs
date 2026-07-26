@@ -123,6 +123,10 @@ internal static class BaselineWritePlanner
         Append(output, lifecycle, comparison.Frozen, BaselineEntryLifecycle.Matched, BaselineEntryDisposition.Retained);
         Append(output, lifecycle, comparison.Ambiguous, BaselineEntryLifecycle.Ambiguous, BaselineEntryDisposition.Retained);
 
+        // Prune never records current findings, but they are still part of the review: omitting
+        // them made the lifecycle report claim there was no newly discovered debt.
+        AppendReportOnly(lifecycle, comparison.New, BaselineEntryLifecycle.New, BaselineEntryDisposition.Reported);
+
         // Removed: reported but not emitted.
         AppendReportOnly(lifecycle, comparison.Resolved, BaselineEntryLifecycle.Resolved, BaselineEntryDisposition.Removed);
         AppendReportOnly(lifecycle, comparison.ConfigurationErrors, BaselineEntryLifecycle.Stale, BaselineEntryDisposition.Removed);

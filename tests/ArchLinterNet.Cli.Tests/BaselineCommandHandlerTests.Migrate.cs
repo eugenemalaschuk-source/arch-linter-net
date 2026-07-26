@@ -82,7 +82,7 @@ public sealed partial class BaselineCommandHandlerTests
         };
         var runtime = new StubRuntime
         {
-            MigrateOutcome = new BaselineMigrateOutcome(false, null, 0, 0, 1, report, Array.Empty<ArchitectureViolation>())
+            MigrateOutcome = new BaselineMigrateOutcome(false, "version: 2\nbaseline: {}\n", 0, 0, 1, report, Array.Empty<ArchitectureViolation>())
         };
         var fileSystem = new StubFileSystem("policy.yml", "baseline.yml");
         var console = new RecordingConsole();
@@ -95,6 +95,7 @@ public sealed partial class BaselineCommandHandlerTests
             Assert.That(result, Is.EqualTo(CliExitCodes.ValidationFailure));
             Assert.That(fileSystem.LastWritePath, Is.Null);
             Assert.That(console.OutputText, Does.Contain("Dry run: ambiguous entries found, no file would be written."));
+            Assert.That(console.OutputText, Does.Contain("version: 2"));
         });
     }
 

@@ -18,6 +18,9 @@ internal sealed class BaselineWriteGate(ICliConsole console, IFileSystem fileSys
         /// <summary>Nothing was written; `--dry-run` was requested.</summary>
         DryRun,
 
+        /// <summary>Nothing was written because the in-place proposal is byte-identical.</summary>
+        Unchanged,
+
         /// <summary>The proposal was written to the destination file.</summary>
         Written,
     }
@@ -117,6 +120,7 @@ internal sealed class BaselineWriteGate(ICliConsole console, IFileSystem fileSys
         {
             Disposition.Preview => "preview",
             Disposition.DryRun => "dry-run",
+            Disposition.Unchanged => "unchanged",
             _ => writtenStatus,
         };
     }

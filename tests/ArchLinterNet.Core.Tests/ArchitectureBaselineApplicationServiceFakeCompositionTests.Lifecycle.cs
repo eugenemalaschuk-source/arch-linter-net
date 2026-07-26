@@ -14,6 +14,11 @@ namespace ArchLinterNet.Core.Tests;
 /// </summary>
 public sealed partial class ArchitectureBaselineApplicationServiceFakeCompositionTests
 {
+    private static readonly string[] _matchedSources = ["SrcKept"];
+    private static readonly string[] _resolvedSources = ["SrcStale"];
+    private static readonly string[] _ambiguousSources = ["SrcAmbiguous"];
+    private static readonly string[] _newSources = ["SrcNew"];
+
     [Test]
     public void Update_ClassifiesMatchedResolvedAmbiguousAndNewEntries()
     {
@@ -32,10 +37,10 @@ public sealed partial class ArchitectureBaselineApplicationServiceFakeCompositio
         Assert.Multiple(() =>
         {
             Assert.That(outcome.Succeeded, Is.True);
-            Assert.That(bySource[BaselineEntryLifecycle.Matched], Is.EqualTo(new[] { "SrcKept" }));
-            Assert.That(bySource[BaselineEntryLifecycle.Resolved], Is.EqualTo(new[] { "SrcStale" }));
-            Assert.That(bySource[BaselineEntryLifecycle.Ambiguous], Is.EqualTo(new[] { "SrcAmbiguous" }));
-            Assert.That(bySource[BaselineEntryLifecycle.New], Is.EqualTo(new[] { "SrcNew" }));
+            Assert.That(bySource[BaselineEntryLifecycle.Matched], Is.EqualTo(_matchedSources));
+            Assert.That(bySource[BaselineEntryLifecycle.Resolved], Is.EqualTo(_resolvedSources));
+            Assert.That(bySource[BaselineEntryLifecycle.Ambiguous], Is.EqualTo(_ambiguousSources));
+            Assert.That(bySource[BaselineEntryLifecycle.New], Is.EqualTo(_newSources));
 
             // Update retains everything; only the disposition distinguishes a carried-through entry
             // from a newly recorded one.
@@ -50,7 +55,7 @@ public sealed partial class ArchitectureBaselineApplicationServiceFakeCompositio
             Assert.That(
                 outcome.Entries.Where(e => BaselineEntryLifecycleNames.Suppresses(e.Lifecycle))
                     .Select(e => e.Entry.SourceType),
-                Is.EqualTo(new[] { "SrcKept" }));
+                Is.EqualTo(_matchedSources));
         });
     }
 
@@ -182,7 +187,13 @@ public sealed partial class ArchitectureBaselineApplicationServiceFakeCompositio
             Assert.That(
                 outcome.Entries.Single(e => e.Entry.SourceType == "SrcAmbiguous").Lifecycle,
                 Is.EqualTo(BaselineEntryLifecycle.Ambiguous));
-            Assert.That(outcome.RemovedEntries.Select(r => r.Entry.SourceType), Is.EqualTo(new[] { "SrcStale" }));
+            Assert.That(
+                outcome.Entries.Single(e => e.Entry.SourceType == "SrcNew").Lifecycle,
+                Is.EqualTo(BaselineEntryLifecycle.New));
+            Assert.That(
+                outcome.Entries.Single(e => e.Entry.SourceType == "SrcNew").Disposition,
+                Is.EqualTo(BaselineEntryDisposition.Reported));
+            Assert.That(outcome.RemovedEntries.Select(r => r.Entry.SourceType), Is.EqualTo(_resolvedSources));
         });
     }
 
@@ -207,7 +218,7 @@ public sealed partial class ArchitectureBaselineApplicationServiceFakeCompositio
         {
             Assert.That(outcome.Succeeded, Is.True);
             Assert.That(outcome.InSync, Is.False);
-            Assert.That(outcome.Ambiguous.Select(e => e.SourceType), Is.EqualTo(new[] { "SrcAmbiguous" }));
+            Assert.That(outcome.Ambiguous.Select(e => e.SourceType), Is.EqualTo(_ambiguousSources));
         });
     }
 
@@ -230,8 +241,8 @@ public sealed partial class ArchitectureBaselineApplicationServiceFakeCompositio
 
         Assert.Multiple(() =>
         {
-            Assert.That(outcome.Ambiguous.Select(e => e.SourceType), Is.EqualTo(new[] { "SrcAmbiguous" }));
-            Assert.That(outcome.Frozen.Select(e => e.SourceType), Is.EqualTo(new[] { "SrcKept" }));
+            Assert.That(outcome.Ambiguous.Select(e => e.SourceType), Is.EqualTo(_ambiguousSources));
+            Assert.That(outcome.Frozen.Select(e => e.SourceType), Is.EqualTo(_matchedSources));
         });
     }
 

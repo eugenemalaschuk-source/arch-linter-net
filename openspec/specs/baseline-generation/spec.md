@@ -445,7 +445,7 @@ What a subcommand *did* with an entry SHALL be reported separately from its life
 
 An entry carried through by `update` or `prune` SHALL keep its `reason` and `issue` metadata verbatim.
 
-`baseline generate`, `update`, `prune`, `diff`, and `verify` SHALL report lifecycle counts, and their `--json` output SHALL expose those counts as a `counts` object carrying every lifecycle wire name, with `0` for values the invoked operation cannot produce (for example `resolved` is always `0` for the read-only `diff` and `verify`, which remove nothing).
+`baseline generate`, `update`, `prune`, `diff`, and `verify` SHALL report lifecycle counts, and their `--json` output SHALL expose those counts as a `counts` object carrying every lifecycle wire name, with `0` only for values the invoked operation cannot produce. Read-only `diff` and `verify` report every observed classification, including `resolved`; `resolved` describes a fixed baseline entry, not a removal performed by the command.
 
 `baseline migrate` keeps its own `matched`/`stale`/`ambiguous` classification and its `matchedCount`/`staleCount`/`ambiguousCount` fields, as specified in its own requirement: it classifies legacy entries for a one-time identity upgrade rather than dispositioning entries of an already-current baseline, and `matched` there means "rewritten with structured identity", which no lifecycle value denotes. Its `stale` and `ambiguous` carry the same meaning as the shared model's.
 
@@ -546,4 +546,3 @@ A comment is any `#` that opens a YAML comment token, whether it begins a line o
 #### Scenario: Issue metadata does not affect matching
 - **WHEN** two baseline entries differ only by their `issue` value
 - **THEN** they SHALL be treated as the same identity for matching and deduplication purposes
-

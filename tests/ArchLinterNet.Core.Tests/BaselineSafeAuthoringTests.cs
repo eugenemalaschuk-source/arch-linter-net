@@ -14,6 +14,13 @@ namespace ArchLinterNet.Core.Tests;
 [TestFixture]
 public sealed class BaselineSafeAuthoringTests
 {
+    private static readonly string[] _sharedLifecycleNames =
+        ["new", "matched", "resolved", "stale", "changed", "ambiguous", "configuration-error"];
+
+    private static readonly int[] _twoUnanchorableCommentLines = [3, 5];
+
+    private static readonly int[] _oneUnanchorableCommentLine = [2];
+
     [Test]
     public void Compare_LegacyEntryMatchingSeveralCandidates_IsAmbiguousNotFrozen()
     {
@@ -163,6 +170,15 @@ public sealed class BaselineSafeAuthoringTests
     }
 
     [Test]
+    public void CommentInspector_LeadingCommentBlock_IsPreservedVerbatim()
+    {
+        const string Header = "# Reviewed baseline\r\n\r\n# Tracked in #123\r\n\r\n";
+        BaselineCommentInspection inspection = BaselineCommentInspector.Inspect(Header + "version: 2\r\n");
+
+        Assert.That(inspection.Header, Is.EqualTo(Header));
+    }
+
+    [Test]
     public void CommentInspector_CommentAfterContent_IsReportedByLineNumber()
     {
         BaselineCommentInspection inspection = BaselineCommentInspector.Inspect(
@@ -171,7 +187,7 @@ public sealed class BaselineSafeAuthoringTests
         Assert.Multiple(() =>
         {
             Assert.That(inspection.CanRoundTrip, Is.False);
-            Assert.That(inspection.UnanchorableCommentLines, Is.EqualTo(new[] { 3, 5 }));
+            Assert.That(inspection.UnanchorableCommentLines, Is.EqualTo(_twoUnanchorableCommentLines));
             Assert.That(inspection.Header, Is.EqualTo("# header" + Environment.NewLine));
         });
     }
@@ -183,7 +199,7 @@ public sealed class BaselineSafeAuthoringTests
         // status word is the compatibility break this guards against.
         Assert.That(
             BaselineEntryLifecycleNames.All,
-            Is.EqualTo(new[] { "new", "matched", "resolved", "stale", "changed", "ambiguous", "configuration-error" }));
+            Is.EqualTo(_sharedLifecycleNames));
     }
 
     [Test]
@@ -213,6 +229,7 @@ public sealed class BaselineSafeAuthoringTests
     [TestCase("  forbidden_reference: Infra.Db   # keep until Q4", true, TestName = "trailing comment after indented content")]
     [TestCase("reason: \"contains # inside double quotes\"", false, TestName = "hash inside a double-quoted scalar")]
     [TestCase("reason: 'contains # inside single quotes'", false, TestName = "hash inside a single-quoted scalar")]
+    [TestCase("reason: \"ends with escaped backslash\\\\\" # reviewed", true, TestName = "hash after a double-quote preceded by two backslashes")]
     [TestCase("source_type: MyApp.Tagged#1", false, TestName = "hash mid-token is not a comment")]
     public void CommentInspector_TrailingComments_AreDetectedButQuotedHashesAreNot(string contentLine, bool expectRefusal)
     {
@@ -222,7 +239,7 @@ public sealed class BaselineSafeAuthoringTests
         Assert.That(inspection.CanRoundTrip, Is.EqualTo(!expectRefusal));
         if (expectRefusal)
         {
-            Assert.That(inspection.UnanchorableCommentLines, Is.EqualTo(new[] { 2 }));
+            Assert.That(inspection.UnanchorableCommentLines, Is.EqualTo(_oneUnanchorableCommentLine));
         }
     }
 

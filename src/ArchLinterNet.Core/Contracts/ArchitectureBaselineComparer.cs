@@ -112,45 +112,59 @@ public static class ArchitectureBaselineComparer
 
             foreach (var ignore in entry.IgnoredViolations)
             {
-                ArchitectureBaselineComparisonEntry comparisonEntry =
-                    BuildComparisonEntry(scope.GroupName, entry.Id, ignore, useStructuredIdentity);
-
-                string key = useStructuredIdentity
+                baselineKeys.Add(useStructuredIdentity
                     ? BuildIdentityKey(ignore.ToIdentity(canonicalContractId))
-                    : BuildLegacyKey(canonicalContractId, ignore.SourceType, ignore.ForbiddenReference);
-                baselineKeys.Add(key);
+                    : BuildLegacyKey(canonicalContractId, ignore.SourceType, ignore.ForbiddenReference));
 
-                if (!idKnown)
-                {
-                    classification.ConfigurationErrors.Add(comparisonEntry);
-                    continue;
-                }
-
-                // Counting every match — rather than stopping at the first — is what separates "this
-                // entry suppresses exactly the violation it was written for" from "this entry would
-                // suppress several distinct violations". The latter is a broadening ratchet, so it is
-                // reported for review instead of being silently treated as matched.
-                IReadOnlyList<ArchitectureBaselineCandidate> matches = useStructuredIdentity
-                    ? MatchCandidatesByIdentity(candidates, scope.GroupName, ignore.ToIdentity(canonicalContractId))
-                    : MatchCandidatesLegacy(candidates, scope.GroupName, canonicalContractId, ignore.SourceType, ignore.ForbiddenReference);
-
-                switch (matches.Count)
-                {
-                    case 0:
-                        classification.Resolved.Add(comparisonEntry);
-                        break;
-                    case 1:
-                        classification.Frozen.Add(
-                            comparisonEntry with { CurrentForbiddenReference = matches[0].ForbiddenReference });
-                        break;
-                    default:
-                        classification.Ambiguous.Add(comparisonEntry);
-                        break;
-                }
+                ClassifyBaselineEntry(
+                    scope.GroupName, entry.Id, canonicalContractId, ignore, idKnown,
+                    candidates, useStructuredIdentity, classification);
             }
         }
 
         return baselineKeys;
+    }
+
+    private static void ClassifyBaselineEntry(
+        string groupName,
+        string entryId,
+        string canonicalContractId,
+        ArchitectureBaselineIgnoredViolation ignore,
+        bool idKnown,
+        IReadOnlyList<ArchitectureBaselineCandidate> candidates,
+        bool useStructuredIdentity,
+        BaselineClassification classification)
+    {
+        ArchitectureBaselineComparisonEntry comparisonEntry =
+            BuildComparisonEntry(groupName, entryId, ignore, useStructuredIdentity);
+
+        if (!idKnown)
+        {
+            classification.ConfigurationErrors.Add(comparisonEntry);
+            return;
+        }
+
+        // Counting every match — rather than stopping at the first — is what separates "this entry
+        // suppresses exactly the violation it was written for" from "this entry would suppress several
+        // distinct violations". The latter is a broadening ratchet, so it is reported for review
+        // instead of being silently treated as matched.
+        List<ArchitectureBaselineCandidate> matches = useStructuredIdentity
+            ? MatchCandidatesByIdentity(candidates, groupName, ignore.ToIdentity(canonicalContractId))
+            : MatchCandidatesLegacy(candidates, groupName, canonicalContractId, ignore.SourceType, ignore.ForbiddenReference);
+
+        switch (matches.Count)
+        {
+            case 0:
+                classification.Resolved.Add(comparisonEntry);
+                break;
+            case 1:
+                classification.Frozen.Add(
+                    comparisonEntry with { CurrentForbiddenReference = matches[0].ForbiddenReference });
+                break;
+            default:
+                classification.Ambiguous.Add(comparisonEntry);
+                break;
+        }
     }
 
     private static ArchitectureBaselineComparisonEntry BuildComparisonEntry(

@@ -57,14 +57,24 @@ internal sealed class BaselinePruneCommandHandler(ICliRuntime runtime, ICliConso
             }
 
             bool json = options.Format == "json";
-            BaselineWriteGate gate = new(console, fileSystem);
-            if (!gate.TryApply(
-                    new BaselineWriteGate.Request(
-                        "baseline prune", options.OutputPath, options.Write.DryRun, options.Write.Force,
-                        outcome.Yaml!, outcome.CommentDiagnostic, options.BaselinePath, !json),
-                    out BaselineWriteGate.Disposition disposition))
+            BaselineWriteGate.Disposition disposition;
+            if (outcome.IsNoOp && !options.Write.DryRun && options.OutputPath != null && SamePath(options.OutputPath, options.BaselinePath))
             {
-                return CliExitCodes.InvalidArgumentsOrRuntimeError;
+                // Do not turn a no-op into a read/decode/re-encode/write cycle: that can alter a
+                // BOM or original encoding even when the text is unchanged.
+                disposition = BaselineWriteGate.Disposition.Unchanged;
+            }
+            else
+            {
+                BaselineWriteGate gate = new(console, fileSystem);
+                if (!gate.TryApply(
+                        new BaselineWriteGate.Request(
+                            "baseline prune", options.OutputPath, options.Write.DryRun, options.Write.Force,
+                            outcome.Yaml!, outcome.CommentDiagnostic, options.BaselinePath, !json),
+                        out disposition))
+                {
+                    return CliExitCodes.InvalidArgumentsOrRuntimeError;
+                }
             }
 
             Report(options, outcome, disposition);
@@ -133,5 +143,10 @@ internal sealed class BaselinePruneCommandHandler(ICliRuntime runtime, ICliConso
         {
             console.Error.WriteLine($"  {violation.SourceType}: {violation.ForbiddenNamespace}");
         }
+    }
+
+    private static bool SamePath(string left, string right)
+    {
+        return string.Equals(Path.GetFullPath(left), Path.GetFullPath(right), StringComparison.Ordinal);
     }
 }

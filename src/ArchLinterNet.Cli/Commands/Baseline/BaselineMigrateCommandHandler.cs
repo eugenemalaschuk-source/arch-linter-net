@@ -66,7 +66,7 @@ internal sealed class BaselineMigrateCommandHandler(ICliRuntime runtime, ICliCon
             // same gate: preview, explicit overwrite intent, atomic replacement. Ambiguity still blocks
             // the write outright, upstream of the gate.
             bool wrote = false;
-            if (outcome.Yaml != null)
+            if (outcome.Yaml != null && outcome.AmbiguousCount == 0)
             {
                 BaselineWriteGate gate = new(console, fileSystem);
                 if (!gate.TryApply(
@@ -80,6 +80,11 @@ internal sealed class BaselineMigrateCommandHandler(ICliRuntime runtime, ICliCon
                 }
 
                 wrote = disposition == BaselineWriteGate.Disposition.Written;
+            }
+            else if (outcome.Yaml != null && options.DryRun && options.Format != "json")
+            {
+                console.Out.WriteLine("Dry run: ambiguous entries found, no file would be written. Proposed content:");
+                console.Out.WriteLine(outcome.Yaml);
             }
 
             console.Out.WriteLine(options.Format == "json"
