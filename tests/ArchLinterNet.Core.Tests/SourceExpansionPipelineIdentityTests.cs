@@ -95,7 +95,7 @@ public sealed class SourceExpansionPipelineIdentityTests
         source_sets:
           future_layers:
             kind: layer
-            globs: [future_*]
+            globs: [future.*]
             optional: true
             reason: The future layer has not been extracted yet.
 

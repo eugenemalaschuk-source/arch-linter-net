@@ -511,13 +511,15 @@ internal sealed class CoverageValidator : IArchitecturePolicyDocumentValidator
             CollectLayerBearingContracts(document).Select(contract => contract.Id).Where(id => !string.IsNullOrEmpty(id))!,
             StringComparer.OrdinalIgnoreCase);
 
-        // Source-set expansion replaces an authored contract with per-instance ids. The authored id
-        // is what a policy author wrote and stays referenceable; execution resolves it back to
-        // every instance (see ArchitectureAnalysisSession.ResolveReferencedContractIds).
-        foreach (ArchitectureContractExpansion expansion in document.SourceExpansion.Contracts)
-        {
-            ids.Add(expansion.AuthoredContractId);
-        }
+        // Source-set expansion replaces a supported layer-bearing contract with per-instance ids.
+        // Preserve its authored id only when an expanded executable contract participates in this
+        // pipeline. The inventory also records package/framework fan-out and project-metadata
+        // inline unions, none of which ArchitectureRuleInputReferences or the coverage executor
+        // support; accepting their authored ids would make rule-input coverage false-green.
+        ids.UnionWith(CollectLayerBearingContracts(document)
+            .OfType<IArchitectureSourceExpandableContract>()
+            .Select(contract => contract.ExpansionOrigin?.AuthoredContractId)
+            .Where(id => !string.IsNullOrEmpty(id))!);
 
         return ids;
     }

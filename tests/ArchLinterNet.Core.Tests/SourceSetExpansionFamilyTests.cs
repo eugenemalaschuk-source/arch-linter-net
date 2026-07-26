@@ -545,6 +545,91 @@ public sealed class SourceSetExpansionFamilyTests
         });
     }
 
+    [TestCase("package")]
+    [TestCase("framework")]
+    [TestCase("project-metadata")]
+    public void RuleInputCoverage_RejectsExpandedUnsupportedContractFamily(string family)
+    {
+        InvalidOperationException exception = Assert.Throws<InvalidOperationException>(() =>
+            Load(UnsupportedRuleInputCoveragePolicy(family)))!;
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(exception.Message, Does.Contain("unknown contract ID"));
+            Assert.That(exception.Message, Does.Contain("unsupported-expanded-contract"));
+        });
+    }
+
+    private static string UnsupportedRuleInputCoveragePolicy(string family) => family switch
+    {
+        "package" => """
+            version: 1
+            name: Test
+            analysis:
+              target_assemblies: [Acme.Modules]
+            source_sets:
+              modules:
+                members: [Acme.Modules]
+            packages:
+              forbidden_packages:
+                package_ids: [Acme.Forbidden]
+            contracts:
+              strict_package_dependency:
+                - name: modules avoid forbidden packages
+                  id: unsupported-expanded-contract
+                  source_sets: [modules]
+                  forbidden: [forbidden_packages]
+              strict_coverage:
+                - name: rule input coverage
+                  scope: rule_input
+                  contract_ids: [unsupported-expanded-contract]
+            """,
+        "framework" => """
+            version: 1
+            name: Test
+            analysis:
+              target_assemblies: [Acme.Modules]
+            source_sets:
+              modules:
+                members: [Acme.Modules]
+            framework_references:
+              forbidden_framework:
+                framework_names: [Acme.Forbidden]
+            contracts:
+              strict_framework_dependency:
+                - name: modules avoid forbidden framework
+                  id: unsupported-expanded-contract
+                  source_sets: [modules]
+                  forbidden: [forbidden_framework]
+              strict_coverage:
+                - name: rule input coverage
+                  scope: rule_input
+                  contract_ids: [unsupported-expanded-contract]
+            """,
+        "project-metadata" => """
+            version: 1
+            name: Test
+            analysis:
+              projects: [src/Acme.Modules/Acme.Modules.csproj]
+            source_sets:
+              modules:
+                kind: project
+                members: [src/Acme.Modules/Acme.Modules.csproj]
+            contracts:
+              strict_project_metadata:
+                - name: modules are packable
+                  id: unsupported-expanded-contract
+                  project_sets: [modules]
+                  required_properties:
+                    IsPackable: "true"
+              strict_coverage:
+                - name: rule input coverage
+                  scope: rule_input
+                  contract_ids: [unsupported-expanded-contract]
+            """,
+        _ => throw new ArgumentOutOfRangeException(nameof(family), family, null)
+    };
+
     private ArchitectureContractDocument Load(string yaml)
     {
         string path = Write("dependencies.arch.yml", yaml);
