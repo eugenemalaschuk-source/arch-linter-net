@@ -60,6 +60,10 @@ A `scope: rule_input` contract resolves each entry in `contract_ids` to its refe
 
 ## What counts as covered
 
+### Planned-empty rule inputs
+
+Use `optional_inputs` only for a reviewed, exact planned-empty input. Each entry names the selected `contract_id`, its layer-bearing `input` field, the exact `layer`, and a non-empty `reason`. The coverage summary reports an empty matching input as `optional-empty`; it becomes covered automatically once matching code appears. The declaration cannot suppress an undeclared layer or any other input in the same contract.
+
 A namespace under `roots` is considered covered when at least one of these is true:
 
 - it matches a declared layer;

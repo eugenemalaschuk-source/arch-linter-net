@@ -151,6 +151,29 @@ public sealed class RuleInputCoverageContractTests
     }
 
     [Test]
+    public void CheckRuleInputCoverage_ExactOptionalEmptyInput_SuppressesOnlyThatInput()
+    {
+        ArchitectureContractDocument document = CreateDocument();
+        ArchitectureCoverageContract contract = CreateRuleInputContract(
+            new[] { "video-to-ghost-rule", "typo-rule" });
+        contract.OptionalInputs.Add(new ArchitectureOptionalRuleInput
+        {
+            ContractId = "video-to-ghost-rule",
+            Input = "forbidden",
+            Layer = "ghost",
+            Reason = "The future video integration has not been created."
+        });
+
+        ArchitectureContractRunner runner = new(CreateContext(), document);
+
+        List<ArchitectureViolation> findings = runner.CheckCoverageContract(contract);
+
+        Assert.That(findings, Has.Count.EqualTo(1));
+        Assert.That(findings[0].SourceType, Is.EqualTo("typo-rule"));
+        Assert.That(findings[0].ForbiddenNamespace, Is.EqualTo("unresolved"));
+    }
+
+    [Test]
     public void CheckRuleInputCoverage_RepeatedRuns_AreDeterministic()
     {
         ArchitectureContractDocument document = CreateDocument();

@@ -249,6 +249,48 @@ internal sealed class CoverageValidator : IArchitecturePolicyDocumentValidator
                     $"Rule-input coverage contract '{contract.Name}' has an exclusion at index {i} without a non-empty reason.");
             }
         }
+
+        HashSet<string> selectedContractIds = new(contract.ContractIds, StringComparer.OrdinalIgnoreCase);
+        HashSet<string> optionalIdentityKeys = new(StringComparer.OrdinalIgnoreCase);
+        Dictionary<string, IArchitectureContract> contractsById = CollectLayerBearingContracts(document)
+            .Where(referenced => referenced.Id is not null)
+            .ToDictionary(referenced => referenced.Id!, StringComparer.OrdinalIgnoreCase);
+
+        foreach (ArchitectureOptionalRuleInput optionalInput in contract.OptionalInputs)
+        {
+            optionalInput.PolicyLocation = document.Provenance.LocationFor(contract);
+            if (string.IsNullOrWhiteSpace(optionalInput.ContractId)
+                || string.IsNullOrWhiteSpace(optionalInput.Input)
+                || string.IsNullOrWhiteSpace(optionalInput.Layer)
+                || string.IsNullOrWhiteSpace(optionalInput.Reason))
+            {
+                throw new InvalidOperationException(
+                    $"Rule-input coverage contract '{contract.Name}' has an optional input without non-empty contract_id, input, layer, and reason.");
+            }
+
+            if (!selectedContractIds.Contains(optionalInput.ContractId)
+                || !contractsById.TryGetValue(optionalInput.ContractId, out IArchitectureContract? referencedContract))
+            {
+                throw new InvalidOperationException(
+                    $"Rule-input coverage contract '{contract.Name}' has an optional input for unknown or unselected contract ID '{optionalInput.ContractId}'.");
+            }
+
+            bool matchesInput = GetRuleInputReferences(referencedContract).Any(reference =>
+                string.Equals(reference.Input, optionalInput.Input, StringComparison.Ordinal)
+                && string.Equals(reference.Layer, optionalInput.Layer, StringComparison.Ordinal));
+            if (!matchesInput)
+            {
+                throw new InvalidOperationException(
+                    $"Rule-input coverage contract '{contract.Name}' has a stale optional input '{optionalInput.ContractId}:{optionalInput.Input}:{optionalInput.Layer}'.");
+            }
+
+            string identityKey = optionalInput.ContractId + "\u001f" + optionalInput.Input + "\u001f" + optionalInput.Layer;
+            if (!optionalIdentityKeys.Add(identityKey))
+            {
+                throw new InvalidOperationException(
+                    $"Rule-input coverage contract '{contract.Name}' declares duplicate optional input '{optionalInput.ContractId}:{optionalInput.Input}:{optionalInput.Layer}'.");
+            }
+        }
     }
 
     private static void ValidateDependencyEdgeCoverageContract(
@@ -435,6 +477,13 @@ internal sealed class CoverageValidator : IArchitecturePolicyDocumentValidator
     // producing zero findings.
     private static HashSet<string> CollectLayerBearingContractIds(ArchitectureContractDocument document)
     {
+        return new HashSet<string>(
+            CollectLayerBearingContracts(document).Select(contract => contract.Id).Where(id => !string.IsNullOrEmpty(id))!,
+            StringComparer.OrdinalIgnoreCase);
+    }
+
+    private static IEnumerable<IArchitectureContract> CollectLayerBearingContracts(ArchitectureContractDocument document)
+    {
         IEnumerable<IArchitectureContract>[] groups =
         [
             document.Contracts.Strict,
@@ -467,8 +516,39 @@ internal sealed class CoverageValidator : IArchitecturePolicyDocumentValidator
             document.Contracts.AuditComposition,
         ];
 
-        return new HashSet<string>(
-            groups.SelectMany(group => group).Select(c => c.Id).Where(id => !string.IsNullOrEmpty(id))!,
-            StringComparer.OrdinalIgnoreCase);
+        return groups.SelectMany(group => group);
     }
+
+    private static IEnumerable<ArchitectureRuleInputReference> GetRuleInputReferences(IArchitectureContract contract)
+    {
+        return contract switch
+        {
+            ArchitectureDependencyContract c => One("source", c.Source).Concat(Many("forbidden", c.Forbidden)),
+            ArchitectureAllowOnlyContract c => One("source", c.Source).Concat(Many("allowed", c.Allowed)),
+            ArchitectureCycleContract c => Many("layers", c.Layers),
+            ArchitectureMethodBodyContract c => One("source", c.Source),
+            ArchitectureIndependenceContract c => Many("layers", c.Layers),
+            ArchitectureLayerContract c => Many("layers", c.Layers),
+            ArchitectureProtectedContract c => Many("protected", c.Protected).Concat(Many("allowed_importers", c.AllowedImporters)),
+            ArchitectureExternalDependencyContract c => One("source", c.Source),
+            ArchitectureExternalAllowOnlyContract c => One("source", c.Source),
+            ArchitectureTypePlacementContract c => One("types_matching.layer", c.TypesMatching.Layer)
+                .Concat(Many("must_reside_in_layers", c.MustResideInLayers)),
+            ArchitectureAttributeUsageContract c => Many("allowed_only_in_layers", c.AllowedOnlyInLayers)
+                .Concat(Many("forbidden_in_layers", c.ForbiddenInLayers)),
+            ArchitectureInheritanceContract c => Many("source_layers", c.SourceLayers),
+            ArchitectureInterfaceImplementationContract c => Many("allowed_only_in_layers", c.AllowedOnlyInLayers)
+                .Concat(Many("forbidden_in_layers", c.ForbiddenInLayers)),
+            ArchitectureCompositionContract c => Many("allowed_only_in_layers", c.AllowedOnlyInLayers),
+            _ => Array.Empty<ArchitectureRuleInputReference>()
+        };
+    }
+
+    private static IEnumerable<ArchitectureRuleInputReference> One(string input, string layer) =>
+        string.IsNullOrWhiteSpace(layer)
+            ? Array.Empty<ArchitectureRuleInputReference>()
+            : new[] { new ArchitectureRuleInputReference(input, layer) };
+
+    private static IEnumerable<ArchitectureRuleInputReference> Many(string input, IEnumerable<string> layers) =>
+        layers.Where(layer => !string.IsNullOrWhiteSpace(layer)).Select(layer => new ArchitectureRuleInputReference(input, layer));
 }

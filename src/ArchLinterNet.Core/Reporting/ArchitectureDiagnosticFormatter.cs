@@ -202,7 +202,7 @@ public sealed partial class ArchitectureDiagnosticFormatter : IArchitectureDiagn
 
         string header = $"- {idPrefix}[{summary.ContractName}] scope: {summary.Scope} " +
             $"covered={counts.Covered} excluded={counts.Excluded} uncovered={counts.Uncovered} " +
-            $"stale={counts.Stale} unknown={counts.Unknown}";
+            $"stale={counts.Stale} unknown={counts.Unknown} optional-empty={counts.OptionalEmpty}";
 
         var excludedLines = summary.ExcludedItems
             .OrderBy(item => item.Item, StringComparer.Ordinal)
@@ -222,9 +222,13 @@ public sealed partial class ArchitectureDiagnosticFormatter : IArchitectureDiagn
             .OrderBy(item => item.Item, StringComparer.Ordinal)
             .Select(item => $"    unknown: {item.Item} ({item.Evidence})");
 
+        var optionalEmptyLines = summary.OptionalEmptyItems
+            .OrderBy(item => item.Item, StringComparer.Ordinal)
+            .Select(item => $"    optional-empty: {item.Item} ({item.Reason}; {item.Evidence})");
+
         return string.Join(
             Environment.NewLine,
-            new[] { header }.Concat(excludedLines).Concat(uncoveredLines).Concat(staleLines).Concat(unknownLines));
+            new[] { header }.Concat(excludedLines).Concat(uncoveredLines).Concat(staleLines).Concat(unknownLines).Concat(optionalEmptyLines));
     }
 
     public string FormatViolationsForCiArtifacts(string contractName, string? contractId,

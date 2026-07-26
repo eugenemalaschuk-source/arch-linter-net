@@ -7,7 +7,8 @@ public sealed record ArchitectureCoverageSummaryCounts(
     int Excluded,
     int Uncovered,
     int Stale,
-    int Unknown);
+    int Unknown,
+    int OptionalEmpty = 0);
 
 public sealed record ArchitectureCoverageSummaryExcludedItem(string Item, string Reason)
 {
@@ -36,6 +37,11 @@ public sealed record ArchitectureCoverageSummaryExcludedItem(string Item, string
 
 public sealed record ArchitectureCoverageSummaryEvidenceItem(string Item, string Evidence);
 
+public sealed record ArchitectureCoverageSummaryOptionalEmptyItem(string Item, string Reason, string Evidence)
+{
+    public ArchitecturePolicySourceLocation? PolicyLocation { get; init; }
+}
+
 public sealed record ArchitectureCoverageSummary(
     string ContractName,
     string? ContractId,
@@ -45,4 +51,8 @@ public sealed record ArchitectureCoverageSummary(
     IReadOnlyCollection<ArchitectureCoverageSummaryEvidenceItem> UncoveredItems,
     IReadOnlyCollection<ArchitectureCoverageSummaryEvidenceItem> StaleItems,
     IReadOnlyCollection<ArchitectureCoverageSummaryEvidenceItem> UnknownItems,
-    IReadOnlyCollection<ArchitectureCoverageSummaryEvidenceItem> CoveredItems);
+    IReadOnlyCollection<ArchitectureCoverageSummaryEvidenceItem> CoveredItems)
+{
+    public IReadOnlyCollection<ArchitectureCoverageSummaryOptionalEmptyItem> OptionalEmptyItems { get; init; } =
+        Array.Empty<ArchitectureCoverageSummaryOptionalEmptyItem>();
+}
