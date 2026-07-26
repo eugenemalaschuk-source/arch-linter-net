@@ -128,13 +128,14 @@ internal sealed class ExplainCommandHandler(ICliRuntime runtime, ICliConsole con
                         $"  [{participation.ContractId}] {hop}when: {participation.Source} ({result})");
                 }
 
-                foreach (var optionalInput in outcome.CoverageSummaries.SelectMany(summary => summary.OptionalEmptyItems))
-                {
-                    string policy = optionalInput.PolicyLocation is null
-                        ? string.Empty
-                        : $" (policy: {optionalInput.PolicyLocation.SourcePath}:{optionalInput.PolicyLocation.YamlPath})";
-                    console.Out.WriteLine($"Optional empty input: {optionalInput.Item} ({optionalInput.Reason}){policy}");
-                }
+            }
+
+            foreach (var optionalInput in outcome.CoverageSummaries.SelectMany(summary => summary.OptionalEmptyItems))
+            {
+                string policy = optionalInput.PolicyLocation is null
+                    ? string.Empty
+                    : $" (policy: {optionalInput.PolicyLocation.SourcePath}:{optionalInput.PolicyLocation.YamlPath})";
+                console.Out.WriteLine($"Optional empty input: {optionalInput.Item} ({optionalInput.Reason}){policy}");
             }
 
             return CliExitCodes.Success;
