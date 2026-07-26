@@ -113,20 +113,85 @@ public partial class CliIntegrationTests
     }
 
     [Test]
-    public void BaselineUpdate_MissingOutputFlag_ExitsTwo()
+    public void BaselineUpdate_MissingOutputFlag_PreviewsToStdout()
     {
         string baselinePath = Path.Combine(Path.GetTempPath(), $"baseline-{Guid.NewGuid():N}.yml");
         try
         {
             File.WriteAllText(baselinePath, "version: 1\nbaseline: {}\n");
 
-            var (exitCode, _, stderr) = RunCli("baseline", "update",
+            var (exitCode, stdout, stderr) = RunCli("baseline", "update",
                 "--config", _passingPolicy, "--baseline", baselinePath);
 
             Assert.Multiple(() =>
             {
+                Assert.That(exitCode, Is.EqualTo(0), $"Baseline update failed, stderr: {stderr}");
+                Assert.That(stdout, Does.Contain("version: 1"));
+                Assert.That(File.ReadAllText(baselinePath), Is.EqualTo("version: 1\nbaseline: {}\n"));
+            });
+        }
+        finally
+        {
+            if (File.Exists(baselinePath))
+                File.Delete(baselinePath);
+        }
+    }
+
+    [Test]
+    public void BaselineUpdate_PreservesLeadingCommentHeader()
+    {
+        string baselinePath = Path.Combine(Path.GetTempPath(), $"baseline-{Guid.NewGuid():N}.yml");
+        try
+        {
+            File.WriteAllText(baselinePath, "# Reviewed baseline — owned by platform\n# Tracked in #123\nversion: 2\nbaseline: {}\n");
+
+            var (exitCode, _, stderr) = RunCli("baseline", "update",
+                "--config", _passingPolicy, "--baseline", baselinePath, "--output", baselinePath);
+
+            string updated = File.ReadAllText(baselinePath);
+            Assert.Multiple(() =>
+            {
+                Assert.That(exitCode, Is.EqualTo(0), $"Baseline update failed, stderr: {stderr}");
+                Assert.That(updated, Does.Contain("# Reviewed baseline — owned by platform"));
+                Assert.That(updated, Does.Contain("# Tracked in #123"));
+                Assert.That(updated, Does.Contain("version: 2"));
+            });
+        }
+        finally
+        {
+            if (File.Exists(baselinePath))
+                File.Delete(baselinePath);
+        }
+    }
+
+    [Test]
+    public void BaselineUpdate_InteriorComments_RefusesAndReportsLines()
+    {
+        string baselinePath = Path.Combine(Path.GetTempPath(), $"baseline-{Guid.NewGuid():N}.yml");
+        const string original = "version: 2\n# a note about the entry below\nbaseline: {}\n";
+        try
+        {
+            File.WriteAllText(baselinePath, original);
+
+            var (exitCode, _, stderr) = RunCli("baseline", "update",
+                "--config", _passingPolicy, "--baseline", baselinePath, "--output", baselinePath);
+
+            Assert.Multiple(() =>
+            {
                 Assert.That(exitCode, Is.EqualTo(2));
-                Assert.That(stderr, Does.Contain("--output"));
+                Assert.That(stderr, Does.Contain("line(s) 2"));
+                Assert.That(stderr, Does.Contain("--dry-run"));
+                Assert.That(File.ReadAllText(baselinePath), Is.EqualTo(original));
+            });
+
+            var (dryRunExit, dryRunStdout, dryRunStderr) = RunCli("baseline", "update",
+                "--config", _passingPolicy, "--baseline", baselinePath, "--output", baselinePath, "--dry-run");
+
+            Assert.Multiple(() =>
+            {
+                Assert.That(dryRunExit, Is.EqualTo(0), $"Dry run failed, stderr: {dryRunStderr}");
+                Assert.That(dryRunStdout, Does.Contain("version: 2"));
+                Assert.That(File.ReadAllText(baselinePath), Is.EqualTo(original));
             });
         }
         finally

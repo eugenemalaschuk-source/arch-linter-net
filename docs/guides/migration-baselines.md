@@ -124,8 +124,8 @@ explicitly run `baseline migrate` (below).
 1. **Merge** — run `arch-linter-net --policy ... --baseline baseline.yml --mode strict` to enforce boundaries going forward
 1. **Update** — run `baseline update` to add newly-introduced debt while preserving the `reason` text on entries that are still valid, without hand-editing YAML
 1. **Prune** — run `baseline prune` to remove entries whose violation has been fixed or whose contract ID no longer exists, and see exactly what was removed
-1. **Diff** — run `baseline diff` at any time to see new/matched/stale/configuration-error entries without changing the file
-1. **Verify** — run `baseline verify` in CI to fail the build if the baseline has drifted out of sync (stale entries or unknown contract IDs), keeping the baseline honest over time
+1. **Diff** — run `baseline diff` at any time to see new/existing/stale/ambiguous/configuration entries without changing the file
+1. **Verify** — run `baseline verify` in CI to fail the build if the baseline has drifted out of sync (stale, ambiguous, or unknown-contract entries), keeping the baseline honest over time
 1. **Migrate** — run `baseline migrate` once, on demand, to deterministically upgrade an existing version 1 baseline to version 2's structured identity
 
 `generate`/`update`/`prune`/`diff`/`verify` share `--config`/`--policy`, `--mode`
@@ -133,6 +133,118 @@ explicitly run `baseline migrate` (below).
 to specific contract IDs), consistent with `validate`. `migrate` shares
 `--config`/`--policy` and `--condition-set` but deliberately has no `--mode`/`--contract`
 — see below.
+
+Which command to reach for:
+
+| Command | Writes a file | Adds entries | Removes entries | Use it for |
+| --- | --- | --- | --- | --- |
+| `generate` | yes | yes (all current violations) | n/a (fresh file) | first adoption, or re-baselining from scratch |
+| `migrate` | yes (new path) | no | drops entries with no current match | one-time version 1 → version 2 identity upgrade |
+| `update` | yes | yes (newly introduced debt) | never | recording new debt without hand-editing YAML |
+| `prune` | yes | never | yes (resolved debt, unknown contract ids) | cleaning up after violations are fixed |
+| `verify` | no | no | no | CI gate: fail when the baseline has drifted |
+| `diff` | no | no | no | reviewing drift without gating |
+
+### Reviewing a change before it happens
+
+Every writing command previews:
+
+- omit `--output` and the proposed document goes to **stdout**; nothing on disk is touched;
+- pass `--dry-run` with `--output` and the command reports the classification plus the proposed
+  content, and writes nothing;
+- add `--json` to get the same report as one machine-readable document, with the proposal in
+  `proposedContent`.
+
+`generate` refuses to replace an existing `--output` file: pass `--force` once you have reviewed the
+proposal. `update` and `prune` writing back to the same path they read (`--output` equal to
+`--baseline`) is the normal in-place step and needs no flag — naming the same file twice is the
+statement of intent. Writing over some *other* existing file requires `--force`.
+
+Writes are atomic (temp file, then rename), so a failed write leaves the original baseline
+byte-for-byte intact.
+
+### Entry lifecycle
+
+Human and JSON output of every baseline subcommand use one vocabulary, so a single entry can be
+followed across commands:
+
+| Value | Meaning |
+| --- | --- |
+| `new` | current violation with no baseline entry |
+| `added` | that violation recorded as a baseline entry by this run |
+| `existing` | baseline entry matching exactly one current violation |
+| `kept` | an existing entry carried through unchanged, reason and issue verbatim |
+| `changed` | an existing entry whose display text was regenerated from the live violation |
+| `stale` | entry matching no current violation, retained (what `update` does with it) |
+| `resolved` | entry matching no current violation, removed (what `prune` does with it) |
+| `ambiguous` | entry matching **more than one** current violation |
+| `configuration` | entry naming a contract id the policy no longer has |
+
+`--json` output carries a `counts` object keyed by these names (values the command cannot produce are
+reported as `0`) and, for `diff`/`verify`, the full canonical structured identity of each entry.
+
+**Ambiguous** is the one worth understanding. Under version 1, identity is the
+`(source_type, forbidden_reference)` pair, so a single entry can correspond to several distinct
+violations — two same-named types in different assemblies, or two forbidden calls in one type. Such
+an entry suppresses more than it was reviewed for. `verify` fails on it, `update` and `prune` carry it
+through untouched rather than guessing which identity to keep, and `migrate` is the command that
+resolves it.
+
+### Comments and issue metadata
+
+A reviewed baseline usually carries context. Two kinds survive an `update`/`prune`:
+
+```yaml
+# Baseline owned by the platform team.
+# Reviewed 2026-07; next review with the Q4 boundary work.
+version: 2
+baseline:
+  strict:
+    - id: app-boundaries
+      ignored_violations:
+        - source_type: MyApp.App.Legacy.LegacyService
+          forbidden_reference: MyApp.Infrastructure.LegacyDb
+          reason: "Known debt — scheduled for extraction"
+          issue: "PROJ-1234"
+          identity_version: 2
+          contract_family: strict
+          kind: dependency
+          occurrence: 0
+```
+
+- the **leading comment header** (the run of comment lines before the first content line) is
+  re-emitted verbatim above the regenerated document;
+- the optional per-entry **`issue`** field is carried through verbatim on every entry a command
+  retains, exactly like `reason`. It never participates in identity, matching, or deduplication.
+
+A comment sitting *next to* an entry cannot be preserved: the document is rebuilt from the model, and
+there is no stable position for that comment once entries are added, removed, or reordered — guessing
+would move your note onto the wrong entry. So `update`/`prune` refuse to write such a file, report the
+exact line numbers, and point at `--dry-run`, which still prints the proposed document so you can
+merge the comments in by hand. Moving those notes into the header block (or into each entry's `reason`
+/`issue`) makes the file updatable in place from then on.
+
+### Per-contract and per-family reasons
+
+`generate` and `update` accept repeatable reason mappings alongside `--reason`:
+
+```bash
+arch-linter-net baseline update \
+  --config architecture/dependencies.arch.yml \
+  --baseline baseline.yml \
+  --output baseline.yml \
+  --reason-for-family package_dependency="Package debt — tracked in #501" \
+  --reason-for-family composition="Composition debt — tracked in #502" \
+  --reason-for-contract app-boundaries="Extraction in progress — #503" \
+  --reason "Accepted during the Q3 adoption pass"
+```
+
+A newly added entry resolves its reason as: `--reason-for-contract` for its contract id, then
+`--reason-for-family` for its contract family (the group name without its `strict_`/`audit_` prefix —
+`package_dependency`, `composition`, `method_body`, …), then `--reason`, then the built-in default.
+Entries carried over from the existing baseline keep their recorded reason regardless of any mapping.
+A mapping without `=`, with an empty key, with empty text, or repeating a key is rejected up front
+rather than silently ignored.
 
 #### Update
 
@@ -144,11 +256,12 @@ arch-linter-net baseline update \
   --reason "Newly accepted debt — tracked in #456"
 ```
 
-Entries whose `(contract id, source_type, forbidden_reference)` still matches a
-current violation are kept unchanged, including their original `reason`. New
-violations are appended using the default or `--reason` text. Entries that no
-longer match any violation are left in place — `update` never removes entries;
-that is `prune`'s job.
+Entries whose identity still matches a current violation are kept unchanged,
+including their original `reason` and `issue`. New violations are appended using
+the resolved reason (see per-contract and per-family reasons above). Entries that
+no longer match any violation are reported as `stale` and left in place —
+`update` never removes entries; that is `prune`'s job. Ambiguous entries are
+carried through untouched rather than rewritten into one guessed identity.
 
 #### Prune
 
@@ -159,10 +272,15 @@ arch-linter-net baseline prune \
   --output baseline.yml
 ```
 
-Removes baseline entries that no longer match any current violation (resolved
-debt) or that reference a contract ID that no longer exists in the policy
-(configuration error), and reports exactly what was removed and why. Add
-`--json` to get the removed-entry list as structured data.
+Removes baseline entries that no longer match any current violation (`resolved`)
+or that reference a contract ID that no longer exists in the policy
+(`configuration`), and reports exactly what was removed and why. Add `--json` to
+get the removed-entry list and lifecycle report as structured data, or
+`--dry-run` to see the removals before committing to them.
+
+Prune removes only entries whose exact identity matched nothing. An entry that
+matches *more than one* current violation is reported as `ambiguous` and
+retained — deleting it would drop accepted debt that is still real.
 
 #### Diff
 
@@ -172,10 +290,11 @@ arch-linter-net baseline diff \
   --baseline baseline.yml
 ```
 
-Read-only comparison of the baseline against current violations. Reports four
-categories: **new** (unbaselined violations), **existing/frozen** (still
-matched), **resolved** (stale entries), and **configuration errors** (unknown
-contract IDs). Never writes a file.
+Read-only comparison of the baseline against current violations, reporting every
+entry with its lifecycle value: **new**, **existing**, **stale**, **ambiguous**,
+and **configuration**. Never writes a file, and always exits 0 — it is a report,
+not a gate. `--json` adds lifecycle counts and each entry's canonical structured
+identity.
 
 #### Verify
 
@@ -185,10 +304,12 @@ arch-linter-net baseline verify \
   --baseline baseline.yml
 ```
 
-Runs the same comparison as `diff` but exits non-zero if any stale entries
-or configuration errors are found — intended as a CI gate that keeps a
-baseline from silently accumulating stale debt. It does not fail on new,
-unbaselined violations (that's `validate`'s job).
+Runs the same comparison as `diff` but exits non-zero if any **stale**,
+**ambiguous**, or **configuration** entries are found — intended as a CI gate
+that keeps a baseline from silently accumulating stale debt or broadening what it
+suppresses. It does not fail on new, unbaselined violations (that's `validate`'s
+job). This is the only baseline command that belongs in CI; see
+[CI integration](ci-integration.md).
 
 #### Migrate
 

@@ -64,7 +64,10 @@ internal sealed class BaselineMigrateCommandHandler(ICliRuntime runtime, ICliCon
 
             if (outcome.Yaml != null && options.OutputPath != null)
             {
-                fileSystem.WriteAllText(options.OutputPath, outcome.Yaml);
+                // Temp-then-rename, so a failed write cannot leave a half-migrated file where a
+                // reviewed baseline used to be.
+                string tempPath = fileSystem.WriteAllTextToTemp(options.OutputPath, outcome.Yaml);
+                fileSystem.RenameTempToTarget(tempPath, options.OutputPath);
             }
 
             console.Out.WriteLine(options.Format == "json"

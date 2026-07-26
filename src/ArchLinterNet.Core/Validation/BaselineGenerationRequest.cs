@@ -10,5 +10,11 @@ public sealed record BaselineGenerationRequest
 
     public string Reason { get; init; } = "generated baseline";
 
+    /// <summary>Repeatable <c>&lt;contract-id&gt;=&lt;reason&gt;</c> mappings for newly added entries.</summary>
+    public IReadOnlyCollection<string>? ReasonForContract { get; init; }
+
+    /// <summary>Repeatable <c>&lt;family&gt;=&lt;reason&gt;</c> mappings for newly added entries.</summary>
+    public IReadOnlyCollection<string>? ReasonForFamily { get; init; }
+
     public IReadOnlyCollection<string>? ContractIds { get; init; }
 }

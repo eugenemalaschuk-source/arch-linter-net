@@ -17,19 +17,27 @@ public sealed partial class BaselineCommandHandlerTests
 {
     private static readonly string[] _contractIds = ["rule-a", "rule-b"];
 
+    private static readonly BaselineReasonOptions _reasons =
+        new("reason", Array.Empty<string>(), Array.Empty<string>());
+
+    private static readonly BaselineWriteOptions _write = new(DryRun: false, Force: false);
+
     [Test]
     public void BaselineCommandOptions_RetainSuppliedValues()
     {
-        var generate = new BaselineGenerateCommandOptions("policy.yml", "generate.yml", "reason", "all", "ci", _contractIds, false);
-        var update = new BaselineUpdateCommandOptions("policy.yml", "baseline.yml", "update.yml", "reason", "strict", "ci", _contractIds, true);
-        var prune = new BaselinePruneCommandOptions("policy.yml", "baseline.yml", "prune.yml", "audit", "ci", "json", _contractIds, false);
+        var generate = new BaselineGenerateCommandOptions(
+            "policy.yml", "generate.yml", _reasons, "all", "ci", "human", _write, _contractIds, false);
+        var update = new BaselineUpdateCommandOptions(
+            "policy.yml", "baseline.yml", "update.yml", _reasons, "strict", "ci", "human", _write, _contractIds, true);
+        var prune = new BaselinePruneCommandOptions(
+            "policy.yml", "baseline.yml", "prune.yml", "audit", "ci", "json", _write, _contractIds, false);
         var diff = new BaselineDiffCommandOptions("policy.yml", "baseline.yml", "strict", "ci", "human", _contractIds, true);
         var verify = new BaselineVerifyCommandOptions("policy.yml", "baseline.yml", "all", "ci", "json", _contractIds, false);
 
         Assert.Multiple(() =>
         {
             Assert.That(generate.OutputPath, Is.EqualTo("generate.yml"));
-            Assert.That(generate.Reason, Is.EqualTo("reason"));
+            Assert.That(generate.Reasons.Reason, Is.EqualTo("reason"));
             Assert.That(generate.ContractIds, Is.EqualTo(_contractIds));
             Assert.That(update.BaselinePath, Is.EqualTo("baseline.yml"));
             Assert.That(update.ShowHelp, Is.True);
@@ -83,7 +91,8 @@ public sealed partial class BaselineCommandHandlerTests
         var fileSystem = new StubFileSystem("policy.yml");
 
         int result = new BaselineGenerateCommandHandler(runtime, console, fileSystem).Execute(
-            new BaselineGenerateCommandOptions("policy.yml", "generated.yml", "generated reason", "all", "ci", _contractIds, false));
+            new BaselineGenerateCommandOptions(
+                "policy.yml", "generated.yml", _reasons with { Reason = "generated reason" }, "all", "ci", "human", _write, _contractIds, false));
 
         Assert.Multiple(() =>
         {
@@ -109,7 +118,7 @@ public sealed partial class BaselineCommandHandlerTests
         var fileSystem = new StubFileSystem("policy.yml");
 
         int result = new BaselineGenerateCommandHandler(runtime, console, fileSystem).Execute(
-            new BaselineGenerateCommandOptions("policy.yml", "generated.yml", "reason", "strict", null, Array.Empty<string>(), false));
+            new BaselineGenerateCommandOptions("policy.yml", "generated.yml", _reasons, "strict", null, "human", _write, Array.Empty<string>(), false));
 
         Assert.Multiple(() =>
         {
@@ -123,21 +132,17 @@ public sealed partial class BaselineCommandHandlerTests
     public void BaselineGenerate_GuardsAndException_ReportErrors()
     {
         AssertGuardCase(console => new BaselineGenerateCommandHandler(new StubRuntime(), console, new StubFileSystem("policy.yml")).Execute(
-                new BaselineGenerateCommandOptions("policy.yml", "generated.yml", "reason", "invalid", null, Array.Empty<string>(), false)),
+                new BaselineGenerateCommandOptions("policy.yml", "generated.yml", _reasons, "invalid", null, "human", _write, Array.Empty<string>(), false)),
             "Invalid mode");
 
-        AssertGuardCase(console => new BaselineGenerateCommandHandler(new StubRuntime(), console, new StubFileSystem("policy.yml")).Execute(
-                new BaselineGenerateCommandOptions("policy.yml", null, "reason", "strict", null, Array.Empty<string>(), false)),
-            "--output is required");
-
         AssertGuardCase(console => new BaselineGenerateCommandHandler(new StubRuntime(), console, new StubFileSystem()).Execute(
-                new BaselineGenerateCommandOptions("policy.yml", "generated.yml", "reason", "strict", null, Array.Empty<string>(), false)),
+                new BaselineGenerateCommandOptions("policy.yml", "generated.yml", _reasons, "strict", null, "human", _write, Array.Empty<string>(), false)),
             "Policy file not found");
 
         var throwingRuntime = new StubRuntime { GenerateException = new InvalidOperationException("generate boom") };
         var exceptionConsole = new RecordingConsole();
         int exceptionResult = new BaselineGenerateCommandHandler(throwingRuntime, exceptionConsole, new StubFileSystem("policy.yml")).Execute(
-            new BaselineGenerateCommandOptions("policy.yml", "generated.yml", "reason", "strict", null, Array.Empty<string>(), false));
+            new BaselineGenerateCommandOptions("policy.yml", "generated.yml", _reasons, "strict", null, "human", _write, Array.Empty<string>(), false));
 
         Assert.That(exceptionResult, Is.EqualTo(CliExitCodes.InvalidArgumentsOrRuntimeError));
         Assert.That(exceptionConsole.ErrorText, Does.Contain("Baseline generation error: generate boom"));
@@ -154,7 +159,9 @@ public sealed partial class BaselineCommandHandlerTests
         var fileSystem = new StubFileSystem("policy.yml", "baseline.yml");
 
         int result = new BaselineUpdateCommandHandler(runtime, console, fileSystem).Execute(
-            new BaselineUpdateCommandOptions("policy.yml", "baseline.yml", "updated.yml", "update reason", "audit", "ci", _contractIds, false));
+            new BaselineUpdateCommandOptions(
+                "policy.yml", "baseline.yml", "updated.yml", _reasons with { Reason = "update reason" }, "audit", "ci", "human", _write,
+                _contractIds, false));
 
         Assert.Multiple(() =>
         {
@@ -178,7 +185,7 @@ public sealed partial class BaselineCommandHandlerTests
         var fileSystem = new StubFileSystem("policy.yml", "baseline.yml");
 
         int result = new BaselineUpdateCommandHandler(runtime, console, fileSystem).Execute(
-            new BaselineUpdateCommandOptions("policy.yml", "baseline.yml", "updated.yml", "reason", "strict", null, Array.Empty<string>(), false));
+            new BaselineUpdateCommandOptions("policy.yml", "baseline.yml", "updated.yml", _reasons, "strict", null, "human", _write, Array.Empty<string>(), false));
 
         Assert.Multiple(() =>
         {
@@ -192,29 +199,25 @@ public sealed partial class BaselineCommandHandlerTests
     public void BaselineUpdate_GuardsAndException_ReportErrors()
     {
         AssertGuardCase(console => new BaselineUpdateCommandHandler(new StubRuntime(), console, new StubFileSystem("policy.yml", "baseline.yml")).Execute(
-                new BaselineUpdateCommandOptions("policy.yml", "baseline.yml", "updated.yml", "reason", "invalid", null, Array.Empty<string>(), false)),
+                new BaselineUpdateCommandOptions("policy.yml", "baseline.yml", "updated.yml", _reasons, "invalid", null, "human", _write, Array.Empty<string>(), false)),
             "Invalid mode");
 
         AssertGuardCase(console => new BaselineUpdateCommandHandler(new StubRuntime(), console, new StubFileSystem("policy.yml", "baseline.yml")).Execute(
-                new BaselineUpdateCommandOptions("policy.yml", null, "updated.yml", "reason", "strict", null, Array.Empty<string>(), false)),
+                new BaselineUpdateCommandOptions("policy.yml", null, "updated.yml", _reasons, "strict", null, "human", _write, Array.Empty<string>(), false)),
             "--baseline is required");
 
-        AssertGuardCase(console => new BaselineUpdateCommandHandler(new StubRuntime(), console, new StubFileSystem("policy.yml", "baseline.yml")).Execute(
-                new BaselineUpdateCommandOptions("policy.yml", "baseline.yml", null, "reason", "strict", null, Array.Empty<string>(), false)),
-            "--output is required");
-
         AssertGuardCase(console => new BaselineUpdateCommandHandler(new StubRuntime(), console, new StubFileSystem("baseline.yml")).Execute(
-                new BaselineUpdateCommandOptions("policy.yml", "baseline.yml", "updated.yml", "reason", "strict", null, Array.Empty<string>(), false)),
+                new BaselineUpdateCommandOptions("policy.yml", "baseline.yml", "updated.yml", _reasons, "strict", null, "human", _write, Array.Empty<string>(), false)),
             "Policy file not found");
 
         AssertGuardCase(console => new BaselineUpdateCommandHandler(new StubRuntime(), console, new StubFileSystem("policy.yml")).Execute(
-                new BaselineUpdateCommandOptions("policy.yml", "baseline.yml", "updated.yml", "reason", "strict", null, Array.Empty<string>(), false)),
+                new BaselineUpdateCommandOptions("policy.yml", "baseline.yml", "updated.yml", _reasons, "strict", null, "human", _write, Array.Empty<string>(), false)),
             "Baseline file not found");
 
         var throwingRuntime = new StubRuntime { UpdateException = new InvalidOperationException("update boom") };
         var exceptionConsole = new RecordingConsole();
         int exceptionResult = new BaselineUpdateCommandHandler(throwingRuntime, exceptionConsole, new StubFileSystem("policy.yml", "baseline.yml")).Execute(
-            new BaselineUpdateCommandOptions("policy.yml", "baseline.yml", "updated.yml", "reason", "strict", null, Array.Empty<string>(), false));
+            new BaselineUpdateCommandOptions("policy.yml", "baseline.yml", "updated.yml", _reasons, "strict", null, "human", _write, Array.Empty<string>(), false));
 
         Assert.That(exceptionResult, Is.EqualTo(CliExitCodes.InvalidArgumentsOrRuntimeError));
         Assert.That(exceptionConsole.ErrorText, Does.Contain("Baseline update error: update boom"));
@@ -223,16 +226,20 @@ public sealed partial class BaselineCommandHandlerTests
     [Test]
     public void BaselinePrune_Success_FormatsJsonAndHumanOutput()
     {
-        var removedEntry = new BaselineRemovedEntry(CreateEntry("group-a", "contract-a", "Source.C", "Forbidden.C", "reason-a"), "stale");
+        ArchitectureBaselineComparisonEntry resolved = CreateEntry("group-a", "contract-a", "Source.C", "Forbidden.C", "reason-a");
+        var removedEntry = new BaselineRemovedEntry(resolved, BaselineEntryLifecycleNames.Resolved);
         var runtime = new StubRuntime
         {
             PruneOutcome = new BaselinePruneOutcome(true, "pruned: yaml", [removedEntry], Array.Empty<ArchitectureViolation>())
+            {
+                Entries = [new BaselineLifecycleEntry(resolved, BaselineEntryLifecycle.Resolved)],
+            }
         };
         var jsonConsole = new RecordingConsole();
         var fileSystem = new StubFileSystem("policy.yml", "baseline.yml");
 
         int jsonResult = new BaselinePruneCommandHandler(runtime, jsonConsole, fileSystem).Execute(
-            new BaselinePruneCommandOptions("policy.yml", "baseline.yml", "pruned.yml", "all", "ci", "json", _contractIds, false));
+            new BaselinePruneCommandOptions("policy.yml", "baseline.yml", "pruned.yml", "all", "ci", "json", _write, _contractIds, false));
 
         using JsonDocument json = JsonDocument.Parse(jsonConsole.OutputText);
         Assert.Multiple(() =>
@@ -240,16 +247,20 @@ public sealed partial class BaselineCommandHandlerTests
             Assert.That(jsonResult, Is.EqualTo(CliExitCodes.Success));
             Assert.That(fileSystem.LastWritePath, Is.EqualTo("pruned.yml"));
             Assert.That(json.RootElement.GetProperty("output").GetString(), Is.EqualTo("pruned.yml"));
-            Assert.That(json.RootElement.GetProperty("removed")[0].GetProperty("removalReason").GetString(), Is.EqualTo("stale"));
+            Assert.That(json.RootElement.GetProperty("removed")[0].GetProperty("removalReason").GetString(), Is.EqualTo("resolved"));
+            Assert.That(json.RootElement.GetProperty("counts").GetProperty("resolved").GetInt32(), Is.EqualTo(1));
+            Assert.That(json.RootElement.GetProperty("entries")[0].GetProperty("status").GetString(), Is.EqualTo("resolved"));
+            Assert.That(json.RootElement.GetProperty("status").GetString(), Is.EqualTo("pruned"));
         });
 
         var humanConsole = new RecordingConsole();
         int humanResult = new BaselinePruneCommandHandler(runtime, humanConsole, new StubFileSystem("policy.yml", "baseline.yml")).Execute(
-            new BaselinePruneCommandOptions("policy.yml", "baseline.yml", "pruned.yml", "all", "ci", "human", _contractIds, false));
+            new BaselinePruneCommandOptions("policy.yml", "baseline.yml", "pruned.yml", "all", "ci", "human", _write, _contractIds, false));
 
         Assert.That(humanResult, Is.EqualTo(CliExitCodes.Success));
         Assert.That(humanConsole.OutputText, Does.Contain("Pruned baseline: removed 1 entries."));
-        Assert.That(humanConsole.OutputText, Does.Contain("[stale] group-a/contract-a: Source.C -> Forbidden.C"));
+        Assert.That(humanConsole.OutputText, Does.Contain("resolved: 1"));
+        Assert.That(humanConsole.OutputText, Does.Contain("group-a/contract-a: Source.C -> Forbidden.C"));
     }
 
     [Test]
@@ -262,7 +273,7 @@ public sealed partial class BaselineCommandHandlerTests
         var console = new RecordingConsole();
 
         int result = new BaselinePruneCommandHandler(runtime, console, new StubFileSystem("policy.yml", "baseline.yml")).Execute(
-            new BaselinePruneCommandOptions("policy.yml", "baseline.yml", "pruned.yml", "strict", null, "json", Array.Empty<string>(), false));
+            new BaselinePruneCommandOptions("policy.yml", "baseline.yml", "pruned.yml", "strict", null, "json", _write, Array.Empty<string>(), false));
 
         Assert.Multiple(() =>
         {
@@ -276,29 +287,25 @@ public sealed partial class BaselineCommandHandlerTests
     public void BaselinePrune_GuardsAndException_ReportErrors()
     {
         AssertGuardCase(console => new BaselinePruneCommandHandler(new StubRuntime(), console, new StubFileSystem("policy.yml", "baseline.yml")).Execute(
-                new BaselinePruneCommandOptions("policy.yml", "baseline.yml", "pruned.yml", "invalid", null, "json", Array.Empty<string>(), false)),
+                new BaselinePruneCommandOptions("policy.yml", "baseline.yml", "pruned.yml", "invalid", null, "json", _write, Array.Empty<string>(), false)),
             "Invalid mode");
 
         AssertGuardCase(console => new BaselinePruneCommandHandler(new StubRuntime(), console, new StubFileSystem("policy.yml", "baseline.yml")).Execute(
-                new BaselinePruneCommandOptions("policy.yml", null, "pruned.yml", "strict", null, "json", Array.Empty<string>(), false)),
+                new BaselinePruneCommandOptions("policy.yml", null, "pruned.yml", "strict", null, "json", _write, Array.Empty<string>(), false)),
             "--baseline is required");
 
-        AssertGuardCase(console => new BaselinePruneCommandHandler(new StubRuntime(), console, new StubFileSystem("policy.yml", "baseline.yml")).Execute(
-                new BaselinePruneCommandOptions("policy.yml", "baseline.yml", null, "strict", null, "json", Array.Empty<string>(), false)),
-            "--output is required");
-
         AssertGuardCase(console => new BaselinePruneCommandHandler(new StubRuntime(), console, new StubFileSystem("baseline.yml")).Execute(
-                new BaselinePruneCommandOptions("policy.yml", "baseline.yml", "pruned.yml", "strict", null, "json", Array.Empty<string>(), false)),
+                new BaselinePruneCommandOptions("policy.yml", "baseline.yml", "pruned.yml", "strict", null, "json", _write, Array.Empty<string>(), false)),
             "Policy file not found");
 
         AssertGuardCase(console => new BaselinePruneCommandHandler(new StubRuntime(), console, new StubFileSystem("policy.yml")).Execute(
-                new BaselinePruneCommandOptions("policy.yml", "baseline.yml", "pruned.yml", "strict", null, "json", Array.Empty<string>(), false)),
+                new BaselinePruneCommandOptions("policy.yml", "baseline.yml", "pruned.yml", "strict", null, "json", _write, Array.Empty<string>(), false)),
             "Baseline file not found");
 
         var throwingRuntime = new StubRuntime { PruneException = new InvalidOperationException("prune boom") };
         var exceptionConsole = new RecordingConsole();
         int exceptionResult = new BaselinePruneCommandHandler(throwingRuntime, exceptionConsole, new StubFileSystem("policy.yml", "baseline.yml")).Execute(
-            new BaselinePruneCommandOptions("policy.yml", "baseline.yml", "pruned.yml", "strict", null, "json", Array.Empty<string>(), false));
+            new BaselinePruneCommandOptions("policy.yml", "baseline.yml", "pruned.yml", "strict", null, "json", _write, Array.Empty<string>(), false));
 
         Assert.That(exceptionResult, Is.EqualTo(CliExitCodes.InvalidArgumentsOrRuntimeError));
         Assert.That(exceptionConsole.ErrorText, Does.Contain("Baseline prune error: prune boom"));
@@ -328,9 +335,10 @@ public sealed partial class BaselineCommandHandlerTests
             Assert.That(runtime.DiffRequest!.ContractIds, Is.EqualTo(_contractIds));
             Assert.That(json.RootElement.GetProperty("new")[0].GetProperty("contractId").GetString(), Is.EqualTo("contract-b"));
             Assert.That(json.RootElement.GetProperty("new")[0].GetProperty("status").GetString(), Is.EqualTo("new"));
-            Assert.That(json.RootElement.GetProperty("frozen")[0].GetProperty("status").GetString(), Is.EqualTo("matched"));
+            Assert.That(json.RootElement.GetProperty("frozen")[0].GetProperty("status").GetString(), Is.EqualTo("existing"));
             Assert.That(json.RootElement.GetProperty("resolved")[0].GetProperty("status").GetString(), Is.EqualTo("stale"));
-            Assert.That(json.RootElement.GetProperty("configurationErrors")[0].GetProperty("status").GetString(), Is.EqualTo("configuration_error"));
+            Assert.That(json.RootElement.GetProperty("configurationErrors")[0].GetProperty("status").GetString(), Is.EqualTo("configuration"));
+            Assert.That(json.RootElement.GetProperty("counts").GetProperty("existing").GetInt32(), Is.EqualTo(1));
         });
 
         var humanConsole = new RecordingConsole();
@@ -422,9 +430,10 @@ public sealed partial class BaselineCommandHandlerTests
             Assert.That(json.RootElement.GetProperty("inSync").GetBoolean(), Is.False);
             Assert.That(json.RootElement.GetProperty("new")[0].GetProperty("sourceType").GetString(), Is.EqualTo("Source.G"));
             Assert.That(json.RootElement.GetProperty("new")[0].GetProperty("status").GetString(), Is.EqualTo("new"));
-            Assert.That(json.RootElement.GetProperty("frozen")[0].GetProperty("status").GetString(), Is.EqualTo("matched"));
+            Assert.That(json.RootElement.GetProperty("frozen")[0].GetProperty("status").GetString(), Is.EqualTo("existing"));
             Assert.That(json.RootElement.GetProperty("resolved")[0].GetProperty("status").GetString(), Is.EqualTo("stale"));
-            Assert.That(json.RootElement.GetProperty("configurationErrors")[0].GetProperty("status").GetString(), Is.EqualTo("configuration_error"));
+            Assert.That(json.RootElement.GetProperty("configurationErrors")[0].GetProperty("status").GetString(), Is.EqualTo("configuration"));
+            Assert.That(json.RootElement.GetProperty("counts").GetProperty("existing").GetInt32(), Is.EqualTo(1));
         });
 
         runtime.VerifyOutcome = runtime.VerifyOutcome with { InSync = true };
@@ -535,8 +544,18 @@ public sealed partial class BaselineCommandHandlerTests
             LastWriteContents = contents;
         }
 
+        /// <summary>Set to simulate a write failure and prove the destination is left alone.</summary>
+        public Exception? TempWriteException { get; set; }
+
+        public int RenameCount { get; private set; }
+
         public string WriteAllTextToTemp(string targetPath, string contents)
         {
+            if (TempWriteException != null)
+            {
+                throw TempWriteException;
+            }
+
             LastWritePath = targetPath;
             LastWriteContents = contents;
             return targetPath + ".tmp";
@@ -544,6 +563,7 @@ public sealed partial class BaselineCommandHandlerTests
 
         public void RenameTempToTarget(string tempPath, string targetPath)
         {
+            RenameCount++;
         }
 
         public void DeleteFile(string path)

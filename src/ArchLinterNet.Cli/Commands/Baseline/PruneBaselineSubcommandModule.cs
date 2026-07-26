@@ -20,6 +20,7 @@ internal sealed class PruneBaselineSubcommandModule : IBaselineSubcommandModule
         Option<string[]> contractOption = new("--contract");
         Option<bool> jsonOption = new("--json");
         Option<bool> shortFormatOption = new("-f");
+        BaselineOptionsFactory.WriteOptionSet writeOptions = BaselineOptionsFactory.CreateWriteOptions();
         Option<bool> helpOption = new("--help");
         helpOption.Aliases.Add("-h");
 
@@ -31,6 +32,7 @@ internal sealed class PruneBaselineSubcommandModule : IBaselineSubcommandModule
         command.Options.Add(contractOption);
         command.Options.Add(jsonOption);
         command.Options.Add(shortFormatOption);
+        BaselineOptionsFactory.AddTo(command, writeOptions);
         command.Options.Add(helpOption);
 
         command.SetAction(parseResult => handler.Execute(new BaselinePruneCommandOptions(
@@ -40,6 +42,7 @@ internal sealed class PruneBaselineSubcommandModule : IBaselineSubcommandModule
             parseResult.GetValue(modeOption) ?? "all",
             parseResult.GetValue(conditionSetOption),
             parseResult.GetValue(jsonOption) || parseResult.GetValue(shortFormatOption) ? "json" : "human",
+            BaselineOptionsFactory.Read(parseResult, writeOptions),
             parseResult.GetValue(contractOption) ?? Array.Empty<string>(),
             parseResult.GetValue(helpOption))));
 

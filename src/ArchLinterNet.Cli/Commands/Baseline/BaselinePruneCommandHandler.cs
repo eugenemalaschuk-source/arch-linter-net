@@ -27,12 +27,6 @@ internal sealed class BaselinePruneCommandHandler(ICliRuntime runtime, ICliConso
             return CliExitCodes.InvalidArgumentsOrRuntimeError;
         }
 
-        if (options.OutputPath == null)
-        {
-            console.Error.WriteLine("--output is required for baseline prune.");
-            return CliExitCodes.InvalidArgumentsOrRuntimeError;
-        }
-
         if (!fileSystem.FileExists(options.PolicyPath))
         {
             console.Error.WriteLine($"Policy file not found: {options.PolicyPath}");
@@ -62,41 +56,73 @@ internal sealed class BaselinePruneCommandHandler(ICliRuntime runtime, ICliConso
                 return CliExitCodes.InvalidArgumentsOrRuntimeError;
             }
 
-            fileSystem.WriteAllText(options.OutputPath, outcome.Yaml!);
-            if (options.Format == "json")
+            bool json = options.Format == "json";
+            BaselineWriteGate gate = new(console, fileSystem);
+            if (!gate.TryApply(
+                    new BaselineWriteGate.Request(
+                        "baseline prune", options.OutputPath, options.Write.DryRun, options.Write.Force,
+                        outcome.Yaml!, outcome.CommentDiagnostic, options.BaselinePath, !json),
+                    out BaselineWriteGate.Disposition disposition))
             {
-                console.Out.WriteLine(JsonSerializer.Serialize(new
-                {
-                    output = options.OutputPath,
-                    removed = outcome.RemovedEntries.Select(r => new
-                    {
-                        contractGroup = r.Entry.ContractGroup,
-                        contractId = r.Entry.ContractId,
-                        sourceType = r.Entry.SourceType,
-                        forbiddenReference = r.Entry.ForbiddenReference,
-                        removalReason = r.RemovalReason,
-                    }),
-                }));
-            }
-            else
-            {
-                console.Out.WriteLine($"Pruned baseline: removed {outcome.RemovedEntries.Count} entries.");
-                foreach (BaselineRemovedEntry removedEntry in outcome.RemovedEntries)
-                {
-                    console.Out.WriteLine(
-                        $"  [{removedEntry.RemovalReason}] {removedEntry.Entry.ContractGroup}/{removedEntry.Entry.ContractId}: " +
-                        $"{removedEntry.Entry.SourceType} -> {removedEntry.Entry.ForbiddenReference}");
-                }
-
-                console.Out.WriteLine($"Output: {options.OutputPath}");
+                return CliExitCodes.InvalidArgumentsOrRuntimeError;
             }
 
+            Report(options, outcome, disposition);
             return CliExitCodes.Success;
         }
         catch (Exception ex)
         {
             console.Error.WriteLine($"Baseline prune error: {ex.Message}");
             return CliExitCodes.InvalidArgumentsOrRuntimeError;
+        }
+    }
+
+    private void Report(
+        BaselinePruneCommandOptions options,
+        BaselinePruneOutcome outcome,
+        BaselineWriteGate.Disposition disposition)
+    {
+        if (options.Format == "json")
+        {
+            bool written = disposition == BaselineWriteGate.Disposition.Written;
+            console.Out.WriteLine(JsonSerializer.Serialize(new
+            {
+                status = BaselineWriteGate.StatusFor(disposition, "pruned"),
+                dryRun = disposition == BaselineWriteGate.Disposition.DryRun,
+                output = options.OutputPath,
+                commentDiagnostic = outcome.CommentDiagnostic,
+                counts = BaselineLifecycleFormatter.Counts(outcome.Entries),
+                entries = BaselineLifecycleFormatter.EntriesForJson(outcome.Entries),
+                removed = outcome.RemovedEntries.Select(r => new
+                {
+                    contractGroup = r.Entry.ContractGroup,
+                    contractId = r.Entry.ContractId,
+                    sourceType = r.Entry.SourceType,
+                    forbiddenReference = r.Entry.ForbiddenReference,
+                    removalReason = r.RemovalReason,
+                    identity = BaselineLifecycleFormatter.IdentityForJson(r.Entry.Identity),
+                }),
+                proposedContent = written ? null : outcome.Yaml,
+            }));
+            return;
+        }
+
+        if (disposition == BaselineWriteGate.Disposition.Preview)
+        {
+            return;
+        }
+
+        console.Out.WriteLine($"Pruned baseline: removed {outcome.RemovedEntries.Count} entries.");
+        console.Out.WriteLine(BaselineLifecycleFormatter.FormatForHumans(outcome.Entries));
+
+        if (outcome.CommentDiagnostic != null)
+        {
+            console.Out.WriteLine(outcome.CommentDiagnostic);
+        }
+
+        if (disposition == BaselineWriteGate.Disposition.Written)
+        {
+            console.Out.WriteLine($"Output: {options.OutputPath}");
         }
     }
 

@@ -33,6 +33,16 @@ public sealed class ArchitectureBaselineLoadingService : IArchitectureBaselineLo
         return LoadFromPath(baselinePath);
     }
 
+    public string ReadRawText(string baselinePath)
+    {
+        if (!_fileSystem.FileExists(baselinePath))
+        {
+            throw new FileNotFoundException($"Baseline file not found: {baselinePath}");
+        }
+
+        return _fileSystem.ReadAllText(baselinePath);
+    }
+
     internal ArchitectureBaselineDocument LoadFromPath(string baselinePath)
     {
         if (!_fileSystem.FileExists(baselinePath))

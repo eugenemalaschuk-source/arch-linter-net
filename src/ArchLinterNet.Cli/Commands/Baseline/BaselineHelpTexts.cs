@@ -18,10 +18,20 @@ internal static class BaselineHelpTexts
           --policy, --config <path>
                               Path to YAML contract file
                               (default: architecture/dependencies.arch.yml)
-          --output <path>     Path to write the generated baseline file (required)
+          --output <path>     Path to write the baseline file. Omit to print the
+                              proposed document to stdout without writing
           --mode <mode>       Contract mode: strict, audit, or all (default: all)
           --reason <text>     Reason text for baseline entries
                               (default: "generated baseline")
+          --reason-for-contract <id>=<text>
+                              Reason for newly added entries of one contract
+                              (may be repeated; wins over --reason-for-family)
+          --reason-for-family <family>=<text>
+                              Reason for newly added entries of one contract
+                              family, e.g. package_dependency (may be repeated)
+          --dry-run           Report the proposal without writing any file
+          --force             Replace an existing output file
+          --json              Emit the lifecycle report as JSON
           --contract <id>     Restrict to this contract ID (may be repeated)
           --condition-set <name>
                               Use a named condition set from analysis.condition_sets
@@ -33,16 +43,27 @@ internal static class BaselineHelpTexts
         Subcommands:
           generate   Generate a fresh baseline from current violations
           update     Update an existing baseline, preserving valid entries
-          prune      Remove stale/resolved entries from an existing baseline
-          diff       Report new/existing/resolved/configuration-error entries
+          prune      Remove resolved entries from an existing baseline
+          diff       Report new/existing/stale/ambiguous/configuration entries
           verify     Exit non-zero if the baseline is out of sync (CI gate)
           migrate    Upgrade a legacy version 1 baseline to structured version 2 identity
 
         Run 'arch-linter-net baseline <subcommand> --help' for subcommand-specific options.
 
+        Entry lifecycle (shared by human and JSON output):
+          new           current violation with no baseline entry
+          added         a new violation this run recorded as a baseline entry
+          existing      baseline entry matching exactly one current violation
+          kept          an existing entry carried through unchanged
+          changed       an existing entry whose display text was regenerated
+          stale         entry matching no current violation, retained
+          resolved      entry matching no current violation, removed
+          ambiguous     entry matching more than one current violation
+          configuration entry whose contract id is not in the policy
+
         Exit codes:
           0   Command completed successfully
-          1   Baseline verify found resolved entries or configuration errors
+          1   Baseline verify found stale, ambiguous, or configuration entries
           2   Runtime error (invalid arguments, file not found, config violations, etc.)
         """;
 
@@ -58,18 +79,37 @@ internal static class BaselineHelpTexts
                               Path to YAML contract file
                               (default: architecture/dependencies.arch.yml)
           --baseline <path>   Path to the existing baseline file to update (required)
-          --output <path>     Path to write the updated baseline file (required)
+          --output <path>     Path to write the updated baseline file. Omit to print
+                              the proposed document to stdout without writing.
+                              Passing the same path as --baseline is the in-place
+                              update and needs no --force
           --mode <mode>       Contract mode: strict, audit, or all (default: all)
           --reason <text>     Reason text for newly added entries
                               (default: "generated baseline")
+          --reason-for-contract <id>=<text>
+                              Reason for newly added entries of one contract
+                              (may be repeated; wins over --reason-for-family)
+          --reason-for-family <family>=<text>
+                              Reason for newly added entries of one contract family
+                              (may be repeated)
+          --dry-run           Report the proposal without writing any file
+          --force             Replace an existing output file other than --baseline
+          --json              Emit the lifecycle report as JSON
           --contract <id>     Restrict to this contract ID (may be repeated)
           --condition-set <name>
                               Use a named condition set from analysis.condition_sets
           -h, --help          Show this help message
 
+        Entries carried over keep their reason and issue metadata verbatim; reason
+        mapping only ever applies to entries this run adds. A leading comment header
+        in the existing file is preserved. Comments sitting next to entries cannot be
+        re-anchored: the run reports their line numbers and refuses to write, and
+        --dry-run prints the proposed document for a manual merge.
+
         Exit codes:
-          0   Baseline updated successfully
-          2   Runtime error (invalid arguments, file not found, config violations, etc.)
+          0   Baseline updated successfully (or previewed)
+          2   Runtime error (invalid arguments, unpreservable comments, existing output
+              without --force, file not found, config violations, etc.)
         """;
 
     public const string PruneHelpText =
@@ -84,17 +124,27 @@ internal static class BaselineHelpTexts
                               Path to YAML contract file
                               (default: architecture/dependencies.arch.yml)
           --baseline <path>   Path to the existing baseline file to prune (required)
-          --output <path>     Path to write the pruned baseline file (required)
+          --output <path>     Path to write the pruned baseline file. Omit to print the
+                              proposed document to stdout without writing. Passing the
+                              same path as --baseline is the in-place prune and needs
+                              no --force
           --mode <mode>       Contract mode: strict, audit, or all (default: all)
           --contract <id>     Restrict to this contract ID (may be repeated)
           --condition-set <name>
                               Use a named condition set from analysis.condition_sets
-          --json              Report removed entries as JSON
+          --dry-run           Report the proposal without writing any file
+          --force             Replace an existing output file other than --baseline
+          --json              Report removed entries and the lifecycle report as JSON
           -h, --help          Show this help message
 
+        Only entries that match no current violation are removed. An entry matching
+        more than one current violation is reported as ambiguous and retained, never
+        removed. Comment handling matches 'baseline update'.
+
         Exit codes:
-          0   Baseline pruned successfully
-          2   Runtime error (invalid arguments, file not found, config violations, etc.)
+          0   Baseline pruned successfully (or previewed)
+          2   Runtime error (invalid arguments, unpreservable comments, existing output
+              without --force, file not found, config violations, etc.)
         """;
 
     public const string DiffHelpText =
@@ -137,12 +187,13 @@ internal static class BaselineHelpTexts
           --contract <id>     Restrict to this contract ID (may be repeated)
           --condition-set <name>
                               Use a named condition set from analysis.condition_sets
-          --json               Output the verification report as JSON
+          --json               Output the verification report as JSON, including
+                               lifecycle counts and each entry's canonical identity
           -h, --help          Show this help message
 
         Exit codes:
           0   Baseline is in sync
-          1   Baseline is out of sync (resolved entries or configuration errors found)
+          1   Baseline is out of sync (stale, ambiguous, or configuration entries found)
           2   Runtime error (invalid arguments, file not found, config violations, etc.)
         """;
 

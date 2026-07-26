@@ -41,8 +41,8 @@ public sealed partial class ArchitectureBaselineApplicationServiceFakeCompositio
 
         Assert.That(outcome.Succeeded, Is.True);
         Assert.That(outcome.Yaml, Is.EqualTo("fake-baseline-yaml"));
-        Assert.That(baselineGenerator.WasCalled, Is.True);
-        Assert.That(baselineGenerator.ReasonReceived, Is.EqualTo("fake reason"));
+        Assert.That(baselineGenerator.BuildFromEntriesWasCalled, Is.True);
+        Assert.That(baselineGenerator.EntriesReceived!.Select(e => e.Reason), Is.All.EqualTo("fake reason"));
         Assert.That(contractExecutor.ModesReceived, Is.EquivalentTo(new[] { "strict", "audit" }));
         Assert.That(runner.StrictArgumentsReceived, Is.EqualTo(new[] { true }));
         Assert.That(runnerSetupService.ModeReceived, Is.Null);
@@ -295,7 +295,7 @@ public sealed partial class ArchitectureBaselineApplicationServiceFakeCompositio
 
         Assert.That(outcome.RemovedEntries, Has.Count.EqualTo(2));
         Assert.That(outcome.RemovedEntries.Single(r => r.Entry.SourceType == "SrcB").RemovalReason, Is.EqualTo("resolved"));
-        Assert.That(outcome.RemovedEntries.Single(r => r.Entry.SourceType == "SrcC").RemovalReason, Is.EqualTo("configuration-error"));
+        Assert.That(outcome.RemovedEntries.Single(r => r.Entry.SourceType == "SrcC").RemovalReason, Is.EqualTo("configuration"));
     }
 
     [Test]

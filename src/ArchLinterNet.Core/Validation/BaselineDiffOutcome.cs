@@ -9,4 +9,8 @@ public sealed record BaselineDiffOutcome(
     IReadOnlyList<ArchitectureBaselineComparisonEntry> Frozen,
     IReadOnlyList<ArchitectureBaselineComparisonEntry> Resolved,
     IReadOnlyList<ArchitectureBaselineComparisonEntry> ConfigurationErrors,
-    IReadOnlyCollection<ArchitectureViolation> ConfigurationViolations);
+    IReadOnlyCollection<ArchitectureViolation> ConfigurationViolations)
+{
+    public IReadOnlyList<ArchitectureBaselineComparisonEntry> Ambiguous { get; init; } =
+        Array.Empty<ArchitectureBaselineComparisonEntry>();
+}

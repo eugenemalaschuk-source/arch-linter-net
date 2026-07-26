@@ -1,11 +1,24 @@
 namespace ArchLinterNet.Cli.Commands.Baseline;
 
+// Reason mapping, preview, and overwrite intent are shared by every writing subcommand, so they are
+// declared once here and spread into each command's options record.
+internal sealed record BaselineReasonOptions(
+    string Reason,
+    IReadOnlyList<string> ReasonForContract,
+    IReadOnlyList<string> ReasonForFamily);
+
+internal sealed record BaselineWriteOptions(
+    bool DryRun,
+    bool Force);
+
 internal sealed record BaselineGenerateCommandOptions(
     string PolicyPath,
     string? OutputPath,
-    string Reason,
+    BaselineReasonOptions Reasons,
     string Mode,
     string? ConditionSetName,
+    string Format,
+    BaselineWriteOptions Write,
     IReadOnlyList<string> ContractIds,
     bool ShowHelp);
 
@@ -13,9 +26,11 @@ internal sealed record BaselineUpdateCommandOptions(
     string PolicyPath,
     string? BaselinePath,
     string? OutputPath,
-    string Reason,
+    BaselineReasonOptions Reasons,
     string Mode,
     string? ConditionSetName,
+    string Format,
+    BaselineWriteOptions Write,
     IReadOnlyList<string> ContractIds,
     bool ShowHelp);
 
@@ -26,6 +41,7 @@ internal sealed record BaselinePruneCommandOptions(
     string Mode,
     string? ConditionSetName,
     string Format,
+    BaselineWriteOptions Write,
     IReadOnlyList<string> ContractIds,
     bool ShowHelp);
 
