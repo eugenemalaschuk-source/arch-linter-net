@@ -18,14 +18,17 @@ public sealed class PublicApiSnapshotStore(IArchitectureFileSystem fileSystem) :
     }
 
     // Two paths merely both existing does not prove they are the same file: a case-sensitive
-    // filesystem can legitimately hold "Surface.txt" and "surface.txt" as two distinct entries.
-    // Conversely, "exactly one real entry matches either spelling" does not prove it either: on a
-    // case-sensitive filesystem holding only "surface.txt", a query for "Surface.txt" still counts
-    // as one case-insensitive match against that entry even though "Surface.txt" does not itself
-    // exist — a case-sensitive FileExists("Surface.txt") correctly fails, and only that failure
-    // reveals it. Both signals are required together: the directory listing rules out two distinct
-    // real entries, and an exact-case existence check on *both* spellings rules out a lone entry
-    // whose casing only happens to match one of them.
+    // filesystem can legitimately hold "Surface.txt" and "surface.txt" as two distinct entries, and
+    // the same is true one level up — "/repo/api/surface.txt" and "/repo/API/surface.txt" can both
+    // be real, distinct files. Comparing directory names with OrdinalIgnoreCase (instead of
+    // establishing their real identity the same way we establish the leaf file's) would let that
+    // slip through as a false match. So identity is established component-by-component, walking up
+    // to the root: at each level, "exactly one real entry matches either spelling" alone is not
+    // proof either — on a case-sensitive filesystem holding only one spelling, a query for the other
+    // still counts as one case-insensitive match against that entry even though the queried spelling
+    // does not itself exist. Both signals are required together at every level: the directory
+    // listing rules out two distinct real entries, and an exact-case existence check on *both*
+    // spellings rules out a lone entry whose casing only happens to match one of them.
     public bool IsSameFile(string first, string second)
     {
         if (string.Equals(first, second, StringComparison.Ordinal))
@@ -35,19 +38,62 @@ public sealed class PublicApiSnapshotStore(IArchitectureFileSystem fileSystem) :
 
         string? firstDirectory = Path.GetDirectoryName(first);
         string? secondDirectory = Path.GetDirectoryName(second);
+        string firstName = Path.GetFileName(first);
+        string secondName = Path.GetFileName(second);
         if (firstDirectory == null || secondDirectory == null
-            || !string.Equals(firstDirectory, secondDirectory, StringComparison.OrdinalIgnoreCase)
-            || !fileSystem.DirectoryExists(secondDirectory))
+            || !string.Equals(firstName, secondName, StringComparison.OrdinalIgnoreCase)
+            || !IsSameDirectory(firstDirectory, secondDirectory))
         {
             return false;
         }
 
-        string sharedName = Path.GetFileName(second);
-        int matchingEntries = fileSystem
-            .EnumerateFiles(secondDirectory, "*", SearchOption.TopDirectoryOnly)
-            .Count(entry => string.Equals(Path.GetFileName(entry), sharedName, StringComparison.OrdinalIgnoreCase));
+        return HasExactlyOneMatch(secondDirectory, secondName, isDirectory: false)
+            && fileSystem.FileExists(first) && fileSystem.FileExists(second);
+    }
 
-        return matchingEntries == 1 && fileSystem.FileExists(first) && fileSystem.FileExists(second);
+    private bool IsSameDirectory(string first, string second)
+    {
+        if (string.Equals(first, second, StringComparison.Ordinal))
+        {
+            return true;
+        }
+
+        string? firstParent = Path.GetDirectoryName(first);
+        string? secondParent = Path.GetDirectoryName(second);
+        string firstName = Path.GetFileName(first);
+        string secondName = Path.GetFileName(second);
+
+        // A root path (e.g. "/" or "C:\") has no parent and no filename component to compare — it is
+        // unambiguous, so exact-case existence on both spellings is the whole check.
+        if (firstParent == null || secondParent == null
+            || firstName.Length == 0 || secondName.Length == 0)
+        {
+            return string.Equals(first, second, StringComparison.OrdinalIgnoreCase)
+                && fileSystem.DirectoryExists(first) && fileSystem.DirectoryExists(second);
+        }
+
+        if (!string.Equals(firstName, secondName, StringComparison.OrdinalIgnoreCase)
+            || !IsSameDirectory(firstParent, secondParent))
+        {
+            return false;
+        }
+
+        return HasExactlyOneMatch(secondParent, secondName, isDirectory: true)
+            && fileSystem.DirectoryExists(first) && fileSystem.DirectoryExists(second);
+    }
+
+    private bool HasExactlyOneMatch(string parentDirectory, string name, bool isDirectory)
+    {
+        if (!fileSystem.DirectoryExists(parentDirectory))
+        {
+            return false;
+        }
+
+        IEnumerable<string> entries = isDirectory
+            ? fileSystem.EnumerateDirectories(parentDirectory, "*", SearchOption.TopDirectoryOnly)
+            : fileSystem.EnumerateFiles(parentDirectory, "*", SearchOption.TopDirectoryOnly);
+
+        return entries.Count(entry => string.Equals(Path.GetFileName(entry), name, StringComparison.OrdinalIgnoreCase)) == 1;
     }
 
     public PublicApiSnapshotDocument Read(string resolvedPath, string authoredPath)

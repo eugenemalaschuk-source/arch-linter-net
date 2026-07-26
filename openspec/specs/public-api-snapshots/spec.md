@@ -229,10 +229,6 @@ The system SHALL resolve every artifact path once, in the application seam, and 
 - **WHEN** the process working directory is not the repository root
 - **THEN** the file written SHALL be the boundary-resolved destination, not the authored string resolved against the working directory
 
-#### Scenario: Path identity comparison is OS-aware
-- **WHEN** update compares a `--snapshot` destination against the contract's declared snapshot path
-- **THEN** the comparison SHALL use the file-name case sensitivity of the host filesystem, so two differently-cased paths are treated as the same file only on a case-insensitive host
-
 #### Scenario: Absolute snapshot path is rejected
 - **WHEN** a policy declares an absolute `api_snapshot` path
 - **THEN** policy loading SHALL fail with an error identifying the contract and the rejected path
@@ -272,7 +268,7 @@ The system SHALL classify why a snapshot is unusable (missing, unparsable, or a 
 
 ### Requirement: Path identity respects the actual filesystem, not an assumption from the host OS or from existence alone
 
-The system SHALL determine whether two differently-cased paths name the same file by consulting what the filesystem actually stores at that location, not by assuming case sensitivity from the operating system, and not by treating a directory listing or a bare existence check alone as sufficient proof of identity — a case-sensitive filesystem holding only one of the two spellings still produces exactly one case-insensitive directory match, so the identity check SHALL also confirm that both spellings independently resolve via an exact-case existence check before treating them as the same file.
+The system SHALL determine whether two differently-cased paths name the same file by consulting what the filesystem actually stores at that location, not by assuming case sensitivity from the operating system, and not by treating a directory listing or a bare existence check alone as sufficient proof of identity — a case-sensitive filesystem holding only one of the two spellings still produces exactly one case-insensitive directory match, so the identity check SHALL also confirm that both spellings independently resolve via an exact-case existence check before treating them as the same file. This confirmation SHALL apply to every path component, not only the leaf file name — a case-sensitive filesystem can hold sibling directories that differ only by case (for example `api` and `API`), each containing a file of the same name, and those are distinct files even though their leaf names and case-insensitive parent-directory names match.
 
 #### Scenario: A case-sensitive filesystem on any host is respected
 - **WHEN** `update` compares a `--snapshot` destination against the contract's declared snapshot path and the two differ only by case
@@ -285,6 +281,10 @@ The system SHALL determine whether two differently-cased paths name the same fil
 #### Scenario: A case-sensitive filesystem with only one spelling written is not treated as a match
 - **WHEN** only one spelling of a differently-cased pair exists on a case-sensitive filesystem, so the directory listing shows exactly one entry matching either spelling case-insensitively
 - **THEN** the system SHALL still treat the two paths as different, because an exact-case existence check on the spelling that was not written fails
+
+#### Scenario: Same-named files in sibling case-variant directories are not treated as the same file
+- **WHEN** two differently-cased paths share the same leaf file name but live under sibling directories that differ only by case (a case-sensitive filesystem holding both `api/surface.txt` and `API/surface.txt`)
+- **THEN** the system SHALL establish the identity of each directory component using the same directory-listing-plus-exact-existence check as the leaf file, and SHALL treat the two paths as different files
 
 #### Scenario: Neither path exists yet
 - **WHEN** the two differently-cased paths being compared do not yet exist on disk

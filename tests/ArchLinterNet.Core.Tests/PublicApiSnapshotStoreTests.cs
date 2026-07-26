@@ -155,6 +155,30 @@ public sealed class PublicApiSnapshotStoreTests
         Assert.That(_store.IsSameFile(upper, lower), Is.False);
     }
 
+    // The second regressed bug: comparing directory names with OrdinalIgnoreCase treats sibling
+    // case-variant directories ("api" and "API") as the same directory, so a same-named file inside
+    // each looks like a single match at the leaf level even though the two files are genuinely
+    // distinct. Only reproducible on a case-sensitive host, where both directories can coexist.
+    [Test]
+    public void IsSameFile_SameLeafNameInSiblingCaseVariantDirectories_DoesNotMatch()
+    {
+        string lowerDirectory = Path.Combine(_repositoryRoot, "architecture", "api");
+        string upperDirectory = Path.Combine(_repositoryRoot, "architecture", "API");
+
+        if (Directory.Exists(upperDirectory))
+        {
+            Assert.Ignore("Host filesystem is case-insensitive; 'api' and 'API' cannot coexist as sibling directories.");
+        }
+
+        Directory.CreateDirectory(upperDirectory);
+        string lower = WriteSnapshot("architecture/api/surface.txt", "class Acme.Module.Thing");
+        string upper = Path.Combine(upperDirectory, "surface.txt");
+        File.WriteAllText(upper, PublicApiSnapshotFormat.Serialize(new PublicApiSnapshotDocument(
+            PublicApiSnapshotFormat.CurrentVersion, "surface", Array.Empty<PublicApiSnapshotEntry>())));
+
+        Assert.That(_store.IsSameFile(upper, lower), Is.False);
+    }
+
     [Test]
     public void IsSameFile_NeitherPathExists_DoesNotMatch()
     {
