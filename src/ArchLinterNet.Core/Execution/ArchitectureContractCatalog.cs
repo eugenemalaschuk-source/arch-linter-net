@@ -1,5 +1,6 @@
 using ArchLinterNet.Core.Contracts;
 using ArchLinterNet.Core.Contracts.Families;
+using ArchLinterNet.Core.Model;
 using ArchitectureContractGroups = ArchLinterNet.Core.Contracts.Families.ArchitectureContractGroups;
 
 namespace ArchLinterNet.Core.Execution;
@@ -24,10 +25,14 @@ public sealed class ArchitectureContractCatalog
     private readonly List<ArchitectureContractDescriptor> _descriptors;
     private readonly List<string> _familiesInOrder;
 
-    private ArchitectureContractCatalog(List<ArchitectureContractDescriptor> descriptors, List<string> familiesInOrder)
+    private ArchitectureContractCatalog(
+        List<ArchitectureContractDescriptor> descriptors,
+        List<string> familiesInOrder,
+        ArchitectureSourceExpansionInventory sourceExpansion)
     {
         _descriptors = descriptors;
         _familiesInOrder = familiesInOrder;
+        _sourceExpansion = sourceExpansion;
     }
 
     // The order families first appear while Build below iterates ArchitectureContractFamilyRegistry.All,
@@ -81,7 +86,7 @@ public sealed class ArchitectureContractCatalog
             }
         }
 
-        return new ArchitectureContractCatalog(descriptors, familiesInOrder);
+        return new ArchitectureContractCatalog(descriptors, familiesInOrder, document.SourceExpansion);
     }
 
     public IEnumerable<IArchitectureContract> ContractsFor(string mode, string family)
@@ -128,6 +133,8 @@ public sealed class ArchitectureContractCatalog
             }
         }
 
+        AddOptionalEmptyAuthoredIds(ids, mode);
+
         return ids;
     }
 
@@ -165,6 +172,14 @@ public sealed class ArchitectureContractCatalog
             if (descriptor.AuthoredId != null)
             {
                 ids.Add(descriptor.AuthoredId);
+            }
+        }
+
+        foreach (ArchitectureContractExpansion expansion in _sourceExpansion.Contracts)
+        {
+            if (expansion.Group == group && expansion.OptionalEmpty)
+            {
+                ids.Add(expansion.AuthoredContractId);
             }
         }
 
@@ -207,5 +222,19 @@ public sealed class ArchitectureContractCatalog
         }
 
         return false;
+    }
+
+    private readonly ArchitectureSourceExpansionInventory _sourceExpansion;
+
+    private void AddOptionalEmptyAuthoredIds(HashSet<string> ids, string mode)
+    {
+        string groupPrefix = $"{mode}_";
+        foreach (ArchitectureContractExpansion expansion in _sourceExpansion.Contracts)
+        {
+            if (expansion.OptionalEmpty && expansion.Group.StartsWith(groupPrefix, StringComparison.Ordinal))
+            {
+                ids.Add(expansion.AuthoredContractId);
+            }
+        }
     }
 }

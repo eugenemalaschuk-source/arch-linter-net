@@ -41,6 +41,15 @@ public sealed record ArchitectureExpandedContractInstance(
     string? SetName,
     string Selector);
 
+// Fan-out contracts become one executable contract per resolved source. List-shaped consumers
+// keep one executable contract and union set values into one of its selectors; recording that as
+// a distinct kind prevents report consumers from mistaking those values for derived contracts.
+public enum ArchitectureContractExpansionKind
+{
+    FanOut,
+    InlineUnion
+}
+
 public sealed record ArchitectureContractExpansion(
     string Group,
     string AuthoredContractId,
@@ -48,6 +57,12 @@ public sealed record ArchitectureContractExpansion(
     IReadOnlyList<string> SetNames,
     IReadOnlyList<ArchitectureExpandedContractInstance> Instances)
 {
+    public ArchitectureContractExpansionKind Kind { get; init; } = ArchitectureContractExpansionKind.FanOut;
+
+    // The authored list-shaped selector which consumed the source sets for InlineUnion entries.
+    // Null for FanOut entries, whose source selector is always `sources`/`source_sets`.
+    public string? SelectorField { get; init; }
+
     // True when every referenced set resolved to nothing and declared `optional: true`. The
     // contract produced no instances on purpose, which is a reported state rather than silence.
     public bool OptionalEmpty { get; init; }
@@ -94,12 +109,11 @@ public sealed class ArchitectureSourceExpansionInventory
             .ToArray();
     }
 
-    // Authored ids that produced at least one instance, so id-acceptance surfaces (contract
-    // selection, baseline known-id sets) can offer the id the author actually wrote.
+    // Authored ids represented by the inventory, including optional-empty fan-out contracts. The
+    // latter have no descriptors after expansion but must remain selectable by the authored id.
     public IReadOnlyList<string> AuthoredContractIds()
     {
         return Contracts
-            .Where(expansion => expansion.Instances.Count > 0)
             .Select(expansion => expansion.AuthoredContractId)
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .ToArray();

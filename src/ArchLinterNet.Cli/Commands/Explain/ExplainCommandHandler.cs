@@ -95,6 +95,10 @@ internal sealed class ExplainCommandHandler(ICliRuntime runtime, ICliConsole con
                             ["group"] = expansion.Group,
                             ["authoredContractId"] = expansion.AuthoredContractId,
                             ["authoredContractName"] = expansion.AuthoredContractName,
+                            ["kind"] = expansion.Kind == ArchitectureContractExpansionKind.FanOut
+                                ? "fan_out"
+                                : "inline_union",
+                            ["selectorField"] = expansion.SelectorField,
                             ["sourceSets"] = expansion.SetNames,
                             ["optionalEmpty"] = expansion.OptionalEmpty,
                             ["optionalReason"] = expansion.OptionalReason,
@@ -185,8 +189,10 @@ internal sealed class ExplainCommandHandler(ICliRuntime runtime, ICliConsole con
                     foreach (ArchitectureExpandedContractInstance instance in expansion.Instances)
                     {
                         string set = instance.SetName is null ? "sources" : $"set '{instance.SetName}'";
+                        string selectorField = expansion.SelectorField is null ? string.Empty :
+                            $" ({expansion.SelectorField})";
                         console.Out.WriteLine(
-                            $"Source expansion: [{expansion.AuthoredContractId}] {set} -> {instance.Source} " +
+                            $"Source expansion: [{expansion.AuthoredContractId}]{selectorField} {set} -> {instance.Source} " +
                             $"(selector: {instance.Selector}; id: {instance.ContractId}){policy}");
                     }
                 }

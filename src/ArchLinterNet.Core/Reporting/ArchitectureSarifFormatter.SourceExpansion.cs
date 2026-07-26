@@ -68,6 +68,8 @@ public sealed partial class ArchitectureSarifFormatter
                 ["group"] = expansion.Group,
                 ["authored_contract_id"] = expansion.AuthoredContractId,
                 ["authored_contract_name"] = expansion.AuthoredContractName,
+                ["kind"] = FormatExpansionKind(expansion.Kind),
+                ["selector_field"] = expansion.SelectorField,
                 ["source_sets"] = expansion.SetNames,
                 ["optional_empty"] = expansion.OptionalEmpty,
                 ["optional_reason"] = expansion.OptionalReason,
@@ -93,4 +95,11 @@ public sealed partial class ArchitectureSarifFormatter
                 ["yaml_path"] = location.YamlPath
             };
     }
+
+    private static string FormatExpansionKind(ArchitectureContractExpansionKind kind) => kind switch
+    {
+        ArchitectureContractExpansionKind.FanOut => "fan_out",
+        ArchitectureContractExpansionKind.InlineUnion => "inline_union",
+        _ => throw new ArgumentOutOfRangeException(nameof(kind), kind, null)
+    };
 }

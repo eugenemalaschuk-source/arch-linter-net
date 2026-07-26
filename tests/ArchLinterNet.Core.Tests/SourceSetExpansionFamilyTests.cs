@@ -494,6 +494,57 @@ public sealed class SourceSetExpansionFamilyTests
         });
     }
 
+    [Test]
+    public void InlineSetConsumers_RecordContractLevelSelectorProvenance()
+    {
+        ArchitectureContractDocument document = Load("""
+            version: 1
+            name: Test
+            analysis:
+              target_assemblies: [Acme.Host.Api, Acme.Host.Worker]
+              projects:
+                - src/Acme.Host.Api/Acme.Host.Api.csproj
+            source_sets:
+              host_projects:
+                kind: project
+                members: [src/Acme.Host.Api/Acme.Host.Api.csproj]
+              host_assemblies:
+                globs: ["Acme.Host.*"]
+            contracts:
+              strict_project_metadata:
+                - name: host project is packable
+                  id: host-packable
+                  project_sets: [host_projects]
+                  required_properties:
+                    IsPackable: "true"
+              audit_composition:
+                - name: composition roots stay in hosts
+                  id: host-composition
+                  forbidden_apis: [AddSingleton]
+                  allowed_only_in_assembly_sets: [host_assemblies]
+            """);
+
+        ArchitectureContractExpansion project = document.SourceExpansion.Contracts
+            .Single(expansion => expansion.AuthoredContractId == "host-packable");
+        ArchitectureContractExpansion composition = document.SourceExpansion.Contracts
+            .Single(expansion => expansion.AuthoredContractId == "host-composition");
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(project.Kind, Is.EqualTo(ArchitectureContractExpansionKind.InlineUnion));
+            Assert.That(project.Group, Is.EqualTo("strict_project_metadata"));
+            Assert.That(project.SelectorField, Is.EqualTo("project_sets"));
+            Assert.That(project.Instances.Single().Source, Is.EqualTo("src/Acme.Host.Api/Acme.Host.Api.csproj"));
+            Assert.That(project.Instances.Single().Selector, Is.EqualTo("src/Acme.Host.Api/Acme.Host.Api.csproj"));
+            Assert.That(composition.Kind, Is.EqualTo(ArchitectureContractExpansionKind.InlineUnion));
+            Assert.That(composition.Group, Is.EqualTo("audit_composition"));
+            Assert.That(composition.SelectorField, Is.EqualTo("allowed_only_in_assembly_sets"));
+            Assert.That(composition.Instances.Select(instance => instance.Source),
+                Is.EqualTo(new[] { "Acme.Host.Api", "Acme.Host.Worker" }));
+            Assert.That(composition.Instances.Select(instance => instance.Selector), Is.All.EqualTo("Acme.Host.*"));
+        });
+    }
+
     private ArchitectureContractDocument Load(string yaml)
     {
         string path = Write("dependencies.arch.yml", yaml);

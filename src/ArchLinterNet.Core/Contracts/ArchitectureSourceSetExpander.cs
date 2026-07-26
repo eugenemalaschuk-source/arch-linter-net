@@ -48,31 +48,20 @@ internal static class ArchitectureSourceSetExpander
         ExpandGroup(document, resolver, expansions, "audit_external_allow_only",
             groups.AuditExternalAllowOnly, list => groups.AuditExternalAllowOnly = list);
 
-        foreach (ArchitectureProjectMetadataContract contract in groups.StrictProjectMetadata
-                     .Concat(groups.AuditProjectMetadata))
-        {
-            document.Provenance.SetValidationSubject(contract);
-            contract.Projects = InlineSets(
-                resolver,
-                contract.Name,
-                "project_sets",
-                ArchitectureSourceSetKind.Project,
-                contract.Projects,
-                contract.ProjectSets);
-        }
-
-        foreach (ArchitectureCompositionContract contract in groups.StrictComposition
-                     .Concat(groups.AuditComposition))
-        {
-            document.Provenance.SetValidationSubject(contract);
-            contract.AllowedOnlyInAssemblies = InlineSets(
-                resolver,
-                contract.Name,
-                "allowed_only_in_assembly_sets",
-                ArchitectureSourceSetKind.Assembly,
-                contract.AllowedOnlyInAssemblies,
-                contract.AllowedOnlyInAssemblySets);
-        }
+        ExpandInlineGroup(document, resolver, expansions, "strict_project_metadata",
+            groups.StrictProjectMetadata, contract => contract.Projects, (contract, values) => contract.Projects = values,
+            contract => contract.ProjectSets, "project_sets", ArchitectureSourceSetKind.Project);
+        ExpandInlineGroup(document, resolver, expansions, "audit_project_metadata",
+            groups.AuditProjectMetadata, contract => contract.Projects, (contract, values) => contract.Projects = values,
+            contract => contract.ProjectSets, "project_sets", ArchitectureSourceSetKind.Project);
+        ExpandInlineGroup(document, resolver, expansions, "strict_composition",
+            groups.StrictComposition, contract => contract.AllowedOnlyInAssemblies,
+            (contract, values) => contract.AllowedOnlyInAssemblies = values,
+            contract => contract.AllowedOnlyInAssemblySets, "allowed_only_in_assembly_sets", ArchitectureSourceSetKind.Assembly);
+        ExpandInlineGroup(document, resolver, expansions, "audit_composition",
+            groups.AuditComposition, contract => contract.AllowedOnlyInAssemblies,
+            (contract, values) => contract.AllowedOnlyInAssemblies = values,
+            contract => contract.AllowedOnlyInAssemblySets, "allowed_only_in_assembly_sets", ArchitectureSourceSetKind.Assembly);
 
         document.Provenance.ResetValidationSubject();
 
@@ -250,7 +239,11 @@ internal static class ArchitectureSourceSetExpander
     }
 
     private static List<string> InlineSets(
+        ArchitectureContractDocument document,
         SourceSetResolver resolver,
+        List<ArchitectureContractExpansion> expansions,
+        string group,
+        IArchitectureContract contract,
         string contractName,
         string field,
         ArchitectureSourceSetKind kind,
@@ -263,17 +256,71 @@ internal static class ArchitectureSourceSetExpander
         }
 
         List<string> resolved = new(declared);
+        Dictionary<string, (string SetName, string Selector)> setValues = new(StringComparer.Ordinal);
+        List<string> optionalReasons = new();
 
         foreach (string setName in setNames)
         {
-            resolved.AddRange(resolver.Resolve(contractName, field, kind, setName).ResolvedSources);
+            ArchitectureSourceSetResolution resolution = resolver.Resolve(contractName, field, kind, setName);
+            if (resolution.ResolvedSources.Count == 0)
+            {
+                optionalReasons.Add(resolution.Reason);
+                continue;
+            }
+
+            foreach (string value in resolution.ResolvedSources)
+            {
+                if (resolved.Contains(value, StringComparer.Ordinal))
+                {
+                    continue;
+                }
+
+                resolved.Add(value);
+                setValues.TryAdd(value, (resolution.Name, resolver.SelectorFor(resolution.Name, value)));
+            }
         }
+
+        string authoredId = contract.Id ?? ArchitecturePolicyDocumentLoader.NormalizeToContractId(contract.Name);
+        expansions.Add(new ArchitectureContractExpansion(
+            group, authoredId, contract.Name, setNames.ToArray(),
+            setValues.OrderBy(pair => pair.Key, StringComparer.Ordinal)
+                .Select(pair => new ArchitectureExpandedContractInstance(
+                    authoredId, pair.Key, pair.Value.SetName, pair.Value.Selector))
+                .ToArray())
+        {
+            Kind = ArchitectureContractExpansionKind.InlineUnion,
+            SelectorField = field,
+            OptionalEmpty = resolved.Count == 0 && optionalReasons.Count > 0,
+            OptionalReason = string.Join("; ", optionalReasons.Where(reason => !string.IsNullOrWhiteSpace(reason))),
+            PolicyLocation = document.Provenance.LocationFor(contract)
+        });
 
         return resolved
             .Where(value => !string.IsNullOrWhiteSpace(value))
             .Distinct(StringComparer.Ordinal)
             .OrderBy(value => value, StringComparer.Ordinal)
             .ToList();
+    }
+
+    private static void ExpandInlineGroup<TContract>(
+        ArchitectureContractDocument document,
+        SourceSetResolver resolver,
+        List<ArchitectureContractExpansion> expansions,
+        string group,
+        IEnumerable<TContract> contracts,
+        Func<TContract, List<string>> declared,
+        Action<TContract, List<string>> assign,
+        Func<TContract, List<string>> setNames,
+        string field,
+        ArchitectureSourceSetKind kind)
+        where TContract : class, IArchitectureContract
+    {
+        foreach (TContract contract in contracts)
+        {
+            document.Provenance.SetValidationSubject(contract);
+            assign(contract, InlineSets(document, resolver, expansions, group, contract, contract.Name,
+                field, kind, declared(contract), setNames(contract)));
+        }
     }
 
     private sealed class SourceSetResolver

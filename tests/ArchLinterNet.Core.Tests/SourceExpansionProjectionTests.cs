@@ -192,6 +192,51 @@ public sealed class SourceExpansionProjectionTests
     }
 
     [Test]
+    public void Sarif_CarriesInlineUnionSelectorFieldAndValueProvenance()
+    {
+        ArchitectureSourceExpansionInventory inventory = new(
+            [],
+            [
+                new ArchitectureContractExpansion(
+                    "strict_project_metadata", "modules-packable", "modules are packable", ["module_projects"],
+                    [new ArchitectureExpandedContractInstance(
+                        "modules-packable", "src/Acme.Modules/Acme.Modules.csproj", "module_projects",
+                        "src/Acme.Modules/Acme.Modules.csproj")])
+                {
+                    Kind = ArchitectureContractExpansionKind.InlineUnion,
+                    SelectorField = "project_sets"
+                },
+                new ArchitectureContractExpansion(
+                    "audit_composition", "host-composition", "host composition", ["hosts"],
+                    [new ArchitectureExpandedContractInstance(
+                        "host-composition", "Acme.Host.Api", "hosts", "Acme.Host.*")])
+                {
+                    Kind = ArchitectureContractExpansionKind.InlineUnion,
+                    SelectorField = "allowed_only_in_assembly_sets"
+                }
+            ]);
+
+        string json = _sarifFormatter.FormatResultAsSarif(
+            "all", Array.Empty<ArchitectureViolation>(), Array.Empty<string>(),
+            Array.Empty<BuildStatePreflightDiagnostic>(), Array.Empty<ArchitectureCoverageSummary>(), inventory, "1.2.3");
+        JsonElement contracts = JsonDocument.Parse(json).RootElement
+            .GetProperty("runs")[0].GetProperty("properties").GetProperty("source_set_expansion")
+            .GetProperty("contracts");
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(contracts[0].GetProperty("kind").GetString(), Is.EqualTo("inline_union"));
+            Assert.That(contracts[0].GetProperty("selector_field").GetString(), Is.EqualTo("project_sets"));
+            Assert.That(contracts[0].GetProperty("instances")[0].GetProperty("selector").GetString(),
+                Is.EqualTo("src/Acme.Modules/Acme.Modules.csproj"));
+            Assert.That(contracts[1].GetProperty("selector_field").GetString(),
+                Is.EqualTo("allowed_only_in_assembly_sets"));
+            Assert.That(contracts[1].GetProperty("instances")[0].GetProperty("selector").GetString(),
+                Is.EqualTo("Acme.Host.*"));
+        });
+    }
+
+    [Test]
     public void CiArtifactsJson_WithoutExpansion_EmitsEmptySections()
     {
         string json = ArchitectureDiagnosticFormatter.FormatResultForCiArtifacts(

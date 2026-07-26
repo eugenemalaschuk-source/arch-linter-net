@@ -133,6 +133,43 @@ public sealed partial class ExplainCommandHandlerTests
     }
 
     [Test]
+    public void Json_InlineUnionExpansion_NamesSelectorFieldAndSetValue()
+    {
+        var runtime = new ExplainStubRuntime
+        {
+            Outcome = new ArchitectureExplainOutcome("A", "B", ["A", "B"], ["rule"])
+            {
+                SourceExpansion = new ArchitectureSourceExpansionInventory(
+                    [],
+                    [
+                        new ArchitectureContractExpansion(
+                            "strict_project_metadata", "modules-packable", "modules are packable", ["module_projects"],
+                            [new ArchitectureExpandedContractInstance(
+                                "modules-packable", "src/Acme.Modules/Acme.Modules.csproj", "module_projects",
+                                "src/Acme.Modules/Acme.Modules.csproj")])
+                        {
+                            Kind = ArchitectureContractExpansionKind.InlineUnion,
+                            SelectorField = "project_sets"
+                        }
+                    ])
+            }
+        };
+        var console = new RecordingCliConsole();
+
+        Handler(runtime, console).Execute(Options(format: "json"));
+
+        using JsonDocument document = JsonDocument.Parse(console.OutputText);
+        JsonElement contract = document.RootElement.GetProperty("sourceSetExpansion").GetProperty("contracts")[0];
+        Assert.Multiple(() =>
+        {
+            Assert.That(contract.GetProperty("kind").GetString(), Is.EqualTo("inline_union"));
+            Assert.That(contract.GetProperty("selectorField").GetString(), Is.EqualTo("project_sets"));
+            Assert.That(contract.GetProperty("instances")[0].GetProperty("selector").GetString(),
+                Is.EqualTo("src/Acme.Modules/Acme.Modules.csproj"));
+        });
+    }
+
+    [Test]
     public void Json_NoExpansion_EmitsEmptyExpansionSections()
     {
         var runtime = new ExplainStubRuntime

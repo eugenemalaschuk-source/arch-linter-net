@@ -80,6 +80,37 @@ public sealed class SourceExpansionPipelineIdentityTests
               forbidden: [forbidden_vendor]
         """);
 
+    private string OptionalEmptyExpandedExternalPolicy() => WritePolicy($"""
+        version: 1
+        name: Test
+
+        layers:
+          core:
+            namespace: ArchLinterNet.Core
+
+        analysis:
+          target_assemblies: [{CoreAssembly}]
+          policy_consistency: off
+
+        source_sets:
+          future_layers:
+            kind: layer
+            globs: [future_*]
+            optional: true
+            reason: The future layer has not been extracted yet.
+
+        external_dependencies:
+          forbidden_vendor:
+            namespace_prefixes: [Definitely.Not.Referenced]
+
+        contracts:
+          strict_external:
+            - name: future layer avoids vendor
+              id: future-no-vendor
+              source_sets: [future_layers]
+              forbidden: [forbidden_vendor]
+        """);
+
     [Test]
     public void Validate_SelectingAuthoredId_IsAcceptedByThePipeline()
     {
@@ -104,6 +135,29 @@ public sealed class SourceExpansionPipelineIdentityTests
         });
 
         Assert.That(outcome.Passed, Is.True);
+    }
+
+    [Test]
+    public void Validate_SelectingOptionalEmptyAuthoredId_IsAcceptedByThePipeline()
+    {
+        string policyPath = OptionalEmptyExpandedExternalPolicy();
+
+        ValidationOutcome outcome = ArchitectureValidationService.Validate(new ValidationRequest
+        {
+            PolicyPath = policyPath,
+            Mode = "strict",
+            ContractIds = new List<string> { "future-no-vendor" }
+        });
+        ArchitectureContractDocument document = new ArchitecturePolicyDocumentLoader().Load(policyPath);
+        HashSet<string> available = Execution.ArchitectureContractCatalog.Build(document).AvailableContractIds("strict");
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(outcome.Passed, Is.True, Describe(outcome));
+            Assert.That(document.Contracts.StrictExternal, Is.Empty);
+            Assert.That(document.SourceExpansion.Contracts.Single().OptionalEmpty, Is.True);
+            Assert.That(available, Does.Contain("future-no-vendor"));
+        });
     }
 
     [Test]
