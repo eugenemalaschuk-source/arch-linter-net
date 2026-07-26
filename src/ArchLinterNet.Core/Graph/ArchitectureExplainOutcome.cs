@@ -1,5 +1,7 @@
 namespace ArchLinterNet.Core.Graph;
 
+using ArchLinterNet.Core.Reporting;
+
 public sealed record ArchitectureExplainOutcome(
     string Source,
     string Target,
@@ -11,4 +13,7 @@ public sealed record ArchitectureExplainOutcome(
     // `when`-bearing selector (see ArchitectureExplainApplicationService).
     public IReadOnlyList<ExplainExpressionParticipation> ExpressionParticipation { get; init; } =
         Array.Empty<ExplainExpressionParticipation>();
+
+    public IReadOnlyCollection<ArchitectureCoverageSummary> CoverageSummaries { get; init; } =
+        Array.Empty<ArchitectureCoverageSummary>();
 }

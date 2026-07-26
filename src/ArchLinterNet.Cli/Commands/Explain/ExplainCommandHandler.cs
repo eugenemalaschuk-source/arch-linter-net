@@ -61,6 +61,21 @@ internal sealed class ExplainCommandHandler(ICliRuntime runtime, ICliConsole con
                     ["target"] = outcome.Target,
                     ["path"] = outcome.Path,
                     ["contractIds"] = outcome.ContractIds,
+                    ["coverageSummary"] = outcome.CoverageSummaries.Select(summary => new Dictionary<string, object?>
+                    {
+                        ["contractId"] = summary.ContractId,
+                        ["optionalEmptyItems"] = summary.OptionalEmptyItems.Select(item => new Dictionary<string, object?>
+                        {
+                            ["item"] = item.Item,
+                            ["reason"] = item.Reason,
+                            ["evidence"] = item.Evidence,
+                            ["policyLocation"] = item.PolicyLocation is null ? null : new Dictionary<string, object?>
+                            {
+                                ["sourcePath"] = item.PolicyLocation.SourcePath,
+                                ["yamlPath"] = item.PolicyLocation.YamlPath
+                            }
+                        }).ToArray()
+                    }).ToArray()
                 };
 
                 if (outcome.ExpressionParticipation.Count > 0)
@@ -108,6 +123,14 @@ internal sealed class ExplainCommandHandler(ICliRuntime runtime, ICliConsole con
                         : string.Empty;
                     console.Out.WriteLine(
                         $"  [{participation.ContractId}] {hop}when: {participation.Source} ({result})");
+                }
+
+                foreach (var optionalInput in outcome.CoverageSummaries.SelectMany(summary => summary.OptionalEmptyItems))
+                {
+                    string policy = optionalInput.PolicyLocation is null
+                        ? string.Empty
+                        : $" (policy: {optionalInput.PolicyLocation.SourcePath}:{optionalInput.PolicyLocation.YamlPath})";
+                    console.Out.WriteLine($"Optional empty input: {optionalInput.Item} ({optionalInput.Reason}){policy}");
                 }
             }
 
