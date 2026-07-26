@@ -170,7 +170,7 @@ public static class PublicApiSnapshotDiffer
             .ToList();
     }
 
-    private static IReadOnlyList<PublicApiDeltaEntry> Order(List<PublicApiDeltaEntry> entries)
+    private static PublicApiDeltaEntry[] Order(List<PublicApiDeltaEntry> entries)
     {
         return entries
             .OrderBy(entry => entry.AssemblyName, StringComparer.Ordinal)

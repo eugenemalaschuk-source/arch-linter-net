@@ -154,19 +154,19 @@ public sealed partial class ArchitecturePublicApiApplicationService(
         // The inline list is written in the legacy identity grammar, so it is compared against the
         // stripped form of the captured exact signatures — otherwise every entry would look stale
         // purely because the snapshot grammar carries more detail.
-        IReadOnlyList<string> stale = inline.Where(signature => !actualBase.Contains(signature))
+        string[] stale = inline.Where(signature => !actualBase.Contains(signature))
             .OrderBy(signature => signature, StringComparer.Ordinal).ToArray();
-        IReadOnlyList<string> undeclared = actualExact
+        string[] undeclared = actualExact
             .Where(signature => !inline.Contains(Scanning.ArchitecturePublicApiSignatureDetails.StripDetails(signature)))
             .OrderBy(signature => signature, StringComparer.Ordinal).ToArray();
 
-        bool hasDrift = stale.Count > 0 || undeclared.Count > 0;
+        bool hasDrift = stale.Length > 0 || undeclared.Length > 0;
         if (hasDrift && !request.AcceptDrift)
         {
             return new PublicApiMigrateOutcome(
                 false, null, stale, undeclared, destination, resolution.PreflightDiagnostics,
-                $"Contract '{request.ContractId}' has {stale.Count} stale inline declaration(s) and " +
-                $"{undeclared.Count} undeclared exported member(s). Migrating now would silently accept that " +
+                $"Contract '{request.ContractId}' has {stale.Length} stale inline declaration(s) and " +
+                $"{undeclared.Length} undeclared exported member(s). Migrating now would silently accept that " +
                 "drift as reviewed. Fix the surface, or re-run with drift acceptance to record the live " +
                 "surface deliberately.",
                 PublicApiFailureKind.Drift);

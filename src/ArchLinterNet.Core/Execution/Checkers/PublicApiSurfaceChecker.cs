@@ -80,52 +80,58 @@ internal static class PublicApiSurfaceChecker
         Evaluation evaluation,
         ArchitectureContractExecutionContext executionContext)
     {
-        List<ArchitectureViolation> violations = new();
+        return contract.Assemblies
+            .Select(assemblyName => evaluation.ScannedByAssembly.GetValueOrDefault(assemblyName))
+            .Where(scanned => scanned != null)
+            .SelectMany(scanned => OrderedViolations(contract, evaluation, scanned!))
+            .Select(verdict => TryBuildViolation(contract, evaluation, verdict, executionContext))
+            .Where(violation => violation != null)
+            .Select(violation => violation!)
+            .ToList();
+    }
 
-        foreach (string assemblyName in contract.Assemblies)
+    private static IEnumerable<EntryVerdict> OrderedViolations(
+        ArchitecturePublicApiSurfaceContract contract,
+        Evaluation evaluation,
+        List<ArchitectureExportedApiEntry> scanned)
+    {
+        return scanned
+            .Select(entry => Classify(contract, evaluation, entry))
+            .Where(verdict => verdict.IsViolation)
+            .OrderBy(verdict => verdict.Entry.DeclaringTypeName, StringComparer.Ordinal)
+            .ThenBy(verdict => verdict.Entry.Signature, StringComparer.Ordinal);
+    }
+
+    // Ignore entries may be authored against either grammar, so both the legacy identity and the
+    // reported (possibly exact) signature are offered to the matcher.
+    private static ArchitectureViolation? TryBuildViolation(
+        ArchitecturePublicApiSurfaceContract contract,
+        Evaluation evaluation,
+        EntryVerdict verdict,
+        ArchitectureContractExecutionContext executionContext)
+    {
+        string reported = evaluation.ExactGrammar ? verdict.Entry.ExactSignature : verdict.Entry.Signature;
+
+        if (executionContext.IsIgnored(verdict.Entry.DeclaringTypeName, verdict.Entry.Signature)
+            || executionContext.IsIgnored(verdict.Entry.DeclaringTypeName, reported))
         {
-            if (!evaluation.ScannedByAssembly.TryGetValue(
-                    assemblyName, out List<ArchitectureExportedApiEntry>? scanned))
-            {
-                continue;
-            }
-
-            IEnumerable<EntryVerdict> ordered = scanned
-                .Select(entry => Classify(contract, evaluation, entry))
-                .Where(verdict => verdict.IsViolation)
-                .OrderBy(verdict => verdict.Entry.DeclaringTypeName, StringComparer.Ordinal)
-                .ThenBy(verdict => verdict.Entry.Signature, StringComparer.Ordinal);
-
-            foreach (EntryVerdict verdict in ordered)
-            {
-                string reported = evaluation.ExactGrammar
-                    ? verdict.Entry.ExactSignature
-                    : verdict.Entry.Signature;
-
-                if (executionContext.IsIgnored(verdict.Entry.DeclaringTypeName, verdict.Entry.Signature)
-                    || executionContext.IsIgnored(verdict.Entry.DeclaringTypeName, reported))
-                {
-                    continue;
-                }
-
-                violations.Add(new ArchitectureViolation(
-                    contract.Name,
-                    contract.Id,
-                    verdict.Entry.DeclaringTypeName,
-                    ViolationCategory,
-                    new[] { reported })
-                {
-                    Payload = new PublicApiSurfacePayload(
-                        UndeclaredApiSignature: reported,
-                        ForbiddenPublicConstant: verdict.ForbiddenConstant ? true : null,
-                        ApiAssemblyName: verdict.Entry.AssemblyName,
-                        ApiVisibility: verdict.Entry.Visibility,
-                        ApiDeltaKind: verdict.Undeclared ? AddedDelta : null)
-                });
-            }
+            return null;
         }
 
-        return violations;
+        return new ArchitectureViolation(
+            contract.Name,
+            contract.Id,
+            verdict.Entry.DeclaringTypeName,
+            ViolationCategory,
+            new[] { reported })
+        {
+            Payload = new PublicApiSurfacePayload(
+                UndeclaredApiSignature: reported,
+                ForbiddenPublicConstant: verdict.ForbiddenConstant ? true : null,
+                ApiAssemblyName: verdict.Entry.AssemblyName,
+                ApiVisibility: verdict.Entry.Visibility,
+                ApiDeltaKind: verdict.Undeclared ? AddedDelta : null),
+        };
     }
 
     private static EntryVerdict Classify(
