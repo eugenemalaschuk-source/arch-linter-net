@@ -45,6 +45,9 @@ public sealed class ArchitectureSarifFormatterTests
             Assert.That(properties.GetProperty("identity_version").GetInt32(), Is.EqualTo(2));
             Assert.That(properties.GetProperty("occurrence").GetInt32(), Is.EqualTo(1));
             Assert.That(properties.GetProperty("source_assembly").GetString(), Is.EqualTo("App"));
+            Assert.That(result.TryGetProperty("logicalLocations", out _), Is.False);
+            Assert.That(result.GetProperty("locations")[0].GetProperty("logicalLocations")[0]
+                .GetProperty("fullyQualifiedName").GetString(), Is.EqualTo("App.Service"));
         });
     }
 

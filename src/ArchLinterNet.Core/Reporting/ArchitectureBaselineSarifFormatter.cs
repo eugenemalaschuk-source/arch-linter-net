@@ -19,7 +19,11 @@ public static class ArchitectureBaselineSarifFormatter
         object[] rules = ordered.Select(entry => entry.Entry.ContractId).Distinct(StringComparer.Ordinal)
             .OrderBy(id => id, StringComparer.Ordinal).Select(id => (object)new Dictionary<string, object?>
             {
-                ["id"] = id, ["shortDescription"] = new Dictionary<string, object?> { ["text"] = id },
+                ["id"] = id,
+                ["shortDescription"] = new Dictionary<string, object?>
+                {
+                    ["text"] = id,
+                },
             }).ToArray();
 
         object[] results = ordered.Select(entry => (object)BuildResult(entry)).ToArray();
@@ -67,9 +71,21 @@ public static class ArchitectureBaselineSarifFormatter
         {
             ["ruleId"] = entry.ContractId,
             ["level"] = lifecycle.Lifecycle is BaselineEntryLifecycle.Matched ? "note" : "warning",
-            ["message"] = new Dictionary<string, string> { ["text"] =
-                $"[{BaselineEntryLifecycleNames.WireName(lifecycle.Lifecycle)}] {entry.SourceType} -> {entry.ForbiddenReference}" },
-            ["logicalLocations"] = new object[] { new Dictionary<string, string> { ["fullyQualifiedName"] = entry.SourceType } },
+            ["message"] = new Dictionary<string, string>
+            {
+                ["text"] =
+                    $"[{BaselineEntryLifecycleNames.WireName(lifecycle.Lifecycle)}] {entry.SourceType} -> {entry.ForbiddenReference}",
+            },
+            ["locations"] = new object[]
+            {
+                new Dictionary<string, object?>
+                {
+                    ["logicalLocations"] = new object[]
+                    {
+                        new Dictionary<string, string> { ["fullyQualifiedName"] = entry.SourceType },
+                    },
+                },
+            },
             ["properties"] = properties,
         };
     }

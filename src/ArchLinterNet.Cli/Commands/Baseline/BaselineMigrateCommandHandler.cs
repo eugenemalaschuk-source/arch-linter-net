@@ -80,7 +80,7 @@ internal sealed class BaselineMigrateCommandHandler(ICliRuntime runtime, ICliCon
                         new BaselineWriteGate.Request(
                             "baseline migrate", options.OutputPath, options.DryRun, options.Force,
                             outcome.Yaml, CommentDiagnostic: null, InPlacePath: null,
-                            EmitProposalToStdout: options.Format != "json"),
+                            EmitProposalToStdout: options.Format == "human"),
                         out BaselineWriteGate.Disposition disposition))
                 {
                     return CliExitCodes.InvalidArgumentsOrRuntimeError;
@@ -88,7 +88,7 @@ internal sealed class BaselineMigrateCommandHandler(ICliRuntime runtime, ICliCon
 
                 wrote = disposition == BaselineWriteGate.Disposition.Written;
             }
-            else if (outcome.Yaml != null && options.DryRun && options.Format != "json")
+            else if (outcome.Yaml != null && options.DryRun && options.Format == "human")
             {
                 console.Out.WriteLine("Dry run: ambiguous entries found, no file would be written. Proposed content:");
                 console.Out.WriteLine(outcome.Yaml);

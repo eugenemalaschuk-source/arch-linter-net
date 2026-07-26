@@ -32,6 +32,7 @@ internal static class BaselineHelpTexts
           --dry-run           Report the proposal without writing any file
           --force             Replace an existing output file
           --json              Emit the lifecycle report as JSON
+          --format <fmt>      Output format: human (default), json, or sarif
           --contract <id>     Restrict to this contract ID (may be repeated)
           --condition-set <name>
                               Use a named condition set from analysis.condition_sets
@@ -170,6 +171,7 @@ internal static class BaselineHelpTexts
           --condition-set <name>
                               Use a named condition set from analysis.condition_sets
           --json               Output the diff as JSON
+          --format <fmt>       Output format: human (default), json, or sarif
           -h, --help          Show this help message
 
         Exit codes:
@@ -195,6 +197,7 @@ internal static class BaselineHelpTexts
                               Use a named condition set from analysis.condition_sets
           --json               Output the verification report as JSON, including
                                lifecycle counts and each entry's canonical identity
+          --format <fmt>       Output format: human (default), json, or sarif
           -h, --help          Show this help message
 
         Exit codes:
@@ -234,6 +237,7 @@ internal static class BaselineHelpTexts
           --condition-set <name>
                               Use a named condition set from analysis.condition_sets
           --json              Output the migration report as JSON
+          --format <fmt>      Output format: human (default), json, or sarif
           -h, --help          Show this help message
 
         Exit codes:

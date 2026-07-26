@@ -51,6 +51,18 @@ public sealed partial class BaselineCommandHandlerTests
     }
 
     [Test]
+    public void BaselineHelpTexts_DocumentSarifFormatForComparisonCommands()
+    {
+        Assert.Multiple(() =>
+        {
+            Assert.That(BaselineHelpTexts.HelpText, Does.Contain("--format <fmt>"));
+            Assert.That(BaselineHelpTexts.DiffHelpText, Does.Contain("--format <fmt>"));
+            Assert.That(BaselineHelpTexts.VerifyHelpText, Does.Contain("--format <fmt>"));
+            Assert.That(BaselineHelpTexts.MigrateHelpText, Does.Contain("--format <fmt>"));
+        });
+    }
+
+    [Test]
     public void SystemCliConsole_WritesToCurrentConsoleStreams()
     {
         TextWriter originalOut = Console.Out;
