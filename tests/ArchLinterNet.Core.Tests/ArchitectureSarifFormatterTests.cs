@@ -24,6 +24,31 @@ public sealed class ArchitectureSarifFormatterTests
     }
 
     [Test]
+    public void BaselineComparisonSarif_ExposesStatusAndCanonicalIdentity()
+    {
+        var identity = new ArchitectureViolationIdentity(
+            2, "method_body", "call", "rule", "App", "App.Service", "Run",
+            "Infra", "Infra.Client", "Call", 1);
+        var entry = new ArchitectureBaselineComparisonEntry(
+            "strict_method_body", "rule", "App.Service", "Infra.Client.Call", "debt", identity);
+
+        string json = ArchitectureBaselineSarifFormatter.Format(
+            [new BaselineLifecycleEntry(entry, BaselineEntryLifecycle.New)], "1.2.3");
+        using JsonDocument document = JsonDocument.Parse(json);
+        JsonElement result = document.RootElement.GetProperty("runs")[0].GetProperty("results")[0];
+        JsonElement properties = result.GetProperty("properties");
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(result.GetProperty("ruleId").GetString(), Is.EqualTo("rule"));
+            Assert.That(properties.GetProperty("baseline_status").GetString(), Is.EqualTo("new"));
+            Assert.That(properties.GetProperty("identity_version").GetInt32(), Is.EqualTo(2));
+            Assert.That(properties.GetProperty("occurrence").GetInt32(), Is.EqualTo(1));
+            Assert.That(properties.GetProperty("source_assembly").GetString(), Is.EqualTo("App"));
+        });
+    }
+
+    [Test]
     public void FormatResultAsSarif_Envelope_HasVersionSchemaAndToolName()
     {
         JsonElement root = Run("strict", Array.Empty<ArchitectureViolation>());

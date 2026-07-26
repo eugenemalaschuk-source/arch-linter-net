@@ -195,6 +195,17 @@ the disposition differs (`retained` vs `removed`).
 produce are reported as `0`), a flat `entries` list in the shared vocabulary, and the full canonical
 structured identity of each entry.
 
+### SARIF and Testing API comparison results
+
+`baseline diff`, `baseline verify`, and `baseline migrate` also accept
+`--format sarif`. Each result carries `baseline_status` plus the canonical identity
+fields in SARIF `properties`; integrations do not need to parse its message.
+
+NUnit tests can use `ArchitectureAssertions.FromPolicy(path).WithBaseline(path)`
+and then call `DiffBaseline()`, `VerifyBaseline()`, or `MigrateBaseline()`. These
+return the typed Core outcomes, including comparison entries, identities, statuses,
+and the verification gate result.
+
 Display text is not identity: when an entry's canonical identity still matches but the live finding
 renders `forbidden_reference` differently, the entry stays `matched` and its display text is
 refreshed. `changed` is reserved for a genuine identity difference, which is why it does not suppress.

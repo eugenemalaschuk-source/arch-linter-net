@@ -1,6 +1,7 @@
 using System.Text.Json;
 using ArchLinterNet.Cli.Abstractions;
 using ArchLinterNet.Core.Model;
+using ArchLinterNet.Core.Reporting;
 using ArchLinterNet.Core.Validation;
 
 namespace ArchLinterNet.Cli.Commands.Baseline;
@@ -18,6 +19,12 @@ internal sealed class BaselineVerifyCommandHandler(ICliRuntime runtime, ICliCons
         if (options.Mode is not ("strict" or "audit" or "all"))
         {
             console.Error.WriteLine($"Invalid mode: {options.Mode}. Use 'strict', 'audit', or 'all'.");
+            return CliExitCodes.InvalidArgumentsOrRuntimeError;
+        }
+
+        if (options.Format is not ("human" or "json" or "sarif"))
+        {
+            console.Error.WriteLine("Invalid format. Use 'human', 'json', or 'sarif'.");
             return CliExitCodes.InvalidArgumentsOrRuntimeError;
         }
 
@@ -64,6 +71,10 @@ internal sealed class BaselineVerifyCommandHandler(ICliRuntime runtime, ICliCons
             {
                 console.Out.WriteLine(JsonSerializer.Serialize(
                     BaselineDiffCommandHandler.BuildJsonPayload(report, outcome.InSync)));
+            }
+            else if (options.Format == "sarif")
+            {
+                console.Out.WriteLine(ArchitectureBaselineSarifFormatter.Format(report.LifecycleEntries, runtime.Version));
             }
             else
             {

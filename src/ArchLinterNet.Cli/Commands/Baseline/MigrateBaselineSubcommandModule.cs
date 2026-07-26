@@ -19,6 +19,7 @@ internal sealed class MigrateBaselineSubcommandModule : IBaselineSubcommandModul
         Option<bool> dryRunOption = new("--dry-run");
         dryRunOption.Aliases.Add("--check");
         Option<bool> jsonOption = new("--json");
+        Option<string> formatOption = new("--format");
         Option<bool> forceOption = new("--force");
         Option<bool> helpOption = new("--help");
         helpOption.Aliases.Add("-h");
@@ -29,6 +30,7 @@ internal sealed class MigrateBaselineSubcommandModule : IBaselineSubcommandModul
         command.Options.Add(conditionSetOption);
         command.Options.Add(dryRunOption);
         command.Options.Add(jsonOption);
+        command.Options.Add(formatOption);
         command.Options.Add(forceOption);
         command.Options.Add(helpOption);
 
@@ -37,7 +39,7 @@ internal sealed class MigrateBaselineSubcommandModule : IBaselineSubcommandModul
             parseResult.GetValue(baselineOption),
             parseResult.GetValue(outputOption),
             parseResult.GetValue(conditionSetOption),
-            parseResult.GetValue(jsonOption) ? "json" : "human",
+            parseResult.GetValue(jsonOption) ? "json" : parseResult.GetValue(formatOption) ?? "human",
             parseResult.GetValue(dryRunOption),
             parseResult.GetValue(forceOption),
             parseResult.GetValue(helpOption))));
