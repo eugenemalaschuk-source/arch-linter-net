@@ -17,8 +17,11 @@ internal sealed class PublicApiCaptureCommandHandler(ICliRuntime runtime, ICliCo
         }
 
         if (!PublicApiCommandGuards.TryValidateCommon(
-                console, fileSystem, options.PolicyPath, options.ContractId, options.Format, CommandName,
-                PublicApiOptionsFactory.OperationFormats, out int exitCode))
+                console,
+                fileSystem,
+                new PublicApiCommandGuards.Invocation(
+                    options.PolicyPath, options.ContractId, options.Format, CommandName, PublicApiOptionsFactory.OperationFormats),
+                out int exitCode))
         {
             return exitCode;
         }
@@ -71,7 +74,7 @@ internal sealed class PublicApiCaptureCommandHandler(ICliRuntime runtime, ICliCo
                 fileSystem.RenameTempToTarget(tempPath, destination);
             }
 
-            console.Out.WriteLine(options.Format == "json"
+            console.Out.WriteLine(options.Format == PublicApiOptionsFactory.JsonFormat
                 ? JsonSerializer.Serialize(new
                 {
                     status = "captured",
@@ -80,9 +83,7 @@ internal sealed class PublicApiCaptureCommandHandler(ICliRuntime runtime, ICliCo
                     entryCount = outcome.EntryCount,
                     alreadyCurrent = identical,
                 })
-                : identical
-                    ? $"Public API snapshot is already current ({outcome.EntryCount} entries): {destination}"
-                    : $"Captured {outcome.EntryCount} public API entries.{Environment.NewLine}Output: {destination}");
+                : FormatForHumans(outcome.EntryCount, destination, identical));
 
             return CliExitCodes.Success;
         }
@@ -91,5 +92,12 @@ internal sealed class PublicApiCaptureCommandHandler(ICliRuntime runtime, ICliCo
             console.Error.WriteLine($"public-api capture error: {ex.Message}");
             return CliExitCodes.InvalidArgumentsOrRuntimeError;
         }
+    }
+
+    private static string FormatForHumans(int entryCount, string destination, bool identical)
+    {
+        return identical
+            ? $"Public API snapshot is already current ({entryCount} entries): {destination}"
+            : $"Captured {entryCount} public API entries.{Environment.NewLine}Output: {destination}";
     }
 }

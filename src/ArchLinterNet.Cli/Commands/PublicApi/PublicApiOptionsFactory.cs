@@ -7,12 +7,15 @@ internal static class PublicApiOptionsFactory
 {
     public const string DefaultPolicyPath = "architecture/dependencies.arch.yml";
 
+    public const string HumanFormat = "human";
+    public const string JsonFormat = "json";
+
     // Only `diff` produces a pure finding set, which is the one shape SARIF can represent. capture,
     // update, and migrate report an operation outcome (status, destination, proposed content) that
     // has no SARIF equivalent, so they reject `sarif` instead of silently emitting human text.
-    public static readonly IReadOnlyList<string> SupportedFormats = new[] { "human", "json", "sarif" };
+    public static readonly IReadOnlyList<string> SupportedFormats = new[] { HumanFormat, JsonFormat, "sarif" };
 
-    public static readonly IReadOnlyList<string> OperationFormats = new[] { "human", "json" };
+    public static readonly IReadOnlyList<string> OperationFormats = new[] { HumanFormat, JsonFormat };
 
     public static Option<string> CreatePolicyOption()
     {
@@ -30,7 +33,7 @@ internal static class PublicApiOptionsFactory
     public static Option<string> CreateFormatOption()
     {
         Option<string> option = new("--format");
-        option.DefaultValueFactory = _ => "human";
+        option.DefaultValueFactory = _ => HumanFormat;
         option.Aliases.Add("-f");
         return option;
     }
@@ -49,6 +52,6 @@ internal static class PublicApiOptionsFactory
 
     public static string GetFormat(ParseResult parseResult, Option<string> formatOption)
     {
-        return parseResult.GetValue(formatOption) ?? "human";
+        return parseResult.GetValue(formatOption) ?? HumanFormat;
     }
 }

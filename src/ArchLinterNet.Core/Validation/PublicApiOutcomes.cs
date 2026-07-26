@@ -45,9 +45,9 @@ public sealed record PublicApiUpdateOutcome(
     string? Error = null,
     PublicApiFailureKind FailureKind = PublicApiFailureKind.None);
 
-// StaleDeclarations are inline `declared_api` entries the live surface no longer exports;
-// UndeclaredSurface are live entries the inline list never acknowledged. Both are reported even
-// when drift is accepted, so a migration always leaves an auditable record of what changed.
+// Stale declarations are inline entries the live surface no longer exports, and undeclared surface
+// holds live entries the inline list never acknowledged. Both are reported even when drift is
+// accepted, so a migration always leaves an auditable record of what changed.
 public sealed record PublicApiMigrateOutcome(
     bool Succeeded,
     string? Snapshot,

@@ -18,8 +18,11 @@ internal sealed class PublicApiUpdateCommandHandler(ICliRuntime runtime, ICliCon
         }
 
         if (!PublicApiCommandGuards.TryValidateCommon(
-                console, fileSystem, options.PolicyPath, options.ContractId, options.Format, CommandName,
-                PublicApiOptionsFactory.OperationFormats, out int exitCode))
+                console,
+                fileSystem,
+                new PublicApiCommandGuards.Invocation(
+                    options.PolicyPath, options.ContractId, options.Format, CommandName, PublicApiOptionsFactory.OperationFormats),
+                out int exitCode))
         {
             return exitCode;
         }
@@ -59,7 +62,7 @@ internal sealed class PublicApiUpdateCommandHandler(ICliRuntime runtime, ICliCon
 
             // One document per invocation: for `json` the delta, status, destination, and proposed
             // content are all fields of a single object, so stdout stays parsable end to end.
-            console.Out.WriteLine(options.Format == "json"
+            console.Out.WriteLine(options.Format == PublicApiOptionsFactory.JsonFormat
                 ? FormatAsJson(outcome, destination, options.DryRun)
                 : FormatForHumans(outcome, destination, options.DryRun));
 
@@ -76,7 +79,7 @@ internal sealed class PublicApiUpdateCommandHandler(ICliRuntime runtime, ICliCon
     {
         List<string> lines = new()
         {
-            PublicApiDeltaFormatter.Format(runtime, "human", "update", outcome.Delta),
+            PublicApiDeltaFormatter.Format(runtime, PublicApiOptionsFactory.HumanFormat, "update", outcome.Delta),
         };
 
         if (dryRun)

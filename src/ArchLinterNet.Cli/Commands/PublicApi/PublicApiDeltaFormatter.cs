@@ -1,3 +1,4 @@
+using System.Buffers;
 using ArchLinterNet.Cli.Abstractions;
 using ArchLinterNet.Core.Model;
 
@@ -11,6 +12,12 @@ namespace ArchLinterNet.Cli.Commands.PublicApi;
 internal static class PublicApiDeltaFormatter
 {
     private const string ContractName = "public-api-delta";
+
+    // Cached so the per-entry name split does not allocate a fresh separator array on every call.
+    private static readonly SearchValues<char> _nameTerminators = SearchValues.Create("(:");
+
+    private static readonly string[] _typeLevelKinds =
+        { "class", "interface", "struct", "enum", "delegate", "ctor" };
     private const string DeltaCategory = "public API surface";
 
     public static IReadOnlyList<ArchitectureViolation> ToViolations(string contractId, PublicApiDelta delta)
@@ -101,10 +108,10 @@ internal static class PublicApiDeltaFormatter
         string kind = signature[..kindSeparator];
         string remainder = signature[(kindSeparator + 1)..];
 
-        int cut = remainder.IndexOfAny(new[] { '(', ':' });
+        int cut = remainder.AsSpan().IndexOfAny(_nameTerminators);
         string name = (cut < 0 ? remainder : remainder[..cut]).TrimEnd();
 
-        if (kind is "class" or "interface" or "struct" or "enum" or "delegate" or "ctor")
+        if (_typeLevelKinds.Contains(kind, StringComparer.Ordinal))
         {
             return name;
         }

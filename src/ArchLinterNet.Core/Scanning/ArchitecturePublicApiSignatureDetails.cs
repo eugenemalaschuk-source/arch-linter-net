@@ -14,6 +14,9 @@ namespace ArchLinterNet.Core.Scanning;
 // is what keeps every existing inline `declared_api` policy working unchanged.
 internal static class ArchitecturePublicApiSignatureDetails
 {
+    private const string StaticModifier = "static";
+    private const string UnavailableConstant = "<unavailable>";
+
     public static string Compose(string baseSignature, IReadOnlyList<string> details)
     {
         return details.Count == 0 ? baseSignature : $"{baseSignature} [{string.Join(", ", details)}]";
@@ -55,7 +58,7 @@ internal static class ArchitecturePublicApiSignatureDetails
             // concept a reviewer recognizes rather than as two unrelated modifiers.
             if (type is { IsAbstract: true, IsSealed: true })
             {
-                details.Add("static");
+                details.Add(StaticModifier);
             }
             else
             {
@@ -97,7 +100,7 @@ internal static class ArchitecturePublicApiSignatureDetails
         {
             if (method.IsStatic)
             {
-                details.Add("static");
+                details.Add(StaticModifier);
             }
 
             if (method is MethodInfo methodInfo)
@@ -149,7 +152,7 @@ internal static class ArchitecturePublicApiSignatureDetails
 
             if ((getter ?? setter)?.IsStatic == true)
             {
-                details.Add("static");
+                details.Add(StaticModifier);
             }
 
             if (getter != null)
@@ -191,7 +194,7 @@ internal static class ArchitecturePublicApiSignatureDetails
 
             if (field.IsStatic)
             {
-                details.Add("static");
+                details.Add(StaticModifier);
             }
 
             if (field.IsInitOnly)
@@ -219,7 +222,7 @@ internal static class ArchitecturePublicApiSignatureDetails
         {
             if (evt.AddMethod?.IsStatic == true)
             {
-                details.Add("static");
+                details.Add(StaticModifier);
             }
         }
         catch (TypeLoadException)
@@ -274,7 +277,7 @@ internal static class ArchitecturePublicApiSignatureDetails
 
             if (parameter.ParameterType.IsByRef)
             {
-                modifier = parameter.IsOut ? "out" : parameter.IsIn ? "in" : "ref";
+                modifier = ByRefDirection(parameter);
             }
             else if (IsParams(parameter))
             {
@@ -286,6 +289,16 @@ internal static class ArchitecturePublicApiSignatureDetails
                 details.Add($"param{i.ToString(CultureInfo.InvariantCulture)}:{modifier}");
             }
         }
+    }
+
+    private static string ByRefDirection(ParameterInfo parameter)
+    {
+        if (parameter.IsOut)
+        {
+            return "out";
+        }
+
+        return parameter.IsIn ? "in" : "ref";
     }
 
     private static bool IsParams(ParameterInfo parameter)
@@ -384,19 +397,19 @@ internal static class ArchitecturePublicApiSignatureDetails
         }
         catch (TypeLoadException)
         {
-            return "<unavailable>";
+            return UnavailableConstant;
         }
         catch (FileNotFoundException)
         {
-            return "<unavailable>";
+            return UnavailableConstant;
         }
         catch (NotSupportedException)
         {
-            return "<unavailable>";
+            return UnavailableConstant;
         }
         catch (InvalidOperationException)
         {
-            return "<unavailable>";
+            return UnavailableConstant;
         }
 
         return value switch

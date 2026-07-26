@@ -9,16 +9,24 @@ namespace ArchLinterNet.Cli.Commands.PublicApi;
 // outcome has to read the same way regardless of which subcommand hit it.
 internal static class PublicApiCommandGuards
 {
+    // The five values describing "which invocation is being validated" travel together, so they are
+    // one parameter object rather than five positional arguments at every call site.
+    internal readonly record struct Invocation(
+        string PolicyPath,
+        string? ContractId,
+        string Format,
+        string CommandName,
+        IReadOnlyList<string> SupportedFormats);
+
     public static bool TryValidateCommon(
         ICliConsole console,
         IFileSystem fileSystem,
-        string policyPath,
-        string? contractId,
-        string format,
-        string commandName,
-        IReadOnlyList<string> supportedFormats,
+        Invocation invocation,
         out int exitCode)
     {
+        (string policyPath, string? contractId, string format, string commandName, IReadOnlyList<string> supportedFormats) =
+            invocation;
+
         exitCode = CliExitCodes.InvalidArgumentsOrRuntimeError;
 
         if (string.IsNullOrWhiteSpace(contractId))

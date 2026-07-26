@@ -31,30 +31,31 @@ internal static class PublicApiSnapshotResolver
             contract.ApiSnapshotError = null;
             contract.ResolvedSnapshotEntries = Array.Empty<PublicApiSnapshotEntry>();
 
-            if (string.IsNullOrWhiteSpace(contract.ApiSnapshot))
+            string? authoredPath = contract.ApiSnapshot;
+            if (string.IsNullOrWhiteSpace(authoredPath))
             {
                 continue;
             }
 
             // Throws for an unsafe path; that is a configuration error, not a bootstrap state.
             string resolvedPath = ResolveSnapshotPath(
-                boundary, contract.ApiSnapshot!, $"Public API surface contract '{contract.Name}'");
+                boundary, authoredPath, $"Public API surface contract '{contract.Name}'");
 
             contract.ResolvedSnapshotPath = resolvedPath;
 
             if (!fileSystem.FileExists(resolvedPath))
             {
                 contract.ApiSnapshotError =
-                    $"references a public API snapshot '{contract.ApiSnapshot}' that does not exist " +
+                    $"references a public API snapshot '{authoredPath}' that does not exist " +
                     $"(resolved to '{resolvedPath}'). Run 'arch-linter-net public-api capture " +
-                    $"--contract {contract.Id ?? contract.Name} --output {contract.ApiSnapshot}' to create it.";
+                    $"--contract {contract.Id ?? contract.Name} --output {authoredPath}' to create it.";
                 continue;
             }
 
             try
             {
                 PublicApiSnapshotDocument snapshot =
-                    PublicApiSnapshotFormat.Parse(fileSystem.ReadAllText(resolvedPath), contract.ApiSnapshot!);
+                    PublicApiSnapshotFormat.Parse(fileSystem.ReadAllText(resolvedPath), authoredPath);
                 contract.ApiSnapshotError = ValidateOwnership(snapshot, contract);
                 if (contract.ApiSnapshotError == null)
                 {

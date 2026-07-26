@@ -16,8 +16,11 @@ internal sealed class PublicApiDiffCommandHandler(ICliRuntime runtime, ICliConso
         }
 
         if (!PublicApiCommandGuards.TryValidateCommon(
-                console, fileSystem, options.PolicyPath, options.ContractId, options.Format, CommandName,
-                PublicApiOptionsFactory.SupportedFormats, out int exitCode))
+                console,
+                fileSystem,
+                new PublicApiCommandGuards.Invocation(
+                    options.PolicyPath, options.ContractId, options.Format, CommandName, PublicApiOptionsFactory.SupportedFormats),
+                out int exitCode))
         {
             return exitCode;
         }

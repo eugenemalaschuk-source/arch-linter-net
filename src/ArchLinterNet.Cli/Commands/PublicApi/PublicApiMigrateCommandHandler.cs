@@ -17,8 +17,11 @@ internal sealed class PublicApiMigrateCommandHandler(ICliRuntime runtime, ICliCo
         }
 
         if (!PublicApiCommandGuards.TryValidateCommon(
-                console, fileSystem, options.PolicyPath, options.ContractId, options.Format, CommandName,
-                PublicApiOptionsFactory.OperationFormats, out int exitCode))
+                console,
+                fileSystem,
+                new PublicApiCommandGuards.Invocation(
+                    options.PolicyPath, options.ContractId, options.Format, CommandName, PublicApiOptionsFactory.OperationFormats),
+                out int exitCode))
         {
             return exitCode;
         }
@@ -58,17 +61,8 @@ internal sealed class PublicApiMigrateCommandHandler(ICliRuntime runtime, ICliCo
                 fileSystem.RenameTempToTarget(tempPath, destination);
             }
 
-            console.Out.WriteLine(options.Format == "json"
-                ? JsonSerializer.Serialize(new
-                {
-                    status = options.DryRun ? "dry-run" : "migrated",
-                    contractId = options.ContractId,
-                    output = options.DryRun ? null : destination,
-                    dryRun = options.DryRun,
-                    acceptedDrift = outcome.HasDrift,
-                    staleDeclarations = outcome.StaleDeclarations,
-                    undeclaredSurface = outcome.UndeclaredSurface,
-                })
+            console.Out.WriteLine(options.Format == PublicApiOptionsFactory.JsonFormat
+                ? FormatAsJson(outcome, options, destination)
                 : FormatForHumans(outcome, options, destination));
 
             return CliExitCodes.Success;
@@ -78,6 +72,24 @@ internal sealed class PublicApiMigrateCommandHandler(ICliRuntime runtime, ICliCo
             console.Error.WriteLine($"public-api migrate error: {ex.Message}");
             return CliExitCodes.InvalidArgumentsOrRuntimeError;
         }
+    }
+
+    private static string FormatAsJson(
+        PublicApiMigrateOutcome outcome, PublicApiMigrateCommandOptions options, string destination)
+    {
+        string? output = options.DryRun ? null : destination;
+        string status = options.DryRun ? "dry-run" : "migrated";
+
+        return JsonSerializer.Serialize(new
+        {
+            status,
+            contractId = options.ContractId,
+            output,
+            dryRun = options.DryRun,
+            acceptedDrift = outcome.HasDrift,
+            staleDeclarations = outcome.StaleDeclarations,
+            undeclaredSurface = outcome.UndeclaredSurface,
+        });
     }
 
     private static string FormatForHumans(

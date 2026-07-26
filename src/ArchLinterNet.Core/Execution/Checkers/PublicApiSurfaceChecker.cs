@@ -12,43 +12,40 @@ internal static class PublicApiSurfaceChecker
     private const string AddedDelta = "added";
     private const string RemovedDelta = "removed";
     private const string ChangedDelta = "changed";
+    private const string UnusableSnapshotDelta = "snapshot-unusable";
+    private const string ViolationCategory = "public API surface";
 
     public static List<ArchitectureViolation> Check(
         ArchitecturePublicApiSurfaceContract contract,
         IReadOnlyDictionary<string, Assembly> resolvedAssemblies,
         ArchitectureContractExecutionContext executionContext)
     {
-        List<ArchitectureViolation> violations = new();
-
         // A missing, unparsable, or foreign snapshot is deliberately not a policy-load failure (see
         // PublicApiSnapshotResolver), so validation is where it has to become loud. Reporting the
         // whole surface as undeclared instead would bury the actual cause in noise.
         if (contract.ApiSnapshotError != null)
         {
-            violations.Add(new ArchitectureViolation(
-                contract.Name,
-                contract.Id,
-                contract.Name,
-                "public API snapshot",
-                new[] { contract.ApiSnapshotError })
-            {
-                Payload = new PublicApiSurfacePayload(
-                    UndeclaredApiSignature: contract.ApiSnapshotError,
-                    ApiDeltaKind: "snapshot-unusable"),
-            });
-            return violations;
+            return new List<ArchitectureViolation> { UnusableSnapshotViolation(contract) };
         }
 
+        Evaluation evaluation = Evaluate(contract, resolvedAssemblies);
+        List<ArchitectureViolation> violations = CollectSurfaceViolations(contract, evaluation, executionContext);
+
+        AddDeltaViolations(contract, evaluation.Delta.Removed, RemovedDelta, executionContext, violations);
+        AddDeltaViolations(contract, evaluation.Delta.Changed, ChangedDelta, executionContext, violations);
+
+        return violations;
+    }
+
+    private static Evaluation Evaluate(
+        ArchitecturePublicApiSurfaceContract contract,
+        IReadOnlyDictionary<string, Assembly> resolvedAssemblies)
+    {
         // The reviewed snapshot records the exact grammar (base signature plus the detail suffix
         // carrying constant values, accessor shape, static/ref/out/in, sealed/abstract, generic
         // constraints). A contract with only an inline `declared_api` list keeps comparing against
         // the legacy identity grammar, which is what keeps existing policies working unchanged.
         bool exactGrammar = !string.IsNullOrWhiteSpace(contract.ApiSnapshot);
-
-        HashSet<string> inlineDeclared = new(contract.DeclaredApi, StringComparer.Ordinal);
-        HashSet<(string Assembly, string Signature)> snapshotDeclared = new(
-            contract.ResolvedSnapshotEntries.Select(entry => (entry.AssemblyName, entry.Signature)));
-        HashSet<string> allowedPublicConstants = new(contract.AllowedPublicConstants, StringComparer.Ordinal);
 
         Dictionary<string, List<ArchitectureExportedApiEntry>> scannedByAssembly =
             ScanContractAssemblies(contract, resolvedAssemblies);
@@ -66,47 +63,47 @@ internal static class PublicApiSurfaceChecker
                 ActualEntries(scannedByAssembly, exactGrammar))
             : PublicApiDelta.Empty;
 
-        HashSet<(string Assembly, string Signature)> addedKeys = new(
-            delta.Added.Select(entry => (entry.AssemblyName, entry.Signature)));
+        return new Evaluation(
+            scannedByAssembly,
+            exactGrammar,
+            exact,
+            delta,
+            new HashSet<(string, string)>(delta.Added.Select(entry => (entry.AssemblyName, entry.Signature))),
+            new HashSet<string>(contract.DeclaredApi, StringComparer.Ordinal),
+            new HashSet<(string, string)>(
+                contract.ResolvedSnapshotEntries.Select(entry => (entry.AssemblyName, entry.Signature))),
+            new HashSet<string>(contract.AllowedPublicConstants, StringComparer.Ordinal));
+    }
+
+    private static List<ArchitectureViolation> CollectSurfaceViolations(
+        ArchitecturePublicApiSurfaceContract contract,
+        Evaluation evaluation,
+        ArchitectureContractExecutionContext executionContext)
+    {
+        List<ArchitectureViolation> violations = new();
 
         foreach (string assemblyName in contract.Assemblies)
         {
-            if (!scannedByAssembly.TryGetValue(assemblyName, out List<ArchitectureExportedApiEntry>? scanned))
+            if (!evaluation.ScannedByAssembly.TryGetValue(
+                    assemblyName, out List<ArchitectureExportedApiEntry>? scanned))
             {
                 continue;
             }
 
-            List<(ArchitectureExportedApiEntry Entry, bool ForbiddenConstant, bool Undeclared)> violatingEntries = new();
+            IEnumerable<EntryVerdict> ordered = scanned
+                .Select(entry => Classify(contract, evaluation, entry))
+                .Where(verdict => verdict.IsViolation)
+                .OrderBy(verdict => verdict.Entry.DeclaringTypeName, StringComparer.Ordinal)
+                .ThenBy(verdict => verdict.Entry.Signature, StringComparer.Ordinal);
 
-            foreach (ArchitectureExportedApiEntry entry in scanned)
+            foreach (EntryVerdict verdict in ordered)
             {
-                string projected = exactGrammar ? entry.ExactSignature : entry.Signature;
+                string reported = evaluation.ExactGrammar
+                    ? verdict.Entry.ExactSignature
+                    : verdict.Entry.Signature;
 
-                bool undeclared = exact
-                    ? addedKeys.Contains((entry.AssemblyName, projected))
-                    : !snapshotDeclared.Contains((entry.AssemblyName, projected))
-                        && !inlineDeclared.Contains(entry.Signature);
-
-                bool forbiddenConstant = contract.ForbidPublicConstantsUnlessDeclared
-                    && entry.IsConst
-                    && entry.ConstQualifiedName != null
-                    && !allowedPublicConstants.Contains(entry.ConstQualifiedName);
-
-                if (!undeclared && !forbiddenConstant)
-                {
-                    continue;
-                }
-
-                violatingEntries.Add((entry, forbiddenConstant, undeclared));
-            }
-
-            foreach (var (entry, forbiddenConstant, undeclared) in violatingEntries
-                         .OrderBy(v => v.Entry.DeclaringTypeName, StringComparer.Ordinal)
-                         .ThenBy(v => v.Entry.Signature, StringComparer.Ordinal))
-            {
-                string reported = exactGrammar ? entry.ExactSignature : entry.Signature;
-                if (executionContext.IsIgnored(entry.DeclaringTypeName, entry.Signature)
-                    || executionContext.IsIgnored(entry.DeclaringTypeName, reported))
+                if (executionContext.IsIgnored(verdict.Entry.DeclaringTypeName, verdict.Entry.Signature)
+                    || executionContext.IsIgnored(verdict.Entry.DeclaringTypeName, reported))
                 {
                     continue;
                 }
@@ -114,24 +111,56 @@ internal static class PublicApiSurfaceChecker
                 violations.Add(new ArchitectureViolation(
                     contract.Name,
                     contract.Id,
-                    entry.DeclaringTypeName,
-                    "public API surface",
+                    verdict.Entry.DeclaringTypeName,
+                    ViolationCategory,
                     new[] { reported })
                 {
                     Payload = new PublicApiSurfacePayload(
                         UndeclaredApiSignature: reported,
-                        ForbiddenPublicConstant: forbiddenConstant ? true : null,
-                        ApiAssemblyName: entry.AssemblyName,
-                        ApiVisibility: entry.Visibility,
-                        ApiDeltaKind: undeclared ? AddedDelta : null)
+                        ForbiddenPublicConstant: verdict.ForbiddenConstant ? true : null,
+                        ApiAssemblyName: verdict.Entry.AssemblyName,
+                        ApiVisibility: verdict.Entry.Visibility,
+                        ApiDeltaKind: verdict.Undeclared ? AddedDelta : null)
                 });
             }
         }
 
-        AddDeltaViolations(contract, delta.Removed, RemovedDelta, executionContext, violations);
-        AddDeltaViolations(contract, delta.Changed, ChangedDelta, executionContext, violations);
-
         return violations;
+    }
+
+    private static EntryVerdict Classify(
+        ArchitecturePublicApiSurfaceContract contract,
+        Evaluation evaluation,
+        ArchitectureExportedApiEntry entry)
+    {
+        string projected = evaluation.ExactGrammar ? entry.ExactSignature : entry.Signature;
+
+        bool undeclared = evaluation.Exact
+            ? evaluation.AddedKeys.Contains((entry.AssemblyName, projected))
+            : !evaluation.SnapshotDeclared.Contains((entry.AssemblyName, projected))
+                && !evaluation.InlineDeclared.Contains(entry.Signature);
+
+        bool forbiddenConstant = contract.ForbidPublicConstantsUnlessDeclared
+            && entry.IsConst
+            && entry.ConstQualifiedName != null
+            && !evaluation.AllowedConstants.Contains(entry.ConstQualifiedName);
+
+        return new EntryVerdict(entry, forbiddenConstant, undeclared);
+    }
+
+    private static ArchitectureViolation UnusableSnapshotViolation(ArchitecturePublicApiSurfaceContract contract)
+    {
+        return new ArchitectureViolation(
+            contract.Name,
+            contract.Id,
+            contract.Name,
+            "public API snapshot",
+            new[] { contract.ApiSnapshotError! })
+        {
+            Payload = new PublicApiSurfacePayload(
+                UndeclaredApiSignature: contract.ApiSnapshotError,
+                ApiDeltaKind: UnusableSnapshotDelta),
+        };
     }
 
     private static void AddDeltaViolations(
@@ -155,7 +184,7 @@ internal static class PublicApiSurfaceChecker
                 contract.Name,
                 contract.Id,
                 declaringTypeName,
-                "public API surface",
+                ViolationCategory,
                 new[] { entry.Signature })
             {
                 Payload = new PublicApiSurfacePayload(
@@ -191,7 +220,7 @@ internal static class PublicApiSurfaceChecker
     // wildcards. Under the exact grammar they are also written in the legacy identity grammar, so an
     // inline entry that still has a live counterpart is lifted to that counterpart's exact signature
     // — otherwise every inline entry on a snapshot-backed contract would look removed.
-    private static IReadOnlyList<PublicApiSnapshotEntry> DeclaredEntries(
+    private static List<PublicApiSnapshotEntry> DeclaredEntries(
         ArchitecturePublicApiSurfaceContract contract,
         Dictionary<string, List<ArchitectureExportedApiEntry>> scannedByAssembly,
         bool exactGrammar)
@@ -221,7 +250,7 @@ internal static class PublicApiSurfaceChecker
         return declared;
     }
 
-    private static IReadOnlyList<PublicApiSnapshotEntry> ActualEntries(
+    private static List<PublicApiSnapshotEntry> ActualEntries(
         Dictionary<string, List<ArchitectureExportedApiEntry>> scannedByAssembly,
         bool exactGrammar)
     {
@@ -231,4 +260,22 @@ internal static class PublicApiSurfaceChecker
                 entry.AssemblyName, exactGrammar ? entry.ExactSignature : entry.Signature))
             .ToList();
     }
+
+    private readonly record struct EntryVerdict(
+        ArchitectureExportedApiEntry Entry,
+        bool ForbiddenConstant,
+        bool Undeclared)
+    {
+        public bool IsViolation => ForbiddenConstant || Undeclared;
+    }
+
+    private sealed record Evaluation(
+        Dictionary<string, List<ArchitectureExportedApiEntry>> ScannedByAssembly,
+        bool ExactGrammar,
+        bool Exact,
+        PublicApiDelta Delta,
+        HashSet<(string Assembly, string Signature)> AddedKeys,
+        HashSet<string> InlineDeclared,
+        HashSet<(string Assembly, string Signature)> SnapshotDeclared,
+        HashSet<string> AllowedConstants);
 }

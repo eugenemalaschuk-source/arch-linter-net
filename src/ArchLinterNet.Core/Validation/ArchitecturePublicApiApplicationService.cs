@@ -112,8 +112,8 @@ public sealed partial class ArchitecturePublicApiApplicationService(
                 PublicApiFailureKind.InvalidInput);
         }
 
-        // The contract's snapshot may legitimately not exist yet on a first update after capture;
-        // an unreadable or foreign one, however, must not be silently replaced.
+        // On a first update the contract snapshot may legitimately be absent, which must not block
+        // the write. An unreadable or foreign one must never be silently replaced.
         if (contract.ApiSnapshotError != null && !IsMissingSnapshot(contract))
         {
             return new PublicApiUpdateOutcome(
