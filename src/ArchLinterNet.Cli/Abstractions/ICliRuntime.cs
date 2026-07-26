@@ -72,6 +72,14 @@ internal interface ICliRuntime
 
     BaselineMigrateOutcome MigrateBaseline(BaselineMigrateRequest request);
 
+    PublicApiCaptureOutcome CapturePublicApi(PublicApiCaptureRequest request);
+
+    PublicApiDiffOutcome DiffPublicApi(PublicApiDiffRequest request);
+
+    PublicApiUpdateOutcome UpdatePublicApi(PublicApiUpdateRequest request);
+
+    PublicApiMigrateOutcome MigratePublicApi(PublicApiMigrateRequest request);
+
     ArchitectureGraphOutcome BuildGraph(ArchitectureGraphRequest request);
 
     string FormatGraphAsJson(ArchitectureDependencyGraph graph);

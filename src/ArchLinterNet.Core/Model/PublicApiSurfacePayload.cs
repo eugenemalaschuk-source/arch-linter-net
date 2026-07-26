@@ -4,7 +4,9 @@ public sealed record PublicApiSurfacePayload(
     string? UndeclaredApiSignature = null,
     bool? ForbiddenPublicConstant = null,
     string? ApiAssemblyName = null,
-    string? ApiVisibility = null)
+    string? ApiVisibility = null,
+    string? ApiDeltaKind = null,
+    string? PreviousApiSignature = null)
     : IArchitectureDiagnosticPayload
 {
     public ArchitectureDiagnostic ToDiagnostic(ArchitectureViolation violation) =>
@@ -16,6 +18,8 @@ public sealed record PublicApiSurfacePayload(
             UndeclaredApiSignature = UndeclaredApiSignature,
             ForbiddenPublicConstant = ForbiddenPublicConstant,
             ApiAssemblyName = ApiAssemblyName,
-            ApiVisibility = ApiVisibility
+            ApiVisibility = ApiVisibility,
+            ApiDeltaKind = ApiDeltaKind,
+            PreviousApiSignature = PreviousApiSignature
         };
 }

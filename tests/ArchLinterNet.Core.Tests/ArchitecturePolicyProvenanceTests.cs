@@ -680,6 +680,9 @@ public sealed class ArchitecturePolicyProvenanceTests
         public IEnumerable<string> EnumerateFiles(string path, string searchPattern, SearchOption searchOption) =>
             _inner.EnumerateFiles(path, searchPattern, searchOption);
 
+        public IEnumerable<string> EnumerateDirectories(string path, string searchPattern, SearchOption searchOption) =>
+            _inner.EnumerateDirectories(path, searchPattern, searchOption);
+
         public DateTime GetLastWriteTimeUtc(string path) => _inner.GetLastWriteTimeUtc(path);
 
         public string GetCurrentDirectory() => _inner.GetCurrentDirectory();

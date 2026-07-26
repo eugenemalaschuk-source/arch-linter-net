@@ -14,4 +14,10 @@ public sealed record PublicApiSurfaceDiagnostic(
     public bool? ForbiddenPublicConstant { get; init; }
     public string? ApiAssemblyName { get; init; }
     public string? ApiVisibility { get; init; }
+
+    // "added", "removed", or "changed" — the normalized API delta record shared by human, JSON,
+    // and SARIF output. Null for contracts that were not evaluated as a delta.
+    public string? ApiDeltaKind { get; init; }
+
+    public string? PreviousApiSignature { get; init; }
 }

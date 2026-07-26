@@ -183,6 +183,11 @@ public sealed partial class ArchitectureSarifFormatter : IArchitectureSarifForma
             return BuildCompositionProperties(composition);
         }
 
+        if (diagnostic is PublicApiSurfaceDiagnostic publicApiSurface)
+        {
+            return BuildPublicApiSurfaceProperties(publicApiSurface);
+        }
+
         IReadOnlyCollection<FrameworkReferenceEvidence>? evidence = diagnostic switch
         {
             FrameworkReferenceDiagnostic d => d.Evidence,
@@ -213,6 +218,40 @@ public sealed partial class ArchitectureSarifFormatter : IArchitectureSarifForma
     // sourceType/forbiddenNamespace/references triple every family already gets via ExtractFields —
     // exposed here so same-named types in different assemblies are distinguishable in SARIF, not
     // just in human/--json/--explain output (issue #360).
+    // API delta records must read the same in SARIF as in human and --json output: a reviewer
+    // triaging a SARIF result needs to see whether a member was added, removed, or re-signed —
+    // and, for a re-signed member, what the reviewed snapshot previously recorded.
+    private static Dictionary<string, object?>? BuildPublicApiSurfaceProperties(PublicApiSurfaceDiagnostic publicApiSurface)
+    {
+        if (publicApiSurface.ApiDeltaKind == null && publicApiSurface.PreviousApiSignature == null
+            && publicApiSurface.ApiAssemblyName == null && publicApiSurface.ApiVisibility == null
+            && publicApiSurface.ForbiddenPublicConstant == null)
+        {
+            return null;
+        }
+
+        var properties = new Dictionary<string, object?>();
+        if (publicApiSurface.ApiDeltaKind != null)
+            properties["api_delta_kind"] = publicApiSurface.ApiDeltaKind;
+
+        if (publicApiSurface.PreviousApiSignature != null)
+            properties["previous_api_signature"] = publicApiSurface.PreviousApiSignature;
+
+        if (publicApiSurface.UndeclaredApiSignature != null)
+            properties["api_signature"] = publicApiSurface.UndeclaredApiSignature;
+
+        if (publicApiSurface.ApiAssemblyName != null)
+            properties["assembly"] = publicApiSurface.ApiAssemblyName;
+
+        if (publicApiSurface.ApiVisibility != null)
+            properties["visibility"] = publicApiSurface.ApiVisibility;
+
+        if (publicApiSurface.ForbiddenPublicConstant != null)
+            properties["forbidden_public_constant"] = publicApiSurface.ForbiddenPublicConstant;
+
+        return properties;
+    }
+
     private static Dictionary<string, object?>? BuildCompositionProperties(CompositionDiagnostic composition)
     {
         if (composition.SourceAssembly == null && composition.SourceMember == null

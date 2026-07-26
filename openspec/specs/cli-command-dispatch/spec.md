@@ -26,7 +26,7 @@ Top-level CLI commands SHALL be contributed through per-command modules implemen
 - **THEN** the CLI composition can discover and compose that module without editing `Program.cs`, `CliRootCommandFactory`, or another hard-coded top-level command registry
 
 ### Requirement: Command execution is instance-based
-Every top-level CLI command (`validate`, `graph`, `explain`, `baseline`) SHALL execute through instance handler classes that receive runtime services through constructors. The CLI SHALL NOT depend on a static `CliEngine`, static service locator, or static command `Run(...)` methods as its primary execution seam.
+Every top-level CLI command (`validate`, `graph`, `explain`, `baseline`, `public-api`) SHALL execute through instance handler classes that receive runtime services through constructors. The CLI SHALL NOT depend on a static `CliEngine`, static service locator, or static command `Run(...)` methods as its primary execution seam.
 
 #### Scenario: Command handlers can be resolved from composition
 - **WHEN** the CLI service collection is built in a test
@@ -71,3 +71,19 @@ CLI abstractions for console, filesystem, runtime, and command-module contracts 
 #### Scenario: Abstractions do not share a folder with infrastructure implementations
 - **WHEN** the CLI project structure is inspected
 - **THEN** abstraction files are stored separately from concrete infrastructure files such as console, filesystem, runtime, and host implementations
+
+### Requirement: The public-api subcommand family is one command surface
+The CLI SHALL expose a `public-api` top-level command with `capture`, `diff`, `update`, and `migrate` subcommands, registered through a command module like every other top-level command, with each subcommand executed by its own instance handler.
+
+#### Scenario: public-api subcommands are reachable
+- **WHEN** `arch-linter-net public-api capture`, `diff`, `update`, or `migrate` is parsed
+- **THEN** the corresponding subcommand handler SHALL be invoked
+
+#### Scenario: public-api is discovered as a top-level module
+- **WHEN** the CLI root command is composed
+- **THEN** the `public-api` command SHALL appear without any hard-coded top-level command list being edited
+
+#### Scenario: Unknown public-api subcommand reports usage
+- **WHEN** an unrecognized `public-api` subcommand or option is supplied
+- **THEN** the CLI SHALL return exit code 2 and print a usage hint naming `arch-linter-net public-api --help`
+

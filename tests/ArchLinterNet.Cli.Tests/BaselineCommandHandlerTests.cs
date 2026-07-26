@@ -684,6 +684,14 @@ public sealed partial class BaselineCommandHandlerTests
             return MigrateException == null ? MigrateOutcome : throw MigrateException;
         }
 
+        public PublicApiCaptureOutcome CapturePublicApi(PublicApiCaptureRequest request) => throw new NotSupportedException();
+
+        public PublicApiDiffOutcome DiffPublicApi(PublicApiDiffRequest request) => throw new NotSupportedException();
+
+        public PublicApiUpdateOutcome UpdatePublicApi(PublicApiUpdateRequest request) => throw new NotSupportedException();
+
+        public PublicApiMigrateOutcome MigratePublicApi(PublicApiMigrateRequest request) => throw new NotSupportedException();
+
         public ArchitectureGraphOutcome BuildGraph(ArchitectureGraphRequest request) => new(_emptyGraph);
 
         public string FormatGraphAsJson(ArchitectureDependencyGraph graph) => "{}";

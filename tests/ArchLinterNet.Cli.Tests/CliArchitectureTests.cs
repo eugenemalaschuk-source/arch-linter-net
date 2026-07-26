@@ -5,6 +5,7 @@ using ArchLinterNet.Cli.Abstractions;
 using ArchLinterNet.Cli.Commands.Baseline;
 using ArchLinterNet.Cli.Commands.Explain;
 using ArchLinterNet.Cli.Commands.Graph;
+using ArchLinterNet.Cli.Commands.PublicApi;
 using ArchLinterNet.Cli.Commands.Validate;
 using ArchLinterNet.Cli.Infrastructure;
 using ArchLinterNet.Core.BuildState;
@@ -36,10 +37,11 @@ public sealed class CliArchitectureTests
                 typeof(BaselineCommandModule),
                 typeof(GraphCommandModule),
                 typeof(ExplainCommandModule),
+                typeof(PublicApiCommandModule),
             }));
             Assert.That(
                 composition.RootCommandFactory.Create().Subcommands.Select(static command => command.Name),
-                Is.EquivalentTo(new[] { "baseline", "graph", "explain" }));
+                Is.EquivalentTo(new[] { "baseline", "graph", "explain", "public-api" }));
         });
     }
 
@@ -446,6 +448,14 @@ public sealed class CliArchitectureTests
 
         public BaselineVerifyOutcome VerifyBaseline(BaselineVerifyRequest request) => throw new NotSupportedException();
         public BaselineMigrateOutcome MigrateBaseline(BaselineMigrateRequest request) => throw new NotSupportedException();
+
+        public PublicApiCaptureOutcome CapturePublicApi(PublicApiCaptureRequest request) => throw new NotSupportedException();
+
+        public PublicApiDiffOutcome DiffPublicApi(PublicApiDiffRequest request) => throw new NotSupportedException();
+
+        public PublicApiUpdateOutcome UpdatePublicApi(PublicApiUpdateRequest request) => throw new NotSupportedException();
+
+        public PublicApiMigrateOutcome MigratePublicApi(PublicApiMigrateRequest request) => throw new NotSupportedException();
 
         public ArchitectureGraphOutcome BuildGraph(ArchitectureGraphRequest request) =>
             throw ExceptionToThrow ?? new NotSupportedException();

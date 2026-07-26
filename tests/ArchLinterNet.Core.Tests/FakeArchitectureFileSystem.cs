@@ -76,6 +76,32 @@ internal sealed class FakeArchitectureFileSystem : IArchitectureFileSystem
         }
     }
 
+    public IEnumerable<string> EnumerateDirectories(string path, string searchPattern, SearchOption searchOption)
+    {
+        string normalizedDirectory = Normalize(path).TrimEnd('/') + "/";
+
+        foreach (string directoryPath in _directories)
+        {
+            if (!directoryPath.StartsWith(normalizedDirectory, StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            string relative = directoryPath[normalizedDirectory.Length..];
+            if (relative.Length == 0)
+            {
+                continue;
+            }
+
+            if (searchOption == SearchOption.TopDirectoryOnly && relative.Contains('/'))
+            {
+                continue;
+            }
+
+            yield return directoryPath;
+        }
+    }
+
     public DateTime GetLastWriteTimeUtc(string path)
     {
         return _lastWriteTimesUtc.TryGetValue(Normalize(path), out DateTime writeTime) ? writeTime : DateTime.MinValue;

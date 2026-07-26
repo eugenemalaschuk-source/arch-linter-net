@@ -12,6 +12,8 @@ public interface IArchitectureFileSystem
 
     IEnumerable<string> EnumerateFiles(string path, string searchPattern, SearchOption searchOption);
 
+    IEnumerable<string> EnumerateDirectories(string path, string searchPattern, SearchOption searchOption);
+
     DateTime GetLastWriteTimeUtc(string path);
 
     string GetCurrentDirectory();

@@ -66,6 +66,30 @@ public sealed class ArchitectureEngine : IDisposable, IAsyncDisposable
             .Migrate(request);
     }
 
+    public PublicApiCaptureOutcome CapturePublicApi(PublicApiCaptureRequest request)
+    {
+        return _serviceProvider.GetRequiredService<IArchitecturePublicApiApplicationService>()
+            .Capture(request);
+    }
+
+    public PublicApiDiffOutcome DiffPublicApi(PublicApiDiffRequest request)
+    {
+        return _serviceProvider.GetRequiredService<IArchitecturePublicApiApplicationService>()
+            .Diff(request);
+    }
+
+    public PublicApiUpdateOutcome UpdatePublicApi(PublicApiUpdateRequest request)
+    {
+        return _serviceProvider.GetRequiredService<IArchitecturePublicApiApplicationService>()
+            .Update(request);
+    }
+
+    public PublicApiMigrateOutcome MigratePublicApi(PublicApiMigrateRequest request)
+    {
+        return _serviceProvider.GetRequiredService<IArchitecturePublicApiApplicationService>()
+            .Migrate(request);
+    }
+
     public AsmdefValidationOutcome ValidateAsmdef(AsmdefValidationRequest request)
     {
         return _serviceProvider.GetRequiredService<IAsmdefValidationService>()

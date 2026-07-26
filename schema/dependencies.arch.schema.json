@@ -1594,6 +1594,17 @@
             "id": { "type": "string", "minLength": 1 },
             "assemblies": { "$ref": "#/$defs/stringList" },
             "declared_api": { "$ref": "#/$defs/stringList" },
+            "api_snapshot": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Repository-local path to a reviewed public API snapshot file, resolved relative to the policy boundary. Its entries are unioned with declared_api. An absolute or boundary-escaping path is a policy load error; a missing, unparsable, or foreign snapshot is reported as a validation violation so the first capture can still create the file."
+            },
+            "api_comparison": {
+              "type": "string",
+              "enum": ["additions_only", "exact"],
+              "default": "additions_only",
+              "description": "additions_only (default) reports undeclared exported surface only. exact additionally reports declared signatures that no longer exist (removals) and declared members whose normalized signature changed."
+            },
             "forbid_public_constants_unless_declared": {
               "type": "boolean",
               "default": false,

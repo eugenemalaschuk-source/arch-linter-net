@@ -433,15 +433,6 @@ public sealed partial class ArchitectureDiagnosticFormatter : IArchitectureDiagn
         return $" ({string.Join("; ", parts)})";
     }
 
-    private static string FormatPublicApiSurfaceContextForHumans(PublicApiSurfaceDiagnostic publicApiSurface)
-    {
-        string reason = publicApiSurface.ForbiddenPublicConstant == true
-            ? "forbidden_public_constant"
-            : "undeclared_api_member";
-        return $" (reason: {reason}, assembly: {publicApiSurface.ApiAssemblyName}, " +
-               $"visibility: {publicApiSurface.ApiVisibility}, signature: {publicApiSurface.UndeclaredApiSignature})";
-    }
-
     private static string FormatAttributeUsageContextForHumans(AttributeUsageDiagnostic attributeUsage)
     {
         return $" (kind: {attributeUsage.AttributeUsageKind}, attribute: {attributeUsage.MatchedAttribute}" +
@@ -687,21 +678,6 @@ public sealed partial class ArchitectureDiagnosticFormatter : IArchitectureDiagn
 
         if (typePlacement.ActualTypeName != null)
             obj["actual_type_name"] = typePlacement.ActualTypeName;
-    }
-
-    private static void ApplyPublicApiSurfaceCiFields(PublicApiSurfaceDiagnostic publicApiSurface, Dictionary<string, object?> obj)
-    {
-        if (publicApiSurface.UndeclaredApiSignature != null)
-            obj["undeclared_api_signature"] = publicApiSurface.UndeclaredApiSignature;
-
-        if (publicApiSurface.ForbiddenPublicConstant != null)
-            obj["forbidden_public_constant"] = publicApiSurface.ForbiddenPublicConstant;
-
-        if (publicApiSurface.ApiAssemblyName != null)
-            obj["assembly"] = publicApiSurface.ApiAssemblyName;
-
-        if (publicApiSurface.ApiVisibility != null)
-            obj["visibility"] = publicApiSurface.ApiVisibility;
     }
 
     private static void ApplyAttributeUsageCiFields(AttributeUsageDiagnostic attributeUsage, Dictionary<string, object?> obj)

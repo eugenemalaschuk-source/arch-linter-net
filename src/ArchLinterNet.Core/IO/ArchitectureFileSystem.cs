@@ -31,6 +31,11 @@ public sealed class ArchitectureFileSystem : IArchitectureFileSystem
         return Directory.EnumerateFiles(path, searchPattern, searchOption);
     }
 
+    public IEnumerable<string> EnumerateDirectories(string path, string searchPattern, SearchOption searchOption)
+    {
+        return Directory.EnumerateDirectories(path, searchPattern, searchOption);
+    }
+
     public DateTime GetLastWriteTimeUtc(string path)
     {
         return File.GetLastWriteTimeUtc(path);
