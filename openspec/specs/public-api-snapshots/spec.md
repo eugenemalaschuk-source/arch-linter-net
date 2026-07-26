@@ -21,8 +21,16 @@ Captured entries SHALL use the exact grammar: the identity signature followed by
 - **WHEN** an exported property gains a setter, or an accessor's visibility widens
 - **THEN** the captured snapshot SHALL differ from the previously reviewed one
 
+#### Scenario: Every non-exported accessor visibility is distinguished
+- **WHEN** a non-exported accessor's visibility changes among `private`, `private protected`, and `internal`
+- **THEN** the captured snapshot SHALL differ from the previously reviewed one, distinguishing each of the three
+
 #### Scenario: Dispatch modifier change on a property or event is visible in the snapshot
 - **WHEN** an exported property or event's own abstract/virtual/override/sealed-override shape changes while its accessors are otherwise unchanged
+- **THEN** the captured snapshot SHALL differ from the previously reviewed one
+
+#### Scenario: An `allows ref struct` anti-constraint change is visible in the snapshot
+- **WHEN** an exported generic type or method parameter's `allows ref struct` constraint is added or removed while every other constraint stays the same
 - **THEN** the captured snapshot SHALL differ from the previously reviewed one
 
 #### Scenario: Parameter direction change is visible in the snapshot
@@ -262,13 +270,17 @@ The system SHALL classify why a snapshot is unusable (missing, unparsable, or a 
 - **WHEN** an existing snapshot fails to parse or fails ownership validation, and its authored path or resolved path text happens to contain the phrase used in the missing-snapshot message
 - **THEN** the system SHALL still classify it as a parse or ownership failure, and update SHALL still refuse to replace it
 
-### Requirement: Path identity respects the actual filesystem, not an assumption from the host OS
+### Requirement: Path identity respects the actual filesystem, not an assumption from the host OS or from existence alone
 
-The system SHALL determine whether two differently-cased paths name the same file by consulting the filesystem, not by assuming case sensitivity from the operating system alone.
+The system SHALL determine whether two differently-cased paths name the same file by consulting what the filesystem actually stores at that location, not by assuming case sensitivity from the operating system, and not by treating both paths merely existing as proof of identity.
 
 #### Scenario: A case-sensitive filesystem on any host is respected
 - **WHEN** `update` compares a `--snapshot` destination against the contract's declared snapshot path and the two differ only by case
-- **THEN** the system SHALL treat them as the same file only when the filesystem itself resolves both spellings to an existing file, regardless of host operating system
+- **THEN** the system SHALL treat them as the same file only when the filesystem's directory listing contains exactly one entry matching either spelling, regardless of host operating system
+
+#### Scenario: Two distinct case-variant files are not treated as the same file
+- **WHEN** the differently-cased paths both exist as separate directory entries (a case-sensitive filesystem holding both "Surface.txt" and "surface.txt")
+- **THEN** the system SHALL treat them as different files
 
 #### Scenario: Neither path exists yet
 - **WHEN** the two differently-cased paths being compared do not yet exist on disk

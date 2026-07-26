@@ -280,6 +280,12 @@ internal static class ArchitecturePublicApiSignatureDetails
         }
     }
 
+    // GetMethod/SetMethod return an accessor at whatever visibility it actually has — including
+    // private, private protected, or internal — not just the exported ones; only the property as a
+    // whole needs one exported accessor to be in scope at all (see GetExportedProperties). Every
+    // distinct CLR accessibility therefore needs its own token, or two different non-exported
+    // visibilities (for example a private setter narrowed to internal) would render identically and
+    // the change would be invisible.
     private static string AccessorToken(string name, MethodInfo accessor)
     {
         if (accessor.IsPublic)
@@ -292,7 +298,17 @@ internal static class ArchitecturePublicApiSignatureDetails
             return $"{name}:protected internal";
         }
 
-        return accessor.IsFamily ? $"{name}:protected" : $"{name}:internal";
+        if (accessor.IsFamily)
+        {
+            return $"{name}:protected";
+        }
+
+        if (accessor.IsFamilyAndAssembly)
+        {
+            return $"{name}:private protected";
+        }
+
+        return accessor.IsAssembly ? $"{name}:internal" : $"{name}:private";
     }
 
     // The base signature renders `ref`, `out`, and `in` identically as `T&`, so the direction has to
@@ -400,6 +416,14 @@ internal static class ArchitecturePublicApiSignatureDetails
             if (attributes.HasFlag(GenericParameterAttributes.NotNullableValueTypeConstraint))
             {
                 constraints.Add("struct");
+            }
+
+            // `allows ref struct` (C# 13/.NET 9+) is an anti-constraint: it widens which types are
+            // legal type arguments and changes the ref-safety contract callers must obey, so it is
+            // just as much part of the exact grammar as the class/struct/new() constraints above.
+            if (attributes.HasFlag(GenericParameterAttributes.AllowByRefLike))
+            {
+                constraints.Add("allows ref struct");
             }
 
             foreach (string constraint in genericParameter.GetGenericParameterConstraints()

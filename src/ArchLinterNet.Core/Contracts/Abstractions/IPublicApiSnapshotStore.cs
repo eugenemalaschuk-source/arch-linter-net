@@ -14,5 +14,11 @@ public interface IPublicApiSnapshotStore
 
     bool Exists(string resolvedPath);
 
+    // Whether two resolved paths that differ only by case name the same on-disk file. Two paths
+    // both merely *existing* does not answer this: a case-sensitive filesystem can legitimately
+    // hold "Surface.txt" and "surface.txt" as two distinct files. The only reliable answer comes
+    // from asking the filesystem what is actually stored at that location.
+    bool IsSameFile(string first, string second);
+
     PublicApiSnapshotDocument Read(string resolvedPath, string authoredPath);
 }

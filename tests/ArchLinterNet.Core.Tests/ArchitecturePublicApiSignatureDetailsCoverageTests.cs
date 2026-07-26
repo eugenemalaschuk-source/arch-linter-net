@@ -221,6 +221,36 @@ public sealed class ArchitecturePublicApiSignatureDetailsCoverageTests
             Does.Contain("override"));
     }
 
+    // GetMethod/SetMethod return an accessor at whatever visibility it actually has, not just the
+    // exported ones. Every distinct CLR accessibility needs its own token, or two different
+    // non-exported visibilities would render identically and a narrowing would be invisible.
+    [Test]
+    public void PrivateSetAccessor_IsDistinguishedFromInternalAndPrivateProtected()
+    {
+        string privateSet = ExactSignatureFor("AccessorVisibilityHolder.PrivateSetProperty");
+        string privateProtectedSet = ExactSignatureFor("AccessorVisibilityHolder.PrivateProtectedSetProperty");
+        string internalSet = ExactSignatureFor("AccessorVisibilityHolder.InternalSetProperty");
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(privateSet, Does.Contain("set:private"));
+            Assert.That(privateSet, Does.Not.Contain("set:internal"));
+            Assert.That(privateProtectedSet, Does.Contain("set:private protected"));
+            Assert.That(internalSet, Does.Contain("set:internal"));
+            Assert.That(internalSet, Does.Not.Contain("set:private "));
+        });
+    }
+
+    // `allows ref struct` widens which types are legal type arguments and changes the ref-safety
+    // contract callers must obey, so it is part of the exact grammar exactly like class/struct/new().
+    [Test]
+    public void AllowByRefLikeConstraint_IsReportedInGenericConstraints()
+    {
+        Assert.That(
+            ExactSignatureFor("method PublicApiSurfaceContractTestFixtures.RefStructConstraintHolder.Do"),
+            Does.Contain("where0:allows ref struct"));
+    }
+
     [Test]
     public void BoolConstant_IsFormattedAsLowercaseLiteral()
     {

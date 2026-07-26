@@ -114,6 +114,58 @@ public sealed class PublicApiSnapshotStoreTests
     }
 
     [Test]
+    public void IsSameFile_ExactPath_AlwaysMatches()
+    {
+        string resolved = WriteSnapshot("architecture/api/surface.txt", "class Acme.Module.Thing");
+
+        Assert.That(_store.IsSameFile(resolved, resolved), Is.True);
+    }
+
+    // Whether a differently-cased path names the same file depends on the actual host filesystem,
+    // not an assumption about the OS — so the test derives its own ground truth (does this host
+    // resolve the case-variant path to the file we wrote?) and asserts IsSameFile agrees with it,
+    // rather than hardcoding an expected result that would be wrong on some CI runners.
+    [Test]
+    public void IsSameFile_CaseVariant_MatchesRealFilesystemBehavior()
+    {
+        string resolved = WriteSnapshot("architecture/api/surface.txt", "class Acme.Module.Thing");
+        string caseVariant = Path.Combine(Path.GetDirectoryName(resolved)!, "Surface.txt");
+        bool hostIsCaseInsensitive = File.Exists(caseVariant);
+
+        Assert.That(_store.IsSameFile(caseVariant, resolved), Is.EqualTo(hostIsCaseInsensitive));
+    }
+
+    // The regressed bug: two paths both existing does not prove they are the same file. Only
+    // reproducible on a case-sensitive host, where "Surface.txt" and "surface.txt" can genuinely
+    // coexist as separate directory entries.
+    [Test]
+    public void IsSameFile_TwoDistinctCaseVariantFiles_DoesNotMatch()
+    {
+        string lower = WriteSnapshot("architecture/api/surface.txt", "class Acme.Module.Thing");
+        string upper = Path.Combine(Path.GetDirectoryName(lower)!, "Surface.txt");
+
+        if (File.Exists(upper))
+        {
+            Assert.Ignore("Host filesystem is case-insensitive; 'Surface.txt' and 'surface.txt' cannot coexist.");
+        }
+
+        File.WriteAllText(upper, PublicApiSnapshotFormat.Serialize(new PublicApiSnapshotDocument(
+            PublicApiSnapshotFormat.CurrentVersion, "surface", Array.Empty<PublicApiSnapshotEntry>())));
+
+        Assert.That(_store.IsSameFile(upper, lower), Is.False);
+    }
+
+    [Test]
+    public void IsSameFile_NeitherPathExists_DoesNotMatch()
+    {
+        string directory = Path.Combine(_repositoryRoot, "architecture", "api");
+        string first = Path.Combine(directory, "Ghost.txt");
+        string second = Path.Combine(directory, "ghost.txt");
+
+        Assert.That(_store.IsSameFile(first, second), Is.False);
+    }
+
+    [Test]
     public void ResolvePath_PolicyOutsideArchitectureFolder_UsesPolicyDirectoryAsBoundary()
     {
         string flatPolicy = Path.Combine(_repositoryRoot, "dependencies.arch.yml");

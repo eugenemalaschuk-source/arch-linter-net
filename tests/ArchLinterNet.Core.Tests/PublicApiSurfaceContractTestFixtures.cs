@@ -271,6 +271,23 @@ namespace PublicApiSurfaceContractTestFixtures
         }
     }
 
+    public class AccessorVisibilityHolder
+    {
+        public int PrivateSetProperty { get; private set; }
+
+        public int PrivateProtectedSetProperty { get; private protected set; }
+
+        public int InternalSetProperty { get; internal set; }
+    }
+
+    public static class RefStructConstraintHolder
+    {
+        public static void Do<T>()
+            where T : allows ref struct
+        {
+        }
+    }
+
     public class OverrideEventHolder : VirtualEventHolder
     {
         public override event EventHandler? Changed

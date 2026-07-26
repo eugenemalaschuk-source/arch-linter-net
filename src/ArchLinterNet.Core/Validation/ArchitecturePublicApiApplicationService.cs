@@ -187,28 +187,13 @@ public sealed partial class ArchitecturePublicApiApplicationService(
 
     // File-path identity cannot be inferred from the OS alone: the default HFS+/APFS format is
     // case-insensitive, but macOS explicitly supports formatting a volume as case-sensitive APFS,
-    // and ext4 (the common Linux filesystem) is always case-sensitive. Assuming every macOS host is
-    // case-insensitive would treat 'Surface.txt' and 'surface.txt' as the same file on a
-    // case-sensitive install and silently update the wrong one.
-    //
-    // `second` is the reference path the caller already trusts (the policy file, or the contract's
-    // declared snapshot). When it exists, the real filesystem is asked whether `first`'s casing also
-    // resolves to it: if both report existing, this filesystem folds the two spellings onto one
-    // file. When `second` does not exist yet (for example a snapshot before its first capture),
-    // there is nothing to probe, so the safe default is to require an exact match.
+    // and ext4 (the common Linux filesystem) is always case-sensitive. Both spellings existing is
+    // not proof either — a case-sensitive filesystem can legitimately hold "Surface.txt" and
+    // "surface.txt" as two distinct files. IsSameFile asks the filesystem what it actually stores
+    // at that location rather than inferring identity from any OS assumption or existence check.
     internal bool PathsMatch(string first, string second)
     {
-        if (string.Equals(first, second, StringComparison.Ordinal))
-        {
-            return true;
-        }
-
-        if (!string.Equals(first, second, StringComparison.OrdinalIgnoreCase))
-        {
-            return false;
-        }
-
-        return snapshotStore.Exists(second) && snapshotStore.Exists(first);
+        return snapshotStore.IsSameFile(first, second);
     }
 
     // The policy (and any imported policy source) must never be a snapshot destination: a --force

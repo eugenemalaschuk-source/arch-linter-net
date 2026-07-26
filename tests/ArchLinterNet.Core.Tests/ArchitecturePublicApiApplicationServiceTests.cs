@@ -606,26 +606,30 @@ public sealed class ArchitecturePublicApiApplicationServiceTests
     }
 
     [Test]
-    public void PathsMatch_CaseDifference_BothPathsExistOnDisk_Matches()
+    public void PathsMatch_CaseDifference_OneRealEntryBacksBothSpellings_Matches()
     {
         const string First = "/repo/architecture/api/Surface.txt";
         const string Second = "/repo/architecture/api/surface.txt";
-        var store = new FakePublicApiSnapshotStore { ExistingPaths = new HashSet<string> { First, Second } };
+        // A case-insensitive filesystem stores the file once; the directory listing reports it
+        // under whichever single casing it was actually written with.
+        var store = new FakePublicApiSnapshotStore { DirectoryEntries = new HashSet<string> { Second } };
         var service = Service(Document(Contract()), store);
 
-        // A case-insensitive filesystem reports both spellings of the same file as existing.
         Assert.That(service.PathsMatch(First, Second), Is.True);
     }
 
+    // The exact bug this regresses: both spellings existing does NOT prove they are the same file.
+    // A case-sensitive filesystem can legitimately hold "Surface.txt" and "surface.txt" as two
+    // distinct directory entries — the directory listing is the only way to tell them apart from
+    // one file that merely answers Exists() for both spellings.
     [Test]
-    public void PathsMatch_CaseDifference_OnlyTheKnownPathExistsOnDisk_DoesNotMatch()
+    public void PathsMatch_CaseDifference_BothSpellingsAreDistinctRealEntries_DoesNotMatch()
     {
         const string First = "/repo/architecture/api/Surface.txt";
         const string Second = "/repo/architecture/api/surface.txt";
-        var store = new FakePublicApiSnapshotStore { ExistingPaths = new HashSet<string> { Second } };
+        var store = new FakePublicApiSnapshotStore { DirectoryEntries = new HashSet<string> { First, Second } };
         var service = Service(Document(Contract()), store);
 
-        // A case-sensitive filesystem only resolves the exact spelling that was actually written.
         Assert.That(service.PathsMatch(First, Second), Is.False);
     }
 
@@ -634,7 +638,7 @@ public sealed class ArchitecturePublicApiApplicationServiceTests
     {
         const string First = "/repo/architecture/api/Surface.txt";
         const string Second = "/repo/architecture/api/surface.txt";
-        var store = new FakePublicApiSnapshotStore { ExistingPaths = new HashSet<string>() };
+        var store = new FakePublicApiSnapshotStore { DirectoryEntries = new HashSet<string>() };
         var service = Service(Document(Contract()), store);
 
         // Nothing exists to probe (for example, a snapshot before its first capture) — the safe
@@ -648,9 +652,9 @@ public sealed class ArchitecturePublicApiApplicationServiceTests
 
         public bool Exists { get; set; } = true;
 
-        // When set, overrides the blanket Exists flag with per-path control, needed for the
-        // PathsMatch tests where the two candidate paths must be allowed to disagree.
-        public HashSet<string>? ExistingPaths { get; set; }
+        // The real directory entries a PathsMatch probe would see, keyed by full path. Null means
+        // "not modeling this", falling back to the blanket Exists flag for plain existence checks.
+        public HashSet<string>? DirectoryEntries { get; set; }
 
         public string? ResolveError { get; set; }
 
@@ -663,7 +667,29 @@ public sealed class ArchitecturePublicApiApplicationServiceTests
                 : throw new InvalidOperationException(ResolveError);
         }
 
-        bool IPublicApiSnapshotStore.Exists(string resolvedPath) => ExistingPaths?.Contains(resolvedPath) ?? Exists;
+        bool IPublicApiSnapshotStore.Exists(string resolvedPath) => DirectoryEntries?.Contains(resolvedPath) ?? Exists;
+
+        // Mirrors the real store's algorithm at fake-directory-listing granularity: exactly one
+        // modeled entry matching either spelling means both resolve to the same file; more than one
+        // means the fake is modeling two genuinely distinct entries.
+        bool IPublicApiSnapshotStore.IsSameFile(string first, string second)
+        {
+            if (string.Equals(first, second, StringComparison.Ordinal))
+            {
+                return true;
+            }
+
+            if (DirectoryEntries == null)
+            {
+                return false;
+            }
+
+            int matches = DirectoryEntries.Count(entry =>
+                string.Equals(entry, first, StringComparison.OrdinalIgnoreCase)
+                || string.Equals(entry, second, StringComparison.OrdinalIgnoreCase));
+
+            return matches == 1;
+        }
 
         public PublicApiSnapshotDocument Read(string resolvedPath, string authoredPath)
         {
