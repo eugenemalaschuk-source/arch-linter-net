@@ -16,64 +16,81 @@ internal static class ArchitectureSourceSetExpander
     // silently multiply every downstream check.
     internal const int MaxInstancesPerContract = 500;
 
+    // The plumbing every expansion step needs, bundled so each step's own parameters stay about the
+    // work it does rather than about how expansion is wired together.
+    private sealed record ExpansionContext(
+        ArchitectureContractDocument Document,
+        SourceSetResolver Resolver,
+        List<ArchitectureContractExpansion> Expansions);
+
+    // One list-shaped selector: which field is being unioned into, the identity domain its members
+    // live in, and how to read and write that field on the contract.
+    private sealed record InlineSelector<TContract>(
+        string Field,
+        ArchitectureSourceSetKind Kind,
+        Func<TContract, List<string>> Declared,
+        Action<TContract, List<string>> Assign,
+        Func<TContract, List<string>> SetNames)
+        where TContract : class, IArchitectureContract;
+
     public static void Expand(ArchitectureContractDocument document)
     {
-        SourceSetResolver resolver = new(document);
-        List<ArchitectureContractExpansion> expansions = new();
+        ExpansionContext context = new(document, new SourceSetResolver(document), new List<ArchitectureContractExpansion>());
 
         Families.ArchitectureContractGroups groups = document.Contracts;
 
-        ExpandGroup(document, resolver, expansions, "strict_package_dependency",
+        ExpandGroup(context, "strict_package_dependency",
             groups.StrictPackageDependency, list => groups.StrictPackageDependency = list);
-        ExpandGroup(document, resolver, expansions, "audit_package_dependency",
+        ExpandGroup(context, "audit_package_dependency",
             groups.AuditPackageDependency, list => groups.AuditPackageDependency = list);
-        ExpandGroup(document, resolver, expansions, "strict_package_allow_only",
+        ExpandGroup(context, "strict_package_allow_only",
             groups.StrictPackageAllowOnly, list => groups.StrictPackageAllowOnly = list);
-        ExpandGroup(document, resolver, expansions, "audit_package_allow_only",
+        ExpandGroup(context, "audit_package_allow_only",
             groups.AuditPackageAllowOnly, list => groups.AuditPackageAllowOnly = list);
-        ExpandGroup(document, resolver, expansions, "strict_framework_dependency",
+        ExpandGroup(context, "strict_framework_dependency",
             groups.StrictFrameworkDependency, list => groups.StrictFrameworkDependency = list);
-        ExpandGroup(document, resolver, expansions, "audit_framework_dependency",
+        ExpandGroup(context, "audit_framework_dependency",
             groups.AuditFrameworkDependency, list => groups.AuditFrameworkDependency = list);
-        ExpandGroup(document, resolver, expansions, "strict_framework_allow_only",
+        ExpandGroup(context, "strict_framework_allow_only",
             groups.StrictFrameworkAllowOnly, list => groups.StrictFrameworkAllowOnly = list);
-        ExpandGroup(document, resolver, expansions, "audit_framework_allow_only",
+        ExpandGroup(context, "audit_framework_allow_only",
             groups.AuditFrameworkAllowOnly, list => groups.AuditFrameworkAllowOnly = list);
-        ExpandGroup(document, resolver, expansions, "strict_external",
+        ExpandGroup(context, "strict_external",
             groups.StrictExternal, list => groups.StrictExternal = list);
-        ExpandGroup(document, resolver, expansions, "audit_external",
+        ExpandGroup(context, "audit_external",
             groups.AuditExternal, list => groups.AuditExternal = list);
-        ExpandGroup(document, resolver, expansions, "strict_external_allow_only",
+        ExpandGroup(context, "strict_external_allow_only",
             groups.StrictExternalAllowOnly, list => groups.StrictExternalAllowOnly = list);
-        ExpandGroup(document, resolver, expansions, "audit_external_allow_only",
+        ExpandGroup(context, "audit_external_allow_only",
             groups.AuditExternalAllowOnly, list => groups.AuditExternalAllowOnly = list);
 
-        ExpandInlineGroup(document, resolver, expansions, "strict_project_metadata",
-            groups.StrictProjectMetadata, contract => contract.Projects, (contract, values) => contract.Projects = values,
-            contract => contract.ProjectSets, "project_sets", ArchitectureSourceSetKind.Project);
-        ExpandInlineGroup(document, resolver, expansions, "audit_project_metadata",
-            groups.AuditProjectMetadata, contract => contract.Projects, (contract, values) => contract.Projects = values,
-            contract => contract.ProjectSets, "project_sets", ArchitectureSourceSetKind.Project);
-        ExpandInlineGroup(document, resolver, expansions, "strict_composition",
-            groups.StrictComposition, contract => contract.AllowedOnlyInAssemblies,
+        InlineSelector<ArchitectureProjectMetadataContract> projectSets = new(
+            "project_sets",
+            ArchitectureSourceSetKind.Project,
+            contract => contract.Projects,
+            (contract, values) => contract.Projects = values,
+            contract => contract.ProjectSets);
+        InlineSelector<ArchitectureCompositionContract> assemblySets = new(
+            "allowed_only_in_assembly_sets",
+            ArchitectureSourceSetKind.Assembly,
+            contract => contract.AllowedOnlyInAssemblies,
             (contract, values) => contract.AllowedOnlyInAssemblies = values,
-            contract => contract.AllowedOnlyInAssemblySets, "allowed_only_in_assembly_sets", ArchitectureSourceSetKind.Assembly);
-        ExpandInlineGroup(document, resolver, expansions, "audit_composition",
-            groups.AuditComposition, contract => contract.AllowedOnlyInAssemblies,
-            (contract, values) => contract.AllowedOnlyInAssemblies = values,
-            contract => contract.AllowedOnlyInAssemblySets, "allowed_only_in_assembly_sets", ArchitectureSourceSetKind.Assembly);
+            contract => contract.AllowedOnlyInAssemblySets);
+
+        ExpandInlineGroup(context, "strict_project_metadata", groups.StrictProjectMetadata, projectSets);
+        ExpandInlineGroup(context, "audit_project_metadata", groups.AuditProjectMetadata, projectSets);
+        ExpandInlineGroup(context, "strict_composition", groups.StrictComposition, assemblySets);
+        ExpandInlineGroup(context, "audit_composition", groups.AuditComposition, assemblySets);
 
         document.Provenance.ResetValidationSubject();
 
         document.SourceExpansion = new ArchitectureSourceExpansionInventory(
-            resolver.Resolutions,
-            expansions);
+            context.Resolver.Resolutions,
+            context.Expansions);
     }
 
     private static void ExpandGroup<TContract>(
-        ArchitectureContractDocument document,
-        SourceSetResolver resolver,
-        List<ArchitectureContractExpansion> expansions,
+        ExpansionContext context,
         string group,
         List<TContract> contracts,
         Action<List<TContract>> assign)
@@ -84,7 +101,7 @@ internal static class ArchitectureSourceSetExpander
             return;
         }
 
-        RequireUniqueAuthoredIds(document, contracts);
+        RequireUniqueAuthoredIds(context.Document, contracts);
 
         List<TContract> expanded = new();
 
@@ -96,7 +113,7 @@ internal static class ArchitectureSourceSetExpander
                 continue;
             }
 
-            expanded.AddRange(ExpandContract(document, resolver, expansions, group, contract));
+            expanded.AddRange(ExpandContract(context, group, contract));
         }
 
         assign(expanded);
@@ -135,9 +152,7 @@ internal static class ArchitectureSourceSetExpander
     }
 
     private static IEnumerable<TContract> ExpandContract<TContract>(
-        ArchitectureContractDocument document,
-        SourceSetResolver resolver,
-        List<ArchitectureContractExpansion> expansions,
+        ExpansionContext context,
         string group,
         TContract contract)
         where TContract : class, IArchitectureSourceExpandableContract
@@ -152,7 +167,7 @@ internal static class ArchitectureSourceSetExpander
 
         // Every throw below is enriched by ArchitecturePolicyDocumentLoader with the current
         // validation subject's location, so point it at the authored contract before resolving.
-        document.Provenance.SetValidationSubject(contract);
+        context.Document.Provenance.SetValidationSubject(contract);
 
         string authoredId = contract.Id ?? ArchitecturePolicyDocumentLoader.NormalizeToContractId(contract.Name);
 
@@ -168,14 +183,14 @@ internal static class ArchitectureSourceSetExpander
                 continue;
             }
 
-            resolver.ValidateExplicitSource(contract.Name, group, contract.SourceKind, source);
+            context.Resolver.ValidateExplicitSource(contract.Name, group, contract.SourceKind, source);
             selectors.TryAdd(source, (null, source));
         }
 
         foreach (string setName in contract.SourceSets)
         {
             ArchitectureSourceSetResolution resolution =
-                resolver.Resolve(contract.Name, group, contract.SourceKind, setName);
+                context.Resolver.Resolve(contract.Name, group, contract.SourceKind, setName);
 
             if (resolution.ResolvedSources.Count == 0)
             {
@@ -185,7 +200,7 @@ internal static class ArchitectureSourceSetExpander
 
             foreach (string source in resolution.ResolvedSources)
             {
-                selectors.TryAdd(source, (resolution.Name, resolver.SelectorFor(resolution.Name, source)));
+                selectors.TryAdd(source, (resolution.Name, context.Resolver.SelectorFor(resolution.Name, source)));
             }
         }
 
@@ -218,12 +233,12 @@ internal static class ArchitectureSourceSetExpander
             instance.ExpansionOrigin = new ArchitectureSourceExpansionOrigin(
                 authoredId, contract.Name, source, setName, selector);
 
-            document.Provenance.BindExpandedContract(contract, instance, group);
+            context.Document.Provenance.BindExpandedContract(contract, instance, group);
             instances.Add(new ArchitectureExpandedContractInstance(instanceId, source, setName, selector));
             expandedContracts.Add(instance);
         }
 
-        expansions.Add(new ArchitectureContractExpansion(
+        context.Expansions.Add(new ArchitectureContractExpansion(
             group,
             authoredId,
             contract.Name,
@@ -232,24 +247,22 @@ internal static class ArchitectureSourceSetExpander
         {
             OptionalEmpty = instances.Count == 0,
             OptionalReason = string.Join("; ", optionalReasons.Where(reason => !string.IsNullOrWhiteSpace(reason))),
-            PolicyLocation = document.Provenance.LocationFor(contract)
+            PolicyLocation = context.Document.Provenance.LocationFor(contract)
         });
 
         return expandedContracts;
     }
 
-    private static List<string> InlineSets(
-        ArchitectureContractDocument document,
-        SourceSetResolver resolver,
-        List<ArchitectureContractExpansion> expansions,
+    private static List<string> InlineSets<TContract>(
+        ExpansionContext context,
         string group,
-        IArchitectureContract contract,
-        string contractName,
-        string field,
-        ArchitectureSourceSetKind kind,
-        List<string> declared,
-        List<string> setNames)
+        TContract contract,
+        InlineSelector<TContract> selector)
+        where TContract : class, IArchitectureContract
     {
+        List<string> declared = selector.Declared(contract);
+        List<string> setNames = selector.SetNames(contract);
+
         if (setNames.Count == 0)
         {
             return declared;
@@ -261,7 +274,8 @@ internal static class ArchitectureSourceSetExpander
 
         foreach (string setName in setNames)
         {
-            ArchitectureSourceSetResolution resolution = resolver.Resolve(contractName, field, kind, setName);
+            ArchitectureSourceSetResolution resolution =
+                context.Resolver.Resolve(contract.Name, selector.Field, selector.Kind, setName);
             if (resolution.ResolvedSources.Count == 0)
             {
                 optionalReasons.Add(resolution.Reason);
@@ -276,12 +290,12 @@ internal static class ArchitectureSourceSetExpander
                 }
 
                 resolved.Add(value);
-                setValues.TryAdd(value, (resolution.Name, resolver.SelectorFor(resolution.Name, value)));
+                setValues.TryAdd(value, (resolution.Name, context.Resolver.SelectorFor(resolution.Name, value)));
             }
         }
 
         string authoredId = contract.Id ?? ArchitecturePolicyDocumentLoader.NormalizeToContractId(contract.Name);
-        expansions.Add(new ArchitectureContractExpansion(
+        context.Expansions.Add(new ArchitectureContractExpansion(
             group, authoredId, contract.Name, setNames.ToArray(),
             setValues.OrderBy(pair => pair.Key, StringComparer.Ordinal)
                 .Select(pair => new ArchitectureExpandedContractInstance(
@@ -289,10 +303,10 @@ internal static class ArchitectureSourceSetExpander
                 .ToArray())
         {
             Kind = ArchitectureContractExpansionKind.InlineUnion,
-            SelectorField = field,
+            SelectorField = selector.Field,
             OptionalEmpty = resolved.Count == 0 && optionalReasons.Count > 0,
             OptionalReason = string.Join("; ", optionalReasons.Where(reason => !string.IsNullOrWhiteSpace(reason))),
-            PolicyLocation = document.Provenance.LocationFor(contract)
+            PolicyLocation = context.Document.Provenance.LocationFor(contract)
         });
 
         return resolved
@@ -303,23 +317,16 @@ internal static class ArchitectureSourceSetExpander
     }
 
     private static void ExpandInlineGroup<TContract>(
-        ArchitectureContractDocument document,
-        SourceSetResolver resolver,
-        List<ArchitectureContractExpansion> expansions,
+        ExpansionContext context,
         string group,
         IEnumerable<TContract> contracts,
-        Func<TContract, List<string>> declared,
-        Action<TContract, List<string>> assign,
-        Func<TContract, List<string>> setNames,
-        string field,
-        ArchitectureSourceSetKind kind)
+        InlineSelector<TContract> selector)
         where TContract : class, IArchitectureContract
     {
         foreach (TContract contract in contracts)
         {
-            document.Provenance.SetValidationSubject(contract);
-            assign(contract, InlineSets(document, resolver, expansions, group, contract, contract.Name,
-                field, kind, declared(contract), setNames(contract)));
+            context.Document.Provenance.SetValidationSubject(contract);
+            selector.Assign(contract, InlineSets(context, group, contract, selector));
         }
     }
 
