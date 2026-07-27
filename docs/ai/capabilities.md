@@ -151,6 +151,12 @@ subcommands report one entry lifecycle — `new`, `matched`, `resolved`, `stale`
 `matched` suppresses a finding. `baseline verify` is the only baseline command intended for CI — never
 regenerate or update a baseline automatically.
 
+For machine consumers, `baseline diff`, `baseline verify`, and `baseline migrate`
+support `--format sarif`; each result exposes `baseline_status` and canonical
+identity fields as SARIF properties. The Testing adapter exposes the same typed
+comparison outcomes through `WithBaseline(...).DiffBaseline()`, `VerifyBaseline()`,
+and `MigrateBaseline()`.
+
 ## Not supported
 
 ArchLinterNet does not currently validate:

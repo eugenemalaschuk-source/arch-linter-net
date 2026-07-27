@@ -285,7 +285,10 @@ public sealed class ArchitectureBaselineApplicationService(
                             Issue = ignore.Issue,
                         });
                         report.Add(new BaselineMigrateEntryReport(
-                            groupName, entry.Id, ignore.SourceType, ignore.ForbiddenReference, "matched", 1));
+                            groupName, entry.Id, ignore.SourceType, ignore.ForbiddenReference, "matched", 1)
+                        {
+                            Identity = candidate.Identity,
+                        });
                     }
                     else if (matches.Count == 0)
                     {

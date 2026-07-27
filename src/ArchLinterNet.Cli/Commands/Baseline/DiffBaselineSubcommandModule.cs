@@ -18,6 +18,7 @@ internal sealed class DiffBaselineSubcommandModule : IBaselineSubcommandModule
         Option<string> conditionSetOption = new("--condition-set");
         Option<string[]> contractOption = new("--contract");
         Option<bool> jsonOption = new("--json");
+        Option<string> formatOption = new("--format");
         Option<bool> helpOption = new("--help");
         helpOption.Aliases.Add("-h");
 
@@ -27,6 +28,7 @@ internal sealed class DiffBaselineSubcommandModule : IBaselineSubcommandModule
         command.Options.Add(conditionSetOption);
         command.Options.Add(contractOption);
         command.Options.Add(jsonOption);
+        command.Options.Add(formatOption);
         command.Options.Add(helpOption);
 
         command.SetAction(parseResult => handler.Execute(new BaselineDiffCommandOptions(
@@ -34,10 +36,14 @@ internal sealed class DiffBaselineSubcommandModule : IBaselineSubcommandModule
             parseResult.GetValue(baselineOption),
             parseResult.GetValue(modeOption) ?? "all",
             parseResult.GetValue(conditionSetOption),
-            parseResult.GetValue(jsonOption) ? "json" : "human",
+            parseResult.GetValue(jsonOption) ? "json" : parseResult.GetValue(formatOption) ?? "human",
             parseResult.GetValue(contractOption) ?? Array.Empty<string>(),
-            parseResult.GetValue(helpOption))));
+            parseResult.GetValue(helpOption))
+        {
+            HasFormatConflict = parseResult.GetValue(jsonOption) && parseResult.GetValue(formatOption) is not null,
+        }));
 
         return command;
     }
+
 }

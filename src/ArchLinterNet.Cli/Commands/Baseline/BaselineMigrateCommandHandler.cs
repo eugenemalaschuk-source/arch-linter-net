@@ -1,6 +1,7 @@
 using System.Text.Json;
 using ArchLinterNet.Cli.Abstractions;
 using ArchLinterNet.Core.Model;
+using ArchLinterNet.Core.Reporting;
 using ArchLinterNet.Core.Validation;
 
 namespace ArchLinterNet.Cli.Commands.Baseline;
@@ -18,6 +19,18 @@ internal sealed class BaselineMigrateCommandHandler(ICliRuntime runtime, ICliCon
         if (options.BaselinePath == null)
         {
             console.Error.WriteLine("--baseline is required for baseline migrate.");
+            return CliExitCodes.InvalidArgumentsOrRuntimeError;
+        }
+
+        if (options.HasFormatConflict)
+        {
+            console.Error.WriteLine("--json cannot be combined with --format.");
+            return CliExitCodes.InvalidArgumentsOrRuntimeError;
+        }
+
+        if (options.Format is not ("human" or "json" or "sarif"))
+        {
+            console.Error.WriteLine("Invalid format. Use 'human', 'json', or 'sarif'.");
             return CliExitCodes.InvalidArgumentsOrRuntimeError;
         }
 
@@ -73,7 +86,7 @@ internal sealed class BaselineMigrateCommandHandler(ICliRuntime runtime, ICliCon
                         new BaselineWriteGate.Request(
                             "baseline migrate", options.OutputPath, options.DryRun, options.Force,
                             outcome.Yaml, CommentDiagnostic: null, InPlacePath: null,
-                            EmitProposalToStdout: options.Format != "json"),
+                            EmitProposalToStdout: options.Format == "human"),
                         out BaselineWriteGate.Disposition disposition))
                 {
                     return CliExitCodes.InvalidArgumentsOrRuntimeError;
@@ -81,15 +94,18 @@ internal sealed class BaselineMigrateCommandHandler(ICliRuntime runtime, ICliCon
 
                 wrote = disposition == BaselineWriteGate.Disposition.Written;
             }
-            else if (outcome.Yaml != null && options.DryRun && options.Format != "json")
+            else if (outcome.Yaml != null && options.DryRun && options.Format == "human")
             {
                 console.Out.WriteLine("Dry run: ambiguous entries found, no file would be written. Proposed content:");
                 console.Out.WriteLine(outcome.Yaml);
             }
 
-            console.Out.WriteLine(options.Format == "json"
-                ? FormatAsJson(outcome, options.OutputPath, options.DryRun, wrote)
-                : FormatForHumans(outcome, options.OutputPath, options.DryRun, wrote));
+            console.Out.WriteLine(options.Format switch
+            {
+                "json" => FormatAsJson(outcome, options.OutputPath, options.DryRun, wrote),
+                "sarif" => ArchitectureBaselineSarifFormatter.Format(ToLifecycleEntries(outcome.Report), runtime.Version),
+                _ => FormatForHumans(outcome, options.OutputPath, options.DryRun, wrote),
+            });
 
             if (outcome.AmbiguousCount > 0)
             {
@@ -169,5 +185,20 @@ internal sealed class BaselineMigrateCommandHandler(ICliRuntime runtime, ICliCon
                 matchCount = e.MatchCount,
             }),
         });
+    }
+
+    private static IReadOnlyList<BaselineLifecycleEntry> ToLifecycleEntries(
+        IReadOnlyList<BaselineMigrateEntryReport> report)
+    {
+        return report.Select(entry => new BaselineLifecycleEntry(
+            new ArchitectureBaselineComparisonEntry(
+                entry.ContractGroup, entry.ContractId, entry.SourceType, entry.ForbiddenReference, null, entry.Identity),
+            entry.Status switch
+            {
+                "matched" => BaselineEntryLifecycle.Matched,
+                "stale" => BaselineEntryLifecycle.Stale,
+                "ambiguous" => BaselineEntryLifecycle.Ambiguous,
+                _ => BaselineEntryLifecycle.ConfigurationError,
+            })).ToArray();
     }
 }
