@@ -440,6 +440,37 @@ baseline:
             "Baselined violation should be suppressed");
     }
 
+    [Test]
+    public void DiffBaseline_ExposesTypedComparisonOutcome()
+    {
+        string contractPath = WriteSelfForbiddenPolicy();
+        var current = ArchitectureAssertions.FromPolicy(contractPath)
+            .WithContracts("self-forbidden")
+            .ValidateStrict().Violations.First();
+        string baselinePath = Path.Combine(_tempDir, "baseline.yml");
+        File.WriteAllText(baselinePath, $@"
+version: 1
+baseline:
+  strict:
+    - id: self-forbidden
+      ignored_violations:
+        - source_type: {current.SourceType}
+          forbidden_reference: {current.ForbiddenReferences.First()}
+          reason: known debt
+");
+
+        var outcome = ArchitectureAssertions.FromPolicy(contractPath)
+            .WithContracts("self-forbidden")
+            .WithBaseline(baselinePath)
+            .DiffBaseline("strict");
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(outcome.Succeeded, Is.True);
+            Assert.That(outcome.Frozen.Count + outcome.Ambiguous.Count, Is.GreaterThan(0));
+        });
+    }
+
     private string WriteUnmatchedIgnorePolicy()
     {
         string contractDir = Path.Combine(_tempDir, "architecture");

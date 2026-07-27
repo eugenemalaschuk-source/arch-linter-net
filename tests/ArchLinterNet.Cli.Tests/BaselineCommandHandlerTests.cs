@@ -354,6 +354,31 @@ public sealed partial class BaselineCommandHandlerTests
     }
 
     [Test]
+    public void BaselineDiff_Sarif_ExposesLifecycleStatus()
+    {
+        var entry = CreateEntry("strict", "rule", "Source.Type", "Forbidden.Type", "debt");
+        var runtime = new StubRuntime
+        {
+            DiffOutcome = new BaselineDiffOutcome(true, [entry], [], [], [], Array.Empty<ArchitectureViolation>())
+            {
+                Entries = [new BaselineLifecycleEntry(entry, BaselineEntryLifecycle.New)],
+            },
+        };
+        var console = new RecordingConsole();
+
+        int result = new BaselineDiffCommandHandler(runtime, console, new StubFileSystem("policy.yml", "baseline.yml")).Execute(
+            new BaselineDiffCommandOptions("policy.yml", "baseline.yml", "all", null, "sarif", [], false));
+
+        using JsonDocument document = JsonDocument.Parse(console.OutputText);
+        Assert.Multiple(() =>
+        {
+            Assert.That(result, Is.EqualTo(CliExitCodes.Success));
+            Assert.That(document.RootElement.GetProperty("runs")[0].GetProperty("results")[0]
+                .GetProperty("properties").GetProperty("baseline_status").GetString(), Is.EqualTo("new"));
+        });
+    }
+
+    [Test]
     public void BaselineDiff_ConfigurationViolations_ReportDetailedError()
     {
         var runtime = new StubRuntime

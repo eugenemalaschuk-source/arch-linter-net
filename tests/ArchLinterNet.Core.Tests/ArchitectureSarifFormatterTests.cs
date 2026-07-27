@@ -24,6 +24,70 @@ public sealed class ArchitectureSarifFormatterTests
     }
 
     [Test]
+    public void BaselineComparisonSarif_ExposesStatusAndCanonicalIdentity()
+    {
+        var identity = new ArchitectureViolationIdentity(
+            2, "method_body", "call", "rule", "App", "App.Service", "Run",
+            "Infra", "Infra.Client", "Call", 1);
+        var entry = new ArchitectureBaselineComparisonEntry(
+            "strict_method_body", "rule", "App.Service", "Infra.Client.Call", "debt", identity);
+
+        string json = ArchitectureBaselineSarifFormatter.Format(
+            [new BaselineLifecycleEntry(entry, BaselineEntryLifecycle.New)], "1.2.3");
+        using JsonDocument document = JsonDocument.Parse(json);
+        JsonElement result = document.RootElement.GetProperty("runs")[0].GetProperty("results")[0];
+        JsonElement properties = result.GetProperty("properties");
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(result.GetProperty("ruleId").GetString(), Is.EqualTo("rule"));
+            Assert.That(properties.GetProperty("baseline_status").GetString(), Is.EqualTo("new"));
+            Assert.That(properties.GetProperty("identity_version").GetInt32(), Is.EqualTo(2));
+            Assert.That(properties.GetProperty("occurrence").GetInt32(), Is.EqualTo(1));
+            Assert.That(properties.GetProperty("source_assembly").GetString(), Is.EqualTo("App"));
+            Assert.That(result.TryGetProperty("logicalLocations", out _), Is.False);
+            Assert.That(result.GetProperty("locations")[0].GetProperty("logicalLocations")[0]
+                .GetProperty("fullyQualifiedName").GetString(), Is.EqualTo("App.Service"));
+        });
+    }
+
+    [Test]
+    public void BaselineComparisonSarif_OrdersEqualDisplayEntriesByCanonicalIdentity()
+    {
+        ArchitectureBaselineComparisonEntry first = CreateBaselineComparisonEntry(occurrence: 1);
+        ArchitectureBaselineComparisonEntry second = CreateBaselineComparisonEntry(occurrence: 0);
+        string firstOrder = ArchitectureBaselineSarifFormatter.Format(
+            [new BaselineLifecycleEntry(first, BaselineEntryLifecycle.New), new BaselineLifecycleEntry(second, BaselineEntryLifecycle.New)], "1.2.3");
+        string secondOrder = ArchitectureBaselineSarifFormatter.Format(
+            [new BaselineLifecycleEntry(second, BaselineEntryLifecycle.New), new BaselineLifecycleEntry(first, BaselineEntryLifecycle.New)], "1.2.3");
+
+        Assert.That(firstOrder, Is.EqualTo(secondOrder));
+    }
+
+    [Test]
+    public void BaselineComparisonSarif_OrdersLegacyEntriesByContractGroup()
+    {
+        var strict = new ArchitectureBaselineComparisonEntry("strict", "rule", "Source", "Forbidden", "debt");
+        var audit = strict with { ContractGroup = "audit" };
+
+        string firstOrder = ArchitectureBaselineSarifFormatter.Format(
+            [new BaselineLifecycleEntry(strict, BaselineEntryLifecycle.Matched), new BaselineLifecycleEntry(audit, BaselineEntryLifecycle.Matched)], "1.2.3");
+        string secondOrder = ArchitectureBaselineSarifFormatter.Format(
+            [new BaselineLifecycleEntry(audit, BaselineEntryLifecycle.Matched), new BaselineLifecycleEntry(strict, BaselineEntryLifecycle.Matched)], "1.2.3");
+
+        Assert.That(firstOrder, Is.EqualTo(secondOrder));
+    }
+
+    private static ArchitectureBaselineComparisonEntry CreateBaselineComparisonEntry(int occurrence)
+    {
+        return new ArchitectureBaselineComparisonEntry(
+            "strict_method_body", "rule", "App.Service", "Infra.Client.Call", "debt",
+            new ArchitectureViolationIdentity(
+                2, "method_body", "call", "rule", "App", "App.Service", "Run",
+                "Infra", "Infra.Client", "Call", occurrence));
+    }
+
+    [Test]
     public void FormatResultAsSarif_Envelope_HasVersionSchemaAndToolName()
     {
         JsonElement root = Run("strict", Array.Empty<ArchitectureViolation>());

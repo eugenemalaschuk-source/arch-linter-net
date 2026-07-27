@@ -148,6 +148,34 @@ public sealed partial class BaselineCommandHandlerTests
     }
 
     [Test]
+    public void BaselineMigrate_DryRunSarif_WritesOnlyOneSarifDocument()
+    {
+        var report = new List<BaselineMigrateEntryReport>
+        {
+            new("strict", "rule", "Source.Type", "Forbidden.Type", "matched", 1),
+        };
+        var runtime = new StubRuntime
+        {
+            MigrateOutcome = new BaselineMigrateOutcome(
+                true, "version: 2\nbaseline: {}\n", 1, 0, 0, report, Array.Empty<ArchitectureViolation>())
+        };
+        var console = new RecordingConsole();
+
+        int result = new BaselineMigrateCommandHandler(runtime, console, new StubFileSystem("policy.yml", "baseline.yml")).Execute(
+            new BaselineMigrateCommandOptions("policy.yml", "baseline.yml", null, null, "sarif", true, Force: false, ShowHelp: false));
+
+        using JsonDocument sarif = JsonDocument.Parse(console.OutputText);
+        Assert.Multiple(() =>
+        {
+            Assert.That(result, Is.EqualTo(CliExitCodes.Success));
+            Assert.That(console.OutputText, Does.Not.Contain("version: 2"));
+            Assert.That(sarif.RootElement.GetProperty("version").GetString(), Is.EqualTo("2.1.0"));
+            Assert.That(sarif.RootElement.GetProperty("runs")[0].GetProperty("results")[0]
+                .GetProperty("properties").GetProperty("baseline_status").GetString(), Is.EqualTo("matched"));
+        });
+    }
+
+    [Test]
     public void BaselineMigrate_ApplicationServiceError_ReportsErrorAndDoesNotWrite()
     {
         var runtime = new StubRuntime

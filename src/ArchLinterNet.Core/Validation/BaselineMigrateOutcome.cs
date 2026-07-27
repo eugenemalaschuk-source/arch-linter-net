@@ -8,7 +8,11 @@ public sealed record BaselineMigrateEntryReport(
     string SourceType,
     string ForbiddenReference,
     string Status,
-    int MatchCount);
+    int MatchCount)
+{
+    /// <summary>Canonical identity of the unique current match, when migration found one.</summary>
+    public ArchitectureViolationIdentity? Identity { get; init; }
+}
 
 public sealed record BaselineMigrateOutcome(
     bool Succeeded,
