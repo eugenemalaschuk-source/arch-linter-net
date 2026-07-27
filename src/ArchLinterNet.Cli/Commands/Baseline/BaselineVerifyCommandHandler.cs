@@ -22,11 +22,15 @@ internal sealed class BaselineVerifyCommandHandler(ICliRuntime runtime, ICliCons
             return CliExitCodes.InvalidArgumentsOrRuntimeError;
         }
 
+        if (options.HasFormatConflict)
+        {
+            console.Error.WriteLine("--json cannot be combined with --format.");
+            return CliExitCodes.InvalidArgumentsOrRuntimeError;
+        }
+
         if (options.Format is not ("human" or "json" or "sarif"))
         {
-            console.Error.WriteLine(options.Format == "conflict"
-                ? "--json cannot be combined with --format."
-                : "Invalid format. Use 'human', 'json', or 'sarif'.");
+            console.Error.WriteLine("Invalid format. Use 'human', 'json', or 'sarif'.");
             return CliExitCodes.InvalidArgumentsOrRuntimeError;
         }
 

@@ -64,6 +64,20 @@ public sealed class ArchitectureSarifFormatterTests
         Assert.That(firstOrder, Is.EqualTo(secondOrder));
     }
 
+    [Test]
+    public void BaselineComparisonSarif_OrdersLegacyEntriesByContractGroup()
+    {
+        var strict = new ArchitectureBaselineComparisonEntry("strict", "rule", "Source", "Forbidden", "debt");
+        var audit = strict with { ContractGroup = "audit" };
+
+        string firstOrder = ArchitectureBaselineSarifFormatter.Format(
+            [new BaselineLifecycleEntry(strict, BaselineEntryLifecycle.Matched), new BaselineLifecycleEntry(audit, BaselineEntryLifecycle.Matched)], "1.2.3");
+        string secondOrder = ArchitectureBaselineSarifFormatter.Format(
+            [new BaselineLifecycleEntry(audit, BaselineEntryLifecycle.Matched), new BaselineLifecycleEntry(strict, BaselineEntryLifecycle.Matched)], "1.2.3");
+
+        Assert.That(firstOrder, Is.EqualTo(secondOrder));
+    }
+
     private static ArchitectureBaselineComparisonEntry CreateBaselineComparisonEntry(int occurrence)
     {
         return new ArchitectureBaselineComparisonEntry(

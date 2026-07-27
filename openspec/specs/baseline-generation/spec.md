@@ -561,6 +561,6 @@ the lifecycle statuses `new`, `matched`, `resolved`, `stale`, or `ambiguous`.
 
 #### Scenario: Comparison result preserves status
 - **WHEN** a diff, verify, or migrate command classifies entries as new, matched,
-  stale, or ambiguous
+  resolved, stale, or ambiguous
 - **THEN** every machine-readable projection exposes the classification as a
   structured status value

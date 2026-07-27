@@ -52,7 +52,10 @@ internal sealed record BaselineDiffCommandOptions(
     string? ConditionSetName,
     string Format,
     IReadOnlyList<string> ContractIds,
-    bool ShowHelp);
+    bool ShowHelp)
+{
+    public bool HasFormatConflict { get; init; }
+}
 
 internal sealed record BaselineVerifyCommandOptions(
     string PolicyPath,
@@ -61,7 +64,10 @@ internal sealed record BaselineVerifyCommandOptions(
     string? ConditionSetName,
     string Format,
     IReadOnlyList<string> ContractIds,
-    bool ShowHelp);
+    bool ShowHelp)
+{
+    public bool HasFormatConflict { get; init; }
+}
 
 // Deliberately has no Mode/ContractIds — unlike the other baseline subcommands, migrate cannot be
 // scoped: a version-2 document cannot preserve version-1 matching semantics for only part of a
@@ -74,4 +80,7 @@ internal sealed record BaselineMigrateCommandOptions(
     string Format,
     bool DryRun,
     bool Force,
-    bool ShowHelp);
+    bool ShowHelp)
+{
+    public bool HasFormatConflict { get; init; }
+}

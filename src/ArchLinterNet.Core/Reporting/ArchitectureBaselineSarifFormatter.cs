@@ -11,10 +11,11 @@ public static class ArchitectureBaselineSarifFormatter
 
     public static string Format(IReadOnlyList<BaselineLifecycleEntry> entries, string toolVersion)
     {
-        var ordered = entries.OrderBy(entry => entry.Entry.ContractId, StringComparer.Ordinal)
+        var ordered = entries.OrderBy(entry => entry.Entry.ContractGroup, StringComparer.Ordinal)
+            .ThenBy(entry => entry.Entry.ContractId, StringComparer.Ordinal)
             .ThenBy(entry => entry.Entry.SourceType, StringComparer.Ordinal)
             .ThenBy(entry => entry.Entry.ForbiddenReference, StringComparer.Ordinal)
-            .ThenBy(entry => CanonicalIdentitySortKey(entry.Entry), StringComparer.Ordinal)
+            .ThenBy(entry => entry.Entry.Identity, ArchitectureViolationIdentityComparer.Instance)
             .ThenBy(entry => BaselineEntryLifecycleNames.WireName(entry.Lifecycle), StringComparer.Ordinal)
             .ToArray();
         object[] rules = ordered.Select(entry => entry.Entry.ContractId).Distinct(StringComparer.Ordinal)
@@ -43,22 +44,66 @@ public static class ArchitectureBaselineSarifFormatter
         });
     }
 
-    private static string CanonicalIdentitySortKey(ArchitectureBaselineComparisonEntry entry)
+    private sealed class ArchitectureViolationIdentityComparer : IComparer<ArchitectureViolationIdentity?>
     {
-        ArchitectureViolationIdentity? identity = entry.Identity;
-        return string.Join('\u001F',
-            identity?.IdentityVersion.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? string.Empty,
-            identity?.ContractFamily ?? string.Empty,
-            identity?.Kind ?? string.Empty,
-            identity?.ContractId ?? entry.ContractId,
-            identity?.SourceAssembly ?? string.Empty,
-            identity?.SourceType ?? entry.SourceType,
-            identity?.SourceMember ?? string.Empty,
-            identity?.TargetAssembly ?? string.Empty,
-            identity?.TargetType ?? string.Empty,
-            identity?.TargetMember ?? string.Empty,
-            identity?.Occurrence.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? string.Empty,
-            identity?.Configuration ?? string.Empty);
+        public static ArchitectureViolationIdentityComparer Instance { get; } = new();
+
+        public int Compare(ArchitectureViolationIdentity? left, ArchitectureViolationIdentity? right)
+        {
+            if (ReferenceEquals(left, right))
+            {
+                return 0;
+            }
+
+            if (left is null)
+            {
+                return -1;
+            }
+
+            if (right is null)
+            {
+                return 1;
+            }
+
+            return CompareFields(
+                left.IdentityVersion, right.IdentityVersion,
+                left.ContractFamily, right.ContractFamily,
+                left.Kind, right.Kind,
+                left.ContractId, right.ContractId,
+                left.SourceAssembly, right.SourceAssembly,
+                left.SourceType, right.SourceType,
+                left.SourceMember, right.SourceMember,
+                left.TargetAssembly, right.TargetAssembly,
+                left.TargetType, right.TargetType,
+                left.TargetMember, right.TargetMember,
+                left.Occurrence, right.Occurrence,
+                left.Configuration, right.Configuration);
+        }
+
+        private static int CompareFields(params object?[] fields)
+        {
+            for (int index = 0; index < fields.Length; index += 2)
+            {
+                int comparison = fields[index] switch
+                {
+                    int left => left.CompareTo((int)fields[index + 1]!),
+                    string left => CompareNullableStrings(left, (string?)fields[index + 1]),
+                    null => fields[index + 1] is null ? 0 : -1,
+                    _ => throw new InvalidOperationException("Unsupported canonical identity field."),
+                };
+                if (comparison != 0)
+                {
+                    return comparison;
+                }
+            }
+
+            return 0;
+        }
+
+        private static int CompareNullableStrings(string? left, string? right)
+        {
+            return left is null ? right is null ? 0 : -1 : right is null ? 1 : StringComparer.Ordinal.Compare(left, right);
+        }
     }
 
     private static Dictionary<string, object?> BuildResult(BaselineLifecycleEntry lifecycle)

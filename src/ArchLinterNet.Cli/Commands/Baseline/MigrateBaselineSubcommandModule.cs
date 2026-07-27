@@ -39,16 +39,15 @@ internal sealed class MigrateBaselineSubcommandModule : IBaselineSubcommandModul
             parseResult.GetValue(baselineOption),
             parseResult.GetValue(outputOption),
             parseResult.GetValue(conditionSetOption),
-            ResolveFormat(parseResult.GetValue(jsonOption), parseResult.GetValue(formatOption)),
+            parseResult.GetValue(jsonOption) ? "json" : parseResult.GetValue(formatOption) ?? "human",
             parseResult.GetValue(dryRunOption),
             parseResult.GetValue(forceOption),
-            parseResult.GetValue(helpOption))));
+            parseResult.GetValue(helpOption))
+        {
+            HasFormatConflict = parseResult.GetValue(jsonOption) && parseResult.GetValue(formatOption) is not null,
+        }));
 
         return command;
     }
 
-    private static string ResolveFormat(bool jsonRequested, string? format)
-    {
-        return jsonRequested && format is not null ? "conflict" : jsonRequested ? "json" : format ?? "human";
-    }
 }
