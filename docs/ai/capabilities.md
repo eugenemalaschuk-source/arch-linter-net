@@ -4,10 +4,6 @@ This page summarizes what ArchLinterNet can and cannot validate for AI policy au
 
 ## Supported policy structure
 
-## Policy-only checks
-
-`arch-linter-net policy check --policy <path>` validates policy syntax, imports, composition, static declarations, and static path/configuration references without building projects or loading target assemblies. It explicitly reports fact-dependent architecture checks as deferred; use ordinary strict validation to determine architecture compliance.
-
 Each run uses one selected root policy; `architecture/arch.yml` is the
 recommended concise convention, not a required filename. A root may import
 focused local fragments and contains:
@@ -21,6 +17,14 @@ focused local fragments and contains:
 - `legacy_runtime_layers`: optional namespace prefixes used by dependency contracts.
 - `analysis`: target assemblies, assembly search paths, optional source roots, condition sets, and default condition set.
 - `contracts`: strict and audit contract groups.
+
+## Packaged schemas
+
+Installed releases expose their immutable offline `adoption-stabilization/v1` schema registry through `arch-linter-net schema list` and `arch-linter-net schema print <logical-id>`. It identifies the currently implemented formats: policy root/fragment v1, baseline v2 with identity v1, the line-oriented API snapshot v1, and analysis build-state receipt v1. Finding, cache, and profile schemas remain deferred to their owning implementation slices.
+
+## Policy-only checks
+
+`arch-linter-net policy check --policy <path>` validates policy syntax, imports, composition, static declarations, and static path/configuration references without building projects or loading target assemblies. It explicitly reports fact-dependent architecture checks as deferred; use ordinary strict validation to determine architecture compliance.
 
 ## Supported contract families
 

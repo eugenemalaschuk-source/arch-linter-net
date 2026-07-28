@@ -95,6 +95,20 @@ jobs:
           core_nuspec=$(unzip -p "nupkg/$core_nupkg" '*.nuspec')
           core_listing=$(unzip -Z1 "nupkg/$core_nupkg")
 
+          for required_schema in \
+            analysis-build-state.schema.json \
+            api-snapshot.schema.json \
+            baseline.schema.json \
+            compatibility-manifest.json \
+            dependencies.arch.fragment.schema.json \
+            dependencies.arch.schema.json; do
+            required_entry="contentFiles/any/any/schema/0.5.1/$required_schema"
+            if ! printf '%s\n' "$core_listing" | grep -qxF "$required_entry"; then
+              echo "Core package is missing release-matched schema '$required_entry'." >&2
+              exit 1
+            fi
+          done
+
           core_cel_dependency=$(printf '%s\n' "$core_nuspec" | grep -oE '<dependency id="ArchLinterNet\.CEL"[^/]*/>')
           if [ -z "$core_cel_dependency" ]; then
             echo "Core .nuspec does not declare ArchLinterNet.CEL as a dependency." >&2
@@ -113,6 +127,29 @@ jobs:
           fi
 
           echo "cel_nupkg=$cel_nupkg" >> "$GITHUB_ENV"
+          cli_nupkg=$(printf '%s\n' "${packages[@]}" | grep '^ArchLinterNet\.Cli\.')
+          echo "cli_nupkg=$cli_nupkg" >> "$GITHUB_ENV"
+
+      - name: Offline packaged schema tool smoke test
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          cli_version=$(printf '%s\n' "$cli_nupkg" | sed -E 's/^ArchLinterNet\.Cli\.(.+)\.nupkg$/\1/')
+          smoke_dir=$(mktemp -d)
+          trap 'rm -rf "$smoke_dir"' EXIT
+
+          pushd "$smoke_dir" >/dev/null
+          dotnet tool install ArchLinterNet.Cli --tool-path tool --add-source "$GITHUB_WORKSPACE/nupkg" --version "$cli_version" --ignore-failed-sources
+          ./tool/arch-linter-net schema list > schemas.txt
+          grep -qx $'policy-root\tv1\thttps://archlinternet.dev/schema/0.5.1/dependencies.arch.schema.json\tschema/0.5.1/dependencies.arch.schema.json' schemas.txt
+          ./tool/arch-linter-net schema print policy-root > printed-schema.json
+
+          core_nupkg=$(printf '%s\n' "$GITHUB_WORKSPACE"/nupkg/ArchLinterNet.Core.*.nupkg)
+          unzip -p "$core_nupkg" contentFiles/any/any/schema/0.5.1/dependencies.arch.schema.json > packaged-schema.json
+          cmp printed-schema.json packaged-schema.json
+          sha256sum printed-schema.json
+          popd >/dev/null
 
       - name: External consumer smoke test
         shell: bash

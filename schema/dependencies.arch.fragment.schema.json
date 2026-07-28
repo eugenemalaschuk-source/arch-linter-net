@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://archlinternet.dev/schema/dependencies.arch.fragment.schema.json",
+  "$id": "https://archlinternet.dev/schema/0.5.1/dependencies.arch.fragment.schema.json",
   "title": "ArchLinterNet dependency architecture policy fragment",
   "description": "Schema for an imported partial policy document. Fragment role is selected by the import graph, not the filename.",
   "type": "object",
@@ -18,43 +18,43 @@
   ],
   "properties": {
     "imports": {
-      "$ref": "https://archlinternet.dev/schema/dependencies.arch.schema.json#/$defs/imports"
+      "$ref": "https://archlinternet.dev/schema/0.5.1/dependencies.arch.schema.json#/$defs/imports"
     },
     "layers": {
       "type": "object",
       "additionalProperties": {
-        "$ref": "https://archlinternet.dev/schema/dependencies.arch.schema.json#/$defs/layer"
+        "$ref": "https://archlinternet.dev/schema/0.5.1/dependencies.arch.schema.json#/$defs/layer"
       }
     },
     "external_dependencies": {
       "type": "object",
       "additionalProperties": {
-        "$ref": "https://archlinternet.dev/schema/dependencies.arch.schema.json#/$defs/externalDependencyGroup"
+        "$ref": "https://archlinternet.dev/schema/0.5.1/dependencies.arch.schema.json#/$defs/externalDependencyGroup"
       }
     },
     "packages": {
       "type": "object",
       "additionalProperties": {
-        "$ref": "https://archlinternet.dev/schema/dependencies.arch.schema.json#/$defs/packageGroup"
+        "$ref": "https://archlinternet.dev/schema/0.5.1/dependencies.arch.schema.json#/$defs/packageGroup"
       }
     },
     "framework_references": {
       "type": "object",
       "additionalProperties": {
-        "$ref": "https://archlinternet.dev/schema/dependencies.arch.schema.json#/$defs/frameworkReferenceGroup"
+        "$ref": "https://archlinternet.dev/schema/0.5.1/dependencies.arch.schema.json#/$defs/frameworkReferenceGroup"
       }
     },
     "legacy_runtime_layers": {
-      "$ref": "https://archlinternet.dev/schema/dependencies.arch.schema.json#/$defs/stringList"
+      "$ref": "https://archlinternet.dev/schema/0.5.1/dependencies.arch.schema.json#/$defs/stringList"
     },
     "analysis": {
-      "$ref": "https://archlinternet.dev/schema/dependencies.arch.schema.json#/$defs/analysis"
+      "$ref": "https://archlinternet.dev/schema/0.5.1/dependencies.arch.schema.json#/$defs/analysis"
     },
     "contracts": {
-      "$ref": "https://archlinternet.dev/schema/dependencies.arch.schema.json#/$defs/contracts"
+      "$ref": "https://archlinternet.dev/schema/0.5.1/dependencies.arch.schema.json#/$defs/contracts"
     },
     "classification": {
-      "$ref": "https://archlinternet.dev/schema/dependencies.arch.schema.json#/$defs/classification"
+      "$ref": "https://archlinternet.dev/schema/0.5.1/dependencies.arch.schema.json#/$defs/classification"
     }
   }
 }

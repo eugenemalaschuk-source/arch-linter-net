@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://archlinternet.dev/schema/baseline.schema.json",
+  "$id": "https://archlinternet.dev/schema/0.5.1/baseline.schema.json",
   "title": "ArchLinterNet baseline file",
   "description": "Schema for baseline YAML files that suppress known violations for architecture policy migration.",
   "type": "object",

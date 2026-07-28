@@ -12,6 +12,8 @@ arch-linter-net baseline prune --config <path> --baseline <path> --output <path>
 arch-linter-net baseline diff --config <path> --baseline <path> [options]
 arch-linter-net baseline verify --config <path> --baseline <path> [options]
 arch-linter-net policy check --policy <path> [options]
+arch-linter-net schema list
+arch-linter-net schema print <logical-id>
 arch-linter-net public-api capture --policy <path> --contract <id> --output <path> [options]
 arch-linter-net public-api diff --policy <path> --contract <id> --snapshot <path> [options]
 arch-linter-net public-api update --policy <path> --contract <id> --snapshot <path> [options]
@@ -23,6 +25,17 @@ During repository development, replace `arch-linter-net` with:
 ```bash
 dotnet run --project src/ArchLinterNet.Cli --
 ```
+
+## Packaged schemas
+
+Installed releases expose an immutable `adoption-stabilization/v1` schema registry without a repository checkout or network access.
+
+```bash
+arch-linter-net schema list
+arch-linter-net schema print policy-root
+```
+
+`list` reports each logical ID, format version, immutable `$id`, and packaged path. `print` writes the exact release-matched JSON Schema to standard output.
 
 ## Validate options
 

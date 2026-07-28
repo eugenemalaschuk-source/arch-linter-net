@@ -28,6 +28,8 @@ layers:
     namespace: ArchLinterNet.Core.Asmdef
   core_composition:
     namespace: ArchLinterNet.Core.Composition
+  core_schema:
+    namespace: ArchLinterNet.Core.Schema
   cli:
     namespace: ArchLinterNet.Cli
   cli_abstractions:
