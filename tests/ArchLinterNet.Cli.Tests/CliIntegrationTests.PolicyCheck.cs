@@ -24,7 +24,28 @@ public partial class CliIntegrationTests
         var (exitCode, _, stderr) = RunCli("policy", "check", "--policy", "missing-policy.yml");
 
         Assert.That(exitCode, Is.EqualTo(2));
-        Assert.That(stderr, Does.Contain("Policy check error"));
+        Assert.Multiple(() =>
+        {
+            Assert.That(stderr, Does.Contain("Policy check error"));
+            Assert.That(stderr, Does.Contain("policy:"));
+            Assert.That(stderr, Does.Contain("Import chain:"));
+        });
+    }
+
+    [Test]
+    public void PolicyCheck_MissingPolicyAsJson_PreservesFailureMessageAndProvenance()
+    {
+        var (exitCode, stdout, stderr) = RunCli("policy", "check", "--policy", "missing-policy.yml", "--format", "json");
+
+        using JsonDocument document = JsonDocument.Parse(stdout);
+        JsonElement failure = document.RootElement.GetProperty("failure");
+        Assert.Multiple(() =>
+        {
+            Assert.That(exitCode, Is.EqualTo(2));
+            Assert.That(failure.GetProperty("message").GetString(), Does.Contain("not found"));
+            Assert.That(failure.GetProperty("policy_location").ValueKind, Is.EqualTo(JsonValueKind.Object));
+            Assert.That(stderr, Is.Empty);
+        });
     }
 
     [Test]

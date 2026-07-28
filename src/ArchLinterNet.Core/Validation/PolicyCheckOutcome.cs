@@ -22,7 +22,9 @@ public sealed record PolicyCheckOutcome(
 public sealed record PolicyCheckDeferredCheck(
     string Kind,
     string Reason,
-    IReadOnlyCollection<ArchitecturePolicySourceLocation> PolicyLocations);
+    IReadOnlyCollection<ArchitecturePolicySourceLocation> PolicyLocations,
+    string? ContractFamily = null,
+    string? ContractId = null);
 
 /// <summary>Describes an expected typed policy/configuration failure.</summary>
 public sealed record PolicyCheckFailure(

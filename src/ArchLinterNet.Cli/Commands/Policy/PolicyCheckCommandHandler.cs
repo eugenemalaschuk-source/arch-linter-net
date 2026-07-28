@@ -2,6 +2,7 @@ using System.Text.Json;
 using ArchLinterNet.Cli.Abstractions;
 using ArchLinterNet.Cli.Commands;
 using ArchLinterNet.Core;
+using ArchLinterNet.Core.Model;
 using ArchLinterNet.Core.Reporting;
 using ArchLinterNet.Core.Validation;
 
@@ -76,7 +77,7 @@ internal sealed class PolicyCheckCommandHandler(ICliConsole console)
     {
         if (format == "human")
         {
-            console.Error.WriteLine($"Policy check error: {failure.Message}");
+            console.Error.WriteLine(FormatFailureForHuman(failure));
             return;
         }
 
@@ -99,27 +100,33 @@ internal sealed class PolicyCheckCommandHandler(ICliConsole console)
 
     private static string FormatSarif(PolicyCheckOutcome outcome, PolicyCheckFailure? failure)
     {
-        return JsonSerializer.Serialize(new
+        object[] results = failure is null
+            ? Array.Empty<object>()
+            :
+            [
+                new Dictionary<string, object?>
+                {
+                    ["ruleId"] = "architecture-policy",
+                    ["level"] = "error",
+                    ["message"] = new { text = failure.Message },
+                    ["properties"] = FormatFailure(failure),
+                    ["relatedLocations"] = ArchitectureSarifFormatter.FormatPolicyLocationsForSarif(
+                        failure.Diagnostic?.Location,
+                        failure.Diagnostic?.RelatedLocations ?? Array.Empty<ArchitecturePolicySourceLocation>()),
+                },
+            ];
+
+        return JsonSerializer.Serialize(new Dictionary<string, object?>
         {
-            version = "2.1.0",
-            runs = new[]
+            ["$schema"] = "https://raw.githubusercontent.com/oasis-tcs/sarif-spec/master/Schemata/sarif-schema-2.1.0.json",
+            ["version"] = "2.1.0",
+            ["runs"] = new[]
             {
                 new
                 {
                     tool = new { driver = new { name = "ArchLinterNet" } },
                     invocations = new[] { new { executionSuccessful = failure is null } },
-                    results = failure is null
-                        ? Array.Empty<object>()
-                        : new object[]
-                        {
-                            new
-                            {
-                                ruleId = "architecture-policy",
-                                level = "error",
-                                message = new { text = failure.Message },
-                                properties = FormatFailure(failure),
-                            },
-                        },
+                    results,
                     properties = new
                     {
                         status = failure is null
@@ -139,6 +146,8 @@ internal sealed class PolicyCheckCommandHandler(ICliConsole console)
         {
             kind = check.Kind,
             reason = check.Reason,
+            contract_family = check.ContractFamily,
+            contract_id = check.ContractId,
             policy_locations = check.PolicyLocations.Select(ArchitectureDiagnosticFormatter.FormatPolicyLocationForJson),
         };
     }
@@ -147,6 +156,7 @@ internal sealed class PolicyCheckCommandHandler(ICliConsole console)
     {
         return new
         {
+            message = failure.Message,
             category = failure.Category,
             diagnostic_kind = failure.Diagnostic?.Kind.ToString(),
             policy_location = failure.Diagnostic?.Location is null
@@ -160,9 +170,22 @@ internal sealed class PolicyCheckCommandHandler(ICliConsole console)
 
     private static string FormatDeferredForHuman(PolicyCheckDeferredCheck check)
     {
+        string contract = check.ContractId is null ? string.Empty : $" (contract: {check.ContractId})";
         string locations = check.PolicyLocations.Count == 0
             ? string.Empty
             : $" (policy: {string.Join(", ", check.PolicyLocations.Select(location => $"{location.SourcePath}:{location.YamlPath}"))})";
-        return check.Reason + locations;
+        return check.Reason + contract + locations;
+    }
+
+    private static string FormatFailureForHuman(PolicyCheckFailure failure)
+    {
+        ArchitecturePolicyDiagnostic? diagnostic = failure.Diagnostic;
+        string location = diagnostic?.Location is null
+            ? string.Empty
+            : $" (policy: {diagnostic.Location.SourcePath}:{diagnostic.Location.YamlPath}; root: {diagnostic.Location.RootPath})";
+        string importChain = diagnostic is { ImportChain.Count: > 0 }
+            ? $"\nImport chain: {string.Join(" -> ", diagnostic.ImportChain)}"
+            : string.Empty;
+        return $"Policy check error: {failure.Message}{location}{importChain}";
     }
 }

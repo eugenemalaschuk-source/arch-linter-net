@@ -2,6 +2,7 @@ using ArchLinterNet.Core;
 using ArchLinterNet.Core.Model;
 using ArchLinterNet.Core.Reporting;
 using ArchLinterNet.Core.Validation;
+using ArchLinterNet.Testing;
 using NUnit.Framework;
 
 namespace ArchLinterNet.Core.Tests;
@@ -120,6 +121,35 @@ contracts:
             Assert.That(outcome.Failure, Is.Not.Null);
             Assert.That(outcome.Failure!.Category, Is.EqualTo("MissingFile"));
             Assert.That(outcome.Failure.Diagnostic?.Location?.Role, Is.EqualTo(ArchitecturePolicyDocumentRole.Root));
+        });
+    }
+
+    [Test]
+    public void CheckPolicy_UnsafeApiSnapshot_ReturnsTypedFailureWithPolicyLocation()
+    {
+        string contractDir = Path.Combine(_tempDir, "architecture");
+        Directory.CreateDirectory(contractDir);
+        string contractPath = Path.Combine(contractDir, "dependencies.arch.yml");
+        File.WriteAllText(contractPath, """
+            version: 1
+            name: Policy Check
+            contracts:
+              strict_public_api_surface:
+                - id: surface
+                  name: surface
+                  assemblies: [ArchLinterNet.Core]
+                  api_snapshot: ../outside.txt
+                  api_comparison: additions_only
+                  reason: Reviewed snapshot governs the exported surface.
+            """);
+
+        PolicyCheckOutcome outcome = ArchitectureAssertions.CheckPolicy(contractPath);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(outcome.IsValid, Is.False);
+            Assert.That(outcome.Failure!.Diagnostic?.Location?.ContractId, Is.EqualTo("surface"));
+            Assert.That(outcome.Failure.Message, Does.Contain("outside the policy boundary"));
         });
     }
 

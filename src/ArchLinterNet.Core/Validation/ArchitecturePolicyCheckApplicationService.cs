@@ -1,5 +1,5 @@
-using ArchLinterNet.Core.Contracts.Abstractions;
 using ArchLinterNet.Core.Contracts;
+using ArchLinterNet.Core.Contracts.Abstractions;
 using ArchLinterNet.Core.Model;
 using ArchLinterNet.Core.Validation.Abstractions;
 
@@ -42,17 +42,30 @@ internal sealed class ArchitecturePolicyCheckApplicationService(
     private static IReadOnlyCollection<PolicyCheckDeferredCheck> BuildDeferredChecks(
         ArchitectureContractDocument document)
     {
-        if (document.ClassificationPathDeferred is not { } deferred)
+        var checks = new List<PolicyCheckDeferredCheck>();
+        if (document.ClassificationPathDeferred is { } classificationPath)
         {
-            return Array.Empty<PolicyCheckDeferredCheck>();
+            checks.Add(new PolicyCheckDeferredCheck(
+                "classification-path",
+                $"{classificationPath.DeclaredEntryCount} classification.path declaration(s) require source facts and were not evaluated.",
+                classificationPath.PolicyLocations));
         }
 
-        return
-        [
-            new PolicyCheckDeferredCheck(
-                "classification-path",
-                $"{deferred.DeclaredEntryCount} classification.path declaration(s) require source facts and were not evaluated.",
-                deferred.PolicyLocations),
-        ];
+        foreach (ArchitectureContractFamilyBinding binding in ArchitectureContractFamilyBindings.All)
+        {
+            foreach (IArchitectureContract contract in binding.Strict(document.Contracts)
+                         .Concat(binding.Audit(document.Contracts)))
+            {
+                ArchitecturePolicySourceLocation? location = document.Provenance.LocationFor(contract);
+                checks.Add(new PolicyCheckDeferredCheck(
+                    "contract-evaluation",
+                    $"Contract '{contract.Id ?? contract.Name}' requires project, assembly, or source facts and was not evaluated.",
+                    location is null ? Array.Empty<ArchitecturePolicySourceLocation>() : [location],
+                    binding.FamilyId,
+                    contract.Id));
+            }
+        }
+
+        return checks;
     }
 }
