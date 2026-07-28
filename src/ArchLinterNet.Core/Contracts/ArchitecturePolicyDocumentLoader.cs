@@ -12,9 +12,7 @@ using YamlDotNet.Serialization.NamingConventions;
 
 namespace ArchLinterNet.Core.Contracts;
 
-public sealed partial class ArchitecturePolicyDocumentLoader :
-    IArchitecturePolicyDocumentLoader,
-    IArchitecturePolicyCheckDocumentLoader
+public sealed partial class ArchitecturePolicyDocumentLoader : IArchitecturePolicyDocumentLoader
 {
     private const string MetadataKey = "metadata";
     private const string SourceKey = "source";
@@ -56,11 +54,6 @@ public sealed partial class ArchitecturePolicyDocumentLoader :
     public ArchitectureContractDocument Load(string policyPath)
     {
         return LoadCore(policyPath, validateEffectiveSchema: false);
-    }
-
-    ArchitectureContractDocument IArchitecturePolicyCheckDocumentLoader.LoadForPolicyCheck(string policyPath)
-    {
-        return LoadCore(policyPath, validateEffectiveSchema: true);
     }
 
     private ArchitectureContractDocument LoadCore(string policyPath, bool validateEffectiveSchema)
