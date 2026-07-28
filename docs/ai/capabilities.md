@@ -4,6 +4,10 @@ This page summarizes what ArchLinterNet can and cannot validate for AI policy au
 
 ## Supported policy structure
 
+## Policy-only checks
+
+`arch-linter-net policy check --policy <path>` validates policy syntax, imports, composition, static declarations, and static path/configuration references without building projects or loading target assemblies. It explicitly reports fact-dependent architecture checks as deferred; use ordinary strict validation to determine architecture compliance.
+
 Each run uses one selected root policy; `architecture/arch.yml` is the
 recommended concise convention, not a required filename. A root may import
 focused local fragments and contains:

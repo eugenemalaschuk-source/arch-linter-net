@@ -21,7 +21,8 @@ internal static class PublicApiSnapshotResolver
     public static void Resolve(
         ArchitectureContractDocument document,
         string policyPath,
-        IArchitectureFileSystem fileSystem)
+        IArchitectureFileSystem fileSystem,
+        Action<ArchitecturePublicApiSurfaceContract, InvalidOperationException>? unsafePathFailure = null)
     {
         string boundary = ResolveBoundary(policyPath);
 
@@ -39,8 +40,17 @@ internal static class PublicApiSnapshotResolver
             }
 
             // Throws for an unsafe path; that is a configuration error, not a bootstrap state.
-            string resolvedPath = ResolveSnapshotPath(
-                boundary, authoredPath, $"Public API surface contract '{contract.Name}'");
+            string resolvedPath;
+            try
+            {
+                resolvedPath = ResolveSnapshotPath(
+                    boundary, authoredPath, $"Public API surface contract '{contract.Name}'");
+            }
+            catch (InvalidOperationException exception)
+            {
+                unsafePathFailure?.Invoke(contract, exception);
+                throw;
+            }
 
             contract.ResolvedSnapshotPath = resolvedPath;
 

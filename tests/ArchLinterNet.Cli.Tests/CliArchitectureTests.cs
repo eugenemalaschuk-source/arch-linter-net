@@ -5,6 +5,7 @@ using ArchLinterNet.Cli.Abstractions;
 using ArchLinterNet.Cli.Commands.Baseline;
 using ArchLinterNet.Cli.Commands.Explain;
 using ArchLinterNet.Cli.Commands.Graph;
+using ArchLinterNet.Cli.Commands.Policy;
 using ArchLinterNet.Cli.Commands.PublicApi;
 using ArchLinterNet.Cli.Commands.Validate;
 using ArchLinterNet.Cli.Infrastructure;
@@ -37,11 +38,12 @@ public sealed class CliArchitectureTests
                 typeof(BaselineCommandModule),
                 typeof(GraphCommandModule),
                 typeof(ExplainCommandModule),
+                typeof(PolicyCommandModule),
                 typeof(PublicApiCommandModule),
             }));
             Assert.That(
                 composition.RootCommandFactory.Create().Subcommands.Select(static command => command.Name),
-                Is.EquivalentTo(new[] { "baseline", "graph", "explain", "public-api" }));
+                Is.EquivalentTo(new[] { "baseline", "graph", "explain", "policy", "public-api" }));
         });
     }
 
