@@ -2,8 +2,17 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://archlinternet.dev/schema/0.5.1/analysis-build-state.schema.json",
   "title": "ArchLinterNet analysis build state v1",
+  "description": "Current persisted BuildReceiptV1 envelope. Build and artifact identities remain separate fields rather than one generic fingerprint.",
   "type": "object",
-  "required": ["version", "fingerprint"],
-  "properties": { "version": { "const": 1 }, "fingerprint": { "type": "string", "minLength": 1 } },
-  "additionalProperties": true
+  "required": ["ProjectPath", "AssemblyName", "Configuration", "TargetFramework", "BuildInputFingerprint", "AssemblyContentDigest"],
+  "properties": {
+    "ProjectPath": { "type": "string", "minLength": 1 },
+    "AssemblyName": { "type": "string", "minLength": 1 },
+    "Configuration": { "type": ["string", "null"] },
+    "TargetFramework": { "type": ["string", "null"] },
+    "BuildInputFingerprint": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "AssemblyContentDigest": { "type": "string", "pattern": "^[0-9a-f]{64}$" }
+  },
+  "additionalProperties": false,
+  "x-archlinternet-envelope": "analysis-build-state/v1"
 }

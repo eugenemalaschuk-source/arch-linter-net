@@ -1,9 +1,0 @@
-{
-  "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://archlinternet.dev/schema/0.5.1/analysis-profile.schema.json",
-  "title": "ArchLinterNet analysis profile v1",
-  "type": "object",
-  "required": ["version", "phases"],
-  "properties": { "version": { "const": 1 }, "phases": { "type": "array" } },
-  "additionalProperties": true
-}

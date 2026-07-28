@@ -15,7 +15,7 @@ public partial class CliIntegrationTests
             Assert.That(stderr, Is.Empty);
             Assert.That(stdout, Does.Contain("policy-root\tv1\thttps://archlinternet.dev/schema/0.5.1/"));
             Assert.That(stdout, Does.Contain("baseline\tv2\t"));
-            Assert.That(stdout, Does.Contain("analysis-profile\tv1\t"));
+            Assert.That(stdout, Does.Contain("analysis-build-state\tv1\t"));
         });
     }
 

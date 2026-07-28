@@ -2,12 +2,13 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://archlinternet.dev/schema/0.5.1/api-snapshot.schema.json",
   "title": "ArchLinterNet API snapshot v1",
-  "type": "object",
-  "required": ["version", "contract", "assemblies"],
-  "properties": {
-    "version": { "const": 1 },
-    "contract": { "type": "string", "minLength": 1 },
-    "assemblies": { "type": "array", "items": { "type": "string" } }
-  },
-  "additionalProperties": false
+  "description": "Machine-readable grammar for the line-oriented snapshot text emitted by public-api capture. It does not claim that snapshots are JSON.",
+  "contentMediaType": "text/plain",
+  "x-archlinternet-text-format": {
+    "formatIdentifier": "arch-linter-net/public-api-snapshot",
+    "version": 1,
+    "lineEnding": "LF with a trailing newline",
+    "directives": ["@format arch-linter-net/public-api-snapshot", "@version 1", "@contract <contract-id>", "@assembly <assembly-name>"],
+    "signatureLines": "One normalized public API signature per line after an @assembly directive; assemblies and signatures are ordinally ordered and duplicate signatures are collapsed."
+  }
 }
