@@ -13,7 +13,7 @@ internal sealed class ArchitecturePolicyCheckApplicationService(
     {
         try
         {
-            ArchitectureContractDocument document = policyDocumentLoader.Load(policyPath);
+            ArchitectureContractDocument document = policyDocumentLoader.Load(policyPath, validateEffectiveSchema: true);
             PolicyCheckFailure? snapshotFailure = FindSnapshotFailure(document);
             if (snapshotFailure is not null)
             {

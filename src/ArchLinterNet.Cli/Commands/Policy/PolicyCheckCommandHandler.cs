@@ -43,16 +43,17 @@ internal sealed class PolicyCheckCommandHandler(ICliConsole console)
         }
         catch (Exception ex)
         {
+            if (options.Format == "json")
+            {
+                WriteFailure("json", new PolicyCheckFailure(ex.Message, "unexpected-tool-failure", null));
+                return CliExitCodes.InvalidArgumentsOrRuntimeError;
+            }
+
             if (options.Format == "sarif")
             {
                 console.Out.WriteLine(FormatSarif(
                     new PolicyCheckOutcome(Array.Empty<string>(), Array.Empty<PolicyCheckDeferredCheck>()),
                     new PolicyCheckFailure(ex.Message, "unexpected-tool-failure", null)));
-                return CliExitCodes.InvalidArgumentsOrRuntimeError;
-            }
-
-            if (options.Format == "json" && PolicyDiagnosticOutputWriter.TryWriteJson(console, ex))
-            {
                 return CliExitCodes.InvalidArgumentsOrRuntimeError;
             }
 

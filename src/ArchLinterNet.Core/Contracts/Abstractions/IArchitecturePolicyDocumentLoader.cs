@@ -4,5 +4,5 @@ namespace ArchLinterNet.Core.Contracts.Abstractions;
 
 public interface IArchitecturePolicyDocumentLoader
 {
-    ArchitectureContractDocument Load(string policyPath);
+    ArchitectureContractDocument Load(string policyPath, bool validateEffectiveSchema = false);
 }

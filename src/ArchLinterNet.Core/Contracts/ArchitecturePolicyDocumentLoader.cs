@@ -51,7 +51,7 @@ public sealed partial class ArchitecturePolicyDocumentLoader : IArchitecturePoli
         _importResolver = new ArchitecturePolicyImportGraphResolver(fileSystem, pathResolver, _sourceParser);
     }
 
-    public ArchitectureContractDocument Load(string policyPath)
+    public ArchitectureContractDocument Load(string policyPath, bool validateEffectiveSchema = false)
     {
         ArchitecturePolicyRootPath? resolvedRoot = EnsureSelectedRootIsRegularFile(policyPath);
 
@@ -96,7 +96,10 @@ public sealed partial class ArchitecturePolicyDocumentLoader : IArchitecturePoli
         else
         {
             provenance = ArchitecturePolicyProvenanceFactory.CreateMonolithic(rootDescriptor, policyPath, yaml);
-            ArchitecturePolicyEffectiveSchemaValidator.Validate(yaml, provenance);
+            if (validateEffectiveSchema)
+            {
+                ArchitecturePolicyEffectiveSchemaValidator.Validate(yaml, provenance);
+            }
         }
 
         try
