@@ -11,16 +11,18 @@ internal static class PolicyCheckSnapshotValidation
         IArchitectureFileSystem fileSystem,
         bool wrapUnsafePathFailure)
     {
-        try
+        if (!wrapUnsafePathFailure)
         {
             PublicApiSnapshotResolver.Resolve(document, policyPath, fileSystem);
+            return;
         }
-        catch (UnsafePublicApiSnapshotPathException exception) when (wrapUnsafePathFailure)
+
+        PublicApiSnapshotResolver.Resolve(document, policyPath, fileSystem, (contract, exception) =>
         {
-            ArchitecturePolicySourceLocation? location = document.Provenance.LocationFor(exception.Contract);
+            ArchitecturePolicySourceLocation? location = document.Provenance.LocationFor(contract);
             if (location is null)
             {
-                throw;
+                return;
             }
 
             var diagnostic = new ArchitecturePolicyDiagnostic(
@@ -29,6 +31,6 @@ internal static class PolicyCheckSnapshotValidation
                 Array.Empty<ArchitecturePolicySourceLocation>(),
                 location.Source.ImportChain);
             throw new ArchitecturePolicyValidationException(exception.Message, diagnostic, exception);
-        }
+        });
     }
 }

@@ -21,7 +21,8 @@ internal static class PublicApiSnapshotResolver
     public static void Resolve(
         ArchitectureContractDocument document,
         string policyPath,
-        IArchitectureFileSystem fileSystem)
+        IArchitectureFileSystem fileSystem,
+        Action<ArchitecturePublicApiSurfaceContract, InvalidOperationException>? unsafePathFailure = null)
     {
         string boundary = ResolveBoundary(policyPath);
 
@@ -47,7 +48,8 @@ internal static class PublicApiSnapshotResolver
             }
             catch (InvalidOperationException exception)
             {
-                throw new UnsafePublicApiSnapshotPathException(contract, exception);
+                unsafePathFailure?.Invoke(contract, exception);
+                throw;
             }
 
             contract.ResolvedSnapshotPath = resolvedPath;
