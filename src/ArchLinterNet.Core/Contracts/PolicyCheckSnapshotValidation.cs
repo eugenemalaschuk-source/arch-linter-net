@@ -15,12 +15,9 @@ internal static class PolicyCheckSnapshotValidation
         {
             PublicApiSnapshotResolver.Resolve(document, policyPath, fileSystem);
         }
-        catch (InvalidOperationException exception) when (wrapUnsafePathFailure)
+        catch (UnsafePublicApiSnapshotPathException exception) when (wrapUnsafePathFailure)
         {
-            ArchitecturePolicySourceLocation? location = document.Contracts.StrictPublicApiSurface
-                .Concat(document.Contracts.AuditPublicApiSurface)
-                .Select(document.Provenance.LocationFor)
-                .FirstOrDefault(candidate => candidate is not null);
+            ArchitecturePolicySourceLocation? location = document.Provenance.LocationFor(exception.Contract);
             if (location is null)
             {
                 throw;

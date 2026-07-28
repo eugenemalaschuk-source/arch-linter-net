@@ -7,13 +7,13 @@ using ArchLinterNet.Core.Validation.Abstractions;
 namespace ArchLinterNet.Core.Validation;
 
 internal sealed class ArchitecturePolicyCheckApplicationService(
-    IArchitecturePolicyDocumentLoader policyDocumentLoader) : IArchitecturePolicyCheckApplicationService
+    IArchitecturePolicyCheckDocumentLoader policyDocumentLoader) : IArchitecturePolicyCheckApplicationService
 {
     public PolicyCheckOutcome Check(string policyPath)
     {
         try
         {
-            ArchitectureContractDocument document = policyDocumentLoader.Load(policyPath, validateEffectiveSchema: true);
+            ArchitectureContractDocument document = policyDocumentLoader.LoadForPolicyCheck(policyPath);
             PolicyCheckFailure? snapshotFailure = FindSnapshotFailure(document);
             if (snapshotFailure is not null)
             {
@@ -73,6 +73,20 @@ internal sealed class ArchitecturePolicyCheckApplicationService(
                 "classification-path",
                 $"{classificationPath.DeclaredEntryCount} classification.path declaration(s) require source facts and were not evaluated.",
                 classificationPath.PolicyLocations));
+        }
+
+        foreach ((string layerName, ArchitectureLayer layer) in document.Layers)
+        {
+            if (layer.Selector is null)
+            {
+                continue;
+            }
+
+            ArchitecturePolicySourceLocation? location = document.Provenance.LocationFor(layer);
+            checks.Add(new PolicyCheckDeferredCheck(
+                "layer-selector",
+                $"Layer '{layerName}' selector requires assembly or source facts and was not evaluated.",
+                location is null ? Array.Empty<ArchitecturePolicySourceLocation>() : [location]));
         }
 
         foreach (ArchitectureContractFamilyBinding binding in ArchitectureContractFamilyBindings.All)

@@ -12,7 +12,9 @@ using YamlDotNet.Serialization.NamingConventions;
 
 namespace ArchLinterNet.Core.Contracts;
 
-public sealed partial class ArchitecturePolicyDocumentLoader : IArchitecturePolicyDocumentLoader
+public sealed partial class ArchitecturePolicyDocumentLoader :
+    IArchitecturePolicyDocumentLoader,
+    IArchitecturePolicyCheckDocumentLoader
 {
     private const string MetadataKey = "metadata";
     private const string SourceKey = "source";
@@ -51,7 +53,17 @@ public sealed partial class ArchitecturePolicyDocumentLoader : IArchitecturePoli
         _importResolver = new ArchitecturePolicyImportGraphResolver(fileSystem, pathResolver, _sourceParser);
     }
 
-    public ArchitectureContractDocument Load(string policyPath, bool validateEffectiveSchema = false)
+    public ArchitectureContractDocument Load(string policyPath)
+    {
+        return LoadCore(policyPath, validateEffectiveSchema: false);
+    }
+
+    ArchitectureContractDocument IArchitecturePolicyCheckDocumentLoader.LoadForPolicyCheck(string policyPath)
+    {
+        return LoadCore(policyPath, validateEffectiveSchema: true);
+    }
+
+    private ArchitectureContractDocument LoadCore(string policyPath, bool validateEffectiveSchema)
     {
         ArchitecturePolicyRootPath? resolvedRoot = EnsureSelectedRootIsRegularFile(policyPath);
 

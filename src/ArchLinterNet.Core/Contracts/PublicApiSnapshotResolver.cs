@@ -39,8 +39,16 @@ internal static class PublicApiSnapshotResolver
             }
 
             // Throws for an unsafe path; that is a configuration error, not a bootstrap state.
-            string resolvedPath = ResolveSnapshotPath(
-                boundary, authoredPath, $"Public API surface contract '{contract.Name}'");
+            string resolvedPath;
+            try
+            {
+                resolvedPath = ResolveSnapshotPath(
+                    boundary, authoredPath, $"Public API surface contract '{contract.Name}'");
+            }
+            catch (InvalidOperationException exception)
+            {
+                throw new UnsafePublicApiSnapshotPathException(contract, exception);
+            }
 
             contract.ResolvedSnapshotPath = resolvedPath;
 
