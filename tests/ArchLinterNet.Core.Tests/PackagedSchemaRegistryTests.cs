@@ -3,6 +3,7 @@ using System.Text;
 using System.Text.Json;
 using ArchLinterNet.Core.BuildState;
 using ArchLinterNet.Core.Contracts;
+using ArchLinterNet.Core.Model;
 using ArchLinterNet.Core.Schema;
 using Json.Schema;
 using NUnit.Framework;
@@ -71,7 +72,7 @@ public sealed class PackagedSchemaRegistryTests
     }
 
     [Test]
-    public void ApiSnapshotDescriptor_DeclaresTheActualTextFormat()
+    public void ApiSnapshotContract_ValidatesSerializedTextAgainstThePackagedResource()
     {
         string snapshot = PublicApiSnapshotFormat.Serialize(new PublicApiSnapshotDocument(
             PublicApiSnapshotFormat.CurrentVersion,
@@ -79,16 +80,16 @@ public sealed class PackagedSchemaRegistryTests
             [new PublicApiSnapshotEntry("Product", "method Product.Api Run()")]));
 
         PackagedSchemaRegistry registry = new();
-        Assert.That(registry.TryRead("api-snapshot", out string descriptor), Is.True);
-        using JsonDocument document = JsonDocument.Parse(descriptor);
+        Assert.That(registry.TryRead("api-snapshot", out string schemaText), Is.True);
+        JsonSchema schema = JsonSchema.FromText(schemaText);
+        using JsonDocument arbitraryJson = JsonDocument.Parse("\"not a public API snapshot\"");
 
         Assert.Multiple(() =>
         {
-            Assert.That(document.RootElement.GetProperty("contentMediaType").GetString(), Is.EqualTo("text/plain"));
-            Assert.That(snapshot, Does.Contain("@format arch-linter-net/public-api-snapshot"));
-            Assert.That(snapshot, Does.Contain("@version 1"));
-            Assert.That(snapshot, Does.Contain("@contract public-api"));
-            Assert.That(snapshot, Does.Contain("@assembly Product"));
+            Assert.That(registry.TryValidateText("api-snapshot", snapshot, out string diagnostic), Is.True, diagnostic);
+            Assert.That(registry.TryValidateText("api-snapshot", snapshot.Replace("@version 1", "@version 2", StringComparison.Ordinal), out diagnostic), Is.False);
+            Assert.That(diagnostic, Does.Contain("unsupported snapshot version '2'"));
+            Assert.That(schema.Evaluate(arbitraryJson.RootElement).IsValid, Is.False);
         });
     }
 }

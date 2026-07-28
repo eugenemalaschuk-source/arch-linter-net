@@ -16,7 +16,7 @@ The system SHALL expose one public stabilization release boundary, `0.5.1`, gove
 - **THEN** the first task may proceed without redefining the unresolved slice or waiting for the complete issue to close
 
 ### Requirement: Release-matched compatibility registry
-The system SHALL publish one `adoption-stabilization/v1` registry for 0.5.1 that identifies every persisted or machine-readable contract by logical schema id, document version, packaged resource path, and compatibility behavior. The 0.5.1 registry SHALL contain at least:
+The system SHALL publish one `adoption-stabilization/v1` registry for 0.5.1 that identifies every shipped persisted or machine-readable contract by logical schema id, document version, packaged resource path, and compatibility behavior. The 0.5.1 registry SHALL contain exactly the formats whose owning slices implement their writers and validate real generated output:
 
 | Surface | Logical schema/version | 0.5.1 writer behavior |
 |---|---|---|
@@ -24,13 +24,12 @@ The system SHALL publish one `adoption-stabilization/v1` registry for 0.5.1 that
 | Imported fragment | `policy-fragment/v1` | writes/validates the release-matched fragment schema |
 | Baseline | `baseline/v2`, YAML `version: 2`, identity `identity_version: 1` | writes v2; reads v1 and v2 |
 | Public API snapshot | `api-snapshot/v1`, document `version: 1` | writes v1 |
-| Normalized finding | `finding/v1` | writes v1 |
 | Analysis/build state | `analysis-build-state/v1` | reuses the approved fingerprint/receipt contract |
-| Analysis cache | `analysis-cache/v1` | writes v1 only after verification |
-| Profiling report | `analysis-profile/v1` | writes v1 |
 | Compatibility registry | `adoption-stabilization/v1` | writes the release-matched registry |
 
-Packaged JSON Schemas SHALL use immutable release-qualified ids under `https://archlinternet.dev/schema/0.5.1/` and SHALL be shipped in the CLI and applicable NuGet packages. Unversioned web schema URLs MAY remain convenience aliases but SHALL NOT be the compatibility source of truth.
+`finding/v1`, `analysis-cache/v1`, and `analysis-profile/v1` remain planned format identities. They SHALL NOT be published in the immutable 0.5.1 package registry until their owning slices implement writers and validate real generated output against their packaged contracts.
+
+Packaged JSON Schemas and text-format contracts SHALL use immutable release-qualified ids under `https://archlinternet.dev/schema/0.5.1/` and SHALL be shipped in the CLI and applicable NuGet packages. Unversioned web schema URLs MAY remain convenience aliases but SHALL NOT be the compatibility source of truth.
 
 #### Scenario: Schema is consumed offline
 - **WHEN** an editor, pre-commit hook, or CI job has the 0.5.1 package but no network access
@@ -339,11 +338,4 @@ The 0.5.1 `adoption-stabilization/v1` compatibility envelope SHALL be represente
 #### Scenario: Later source alias changes
 - **WHEN** the repository default branch changes an unversioned schema alias after a 0.5.1 package is installed
 - **THEN** the installed tool continues to list and print the same release-qualified 0.5.1 schema set and digests
-
-### Requirement: Registry publication follows implemented format ownership
-The compatibility envelope SHALL distinguish planned format identities from formats shipped by an installed package. A release-matched registry SHALL publish a format only after its owning slice implements the writer and validates a real generated document against the packaged contract.
-
-#### Scenario: Planned format remains unimplemented
-- **WHEN** a compatibility blueprint names a future cache, profile, or finding envelope but its owning slice is unfinished
-- **THEN** the installed registry omits that envelope and does not claim it as a shipped immutable format
 

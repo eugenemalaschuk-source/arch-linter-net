@@ -2,6 +2,10 @@ using System.Reflection;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using System.Text.Json.Nodes;
+using ArchLinterNet.Core.Contracts;
+using ArchLinterNet.Core.Model;
+using Json.Schema;
 
 namespace ArchLinterNet.Core.Schema;
 
@@ -38,6 +42,56 @@ public sealed class PackagedSchemaRegistry
         return true;
     }
 
+    /// <summary>
+    /// Validates text for a packaged, line-oriented format against its release-matched contract.
+    /// </summary>
+    /// <param name="logicalId">The logical id returned by <see cref="List"/>.</param>
+    /// <param name="content">The complete serialized text document.</param>
+    /// <param name="diagnostic">An actionable diagnostic when validation returns <see langword="false"/>.</param>
+    /// <returns><see langword="true"/> when the text satisfies the packaged contract.</returns>
+    public bool TryValidateText(string logicalId, string content, out string diagnostic)
+    {
+        ArgumentNullException.ThrowIfNull(logicalId);
+        ArgumentNullException.ThrowIfNull(content);
+
+        if (!TryRead(logicalId, out string schemaText))
+        {
+            diagnostic = $"Packaged schema '{logicalId}' is unknown.";
+            return false;
+        }
+
+        if (!string.Equals(logicalId, "api-snapshot", StringComparison.Ordinal))
+        {
+            diagnostic = $"Packaged schema '{logicalId}' does not define a line-oriented text format.";
+            return false;
+        }
+
+        try
+        {
+            PublicApiSnapshotDocument snapshot = PublicApiSnapshotFormat.Parse(content, "packaged schema validation");
+            if (!string.Equals(content, PublicApiSnapshotFormat.Serialize(snapshot), StringComparison.Ordinal))
+            {
+                diagnostic = "The public API snapshot is valid input but is not in the canonical writer form required by the packaged contract.";
+                return false;
+            }
+
+            JsonSchema schema = JsonSchema.FromText(schemaText);
+            if (!schema.Evaluate(ToApiSnapshotInstance(snapshot)).IsValid)
+            {
+                diagnostic = "The public API snapshot does not satisfy the packaged API snapshot contract.";
+                return false;
+            }
+
+            diagnostic = string.Empty;
+            return true;
+        }
+        catch (InvalidOperationException exception)
+        {
+            diagnostic = exception.Message;
+            return false;
+        }
+    }
+
     private IReadOnlyDictionary<string, Entry> ReadManifest()
     {
         using Stream stream = _assembly.GetManifestResourceStream(ManifestResourceName)
@@ -68,6 +122,34 @@ public sealed class PackagedSchemaRegistry
         }
 
         return text;
+    }
+
+    private static JsonObject ToApiSnapshotInstance(PublicApiSnapshotDocument snapshot)
+    {
+        JsonArray assemblies = new();
+        foreach (IGrouping<string, PublicApiSnapshotEntry> assembly in snapshot.Entries
+                     .GroupBy(static entry => entry.AssemblyName, StringComparer.Ordinal))
+        {
+            JsonArray signatures = new();
+            foreach (PublicApiSnapshotEntry entry in assembly)
+            {
+                signatures.Add(entry.Signature);
+            }
+
+            assemblies.Add(new JsonObject
+            {
+                ["name"] = assembly.Key,
+                ["signatures"] = signatures,
+            });
+        }
+
+        return new JsonObject
+        {
+            ["format"] = PublicApiSnapshotFormat.FormatIdentifier,
+            ["version"] = snapshot.Version,
+            ["contract"] = snapshot.ContractId,
+            ["assemblies"] = assemblies,
+        };
     }
 
     private sealed record Entry(PackagedSchemaDescriptor Descriptor, string ResourceName)
