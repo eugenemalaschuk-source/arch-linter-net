@@ -63,6 +63,23 @@ contracts:
         Assert.That(cycles, Is.Empty);
     }
 
+    [Test]
+    public void CheckPolicy_ValidPolicy_ReturnsStaticAndDeferredChecks()
+    {
+        string contractDir = Path.Combine(_tempDir, "architecture");
+        Directory.CreateDirectory(contractDir);
+        string contractPath = Path.Combine(contractDir, "dependencies.arch.yml");
+        File.WriteAllText(contractPath, "version: 1\nname: Policy Check\nlayers: {}\ncontracts: {}\n");
+
+        PolicyCheckOutcome outcome = ArchitectureValidator.CheckPolicy(contractPath);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(outcome.CompletedChecks, Does.Contain("imports-and-composition"));
+            Assert.That(outcome.DeferredChecks.Select(static check => check.Kind), Does.Contain("architecture-evaluation"));
+        });
+    }
+
     // Regression coverage for the semantic-classification-model design
     // (openspec/changes/archive/2026-07-10-design-semantic-classification-model): a review round
     // found that an earlier revision allowed a selector-only layer (no 'namespace'), which loaded

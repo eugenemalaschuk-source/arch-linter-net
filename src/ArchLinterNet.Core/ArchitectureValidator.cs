@@ -15,6 +15,12 @@ public static class ArchitectureValidator
         return _engine.Value.Validate(request, timing);
     }
 
+    /// <summary>Validates policy and static configuration without loading target assemblies.</summary>
+    public static PolicyCheckOutcome CheckPolicy(string policyPath)
+    {
+        return _engine.Value.CheckPolicy(policyPath);
+    }
+
     public static bool Validate(string policyPath)
     {
         return Validate(policyPath, out _, out _);
