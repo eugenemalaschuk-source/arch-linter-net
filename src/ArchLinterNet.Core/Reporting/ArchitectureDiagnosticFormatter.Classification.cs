@@ -227,18 +227,18 @@ public sealed partial class ArchitectureDiagnosticFormatter
         {
             passed = request.Passed,
             mode = request.Mode,
-            violations = request.Violations
-                .Select(ArchitectureDiagnosticMapper.FromViolation)
-                .Select(d => ToCiJsonObject(d, includeContract: true))
+            violations = ArchitectureFindingMapper.Order(request.Violations.Select(ArchitectureFindingMapper.FromViolation))
+                .Select(finding => ToCiJsonObject(finding.Details, includeContract: true))
                 .ToArray(),
             cycles = request.Cycles
                 .Select(cycle => ArchitectureDiagnosticMapper.FromCycle(cycle, contractName: string.Empty, contractId: null))
                 .Select(d => d.Path)
                 .ToArray(),
             cycle_diagnostics = cycleDiagnosticsSerialized,
-            coverage_findings = (request.CoverageFindings ?? Array.Empty<ArchitectureViolation>())
-                .Select(ArchitectureDiagnosticMapper.FromViolation)
-                .Select(d => ToCiJsonObject(d, includeContract: true))
+            coverage_findings = ArchitectureFindingMapper.Order(
+                    (request.CoverageFindings ?? Array.Empty<ArchitectureViolation>())
+                    .Select(ArchitectureFindingMapper.FromViolation))
+                .Select(finding => ToCiJsonObject(finding.Details, includeContract: true))
                 .ToArray(),
             unmatched_ignored_violations = unmatchedSerialized,
             policy_consistency_findings = policyConsistencySerialized,

@@ -123,3 +123,10 @@ The Testing API SHALL expose the same policy-only completed, deferred, and typed
 - **WHEN** a test invokes policy-only validation for a valid decomposed policy
 - **THEN** it receives completed checks and deferred records equivalent to CLI machine-readable output
 
+### Requirement: Testing API exposes normalized findings
+The Testing API SHALL expose normalized findings and baseline lifecycle status directly so test assertions do not parse formatted output.
+
+#### Scenario: Baseline lifecycle assertion
+- **WHEN** baseline verification reports a stale entry through the Testing API
+- **THEN** the returned normalized finding exposes `baseline_state` of `stale` and its canonical identity
+

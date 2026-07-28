@@ -35,6 +35,8 @@ internal static class BaselineLifecycleFormatter
         BaselineEntryLifecycle lifecycle,
         BaselineEntryDisposition disposition = BaselineEntryDisposition.Reported)
     {
+        string status = BaselineEntryLifecycleNames.WireName(lifecycle);
+        object? identity = IdentityForJson(entry.Identity);
         return new
         {
             contractGroup = entry.ContractGroup,
@@ -46,10 +48,23 @@ internal static class BaselineLifecycleFormatter
             // `status` is the shared lifecycle vocabulary and nothing else. What the command did with
             // the entry is `disposition`, and whether the entry suppresses a finding is `suppresses` —
             // three separate questions a consumer would otherwise have to infer from one string.
-            status = BaselineEntryLifecycleNames.WireName(lifecycle),
+            status,
             disposition = BaselineEntryDispositionNames.WireName(disposition),
             suppresses = BaselineEntryLifecycleNames.Suppresses(lifecycle),
-            identity = IdentityForJson(entry.Identity),
+            identity,
+            schemaVersion = ArchitectureFinding.CurrentSchemaVersion,
+            kind = "baseline",
+            canonicalIdentity = entry.Identity?.ToString()
+                ?? $"{entry.ContractGroup}:{entry.ContractId}:{entry.SourceType}:{entry.ForbiddenReference}",
+            baselineState = status,
+            details = new
+            {
+                contractGroup = entry.ContractGroup,
+                sourceType = entry.SourceType,
+                forbiddenReference = entry.ForbiddenReference,
+                reason = entry.Reason,
+                identity,
+            },
         };
     }
 

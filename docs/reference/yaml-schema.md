@@ -7,7 +7,7 @@ policies with schema-aware editors or AI agents.
 
 ## Release-matched packaged schemas
 
-Use `arch-linter-net schema list` offline to inspect the release registry, or `arch-linter-net schema print <logical-id>` to write one exact packaged schema. The current 0.5.1 registry contains policy root/fragment v1, baseline v2 with identity v1, the API snapshot v1 canonical-model contract, and analysis build-state receipt v1. `PackagedSchemaRegistry.TryValidateText` parses a serialized API snapshot and validates that model against its packaged contract. Finding, cache, and profile formats are not published until their owning implementation slices are complete.
+Use `arch-linter-net schema list` offline to inspect the release registry, or `arch-linter-net schema print <logical-id>` to write one exact packaged schema. The current 0.5.1 registry contains policy root/fragment v1, baseline v2 with identity v1, the API snapshot v1 canonical-model contract, normalized finding v1, and analysis build-state receipt v1. JSON diagnostics use `schema_version: 1`, a stable `kind`, and a typed `details` object; documented legacy fields remain available during the compatibility window. `PackagedSchemaRegistry.TryValidateText` parses a serialized API snapshot and validates that model against its packaged contract. Cache and profile formats are not published until their owning implementation slices are complete.
 
 Release-qualified editor IDs are immutable: `https://archlinternet.dev/schema/0.5.1/dependencies.arch.schema.json` for a root policy and `https://archlinternet.dev/schema/0.5.1/dependencies.arch.fragment.schema.json` for an imported fragment.
 

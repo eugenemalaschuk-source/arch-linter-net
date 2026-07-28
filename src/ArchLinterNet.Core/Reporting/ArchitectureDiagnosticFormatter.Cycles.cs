@@ -69,9 +69,13 @@ public sealed partial class ArchitectureDiagnosticFormatter
     {
         var obj = new Dictionary<string, object?>
         {
+            ["schema_version"] = ArchitectureFinding.CurrentSchemaVersion,
+            ["kind"] = "cycle",
+            ["canonical_identity"] = ArchitectureFindingMapper.FromDiagnostic(diagnostic).CanonicalIdentity,
             ["contract"] = diagnostic.ContractName,
             ["contract_id"] = diagnostic.ContractId,
-            ["path"] = diagnostic.Path
+            ["path"] = diagnostic.Path,
+            ["details"] = new Dictionary<string, object?> { ["path"] = diagnostic.Path }
         };
         ApplyPolicyLocationFields(diagnostic, obj);
         return obj;

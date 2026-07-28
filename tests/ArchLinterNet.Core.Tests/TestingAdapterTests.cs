@@ -1,3 +1,4 @@
+using ArchLinterNet.Core.Model;
 using ArchLinterNet.Testing;
 using NUnit.Framework;
 
@@ -55,6 +56,28 @@ contracts:
         var result = ArchitectureAssertions.FromPolicy(contractPath).ValidateStrict();
 
         Assert.That(result.Passed, Is.True);
+    }
+
+    [Test]
+    public void Result_ExposesNormalizedTypedFindingsWithoutParsingHumanOutput()
+    {
+        var violation = new ArchitectureViolation(
+            "composition", "composition", "Program", "forbidden API", ["BuildServiceProvider"])
+        {
+            Payload = new CompositionPayload("Main", "BuildServiceProvider", "Host.One", "composition root")
+        };
+        var result = new ArchitectureValidationResult(new ArchitectureValidationResultParams(
+            false, [violation], Array.Empty<string>()));
+
+        ArchitectureFinding finding = result.Findings.Single();
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(finding.SchemaVersion, Is.EqualTo(ArchitectureFinding.CurrentSchemaVersion));
+            Assert.That(finding.Kind, Is.EqualTo("composition"));
+            Assert.That(finding.CanonicalIdentity, Does.Contain("Host.One:Program:Main"));
+            Assert.That(finding.Details, Is.TypeOf<CompositionDiagnostic>());
+        });
     }
 
     [Test]

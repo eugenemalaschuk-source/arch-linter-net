@@ -116,6 +116,21 @@ public static class ArchitectureBaselineSarifFormatter
             ["contract_id"] = entry.ContractId,
             ["source_type"] = entry.SourceType,
             ["forbidden_reference"] = entry.ForbiddenReference,
+            ["arch_linter_net"] = new Dictionary<string, object?>
+            {
+                ["schema_version"] = ArchitectureFinding.CurrentSchemaVersion,
+                ["kind"] = "baseline",
+                ["canonical_identity"] = entry.Identity?.ToString()
+                    ?? $"{entry.ContractGroup}:{entry.ContractId}:{entry.SourceType}:{entry.ForbiddenReference}",
+                ["baseline_state"] = BaselineEntryLifecycleNames.WireName(lifecycle.Lifecycle),
+                ["details"] = new Dictionary<string, object?>
+                {
+                    ["contract_group"] = entry.ContractGroup,
+                    ["source_type"] = entry.SourceType,
+                    ["forbidden_reference"] = entry.ForbiddenReference,
+                    ["identity"] = entry.Identity,
+                },
+            },
         };
         if (entry.Identity is { } identity)
         {

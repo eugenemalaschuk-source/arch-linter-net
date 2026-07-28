@@ -10,6 +10,7 @@ public sealed class ArchitectureValidationResult
 
     public bool Passed { get; }
     public IReadOnlyCollection<ArchitectureViolation> Violations { get; }
+    public IReadOnlyCollection<ArchitectureFinding> Findings { get; }
     public IReadOnlyCollection<string> Cycles { get; }
     public IReadOnlyCollection<ArchitectureCycleFinding> CycleFindings { get; }
     public IReadOnlyCollection<PolicyConsistencyDiagnostic> PolicyConsistencyFindings { get; }
@@ -27,6 +28,8 @@ public sealed class ArchitectureValidationResult
     {
         Passed = @params.Passed;
         Violations = @params.Violations;
+        Findings = ArchitectureFindingMapper.Order(
+            Violations.Select(ArchitectureFindingMapper.FromViolation));
         Cycles = @params.Cycles;
         CycleFindings = @params.CycleFindings ?? Array.Empty<ArchitectureCycleFinding>();
         PolicyConsistencyFindings = @params.PolicyConsistencyFindings ?? Array.Empty<PolicyConsistencyDiagnostic>();

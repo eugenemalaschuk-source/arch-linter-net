@@ -1,0 +1,29 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://archlinternet.dev/schema/0.5.1/normalized-finding.schema.json",
+  "title": "ArchLinterNet normalized finding v1",
+  "type": "object",
+  "required": ["schema_version", "kind", "canonical_identity", "details"],
+  "properties": {
+    "schema_version": { "const": 1 },
+    "kind": {
+      "type": "string",
+      "enum": [
+        "dependency", "cycle", "unmatched_ignore", "configuration", "external_dependency",
+        "policy_consistency", "package_dependency", "type_placement", "public_api_surface",
+        "attribute_usage", "inheritance", "interface_implementation", "composition",
+        "project_metadata", "context_dependency", "context_allow_only", "port_boundary",
+        "layout_convention", "package_allow_only", "framework_reference",
+        "framework_reference_allow_only", "build_state_preflight", "baseline", "architecture_policy_error"
+      ]
+    },
+    "contract": { "type": ["string", "null"] },
+    "contract_id": { "type": ["string", "null"] },
+    "canonical_identity": { "type": "string" },
+    "source": { "type": "string" },
+    "forbidden_namespace": { "type": "string" },
+    "forbidden_references": { "type": "array", "items": { "type": "string" } },
+    "details": { "type": "object" }
+  },
+  "additionalProperties": true
+}

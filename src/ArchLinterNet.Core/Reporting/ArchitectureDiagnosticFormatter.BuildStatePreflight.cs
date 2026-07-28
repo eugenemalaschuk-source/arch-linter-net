@@ -94,6 +94,9 @@ public sealed partial class ArchitectureDiagnosticFormatter
             .OrderBy(d => d.Evidence.ProjectPath, StringComparer.Ordinal)
             .Select(d => (object)new
             {
+                schema_version = ArchitectureFinding.CurrentSchemaVersion,
+                kind = "build_state_preflight",
+                canonical_identity = $"{d.ContractId ?? d.ContractName}:build_state_preflight:{StateToken(d.State)}:{d.Evidence.ProjectPath}",
                 state = StateToken(d.State),
                 project_path = d.Evidence.ProjectPath,
                 assembly_name = d.Evidence.AssemblyName,
@@ -103,7 +106,20 @@ public sealed partial class ArchitectureDiagnosticFormatter
                 observed_target_framework = d.Evidence.ObservedTargetFramework,
                 expected_output_path = d.Evidence.ExpectedOutputPath,
                 build_command = d.Evidence.BuildCommand,
-                detail = d.Evidence.Detail
+                detail = d.Evidence.Detail,
+                details = new
+                {
+                    state = StateToken(d.State),
+                    project_path = d.Evidence.ProjectPath,
+                    assembly_name = d.Evidence.AssemblyName,
+                    requested_configuration = d.Evidence.RequestedConfiguration,
+                    observed_configuration = d.Evidence.ObservedConfiguration,
+                    requested_target_framework = d.Evidence.RequestedTargetFramework,
+                    observed_target_framework = d.Evidence.ObservedTargetFramework,
+                    expected_output_path = d.Evidence.ExpectedOutputPath,
+                    build_command = d.Evidence.BuildCommand,
+                    detail = d.Evidence.Detail,
+                }
             })
             .ToArray();
     }

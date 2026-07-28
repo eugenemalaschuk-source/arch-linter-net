@@ -52,6 +52,11 @@ public sealed partial class ArchitectureDiagnosticFormatterTests
             violation.GetProperty("forbidden_references").EnumerateArray().Select(e => e.GetString()),
             Is.EquivalentTo(_packageDependencyReferences));
         Assert.That(violation.GetProperty("forbidden_package_group").GetString(), Is.EqualTo("forbidden_infra"));
+        Assert.That(violation.GetProperty("schema_version").GetInt32(), Is.EqualTo(1));
+        Assert.That(violation.GetProperty("kind").GetString(), Is.EqualTo("package_dependency"));
+        Assert.That(
+            violation.GetProperty("details").GetProperty("forbidden_package_group").GetString(),
+            Is.EqualTo("forbidden_infra"));
     }
 
     [Test]
@@ -149,5 +154,11 @@ public sealed partial class ArchitectureDiagnosticFormatterTests
             Is.EquivalentTo(_packageDependencyReferences));
         string sarifMessage = sarifResult.GetProperty("message").GetProperty("text").GetString()!;
         Assert.That(sarifMessage, Does.Contain("Microsoft.EntityFrameworkCore@8.0.0"));
+        JsonElement normalized = sarifResult.GetProperty("properties").GetProperty("arch_linter_net");
+        Assert.That(normalized.GetProperty("schema_version").GetInt32(), Is.EqualTo(1));
+        Assert.That(normalized.GetProperty("kind").GetString(), Is.EqualTo("package_dependency"));
+        Assert.That(
+            normalized.GetProperty("details").GetProperty("forbidden_package_group").GetString(),
+            Is.EqualTo("forbidden_infra"));
     }
 }

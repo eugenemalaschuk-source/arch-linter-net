@@ -1,9 +1,11 @@
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using ArchLinterNet.Core.BuildState;
 using ArchLinterNet.Core.Contracts;
 using ArchLinterNet.Core.Model;
+using ArchLinterNet.Core.Reporting;
 using ArchLinterNet.Core.Schema;
 using Json.Schema;
 using NUnit.Framework;
@@ -24,7 +26,7 @@ public sealed class PackagedSchemaRegistryTests
         {
             Assert.That(schemas.Select(static schema => schema.LogicalId), Is.EqualTo(new[]
             {
-                "analysis-build-state", "api-snapshot", "baseline", "policy-fragment", "policy-root",
+                "analysis-build-state", "api-snapshot", "baseline", "normalized-finding", "policy-fragment", "policy-root",
             }));
             Assert.That(schemas.Single(static schema => schema.LogicalId == "baseline").DocumentVersion, Is.EqualTo("v2"));
             Assert.That(schemas.All(static schema => schema.SchemaId.Contains("/schema/0.5.1/", StringComparison.Ordinal)), Is.True);
@@ -74,6 +76,32 @@ public sealed class PackagedSchemaRegistryTests
         JsonSchema schema = JsonSchema.FromText(schemaText);
         using JsonDocument document = JsonDocument.Parse(receiptJson);
         Assert.That(schema.Evaluate(document.RootElement).IsValid, Is.True);
+    }
+
+    [Test]
+    public void NormalizedFindingSchema_ValidatesCurrentPackageDiagnosticProjection()
+    {
+        var violation = new ArchitectureViolation(
+            "domain-no-ef", "domain-no-ef", "Product.Domain", "forbidden package group",
+            ["Example.Package@1.0.0"])
+        {
+            Payload = new PackageDependencyPayload("forbidden")
+        };
+        var formatter = new ArchitectureDiagnosticFormatter();
+        using JsonDocument output = JsonDocument.Parse(
+            formatter.FormatResultForCiArtifacts("strict", false, [violation], Array.Empty<string>()));
+        JsonElement finding = output.RootElement.GetProperty("violations")[0];
+
+        PackagedSchemaRegistry registry = new();
+        Assert.That(registry.TryRead("normalized-finding", out string schemaText), Is.True);
+
+        JsonSchema schema = JsonSchema.FromText(schemaText);
+        Assert.That(schema.Evaluate(finding).IsValid, Is.True);
+
+        JsonObject unknownKind = JsonNode.Parse(finding.GetRawText())!.AsObject();
+        unknownKind["kind"] = "future_finding";
+        unknownKind["schema_version"] = 2;
+        Assert.That(schema.Evaluate(unknownKind).IsValid, Is.False);
     }
 
     [Test]

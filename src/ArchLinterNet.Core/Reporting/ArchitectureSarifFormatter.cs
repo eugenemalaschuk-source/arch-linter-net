@@ -204,11 +204,12 @@ public sealed partial class ArchitectureSarifFormatter : IArchitectureSarifForma
             json["relatedLocations"] = relatedLocations;
         }
 
-        Dictionary<string, object?>? properties = BuildProperties(diagnostic);
-        if (properties != null)
-        {
-            json["properties"] = properties;
-        }
+        Dictionary<string, object?> properties = BuildProperties(diagnostic) ?? new Dictionary<string, object?>();
+        // SARIF's standard fields remain the interoperable summary. The exact same
+        // versioned JSON finding used by the CI formatter is retained under a
+        // namespaced property so no evidence has to be reconstructed from prose.
+        properties["arch_linter_net"] = ArchitectureDiagnosticFormatter.FormatNormalizedFindingForSarif(diagnostic);
+        json["properties"] = properties;
 
         return new ResultEntry(ruleId, diagnostic.ContractName, sourceType, forbiddenNamespace, json);
     }

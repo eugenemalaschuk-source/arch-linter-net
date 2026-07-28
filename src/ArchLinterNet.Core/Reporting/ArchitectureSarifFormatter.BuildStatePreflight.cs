@@ -111,6 +111,28 @@ public sealed partial class ArchitectureSarifFormatter
                     },
                 },
             },
+            ["properties"] = new Dictionary<string, object?>
+            {
+                ["arch_linter_net"] = new Dictionary<string, object?>
+                {
+                    ["schema_version"] = ArchitectureFinding.CurrentSchemaVersion,
+                    ["kind"] = "build_state_preflight",
+                    ["canonical_identity"] = ArchitectureFindingMapper.FromDiagnostic(diagnostic).CanonicalIdentity,
+                    ["details"] = new Dictionary<string, object?>
+                    {
+                        ["state"] = state,
+                        ["project_path"] = evidence.ProjectPath,
+                        ["assembly_name"] = evidence.AssemblyName,
+                        ["requested_configuration"] = evidence.RequestedConfiguration,
+                        ["observed_configuration"] = evidence.ObservedConfiguration,
+                        ["requested_target_framework"] = evidence.RequestedTargetFramework,
+                        ["observed_target_framework"] = evidence.ObservedTargetFramework,
+                        ["expected_output_path"] = evidence.ExpectedOutputPath,
+                        ["build_command"] = evidence.BuildCommand,
+                        ["detail"] = evidence.Detail,
+                    },
+                },
+            },
         };
 
         return new ResultEntry(ruleId, "build-state-preflight", evidence.ProjectPath, "build-state-preflight", json);

@@ -38,12 +38,14 @@
     <EmbeddedResource Include="..\..\schema\baseline.schema.json" Link="Schema\baseline.schema.json" />
     <EmbeddedResource Include="..\..\schema\0.5.1\compatibility-manifest.json" Link="Schema\0.5.1\compatibility-manifest.json" LogicalName="ArchLinterNet.Core.Schema.0.5.1.compatibility-manifest.json" />
     <EmbeddedResource Include="..\..\schema\0.5.1\api-snapshot.schema.json" Link="Schema\0.5.1\api-snapshot.schema.json" LogicalName="ArchLinterNet.Core.Schema.0.5.1.api-snapshot.schema.json" />
+    <EmbeddedResource Include="..\..\schema\0.5.1\normalized-finding.schema.json" Link="Schema\0.5.1\normalized-finding.schema.json" LogicalName="ArchLinterNet.Core.Schema.0.5.1.normalized-finding.schema.json" />
     <EmbeddedResource Include="..\..\schema\0.5.1\analysis-build-state.schema.json" Link="Schema\0.5.1\analysis-build-state.schema.json" LogicalName="ArchLinterNet.Core.Schema.0.5.1.analysis-build-state.schema.json" />
     <Content Include="..\..\schema\dependencies.arch.schema.json" Pack="true" PackagePath="contentFiles/any/any/schema/0.5.1/dependencies.arch.schema.json" />
     <Content Include="..\..\schema\dependencies.arch.fragment.schema.json" Pack="true" PackagePath="contentFiles/any/any/schema/0.5.1/dependencies.arch.fragment.schema.json" />
     <Content Include="..\..\schema\baseline.schema.json" Pack="true" PackagePath="contentFiles/any/any/schema/0.5.1/baseline.schema.json" />
     <Content Include="..\..\schema\0.5.1\compatibility-manifest.json" Pack="true" PackagePath="contentFiles/any/any/schema/0.5.1/" />
     <Content Include="..\..\schema\0.5.1\api-snapshot.schema.json" Pack="true" PackagePath="contentFiles/any/any/schema/0.5.1/" />
+    <Content Include="..\..\schema\0.5.1\normalized-finding.schema.json" Pack="true" PackagePath="contentFiles/any/any/schema/0.5.1/" />
     <Content Include="..\..\schema\0.5.1\analysis-build-state.schema.json" Pack="true" PackagePath="contentFiles/any/any/schema/0.5.1/" />
   </ItemGroup>
 
