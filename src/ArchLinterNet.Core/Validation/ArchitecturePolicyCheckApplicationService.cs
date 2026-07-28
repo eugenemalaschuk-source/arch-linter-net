@@ -1,5 +1,6 @@
 using ArchLinterNet.Core.Contracts;
 using ArchLinterNet.Core.Contracts.Abstractions;
+using ArchLinterNet.Core.Contracts.Families;
 using ArchLinterNet.Core.Model;
 using ArchLinterNet.Core.Validation.Abstractions;
 
@@ -13,6 +14,11 @@ internal sealed class ArchitecturePolicyCheckApplicationService(
         try
         {
             ArchitectureContractDocument document = policyDocumentLoader.Load(policyPath);
+            PolicyCheckFailure? snapshotFailure = FindSnapshotFailure(document);
+            if (snapshotFailure is not null)
+            {
+                return PolicyCheckOutcome.Invalid(snapshotFailure);
+            }
 
             return new PolicyCheckOutcome(
                 [
@@ -37,6 +43,24 @@ internal sealed class ArchitecturePolicyCheckApplicationService(
                 exception.Diagnostic.Kind.ToString(),
                 exception.Diagnostic));
         }
+    }
+
+    private static PolicyCheckFailure? FindSnapshotFailure(ArchitectureContractDocument document)
+    {
+        foreach (ArchitecturePublicApiSurfaceContract contract in document.Contracts.StrictPublicApiSurface
+                     .Concat(document.Contracts.AuditPublicApiSurface)
+                     .Where(contract => contract.ApiSnapshotErrorKind is PublicApiSnapshotErrorKind.ParseError or PublicApiSnapshotErrorKind.OwnershipError))
+        {
+            ArchitecturePolicySourceLocation? location = document.Provenance.LocationFor(contract);
+            ArchitecturePolicyDiagnostic? diagnostic = location is null ? null : new ArchitecturePolicyDiagnostic(
+                ArchitecturePolicyDiagnosticKind.SemanticValidation,
+                location,
+                Array.Empty<ArchitecturePolicySourceLocation>(),
+                location.Source.ImportChain);
+            return new PolicyCheckFailure(contract.ApiSnapshotError!, contract.ApiSnapshotErrorKind.ToString(), diagnostic);
+        }
+
+        return null;
     }
 
     private static IReadOnlyCollection<PolicyCheckDeferredCheck> BuildDeferredChecks(

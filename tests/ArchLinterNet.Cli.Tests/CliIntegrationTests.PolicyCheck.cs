@@ -13,7 +13,7 @@ public partial class CliIntegrationTests
         Assert.Multiple(() =>
         {
             Assert.That(exitCode, Is.EqualTo(0));
-            Assert.That(stdout, Does.Contain("\"valid\""));
+            Assert.That(stdout, Does.Contain("valid-with-deferred-checks"));
             Assert.That(stderr, Is.Empty);
         });
     }

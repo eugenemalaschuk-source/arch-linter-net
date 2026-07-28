@@ -101,7 +101,16 @@ internal sealed class PolicyCheckCommandHandler(ICliConsole console)
     private static string FormatSarif(PolicyCheckOutcome outcome, PolicyCheckFailure? failure)
     {
         object[] results = failure is null
-            ? Array.Empty<object>()
+            ? outcome.DeferredChecks.Select(check => (object)new Dictionary<string, object?>
+            {
+                ["ruleId"] = "architecture-policy-deferred",
+                ["level"] = "note",
+                ["message"] = new { text = check.Reason },
+                ["properties"] = FormatDeferred(check),
+                ["relatedLocations"] = ArchitectureSarifFormatter.FormatPolicyLocationsForSarif(
+                    primaryLocation: null,
+                    check.PolicyLocations),
+            }).ToArray()
             :
             [
                 new Dictionary<string, object?>
@@ -186,6 +195,9 @@ internal sealed class PolicyCheckCommandHandler(ICliConsole console)
         string importChain = diagnostic is { ImportChain.Count: > 0 }
             ? $"\nImport chain: {string.Join(" -> ", diagnostic.ImportChain)}"
             : string.Empty;
-        return $"Policy check error: {failure.Message}{location}{importChain}";
+        string related = diagnostic is { RelatedLocations.Count: > 0 }
+            ? $"\nRelated policy locations: {string.Join(", ", diagnostic.RelatedLocations.Select(item => $"{item.SourcePath}:{item.YamlPath}"))}"
+            : string.Empty;
+        return $"Policy check error: {failure.Message}{location}{importChain}{related}";
     }
 }

@@ -96,6 +96,7 @@ public sealed partial class ArchitecturePolicyDocumentLoader : IArchitecturePoli
         else
         {
             provenance = ArchitecturePolicyProvenanceFactory.CreateMonolithic(rootDescriptor, policyPath, yaml);
+            ArchitecturePolicyEffectiveSchemaValidator.Validate(yaml, provenance);
         }
 
         try

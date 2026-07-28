@@ -153,6 +153,17 @@ contracts:
         });
     }
 
+    [Test]
+    public void CheckPolicy_MonolithicUnsupportedVersion_ReturnsTypedFailure()
+    {
+        string policyPath = Path.Combine(_tempDir, "policy.yml");
+        File.WriteAllText(policyPath, "version: 2\nname: Invalid\ncontracts: {}\n");
+
+        PolicyCheckOutcome outcome = ArchitectureAssertions.CheckPolicy(policyPath);
+
+        Assert.That(outcome.IsValid, Is.False);
+    }
+
     // Regression coverage for the semantic-classification-model design
     // (openspec/changes/archive/2026-07-10-design-semantic-classification-model): a review round
     // found that an earlier revision allowed a selector-only layer (no 'namespace'), which loaded
