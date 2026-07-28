@@ -64,7 +64,7 @@ contracts:
     }
 
     [Test]
-    public void CheckPolicy_ValidPolicy_ReturnsStaticAndDeferredChecks()
+    public void CheckPolicy_ValidPolicy_ReturnsStaticChecksWithoutGenericDeferredState()
     {
         string contractDir = Path.Combine(_tempDir, "architecture");
         Directory.CreateDirectory(contractDir);
@@ -76,7 +76,50 @@ contracts:
         Assert.Multiple(() =>
         {
             Assert.That(outcome.CompletedChecks, Does.Contain("imports-and-composition"));
-            Assert.That(outcome.DeferredChecks.Select(static check => check.Kind), Does.Contain("architecture-evaluation"));
+            Assert.That(outcome.IsValid, Is.True);
+            Assert.That(outcome.DeferredChecks, Is.Empty);
+        });
+    }
+
+    [Test]
+    public void CheckPolicy_ClassificationPath_ReturnsProvenanceAwareDeferredCheck()
+    {
+        string contractDir = Path.Combine(_tempDir, "architecture");
+        Directory.CreateDirectory(contractDir);
+        string contractPath = Path.Combine(contractDir, "dependencies.arch.yml");
+        File.WriteAllText(contractPath, """
+            version: 1
+            name: Policy Check
+            classification:
+              path:
+                - path_prefix: src/Sales/Domain
+                  role: DomainLayer
+            layers: {}
+            contracts: {}
+            """);
+
+        PolicyCheckOutcome outcome = ArchitectureValidator.CheckPolicy(contractPath);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(outcome.IsValid, Is.True);
+            Assert.That(outcome.DeferredChecks.Single().Kind, Is.EqualTo("classification-path"));
+            Assert.That(outcome.DeferredChecks.Single().PolicyLocations.Single().YamlPath,
+                Is.EqualTo("classification.path[0]"));
+        });
+    }
+
+    [Test]
+    public void CheckPolicy_MissingPolicy_ReturnsTypedFailureForTestingApi()
+    {
+        PolicyCheckOutcome outcome = ArchitectureAssertions.CheckPolicy(Path.Combine(_tempDir, "missing.yml"));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(outcome.IsValid, Is.False);
+            Assert.That(outcome.Failure, Is.Not.Null);
+            Assert.That(outcome.Failure!.Category, Is.EqualTo("MissingFile"));
+            Assert.That(outcome.Failure.Diagnostic?.Location?.Role, Is.EqualTo(ArchitecturePolicyDocumentRole.Root));
         });
     }
 
