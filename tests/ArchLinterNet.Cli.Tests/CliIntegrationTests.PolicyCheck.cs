@@ -59,6 +59,8 @@ public partial class CliIntegrationTests
             Assert.That(exitCode, Is.EqualTo(2));
             Assert.That(document.RootElement.GetProperty("version").GetString(), Is.EqualTo("2.1.0"));
             Assert.That(document.RootElement.GetProperty("runs")[0].GetProperty("results").GetArrayLength(), Is.EqualTo(1));
+            Assert.That(document.RootElement.GetProperty("runs")[0].GetProperty("results")[0]
+                .GetProperty("locations").GetArrayLength(), Is.EqualTo(1));
             Assert.That(stderr, Is.Empty);
         });
     }

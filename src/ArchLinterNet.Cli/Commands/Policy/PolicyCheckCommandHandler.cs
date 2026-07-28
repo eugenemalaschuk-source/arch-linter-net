@@ -92,7 +92,7 @@ internal sealed class PolicyCheckCommandHandler(ICliConsole console)
         {
             status = outcome.IsValid
                 ? outcome.DeferredChecks.Count == 0 ? "valid" : "valid-with-deferred-checks"
-                : "invalid-policy",
+                : FailureStatus(outcome.Failure!),
             completed_checks = outcome.CompletedChecks,
             deferred_checks = outcome.DeferredChecks.Select(FormatDeferred),
             failure = outcome.Failure is null ? null : FormatFailure(outcome.Failure),
@@ -120,6 +120,7 @@ internal sealed class PolicyCheckCommandHandler(ICliConsole console)
                     ["level"] = "error",
                     ["message"] = new { text = failure.Message },
                     ["properties"] = FormatFailure(failure),
+                    ["locations"] = FormatPrimarySarifLocations(failure.Diagnostic?.Location),
                     ["relatedLocations"] = ArchitectureSarifFormatter.FormatPolicyLocationsForSarif(
                         failure.Diagnostic?.Location,
                         failure.Diagnostic?.RelatedLocations ?? Array.Empty<ArchitecturePolicySourceLocation>()),
@@ -141,7 +142,7 @@ internal sealed class PolicyCheckCommandHandler(ICliConsole console)
                     {
                         status = failure is null
                             ? outcome.DeferredChecks.Count == 0 ? "valid" : "valid-with-deferred-checks"
-                            : "invalid-policy",
+                            : FailureStatus(failure),
                         completedChecks = outcome.CompletedChecks,
                         deferredChecks = outcome.DeferredChecks.Select(FormatDeferred),
                     },
@@ -176,6 +177,32 @@ internal sealed class PolicyCheckCommandHandler(ICliConsole console)
                 .Select(ArchitectureDiagnosticFormatter.FormatPolicyLocationForJson),
             import_chain = failure.Diagnostic?.ImportChain,
         };
+    }
+
+    private static string FailureStatus(PolicyCheckFailure failure)
+    {
+        return failure.Category == "unexpected-tool-failure" ? "unexpected-tool-failure" : "invalid-policy";
+    }
+
+    private static object[] FormatPrimarySarifLocations(ArchitecturePolicySourceLocation? location)
+    {
+        return location is null
+            ? Array.Empty<object>()
+            :
+            [
+                new Dictionary<string, object?>
+                {
+                    ["physicalLocation"] = new Dictionary<string, object?>
+                    {
+                        ["artifactLocation"] = new Dictionary<string, object?> { ["uri"] = location.SourcePath },
+                        ["region"] = new Dictionary<string, object?>
+                        {
+                            ["startLine"] = location.Line,
+                            ["startColumn"] = location.Column,
+                        },
+                    },
+                },
+            ];
     }
 
     private static string FormatDeferredForHuman(PolicyCheckDeferredCheck check)
