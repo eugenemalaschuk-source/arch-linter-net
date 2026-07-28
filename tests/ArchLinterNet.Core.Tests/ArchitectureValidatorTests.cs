@@ -70,7 +70,7 @@ contracts:
         string contractDir = Path.Combine(_tempDir, "architecture");
         Directory.CreateDirectory(contractDir);
         string contractPath = Path.Combine(contractDir, "dependencies.arch.yml");
-        File.WriteAllText(contractPath, "version: 1\nname: Policy Check\nlayers: {}\ncontracts: {}\n");
+        File.WriteAllText(contractPath, "version: 1\nname: Policy Check\nlayers: {}\nanalysis: {}\ncontracts: {}\n");
 
         PolicyCheckOutcome outcome = ArchitectureValidator.CheckPolicy(contractPath);
 
@@ -96,6 +96,7 @@ contracts:
                 - path_prefix: src/Sales/Domain
                   role: DomainLayer
             layers: {}
+            analysis: {}
             contracts: {}
             """);
 
@@ -133,6 +134,8 @@ contracts:
         File.WriteAllText(contractPath, """
             version: 1
             name: Policy Check
+            layers: {}
+            analysis: {}
             contracts:
               strict_public_api_surface:
                 - id: surface
@@ -157,7 +160,7 @@ contracts:
     public void CheckPolicy_MonolithicUnsupportedVersion_ReturnsTypedFailure()
     {
         string policyPath = Path.Combine(_tempDir, "policy.yml");
-        File.WriteAllText(policyPath, "version: 2\nname: Invalid\ncontracts: {}\n");
+        File.WriteAllText(policyPath, "version: 2\nname: Invalid\nlayers: {}\nanalysis: {}\ncontracts: {}\n");
 
         PolicyCheckOutcome outcome = ArchitectureAssertions.CheckPolicy(policyPath);
 

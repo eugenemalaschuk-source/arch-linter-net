@@ -139,7 +139,8 @@ public sealed partial class ArchitecturePolicyDocumentLoader : IArchitecturePoli
 
         // Reviewed API snapshots are resolved before the validator pipeline so that a contract's
         // declared surface is complete by the time any validator inspects it.
-        PublicApiSnapshotResolver.Resolve(document, policyPath, _fileSystem);
+        PolicyCheckSnapshotValidation.Resolve(
+            document, policyPath, _fileSystem, validateEffectiveSchema);
 
         // Source sets expand after provenance binding (so expanded instances can be aliased onto
         // their authored location) and before validation (so every validator, and everything
