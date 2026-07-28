@@ -28,6 +28,11 @@ public sealed class PackagedSchemaRegistryTests
             }));
             Assert.That(schemas.Single(static schema => schema.LogicalId == "baseline").DocumentVersion, Is.EqualTo("v2"));
             Assert.That(schemas.All(static schema => schema.SchemaId.Contains("/schema/0.5.1/", StringComparison.Ordinal)), Is.True);
+            Assert.That(schemas.All(static schema => schema.ResourcePath.StartsWith("schema/0.5.1/", StringComparison.Ordinal)), Is.True);
+            Assert.That(schemas.All(static schema => schema.Sha256.Length == 64), Is.True);
+            Assert.That(schemas.All(static schema => schema.SupportsRead && schema.SupportsWrite), Is.True);
+            Assert.That(schemas.All(static schema => !string.IsNullOrWhiteSpace(schema.MigrationNote)), Is.True);
+            Assert.That(schemas.All(static schema => !string.IsNullOrWhiteSpace(schema.OwningCapability)), Is.True);
         });
     }
 
@@ -90,6 +95,30 @@ public sealed class PackagedSchemaRegistryTests
             Assert.That(registry.TryValidateText("api-snapshot", snapshot.Replace("@version 1", "@version 2", StringComparison.Ordinal), out diagnostic), Is.False);
             Assert.That(diagnostic, Does.Contain("unsupported snapshot version '2'"));
             Assert.That(schema.Evaluate(arbitraryJson.RootElement).IsValid, Is.False);
+        });
+    }
+
+    [Test]
+    public void TryValidateText_RejectsUnknownNonTextAndNonCanonicalDocuments()
+    {
+        string snapshot = PublicApiSnapshotFormat.Serialize(new PublicApiSnapshotDocument(
+            PublicApiSnapshotFormat.CurrentVersion,
+            "public-api",
+            [new PublicApiSnapshotEntry("Product", "method Product.Api Run()")]));
+        PackagedSchemaRegistry registry = new();
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(registry.TryValidateText("missing", snapshot, out string diagnostic), Is.False);
+            Assert.That(diagnostic, Does.Contain("unknown"));
+            Assert.That(registry.TryValidateText("baseline", snapshot, out diagnostic), Is.False);
+            Assert.That(diagnostic, Does.Contain("does not define a line-oriented text format"));
+            Assert.That(registry.TryValidateText("api-snapshot", snapshot.Replace("\n", "\r\n", StringComparison.Ordinal), out diagnostic), Is.False);
+            Assert.That(diagnostic, Does.Contain("canonical writer form"));
+            Assert.That(registry.TryValidateText("api-snapshot", snapshot.Replace("@contract public-api", "@contract ", StringComparison.Ordinal), out diagnostic), Is.False);
+            Assert.That(diagnostic, Does.Contain("does not satisfy the packaged API snapshot contract"));
+            Assert.That(registry.TryValidateText("api-snapshot", PublicApiSnapshotFormat.Serialize(new PublicApiSnapshotDocument(
+                PublicApiSnapshotFormat.CurrentVersion, "empty", [])), out diagnostic), Is.True, diagnostic);
         });
     }
 }
