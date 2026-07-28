@@ -11,6 +11,7 @@ arch-linter-net baseline update --config <path> --baseline <path> --output <path
 arch-linter-net baseline prune --config <path> --baseline <path> --output <path> [options]
 arch-linter-net baseline diff --config <path> --baseline <path> [options]
 arch-linter-net baseline verify --config <path> --baseline <path> [options]
+arch-linter-net policy check --policy <path> [options]
 arch-linter-net public-api capture --policy <path> --contract <id> --output <path> [options]
 arch-linter-net public-api diff --policy <path> --contract <id> --snapshot <path> [options]
 arch-linter-net public-api update --policy <path> --contract <id> --snapshot <path> [options]
@@ -22,6 +23,18 @@ During repository development, replace `arch-linter-net` with:
 ```bash
 dotnet run --project src/ArchLinterNet.Cli --
 ```
+
+## Validate options
+
+## Policy check
+
+`policy check` validates policy syntax, imports, composition, IDs, and static configuration without invoking MSBuild, evaluating projects, or loading target assemblies. It is intended for clean checkouts, editor feedback, and pre-commit checks; it never claims that an architecture is clean.
+
+```bash
+arch-linter-net policy check --policy architecture/dependencies.arch.yml --format json
+```
+
+The command exits `0` for valid static policy/configuration and reports fact-dependent validation as explicit deferred checks. Invalid policy/configuration exits `2`.
 
 ## Validate options
 

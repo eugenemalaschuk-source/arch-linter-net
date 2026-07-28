@@ -30,7 +30,9 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<IArchitectureEnvironment, ArchitectureEnvironment>();
         services.AddSingleton<IArchitectureAssemblyLoader, ArchitectureAssemblyLoader>();
         services.AddSingleton<IRoslynCompilationFactory, RoslynCompilationFactory>();
-        services.AddSingleton<IArchitecturePolicyDocumentLoader, ArchitecturePolicyDocumentLoader>();
+        services.AddSingleton<ArchitecturePolicyDocumentLoader>();
+        services.AddSingleton<IArchitecturePolicyDocumentLoader>(sp => sp.GetRequiredService<ArchitecturePolicyDocumentLoader>());
+        services.AddSingleton<IArchitecturePolicyCheckDocumentLoader>(sp => sp.GetRequiredService<ArchitecturePolicyDocumentLoader>());
         services.AddSingleton<IArchitectureBaselineLoadingService, ArchitectureBaselineLoadingService>();
         services.AddSingleton<IArchitectureBaselineGenerator, ArchitectureBaselineGenerator>();
         services.AddSingleton<IArchitectureDiagnosticFormatter, ArchitectureDiagnosticFormatter>();
@@ -56,6 +58,7 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<IArchitectureContractExecutor, ArchitectureContractExecutor>();
         services.AddSingleton<IBuildStatePreparationService, BuildStatePreparationService>();
         services.AddSingleton<IArchitectureValidationApplicationService, ArchitectureValidationApplicationService>();
+        services.AddSingleton<IArchitecturePolicyCheckApplicationService, ArchitecturePolicyCheckApplicationService>();
         services.AddSingleton<IArchitectureBaselineApplicationService, ArchitectureBaselineApplicationService>();
         services.AddSingleton<IPublicApiSnapshotStore, PublicApiSnapshotStore>();
         services.AddSingleton<IArchitecturePublicApiApplicationService, ArchitecturePublicApiApplicationService>();

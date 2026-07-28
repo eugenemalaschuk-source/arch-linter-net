@@ -7,6 +7,11 @@
     "strict": "Blocking validation mode for no-new-debt gates.",
     "audit": "Diagnostic validation mode for migration discovery and future-state rules."
   },
+  "policyCheck": {
+    "command": "policy check --policy <path>",
+    "validates": "Policy syntax, imports, composition, contract references, and static configuration without project evaluation or target-assembly loading.",
+    "deferred": "Architecture checks requiring project, assembly, or source facts are reported explicitly and are not architecture compliance results."
+  },
   "externalDependencies": {
     "namespace_prefixes": "Exact namespace or child namespace prefix match against referenced external types.",
     "type_prefixes": "Full referenced type-name prefix match for targeted vendor/framework APIs.",

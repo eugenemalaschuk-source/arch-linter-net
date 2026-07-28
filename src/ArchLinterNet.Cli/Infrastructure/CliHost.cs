@@ -65,7 +65,7 @@ internal sealed class CliHost(ICliRootCommandFactory rootCommandFactory, ICliCon
 
     private static bool IsTopLevelCommand(string arg)
     {
-        return arg is "baseline" or "graph" or "explain" or "public-api";
+        return arg is "baseline" or "graph" or "explain" or "policy" or "public-api";
     }
 
     private void WriteParseErrors(ParseResult parseResult)

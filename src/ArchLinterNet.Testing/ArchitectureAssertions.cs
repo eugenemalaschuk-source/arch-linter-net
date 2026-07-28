@@ -1,3 +1,6 @@
+using ArchLinterNet.Core;
+using ArchLinterNet.Core.Validation;
+
 namespace ArchLinterNet.Testing;
 
 public static class ArchitectureAssertions
@@ -11,5 +14,11 @@ public static class ArchitectureAssertions
     {
         string policyPath = Path.Combine(repositoryRoot, "architecture", "dependencies.arch.yml");
         return new ArchitectureValidationBuilder(policyPath);
+    }
+
+    /// <summary>Checks policy and static configuration without loading target assemblies.</summary>
+    public static PolicyCheckOutcome CheckPolicy(string policyPath)
+    {
+        return ArchitectureValidator.CheckPolicy(policyPath);
     }
 }
