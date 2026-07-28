@@ -25,7 +25,12 @@ rtk-init-windows:  ## Configure RTK AI agent integrations on Windows
 
 restore:  ## Restore NuGet packages for all .NET projects
 	@mkdir -p "$(PROJECT_ROOT)/nupkg"
-	@dotnet restore "$(SLNX)"
+	@for attempt in 1 2 3; do \
+		if dotnet restore "$(SLNX)"; then exit 0; fi; \
+		if [ "$$attempt" -eq 3 ]; then exit 1; fi; \
+		printf 'NuGet restore failed; retrying in %s seconds (attempt %s of 3).\n' "$$((attempt * 10))" "$$attempt"; \
+		sleep "$$((attempt * 10))"; \
+	done
 
 pack:  ## Build NuGet packages for all publishable projects
 	@dotnet pack "$(SLNX)" -c Release -o "$(PROJECT_ROOT)/nupkg" --nologo
