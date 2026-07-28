@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://archlinternet.dev/schema/dependencies.arch.schema.json",
+  "$id": "https://archlinternet.dev/schema/0.5.1/dependencies.arch.schema.json",
   "title": "ArchLinterNet dependency architecture policy",
   "description": "Schema for one explicitly selected ArchLinterNet root policy, regardless of filename.",
   "type": "object",

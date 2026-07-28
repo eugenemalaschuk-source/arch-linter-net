@@ -12,6 +12,14 @@
     "validates": "Policy syntax, imports, composition, contract references, and static configuration without project evaluation or target-assembly loading.",
     "deferred": "Architecture checks requiring project, assembly, or source facts are reported explicitly and are not architecture compliance results."
   },
+  "packagedSchemas": {
+    "compatibilityEnvelope": "adoption-stabilization/v1",
+    "command": "schema list | schema print <logical-id>",
+    "offline": true,
+    "formats": {
+      "policy-root": "v1", "policy-fragment": "v1", "baseline": "v2 with identity v1", "api-snapshot": "v1", "finding": "v1", "analysis-build-state": "v1", "analysis-cache": "v1", "analysis-profile": "v1"
+    }
+  },
   "externalDependencies": {
     "namespace_prefixes": "Exact namespace or child namespace prefix match against referenced external types.",
     "type_prefixes": "Full referenced type-name prefix match for targeted vendor/framework APIs.",

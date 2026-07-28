@@ -95,6 +95,23 @@ jobs:
           core_nuspec=$(unzip -p "nupkg/$core_nupkg" '*.nuspec')
           core_listing=$(unzip -Z1 "nupkg/$core_nupkg")
 
+          for required_schema in \
+            analysis-build-state.schema.json \
+            analysis-cache.schema.json \
+            analysis-profile.schema.json \
+            api-snapshot.schema.json \
+            baseline.schema.json \
+            compatibility-manifest.json \
+            dependencies.arch.fragment.schema.json \
+            dependencies.arch.schema.json \
+            finding.schema.json; do
+            required_entry="contentFiles/any/any/schema/0.5.1/$required_schema"
+            if ! printf '%s\n' "$core_listing" | grep -qxF "$required_entry"; then
+              echo "Core package is missing release-matched schema '$required_entry'." >&2
+              exit 1
+            fi
+          done
+
           core_cel_dependency=$(printf '%s\n' "$core_nuspec" | grep -oE '<dependency id="ArchLinterNet\.CEL"[^/]*/>')
           if [ -z "$core_cel_dependency" ]; then
             echo "Core .nuspec does not declare ArchLinterNet.CEL as a dependency." >&2

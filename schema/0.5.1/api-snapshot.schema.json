@@ -1,0 +1,13 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://archlinternet.dev/schema/0.5.1/api-snapshot.schema.json",
+  "title": "ArchLinterNet API snapshot v1",
+  "type": "object",
+  "required": ["version", "contract", "assemblies"],
+  "properties": {
+    "version": { "const": 1 },
+    "contract": { "type": "string", "minLength": 1 },
+    "assemblies": { "type": "array", "items": { "type": "string" } }
+  },
+  "additionalProperties": false
+}

@@ -5,6 +5,12 @@ The machine-readable root/effective-policy JSON Schema lives at
 `schema/dependencies.arch.fragment.schema.json`. Use them when authoring
 policies with schema-aware editors or AI agents.
 
+## Release-matched packaged schemas
+
+Use `arch-linter-net schema list` offline to inspect the release registry, or `arch-linter-net schema print <logical-id>` to write one exact packaged schema. The 0.5.1 registry contains policy root/fragment v1, baseline v2 with identity v1, API snapshot v1, finding v1, analysis build state v1, analysis cache v1, and analysis profile v1.
+
+Release-qualified editor IDs are immutable: `https://archlinternet.dev/schema/0.5.1/dependencies.arch.schema.json` for a root policy and `https://archlinternet.dev/schema/0.5.1/dependencies.arch.fragment.schema.json` for an imported fragment.
+
 > Note: the current runtime YAML loader ignores unmatched properties while
 > deserializing. Validate against the JSON Schema before opening policy PRs if
 > you need unsupported fields to fail fast.
@@ -42,7 +48,7 @@ schema directive for imported partial documents:
 
 ```yaml
 # Imported fragment, even if this file is named domain.data
-# yaml-language-server: $schema=../../../schema/dependencies.arch.fragment.schema.json
+# yaml-language-server: $schema=https://archlinternet.dev/schema/0.5.1/dependencies.arch.fragment.schema.json
 layers:
   domain:
     namespace: Company.Domain

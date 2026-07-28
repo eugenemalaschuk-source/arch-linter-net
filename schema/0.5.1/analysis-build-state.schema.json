@@ -1,0 +1,9 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://archlinternet.dev/schema/0.5.1/analysis-build-state.schema.json",
+  "title": "ArchLinterNet analysis build state v1",
+  "type": "object",
+  "required": ["version", "fingerprint"],
+  "properties": { "version": { "const": 1 }, "fingerprint": { "type": "string", "minLength": 1 } },
+  "additionalProperties": true
+}

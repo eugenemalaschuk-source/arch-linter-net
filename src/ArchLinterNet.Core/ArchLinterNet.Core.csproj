@@ -34,6 +34,13 @@
 
   <ItemGroup>
     <EmbeddedResource Include="..\..\schema\dependencies.arch.schema.json" Link="Schema\dependencies.arch.schema.json" />
+    <EmbeddedResource Include="..\..\schema\dependencies.arch.fragment.schema.json" Link="Schema\dependencies.arch.fragment.schema.json" />
+    <EmbeddedResource Include="..\..\schema\baseline.schema.json" Link="Schema\baseline.schema.json" />
+    <EmbeddedResource Include="..\..\schema\0.5.1\*.json" Link="Schema\0.5.1\%(Filename)%(Extension)" />
+    <Content Include="..\..\schema\dependencies.arch.schema.json" Pack="true" PackagePath="contentFiles/any/any/schema/0.5.1/dependencies.arch.schema.json" />
+    <Content Include="..\..\schema\dependencies.arch.fragment.schema.json" Pack="true" PackagePath="contentFiles/any/any/schema/0.5.1/dependencies.arch.fragment.schema.json" />
+    <Content Include="..\..\schema\baseline.schema.json" Pack="true" PackagePath="contentFiles/any/any/schema/0.5.1/baseline.schema.json" />
+    <Content Include="..\..\schema\0.5.1\*.json" Pack="true" PackagePath="contentFiles/any/any/schema/0.5.1/" />
   </ItemGroup>
 
 </Project>

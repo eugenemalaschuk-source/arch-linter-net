@@ -4,6 +4,10 @@ This page summarizes what ArchLinterNet can and cannot validate for AI policy au
 
 ## Supported policy structure
 
+## Packaged schemas
+
+Installed releases expose their immutable offline `adoption-stabilization/v1` schema registry through `arch-linter-net schema list` and `arch-linter-net schema print <logical-id>`. It identifies policy root/fragment v1, baseline v2 with identity v1, API snapshot v1, finding v1, analysis build state v1, analysis cache v1, and analysis profile v1.
+
 ## Policy-only checks
 
 `arch-linter-net policy check --policy <path>` validates policy syntax, imports, composition, static declarations, and static path/configuration references without building projects or loading target assemblies. It explicitly reports fact-dependent architecture checks as deferred; use ordinary strict validation to determine architecture compliance.

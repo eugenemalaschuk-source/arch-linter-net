@@ -111,7 +111,7 @@ public sealed class ArchitecturePolicyImportSchemaTests
 
     private static void RewriteRootReferences(JsonNode? node)
     {
-        const string RootPrefix = "https://archlinternet.dev/schema/dependencies.arch.schema.json#/$defs/";
+        const string RootPrefix = "https://archlinternet.dev/schema/0.5.1/dependencies.arch.schema.json#/$defs/";
         if (node is JsonObject mapping)
         {
             foreach (string key in mapping.Select(pair => pair.Key).ToArray())
