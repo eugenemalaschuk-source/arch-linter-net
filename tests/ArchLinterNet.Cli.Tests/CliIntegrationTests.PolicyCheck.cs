@@ -66,6 +66,22 @@ public partial class CliIntegrationTests
     }
 
     [Test]
+    public void PolicyCheck_DeferredSarifResult_HasPrimaryPolicyLocation()
+    {
+        var (exitCode, stdout, stderr) = RunCli("policy", "check", "--policy", _passingPolicy, "--format", "sarif");
+
+        using JsonDocument document = JsonDocument.Parse(stdout);
+        JsonElement result = document.RootElement.GetProperty("runs")[0].GetProperty("results")[0];
+        Assert.Multiple(() =>
+        {
+            Assert.That(exitCode, Is.EqualTo(0));
+            Assert.That(result.GetProperty("ruleId").GetString(), Is.EqualTo("architecture-policy-deferred"));
+            Assert.That(result.GetProperty("locations").GetArrayLength(), Is.EqualTo(1));
+            Assert.That(stderr, Is.Empty);
+        });
+    }
+
+    [Test]
     public void PolicyCheck_MalformedImportedFragmentAsSarif_WritesParseableSarifToStdout()
     {
         string directory = Path.Combine(Path.GetTempPath(), $"arch-linter-policy-check-{Guid.NewGuid():N}");

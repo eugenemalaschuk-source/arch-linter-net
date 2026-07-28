@@ -108,9 +108,10 @@ internal sealed class PolicyCheckCommandHandler(ICliConsole console)
                 ["level"] = "note",
                 ["message"] = new { text = check.Reason },
                 ["properties"] = FormatDeferred(check),
+                ["locations"] = FormatPrimarySarifLocations(check.PolicyLocations.FirstOrDefault()),
                 ["relatedLocations"] = ArchitectureSarifFormatter.FormatPolicyLocationsForSarif(
                     primaryLocation: null,
-                    check.PolicyLocations),
+                    check.PolicyLocations.Skip(1)),
             }).ToArray()
             :
             [
