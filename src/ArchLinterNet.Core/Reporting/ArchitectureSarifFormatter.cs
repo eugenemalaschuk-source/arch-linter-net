@@ -72,11 +72,10 @@ public sealed partial class ArchitectureSarifFormatter : IArchitectureSarifForma
     {
         string level = mode == "strict" ? "error" : "warning";
 
-        List<ResultEntry> entries = violations
-            .Select(ArchitectureDiagnosticMapper.FromViolation)
-            .Select(diagnostic => BuildViolationEntry(diagnostic, level))
+        List<ResultEntry> entries = ArchitectureFindingMapper.FromViolations(violations, mode)
+            .Select(finding => BuildViolationEntry(finding, level))
             .Concat(cycleEntryFactories.Select(factory => factory(level)))
-            .Concat(preflightDiagnostics.Where(d => d.IsBlocking).Select(BuildPreflightEntry))
+            .Concat(preflightDiagnostics.Where(d => d.IsBlocking).Select(diagnostic => BuildPreflightEntry(diagnostic, mode)))
             .OrderBy(e => e.RuleId, StringComparer.Ordinal)
             .ThenBy(e => e.SourceIdentifier, StringComparer.Ordinal)
             .ThenBy(e => e.Category, StringComparer.Ordinal)
@@ -154,8 +153,9 @@ public sealed partial class ArchitectureSarifFormatter : IArchitectureSarifForma
             }).ToArray();
     }
 
-    private static ResultEntry BuildViolationEntry(ArchitectureDiagnostic diagnostic, string level)
+    private static ResultEntry BuildViolationEntry(ArchitectureFinding finding, string level)
     {
+        ArchitectureDiagnostic diagnostic = finding.Details;
         (string sourceType, string forbiddenNamespace, IReadOnlyCollection<string> references) = ExtractFields(diagnostic);
         string ruleId = diagnostic.ContractId ?? ArchitecturePolicyDocumentLoader.NormalizeToContractId(diagnostic.ContractName);
 
@@ -208,9 +208,7 @@ public sealed partial class ArchitectureSarifFormatter : IArchitectureSarifForma
         // SARIF's standard fields remain the interoperable summary. The exact same
         // versioned JSON finding used by the CI formatter is retained under a
         // namespaced property so no evidence has to be reconstructed from prose.
-        properties["arch_linter_net"] = ArchitectureDiagnosticFormatter.FormatNormalizedFindingForSarif(
-            diagnostic,
-            level == "error" ? "strict" : "audit");
+        properties["arch_linter_net"] = ArchitectureDiagnosticFormatter.FormatNormalizedFindingForSarif(finding);
         json["properties"] = properties;
 
         return new ResultEntry(ruleId, diagnostic.ContractName, sourceType, forbiddenNamespace, json);
@@ -422,6 +420,9 @@ public sealed partial class ArchitectureSarifFormatter : IArchitectureSarifForma
         Match match = CycleIdPrefixPattern().Match(cycle);
         string ruleId = match.Success ? match.Groups["id"].Value : CycleRuleFallback;
         string path = match.Success ? cycle[match.Length..] : cycle;
+        ArchitectureFinding finding = ArchitectureFindingMapper.FromDiagnostic(
+            new CycleDiagnostic(ruleId, match.Success ? ruleId : null, path),
+            level == "error" ? "strict" : "audit");
 
         var json = new Dictionary<string, object?>
         {
@@ -431,9 +432,7 @@ public sealed partial class ArchitectureSarifFormatter : IArchitectureSarifForma
             ["logicalLocations"] = BuildLogicalLocations(path, "namespace"),
             ["properties"] = new Dictionary<string, object?>
             {
-                ["arch_linter_net"] = ArchitectureDiagnosticFormatter.FormatNormalizedFindingForSarif(
-                    new CycleDiagnostic(ruleId, match.Success ? ruleId : null, path),
-                    level == "error" ? "strict" : "audit"),
+                ["arch_linter_net"] = ArchitectureDiagnosticFormatter.FormatNormalizedFindingForSarif(finding),
             },
         };
 
@@ -443,6 +442,9 @@ public sealed partial class ArchitectureSarifFormatter : IArchitectureSarifForma
     private static ResultEntry BuildCycleEntry(CycleDiagnostic diagnostic, string level)
     {
         string ruleId = diagnostic.ContractId ?? CycleRuleFallback;
+        ArchitectureFinding finding = ArchitectureFindingMapper.FromDiagnostic(
+            diagnostic,
+            level == "error" ? "strict" : "audit");
 
         var json = new Dictionary<string, object?>
         {
@@ -452,9 +454,7 @@ public sealed partial class ArchitectureSarifFormatter : IArchitectureSarifForma
             ["logicalLocations"] = BuildLogicalLocations(diagnostic.Path, "namespace"),
             ["properties"] = new Dictionary<string, object?>
             {
-                ["arch_linter_net"] = ArchitectureDiagnosticFormatter.FormatNormalizedFindingForSarif(
-                    diagnostic,
-                    level == "error" ? "strict" : "audit"),
+                ["arch_linter_net"] = ArchitectureDiagnosticFormatter.FormatNormalizedFindingForSarif(finding),
             },
         };
 

@@ -217,7 +217,11 @@ public sealed partial class ArchitectureDiagnosticFormatterTests
 
         string output = _formatter.FormatViolationsForHumans(violations);
 
-        Assert.That(output, Does.Contain("source_member: Source.Type.Configure"));
+        Assert.Multiple(() =>
+        {
+            Assert.That(output, Does.Contain("source_member: Source.Type.Configure"));
+            Assert.That(output, Does.Contain("occurrence: 0"));
+        });
     }
 
     [Test]
@@ -732,6 +736,8 @@ public sealed partial class ArchitectureDiagnosticFormatterTests
         JsonElement policyLocation = document.RootElement.GetProperty("violations")[0].GetProperty("policy_location");
         JsonElement relatedLocation = document.RootElement.GetProperty("policy_consistency_findings")[0]
             .GetProperty("related_policy_locations")[0];
+        JsonElement normalizedConsistency = document.RootElement.GetProperty("policy_consistency_findings")[0];
+        JsonElement normalizedUnmatched = document.RootElement.GetProperty("unmatched_ignored_violations")[0];
         JsonElement cycleLocation = document.RootElement.GetProperty("cycle_diagnostics")[0]
             .GetProperty("policy_location");
 
@@ -747,6 +753,10 @@ public sealed partial class ArchitectureDiagnosticFormatterTests
             Assert.That(document.RootElement.GetProperty("unmatched_ignored_violations")[0]
                 .GetProperty("policy_location").GetProperty("source_ordinal").GetInt32(), Is.EqualTo(1));
             Assert.That(cycleLocation.GetProperty("yaml_path").GetString(), Is.EqualTo("contracts.strict[10]"));
+            Assert.That(normalizedConsistency.GetProperty("mode").GetString(), Is.EqualTo("strict"));
+            Assert.That(normalizedConsistency.GetProperty("severity").GetString(), Is.EqualTo("error"));
+            Assert.That(normalizedUnmatched.GetProperty("mode").GetString(), Is.EqualTo("strict"));
+            Assert.That(normalizedUnmatched.GetProperty("severity").GetString(), Is.EqualTo("error"));
         });
     }
 

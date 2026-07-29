@@ -112,10 +112,10 @@ public sealed partial class ArchitectureDiagnosticFormatter : IArchitectureDiagn
     public string FormatViolationsForHumans(IReadOnlyCollection<ArchitectureViolation> violations)
     {
         IReadOnlyList<ArchitectureFinding> findings = ArchitectureFindingMapper.Order(
-            violations.Select(ArchitectureFindingMapper.FromViolation));
+            ArchitectureFindingMapper.FromViolations(violations));
         return string.Join(
             Environment.NewLine,
-            findings.Select(finding => FormatForHumans(finding.Details)));
+            findings.Select(FormatFindingForHumans));
     }
 
     public string FormatUnmatchedForHumans(IReadOnlyCollection<ArchitectureUnmatchedIgnoredViolation> unmatched)
@@ -125,16 +125,20 @@ public sealed partial class ArchitectureDiagnosticFormatter : IArchitectureDiagn
             return string.Empty;
         }
 
-        var diagnostics = unmatched.Select(ArchitectureDiagnosticMapper.FromUnmatchedIgnore).ToArray();
+        ArchitectureFinding[] findings = unmatched
+            .Select(ArchitectureDiagnosticMapper.FromUnmatchedIgnore)
+            .Select(ArchitectureFindingMapper.FromDiagnostic)
+            .ToArray();
 
         return "Unmatched ignored violations:" + Environment.NewLine
             + string.Join(
                 Environment.NewLine,
-                diagnostics
-                    .OrderBy(u => u.ContractName)
-                    .ThenBy(u => u.IgnoreIndex)
-                    .Select(u =>
+                findings
+                    .OrderBy(finding => finding.ContractName)
+                    .ThenBy(finding => ((UnmatchedIgnoreDiagnostic)finding.Details).IgnoreIndex)
+                    .Select(finding =>
                     {
+                        var u = (UnmatchedIgnoreDiagnostic)finding.Details;
                         string idPrefix = u.ContractId != null ? $"[{u.ContractId}] " : string.Empty;
                         return $"  {idPrefix}[{u.ContractName}] ignored_violations[{u.IgnoreIndex}] no longer matches any current violation:{Environment.NewLine}" +
                                $"    source_type: {u.SourceType}{Environment.NewLine}" +
@@ -151,14 +155,18 @@ public sealed partial class ArchitectureDiagnosticFormatter : IArchitectureDiagn
             return string.Empty;
         }
 
+        ArchitectureFinding[] normalized = findings
+            .Select(finding => ArchitectureFindingMapper.FromDiagnostic(finding))
+            .ToArray();
         return "Policy consistency findings:" + Environment.NewLine
             + string.Join(
                 Environment.NewLine,
-                findings
-                    .OrderBy(f => f.CheckKind, StringComparer.Ordinal)
-                    .ThenBy(f => f.ContractName, StringComparer.Ordinal)
-                    .Select(f =>
+                normalized
+                    .OrderBy(finding => ((PolicyConsistencyDiagnostic)finding.Details).CheckKind, StringComparer.Ordinal)
+                    .ThenBy(finding => finding.ContractName, StringComparer.Ordinal)
+                    .Select(finding =>
                     {
+                        var f = (PolicyConsistencyDiagnostic)finding.Details;
                         string idPrefix = f.ContractId != null ? $"[{f.ContractId}] " : string.Empty;
                         string names = string.Join(", ", f.ConflictingContractNames);
                         return $"  {idPrefix}[{f.CheckKind}] {f.Reason}" +
@@ -240,8 +248,8 @@ public sealed partial class ArchitectureDiagnosticFormatter : IArchitectureDiagn
             kind = "architecture_violations",
             contract = contractName,
             contract_id = contractId,
-            violations = ArchitectureFindingMapper.Order(violations.Select(ArchitectureFindingMapper.FromViolation))
-                .Select(finding => ToCiJsonObject(finding.Details, includeContract: false))
+            violations = ArchitectureFindingMapper.Order(ArchitectureFindingMapper.FromViolations(violations))
+                .Select(finding => ToCiJsonObject(finding, includeContract: false))
         };
 
         return JsonSerializer.Serialize(payload);
@@ -329,6 +337,14 @@ public sealed partial class ArchitectureDiagnosticFormatter : IArchitectureDiagn
 
         return $"- {idPrefix}[{diagnostic.ContractName}] {SourceTypeOf(diagnostic)} -> {nsDisplay}{context}: " +
                $"{refs}{pathSuffix}{FormatPolicyLocationSuffix(diagnostic)}";
+    }
+
+    private static string FormatFindingForHumans(ArchitectureFinding finding)
+    {
+        string text = FormatForHumans(finding.Details);
+        return finding.Details is CompositionDiagnostic && finding.Identity is not null
+            ? $"{text} (occurrence: {finding.Identity.Occurrence})"
+            : text;
     }
 
     private static string BuildHumanContext(ArchitectureDiagnostic diagnostic)
@@ -528,12 +544,11 @@ public sealed partial class ArchitectureDiagnosticFormatter : IArchitectureDiagn
     }
 
     private static Dictionary<string, object?> ToCiJsonObject(
-        ArchitectureDiagnostic diagnostic,
-        bool includeContract,
-        string? mode = null)
+        ArchitectureFinding finding,
+        bool includeContract)
     {
         var obj = new Dictionary<string, object?>();
-        ArchitectureFinding finding = ArchitectureFindingMapper.FromDiagnostic(diagnostic, mode);
+        ArchitectureDiagnostic diagnostic = finding.Details;
 
         // The versioned envelope is additive: callers that still consume the original
         // flat fields keep working, while new callers get an explicit discriminator
@@ -543,9 +558,16 @@ public sealed partial class ArchitectureDiagnosticFormatter : IArchitectureDiagn
         obj["canonical_identity"] = finding.CanonicalIdentity;
         obj["mode"] = finding.Mode;
         obj["severity"] = finding.Severity;
-        obj["message_code"] = finding.Kind;
-        obj["policy_origin"] = diagnostic.PolicyLocation is null ? null : FormatPolicyLocationForJson(diagnostic.PolicyLocation);
-        obj["source_location"] = SourceLocationForJson(diagnostic);
+        obj["message_code"] = finding.MessageCode;
+        obj["policy_origin"] = finding.PolicyOrigin is null ? null : FormatPolicyLocationForJson(finding.PolicyOrigin);
+        obj["source_location"] = finding.SourceLocation is null
+            ? null
+            : new Dictionary<string, object?>
+            {
+                ["path"] = finding.SourceLocation.Path,
+                ["line"] = finding.SourceLocation.Line,
+                ["column"] = finding.SourceLocation.Column,
+            };
         obj["baseline_state"] = finding.BaselineState;
 
         if (includeContract)
@@ -574,51 +596,36 @@ public sealed partial class ArchitectureDiagnosticFormatter : IArchitectureDiagn
         return obj;
     }
 
-    internal static Dictionary<string, object?> FormatNormalizedFindingForSarif(
-        ArchitectureDiagnostic diagnostic,
-        string? mode = null) =>
-        ToCiJsonObject(diagnostic, includeContract: true, mode);
+    internal static Dictionary<string, object?> FormatNormalizedFindingForSarif(ArchitectureFinding finding) =>
+        ToCiJsonObject(finding, includeContract: true);
+
+    public static Dictionary<string, object?> FormatNormalizedFindingForJson(ArchitectureFinding finding) =>
+        ToCiJsonObject(finding, includeContract: true);
 
     private static Dictionary<string, object?> BuildDetailsJsonObject(ArchitectureDiagnostic diagnostic)
     {
         var details = new Dictionary<string, object?>
         {
             ["detail_kind"] = ArchitectureFindingMapper.KindToken(diagnostic.Kind),
+            ["contract"] = diagnostic.ContractName,
+            ["contract_id"] = diagnostic.ContractId,
         };
+        string source = SourceTypeOf(diagnostic);
+        if (!string.IsNullOrEmpty(source))
+        {
+            details["source"] = source;
+            details["forbidden_namespace"] = ForbiddenNamespaceOf(diagnostic);
+            details["forbidden_references"] = ForbiddenReferencesOf(diagnostic).ToArray();
+        }
         ApplyDiagnosticSpecificCiFields(diagnostic, details);
         return details;
     }
 
-    private static Dictionary<string, object?> ToUnmatchedJsonObject(UnmatchedIgnoreDiagnostic unmatched)
+    private static Dictionary<string, object?> ToUnmatchedJsonObject(
+        UnmatchedIgnoreDiagnostic unmatched,
+        string? mode)
     {
-        var obj = new Dictionary<string, object?>
-        {
-            ["schema_version"] = ArchitectureFinding.CurrentSchemaVersion,
-            ["kind"] = "unmatched_ignore",
-            ["canonical_identity"] = ArchitectureFindingMapper.FromDiagnostic(unmatched).CanonicalIdentity,
-            ["mode"] = null,
-            ["severity"] = null,
-            ["message_code"] = "unmatched_ignore",
-            ["policy_origin"] = unmatched.PolicyLocation is null ? null : FormatPolicyLocationForJson(unmatched.PolicyLocation),
-            ["source_location"] = null,
-            ["baseline_state"] = null,
-            ["contract"] = unmatched.ContractName,
-            ["contract_id"] = unmatched.ContractId,
-            ["ignore_index"] = unmatched.IgnoreIndex,
-            ["source_type"] = unmatched.SourceType,
-            ["forbidden_reference"] = unmatched.ForbiddenReference,
-            ["reason"] = unmatched.Reason
-        };
-        obj["details"] = new Dictionary<string, object?>
-        {
-            ["detail_kind"] = "unmatched_ignore",
-            ["ignore_index"] = unmatched.IgnoreIndex,
-            ["source_type"] = unmatched.SourceType,
-            ["forbidden_reference"] = unmatched.ForbiddenReference,
-            ["reason"] = unmatched.Reason,
-        };
-        ApplyPolicyLocationFields(unmatched, obj);
-        return obj;
+        return ToCiJsonObject(ArchitectureFindingMapper.FromDiagnostic(unmatched, mode), includeContract: true);
     }
 
     private static void ApplyDependencyCiFields(DependencyDiagnostic dependency, Dictionary<string, object?> obj)

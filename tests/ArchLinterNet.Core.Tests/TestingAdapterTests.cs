@@ -75,8 +75,36 @@ contracts:
         {
             Assert.That(finding.SchemaVersion, Is.EqualTo(ArchitectureFinding.CurrentSchemaVersion));
             Assert.That(finding.Kind, Is.EqualTo("composition"));
-            Assert.That(finding.CanonicalIdentity, Does.Contain("Host.One:Program:Main"));
+            Assert.That(finding.Identity!.SourceAssembly, Is.EqualTo("Host.One"));
+            Assert.That(finding.Identity.SourceType, Does.Contain("Host.One:Program:Main"));
             Assert.That(finding.Details, Is.TypeOf<CompositionDiagnostic>());
+            Assert.That(finding.MessageCode, Is.EqualTo("composition"));
+        });
+    }
+
+    [Test]
+    public void Result_PrefersEnrichedCyclesAndExposesModeAndBaselineLifecycle()
+    {
+        var baseline = new BaselineLifecycleEntry(
+            new ArchitectureBaselineComparisonEntry(
+                "strict", "baseline-id", "Source", "Target", "debt"),
+            BaselineEntryLifecycle.Stale);
+        var result = new ArchitectureValidationResult(new ArchitectureValidationResultParams(
+            false,
+            Array.Empty<ArchitectureViolation>(),
+            ["[cycle-id] A -> B -> A"])
+        {
+            Mode = "strict",
+            CycleFindings = [new ArchitectureCycleFinding("cycle", "cycle-id", "A -> B -> A")],
+            BaselineLifecycleEntries = [baseline],
+        });
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(result.Findings.Count(finding => finding.Kind == "cycle"), Is.EqualTo(1));
+            Assert.That(result.Findings.Single(finding => finding.Kind == "cycle").Mode, Is.EqualTo("strict"));
+            Assert.That(result.Findings.Single(finding => finding.Kind == "cycle").Severity, Is.EqualTo("error"));
+            Assert.That(result.Findings.Single(finding => finding.Kind == "baseline").BaselineState, Is.EqualTo("stale"));
         });
     }
 

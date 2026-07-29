@@ -452,9 +452,8 @@ public sealed class ContextDependencyContractTests
             Assert.That(humanOutput, Does.Contain("source_role: DomainLayer"));
 
             // The namespace/layer violation line must not carry contextual-only evidence tokens.
-            int namespaceLineStart = humanOutput.IndexOf("MyApp.Application.Service", StringComparison.Ordinal);
-            Assert.That(namespaceLineStart, Is.GreaterThanOrEqualTo(0));
-            string namespaceLine = humanOutput[namespaceLineStart..];
+            string namespaceLine = humanOutput.Split(Environment.NewLine, StringSplitOptions.RemoveEmptyEntries)
+                .Single(line => line.Contains("MyApp.Application.Service", StringComparison.Ordinal));
             Assert.That(namespaceLine, Does.Not.Contain("kind: context_dependency"));
         });
     }

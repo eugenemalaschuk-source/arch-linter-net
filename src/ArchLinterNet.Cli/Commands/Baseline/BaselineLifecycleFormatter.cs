@@ -1,4 +1,5 @@
 using ArchLinterNet.Core.Model;
+using ArchLinterNet.Core.Reporting;
 
 namespace ArchLinterNet.Cli.Commands.Baseline;
 
@@ -36,43 +37,21 @@ internal static class BaselineLifecycleFormatter
         BaselineEntryDisposition disposition = BaselineEntryDisposition.Reported)
     {
         string status = BaselineEntryLifecycleNames.WireName(lifecycle);
-        object? identity = IdentityForJson(entry.Identity);
-        return new
-        {
-            contractGroup = entry.ContractGroup,
-            contractId = entry.ContractId,
-            sourceType = entry.SourceType,
-            forbiddenReference = entry.ForbiddenReference,
-            reason = entry.Reason,
-            issue = entry.Issue,
-            // `status` is the shared lifecycle vocabulary and nothing else. What the command did with
-            // the entry is `disposition`, and whether the entry suppresses a finding is `suppresses` —
-            // three separate questions a consumer would otherwise have to infer from one string.
-            status,
-            disposition = BaselineEntryDispositionNames.WireName(disposition),
-            suppresses = BaselineEntryLifecycleNames.Suppresses(lifecycle),
-            identity,
-            schema_version = ArchitectureFinding.CurrentSchemaVersion,
-            kind = "baseline",
-            canonical_identity = entry.Identity is { } structuredIdentity
-                ? ArchitectureViolationIdentityJson.Serialize(structuredIdentity)
-                : $"{entry.ContractGroup}:{entry.ContractId}:{entry.SourceType}:{entry.ForbiddenReference}",
-            mode = (string?)null,
-            severity = (string?)null,
-            message_code = "baseline",
-            policy_origin = (object?)null,
-            source_location = (object?)null,
-            baseline_state = status,
-            details = new
-            {
-                detail_kind = "baseline",
-                contractGroup = entry.ContractGroup,
-                sourceType = entry.SourceType,
-                forbiddenReference = entry.ForbiddenReference,
-                reason = entry.Reason,
-                identity,
-            },
-        };
+        ArchitectureFinding finding = ArchitectureFindingMapper.FromBaseline(
+            new BaselineLifecycleEntry(entry, lifecycle, disposition));
+        object? identity = IdentityForJson(finding.Identity);
+        Dictionary<string, object?> result = ArchitectureDiagnosticFormatter.FormatNormalizedFindingForJson(finding);
+        result["contractGroup"] = entry.ContractGroup;
+        result["contractId"] = entry.ContractId;
+        result["sourceType"] = entry.SourceType;
+        result["forbiddenReference"] = entry.ForbiddenReference;
+        result["reason"] = entry.Reason;
+        result["issue"] = entry.Issue;
+        result["status"] = status;
+        result["disposition"] = BaselineEntryDispositionNames.WireName(disposition);
+        result["suppresses"] = BaselineEntryLifecycleNames.Suppresses(lifecycle);
+        result["identity"] = identity;
+        return result;
     }
 
     /// <summary>
@@ -82,7 +61,27 @@ internal static class BaselineLifecycleFormatter
     /// </summary>
     public static object? IdentityForJson(ArchitectureViolationIdentity? identity)
     {
-        return identity == null ? null : ArchitectureViolationIdentityJson.ToWireObject(identity);
+        if (identity == null)
+        {
+            return null;
+        }
+
+        return new
+        {
+            identityVersion = identity.IdentityVersion,
+            contractFamily = identity.ContractFamily,
+            kind = identity.Kind,
+            contractId = identity.ContractId,
+            sourceAssembly = identity.SourceAssembly,
+            sourceType = identity.SourceType,
+            sourceMember = identity.SourceMember,
+            targetAssembly = identity.TargetAssembly,
+            targetType = identity.TargetType,
+            targetMember = identity.TargetMember,
+            occurrence = identity.Occurrence,
+            configuration = identity.Configuration,
+            canonical = ArchitectureViolationIdentityJson.Serialize(identity),
+        };
     }
 
     public static IEnumerable<object> EntriesForJson(IEnumerable<BaselineLifecycleEntry> entries)
@@ -100,8 +99,9 @@ internal static class BaselineLifecycleFormatter
 
         foreach (string name in BaselineEntryLifecycleNames.All)
         {
-            List<BaselineLifecycleEntry> matching = entries
-                .Where(e => BaselineEntryLifecycleNames.WireName(e.Lifecycle) == name)
+            List<ArchitectureFinding> matching = entries
+                .Where(entry => BaselineEntryLifecycleNames.WireName(entry.Lifecycle) == name)
+                .Select(ArchitectureFindingMapper.FromBaseline)
                 .ToList();
 
             if (matching.Count == 0)
@@ -110,9 +110,12 @@ internal static class BaselineLifecycleFormatter
             }
 
             lines.Add($"{name}: {matching.Count}");
-            foreach (BaselineLifecycleEntry entry in matching)
+            foreach (ArchitectureFinding finding in matching)
             {
-                lines.Add($"{Describe(entry.Entry)} [{BaselineEntryDispositionNames.WireName(entry.Disposition)}]");
+                var details = (BaselineLifecycleDiagnostic)finding.Details;
+                lines.Add(
+                    $"  {details.ContractGroup}/{details.ContractId}: {details.SourceType} -> {details.ForbiddenReference} " +
+                    $"[{BaselineEntryDispositionNames.WireName(details.Disposition)}]");
             }
         }
 

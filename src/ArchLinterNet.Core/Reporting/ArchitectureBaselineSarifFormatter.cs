@@ -109,6 +109,7 @@ public static class ArchitectureBaselineSarifFormatter
     private static Dictionary<string, object?> BuildResult(BaselineLifecycleEntry lifecycle)
     {
         ArchitectureBaselineComparisonEntry entry = lifecycle.Entry;
+        ArchitectureFinding finding = ArchitectureFindingMapper.FromBaseline(lifecycle);
         var properties = new Dictionary<string, object?>
         {
             ["baseline_status"] = BaselineEntryLifecycleNames.WireName(lifecycle.Lifecycle),
@@ -116,28 +117,7 @@ public static class ArchitectureBaselineSarifFormatter
             ["contract_id"] = entry.ContractId,
             ["source_type"] = entry.SourceType,
             ["forbidden_reference"] = entry.ForbiddenReference,
-            ["arch_linter_net"] = new Dictionary<string, object?>
-            {
-                ["schema_version"] = ArchitectureFinding.CurrentSchemaVersion,
-                ["kind"] = "baseline",
-                ["canonical_identity"] = entry.Identity is { } identity
-                    ? ArchitectureViolationIdentityJson.Serialize(identity)
-                    : $"{entry.ContractGroup}:{entry.ContractId}:{entry.SourceType}:{entry.ForbiddenReference}",
-                ["mode"] = null,
-                ["severity"] = null,
-                ["message_code"] = "baseline",
-                ["policy_origin"] = null,
-                ["source_location"] = null,
-                ["baseline_state"] = BaselineEntryLifecycleNames.WireName(lifecycle.Lifecycle),
-                ["details"] = new Dictionary<string, object?>
-                {
-                    ["detail_kind"] = "baseline",
-                    ["contract_group"] = entry.ContractGroup,
-                    ["source_type"] = entry.SourceType,
-                    ["forbidden_reference"] = entry.ForbiddenReference,
-                    ["identity"] = entry.Identity is null ? null : ArchitectureViolationIdentityJson.ToWireObject(entry.Identity),
-                },
-            },
+            ["arch_linter_net"] = ArchitectureDiagnosticFormatter.FormatNormalizedFindingForSarif(finding),
         };
         if (entry.Identity is { } structuredIdentity)
         {

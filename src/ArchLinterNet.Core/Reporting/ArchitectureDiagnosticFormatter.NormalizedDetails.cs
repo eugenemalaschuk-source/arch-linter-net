@@ -32,18 +32,40 @@ public sealed partial class ArchitectureDiagnosticFormatter
             case PortBoundaryDiagnostic boundary: ApplyPortBoundaryCiFields(boundary, obj); break;
             case CycleDiagnostic cycle: obj["path"] = cycle.Path; break;
             case BuildStatePreflightDiagnostic preflight: ApplyBuildStatePreflightCiFields(preflight, obj); break;
+            case UnmatchedIgnoreDiagnostic unmatched:
+                obj["ignore_index"] = unmatched.IgnoreIndex;
+                obj["source_type"] = unmatched.SourceType;
+                obj["forbidden_reference"] = unmatched.ForbiddenReference;
+                obj["reason"] = unmatched.Reason;
+                break;
+            case PolicyConsistencyDiagnostic policy:
+                obj["check_kind"] = policy.CheckKind;
+                obj["reason"] = policy.Reason;
+                obj["conflicting_contract_ids"] = policy.ConflictingContractIds.ToArray();
+                obj["conflicting_contract_names"] = policy.ConflictingContractNames.ToArray();
+                obj["layers"] = policy.Layers.ToArray();
+                obj["representative_type"] = policy.RepresentativeType;
+                break;
+            case BaselineLifecycleDiagnostic baseline:
+                obj["contract_group"] = baseline.ContractGroup;
+                obj["source_type"] = baseline.SourceType;
+                obj["forbidden_reference"] = baseline.ForbiddenReference;
+                obj["reason"] = baseline.Reason;
+                obj["issue"] = baseline.Issue;
+                obj["disposition"] = BaselineEntryDispositionNames.WireName(baseline.Disposition);
+                obj["suppresses"] = baseline.Suppresses;
+                obj["identity"] = baseline.StructuredIdentity is null
+                    ? null
+                    : ArchitectureViolationIdentityJson.ToWireObject(baseline.StructuredIdentity);
+                break;
+            case ArchitecturePolicyErrorDiagnostic policyError:
+                obj["diagnostic_kind"] = policyError.DiagnosticKind.ToString().ToLowerInvariant();
+                obj["error_category"] = policyError.ErrorCategory;
+                obj["import_chain"] = policyError.ImportChain;
+                obj["message"] = policyError.Message;
+                break;
         }
     }
-
-    private static object? SourceLocationForJson(ArchitectureDiagnostic diagnostic) => diagnostic switch
-    {
-        LayoutConventionDiagnostic { MatchedFilePath: { } path } => new Dictionary<string, object?> { ["path"] = path },
-        FrameworkReferenceDiagnostic { Evidence: { Count: > 0 } evidence } => new Dictionary<string, object?> { ["path"] = evidence.First().SourcePath },
-        FrameworkReferenceAllowOnlyDiagnostic { Evidence: { Count: > 0 } evidence } => new Dictionary<string, object?> { ["path"] = evidence.First().SourcePath },
-        ProjectMetadataDiagnostic { ProjectMetadataSourcePath: { } path } => new Dictionary<string, object?> { ["path"] = path },
-        BuildStatePreflightDiagnostic { Evidence.ProjectPath: var path } => new Dictionary<string, object?> { ["path"] = path },
-        _ => null,
-    };
 
     private static void ApplyBuildStatePreflightCiFields(BuildStatePreflightDiagnostic preflight, Dictionary<string, object?> obj)
     {

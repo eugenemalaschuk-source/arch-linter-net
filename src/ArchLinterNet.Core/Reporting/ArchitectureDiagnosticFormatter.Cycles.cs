@@ -7,20 +7,29 @@ public sealed partial class ArchitectureDiagnosticFormatter
 {
     public string FormatCyclesForHumans(IReadOnlyCollection<string> cycles)
     {
-        var diagnostics = cycles.Select(cycle => ArchitectureDiagnosticMapper.FromCycle(cycle, contractName: string.Empty, contractId: null));
-        return string.Join(Environment.NewLine, diagnostics.OrderBy(d => d.Path).Select(d => $"- {d.Path}"));
+        var findings = cycles
+            .Select(cycle => ArchitectureDiagnosticMapper.FromCycle(cycle, contractName: string.Empty, contractId: null))
+            .Select(ArchitectureFindingMapper.FromDiagnostic);
+        return string.Join(
+            Environment.NewLine,
+            findings
+                .OrderBy(finding => ((CycleDiagnostic)finding.Details).Path)
+                .Select(finding => $"- {((CycleDiagnostic)finding.Details).Path}"));
     }
 
     public static string FormatCyclesForHumans(IReadOnlyCollection<ArchitectureCycleFinding> cycles)
     {
-        var diagnostics = cycles.Select(ArchitectureDiagnosticMapper.FromCycle);
+        var findings = cycles
+            .Select(ArchitectureDiagnosticMapper.FromCycle)
+            .Select(ArchitectureFindingMapper.FromDiagnostic);
         return string.Join(
             Environment.NewLine,
-            diagnostics
-                .OrderBy(d => d.Path, StringComparer.Ordinal)
-                .ThenBy(d => d.ContractId, StringComparer.Ordinal)
-                .Select(d =>
+            findings
+                .OrderBy(finding => ((CycleDiagnostic)finding.Details).Path, StringComparer.Ordinal)
+                .ThenBy(finding => finding.ContractId, StringComparer.Ordinal)
+                .Select(finding =>
                 {
+                    var d = (CycleDiagnostic)finding.Details;
                     string idPrefix = d.ContractId != null ? $"[{d.ContractId}] " : string.Empty;
                     return $"- {idPrefix}{d.Path}{FormatPolicyLocationSuffix(d)}";
                 }));
@@ -54,7 +63,7 @@ public sealed partial class ArchitectureDiagnosticFormatter
             contract = contractName,
             contract_id = contractId,
             cycles = diagnostics.Select(d => d.Path).ToArray(),
-            cycle_diagnostics = diagnostics.Select(ToCycleJsonObject).ToArray()
+            cycle_diagnostics = diagnostics.Select(cycle => ToCycleJsonObject(cycle, mode: null)).ToArray()
         };
 
         return JsonSerializer.Serialize(payload);
@@ -62,32 +71,17 @@ public sealed partial class ArchitectureDiagnosticFormatter
 
     private static Dictionary<string, object?> ToCycleJsonObject(ArchitectureCycleFinding cycle)
     {
-        return ToCycleJsonObject(ArchitectureDiagnosticMapper.FromCycle(cycle));
+        return ToCycleJsonObject(ArchitectureDiagnosticMapper.FromCycle(cycle), mode: null);
     }
 
-    private static Dictionary<string, object?> ToCycleJsonObject(CycleDiagnostic diagnostic)
+    private static Dictionary<string, object?> ToCycleJsonObject(ArchitectureCycleFinding cycle, string? mode) =>
+        ToCycleJsonObject(ArchitectureDiagnosticMapper.FromCycle(cycle), mode);
+
+    private static Dictionary<string, object?> ToCycleJsonObject(CycleDiagnostic diagnostic, string? mode)
     {
-        var obj = new Dictionary<string, object?>
-        {
-            ["schema_version"] = ArchitectureFinding.CurrentSchemaVersion,
-            ["kind"] = "cycle",
-            ["canonical_identity"] = ArchitectureFindingMapper.FromDiagnostic(diagnostic).CanonicalIdentity,
-            ["mode"] = null,
-            ["severity"] = null,
-            ["message_code"] = "cycle",
-            ["policy_origin"] = diagnostic.PolicyLocation is null ? null : FormatPolicyLocationForJson(diagnostic.PolicyLocation),
-            ["source_location"] = null,
-            ["baseline_state"] = null,
-            ["contract"] = diagnostic.ContractName,
-            ["contract_id"] = diagnostic.ContractId,
-            ["path"] = diagnostic.Path,
-            ["details"] = new Dictionary<string, object?>
-            {
-                ["detail_kind"] = "cycle",
-                ["path"] = diagnostic.Path,
-            }
-        };
-        ApplyPolicyLocationFields(diagnostic, obj);
+        ArchitectureFinding finding = ArchitectureFindingMapper.FromDiagnostic(diagnostic, mode);
+        Dictionary<string, object?> obj = ToCiJsonObject(finding, includeContract: true);
+        obj["path"] = diagnostic.Path;
         return obj;
     }
 }

@@ -19,6 +19,12 @@ public sealed record ArchitectureFinding(
 
     public string? Severity { get; init; }
 
+    public string MessageCode { get; init; } = string.Empty;
+
+    public ArchitecturePolicySourceLocation? PolicyOrigin { get; init; }
+
+    public ArchitectureFindingSourceLocation? SourceLocation { get; init; }
+
     public string? BaselineState { get; init; }
 
     /// <summary>
@@ -28,8 +34,12 @@ public sealed record ArchitectureFinding(
     /// </summary>
     public ArchitectureViolationIdentity? Identity { get; init; }
 
-    public ArchitecturePolicySourceLocation? PolicyLocation => Details.PolicyLocation;
+    public ArchitecturePolicySourceLocation? PolicyLocation => PolicyOrigin;
 
-    public IReadOnlyCollection<ArchitecturePolicySourceLocation> RelatedPolicyLocations =>
-        Details.RelatedPolicyLocations;
+    public IReadOnlyCollection<ArchitecturePolicySourceLocation> RelatedPolicyOrigins { get; init; } =
+        Array.Empty<ArchitecturePolicySourceLocation>();
+
+    public IReadOnlyCollection<ArchitecturePolicySourceLocation> RelatedPolicyLocations => RelatedPolicyOrigins;
 }
+
+public sealed record ArchitectureFindingSourceLocation(string Path, int? Line = null, int? Column = null);

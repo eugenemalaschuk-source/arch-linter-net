@@ -23,6 +23,8 @@ public sealed class ArchitectureValidationResult
     public ValidationTiming? Timing { get; }
     public IReadOnlyCollection<BuildStatePreflightDiagnostic> PreflightDiagnostics { get; }
     public bool PreflightBlocked { get; }
+    public string? Mode { get; }
+    public IReadOnlyCollection<BaselineLifecycleEntry> BaselineLifecycleEntries { get; }
 
     public ArchitectureValidationResult(ArchitectureValidationResultParams @params)
     {
@@ -40,41 +42,57 @@ public sealed class ArchitectureValidationResult
         Timing = @params.Timing;
         PreflightDiagnostics = @params.PreflightDiagnostics ?? Array.Empty<BuildStatePreflightDiagnostic>();
         PreflightBlocked = @params.PreflightBlocked;
+        Mode = @params.Mode;
+        BaselineLifecycleEntries = @params.BaselineLifecycleEntries ?? Array.Empty<BaselineLifecycleEntry>();
         Findings = ArchitectureFindingMapper.Order(AllDiagnostics());
     }
 
     private IEnumerable<ArchitectureFinding> AllDiagnostics()
     {
-        foreach (ArchitectureViolation violation in Violations.Concat(CoverageFindings))
+        foreach (ArchitectureFinding finding in ArchitectureFindingMapper.FromViolations(
+                     Violations.Concat(CoverageFindings),
+                     Mode))
         {
-            yield return ArchitectureFindingMapper.FromViolation(violation);
+            yield return finding;
         }
 
-        foreach (ArchitectureCycleFinding cycle in CycleFindings)
+        if (CycleFindings.Count > 0)
         {
-            yield return ArchitectureFindingMapper.FromDiagnostic(ArchitectureDiagnosticMapper.FromCycle(cycle));
+            foreach (ArchitectureCycleFinding cycle in CycleFindings)
+            {
+                yield return ArchitectureFindingMapper.FromDiagnostic(ArchitectureDiagnosticMapper.FromCycle(cycle), Mode);
+            }
         }
-
-        foreach (string cycle in Cycles)
+        else
         {
-            yield return ArchitectureFindingMapper.FromDiagnostic(
-                ArchitectureDiagnosticMapper.FromCycle(cycle, string.Empty, null));
+            foreach (string cycle in Cycles)
+            {
+                yield return ArchitectureFindingMapper.FromDiagnostic(
+                    ArchitectureDiagnosticMapper.FromCycle(cycle, string.Empty, null),
+                    Mode);
+            }
         }
 
         foreach (PolicyConsistencyDiagnostic finding in PolicyConsistencyFindings)
         {
-            yield return ArchitectureFindingMapper.FromDiagnostic(finding);
+            yield return ArchitectureFindingMapper.FromDiagnostic(finding, Mode);
         }
 
         foreach (ArchitectureUnmatchedIgnoredViolation unmatched in UnmatchedIgnoredViolations)
         {
             yield return ArchitectureFindingMapper.FromDiagnostic(
-                ArchitectureDiagnosticMapper.FromUnmatchedIgnore(unmatched));
+                ArchitectureDiagnosticMapper.FromUnmatchedIgnore(unmatched),
+                Mode);
         }
 
         foreach (BuildStatePreflightDiagnostic preflight in PreflightDiagnostics)
         {
-            yield return ArchitectureFindingMapper.FromDiagnostic(preflight);
+            yield return ArchitectureFindingMapper.FromDiagnostic(preflight, Mode);
+        }
+
+        foreach (BaselineLifecycleEntry baseline in BaselineLifecycleEntries)
+        {
+            yield return ArchitectureFindingMapper.FromBaseline(baseline);
         }
     }
 
@@ -160,4 +178,6 @@ public sealed record ArchitectureValidationResultParams(
     public IReadOnlyCollection<ArchitectureCycleFinding>? CycleFindings { get; init; }
     public IReadOnlyCollection<BuildStatePreflightDiagnostic>? PreflightDiagnostics { get; init; }
     public bool PreflightBlocked { get; init; }
+    public string? Mode { get; init; }
+    public IReadOnlyCollection<BaselineLifecycleEntry>? BaselineLifecycleEntries { get; init; }
 }

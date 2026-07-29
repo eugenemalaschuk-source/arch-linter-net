@@ -74,7 +74,10 @@ internal sealed class ArchitectureContractExecutor : IArchitectureContractExecut
             foreach (IArchitectureContract contract in session.Catalog.ContractsFor(mode, CoverageFamily))
             {
                 coverageCount++;
-                coverageViolations.AddRange(handlerRegistry.Execute(CoverageFamily, session, contract).Violations
+                int identityCursor = session.FindingIdentityCursor;
+                coverageViolations.AddRange(session.AttachFindingIdentities(
+                        handlerRegistry.Execute(CoverageFamily, session, contract).Violations,
+                        identityCursor)
                     .Select(violation => session.Document.Provenance.Enrich(violation, contract)));
 
                 ArchitectureCoverageSummary? summary =
@@ -101,8 +104,9 @@ internal sealed class ArchitectureContractExecutor : IArchitectureContractExecut
             foreach (IArchitectureContract contract in session.Catalog.ContractsFor(mode, family))
             {
                 count++;
+                int identityCursor = session.FindingIdentityCursor;
                 ArchitectureHandlerResult result = handlerRegistry.Execute(family, session, contract);
-                findings.Violations.AddRange(result.Violations
+                findings.Violations.AddRange(session.AttachFindingIdentities(result.Violations, identityCursor)
                     .Select(violation => session.Document.Provenance.Enrich(violation, contract)));
                 string cycleIdPrefix = contract.Id is null ? string.Empty : $"[{contract.Id}] ";
                 foreach (string cycle in result.Cycles)

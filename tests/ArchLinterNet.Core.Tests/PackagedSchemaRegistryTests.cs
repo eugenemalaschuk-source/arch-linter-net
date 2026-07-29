@@ -100,8 +100,44 @@ public sealed class PackagedSchemaRegistryTests
 
         JsonObject unknownKind = JsonNode.Parse(finding.GetRawText())!.AsObject();
         unknownKind["kind"] = "future_finding";
-        unknownKind["schema_version"] = 2;
         Assert.That(schema.Evaluate(unknownKind).IsValid, Is.False);
+
+        JsonObject unknownVersion = JsonNode.Parse(finding.GetRawText())!.AsObject();
+        unknownVersion["schema_version"] = 2;
+        Assert.That(schema.Evaluate(unknownVersion).IsValid, Is.False);
+    }
+
+    [Test]
+    public void NormalizedFindingReader_UnknownV1Kind_IsOpaqueForNonStrictAndRejectedForStrict()
+    {
+        const string Json = """
+            {
+              "schema_version": 1,
+              "kind": "future_finding",
+              "canonical_identity": "future:1",
+              "mode": "strict",
+              "severity": "error",
+              "message_code": "future",
+              "policy_origin": null,
+              "source_location": null,
+              "baseline_state": null,
+              "details": { "future_evidence": true }
+            }
+            """;
+
+        ArchitectureFindingReadEnvelope opaque = ArchitectureFindingJsonReader.Read(Json, strict: false);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(opaque.IsOpaque, Is.True);
+            Assert.That(opaque.SchemaVersion, Is.EqualTo(1));
+            Assert.That(opaque.Kind, Is.EqualTo("future_finding"));
+            Assert.That(opaque.RawDetails.GetProperty("future_evidence").GetBoolean(), Is.True);
+            Assert.That(
+                () => ArchitectureFindingJsonReader.Read(Json, strict: true),
+                Throws.TypeOf<ArchitectureFindingFormatException>()
+                    .With.Message.Contains("Unsupported normalized finding kind 'future_finding'"));
+        });
     }
 
     [Test]

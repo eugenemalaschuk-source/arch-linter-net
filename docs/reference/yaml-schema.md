@@ -11,6 +11,38 @@ Use `arch-linter-net schema list` offline to inspect the release registry, or `a
 
 Release-qualified editor IDs are immutable: `https://archlinternet.dev/schema/0.5.1/dependencies.arch.schema.json` for a root policy and `https://archlinternet.dev/schema/0.5.1/dependencies.arch.fragment.schema.json` for an imported fragment.
 
+### Normalized finding v1 compatibility
+
+Machine consumers should validate each finding against the packaged
+`normalized-finding` schema and use the versioned envelope plus `details`:
+
+- `kind` and `details.detail_kind` are the same lower-snake-case discriminator;
+- `canonical_identity` is the stable serialized `ArchitectureViolationIdentity`,
+  including assembly/member/target/configuration/occurrence evidence when the
+  producer has it;
+- `mode`, `severity`, `message_code`, `policy_origin`, `source_location`, and
+  `baseline_state` are always present in the envelope and are `null` only when
+  that metadata does not apply or is unavailable;
+- `details` has a kind-specific required shape. It is not an open property bag;
+  a payload belonging to another `kind` does not validate;
+- SARIF carries the same object under
+  `result.properties.arch_linter_net`, while physical source paths also remain
+  in standard SARIF `locations`;
+- the Testing API exposes the same normalized `ArchitectureFinding` objects,
+  including cycle, coverage, policy-consistency, unmatched-ignore, preflight,
+  and baseline lifecycle findings.
+
+The existing top-level `contract`, `contract_id`, `source`,
+`forbidden_namespace`, `forbidden_references`, and family-specific fields remain
+as derived compatibility fields for 0.5.1. New integrations should read
+`details`; compatibility fields may be deprecated in a later versioned schema.
+Baseline command JSON also retains its existing camel-case lifecycle and
+`identity` fields alongside the normalized snake-case envelope.
+
+Readers reject unknown schema versions. For schema version 1, non-strict readers
+preserve an unknown `kind` and its raw `details` as an opaque finding; strict
+validation rejects that kind deterministically.
+
 > Note: the current runtime YAML loader ignores unmatched properties while
 > deserializing. Validate against the JSON Schema before opening policy PRs if
 > you need unsupported fields to fail fast.

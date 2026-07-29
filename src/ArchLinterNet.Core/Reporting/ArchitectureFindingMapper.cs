@@ -8,11 +8,11 @@ public static class ArchitectureFindingMapper
     public static ArchitectureFinding FromViolation(ArchitectureViolation violation) =>
         FromViolation(violation, mode: null);
 
-    public static ArchitectureFinding FromViolation(ArchitectureViolation violation, string? mode) =>
-        Create(
-            ArchitectureDiagnosticMapper.FromViolation(violation),
-            violation.Identity ?? BuildIdentity(ArchitectureDiagnosticMapper.FromViolation(violation)),
-            mode);
+    public static ArchitectureFinding FromViolation(ArchitectureViolation violation, string? mode)
+    {
+        ArchitectureDiagnostic diagnostic = ArchitectureDiagnosticMapper.FromViolation(violation);
+        return Create(diagnostic, violation.Identity ?? BuildIdentity(diagnostic), mode);
+    }
 
     public static ArchitectureFinding FromDiagnostic(ArchitectureDiagnostic diagnostic) =>
         FromDiagnostic(diagnostic, mode: null);
@@ -20,25 +20,61 @@ public static class ArchitectureFindingMapper
     public static ArchitectureFinding FromDiagnostic(ArchitectureDiagnostic diagnostic, string? mode) =>
         Create(diagnostic, BuildIdentity(diagnostic), mode);
 
+    public static ArchitectureFinding FromBaseline(BaselineLifecycleEntry lifecycle)
+    {
+        ArchitectureBaselineComparisonEntry entry = lifecycle.Entry;
+        string state = BaselineEntryLifecycleNames.WireName(lifecycle.Lifecycle);
+        ArchitectureViolationIdentity identity = entry.Identity ?? BuildBaselineFallbackIdentity(entry);
+        var diagnostic = new BaselineLifecycleDiagnostic(
+            "baseline",
+            entry.ContractId,
+            entry.ContractGroup,
+            entry.SourceType,
+            entry.ForbiddenReference,
+            entry.Reason,
+            entry.Issue,
+            lifecycle.Disposition,
+            BaselineEntryLifecycleNames.Suppresses(lifecycle.Lifecycle),
+            entry.Identity);
+        return Create(diagnostic, identity, mode: null) with { BaselineState = state };
+    }
+
+    public static ArchitectureFinding FromPolicyError(
+        string message,
+        ArchitecturePolicyDiagnostic diagnostic,
+        string? category = null)
+    {
+        var details = new ArchitecturePolicyErrorDiagnostic(
+            message,
+            diagnostic.Kind,
+            category,
+            diagnostic.ImportChain)
+        {
+            PolicyLocation = diagnostic.Location,
+            RelatedPolicyLocations = diagnostic.RelatedLocations,
+        };
+        return FromDiagnostic(details);
+    }
+
     /// <summary>
-    /// Maps a batch in deterministic producer order and assigns the identity occurrence from the
-    /// same zero-occurrence identity used by baseline matching. This keeps repeated calls distinct
-    /// without putting a source line number into a stable identity.
+    /// Maps a batch without recomputing occurrence. Production violations carry identities assigned
+    /// live by the execution context before ignore matching; aggregated legacy violations expand to
+    /// one normalized finding per authoritative identity.
     /// </summary>
     public static IReadOnlyList<ArchitectureFinding> FromViolations(
         IEnumerable<ArchitectureViolation> violations,
         string? mode = null)
     {
-        var occurrences = new Dictionary<ArchitectureViolationIdentity, int>();
         var findings = new List<ArchitectureFinding>();
         foreach (ArchitectureViolation violation in violations)
         {
             ArchitectureDiagnostic diagnostic = ArchitectureDiagnosticMapper.FromViolation(violation);
-            ArchitectureViolationIdentity identity = violation.Identity ?? BuildIdentity(diagnostic);
-            ArchitectureViolationIdentity zeroed = identity with { Occurrence = 0 };
-            int occurrence = occurrences.TryGetValue(zeroed, out int count) ? count : 0;
-            occurrences[zeroed] = occurrence + 1;
-            findings.Add(Create(diagnostic, identity with { Occurrence = occurrence }, mode));
+            IReadOnlyCollection<ArchitectureViolationIdentity> identities = violation.Identities.Count > 0
+                ? violation.Identities
+                : violation.Identity is { } identity
+                    ? new[] { identity }
+                    : new[] { BuildIdentity(diagnostic) };
+            findings.AddRange(identities.Select(identity => Create(diagnostic, identity, mode)));
         }
 
         return findings;
@@ -48,6 +84,9 @@ public static class ArchitectureFindingMapper
         findings.OrderBy(finding => finding.ContractId ?? finding.ContractName, StringComparer.Ordinal)
             .ThenBy(finding => finding.CanonicalIdentity, StringComparer.Ordinal)
             .ThenBy(finding => finding.Kind, StringComparer.Ordinal)
+            .ThenBy(finding => finding.SourceLocation?.Path, StringComparer.Ordinal)
+            .ThenBy(finding => finding.SourceLocation?.Line)
+            .ThenBy(finding => finding.SourceLocation?.Column)
             .ToArray();
 
     public static string KindToken(ArchitectureDiagnosticKind kind) => kind switch
@@ -69,6 +108,8 @@ public static class ArchitectureFindingMapper
         ArchitectureDiagnosticKind.BuildStatePreflight => "build_state_preflight",
         ArchitectureDiagnosticKind.PolicyConsistency => "policy_consistency",
         ArchitectureDiagnosticKind.UnmatchedIgnore => "unmatched_ignore",
+        ArchitectureDiagnosticKind.Baseline => "baseline",
+        ArchitectureDiagnosticKind.ArchitecturePolicyError => "architecture_policy_error",
         _ => kind.ToString().ToLowerInvariant()
     };
 
@@ -87,7 +128,23 @@ public static class ArchitectureFindingMapper
             Identity = identity,
             Mode = mode,
             Severity = mode is null ? null : mode == "strict" ? "error" : "warning",
+            MessageCode = KindToken(diagnostic.Kind),
+            PolicyOrigin = diagnostic.PolicyLocation,
+            RelatedPolicyOrigins = diagnostic.RelatedPolicyLocations,
+            SourceLocation = SourceLocationOf(diagnostic),
         };
+
+    private static ArchitectureFindingSourceLocation? SourceLocationOf(ArchitectureDiagnostic diagnostic) => diagnostic switch
+    {
+        LayoutConventionDiagnostic { MatchedFilePath: { } path } => new ArchitectureFindingSourceLocation(path),
+        FrameworkReferenceDiagnostic { Evidence: { Count: > 0 } evidence } =>
+            new ArchitectureFindingSourceLocation(evidence.First().SourcePath),
+        FrameworkReferenceAllowOnlyDiagnostic { Evidence: { Count: > 0 } evidence } =>
+            new ArchitectureFindingSourceLocation(evidence.First().SourcePath),
+        ProjectMetadataDiagnostic { ProjectMetadataSourcePath: { } path } => new ArchitectureFindingSourceLocation(path),
+        BuildStatePreflightDiagnostic { Evidence.ProjectPath: var path } => new ArchitectureFindingSourceLocation(path),
+        _ => null,
+    };
 
     private static ArchitectureViolationIdentity BuildIdentity(ArchitectureDiagnostic diagnostic)
     {
@@ -106,6 +163,23 @@ public static class ArchitectureFindingMapper
             targetMember,
             0,
             configuration);
+    }
+
+    private static ArchitectureViolationIdentity BuildBaselineFallbackIdentity(ArchitectureBaselineComparisonEntry entry)
+    {
+        string family = ArchitectureViolationIdentity.ResolveContractFamily(entry.ContractGroup);
+        return new ArchitectureViolationIdentity(
+            ArchitectureViolationIdentity.CurrentVersion,
+            family,
+            ArchitectureViolationIdentity.ResolveKind(family),
+            entry.ContractId,
+            null,
+            entry.SourceType,
+            null,
+            null,
+            null,
+            entry.ForbiddenReference,
+            0);
     }
 
     private static (string? SourceAssembly, string? SourceMember, string? TargetAssembly, string? TargetType,
@@ -134,6 +208,10 @@ public static class ArchitectureFindingMapper
                 (null, null, null, null, unmatched.ForbiddenReference, unmatched.IgnoreIndex.ToString()),
             PolicyConsistencyDiagnostic policy =>
                 (null, null, null, null, policy.RepresentativeType ?? policy.CheckKind, policy.CheckKind),
+            BaselineLifecycleDiagnostic baseline =>
+                (null, null, null, null, baseline.ForbiddenReference, baseline.ContractGroup),
+            ArchitecturePolicyErrorDiagnostic policyError =>
+                (null, null, null, null, policyError.PolicyLocation?.YamlPath ?? policyError.Message, policyError.ErrorCategory),
             _ => (null, null, null, null, SourceIdentifier(diagnostic), diagnostic.Kind.ToString()),
         };
     }
@@ -144,6 +222,8 @@ public static class ArchitectureFindingMapper
         BuildStatePreflightDiagnostic preflight => preflight.Evidence.ProjectPath,
         UnmatchedIgnoreDiagnostic unmatched => unmatched.SourceType,
         PolicyConsistencyDiagnostic policy => policy.RepresentativeType ?? policy.CheckKind,
+        BaselineLifecycleDiagnostic baseline => baseline.SourceType,
+        ArchitecturePolicyErrorDiagnostic policyError => policyError.PolicyLocation?.SourcePath ?? "<policy>",
         _ => SourceIdentifier(diagnostic),
     };
 
@@ -171,6 +251,8 @@ public static class ArchitectureFindingMapper
         UnmatchedIgnoreDiagnostic d => $"{d.SourceType}:{d.IgnoreIndex}:{d.ForbiddenReference}",
         PolicyConsistencyDiagnostic d => $"{d.CheckKind}:{d.RepresentativeType}",
         BuildStatePreflightDiagnostic d => $"{d.State}:{d.Evidence.ProjectPath}",
+        BaselineLifecycleDiagnostic d => d.SourceType,
+        ArchitecturePolicyErrorDiagnostic d => d.PolicyLocation?.SourcePath ?? "<policy>",
         _ => string.Empty,
     };
 }
