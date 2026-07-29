@@ -56,7 +56,7 @@ internal static class BaselineLifecycleFormatter
             kind = "baseline",
             canonical_identity = entry.Identity is { } structuredIdentity
                 ? ArchitectureViolationIdentityJson.Serialize(structuredIdentity)
-                ?? $"{entry.ContractGroup}:{entry.ContractId}:{entry.SourceType}:{entry.ForbiddenReference}",
+                : $"{entry.ContractGroup}:{entry.ContractId}:{entry.SourceType}:{entry.ForbiddenReference}",
             baseline_state = status,
             details = new
             {
