@@ -2,6 +2,7 @@ using System.Linq;
 using ArchLinterNet.Core.Contracts;
 using ArchLinterNet.Core.Contracts.Families;
 using ArchLinterNet.Core.Execution;
+using ArchLinterNet.Core.Execution.Abstractions;
 using ArchLinterNet.Core.Model;
 using ArchLinterNet.Core.Resolution;
 using ArchLinterNet.Core.Validation;
@@ -572,6 +573,18 @@ public sealed class CompositionContractTests
             .Count(c => c.SourceType == RepeatedCallSourceType && c.Identity!.SourceMember == RepeatedCallSourceMember);
         Assert.That(candidateCount, Is.EqualTo(2),
             "Both distinct call sites must independently reach the baseline-candidate/occurrence machinery.");
+
+        var executorRunner = new ArchitectureContractRunner(CreateContext(), documentNoBaseline);
+        ArchitectureContractExecutionResult executorResult = new ArchitectureContractExecutor()
+            .Execute(executorRunner.Session, "strict", new ArchitectureContractHandlerRegistry());
+        ArchitectureViolation repeatedViolation = executorResult.Violations.Single(v =>
+            v.SourceType == RepeatedCallSourceType
+            && (v.Payload as CompositionPayload)?.SourceMember == RepeatedCallSourceMember);
+
+        Assert.That(
+            repeatedViolation.Identities.Select(identity => identity.Occurrence),
+            Is.EqualTo(new[] { 0, 1 }),
+            "The normalized producer must retain both authoritative call-site identities even though the legacy violation is grouped.");
 
         var contractWithBaseline = new ArchitectureCompositionContract
         {

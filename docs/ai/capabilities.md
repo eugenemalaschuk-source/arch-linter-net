@@ -20,7 +20,7 @@ focused local fragments and contains:
 
 ## Packaged schemas
 
-Installed releases expose their immutable offline `adoption-stabilization/v1` schema registry through `arch-linter-net schema list` and `arch-linter-net schema print <logical-id>`. It identifies the currently implemented formats: policy root/fragment v1, baseline v2 with identity v1, the line-oriented API snapshot v1, and analysis build-state receipt v1. Finding, cache, and profile schemas remain deferred to their owning implementation slices.
+Installed releases expose their immutable offline `adoption-stabilization/v1` schema registry through `arch-linter-net schema list` and `arch-linter-net schema print <logical-id>`. It identifies the currently implemented formats: policy root/fragment v1, baseline v2 with identity v1, the line-oriented API snapshot v1, normalized finding v1, and analysis build-state receipt v1. Normalized diagnostic JSON retains legacy common fields while adding `schema_version`, `kind`, and typed `details`; cache and profile schemas remain deferred to their owning implementation slices.
 
 ## Policy-only checks
 

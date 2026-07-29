@@ -47,8 +47,9 @@ public sealed partial class ArchitectureDiagnosticFormatter
         }
 
         var lines = diagnostics
-            .OrderBy(d => d.Evidence.ProjectPath, StringComparer.Ordinal)
-            .Select(FormatBuildStatePreflightLine);
+            .Select(diagnostic => ArchitectureFindingMapper.FromDiagnostic(diagnostic))
+            .OrderBy(finding => ((BuildStatePreflightDiagnostic)finding.Details).Evidence.ProjectPath, StringComparer.Ordinal)
+            .Select(finding => FormatBuildStatePreflightLine((BuildStatePreflightDiagnostic)finding.Details));
 
         return "Build-state preflight:" + Environment.NewLine + string.Join(Environment.NewLine, lines);
     }
@@ -88,23 +89,15 @@ public sealed partial class ArchitectureDiagnosticFormatter
         return string.Join(Environment.NewLine + "    ", parts);
     }
 
-    private static object[] BuildStatePreflightJson(IReadOnlyCollection<BuildStatePreflightDiagnostic>? diagnostics)
+    private static object[] BuildStatePreflightJson(
+        IReadOnlyCollection<BuildStatePreflightDiagnostic>? diagnostics,
+        string mode)
     {
         return (diagnostics ?? Array.Empty<BuildStatePreflightDiagnostic>())
             .OrderBy(d => d.Evidence.ProjectPath, StringComparer.Ordinal)
-            .Select(d => (object)new
-            {
-                state = StateToken(d.State),
-                project_path = d.Evidence.ProjectPath,
-                assembly_name = d.Evidence.AssemblyName,
-                requested_configuration = d.Evidence.RequestedConfiguration,
-                observed_configuration = d.Evidence.ObservedConfiguration,
-                requested_target_framework = d.Evidence.RequestedTargetFramework,
-                observed_target_framework = d.Evidence.ObservedTargetFramework,
-                expected_output_path = d.Evidence.ExpectedOutputPath,
-                build_command = d.Evidence.BuildCommand,
-                detail = d.Evidence.Detail
-            })
+            .Select(d => (object)ToCiJsonObject(
+                ArchitectureFindingMapper.FromDiagnostic(d, mode),
+                includeContract: true))
             .ToArray();
     }
 

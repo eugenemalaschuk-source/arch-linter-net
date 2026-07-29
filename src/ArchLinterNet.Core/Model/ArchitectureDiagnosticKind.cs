@@ -23,5 +23,7 @@ public enum ArchitectureDiagnosticKind
     PackageAllowOnly,
     FrameworkReference,
     FrameworkReferenceAllowOnly,
-    BuildStatePreflight
+    BuildStatePreflight,
+    Baseline,
+    ArchitecturePolicyError
 }

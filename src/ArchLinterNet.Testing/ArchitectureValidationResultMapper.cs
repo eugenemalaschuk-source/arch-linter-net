@@ -8,7 +8,7 @@ namespace ArchLinterNet.Testing;
 // (ArchitectureValidationSnapshotSession) so both produce identically-shaped results.
 internal static class ArchitectureValidationResultMapper
 {
-    public static ArchitectureValidationResult ToResult(ValidationOutcome outcome, ValidationTiming? timing)
+    public static ArchitectureValidationResult ToResult(ValidationOutcome outcome, ValidationTiming? timing, string mode)
     {
         return new ArchitectureValidationResult(new ArchitectureValidationResultParams(
             outcome.Passed,
@@ -25,7 +25,8 @@ internal static class ArchitectureValidationResultMapper
         {
             CycleFindings = outcome.CycleFindings,
             PreflightDiagnostics = outcome.PreflightDiagnostics,
-            PreflightBlocked = outcome.PreflightBlocked
+            PreflightBlocked = outcome.PreflightBlocked,
+            Mode = mode,
         });
     }
 }

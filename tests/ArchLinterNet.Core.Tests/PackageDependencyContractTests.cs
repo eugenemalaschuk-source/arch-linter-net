@@ -3,7 +3,9 @@ using ArchLinterNet.Core.Contracts;
 using ArchLinterNet.Core.Contracts.Families;
 using ArchLinterNet.Core.Discovery;
 using ArchLinterNet.Core.Execution;
+using ArchLinterNet.Core.Execution.Abstractions;
 using ArchLinterNet.Core.Model;
+using ArchLinterNet.Core.Reporting;
 using NUnit.Framework;
 using ArchitectureContractGroups = ArchLinterNet.Core.Contracts.Families.ArchitectureContractGroups;
 
@@ -106,6 +108,52 @@ public sealed class PackageDependencyContractTests
         Assert.That(violations[0].SourceType, Is.EqualTo(SourceAssemblyName));
         Assert.That((violations[0].Payload as PackageDependencyPayload)?.ForbiddenPackageGroup, Is.EqualTo("forbidden_infra"));
         Assert.That(violations[0].ForbiddenReferences, Is.EqualTo(new[] { "Microsoft.EntityFrameworkCore@8.0.0" }));
+    }
+
+    [Test]
+    public void Executor_PackageReferences_RetainOneAuthoritativeIdentityPerFormattedReference()
+    {
+        var packages = new Dictionary<string, ArchitecturePackageGroup>
+        {
+            ["forbidden_infra"] = new() { PackagePrefixes = { "Microsoft.EntityFrameworkCore" } }
+        };
+        var contract = new ArchitecturePackageDependencyContract
+        {
+            Name = "Domain must not reference EF Core",
+            Id = "domain-no-ef",
+            Source = SourceAssemblyName,
+            Forbidden = new List<string> { "forbidden_infra" }
+        };
+        var document = CreateDocument(packages, contract);
+        var runner = new ArchitectureContractRunner(
+            CreateContext(Project(
+                SourceAssemblyName,
+                ("Microsoft.EntityFrameworkCore", "8.0.0"),
+                ("Microsoft.EntityFrameworkCore.SqlServer", "8.0.0"))),
+            document);
+
+        ArchitectureContractExecutionResult result = new ArchitectureContractExecutor()
+            .Execute(runner.Session, "strict", new ArchitectureContractHandlerRegistry());
+        ArchitectureViolation violation = result.Violations.Single();
+        IReadOnlyList<ArchitectureFinding> findings = ArchitectureFindingMapper.FromViolations(
+            result.Violations,
+            "strict");
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(violation.Identities, Has.Count.EqualTo(2));
+            Assert.That(
+                violation.Identities.Select(identity => identity.TargetMember),
+                Is.EquivalentTo(new[]
+                {
+                    "Microsoft.EntityFrameworkCore",
+                    "Microsoft.EntityFrameworkCore.SqlServer",
+                }));
+            Assert.That(findings, Has.Count.EqualTo(2));
+            Assert.That(
+                findings.Select(finding => finding.CanonicalIdentity).Distinct(StringComparer.Ordinal).Count(),
+                Is.EqualTo(2));
+        });
     }
 
     [Test]

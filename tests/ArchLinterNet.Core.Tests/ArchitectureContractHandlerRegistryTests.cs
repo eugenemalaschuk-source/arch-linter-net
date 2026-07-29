@@ -505,6 +505,8 @@ public sealed class ArchitectureContractHandlerRegistryTests
             new ArchitectureContractExecutor().Execute(runner.Session, "strict", CreateRegistry());
 
         Assert.That(result.Violations, Has.Count.GreaterThan(0));
+        Assert.That(result.Violations, Has.All.Property(nameof(ArchitectureViolation.Identity)).Not.Null,
+            "Executor output must retain the live identity assigned before ignore matching.");
         Assert.That(runner.BaselineCandidates, Has.Count.GreaterThan(0),
             "Baseline candidates collected while a handler ran against the session should surface through the runner facade.");
         Assert.That(runner.UnmatchedIgnoredViolations, Has.Count.EqualTo(1),

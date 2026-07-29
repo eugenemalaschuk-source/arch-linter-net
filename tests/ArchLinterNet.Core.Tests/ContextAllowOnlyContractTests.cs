@@ -378,9 +378,8 @@ public sealed class ContextAllowOnlyContractTests
             Assert.That(humanOutput, Does.Contain("source_role: DomainLayer"));
             Assert.That(humanOutput, Does.Contain("matched_selector: none"));
 
-            int namespaceLineStart = humanOutput.IndexOf("MyApp.Domain.Order", StringComparison.Ordinal);
-            Assert.That(namespaceLineStart, Is.GreaterThanOrEqualTo(0));
-            string namespaceLine = humanOutput[namespaceLineStart..];
+            string namespaceLine = humanOutput.Split(Environment.NewLine, StringSplitOptions.RemoveEmptyEntries)
+                .Single(line => line.Contains("MyApp.Domain.Order", StringComparison.Ordinal));
             Assert.That(namespaceLine, Does.Not.Contain("kind: context_allow_only"));
         });
     }

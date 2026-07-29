@@ -209,36 +209,37 @@ public sealed partial class ArchitectureDiagnosticFormatter
     {
         var unmatchedSerialized = (request.Unmatched ?? Array.Empty<ArchitectureUnmatchedIgnoredViolation>())
             .Select(ArchitectureDiagnosticMapper.FromUnmatchedIgnore)
-            .Select(ToUnmatchedJsonObject)
+            .Select(diagnostic => ToUnmatchedJsonObject(diagnostic, request.Mode))
             .ToArray();
 
         var policyConsistencySerialized = (request.PolicyConsistencyFindings ?? Array.Empty<PolicyConsistencyDiagnostic>())
-            .Select(ToPolicyConsistencyJsonObject)
+            .Select(diagnostic => ToPolicyConsistencyJsonObject(diagnostic, request.Mode))
             .ToArray();
 
         var classificationConflictsSerialized = BuildClassificationConflictsJson(request.ClassificationConflicts);
         var classificationMetadataFailuresSerialized = BuildClassificationMetadataFailuresJson(request.ClassificationMetadataFailures);
         var classificationRolesSerialized = BuildClassificationRolesJson(request.ClassificationRoles);
         var cycleDiagnosticsSerialized = (request.CycleFindings ?? Array.Empty<ArchitectureCycleFinding>())
-            .Select(ToCycleJsonObject)
+            .Select(cycle => ToCycleJsonObject(cycle, request.Mode))
             .ToArray();
 
         var payload = new
         {
             passed = request.Passed,
             mode = request.Mode,
-            violations = request.Violations
-                .Select(ArchitectureDiagnosticMapper.FromViolation)
-                .Select(d => ToCiJsonObject(d, includeContract: true))
+            violations = ArchitectureFindingMapper.Order(ArchitectureFindingMapper.FromViolations(request.Violations, request.Mode))
+                .Select(finding => ToCiJsonObject(finding, includeContract: true))
                 .ToArray(),
             cycles = request.Cycles
                 .Select(cycle => ArchitectureDiagnosticMapper.FromCycle(cycle, contractName: string.Empty, contractId: null))
                 .Select(d => d.Path)
                 .ToArray(),
             cycle_diagnostics = cycleDiagnosticsSerialized,
-            coverage_findings = (request.CoverageFindings ?? Array.Empty<ArchitectureViolation>())
-                .Select(ArchitectureDiagnosticMapper.FromViolation)
-                .Select(d => ToCiJsonObject(d, includeContract: true))
+            coverage_findings = ArchitectureFindingMapper.Order(
+                    ArchitectureFindingMapper.FromViolations(
+                        request.CoverageFindings ?? Array.Empty<ArchitectureViolation>(),
+                        request.Mode))
+                .Select(finding => ToCiJsonObject(finding, includeContract: true))
                 .ToArray(),
             unmatched_ignored_violations = unmatchedSerialized,
             policy_consistency_findings = policyConsistencySerialized,
@@ -258,7 +259,7 @@ public sealed partial class ArchitectureDiagnosticFormatter
                         .Select(FormatPolicyLocationForJson)
                         .ToArray()
                 },
-            preflight_diagnostics = BuildStatePreflightJson(request.PreflightDiagnostics),
+            preflight_diagnostics = BuildStatePreflightJson(request.PreflightDiagnostics, request.Mode),
             source_set_expansion = ArchitectureSarifFormatter.FormatSourceExpansion(
                 request.SourceExpansion ?? Model.ArchitectureSourceExpansionInventory.Empty)
         };

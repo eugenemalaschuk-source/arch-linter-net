@@ -101,7 +101,8 @@ jobs:
             baseline.schema.json \
             compatibility-manifest.json \
             dependencies.arch.fragment.schema.json \
-            dependencies.arch.schema.json; do
+            dependencies.arch.schema.json \
+            normalized-finding.schema.json; do
             required_entry="contentFiles/any/any/schema/0.5.1/$required_schema"
             if ! printf '%s\n' "$core_listing" | grep -qxF "$required_entry"; then
               echo "Core package is missing release-matched schema '$required_entry'." >&2
@@ -143,12 +144,17 @@ jobs:
           dotnet tool install ArchLinterNet.Cli --tool-path tool --add-source "$GITHUB_WORKSPACE/nupkg" --version "$cli_version" --ignore-failed-sources
           ./tool/arch-linter-net schema list > schemas.txt
           grep -qx $'policy-root\tv1\thttps://archlinternet.dev/schema/0.5.1/dependencies.arch.schema.json\tschema/0.5.1/dependencies.arch.schema.json' schemas.txt
+          grep -qx $'normalized-finding\tv1\thttps://archlinternet.dev/schema/0.5.1/normalized-finding.schema.json\tschema/0.5.1/normalized-finding.schema.json' schemas.txt
           ./tool/arch-linter-net schema print policy-root > printed-schema.json
+          ./tool/arch-linter-net schema print normalized-finding > printed-normalized-finding-schema.json
 
           core_nupkg=$(printf '%s\n' "$GITHUB_WORKSPACE"/nupkg/ArchLinterNet.Core.*.nupkg)
           unzip -p "$core_nupkg" contentFiles/any/any/schema/0.5.1/dependencies.arch.schema.json > packaged-schema.json
+          unzip -p "$core_nupkg" contentFiles/any/any/schema/0.5.1/normalized-finding.schema.json > packaged-normalized-finding-schema.json
           cmp printed-schema.json packaged-schema.json
+          cmp printed-normalized-finding-schema.json packaged-normalized-finding-schema.json
           sha256sum printed-schema.json
+          sha256sum printed-normalized-finding-schema.json
           popd >/dev/null
 
       - name: External consumer smoke test

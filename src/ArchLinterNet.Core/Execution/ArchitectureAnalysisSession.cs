@@ -25,6 +25,7 @@ public sealed partial class ArchitectureAnalysisSession
     private readonly List<ArchitectureUnmatchedIgnoredViolation> _unmatchedIgnoredViolations = new();
 
     private readonly List<ArchitectureBaselineCandidate> _baselineCandidates = new();
+    private readonly List<ArchitectureBaselineCandidate> _findingIdentityCandidates = new();
 
     private readonly Dictionary<string, ArchitectureContextualConsumerReference> _registeredContextualConsumers =
         new(StringComparer.Ordinal);
@@ -190,9 +191,15 @@ public sealed partial class ArchitectureAnalysisSession
         IArchitectureContract contract,
         IReadOnlyList<ArchitectureIgnoredViolation> ignoredViolations)
     {
-        string? contractGroup = EnableUnmatchedIgnoreTracking ? ResolveContractGroup(contract) : null;
+        string? contractGroup = ResolveContractGroup(contract);
         return new ArchitectureContractExecutionContext(
-            contract.Name, contract.Id, ignoredViolations, EnableUnmatchedIgnoreTracking, contractGroup, _baselineCandidates);
+            contract.Name,
+            contract.Id,
+            ignoredViolations,
+            EnableUnmatchedIgnoreTracking,
+            contractGroup,
+            _baselineCandidates,
+            _findingIdentityCandidates);
     }
 
     private string? ResolveContractGroup(IArchitectureContract contract)

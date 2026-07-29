@@ -167,7 +167,7 @@ public sealed class ArchitectureValidationBuilder
         ValidationTiming? timing = _collectTimings ? new ValidationTiming() : null;
         ValidationOutcome outcome = _engine.Value.Validate(request, timing);
 
-        return ArchitectureValidationResultMapper.ToResult(outcome, timing);
+        return ArchitectureValidationResultMapper.ToResult(outcome, timing, mode);
     }
 
     private string RequireBaselinePath()

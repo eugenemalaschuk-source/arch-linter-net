@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using ArchLinterNet.Core.Model;
 using ArchLinterNet.Core.Reporting;
 using NUnit.Framework;
@@ -48,6 +49,11 @@ public sealed class ArchitectureSarifFormatterTests
             Assert.That(result.TryGetProperty("logicalLocations", out _), Is.False);
             Assert.That(result.GetProperty("locations")[0].GetProperty("logicalLocations")[0]
                 .GetProperty("fullyQualifiedName").GetString(), Is.EqualTo("App.Service"));
+            JsonElement normalized = properties.GetProperty("arch_linter_net");
+            Assert.That(normalized.GetProperty("schema_version").GetInt32(), Is.EqualTo(1));
+            Assert.That(normalized.GetProperty("kind").GetString(), Is.EqualTo("baseline"));
+            Assert.That(normalized.GetProperty("baseline_state").GetString(), Is.EqualTo("new"));
+            Assert.That(normalized.GetProperty("details").GetProperty("identity").GetProperty("occurrence").GetInt32(), Is.EqualTo(1));
         });
     }
 
@@ -111,6 +117,76 @@ public sealed class ArchitectureSarifFormatterTests
 
         JsonElement results = root.GetProperty("runs")[0].GetProperty("results");
         Assert.That(results.GetArrayLength(), Is.EqualTo(0));
+    }
+
+    [Test]
+    public void FormatResultAsSarif_CycleCarriesTheNormalizedFindingEnvelope()
+    {
+        JsonElement root = Run("strict", Array.Empty<ArchitectureViolation>(), ["[cycle-id] A -> B -> A"]);
+
+        JsonElement normalized = root.GetProperty("runs")[0].GetProperty("results")[0]
+            .GetProperty("properties").GetProperty("arch_linter_net");
+        Assert.Multiple(() =>
+        {
+            Assert.That(normalized.GetProperty("schema_version").GetInt32(), Is.EqualTo(1));
+            Assert.That(normalized.GetProperty("kind").GetString(), Is.EqualTo("cycle"));
+            Assert.That(normalized.GetProperty("details").GetProperty("path").GetString(), Is.EqualTo("A -> B -> A"));
+        });
+    }
+
+    [Test]
+    public void FormatResultAsSarif_ViolationCarriesExactCiNormalizedFinding()
+    {
+        var identity = new ArchitectureViolationIdentity(
+            2, "package_dependency", "package", "package-id", null, "Product.Domain",
+            null, null, null, "Example.Package@1.0.0", 3, "Debug|net10.0");
+        var violation = new ArchitectureViolation(
+            "package", "package-id", "Product.Domain", "forbidden package group", ["Example.Package@1.0.0"])
+        {
+            Identity = identity,
+            Identities = [identity],
+            Payload = new PackageDependencyPayload("forbidden"),
+        };
+        var ciFormatter = new ArchitectureDiagnosticFormatter();
+        using JsonDocument ci = JsonDocument.Parse(
+            ciFormatter.FormatResultForCiArtifacts("strict", false, [violation], Array.Empty<string>()));
+        using JsonDocument sarif = JsonDocument.Parse(
+            _formatter.FormatResultAsSarif("strict", [violation], Array.Empty<string>(), "1.2.3"));
+
+        JsonNode? ciFinding = JsonNode.Parse(ci.RootElement.GetProperty("violations")[0].GetRawText());
+        JsonNode? sarifFinding = JsonNode.Parse(sarif.RootElement.GetProperty("runs")[0].GetProperty("results")[0]
+            .GetProperty("properties").GetProperty("arch_linter_net").GetRawText());
+
+        Assert.That(JsonNode.DeepEquals(ciFinding, sarifFinding), Is.True);
+    }
+
+    [Test]
+    public void FormatResultAsSarif_PreflightCarriesExactCiNormalizedFinding()
+    {
+        var preflight = new BuildStatePreflightDiagnostic(
+            "preflight", "preflight-id", BuildStatePreflightState.MissingArtifact,
+            new BuildStatePreflightEvidence("src/App.csproj", "App"));
+        var ciFormatter = new ArchitectureDiagnosticFormatter();
+        using JsonDocument ci = JsonDocument.Parse(ciFormatter.FormatResultForCiArtifacts(
+            "strict",
+            false,
+            Array.Empty<ArchitectureViolation>(),
+            Array.Empty<string>(),
+            Array.Empty<ArchitectureClassificationRoleFact>(),
+            classificationPathDeferred: null,
+            preflightDiagnostics: [preflight]));
+        using JsonDocument sarif = JsonDocument.Parse(_formatter.FormatResultAsSarif(
+            "strict",
+            Array.Empty<ArchitectureViolation>(),
+            Array.Empty<string>(),
+            [preflight],
+            "1.2.3"));
+
+        JsonNode? ciFinding = JsonNode.Parse(ci.RootElement.GetProperty("preflight_diagnostics")[0].GetRawText());
+        JsonNode? sarifFinding = JsonNode.Parse(sarif.RootElement.GetProperty("runs")[0].GetProperty("results")[0]
+            .GetProperty("properties").GetProperty("arch_linter_net").GetRawText());
+
+        Assert.That(JsonNode.DeepEquals(ciFinding, sarifFinding), Is.True);
     }
 
     [Test]
@@ -314,6 +390,10 @@ public sealed class ArchitectureSarifFormatterTests
         Assert.That(result.TryGetProperty("locations", out JsonElement locations), Is.True);
         Assert.That(
             locations[0].GetProperty("physicalLocation").GetProperty("artifactLocation").GetProperty("uri").GetString(),
+            Is.EqualTo("src/App/Services/Bad.cs"));
+        Assert.That(
+            result.GetProperty("properties").GetProperty("arch_linter_net")
+                .GetProperty("source_location").GetProperty("path").GetString(),
             Is.EqualTo("src/App/Services/Bad.cs"));
         Assert.That(result.TryGetProperty("logicalLocations", out _), Is.False);
     }

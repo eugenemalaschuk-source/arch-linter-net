@@ -23,7 +23,7 @@ jobs:
     name: Pull Request Validation
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
     permissions:
       contents: read
       pull-requests: write
@@ -272,7 +272,7 @@ jobs:
     name: Intel macOS Test Suite
     if: github.event_name == 'pull_request'
     runs-on: macos-15-intel
-    timeout-minutes: 10
+    timeout-minutes: 15
     permissions:
       contents: read
 
@@ -300,7 +300,7 @@ jobs:
     name: Windows Test Suite
     if: github.event_name == 'pull_request'
     runs-on: windows-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
     permissions:
       contents: read
 

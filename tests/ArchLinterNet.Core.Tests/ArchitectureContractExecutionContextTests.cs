@@ -145,6 +145,47 @@ public sealed class ArchitectureContractExecutionContextTests
     }
 
     [Test]
+    public void IsIgnored_SuppressedFirstOccurrence_PreservesLiveOccurrenceOnFindingCandidate()
+    {
+        var ignoredViolations = new List<ArchitectureIgnoredViolation>
+        {
+            new()
+            {
+                SourceType = "MyApp.Service",
+                ForbiddenReference = "line 10: -> Console.WriteLine",
+                Reason = "known debt",
+                IdentityVersion = 2,
+                ContractFamily = "method_body",
+                Kind = "call",
+                TargetMember = "System.Console.WriteLine(string)",
+                Occurrence = 0,
+            },
+        };
+        var findingCandidates = new List<ArchitectureBaselineCandidate>();
+        var context = new ArchitectureContractExecutionContext(
+            "contract-name",
+            "contract-id",
+            ignoredViolations,
+            enableUnmatchedIgnoreTracking: false,
+            contractGroup: "strict_method_body",
+            baselineCandidates: null,
+            findingIdentityCandidates: findingCandidates);
+
+        Assert.That(context.IsIgnored(
+            "MyApp.Service", "line 10: -> Console.WriteLine",
+            targetMember: "System.Console.WriteLine(string)"), Is.True);
+        Assert.That(context.IsIgnored(
+            "MyApp.Service", "line 20: -> Console.WriteLine",
+            targetMember: "System.Console.WriteLine(string)"), Is.False);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(findingCandidates, Has.Count.EqualTo(1));
+            Assert.That(findingCandidates[0].Identity!.Occurrence, Is.EqualTo(1));
+        });
+    }
+
+    [Test]
     public void IsIgnored_Version1LegacyEntry_MatchesByGlobPairRegardlessOfStructuredIdentity()
     {
         // Entries merged from a version-1 baseline (no IdentityVersion) must keep matching by the

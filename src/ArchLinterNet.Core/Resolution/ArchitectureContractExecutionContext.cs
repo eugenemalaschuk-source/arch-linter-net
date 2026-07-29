@@ -9,6 +9,7 @@ internal sealed class ArchitectureContractExecutionContext
     private readonly ArchitectureIgnoreUsageTracker? _tracker;
     private readonly string? _contractGroup;
     private readonly List<ArchitectureBaselineCandidate>? _baselineCandidates;
+    private readonly List<ArchitectureBaselineCandidate> _findingIdentityCandidates;
 
     // Assigns each occurrence's non-line-based discriminator live, in deterministic call order,
     // incremented unconditionally (before the ignore decision is known) — so a baselined occurrence's
@@ -24,7 +25,8 @@ internal sealed class ArchitectureContractExecutionContext
         IReadOnlyList<ArchitectureIgnoredViolation> ignoredViolations,
         bool enableUnmatchedIgnoreTracking,
         string? contractGroup,
-        List<ArchitectureBaselineCandidate>? baselineCandidates)
+        List<ArchitectureBaselineCandidate>? baselineCandidates,
+        List<ArchitectureBaselineCandidate>? findingIdentityCandidates = null)
     {
         ContractName = contractName ?? throw new ArgumentNullException(nameof(contractName));
         ContractId = contractId;
@@ -37,6 +39,7 @@ internal sealed class ArchitectureContractExecutionContext
         // candidate collection is enabled for this run.
         _contractGroup = contractGroup;
         _baselineCandidates = enableUnmatchedIgnoreTracking ? baselineCandidates : null;
+        _findingIdentityCandidates = findingIdentityCandidates ?? new List<ArchitectureBaselineCandidate>();
     }
 
     public string ContractName { get; }
@@ -57,9 +60,12 @@ internal sealed class ArchitectureContractExecutionContext
 
         bool ignored = ArchitectureIgnoreMatcher.IsIgnored(sourceType, forbiddenReference, _ignoredViolations, _tracker, liveIdentity);
 
-        if (!ignored && ContractId != null && _baselineCandidates != null && liveIdentity != null)
+        if (!ignored && ContractId != null && liveIdentity != null)
         {
-            _baselineCandidates.Add(new ArchitectureBaselineCandidate(_contractGroup!, ContractId, sourceType, forbiddenReference, liveIdentity));
+            var candidate = new ArchitectureBaselineCandidate(
+                _contractGroup!, ContractId, sourceType, forbiddenReference, liveIdentity);
+            _findingIdentityCandidates.Add(candidate);
+            _baselineCandidates?.Add(candidate);
         }
 
         return ignored;
