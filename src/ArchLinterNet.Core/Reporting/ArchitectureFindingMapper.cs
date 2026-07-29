@@ -11,7 +11,11 @@ public static class ArchitectureFindingMapper
     public static ArchitectureFinding FromViolation(ArchitectureViolation violation, string? mode)
     {
         ArchitectureDiagnostic diagnostic = ArchitectureDiagnosticMapper.FromViolation(violation);
-        return Create(diagnostic, violation.Identity ?? BuildIdentity(diagnostic), mode);
+        ArchitectureViolationIdentity identity = violation.Identity ?? BuildIdentity(diagnostic);
+        ArchitectureDiagnostic projected = violation.Identities.Count > 1
+            ? ProjectDiagnosticForIdentity(diagnostic, identity)
+            : diagnostic;
+        return Create(projected, identity, mode);
     }
 
     public static ArchitectureFinding FromDiagnostic(ArchitectureDiagnostic diagnostic) =>
@@ -74,7 +78,11 @@ public static class ArchitectureFindingMapper
                 : violation.Identity is { } identity
                     ? new[] { identity }
                     : new[] { BuildIdentity(diagnostic) };
-            findings.AddRange(identities.Select(identity => Create(diagnostic, identity, mode)));
+            bool isAggregated = identities.Count > 1;
+            findings.AddRange(identities.Select(identity => Create(
+                isAggregated ? ProjectDiagnosticForIdentity(diagnostic, identity) : diagnostic,
+                identity,
+                mode)));
         }
 
         return findings;
@@ -211,9 +219,102 @@ public static class ArchitectureFindingMapper
             BaselineLifecycleDiagnostic baseline =>
                 (null, null, null, null, baseline.ForbiddenReference, baseline.ContractGroup),
             ArchitecturePolicyErrorDiagnostic policyError =>
-                (null, null, null, null, policyError.PolicyLocation?.YamlPath ?? policyError.Message, policyError.ErrorCategory),
+                (null, PolicyErrorImportPosition(policyError), null, null,
+                    policyError.PolicyLocation?.YamlPath ?? policyError.DiagnosticKind.ToString(),
+                    PolicyErrorConfiguration(policyError)),
             _ => (null, null, null, null, SourceIdentifier(diagnostic), diagnostic.Kind.ToString()),
         };
+    }
+
+    private static ArchitectureDiagnostic ProjectDiagnosticForIdentity(
+        ArchitectureDiagnostic diagnostic,
+        ArchitectureViolationIdentity identity)
+    {
+        return diagnostic switch
+        {
+            DependencyDiagnostic dependency =>
+                dependency with { ForbiddenReferences = ReferencesForIdentity(dependency.ForbiddenReferences, identity) },
+            ExternalDependencyDiagnostic external =>
+                external with { ForbiddenReferences = ReferencesForIdentity(external.ForbiddenReferences, identity) },
+            PackageDependencyDiagnostic package =>
+                package with { ForbiddenReferences = ReferencesForIdentity(package.ForbiddenReferences, identity) },
+            PackageAllowOnlyDiagnostic package =>
+                package with { ForbiddenReferences = ReferencesForIdentity(package.ForbiddenReferences, identity) },
+            FrameworkReferenceDiagnostic framework => framework with
+            {
+                ForbiddenReferences = ReferencesForIdentity(framework.ForbiddenReferences, identity),
+                Evidence = FrameworkEvidenceForIdentity(
+                    framework.Evidence,
+                    framework.ForbiddenReferences,
+                    identity),
+            },
+            FrameworkReferenceAllowOnlyDiagnostic framework => framework with
+            {
+                ForbiddenReferences = ReferencesForIdentity(framework.ForbiddenReferences, identity),
+                Evidence = FrameworkEvidenceForIdentity(
+                    framework.Evidence,
+                    framework.ForbiddenReferences,
+                    identity),
+            },
+            CompositionDiagnostic composition =>
+                composition with { ForbiddenReferences = ReferencesForIdentity(composition.ForbiddenReferences, identity) },
+            _ => diagnostic,
+        };
+    }
+
+    private static IReadOnlyCollection<string> ReferencesForIdentity(
+        IReadOnlyCollection<string> references,
+        ArchitectureViolationIdentity identity)
+    {
+        if (identity.TargetMember is not { Length: > 0 } targetMember)
+        {
+            return references;
+        }
+
+        string[] selected = references
+            .Where(reference => ReferenceMatchesIdentity(reference, targetMember))
+            .ToArray();
+        return selected.Length == 0 ? references : selected;
+    }
+
+    private static IReadOnlyCollection<FrameworkReferenceEvidence> FrameworkEvidenceForIdentity(
+        IReadOnlyCollection<FrameworkReferenceEvidence> evidence,
+        IReadOnlyCollection<string> references,
+        ArchitectureViolationIdentity identity)
+    {
+        if (identity.TargetMember is not { Length: > 0 } targetMember)
+        {
+            return evidence;
+        }
+
+        FrameworkReferenceEvidence[] selected = evidence
+            .Where(item =>
+                string.Equals(item.FrameworkName, targetMember, StringComparison.Ordinal)
+                || string.Equals(
+                    $"{item.FrameworkName} ({item.TargetFramework})",
+                    targetMember,
+                    StringComparison.Ordinal))
+            .ToArray();
+        return references.Any(reference => ReferenceMatchesIdentity(reference, targetMember))
+            ? selected
+            : evidence;
+    }
+
+    private static bool ReferenceMatchesIdentity(string reference, string targetMember) =>
+        reference.Equals(targetMember, StringComparison.Ordinal)
+        || reference.StartsWith(targetMember + "@", StringComparison.Ordinal)
+        || reference.StartsWith(targetMember + " ", StringComparison.Ordinal);
+
+    private static string? PolicyErrorImportPosition(ArchitecturePolicyErrorDiagnostic policyError) =>
+        policyError.ImportChain.Count == 0
+            ? null
+            : $"{policyError.ImportChain.Count - 1}:{policyError.ImportChain[^1]}";
+
+    private static string PolicyErrorConfiguration(ArchitecturePolicyErrorDiagnostic policyError)
+    {
+        string importChain = string.Join(" -> ", policyError.ImportChain);
+        return $"kind={policyError.DiagnosticKind};category={policyError.ErrorCategory ?? "<none>"};"
+            + $"import_chain={importChain}";
     }
 
     private static string SourceTypeOf(ArchitectureDiagnostic diagnostic) => diagnostic switch

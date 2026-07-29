@@ -161,4 +161,71 @@ public sealed partial class ArchitectureDiagnosticFormatterTests
             normalized.GetProperty("details").GetProperty("forbidden_package_group").GetString(),
             Is.EqualTo("forbidden_infra"));
     }
+
+    [Test]
+    public void GroupedPackageViolation_EachAdapterAlignsEvidenceWithCanonicalIdentity()
+    {
+        string[] references = ["Example.A@1.0.0", "Example.B@2.0.0"];
+        var violation = new ArchitectureViolation(
+            "package", "package-id", "Product.Domain", "forbidden package group", references)
+        {
+            Payload = new PackageDependencyPayload("forbidden"),
+            Identities =
+            [
+                PackageIdentity("Example.A"),
+                PackageIdentity("Example.B"),
+            ],
+        };
+
+        string human = _formatter.FormatViolationsForHumans([violation]);
+        using JsonDocument jsonDocument = JsonDocument.Parse(_formatter.FormatResultForCiArtifacts(
+            "strict", false, [violation], Array.Empty<string>()));
+        using JsonDocument sarifDocument = JsonDocument.Parse(
+            new ArchitectureSarifFormatter().FormatResultAsSarif(
+                "strict", [violation], Array.Empty<string>(), "1.0.0"));
+
+        JsonElement jsonFindings = jsonDocument.RootElement.GetProperty("violations");
+        JsonElement sarifResults = sarifDocument.RootElement.GetProperty("runs")[0].GetProperty("results");
+        string[] humanLines = human.Split(Environment.NewLine, StringSplitOptions.RemoveEmptyEntries);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(humanLines, Has.Length.EqualTo(2));
+            Assert.That(humanLines.Count(line => line.Contains("Example.A@1.0.0", StringComparison.Ordinal)), Is.EqualTo(1));
+            Assert.That(humanLines.Count(line => line.Contains("Example.B@2.0.0", StringComparison.Ordinal)), Is.EqualTo(1));
+            Assert.That(humanLines.All(line =>
+                !(line.Contains("Example.A@1.0.0", StringComparison.Ordinal)
+                    && line.Contains("Example.B@2.0.0", StringComparison.Ordinal))), Is.True);
+            AssertFindingEvidenceMatchesIdentity(jsonFindings.EnumerateArray());
+            AssertFindingEvidenceMatchesIdentity(sarifResults.EnumerateArray().Select(result =>
+                result.GetProperty("properties").GetProperty("arch_linter_net")));
+        });
+    }
+
+    private static ArchitectureViolationIdentity PackageIdentity(string packageId) =>
+        new(
+            ArchitectureViolationIdentity.CurrentVersion,
+            "package_dependency",
+            "package",
+            "package-id",
+            null,
+            "Product.Domain",
+            null,
+            null,
+            null,
+            packageId,
+            0);
+
+    private static void AssertFindingEvidenceMatchesIdentity(IEnumerable<JsonElement> findings)
+    {
+        JsonElement[] materialized = findings.ToArray();
+        Assert.That(materialized, Has.Length.EqualTo(2));
+        foreach (JsonElement finding in materialized)
+        {
+            string reference = finding.GetProperty("details").GetProperty("forbidden_references")[0].GetString()!;
+            using JsonDocument identity = JsonDocument.Parse(finding.GetProperty("canonical_identity").GetString()!);
+            string targetMember = identity.RootElement.GetProperty("target_member").GetString()!;
+            Assert.That(reference, Does.StartWith(targetMember));
+        }
+    }
 }

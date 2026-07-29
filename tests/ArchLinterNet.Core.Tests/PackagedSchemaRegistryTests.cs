@@ -114,12 +114,27 @@ public sealed class PackagedSchemaRegistryTests
             {
               "schema_version": 1,
               "kind": "future_finding",
+              "contract": "future contract",
+              "contract_id": "future-contract",
               "canonical_identity": "future:1",
               "mode": "strict",
               "severity": "error",
               "message_code": "future",
-              "policy_origin": null,
-              "source_location": null,
+              "policy_origin": {
+                "root_path": "/repo",
+                "source_path": "architecture/future.yml",
+                "role": "fragment",
+                "yaml_path": "future[0]",
+                "line": 7,
+                "column": 3,
+                "source_ordinal": 2,
+                "import_chain": ["architecture.yml", "architecture/future.yml"]
+              },
+              "source_location": {
+                "path": "src/Future.cs",
+                "line": 11,
+                "column": 5
+              },
               "baseline_state": null,
               "details": { "future_evidence": true }
             }
@@ -132,7 +147,25 @@ public sealed class PackagedSchemaRegistryTests
             Assert.That(opaque.IsOpaque, Is.True);
             Assert.That(opaque.SchemaVersion, Is.EqualTo(1));
             Assert.That(opaque.Kind, Is.EqualTo("future_finding"));
+            Assert.That(opaque.Contract, Is.EqualTo("future contract"));
+            Assert.That(opaque.ContractId, Is.EqualTo("future-contract"));
+            Assert.That(
+                opaque.RawPolicyOrigin?.GetProperty("yaml_path").GetString(),
+                Is.EqualTo("future[0]"));
+            Assert.That(
+                opaque.RawSourceLocation?.GetProperty("path").GetString(),
+                Is.EqualTo("src/Future.cs"));
             Assert.That(opaque.RawDetails.GetProperty("future_evidence").GetBoolean(), Is.True);
+            using JsonDocument forwarded = JsonDocument.Parse(opaque.ToJson());
+            Assert.That(
+                forwarded.RootElement.GetProperty("policy_origin").GetProperty("source_path").GetString(),
+                Is.EqualTo("architecture/future.yml"));
+            Assert.That(
+                forwarded.RootElement.GetProperty("details").GetProperty("future_evidence").GetBoolean(),
+                Is.True);
+            Assert.That(
+                JsonNode.DeepEquals(JsonNode.Parse(Json), JsonNode.Parse(opaque.ToJson())),
+                Is.True);
             Assert.That(
                 () => ArchitectureFindingJsonReader.Read(Json, strict: true),
                 Throws.TypeOf<ArchitectureFindingFormatException>()

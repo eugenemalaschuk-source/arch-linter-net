@@ -11,7 +11,21 @@ public sealed record ArchitectureFindingReadEnvelope(
     string MessageCode,
     string? BaselineState,
     JsonElement RawDetails,
-    bool IsOpaque);
+    bool IsOpaque)
+{
+    public string? Contract { get; init; }
+
+    public string? ContractId { get; init; }
+
+    public JsonElement? RawPolicyOrigin { get; init; }
+
+    public JsonElement? RawSourceLocation { get; init; }
+
+    /// <summary>The original normalized envelope, retained for lossless forwarding.</summary>
+    public JsonElement RawEnvelope { get; init; }
+
+    public string ToJson() => RawEnvelope.GetRawText();
+}
 
 public sealed class ArchitectureFindingFormatException(string message) : InvalidOperationException(message);
 
@@ -63,12 +77,31 @@ public static class ArchitectureFindingJsonReader
             root.GetProperty("message_code").GetString() ?? string.Empty,
             ReadNullableString(root, "baseline_state"),
             root.GetProperty("details").Clone(),
-            opaque);
+            opaque)
+        {
+            Contract = ReadOptionalNullableString(root, "contract"),
+            ContractId = ReadOptionalNullableString(root, "contract_id"),
+            RawPolicyOrigin = ReadOptionalElement(root, "policy_origin"),
+            RawSourceLocation = ReadOptionalElement(root, "source_location"),
+            RawEnvelope = root.Clone(),
+        };
     }
 
     private static string? ReadNullableString(JsonElement root, string propertyName)
     {
         JsonElement value = root.GetProperty(propertyName);
         return value.ValueKind == JsonValueKind.Null ? null : value.GetString();
+    }
+
+    private static string? ReadOptionalNullableString(JsonElement root, string propertyName)
+    {
+        return root.TryGetProperty(propertyName, out JsonElement value) && value.ValueKind != JsonValueKind.Null
+            ? value.GetString()
+            : null;
+    }
+
+    private static JsonElement? ReadOptionalElement(JsonElement root, string propertyName)
+    {
+        return root.TryGetProperty(propertyName, out JsonElement value) ? value.Clone() : null;
     }
 }
