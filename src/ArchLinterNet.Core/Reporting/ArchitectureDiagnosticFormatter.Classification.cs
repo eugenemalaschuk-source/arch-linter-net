@@ -227,8 +227,8 @@ public sealed partial class ArchitectureDiagnosticFormatter
         {
             passed = request.Passed,
             mode = request.Mode,
-            violations = ArchitectureFindingMapper.Order(request.Violations.Select(ArchitectureFindingMapper.FromViolation))
-                .Select(finding => ToCiJsonObject(finding.Details, includeContract: true))
+            violations = ArchitectureFindingMapper.Order(ArchitectureFindingMapper.FromViolations(request.Violations, request.Mode))
+                .Select(finding => ToCiJsonObject(finding.Details, includeContract: true, request.Mode))
                 .ToArray(),
             cycles = request.Cycles
                 .Select(cycle => ArchitectureDiagnosticMapper.FromCycle(cycle, contractName: string.Empty, contractId: null))
@@ -236,9 +236,10 @@ public sealed partial class ArchitectureDiagnosticFormatter
                 .ToArray(),
             cycle_diagnostics = cycleDiagnosticsSerialized,
             coverage_findings = ArchitectureFindingMapper.Order(
-                    (request.CoverageFindings ?? Array.Empty<ArchitectureViolation>())
-                    .Select(ArchitectureFindingMapper.FromViolation))
-                .Select(finding => ToCiJsonObject(finding.Details, includeContract: true))
+                    ArchitectureFindingMapper.FromViolations(
+                        request.CoverageFindings ?? Array.Empty<ArchitectureViolation>(),
+                        request.Mode))
+                .Select(finding => ToCiJsonObject(finding.Details, includeContract: true, request.Mode))
                 .ToArray(),
             unmatched_ignored_violations = unmatchedSerialized,
             policy_consistency_findings = policyConsistencySerialized,

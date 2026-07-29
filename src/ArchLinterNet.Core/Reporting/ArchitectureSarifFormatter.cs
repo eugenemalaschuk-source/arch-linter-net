@@ -208,7 +208,9 @@ public sealed partial class ArchitectureSarifFormatter : IArchitectureSarifForma
         // SARIF's standard fields remain the interoperable summary. The exact same
         // versioned JSON finding used by the CI formatter is retained under a
         // namespaced property so no evidence has to be reconstructed from prose.
-        properties["arch_linter_net"] = ArchitectureDiagnosticFormatter.FormatNormalizedFindingForSarif(diagnostic);
+        properties["arch_linter_net"] = ArchitectureDiagnosticFormatter.FormatNormalizedFindingForSarif(
+            diagnostic,
+            level == "error" ? "strict" : "audit");
         json["properties"] = properties;
 
         return new ResultEntry(ruleId, diagnostic.ContractName, sourceType, forbiddenNamespace, json);
@@ -430,7 +432,8 @@ public sealed partial class ArchitectureSarifFormatter : IArchitectureSarifForma
             ["properties"] = new Dictionary<string, object?>
             {
                 ["arch_linter_net"] = ArchitectureDiagnosticFormatter.FormatNormalizedFindingForSarif(
-                    new CycleDiagnostic(ruleId, match.Success ? ruleId : null, path)),
+                    new CycleDiagnostic(ruleId, match.Success ? ruleId : null, path),
+                    level == "error" ? "strict" : "audit"),
             },
         };
 
@@ -449,7 +452,9 @@ public sealed partial class ArchitectureSarifFormatter : IArchitectureSarifForma
             ["logicalLocations"] = BuildLogicalLocations(diagnostic.Path, "namespace"),
             ["properties"] = new Dictionary<string, object?>
             {
-                ["arch_linter_net"] = ArchitectureDiagnosticFormatter.FormatNormalizedFindingForSarif(diagnostic),
+                ["arch_linter_net"] = ArchitectureDiagnosticFormatter.FormatNormalizedFindingForSarif(
+                    diagnostic,
+                    level == "error" ? "strict" : "audit"),
             },
         };
 

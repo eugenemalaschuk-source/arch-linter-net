@@ -17,7 +17,7 @@ public sealed class ArchitectureFindingMapperTests
         Assert.Multiple(() =>
         {
             Assert.That(tokens, Has.Length.EqualTo(Enum.GetValues<ArchitectureDiagnosticKind>().Length));
-            Assert.That(tokens.Distinct(StringComparer.Ordinal), Has.Count.EqualTo(tokens.Length));
+            Assert.That(tokens.Distinct(StringComparer.Ordinal).Count(), Is.EqualTo(tokens.Length));
             Assert.That(tokens, Does.Contain("package_dependency"));
             Assert.That(tokens, Does.Contain("composition"));
             Assert.That(tokens, Does.Contain("build_state_preflight"));

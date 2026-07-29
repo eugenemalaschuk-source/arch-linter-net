@@ -527,10 +527,13 @@ public sealed partial class ArchitectureDiagnosticFormatter : IArchitectureDiagn
         return string.Empty;
     }
 
-    private static Dictionary<string, object?> ToCiJsonObject(ArchitectureDiagnostic diagnostic, bool includeContract)
+    private static Dictionary<string, object?> ToCiJsonObject(
+        ArchitectureDiagnostic diagnostic,
+        bool includeContract,
+        string? mode = null)
     {
         var obj = new Dictionary<string, object?>();
-        ArchitectureFinding finding = ArchitectureFindingMapper.FromDiagnostic(diagnostic);
+        ArchitectureFinding finding = ArchitectureFindingMapper.FromDiagnostic(diagnostic, mode);
 
         // The versioned envelope is additive: callers that still consume the original
         // flat fields keep working, while new callers get an explicit discriminator
@@ -542,7 +545,7 @@ public sealed partial class ArchitectureDiagnosticFormatter : IArchitectureDiagn
         obj["severity"] = finding.Severity;
         obj["message_code"] = finding.Kind;
         obj["policy_origin"] = diagnostic.PolicyLocation is null ? null : FormatPolicyLocationForJson(diagnostic.PolicyLocation);
-        obj["source_location"] = null;
+        obj["source_location"] = SourceLocationForJson(diagnostic);
         obj["baseline_state"] = finding.BaselineState;
 
         if (includeContract)
@@ -571,8 +574,10 @@ public sealed partial class ArchitectureDiagnosticFormatter : IArchitectureDiagn
         return obj;
     }
 
-    internal static Dictionary<string, object?> FormatNormalizedFindingForSarif(ArchitectureDiagnostic diagnostic) =>
-        ToCiJsonObject(diagnostic, includeContract: true);
+    internal static Dictionary<string, object?> FormatNormalizedFindingForSarif(
+        ArchitectureDiagnostic diagnostic,
+        string? mode = null) =>
+        ToCiJsonObject(diagnostic, includeContract: true, mode);
 
     private static Dictionary<string, object?> BuildDetailsJsonObject(ArchitectureDiagnostic diagnostic)
     {
@@ -591,6 +596,12 @@ public sealed partial class ArchitectureDiagnosticFormatter : IArchitectureDiagn
             ["schema_version"] = ArchitectureFinding.CurrentSchemaVersion,
             ["kind"] = "unmatched_ignore",
             ["canonical_identity"] = ArchitectureFindingMapper.FromDiagnostic(unmatched).CanonicalIdentity,
+            ["mode"] = null,
+            ["severity"] = null,
+            ["message_code"] = "unmatched_ignore",
+            ["policy_origin"] = unmatched.PolicyLocation is null ? null : FormatPolicyLocationForJson(unmatched.PolicyLocation),
+            ["source_location"] = null,
+            ["baseline_state"] = null,
             ["contract"] = unmatched.ContractName,
             ["contract_id"] = unmatched.ContractId,
             ["ignore_index"] = unmatched.IgnoreIndex,
@@ -608,69 +619,6 @@ public sealed partial class ArchitectureDiagnosticFormatter : IArchitectureDiagn
         };
         ApplyPolicyLocationFields(unmatched, obj);
         return obj;
-    }
-
-    private static void ApplyDiagnosticSpecificCiFields(ArchitectureDiagnostic diagnostic, Dictionary<string, object?> obj)
-    {
-        switch (diagnostic)
-        {
-            case DependencyDiagnostic dependency:
-                ApplyDependencyCiFields(dependency, obj);
-                break;
-            case ExternalDependencyDiagnostic external:
-                obj["forbidden_external_group"] = external.ForbiddenExternalGroup;
-                break;
-            case PackageDependencyDiagnostic packageDependency:
-                obj["forbidden_package_group"] = packageDependency.ForbiddenPackageGroup;
-                break;
-            case PackageAllowOnlyDiagnostic packageAllowOnly:
-                obj["allowed_package_groups"] = packageAllowOnly.AllowedPackageGroups.ToArray();
-                break;
-            case FrameworkReferenceDiagnostic frameworkDependency:
-                obj["forbidden_framework_group"] = frameworkDependency.ForbiddenFrameworkGroup;
-                ApplyFrameworkReferenceEvidenceCiFields(frameworkDependency.Evidence, obj);
-                break;
-            case FrameworkReferenceAllowOnlyDiagnostic frameworkAllowOnly:
-                obj["allowed_framework_groups"] = frameworkAllowOnly.AllowedFrameworkGroups.ToArray();
-                ApplyFrameworkReferenceEvidenceCiFields(frameworkAllowOnly.Evidence, obj);
-                break;
-            case TypePlacementDiagnostic typePlacement:
-                ApplyTypePlacementCiFields(typePlacement, obj);
-                break;
-            case LayoutConventionDiagnostic layoutConvention:
-                ApplyLayoutConventionCiFields(layoutConvention, obj);
-                break;
-            case PublicApiSurfaceDiagnostic publicApiSurface:
-                ApplyPublicApiSurfaceCiFields(publicApiSurface, obj);
-                break;
-            case AttributeUsageDiagnostic attributeUsage:
-                ApplyAttributeUsageCiFields(attributeUsage, obj);
-                break;
-            case InheritanceDiagnostic inheritance:
-                ApplyInheritanceCiFields(inheritance, obj);
-                break;
-            case InterfaceImplementationDiagnostic interfaceImplementation:
-                ApplyInterfaceImplementationCiFields(interfaceImplementation, obj);
-                break;
-            case CompositionDiagnostic composition:
-                ApplyCompositionCiFields(composition, obj);
-                break;
-            case ProjectMetadataDiagnostic projectMetadata:
-                ApplyProjectMetadataCiFields(projectMetadata, obj);
-                break;
-            case ConfigurationDiagnostic configuration:
-                ApplyConfigurationCiFields(configuration, obj);
-                break;
-            case ContextDependencyDiagnostic contextDependency:
-                ApplyContextDependencyCiFields(contextDependency, obj);
-                break;
-            case ContextAllowOnlyDiagnostic contextAllowOnly:
-                ApplyContextAllowOnlyCiFields(contextAllowOnly, obj);
-                break;
-            case PortBoundaryDiagnostic portBoundary:
-                ApplyPortBoundaryCiFields(portBoundary, obj);
-                break;
-        }
     }
 
     private static void ApplyDependencyCiFields(DependencyDiagnostic dependency, Dictionary<string, object?> obj)

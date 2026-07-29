@@ -21,6 +21,13 @@ public sealed record ArchitectureFinding(
 
     public string? BaselineState { get; init; }
 
+    /// <summary>
+    /// The versioned identity used by baseline matching. Its JSON projection is the wire value of
+    /// <see cref="CanonicalIdentity"/>; keeping the structured source alongside the string prevents
+    /// adapters from re-deriving a lossy display key.
+    /// </summary>
+    public ArchitectureViolationIdentity? Identity { get; init; }
+
     public ArchitecturePolicySourceLocation? PolicyLocation => Details.PolicyLocation;
 
     public IReadOnlyCollection<ArchitecturePolicySourceLocation> RelatedPolicyLocations =>

@@ -57,6 +57,11 @@ internal static class BaselineLifecycleFormatter
             canonical_identity = entry.Identity is { } structuredIdentity
                 ? ArchitectureViolationIdentityJson.Serialize(structuredIdentity)
                 : $"{entry.ContractGroup}:{entry.ContractId}:{entry.SourceType}:{entry.ForbiddenReference}",
+            mode = (string?)null,
+            severity = (string?)null,
+            message_code = "baseline",
+            policy_origin = (object?)null,
+            source_location = (object?)null,
             baseline_state = status,
             details = new
             {
@@ -77,27 +82,7 @@ internal static class BaselineLifecycleFormatter
     /// </summary>
     public static object? IdentityForJson(ArchitectureViolationIdentity? identity)
     {
-        if (identity == null)
-        {
-            return null;
-        }
-
-        return new
-        {
-            identityVersion = identity.IdentityVersion,
-            contractFamily = identity.ContractFamily,
-            kind = identity.Kind,
-            contractId = identity.ContractId,
-            sourceAssembly = identity.SourceAssembly,
-            sourceType = identity.SourceType,
-            sourceMember = identity.SourceMember,
-            targetAssembly = identity.TargetAssembly,
-            targetType = identity.TargetType,
-            targetMember = identity.TargetMember,
-            occurrence = identity.Occurrence,
-            configuration = identity.Configuration,
-            canonical = identity.ToString(),
-        };
+        return identity == null ? null : ArchitectureViolationIdentityJson.ToWireObject(identity);
     }
 
     public static IEnumerable<object> EntriesForJson(IEnumerable<BaselineLifecycleEntry> entries)

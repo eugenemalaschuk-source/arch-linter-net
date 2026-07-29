@@ -13,6 +13,9 @@ public sealed record ArchitectureViolation(
 
     public ArchitecturePolicySourceLocation? PolicyLocation { get; init; }
 
+    /// <summary>Authoritative baseline identity when the execution path has already resolved it.</summary>
+    public ArchitectureViolationIdentity? Identity { get; init; }
+
     public IReadOnlyCollection<ArchitecturePolicySourceLocation> RelatedPolicyLocations { get; init; } =
         Array.Empty<ArchitecturePolicySourceLocation>();
 }

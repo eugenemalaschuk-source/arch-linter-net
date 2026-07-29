@@ -3,7 +3,7 @@
   "$id": "https://archlinternet.dev/schema/0.5.1/normalized-finding.schema.json",
   "title": "ArchLinterNet normalized finding v1",
   "type": "object",
-  "required": ["schema_version", "kind", "canonical_identity", "details"],
+  "required": ["schema_version", "kind", "canonical_identity", "mode", "severity", "message_code", "policy_origin", "source_location", "baseline_state", "details"],
   "properties": {
     "schema_version": { "const": 1 },
     "kind": {
@@ -20,6 +20,12 @@
     "contract": { "type": ["string", "null"] },
     "contract_id": { "type": ["string", "null"] },
     "canonical_identity": { "type": "string" },
+    "mode": { "type": ["string", "null"] },
+    "severity": { "type": ["string", "null"] },
+    "message_code": { "type": "string" },
+    "policy_origin": { "type": ["object", "null"] },
+    "source_location": { "type": ["object", "null"], "properties": { "path": { "type": "string" } } },
+    "baseline_state": { "type": ["string", "null"] },
     "source": { "type": "string" },
     "forbidden_namespace": { "type": "string" },
     "forbidden_references": { "type": "array", "items": { "type": "string" } },
@@ -54,5 +60,31 @@
       ]
     }
   },
+  "allOf": [
+    { "if": { "properties": { "kind": { "const": "dependency" } } }, "then": { "properties": { "details": { "properties": { "detail_kind": { "const": "dependency" } } } } } },
+    { "if": { "properties": { "kind": { "const": "cycle" } } }, "then": { "properties": { "details": { "properties": { "detail_kind": { "const": "cycle" } }, "required": ["path"] } } } },
+    { "if": { "properties": { "kind": { "const": "unmatched_ignore" } } }, "then": { "properties": { "details": { "properties": { "detail_kind": { "const": "unmatched_ignore" } } } } } },
+    { "if": { "properties": { "kind": { "const": "configuration" } } }, "then": { "properties": { "details": { "properties": { "detail_kind": { "const": "configuration" } } } } } },
+    { "if": { "properties": { "kind": { "const": "external_dependency" } } }, "then": { "properties": { "details": { "properties": { "detail_kind": { "const": "external_dependency" } } } } } },
+    { "if": { "properties": { "kind": { "const": "policy_consistency" } } }, "then": { "properties": { "details": { "properties": { "detail_kind": { "const": "policy_consistency" } } } } } },
+    { "if": { "properties": { "kind": { "const": "package_dependency" } } }, "then": { "properties": { "details": { "properties": { "detail_kind": { "const": "package_dependency" } }, "required": ["forbidden_package_group"] } } } },
+    { "if": { "properties": { "kind": { "const": "type_placement" } } }, "then": { "properties": { "details": { "properties": { "detail_kind": { "const": "type_placement" } } } } } },
+    { "if": { "properties": { "kind": { "const": "public_api_surface" } } }, "then": { "properties": { "details": { "properties": { "detail_kind": { "const": "public_api_surface" } } } } } },
+    { "if": { "properties": { "kind": { "const": "attribute_usage" } } }, "then": { "properties": { "details": { "properties": { "detail_kind": { "const": "attribute_usage" } } } } } },
+    { "if": { "properties": { "kind": { "const": "inheritance" } } }, "then": { "properties": { "details": { "properties": { "detail_kind": { "const": "inheritance" } } } } } },
+    { "if": { "properties": { "kind": { "const": "interface_implementation" } } }, "then": { "properties": { "details": { "properties": { "detail_kind": { "const": "interface_implementation" } } } } } },
+    { "if": { "properties": { "kind": { "const": "composition" } } }, "then": { "properties": { "details": { "properties": { "detail_kind": { "const": "composition" } } } } } },
+    { "if": { "properties": { "kind": { "const": "project_metadata" } } }, "then": { "properties": { "details": { "properties": { "detail_kind": { "const": "project_metadata" } } } } } },
+    { "if": { "properties": { "kind": { "const": "context_dependency" } } }, "then": { "properties": { "details": { "properties": { "detail_kind": { "const": "context_dependency" } } } } } },
+    { "if": { "properties": { "kind": { "const": "context_allow_only" } } }, "then": { "properties": { "details": { "properties": { "detail_kind": { "const": "context_allow_only" } } } } } },
+    { "if": { "properties": { "kind": { "const": "port_boundary" } } }, "then": { "properties": { "details": { "properties": { "detail_kind": { "const": "port_boundary" } } } } } },
+    { "if": { "properties": { "kind": { "const": "layout_convention" } } }, "then": { "properties": { "details": { "properties": { "detail_kind": { "const": "layout_convention" } } } } } },
+    { "if": { "properties": { "kind": { "const": "package_allow_only" } } }, "then": { "properties": { "details": { "properties": { "detail_kind": { "const": "package_allow_only" } } } } } },
+    { "if": { "properties": { "kind": { "const": "framework_reference" } } }, "then": { "properties": { "details": { "properties": { "detail_kind": { "const": "framework_reference" } } } } } },
+    { "if": { "properties": { "kind": { "const": "framework_reference_allow_only" } } }, "then": { "properties": { "details": { "properties": { "detail_kind": { "const": "framework_reference_allow_only" } } } } } },
+    { "if": { "properties": { "kind": { "const": "build_state_preflight" } } }, "then": { "properties": { "details": { "properties": { "detail_kind": { "const": "build_state_preflight" } }, "required": ["state", "project_path"] } } } },
+    { "if": { "properties": { "kind": { "const": "baseline" } } }, "then": { "properties": { "details": { "properties": { "detail_kind": { "const": "baseline" } }, "required": ["contract_group", "source_type", "forbidden_reference"] } } } },
+    { "if": { "properties": { "kind": { "const": "architecture_policy_error" } } }, "then": { "properties": { "details": { "properties": { "detail_kind": { "const": "architecture_policy_error" } } } } } }
+  ],
   "additionalProperties": true
 }

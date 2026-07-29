@@ -120,30 +120,37 @@ public static class ArchitectureBaselineSarifFormatter
             {
                 ["schema_version"] = ArchitectureFinding.CurrentSchemaVersion,
                 ["kind"] = "baseline",
-                ["canonical_identity"] = entry.Identity?.ToString()
-                    ?? $"{entry.ContractGroup}:{entry.ContractId}:{entry.SourceType}:{entry.ForbiddenReference}",
+                ["canonical_identity"] = entry.Identity is { } identity
+                    ? ArchitectureViolationIdentityJson.Serialize(identity)
+                    : $"{entry.ContractGroup}:{entry.ContractId}:{entry.SourceType}:{entry.ForbiddenReference}",
+                ["mode"] = null,
+                ["severity"] = null,
+                ["message_code"] = "baseline",
+                ["policy_origin"] = null,
+                ["source_location"] = null,
                 ["baseline_state"] = BaselineEntryLifecycleNames.WireName(lifecycle.Lifecycle),
                 ["details"] = new Dictionary<string, object?>
                 {
+                    ["detail_kind"] = "baseline",
                     ["contract_group"] = entry.ContractGroup,
                     ["source_type"] = entry.SourceType,
                     ["forbidden_reference"] = entry.ForbiddenReference,
-                    ["identity"] = entry.Identity,
+                    ["identity"] = entry.Identity is null ? null : ArchitectureViolationIdentityJson.ToWireObject(entry.Identity),
                 },
             },
         };
-        if (entry.Identity is { } identity)
+        if (entry.Identity is { } structuredIdentity)
         {
-            properties["identity_version"] = identity.IdentityVersion;
-            properties["contract_family"] = identity.ContractFamily;
-            properties["kind"] = identity.Kind;
-            properties["source_assembly"] = identity.SourceAssembly;
-            properties["source_member"] = identity.SourceMember;
-            properties["target_assembly"] = identity.TargetAssembly;
-            properties["target_type"] = identity.TargetType;
-            properties["target_member"] = identity.TargetMember;
-            properties["occurrence"] = identity.Occurrence;
-            properties["configuration"] = identity.Configuration;
+            properties["identity_version"] = structuredIdentity.IdentityVersion;
+            properties["contract_family"] = structuredIdentity.ContractFamily;
+            properties["kind"] = structuredIdentity.Kind;
+            properties["source_assembly"] = structuredIdentity.SourceAssembly;
+            properties["source_member"] = structuredIdentity.SourceMember;
+            properties["target_assembly"] = structuredIdentity.TargetAssembly;
+            properties["target_type"] = structuredIdentity.TargetType;
+            properties["target_member"] = structuredIdentity.TargetMember;
+            properties["occurrence"] = structuredIdentity.Occurrence;
+            properties["configuration"] = structuredIdentity.Configuration;
         }
 
         return new Dictionary<string, object?>
