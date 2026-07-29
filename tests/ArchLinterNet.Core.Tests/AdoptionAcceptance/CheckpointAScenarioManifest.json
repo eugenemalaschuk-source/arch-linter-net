@@ -1,0 +1,24 @@
+{
+  "schema": "adoption-acceptance-corpus/v1",
+  "checkpoint": "A",
+  "release_gate": false,
+  "synthetic_identities_only": true,
+  "fixtures": [
+    { "id": "minimal-single-project", "shape": "small", "owner": "#356", "entrypoints": ["LayerExclusionAcceptanceTests.MinimalPolicy_ProductWildcardExcludingGenerated_GeneratedTypeFallsOutOfLayer"] },
+    { "id": "conventional-multi-project", "shape": "multi-project", "owner": "#358", "entrypoints": ["FrameworkReferenceBaselineIdentityTests.MultiTargetProject_ConditionScopedFrameworkReference_AppliesOnlyToMatchingTargetFramework"] },
+    { "id": "same-named-multi-host", "shape": "multi-host", "owner": "#361", "entrypoints": ["CompositionContractTests"] },
+    { "id": "legacy-import-migration", "shape": "migration", "owner": "#357", "entrypoints": ["ArchitecturePolicyImportAcceptanceTests", "ArchitectureBaselineComparerTests.Compare_Version1Baseline_UnqualifiedIdentityStillMatchesByLegacyPair"] },
+    { "id": "clean-checkout", "shape": "clean-checkout", "owner": "#362", "entrypoints": ["BuildStatePreflightCleanCheckoutTests.TargetAssembliesWithDiscoveredProject_CleanCheckout_BlocksWithMissingArtifactWithoutThrowing"] }
+  ],
+  "scenarios": [
+    { "id": "imports-provenance", "owners": ["#356"], "entrypoints": ["CliIntegrationTests.ImportedPolicy_HumanDiagnostic_IncludesPortableFragmentAndRootContext", "CliIntegrationTests.ImportedPolicy_JsonDiagnostic_IncludesStableStructuredPolicyLocation", "CliIntegrationTests.ImportedPolicy_SarifDiagnostic_PreservesLogicalAndPolicyLocations"] },
+    { "id": "baseline-exact-identity", "owners": ["#357"], "entrypoints": ["ArchitectureBaselineComparerTests", "CompositionContractTests"] },
+    { "id": "subtractive-selectors", "owners": ["#356"], "entrypoints": ["LayerExclusionAcceptanceTests"] },
+    { "id": "package-framework-evidence", "owners": ["#358"], "entrypoints": ["ArchitectureDiagnosticFormatterTests.PackageDiagnostics", "ArchitectureDiagnosticFormatterTests.FrameworkReferenceDiagnostics"] },
+    { "id": "assembly-aware-composition", "owners": ["#361"], "entrypoints": ["CompositionContractTests"] },
+    { "id": "build-state-preflight", "owners": ["#362"], "entrypoints": ["BuildStatePreflightCleanCheckoutTests"] },
+    { "id": "single-snapshot-and-report-sinks", "owners": ["#363", "#364"], "entrypoints": ["ArchitectureValidationSnapshotSessionTests", "ReportCoordinatorTests"] },
+    { "id": "non-tty-human-json-sarif", "owners": ["#364"], "entrypoints": ["CheckpointACommandLineAcceptanceTests.RedirectedHumanJsonAndSarif_UseOneCorpusScenario"] }
+  ],
+  "reusers": ["#374", "#411", "#366"]
+}
