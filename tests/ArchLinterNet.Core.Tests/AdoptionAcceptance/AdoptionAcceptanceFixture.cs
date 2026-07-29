@@ -31,8 +31,14 @@ internal sealed class AdoptionAcceptanceFixture : IDisposable
             throw new InvalidOperationException($"Unknown adoption fixture root '{id}'.");
         }
 
+        string temporaryRoot = Path.GetTempPath();
+        if (OperatingSystem.IsMacOS() && temporaryRoot.StartsWith("/var/", StringComparison.Ordinal))
+        {
+            temporaryRoot = $"/private{temporaryRoot}";
+        }
+
         string destination = Path.Combine(
-            Path.GetTempPath(),
+            temporaryRoot,
             $"arch-linter-adoption-{id}-{Guid.NewGuid():N}");
         CopyDirectory(source, destination);
         return new AdoptionAcceptanceFixture(id, destination);
