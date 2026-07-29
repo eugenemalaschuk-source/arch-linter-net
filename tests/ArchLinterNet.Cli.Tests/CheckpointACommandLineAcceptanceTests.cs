@@ -26,7 +26,10 @@ public sealed class CheckpointACommandLineAcceptanceTests
             {
                 Assert.That(result.ExitCode, Is.EqualTo(1), result.StdErr);
                 Assert.That(result.StdOut, Does.Contain("root: imported-provenance-root.yml"));
-                Assert.That(result.StdOut, Does.Not.Contain("\u001b["));
+                Assert.That(
+                    result.StdOut.IndexOf('\u001b'),
+                    Is.EqualTo(-1),
+                    Convert.ToHexString(System.Text.Encoding.UTF8.GetBytes(result.StdOut)));
                 Assert.That(json.RootElement.GetProperty("violations")[0].GetProperty("policy_location")
                     .GetProperty("role").GetString(), Is.EqualTo("fragment"));
                 Assert.That(sarif.RootElement.GetProperty("runs")[0].GetProperty("results")[0]

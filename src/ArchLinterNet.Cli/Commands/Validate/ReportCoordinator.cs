@@ -1,7 +1,7 @@
 using System.Text;
 using System.Text.Json.Nodes;
-using System.Text.RegularExpressions;
 using ArchLinterNet.Cli.Abstractions;
+using ArchLinterNet.Cli.Infrastructure;
 using ArchLinterNet.Core.Model;
 using ArchLinterNet.Core.Reporting;
 using ArchLinterNet.Core.Validation;
@@ -30,10 +30,6 @@ internal sealed class ReportCoordinator
     private const string FormatHuman = "human";
     private const string FormatJson = "json";
     private const string FormatSarif = "sarif";
-    private static readonly Regex _ansiEscapeSequence = new(
-        "\\x1B(?:\\[[0-?]*[ -/]*[@-~]|\\][^\\x07]*(?:\\x07|\\x1B\\\\))",
-        RegexOptions.CultureInvariant,
-        TimeSpan.FromSeconds(1));
 
     private readonly ICliRuntime _runtime;
     private readonly ICliConsole _console;
@@ -475,7 +471,7 @@ internal sealed class ReportCoordinator
         return StripAnsi(sb.ToString().TrimEnd());
     }
 
-    internal static string StripAnsi(string content) => _ansiEscapeSequence.Replace(content, string.Empty);
+    internal static string StripAnsi(string content) => AnsiEscapeSequenceStripper.Strip(content);
 
     private void AppendHumanSection(StringBuilder sb, ValidationOutcome outcome)
     {
