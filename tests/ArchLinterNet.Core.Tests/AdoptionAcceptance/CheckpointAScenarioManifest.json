@@ -5,20 +5,21 @@
   "synthetic_identities_only": true,
   "fixtures": [
     { "id": "minimal-single-project", "shape": "small", "owner": "#356", "entrypoints": ["LayerExclusionAcceptanceTests.MinimalPolicy_ProductWildcardExcludingGenerated_GeneratedTypeFallsOutOfLayer"] },
-    { "id": "conventional-multi-project", "shape": "multi-project", "owner": "#358", "entrypoints": ["FrameworkReferenceBaselineIdentityTests.MultiTargetProject_ConditionScopedFrameworkReference_AppliesOnlyToMatchingTargetFramework"] },
-    { "id": "same-named-multi-host", "shape": "multi-host", "owner": "#361", "entrypoints": ["CompositionContractTests"] },
-    { "id": "legacy-import-migration", "shape": "migration", "owner": "#357", "entrypoints": ["ArchitecturePolicyImportAcceptanceTests", "ArchitectureBaselineComparerTests.Compare_Version1Baseline_UnqualifiedIdentityStillMatchesByLegacyPair"] },
+    { "id": "conventional-multi-project", "shape": "multi-project", "owner": "#359", "entrypoints": ["CheckpointAAdoptionAcceptanceTests.ExecuteScenario"] },
+    { "id": "same-named-multi-host", "shape": "multi-host", "owner": "#360", "entrypoints": ["CheckpointAAdoptionAcceptanceTests.ExecuteScenario"] },
+    { "id": "legacy-import-migration", "shape": "migration", "owner": "#361", "entrypoints": ["CheckpointAAdoptionAcceptanceTests.ExecuteScenario"] },
     { "id": "clean-checkout", "shape": "clean-checkout", "owner": "#362", "entrypoints": ["BuildStatePreflightCleanCheckoutTests.TargetAssembliesWithDiscoveredProject_CleanCheckout_BlocksWithMissingArtifactWithoutThrowing"] }
   ],
   "scenarios": [
-    { "id": "imports-provenance", "owners": ["#356"], "entrypoints": ["CliIntegrationTests.ImportedPolicy_HumanDiagnostic_IncludesPortableFragmentAndRootContext", "CliIntegrationTests.ImportedPolicy_JsonDiagnostic_IncludesStableStructuredPolicyLocation", "CliIntegrationTests.ImportedPolicy_SarifDiagnostic_PreservesLogicalAndPolicyLocations"] },
-    { "id": "baseline-exact-identity", "owners": ["#357"], "entrypoints": ["ArchitectureBaselineComparerTests", "CompositionContractTests"] },
-    { "id": "subtractive-selectors", "owners": ["#356"], "entrypoints": ["LayerExclusionAcceptanceTests"] },
-    { "id": "package-framework-evidence", "owners": ["#358"], "entrypoints": ["ArchitectureDiagnosticFormatterTests.PackageDiagnostics", "ArchitectureDiagnosticFormatterTests.FrameworkReferenceDiagnostics"] },
-    { "id": "assembly-aware-composition", "owners": ["#361"], "entrypoints": ["CompositionContractTests"] },
-    { "id": "build-state-preflight", "owners": ["#362"], "entrypoints": ["BuildStatePreflightCleanCheckoutTests"] },
-    { "id": "single-snapshot-and-report-sinks", "owners": ["#363", "#364"], "entrypoints": ["ArchitectureValidationSnapshotSessionTests", "ReportCoordinatorTests"] },
-    { "id": "non-tty-human-json-sarif", "owners": ["#364"], "entrypoints": ["CheckpointACommandLineAcceptanceTests.RedirectedHumanJsonAndSarif_UseOneCorpusScenario"] }
+    { "id": "imports-provenance", "owner": "#361", "entrypoint": "CheckpointAAdoptionAcceptanceTests.ExecuteScenario" },
+    { "id": "baseline-exact-identity", "owner": "#357", "entrypoint": "CheckpointAAdoptionAcceptanceTests.ExecuteScenario" },
+    { "id": "subtractive-selectors", "owner": "#356", "entrypoint": "CheckpointAAdoptionAcceptanceTests.ExecuteScenario" },
+    { "id": "package-evidence", "owner": "#358", "entrypoint": "CheckpointAAdoptionAcceptanceTests.ExecuteScenario" },
+    { "id": "framework-reference-evidence", "owner": "#359", "entrypoint": "CheckpointAAdoptionAcceptanceTests.ExecuteScenario" },
+    { "id": "assembly-aware-composition", "owner": "#360", "entrypoint": "CheckpointAAdoptionAcceptanceTests.ExecuteScenario" },
+    { "id": "build-state-preflight", "owner": "#362", "entrypoint": "CheckpointAAdoptionAcceptanceTests.ExecuteScenario" },
+    { "id": "single-snapshot", "owner": "#363", "entrypoint": "CheckpointAAdoptionAcceptanceTests.ExecuteScenario" },
+    { "id": "non-tty-human-json-sarif-parity", "owner": "#364", "entrypoint": "CheckpointAAdoptionAcceptanceTests.ExecuteScenario" }
   ],
   "reusers": ["#374", "#411", "#366"]
 }

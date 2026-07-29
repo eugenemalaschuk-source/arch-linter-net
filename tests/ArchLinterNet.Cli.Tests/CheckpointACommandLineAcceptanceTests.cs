@@ -30,7 +30,7 @@ public sealed class CheckpointACommandLineAcceptanceTests
                 Assert.That(json.RootElement.GetProperty("violations")[0].GetProperty("policy_location")
                     .GetProperty("role").GetString(), Is.EqualTo("fragment"));
                 Assert.That(sarif.RootElement.GetProperty("runs")[0].GetProperty("results")[0]
-                    .GetProperty("relatedLocations"), Is.Not.Empty);
+                    .GetProperty("relatedLocations").GetArrayLength(), Is.GreaterThan(0));
             });
         }
         finally
@@ -49,6 +49,7 @@ public sealed class CheckpointACommandLineAcceptanceTests
             UseShellExecute = false,
             WorkingDirectory = repositoryRoot
         };
+        startInfo.Environment["DOTNET_CLI_DISABLE_COLOR"] = "1";
         startInfo.ArgumentList.Add("run");
         startInfo.ArgumentList.Add("--no-build");
         startInfo.ArgumentList.Add("--project");

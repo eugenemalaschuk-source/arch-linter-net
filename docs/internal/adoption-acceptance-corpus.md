@@ -7,9 +7,9 @@ This document owns the reusable, synthetic adopter-shaped fixture system introdu
 | Fixture | Shape | Primary evidence | Owner |
 |---|---|---|---|
 | `minimal-single-project` | Small policy | include-minus-exclude selector behavior | #356 |
-| `conventional-multi-project` | Ordinary multi-project solution | evaluated `FrameworkReference` behavior | #358 |
-| `same-named-multi-host` | Multiple hosts with same-named roots | assembly-aware composition identity | #361 |
-| `legacy-import-migration` | Imported root policy with a 0.5.0 baseline | provenance and legacy-baseline compatibility | #357 |
+| `conventional-multi-project` | Ordinary multi-project solution | evaluated `FrameworkReference` behavior | #359 |
+| `same-named-multi-host` | Multiple hosts with same-named roots | assembly-aware composition identity | #360 |
+| `legacy-import-migration` | Imported root policy with a 0.5.0 baseline | provenance and legacy-baseline compatibility | #361 |
 | `clean-checkout` | Project tree without `bin`/`obj` | deterministic build-state preflight | #362 |
 
 All fixture names, source identities, report examples, and repository references are synthetic. The executable entrypoints are NUnit tests: `CheckpointAAdoptionAcceptanceTests` validates the manifest and cross-surface Core/Testing behavior, while `CheckpointACommandLineAcceptanceTests` validates redirected CLI output.
