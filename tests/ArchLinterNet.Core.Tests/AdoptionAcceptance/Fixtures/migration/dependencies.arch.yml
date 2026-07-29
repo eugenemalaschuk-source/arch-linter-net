@@ -1,0 +1,5 @@
+version: 1
+name: Synthetic migration adopter
+imports: [fragments/legacy.yml]
+analysis:
+  target_assemblies: [Synthetic.Legacy]

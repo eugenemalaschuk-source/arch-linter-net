@@ -1,0 +1,4 @@
+version: 1
+name: Synthetic multi-project adopter
+analysis:
+  target_assemblies: [Synthetic.Api, Synthetic.Domain]

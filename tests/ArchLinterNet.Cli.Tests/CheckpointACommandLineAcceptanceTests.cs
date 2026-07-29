@@ -50,11 +50,8 @@ public sealed class CheckpointACommandLineAcceptanceTests
             WorkingDirectory = repositoryRoot
         };
         startInfo.Environment["DOTNET_CLI_DISABLE_COLOR"] = "1";
-        startInfo.ArgumentList.Add("run");
-        startInfo.ArgumentList.Add("--no-build");
-        startInfo.ArgumentList.Add("--project");
-        startInfo.ArgumentList.Add(Path.Combine(repositoryRoot, "src", "ArchLinterNet.Cli"));
-        startInfo.ArgumentList.Add("--");
+        startInfo.ArgumentList.Add(Path.Combine(
+            repositoryRoot, "src", "ArchLinterNet.Cli", "bin", "Debug", "net10.0", "ArchLinterNet.Cli.dll"));
         startInfo.ArgumentList.Add("--policy");
         startInfo.ArgumentList.Add(policy);
         startInfo.ArgumentList.Add("--strict");

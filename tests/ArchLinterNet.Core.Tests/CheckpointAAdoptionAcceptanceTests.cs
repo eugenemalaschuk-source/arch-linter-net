@@ -1,5 +1,5 @@
-using System.Text.Json;
 using System.Diagnostics;
+using System.Text.Json;
 using ArchLinterNet.Core.Contracts;
 using ArchLinterNet.Core.Model;
 using ArchLinterNet.Core.Resolution;
@@ -38,6 +38,7 @@ public sealed class CheckpointAAdoptionAcceptanceTests
             Assert.That(root.GetProperty("scenarios").EnumerateArray()
                 .All(scenario => scenario.GetProperty("entrypoint").GetString() ==
                     "CheckpointAAdoptionAcceptanceTests.ExecuteScenario"), Is.True);
+            Assert.That(FixtureRootNames(), Is.EqualTo(new[] { "clean-checkout", "migration", "multi-host", "multi-project", "small" }));
         });
     }
 
@@ -147,11 +148,8 @@ public sealed class CheckpointAAdoptionAcceptanceTests
             WorkingDirectory = root,
         };
         startInfo.Environment["DOTNET_CLI_DISABLE_COLOR"] = "1";
-        startInfo.ArgumentList.Add("run");
-        startInfo.ArgumentList.Add("--no-build");
-        startInfo.ArgumentList.Add("--project");
-        startInfo.ArgumentList.Add(Path.Combine(root, "src", "ArchLinterNet.Cli"));
-        startInfo.ArgumentList.Add("--");
+        startInfo.ArgumentList.Add(Path.Combine(
+            root, "src", "ArchLinterNet.Cli", "bin", "Debug", "net10.0", "ArchLinterNet.Cli.dll"));
         startInfo.ArgumentList.Add("--policy");
         startInfo.ArgumentList.Add(policy);
         startInfo.ArgumentList.Add("--strict");
@@ -182,5 +180,11 @@ public sealed class CheckpointAAdoptionAcceptanceTests
     {
         string root = new ArchitectureRepositoryRootResolver().Resolve();
         return Path.Combine(root, "tests", "ArchLinterNet.Core.Tests", "AdoptionAcceptance", "CheckpointAScenarioManifest.json");
+    }
+
+    private static string[] FixtureRootNames()
+    {
+        string fixtures = Path.Combine(Path.GetDirectoryName(ManifestPath())!, "Fixtures");
+        return Directory.GetDirectories(fixtures).Select(Path.GetFileName).OrderBy(name => name, StringComparer.Ordinal).ToArray()!;
     }
 }

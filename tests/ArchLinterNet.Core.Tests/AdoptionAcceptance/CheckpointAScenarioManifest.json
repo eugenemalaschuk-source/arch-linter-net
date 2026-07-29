@@ -4,11 +4,11 @@
   "release_gate": false,
   "synthetic_identities_only": true,
   "fixtures": [
-    { "id": "minimal-single-project", "shape": "small", "owner": "#356", "entrypoints": ["LayerExclusionAcceptanceTests.MinimalPolicy_ProductWildcardExcludingGenerated_GeneratedTypeFallsOutOfLayer"] },
-    { "id": "conventional-multi-project", "shape": "multi-project", "owner": "#359", "entrypoints": ["CheckpointAAdoptionAcceptanceTests.ExecuteScenario"] },
-    { "id": "same-named-multi-host", "shape": "multi-host", "owner": "#360", "entrypoints": ["CheckpointAAdoptionAcceptanceTests.ExecuteScenario"] },
-    { "id": "legacy-import-migration", "shape": "migration", "owner": "#361", "entrypoints": ["CheckpointAAdoptionAcceptanceTests.ExecuteScenario"] },
-    { "id": "clean-checkout", "shape": "clean-checkout", "owner": "#362", "entrypoints": ["BuildStatePreflightCleanCheckoutTests.TargetAssembliesWithDiscoveredProject_CleanCheckout_BlocksWithMissingArtifactWithoutThrowing"] }
+    { "id": "minimal-single-project", "root": "Fixtures/small", "shape": "small", "owner": "#356", "entrypoints": ["CheckpointAAdoptionAcceptanceTests.ExecuteScenario"] },
+    { "id": "conventional-multi-project", "root": "Fixtures/multi-project", "shape": "multi-project", "owner": "#359", "entrypoints": ["CheckpointAAdoptionAcceptanceTests.ExecuteScenario"] },
+    { "id": "same-named-multi-host", "root": "Fixtures/multi-host", "shape": "multi-host", "owner": "#360", "entrypoints": ["CheckpointAAdoptionAcceptanceTests.ExecuteScenario"] },
+    { "id": "legacy-import-migration", "root": "Fixtures/migration", "shape": "migration", "owner": "#361", "entrypoints": ["CheckpointAAdoptionAcceptanceTests.ExecuteScenario"] },
+    { "id": "clean-checkout", "root": "Fixtures/clean-checkout", "shape": "clean-checkout", "owner": "#362", "entrypoints": ["CheckpointAAdoptionAcceptanceTests.ExecuteScenario"] }
   ],
   "scenarios": [
     { "id": "imports-provenance", "owner": "#361", "entrypoint": "CheckpointAAdoptionAcceptanceTests.ExecuteScenario" },
