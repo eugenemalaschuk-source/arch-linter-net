@@ -54,6 +54,7 @@ internal sealed class AdoptionAcceptanceFixture : IDisposable
         startInfo.ArgumentList.Add("--nologo");
         startInfo.ArgumentList.Add("--verbosity");
         startInfo.ArgumentList.Add("quiet");
+        startInfo.ArgumentList.Add("--maxcpucount:1");
 
         using var process = Process.Start(startInfo)!;
         string output = process.StandardOutput.ReadToEnd();
