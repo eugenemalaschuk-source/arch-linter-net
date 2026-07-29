@@ -23,7 +23,36 @@
     "source": { "type": "string" },
     "forbidden_namespace": { "type": "string" },
     "forbidden_references": { "type": "array", "items": { "type": "string" } },
-    "details": { "type": "object" }
+    "details": {
+      "type": "object",
+      "required": ["detail_kind"],
+      "oneOf": [
+        { "properties": { "detail_kind": { "const": "dependency" } } },
+        { "properties": { "detail_kind": { "const": "configuration" } } },
+        { "properties": { "detail_kind": { "const": "external_dependency" } } },
+        { "properties": { "detail_kind": { "const": "package_dependency" }, "forbidden_package_group": { "type": "string" } }, "required": ["forbidden_package_group"] },
+        { "properties": { "detail_kind": { "const": "package_allow_only" } } },
+        { "properties": { "detail_kind": { "const": "framework_reference" } } },
+        { "properties": { "detail_kind": { "const": "framework_reference_allow_only" } } },
+        { "properties": { "detail_kind": { "const": "type_placement" } } },
+        { "properties": { "detail_kind": { "const": "layout_convention" } } },
+        { "properties": { "detail_kind": { "const": "public_api_surface" } } },
+        { "properties": { "detail_kind": { "const": "attribute_usage" } } },
+        { "properties": { "detail_kind": { "const": "inheritance" } } },
+        { "properties": { "detail_kind": { "const": "interface_implementation" } } },
+        { "properties": { "detail_kind": { "const": "composition" } } },
+        { "properties": { "detail_kind": { "const": "project_metadata" } } },
+        { "properties": { "detail_kind": { "const": "context_dependency" } } },
+        { "properties": { "detail_kind": { "const": "context_allow_only" } } },
+        { "properties": { "detail_kind": { "const": "port_boundary" } } },
+        { "properties": { "detail_kind": { "const": "cycle" }, "path": { "type": "string" } }, "required": ["path"] },
+        { "properties": { "detail_kind": { "const": "unmatched_ignore" } } },
+        { "properties": { "detail_kind": { "const": "policy_consistency" } } },
+        { "properties": { "detail_kind": { "const": "build_state_preflight" } } },
+        { "properties": { "detail_kind": { "const": "baseline" } } },
+        { "properties": { "detail_kind": { "const": "architecture_policy_error" } } }
+      ]
+    }
   },
   "additionalProperties": true
 }

@@ -527,42 +527,6 @@ public sealed partial class ArchitectureDiagnosticFormatter : IArchitectureDiagn
         return string.Empty;
     }
 
-    private static Dictionary<string, object?> ToPolicyConsistencyJsonObject(PolicyConsistencyDiagnostic finding)
-    {
-        var obj = new Dictionary<string, object?>
-        {
-            ["schema_version"] = ArchitectureFinding.CurrentSchemaVersion,
-            ["kind"] = "policy_consistency",
-            ["canonical_identity"] = ArchitectureFindingMapper.FromDiagnostic(finding).CanonicalIdentity,
-            ["check_kind"] = finding.CheckKind,
-            ["contract"] = finding.ContractName,
-            ["contract_id"] = finding.ContractId,
-            ["reason"] = finding.Reason,
-            ["conflicting_contract_ids"] = finding.ConflictingContractIds.ToArray(),
-            ["conflicting_contract_names"] = finding.ConflictingContractNames.ToArray(),
-            ["layers"] = finding.Layers.ToArray()
-        };
-
-        obj["details"] = new Dictionary<string, object?>
-        {
-            ["check_kind"] = finding.CheckKind,
-            ["reason"] = finding.Reason,
-            ["conflicting_contract_ids"] = finding.ConflictingContractIds.ToArray(),
-            ["conflicting_contract_names"] = finding.ConflictingContractNames.ToArray(),
-            ["layers"] = finding.Layers.ToArray(),
-            ["representative_type"] = finding.RepresentativeType,
-        };
-
-        if (finding.RepresentativeType != null)
-        {
-            obj["representative_type"] = finding.RepresentativeType;
-        }
-
-        ApplyPolicyLocationFields(finding, obj);
-
-        return obj;
-    }
-
     private static Dictionary<string, object?> ToCiJsonObject(ArchitectureDiagnostic diagnostic, bool includeContract)
     {
         var obj = new Dictionary<string, object?>();
@@ -574,6 +538,12 @@ public sealed partial class ArchitectureDiagnosticFormatter : IArchitectureDiagn
         obj["schema_version"] = finding.SchemaVersion;
         obj["kind"] = finding.Kind;
         obj["canonical_identity"] = finding.CanonicalIdentity;
+        obj["mode"] = finding.Mode;
+        obj["severity"] = finding.Severity;
+        obj["message_code"] = finding.Kind;
+        obj["policy_origin"] = diagnostic.PolicyLocation is null ? null : FormatPolicyLocationForJson(diagnostic.PolicyLocation);
+        obj["source_location"] = null;
+        obj["baseline_state"] = finding.BaselineState;
 
         if (includeContract)
         {
@@ -606,7 +576,10 @@ public sealed partial class ArchitectureDiagnosticFormatter : IArchitectureDiagn
 
     private static Dictionary<string, object?> BuildDetailsJsonObject(ArchitectureDiagnostic diagnostic)
     {
-        var details = new Dictionary<string, object?>();
+        var details = new Dictionary<string, object?>
+        {
+            ["detail_kind"] = ArchitectureFindingMapper.KindToken(diagnostic.Kind),
+        };
         ApplyDiagnosticSpecificCiFields(diagnostic, details);
         return details;
     }
@@ -627,6 +600,7 @@ public sealed partial class ArchitectureDiagnosticFormatter : IArchitectureDiagn
         };
         obj["details"] = new Dictionary<string, object?>
         {
+            ["detail_kind"] = "unmatched_ignore",
             ["ignore_index"] = unmatched.IgnoreIndex,
             ["source_type"] = unmatched.SourceType,
             ["forbidden_reference"] = unmatched.ForbiddenReference,

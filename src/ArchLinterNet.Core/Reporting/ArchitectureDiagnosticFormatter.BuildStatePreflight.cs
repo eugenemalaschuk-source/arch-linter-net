@@ -109,6 +109,7 @@ public sealed partial class ArchitectureDiagnosticFormatter
                 detail = d.Evidence.Detail,
                 details = new
                 {
+                    detail_kind = "build_state_preflight",
                     state = StateToken(d.State),
                     project_path = d.Evidence.ProjectPath,
                     assembly_name = d.Evidence.AssemblyName,

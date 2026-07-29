@@ -1,4 +1,5 @@
 using ArchLinterNet.Core.Model;
+using ArchLinterNet.Core.Reporting;
 using NUnit.Framework;
 
 namespace ArchLinterNet.Core.Tests;

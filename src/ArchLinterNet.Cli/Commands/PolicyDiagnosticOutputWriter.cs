@@ -50,6 +50,7 @@ internal static class PolicyDiagnosticOutputWriter
             import_chain = diagnostic.ImportChain,
             details = new
             {
+                detail_kind = "architecture_policy_error",
                 diagnostic_kind = diagnostic.Kind.ToString().ToLowerInvariant(),
                 error_category = category,
                 import_chain = diagnostic.ImportChain,

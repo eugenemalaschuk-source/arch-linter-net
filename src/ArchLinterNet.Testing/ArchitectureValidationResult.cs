@@ -28,8 +28,6 @@ public sealed class ArchitectureValidationResult
     {
         Passed = @params.Passed;
         Violations = @params.Violations;
-        Findings = ArchitectureFindingMapper.Order(
-            Violations.Select(ArchitectureFindingMapper.FromViolation));
         Cycles = @params.Cycles;
         CycleFindings = @params.CycleFindings ?? Array.Empty<ArchitectureCycleFinding>();
         PolicyConsistencyFindings = @params.PolicyConsistencyFindings ?? Array.Empty<PolicyConsistencyDiagnostic>();
@@ -42,6 +40,42 @@ public sealed class ArchitectureValidationResult
         Timing = @params.Timing;
         PreflightDiagnostics = @params.PreflightDiagnostics ?? Array.Empty<BuildStatePreflightDiagnostic>();
         PreflightBlocked = @params.PreflightBlocked;
+        Findings = ArchitectureFindingMapper.Order(AllDiagnostics());
+    }
+
+    private IEnumerable<ArchitectureFinding> AllDiagnostics()
+    {
+        foreach (ArchitectureViolation violation in Violations.Concat(CoverageFindings))
+        {
+            yield return ArchitectureFindingMapper.FromViolation(violation);
+        }
+
+        foreach (ArchitectureCycleFinding cycle in CycleFindings)
+        {
+            yield return ArchitectureFindingMapper.FromDiagnostic(ArchitectureDiagnosticMapper.FromCycle(cycle));
+        }
+
+        foreach (string cycle in Cycles)
+        {
+            yield return ArchitectureFindingMapper.FromDiagnostic(
+                ArchitectureDiagnosticMapper.FromCycle(cycle, string.Empty, null));
+        }
+
+        foreach (PolicyConsistencyDiagnostic finding in PolicyConsistencyFindings)
+        {
+            yield return ArchitectureFindingMapper.FromDiagnostic(finding);
+        }
+
+        foreach (ArchitectureUnmatchedIgnoredViolation unmatched in UnmatchedIgnoredViolations)
+        {
+            yield return ArchitectureFindingMapper.FromDiagnostic(
+                ArchitectureDiagnosticMapper.FromUnmatchedIgnore(unmatched));
+        }
+
+        foreach (BuildStatePreflightDiagnostic preflight in PreflightDiagnostics)
+        {
+            yield return ArchitectureFindingMapper.FromDiagnostic(preflight);
+        }
     }
 
     public void ShouldPass()

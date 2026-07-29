@@ -119,6 +119,21 @@ public sealed class ArchitectureSarifFormatterTests
     }
 
     [Test]
+    public void FormatResultAsSarif_CycleCarriesTheNormalizedFindingEnvelope()
+    {
+        JsonElement root = Run("strict", Array.Empty<ArchitectureViolation>(), ["[cycle-id] A -> B -> A"]);
+
+        JsonElement normalized = root.GetProperty("runs")[0].GetProperty("results")[0]
+            .GetProperty("properties").GetProperty("arch_linter_net");
+        Assert.Multiple(() =>
+        {
+            Assert.That(normalized.GetProperty("schema_version").GetInt32(), Is.EqualTo(1));
+            Assert.That(normalized.GetProperty("kind").GetString(), Is.EqualTo("cycle"));
+            Assert.That(normalized.GetProperty("details").GetProperty("path").GetString(), Is.EqualTo("A -> B -> A"));
+        });
+    }
+
+    [Test]
     public void FormatResultAsSarif_OptionalEmptyCoverage_PreservesTypedIdentity()
     {
         var summary = new ArchitectureCoverageSummary(

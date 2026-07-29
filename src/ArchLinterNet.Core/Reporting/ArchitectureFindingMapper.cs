@@ -1,12 +1,20 @@
-namespace ArchLinterNet.Core.Model;
+using ArchLinterNet.Core.Model;
+
+namespace ArchLinterNet.Core.Reporting;
 
 /// <summary>Builds the stable public finding envelope without inspecting display text.</summary>
 public static class ArchitectureFindingMapper
 {
-    public static ArchitectureFinding FromViolation(ArchitectureViolation violation, string? mode = null) =>
+    public static ArchitectureFinding FromViolation(ArchitectureViolation violation) =>
+        FromViolation(violation, mode: null);
+
+    public static ArchitectureFinding FromViolation(ArchitectureViolation violation, string? mode) =>
         FromDiagnostic(ArchitectureDiagnosticMapper.FromViolation(violation), mode);
 
-    public static ArchitectureFinding FromDiagnostic(ArchitectureDiagnostic diagnostic, string? mode = null) =>
+    public static ArchitectureFinding FromDiagnostic(ArchitectureDiagnostic diagnostic) =>
+        FromDiagnostic(diagnostic, mode: null);
+
+    public static ArchitectureFinding FromDiagnostic(ArchitectureDiagnostic diagnostic, string? mode) =>
         new(
             ArchitectureFinding.CurrentSchemaVersion,
             KindToken(diagnostic.Kind),

@@ -75,7 +75,11 @@ public sealed partial class ArchitectureDiagnosticFormatter
             ["contract"] = diagnostic.ContractName,
             ["contract_id"] = diagnostic.ContractId,
             ["path"] = diagnostic.Path,
-            ["details"] = new Dictionary<string, object?> { ["path"] = diagnostic.Path }
+            ["details"] = new Dictionary<string, object?>
+            {
+                ["detail_kind"] = "cycle",
+                ["path"] = diagnostic.Path,
+            }
         };
         ApplyPolicyLocationFields(diagnostic, obj);
         return obj;

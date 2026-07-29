@@ -52,13 +52,15 @@ internal static class BaselineLifecycleFormatter
             disposition = BaselineEntryDispositionNames.WireName(disposition),
             suppresses = BaselineEntryLifecycleNames.Suppresses(lifecycle),
             identity,
-            schemaVersion = ArchitectureFinding.CurrentSchemaVersion,
+            schema_version = ArchitectureFinding.CurrentSchemaVersion,
             kind = "baseline",
-            canonicalIdentity = entry.Identity?.ToString()
+            canonical_identity = entry.Identity is { } structuredIdentity
+                ? ArchitectureViolationIdentityJson.Serialize(structuredIdentity)
                 ?? $"{entry.ContractGroup}:{entry.ContractId}:{entry.SourceType}:{entry.ForbiddenReference}",
-            baselineState = status,
+            baseline_state = status,
             details = new
             {
+                detail_kind = "baseline",
                 contractGroup = entry.ContractGroup,
                 sourceType = entry.SourceType,
                 forbiddenReference = entry.ForbiddenReference,

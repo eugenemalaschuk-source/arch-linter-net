@@ -427,6 +427,11 @@ public sealed partial class ArchitectureSarifFormatter : IArchitectureSarifForma
             ["level"] = level,
             [MessagePropertyName] = new Dictionary<string, object?> { ["text"] = $"Dependency cycle detected: {path}" },
             ["logicalLocations"] = BuildLogicalLocations(path, "namespace"),
+            ["properties"] = new Dictionary<string, object?>
+            {
+                ["arch_linter_net"] = ArchitectureDiagnosticFormatter.FormatNormalizedFindingForSarif(
+                    new CycleDiagnostic(ruleId, match.Success ? ruleId : null, path)),
+            },
         };
 
         return new ResultEntry(ruleId, ruleId, path, "cycle", json);
@@ -442,6 +447,10 @@ public sealed partial class ArchitectureSarifFormatter : IArchitectureSarifForma
             ["level"] = level,
             [MessagePropertyName] = new Dictionary<string, object?> { ["text"] = $"Dependency cycle detected: {diagnostic.Path}" },
             ["logicalLocations"] = BuildLogicalLocations(diagnostic.Path, "namespace"),
+            ["properties"] = new Dictionary<string, object?>
+            {
+                ["arch_linter_net"] = ArchitectureDiagnosticFormatter.FormatNormalizedFindingForSarif(diagnostic),
+            },
         };
 
         object[] relatedPolicyLocations = FormatPolicyLocationsForSarif(
