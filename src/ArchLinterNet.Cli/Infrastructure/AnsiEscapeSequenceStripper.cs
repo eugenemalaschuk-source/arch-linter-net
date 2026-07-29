@@ -29,142 +29,69 @@ internal static class AnsiEscapeSequenceStripper
             switch (_state)
             {
                 case ParserState.Text:
-                    WriteText(value);
+                    if (value == '\u001b')
+                    {
+                        _state = ParserState.Escape;
+                    }
+                    else if (value == '\u009b')
+                    {
+                        _state = ParserState.ControlSequence;
+                    }
+                    else if (value == '\u009d')
+                    {
+                        _state = ParserState.OperatingSystemCommand;
+                    }
+                    else
+                    {
+                        writeVisibleCharacter(value);
+                    }
                     break;
                 case ParserState.Escape:
-                    WriteEscape(value);
-                    break;
-                case ParserState.EscapeIntermediate:
-                    WriteEscapeIntermediate(value);
+                    _state = value switch
+                    {
+                        '[' => ParserState.ControlSequence,
+                        ']' => ParserState.OperatingSystemCommand,
+                        '\u001b' => ParserState.Escape,
+                        >= '\u0020' and <= '\u002f' => ParserState.Escape,
+                        _ => ParserState.Text,
+                    };
+                    if (_state == ParserState.Text && value > '\u007e')
+                    {
+                        writeVisibleCharacter(value);
+                    }
                     break;
                 case ParserState.ControlSequence:
-                    WriteControlSequence(value);
+                    if (value is >= '\u0040' and <= '\u007e')
+                    {
+                        _state = ParserState.Text;
+                    }
+                    else if (value is not (>= '\u0020' and <= '\u003f'))
+                    {
+                        _state = ParserState.Text;
+                        writeVisibleCharacter(value);
+                    }
                     break;
                 case ParserState.OperatingSystemCommand:
-                    WriteOperatingSystemCommand(value);
-                    break;
-                case ParserState.StringCommand:
-                    WriteStringCommand(value);
+                    if (value is '\u0007' or '\u009c')
+                    {
+                        _state = ParserState.Text;
+                    }
+                    else if (value == '\u001b')
+                    {
+                        _state = ParserState.OperatingSystemCommandTerminator;
+                    }
                     break;
                 case ParserState.OperatingSystemCommandTerminator:
-                    WriteOperatingSystemCommandTerminator(value);
+                    if (value == '\\')
+                    {
+                        _state = ParserState.Text;
+                    }
+                    else
+                    {
+                        _state = ParserState.OperatingSystemCommand;
+                        Write(value);
+                    }
                     break;
-                case ParserState.StringCommandTerminator:
-                    WriteStringCommandTerminator(value);
-                    break;
-            }
-        }
-
-        private void WriteText(char value)
-        {
-            _state = value switch
-            {
-                '\u001b' => ParserState.Escape,
-                '\u0090' or '\u0098' or '\u009e' or '\u009f' => ParserState.StringCommand,
-                '\u009b' => ParserState.ControlSequence,
-                '\u009d' => ParserState.OperatingSystemCommand,
-                _ => ParserState.Text,
-            };
-
-            if (_state == ParserState.Text)
-            {
-                writeVisibleCharacter(value);
-            }
-        }
-
-        private void WriteEscape(char value)
-        {
-            _state = value switch
-            {
-                '[' => ParserState.ControlSequence,
-                ']' => ParserState.OperatingSystemCommand,
-                'P' or 'X' or '^' or '_' => ParserState.StringCommand,
-                >= '\u0020' and <= '\u002f' => ParserState.EscapeIntermediate,
-                '\u001b' => ParserState.Escape,
-                >= '\u0030' and <= '\u007e' => ParserState.Text,
-                _ => ParserState.Text,
-            };
-
-            if (_state == ParserState.Text && value > '\u007e')
-            {
-                writeVisibleCharacter(value);
-            }
-        }
-
-        private void WriteEscapeIntermediate(char value)
-        {
-            if (value is >= '\u0030' and <= '\u007e')
-            {
-                _state = ParserState.Text;
-            }
-            else if (value == '\u001b')
-            {
-                _state = ParserState.Escape;
-            }
-        }
-
-        private void WriteControlSequence(char value)
-        {
-            if (value is >= '\u0040' and <= '\u007e')
-            {
-                _state = ParserState.Text;
-            }
-            else if (value is not (>= '\u0020' and <= '\u003f'))
-            {
-                _state = ParserState.Text;
-                writeVisibleCharacter(value);
-            }
-        }
-
-        private void WriteOperatingSystemCommand(char value)
-        {
-            if (value is '\u0007' or '\u009c')
-            {
-                _state = ParserState.Text;
-            }
-            else if (value == '\u001b')
-            {
-                _state = ParserState.OperatingSystemCommandTerminator;
-            }
-        }
-
-        private void WriteStringCommand(char value)
-        {
-            if (value == '\u009c')
-            {
-                _state = ParserState.Text;
-            }
-            else if (value == '\u001b')
-            {
-                _state = ParserState.StringCommandTerminator;
-            }
-        }
-
-        private void WriteOperatingSystemCommandTerminator(char value)
-        {
-            if (value == '\\')
-            {
-                _state = ParserState.Text;
-            }
-            else
-            {
-                _state = value == '\u001b'
-                    ? ParserState.OperatingSystemCommandTerminator
-                    : ParserState.OperatingSystemCommand;
-            }
-        }
-
-        private void WriteStringCommandTerminator(char value)
-        {
-            if (value == '\\')
-            {
-                _state = ParserState.Text;
-            }
-            else
-            {
-                _state = value == '\u001b'
-                    ? ParserState.StringCommandTerminator
-                    : ParserState.StringCommand;
             }
         }
 
@@ -172,12 +99,9 @@ internal static class AnsiEscapeSequenceStripper
         {
             Text,
             Escape,
-            EscapeIntermediate,
             ControlSequence,
             OperatingSystemCommand,
-            StringCommand,
             OperatingSystemCommandTerminator,
-            StringCommandTerminator,
         }
     }
 }

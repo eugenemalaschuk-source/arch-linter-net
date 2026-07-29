@@ -53,12 +53,40 @@ public sealed class SystemCliConsoleTests
         console.Out.Write("link");
         console.Out.Write("\u001b]8;;\u001b");
         console.Out.Write("\\");
-        console.Error.Write("\u001b[33mwarning\u001b[0m");
+        console.Out.Write('!');
+        console.Out.Write(new[] { 'x', '?' }, 1, 1);
+        console.Out.Write(".".AsSpan());
+        console.Error.Write(new[] { '\u001b', '[', '3', '3', 'm' });
+        console.Error.Write("warning\u001b[0m");
+        _ = console.Out.Encoding;
+        _ = console.Out.FormatProvider;
+        console.Out.Flush();
 
         Assert.Multiple(() =>
         {
-            Assert.That(outWriter.ToString(), Is.EqualTo("violationlink"));
+            Assert.That(outWriter.ToString(), Is.EqualTo("violationlink!?."));
             Assert.That(errorWriter.ToString(), Is.EqualTo("warning"));
+        });
+    }
+
+    [Test]
+    public void InteractiveStreamsPreserveAnsi()
+    {
+        using var outWriter = new StringWriter();
+        using var errorWriter = new StringWriter();
+        var console = new SystemCliConsole(
+            outWriter,
+            errorWriter,
+            outputRedirected: false,
+            errorRedirected: false);
+
+        console.Out.Write("\u001b[31mred");
+        console.Error.Write("\u001b[33mwarning");
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(outWriter.ToString(), Is.EqualTo("\u001b[31mred"));
+            Assert.That(errorWriter.ToString(), Is.EqualTo("\u001b[33mwarning"));
         });
     }
 }
