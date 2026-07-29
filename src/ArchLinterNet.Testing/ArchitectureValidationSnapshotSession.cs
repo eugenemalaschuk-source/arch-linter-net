@@ -26,7 +26,7 @@ public sealed class ArchitectureValidationSnapshotSession(ArchitectureAnalysisSn
     private ArchitectureValidationResult Evaluate(string mode)
     {
         ValidationOutcome outcome = snapshot.Evaluate(mode, timing);
-        return ArchitectureValidationResultMapper.ToResult(outcome, timing);
+        return ArchitectureValidationResultMapper.ToResult(outcome, timing, mode);
     }
 
     public void Dispose()

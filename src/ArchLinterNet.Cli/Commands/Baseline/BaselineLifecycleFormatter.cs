@@ -1,4 +1,5 @@
 using ArchLinterNet.Core.Model;
+using ArchLinterNet.Core.Reporting;
 
 namespace ArchLinterNet.Cli.Commands.Baseline;
 
@@ -35,22 +36,22 @@ internal static class BaselineLifecycleFormatter
         BaselineEntryLifecycle lifecycle,
         BaselineEntryDisposition disposition = BaselineEntryDisposition.Reported)
     {
-        return new
-        {
-            contractGroup = entry.ContractGroup,
-            contractId = entry.ContractId,
-            sourceType = entry.SourceType,
-            forbiddenReference = entry.ForbiddenReference,
-            reason = entry.Reason,
-            issue = entry.Issue,
-            // `status` is the shared lifecycle vocabulary and nothing else. What the command did with
-            // the entry is `disposition`, and whether the entry suppresses a finding is `suppresses` —
-            // three separate questions a consumer would otherwise have to infer from one string.
-            status = BaselineEntryLifecycleNames.WireName(lifecycle),
-            disposition = BaselineEntryDispositionNames.WireName(disposition),
-            suppresses = BaselineEntryLifecycleNames.Suppresses(lifecycle),
-            identity = IdentityForJson(entry.Identity),
-        };
+        string status = BaselineEntryLifecycleNames.WireName(lifecycle);
+        ArchitectureFinding finding = ArchitectureFindingMapper.FromBaseline(
+            new BaselineLifecycleEntry(entry, lifecycle, disposition));
+        object? identity = IdentityForJson(finding.Identity);
+        Dictionary<string, object?> result = ArchitectureDiagnosticFormatter.FormatNormalizedFindingForJson(finding);
+        result["contractGroup"] = entry.ContractGroup;
+        result["contractId"] = entry.ContractId;
+        result["sourceType"] = entry.SourceType;
+        result["forbiddenReference"] = entry.ForbiddenReference;
+        result["reason"] = entry.Reason;
+        result["issue"] = entry.Issue;
+        result["status"] = status;
+        result["disposition"] = BaselineEntryDispositionNames.WireName(disposition);
+        result["suppresses"] = BaselineEntryLifecycleNames.Suppresses(lifecycle);
+        result["identity"] = identity;
+        return result;
     }
 
     /// <summary>
@@ -79,7 +80,7 @@ internal static class BaselineLifecycleFormatter
             targetMember = identity.TargetMember,
             occurrence = identity.Occurrence,
             configuration = identity.Configuration,
-            canonical = identity.ToString(),
+            canonical = ArchitectureViolationIdentityJson.Serialize(identity),
         };
     }
 
@@ -98,8 +99,9 @@ internal static class BaselineLifecycleFormatter
 
         foreach (string name in BaselineEntryLifecycleNames.All)
         {
-            List<BaselineLifecycleEntry> matching = entries
-                .Where(e => BaselineEntryLifecycleNames.WireName(e.Lifecycle) == name)
+            List<ArchitectureFinding> matching = entries
+                .Where(entry => BaselineEntryLifecycleNames.WireName(entry.Lifecycle) == name)
+                .Select(ArchitectureFindingMapper.FromBaseline)
                 .ToList();
 
             if (matching.Count == 0)
@@ -108,9 +110,12 @@ internal static class BaselineLifecycleFormatter
             }
 
             lines.Add($"{name}: {matching.Count}");
-            foreach (BaselineLifecycleEntry entry in matching)
+            foreach (ArchitectureFinding finding in matching)
             {
-                lines.Add($"{Describe(entry.Entry)} [{BaselineEntryDispositionNames.WireName(entry.Disposition)}]");
+                var details = (BaselineLifecycleDiagnostic)finding.Details;
+                lines.Add(
+                    $"  {details.ContractGroup}/{details.ContractId}: {details.SourceType} -> {details.ForbiddenReference} " +
+                    $"[{BaselineEntryDispositionNames.WireName(details.Disposition)}]");
             }
         }
 

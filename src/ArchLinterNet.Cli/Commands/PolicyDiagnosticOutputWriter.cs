@@ -38,15 +38,17 @@ internal static class PolicyDiagnosticOutputWriter
         ArchitecturePolicyDiagnostic diagnostic,
         string? category = null)
     {
-        return JsonSerializer.Serialize(new
-        {
-            kind = "architecture_policy_error",
-            message,
-            error_category = category,
-            policy_location = diagnostic.Location is null ? null : ArchitectureDiagnosticFormatter.FormatPolicyLocationForJson(diagnostic.Location),
-            related_policy_locations = diagnostic.RelatedLocations.Select(ArchitectureDiagnosticFormatter.FormatPolicyLocationForJson),
-            import_chain = diagnostic.ImportChain,
-        });
+        ArchitectureFinding finding = ArchitectureFindingMapper.FromPolicyError(message, diagnostic, category);
+        Dictionary<string, object?> json = ArchitectureDiagnosticFormatter.FormatNormalizedFindingForJson(finding);
+        json["message"] = message;
+        json["error_category"] = category;
+        json["policy_location"] = finding.PolicyOrigin is null
+            ? null
+            : ArchitectureDiagnosticFormatter.FormatPolicyLocationForJson(finding.PolicyOrigin);
+        json["related_policy_locations"] = finding.RelatedPolicyOrigins
+            .Select(ArchitectureDiagnosticFormatter.FormatPolicyLocationForJson);
+        json["import_chain"] = diagnostic.ImportChain;
+        return JsonSerializer.Serialize(json);
     }
 
     public static bool TryWriteHuman(ICliConsole console, string prefix, Exception exception)
@@ -80,13 +82,15 @@ internal static class PolicyDiagnosticOutputWriter
         string message,
         ArchitecturePolicyDiagnostic diagnostic)
     {
-        string location = diagnostic.Location is null
+        ArchitectureFinding finding = ArchitectureFindingMapper.FromPolicyError(message, diagnostic);
+        var details = (ArchitecturePolicyErrorDiagnostic)finding.Details;
+        string location = finding.PolicyOrigin is null
             ? string.Empty
-            : $" (policy: {diagnostic.Location.SourcePath}:{diagnostic.Location.YamlPath}; root: {diagnostic.Location.RootPath})";
-        string text = $"{prefix}: {message}{location}";
-        if (diagnostic.ImportChain.Count > 0)
+            : $" (policy: {finding.PolicyOrigin.SourcePath}:{finding.PolicyOrigin.YamlPath}; root: {finding.PolicyOrigin.RootPath})";
+        string text = $"{prefix}: {details.Message}{location}";
+        if (details.ImportChain.Count > 0)
         {
-            text += $"\nImport chain: {string.Join(" -> ", diagnostic.ImportChain)}";
+            text += $"\nImport chain: {string.Join(" -> ", details.ImportChain)}";
         }
 
         return text;

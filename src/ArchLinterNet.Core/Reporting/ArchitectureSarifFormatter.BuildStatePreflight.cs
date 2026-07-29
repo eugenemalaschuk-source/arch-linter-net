@@ -84,11 +84,12 @@ public sealed partial class ArchitectureSarifFormatter
             preflightDiagnostics);
     }
 
-    private static ResultEntry BuildPreflightEntry(BuildStatePreflightDiagnostic diagnostic)
+    private static ResultEntry BuildPreflightEntry(BuildStatePreflightDiagnostic diagnostic, string mode)
     {
         string state = PreflightStateToken(diagnostic.State);
         string ruleId = $"build-state-preflight/{state}";
         BuildStatePreflightEvidence evidence = diagnostic.Evidence;
+        ArchitectureFinding finding = ArchitectureFindingMapper.FromDiagnostic(diagnostic, mode);
 
         var json = new Dictionary<string, object?>
         {
@@ -110,6 +111,10 @@ public sealed partial class ArchitectureSarifFormatter
                         ["artifactLocation"] = new Dictionary<string, object?> { ["uri"] = evidence.ProjectPath },
                     },
                 },
+            },
+            ["properties"] = new Dictionary<string, object?>
+            {
+                ["arch_linter_net"] = ArchitectureDiagnosticFormatter.FormatNormalizedFindingForSarif(finding),
             },
         };
 

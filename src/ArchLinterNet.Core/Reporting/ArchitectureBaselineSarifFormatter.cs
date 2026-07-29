@@ -109,6 +109,7 @@ public static class ArchitectureBaselineSarifFormatter
     private static Dictionary<string, object?> BuildResult(BaselineLifecycleEntry lifecycle)
     {
         ArchitectureBaselineComparisonEntry entry = lifecycle.Entry;
+        ArchitectureFinding finding = ArchitectureFindingMapper.FromBaseline(lifecycle);
         var properties = new Dictionary<string, object?>
         {
             ["baseline_status"] = BaselineEntryLifecycleNames.WireName(lifecycle.Lifecycle),
@@ -116,19 +117,20 @@ public static class ArchitectureBaselineSarifFormatter
             ["contract_id"] = entry.ContractId,
             ["source_type"] = entry.SourceType,
             ["forbidden_reference"] = entry.ForbiddenReference,
+            ["arch_linter_net"] = ArchitectureDiagnosticFormatter.FormatNormalizedFindingForSarif(finding),
         };
-        if (entry.Identity is { } identity)
+        if (entry.Identity is { } structuredIdentity)
         {
-            properties["identity_version"] = identity.IdentityVersion;
-            properties["contract_family"] = identity.ContractFamily;
-            properties["kind"] = identity.Kind;
-            properties["source_assembly"] = identity.SourceAssembly;
-            properties["source_member"] = identity.SourceMember;
-            properties["target_assembly"] = identity.TargetAssembly;
-            properties["target_type"] = identity.TargetType;
-            properties["target_member"] = identity.TargetMember;
-            properties["occurrence"] = identity.Occurrence;
-            properties["configuration"] = identity.Configuration;
+            properties["identity_version"] = structuredIdentity.IdentityVersion;
+            properties["contract_family"] = structuredIdentity.ContractFamily;
+            properties["kind"] = structuredIdentity.Kind;
+            properties["source_assembly"] = structuredIdentity.SourceAssembly;
+            properties["source_member"] = structuredIdentity.SourceMember;
+            properties["target_assembly"] = structuredIdentity.TargetAssembly;
+            properties["target_type"] = structuredIdentity.TargetType;
+            properties["target_member"] = structuredIdentity.TargetMember;
+            properties["occurrence"] = structuredIdentity.Occurrence;
+            properties["configuration"] = structuredIdentity.Configuration;
         }
 
         return new Dictionary<string, object?>
