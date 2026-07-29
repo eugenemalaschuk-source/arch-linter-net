@@ -1,5 +1,6 @@
 using System.Text;
 using System.Text.Json.Nodes;
+using System.Text.RegularExpressions;
 using ArchLinterNet.Cli.Abstractions;
 using ArchLinterNet.Core.Model;
 using ArchLinterNet.Core.Reporting;
@@ -29,6 +30,10 @@ internal sealed class ReportCoordinator
     private const string FormatHuman = "human";
     private const string FormatJson = "json";
     private const string FormatSarif = "sarif";
+    private static readonly Regex _ansiEscapeSequence = new(
+        "\\x1B(?:\\[[0-?]*[ -/]*[@-~]|\\][^\\x07]*(?:\\x07|\\x1B\\\\))",
+        RegexOptions.CultureInvariant,
+        TimeSpan.FromSeconds(1));
 
     private readonly ICliRuntime _runtime;
     private readonly ICliConsole _console;
@@ -447,7 +452,7 @@ internal sealed class ReportCoordinator
     {
         var sb = new StringBuilder();
         AppendHumanSection(sb, outcome);
-        return sb.ToString().TrimEnd();
+        return StripAnsi(sb.ToString().TrimEnd());
     }
 
     private string FormatCombinedHuman(IReadOnlyList<(string Mode, ValidationOutcome Outcome)> outcomesByMode)
@@ -467,8 +472,10 @@ internal sealed class ReportCoordinator
             }
             AppendHumanSection(sb, outcome);
         }
-        return sb.ToString().TrimEnd();
+        return StripAnsi(sb.ToString().TrimEnd());
     }
+
+    internal static string StripAnsi(string content) => _ansiEscapeSequence.Replace(content, string.Empty);
 
     private void AppendHumanSection(StringBuilder sb, ValidationOutcome outcome)
     {

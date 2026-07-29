@@ -1,5 +1,7 @@
 version: 1
 name: Synthetic migration adopter
 imports: [fragments/legacy.yml]
+contracts: {}
 analysis:
   target_assemblies: [Synthetic.Legacy]
+  projects: [Synthetic.Legacy.csproj]

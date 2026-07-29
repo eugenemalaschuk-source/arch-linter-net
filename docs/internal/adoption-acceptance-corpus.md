@@ -12,7 +12,9 @@ This document owns the reusable, synthetic adopter-shaped fixture system introdu
 | `legacy-import-migration` | Imported root policy with a 0.5.0 baseline | provenance and legacy-baseline compatibility | #361 |
 | `clean-checkout` | Project tree without `bin`/`obj` | deterministic build-state preflight | #362 |
 
-All fixture names, source identities, report examples, and repository references are synthetic. The executable entrypoints are NUnit tests: `CheckpointAAdoptionAcceptanceTests` validates the manifest and cross-surface Core/Testing behavior, while `CheckpointACommandLineAcceptanceTests` validates redirected CLI output.
+All fixture names, source identities, report examples, and repository references are synthetic. Each manifest root contains a policy, compilable `.csproj`/`.slnx` project tree, and source code; the migration root also contains an imported fragment and legacy baseline. `AdoptionAcceptanceFixture` copies roots to isolated temporary directories, builds them without modifying checked-in fixtures, and is the shared execution helper for #374, #411, and #366.
+
+The executable entrypoints are NUnit tests: `CheckpointAAdoptionAcceptanceTests` drives the manifest scenarios and shared fixture roots, `CheckpointACommandLineAcceptanceTests` validates redirected CLI output, and `CheckpointA_HumanJsonAndSarifSinks_ExecuteOneAnalysis` observes that three report sinks consume one validation execution.
 
 ## Extension rule
 

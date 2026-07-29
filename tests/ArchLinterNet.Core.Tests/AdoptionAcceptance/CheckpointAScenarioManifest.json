@@ -19,7 +19,7 @@
     { "id": "assembly-aware-composition", "owner": "#360", "entrypoint": "CheckpointAAdoptionAcceptanceTests.ExecuteScenario" },
     { "id": "build-state-preflight", "owner": "#362", "entrypoint": "CheckpointAAdoptionAcceptanceTests.ExecuteScenario" },
     { "id": "single-snapshot", "owner": "#363", "entrypoint": "CheckpointAAdoptionAcceptanceTests.ExecuteScenario" },
-    { "id": "non-tty-human-json-sarif-parity", "owner": "#364", "entrypoint": "CheckpointAAdoptionAcceptanceTests.ExecuteScenario" }
+    { "id": "non-tty-human-json-sarif-parity", "owner": "#364", "entrypoint": "ValidateCommandHandlerReportModeTests.CheckpointA_HumanJsonAndSarifSinks_ExecuteOneAnalysis" }
   ],
   "reusers": ["#374", "#411", "#366"]
 }

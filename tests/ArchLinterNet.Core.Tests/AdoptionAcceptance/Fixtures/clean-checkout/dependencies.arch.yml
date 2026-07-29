@@ -2,3 +2,4 @@ version: 1
 name: Synthetic clean checkout adopter
 analysis:
   target_assemblies: [Synthetic.Clean]
+  projects: [src/Synthetic.Clean/Synthetic.Clean.csproj]

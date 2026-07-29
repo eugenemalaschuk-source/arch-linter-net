@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Text.Json;
+using ArchLinterNet.Core.BuildState;
 using ArchLinterNet.Core.Contracts;
 using ArchLinterNet.Core.Model;
 using ArchLinterNet.Core.Resolution;
@@ -36,9 +37,13 @@ public sealed class CheckpointAAdoptionAcceptanceTests
                 .Select(scenario => scenario.GetProperty("owner").GetString()),
                 Is.EquivalentTo(new[] { "#356", "#357", "#358", "#359", "#360", "#361", "#362", "#363", "#364" }));
             Assert.That(root.GetProperty("scenarios").EnumerateArray()
-                .All(scenario => scenario.GetProperty("entrypoint").GetString() ==
-                    "CheckpointAAdoptionAcceptanceTests.ExecuteScenario"), Is.True);
-            Assert.That(FixtureRootNames(), Is.EqualTo(new[] { "clean-checkout", "migration", "multi-host", "multi-project", "small" }));
+                .All(scenario => !string.IsNullOrWhiteSpace(scenario.GetProperty("entrypoint").GetString())), Is.True);
+            Assert.That(root.GetProperty("scenarios").EnumerateArray()
+                .Single(scenario => scenario.GetProperty("owner").GetString() == "#364")
+                .GetProperty("entrypoint").GetString(),
+                Is.EqualTo("ValidateCommandHandlerReportModeTests.CheckpointA_HumanJsonAndSarifSinks_ExecuteOneAnalysis"));
+            Assert.That(DeclaredFixtureRoots(root),
+                Is.EqualTo(new[] { "clean-checkout", "migration", "multi-host", "multi-project", "small" }));
         });
     }
 
@@ -59,22 +64,49 @@ public sealed class CheckpointAAdoptionAcceptanceTests
                 ImportedMigrationFixture_LoadsThroughThePublicPolicyLoader();
                 break;
             case "baseline-exact-identity":
-            case "assembly-aware-composition":
-                Assert.That(
-                    new ArchitectureViolationIdentity(2, "composition", "call", "rule", "HostA", "Program", null, null, null, "Run", 0),
-                    Is.Not.EqualTo(new ArchitectureViolationIdentity(2, "composition", "call", "rule", "HostB", "Program", null, null, null, "Run", 0)));
+                new ArchitectureBaselineComparerTests()
+                    .Compare_Version1Baseline_UnqualifiedIdentityStillMatchesByLegacyPair();
                 break;
             case "subtractive-selectors":
+                using (AdoptionAcceptanceFixture fixture = AdoptionAcceptanceFixture.Create("small"))
+                {
+                    fixture.Build();
+                }
                 Assert.That(ArchitectureLayerResolver.MatchesNamespace(
                     new ArchitectureLayer { Namespace = "Synthetic.Product.*", Exclude = [new ArchitectureLayerExclusion { Namespace = "Synthetic.Product.Generated" }] },
                     "Synthetic.Product.Generated"), Is.False);
                 break;
             case "package-evidence":
+                new ArchitectureDiagnosticFormatterTests()
+                    .GroupedPackageViolation_EachAdapterAlignsEvidenceWithCanonicalIdentity();
+                break;
             case "framework-reference-evidence":
-                Assert.That(ArchitectureFindingJsonReader.Read("""{"schema_version":1,"kind":"package_dependency","canonical_identity":"synthetic","mode":"strict","severity":"error","message_code":"package","baseline_state":null,"details":{"detail_kind":"package"}}""", strict: true).RawDetails.GetProperty("detail_kind").GetString(), Is.EqualTo("package"));
+                using (AdoptionAcceptanceFixture fixture = AdoptionAcceptanceFixture.Create("multi-project"))
+                {
+                    fixture.Build();
+                }
+                new ArchitectureDiagnosticFormatterTests()
+                    .FrameworkReferenceViolation_WithEvidence_HumanJsonAndSarifRenderStructuredFields();
+                break;
+            case "assembly-aware-composition":
+                using (AdoptionAcceptanceFixture fixture = AdoptionAcceptanceFixture.Create("multi-host"))
+                {
+                    fixture.Build();
+                }
+                var composition = new CompositionContractTests();
+                composition.SetUp();
+                try
+                {
+                    composition.CheckCompositionContract_Violation_BaselineCandidateIsAssemblyAndMemberQualified();
+                    composition.CheckCompositionContract_TwoCallsToSameApiInSameMember_BaseliningFirstDoesNotSuppressSecond();
+                }
+                finally
+                {
+                    composition.TearDown();
+                }
                 break;
             case "build-state-preflight":
-                Assert.That(File.Exists(ManifestPath()), Is.True);
+                CleanCheckoutFixture_ReportsMissingArtifact();
                 break;
             case "single-snapshot":
                 TestingSnapshot_UsesOneAnalysisSessionForStrictAndAudit();
@@ -91,12 +123,33 @@ public sealed class CheckpointAAdoptionAcceptanceTests
     [Test]
     public void ImportedMigrationFixture_LoadsThroughThePublicPolicyLoader()
     {
-        string root = new ArchitectureRepositoryRootResolver().Resolve();
-        string policy = Path.Combine(root, "tests", "ArchLinterNet.Cli.Tests", "TestPolicies", "imported-provenance-root.yml");
+        using AdoptionAcceptanceFixture fixture = AdoptionAcceptanceFixture.Create("migration");
 
-        ArchitectureContractDocument document = new ArchitecturePolicyDocumentLoader().Load(policy);
+        ArchitectureContractDocument document = new ArchitecturePolicyDocumentLoader().Load(fixture.PolicyPath);
 
-        Assert.That(document.Analysis.TargetAssemblies, Is.Not.Empty);
+        Assert.Multiple(() =>
+        {
+            Assert.That(document.Analysis.TargetAssemblies, Is.EqualTo(new[] { "Synthetic.Legacy" }));
+            Assert.That(document.Layers, Contains.Key("legacy"));
+            Assert.That(File.ReadAllText(Path.Combine(fixture.Root, "baseline.yml")), Does.StartWith("version: 1"));
+        });
+    }
+
+    [TestCase("small")]
+    [TestCase("multi-project")]
+    [TestCase("multi-host")]
+    [TestCase("migration")]
+    public void FixtureRoot_IsCompilableAndContainsSyntheticSources(string fixtureId)
+    {
+        using AdoptionAcceptanceFixture fixture = AdoptionAcceptanceFixture.Create(fixtureId);
+
+        fixture.Build();
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(fixture.ProjectPaths, Is.Not.Empty);
+            Assert.That(fixture.SourcePaths, Is.Not.Empty);
+        });
     }
 
     [Test]
@@ -176,15 +229,46 @@ public sealed class CheckpointAAdoptionAcceptanceTests
         });
     }
 
-    private static string ManifestPath()
+    internal static string ManifestPath()
     {
         string root = new ArchitectureRepositoryRootResolver().Resolve();
         return Path.Combine(root, "tests", "ArchLinterNet.Core.Tests", "AdoptionAcceptance", "CheckpointAScenarioManifest.json");
     }
 
-    private static string[] FixtureRootNames()
+    private static string[] DeclaredFixtureRoots(JsonElement manifest)
     {
-        string fixtures = Path.Combine(Path.GetDirectoryName(ManifestPath())!, "Fixtures");
-        return Directory.GetDirectories(fixtures).Select(Path.GetFileName).OrderBy(name => name, StringComparer.Ordinal).ToArray()!;
+        string manifestDirectory = Path.GetDirectoryName(ManifestPath())!;
+        string[] roots = manifest.GetProperty("fixtures").EnumerateArray()
+            .Select(fixture => fixture.GetProperty("root").GetString()!)
+            .ToArray();
+        foreach (string relativeRoot in roots)
+        {
+            string root = Path.Combine(manifestDirectory, relativeRoot.Replace('/', Path.DirectorySeparatorChar));
+            Assert.Multiple(() =>
+            {
+                Assert.That(File.Exists(Path.Combine(root, "dependencies.arch.yml")), Is.True, relativeRoot);
+                Assert.That(Directory.GetFiles(root, "*.csproj", SearchOption.AllDirectories), Is.Not.Empty, relativeRoot);
+                Assert.That(Directory.GetFiles(root, "*.cs", SearchOption.AllDirectories), Is.Not.Empty, relativeRoot);
+                Assert.That(Directory.GetDirectories(root, "bin", SearchOption.AllDirectories), Is.Empty, relativeRoot);
+                Assert.That(Directory.GetDirectories(root, "obj", SearchOption.AllDirectories), Is.Empty, relativeRoot);
+            });
+        }
+
+        return roots.Select(Path.GetFileName).OrderBy(name => name, StringComparer.Ordinal).ToArray()!;
+    }
+
+    private static void CleanCheckoutFixture_ReportsMissingArtifact()
+    {
+        using AdoptionAcceptanceFixture fixture = AdoptionAcceptanceFixture.Create("clean-checkout");
+
+        ArchitectureValidationResult result = new ArchitectureValidationBuilder(fixture.PolicyPath).ValidateStrict();
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(result.PreflightBlocked, Is.True);
+            Assert.That(result.PreflightDiagnostics.Single().State, Is.EqualTo(BuildStatePreflightState.MissingArtifact));
+            Assert.That(Directory.GetDirectories(fixture.Root, "bin", SearchOption.AllDirectories), Is.Empty);
+            Assert.That(Directory.GetDirectories(fixture.Root, "obj", SearchOption.AllDirectories), Is.Empty);
+        });
     }
 }
