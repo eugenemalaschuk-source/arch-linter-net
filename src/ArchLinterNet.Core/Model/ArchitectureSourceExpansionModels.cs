@@ -44,6 +44,15 @@ public sealed record ArchitectureExpandedContractInstance(
     // The authored location this instance's source came from: the matching `sources[i]` entry for
     // an explicit source, or the referenced source set's own declaration for a resolved member/glob.
     public ArchitecturePolicySourceLocation? PolicyLocation { get; init; }
+
+    // The root of the authored contract. This remains distinct from PolicyLocation when a source
+    // comes from an imported set, so consumers can show both the rule that consumes the source and
+    // the concrete set selector that produced it.
+    public ArchitecturePolicySourceLocation? AuthoredContractPolicyLocation { get; init; }
+
+    // The precise `source_sets[i]` reference on the authored contract. Null for explicit sources
+    // and container-template expansion, whose source has no named-set reference.
+    public ArchitecturePolicySourceLocation? SourceSetReferencePolicyLocation { get; init; }
 }
 
 public sealed record ArchitectureExpandedContractExclusion(

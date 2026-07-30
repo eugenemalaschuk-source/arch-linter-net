@@ -1,4 +1,5 @@
 using ArchLinterNet.Core.Contracts;
+using ArchLinterNet.Core.Contracts.Families;
 using ArchLinterNet.Core.Execution;
 using ArchLinterNet.Core.Model;
 using NUnit.Framework;
@@ -69,11 +70,12 @@ public sealed partial class LayoutConventionContractTests
         runner.Session.CheckLayoutConventionsContract(contract);
 
         Assert.That(
-            runner.SubtractiveMatcherParticipation.Select(p => (p.Field, p.Index, p.Matched)),
+            runner.SubtractiveMatcherParticipation.Select(p => (p.Kind, p.Field, p.Index, p.Matched)),
             Is.EqualTo(new[]
             {
-                ("exclude_files_matching", 0, true),
-                ("exclude_files_matching", 1, false)
+                (ArchitectureSelectorParticipationKind.Inclusion, "files_matching", 0, true),
+                (ArchitectureSelectorParticipationKind.Exclusion, "exclude_files_matching", 0, true),
+                (ArchitectureSelectorParticipationKind.Exclusion, "exclude_files_matching", 1, false)
             }),
             "The first exclusion actually subtracted a candidate and must report matched; the " +
             "second targets a folder that doesn't exist and must report stale.");
@@ -116,8 +118,38 @@ public sealed partial class LayoutConventionContractTests
         {
             Assert.That(violations.Any(v => v.SourceType.Contains("ServiceInMatchingNamespace", StringComparison.Ordinal)), Is.True);
             Assert.That(
-                runner.SubtractiveMatcherParticipation.Select(p => (p.Field, p.Index, p.Matched)),
-                Is.EqualTo(new[] { ("exclude_files_matching", 0, false) }));
+                runner.SubtractiveMatcherParticipation.Select(p => (p.Kind, p.Field, p.Index, p.Matched)),
+                Is.EqualTo(new[]
+                {
+                    (ArchitectureSelectorParticipationKind.Inclusion, "files_matching", 0, true),
+                    (ArchitectureSelectorParticipationKind.Exclusion, "exclude_files_matching", 0, false)
+                }));
+        });
+    }
+
+    [Test]
+    public void CheckLayoutConventionsContract_NoSourceEnrichedFacts_RecordsExclusionEvaluationFailed()
+    {
+        var contract = new ArchitectureLayoutConventionContract
+        {
+            Name = "services-folder-must-contain-classes",
+            FilesMatching = new ArchitectureLayoutFileMatcher { FolderSegment = "Services" },
+            ExcludeFilesMatching = { new ArchitectureLayoutFileMatcher { FolderSegment = "Generated" } },
+            RequireTypeKind = "class"
+        };
+        var runner = new ArchitectureContractRunner(CreateContext(), CreateDocument(contract, withSourceRoots: false));
+
+        runner.Session.CheckLayoutConventionsContract(contract);
+
+        // The whole run aborted before any exclusion got evaluated - the exclusion needs
+        // source-path facts just like the include selector, so it must still surface as
+        // evaluation-failed rather than silently vanish from the participation result.
+        ArchitectureSubtractiveMatcherParticipation participation = runner.SubtractiveMatcherParticipation
+            .Single(item => item.Kind == ArchitectureSelectorParticipationKind.Exclusion);
+        Assert.Multiple(() =>
+        {
+            Assert.That(participation.EvaluationFailed, Is.True);
+            Assert.That(participation.Matched, Is.False);
         });
     }
 
@@ -188,7 +220,8 @@ public sealed partial class LayoutConventionContractTests
         // The exclusion's `when` couldn't be evaluated for this candidate (no resolved source
         // file) - it must report neither Matched nor stale, since whether it would have excluded
         // the candidate is genuinely unknown, not "no".
-        ArchitectureSubtractiveMatcherParticipation participation = runner.SubtractiveMatcherParticipation.Single();
+        ArchitectureSubtractiveMatcherParticipation participation = runner.SubtractiveMatcherParticipation
+            .Single(item => item.Kind == ArchitectureSelectorParticipationKind.Exclusion);
         Assert.Multiple(() =>
         {
             Assert.That(participation.EvaluationFailed, Is.True);

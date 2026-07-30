@@ -37,6 +37,10 @@ public sealed partial class ExplainCommandHandlerTests
             Assert.That(instance.GetProperty("selector").GetString(), Is.EqualTo("Acme.Modules.*"));
             Assert.That(contract.GetProperty("policyLocation").GetProperty("sourcePath").GetString(),
                 Is.EqualTo("architecture/parts/modules.yml"));
+            Assert.That(instance.GetProperty("authoredContractPolicyLocation").GetProperty("sourcePath").GetString(),
+                Is.EqualTo("architecture/parts/modules.yml"));
+            Assert.That(instance.GetProperty("sourceSetReferencePolicyLocation").GetProperty("sourcePath").GetString(),
+                Is.EqualTo("architecture/parts/modules.yml"));
         });
     }
 
@@ -61,6 +65,44 @@ public sealed partial class ExplainCommandHandlerTests
                 Does.Contain("Source expansion exclusion: [modules-no-infrastructure] stale sources -> Acme.Modules.Legacy"));
             Assert.That(console.OutputText, Does.Contain("architecture/parts/modules.yml"));
         });
+    }
+
+    [Test]
+    public void Explain_SelectorParticipation_ReportsEffectiveInclusionAndStaleExclusion()
+    {
+        var runtime = new ExplainStubRuntime
+        {
+            Outcome = new ArchitectureExplainOutcome("A", "B", ["A", "B"], ["rule"])
+            {
+                SelectorParticipation =
+                [
+                    new ArchitectureSubtractiveMatcherParticipation(
+                        "controllers", "controllers", "types_matching", 0, true)
+                    {
+                        Kind = ArchitectureSelectorParticipationKind.Inclusion
+                    },
+                    new ArchitectureSubtractiveMatcherParticipation(
+                        "controllers", "controllers", "exclude_types_matching", 0, false)
+                ]
+            }
+        };
+        var console = new RecordingCliConsole();
+
+        Handler(runtime, console).Execute(Options(format: "json"));
+
+        using JsonDocument document = JsonDocument.Parse(console.OutputText);
+        JsonElement participation = document.RootElement.GetProperty("selectorParticipation");
+        Assert.Multiple(() =>
+        {
+            Assert.That(participation[0].GetProperty("kind").GetString(), Is.EqualTo("inclusion"));
+            Assert.That(participation[0].GetProperty("matched").GetBoolean(), Is.True);
+            Assert.That(participation[1].GetProperty("kind").GetString(), Is.EqualTo("exclusion"));
+            Assert.That(participation[1].GetProperty("staleExclusion").GetBoolean(), Is.True);
+        });
+
+        Handler(runtime, console).Execute(Options(format: "human"));
+        Assert.That(console.OutputText,
+            Does.Contain("Selector participation: [controllers] exclusion exclude_types_matching[0] stale"));
     }
 
     [Test]
@@ -221,6 +263,11 @@ public sealed partial class ExplainCommandHandlerTests
                             "Acme.Modules.Orders",
                             "modules",
                             "Acme.Modules.*")
+                        {
+                            PolicyLocation = location,
+                            AuthoredContractPolicyLocation = location,
+                            SourceSetReferencePolicyLocation = location
+                        }
                     ])
                 {
                     PolicyLocation = location,

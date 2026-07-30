@@ -267,6 +267,9 @@ optional-empty in `explain`, JSON, and SARIF output rather than disappearing sil
 shape as `files_matching`. `layer_templates` supports `exclude_containers:` to subtract selected
 containers before template expansion. Empty exclusion matchers are rejected at policy load time.
 
+For source-set expansion, structured outputs retain separate locations for the consuming contract,
+its `source_sets[i]` reference, and the matching source-set `members[i]` or `globs[i]` selector.
+
 ## `legacy_runtime_layers`
 
 Optional. List of namespace prefixes that are runtime-only or otherwise not

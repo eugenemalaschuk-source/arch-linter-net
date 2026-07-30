@@ -55,7 +55,7 @@ The system SHALL fail policy loading when a contract references an unknown set n
 - **THEN** policy loading succeeds and the expansion inventory records the contract as optional-empty with that reason
 
 ### Requirement: The resolved expansion is a typed, provenance-preserving inventory
-The system SHALL record a deterministic expansion inventory listing each resolved set and each expanded contract with its authored id, resolved sources, and selectors. Expanded instances SHALL resolve to their authored contract's policy location, including the authored fragment location when the contract was imported. The inventory SHALL be exposed through the shared coverage inventory, `explain`, and structured JSON and SARIF output without requiring display-text parsing.
+The system SHALL record a deterministic expansion inventory listing each resolved set and each expanded contract with its authored id, resolved sources, and selectors. An instance produced through `source_sets[i]` SHALL retain independently the authored contract location, the `source_sets[i]` reference location, and the concrete resolved `members[i]`/`globs[i]` selector location, including imported-fragment locations. The inventory SHALL be exposed through the shared coverage inventory, `explain`, and structured JSON and SARIF output without requiring display-text parsing.
 
 #### Scenario: Adding a matching module changes the inventory
 - **WHEN** a newly declared target assembly matches an existing set glob

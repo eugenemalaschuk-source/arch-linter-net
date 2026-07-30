@@ -94,7 +94,9 @@ public sealed partial class ArchitectureSarifFormatter
                     ["source"] = instance.Source,
                     ["source_set"] = instance.SetName,
                     ["selector"] = instance.Selector,
-                    ["policy_location"] = FormatSourceExpansionLocation(instance.PolicyLocation)
+                    ["policy_location"] = FormatSourceExpansionLocation(instance.PolicyLocation),
+                    ["authored_contract_policy_location"] = FormatSourceExpansionLocation(instance.AuthoredContractPolicyLocation),
+                    ["source_set_reference_policy_location"] = FormatSourceExpansionLocation(instance.SourceSetReferencePolicyLocation)
                 }).ToArray()
             }).ToArray()
         };
@@ -111,6 +113,8 @@ public sealed partial class ArchitectureSarifFormatter
             ["index"] = p.Index,
             ["matched"] = p.Matched,
             ["evaluation_failed"] = p.EvaluationFailed,
+            ["kind"] = p.Kind == ArchitectureSelectorParticipationKind.Inclusion ? "inclusion" : "exclusion",
+            ["stale_exclusion"] = p.IsStaleExclusion,
             ["policy_location"] = FormatSourceExpansionLocation(p.PolicyLocation)
         }).ToArray();
     }

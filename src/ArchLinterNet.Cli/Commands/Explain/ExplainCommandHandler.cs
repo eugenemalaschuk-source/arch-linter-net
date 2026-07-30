@@ -122,10 +122,26 @@ internal sealed class ExplainCommandHandler(ICliRuntime runtime, ICliConsole con
                                 ["source"] = instance.Source,
                                 ["sourceSet"] = instance.SetName,
                                 ["selector"] = instance.Selector,
-                                ["policyLocation"] = FormatPolicyLocation(instance.PolicyLocation)
+                                ["policyLocation"] = FormatPolicyLocation(instance.PolicyLocation),
+                                ["authoredContractPolicyLocation"] = FormatPolicyLocation(instance.AuthoredContractPolicyLocation),
+                                ["sourceSetReferencePolicyLocation"] = FormatPolicyLocation(instance.SourceSetReferencePolicyLocation)
                             }).ToArray()
                         }).ToArray()
-                    }
+                    },
+                    ["selectorParticipation"] = outcome.SelectorParticipation.Select(participation => new Dictionary<string, object?>
+                    {
+                        ["contractId"] = participation.ContractId,
+                        ["contractName"] = participation.ContractName,
+                        ["kind"] = participation.Kind == ArchitectureSelectorParticipationKind.Inclusion
+                            ? "inclusion"
+                            : "exclusion",
+                        ["field"] = participation.Field,
+                        ["index"] = participation.Index,
+                        ["matched"] = participation.Matched,
+                        ["staleExclusion"] = participation.IsStaleExclusion,
+                        ["evaluationFailed"] = participation.EvaluationFailed,
+                        ["policyLocation"] = FormatPolicyLocation(participation.PolicyLocation)
+                    }).ToArray()
                 };
 
                 if (outcome.ExpressionParticipation.Count > 0)
@@ -189,9 +205,7 @@ internal sealed class ExplainCommandHandler(ICliRuntime runtime, ICliConsole con
 
                 foreach (ArchitectureContractExpansion expansion in outcome.SourceExpansion.Contracts)
                 {
-                    string policy = expansion.PolicyLocation is null
-                        ? string.Empty
-                        : $" (policy: {expansion.PolicyLocation.SourcePath}:{expansion.PolicyLocation.YamlPath})";
+                    string policy = FormatPolicySuffix(expansion.PolicyLocation);
 
                     if (expansion.OptionalEmpty)
                     {
@@ -210,18 +224,17 @@ internal sealed class ExplainCommandHandler(ICliRuntime runtime, ICliConsole con
                             string set = instance.SetName is null ? "sources" : $"set '{instance.SetName}'";
                             string selectorField = expansion.SelectorField is null ? string.Empty :
                                 $" ({expansion.SelectorField})";
+                            string instancePolicy = FormatInstancePolicySuffix(instance);
                             console.Out.WriteLine(
                                 $"Source expansion: [{expansion.AuthoredContractId}]{selectorField} {set} -> {instance.Source} " +
-                                $"(selector: {instance.Selector}; id: {instance.ContractId}){policy}");
+                                $"(selector: {instance.Selector}; id: {instance.ContractId}){instancePolicy}");
                         }
                     }
 
                     foreach (ArchitectureExpandedContractExclusion exclusion in expansion.Exclusions)
                     {
                         string set = exclusion.SetName is null ? "sources" : $"set '{exclusion.SetName}'";
-                        string exclusionPolicy = exclusion.PolicyLocation is null
-                            ? string.Empty
-                            : $" (policy: {exclusion.PolicyLocation.SourcePath}:{exclusion.PolicyLocation.YamlPath})";
+                        string exclusionPolicy = FormatPolicySuffix(exclusion.PolicyLocation);
 
                         if (exclusion.OptionalEmpty)
                         {
@@ -236,6 +249,23 @@ internal sealed class ExplainCommandHandler(ICliRuntime runtime, ICliConsole con
                             $"Source expansion exclusion: [{expansion.AuthoredContractId}] {state} {set} -> {exclusion.Source} " +
                             $"(selector: {exclusion.Selector}){exclusionPolicy}");
                     }
+                }
+
+                foreach (ArchitectureSubtractiveMatcherParticipation participation in outcome.SelectorParticipation)
+                {
+                    string state = participation.EvaluationFailed
+                        ? "evaluation failed"
+                        : participation.Matched
+                            ? "matched"
+                            : participation.IsStaleExclusion
+                                ? "stale"
+                                : "not matched";
+                    string kind = participation.Kind == ArchitectureSelectorParticipationKind.Inclusion
+                        ? "inclusion"
+                        : "exclusion";
+                    console.Out.WriteLine(
+                        $"Selector participation: [{participation.ContractId}] {kind} {participation.Field}[{participation.Index}] " +
+                        $"{state}{FormatPolicySuffix(participation.PolicyLocation)}");
                 }
             }
 
@@ -266,4 +296,28 @@ internal sealed class ExplainCommandHandler(ICliRuntime runtime, ICliConsole con
                 ["sourcePath"] = location.SourcePath,
                 ["yamlPath"] = location.YamlPath
             };
+
+    private static string FormatPolicySuffix(ArchitecturePolicySourceLocation? location) =>
+        location is null ? string.Empty : $" (policy: {location.SourcePath}:{location.YamlPath})";
+
+    private static string FormatInstancePolicySuffix(ArchitectureExpandedContractInstance instance)
+    {
+        List<string> locations = new();
+        if (instance.AuthoredContractPolicyLocation is not null)
+        {
+            locations.Add($"contract: {instance.AuthoredContractPolicyLocation.SourcePath}:{instance.AuthoredContractPolicyLocation.YamlPath}");
+        }
+
+        if (instance.SourceSetReferencePolicyLocation is not null)
+        {
+            locations.Add($"source set reference: {instance.SourceSetReferencePolicyLocation.SourcePath}:{instance.SourceSetReferencePolicyLocation.YamlPath}");
+        }
+
+        if (instance.PolicyLocation is not null)
+        {
+            locations.Add($"selector: {instance.PolicyLocation.SourcePath}:{instance.PolicyLocation.YamlPath}");
+        }
+
+        return locations.Count == 0 ? string.Empty : $" (policy: {string.Join("; ", locations)})";
+    }
 }

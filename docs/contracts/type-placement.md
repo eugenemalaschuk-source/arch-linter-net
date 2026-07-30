@@ -54,6 +54,8 @@ At least one `types_matching` field must be populated. An omitted, empty (`types
 
 `exclude_types_matching` reuses the exact same matcher shape and subtracts matched types after inclusion. Empty exclusion matchers are rejected for the same reason: `exclude_types_matching: [{}]` would otherwise silently match every loaded type and disable the contract.
 
+Validation evidence records the positive `types_matching` selector and every exclusion independently. An exclusion is reported as matched only when it subtracts an included type; an exclusion that subtracts none is stale, while an unavailable source-dependent evaluation remains distinct from stale.
+
 ### Placement expectations
 
 `must_reside_in_layers`, `must_reside_in_namespaces`, `must_reside_in_projects`, and `must_reside_in_assemblies` are all optional lists that together form a single set of allowed locations: a selected type's actual location must satisfy **at least one** entry across all four lists, or it's a placement violation.

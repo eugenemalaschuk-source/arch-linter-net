@@ -73,9 +73,12 @@ The `explain` command SHALL report, in both human and JSON output, each expanded
 - **THEN** the output names the authored contract, the set, each concrete resolved source, and the authored policy fragment location
 
 ### Requirement: Explain reports effective subtractive scope
-The explain command SHALL report effective compatible selector scope with authored and imported provenance without requiring clients to parse display prose.
+The explain command SHALL report effective compatible selector scope with authored and imported provenance without requiring clients to parse display prose. For runtime type-placement and layout-convention selectors, JSON SHALL include typed inclusion/exclusion participation with matched, stale-exclusion, and evaluation-failed states; human output SHALL render the same state.
 
 #### Scenario: Explain identifies an exclusion
 - **WHEN** an effective scope excludes a resolved item
 - **THEN** explain output SHALL identify the exclusion item and its provenance
 
+#### Scenario: Explain shows runtime stale exclusion
+- **WHEN** a type-placement or layout-convention exclusion matches no candidate accepted by its inclusion matcher
+- **THEN** explain output SHALL identify that exclusion as stale alongside the positive matcher participation

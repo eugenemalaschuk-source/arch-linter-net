@@ -54,7 +54,7 @@ The inventory SHALL be built lazily, only when a consumer requests it, and SHALL
 - **THEN** the coverage inventory is never constructed during that run
 
 ### Requirement: Inventory performs no coverage classification
-The inventory SHALL NOT classify any namespace, project, assembly, or dependency edge as `covered`, `excluded`, `uncovered`, `unknown`, `stale`, or `empty-input`; it SHALL only expose the raw facts a future classifier needs.
+The inventory SHALL NOT classify any namespace, project, assembly, or dependency edge as `covered`, `excluded`, `uncovered`, `unknown`, `stale`, or `empty-input`; it SHALL only expose the raw facts a future classifier needs. Typed selector participation is an explicit exception: it reports matcher evaluation evidence, not a coverage classification of those domain facts.
 
 #### Scenario: Inventory output contains no classification status
 - **WHEN** the inventory is built for any document
@@ -74,3 +74,6 @@ The system SHALL expose typed inclusion, exclusion, and stale-exclusion evidence
 - **WHEN** a compatible exclusion matches no included fact
 - **THEN** coverage inventory SHALL record it as unmatched rather than silently expanding or changing the analysis graph
 
+#### Scenario: Runtime matcher scope is available after execution
+- **WHEN** a type-placement or layout-convention contract evaluates an include matcher and one or more exclusions
+- **THEN** the inventory SHALL expose typed inclusion participation and each exclusion's matched, stale, or evaluation-failed state without re-evaluating the matcher

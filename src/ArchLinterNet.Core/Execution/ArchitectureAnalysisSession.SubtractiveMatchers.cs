@@ -4,9 +4,9 @@ using ArchLinterNet.Core.Model;
 
 namespace ArchLinterNet.Core.Execution;
 
-// Matched/stale participation evidence for exclude_types_matching/exclude_files_matching items,
-// split out of ArchitectureAnalysisSession.cs to keep both files under the repository's file-size
-// lint budget (make/lint.mk CS_SIZE_LINT_ERROR_LINES). Populated by
+// Typed inclusion/exclusion participation evidence for type/layout matchers, split out of
+// ArchitectureAnalysisSession.cs to keep both files under the repository's file-size lint budget
+// (make/lint.mk CS_SIZE_LINT_ERROR_LINES). Populated by
 // ArchitectureAnalysisSession.TypePlacement.cs and ArchitectureAnalysisSession.LayoutConventions.cs
 // / .LayoutMatching.cs as each contract that declares these matchers executes.
 public sealed partial class ArchitectureAnalysisSession
@@ -17,13 +17,19 @@ public sealed partial class ArchitectureAnalysisSession
         => _subtractiveMatcherParticipation;
 
     private void RecordSubtractiveMatcherParticipation(
-        IArchitectureContract contract, string field, int index, bool matched, bool evaluationFailed = false)
+        IArchitectureContract contract,
+        string field,
+        int index,
+        bool matched,
+        bool evaluationFailed = false,
+        ArchitectureSelectorParticipationKind kind = ArchitectureSelectorParticipationKind.Exclusion)
     {
         _subtractiveMatcherParticipation.Add(new ArchitectureSubtractiveMatcherParticipation(
             contract.Id ?? contract.Name, contract.Name, field, index, matched)
         {
             PolicyLocation = ItemLocation(contract, field, index),
-            EvaluationFailed = evaluationFailed
+            EvaluationFailed = evaluationFailed,
+            Kind = kind
         });
     }
 

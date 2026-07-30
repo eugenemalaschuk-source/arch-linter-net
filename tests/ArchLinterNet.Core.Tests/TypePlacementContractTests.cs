@@ -143,11 +143,12 @@ public sealed class TypePlacementContractTests
         runner.Session.CheckTypePlacementContract(contract);
 
         Assert.That(
-            runner.SubtractiveMatcherParticipation.Select(p => (p.Field, p.Index, p.Matched)),
+            runner.SubtractiveMatcherParticipation.Select(p => (p.Kind, p.Field, p.Index, p.Matched)),
             Is.EqualTo(new[]
             {
-                ("exclude_types_matching", 0, true),
-                ("exclude_types_matching", 1, false)
+                (ArchitectureSelectorParticipationKind.Inclusion, "types_matching", 0, true),
+                (ArchitectureSelectorParticipationKind.Exclusion, "exclude_types_matching", 0, true),
+                (ArchitectureSelectorParticipationKind.Exclusion, "exclude_types_matching", 1, false)
             }),
             "The first exclusion actually subtracted a candidate and must report matched; the " +
             "second never matched anything and must report stale.");

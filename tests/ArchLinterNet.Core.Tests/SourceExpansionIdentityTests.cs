@@ -575,6 +575,10 @@ public sealed class SourceExpansionIdentityTests
                 Assert.That(applicationInstance.PolicyLocation!.YamlPath, Does.Contain("members/0"));
                 Assert.That(domainInstance.PolicyLocation!.YamlPath, Does.Contain("members/1"));
                 Assert.That(infrastructureInstance.PolicyLocation!.YamlPath, Does.Contain("globs/0"));
+                Assert.That(applicationInstance.AuthoredContractPolicyLocation!.YamlPath,
+                    Does.Contain("contracts.strict_external[0]"));
+                Assert.That(applicationInstance.SourceSetReferencePolicyLocation!.YamlPath,
+                    Does.Contain("source_sets/0"));
                 Assert.That(new[]
                 {
                     applicationInstance.PolicyLocation!.YamlPath,

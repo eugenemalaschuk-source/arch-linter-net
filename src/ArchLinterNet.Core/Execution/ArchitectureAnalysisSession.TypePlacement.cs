@@ -41,11 +41,19 @@ public sealed partial class ArchitectureAnalysisSession
             expectedLocationDescription, expectedNameDescription, executionContext);
 
         bool[] exclusionMatched = new bool[contract.ExcludeTypesMatching.Count];
-
-        Type[] candidateTypes = TypeIndex.AllTypes()
+        Type[] includedTypes = TypeIndex.AllTypes()
             .Where(type => ArchitectureTypeRoleMatcher.Matches(type, contract.TypesMatching, Document, contract.Name))
-            .Where(type => !IsExcludedType(type, contract, exclusionMatched))
             .OrderBy(ArchitectureTypeNames.SafeFullName, StringComparer.Ordinal)
+            .ToArray();
+
+        // Inclusion is captured before subtraction: an excluded type still proves the positive
+        // selector had a candidate, making effective scope observable without rerunning matching.
+        RecordSubtractiveMatcherParticipation(
+            contract, "types_matching", 0, includedTypes.Length > 0,
+            kind: ArchitectureSelectorParticipationKind.Inclusion);
+
+        Type[] candidateTypes = includedTypes
+            .Where(type => !IsExcludedType(type, contract, exclusionMatched))
             .ToArray();
 
         for (int index = 0; index < contract.ExcludeTypesMatching.Count; index++)

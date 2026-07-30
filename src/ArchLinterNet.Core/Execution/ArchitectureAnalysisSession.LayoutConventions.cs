@@ -71,6 +71,26 @@ public sealed partial class ArchitectureAnalysisSession
                     WhenExpressions = BuildUnavailableLayoutWhenExpressions(contract),
                 }
             });
+
+            // The whole run aborted before any exclusion got a chance to evaluate - every exclusion
+            // that itself needs source-path facts must still surface as evaluation-failed rather than
+            // silently vanish from the structured participation result.
+            for (int index = 0; index < contract.ExcludeFilesMatching.Count; index++)
+            {
+                if (MatcherNeedsSourcePath(contract.ExcludeFilesMatching[index]))
+                {
+                    RecordSubtractiveMatcherParticipation(
+                        contract, "exclude_files_matching", index, matched: false, evaluationFailed: true);
+                }
+            }
+
+            if (MatcherNeedsSourcePath(contract.FilesMatching))
+            {
+                RecordSubtractiveMatcherParticipation(
+                    contract, "files_matching", 0, matched: false, evaluationFailed: true,
+                    kind: ArchitectureSelectorParticipationKind.Inclusion);
+            }
+
             return violations;
         }
 
@@ -89,7 +109,12 @@ public sealed partial class ArchitectureAnalysisSession
         bool[] exclusionMatched = new bool[contract.ExcludeFilesMatching.Count];
         bool[] exclusionEvaluationFailed = new bool[contract.ExcludeFilesMatching.Count];
         List<LayoutFileGroup> matchedGroups = CollectMatchedFileGroups(
-            contract, executionContext, violations, exclusionMatched, exclusionEvaluationFailed);
+            contract, executionContext, violations, exclusionMatched, exclusionEvaluationFailed,
+            out bool inclusionMatched);
+
+        RecordSubtractiveMatcherParticipation(
+            contract, "files_matching", 0, inclusionMatched,
+            kind: ArchitectureSelectorParticipationKind.Inclusion);
 
         foreach (LayoutFileGroup group in matchedGroups)
         {
@@ -294,6 +319,10 @@ public sealed partial class ArchitectureAnalysisSession
         Dictionary<(string AssemblyName, string FullTypeName), Type>? typesByIdentity,
         bool[] exclusionMatched)
     {
+        // Same rationale as IsExcludedUnfiledEntry: evaluate every authored exclusion against this
+        // ambiguity independently, not just until the first one matches, so overlapping exclusions
+        // each get their own matched record.
+        bool excludedAny = false;
         for (int index = 0; index < contract.ExcludeFilesMatching.Count; index++)
         {
             ArchitectureLayoutFileMatcher exclusion = contract.ExcludeFilesMatching[index];
@@ -316,11 +345,11 @@ public sealed partial class ArchitectureAnalysisSession
             if (MatchesWhenForAmbiguity(exclusion, ambiguity, typesByIdentity))
             {
                 exclusionMatched[index] = true;
-                return true;
+                excludedAny = true;
             }
         }
 
-        return false;
+        return excludedAny;
     }
 
     private Dictionary<(string AssemblyName, string FullTypeName), Type> BuildTypeIdentityLookup()

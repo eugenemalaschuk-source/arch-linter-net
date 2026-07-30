@@ -82,6 +82,8 @@ Layout convention contracts read from the same deterministic source-file and dec
 
 `exclude_files_matching` reuses the same matcher shape as `files_matching` and subtracts matched candidates before expectations run. Its own optional `when` predicates are compiled and evaluated the same way as `files_matching.when`; empty exclusion matchers are rejected at policy load time.
 
+The effective selector scope is observable in validation reports and `explain`: the included `files_matching` matcher and each exclusion are recorded independently as matched, stale, or evaluation-failed when source facts are unavailable.
+
 ### Violations and ignored violations
 
 Diagnostics identify the matched file, the contract, and whichever of expected/actual type kind, expected/actual name, file/type-name mismatch, or expected/actual counterpart applied. `ignored_violations` entries use the same `source_type`/`forbidden_reference`/`reason` shape as other contract families.

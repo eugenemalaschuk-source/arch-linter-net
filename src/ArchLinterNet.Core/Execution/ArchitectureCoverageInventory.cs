@@ -25,6 +25,7 @@ public sealed class ArchitectureCoverageInventory
         IReadOnlyList<ArchitectureCoverageLayerEntry> declaredLayers,
         IReadOnlyList<ArchitectureLayerContract> expandedLayerTemplates,
         ArchitectureSourceExpansionInventory sourceExpansion,
+        IReadOnlyList<ArchitectureSubtractiveMatcherParticipation> selectorParticipation,
         ProjectDiscoveryResult? projectDiscovery)
     {
         Namespaces = namespaces;
@@ -33,6 +34,7 @@ public sealed class ArchitectureCoverageInventory
         DeclaredLayers = declaredLayers;
         ExpandedLayerTemplates = expandedLayerTemplates;
         SourceExpansion = sourceExpansion;
+        SelectorParticipation = selectorParticipation;
         ProjectDiscovery = projectDiscovery;
         _dependencyEdges = new Lazy<IReadOnlyList<ArchitectureCoverageDependencyEdge>>(BuildDependencyEdges);
     }
@@ -47,6 +49,16 @@ public sealed class ArchitectureCoverageInventory
     // coverage consumer can prove which sources each authored contract resolved to without
     // re-running expansion.
     public ArchitectureSourceExpansionInventory SourceExpansion { get; }
+
+    // The run-time stream is held by reference to the session's append-only collection. A coverage
+    // contract may request the lazy inventory before type/layout execution; this lets its consumer
+    // observe the completed effective scope without replaying matcher evaluation.
+    public IReadOnlyList<ArchitectureSubtractiveMatcherParticipation> SelectorParticipation { get; }
+
+    // Kept for consumers introduced when this stream contained exclusions only. New consumers
+    // should prefer SelectorParticipation, which includes typed positive-selector evidence too.
+    public IReadOnlyList<ArchitectureSubtractiveMatcherParticipation> SubtractiveMatcherParticipation =>
+        SelectorParticipation;
 
     public ProjectDiscoveryResult? ProjectDiscovery { get; }
 
@@ -86,6 +98,7 @@ public sealed class ArchitectureCoverageInventory
             declaredLayers,
             expandedTemplates,
             document.SourceExpansion,
+            session.SubtractiveMatcherParticipation,
             projectDiscovery);
     }
 

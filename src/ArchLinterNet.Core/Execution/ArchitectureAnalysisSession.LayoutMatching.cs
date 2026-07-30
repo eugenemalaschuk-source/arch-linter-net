@@ -21,15 +21,19 @@ public sealed partial class ArchitectureAnalysisSession
         ArchitectureContractExecutionContext executionContext,
         List<ArchitectureViolation> violations,
         bool[] exclusionMatched,
-        bool[] exclusionEvaluationFailed)
+        bool[] exclusionEvaluationFailed,
+        out bool inclusionMatched)
     {
         ArchitectureLayoutFileMatcher matcher = contract.FilesMatching;
         (Dictionary<string, List<(Type Type, ArchitectureDeclaredTypeFact Fact)>> byFile,
             List<(Type Type, ArchitectureDeclaredTypeFact Fact)> unfiled) = BuildCandidateIndex();
 
-        List<LayoutFileGroup> groups = CollectFiledGroups(contract, byFile, exclusionMatched);
-        groups.AddRange(CollectUnfiledGroups(
-            contract, matcher, unfiled, executionContext, violations, exclusionMatched, exclusionEvaluationFailed));
+        List<LayoutFileGroup> groups = CollectFiledGroups(contract, byFile, exclusionMatched, out bool filedInclusionMatched);
+        List<LayoutFileGroup> unfiledGroups = CollectUnfiledGroups(
+            contract, matcher, unfiled, executionContext, violations, exclusionMatched, exclusionEvaluationFailed,
+            out bool unfiledInclusionMatched);
+        groups.AddRange(unfiledGroups);
+        inclusionMatched = filedInclusionMatched || unfiledInclusionMatched;
         return groups;
     }
 
@@ -70,9 +74,11 @@ public sealed partial class ArchitectureAnalysisSession
     private List<LayoutFileGroup> CollectFiledGroups(
         ArchitectureLayoutConventionContract contract,
         Dictionary<string, List<(Type Type, ArchitectureDeclaredTypeFact Fact)>> byFile,
-        bool[] exclusionMatched)
+        bool[] exclusionMatched,
+        out bool inclusionMatched)
     {
         List<LayoutFileGroup> groups = new();
+        inclusionMatched = false;
 
         foreach ((string filePath, List<(Type Type, ArchitectureDeclaredTypeFact Fact)> entries) in
                  byFile.OrderBy(entry => entry.Key, StringComparer.Ordinal))
@@ -87,6 +93,8 @@ public sealed partial class ArchitectureAnalysisSession
             {
                 continue;
             }
+
+            inclusionMatched = true;
 
             eligibleFacts = ApplyFiledExclusions(entries, eligibleFacts, contract.ExcludeFilesMatching, exclusionMatched);
             if (eligibleFacts.Count == 0)
@@ -162,9 +170,11 @@ public sealed partial class ArchitectureAnalysisSession
         ArchitectureContractExecutionContext executionContext,
         List<ArchitectureViolation> violations,
         bool[] exclusionMatched,
-        bool[] exclusionEvaluationFailed)
+        bool[] exclusionEvaluationFailed,
+        out bool inclusionMatched)
     {
         List<LayoutFileGroup> groups = new();
+        inclusionMatched = false;
 
         foreach ((Type Type, ArchitectureDeclaredTypeFact Fact) entry in
                  unfiled.OrderBy(entry => entry.Fact.FullTypeName, StringComparer.Ordinal))
@@ -180,8 +190,14 @@ public sealed partial class ArchitectureAnalysisSession
                 continue;
             }
 
-            if (!included
-                || IsExcludedUnfiledEntry(contract, entry, executionContext, violations, exclusionMatched, exclusionEvaluationFailed))
+            if (!included)
+            {
+                continue;
+            }
+
+            inclusionMatched = true;
+
+            if (IsExcludedUnfiledEntry(contract, entry, executionContext, violations, exclusionMatched, exclusionEvaluationFailed))
             {
                 continue;
             }
@@ -200,6 +216,11 @@ public sealed partial class ArchitectureAnalysisSession
         bool[] exclusionMatched,
         bool[] exclusionEvaluationFailed)
     {
+        // Every authored exclusion is evaluated against this candidate independently - not just
+        // until the first one excludes it - so two overlapping exclusion items both get their own
+        // matched/evaluation-failed record instead of the later ones being starved of a chance to
+        // ever observe this candidate and misreporting as stale.
+        bool excludedAny = false;
         for (int index = 0; index < contract.ExcludeFilesMatching.Count; index++)
         {
             ArchitectureLayoutFileMatcher exclusion = contract.ExcludeFilesMatching[index];
@@ -229,17 +250,18 @@ public sealed partial class ArchitectureAnalysisSession
                 // candidate is suppressed defensively (fail-closed, matching TryEvaluateUnfiledMatcher's
                 // own DataUnavailable violation) but the matcher's participation status is unknown.
                 exclusionEvaluationFailed[index] = true;
-                return true;
+                excludedAny = true;
+                continue;
             }
 
             if (excluded)
             {
                 exclusionMatched[index] = true;
-                return true;
+                excludedAny = true;
             }
         }
 
-        return false;
+        return excludedAny;
     }
 
     private bool TryEvaluateUnfiledMatcher(
