@@ -1,6 +1,7 @@
 using System.Text;
 using System.Text.Json.Nodes;
 using ArchLinterNet.Cli.Abstractions;
+using ArchLinterNet.Cli.Infrastructure;
 using ArchLinterNet.Core.Model;
 using ArchLinterNet.Core.Reporting;
 using ArchLinterNet.Core.Validation;
@@ -447,7 +448,7 @@ internal sealed class ReportCoordinator
     {
         var sb = new StringBuilder();
         AppendHumanSection(sb, outcome);
-        return sb.ToString().TrimEnd();
+        return StripAnsi(sb.ToString().TrimEnd());
     }
 
     private string FormatCombinedHuman(IReadOnlyList<(string Mode, ValidationOutcome Outcome)> outcomesByMode)
@@ -467,8 +468,10 @@ internal sealed class ReportCoordinator
             }
             AppendHumanSection(sb, outcome);
         }
-        return sb.ToString().TrimEnd();
+        return StripAnsi(sb.ToString().TrimEnd());
     }
+
+    internal static string StripAnsi(string content) => AnsiEscapeSequenceStripper.Strip(content);
 
     private void AppendHumanSection(StringBuilder sb, ValidationOutcome outcome)
     {

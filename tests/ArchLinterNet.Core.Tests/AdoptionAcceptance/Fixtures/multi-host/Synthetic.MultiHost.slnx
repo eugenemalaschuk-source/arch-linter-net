@@ -1,0 +1,4 @@
+<Solution>
+  <Project Path="src/Synthetic.HostA/Synthetic.HostA.csproj" />
+  <Project Path="src/Synthetic.HostB/Synthetic.HostB.csproj" />
+</Solution>

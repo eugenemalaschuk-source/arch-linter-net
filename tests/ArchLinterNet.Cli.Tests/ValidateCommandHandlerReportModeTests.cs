@@ -17,7 +17,7 @@ namespace ArchLinterNet.Cli.Tests;
 // errors — the report-mode error-routing surface added and hardened across #364's review
 // iterations.
 [TestFixture]
-public sealed class ValidateCommandHandlerReportModeTests
+public sealed partial class ValidateCommandHandlerReportModeTests
 {
     [Test]
     public void ValidateHandler_ReportMode_PolicyErrorRoutesJsonToFileSink()
@@ -532,6 +532,8 @@ public sealed class ValidateCommandHandlerReportModeTests
 
     private sealed class FakeCliRuntime : ICliRuntime
     {
+        public int ValidationCallCount { get; private set; }
+
         public string Version => "1.2.3";
 
         public ValidationRequest? LastValidationRequest { get; private set; }
@@ -548,6 +550,7 @@ public sealed class ValidateCommandHandlerReportModeTests
 
         public ValidationOutcome Validate(ValidationRequest request, ValidationTiming? timing)
         {
+            ValidationCallCount++;
             LastValidationRequest = request;
             if (ExceptionToThrow is not null)
             {

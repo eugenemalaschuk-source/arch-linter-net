@@ -1,0 +1,4 @@
+<Solution>
+  <Project Path="src/Synthetic.Domain/Synthetic.Domain.csproj" />
+  <Project Path="src/Synthetic.Api/Synthetic.Api.csproj" />
+</Solution>

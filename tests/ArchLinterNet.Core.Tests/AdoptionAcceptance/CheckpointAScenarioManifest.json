@@ -1,0 +1,25 @@
+{
+  "schema": "adoption-acceptance-corpus/v1",
+  "checkpoint": "A",
+  "release_gate": false,
+  "synthetic_identities_only": true,
+  "fixtures": [
+    { "id": "minimal-single-project", "root": "Fixtures/small", "shape": "small", "owner": "#356", "entrypoints": ["CheckpointAAdoptionAcceptanceTests.ExecuteScenario"] },
+    { "id": "conventional-multi-project", "root": "Fixtures/multi-project", "shape": "multi-project", "owner": "#359", "entrypoints": ["CheckpointAAdoptionAcceptanceTests.ExecuteScenario"] },
+    { "id": "same-named-multi-host", "root": "Fixtures/multi-host", "shape": "multi-host", "owner": "#360", "entrypoints": ["CheckpointAAdoptionAcceptanceTests.ExecuteScenario"] },
+    { "id": "legacy-import-migration", "root": "Fixtures/migration", "shape": "migration", "owner": "#361", "entrypoints": ["CheckpointAAdoptionAcceptanceTests.ExecuteScenario"] },
+    { "id": "clean-checkout", "root": "Fixtures/clean-checkout", "shape": "clean-checkout", "owner": "#362", "entrypoints": ["CheckpointAAdoptionAcceptanceTests.ExecuteScenario"] }
+  ],
+  "scenarios": [
+    { "id": "imports-provenance", "owner": "#361", "entrypoint": "CheckpointAAdoptionAcceptanceTests.ExecuteScenario" },
+    { "id": "baseline-exact-identity", "owner": "#357", "entrypoint": "CheckpointAAdoptionAcceptanceTests.ExecuteScenario" },
+    { "id": "subtractive-selectors", "owner": "#356", "entrypoint": "CheckpointAAdoptionAcceptanceTests.ExecuteScenario" },
+    { "id": "package-evidence", "owner": "#358", "entrypoint": "CheckpointAAdoptionAcceptanceTests.ExecuteScenario" },
+    { "id": "framework-reference-evidence", "owner": "#359", "entrypoint": "CheckpointAAdoptionAcceptanceTests.ExecuteScenario" },
+    { "id": "assembly-aware-composition", "owner": "#360", "entrypoint": "CheckpointAAdoptionAcceptanceTests.ExecuteScenario" },
+    { "id": "build-state-preflight", "owner": "#362", "entrypoint": "CheckpointAAdoptionAcceptanceTests.ExecuteScenario" },
+    { "id": "single-snapshot", "owner": "#363", "entrypoint": "CheckpointAAdoptionAcceptanceTests.ExecuteScenario" },
+    { "id": "non-tty-human-json-sarif-parity", "owner": "#364", "entrypoint": "ValidateCommandHandlerReportModeTests.CheckpointA_HumanJsonAndSarifSinks_ExecuteOneAnalysis" }
+  ],
+  "reusers": ["#374", "#411", "#366"]
+}

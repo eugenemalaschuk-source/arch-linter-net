@@ -23,4 +23,9 @@
     <ProjectReference Include="..\..\src\ArchLinterNet.Testing\ArchLinterNet.Testing.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <Compile Remove="AdoptionAcceptance\Fixtures\**\*.cs" />
+    <None Include="AdoptionAcceptance\Fixtures\**\*" />
+  </ItemGroup>
+
 </Project>

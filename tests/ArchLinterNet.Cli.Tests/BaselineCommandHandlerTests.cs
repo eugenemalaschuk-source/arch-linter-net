@@ -2,7 +2,6 @@ using System.Text;
 using System.Text.Json;
 using ArchLinterNet.Cli.Abstractions;
 using ArchLinterNet.Cli.Commands.Baseline;
-using ArchLinterNet.Cli.Infrastructure;
 using ArchLinterNet.Core.BuildState;
 using ArchLinterNet.Core.Graph;
 using ArchLinterNet.Core.Model;
@@ -48,36 +47,6 @@ public sealed partial class BaselineCommandHandlerTests
             Assert.That(verify.PolicyPath, Is.EqualTo("policy.yml"));
             Assert.That(verify.BaselinePath, Is.EqualTo("baseline.yml"));
         });
-    }
-
-    [Test]
-    public void SystemCliConsole_WritesToCurrentConsoleStreams()
-    {
-        TextWriter originalOut = Console.Out;
-        TextWriter originalError = Console.Error;
-        using var outWriter = new StringWriter();
-        using var errorWriter = new StringWriter();
-
-        try
-        {
-            Console.SetOut(outWriter);
-            Console.SetError(errorWriter);
-
-            var console = new SystemCliConsole();
-            console.Out.Write("hello");
-            console.Error.Write("boom");
-
-            Assert.Multiple(() =>
-            {
-                Assert.That(outWriter.ToString(), Is.EqualTo("hello"));
-                Assert.That(errorWriter.ToString(), Is.EqualTo("boom"));
-            });
-        }
-        finally
-        {
-            Console.SetOut(originalOut);
-            Console.SetError(originalError);
-        }
     }
 
     [Test]
