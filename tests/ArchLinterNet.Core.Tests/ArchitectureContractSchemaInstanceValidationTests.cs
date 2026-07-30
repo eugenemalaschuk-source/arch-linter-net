@@ -498,6 +498,28 @@ public sealed class ArchitectureContractSchemaInstanceValidationTests
             $"{defName} must still accept 'sources' combined with 'exclude_sources'.");
     }
 
+    // Runtime parity: an empty exclude_sources/exclude_source_sets list is a no-op that
+    // ArchitectureSourceSetExpander's routing check (Count == 0) never treats as declaring an
+    // exclusion, so the exact-'source' contract stays un-expanded rather than rejected. The schema
+    // must accept the same shape, not merely the presence of the key.
+    [TestCase("packageDependencyContract", "forbidden: [Vendor]", "exclude_sources")]
+    [TestCase("externalDependencyContract", "forbidden: [Vendor]", "exclude_sources")]
+    [TestCase("packageDependencyContract", "forbidden: [Vendor]", "exclude_source_sets")]
+    public void SourceScopedContract_ExactSourceWithEmptyExcludeList_IsAccepted(
+        string defName, string requiredField, string exclusionField)
+    {
+        string yaml = $"""
+            name: exact-source-with-empty-exclusion
+            source: application
+            {exclusionField}: []
+            {requiredField}
+            """;
+
+        Assert.That(Validate(yaml, defName), Is.True,
+            $"{defName} must accept 'source' combined with an empty '{exclusionField}', matching the " +
+            "runtime's no-op treatment of an empty exclusion list.");
+    }
+
     private static void CollectFailures(JsonNode instance, string defName, string location, List<string> failures)
     {
         JsonSchema subSchema = LoadSubSchema(defName);

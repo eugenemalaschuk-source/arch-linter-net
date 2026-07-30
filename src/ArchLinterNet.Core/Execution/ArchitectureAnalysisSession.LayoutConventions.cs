@@ -87,7 +87,9 @@ public sealed partial class ArchitectureAnalysisSession
                 : null;
 
         bool[] exclusionMatched = new bool[contract.ExcludeFilesMatching.Count];
-        List<LayoutFileGroup> matchedGroups = CollectMatchedFileGroups(contract, executionContext, violations, exclusionMatched);
+        bool[] exclusionEvaluationFailed = new bool[contract.ExcludeFilesMatching.Count];
+        List<LayoutFileGroup> matchedGroups = CollectMatchedFileGroups(
+            contract, executionContext, violations, exclusionMatched, exclusionEvaluationFailed);
 
         foreach (LayoutFileGroup group in matchedGroups)
         {
@@ -98,7 +100,9 @@ public sealed partial class ArchitectureAnalysisSession
 
         for (int index = 0; index < contract.ExcludeFilesMatching.Count; index++)
         {
-            RecordSubtractiveMatcherParticipation(contract, "exclude_files_matching", index, exclusionMatched[index]);
+            RecordSubtractiveMatcherParticipation(
+                contract, "exclude_files_matching", index, exclusionMatched[index],
+                evaluationFailed: exclusionEvaluationFailed[index]);
         }
 
         executionContext.CollectUnmatchedIgnores(_unmatchedIgnoredViolations);

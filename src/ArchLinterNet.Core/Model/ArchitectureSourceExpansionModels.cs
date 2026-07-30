@@ -68,7 +68,12 @@ public sealed record ArchitectureExpandedContractExclusion(
 public enum ArchitectureContractExpansionKind
 {
     FanOut,
-    InlineUnion
+    InlineUnion,
+
+    // A layer_template contract's `containers` minus `exclude_containers`, computed once at load
+    // time exactly like source-set expansion, so exclude_containers gets the same typed
+    // matched/stale participation evidence and reuses the same coverage/explain/JSON/SARIF wiring.
+    ContainerSet
 }
 
 public sealed record ArchitectureContractExpansion(

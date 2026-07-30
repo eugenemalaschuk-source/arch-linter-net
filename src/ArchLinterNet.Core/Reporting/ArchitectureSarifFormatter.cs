@@ -68,7 +68,8 @@ public sealed partial class ArchitectureSarifFormatter : IArchitectureSarifForma
         string toolVersion,
         IReadOnlyCollection<BuildStatePreflightDiagnostic> preflightDiagnostics,
         IReadOnlyCollection<ArchitectureCoverageSummary>? coverageSummaries = null,
-        Model.ArchitectureSourceExpansionInventory? sourceExpansion = null)
+        Model.ArchitectureSourceExpansionInventory? sourceExpansion = null,
+        IReadOnlyCollection<Model.ArchitectureSubtractiveMatcherParticipation>? subtractiveMatcherParticipation = null)
     {
         string level = mode == "strict" ? "error" : "warning";
 
@@ -115,7 +116,9 @@ public sealed partial class ArchitectureSarifFormatter : IArchitectureSarifForma
                     {
                         ["coverage_summary"] = FormatCoverageSummaries(coverageSummaries ?? Array.Empty<ArchitectureCoverageSummary>()),
                         ["source_set_expansion"] = FormatSourceExpansion(
-                            sourceExpansion ?? Model.ArchitectureSourceExpansionInventory.Empty)
+                            sourceExpansion ?? Model.ArchitectureSourceExpansionInventory.Empty),
+                        ["subtractive_matcher_participation"] = FormatSubtractiveMatcherParticipation(
+                            subtractiveMatcherParticipation ?? Array.Empty<Model.ArchitectureSubtractiveMatcherParticipation>())
                     },
                 },
             },

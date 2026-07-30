@@ -95,9 +95,12 @@ internal sealed class ExplainCommandHandler(ICliRuntime runtime, ICliConsole con
                             ["group"] = expansion.Group,
                             ["authoredContractId"] = expansion.AuthoredContractId,
                             ["authoredContractName"] = expansion.AuthoredContractName,
-                            ["kind"] = expansion.Kind == ArchitectureContractExpansionKind.FanOut
-                                ? "fan_out"
-                                : "inline_union",
+                            ["kind"] = expansion.Kind switch
+                            {
+                                ArchitectureContractExpansionKind.FanOut => "fan_out",
+                                ArchitectureContractExpansionKind.ContainerSet => "container_set",
+                                _ => "inline_union",
+                            },
                             ["selectorField"] = expansion.SelectorField,
                             ["sourceSets"] = expansion.SetNames,
                             ["optionalEmpty"] = expansion.OptionalEmpty,

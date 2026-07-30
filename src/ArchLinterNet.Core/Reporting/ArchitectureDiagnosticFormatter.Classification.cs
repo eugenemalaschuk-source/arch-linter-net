@@ -203,6 +203,12 @@ public sealed partial class ArchitectureDiagnosticFormatter
         // Init-only rather than a 15th positional parameter, so every existing positional call site
         // above stays unchanged; only the source-expansion overload sets it.
         public Model.ArchitectureSourceExpansionInventory? SourceExpansion { get; init; }
+
+        public IReadOnlyCollection<Model.ArchitectureSubtractiveMatcherParticipation>? SubtractiveMatcherParticipation
+        {
+            get;
+            init;
+        }
     }
 
     private static string BuildCiArtifactsJson(CiArtifactsRequest request)
@@ -261,7 +267,20 @@ public sealed partial class ArchitectureDiagnosticFormatter
                 },
             preflight_diagnostics = BuildStatePreflightJson(request.PreflightDiagnostics, request.Mode),
             source_set_expansion = ArchitectureSarifFormatter.FormatSourceExpansion(
-                request.SourceExpansion ?? Model.ArchitectureSourceExpansionInventory.Empty)
+                request.SourceExpansion ?? Model.ArchitectureSourceExpansionInventory.Empty),
+            subtractive_matcher_participation = (request.SubtractiveMatcherParticipation
+                    ?? Array.Empty<Model.ArchitectureSubtractiveMatcherParticipation>())
+                .Select(p => new
+                {
+                    contract_id = p.ContractId,
+                    contract_name = p.ContractName,
+                    field = p.Field,
+                    index = p.Index,
+                    matched = p.Matched,
+                    evaluation_failed = p.EvaluationFailed,
+                    policy_location = p.PolicyLocation is null ? null : FormatPolicyLocationForJson(p.PolicyLocation)
+                })
+                .ToArray()
         };
 
         return JsonSerializer.Serialize(payload);

@@ -521,4 +521,71 @@ public sealed class SourceExpansionIdentityTests
             Directory.Delete(directory, recursive: true);
         }
     }
+
+    [Test]
+    public void SourceExpansion_InstanceLocation_PointsAtTheSpecificMemberOrGlobEntry()
+    {
+        string directory = Path.Combine(Path.GetTempPath(), $"arch-linter-expansion-item-location-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(directory);
+
+        try
+        {
+            string path = Path.Combine(directory, "dependencies.arch.yml");
+            File.WriteAllText(path, """
+                version: 1
+                name: Test
+                layers:
+                  application:
+                    namespace: Acme.Application
+                  domain:
+                    namespace: Acme.Domain
+                  infra.gateway:
+                    namespace: Acme.Infrastructure
+                source_sets:
+                  inner_layers:
+                    kind: layer
+                    members: [application, domain]
+                    globs: ["infra.*"]
+                external_dependencies:
+                  vendor:
+                    namespace_prefixes: [Vendor]
+                contracts:
+                  strict_external:
+                    - name: inner layers avoid vendor
+                      id: inner-no-vendor
+                      source_sets: [inner_layers]
+                      forbidden: [vendor]
+                """);
+
+            ArchitectureContractDocument document = new ArchitecturePolicyDocumentLoader().Load(path);
+            ArchitectureContractExpansion expansion = document.SourceExpansion.Contracts.Single();
+
+            ArchitectureExpandedContractInstance applicationInstance =
+                expansion.Instances.Single(i => i.Source == "application");
+            ArchitectureExpandedContractInstance domainInstance =
+                expansion.Instances.Single(i => i.Source == "domain");
+            ArchitectureExpandedContractInstance infrastructureInstance =
+                expansion.Instances.Single(i => i.Source == "infra.gateway");
+
+            // Each instance's location must point at the specific authored member/glob entry that
+            // produced it - not merely the shared 'source_sets.inner_layers' root every one of these
+            // three otherwise-identical-looking sources came from.
+            Assert.Multiple(() =>
+            {
+                Assert.That(applicationInstance.PolicyLocation!.YamlPath, Does.Contain("members/0"));
+                Assert.That(domainInstance.PolicyLocation!.YamlPath, Does.Contain("members/1"));
+                Assert.That(infrastructureInstance.PolicyLocation!.YamlPath, Does.Contain("globs/0"));
+                Assert.That(new[]
+                {
+                    applicationInstance.PolicyLocation!.YamlPath,
+                    domainInstance.PolicyLocation!.YamlPath,
+                    infrastructureInstance.PolicyLocation!.YamlPath
+                }, Is.Unique);
+            });
+        }
+        finally
+        {
+            Directory.Delete(directory, recursive: true);
+        }
+    }
 }

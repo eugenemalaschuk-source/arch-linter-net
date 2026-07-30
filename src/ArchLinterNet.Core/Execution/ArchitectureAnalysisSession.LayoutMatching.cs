@@ -20,14 +20,16 @@ public sealed partial class ArchitectureAnalysisSession
         ArchitectureLayoutConventionContract contract,
         ArchitectureContractExecutionContext executionContext,
         List<ArchitectureViolation> violations,
-        bool[] exclusionMatched)
+        bool[] exclusionMatched,
+        bool[] exclusionEvaluationFailed)
     {
         ArchitectureLayoutFileMatcher matcher = contract.FilesMatching;
         (Dictionary<string, List<(Type Type, ArchitectureDeclaredTypeFact Fact)>> byFile,
             List<(Type Type, ArchitectureDeclaredTypeFact Fact)> unfiled) = BuildCandidateIndex();
 
         List<LayoutFileGroup> groups = CollectFiledGroups(contract, byFile, exclusionMatched);
-        groups.AddRange(CollectUnfiledGroups(contract, matcher, unfiled, executionContext, violations, exclusionMatched));
+        groups.AddRange(CollectUnfiledGroups(
+            contract, matcher, unfiled, executionContext, violations, exclusionMatched, exclusionEvaluationFailed));
         return groups;
     }
 
@@ -109,6 +111,14 @@ public sealed partial class ArchitectureAnalysisSession
             return eligibleFacts;
         }
 
+        // An exclusion only "matches" for participation purposes when it actually subtracts a
+        // candidate the inclusion selector already accepted - checking against every fact in the
+        // file (not just eligibleFacts) would report Matched for a type the include selector's own
+        // `when` had already dropped, even though the exclusion removed nothing from this run.
+        HashSet<(string AssemblyName, string FullTypeName)> eligibleKeys = eligibleFacts
+            .Select(fact => (fact.AssemblyName, fact.FullTypeName))
+            .ToHashSet();
+
         HashSet<(string AssemblyName, string FullTypeName)> excluded = new();
         for (int index = 0; index < exclusions.Count; index++)
         {
@@ -120,7 +130,13 @@ public sealed partial class ArchitectureAnalysisSession
 
             foreach (ArchitectureDeclaredTypeFact fact in FilterByWhen(exclusion, entries))
             {
-                excluded.Add((fact.AssemblyName, fact.FullTypeName));
+                (string AssemblyName, string FullTypeName) key = (fact.AssemblyName, fact.FullTypeName);
+                if (!eligibleKeys.Contains(key))
+                {
+                    continue;
+                }
+
+                excluded.Add(key);
                 exclusionMatched[index] = true;
             }
         }
@@ -145,7 +161,8 @@ public sealed partial class ArchitectureAnalysisSession
         List<(Type Type, ArchitectureDeclaredTypeFact Fact)> unfiled,
         ArchitectureContractExecutionContext executionContext,
         List<ArchitectureViolation> violations,
-        bool[] exclusionMatched)
+        bool[] exclusionMatched,
+        bool[] exclusionEvaluationFailed)
     {
         List<LayoutFileGroup> groups = new();
 
@@ -163,7 +180,8 @@ public sealed partial class ArchitectureAnalysisSession
                 continue;
             }
 
-            if (!included || IsExcludedUnfiledEntry(contract, entry, executionContext, violations, exclusionMatched))
+            if (!included
+                || IsExcludedUnfiledEntry(contract, entry, executionContext, violations, exclusionMatched, exclusionEvaluationFailed))
             {
                 continue;
             }
@@ -179,7 +197,8 @@ public sealed partial class ArchitectureAnalysisSession
         (Type Type, ArchitectureDeclaredTypeFact Fact) entry,
         ArchitectureContractExecutionContext executionContext,
         List<ArchitectureViolation> violations,
-        bool[] exclusionMatched)
+        bool[] exclusionMatched,
+        bool[] exclusionEvaluationFailed)
     {
         for (int index = 0; index < contract.ExcludeFilesMatching.Count; index++)
         {
@@ -205,7 +224,11 @@ public sealed partial class ArchitectureAnalysisSession
                     whenExpressions,
                     out bool excluded))
             {
-                exclusionMatched[index] = true;
+                // The exclusion structurally matched this candidate but its `when` couldn't be
+                // evaluated (no resolved source file) - this is neither "matched" nor "stale"; the
+                // candidate is suppressed defensively (fail-closed, matching TryEvaluateUnfiledMatcher's
+                // own DataUnavailable violation) but the matcher's participation status is unknown.
+                exclusionEvaluationFailed[index] = true;
                 return true;
             }
 

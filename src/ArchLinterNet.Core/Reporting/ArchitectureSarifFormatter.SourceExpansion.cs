@@ -18,7 +18,8 @@ public sealed partial class ArchitectureSarifFormatter
         IReadOnlyCollection<BuildStatePreflightDiagnostic> preflightDiagnostics,
         IReadOnlyCollection<ArchitectureCoverageSummary> coverageSummaries,
         ArchitectureSourceExpansionInventory sourceExpansion,
-        string toolVersion)
+        string toolVersion,
+        IReadOnlyCollection<ArchitectureSubtractiveMatcherParticipation>? subtractiveMatcherParticipation = null)
     {
         return FormatResultAsSarifCore(
             mode,
@@ -27,7 +28,8 @@ public sealed partial class ArchitectureSarifFormatter
             toolVersion,
             preflightDiagnostics,
             coverageSummaries,
-            sourceExpansion);
+            sourceExpansion,
+            subtractiveMatcherParticipation);
     }
 
     public static string FormatResultAsSarif(
@@ -37,7 +39,8 @@ public sealed partial class ArchitectureSarifFormatter
         IReadOnlyCollection<BuildStatePreflightDiagnostic> preflightDiagnostics,
         IReadOnlyCollection<ArchitectureCoverageSummary> coverageSummaries,
         ArchitectureSourceExpansionInventory sourceExpansion,
-        string toolVersion)
+        string toolVersion,
+        IReadOnlyCollection<ArchitectureSubtractiveMatcherParticipation>? subtractiveMatcherParticipation = null)
     {
         return FormatResultAsSarifCore(
             mode,
@@ -47,7 +50,8 @@ public sealed partial class ArchitectureSarifFormatter
             toolVersion,
             preflightDiagnostics,
             coverageSummaries,
-            sourceExpansion);
+            sourceExpansion,
+            subtractiveMatcherParticipation);
     }
 
     internal static Dictionary<string, object?> FormatSourceExpansion(ArchitectureSourceExpansionInventory inventory)
@@ -96,6 +100,21 @@ public sealed partial class ArchitectureSarifFormatter
         };
     }
 
+    internal static object[] FormatSubtractiveMatcherParticipation(
+        IReadOnlyCollection<ArchitectureSubtractiveMatcherParticipation> participation)
+    {
+        return participation.Select(p => (object)new Dictionary<string, object?>
+        {
+            ["contract_id"] = p.ContractId,
+            ["contract_name"] = p.ContractName,
+            ["field"] = p.Field,
+            ["index"] = p.Index,
+            ["matched"] = p.Matched,
+            ["evaluation_failed"] = p.EvaluationFailed,
+            ["policy_location"] = FormatSourceExpansionLocation(p.PolicyLocation)
+        }).ToArray();
+    }
+
     private static Dictionary<string, object?>? FormatSourceExpansionLocation(ArchitecturePolicySourceLocation? location)
     {
         return location is null
@@ -111,6 +130,7 @@ public sealed partial class ArchitectureSarifFormatter
     {
         ArchitectureContractExpansionKind.FanOut => "fan_out",
         ArchitectureContractExpansionKind.InlineUnion => "inline_union",
+        ArchitectureContractExpansionKind.ContainerSet => "container_set",
         _ => throw new ArgumentOutOfRangeException(nameof(kind), kind, null)
     };
 }

@@ -15,4 +15,10 @@ public sealed record ArchitectureSubtractiveMatcherParticipation(
     bool Matched)
 {
     public ArchitecturePolicySourceLocation? PolicyLocation { get; init; }
+
+    // True when the matcher's own applicability couldn't be determined for at least one candidate
+    // it structurally matched (e.g. a `when` referencing source-path facts with no resolved source
+    // file) - a distinct state from Matched: the matcher may or may not have actually excluded
+    // anything, so it must not be reported as either matched or stale.
+    public bool EvaluationFailed { get; init; }
 }

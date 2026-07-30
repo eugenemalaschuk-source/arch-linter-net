@@ -80,6 +80,48 @@ public sealed partial class LayoutConventionContractTests
     }
 
     [Test]
+    public void CheckLayoutConventionsContract_ExclusionMatchesOnlyAlreadyExcludedType_ReportsStaleNotMatched()
+    {
+        string assemblyName = typeof(LayoutConventionContractTests).Assembly.GetName().Name!;
+        string policyPath = Path.Combine(_tempDir, "dependencies.arch.yml");
+        File.WriteAllText(policyPath, $"""
+            version: 1
+            name: Test
+            analysis:
+              target_assemblies: [{assemblyName}]
+              source_roots: ["."]
+            contracts:
+              strict_layout_conventions:
+                - name: exclusion-against-eligible-set
+                  files_matching:
+                    folder_segment: MixedNamespaceFile
+                    when: subject.simpleName == "ServiceInMatchingNamespace"
+                  exclude_files_matching:
+                    - folder_segment: MixedNamespaceFile
+                      when: subject.simpleName == "IEscapingInterface"
+                  required_name_suffix: DoesNotMatchAnything
+            """);
+
+        ArchitectureContractDocument document = new ArchitecturePolicyDocumentLoader().Load(policyPath);
+        var contract = document.Contracts.StrictLayoutConventions[0];
+        var runner = new ArchitectureContractRunner(CreateContext(), document);
+
+        var violations = runner.Session.CheckLayoutConventionsContract(contract);
+
+        // IEscapingInterface was never part of the eligible set (files_matching's own `when` never
+        // included it), so the exclusion - which only ever matches IEscapingInterface - subtracted
+        // nothing and must report stale, not matched. ServiceInMatchingNamespace must still be
+        // flagged, proving the eligible set itself is untouched.
+        Assert.Multiple(() =>
+        {
+            Assert.That(violations.Any(v => v.SourceType.Contains("ServiceInMatchingNamespace", StringComparison.Ordinal)), Is.True);
+            Assert.That(
+                runner.SubtractiveMatcherParticipation.Select(p => (p.Field, p.Index, p.Matched)),
+                Is.EqualTo(new[] { ("exclude_files_matching", 0, false) }));
+        });
+    }
+
+    [Test]
     public void CheckLayoutConventionsContract_AmbiguousPartialType_ExcludeMatcherSuppressesViolation()
     {
         string assemblyName = typeof(LayoutConventionContractTests).Assembly.GetName().Name!;
@@ -142,5 +184,15 @@ public sealed partial class LayoutConventionContractTests
         Assert.That(violations.Any(v =>
             v.SourceType.Contains("NoSourceFileType", StringComparison.Ordinal)
             && v.Payload is LayoutConventionPayload { DataUnavailable: true }), Is.True);
+
+        // The exclusion's `when` couldn't be evaluated for this candidate (no resolved source
+        // file) - it must report neither Matched nor stale, since whether it would have excluded
+        // the candidate is genuinely unknown, not "no".
+        ArchitectureSubtractiveMatcherParticipation participation = runner.SubtractiveMatcherParticipation.Single();
+        Assert.Multiple(() =>
+        {
+            Assert.That(participation.EvaluationFailed, Is.True);
+            Assert.That(participation.Matched, Is.False);
+        });
     }
 }

@@ -27,6 +27,7 @@ internal static class ArchitectureValidationResultMapper
             PreflightDiagnostics = outcome.PreflightDiagnostics,
             PreflightBlocked = outcome.PreflightBlocked,
             Mode = mode,
+            SubtractiveMatcherParticipation = outcome.SubtractiveMatcherParticipation,
         });
     }
 }

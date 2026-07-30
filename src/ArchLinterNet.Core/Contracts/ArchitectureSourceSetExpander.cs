@@ -64,6 +64,9 @@ internal static class ArchitectureSourceSetExpander
             (contract, values) => contract.AllowedOnlyInAssemblies = values,
             contract => contract.AllowedOnlyInAssemblySets, "allowed_only_in_assembly_sets", ArchitectureSourceSetKind.Assembly);
 
+        RecordLayerTemplateContainerExclusions(document, expansions, "strict_layer_templates", groups.StrictLayerTemplates);
+        RecordLayerTemplateContainerExclusions(document, expansions, "audit_layer_templates", groups.AuditLayerTemplates);
+
         document.Provenance.ResetValidationSubject();
 
         document.SourceExpansion = new ArchitectureSourceExpansionInventory(
@@ -200,7 +203,7 @@ internal static class ArchitectureSourceSetExpander
             {
                 if (selectors.TryAdd(source, (resolution.Name, resolver.SelectorFor(resolution.Name, source))))
                 {
-                    instanceLocations[source] = resolution.PolicyLocation;
+                    instanceLocations[source] = resolver.LocationFor(resolution.Name, source);
                 }
             }
         }
@@ -321,6 +324,65 @@ internal static class ArchitectureSourceSetExpander
         return expandedContracts;
     }
 
+    // Layer templates aren't source-expandable (no `source`/`sources`/`source_sets`), but
+    // `exclude_containers` is the same "subtract from an explicit list" shape as `exclude_sources`,
+    // so it gets the same typed matched/stale participation evidence here rather than a bespoke
+    // model - and for free, the same coverage/explain/JSON/SARIF wiring that already projects
+    // document.SourceExpansion.Contracts. The actual container -> layer-contract fan-out this
+    // evidence describes still happens separately in LayerTemplateExpander.Expand, called wherever
+    // the executable ArchitectureLayerContract instances are needed.
+    private static void RecordLayerTemplateContainerExclusions(
+        ArchitectureContractDocument document,
+        List<ArchitectureContractExpansion> expansions,
+        string group,
+        List<ArchitectureLayerTemplateContract> contracts)
+    {
+        foreach (ArchitectureLayerTemplateContract contract in contracts)
+        {
+            if (contract.ExcludeContainers.Count == 0)
+            {
+                continue;
+            }
+
+            document.Provenance.SetValidationSubject(contract);
+            string authoredId = contract.Id ?? ArchitecturePolicyDocumentLoader.NormalizeToContractId(contract.Name);
+            ArchitecturePolicySourceLocation? contractLocation = document.Provenance.LocationFor(contract);
+
+            HashSet<string> remaining = new(
+                contract.Containers.Where(container => !string.IsNullOrWhiteSpace(container)), StringComparer.Ordinal);
+            List<ArchitectureExpandedContractExclusion> exclusions = new();
+
+            for (int index = 0; index < contract.ExcludeContainers.Count; index++)
+            {
+                string container = contract.ExcludeContainers[index];
+                if (string.IsNullOrWhiteSpace(container))
+                {
+                    continue;
+                }
+
+                bool matched = remaining.Remove(container);
+                exclusions.Add(new ArchitectureExpandedContractExclusion(container, null, container, matched)
+                {
+                    PolicyLocation = ExclusionLocation(document, contractLocation, "exclude_containers", index)
+                });
+            }
+
+            List<ArchitectureExpandedContractInstance> instances = remaining
+                .OrderBy(container => container, StringComparer.Ordinal)
+                .Select(container => new ArchitectureExpandedContractInstance(
+                    $"{authoredId}/{ArchitecturePolicyDocumentLoader.NormalizeToContractId(container)}", container, null, container))
+                .ToList();
+
+            expansions.Add(new ArchitectureContractExpansion(
+                group, authoredId, contract.Name, Array.Empty<string>(), instances)
+            {
+                Kind = ArchitectureContractExpansionKind.ContainerSet,
+                PolicyLocation = contractLocation,
+                Exclusions = exclusions
+            });
+        }
+    }
+
     private static List<string> InlineSets(
         ArchitectureContractDocument document,
         SourceSetResolver resolver,
@@ -431,6 +493,7 @@ internal static class ArchitectureSourceSetExpander
         private readonly Dictionary<string, ArchitectureSourceSetResolution> _resolutions =
             new(StringComparer.Ordinal);
         private readonly Dictionary<(string Set, string Source), string> _selectors = new();
+        private readonly Dictionary<(string Set, string Source), ArchitecturePolicySourceLocation?> _itemLocations = new();
         private readonly List<ArchitectureSourceSetResolution> _ordered = new();
 
         public SourceSetResolver(ArchitectureContractDocument document)
@@ -456,6 +519,16 @@ internal static class ArchitectureSourceSetExpander
 
         public string SelectorFor(string setName, string source) =>
             _selectors.TryGetValue((setName, source), out string? selector) ? selector : source;
+
+        // The specific `members[i]`/`globs[i]` entry that resolved this source, falling back to the
+        // set's own root location when the item-level path couldn't be resolved (e.g. a set with no
+        // provenance, such as one built directly in a test rather than loaded from YAML).
+        public ArchitecturePolicySourceLocation? LocationFor(string setName, string source) =>
+            _itemLocations.TryGetValue((setName, source), out ArchitecturePolicySourceLocation? location)
+                ? location
+                : _resolutions.TryGetValue(setName, out ArchitectureSourceSetResolution? resolution)
+                    ? resolution.PolicyLocation
+                    : null;
 
         public ArchitectureSourceSetResolution Resolve(
             string contractName,
@@ -551,8 +624,15 @@ internal static class ArchitectureSourceSetExpander
 
         private void AddMembers(string name, ArchitectureSourceSet set, SortedSet<string> resolved)
         {
-            foreach (string member in set.Members.Where(value => !string.IsNullOrWhiteSpace(value)))
+            int index = 0;
+            foreach (string member in set.Members)
             {
+                int memberIndex = index++;
+                if (string.IsNullOrWhiteSpace(member))
+                {
+                    continue;
+                }
+
                 if (!IsInUniverse(set.Kind, member))
                 {
                     throw new InvalidOperationException(
@@ -563,6 +643,7 @@ internal static class ArchitectureSourceSetExpander
 
                 resolved.Add(member);
                 _selectors.TryAdd((name, member), member);
+                _itemLocations.TryAdd((name, member), ItemLocation(name, "members", memberIndex));
             }
         }
 
@@ -570,8 +651,15 @@ internal static class ArchitectureSourceSetExpander
         {
             IReadOnlyList<string> universe = Universe(set.Kind);
 
-            foreach (string glob in set.Globs.Where(value => !string.IsNullOrWhiteSpace(value)))
+            int index = 0;
+            foreach (string glob in set.Globs)
             {
+                int globIndex = index++;
+                if (string.IsNullOrWhiteSpace(glob))
+                {
+                    continue;
+                }
+
                 if (universe.Count == 0)
                 {
                     throw new InvalidOperationException(
@@ -590,12 +678,32 @@ internal static class ArchitectureSourceSetExpander
                         "'optional: true' with a reason if the absence is intentional.");
                 }
 
+                ArchitecturePolicySourceLocation? globLocation = ItemLocation(name, "globs", globIndex);
                 foreach (string candidate in matches)
                 {
                     resolved.Add(candidate);
                     _selectors.TryAdd((name, candidate), glob);
+                    _itemLocations.TryAdd((name, candidate), globLocation);
                 }
             }
+        }
+
+        // The set's own root location (source_sets.<name>) with "/<field>/<index>" appended - the
+        // authored member/glob entry that actually produced a given resolved source, rather than
+        // just the set it came from.
+        private ArchitecturePolicySourceLocation? ItemLocation(string setName, string field, int index)
+        {
+            ArchitecturePolicySourceLocation? setLocation = _document.Provenance.LocationForSourceSet(setName);
+            if (setLocation is null)
+            {
+                return null;
+            }
+
+            string path = ArchitecturePolicyProvenancePath.AppendIndex(
+                ArchitecturePolicyProvenancePath.AppendProperty(setLocation.YamlPath, field), index);
+            return _document.Provenance.TryGetLocation(path, out ArchitecturePolicySourceLocation? location)
+                ? location
+                : setLocation with { YamlPath = path };
         }
 
         private bool IsInUniverse(ArchitectureSourceSetKind kind, string value)

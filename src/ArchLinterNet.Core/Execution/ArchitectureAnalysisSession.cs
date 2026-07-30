@@ -24,8 +24,6 @@ public sealed partial class ArchitectureAnalysisSession
 
     private readonly List<ArchitectureUnmatchedIgnoredViolation> _unmatchedIgnoredViolations = new();
 
-    private readonly List<ArchitectureSubtractiveMatcherParticipation> _subtractiveMatcherParticipation = new();
-
     private readonly List<ArchitectureBaselineCandidate> _baselineCandidates = new();
     private readonly List<ArchitectureBaselineCandidate> _findingIdentityCandidates = new();
 
@@ -157,36 +155,6 @@ public sealed partial class ArchitectureAnalysisSession
 
     public IReadOnlyList<ArchitectureUnmatchedIgnoredViolation> UnmatchedIgnoredViolations
         => _unmatchedIgnoredViolations;
-
-    // Matched/stale evidence for exclude_types_matching/exclude_files_matching items, recorded as
-    // each contract that declares them executes. See ArchitectureSubtractiveMatcherParticipation.
-    public IReadOnlyList<ArchitectureSubtractiveMatcherParticipation> SubtractiveMatcherParticipation
-        => _subtractiveMatcherParticipation;
-
-    private void RecordSubtractiveMatcherParticipation(
-        IArchitectureContract contract, string field, int index, bool matched)
-    {
-        _subtractiveMatcherParticipation.Add(new ArchitectureSubtractiveMatcherParticipation(
-            contract.Id ?? contract.Name, contract.Name, field, index, matched)
-        {
-            PolicyLocation = ItemLocation(contract, field, index)
-        });
-    }
-
-    private ArchitecturePolicySourceLocation? ItemLocation(IArchitectureContract contract, string field, int index)
-    {
-        ArchitecturePolicySourceLocation? contractLocation = Document.Provenance.LocationFor(contract);
-        if (contractLocation is null)
-        {
-            return null;
-        }
-
-        string path = ArchitecturePolicyProvenancePath.AppendIndex(
-            ArchitecturePolicyProvenancePath.AppendProperty(contractLocation.YamlPath, field), index);
-        return Document.Provenance.TryGetLocation(path, out ArchitecturePolicySourceLocation? location)
-            ? location
-            : contractLocation with { YamlPath = path };
-    }
 
     public IReadOnlyList<ArchitectureBaselineCandidate> BaselineCandidates
         => _baselineCandidates;

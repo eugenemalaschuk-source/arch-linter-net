@@ -123,8 +123,8 @@
     "exactSourceWithExclusions": {
       "required": ["source"],
       "anyOf": [
-        { "required": ["exclude_sources"] },
-        { "required": ["exclude_source_sets"] }
+        { "required": ["exclude_sources"], "properties": { "exclude_sources": { "minItems": 1 } } },
+        { "required": ["exclude_source_sets"], "properties": { "exclude_source_sets": { "minItems": 1 } } }
       ]
     },
     "stringMap": {
