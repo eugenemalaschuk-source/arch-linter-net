@@ -1,0 +1,7 @@
+version: 1
+name: Synthetic multi-host adopter
+analysis:
+  target_assemblies: [Synthetic.HostA, Synthetic.HostB]
+  projects:
+    - src/Synthetic.HostA/Synthetic.HostA.csproj
+    - src/Synthetic.HostB/Synthetic.HostB.csproj
