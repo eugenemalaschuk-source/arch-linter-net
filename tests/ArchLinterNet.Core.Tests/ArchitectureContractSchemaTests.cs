@@ -139,6 +139,45 @@ public sealed class ArchitectureContractSchemaTests
     }
 
     [Test]
+    public void Schema_SourceExpandableContracts_DeclareSourceExclusionFields()
+    {
+        JsonElement defs = LoadSchema().GetProperty("$defs");
+
+        foreach (string defName in new[]
+                 {
+                     "packageDependencyContract",
+                     "packageAllowOnlyContract",
+                     "frameworkDependencyContract",
+                     "frameworkAllowOnlyContract",
+                     "externalDependencyContract",
+                     "externalAllowOnlyContract"
+                 })
+        {
+            JsonElement properties = defs.GetProperty(defName).GetProperty("properties");
+            Assert.That(properties.TryGetProperty("exclude_sources", out _), Is.True, $"{defName}.exclude_sources must be declared.");
+            Assert.That(properties.TryGetProperty("exclude_source_sets", out _), Is.True, $"{defName}.exclude_source_sets must be declared.");
+        }
+    }
+
+    [Test]
+    public void Schema_TypePlacementAndLayoutConventions_DeclareSubtractiveMatchers()
+    {
+        JsonElement defs = LoadSchema().GetProperty("$defs");
+
+        Assert.That(defs.GetProperty("typePlacementContract").GetProperty("allOf")[1].GetProperty("properties")
+            .TryGetProperty("exclude_types_matching", out JsonElement typeExclusions), Is.True);
+        Assert.That(typeExclusions.GetProperty("items").GetProperty("$ref").GetString(), Is.EqualTo("#/$defs/typeMatcher"));
+
+        Assert.That(defs.GetProperty("layoutConventionContract").GetProperty("allOf")[1].GetProperty("properties")
+            .TryGetProperty("exclude_files_matching", out JsonElement fileExclusions), Is.True);
+        Assert.That(fileExclusions.GetProperty("items").GetProperty("$ref").GetString(), Is.EqualTo("#/$defs/layoutFileMatcher"));
+
+        Assert.That(defs.GetProperty("layerTemplateContract").GetProperty("properties")
+            .TryGetProperty("exclude_containers", out JsonElement containers), Is.True);
+        Assert.That(containers.GetProperty("items").GetProperty("type").GetString(), Is.EqualTo("string"));
+    }
+
+    [Test]
     public void Schema_Analysis_DeclaresProjectDiscoveryAndBuildSelectors()
     {
         JsonElement properties = LoadSchema().GetProperty("$defs").GetProperty("analysis").GetProperty("properties");

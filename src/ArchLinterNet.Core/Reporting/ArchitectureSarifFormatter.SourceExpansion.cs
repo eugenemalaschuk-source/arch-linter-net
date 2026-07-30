@@ -74,6 +74,14 @@ public sealed partial class ArchitectureSarifFormatter
                 ["optional_empty"] = expansion.OptionalEmpty,
                 ["optional_reason"] = expansion.OptionalReason,
                 ["policy_location"] = FormatSourceExpansionLocation(expansion.PolicyLocation),
+                ["exclusions"] = expansion.Exclusions.Select(exclusion => (object)new Dictionary<string, object?>
+                {
+                    ["source"] = exclusion.Source,
+                    ["source_set"] = exclusion.SetName,
+                    ["selector"] = exclusion.Selector,
+                    ["matched"] = exclusion.Matched,
+                    ["policy_location"] = FormatSourceExpansionLocation(exclusion.PolicyLocation)
+                }).ToArray(),
                 ["instances"] = expansion.Instances.Select(instance => (object)new Dictionary<string, object?>
                 {
                     ["contract_id"] = instance.ContractId,

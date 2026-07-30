@@ -233,7 +233,9 @@ Contracts reference sets in two shapes:
   replace `source:` and expand the contract into one instance per resolved source. Each instance
   keeps its own diagnostics and baseline identity under the derived id
   `<authored-id>/<normalized-source>`; `--contract` selection and rule-input coverage `contract_ids`
-  still accept the authored id.
+  still accept the authored id. These families may also declare `exclude_sources:` and
+  `exclude_source_sets:`; exclusions subtract from the already resolved source universe and are
+  reported as matched/stale source-expansion evidence in JSON, `explain`, and SARIF.
 - **Inline union** — `project_sets:` on project metadata contracts and
   `allowed_only_in_assembly_sets:` on composition contracts union resolved members into the
   contract's existing list field without producing extra contract instances. A project metadata
@@ -259,6 +261,11 @@ declared input, a glob with no declared universe, a zero-match selector, or a co
 both `source` and `sources`/`source_sets`. The single exception is a set declaring `optional: true`
 with a `reason`: contracts referencing only such sets expand to zero instances and are reported as
 optional-empty in `explain`, JSON, and SARIF output rather than disappearing silently.
+
+`type_placement` additionally supports `exclude_types_matching:` with the same matcher shape as
+`types_matching`, and `layout_conventions` supports `exclude_files_matching:` with the same matcher
+shape as `files_matching`. `layer_templates` supports `exclude_containers:` to subtract selected
+containers before template expansion. Empty exclusion matchers are rejected at policy load time.
 
 ## `legacy_runtime_layers`
 

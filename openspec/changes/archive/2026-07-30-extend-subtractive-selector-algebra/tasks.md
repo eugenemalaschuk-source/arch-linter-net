@@ -7,7 +7,7 @@
 ## 2. Family evaluation and projections
 
 - [x] 2.1 Apply subtraction to layer templates, type placement, and layout conventions without altering no-exclusion behavior.
-- [x] 2.2 Apply source/layer subtraction to package, framework, assembly, external, protected-surface, and allow-only compatible families.
+- [x] 2.2 Apply source/layer subtraction to package, framework, external, and allow-only compatible families; document assembly dependency/allow-only and protected-surface operands as intentionally incompatible exact forms.
 - [x] 2.3 Project effective scope and provenance consistently through normalized diagnostics, explain, and coverage inventory.
 
 ## 3. Tests and synchronization

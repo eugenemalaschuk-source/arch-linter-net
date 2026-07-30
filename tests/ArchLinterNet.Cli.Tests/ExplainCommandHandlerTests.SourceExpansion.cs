@@ -31,6 +31,7 @@ public sealed partial class ExplainCommandHandlerTests
         {
             Assert.That(expansion.GetProperty("sets")[0].GetProperty("name").GetString(), Is.EqualTo("modules"));
             Assert.That(contract.GetProperty("authoredContractId").GetString(), Is.EqualTo("modules-no-infrastructure"));
+            Assert.That(contract.GetProperty("exclusions")[0].GetProperty("matched").GetBoolean(), Is.False);
             Assert.That(instance.GetProperty("source").GetString(), Is.EqualTo("Acme.Modules.Orders"));
             Assert.That(instance.GetProperty("sourceSet").GetString(), Is.EqualTo("modules"));
             Assert.That(instance.GetProperty("selector").GetString(), Is.EqualTo("Acme.Modules.*"));
@@ -56,6 +57,8 @@ public sealed partial class ExplainCommandHandlerTests
         Assert.Multiple(() =>
         {
             Assert.That(console.OutputText, Does.Contain("[modules-no-infrastructure] set 'modules' -> Acme.Modules.Orders"));
+            Assert.That(console.OutputText,
+                Does.Contain("Source expansion exclusion: [modules-no-infrastructure] stale sources -> Acme.Modules.Legacy"));
             Assert.That(console.OutputText, Does.Contain("architecture/parts/modules.yml"));
         });
     }
@@ -220,7 +223,18 @@ public sealed partial class ExplainCommandHandlerTests
                             "Acme.Modules.*")
                     ])
                 {
-                    PolicyLocation = location
+                    PolicyLocation = location,
+                    Exclusions =
+                    [
+                        new ArchitectureExpandedContractExclusion(
+                            "Acme.Modules.Legacy",
+                            null,
+                            "Acme.Modules.Legacy",
+                            false)
+                        {
+                            PolicyLocation = location
+                        }
+                    ]
                 }
             ]);
     }

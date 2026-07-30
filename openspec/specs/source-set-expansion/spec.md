@@ -66,9 +66,8 @@ The system SHALL record a deterministic expansion inventory listing each resolve
 - **THEN** its instances report the fragment's authored location
 
 ### Requirement: Source expansion supports bounded subtraction
-The system SHALL allow compatible source-scoped contracts to subtract explicit sources or resolved source sets after ordered source expansion, without adding inputs beyond the declared source universe.
+The system SHALL allow the compatible source-scoped contract families (`package_dependency`, `package_allow_only`, `framework_dependency`, `framework_allow_only`, `external`, and `external_allow_only`) to subtract explicit sources or resolved source sets after ordered source expansion, without adding inputs beyond the declared source universe.
 
 #### Scenario: Excluded expanded source creates no instance
 - **WHEN** a source is resolved by an included source set and an exclusion
 - **THEN** expansion SHALL not create an instance for that source and SHALL retain authored provenance for the exclusion evidence
-

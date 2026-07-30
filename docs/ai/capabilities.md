@@ -43,11 +43,11 @@ Installed releases expose their immutable offline `adoption-stabilization/v1` sc
 | Assembly allow-only | `strict_assembly_allow_only` | `audit_assembly_allow_only` | Source assembly directly references only itself and explicitly allowed declared assemblies. |
 | Project metadata | `strict_project_metadata` | `audit_project_metadata` | Selected discovered projects preserve required metadata, restrict friend assemblies, and avoid forbidden project references. |
 | Protected surface | `strict_protected` | `audit_protected` | Protected layers are referenced only by explicitly allowed importers. |
-| External dependency | `strict_external` | `audit_external` | Source layer does not reference forbidden vendor/framework dependency groups. Supports `sources`/`source_sets` expansion. |
-| External allow-only | `strict_external_allow_only` | `audit_external_allow_only` | Source layer references only explicitly allowed vendor/framework dependency groups. Supports `sources`/`source_sets` expansion. |
-| Layer template | `strict_layer_templates` | `audit_layer_templates` | Reusable layer order applied to multiple containers. |
-| Type placement | `strict_type_placement` | `audit_type_placement` | A selected architectural role resides in a declared layer/namespace/project/assembly and/or carries a declared naming suffix/prefix. |
-| Layout conventions | `strict_layout_conventions` | `audit_layout_conventions` | Declared types in source files selected by folder/namespace segment and/or file-name prefix/suffix satisfy a required/forbidden type kind, required/forbidden naming, file-name-matches-primary-type, and/or matching-interface counterpart expectation. |
+| External dependency | `strict_external` | `audit_external` | Source layer does not reference forbidden vendor/framework dependency groups. Supports `sources`/`source_sets` plus bounded `exclude_sources`/`exclude_source_sets` subtraction. |
+| External allow-only | `strict_external_allow_only` | `audit_external_allow_only` | Source layer references only explicitly allowed vendor/framework dependency groups. Supports `sources`/`source_sets` plus bounded `exclude_sources`/`exclude_source_sets` subtraction. |
+| Layer template | `strict_layer_templates` | `audit_layer_templates` | Reusable layer order applied to multiple containers, with optional `exclude_containers` subtraction before expansion. |
+| Type placement | `strict_type_placement` | `audit_type_placement` | A selected architectural role resides in a declared layer/namespace/project/assembly and/or carries a declared naming suffix/prefix, with optional subtractive `exclude_types_matching` filters. |
+| Layout conventions | `strict_layout_conventions` | `audit_layout_conventions` | Declared types in source files selected by folder/namespace segment and/or file-name prefix/suffix satisfy a required/forbidden type kind, required/forbidden naming, file-name-matches-primary-type, and/or matching-interface counterpart expectation, with optional subtractive `exclude_files_matching` filters. |
 | Public API surface | `strict_public_api_surface` | `audit_public_api_surface` | An assembly's exported public/protected/protected-internal types and members match a declared signature allowlist. |
 | Attribute usage | `strict_attribute_usage` | `audit_attribute_usage` | A declared attribute/marker type appears only in (or never in) a declared layer/namespace/project/assembly. |
 | Inheritance | `strict_inheritance` | `audit_inheritance` | Types in a declared source layer/namespace do not inherit (directly or transitively) from declared forbidden base types. |
@@ -71,11 +71,13 @@ only against declared `layers` keys, and `project` sets accept explicit `members
 
 Package dependency, package allow-only, framework dependency, framework allow-only, external
 dependency, and external allow-only contracts may declare `sources`/`source_sets` instead of
-`source`. Each authored contract then expands into one instance per resolved source, with the derived
-id `<authored-id>/<normalized-source>` and its own diagnostics and baseline identity; the authored id
-remains valid for `--contract` selection and rule-input coverage `contract_ids`. Project metadata
-contracts use `project_sets` and composition contracts use `allowed_only_in_assembly_sets`, which
-union resolved members into the existing list field instead of fanning out.
+`source`. These same families may additionally subtract `exclude_sources`/`exclude_source_sets`
+after expansion, without widening the declared universe. Each authored contract then expands into one
+instance per resolved source, with the derived id `<authored-id>/<normalized-source>` and its own
+diagnostics and baseline identity; the authored id remains valid for `--contract` selection and
+rule-input coverage `contract_ids`. Project metadata contracts use `project_sets` and composition
+contracts use `allowed_only_in_assembly_sets`, which union resolved members into the existing list
+field instead of fanning out.
 
 Expansion is deterministic, bounded at 500 instances per authored contract, and fails closed on an
 unknown set, mismatched `kind`, out-of-input member, glob with no declared universe, zero-match
@@ -97,9 +99,9 @@ A layer may declare a `selector` (`role` and optional `metadata` key/value const
 
 `ignored_violations` should be exact and narrow. Broad patterns should be treated as temporary migration debt and reviewed by a human.
 
-Type placement `types_matching` fields (`name_suffix`, `name_prefix`, `namespace`, `layer`, `base_type`, `implements_interface`, `has_attribute`) combine with AND semantics — every populated field must match. There is no regex or expression-language selector. `must_reside_in_projects` resolves to assembly-name matching via project discovery (see [Type placement contracts](../contracts/type-placement.md)); it is not physical `.csproj`-membership tracking.
+Type placement `types_matching` fields (`name_suffix`, `name_prefix`, `namespace`, `layer`, `base_type`, `implements_interface`, `has_attribute`) combine with AND semantics — every populated field must match. `exclude_types_matching` reuses the same matcher shape and subtracts matched types after inclusion. There is no regex or expression-language selector. `must_reside_in_projects` resolves to assembly-name matching via project discovery (see [Type placement contracts](../contracts/type-placement.md)); it is not physical `.csproj`-membership tracking.
 
-Layout conventions `files_matching` fields (`folder_segment`, `namespace_segment`, `file_name_suffix`, `file_name_prefix`) combine with AND semantics — every populated field must match; there is no regex. `files_matching.when` is the one exception to the "no expression-language selector" rule elsewhere in this family: an optional CEL predicate narrowing which declared types in an already-selected file are checked (see the closed `when` location list below). `require_matching_interface` only applies to concrete (non-abstract) classes. Folder/file-name matching and record-vs-class/struct type-kind classification require `analysis.source_roots`; when that data is missing for the whole run, or for an individual declared type under partial enrichment, the contract reports a deterministic "unavailable" diagnostic rather than silently passing. See [Layout convention contracts](../contracts/layout-conventions.md).
+Layout conventions `files_matching` fields (`folder_segment`, `namespace_segment`, `file_name_suffix`, `file_name_prefix`) combine with AND semantics — every populated field must match; there is no regex. `exclude_files_matching` reuses the same matcher shape and subtracts matched candidates before expectations, including its own `when` predicates. `files_matching.when` is the one exception to the "no expression-language selector" rule elsewhere in this family: an optional CEL predicate narrowing which declared types in an already-selected file are checked (see the closed `when` location list below). `require_matching_interface` only applies to concrete (non-abstract) classes. Folder/file-name matching and record-vs-class/struct type-kind classification require `analysis.source_roots`; when that data is missing for the whole run, or for an individual declared type under partial enrichment, the contract reports a deterministic "unavailable" diagnostic rather than silently passing. See [Layout convention contracts](../contracts/layout-conventions.md).
 
 Public API surface `declared_api` entries are normalized signature strings (`<kind> <FullyQualifiedName>[(<param types>)][: <member type>]`); generic type/method parameters are rendered positionally (`!N`/`!!N`), not by their source-declared name. `forbid_public_constants_unless_declared` is an independent, stricter check layered on top of the general declaration — an exported `const` field can still be forbidden even when its full signature is already in `declared_api`, unless its fully-qualified name is also in `allowed_public_constants`. See [Public API surface contracts](../contracts/public-api-surface.md) for the full grammar.
 

@@ -1,0 +1,324 @@
+using ArchLinterNet.Core.Contracts.Families;
+using ArchLinterNet.Core.Execution.Expressions;
+using ArchLinterNet.Core.Model;
+using ArchLinterNet.Core.Resolution;
+using ArchLinterNet.Core.Scanning;
+
+namespace ArchLinterNet.Core.Execution;
+
+public sealed partial class ArchitectureAnalysisSession
+{
+    // File selection is file-granular, not fact-granular: a file matches folder_segment/file_name_*
+    // (shared by every type declared in it) or namespace_segment (true if ANY declared type in the
+    // file has that namespace segment) as a whole, and once a file matches, every declared type in
+    // it becomes a candidate - not just the one(s) whose own namespace happened to match. Matching
+    // fact-by-fact instead would let an offending type escape every expectation just by being
+    // declared under a different namespace in the same already-selected file. Facts with no
+    // resolvable source file (no source enrichment, or an ambiguous partial-class declaration) can
+    // only ever satisfy namespace_segment, evaluated per-type since there is no file to group by.
+    private List<LayoutFileGroup> CollectMatchedFileGroups(
+        ArchitectureLayoutConventionContract contract,
+        ArchitectureContractExecutionContext executionContext,
+        List<ArchitectureViolation> violations)
+    {
+        ArchitectureLayoutFileMatcher matcher = contract.FilesMatching;
+        (Dictionary<string, List<(Type Type, ArchitectureDeclaredTypeFact Fact)>> byFile,
+            List<(Type Type, ArchitectureDeclaredTypeFact Fact)> unfiled) = BuildCandidateIndex();
+
+        List<LayoutFileGroup> groups = CollectFiledGroups(contract, byFile);
+        groups.AddRange(CollectUnfiledGroups(contract, matcher, unfiled, executionContext, violations));
+        return groups;
+    }
+
+    private (Dictionary<string, List<(Type Type, ArchitectureDeclaredTypeFact Fact)>> ByFile,
+        List<(Type Type, ArchitectureDeclaredTypeFact Fact)> Unfiled) BuildCandidateIndex()
+    {
+        Dictionary<string, List<(Type Type, ArchitectureDeclaredTypeFact Fact)>> byFile = new(StringComparer.Ordinal);
+        List<(Type Type, ArchitectureDeclaredTypeFact Fact)> unfiled = new();
+
+        foreach (Type type in TypeIndex.AllTypes())
+        {
+            string assemblyName = type.Assembly.GetName().Name ?? string.Empty;
+            string fullName = ArchitectureTypeNames.SafeFullName(type);
+            if (string.IsNullOrEmpty(fullName)
+                || !SourceFileFactIndex.TryGetFact(assemblyName, fullName, out ArchitectureDeclaredTypeFact fact))
+            {
+                continue;
+            }
+
+            if (fact.SourceFilePath == null)
+            {
+                unfiled.Add((type, fact));
+                continue;
+            }
+
+            if (!byFile.TryGetValue(fact.SourceFilePath, out List<(Type Type, ArchitectureDeclaredTypeFact Fact)>? entries))
+            {
+                entries = new List<(Type, ArchitectureDeclaredTypeFact)>();
+                byFile[fact.SourceFilePath] = entries;
+            }
+
+            entries.Add((type, fact));
+        }
+
+        return (byFile, unfiled);
+    }
+
+    private List<LayoutFileGroup> CollectFiledGroups(
+        ArchitectureLayoutConventionContract contract,
+        Dictionary<string, List<(Type Type, ArchitectureDeclaredTypeFact Fact)>> byFile)
+    {
+        List<LayoutFileGroup> groups = new();
+
+        foreach ((string filePath, List<(Type Type, ArchitectureDeclaredTypeFact Fact)> entries) in
+                 byFile.OrderBy(entry => entry.Key, StringComparer.Ordinal))
+        {
+            if (!MatchesFileLevelSelector(contract.FilesMatching, entries))
+            {
+                continue;
+            }
+
+            List<ArchitectureDeclaredTypeFact> eligibleFacts = FilterByWhen(contract.FilesMatching, entries);
+            if (eligibleFacts.Count == 0)
+            {
+                continue;
+            }
+
+            eligibleFacts = ApplyFiledExclusions(entries, eligibleFacts, contract.ExcludeFilesMatching);
+            if (eligibleFacts.Count == 0)
+            {
+                continue;
+            }
+
+            groups.Add(new LayoutFileGroup(filePath, entries[0].Fact.FileNameWithoutExtension, eligibleFacts));
+        }
+
+        return groups;
+    }
+
+    private List<ArchitectureDeclaredTypeFact> ApplyFiledExclusions(
+        List<(Type Type, ArchitectureDeclaredTypeFact Fact)> entries,
+        List<ArchitectureDeclaredTypeFact> eligibleFacts,
+        IReadOnlyList<ArchitectureLayoutFileMatcher> exclusions)
+    {
+        if (exclusions.Count == 0)
+        {
+            return eligibleFacts;
+        }
+
+        HashSet<(string AssemblyName, string FullTypeName)> excluded = new();
+        foreach (ArchitectureLayoutFileMatcher exclusion in exclusions)
+        {
+            if (!MatchesFileLevelSelector(exclusion, entries))
+            {
+                continue;
+            }
+
+            foreach (ArchitectureDeclaredTypeFact fact in FilterByWhen(exclusion, entries))
+            {
+                excluded.Add((fact.AssemblyName, fact.FullTypeName));
+            }
+        }
+
+        return excluded.Count == 0
+            ? eligibleFacts
+            : eligibleFacts
+                .Where(fact => !excluded.Contains((fact.AssemblyName, fact.FullTypeName)))
+                .ToList();
+    }
+
+    // A `when` referencing subject.sourcePaths/sourceDirectoryPrefixes evaluates those as an
+    // empty list - not an evaluation error - for a fact with no resolved source file, so it can
+    // silently include or exclude a candidate the run-level guard never sees (that guard only fires
+    // when NO fact anywhere has a path; this is the partial-enrichment case where other facts do).
+    // An ambiguous partial-class declaration is exempt: its sourcePaths carries every candidate
+    // declaration path (see ArchitectureExpressionSubjectFactBuilder.ResolveSourcePaths), so a
+    // path-referencing predicate evaluates against real data for it, same as any filed fact.
+    private List<LayoutFileGroup> CollectUnfiledGroups(
+        ArchitectureLayoutConventionContract contract,
+        ArchitectureLayoutFileMatcher matcher,
+        List<(Type Type, ArchitectureDeclaredTypeFact Fact)> unfiled,
+        ArchitectureContractExecutionContext executionContext,
+        List<ArchitectureViolation> violations)
+    {
+        List<LayoutFileGroup> groups = new();
+
+        foreach ((Type Type, ArchitectureDeclaredTypeFact Fact) entry in
+                 unfiled.OrderBy(entry => entry.Fact.FullTypeName, StringComparer.Ordinal))
+        {
+            if (!MatchesUnfiledFact(matcher, entry.Fact))
+            {
+                continue;
+            }
+
+            if (!TryEvaluateUnfiledMatcher(contract, matcher, entry, executionContext, violations, "files_matching",
+                    BuildUnevaluatedLayoutWhenExpressions(contract), out bool included))
+            {
+                continue;
+            }
+
+            if (!included || IsExcludedUnfiledEntry(contract, entry, executionContext, violations))
+            {
+                continue;
+            }
+
+            groups.Add(new LayoutFileGroup(null, null, new List<ArchitectureDeclaredTypeFact> { entry.Fact }));
+        }
+
+        return groups;
+    }
+
+    private bool IsExcludedUnfiledEntry(
+        ArchitectureLayoutConventionContract contract,
+        (Type Type, ArchitectureDeclaredTypeFact Fact) entry,
+        ArchitectureContractExecutionContext executionContext,
+        List<ArchitectureViolation> violations)
+    {
+        for (int index = 0; index < contract.ExcludeFilesMatching.Count; index++)
+        {
+            ArchitectureLayoutFileMatcher exclusion = contract.ExcludeFilesMatching[index];
+            if (!MatchesUnfiledFact(exclusion, entry.Fact))
+            {
+                continue;
+            }
+
+            string fieldName = $"exclude_files_matching[{index}]";
+            IReadOnlyList<ExpressionParticipation>? whenExpressions = BuildLayoutWhenExpressions(
+                exclusion,
+                contract.Name,
+                fieldName,
+                ExpressionParticipationResult.EvaluationFailed);
+            if (!TryEvaluateUnfiledMatcher(
+                    contract,
+                    exclusion,
+                    entry,
+                    executionContext,
+                    violations,
+                    fieldName,
+                    whenExpressions,
+                    out bool excluded))
+            {
+                return true;
+            }
+
+            if (excluded)
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private bool TryEvaluateUnfiledMatcher(
+        ArchitectureLayoutConventionContract contract,
+        ArchitectureLayoutFileMatcher matcher,
+        (Type Type, ArchitectureDeclaredTypeFact Fact) entry,
+        ArchitectureContractExecutionContext executionContext,
+        List<ArchitectureViolation> violations,
+        string fieldName,
+        IReadOnlyList<ExpressionParticipation>? whenExpressions,
+        out bool matched)
+    {
+        matched = false;
+        if (matcher.CompiledWhen == null)
+        {
+            matched = true;
+            return true;
+        }
+
+        bool whenReferencesSourcePath = ReferencesSourcePathIdentifier(matcher.When);
+        bool isAmbiguous = SourceFileFactIndex.Ambiguities.Any(ambiguity =>
+            ambiguity.AssemblyName == entry.Fact.AssemblyName
+            && ambiguity.FullTypeName == entry.Fact.FullTypeName);
+        if (whenReferencesSourcePath && !isAmbiguous)
+        {
+            AddViolation(
+                contract,
+                executionContext,
+                violations,
+                sourceType: entry.Fact.FullTypeName,
+                forbiddenReference: $"cannot evaluate {fieldName}.when: it references source-path facts " +
+                    "(sourcePaths/sourceDirectoryPrefixes), but this declared type has no resolved source file",
+                payload: new LayoutConventionPayload(DataUnavailable: true)
+                {
+                    WhenExpressions = whenExpressions,
+                });
+            return false;
+        }
+
+        matched = EvaluateLayoutWhen(matcher, entry.Type);
+        return true;
+    }
+
+    private List<ArchitectureDeclaredTypeFact> FilterByWhen(
+        ArchitectureLayoutFileMatcher matcher,
+        List<(Type Type, ArchitectureDeclaredTypeFact Fact)> entries)
+    {
+        if (matcher.CompiledWhen == null)
+        {
+            return entries.Select(entry => entry.Fact).ToList();
+        }
+
+        return entries.Where(entry => EvaluateLayoutWhen(matcher, entry.Type)).Select(entry => entry.Fact).ToList();
+    }
+
+    private static bool MatchesFileLevelSelector(
+        ArchitectureLayoutFileMatcher matcher,
+        List<(Type Type, ArchitectureDeclaredTypeFact Fact)> entries)
+    {
+        // Every entry in this list shares the same SourceFilePath, so FolderSegments/FileNameWithoutExtension
+        // are identical across all of them - the first entry's fact is representative for those fields.
+        ArchitectureDeclaredTypeFact representative = entries[0].Fact;
+
+        if (!string.IsNullOrEmpty(matcher.FolderSegment)
+            && !representative.FolderSegments.Contains(matcher.FolderSegment, StringComparer.Ordinal))
+        {
+            return false;
+        }
+
+        if (!string.IsNullOrEmpty(matcher.FileNameSuffix)
+            && (representative.FileNameWithoutExtension == null
+                || !representative.FileNameWithoutExtension.EndsWith(matcher.FileNameSuffix, StringComparison.Ordinal)))
+        {
+            return false;
+        }
+
+        if (!string.IsNullOrEmpty(matcher.FileNamePrefix)
+            && (representative.FileNameWithoutExtension == null
+                || !representative.FileNameWithoutExtension.StartsWith(matcher.FileNamePrefix, StringComparison.Ordinal)))
+        {
+            return false;
+        }
+
+        if (!string.IsNullOrEmpty(matcher.NamespaceSegment)
+            && !entries.Any(entry => entry.Fact.NamespaceSegments.Contains(matcher.NamespaceSegment, StringComparer.Ordinal)))
+        {
+            return false;
+        }
+
+        return true;
+    }
+
+    private static bool MatchesUnfiledFact(ArchitectureLayoutFileMatcher matcher, ArchitectureDeclaredTypeFact fact)
+    {
+        bool requiresSourceFile = !string.IsNullOrEmpty(matcher.FolderSegment)
+            || !string.IsNullOrEmpty(matcher.FileNameSuffix)
+            || !string.IsNullOrEmpty(matcher.FileNamePrefix);
+        if (requiresSourceFile)
+        {
+            return false;
+        }
+
+        return fact.NamespaceSegments.Contains(matcher.NamespaceSegment, StringComparer.Ordinal);
+    }
+
+    private bool EvaluateLayoutWhen(ArchitectureLayoutFileMatcher matcher, Type type)
+    {
+        var context = ArchitectureExpressionContextFactory.CreateSelectorContext(ExpressionFacts.BuildSubjectFacts(type));
+        string description =
+            $"Layout convention files_matching at '{matcher.WhenLocation?.YamlPath}' (contract: {matcher.WhenContractName}, " +
+            $"when: {matcher.When}) for type '{ArchitectureTypeNames.SafeFullName(type)}'";
+        return ArchitectureExpressionFactService.Evaluate(matcher.CompiledWhen!, context, description, matcher.WhenLocation);
+    }
+}

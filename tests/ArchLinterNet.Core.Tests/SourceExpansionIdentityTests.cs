@@ -274,7 +274,7 @@ public sealed class SourceExpansionIdentityTests
                 source_sets:
                   inner_layers:
                     kind: layer
-                    members: [application, domain, infrastructure]
+                    members: [application, domain]
                   omitted_layers:
                     kind: layer
                     members: [domain]
@@ -286,7 +286,7 @@ public sealed class SourceExpansionIdentityTests
                     - name: inner layers avoid vendor
                       id: inner-no-vendor
                       source_sets: [inner_layers]
-                      exclude_sources: [application]
+                      exclude_sources: [infrastructure]
                       exclude_source_sets: [omitted_layers]
                       forbidden: [vendor]
                 """);
@@ -294,7 +294,59 @@ public sealed class SourceExpansionIdentityTests
             ArchitectureContractDocument document = new ArchitecturePolicyDocumentLoader().Load(path);
 
             Assert.That(document.Contracts.StrictExternal.Select(contract => contract.Source),
-                Is.EqualTo(new[] { "infrastructure" }));
+                Is.EqualTo(new[] { "application" }));
+            Assert.That(document.SourceExpansion.Contracts.Single().Exclusions.Select(exclusion => (exclusion.Source, exclusion.Matched)),
+                Is.EqualTo(new[] { ("infrastructure", false), ("domain", true) }));
+        }
+        finally
+        {
+            Directory.Delete(directory, recursive: true);
+        }
+    }
+
+    [Test]
+    public void SourceExpansion_AllResolvedSourcesExcluded_ProducesEmptyExpansionWithoutLoadError()
+    {
+        string directory = Path.Combine(Path.GetTempPath(), $"arch-linter-expansion-empty-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(directory);
+
+        try
+        {
+            string path = Path.Combine(directory, "dependencies.arch.yml");
+            File.WriteAllText(path, """
+                version: 1
+                name: Test
+                layers:
+                  application:
+                    namespace: Acme.Application
+                  domain:
+                    namespace: Acme.Domain
+                source_sets:
+                  inner_layers:
+                    kind: layer
+                    members: [application, domain]
+                external_dependencies:
+                  vendor:
+                    namespace_prefixes: [Vendor]
+                contracts:
+                  strict_external:
+                    - name: inner layers avoid vendor
+                      id: inner-no-vendor
+                      source_sets: [inner_layers]
+                      exclude_source_sets: [inner_layers]
+                      forbidden: [vendor]
+                """);
+
+            ArchitectureContractDocument document = new ArchitecturePolicyDocumentLoader().Load(path);
+            ArchitectureContractExpansion expansion = document.SourceExpansion.Contracts.Single();
+
+            Assert.Multiple(() =>
+            {
+                Assert.That(document.Contracts.StrictExternal, Is.Empty);
+                Assert.That(expansion.Instances, Is.Empty);
+                Assert.That(expansion.OptionalEmpty, Is.False);
+                Assert.That(expansion.Exclusions.All(exclusion => exclusion.Matched), Is.True);
+            });
         }
         finally
         {

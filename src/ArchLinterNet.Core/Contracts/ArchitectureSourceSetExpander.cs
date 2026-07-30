@@ -1,4 +1,5 @@
 using ArchLinterNet.Core.Contracts.Families;
+using ArchLinterNet.Core.Contracts.PolicyImports;
 using ArchLinterNet.Core.Model;
 using ArchLinterNet.Core.Resolution;
 
@@ -157,6 +158,7 @@ internal static class ArchitectureSourceSetExpander
         document.Provenance.SetValidationSubject(contract);
 
         string authoredId = contract.Id ?? ArchitecturePolicyDocumentLoader.NormalizeToContractId(contract.Name);
+        ArchitecturePolicySourceLocation? contractLocation = document.Provenance.LocationFor(contract);
 
         // Selector per resolved source, first writer wins, so overlapping sets and repeated members
         // collapse to exactly one instance and the reported selector is deterministic.
@@ -191,26 +193,49 @@ internal static class ArchitectureSourceSetExpander
             }
         }
 
-        HashSet<string> exclusions = new(StringComparer.Ordinal);
-        foreach (string source in contract.ExcludedSources.Where(source => !string.IsNullOrWhiteSpace(source)))
+        int includedCountBeforeExclusions = selectors.Count;
+        List<ArchitectureExpandedContractExclusion> exclusions = new();
+
+        for (int index = 0; index < contract.ExcludedSources.Count; index++)
         {
+            string source = contract.ExcludedSources[index];
+            if (string.IsNullOrWhiteSpace(source))
+            {
+                continue;
+            }
+
             resolver.ValidateExplicitSource(contract.Name, group, contract.SourceKind, source);
-            exclusions.Add(source);
+            bool matched = selectors.Remove(source);
+            exclusions.Add(new ArchitectureExpandedContractExclusion(source, null, source, matched)
+            {
+                PolicyLocation = ExclusionLocation(document, contractLocation, "exclude_sources", index)
+            });
         }
 
-        foreach (string setName in contract.ExcludedSourceSets)
+        for (int index = 0; index < contract.ExcludedSourceSets.Count; index++)
         {
+            string setName = contract.ExcludedSourceSets[index];
             ArchitectureSourceSetResolution resolution =
                 resolver.Resolve(contract.Name, group, contract.SourceKind, setName);
-            exclusions.UnionWith(resolution.ResolvedSources);
+
+            ArchitecturePolicySourceLocation? exclusionLocation =
+                ExclusionLocation(document, contractLocation, "exclude_source_sets", index);
+
+            foreach (string source in resolution.ResolvedSources)
+            {
+                bool matched = selectors.Remove(source);
+                exclusions.Add(new ArchitectureExpandedContractExclusion(
+                    source,
+                    resolution.Name,
+                    resolver.SelectorFor(resolution.Name, source),
+                    matched)
+                {
+                    PolicyLocation = exclusionLocation
+                });
+            }
         }
 
-        foreach (string source in exclusions)
-        {
-            selectors.Remove(source);
-        }
-
-        if (selectors.Count == 0 && optionalReasons.Count == 0)
+        if (selectors.Count == 0 && includedCountBeforeExclusions == 0 && optionalReasons.Count == 0)
         {
             throw new InvalidOperationException(
                 $"Contract '{contract.Name}' in '{group}' resolved no sources from its " +
@@ -251,9 +276,10 @@ internal static class ArchitectureSourceSetExpander
             contract.SourceSets.ToArray(),
             instances)
         {
-            OptionalEmpty = instances.Count == 0,
+            OptionalEmpty = includedCountBeforeExclusions == 0 && optionalReasons.Count > 0,
             OptionalReason = string.Join("; ", optionalReasons.Where(reason => !string.IsNullOrWhiteSpace(reason))),
-            PolicyLocation = document.Provenance.LocationFor(contract)
+            PolicyLocation = contractLocation,
+            Exclusions = exclusions
         });
 
         return expandedContracts;
@@ -342,6 +368,25 @@ internal static class ArchitectureSourceSetExpander
             assign(contract, InlineSets(document, resolver, expansions, group, contract, contract.Name,
                 field, kind, declared(contract), setNames(contract)));
         }
+    }
+
+    private static ArchitecturePolicySourceLocation? ExclusionLocation(
+        ArchitectureContractDocument document,
+        ArchitecturePolicySourceLocation? contractLocation,
+        string fieldName,
+        int index)
+    {
+        if (contractLocation is null)
+        {
+            return null;
+        }
+
+        string path = ArchitecturePolicyProvenancePath.AppendIndex(
+            ArchitecturePolicyProvenancePath.AppendProperty(contractLocation.YamlPath, fieldName),
+            index);
+        return document.Provenance.TryGetLocation(path, out ArchitecturePolicySourceLocation? location)
+            ? location
+            : contractLocation with { YamlPath = path };
     }
 
     private sealed class SourceSetResolver

@@ -31,8 +31,10 @@ second bounded selection seam.
 | Layer-template containers | Compatible | Accept include/exclude containers before template expansion. |
 | Type-placement selectors | Compatible | Add typed include/exclude matcher lists; subtract matched types after inclusion. |
 | Layout conventions | Compatible | Add typed include/exclude file matchers; subtract files before `when` and expectation checks. |
-| Package/framework/assembly sources | Compatible | Extend source expansion with bounded source exclusions after source/set expansion. |
-| External/protected layer sources | Compatible | Use the same bounded layer source exclusion seam. |
+| Package/framework sources | Compatible | Extend source expansion with bounded source exclusions after source/set expansion. |
+| External layer sources | Compatible | Use the same bounded layer source exclusion seam. |
+| Assembly dependency/allow-only sources | Intentionally incompatible | `source` remains an exact assembly identifier rather than a bounded expandable selector; subtraction would change contract semantics instead of narrowing an existing selector universe. |
+| Protected surface operands | Intentionally incompatible | `protected` and `allowed_importers` remain exact rule operands, not selector scopes; subtraction would alter who the rule governs rather than subtracting from a pre-materialized candidate set. |
 | Reusable source sets | Compatible | Support ordered subtraction of the resolved set union without altering its universe. |
 | Exact `forbidden`/`allowed` and placement expectation values | Intentionally incompatible | They are rule operands, not selection scopes; subtraction would change rule meaning. |
 

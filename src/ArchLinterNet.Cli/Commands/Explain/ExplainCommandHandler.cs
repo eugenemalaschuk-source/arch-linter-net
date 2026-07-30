@@ -103,6 +103,14 @@ internal sealed class ExplainCommandHandler(ICliRuntime runtime, ICliConsole con
                             ["optionalEmpty"] = expansion.OptionalEmpty,
                             ["optionalReason"] = expansion.OptionalReason,
                             ["policyLocation"] = FormatPolicyLocation(expansion.PolicyLocation),
+                            ["exclusions"] = expansion.Exclusions.Select(exclusion => new Dictionary<string, object?>
+                            {
+                                ["source"] = exclusion.Source,
+                                ["sourceSet"] = exclusion.SetName,
+                                ["selector"] = exclusion.Selector,
+                                ["matched"] = exclusion.Matched,
+                                ["policyLocation"] = FormatPolicyLocation(exclusion.PolicyLocation)
+                            }).ToArray(),
                             ["instances"] = expansion.Instances.Select(instance => new Dictionary<string, object?>
                             {
                                 ["contractId"] = instance.ContractId,
@@ -183,17 +191,35 @@ internal sealed class ExplainCommandHandler(ICliRuntime runtime, ICliConsole con
                     {
                         console.Out.WriteLine(
                             $"Source expansion: [{expansion.AuthoredContractId}] optional-empty ({expansion.OptionalReason}){policy}");
-                        continue;
+                    }
+                    else if (expansion.Instances.Count == 0)
+                    {
+                        console.Out.WriteLine(
+                            $"Source expansion: [{expansion.AuthoredContractId}] fully excluded{policy}");
+                    }
+                    else
+                    {
+                        foreach (ArchitectureExpandedContractInstance instance in expansion.Instances)
+                        {
+                            string set = instance.SetName is null ? "sources" : $"set '{instance.SetName}'";
+                            string selectorField = expansion.SelectorField is null ? string.Empty :
+                                $" ({expansion.SelectorField})";
+                            console.Out.WriteLine(
+                                $"Source expansion: [{expansion.AuthoredContractId}]{selectorField} {set} -> {instance.Source} " +
+                                $"(selector: {instance.Selector}; id: {instance.ContractId}){policy}");
+                        }
                     }
 
-                    foreach (ArchitectureExpandedContractInstance instance in expansion.Instances)
+                    foreach (ArchitectureExpandedContractExclusion exclusion in expansion.Exclusions)
                     {
-                        string set = instance.SetName is null ? "sources" : $"set '{instance.SetName}'";
-                        string selectorField = expansion.SelectorField is null ? string.Empty :
-                            $" ({expansion.SelectorField})";
+                        string set = exclusion.SetName is null ? "sources" : $"set '{exclusion.SetName}'";
+                        string state = exclusion.Matched ? "matched" : "stale";
+                        string exclusionPolicy = exclusion.PolicyLocation is null
+                            ? string.Empty
+                            : $" (policy: {exclusion.PolicyLocation.SourcePath}:{exclusion.PolicyLocation.YamlPath})";
                         console.Out.WriteLine(
-                            $"Source expansion: [{expansion.AuthoredContractId}]{selectorField} {set} -> {instance.Source} " +
-                            $"(selector: {instance.Selector}; id: {instance.ContractId}){policy}");
+                            $"Source expansion exclusion: [{expansion.AuthoredContractId}] {state} {set} -> {exclusion.Source} " +
+                            $"(selector: {exclusion.Selector}){exclusionPolicy}");
                     }
                 }
             }

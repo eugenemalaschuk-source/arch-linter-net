@@ -41,6 +41,15 @@ public sealed record ArchitectureExpandedContractInstance(
     string? SetName,
     string Selector);
 
+public sealed record ArchitectureExpandedContractExclusion(
+    string Source,
+    string? SetName,
+    string Selector,
+    bool Matched)
+{
+    public ArchitecturePolicySourceLocation? PolicyLocation { get; init; }
+}
+
 // Fan-out contracts become one executable contract per resolved source. List-shaped consumers
 // keep one executable contract and union set values into one of its selectors; recording that as
 // a distinct kind prevents report consumers from mistaking those values for derived contracts.
@@ -70,6 +79,9 @@ public sealed record ArchitectureContractExpansion(
     public string OptionalReason { get; init; } = string.Empty;
 
     public ArchitecturePolicySourceLocation? PolicyLocation { get; init; }
+
+    public IReadOnlyList<ArchitectureExpandedContractExclusion> Exclusions { get; init; } =
+        Array.Empty<ArchitectureExpandedContractExclusion>();
 }
 
 public sealed class ArchitectureSourceExpansionInventory
