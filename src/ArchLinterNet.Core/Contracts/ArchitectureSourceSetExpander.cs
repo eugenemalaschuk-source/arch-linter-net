@@ -79,7 +79,8 @@ internal static class ArchitectureSourceSetExpander
         Action<List<TContract>> assign)
         where TContract : class, IArchitectureSourceExpandableContract
     {
-        if (contracts.All(contract => contract.Sources.Count == 0 && contract.SourceSets.Count == 0))
+        if (contracts.All(contract => contract.Sources.Count == 0 && contract.SourceSets.Count == 0
+            && contract.ExcludedSources.Count == 0 && contract.ExcludedSourceSets.Count == 0))
         {
             return;
         }
@@ -90,7 +91,8 @@ internal static class ArchitectureSourceSetExpander
 
         foreach (TContract contract in contracts)
         {
-            if (contract.Sources.Count == 0 && contract.SourceSets.Count == 0)
+            if (contract.Sources.Count == 0 && contract.SourceSets.Count == 0
+                && contract.ExcludedSources.Count == 0 && contract.ExcludedSourceSets.Count == 0)
             {
                 expanded.Add(contract);
                 continue;
@@ -187,6 +189,25 @@ internal static class ArchitectureSourceSetExpander
             {
                 selectors.TryAdd(source, (resolution.Name, resolver.SelectorFor(resolution.Name, source)));
             }
+        }
+
+        HashSet<string> exclusions = new(StringComparer.Ordinal);
+        foreach (string source in contract.ExcludedSources.Where(source => !string.IsNullOrWhiteSpace(source)))
+        {
+            resolver.ValidateExplicitSource(contract.Name, group, contract.SourceKind, source);
+            exclusions.Add(source);
+        }
+
+        foreach (string setName in contract.ExcludedSourceSets)
+        {
+            ArchitectureSourceSetResolution resolution =
+                resolver.Resolve(contract.Name, group, contract.SourceKind, setName);
+            exclusions.UnionWith(resolution.ResolvedSources);
+        }
+
+        foreach (string source in exclusions)
+        {
+            selectors.Remove(source);
         }
 
         if (selectors.Count == 0 && optionalReasons.Count == 0)

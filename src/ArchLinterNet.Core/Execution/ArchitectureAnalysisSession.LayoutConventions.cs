@@ -310,11 +310,15 @@ public sealed partial class ArchitectureAnalysisSession
         (Dictionary<string, List<(Type Type, ArchitectureDeclaredTypeFact Fact)>> byFile,
             List<(Type Type, ArchitectureDeclaredTypeFact Fact)> unfiled) = BuildCandidateIndex();
 
-        List<LayoutFileGroup> groups = CollectFiledGroups(matcher, byFile);
+        List<LayoutFileGroup> groups = CollectFiledGroups(matcher, byFile)
+            .Where(group => !contract.ExcludeFilesMatching.Any(exclude =>
+                group.SourceFilePath != null
+                && byFile.TryGetValue(group.SourceFilePath, out List<(Type Type, ArchitectureDeclaredTypeFact Fact)>? entries)
+                && MatchesFileLevelSelector(exclude, entries)))
+            .ToList();
         groups.AddRange(CollectUnfiledGroups(contract, matcher, unfiled, executionContext, violations));
         return groups;
     }
-
     private (Dictionary<string, List<(Type Type, ArchitectureDeclaredTypeFact Fact)>> ByFile,
         List<(Type Type, ArchitectureDeclaredTypeFact Fact)> Unfiled) BuildCandidateIndex()
     {

@@ -161,3 +161,10 @@ violation carries.
 - **WHEN** the same violation is rendered as human text, unified JSON, and SARIF
 - **THEN** all three identify the same source project and the same matched package reference(s)
 
+### Requirement: Package contracts support bounded source subtraction
+The system SHALL allow package dependency sources resolved by the configured source model to be subtracted before package evaluation.
+
+#### Scenario: Excluded source is not checked
+- **WHEN** a package contract excludes a resolved source
+- **THEN** the system SHALL not produce a package finding for it
+

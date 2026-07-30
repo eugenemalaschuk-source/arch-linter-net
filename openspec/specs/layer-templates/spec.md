@@ -2,9 +2,7 @@
 
 ## Purpose
 Defines reusable layer-contract templates that expand into concrete layer contracts from a declarative YAML structure.
-
 ## Requirements
-
 ### Requirement: Template contract YAML structure
 
 The system SHALL support `strict_layer_templates` and `audit_layer_templates` arrays in the `contracts:` section of `dependencies.arch.yml`.
@@ -168,3 +166,11 @@ Exhaustive violations SHALL include the template name and container namespace as
 - **WHEN** a violation occurs for unmapped namespace `MyApp.Features.Fishing.Payments` in template `feature-clean-architecture`
 - **THEN** the JSON output includes `"template_name": "feature-clean-architecture"` and `"container_namespace": "MyApp.Features.Fishing"`
 - **THEN** the human-readable output includes the template and container context
+
+### Requirement: Layer templates support container subtraction
+The system SHALL allow template container selectors to subtract declared containers before expansion, preserving deterministic template/container provenance.
+
+#### Scenario: Excluded container is not expanded
+- **WHEN** a container matches a template include and exclusion
+- **THEN** no concrete layer contract SHALL be created for that container
+

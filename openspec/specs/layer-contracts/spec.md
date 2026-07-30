@@ -100,3 +100,10 @@ The shared layer-description text used to render a layer's scope in violation me
 - **WHEN** the layer's description is rendered
 - **THEN** the rendered text is identical to its pre-exclusion form
 
+### Requirement: Layer subtraction remains observable
+The system SHALL preserve deterministic layer include-minus-exclude behavior and expose matching exclusion participation through normalized projections.
+
+#### Scenario: Legacy layer remains unchanged
+- **WHEN** a layer has no exclusion
+- **THEN** its resolved membership SHALL remain unchanged
+

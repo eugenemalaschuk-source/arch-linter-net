@@ -97,6 +97,22 @@ public sealed class TypePlacementContractTests
     }
 
     [Test]
+    public void CheckTypePlacementContract_ExcludeMatcherSubtractsIncludedTypes()
+    {
+        var contract = new ArchitectureTypePlacementContract
+        {
+            Name = "controllers-in-correct",
+            TypesMatching = new ArchitectureTypeMatcher { NameSuffix = "Controller" },
+            ExcludeTypesMatching = { new ArchitectureTypeMatcher { Namespace = "TypePlacementContractTestFixtures.Wrong" } },
+            MustResideInNamespaces = new List<string> { "TypePlacementContractTestFixtures.Correct" }
+        };
+
+        var runner = new ArchitectureContractRunner(CreateContext(), CreateDocument(contract));
+
+        Assert.That(runner.Session.CheckTypePlacementContract(contract), Is.Empty);
+    }
+
+    [Test]
     public void CheckTypePlacementContract_NamespaceSelector_MatchesTypesInNamespace()
     {
         var contract = new ArchitectureTypePlacementContract

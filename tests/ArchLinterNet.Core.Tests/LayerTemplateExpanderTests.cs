@@ -9,6 +9,20 @@ namespace ArchLinterNet.Core.Tests;
 public sealed class LayerTemplateExpanderTests
 {
     [Test]
+    public void Expand_ExcludeContainers_SubtractsBeforeExpansion()
+    {
+        ArchitectureLayerTemplateContract template = new()
+        {
+            Name = "feature",
+            Containers = { "App.Features.One", "App.Features.Two" },
+            ExcludeContainers = { "App.Features.Two" },
+            Layers = { new ArchitectureTemplateLayer { Name = "Domain" } }
+        };
+
+        Assert.That(LayerTemplateExpander.Expand(new[] { template }).Select(contract => contract.ContainerNamespace),
+            Is.EqualTo(new[] { "App.Features.One" }));
+    }
+    [Test]
     public void Expand_SingleContainer_ProducesOneContract()
     {
         var templates = new List<ArchitectureLayerTemplateContract>

@@ -2,9 +2,7 @@
 
 ## Purpose
 Lets policies declare named external dependency groups and evaluate contracts that forbid referencing them.
-
 ## Requirements
-
 ### Requirement: Declare external dependency groups
 The system SHALL allow policies to declare named external dependency groups in a top-level `external_dependencies` section. Each group SHALL support `namespace_prefixes` and `type_prefixes` lists.
 
@@ -111,3 +109,11 @@ The system SHALL preserve existing `external: true` layer behavior while documen
 #### Scenario: Existing external layer policy remains valid
 - **WHEN** an existing policy uses a layer with `external: true`
 - **THEN** that policy SHALL continue to load and evaluate according to existing external layer semantics
+
+### Requirement: External contracts support bounded layer subtraction
+The system SHALL allow external-dependency layer sources resolved by the configured source model to be subtracted before external reference evaluation.
+
+#### Scenario: Excluded layer is not checked
+- **WHEN** an external contract excludes a resolved layer source
+- **THEN** the system SHALL not produce an external-dependency finding for it
+

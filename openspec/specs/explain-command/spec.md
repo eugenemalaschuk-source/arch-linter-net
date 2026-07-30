@@ -72,3 +72,10 @@ The `explain` command SHALL report, in both human and JSON output, each expanded
 - **WHEN** `explain` runs against a policy whose contracts were expanded from a named source set
 - **THEN** the output names the authored contract, the set, each concrete resolved source, and the authored policy fragment location
 
+### Requirement: Explain reports effective subtractive scope
+The explain command SHALL report effective compatible selector scope with authored and imported provenance without requiring clients to parse display prose.
+
+#### Scenario: Explain identifies an exclusion
+- **WHEN** an effective scope excludes a resolved item
+- **THEN** explain output SHALL identify the exclusion item and its provenance
+

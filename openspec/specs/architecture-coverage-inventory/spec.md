@@ -67,3 +67,10 @@ The shared coverage inventory SHALL expose the policy document's resolved source
 - **WHEN** the coverage inventory is built for a policy whose contracts reference named source sets
 - **THEN** it exposes each authored contract's resolved sources and each set's resolved members in deterministic order
 
+### Requirement: Coverage inventories effective selector participation
+The system SHALL expose typed inclusion, exclusion, and stale-exclusion evidence for compatible selector families whose fact universe is available.
+
+#### Scenario: Stale exclusion is visible
+- **WHEN** a compatible exclusion matches no included fact
+- **THEN** coverage inventory SHALL record it as unmatched rather than silently expanding or changing the analysis graph
+

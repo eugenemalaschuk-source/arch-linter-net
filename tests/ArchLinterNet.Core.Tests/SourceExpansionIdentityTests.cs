@@ -251,4 +251,54 @@ public sealed class SourceExpansionIdentityTests
             Directory.Delete(directory, recursive: true);
         }
     }
+
+    [Test]
+    public void SourceExpansion_ExcludesExplicitAndSetResolvedSourcesWithoutExpandingTheUniverse()
+    {
+        string directory = Path.Combine(Path.GetTempPath(), $"arch-linter-expansion-exclusion-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(directory);
+
+        try
+        {
+            string path = Path.Combine(directory, "dependencies.arch.yml");
+            File.WriteAllText(path, """
+                version: 1
+                name: Test
+                layers:
+                  application:
+                    namespace: Acme.Application
+                  domain:
+                    namespace: Acme.Domain
+                  infrastructure:
+                    namespace: Acme.Infrastructure
+                source_sets:
+                  inner_layers:
+                    kind: layer
+                    members: [application, domain, infrastructure]
+                  omitted_layers:
+                    kind: layer
+                    members: [domain]
+                external_dependencies:
+                  vendor:
+                    namespace_prefixes: [Vendor]
+                contracts:
+                  strict_external:
+                    - name: inner layers avoid vendor
+                      id: inner-no-vendor
+                      source_sets: [inner_layers]
+                      exclude_sources: [application]
+                      exclude_source_sets: [omitted_layers]
+                      forbidden: [vendor]
+                """);
+
+            ArchitectureContractDocument document = new ArchitecturePolicyDocumentLoader().Load(path);
+
+            Assert.That(document.Contracts.StrictExternal.Select(contract => contract.Source),
+                Is.EqualTo(new[] { "infrastructure" }));
+        }
+        finally
+        {
+            Directory.Delete(directory, recursive: true);
+        }
+    }
 }

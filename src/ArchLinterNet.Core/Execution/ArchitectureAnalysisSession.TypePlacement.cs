@@ -42,6 +42,8 @@ public sealed partial class ArchitectureAnalysisSession
 
         Type[] candidateTypes = TypeIndex.AllTypes()
             .Where(type => ArchitectureTypeRoleMatcher.Matches(type, contract.TypesMatching, Document, contract.Name))
+            .Where(type => !contract.ExcludeTypesMatching.Any(exclude =>
+                ArchitectureTypeRoleMatcher.Matches(type, exclude, Document, contract.Name)))
             .OrderBy(ArchitectureTypeNames.SafeFullName, StringComparer.Ordinal)
             .ToArray();
 

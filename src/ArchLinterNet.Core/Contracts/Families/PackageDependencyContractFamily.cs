@@ -24,6 +24,10 @@ public sealed class ArchitecturePackageDependencyContract : IArchitectureSourceE
 
     [YamlMember(Alias = "source_sets")] public List<string> SourceSets { get; set; } = new();
 
+    [YamlMember(Alias = "exclude_sources")] public List<string> ExcludedSources { get; set; } = new();
+
+    [YamlMember(Alias = "exclude_source_sets")] public List<string> ExcludedSourceSets { get; set; } = new();
+
     [YamlMember(Alias = "forbidden")] public List<string> Forbidden { get; set; } = new();
 
     [YamlMember(Alias = "dependency_depth")]

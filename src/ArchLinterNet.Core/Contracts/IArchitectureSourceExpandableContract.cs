@@ -17,6 +17,10 @@ public interface IArchitectureSourceExpandableContract : IArchitectureContract
 
     List<string> SourceSets { get; set; }
 
+    List<string> ExcludedSources { get; set; }
+
+    List<string> ExcludedSourceSets { get; set; }
+
     ArchitectureSourceExpansionOrigin? ExpansionOrigin { get; set; }
 
     // Returns a copy of this contract bound to exactly one resolved source. Implemented per family

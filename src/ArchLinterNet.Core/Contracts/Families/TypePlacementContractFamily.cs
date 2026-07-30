@@ -37,6 +37,9 @@ public sealed class ArchitectureTypePlacementContract : IArchitectureContract
 
     [YamlMember(Alias = "types_matching")] public ArchitectureTypeMatcher TypesMatching { get; set; } = new();
 
+    [YamlMember(Alias = "exclude_types_matching")]
+    public List<ArchitectureTypeMatcher> ExcludeTypesMatching { get; set; } = new();
+
     [YamlMember(Alias = "must_reside_in_layers")]
     public List<string> MustResideInLayers { get; set; } = new();
 
