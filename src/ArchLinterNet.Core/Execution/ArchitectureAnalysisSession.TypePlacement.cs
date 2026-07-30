@@ -40,12 +40,18 @@ public sealed partial class ArchitectureAnalysisSession
             allowedLayers, allowedAssemblyNames, hasPlacementExpectation,
             expectedLocationDescription, expectedNameDescription, executionContext);
 
+        bool[] exclusionMatched = new bool[contract.ExcludeTypesMatching.Count];
+
         Type[] candidateTypes = TypeIndex.AllTypes()
             .Where(type => ArchitectureTypeRoleMatcher.Matches(type, contract.TypesMatching, Document, contract.Name))
-            .Where(type => !contract.ExcludeTypesMatching.Any(exclude =>
-                ArchitectureTypeRoleMatcher.Matches(type, exclude, Document, contract.Name)))
+            .Where(type => !IsExcludedType(type, contract, exclusionMatched))
             .OrderBy(ArchitectureTypeNames.SafeFullName, StringComparer.Ordinal)
             .ToArray();
+
+        for (int index = 0; index < contract.ExcludeTypesMatching.Count; index++)
+        {
+            RecordSubtractiveMatcherParticipation(contract, "exclude_types_matching", index, exclusionMatched[index]);
+        }
 
         foreach (Type type in candidateTypes)
         {
@@ -58,6 +64,27 @@ public sealed partial class ArchitectureAnalysisSession
 
         executionContext.CollectUnmatchedIgnores(_unmatchedIgnoredViolations);
         return violations;
+    }
+
+    // Records which exclude_types_matching[i] item actually matched this type, rather than only
+    // whether any of them did, so RecordSubtractiveMatcherParticipation can report per-item
+    // matched/stale evidence instead of collapsing every exclusion into one boolean.
+    private bool IsExcludedType(
+        Type type, ArchitectureTypePlacementContract contract, bool[] exclusionMatched)
+    {
+        bool excluded = false;
+        for (int index = 0; index < contract.ExcludeTypesMatching.Count; index++)
+        {
+            if (!ArchitectureTypeRoleMatcher.Matches(type, contract.ExcludeTypesMatching[index], Document, contract.Name))
+            {
+                continue;
+            }
+
+            exclusionMatched[index] = true;
+            excluded = true;
+        }
+
+        return excluded;
     }
 
     private static void TryAddTypePlacementViolation(

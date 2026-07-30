@@ -121,6 +121,39 @@ public sealed class TypePlacementContractTests
     }
 
     [Test]
+    public void CheckTypePlacementContract_ExcludeTypesMatching_RecordsMatchedAndStaleParticipation()
+    {
+        var contract = new ArchitectureTypePlacementContract
+        {
+            Name = "controllers-in-correct",
+            TypesMatching = new ArchitectureTypeMatcher
+            {
+                NameSuffix = "Controller",
+                Namespace = "TypePlacementContractTestFixtures"
+            },
+            ExcludeTypesMatching =
+            {
+                new ArchitectureTypeMatcher { Namespace = "TypePlacementContractTestFixtures.Wrong" },
+                new ArchitectureTypeMatcher { Namespace = "TypePlacementContractTestFixtures.NoSuchNamespace" }
+            },
+            MustResideInNamespaces = new List<string> { "TypePlacementContractTestFixtures.Correct" }
+        };
+
+        var runner = new ArchitectureContractRunner(CreateContext(), CreateDocument(contract));
+        runner.Session.CheckTypePlacementContract(contract);
+
+        Assert.That(
+            runner.SubtractiveMatcherParticipation.Select(p => (p.Field, p.Index, p.Matched)),
+            Is.EqualTo(new[]
+            {
+                ("exclude_types_matching", 0, true),
+                ("exclude_types_matching", 1, false)
+            }),
+            "The first exclusion actually subtracted a candidate and must report matched; the " +
+            "second never matched anything and must report stale.");
+    }
+
+    [Test]
     public void CheckTypePlacementContract_NamespaceSelector_MatchesTypesInNamespace()
     {
         var contract = new ArchitectureTypePlacementContract
@@ -484,7 +517,7 @@ public sealed class TypePlacementContractTests
         InvalidOperationException ex = Assert.Throws<InvalidOperationException>(() =>
             new ArchitecturePolicyDocumentLoader().Load(policyPath))!;
 
-        Assert.That(ex.Message, Does.Contain("no placement"));
+        Assert.That(ex.Message, Does.Contain("no expectation"));
         Assert.That(ex.Message, Does.Contain("controllers-no-expectation"));
     }
 

@@ -40,6 +40,46 @@ public sealed partial class LayoutConventionContractTests
     }
 
     [Test]
+    public void CheckLayoutConventionsContract_ExcludeFilesMatching_RecordsMatchedAndStaleParticipation()
+    {
+        string assemblyName = typeof(LayoutConventionContractTests).Assembly.GetName().Name!;
+        string policyPath = Path.Combine(_tempDir, "dependencies.arch.yml");
+        File.WriteAllText(policyPath, $"""
+            version: 1
+            name: Test
+            analysis:
+              target_assemblies: [{assemblyName}]
+              source_roots: ["."]
+            contracts:
+              strict_layout_conventions:
+                - name: exclusion-when
+                  files_matching:
+                    folder_segment: WhenRefinement
+                  exclude_files_matching:
+                    - folder_segment: WhenRefinement
+                      when: subject.simpleName == "ExcludedByWhen"
+                    - folder_segment: NoSuchFolderAnywhere
+                  required_name_suffix: DoesNotMatchAnything
+            """);
+
+        ArchitectureContractDocument document = new ArchitecturePolicyDocumentLoader().Load(policyPath);
+        var contract = document.Contracts.StrictLayoutConventions[0];
+        var runner = new ArchitectureContractRunner(CreateContext(), document);
+
+        runner.Session.CheckLayoutConventionsContract(contract);
+
+        Assert.That(
+            runner.SubtractiveMatcherParticipation.Select(p => (p.Field, p.Index, p.Matched)),
+            Is.EqualTo(new[]
+            {
+                ("exclude_files_matching", 0, true),
+                ("exclude_files_matching", 1, false)
+            }),
+            "The first exclusion actually subtracted a candidate and must report matched; the " +
+            "second targets a folder that doesn't exist and must report stale.");
+    }
+
+    [Test]
     public void CheckLayoutConventionsContract_AmbiguousPartialType_ExcludeMatcherSuppressesViolation()
     {
         string assemblyName = typeof(LayoutConventionContractTests).Assembly.GetName().Name!;

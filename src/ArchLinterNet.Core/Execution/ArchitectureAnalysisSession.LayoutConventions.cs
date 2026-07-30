@@ -86,14 +86,20 @@ public sealed partial class ArchitectureAnalysisSession
                 ? BuildTypeIdentityLookup()
                 : null;
 
-        List<LayoutFileGroup> matchedGroups = CollectMatchedFileGroups(contract, executionContext, violations);
+        bool[] exclusionMatched = new bool[contract.ExcludeFilesMatching.Count];
+        List<LayoutFileGroup> matchedGroups = CollectMatchedFileGroups(contract, executionContext, violations, exclusionMatched);
 
         foreach (LayoutFileGroup group in matchedGroups)
         {
             EvaluateFileGroupExpectations(contract, group, executionContext, violations, typesByIdentity);
         }
 
-        AddAmbiguousSourceDeclarationViolations(contract, executionContext, violations, typesByIdentity);
+        AddAmbiguousSourceDeclarationViolations(contract, executionContext, violations, typesByIdentity, exclusionMatched);
+
+        for (int index = 0; index < contract.ExcludeFilesMatching.Count; index++)
+        {
+            RecordSubtractiveMatcherParticipation(contract, "exclude_files_matching", index, exclusionMatched[index]);
+        }
 
         executionContext.CollectUnmatchedIgnores(_unmatchedIgnoredViolations);
         return violations;
@@ -202,7 +208,8 @@ public sealed partial class ArchitectureAnalysisSession
         ArchitectureLayoutConventionContract contract,
         ArchitectureContractExecutionContext executionContext,
         List<ArchitectureViolation> violations,
-        Dictionary<(string AssemblyName, string FullTypeName), Type>? typesByIdentity)
+        Dictionary<(string AssemblyName, string FullTypeName), Type>? typesByIdentity,
+        bool[] exclusionMatched)
     {
         ArchitectureLayoutFileMatcher matcher = contract.FilesMatching;
         bool selectorNeedsSourcePath = !string.IsNullOrEmpty(matcher.FolderSegment)
@@ -221,7 +228,7 @@ public sealed partial class ArchitectureAnalysisSession
                 continue;
             }
 
-            if (MatchesAnyExclusionForAmbiguity(contract, ambiguity, typesByIdentity))
+            if (MatchesAnyExclusionForAmbiguity(contract, ambiguity, typesByIdentity, exclusionMatched))
             {
                 continue;
             }
@@ -280,10 +287,12 @@ public sealed partial class ArchitectureAnalysisSession
     private bool MatchesAnyExclusionForAmbiguity(
         ArchitectureLayoutConventionContract contract,
         ArchitectureDeclaredTypeSourceAmbiguity ambiguity,
-        Dictionary<(string AssemblyName, string FullTypeName), Type>? typesByIdentity)
+        Dictionary<(string AssemblyName, string FullTypeName), Type>? typesByIdentity,
+        bool[] exclusionMatched)
     {
-        foreach (ArchitectureLayoutFileMatcher exclusion in contract.ExcludeFilesMatching)
+        for (int index = 0; index < contract.ExcludeFilesMatching.Count; index++)
         {
+            ArchitectureLayoutFileMatcher exclusion = contract.ExcludeFilesMatching[index];
             if (!AnyCandidatePathMatchesFileSelector(exclusion, ambiguity.SourceFilePaths))
             {
                 continue;
@@ -302,6 +311,7 @@ public sealed partial class ArchitectureAnalysisSession
 
             if (MatchesWhenForAmbiguity(exclusion, ambiguity, typesByIdentity))
             {
+                exclusionMatched[index] = true;
                 return true;
             }
         }

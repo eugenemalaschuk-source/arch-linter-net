@@ -39,15 +39,27 @@ public sealed record ArchitectureExpandedContractInstance(
     string ContractId,
     string Source,
     string? SetName,
-    string Selector);
+    string Selector)
+{
+    // The authored location this instance's source came from: the matching `sources[i]` entry for
+    // an explicit source, or the referenced source set's own declaration for a resolved member/glob.
+    public ArchitecturePolicySourceLocation? PolicyLocation { get; init; }
+}
 
 public sealed record ArchitectureExpandedContractExclusion(
-    string Source,
+    string? Source,
     string? SetName,
-    string Selector,
+    string? Selector,
     bool Matched)
 {
     public ArchitecturePolicySourceLocation? PolicyLocation { get; init; }
+
+    // True when this record represents a whole `exclude_source_sets` reference that resolved to no
+    // source (an `optional: true` set), so it carries no concrete Source/Selector of its own but
+    // must still be observable evidence rather than silently vanishing from the exclusion list.
+    public bool OptionalEmpty { get; init; }
+
+    public string OptionalReason { get; init; } = string.Empty;
 }
 
 // Fan-out contracts become one executable contract per resolved source. List-shaped consumers

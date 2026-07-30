@@ -109,6 +109,8 @@ internal sealed class ExplainCommandHandler(ICliRuntime runtime, ICliConsole con
                                 ["sourceSet"] = exclusion.SetName,
                                 ["selector"] = exclusion.Selector,
                                 ["matched"] = exclusion.Matched,
+                                ["optionalEmpty"] = exclusion.OptionalEmpty,
+                                ["optionalReason"] = exclusion.OptionalReason,
                                 ["policyLocation"] = FormatPolicyLocation(exclusion.PolicyLocation)
                             }).ToArray(),
                             ["instances"] = expansion.Instances.Select(instance => new Dictionary<string, object?>
@@ -116,7 +118,8 @@ internal sealed class ExplainCommandHandler(ICliRuntime runtime, ICliConsole con
                                 ["contractId"] = instance.ContractId,
                                 ["source"] = instance.Source,
                                 ["sourceSet"] = instance.SetName,
-                                ["selector"] = instance.Selector
+                                ["selector"] = instance.Selector,
+                                ["policyLocation"] = FormatPolicyLocation(instance.PolicyLocation)
                             }).ToArray()
                         }).ToArray()
                     }
@@ -213,10 +216,19 @@ internal sealed class ExplainCommandHandler(ICliRuntime runtime, ICliConsole con
                     foreach (ArchitectureExpandedContractExclusion exclusion in expansion.Exclusions)
                     {
                         string set = exclusion.SetName is null ? "sources" : $"set '{exclusion.SetName}'";
-                        string state = exclusion.Matched ? "matched" : "stale";
                         string exclusionPolicy = exclusion.PolicyLocation is null
                             ? string.Empty
                             : $" (policy: {exclusion.PolicyLocation.SourcePath}:{exclusion.PolicyLocation.YamlPath})";
+
+                        if (exclusion.OptionalEmpty)
+                        {
+                            console.Out.WriteLine(
+                                $"Source expansion exclusion: [{expansion.AuthoredContractId}] optional-empty {set} " +
+                                $"({exclusion.OptionalReason}){exclusionPolicy}");
+                            continue;
+                        }
+
+                        string state = exclusion.Matched ? "matched" : "stale";
                         console.Out.WriteLine(
                             $"Source expansion exclusion: [{expansion.AuthoredContractId}] {state} {set} -> {exclusion.Source} " +
                             $"(selector: {exclusion.Selector}){exclusionPolicy}");

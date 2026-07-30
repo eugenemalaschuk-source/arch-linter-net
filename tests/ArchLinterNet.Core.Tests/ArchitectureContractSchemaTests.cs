@@ -153,7 +153,10 @@ public sealed class ArchitectureContractSchemaTests
                      "externalAllowOnlyContract"
                  })
         {
-            JsonElement properties = defs.GetProperty(defName).GetProperty("properties");
+            JsonElement def = defs.GetProperty(defName);
+            JsonElement properties = def.TryGetProperty("allOf", out JsonElement allOf)
+                ? allOf[allOf.GetArrayLength() - 1].GetProperty("properties")
+                : def.GetProperty("properties");
             Assert.That(properties.TryGetProperty("exclude_sources", out _), Is.True, $"{defName}.exclude_sources must be declared.");
             Assert.That(properties.TryGetProperty("exclude_source_sets", out _), Is.True, $"{defName}.exclude_source_sets must be declared.");
         }

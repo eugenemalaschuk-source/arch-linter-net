@@ -147,10 +147,14 @@ internal static class ArchitectureSourceSetExpander
     {
         if (!string.IsNullOrWhiteSpace(contract.Source))
         {
-            throw new InvalidOperationException(
-                $"Contract '{contract.Name}' in '{group}' declares both 'source' and " +
-                "'sources'/'source_sets'. Declare exactly one source selector: an exact 'source', " +
-                "or the multi-source 'sources'/'source_sets' form.");
+            bool declaresMultiSource = contract.Sources.Count > 0 || contract.SourceSets.Count > 0;
+            throw new InvalidOperationException(declaresMultiSource
+                ? $"Contract '{contract.Name}' in '{group}' declares both 'source' and " +
+                  "'sources'/'source_sets'. Declare exactly one source selector: an exact 'source', " +
+                  "or the multi-source 'sources'/'source_sets' form."
+                : $"Contract '{contract.Name}' in '{group}' declares an exact 'source' together with " +
+                  "'exclude_sources'/'exclude_source_sets'. Subtraction only applies to the multi-source " +
+                  "'sources'/'source_sets' form; remove the exclusion, or switch 'source' to 'sources'.");
         }
 
         // Every throw below is enriched by ArchitecturePolicyDocumentLoader with the current
@@ -163,17 +167,22 @@ internal static class ArchitectureSourceSetExpander
         // Selector per resolved source, first writer wins, so overlapping sets and repeated members
         // collapse to exactly one instance and the reported selector is deterministic.
         Dictionary<string, (string? SetName, string Selector)> selectors = new(StringComparer.Ordinal);
+        Dictionary<string, ArchitecturePolicySourceLocation?> instanceLocations = new(StringComparer.Ordinal);
         List<string> optionalReasons = new();
 
-        foreach (string source in contract.Sources)
+        for (int index = 0; index < contract.Sources.Count; index++)
         {
+            string source = contract.Sources[index];
             if (string.IsNullOrWhiteSpace(source))
             {
                 continue;
             }
 
             resolver.ValidateExplicitSource(contract.Name, group, contract.SourceKind, source);
-            selectors.TryAdd(source, (null, source));
+            if (selectors.TryAdd(source, (null, source)))
+            {
+                instanceLocations[source] = ExclusionLocation(document, contractLocation, "sources", index);
+            }
         }
 
         foreach (string setName in contract.SourceSets)
@@ -189,11 +198,20 @@ internal static class ArchitectureSourceSetExpander
 
             foreach (string source in resolution.ResolvedSources)
             {
-                selectors.TryAdd(source, (resolution.Name, resolver.SelectorFor(resolution.Name, source)));
+                if (selectors.TryAdd(source, (resolution.Name, resolver.SelectorFor(resolution.Name, source))))
+                {
+                    instanceLocations[source] = resolution.PolicyLocation;
+                }
             }
         }
 
         int includedCountBeforeExclusions = selectors.Count;
+
+        // A stable snapshot of what was actually included, taken before any exclusion mutates
+        // `selectors`. Matched/stale status for each authored exclusion item is judged against this
+        // snapshot rather than the live dictionary, so a source excluded by an earlier item does not
+        // make a later, equally-valid exclusion of the same source misreport as stale.
+        HashSet<string> includedSnapshot = new(selectors.Keys, StringComparer.Ordinal);
         List<ArchitectureExpandedContractExclusion> exclusions = new();
 
         for (int index = 0; index < contract.ExcludedSources.Count; index++)
@@ -205,7 +223,8 @@ internal static class ArchitectureSourceSetExpander
             }
 
             resolver.ValidateExplicitSource(contract.Name, group, contract.SourceKind, source);
-            bool matched = selectors.Remove(source);
+            bool matched = includedSnapshot.Contains(source);
+            selectors.Remove(source);
             exclusions.Add(new ArchitectureExpandedContractExclusion(source, null, source, matched)
             {
                 PolicyLocation = ExclusionLocation(document, contractLocation, "exclude_sources", index)
@@ -221,9 +240,21 @@ internal static class ArchitectureSourceSetExpander
             ArchitecturePolicySourceLocation? exclusionLocation =
                 ExclusionLocation(document, contractLocation, "exclude_source_sets", index);
 
+            if (resolution.ResolvedSources.Count == 0)
+            {
+                exclusions.Add(new ArchitectureExpandedContractExclusion(null, resolution.Name, null, false)
+                {
+                    PolicyLocation = exclusionLocation,
+                    OptionalEmpty = true,
+                    OptionalReason = resolution.Reason
+                });
+                continue;
+            }
+
             foreach (string source in resolution.ResolvedSources)
             {
-                bool matched = selectors.Remove(source);
+                bool matched = includedSnapshot.Contains(source);
+                selectors.Remove(source);
                 exclusions.Add(new ArchitectureExpandedContractExclusion(
                     source,
                     resolution.Name,
@@ -265,7 +296,12 @@ internal static class ArchitectureSourceSetExpander
                 authoredId, contract.Name, source, setName, selector);
 
             document.Provenance.BindExpandedContract(contract, instance, group);
-            instances.Add(new ArchitectureExpandedContractInstance(instanceId, source, setName, selector));
+            instances.Add(new ArchitectureExpandedContractInstance(instanceId, source, setName, selector)
+            {
+                PolicyLocation = instanceLocations.TryGetValue(source, out ArchitecturePolicySourceLocation? location)
+                    ? location
+                    : null
+            });
             expandedContracts.Add(instance);
         }
 

@@ -19,14 +19,15 @@ public sealed partial class ArchitectureAnalysisSession
     private List<LayoutFileGroup> CollectMatchedFileGroups(
         ArchitectureLayoutConventionContract contract,
         ArchitectureContractExecutionContext executionContext,
-        List<ArchitectureViolation> violations)
+        List<ArchitectureViolation> violations,
+        bool[] exclusionMatched)
     {
         ArchitectureLayoutFileMatcher matcher = contract.FilesMatching;
         (Dictionary<string, List<(Type Type, ArchitectureDeclaredTypeFact Fact)>> byFile,
             List<(Type Type, ArchitectureDeclaredTypeFact Fact)> unfiled) = BuildCandidateIndex();
 
-        List<LayoutFileGroup> groups = CollectFiledGroups(contract, byFile);
-        groups.AddRange(CollectUnfiledGroups(contract, matcher, unfiled, executionContext, violations));
+        List<LayoutFileGroup> groups = CollectFiledGroups(contract, byFile, exclusionMatched);
+        groups.AddRange(CollectUnfiledGroups(contract, matcher, unfiled, executionContext, violations, exclusionMatched));
         return groups;
     }
 
@@ -66,7 +67,8 @@ public sealed partial class ArchitectureAnalysisSession
 
     private List<LayoutFileGroup> CollectFiledGroups(
         ArchitectureLayoutConventionContract contract,
-        Dictionary<string, List<(Type Type, ArchitectureDeclaredTypeFact Fact)>> byFile)
+        Dictionary<string, List<(Type Type, ArchitectureDeclaredTypeFact Fact)>> byFile,
+        bool[] exclusionMatched)
     {
         List<LayoutFileGroup> groups = new();
 
@@ -84,7 +86,7 @@ public sealed partial class ArchitectureAnalysisSession
                 continue;
             }
 
-            eligibleFacts = ApplyFiledExclusions(entries, eligibleFacts, contract.ExcludeFilesMatching);
+            eligibleFacts = ApplyFiledExclusions(entries, eligibleFacts, contract.ExcludeFilesMatching, exclusionMatched);
             if (eligibleFacts.Count == 0)
             {
                 continue;
@@ -99,7 +101,8 @@ public sealed partial class ArchitectureAnalysisSession
     private List<ArchitectureDeclaredTypeFact> ApplyFiledExclusions(
         List<(Type Type, ArchitectureDeclaredTypeFact Fact)> entries,
         List<ArchitectureDeclaredTypeFact> eligibleFacts,
-        IReadOnlyList<ArchitectureLayoutFileMatcher> exclusions)
+        IReadOnlyList<ArchitectureLayoutFileMatcher> exclusions,
+        bool[] exclusionMatched)
     {
         if (exclusions.Count == 0)
         {
@@ -107,8 +110,9 @@ public sealed partial class ArchitectureAnalysisSession
         }
 
         HashSet<(string AssemblyName, string FullTypeName)> excluded = new();
-        foreach (ArchitectureLayoutFileMatcher exclusion in exclusions)
+        for (int index = 0; index < exclusions.Count; index++)
         {
+            ArchitectureLayoutFileMatcher exclusion = exclusions[index];
             if (!MatchesFileLevelSelector(exclusion, entries))
             {
                 continue;
@@ -117,6 +121,7 @@ public sealed partial class ArchitectureAnalysisSession
             foreach (ArchitectureDeclaredTypeFact fact in FilterByWhen(exclusion, entries))
             {
                 excluded.Add((fact.AssemblyName, fact.FullTypeName));
+                exclusionMatched[index] = true;
             }
         }
 
@@ -139,7 +144,8 @@ public sealed partial class ArchitectureAnalysisSession
         ArchitectureLayoutFileMatcher matcher,
         List<(Type Type, ArchitectureDeclaredTypeFact Fact)> unfiled,
         ArchitectureContractExecutionContext executionContext,
-        List<ArchitectureViolation> violations)
+        List<ArchitectureViolation> violations,
+        bool[] exclusionMatched)
     {
         List<LayoutFileGroup> groups = new();
 
@@ -157,7 +163,7 @@ public sealed partial class ArchitectureAnalysisSession
                 continue;
             }
 
-            if (!included || IsExcludedUnfiledEntry(contract, entry, executionContext, violations))
+            if (!included || IsExcludedUnfiledEntry(contract, entry, executionContext, violations, exclusionMatched))
             {
                 continue;
             }
@@ -172,7 +178,8 @@ public sealed partial class ArchitectureAnalysisSession
         ArchitectureLayoutConventionContract contract,
         (Type Type, ArchitectureDeclaredTypeFact Fact) entry,
         ArchitectureContractExecutionContext executionContext,
-        List<ArchitectureViolation> violations)
+        List<ArchitectureViolation> violations,
+        bool[] exclusionMatched)
     {
         for (int index = 0; index < contract.ExcludeFilesMatching.Count; index++)
         {
@@ -198,11 +205,13 @@ public sealed partial class ArchitectureAnalysisSession
                     whenExpressions,
                     out bool excluded))
             {
+                exclusionMatched[index] = true;
                 return true;
             }
 
             if (excluded)
             {
+                exclusionMatched[index] = true;
                 return true;
             }
         }

@@ -492,7 +492,7 @@ public sealed partial class ArchitecturePolicyDocumentLoader : IArchitecturePoli
 
     private static readonly string[] _layoutConventionContractAllowedKeys =
     {
-        "name", "id", "files_matching", "require_type_kind", "forbid_type_kind",
+        "name", "id", "files_matching", "exclude_files_matching", "require_type_kind", "forbid_type_kind",
         "required_name_suffix", "required_name_prefix", "forbidden_name_suffix", "forbidden_name_prefix",
         "require_type_name_matches_file_name", "require_matching_interface", "ignored_violations", "reason"
     };
@@ -552,6 +552,31 @@ public sealed partial class ArchitecturePolicyDocumentLoader : IArchitecturePoli
             {
                 ValidateKnownKeys(
                     filesMatchingMapping, contractName, "files_matching", _layoutFilesMatchingAllowedKeys);
+            }
+
+            // Same rationale as files_matching above: each exclude_files_matching item is validated
+            // against the same matcher key set, with the validation subject pointed at that indexed
+            // item so a typo'd exclusion key reports its own location rather than the contract's.
+            if (TryGetChild(contractNode, "exclude_files_matching", out YamlNode? excludeFilesMatchingNode)
+                && excludeFilesMatchingNode is YamlSequenceNode excludeFilesMatchingSequence)
+            {
+                string excludeFilesMatchingPath = ArchitecturePolicyProvenancePath.AppendProperty(
+                    ContractPath(groupKey, index), "exclude_files_matching");
+
+                for (int exclusionIndex = 0; exclusionIndex < excludeFilesMatchingSequence.Children.Count; exclusionIndex++)
+                {
+                    if (excludeFilesMatchingSequence.Children[exclusionIndex] is not YamlMappingNode exclusionMapping)
+                    {
+                        continue;
+                    }
+
+                    provenance.SetValidationSubject(
+                        ArchitecturePolicyProvenancePath.AppendIndex(excludeFilesMatchingPath, exclusionIndex));
+                    ValidateKnownKeys(
+                        exclusionMapping, contractName, "exclude_files_matching", _layoutFilesMatchingAllowedKeys);
+                }
+
+                provenance.SetValidationSubject(ContractPath(groupKey, index));
             }
 
             // Same rationale as files_matching above: require_matching_interface has exactly one
