@@ -10,7 +10,7 @@ namespace ArchLinterNet.Core.Contracts;
 // and before the validator pipeline so every existing validator, the contract catalog, the
 // executor, baselines, coverage and the reporters keep seeing ordinary single-source contracts.
 // See openspec/changes/add-source-set-expansion/design.md.
-internal static class ArchitectureSourceSetExpander
+internal static partial class ArchitectureSourceSetExpander
 {
     // A bound, not a tuning knob: an authored contract that resolves past this many sources is far
     // more likely to be an over-broad glob than a reviewed policy, and an unbounded expansion would
@@ -386,81 +386,6 @@ internal static class ArchitectureSourceSetExpander
         });
 
         return expandedContracts;
-    }
-
-    // Layer templates use the same typed expansion evidence for containers as source-scoped contracts.
-    private static void RecordLayerTemplateContainerExclusions(
-        ArchitectureContractDocument document,
-        List<ArchitectureContractExpansion> expansions,
-        string group,
-        List<ArchitectureLayerTemplateContract> contracts)
-    {
-        foreach (ArchitectureLayerTemplateContract contract in contracts)
-        {
-            document.Provenance.SetValidationSubject(contract);
-            string authoredId = contract.Id ?? ArchitecturePolicyDocumentLoader.NormalizeToContractId(contract.Name);
-            ArchitecturePolicySourceLocation? contractLocation = document.Provenance.LocationFor(contract);
-
-            HashSet<string> remaining = new(
-                contract.Containers.Where(container => !string.IsNullOrWhiteSpace(container)), StringComparer.Ordinal);
-
-            // A stable snapshot judged independently of the live `remaining` set, so two
-            // overlapping/duplicate exclude_containers entries targeting the same container both
-            // report matched instead of the second misreporting stale once the first already
-            // removed it - same defect class already fixed for source exclusions above.
-            HashSet<string> includedSnapshot = new(remaining, StringComparer.Ordinal);
-            List<ArchitectureExpandedContractExclusion> exclusions = new();
-
-            for (int index = 0; index < contract.ExcludeContainers.Count; index++)
-            {
-                string container = contract.ExcludeContainers[index];
-                if (string.IsNullOrWhiteSpace(container))
-                {
-                    continue;
-                }
-
-                bool matched = includedSnapshot.Contains(container);
-                remaining.Remove(container);
-                exclusions.Add(new ArchitectureExpandedContractExclusion(container, null, container, matched)
-                {
-                    PolicyLocation = ExclusionLocation(document, contractLocation, "exclude_containers", index)
-                });
-            }
-
-            Dictionary<string, ArchitecturePolicySourceLocation?> containerLocations = new(StringComparer.Ordinal);
-            for (int index = 0; index < contract.Containers.Count; index++)
-            {
-                string container = contract.Containers[index];
-                if (string.IsNullOrWhiteSpace(container))
-                {
-                    continue;
-                }
-
-                containerLocations.TryAdd(container, ExclusionLocation(document, contractLocation, "containers", index));
-            }
-
-            List<ArchitectureExpandedContractInstance> inclusions = includedSnapshot
-                .OrderBy(container => container, StringComparer.Ordinal)
-                .Select(container => CreateExpandedInstance(
-                    $"{authoredId}/{ArchitecturePolicyDocumentLoader.NormalizeToContractId(container)}",
-                    container, null, container, containerLocations.GetValueOrDefault(container), contractLocation, null))
-                .ToList();
-            List<ArchitectureExpandedContractInstance> instances = remaining
-                .OrderBy(container => container, StringComparer.Ordinal)
-                .Select(container => CreateExpandedInstance(
-                    $"{authoredId}/{ArchitecturePolicyDocumentLoader.NormalizeToContractId(container)}",
-                    container, null, container, containerLocations.GetValueOrDefault(container), contractLocation, null))
-                .ToList();
-
-            expansions.Add(new ArchitectureContractExpansion(
-                group, authoredId, contract.Name, Array.Empty<string>(), instances)
-            {
-                Kind = ArchitectureContractExpansionKind.ContainerSet,
-                PolicyLocation = contractLocation,
-                Exclusions = exclusions,
-                Inclusions = inclusions
-            });
-        }
     }
 
     // Bundles the three values every expansion step threads through unchanged, so a step's own
