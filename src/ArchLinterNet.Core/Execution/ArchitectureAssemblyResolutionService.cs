@@ -177,21 +177,34 @@ public sealed class ArchitectureAssemblyResolutionService : IArchitectureAssembl
             ? assemblyLoader.CreateIsolatedLoadScope(probingPaths, exactPaths)
             : null;
 
-        foreach (string name in names.Where(value => !string.IsNullOrWhiteSpace(value))
-                     .Distinct(StringComparer.Ordinal))
+        // Ownership of isolatedLoadScope transfers to the returned ResolutionResult only when this
+        // method actually returns one. Any exceptional exit from the loop below (in particular
+        // cancellation, but any other unexpected throw too) must dispose the scope here instead —
+        // nothing downstream can reach it to clean it up, since no ResolutionResult/
+        // ArchitectureAnalysisContext was ever constructed to own it.
+        try
         {
-            cancellationToken.ThrowIfCancellationRequested();
-            try
+            foreach (string name in names.Where(value => !string.IsNullOrWhiteSpace(value))
+                         .Distinct(StringComparer.Ordinal))
             {
-                ResolvedAssembly resolved = ResolveByName(
-                    name.Trim(), probingPaths, fileSystem, assemblyLoader, isolatedLoadScope, exactPaths);
-                assemblies.Add(resolved.Assembly);
-                assemblyLoads += resolved.WasLoaded ? 1 : 0;
+                cancellationToken.ThrowIfCancellationRequested();
+                try
+                {
+                    ResolvedAssembly resolved = ResolveByName(
+                        name.Trim(), probingPaths, fileSystem, assemblyLoader, isolatedLoadScope, exactPaths);
+                    assemblies.Add(resolved.Assembly);
+                    assemblyLoads += resolved.WasLoaded ? 1 : 0;
+                }
+                catch (InvalidOperationException)
+                {
+                    missing.Add(name.Trim());
+                }
             }
-            catch (InvalidOperationException)
-            {
-                missing.Add(name.Trim());
-            }
+        }
+        catch
+        {
+            isolatedLoadScope?.Dispose();
+            throw;
         }
 
         return new ResolutionResult(assemblies, missing, probingPaths.ToArray(), assemblyLoads, isolatedLoadScope);

@@ -30,6 +30,11 @@ public sealed class ArchitectureAnalysisSnapshotTests
 
         public Exception? ExceptionToThrowFromBuildRunner { get; set; }
 
+        // Issue #375 PR #416 review: captures what BuildRunner actually received, so a test can
+        // prove ArchitectureValidationApplicationService.BuildRunnerFor forwards the request's
+        // token instead of silently defaulting it.
+        public CancellationToken LastCancellationTokenReceived { get; private set; }
+
         public ArchitectureContractDocument LoadDocument(
             string policyPath, string? baselinePath = null, ValidationTiming? timing = null)
         {
@@ -49,6 +54,7 @@ public sealed class ArchitectureAnalysisSnapshotTests
             CancellationToken cancellationToken = default)
         {
             BuildRunnerCallCount++;
+            LastCancellationTokenReceived = cancellationToken;
             if (ExceptionToThrowFromBuildRunner is not null)
             {
                 throw ExceptionToThrowFromBuildRunner;
@@ -386,6 +392,23 @@ public sealed class ArchitectureAnalysisSnapshotTests
             CreateSnapshotRequest() with { CancellationToken = cts.Token }));
 
         Assert.That(fixture.RunnerSetupService.BuildRunnerCallCount, Is.EqualTo(0));
+    }
+
+    // Issue #375 PR #416 review: BuildRunnerFor previously never forwarded request.CancellationToken
+    // to IArchitectureRunnerSetupService.BuildRunner, so BuildRunner always received `default` —
+    // meaning a cancellation observed during project discovery or assembly resolution (inside
+    // BuildRunner, which this fake stands in for) was never even checkable there. This asserts the
+    // exact token identity reaches BuildRunner, not merely that CreateSnapshot eventually throws.
+    [Test]
+    public void CreateSnapshot_TokenFromRequest_ReachesBuildRunnerUnchanged()
+    {
+        Fixture fixture = CreateFixture();
+        using CancellationTokenSource cts = new();
+
+        using ArchitectureAnalysisSnapshot snapshot = fixture.ApplicationService.CreateSnapshot(
+            CreateSnapshotRequest() with { CancellationToken = cts.Token });
+
+        Assert.That(fixture.RunnerSetupService.LastCancellationTokenReceived, Is.EqualTo(cts.Token));
     }
 
     [Test]

@@ -75,4 +75,30 @@ public sealed partial class ReportCoordinatorTests
             Assert.That(fileSystem.FileExists("two.sarif.tmp"), Is.False);
         });
     }
+
+    // Issue #375 PR #416 review: the legacy no-report path writes the normal document directly to
+    // stdout before DistributeToSinks (which only guards file-sink staging/commit) ever runs — a
+    // cancellation already observed at RouteOutcomes entry must stop that write, not just prevent
+    // a file sink from being staged. Uses --format json (not human) so a single WriteLine call, not
+    // the legacy-combined-human per-mode loop, is what's being guarded here.
+    [Test]
+    public void RouteSingleOutcome_CancelledBeforeRendering_NoAdditionalSinks_NeverWritesToStdout()
+    {
+        var runtime = new CountingRuntime();
+        var console = new CapturingConsole();
+        var fileSystem = new StubFileSystem();
+        var coordinator = new ReportCoordinator(runtime, console, fileSystem);
+        using CancellationTokenSource cts = new();
+        cts.Cancel();
+
+        RouteResult result = coordinator.RouteSingleOutcome(
+            "json", "strict", PassedOutcome, Array.Empty<ReportSink>(), cts.Token);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(result.Cancelled, Is.True);
+            Assert.That(console.OutputText, Is.Empty);
+            Assert.That(console.ErrorText, Is.Empty);
+        });
+    }
 }

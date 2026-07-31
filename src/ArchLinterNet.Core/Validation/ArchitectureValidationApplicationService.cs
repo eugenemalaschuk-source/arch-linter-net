@@ -280,10 +280,12 @@ public sealed class ArchitectureValidationApplicationService(
         return loadPostBuildArtifacts
             ? runnerSetupService.BuildRunnerForPostBuild(
                 policy.Document, request.PolicyPath, request.ConditionSetName, request.PreprocessorSymbols,
-                policy.SelectedContractIds, policy.EnableUnmatchedIgnoreTracking, timing, modeHint)
+                policy.SelectedContractIds, policy.EnableUnmatchedIgnoreTracking, timing, modeHint,
+                request.CancellationToken)
             : runnerSetupService.BuildRunner(
                 policy.Document, request.PolicyPath, request.ConditionSetName, request.PreprocessorSymbols,
-                policy.SelectedContractIds, policy.EnableUnmatchedIgnoreTracking, timing, modeHint);
+                policy.SelectedContractIds, policy.EnableUnmatchedIgnoreTracking, timing, modeHint,
+                request.CancellationToken);
     }
 
     private static void EnsureValidSeverityConfig(string value, string settingName)

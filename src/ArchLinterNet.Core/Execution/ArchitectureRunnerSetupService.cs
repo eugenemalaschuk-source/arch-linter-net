@@ -110,6 +110,8 @@ public sealed class ArchitectureRunnerSetupService(
             ProjectDiscoveryResult discovery = projectDiscoveryService.ResolveAndApply(
                 document, repositoryRoot, resolveAssemblyOutputs, cancellationToken);
 
+            cancellationToken.ThrowIfCancellationRequested();
+
             ResolutionResult resolution = loadPostBuildArtifacts
                 ? assemblyResolutionService.ResolvePostBuild(
                     document, repositoryRoot, discovery, resolveAssemblyOutputs, mode, selectedContractIds,

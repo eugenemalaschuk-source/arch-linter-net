@@ -34,11 +34,17 @@ public sealed class ArchitectureRunnerSetupServiceFakeDependencyTests
     {
         public bool WasCalled { get; private set; }
 
+        // Issue #375 regression: lets a test cancel from inside "discovery" (as opposed to
+        // passing an already-cancelled token) to prove BuildRunnerCore observes cancellation that
+        // occurs during this call rather than only before it starts.
+        public Action? OnResolveAndApply { get; set; }
+
         public ProjectDiscoveryResult ResolveAndApply(
             ArchitectureContractDocument document, string repositoryRoot, bool resolveAssemblyOutputs,
             CancellationToken cancellationToken = default)
         {
             WasCalled = true;
+            OnResolveAndApply?.Invoke();
             return ProjectDiscoveryResult.Empty;
         }
     }
@@ -111,5 +117,37 @@ public sealed class ArchitectureRunnerSetupServiceFakeDependencyTests
         Assert.That(context.TargetAssemblies, Has.Member(typeof(FakeAssemblyResolutionService).Assembly));
         Assert.That(context.MissingAssemblyNames, Has.Member("fake-missing-assembly-marker"));
         Assert.That(context.AssemblyProbingPaths, Has.Member("fake-probing-path-marker"));
+    }
+
+    // Issue #375 PR #416 review: proves cancellation observed *during* project discovery (not an
+    // already-cancelled token checked only before BuildRunner starts) stops the call before
+    // assembly resolution ever runs — i.e. the token genuinely reaches and is honored by the
+    // discovery/resolution loop, not just checked once up front.
+    [Test]
+    public void BuildRunner_CancelledDuringDiscovery_ThrowsBeforeAssemblyResolutionRuns()
+    {
+        var document = new ArchitectureContractDocument { Version = 1, Name = "Test" };
+        var fakeRepositoryRoot = new FakeRepositoryRootResolver();
+        var fakeProjectDiscovery = new FakeProjectDiscoveryService();
+        var fakeAssemblyResolution = new FakeAssemblyResolutionService();
+        using CancellationTokenSource cts = new();
+        fakeProjectDiscovery.OnResolveAndApply = () => cts.Cancel();
+
+        var runnerSetupService = new ArchitectureRunnerSetupService(
+            new ArchitecturePolicyDocumentLoader(),
+            new ArchitectureBaselineLoadingService(),
+            fakeRepositoryRoot,
+            new ConditionSetResolutionService(),
+            fakeProjectDiscovery,
+            fakeAssemblyResolution);
+
+        Assert.Throws<OperationCanceledException>(() => runnerSetupService.BuildRunner(
+            document, policyPath: "unused-by-fakes.arch.yml", cancellationToken: cts.Token));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(fakeProjectDiscovery.WasCalled, Is.True);
+            Assert.That(fakeAssemblyResolution.WasCalled, Is.False);
+        });
     }
 }

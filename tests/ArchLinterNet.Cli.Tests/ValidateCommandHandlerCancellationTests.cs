@@ -89,4 +89,40 @@ public sealed partial class ValidateCommandHandlerReportModeTests
             Assert.That(console.StdOut, Does.Not.Contain("architecture-execution"));
         });
     }
+
+    // Issue #375 PR #416 review: proves cancellation reported by ReportCoordinator itself
+    // (RouteResult.Cancelled — validation succeeded, staging/commit was interrupted) is handled
+    // distinctly from an OperationCanceledException thrown by Core — the handler must not fall
+    // through to WriteOutputError and report this as a generic "partial-output"/"output-failed".
+    [Test]
+    public void ValidateHandler_CoordinatorReportsCancelled_WritesDistinctCancelledStatusNotOutputFailure()
+    {
+        FakeCliRuntime runtime = new();
+        FakeCliConsole console = new();
+        using CancellationTokenSource cts = new();
+        FakeFileSystem fileSystem = new(exists: true)
+        {
+            // The write itself succeeds; cancellation is simply already observed by the time
+            // DistributeToSinks checks the token again before committing — not a write failure.
+            OnWriteAllTextToTemp = () => cts.Cancel(),
+        };
+        ValidateCommandHandler handler = new(runtime, console, fileSystem, cts.Token);
+
+        ValidateCommandOptions options = new(
+            "policy.yml", "strict", "human", [], null, false, null, false, false)
+        {
+            AdditionalSinks = [new ReportSink("json", ReportDestinationType.File, "out.json")],
+        };
+
+        int exitCode = handler.Execute(options);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(exitCode, Is.EqualTo(CliExitCodes.InvalidArgumentsOrRuntimeError));
+            Assert.That(console.StdErr, Does.Contain("\"status\":\"cancelled\""));
+            Assert.That(console.StdErr, Does.Not.Contain("partial-output"));
+            Assert.That(console.StdErr, Does.Not.Contain("output-failed"));
+            Assert.That(fileSystem.CommittedPaths, Is.Empty);
+        });
+    }
 }

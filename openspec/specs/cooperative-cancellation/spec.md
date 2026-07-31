@@ -26,13 +26,21 @@ cancellation state by any other path.
   `ValidateAudit()`, or `CreateSnapshot()`
 - **THEN** the resulting `ValidationRequest`/`AnalysisSnapshotRequest` carries that same token
 
-### Requirement: Cancellation propagates through every applicable phase
+### Requirement: Cancellation propagates through every applicable phase reachable through the validation seam
 The system SHALL observe cancellation during policy read/import/composition, project discovery, restore
 prerequisite checks and ensure-built child-process execution, build-state hashing/receipt
 verification/preflight, assembly resolution/load and snapshot creation, type/IL/source scanning and
-fact-index materialization, contract-family execution and coverage/post-processing, baseline/public-API
-operations that use the shared pipeline, human/JSON/SARIF rendering, multi-sink staging/validation/commit,
-and profile/artifact cleanup.
+fact-index materialization, contract-family execution and coverage/post-processing, and human/JSON/SARIF
+rendering and multi-sink staging/validation/commit — for every operation that flows through
+`ValidationRequest`/`AnalysisSnapshotRequest` (the `validate` CLI command and the equivalent
+`ArchitectureValidationBuilder` Testing API entrypoints).
+
+Baseline operations (`baseline diff`/`verify`/`migrate`/`generate`/`update`/`prune`), public-API operations
+(`public-api capture`/`diff`/`update`/`migrate`), and profile-generation/artifact-cleanup operations do NOT
+currently accept a `CancellationToken` on their own request types (`BaselineDiffRequest`,
+`PublicApiCaptureRequest`, etc.) or thread one through their application services — this capability does not
+cover them. Extending coverage to those surfaces is explicit future work, not something this requirement
+claims is already true.
 
 #### Scenario: Cancellation during policy composition
 - **WHEN** the token is cancelled while `ArchitectureValidationApplicationService.CreateSnapshotCore` is

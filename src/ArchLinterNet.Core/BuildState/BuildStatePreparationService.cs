@@ -469,9 +469,21 @@ public sealed class BuildStatePreparationService : IBuildStatePreparationService
             if (cancellationToken.IsCancellationRequested)
             {
                 TryKillProcessTree(process);
+
+                // Process.Kill is asynchronous — it requests termination but does not wait for it.
+                // Block here (no timeout: the process is already being killed, so this is bounded
+                // in practice) until the tree has actually exited before propagating cancellation,
+                // so a caller catching this never observes a still-running child process.
+                process.WaitForExit();
                 cancellationToken.ThrowIfCancellationRequested();
             }
         }
+
+        // The loop above can also exit normally (WaitForExit(ProcessPollIntervalMs) returned true)
+        // in the same interval the token was cancelled, without ever reaching the check inside the
+        // loop. Re-check here so a cancelled session can never treat a just-finished exit-0 build
+        // as success or go on to publish build receipts for it.
+        cancellationToken.ThrowIfCancellationRequested();
     }
 
     private static void TryKillProcessTree(Process process)

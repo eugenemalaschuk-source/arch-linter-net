@@ -6,6 +6,7 @@ public static class Program
 {
     public static int Main(string[] args)
     {
-        return CliCompositionRoot.CreateHost().Run(args);
+        using CliComposition composition = CliCompositionRoot.Compose();
+        return composition.Host.Run(args);
     }
 }

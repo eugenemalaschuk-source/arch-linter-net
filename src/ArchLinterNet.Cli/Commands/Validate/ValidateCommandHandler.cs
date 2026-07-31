@@ -556,6 +556,12 @@ internal sealed partial class ValidateCommandHandler
         RouteResult result = _coordinator.RouteSingleOutcome(
             options.Format, mode, outcome, options.AdditionalSinks, _cancellationToken);
         timing?.WriteReport(_console.Error);
+        if (result.Cancelled)
+        {
+            WriteCancelledRouting(options, errorFormat, result, isSingleMode: true, new[] { (mode, outcome) });
+            return CliExitCodes.InvalidArgumentsOrRuntimeError;
+        }
+
         if (result.Status != ReportRouteStatus.AllSucceeded)
         {
             WriteOutputError(options, errorFormat, result, isSingleMode: true, new[] { (mode, outcome) });
@@ -625,6 +631,12 @@ internal sealed partial class ValidateCommandHandler
             options.Format, outcomesByMode, options.AdditionalSinks, _cancellationToken);
 
         timing?.WriteReport(_console.Error);
+        if (result.Cancelled)
+        {
+            WriteCancelledRouting(options, errorFormat, result, isSingleMode: false, outcomesByMode);
+            return CliExitCodes.InvalidArgumentsOrRuntimeError;
+        }
+
         if (result.Status != ReportRouteStatus.AllSucceeded)
         {
             WriteOutputError(options, errorFormat, result, isSingleMode: false, outcomesByMode);

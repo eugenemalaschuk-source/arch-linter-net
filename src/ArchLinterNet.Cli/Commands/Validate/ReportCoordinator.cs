@@ -81,6 +81,20 @@ internal sealed class ReportCoordinator
         bool isReportMode,
         CancellationToken cancellationToken)
     {
+        // Checked before any rendering or stream write. DistributeToSinks below only guards
+        // file-sink staging/commit — it never ran early enough to stop the legacy-combined-human
+        // per-mode writes inside ResolveHumanContent or the legacy/no-report stdout dispatch a few
+        // lines down, both of which publish directly to _console.Out. Without this guard, a token
+        // already cancelled by the time this method runs would still let a normal document reach
+        // stdout before any cancellation evidence is reported.
+        if (cancellationToken.IsCancellationRequested)
+        {
+            return BuildRouteResult(
+                additionalSinks, contentByFormat: new Dictionary<string, string>(), failedPaths: new List<string>(),
+                committedPaths: new List<string>(), stagedPaths: new List<string>(), errorDetails: new List<string>(),
+                deliveredStreamPaths: new List<string>(), cancelled: true);
+        }
+
         // Legacy combined human: write each mode sequentially (pre-#364 behavior)
         bool legacyCombinedHuman = !isReportMode && !isSingleMode && stdoutFormat == FormatHuman;
 
