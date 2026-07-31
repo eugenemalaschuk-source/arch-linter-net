@@ -10,7 +10,7 @@ using ArchitectureContractGroups = ArchLinterNet.Core.Contracts.Families.Archite
 namespace ArchLinterNet.Core.Tests;
 
 [TestFixture]
-public sealed class LayoutConventionContractTests
+public sealed partial class LayoutConventionContractTests
 {
     private string _tempDir = null!;
 

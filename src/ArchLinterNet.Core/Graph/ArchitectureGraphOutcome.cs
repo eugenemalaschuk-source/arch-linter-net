@@ -15,4 +15,9 @@ public sealed record ArchitectureGraphOutcome(ArchitectureDependencyGraph Graph)
     internal IReadOnlyCollection<ArchitectureCoverageSummary>? CoverageSummaries { get; init; }
 
     internal Model.ArchitectureSourceExpansionInventory? SourceExpansion { get; init; }
+
+    // Concrete graph construction executes type/layout contracts as part of the same pass. Carry
+    // their typed selector evidence into explain rather than asking its formatter to infer scope
+    // from diagnostics or rerun matchers.
+    internal IReadOnlyList<Model.ArchitectureSubtractiveMatcherParticipation>? SelectorParticipation { get; init; }
 }

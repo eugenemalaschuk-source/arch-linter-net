@@ -18,22 +18,28 @@ public sealed class ArchitectureCoverageInventory
     private readonly ArchitectureReferenceGraph _referenceGraph;
     private readonly Lazy<IReadOnlyList<ArchitectureCoverageDependencyEdge>> _dependencyEdges;
 
-    private ArchitectureCoverageInventory(
-        IReadOnlyList<ArchitectureCoverageNamespaceEntry> namespaces,
-        Dictionary<string, Type[]> typesByNamespace,
-        ArchitectureReferenceGraph referenceGraph,
-        IReadOnlyList<ArchitectureCoverageLayerEntry> declaredLayers,
-        IReadOnlyList<ArchitectureLayerContract> expandedLayerTemplates,
-        ArchitectureSourceExpansionInventory sourceExpansion,
-        ProjectDiscoveryResult? projectDiscovery)
+    // Bundles the Build factory's fully-computed inputs into one value, so the constructor itself
+    // only has to name "the assembled data", not each of its eight ingredients individually.
+    private sealed record Args(
+        IReadOnlyList<ArchitectureCoverageNamespaceEntry> Namespaces,
+        Dictionary<string, Type[]> TypesByNamespace,
+        ArchitectureReferenceGraph ReferenceGraph,
+        IReadOnlyList<ArchitectureCoverageLayerEntry> DeclaredLayers,
+        IReadOnlyList<ArchitectureLayerContract> ExpandedLayerTemplates,
+        ArchitectureSourceExpansionInventory SourceExpansion,
+        IReadOnlyList<ArchitectureSubtractiveMatcherParticipation> SelectorParticipation,
+        ProjectDiscoveryResult? ProjectDiscovery);
+
+    private ArchitectureCoverageInventory(Args args)
     {
-        Namespaces = namespaces;
-        _typesByNamespace = typesByNamespace;
-        _referenceGraph = referenceGraph;
-        DeclaredLayers = declaredLayers;
-        ExpandedLayerTemplates = expandedLayerTemplates;
-        SourceExpansion = sourceExpansion;
-        ProjectDiscovery = projectDiscovery;
+        Namespaces = args.Namespaces;
+        _typesByNamespace = args.TypesByNamespace;
+        _referenceGraph = args.ReferenceGraph;
+        DeclaredLayers = args.DeclaredLayers;
+        ExpandedLayerTemplates = args.ExpandedLayerTemplates;
+        SourceExpansion = args.SourceExpansion;
+        SelectorParticipation = args.SelectorParticipation;
+        ProjectDiscovery = args.ProjectDiscovery;
         _dependencyEdges = new Lazy<IReadOnlyList<ArchitectureCoverageDependencyEdge>>(BuildDependencyEdges);
     }
 
@@ -47,6 +53,16 @@ public sealed class ArchitectureCoverageInventory
     // coverage consumer can prove which sources each authored contract resolved to without
     // re-running expansion.
     public ArchitectureSourceExpansionInventory SourceExpansion { get; }
+
+    // The run-time stream is held by reference to the session's append-only collection. A coverage
+    // contract may request the lazy inventory before type/layout execution; this lets its consumer
+    // observe the completed effective scope without replaying matcher evaluation.
+    public IReadOnlyList<ArchitectureSubtractiveMatcherParticipation> SelectorParticipation { get; }
+
+    // Kept for consumers introduced when this stream contained exclusions only. New consumers
+    // should prefer SelectorParticipation, which includes typed positive-selector evidence too.
+    public IReadOnlyList<ArchitectureSubtractiveMatcherParticipation> SubtractiveMatcherParticipation =>
+        SelectorParticipation;
 
     public ProjectDiscoveryResult? ProjectDiscovery { get; }
 
@@ -79,14 +95,15 @@ public sealed class ArchitectureCoverageInventory
         List<ArchitectureLayerContract> expandedTemplates = LayerTemplateExpander.Expand(
             document.Contracts.StrictLayerTemplates.Concat(document.Contracts.AuditLayerTemplates));
 
-        return new ArchitectureCoverageInventory(
+        return new ArchitectureCoverageInventory(new Args(
             namespaces,
             typesByNamespace,
             session.ReferenceGraph,
             declaredLayers,
             expandedTemplates,
             document.SourceExpansion,
-            projectDiscovery);
+            session.SubtractiveMatcherParticipation,
+            projectDiscovery));
     }
 
     private List<ArchitectureCoverageDependencyEdge> BuildDependencyEdges()

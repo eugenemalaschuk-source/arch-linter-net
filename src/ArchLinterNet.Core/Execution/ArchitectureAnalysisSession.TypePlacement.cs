@@ -40,10 +40,26 @@ public sealed partial class ArchitectureAnalysisSession
             allowedLayers, allowedAssemblyNames, hasPlacementExpectation,
             expectedLocationDescription, expectedNameDescription, executionContext);
 
-        Type[] candidateTypes = TypeIndex.AllTypes()
+        bool[] exclusionMatched = new bool[contract.ExcludeTypesMatching.Count];
+        Type[] includedTypes = TypeIndex.AllTypes()
             .Where(type => ArchitectureTypeRoleMatcher.Matches(type, contract.TypesMatching, Document, contract.Name))
             .OrderBy(ArchitectureTypeNames.SafeFullName, StringComparer.Ordinal)
             .ToArray();
+
+        // Inclusion is captured before subtraction: an excluded type still proves the positive
+        // selector had a candidate, making effective scope observable without rerunning matching.
+        RecordSubtractiveMatcherParticipation(
+            contract, "types_matching", null, includedTypes.Length > 0,
+            kind: ArchitectureSelectorParticipationKind.Inclusion);
+
+        Type[] candidateTypes = includedTypes
+            .Where(type => !IsExcludedType(type, contract, exclusionMatched))
+            .ToArray();
+
+        for (int index = 0; index < contract.ExcludeTypesMatching.Count; index++)
+        {
+            RecordSubtractiveMatcherParticipation(contract, "exclude_types_matching", index, exclusionMatched[index]);
+        }
 
         foreach (Type type in candidateTypes)
         {
@@ -56,6 +72,27 @@ public sealed partial class ArchitectureAnalysisSession
 
         executionContext.CollectUnmatchedIgnores(_unmatchedIgnoredViolations);
         return violations;
+    }
+
+    // Records which exclude_types_matching[i] item actually matched this type, rather than only
+    // whether any of them did, so RecordSubtractiveMatcherParticipation can report per-item
+    // matched/stale evidence instead of collapsing every exclusion into one boolean.
+    private bool IsExcludedType(
+        Type type, ArchitectureTypePlacementContract contract, bool[] exclusionMatched)
+    {
+        bool excluded = false;
+        for (int index = 0; index < contract.ExcludeTypesMatching.Count; index++)
+        {
+            if (!ArchitectureTypeRoleMatcher.Matches(type, contract.ExcludeTypesMatching[index], Document, contract.Name))
+            {
+                continue;
+            }
+
+            exclusionMatched[index] = true;
+            excluded = true;
+        }
+
+        return excluded;
     }
 
     private static void TryAddTypePlacementViolation(

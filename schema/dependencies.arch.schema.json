@@ -120,6 +120,13 @@
       "items": { "type": "string", "minLength": 1, "pattern": ".*\\S.*" },
       "default": []
     },
+    "exactSourceWithExclusions": {
+      "required": ["source"],
+      "anyOf": [
+        { "required": ["exclude_sources"], "properties": { "exclude_sources": { "minItems": 1 } } },
+        { "required": ["exclude_source_sets"], "properties": { "exclude_source_sets": { "minItems": 1 } } }
+      ]
+    },
     "stringMap": {
       "type": "object",
       "additionalProperties": {
@@ -1410,12 +1417,15 @@
         { "required": ["sources"] },
         { "required": ["source_sets"] }
       ],
+      "not": { "$ref": "#/$defs/exactSourceWithExclusions" },
       "properties": {
         "name": { "type": "string", "minLength": 1 },
         "id": { "type": "string", "minLength": 1 },
         "source": { "type": "string", "minLength": 1 },
         "sources": { "$ref": "#/$defs/nonBlankStringList" },
         "source_sets": { "$ref": "#/$defs/nonBlankStringList" },
+        "exclude_sources": { "$ref": "#/$defs/nonBlankStringList" },
+        "exclude_source_sets": { "$ref": "#/$defs/nonBlankStringList" },
         "forbidden": { "$ref": "#/$defs/stringList" },
         "dependency_depth": {
           "type": "string",
@@ -1436,12 +1446,15 @@
         { "required": ["sources"] },
         { "required": ["source_sets"] }
       ],
+      "not": { "$ref": "#/$defs/exactSourceWithExclusions" },
       "properties": {
         "name": { "type": "string", "minLength": 1 },
         "id": { "type": "string", "minLength": 1 },
         "source": { "type": "string", "minLength": 1 },
         "sources": { "$ref": "#/$defs/nonBlankStringList" },
         "source_sets": { "$ref": "#/$defs/nonBlankStringList" },
+        "exclude_sources": { "$ref": "#/$defs/nonBlankStringList" },
+        "exclude_source_sets": { "$ref": "#/$defs/nonBlankStringList" },
         "allowed": { "$ref": "#/$defs/stringList" },
         "dependency_depth": {
           "type": "string",
@@ -1462,12 +1475,15 @@
         { "required": ["sources"] },
         { "required": ["source_sets"] }
       ],
+      "not": { "$ref": "#/$defs/exactSourceWithExclusions" },
       "properties": {
         "name": { "type": "string", "minLength": 1 },
         "id": { "type": "string", "minLength": 1 },
         "source": { "type": "string", "minLength": 1 },
         "sources": { "$ref": "#/$defs/nonBlankStringList" },
         "source_sets": { "$ref": "#/$defs/nonBlankStringList" },
+        "exclude_sources": { "$ref": "#/$defs/nonBlankStringList" },
+        "exclude_source_sets": { "$ref": "#/$defs/nonBlankStringList" },
         "forbidden": { "$ref": "#/$defs/stringList" },
         "ignored_violations": { "$ref": "#/$defs/ignoredViolations" },
         "reason": { "type": "string" }
@@ -1482,12 +1498,15 @@
         { "required": ["sources"] },
         { "required": ["source_sets"] }
       ],
+      "not": { "$ref": "#/$defs/exactSourceWithExclusions" },
       "properties": {
         "name": { "type": "string", "minLength": 1 },
         "id": { "type": "string", "minLength": 1 },
         "source": { "type": "string", "minLength": 1 },
         "sources": { "$ref": "#/$defs/nonBlankStringList" },
         "source_sets": { "$ref": "#/$defs/nonBlankStringList" },
+        "exclude_sources": { "$ref": "#/$defs/nonBlankStringList" },
+        "exclude_source_sets": { "$ref": "#/$defs/nonBlankStringList" },
         "allowed": { "$ref": "#/$defs/stringList" },
         "ignored_violations": { "$ref": "#/$defs/ignoredViolations" },
         "reason": { "type": "string" }
@@ -1569,12 +1588,15 @@
             { "required": ["sources"] },
             { "required": ["source_sets"] }
           ],
+          "not": { "$ref": "#/$defs/exactSourceWithExclusions" },
           "properties": {
             "name": { "type": "string", "minLength": 1 },
             "id": { "type": "string", "minLength": 1 },
             "source": { "type": "string", "minLength": 1 },
             "sources": { "$ref": "#/$defs/nonBlankStringList" },
             "source_sets": { "$ref": "#/$defs/nonBlankStringList" },
+            "exclude_sources": { "$ref": "#/$defs/nonBlankStringList" },
+            "exclude_source_sets": { "$ref": "#/$defs/nonBlankStringList" },
             "forbidden": { "$ref": "#/$defs/stringList" },
             "ignored_violations": { "$ref": "#/$defs/ignoredViolations" },
             "reason": { "type": "string" }
@@ -1594,12 +1616,15 @@
             { "required": ["sources"] },
             { "required": ["source_sets"] }
           ],
+          "not": { "$ref": "#/$defs/exactSourceWithExclusions" },
           "properties": {
             "name": { "type": "string", "minLength": 1 },
             "id": { "type": "string", "minLength": 1 },
             "source": { "type": "string", "minLength": 1 },
             "sources": { "$ref": "#/$defs/nonBlankStringList" },
             "source_sets": { "$ref": "#/$defs/nonBlankStringList" },
+            "exclude_sources": { "$ref": "#/$defs/nonBlankStringList" },
+            "exclude_source_sets": { "$ref": "#/$defs/nonBlankStringList" },
             "allowed": { "$ref": "#/$defs/stringList" },
             "allowed_types": { "$ref": "#/$defs/stringList" },
             "ignored_violations": { "$ref": "#/$defs/ignoredViolations" },
@@ -1633,6 +1658,11 @@
             "name": { "type": "string", "minLength": 1 },
             "id": { "type": "string", "minLength": 1 },
             "types_matching": { "$ref": "#/$defs/typeMatcher" },
+            "exclude_types_matching": {
+              "type": "array",
+              "items": { "$ref": "#/$defs/typeMatcher" },
+              "default": []
+            },
             "must_reside_in_layers": { "$ref": "#/$defs/stringList" },
             "must_reside_in_namespaces": { "$ref": "#/$defs/stringList" },
             "must_reside_in_projects": { "$ref": "#/$defs/stringList" },
@@ -1683,6 +1713,11 @@
             "name": { "type": "string", "minLength": 1 },
             "id": { "type": "string", "minLength": 1 },
             "files_matching": { "$ref": "#/$defs/layoutFileMatcher" },
+            "exclude_files_matching": {
+              "type": "array",
+              "items": { "$ref": "#/$defs/layoutFileMatcher" },
+              "default": []
+            },
             "require_type_kind": {
               "type": "string",
               "enum": ["class", "interface", "struct", "enum", "record", "delegate"]
@@ -1857,6 +1892,11 @@
           "type": "array",
           "items": { "type": "string", "minLength": 1 },
           "minItems": 1
+        },
+        "exclude_containers": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 },
+          "default": []
         },
         "layers": {
           "type": "array",

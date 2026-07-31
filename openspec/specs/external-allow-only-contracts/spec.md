@@ -77,3 +77,9 @@ The system SHALL allow `ignored_violations` entries on an external allow-only co
 - **WHEN** an external allow-only contract declares an `ignored_violations` entry that does not match any actual violation
 - **THEN** the system SHALL record that entry as an unmatched ignored violation
 
+### Requirement: External allow-only contracts support bounded layer subtraction
+The system SHALL allow external allow-only layer sources resolved by the configured source model to be subtracted before external reference evaluation.
+
+#### Scenario: Excluded source is not checked
+- **WHEN** an external allow-only contract excludes a resolved source layer
+- **THEN** the system SHALL not produce an external allow-only finding for it

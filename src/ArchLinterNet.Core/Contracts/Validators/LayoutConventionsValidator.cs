@@ -10,19 +10,10 @@ internal sealed class LayoutConventionsValidator : IArchitecturePolicyDocumentVa
         foreach (ArchitectureLayoutConventionContract contract in document.Provenance.Track(
                      document.Contracts.StrictLayoutConventions.Concat(document.Contracts.AuditLayoutConventions)))
         {
-            ArchitectureLayoutFileMatcher matcher = contract.FilesMatching;
-            bool hasSelectorField = !string.IsNullOrEmpty(matcher.FolderSegment)
-                || !string.IsNullOrEmpty(matcher.NamespaceSegment)
-                || !string.IsNullOrEmpty(matcher.FileNameSuffix)
-                || !string.IsNullOrEmpty(matcher.FileNamePrefix);
-
-            if (!hasSelectorField)
+            ValidateMatcher(contract.Name, "files_matching", contract.FilesMatching);
+            foreach (ArchitectureLayoutFileMatcher exclusion in contract.ExcludeFilesMatching)
             {
-                throw new InvalidOperationException(
-                    $"Layout convention contract '{contract.Name}' declares no usable files_matching selector field " +
-                    "(folder_segment/namespace_segment/file_name_suffix/file_name_prefix). An empty or omitted " +
-                    "selector would match every source file, turning a folder-specific rule into a global one. " +
-                    "Declare at least one selector field, or check for a typo'd field name.");
+                ValidateMatcher(contract.Name, "exclude_files_matching", exclusion);
             }
 
             bool hasExpectation = !string.IsNullOrEmpty(contract.RequireTypeKind)
@@ -45,6 +36,23 @@ internal sealed class LayoutConventionsValidator : IArchitecturePolicyDocumentVa
 
             ValidateTypeKind(contract.Name, "require_type_kind", contract.RequireTypeKind);
             ValidateTypeKind(contract.Name, "forbid_type_kind", contract.ForbidTypeKind);
+        }
+    }
+
+    private static void ValidateMatcher(string contractName, string fieldName, ArchitectureLayoutFileMatcher matcher)
+    {
+        bool hasSelectorField = !string.IsNullOrEmpty(matcher.FolderSegment)
+            || !string.IsNullOrEmpty(matcher.NamespaceSegment)
+            || !string.IsNullOrEmpty(matcher.FileNameSuffix)
+            || !string.IsNullOrEmpty(matcher.FileNamePrefix);
+
+        if (!hasSelectorField)
+        {
+            throw new InvalidOperationException(
+                $"Layout convention contract '{contractName}' declares no usable {fieldName} selector field " +
+                "(folder_segment/namespace_segment/file_name_suffix/file_name_prefix). An empty or omitted " +
+                "selector would match every source file, turning a folder-specific rule into a global one. " +
+                "Declare at least one selector field, or check for a typo'd field name.");
         }
     }
 

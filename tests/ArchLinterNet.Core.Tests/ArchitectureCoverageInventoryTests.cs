@@ -30,7 +30,7 @@ public sealed class ArchitectureCoverageInventoryTests
     private const string AlphaNamespace = "ArchLinterNet.Core.Tests.CoverageInventoryFixtures.Alpha";
     private const string BetaNamespace = "ArchLinterNet.Core.Tests.CoverageInventoryFixtures.Beta";
 
-    private static ArchitectureAnalysisSession CreateSession()
+    private static ArchitectureAnalysisSession CreateSession(ArchitectureContractDocument? document = null)
     {
         var context = new ArchitectureAnalysisContext(
             repositoryRoot: AppContext.BaseDirectory,
@@ -39,7 +39,7 @@ public sealed class ArchitectureCoverageInventoryTests
             assemblyProbingPaths: Array.Empty<string>());
 
         return new ArchitectureAnalysisSession(
-            context, CreateDocument(), selectedContractIds: null, enableUnmatchedIgnoreTracking: true, preprocessorSymbols: null);
+            context, document ?? CreateDocument(), selectedContractIds: null, enableUnmatchedIgnoreTracking: true, preprocessorSymbols: null);
     }
 
     private static ArchitectureContractDocument CreateDocument()
@@ -181,6 +181,34 @@ public sealed class ArchitectureCoverageInventoryTests
         ArchitectureCoverageInventory inventory = session.BuildCoverageInventory(CreateDocument());
 
         Assert.That(inventory.Namespaces, Is.Not.Empty);
+    }
+
+    [Test]
+    public void Build_ExposesTypedRuntimeInclusionAndStaleExclusionParticipation()
+    {
+        ArchitectureContractDocument document = CreateDocument();
+        var contract = new ArchitectureTypePlacementContract
+        {
+            Name = "alpha-types",
+            Id = "alpha-types",
+            TypesMatching = new ArchitectureTypeMatcher { Namespace = AlphaNamespace },
+            ExcludeTypesMatching = { new ArchitectureTypeMatcher { Namespace = "No.Such.Namespace" } }
+        };
+        document.Contracts.StrictTypePlacement.Add(contract);
+        ArchitectureAnalysisSession session = CreateSession(document);
+
+        // Build before execution to prove the lazily cached inventory exposes the session's final
+        // append-only runtime evidence without reconstructing selector matches.
+        ArchitectureCoverageInventory inventory = session.BuildCoverageInventory(document);
+        session.CheckTypePlacementContract(contract);
+
+        Assert.That(
+            inventory.SelectorParticipation.Select(item => (item.Kind, item.Field, item.Matched, item.IsStaleExclusion)),
+            Is.EqualTo(new[]
+            {
+                (ArchitectureSelectorParticipationKind.Inclusion, "types_matching", true, false),
+                (ArchitectureSelectorParticipationKind.Exclusion, "exclude_types_matching", false, true)
+            }));
     }
 
     [Test]

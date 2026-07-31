@@ -59,83 +59,32 @@ public sealed partial class ArchitecturePolicyDocumentLoader : IArchitecturePoli
     private ArchitectureContractDocument LoadCore(string policyPath, bool validateEffectiveSchema)
     {
         ArchitecturePolicyRootPath? resolvedRoot = EnsureSelectedRootIsRegularFile(policyPath);
+        ArchitecturePolicySourceDescriptor rootDescriptor = ResolveRootDescriptor(policyPath, resolvedRoot);
 
-        ArchitecturePolicySourceDescriptor rootDescriptor = resolvedRoot is null
-            ? ArchitecturePolicyProvenanceFactory.CreateRootDescriptor(_pathResolver, policyPath)
-            : ArchitecturePolicyProvenanceFactory.CreateRootDescriptor(resolvedRoot);
-        if (resolvedRoot is null && !_fileSystem.FileExists(policyPath))
-        {
-            throw ArchitecturePolicyDiagnosticFactory.Exception(
-                ArchitecturePolicyImportErrorCategory.MissingFile,
-                $"Root policy file not found: {rootDescriptor.SourcePath}",
-                ArchitecturePolicyDiagnosticFactory.Location(rootDescriptor));
-        }
-
-        IDeserializer deserializer = new DeserializerBuilder()
-            .WithNamingConvention(UnderscoredNamingConvention.Instance)
-            .IgnoreUnmatchedProperties()
-            .WithNodeDeserializer(
-                new ArchitectureClassificationMetadataScalarNodeDeserializer(),
-                syntax => syntax.Before<YamlDotNet.Serialization.NodeDeserializers.ScalarNodeDeserializer>())
-            .Build();
-
-        string yaml = ArchitecturePolicySourceReader.ReadAllText(
-            _fileSystem,
-            resolvedRoot?.PhysicalPath ?? policyPath,
-            rootDescriptor.SourcePath,
-            resolvedRoot?.FileIdentity,
-            ArchitecturePolicyDiagnosticFactory.Location(rootDescriptor),
-            rootDescriptor.ImportChain);
-        ArchitecturePolicyProvenanceIndex provenance;
-        if (ArchitecturePolicySourceParser.ContainsImports(yaml, rootDescriptor))
-        {
-            IReadOnlyList<ArchitecturePolicySource> sources = resolvedRoot is null
-                ? _importResolver.Resolve(policyPath, yaml)
-                : _importResolver.Resolve(resolvedRoot, rootDescriptor, yaml);
-            ArchitecturePolicyCompositionResult composition =
-                new ArchitecturePolicyDocumentComposer().Compose(sources);
-            yaml = composition.Yaml;
-            provenance = composition.Provenance;
-            ArchitecturePolicyEffectiveSchemaValidator.Validate(yaml, provenance);
-        }
-        else
-        {
-            provenance = ArchitecturePolicyProvenanceFactory.CreateMonolithic(rootDescriptor, policyPath, yaml);
-            if (validateEffectiveSchema)
-            {
-                ArchitecturePolicyEffectiveSchemaValidator.Validate(yaml, provenance);
-            }
-        }
+        (string yaml, ArchitecturePolicyProvenanceIndex provenance) =
+            LoadYamlAndProvenance(policyPath, resolvedRoot, rootDescriptor, validateEffectiveSchema);
 
         try
         {
-            ValidateRawLayerYaml(yaml, provenance);
-            ValidateRawContextualContractYaml(yaml, provenance);
-            ValidateRawSemanticCoverageYaml(yaml, provenance);
-            ValidateRawLayoutConventionYaml(yaml, provenance);
-            ValidateRawWhenFieldLocations(yaml);
-        }
-        catch (InvalidOperationException exception)
-        {
-            Exception enriched = provenance.EnrichValidationException(exception);
-            if (ReferenceEquals(enriched, exception))
+            // The finally here must stay outside RunWithEnrichedExceptions: enrichment reads the
+            // provenance index's current validation subject, so it has to run (inside that helper's
+            // catch) before this reset clears it.
+            RunWithEnrichedExceptions(provenance, () =>
             {
-                throw;
-            }
-
-            throw enriched;
+                ValidateRawLayerYaml(yaml, provenance);
+                ValidateRawContextualContractYaml(yaml, provenance);
+                ValidateRawSemanticCoverageYaml(yaml, provenance);
+                ValidateRawLayoutConventionYaml(yaml, provenance);
+                ValidateRawLayerTemplateYaml(yaml, provenance);
+                ValidateRawWhenFieldLocations(yaml);
+            });
         }
         finally
         {
             provenance.ResetValidationSubject();
         }
 
-        ArchitectureContractDocument? document = deserializer.Deserialize<ArchitectureContractDocument>(yaml);
-
-        if (document == null)
-        {
-            throw new InvalidOperationException("Failed to deserialize architecture contract YAML.");
-        }
+        ArchitectureContractDocument document = DeserializeDocument(yaml);
 
         AssignFallbackIds(document);
         document.Provenance = provenance;
@@ -150,9 +99,90 @@ public sealed partial class ArchitecturePolicyDocumentLoader : IArchitecturePoli
         // Source sets expand after provenance binding (so expanded instances can be aliased onto
         // their authored location) and before validation (so every validator, and everything
         // downstream, sees ordinary single-source contracts).
+        RunWithEnrichedExceptions(provenance, () => ArchitectureSourceSetExpander.Expand(document));
+
+        foreach (IArchitecturePolicyDocumentValidator validator in ArchitecturePolicyDocumentValidatorPipeline.All)
+        {
+            provenance.ResetValidationSubject();
+            RunWithEnrichedExceptions(provenance, () => validator.Validate(document));
+        }
+
+        return document;
+    }
+
+    private ArchitecturePolicySourceDescriptor ResolveRootDescriptor(
+        string policyPath, ArchitecturePolicyRootPath? resolvedRoot)
+    {
+        ArchitecturePolicySourceDescriptor rootDescriptor = resolvedRoot is null
+            ? ArchitecturePolicyProvenanceFactory.CreateRootDescriptor(_pathResolver, policyPath)
+            : ArchitecturePolicyProvenanceFactory.CreateRootDescriptor(resolvedRoot);
+        if (resolvedRoot is null && !_fileSystem.FileExists(policyPath))
+        {
+            throw ArchitecturePolicyDiagnosticFactory.Exception(
+                ArchitecturePolicyImportErrorCategory.MissingFile,
+                $"Root policy file not found: {rootDescriptor.SourcePath}",
+                ArchitecturePolicyDiagnosticFactory.Location(rootDescriptor));
+        }
+
+        return rootDescriptor;
+    }
+
+    private (string Yaml, ArchitecturePolicyProvenanceIndex Provenance) LoadYamlAndProvenance(
+        string policyPath,
+        ArchitecturePolicyRootPath? resolvedRoot,
+        ArchitecturePolicySourceDescriptor rootDescriptor,
+        bool validateEffectiveSchema)
+    {
+        string yaml = ArchitecturePolicySourceReader.ReadAllText(
+            _fileSystem,
+            resolvedRoot?.PhysicalPath ?? policyPath,
+            rootDescriptor.SourcePath,
+            resolvedRoot?.FileIdentity,
+            ArchitecturePolicyDiagnosticFactory.Location(rootDescriptor),
+            rootDescriptor.ImportChain);
+
+        if (!ArchitecturePolicySourceParser.ContainsImports(yaml, rootDescriptor))
+        {
+            ArchitecturePolicyProvenanceIndex monolithicProvenance =
+                ArchitecturePolicyProvenanceFactory.CreateMonolithic(rootDescriptor, policyPath, yaml);
+            if (validateEffectiveSchema)
+            {
+                ArchitecturePolicyEffectiveSchemaValidator.Validate(yaml, monolithicProvenance);
+            }
+
+            return (yaml, monolithicProvenance);
+        }
+
+        IReadOnlyList<ArchitecturePolicySource> sources = resolvedRoot is null
+            ? _importResolver.Resolve(policyPath, yaml)
+            : _importResolver.Resolve(resolvedRoot, rootDescriptor, yaml);
+        ArchitecturePolicyCompositionResult composition = new ArchitecturePolicyDocumentComposer().Compose(sources);
+        ArchitecturePolicyEffectiveSchemaValidator.Validate(composition.Yaml, composition.Provenance);
+        return (composition.Yaml, composition.Provenance);
+    }
+
+    private static ArchitectureContractDocument DeserializeDocument(string yaml)
+    {
+        IDeserializer deserializer = new DeserializerBuilder()
+            .WithNamingConvention(UnderscoredNamingConvention.Instance)
+            .IgnoreUnmatchedProperties()
+            .WithNodeDeserializer(
+                new ArchitectureClassificationMetadataScalarNodeDeserializer(),
+                syntax => syntax.Before<YamlDotNet.Serialization.NodeDeserializers.ScalarNodeDeserializer>())
+            .Build();
+
+        return deserializer.Deserialize<ArchitectureContractDocument>(yaml)
+            ?? throw new InvalidOperationException("Failed to deserialize architecture contract YAML.");
+    }
+
+    // Every raw-validation, expansion, and validator-pipeline step reports an InvalidOperationException
+    // enriched with the offending policy location - centralized here so LoadCore's own control flow
+    // stays flat instead of repeating this try/catch/enrich shape at each call site.
+    private static void RunWithEnrichedExceptions(ArchitecturePolicyProvenanceIndex provenance, Action action)
+    {
         try
         {
-            ArchitectureSourceSetExpander.Expand(document);
+            action();
         }
         catch (InvalidOperationException exception)
         {
@@ -164,27 +194,6 @@ public sealed partial class ArchitecturePolicyDocumentLoader : IArchitecturePoli
 
             throw enriched;
         }
-
-        foreach (IArchitecturePolicyDocumentValidator validator in ArchitecturePolicyDocumentValidatorPipeline.All)
-        {
-            provenance.ResetValidationSubject();
-            try
-            {
-                validator.Validate(document);
-            }
-            catch (InvalidOperationException exception)
-            {
-                Exception enriched = provenance.EnrichValidationException(exception);
-                if (ReferenceEquals(enriched, exception))
-                {
-                    throw;
-                }
-
-                throw enriched;
-            }
-        }
-
-        return document;
     }
 
     private ArchitecturePolicyRootPath? EnsureSelectedRootIsRegularFile(string policyPath)
@@ -481,89 +490,6 @@ public sealed partial class ArchitecturePolicyDocumentLoader : IArchitecturePoli
                         "namespace", NamespaceSuffixKey, "project", "assembly", "contract_id", "between",
                         "role", "metadata", "reason"
                     });
-            }
-        }
-    }
-
-    private static readonly string[] _layoutFilesMatchingAllowedKeys =
-        { "folder_segment", "namespace_segment", "file_name_suffix", "file_name_prefix", WhenKey };
-
-    private static readonly string[] _layoutRequireMatchingInterfaceAllowedKeys = { "name_prefix" };
-
-    private static readonly string[] _layoutConventionContractAllowedKeys =
-    {
-        "name", "id", "files_matching", "require_type_kind", "forbid_type_kind",
-        "required_name_suffix", "required_name_prefix", "forbidden_name_suffix", "forbidden_name_prefix",
-        "require_type_name_matches_file_name", "require_matching_interface", "ignored_violations", "reason"
-    };
-
-    // Mirrors ValidateRawContextualContractYaml's rationale: IgnoreUnmatchedProperties() would
-    // otherwise silently drop a typo'd files_matching key (e.g. "folder_segments" for
-    // "folder_segment"), leaving the selector looking like a legitimate-but-empty field instead of
-    // failing the load. ValidateRawWhenFieldLocations (WhenFields.cs) separately enforces that `when`
-    // may only appear on this exact node - this pass only checks the non-`when` field names.
-    private static void ValidateRawLayoutConventionYaml(string yaml, ArchitecturePolicyProvenanceIndex provenance)
-    {
-        var stream = new YamlStream();
-        stream.Load(new StringReader(yaml));
-
-        if (stream.Documents.Count == 0
-            || stream.Documents[0].RootNode is not YamlMappingNode root
-            || !TryGetMappingChild(root, ContractsKey, out YamlMappingNode? contracts))
-        {
-            return;
-        }
-
-        ValidateLayoutConventionContractGroup(contracts!, "strict_layout_conventions", provenance);
-        ValidateLayoutConventionContractGroup(contracts!, "audit_layout_conventions", provenance);
-    }
-
-    private static void ValidateLayoutConventionContractGroup(
-        YamlMappingNode contracts, string groupKey, ArchitecturePolicyProvenanceIndex provenance)
-    {
-        if (!TryGetChild(contracts, groupKey, out YamlNode? groupNode) || groupNode is not YamlSequenceNode sequence)
-        {
-            return;
-        }
-
-        for (int index = 0; index < sequence.Children.Count; index++)
-        {
-            if (sequence.Children[index] is not YamlMappingNode contractNode)
-            {
-                continue;
-            }
-
-            provenance.SetValidationSubject(ContractPath(groupKey, index));
-            string contractName = TryGetChild(contractNode, "name", out YamlNode? nameNode)
-                && nameNode is YamlScalarNode nameScalar
-                    ? nameScalar.Value ?? UnnamedContractName
-                    : UnnamedContractName;
-
-            // Top-level fields too: without this, a typo like "required_name_sufix" is silently
-            // dropped by IgnoreUnmatchedProperties() for a monolithic (non-imported) policy - the
-            // composed-policy path catches this via schema/dependencies.arch.schema.json's
-            // additionalProperties: false, but that JSON-schema pass never runs for a monolithic
-            // policy, so this raw-YAML check is the only place monolithic policies get the same
-            // protection. Mirrors ValidatePortBoundaryContractNodeKeys's identical rationale.
-            ValidateKnownKeys(contractNode, contractName, "layout convention contract", _layoutConventionContractAllowedKeys);
-
-            if (TryGetChild(contractNode, "files_matching", out YamlNode? filesMatchingNode)
-                && filesMatchingNode is YamlMappingNode filesMatchingMapping)
-            {
-                ValidateKnownKeys(
-                    filesMatchingMapping, contractName, "files_matching", _layoutFilesMatchingAllowedKeys);
-            }
-
-            // Same rationale as files_matching above: require_matching_interface has exactly one
-            // accepted key (name_prefix). Without this raw-YAML check, a typo like "name_prefx"
-            // would be silently dropped by IgnoreUnmatchedProperties(), leaving NamePrefix null and
-            // the contract quietly falling back to the default "I" prefix instead of failing to load.
-            if (TryGetChild(contractNode, "require_matching_interface", out YamlNode? requireMatchingInterfaceNode)
-                && requireMatchingInterfaceNode is YamlMappingNode requireMatchingInterfaceMapping)
-            {
-                ValidateKnownKeys(
-                    requireMatchingInterfaceMapping, contractName, "require_matching_interface",
-                    _layoutRequireMatchingInterfaceAllowedKeys);
             }
         }
     }

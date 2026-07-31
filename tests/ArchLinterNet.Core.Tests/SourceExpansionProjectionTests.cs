@@ -63,7 +63,26 @@ public sealed class SourceExpansionProjectionTests
                             "Acme.Modules.*")
                     ])
                 {
-                    PolicyLocation = location
+                    PolicyLocation = location,
+                    Exclusions =
+                    [
+                        new ArchitectureExpandedContractExclusion(
+                            "Acme.Modules.Legacy",
+                            null,
+                            "Acme.Modules.Legacy",
+                            false)
+                        {
+                            PolicyLocation = location
+                        },
+                        new ArchitectureExpandedContractExclusion(
+                            "Acme.Modules.Billing",
+                            "modules",
+                            "Acme.Modules.*",
+                            true)
+                        {
+                            PolicyLocation = location
+                        }
+                    ]
                 },
                 new ArchitectureContractExpansion(
                     "strict_external",
@@ -94,6 +113,7 @@ public sealed class SourceExpansionProjectionTests
             .GetProperty("runs")[0].GetProperty("properties").GetProperty("source_set_expansion");
         JsonElement set = expansion.GetProperty("sets")[0];
         JsonElement contract = expansion.GetProperty("contracts")[0];
+        JsonElement exclusion = contract.GetProperty("exclusions")[1];
         JsonElement instance = contract.GetProperty("instances")[0];
 
         Assert.Multiple(() =>
@@ -109,6 +129,8 @@ public sealed class SourceExpansionProjectionTests
             Assert.That(contract.GetProperty("authored_contract_name").GetString(), Is.EqualTo("modules avoid infrastructure"));
             Assert.That(contract.GetProperty("source_sets").EnumerateArray().Select(v => v.GetString()),
                 Is.EqualTo(new[] { "modules" }));
+            Assert.That(exclusion.GetProperty("source_set").GetString(), Is.EqualTo("modules"));
+            Assert.That(exclusion.GetProperty("matched").GetBoolean(), Is.True);
             Assert.That(instance.GetProperty("contract_id").GetString(),
                 Is.EqualTo("modules-no-infrastructure/acme-modules-billing"));
             Assert.That(instance.GetProperty("source").GetString(), Is.EqualTo("Acme.Modules.Billing"));
@@ -188,6 +210,31 @@ public sealed class SourceExpansionProjectionTests
             Assert.That(expansion.GetProperty("sets")[0].GetProperty("name").GetString(), Is.EqualTo("modules"));
             Assert.That(expansion.GetProperty("contracts")[0].GetProperty("instances")[0].GetProperty("source").GetString(),
                 Is.EqualTo("Acme.Modules.Billing"));
+            Assert.That(expansion.GetProperty("contracts")[0].GetProperty("exclusions")[0].GetProperty("matched").GetBoolean(),
+                Is.False);
+        });
+    }
+
+    [Test]
+    public void CiArtifactsJson_CarriesSelectorKindAndStaleExclusion()
+    {
+        string json = ArchitectureDiagnosticFormatter.FormatResultForCiArtifacts(
+            "strict", true, Array.Empty<ArchitectureViolation>(), Array.Empty<string>(),
+            Array.Empty<ArchitectureCycleFinding>(), Array.Empty<ArchitectureClassificationRoleFact>(), null,
+            Array.Empty<BuildStatePreflightDiagnostic>(), Inventory(),
+            subtractiveMatcherParticipation:
+            [
+                new ArchitectureSubtractiveMatcherParticipation(
+                    "modules-no-infrastructure", "modules avoid infrastructure", "exclude_files_matching", 0, false)
+            ]);
+
+        JsonElement participation = JsonDocument.Parse(json).RootElement
+            .GetProperty("subtractive_matcher_participation")[0];
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(participation.GetProperty("kind").GetString(), Is.EqualTo("exclusion"));
+            Assert.That(participation.GetProperty("stale_exclusion").GetBoolean(), Is.True);
         });
     }
 

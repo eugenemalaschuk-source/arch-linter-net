@@ -83,7 +83,8 @@ internal sealed class CliRuntime : ICliRuntime
         IReadOnlyCollection<ArchitectureClassificationRoleFact> classificationRoles,
         ArchitectureClassificationPathDeferredNotice? classificationPathDeferred,
         IReadOnlyCollection<BuildStatePreflightDiagnostic> preflightDiagnostics,
-        ArchitectureSourceExpansionInventory sourceExpansion)
+        ArchitectureSourceExpansionInventory sourceExpansion,
+        IReadOnlyCollection<ArchitectureSubtractiveMatcherParticipation>? subtractiveMatcherParticipation = null)
     {
         return ArchitectureDiagnosticFormatter.FormatResultForCiArtifacts(
             mode,
@@ -100,7 +101,8 @@ internal sealed class CliRuntime : ICliRuntime
             policyConsistencyFindings,
             coverageSummaries,
             classificationConflicts,
-            classificationMetadataFailures);
+            classificationMetadataFailures,
+            subtractiveMatcherParticipation);
     }
 
     public string FormatBuildStatePreflightForHumans(IReadOnlyCollection<BuildStatePreflightDiagnostic> diagnostics)
@@ -149,13 +151,16 @@ internal sealed class CliRuntime : ICliRuntime
         IReadOnlyCollection<ArchitectureCycleFinding> cycleFindings,
         IReadOnlyCollection<BuildStatePreflightDiagnostic> preflightDiagnostics,
         IReadOnlyCollection<ArchitectureCoverageSummary> coverageSummaries,
-        ArchitectureSourceExpansionInventory sourceExpansion)
+        ArchitectureSourceExpansionInventory sourceExpansion,
+        IReadOnlyCollection<ArchitectureSubtractiveMatcherParticipation>? subtractiveMatcherParticipation = null)
     {
         return cycleFindings.Count > 0
             ? ArchitectureSarifFormatter.FormatResultAsSarif(
-                mode, violations, cycleFindings, preflightDiagnostics, coverageSummaries, sourceExpansion, Version)
+                mode, violations, cycleFindings, preflightDiagnostics, coverageSummaries, sourceExpansion, Version,
+                subtractiveMatcherParticipation)
             : _sarifFormatter.FormatResultAsSarif(
-                mode, violations, cycles, preflightDiagnostics, coverageSummaries, sourceExpansion, Version);
+                mode, violations, cycles, preflightDiagnostics, coverageSummaries, sourceExpansion, Version,
+                subtractiveMatcherParticipation);
     }
 
     public string FormatViolationsForHumans(IReadOnlyCollection<ArchitectureViolation> violations)

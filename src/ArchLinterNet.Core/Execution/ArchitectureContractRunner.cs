@@ -24,6 +24,9 @@ public sealed class ArchitectureContractRunner(
     public IReadOnlyList<ArchitectureUnmatchedIgnoredViolation> UnmatchedIgnoredViolations
         => _session.UnmatchedIgnoredViolations;
 
+    public IReadOnlyList<ArchitectureSubtractiveMatcherParticipation> SubtractiveMatcherParticipation
+        => _session.SubtractiveMatcherParticipation;
+
     public IReadOnlyList<ArchitectureBaselineCandidate> BaselineCandidates
         => _session.BaselineCandidates;
 

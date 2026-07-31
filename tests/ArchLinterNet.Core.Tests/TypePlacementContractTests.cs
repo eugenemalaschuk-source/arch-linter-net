@@ -83,7 +83,11 @@ public sealed class TypePlacementContractTests
         var contract = new ArchitectureTypePlacementContract
         {
             Name = "controllers-in-correct",
-            TypesMatching = new ArchitectureTypeMatcher { NameSuffix = "Controller" },
+            TypesMatching = new ArchitectureTypeMatcher
+            {
+                NameSuffix = "Controller",
+                Namespace = "TypePlacementContractTestFixtures"
+            },
             MustResideInNamespaces = new List<string> { "TypePlacementContractTestFixtures.Correct" }
         };
         var document = CreateDocument(contract);
@@ -94,6 +98,60 @@ public sealed class TypePlacementContractTests
         Assert.That(violations.Any(v => v.SourceType.Contains("Wrong.SampleController", StringComparison.Ordinal)), Is.True);
         Assert.That(violations.Any(v => v.SourceType.Contains("Correct.SampleController", StringComparison.Ordinal)), Is.False);
         Assert.That(violations.Any(v => v.SourceType.Contains("SampleService", StringComparison.Ordinal)), Is.False);
+    }
+
+    [Test]
+    public void CheckTypePlacementContract_ExcludeMatcherSubtractsIncludedTypes()
+    {
+        var contract = new ArchitectureTypePlacementContract
+        {
+            Name = "controllers-in-correct",
+            TypesMatching = new ArchitectureTypeMatcher
+            {
+                NameSuffix = "Controller",
+                Namespace = "TypePlacementContractTestFixtures"
+            },
+            ExcludeTypesMatching = { new ArchitectureTypeMatcher { Namespace = "TypePlacementContractTestFixtures.Wrong" } },
+            MustResideInNamespaces = new List<string> { "TypePlacementContractTestFixtures.Correct" }
+        };
+
+        var runner = new ArchitectureContractRunner(CreateContext(), CreateDocument(contract));
+
+        Assert.That(runner.Session.CheckTypePlacementContract(contract), Is.Empty);
+    }
+
+    [Test]
+    public void CheckTypePlacementContract_ExcludeTypesMatching_RecordsMatchedAndStaleParticipation()
+    {
+        var contract = new ArchitectureTypePlacementContract
+        {
+            Name = "controllers-in-correct",
+            TypesMatching = new ArchitectureTypeMatcher
+            {
+                NameSuffix = "Controller",
+                Namespace = "TypePlacementContractTestFixtures"
+            },
+            ExcludeTypesMatching =
+            {
+                new ArchitectureTypeMatcher { Namespace = "TypePlacementContractTestFixtures.Wrong" },
+                new ArchitectureTypeMatcher { Namespace = "TypePlacementContractTestFixtures.NoSuchNamespace" }
+            },
+            MustResideInNamespaces = new List<string> { "TypePlacementContractTestFixtures.Correct" }
+        };
+
+        var runner = new ArchitectureContractRunner(CreateContext(), CreateDocument(contract));
+        runner.Session.CheckTypePlacementContract(contract);
+
+        Assert.That(
+            runner.SubtractiveMatcherParticipation.Select(p => (p.Kind, p.Field, p.Index, p.Matched)),
+            Is.EqualTo(new[]
+            {
+                (ArchitectureSelectorParticipationKind.Inclusion, "types_matching", (int?)null, true),
+                (ArchitectureSelectorParticipationKind.Exclusion, "exclude_types_matching", 0, true),
+                (ArchitectureSelectorParticipationKind.Exclusion, "exclude_types_matching", 1, false)
+            }),
+            "The first exclusion actually subtracted a candidate and must report matched; the " +
+            "second never matched anything and must report stale.");
     }
 
     [Test]
@@ -460,7 +518,7 @@ public sealed class TypePlacementContractTests
         InvalidOperationException ex = Assert.Throws<InvalidOperationException>(() =>
             new ArchitecturePolicyDocumentLoader().Load(policyPath))!;
 
-        Assert.That(ex.Message, Does.Contain("no placement"));
+        Assert.That(ex.Message, Does.Contain("no expectation"));
         Assert.That(ex.Message, Does.Contain("controllers-no-expectation"));
     }
 
@@ -485,6 +543,32 @@ public sealed class TypePlacementContractTests
 
         Assert.That(ex.Message, Does.Contain("no usable types_matching selector field"));
         Assert.That(ex.Message, Does.Contain("controllers-empty-selector"));
+    }
+
+    [Test]
+    public void TypePlacement_EmptyExcludeTypesMatching_ThrowsActionableError()
+    {
+        string policyPath = WritePolicy("""
+            version: 1
+            name: Test
+            analysis:
+              target_assemblies: [ArchLinterNet.Core]
+            contracts:
+              strict_type_placement:
+                - name: controllers-empty-exclusion
+                  types_matching:
+                    name_suffix: Controller
+                  exclude_types_matching:
+                    - {}
+                  required_name_suffix: Controller
+                  reason: Empty exclusion would match every loaded type.
+            """);
+
+        InvalidOperationException ex = Assert.Throws<InvalidOperationException>(() =>
+            new ArchitecturePolicyDocumentLoader().Load(policyPath))!;
+
+        Assert.That(ex.Message, Does.Contain("no usable exclude_types_matching selector field"));
+        Assert.That(ex.Message, Does.Contain("controllers-empty-exclusion"));
     }
 
     [Test]

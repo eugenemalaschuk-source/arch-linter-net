@@ -102,3 +102,9 @@ Every `framework_allow_only` violation SHALL render the same source project, dis
 - **WHEN** a `framework_allow_only` violation is serialized to unified JSON
 - **THEN** the JSON object includes a field listing the contract's configured `allowed` framework group names, alongside non-empty source and forbidden-reference fields, and an `evidence` array with per-reference `framework_name`, `target_framework`, `explicit`, and `source_path` fields
 
+### Requirement: Framework allow-only contracts support bounded source subtraction
+The system SHALL allow framework-reference allow-only sources resolved by the configured source model to be subtracted before framework evaluation.
+
+#### Scenario: Excluded source is not checked
+- **WHEN** a framework allow-only contract excludes a resolved source
+- **THEN** the system SHALL not produce a framework allow-only finding for it
