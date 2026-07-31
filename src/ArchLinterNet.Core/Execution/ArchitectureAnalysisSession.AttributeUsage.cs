@@ -102,6 +102,8 @@ public sealed partial class ArchitectureAnalysisSession
                     match.SourceIdentifier,
                     match.MatchedAttribute,
                     sourceAssembly: actualAssemblyName,
+                    targetAssembly: match.TargetAssembly,
+                    targetType: match.MatchedAttribute,
                     targetMember: match.MatchedAttribute))
             {
                 continue;

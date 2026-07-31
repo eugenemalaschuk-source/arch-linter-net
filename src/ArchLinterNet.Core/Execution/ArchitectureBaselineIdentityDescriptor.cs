@@ -35,9 +35,9 @@ internal sealed record ArchitectureBaselineIdentityDescriptor(
         return familyId switch
         {
             "method_body" or "composition" => common.Concat(["source-assembly", "source-member", "target-member"]).ToArray(),
-            "package_dependency" or "package_allow_only" => common.Concat(["source-project", "package-id", "target-framework", "condition"]).ToArray(),
+            "package_dependency" or "package_allow_only" => common.Concat(["source-project", "package-id"]).ToArray(),
             "framework_dependency" or "framework_allow_only" => common.Concat(["source-project", "framework-reference", "target-framework", "condition"]).ToArray(),
-            "public_api_surface" => common.Concat(["source-assembly", "api-symbol", "api-delta-kind"]).ToArray(),
+            "public_api_surface" => common.Concat(["source-assembly", "api-symbol"]).ToArray(),
             "coverage" => common.Concat(["coverage-subject", "coverage-kind"]).ToArray(),
             "project_metadata" => common.Concat(["source-project", "metadata-key", "configuration", "target-framework"]).ToArray(),
             "assembly_independence" or "assembly_dependency" or "assembly_allow_only" => common.Concat(["source-assembly", "target-assembly"]).ToArray(),

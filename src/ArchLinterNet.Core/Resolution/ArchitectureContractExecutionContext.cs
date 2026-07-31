@@ -72,6 +72,36 @@ internal sealed class ArchitectureContractExecutionContext
         return ignored;
     }
 
+    public bool IsIgnoredWithAliases(
+        string sourceType,
+        IReadOnlyList<string> forbiddenReferenceAliases,
+        string canonicalForbiddenReference,
+        string? sourceAssembly = null,
+        string? targetAssembly = null,
+        string? targetType = null,
+        string? sourceMember = null,
+        string? targetMember = null,
+        string? configuration = null)
+    {
+        ArgumentNullException.ThrowIfNull(forbiddenReferenceAliases);
+
+        ArchitectureViolationIdentity? liveIdentity = BuildLiveIdentity(
+            sourceType, canonicalForbiddenReference, sourceAssembly, targetAssembly, targetType, sourceMember, targetMember, configuration);
+
+        bool ignored = forbiddenReferenceAliases.Any(alias =>
+            ArchitectureIgnoreMatcher.IsIgnored(sourceType, alias, _ignoredViolations, _tracker, liveIdentity));
+
+        if (!ignored && ContractId != null && liveIdentity != null)
+        {
+            var candidate = new ArchitectureBaselineCandidate(
+                _contractGroup!, ContractId, sourceType, canonicalForbiddenReference, liveIdentity);
+            _findingIdentityCandidates.Add(candidate);
+            _baselineCandidates?.Add(candidate);
+        }
+
+        return ignored;
+    }
+
     private ArchitectureViolationIdentity? BuildLiveIdentity(
         string sourceType, string forbiddenReference, string? sourceAssembly, string? targetAssembly, string? targetType, string? sourceMember,
         string? targetMember, string? configuration = null)

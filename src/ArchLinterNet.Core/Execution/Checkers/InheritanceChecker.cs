@@ -43,16 +43,18 @@ internal static class InheritanceChecker
 
             var matches = ArchitectureTypeRelationshipScanner
                 .GetForbiddenBaseTypeMatches(type, contract.ForbiddenBaseTypes, contract.ForbiddenBaseTypePrefixes)
-                .OrderBy(m => m, StringComparer.Ordinal);
+                .OrderBy(m => m.TypeName, StringComparer.Ordinal)
+                .ThenBy(m => m.AssemblyName, StringComparer.Ordinal);
 
-            foreach (string matchedBaseType in matches)
+            foreach (ArchitectureTypeRelationshipMatch match in matches)
             {
                 if (executionContext.IsIgnored(
                         sourceType,
-                        matchedBaseType,
+                        match.TypeName,
                         sourceAssembly: sourceAssembly,
-                        targetType: matchedBaseType,
-                        targetMember: matchedBaseType))
+                        targetAssembly: match.AssemblyName,
+                        targetType: match.TypeName,
+                        targetMember: match.TypeName))
                 {
                     continue;
                 }
@@ -61,11 +63,11 @@ internal static class InheritanceChecker
                     contract.Name,
                     contract.Id,
                     sourceType,
-                    matchedBaseType,
-                    new[] { matchedBaseType })
+                    match.TypeName,
+                    new[] { match.TypeName })
                 {
                     Payload = new InheritancePayload(
-                        ForbiddenBaseType: matchedBaseType,
+                        ForbiddenBaseType: match.TypeName,
                         InheritanceSourceSurface: sourceSurfaceDescription)
                 });
             }

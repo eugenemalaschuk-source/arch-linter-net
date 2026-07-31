@@ -1,5 +1,7 @@
 namespace ArchLinterNet.Core.Scanning;
 
+internal readonly record struct ArchitectureTypeRelationshipMatch(string TypeName, string AssemblyName);
+
 // Reflection-based enumeration of a type's base-type chain and implemented-interface set for the
 // inheritance and interface_implementation contract families, mirroring the defensive-reflection
 // posture of ArchitectureTypeRoleMatcher. Constructed generic base types/interfaces are matched by
@@ -8,27 +10,30 @@ namespace ArchLinterNet.Core.Scanning;
 // normalized name.
 internal static class ArchitectureTypeRelationshipScanner
 {
-    public static IEnumerable<string> GetForbiddenBaseTypeMatches(
+    public static IEnumerable<ArchitectureTypeRelationshipMatch> GetForbiddenBaseTypeMatches(
         Type type, IReadOnlyList<string> forbiddenBaseTypes, IReadOnlyList<string> forbiddenBaseTypePrefixes)
     {
-        HashSet<string> seen = new(StringComparer.Ordinal);
+        HashSet<(string TypeName, string AssemblyName)> seen = new();
 
         for (Type? current = SafeBaseType(type); current != null; current = SafeBaseType(current))
         {
-            string baseTypeName = ComparableName(current);
+            Type comparableType = ComparableType(current);
+            string baseTypeName = ArchitectureTypeNames.SafeFullName(comparableType);
             if (baseTypeName.Length == 0)
             {
                 continue;
             }
 
-            if (IsMatch(baseTypeName, forbiddenBaseTypes, forbiddenBaseTypePrefixes) && seen.Add(baseTypeName))
+            string baseTypeAssembly = ArchitectureTypeNames.SafeAssemblyName(comparableType) ?? string.Empty;
+            if (IsMatch(baseTypeName, forbiddenBaseTypes, forbiddenBaseTypePrefixes)
+                && seen.Add((baseTypeName, baseTypeAssembly)))
             {
-                yield return baseTypeName;
+                yield return new ArchitectureTypeRelationshipMatch(baseTypeName, baseTypeAssembly);
             }
         }
     }
 
-    public static IEnumerable<string> GetImplementedInterfaceMatches(
+    public static IEnumerable<ArchitectureTypeRelationshipMatch> GetImplementedInterfaceMatches(
         Type type, IReadOnlyList<string> interfaces, IReadOnlyList<string> interfacePrefixes)
     {
         // An interface extending a selected interface is a contract extension, not an
@@ -52,24 +57,27 @@ internal static class ArchitectureTypeRelationshipScanner
             yield break;
         }
 
-        HashSet<string> seen = new(StringComparer.Ordinal);
+        HashSet<(string TypeName, string AssemblyName)> seen = new();
 
         foreach (Type implementedInterface in implementedInterfaces)
         {
-            string interfaceName = ComparableName(implementedInterface);
+            Type comparableType = ComparableType(implementedInterface);
+            string interfaceName = ArchitectureTypeNames.SafeFullName(comparableType);
             if (interfaceName.Length == 0)
             {
                 continue;
             }
 
-            if (IsMatch(interfaceName, interfaces, interfacePrefixes) && seen.Add(interfaceName))
+            string interfaceAssembly = ArchitectureTypeNames.SafeAssemblyName(comparableType) ?? string.Empty;
+            if (IsMatch(interfaceName, interfaces, interfacePrefixes)
+                && seen.Add((interfaceName, interfaceAssembly)))
             {
-                yield return interfaceName;
+                yield return new ArchitectureTypeRelationshipMatch(interfaceName, interfaceAssembly);
             }
         }
     }
 
-    private static string ComparableName(Type type)
+    private static Type ComparableType(Type type)
     {
         Type target = type;
         try
@@ -92,7 +100,7 @@ internal static class ArchitectureTypeRelationshipScanner
             // Swallow — defensive reflection may encounter unsupported type metadata
         }
 
-        return ArchitectureTypeNames.SafeFullName(target);
+        return target;
     }
 
     private static bool IsMatch(string typeName, IReadOnlyList<string> exactNames, IReadOnlyList<string> prefixes)

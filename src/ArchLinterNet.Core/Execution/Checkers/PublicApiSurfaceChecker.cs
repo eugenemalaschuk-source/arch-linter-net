@@ -112,15 +112,9 @@ internal static class PublicApiSurfaceChecker
     {
         string reported = evaluation.ExactGrammar ? verdict.Entry.ExactSignature : verdict.Entry.Signature;
 
-        if (executionContext.IsIgnored(
+        if (executionContext.IsIgnoredWithAliases(
                 verdict.Entry.DeclaringTypeName,
-                verdict.Entry.Signature,
-                sourceAssembly: verdict.Entry.AssemblyName,
-                targetAssembly: verdict.Entry.AssemblyName,
-                targetType: verdict.Entry.DeclaringTypeName,
-                targetMember: verdict.Entry.Signature)
-            || executionContext.IsIgnored(
-                verdict.Entry.DeclaringTypeName,
+                new[] { verdict.Entry.Signature, reported }.Distinct(StringComparer.Ordinal).ToArray(),
                 reported,
                 sourceAssembly: verdict.Entry.AssemblyName,
                 targetAssembly: verdict.Entry.AssemblyName,

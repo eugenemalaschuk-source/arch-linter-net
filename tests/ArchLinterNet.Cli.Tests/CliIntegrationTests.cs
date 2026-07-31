@@ -19,8 +19,7 @@ public partial class CliIntegrationTests
     public void OneTimeSetUp()
     {
         _repoRoot = FindRepoRoot();
-        _cliDllPath = Path.Combine(
-            _repoRoot, "src", "ArchLinterNet.Cli", "bin", "Debug", "net10.0", "ArchLinterNet.Cli.dll");
+        _cliDllPath = Path.Combine(AppContext.BaseDirectory, "ArchLinterNet.Cli.dll");
         _passingPolicy = Path.Combine(
             _repoRoot, "tests", "ArchLinterNet.Cli.Tests", "TestPolicies", "passing-policy.yml");
         _failingPolicy = Path.Combine(
