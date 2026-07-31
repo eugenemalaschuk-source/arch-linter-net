@@ -92,16 +92,16 @@ public sealed partial class ArchitectureAnalysisSession
         LayoutExclusionTracker tracker = new(contract.ExcludeFilesMatching.Count);
         List<LayoutFileGroup> matchedGroups = CollectMatchedFileGroups(contract, executionContext, violations, tracker);
 
-        RecordSubtractiveMatcherParticipation(
-            contract, "files_matching", null, tracker.InclusionMatched, evaluationFailed: tracker.InclusionEvaluationFailed,
-            kind: ArchitectureSelectorParticipationKind.Inclusion);
-
         foreach (LayoutFileGroup group in matchedGroups)
         {
             EvaluateFileGroupExpectations(contract, group, executionContext, violations, typesByIdentity);
         }
 
         AddAmbiguousSourceDeclarationViolations(contract, executionContext, violations, typesByIdentity, tracker);
+
+        RecordSubtractiveMatcherParticipation(
+            contract, "files_matching", null, tracker.InclusionMatched, evaluationFailed: tracker.InclusionEvaluationFailed,
+            kind: ArchitectureSelectorParticipationKind.Inclusion);
 
         for (int index = 0; index < contract.ExcludeFilesMatching.Count; index++)
         {
