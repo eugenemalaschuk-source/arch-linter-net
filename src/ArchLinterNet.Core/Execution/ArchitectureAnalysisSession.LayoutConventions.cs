@@ -446,6 +446,7 @@ public sealed partial class ArchitectureAnalysisSession
         AddViolation(
             contract, executionContext, violations,
             sourceType: groupLabel,
+            identitySourceType: BuildIdentitySourceType(group),
             forbiddenReference: $"expected type kind '{contract.RequireTypeKind}', found: [{actualKinds}]",
             payload: new LayoutConventionPayload(
                 MatchedFilePath: group.SourceFilePath,
@@ -545,6 +546,7 @@ public sealed partial class ArchitectureAnalysisSession
             AddViolation(
                 contract, executionContext, violations,
                 sourceType: groupLabel,
+                identitySourceType: BuildIdentitySourceType(group),
                 forbiddenReference: "require_type_name_matches_file_name cannot be evaluated: no resolvable source " +
                     "file for this declared type (missing source enrichment or an ambiguous partial-class declaration)",
                 payload: new LayoutConventionPayload(DataUnavailable: true)
@@ -563,6 +565,7 @@ public sealed partial class ArchitectureAnalysisSession
         AddViolation(
             contract, executionContext, violations,
             sourceType: groupLabel,
+            identitySourceType: BuildIdentitySourceType(group),
             forbiddenReference: $"no declared type named '{group.FileNameWithoutExtension}', found: [{actualNames}]",
             payload: new LayoutConventionPayload(
                 MatchedFilePath: group.SourceFilePath,
@@ -638,6 +641,7 @@ public sealed partial class ArchitectureAnalysisSession
         AddViolation(
             contract, executionContext, violations,
             sourceType: groupLabel,
+            identitySourceType: BuildIdentitySourceType(group),
             forbiddenReference: $"cannot evaluate {fieldName}: record — record vs class/struct classification requires " +
                 "source-enriched facts, unavailable for this declared type (missing source enrichment or an ambiguous " +
                 "partial-class declaration)",
@@ -653,9 +657,14 @@ public sealed partial class ArchitectureAnalysisSession
         List<ArchitectureViolation> violations,
         string sourceType,
         string forbiddenReference,
-        LayoutConventionPayload payload)
+        LayoutConventionPayload payload,
+        string? identitySourceType = null)
     {
-        if (executionContext.IsIgnored(sourceType, forbiddenReference))
+        if (executionContext.IsIgnored(
+                identitySourceType ?? sourceType,
+                forbiddenReference,
+                targetType: "layout-convention",
+                targetMember: BuildIdentityTarget(payload)))
         {
             return;
         }
@@ -669,6 +678,33 @@ public sealed partial class ArchitectureAnalysisSession
         {
             Payload = payload
         });
+    }
+
+    private static string BuildIdentitySourceType(LayoutFileGroup group) =>
+        string.Join(
+            "|",
+            group.Facts
+                .Select(fact => fact.FullTypeName)
+                .OrderBy(fullTypeName => fullTypeName, StringComparer.Ordinal));
+
+    private static string BuildIdentityTarget(LayoutConventionPayload payload)
+    {
+        if (payload.DataUnavailable)
+        {
+            return "data-unavailable";
+        }
+
+        if (payload.ExpectedTypeKind != null || payload.ActualTypeKind != null)
+        {
+            return $"type-kind:{payload.ExpectedTypeKind ?? string.Empty}:{payload.ActualTypeKind ?? string.Empty}";
+        }
+
+        if (payload.ExpectedTypeName != null || payload.ActualTypeName != null)
+        {
+            return $"type-name:{payload.ExpectedTypeName ?? string.Empty}:{payload.ActualTypeName ?? string.Empty}";
+        }
+
+        return $"counterpart:{payload.ExpectedCounterpartName ?? string.Empty}";
     }
 
     private static ArchitectureTypeKind ParseTypeKind(string value)

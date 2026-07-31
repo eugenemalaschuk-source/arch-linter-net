@@ -28,8 +28,17 @@ internal sealed class ArchitectureExternalDependencyIlScanner : IArchitectureExt
         foreach (Type sourceType in sourceTypes)
         {
             string sourceTypeName = ArchitectureTypeNames.SafeFullName(sourceType);
+            string sourceAssembly = sourceType.Assembly.GetName().Name ?? string.Empty;
             string[] forbiddenReferences = FindTypeMatches(sourceType, externalGroup)
-                .Where(match => !executionContext.IsIgnored(sourceTypeName, match))
+                .Where(match => !executionContext.IsIgnored(
+                    sourceTypeName,
+                    match.Display,
+                    sourceAssembly: sourceAssembly,
+                    targetAssembly: match.TargetAssembly,
+                    targetType: match.TargetType,
+                    sourceMember: match.SourceMember,
+                    targetMember: match.TargetType))
+                .Select(match => match.Display)
                 .Distinct(StringComparer.Ordinal)
                 .OrderBy(name => name, StringComparer.Ordinal)
                 .ToArray();
@@ -51,13 +60,13 @@ internal sealed class ArchitectureExternalDependencyIlScanner : IArchitectureExt
         }
     }
 
-    private static IEnumerable<string> FindTypeMatches(
+    private static IEnumerable<ExternalIlMatch> FindTypeMatches(
         Type sourceType,
         ArchitectureExternalDependencyGroup externalGroup)
     {
         foreach (MethodBase method in EnumerateMethods(sourceType))
         {
-            foreach (string match in FindMethodMatches(method, externalGroup))
+            foreach (ExternalIlMatch match in FindMethodMatches(method, externalGroup))
             {
                 yield return match;
             }
@@ -81,7 +90,7 @@ internal sealed class ArchitectureExternalDependencyIlScanner : IArchitectureExt
         }
     }
 
-    private static IEnumerable<string> FindMethodMatches(
+    private static IEnumerable<ExternalIlMatch> FindMethodMatches(
         MethodBase method,
         ArchitectureExternalDependencyGroup externalGroup)
     {
@@ -138,9 +147,19 @@ internal sealed class ArchitectureExternalDependencyIlScanner : IArchitectureExt
                 continue;
             }
 
-            yield return $"{methodName}: {matchedType}";
+            yield return new ExternalIlMatch(
+                $"{methodName}: {matchedType}",
+                methodName,
+                matchedType,
+                referencedMember.DeclaringType?.Assembly.GetName().Name);
         }
     }
+
+    private sealed record ExternalIlMatch(
+        string Display,
+        string SourceMember,
+        string TargetType,
+        string? TargetAssembly);
 
     private static string? FindMatchedExternalType(
         MemberInfo member,

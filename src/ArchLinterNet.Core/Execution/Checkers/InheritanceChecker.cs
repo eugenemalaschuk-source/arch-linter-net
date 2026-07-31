@@ -39,6 +39,7 @@ internal static class InheritanceChecker
             }
 
             string sourceType = ArchitectureTypeNames.SafeFullName(type);
+            string sourceAssembly = ArchitectureTypeNames.SafeAssemblyName(type) ?? string.Empty;
 
             var matches = ArchitectureTypeRelationshipScanner
                 .GetForbiddenBaseTypeMatches(type, contract.ForbiddenBaseTypes, contract.ForbiddenBaseTypePrefixes)
@@ -46,7 +47,12 @@ internal static class InheritanceChecker
 
             foreach (string matchedBaseType in matches)
             {
-                if (executionContext.IsIgnored(sourceType, matchedBaseType))
+                if (executionContext.IsIgnored(
+                        sourceType,
+                        matchedBaseType,
+                        sourceAssembly: sourceAssembly,
+                        targetType: matchedBaseType,
+                        targetMember: matchedBaseType))
                 {
                     continue;
                 }

@@ -18,18 +18,26 @@ internal static class ArchitectureExternalDependencyViolationFinder
             .Select(type =>
             {
                 string sourceType = ArchitectureTypeNames.SafeFullName(type);
+                string sourceAssembly = type.Assembly.GetName().Name ?? string.Empty;
                 string[] forbiddenReferences = ArchitectureReferenceScanner.GetReferencedTypes(type)
                     .Select(reference => new
                     {
                         FullName = ArchitectureTypeNames.SafeFullName(reference),
-                        Namespace = ArchitectureTypeNames.SafeNamespace(reference)
+                        Namespace = ArchitectureTypeNames.SafeNamespace(reference),
+                        AssemblyName = reference.Assembly.GetName().Name ?? string.Empty
                     })
                     .Where(reference => !string.IsNullOrEmpty(reference.FullName))
                     .Where(reference =>
                         ArchitectureExternalDependencyResolver.MatchesGroup(externalGroup, reference.FullName,
                             reference.Namespace))
                     .Where(reference => excludedTypes == null || !excludedTypes.Contains(reference.FullName))
-                    .Where(reference => !executionContext.IsIgnored(sourceType, reference.FullName))
+                    .Where(reference => !executionContext.IsIgnored(
+                        sourceType,
+                        reference.FullName,
+                        sourceAssembly: sourceAssembly,
+                        targetAssembly: reference.AssemblyName,
+                        targetType: reference.FullName,
+                        targetMember: reference.FullName))
                     .Select(reference => reference.FullName)
                     .Distinct(StringComparer.Ordinal)
                     .OrderBy(name => name, StringComparer.Ordinal)

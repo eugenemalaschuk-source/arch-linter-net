@@ -112,8 +112,20 @@ internal static class PublicApiSurfaceChecker
     {
         string reported = evaluation.ExactGrammar ? verdict.Entry.ExactSignature : verdict.Entry.Signature;
 
-        if (executionContext.IsIgnored(verdict.Entry.DeclaringTypeName, verdict.Entry.Signature)
-            || executionContext.IsIgnored(verdict.Entry.DeclaringTypeName, reported))
+        if (executionContext.IsIgnored(
+                verdict.Entry.DeclaringTypeName,
+                verdict.Entry.Signature,
+                sourceAssembly: verdict.Entry.AssemblyName,
+                targetAssembly: verdict.Entry.AssemblyName,
+                targetType: verdict.Entry.DeclaringTypeName,
+                targetMember: verdict.Entry.Signature)
+            || executionContext.IsIgnored(
+                verdict.Entry.DeclaringTypeName,
+                reported,
+                sourceAssembly: verdict.Entry.AssemblyName,
+                targetAssembly: verdict.Entry.AssemblyName,
+                targetType: verdict.Entry.DeclaringTypeName,
+                targetMember: reported))
         {
             return null;
         }
@@ -181,7 +193,13 @@ internal static class PublicApiSurfaceChecker
             // A removed member has no live reflection entry, so its declaring type and the
             // signature reviewers recognize both come from the reviewed string itself.
             string declaringTypeName = PublicApiSignatureIdentity.DeclaringTypeName(entry.Signature);
-            if (executionContext.IsIgnored(declaringTypeName, entry.Signature))
+            if (executionContext.IsIgnored(
+                    declaringTypeName,
+                    entry.Signature,
+                    sourceAssembly: entry.AssemblyName,
+                    targetAssembly: entry.AssemblyName,
+                    targetType: declaringTypeName,
+                    targetMember: entry.Signature))
             {
                 continue;
             }

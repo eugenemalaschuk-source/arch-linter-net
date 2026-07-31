@@ -66,10 +66,11 @@ public sealed class CheckpointACommandLineAcceptanceTests
         startInfo.ArgumentList.Add($"sarif={sarifPath}");
 
         using var process = System.Diagnostics.Process.Start(startInfo)!;
-        string output = process.StandardOutput.ReadToEnd();
-        string error = process.StandardError.ReadToEnd();
+        Task<string> outputTask = process.StandardOutput.ReadToEndAsync();
+        Task<string> errorTask = process.StandardError.ReadToEndAsync();
         process.WaitForExit();
-        return (process.ExitCode, output, error);
+        Task.WaitAll(outputTask, errorTask);
+        return (process.ExitCode, outputTask.Result, errorTask.Result);
     }
 
     private static string FindRepositoryRoot()

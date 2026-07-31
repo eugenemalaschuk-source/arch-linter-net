@@ -21,6 +21,7 @@ public sealed partial class ArchitectureAnalysisSession
         {
             if (!RoleIndex.TryGetRole(source, out ArchitectureTypeClassificationResult sourceRole)) continue;
             string sourceName = ArchitectureTypeNames.SafeFullName(source);
+            string sourceAssembly = ArchitectureTypeNames.SafeAssemblyName(source) ?? string.Empty;
 
             // Per the "Unsupported evidence fails closed with explicit diagnostics" requirement:
             // a member (field/property/method/parameter) whose type couldn't be loaded is silently
@@ -28,14 +29,19 @@ public sealed partial class ArchitectureAnalysisSession
             // be incomplete, so a forbidden direct edge could vanish with no violation and no signal.
             // Report that explicitly instead of letting the contract pass on partial evidence.
             bool scanComplete = ArchitectureReferenceScanner.TryGetReferencedTypes(source, out List<Type> referencedTypes);
-            if (!scanComplete && !context.IsIgnored(sourceName, UnsupportedEvidenceReference))
+            if (!scanComplete && !context.IsIgnored(
+                    sourceName,
+                    UnsupportedEvidenceReference,
+                    sourceAssembly: sourceAssembly,
+                    targetMember: UnsupportedEvidenceReference))
             {
                 violations.Add(BuildUnsupportedEvidenceViolation(contract, sourceRole, sourceName));
             }
 
             foreach (Type target in referencedTypes.Distinct())
             {
-                ArchitectureViolation? violation = TryBuildDirectEdgeViolation(contract, context, sourceRole, sourceName, target);
+                ArchitectureViolation? violation = TryBuildDirectEdgeViolation(
+                    contract, context, sourceRole, sourceName, sourceAssembly, target);
                 if (violation != null) violations.Add(violation);
             }
         }
@@ -46,7 +52,7 @@ public sealed partial class ArchitectureAnalysisSession
 
     private ArchitectureViolation? TryBuildDirectEdgeViolation(ArchitecturePortBoundaryContract contract,
         ArchitectureContractExecutionContext context, ArchitectureTypeClassificationResult sourceRole,
-        string sourceName, Type target)
+        string sourceName, string sourceAssembly, Type target)
     {
         if (!MatchesTargetContext(contract.TargetContext, target, sourceRole)
             || IsExcludedFromContextMatch(target, contract.Exclude, sourceRole)) return null;
@@ -54,7 +60,13 @@ public sealed partial class ArchitectureAnalysisSession
         bool matchesAllowedSeam = contract.AllowedSeams.Any(s => ArchitectureContextSelectorMatcher.Matches(s, target, RoleIndex, sourceRole));
         if (matchesAllowedSeam && !matchesForbidden) return null;
         string targetName = ArchitectureTypeNames.SafeFullName(target);
-        if (string.IsNullOrEmpty(targetName) || context.IsIgnored(sourceName, targetName)) return null;
+        if (string.IsNullOrEmpty(targetName) || context.IsIgnored(
+                sourceName,
+                targetName,
+                sourceAssembly: sourceAssembly,
+                targetAssembly: ArchitectureTypeNames.SafeAssemblyName(target),
+                targetType: targetName,
+                targetMember: targetName)) return null;
         RoleIndex.TryGetRole(target, out ArchitectureTypeClassificationResult targetRole);
         string expectedSeam = string.Join(" or ", contract.AllowedSeams.Select(DescribeContextSelector));
         // matchesForbidden distinguishes an explicit forbidden-selector match from a target that
@@ -137,7 +149,13 @@ public sealed partial class ArchitectureAnalysisSession
         // not a static description of the expected port - otherwise a baseline entry keeps suppressing
         // findings after the adapter's actual mismatched/missing interface changes, and a manual ignore
         // copied from the reported forbidden_reference never matches (see PR #306 review).
-        if (context.IsIgnored(adapterName, actualPortName)) return null;
+        if (context.IsIgnored(
+                adapterName,
+                actualPortName,
+                sourceAssembly: ArchitectureTypeNames.SafeAssemblyName(adapter),
+                targetAssembly: actualPort == null ? null : ArchitectureTypeNames.SafeAssemblyName(actualPort),
+                targetType: actualPortName,
+                targetMember: actualPortName)) return null;
 
         string kind = implementsExpectedPort ? "adapter_context" : "adapter_port_mismatch";
         string detail = implementsExpectedPort

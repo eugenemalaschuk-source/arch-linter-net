@@ -51,12 +51,13 @@ internal sealed class ArchitectureContractExecutionContext
         string forbiddenReference,
         string? sourceAssembly = null,
         string? targetAssembly = null,
+        string? targetType = null,
         string? sourceMember = null,
         string? targetMember = null,
         string? configuration = null)
     {
         ArchitectureViolationIdentity? liveIdentity = BuildLiveIdentity(
-            sourceType, forbiddenReference, sourceAssembly, targetAssembly, sourceMember, targetMember, configuration);
+            sourceType, forbiddenReference, sourceAssembly, targetAssembly, targetType, sourceMember, targetMember, configuration);
 
         bool ignored = ArchitectureIgnoreMatcher.IsIgnored(sourceType, forbiddenReference, _ignoredViolations, _tracker, liveIdentity);
 
@@ -72,7 +73,7 @@ internal sealed class ArchitectureContractExecutionContext
     }
 
     private ArchitectureViolationIdentity? BuildLiveIdentity(
-        string sourceType, string forbiddenReference, string? sourceAssembly, string? targetAssembly, string? sourceMember,
+        string sourceType, string forbiddenReference, string? sourceAssembly, string? targetAssembly, string? targetType, string? sourceMember,
         string? targetMember, string? configuration = null)
     {
         if (ContractId == null || _contractGroup == null)
@@ -81,13 +82,6 @@ internal sealed class ArchitectureContractExecutionContext
         }
 
         string contractFamily = ArchitectureViolationIdentity.ResolveContractFamily(_contractGroup);
-
-        // Families that don't yet supply a richer targetMember (every family except method-body and
-        // other qualified call sites) still need SOMETHING to discriminate genuinely distinct targets
-        // from the same source — falling back to the full forbiddenReference string preserves the old
-        // (source_type, forbidden_reference) discrimination exactly, so the occurrence discriminator
-        // only kicks in for true duplicates, not distinct targets.
-        string effectiveTargetMember = targetMember ?? forbiddenReference;
 
         var zeroed = new ArchitectureViolationIdentity(
             ArchitectureViolationIdentity.CurrentVersion,
@@ -98,8 +92,8 @@ internal sealed class ArchitectureContractExecutionContext
             sourceType,
             sourceMember,
             targetAssembly,
-            null,
-            effectiveTargetMember,
+            targetType,
+            targetMember,
             0,
             configuration);
 

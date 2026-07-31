@@ -100,7 +100,12 @@ public sealed partial class ArchitectureAnalysisSession
 
         foreach (string matchedInterface in matches)
         {
-            if (context.ExecutionContext.IsIgnored(sourceType, matchedInterface))
+            if (context.ExecutionContext.IsIgnored(
+                    sourceType,
+                    matchedInterface,
+                    sourceAssembly: actualAssemblyName,
+                    targetType: matchedInterface,
+                    targetMember: matchedInterface))
             {
                 continue;
             }

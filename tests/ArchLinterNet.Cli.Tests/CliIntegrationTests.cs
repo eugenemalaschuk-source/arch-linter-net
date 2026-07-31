@@ -8,7 +8,7 @@ namespace ArchLinterNet.Cli.Tests;
 public partial class CliIntegrationTests
 {
     private static string _repoRoot = null!;
-    private static string _cliProjectPath = null!;
+    private static string _cliDllPath = null!;
     private static string _passingPolicy = null!;
     private static string _failingPolicy = null!;
     private static string _coveragePolicy = null!;
@@ -19,7 +19,8 @@ public partial class CliIntegrationTests
     public void OneTimeSetUp()
     {
         _repoRoot = FindRepoRoot();
-        _cliProjectPath = Path.Combine(_repoRoot, "src", "ArchLinterNet.Cli");
+        _cliDllPath = Path.Combine(
+            _repoRoot, "src", "ArchLinterNet.Cli", "bin", "Debug", "net10.0", "ArchLinterNet.Cli.dll");
         _passingPolicy = Path.Combine(
             _repoRoot, "tests", "ArchLinterNet.Cli.Tests", "TestPolicies", "passing-policy.yml");
         _failingPolicy = Path.Combine(
@@ -31,31 +32,10 @@ public partial class CliIntegrationTests
         _passingWithIdsPolicy = Path.Combine(
             _repoRoot, "tests", "ArchLinterNet.Cli.Tests", "TestPolicies", "passing-with-ids.yml");
 
-        using var build = new Process
-        {
-            StartInfo = new ProcessStartInfo
-            {
-                FileName = "dotnet",
-                RedirectStandardOutput = true,
-                RedirectStandardError = true,
-                UseShellExecute = false,
-                WorkingDirectory = _repoRoot
-            }
-        };
-        build.StartInfo.ArgumentList.Add("build");
-        build.StartInfo.ArgumentList.Add(_cliProjectPath);
-        build.StartInfo.ArgumentList.Add("--nologo");
-        build.StartInfo.ArgumentList.Add("--verbosity");
-        build.StartInfo.ArgumentList.Add("quiet");
-        build.Start();
-
-        string buildStderr = build.StandardError.ReadToEnd();
-        build.WaitForExit();
-
-        if (build.ExitCode != 0)
+        if (!File.Exists(_cliDllPath))
         {
             throw new InvalidOperationException(
-                $"CLI project build failed (exit {build.ExitCode}):{Environment.NewLine}{buildStderr}");
+                $"CLI artifact was not built by the test project: {_cliDllPath}");
         }
     }
 
@@ -78,11 +58,7 @@ public partial class CliIntegrationTests
             WorkingDirectory = _repoRoot
         };
 
-        startInfo.ArgumentList.Add("run");
-        startInfo.ArgumentList.Add("--no-build");
-        startInfo.ArgumentList.Add("--project");
-        startInfo.ArgumentList.Add(_cliProjectPath);
-        startInfo.ArgumentList.Add("--");
+        startInfo.ArgumentList.Add(_cliDllPath);
         foreach (string argument in args)
         {
             startInfo.ArgumentList.Add(argument);
@@ -91,11 +67,12 @@ public partial class CliIntegrationTests
         using var process = new Process { StartInfo = startInfo };
         process.Start();
 
-        string stdout = process.StandardOutput.ReadToEnd();
-        string stderr = process.StandardError.ReadToEnd();
+        Task<string> stdoutTask = process.StandardOutput.ReadToEndAsync();
+        Task<string> stderrTask = process.StandardError.ReadToEndAsync();
         process.WaitForExit();
+        Task.WaitAll(stdoutTask, stderrTask);
 
-        return (process.ExitCode, stdout, stderr);
+        return (process.ExitCode, stdoutTask.Result, stderrTask.Result);
     }
 
     /* --help / -h */
