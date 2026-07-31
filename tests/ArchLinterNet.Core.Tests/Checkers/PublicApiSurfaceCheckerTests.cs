@@ -43,4 +43,29 @@ public sealed class PublicApiSurfaceCheckerTests
 
         Assert.That(violations.Any(v => v.SourceType == TypeName && (v.Payload as PublicApiSurfacePayload)?.UndeclaredApiSignature == $"class {TypeName}"), Is.True);
     }
+
+    [Test]
+    public void Check_UndeclaredApi_RegistersExactlyOneCanonicalCandidatePerViolation()
+    {
+        string assemblyName = _fixturesAssembly.GetName().Name!;
+        var contract = new ArchitecturePublicApiSurfaceContract
+        {
+            Name = "Public API Surface",
+            Id = "no-accidental-public",
+            Assemblies = new List<string> { assemblyName },
+            DeclaredApi = new List<string>(),
+        };
+        var candidates = new List<ArchitectureBaselineCandidate>();
+        var context = new ArchitectureContractExecutionContext(
+            contract.Name, contract.Id, Array.Empty<ArchitectureIgnoredViolation>(),
+            enableUnmatchedIgnoreTracking: true, contractGroup: "public_api_surface", baselineCandidates: candidates);
+
+        List<ArchitectureViolation> violations = PublicApiSurfaceChecker.Check(
+            contract,
+            new Dictionary<string, Assembly>(StringComparer.Ordinal) { [assemblyName] = _fixturesAssembly },
+            context);
+
+        Assert.That(candidates, Has.Count.EqualTo(violations.Count));
+        Assert.That(candidates.Select(candidate => candidate.Identity!.Occurrence), Is.All.EqualTo(0));
+    }
 }

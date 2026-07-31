@@ -43,7 +43,9 @@ internal static class ArchitectureNamespaceViolationFinder
                     .Where(x => !executionContext.IsIgnored(
                         sourceFullName, x.FullName,
                         sourceAssembly: sourceAssemblyName,
-                        targetAssembly: ArchitectureTypeNames.SafeAssemblyName(x.Reference)))
+                        targetAssembly: ArchitectureTypeNames.SafeAssemblyName(x.Reference),
+                        targetType: x.FullName,
+                        targetMember: x.FullName))
                     .GroupBy(x => x.FullName, StringComparer.Ordinal)
                     .Select(group => new
                     {
@@ -180,7 +182,9 @@ internal static class ArchitectureNamespaceViolationFinder
         if (executionContext.IsIgnored(
                 sourceFullName, refFullName,
                 sourceAssembly: sourceAssemblyName,
-                targetAssembly: ArchitectureTypeNames.SafeAssemblyName(referenced)))
+                targetAssembly: ArchitectureTypeNames.SafeAssemblyName(referenced),
+                targetType: refFullName,
+                targetMember: refFullName))
         {
             return;
         }

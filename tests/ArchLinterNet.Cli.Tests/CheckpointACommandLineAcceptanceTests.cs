@@ -18,7 +18,7 @@ public sealed class CheckpointACommandLineAcceptanceTests
         {
             string jsonPath = Path.Combine(directory, "result.json");
             string sarifPath = Path.Combine(directory, "result.sarif");
-            var result = RunCli(repositoryRoot, policy, jsonPath, sarifPath);
+            var result = RunCli(repositoryRoot, policy, jsonPath, sarifPath, Path.Combine(AppContext.BaseDirectory, "ArchLinterNet.Cli.dll"));
 
             using JsonDocument json = JsonDocument.Parse(File.ReadAllText(jsonPath));
             using JsonDocument sarif = JsonDocument.Parse(File.ReadAllText(sarifPath));
@@ -43,7 +43,7 @@ public sealed class CheckpointACommandLineAcceptanceTests
     }
 
     private static (int ExitCode, string StdOut, string StdErr) RunCli(
-        string repositoryRoot, string policy, string jsonPath, string sarifPath)
+        string repositoryRoot, string policy, string jsonPath, string sarifPath, string cliDllPath)
     {
         var startInfo = new System.Diagnostics.ProcessStartInfo("dotnet")
         {
@@ -53,8 +53,7 @@ public sealed class CheckpointACommandLineAcceptanceTests
             WorkingDirectory = repositoryRoot
         };
         startInfo.Environment["DOTNET_CLI_DISABLE_COLOR"] = "1";
-        startInfo.ArgumentList.Add(Path.Combine(
-            repositoryRoot, "src", "ArchLinterNet.Cli", "bin", "Debug", "net10.0", "ArchLinterNet.Cli.dll"));
+        startInfo.ArgumentList.Add(cliDllPath);
         startInfo.ArgumentList.Add("--policy");
         startInfo.ArgumentList.Add(policy);
         startInfo.ArgumentList.Add("--strict");
@@ -66,10 +65,11 @@ public sealed class CheckpointACommandLineAcceptanceTests
         startInfo.ArgumentList.Add($"sarif={sarifPath}");
 
         using var process = System.Diagnostics.Process.Start(startInfo)!;
-        string output = process.StandardOutput.ReadToEnd();
-        string error = process.StandardError.ReadToEnd();
+        Task<string> outputTask = process.StandardOutput.ReadToEndAsync();
+        Task<string> errorTask = process.StandardError.ReadToEndAsync();
         process.WaitForExit();
-        return (process.ExitCode, output, error);
+        Task.WaitAll(outputTask, errorTask);
+        return (process.ExitCode, outputTask.Result, errorTask.Result);
     }
 
     private static string FindRepositoryRoot()

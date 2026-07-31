@@ -36,7 +36,10 @@ public sealed partial class ArchitectureAnalysisSession
                 .Where(reference => ArchitectureFrameworkReferenceResolver.MatchesGroup(frameworkGroup, reference.FrameworkName))
                 .Where(reference => !executionContext.IsIgnored(
                     contract.Source, reference.FrameworkName,
-                    targetMember: FormatFrameworkReference(reference), configuration: ResolvedBuildConfiguration))
+                    sourceAssembly: contract.Source,
+                    targetType: reference.FrameworkName,
+                    targetMember: FormatFrameworkReference(reference),
+                    configuration: ResolvedBuildConfiguration))
                 .ToArray();
 
             string[] forbiddenReferences = matched
@@ -87,9 +90,12 @@ public sealed partial class ArchitectureAnalysisSession
         ArchitectureDiscoveredFrameworkReference[] disallowed = references
             .Where(reference => !allowedGroups.Any(group =>
                 ArchitectureFrameworkReferenceResolver.MatchesGroup(group, reference.FrameworkName)))
-            .Where(reference => !executionContext.IsIgnored(
-                contract.Source, reference.FrameworkName,
-                targetMember: FormatFrameworkReference(reference), configuration: ResolvedBuildConfiguration))
+                .Where(reference => !executionContext.IsIgnored(
+                    contract.Source, reference.FrameworkName,
+                    sourceAssembly: contract.Source,
+                    targetType: reference.FrameworkName,
+                    targetMember: FormatFrameworkReference(reference),
+                    configuration: ResolvedBuildConfiguration))
             .ToArray();
 
         string[] disallowedReferences = disallowed

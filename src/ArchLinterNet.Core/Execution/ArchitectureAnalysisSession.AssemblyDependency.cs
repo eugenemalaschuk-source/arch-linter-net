@@ -44,7 +44,13 @@ public sealed partial class ArchitectureAnalysisSession
                 continue;
             }
 
-            if (executionContext.IsIgnored(contract.Source, forbiddenAssemblyName))
+            if (executionContext.IsIgnored(
+                    contract.Source,
+                    forbiddenAssemblyName,
+                    sourceAssembly: contract.Source,
+                    targetAssembly: forbiddenAssemblyName,
+                    targetType: forbiddenAssemblyName,
+                    targetMember: forbiddenAssemblyName))
             {
                 continue;
             }
@@ -88,7 +94,13 @@ public sealed partial class ArchitectureAnalysisSession
             .Where(name => !string.IsNullOrEmpty(name))
             .Where(resolvedAssemblies.ContainsKey)
             .Where(name => !allowedNames.Contains(name))
-            .Where(name => !executionContext.IsIgnored(contract.Source, name))
+            .Where(name => !executionContext.IsIgnored(
+                contract.Source,
+                name,
+                sourceAssembly: contract.Source,
+                targetAssembly: name,
+                targetType: name,
+                targetMember: name))
             .Distinct(StringComparer.Ordinal)
             .OrderBy(name => name, StringComparer.Ordinal)
             .ToArray();

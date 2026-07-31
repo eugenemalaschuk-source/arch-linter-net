@@ -98,7 +98,13 @@ public sealed partial class ArchitectureAnalysisSession
                 continue;
             }
 
-            if (context.ExecutionContext.IsIgnored(match.SourceIdentifier, match.MatchedAttribute))
+            if (context.ExecutionContext.IsIgnored(
+                    match.SourceIdentifier,
+                    match.MatchedAttribute,
+                    sourceAssembly: actualAssemblyName,
+                    targetAssembly: match.TargetAssembly,
+                    targetType: match.MatchedAttribute,
+                    targetMember: match.MatchedAttribute))
             {
                 continue;
             }

@@ -95,12 +95,19 @@ public sealed partial class ArchitectureAnalysisSession
         string sourceType = ArchitectureTypeNames.SafeFullName(type);
 
         var matches = ArchitectureTypeRelationshipScanner
-            .GetImplementedInterfaceMatches(type, contract.Interfaces, contract.InterfacePrefixes)
-            .OrderBy(m => m, StringComparer.Ordinal);
+                .GetImplementedInterfaceMatches(type, contract.Interfaces, contract.InterfacePrefixes)
+            .OrderBy(m => m.TypeName, StringComparer.Ordinal)
+            .ThenBy(m => m.AssemblyName, StringComparer.Ordinal);
 
-        foreach (string matchedInterface in matches)
+        foreach (ArchitectureTypeRelationshipMatch match in matches)
         {
-            if (context.ExecutionContext.IsIgnored(sourceType, matchedInterface))
+            if (context.ExecutionContext.IsIgnored(
+                    sourceType,
+                    match.TypeName,
+                    sourceAssembly: actualAssemblyName,
+                    targetAssembly: match.AssemblyName,
+                    targetType: match.TypeName,
+                    targetMember: match.TypeName))
             {
                 continue;
             }
@@ -112,11 +119,11 @@ public sealed partial class ArchitectureAnalysisSession
                 contract.Name,
                 contract.Id,
                 sourceType,
-                matchedInterface,
+                match.TypeName,
                 new[] { actualLocationDescription })
             {
                 Payload = new InterfaceImplementationPayload(
-                    MatchedInterface: matchedInterface,
+                    MatchedInterface: match.TypeName,
                     ImplementationKind: implementationKind,
                     ActualImplementationLocation: actualLocationDescription,
                     ExpectedImplementationLocation: expectedImplementationLocation)

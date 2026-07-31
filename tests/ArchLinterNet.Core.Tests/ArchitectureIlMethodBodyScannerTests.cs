@@ -43,6 +43,8 @@ public sealed class ArchitectureIlMethodBodyScannerTests
         Assert.That(details, Is.Not.Empty);
         Assert.That(details[0].SourceMember, Does.Contain("CallsForbiddenMethod"));
         Assert.That(details[0].MatchedMember, Does.Contain("Console.WriteLine"));
+        Assert.That(details[0].TargetType, Is.EqualTo(typeof(Console).FullName));
+        Assert.That(details[0].TargetAssembly, Is.EqualTo(typeof(Console).Assembly.GetName().Name));
         Assert.That(members, Does.Contain(details[0].MatchedMember));
     }
 

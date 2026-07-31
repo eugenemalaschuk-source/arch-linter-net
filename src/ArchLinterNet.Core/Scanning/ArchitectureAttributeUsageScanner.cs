@@ -3,7 +3,12 @@ using System.Reflection;
 
 namespace ArchLinterNet.Core.Scanning;
 
-internal readonly record struct ArchitectureAttributeUsageMatch(string SourceIdentifier, string MatchedAttribute);
+internal readonly record struct ArchitectureAttributeUsageMatch(
+    string SourceIdentifier,
+    string MatchedAttribute,
+    string TargetAssembly);
+
+internal readonly record struct ArchitectureAttributeTypeMatch(string Name, string AssemblyName);
 
 // Reflection-based enumeration of attribute usage on a type and its declared members, mirroring the
 // defensive-reflection posture of ArchitecturePublicApiSurfaceScanner/ArchitectureTypeRoleMatcher.
@@ -54,9 +59,9 @@ internal static class ArchitectureAttributeUsageScanner
     private static IEnumerable<ArchitectureAttributeUsageMatch> TypeMatches(
         Type type, string typeName, IReadOnlyList<string> attributes, IReadOnlyList<string> attributePrefixes)
     {
-        foreach (string matchedAttribute in MatchedAttributes(type, attributes, attributePrefixes))
+        foreach (ArchitectureAttributeTypeMatch matchedAttribute in MatchedAttributes(type, attributes, attributePrefixes))
         {
-            yield return new ArchitectureAttributeUsageMatch(typeName, matchedAttribute);
+            yield return new ArchitectureAttributeUsageMatch(typeName, matchedAttribute.Name, matchedAttribute.AssemblyName);
         }
     }
 
@@ -65,10 +70,10 @@ internal static class ArchitectureAttributeUsageScanner
     {
         foreach (ConstructorInfo ctor in SafeGetMembers(type, t => t.GetConstructors(MemberFlags)))
         {
-            foreach (string matchedAttribute in MatchedAttributes(ctor, attributes, attributePrefixes))
+            foreach (ArchitectureAttributeTypeMatch matchedAttribute in MatchedAttributes(ctor, attributes, attributePrefixes))
             {
                 yield return new ArchitectureAttributeUsageMatch(
-                    $"{typeName}.{ctor.Name}({ParameterSignature(ctor)})", matchedAttribute);
+                    $"{typeName}.{ctor.Name}({ParameterSignature(ctor)})", matchedAttribute.Name, matchedAttribute.AssemblyName);
             }
         }
     }
@@ -83,10 +88,10 @@ internal static class ArchitectureAttributeUsageScanner
                 continue;
             }
 
-            foreach (string matchedAttribute in MatchedAttributes(method, attributes, attributePrefixes))
+            foreach (ArchitectureAttributeTypeMatch matchedAttribute in MatchedAttributes(method, attributes, attributePrefixes))
             {
                 yield return new ArchitectureAttributeUsageMatch(
-                    $"{typeName}.{method.Name}({ParameterSignature(method)})", matchedAttribute);
+                    $"{typeName}.{method.Name}({ParameterSignature(method)})", matchedAttribute.Name, matchedAttribute.AssemblyName);
             }
         }
     }
@@ -96,9 +101,10 @@ internal static class ArchitectureAttributeUsageScanner
     {
         foreach (PropertyInfo property in SafeGetMembers(type, t => t.GetProperties(MemberFlags)))
         {
-            foreach (string matchedAttribute in MatchedAttributes(property, attributes, attributePrefixes))
+            foreach (ArchitectureAttributeTypeMatch matchedAttribute in MatchedAttributes(property, attributes, attributePrefixes))
             {
-                yield return new ArchitectureAttributeUsageMatch($"{typeName}.{property.Name}", matchedAttribute);
+                yield return new ArchitectureAttributeUsageMatch(
+                    $"{typeName}.{property.Name}", matchedAttribute.Name, matchedAttribute.AssemblyName);
             }
         }
     }
@@ -108,9 +114,10 @@ internal static class ArchitectureAttributeUsageScanner
     {
         foreach (FieldInfo field in SafeGetMembers(type, t => t.GetFields(MemberFlags)))
         {
-            foreach (string matchedAttribute in MatchedAttributes(field, attributes, attributePrefixes))
+            foreach (ArchitectureAttributeTypeMatch matchedAttribute in MatchedAttributes(field, attributes, attributePrefixes))
             {
-                yield return new ArchitectureAttributeUsageMatch($"{typeName}.{field.Name}", matchedAttribute);
+                yield return new ArchitectureAttributeUsageMatch(
+                    $"{typeName}.{field.Name}", matchedAttribute.Name, matchedAttribute.AssemblyName);
             }
         }
     }
@@ -120,9 +127,10 @@ internal static class ArchitectureAttributeUsageScanner
     {
         foreach (EventInfo evt in SafeGetMembers(type, t => t.GetEvents(MemberFlags)))
         {
-            foreach (string matchedAttribute in MatchedAttributes(evt, attributes, attributePrefixes))
+            foreach (ArchitectureAttributeTypeMatch matchedAttribute in MatchedAttributes(evt, attributes, attributePrefixes))
             {
-                yield return new ArchitectureAttributeUsageMatch($"{typeName}.{evt.Name}", matchedAttribute);
+                yield return new ArchitectureAttributeUsageMatch(
+                    $"{typeName}.{evt.Name}", matchedAttribute.Name, matchedAttribute.AssemblyName);
             }
         }
     }
@@ -146,7 +154,7 @@ internal static class ArchitectureAttributeUsageScanner
         }
     }
 
-    private static IEnumerable<string> MatchedAttributes(
+    private static IEnumerable<ArchitectureAttributeTypeMatch> MatchedAttributes(
         MemberInfo member, IReadOnlyList<string> attributes, IReadOnlyList<string> attributePrefixes)
     {
         IList<CustomAttributeData> attributeData;
@@ -169,24 +177,28 @@ internal static class ArchitectureAttributeUsageScanner
 
         foreach (CustomAttributeData data in attributeData)
         {
-            string? attributeName = TrySafeAttributeTypeName(data);
-            if (attributeName == null)
+            Type? attributeType = TrySafeAttributeType(data);
+            if (attributeType == null)
             {
                 continue;
             }
 
+            string attributeName = ArchitectureTypeNames.SafeFullName(attributeType);
+
             if (IsMatch(attributeName, attributes, attributePrefixes))
             {
-                yield return attributeName;
+                yield return new ArchitectureAttributeTypeMatch(
+                    attributeName,
+                    ArchitectureTypeNames.SafeAssemblyName(attributeType) ?? string.Empty);
             }
         }
     }
 
-    private static string? TrySafeAttributeTypeName(CustomAttributeData data)
+    private static Type? TrySafeAttributeType(CustomAttributeData data)
     {
         try
         {
-            return ArchitectureTypeNames.SafeFullName(data.AttributeType);
+            return data.AttributeType;
         }
         catch (TypeLoadException)
         {

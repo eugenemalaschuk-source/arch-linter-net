@@ -393,7 +393,11 @@ public sealed partial class ArchitectureAnalysisSession
 #pragma warning disable S6607 // IsIgnored has an ordered side effect (baseline-candidate
             // collection), so it must run in this OrderBy-then-Where sequence, not before it.
             .OrderBy(entry => entry.Namespace, StringComparer.Ordinal)
-            .Where(entry => !executionContext.IsIgnored(entry.Namespace, "uncovered namespace"))
+            .Where(entry => !executionContext.IsIgnored(
+                entry.Namespace,
+                "uncovered namespace",
+                targetType: entry.Namespace,
+                targetMember: "uncovered namespace"))
 #pragma warning restore S6607
             .Select(entry => new ArchitectureViolation(
                 contract.Name,
@@ -503,7 +507,11 @@ public sealed partial class ArchitectureAnalysisSession
             string layerName = input.Layer;
             if (!Document.Layers.TryGetValue(layerName, out ArchitectureLayer? layer))
             {
-                if (!executionContext.IsIgnored(referencedContractId, layerName))
+                if (!executionContext.IsIgnored(
+                        referencedContractId,
+                        layerName,
+                        targetType: layerName,
+                        targetMember: layerName))
                 {
                     findings.Add(new ArchitectureViolation(
                         contract.Name,
@@ -521,7 +529,11 @@ public sealed partial class ArchitectureAnalysisSession
 
             if (!matchesAnyCode
                 && FindOptionalInput(contract, authoredContractId, referencedContractId, input) is null
-                && !executionContext.IsIgnored(referencedContractId, layerName))
+                && !executionContext.IsIgnored(
+                    referencedContractId,
+                    layerName,
+                    targetType: layerName,
+                    targetMember: layerName))
             {
                 findings.Add(new ArchitectureViolation(
                     contract.Name,
@@ -562,7 +574,12 @@ public sealed partial class ArchitectureAnalysisSession
 #pragma warning disable S6607 // IsIgnored has an ordered side effect (baseline-candidate
             // collection), so it must run in this OrderBy-then-Where sequence, not before it.
             .OrderBy(entry => entry.Name, StringComparer.Ordinal)
-            .Where(entry => !executionContext.IsIgnored(entry.Name, "uncovered assembly"))
+            .Where(entry => !executionContext.IsIgnored(
+                entry.Name,
+                "uncovered assembly",
+                sourceAssembly: entry.Name,
+                targetType: entry.Name,
+                targetMember: "uncovered assembly"))
 #pragma warning restore S6607
             .Select(entry => new ArchitectureViolation(
                 contract.Name,
@@ -598,7 +615,12 @@ public sealed partial class ArchitectureAnalysisSession
 
             if (resolvedAssembly == null)
             {
-                if (!executionContext.IsIgnored(project.Path, "unresolved project"))
+                if (!executionContext.IsIgnored(
+                        project.Path,
+                        "unresolved project",
+                        sourceAssembly: project.AssemblyName,
+                        targetType: project.AssemblyName,
+                        targetMember: "unresolved project"))
                 {
                     findings.Add(new ArchitectureViolation(
                         contract.Name,
@@ -614,7 +636,12 @@ public sealed partial class ArchitectureAnalysisSession
             bool covered = GetAssemblyNamespaces(resolvedAssembly)
                 .Any(ns => IsCoveredByDeclaredLayers(inventory, ns) || IsCoveredByExpandedTemplates(inventory, ns));
 
-            if (!covered && !executionContext.IsIgnored(project.Path, "uncovered project"))
+            if (!covered && !executionContext.IsIgnored(
+                    project.Path,
+                    "uncovered project",
+                    sourceAssembly: project.AssemblyName,
+                    targetType: project.AssemblyName,
+                    targetMember: "uncovered project"))
             {
                 findings.Add(new ArchitectureViolation(
                     contract.Name,
@@ -622,53 +649,6 @@ public sealed partial class ArchitectureAnalysisSession
                     project.Path,
                     "uncovered project",
                     new[] { project.AssemblyName, GetRepresentativeType(resolvedAssembly) }));
-            }
-        }
-
-        executionContext.CollectUnmatchedIgnores(_unmatchedIgnoredViolations);
-
-        return findings
-            .OrderBy(f => f.SourceType, StringComparer.Ordinal)
-            .ToList();
-    }
-
-    private List<ArchitectureViolation> CheckDependencyEdgeCoverageContract(ArchitectureCoverageContract contract)
-    {
-        ArchitectureCoverageInventory inventory = BuildCoverageInventory(Document);
-        ArchitectureContractExecutionContext executionContext = CreateExecutionContext(contract, contract.IgnoredViolations);
-
-        List<ArchitectureViolation> findings = new();
-
-        foreach (List<string> pair in contract.Between)
-        {
-            string sourceLayer = pair[0];
-            string targetLayer = pair[1];
-
-            if (contract.Exclude.Any(exclusion => MatchesDependencyEdgeExclusion(exclusion, sourceLayer, targetLayer)))
-            {
-                continue;
-            }
-
-            if (IsLayerPairGoverned(sourceLayer, targetLayer))
-            {
-                continue;
-            }
-
-            foreach (ArchitectureCoverageDependencyEdge edge in GetEdgesForLayerPair(sourceLayer, targetLayer))
-            {
-                string edgeKey = $"{edge.SourceNamespace} -> {edge.TargetNamespace}";
-
-                if (executionContext.IsIgnored(edgeKey, "uncovered dependency edge"))
-                {
-                    continue;
-                }
-
-                findings.Add(new ArchitectureViolation(
-                    contract.Name,
-                    contract.Id,
-                    edgeKey,
-                    "uncovered dependency edge",
-                    new[] { GetRepresentativeNamespaceType(inventory, edge.SourceNamespace) }));
             }
         }
 

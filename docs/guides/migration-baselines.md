@@ -186,6 +186,16 @@ followed across commands, and across output formats:
 never silently suppress one — each entry's JSON carries `suppresses` so this is readable without
 inferring it from the status.
 
+### Reviewing a requalified identity
+
+When a release adds a required semantic identity dimension, an older structured entry is never
+silently widened to cover it. Review `baseline diff` (or let `baseline verify` fail in CI), then
+use `baseline update` or a reviewed recapture to add the exact current entries. Run `baseline prune`
+only after those entries have been accepted. `changed` means a single successor is provable but
+still needs review; `stale` means the entry cannot be evaluated; `ambiguous` means several
+successors are possible and the tool refuses to guess. Reasons and `issue` metadata are carried
+only when that one-to-one relationship is deterministic.
+
 What a command *did* with an entry is a separate axis, reported as its **disposition**: `reported`
 (read-only), `added`, `retained`, or `removed`. This is how `update` and `prune` act differently on
 the same classification without either renaming it — a fixed violation is `resolved` in both, and only

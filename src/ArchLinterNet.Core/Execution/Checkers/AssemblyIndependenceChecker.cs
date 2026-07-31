@@ -42,7 +42,13 @@ internal static class AssemblyIndependenceChecker
                     continue;
                 }
 
-                if (executionContext.IsIgnored(sourceAssemblyName, forbiddenAssemblyName))
+                if (executionContext.IsIgnored(
+                        sourceAssemblyName,
+                        forbiddenAssemblyName,
+                        sourceAssembly: sourceAssemblyName,
+                        targetAssembly: forbiddenAssemblyName,
+                        targetType: forbiddenAssemblyName,
+                        targetMember: forbiddenAssemblyName))
                 {
                     continue;
                 }

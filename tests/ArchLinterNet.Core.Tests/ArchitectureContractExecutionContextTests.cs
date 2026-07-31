@@ -34,10 +34,9 @@ public sealed class ArchitectureContractExecutionContextTests
             Assert.That(candidate.Identity.SourceType, Is.EqualTo("Source.Type"));
             Assert.That(candidate.Identity.SourceAssembly, Is.Null);
             Assert.That(candidate.Identity.TargetAssembly, Is.Null);
-            // No richer targetMember was supplied by the caller, so identity falls back to the
-            // full forbiddenReference text — preserving legacy (source_type, forbidden_reference)
-            // discrimination for families not yet qualified with assembly/member info.
-            Assert.That(candidate.Identity.TargetMember, Is.EqualTo("Forbidden.Reference"));
+            // Display text is deliberately not part of canonical identity. Call sites that have a
+            // semantic target must provide it explicitly instead of inheriting forbiddenReference.
+            Assert.That(candidate.Identity.TargetMember, Is.Null);
             Assert.That(candidate.Identity.Occurrence, Is.EqualTo(0));
         });
     }
@@ -64,6 +63,33 @@ public sealed class ArchitectureContractExecutionContextTests
             Assert.That(identity.SourceAssembly, Is.EqualTo("MyApp.App"));
             Assert.That(identity.TargetAssembly, Is.EqualTo("System.Console"));
             Assert.That(identity.TargetMember, Is.EqualTo("System.Console.WriteLine(string)"));
+        });
+    }
+
+    [Test]
+    public void IsIgnored_WithTargetType_PreservesSemanticTargetSeparatelyFromDisplayText()
+    {
+        var baselineCandidates = new List<ArchitectureBaselineCandidate>();
+        var context = new ArchitectureContractExecutionContext(
+            "contract-name", "contract-id", Array.Empty<ArchitectureIgnoredViolation>(),
+            enableUnmatchedIgnoreTracking: true, contractGroup: "strict_method_body", baselineCandidates: baselineCandidates);
+
+        bool ignored = context.IsIgnored(
+            "Source.Type",
+            "il 000A (Run): forbidden -> Target.Type.Call()",
+            sourceAssembly: "Source.Assembly",
+            targetAssembly: "Target.Assembly",
+            targetType: "Target.Type",
+            sourceMember: "Source.Type.Run",
+            targetMember: "Target.Type.Call()");
+
+        Assert.That(ignored, Is.False);
+        ArchitectureViolationIdentity identity = baselineCandidates[0].Identity!;
+        Assert.Multiple(() =>
+        {
+            Assert.That(identity.TargetType, Is.EqualTo("Target.Type"));
+            Assert.That(identity.TargetMember, Is.EqualTo("Target.Type.Call()"));
+            Assert.That(identity.TargetMember, Does.Not.Contain("il 000A"));
         });
     }
 

@@ -154,7 +154,13 @@ public sealed partial class ArchitectureAnalysisSession
                 continue;
             }
 
-            if (executionContext.IsIgnored(sourceTypeFullName, refFullName))
+            if (executionContext.IsIgnored(
+                    sourceTypeFullName,
+                    refFullName,
+                    sourceAssembly: ArchitectureTypeNames.SafeAssemblyName(sourceType),
+                    targetAssembly: ArchitectureTypeNames.SafeAssemblyName(refType),
+                    targetType: refFullName,
+                    targetMember: refFullName))
             {
                 continue;
             }

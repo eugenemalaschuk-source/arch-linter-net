@@ -62,7 +62,12 @@ public sealed partial class ArchitectureAnalysisSession
             }
 
             string forbiddenReference = BuildRequiredPropertyReference(requirement.Key, actualValue);
-            if (executionContext.IsIgnored(project.Path, forbiddenReference))
+            if (executionContext.IsIgnored(
+                    project.Path,
+                    forbiddenReference,
+                    sourceAssembly: project.AssemblyName,
+                    targetType: requirement.Key,
+                    targetMember: forbiddenReference))
             {
                 continue;
             }
@@ -102,7 +107,12 @@ public sealed partial class ArchitectureAnalysisSession
             }
 
             string forbiddenReference = BuildForbiddenPropertyReference(rule.Key, property.Value);
-            if (executionContext.IsIgnored(project.Path, forbiddenReference))
+            if (executionContext.IsIgnored(
+                    project.Path,
+                    forbiddenReference,
+                    sourceAssembly: project.AssemblyName,
+                    targetType: rule.Key,
+                    targetMember: forbiddenReference))
             {
                 continue;
             }
@@ -150,7 +160,13 @@ public sealed partial class ArchitectureAnalysisSession
             }
 
             string forbiddenReference = BuildFriendAssemblyReference(friendAssembly.AssemblyName);
-            if (executionContext.IsIgnored(project.Path, forbiddenReference))
+            if (executionContext.IsIgnored(
+                    project.Path,
+                    forbiddenReference,
+                    sourceAssembly: project.AssemblyName,
+                    targetAssembly: friendAssembly.AssemblyName,
+                    targetType: friendAssembly.AssemblyName,
+                    targetMember: forbiddenReference))
             {
                 continue;
             }
@@ -194,7 +210,12 @@ public sealed partial class ArchitectureAnalysisSession
             }
 
             string forbiddenReference = BuildProjectReferenceReference(projectReference.Path);
-            if (executionContext.IsIgnored(project.Path, forbiddenReference))
+            if (executionContext.IsIgnored(
+                    project.Path,
+                    forbiddenReference,
+                    sourceAssembly: project.AssemblyName,
+                    targetType: projectReference.Path,
+                    targetMember: forbiddenReference))
             {
                 continue;
             }

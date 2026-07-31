@@ -76,9 +76,15 @@ public sealed partial class ArchitectureAnalysisSession
             }
 
             string subject = ArchitectureTypeNames.SafeFullName(type);
+            string sourceAssembly = ArchitectureTypeNames.SafeAssemblyName(type) ?? string.Empty;
             if (!RoleIndex.TryGetRole(type, out ArchitectureTypeClassificationResult descriptor))
             {
-                if (!executionContext.IsIgnored(subject, "unclassified semantic fact"))
+                if (!executionContext.IsIgnored(
+                        subject,
+                        "unclassified semantic fact",
+                        sourceAssembly: sourceAssembly,
+                        targetType: subject,
+                        targetMember: "unclassified semantic fact"))
                 {
                     findings.Add(new ArchitectureViolation(contract.Name, contract.Id, subject,
                         "unclassified semantic fact", new[] { subject }));
@@ -92,7 +98,12 @@ public sealed partial class ArchitectureAnalysisSession
                 continue;
             }
 
-            if (!executionContext.IsIgnored(subject, "uncovered semantic role"))
+            if (!executionContext.IsIgnored(
+                    subject,
+                    "uncovered semantic role",
+                    sourceAssembly: sourceAssembly,
+                    targetType: subject,
+                    targetMember: "uncovered semantic role"))
             {
                 findings.Add(new ArchitectureViolation(contract.Name, contract.Id, subject,
                     "uncovered semantic role", new[] { DescribeSemanticFact(descriptor) }));

@@ -41,4 +41,31 @@ public sealed class InheritanceCheckerTests
         Assert.That(violations.Any(v =>
             v.SourceType == "InheritanceContractTestFixtures.Domain.CleanDomainType"), Is.False);
     }
+
+    [Test]
+    public void Check_BaseTypeCandidate_IncludesTheMatchedTypeAssembly()
+    {
+        var contract = new ArchitectureInheritanceContract
+        {
+            Name = "No Framework Inheritance",
+            Id = "no-framework-base",
+            SourceNamespaces = new List<string> { "InheritanceContractTestFixtures.Domain" },
+            ForbiddenBaseTypes = new List<string> { "InheritanceContractTestFixtures.Framework.FrameworkBase" },
+        };
+        var candidates = new List<ArchitectureBaselineCandidate>();
+        var context = new ArchitectureContractExecutionContext(
+            contract.Name, contract.Id, Array.Empty<ArchitectureIgnoredViolation>(),
+            enableUnmatchedIgnoreTracking: true, contractGroup: "inheritance", baselineCandidates: candidates);
+
+        InheritanceChecker.Check(
+            contract,
+            new ArchitectureContractDocument(),
+            new ArchitectureTypeIndex(new[] { typeof(DirectViolation).Assembly }),
+            context);
+
+        ArchitectureViolationIdentity identity = candidates.Single(candidate =>
+            candidate.SourceType == "InheritanceContractTestFixtures.Domain.DirectViolation").Identity!;
+        Assert.That(identity.TargetAssembly, Is.EqualTo(
+            typeof(InheritanceContractTestFixtures.Framework.FrameworkBase).Assembly.GetName().Name));
+    }
 }

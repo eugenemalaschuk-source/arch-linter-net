@@ -37,7 +37,12 @@ public sealed partial class ArchitectureAnalysisSession
 
             string[] forbiddenReferences = references
                 .Where(reference => ArchitecturePackageDependencyResolver.MatchesGroup(packageGroup, reference.PackageId))
-                .Where(reference => !executionContext.IsIgnored(contract.Source, reference.PackageId))
+                .Where(reference => !executionContext.IsIgnored(
+                    contract.Source,
+                    reference.PackageId,
+                    sourceAssembly: contract.Source,
+                    targetType: reference.PackageId,
+                    targetMember: reference.PackageId))
                 .Select(FormatPackageReference)
                 .Distinct(StringComparer.Ordinal)
                 .OrderBy(reference => reference, StringComparer.Ordinal)
@@ -91,7 +96,12 @@ public sealed partial class ArchitectureAnalysisSession
 
         string[] disallowedReferences = references
             .Where(reference => !allowedGroups.Any(group => ArchitecturePackageDependencyResolver.MatchesGroup(group, reference.PackageId)))
-            .Where(reference => !executionContext.IsIgnored(contract.Source, reference.PackageId))
+            .Where(reference => !executionContext.IsIgnored(
+                contract.Source,
+                reference.PackageId,
+                sourceAssembly: contract.Source,
+                targetType: reference.PackageId,
+                targetMember: reference.PackageId))
             .Select(FormatPackageReference)
             .Distinct(StringComparer.Ordinal)
             .OrderBy(reference => reference, StringComparer.Ordinal)
