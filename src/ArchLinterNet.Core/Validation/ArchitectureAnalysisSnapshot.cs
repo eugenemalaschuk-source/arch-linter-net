@@ -34,6 +34,7 @@ public sealed class ArchitectureAnalysisSnapshot : IDisposable
     private readonly Dictionary<string, ValidationOutcome> _evaluatedModes = new(StringComparer.Ordinal);
     private ArchitectureAnalysisSnapshotCounters _counters;
     private bool _disposed;
+    private bool _cancelled;
 
     internal ArchitectureAnalysisSnapshot(
         ArchitectureContractDocument document,
@@ -101,6 +102,20 @@ public sealed class ArchitectureAnalysisSnapshot : IDisposable
         }
     }
 
+    // Set once cancellation is observed during any Evaluate() call on this snapshot. A cancelled
+    // snapshot is never reusable — see openspec/specs/analysis-build-state-fingerprints/spec.md,
+    // "CLI and Testing share ownership semantics" (a cancelled snapshot's reuse is rejected).
+    public bool Cancelled
+    {
+        get
+        {
+            lock (_gate)
+            {
+                return _cancelled;
+            }
+        }
+    }
+
     public ValidationOutcome Evaluate(string mode, ValidationTiming? timing = null)
     {
         if (mode is not ("strict" or "audit"))
@@ -111,6 +126,11 @@ public sealed class ArchitectureAnalysisSnapshot : IDisposable
         lock (_gate)
         {
             ObjectDisposedException.ThrowIf(_disposed, this);
+            if (_cancelled)
+            {
+                throw new OperationCanceledException(
+                    "This snapshot observed cancellation during a prior Evaluate() call and cannot be reused.");
+            }
 
             if (_evaluatedModes.TryGetValue(mode, out ValidationOutcome? cached))
             {
@@ -133,6 +153,15 @@ public sealed class ArchitectureAnalysisSnapshot : IDisposable
                 _evaluatedModes[mode] = outcome;
                 _counters = _counters with { ModesEvaluated = _evaluatedModes.Count };
                 return outcome;
+            }
+            catch (OperationCanceledException)
+            {
+                // Mark the snapshot cancelled before rethrowing so no later Evaluate() call (for
+                // this or another mode) can proceed against a session that stopped mid-evaluation —
+                // see the Cancelled entry guard above. Rethrown raw, not wrapped, for the same
+                // reason ArchitecturePolicyValidationException is excluded below.
+                _cancelled = true;
+                throw;
             }
             catch (Exception ex) when (ex is not ArchitecturePolicyValidationException)
             {
@@ -214,8 +243,13 @@ public sealed class ArchitectureAnalysisSnapshot : IDisposable
         // mutable list shared across every mode evaluated on this snapshot's session.
         int subtractiveMatcherStartIndex = runner.Session.SubtractiveMatcherParticipation.Count;
 
+        CancellationToken cancellationToken = runner.Session.Context.CancellationToken;
+        cancellationToken.ThrowIfCancellationRequested();
+
         using (timing?.Measure("configuration_check"))
             allViolations.AddRange(runner.CheckConfiguration(strict: mode == "strict"));
+
+        cancellationToken.ThrowIfCancellationRequested();
 
         List<PolicyConsistencyDiagnostic> policyConsistencyFindings;
         using (timing?.Measure("policy_consistency_check"))
@@ -225,6 +259,8 @@ public sealed class ArchitectureAnalysisSnapshot : IDisposable
                 : runner.CheckPolicyConsistency();
         }
 
+        cancellationToken.ThrowIfCancellationRequested();
+
         ArchitectureContractExecutionResult execution;
         using (timing?.Measure("contract_checks"))
         {
@@ -233,6 +269,8 @@ public sealed class ArchitectureAnalysisSnapshot : IDisposable
         }
 
         allViolations.AddRange(execution.Violations);
+
+        cancellationToken.ThrowIfCancellationRequested();
 
         IReadOnlyCollection<ArchitectureViolation> coverageFindings = _coverageConfig == "off"
             ? Array.Empty<ArchitectureViolation>()

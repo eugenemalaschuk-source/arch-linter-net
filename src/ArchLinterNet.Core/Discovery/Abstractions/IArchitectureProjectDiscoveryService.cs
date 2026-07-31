@@ -6,5 +6,8 @@ namespace ArchLinterNet.Core.Discovery.Abstractions;
 public interface IArchitectureProjectDiscoveryService
 {
     ProjectDiscoveryResult ResolveAndApply(
-        ArchitectureContractDocument document, string repositoryRoot, bool resolveAssemblyOutputs);
+        ArchitectureContractDocument document,
+        string repositoryRoot,
+        bool resolveAssemblyOutputs,
+        CancellationToken cancellationToken = default);
 }

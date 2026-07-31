@@ -4,7 +4,8 @@ namespace ArchLinterNet.Cli.Abstractions;
 
 internal interface IRootCliCommandModule
 {
-    RootCommand CreateRootCommand(ICliRuntime runtime, ICliConsole console, IFileSystem fileSystem);
+    RootCommand CreateRootCommand(
+        ICliRuntime runtime, ICliConsole console, IFileSystem fileSystem, CancellationToken cancellationToken = default);
 }
 
 internal interface ICliSubcommandModule

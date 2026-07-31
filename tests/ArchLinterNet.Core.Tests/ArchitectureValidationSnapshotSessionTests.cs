@@ -67,4 +67,29 @@ public sealed class ArchitectureValidationSnapshotSessionTests
             Assert.That(audit.Passed, Is.True);
         });
     }
+
+    // Issue #375: WithCancellation gives the Testing API the same cancellation semantics as the
+    // CLI — a caller-supplied token that has already been cancelled must stop ValidateStrict()/
+    // CreateSnapshot() with OperationCanceledException rather than running to completion.
+    [Test]
+    public void WithCancellation_AlreadyCancelledToken_ValidateStrictThrowsOperationCanceled()
+    {
+        string policyPath = CreateHarmlessPolicyPath();
+        using CancellationTokenSource cts = new();
+        cts.Cancel();
+        var builder = new ArchitectureValidationBuilder(policyPath).WithCancellation(cts.Token);
+
+        Assert.Throws<OperationCanceledException>(() => builder.ValidateStrict());
+    }
+
+    [Test]
+    public void WithCancellation_AlreadyCancelledToken_CreateSnapshotThrowsOperationCanceled()
+    {
+        string policyPath = CreateHarmlessPolicyPath();
+        using CancellationTokenSource cts = new();
+        cts.Cancel();
+        var builder = new ArchitectureValidationBuilder(policyPath).WithCancellation(cts.Token);
+
+        Assert.Throws<OperationCanceledException>(() => builder.CreateSnapshot());
+    }
 }

@@ -23,7 +23,8 @@ public interface IArchitectureRunnerSetupService
         HashSet<string>? selectedContractIds = null,
         bool enableUnmatchedIgnoreTracking = true,
         ValidationTiming? timing = null,
-        string? mode = null);
+        string? mode = null,
+        CancellationToken cancellationToken = default);
 
     // The post-ensure-built pass must build a runner from fresh artifacts, not by delegating to
     // ordinary same-simple-name assembly resolution.
@@ -35,5 +36,6 @@ public interface IArchitectureRunnerSetupService
         HashSet<string>? selectedContractIds = null,
         bool enableUnmatchedIgnoreTracking = true,
         ValidationTiming? timing = null,
-        string? mode = null);
+        string? mode = null,
+        CancellationToken cancellationToken = default);
 }

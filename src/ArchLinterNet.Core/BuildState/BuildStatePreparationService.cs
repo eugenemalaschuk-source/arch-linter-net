@@ -427,7 +427,7 @@ public sealed class BuildStatePreparationService : IBuildStatePreparationService
         process.Start();
         process.BeginOutputReadLine();
         process.BeginErrorReadLine();
-        process.WaitForExit();
+        WaitForExitOrCancellation(process, request.CancellationToken);
 
         if (process.ExitCode == 0)
         {
@@ -455,6 +455,37 @@ public sealed class BuildStatePreparationService : IBuildStatePreparationService
 
     private static string QuoteIfNeeded(string argument) =>
         argument.Contains(' ', StringComparison.Ordinal) ? $"\"{argument}\"" : argument;
+
+    // Polls instead of a blocking WaitForExit() so cancellation can interrupt an in-flight
+    // dotnet restore/build. No shell is ever involved (UseShellExecute=false above) — killing the
+    // tracked Process handle's own tree is sufficient. The 100ms interval is not observable at the
+    // scale of a dotnet build/restore invocation (seconds at minimum).
+    private const int ProcessPollIntervalMs = 100;
+
+    private static void WaitForExitOrCancellation(Process process, CancellationToken cancellationToken)
+    {
+        while (!process.WaitForExit(ProcessPollIntervalMs))
+        {
+            if (cancellationToken.IsCancellationRequested)
+            {
+                TryKillProcessTree(process);
+                cancellationToken.ThrowIfCancellationRequested();
+            }
+        }
+    }
+
+    private static void TryKillProcessTree(Process process)
+    {
+        try
+        {
+            process.Kill(entireProcessTree: true);
+        }
+        catch (InvalidOperationException)
+        {
+            // The process already exited between the poll check and this call — benign race, not
+            // an error worth surfacing.
+        }
+    }
 
     private static void WriteReceiptsForCurrentArtifacts(
         BuildStatePreflightRequest request, BuildStatePreflightResult evaluation)

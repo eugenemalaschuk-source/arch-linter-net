@@ -8,11 +8,12 @@ internal sealed class CliRootCommandFactory(
     IReadOnlyList<ITopLevelCliSubcommandModule> subcommandModules,
     ICliRuntime runtime,
     ICliConsole console,
-    IFileSystem fileSystem) : ICliRootCommandFactory
+    IFileSystem fileSystem,
+    CancellationToken cancellationToken = default) : ICliRootCommandFactory
 {
     public Command Create()
     {
-        RootCommand rootCommand = rootCommandModule.CreateRootCommand(runtime, console, fileSystem);
+        RootCommand rootCommand = rootCommandModule.CreateRootCommand(runtime, console, fileSystem, cancellationToken);
         foreach (ITopLevelCliSubcommandModule module in subcommandModules.OrderBy(static module => module.CommandName, StringComparer.Ordinal))
         {
             rootCommand.Subcommands.Add(module.CreateCommand(runtime, console, fileSystem));

@@ -54,7 +54,8 @@ public sealed partial class ArchitectureAnalysisSession
             preprocessorSymbols,
             fileSystem: null,
             context.ProjectDiscovery,
-            sourceRootAssemblyOwnership: null);
+            sourceRootAssemblyOwnership: null,
+            context.CancellationToken);
         ExpressionFacts = new ArchitectureExpressionFactService(RoleIndex, SourceFileFactIndex, context.ProjectDiscovery);
         RegisterAllContextualConsumersFromDocument();
     }

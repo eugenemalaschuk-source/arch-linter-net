@@ -39,6 +39,7 @@ public sealed class ArchitectureSourceFileFactIndex
     private readonly IReadOnlyList<string>? _preprocessorSymbols;
     private readonly IArchitectureFileSystem _fileSystem;
     private readonly IReadOnlyList<(string SourcePath, string AssemblyName)> _sourcePathAssemblyOwnership;
+    private readonly CancellationToken _cancellationToken;
     private readonly Lazy<FactIndexData> _data;
 
     public ArchitectureSourceFileFactIndex(
@@ -46,7 +47,8 @@ public sealed class ArchitectureSourceFileFactIndex
         string repositoryRoot,
         IReadOnlyList<string> sourceRoots,
         IReadOnlyList<string>? preprocessorSymbols = null,
-        IArchitectureFileSystem? fileSystem = null)
+        IArchitectureFileSystem? fileSystem = null,
+        CancellationToken cancellationToken = default)
         : this(
             targetAssemblies,
             repositoryRoot,
@@ -54,7 +56,8 @@ public sealed class ArchitectureSourceFileFactIndex
             preprocessorSymbols,
             fileSystem,
             projectDiscovery: null,
-            sourceRootAssemblyOwnership: null)
+            sourceRootAssemblyOwnership: null,
+            cancellationToken)
     {
     }
 
@@ -65,7 +68,8 @@ public sealed class ArchitectureSourceFileFactIndex
         IReadOnlyList<string>? preprocessorSymbols,
         IArchitectureFileSystem? fileSystem,
         ProjectDiscoveryResult? projectDiscovery,
-        IReadOnlyDictionary<string, string>? sourceRootAssemblyOwnership)
+        IReadOnlyDictionary<string, string>? sourceRootAssemblyOwnership,
+        CancellationToken cancellationToken = default)
     {
         _targetAssemblies = targetAssemblies ?? throw new ArgumentNullException(nameof(targetAssemblies));
         _repositoryRoot = repositoryRoot ?? throw new ArgumentNullException(nameof(repositoryRoot));
@@ -77,6 +81,7 @@ public sealed class ArchitectureSourceFileFactIndex
             _sourceRoots,
             projectDiscovery,
             sourceRootAssemblyOwnership);
+        _cancellationToken = cancellationToken;
         _data = new Lazy<FactIndexData>(BuildData);
     }
 
@@ -122,12 +127,16 @@ public sealed class ArchitectureSourceFileFactIndex
 
     private FactIndexData BuildData()
     {
+        _cancellationToken.ThrowIfCancellationRequested();
+
         List<Assembly> sortedAssemblies = _targetAssemblies
             .Distinct()
             .OrderBy(a => a.GetName().Name ?? string.Empty, _ordinal)
             .ToList();
 
         Dictionary<string, List<BaseFact>> reflectionFacts = RunReflectionPass(sortedAssemblies);
+
+        _cancellationToken.ThrowIfCancellationRequested();
 
         Dictionary<SourceFactKey, List<(string FilePath, ArchitectureTypeKind Kind)>> sourceMap =
             _sourceRoots.Count > 0 ? RunSourceScan() : [];

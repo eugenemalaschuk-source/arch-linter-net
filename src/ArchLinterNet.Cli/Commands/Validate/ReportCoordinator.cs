@@ -22,7 +22,14 @@ internal readonly record struct RouteResult(
     IReadOnlyList<string> StagedPaths,
     IReadOnlyList<string> UncommittedPaths,
     IReadOnlyList<string> ErrorDetails,
-    IReadOnlyList<string> DeliveredStreamPaths);
+    IReadOnlyList<string> DeliveredStreamPaths)
+{
+    // Additive evidence, not a fourth ReportRouteStatus value: Status still reports how much
+    // committed (AllSucceeded/PartialOutput/OutputFailed); Cancelled reports why the run stopped
+    // short of that. Files already renamed into place before cancellation was observed stay
+    // committed — there is no code path that undoes a completed rename.
+    public bool Cancelled { get; init; }
+}
 
 internal sealed class ReportCoordinator
 {
@@ -46,19 +53,24 @@ internal sealed class ReportCoordinator
         string stdoutFormat,
         string mode,
         ValidationOutcome outcome,
-        IReadOnlyList<ReportSink> additionalSinks)
+        IReadOnlyList<ReportSink> additionalSinks,
+        CancellationToken cancellationToken = default)
     {
         bool isReportMode = additionalSinks.Count > 0;
-        return RouteOutcomes(stdoutFormat, new[] { (mode, outcome) }, additionalSinks, isSingleMode: true, isReportMode);
+        return RouteOutcomes(
+            stdoutFormat, new[] { (mode, outcome) }, additionalSinks, isSingleMode: true, isReportMode,
+            cancellationToken);
     }
 
     public RouteResult RouteCombinedOutcomes(
         string stdoutFormat,
         IReadOnlyList<(string Mode, ValidationOutcome Outcome)> outcomesByMode,
-        IReadOnlyList<ReportSink> additionalSinks)
+        IReadOnlyList<ReportSink> additionalSinks,
+        CancellationToken cancellationToken = default)
     {
         bool isReportMode = additionalSinks.Count > 0;
-        return RouteOutcomes(stdoutFormat, outcomesByMode, additionalSinks, isSingleMode: false, isReportMode);
+        return RouteOutcomes(
+            stdoutFormat, outcomesByMode, additionalSinks, isSingleMode: false, isReportMode, cancellationToken);
     }
 
     private RouteResult RouteOutcomes(
@@ -66,7 +78,8 @@ internal sealed class ReportCoordinator
         IReadOnlyList<(string Mode, ValidationOutcome Outcome)> outcomesByMode,
         IReadOnlyList<ReportSink> additionalSinks,
         bool isSingleMode,
-        bool isReportMode)
+        bool isReportMode,
+        CancellationToken cancellationToken)
     {
         // Legacy combined human: write each mode sequentially (pre-#364 behavior)
         bool legacyCombinedHuman = !isReportMode && !isSingleMode && stdoutFormat == FormatHuman;
@@ -86,7 +99,8 @@ internal sealed class ReportCoordinator
             _console.Out.WriteLine(DispatchFormat(stdoutFormat, humanContent, jsonContent, sarifContent));
         }
 
-        return DistributeToSinks(additionalSinks, BuildContentByFormat(humanContent, jsonContent, sarifContent));
+        return DistributeToSinks(
+            additionalSinks, BuildContentByFormat(humanContent, jsonContent, sarifContent), cancellationToken);
     }
 
     private string? ResolveHumanContent(
@@ -177,20 +191,29 @@ internal sealed class ReportCoordinator
     // this invocation, so there is nothing at the destination for the error content to clobber.
     public RouteResult RouteErrorToAllSinks(
         IReadOnlyList<ReportSink> additionalSinks,
-        IReadOnlyDictionary<string, string> contentByFormat)
+        IReadOnlyDictionary<string, string> contentByFormat,
+        CancellationToken cancellationToken = default)
     {
-        return DistributeToSinks(additionalSinks, contentByFormat);
+        return DistributeToSinks(additionalSinks, contentByFormat, cancellationToken);
     }
 
     private RouteResult DistributeToSinks(
         IReadOnlyList<ReportSink> additionalSinks,
-        IReadOnlyDictionary<string, string> contentByFormat)
+        IReadOnlyDictionary<string, string> contentByFormat,
+        CancellationToken cancellationToken)
     {
         List<string> failedPaths = new();
         List<string> stagedPaths = new();
         List<string> errorDetails = new();
         List<string> deliveredStreamPaths = new();
         List<(string TempPath, string TargetPath)> pendingRenames = new();
+
+        if (cancellationToken.IsCancellationRequested)
+        {
+            return BuildRouteResult(
+                additionalSinks, contentByFormat, failedPaths, new List<string>(), stagedPaths, errorDetails,
+                deliveredStreamPaths, cancelled: true);
+        }
 
         // Do not emit a normal stream document until every file artifact passed staging. Otherwise
         // a later file-stage failure leaves a successful --report ...=stderr stream
@@ -201,7 +224,7 @@ internal sealed class ReportCoordinator
         }
 
         List<string> committedPaths = new();
-        if (failedPaths.Count == 0)
+        if (failedPaths.Count == 0 && !cancellationToken.IsCancellationRequested)
         {
             // Stderr is last so a failed stdout never leaves a successful stderr report that
             // hides the same invocation's output failure. A failed stderr is retried by the
@@ -217,9 +240,12 @@ internal sealed class ReportCoordinator
             }
         }
 
-        if (failedPaths.Count == 0)
+        bool cancelledBeforeCommit = cancellationToken.IsCancellationRequested;
+        bool cancelledMidCommit = false;
+        if (failedPaths.Count == 0 && !cancelledBeforeCommit)
         {
-            CommitPendingRenames(pendingRenames, committedPaths, failedPaths, errorDetails);
+            cancelledMidCommit = CommitPendingRenames(
+                pendingRenames, committedPaths, failedPaths, errorDetails, cancellationToken);
         }
         else
         {
@@ -227,7 +253,8 @@ internal sealed class ReportCoordinator
         }
 
         return BuildRouteResult(
-            additionalSinks, contentByFormat, failedPaths, committedPaths, stagedPaths, errorDetails, deliveredStreamPaths);
+            additionalSinks, contentByFormat, failedPaths, committedPaths, stagedPaths, errorDetails,
+            deliveredStreamPaths, cancelled: cancelledBeforeCommit || cancelledMidCommit);
     }
 
     private void StageFileSink(
@@ -309,14 +336,26 @@ internal sealed class ReportCoordinator
     // Phase 2 only runs once every staged sink is already known-good (StageSink validated each
     // temp file before adding it here), so a failure at this point is a genuine OS-level rename
     // fault, not a precondition this coordinator could have caught earlier.
-    private void CommitPendingRenames(
+    //
+    // Returns true if cancellation stopped this loop before every pending rename was processed.
+    // Files already renamed before that point stay committed — no rollback; any rename still
+    // pending when cancellation was observed has its staged temp file removed instead of renamed.
+    private bool CommitPendingRenames(
         List<(string TempPath, string TargetPath)> pendingRenames,
         List<string> committedPaths,
         List<string> failedPaths,
-        List<string> errorDetails)
+        List<string> errorDetails,
+        CancellationToken cancellationToken)
     {
-        foreach ((string tempPath, string targetPath) in pendingRenames)
+        for (int i = 0; i < pendingRenames.Count; i++)
         {
+            if (cancellationToken.IsCancellationRequested)
+            {
+                DeletePendingTemps(pendingRenames.Skip(i));
+                return true;
+            }
+
+            (string tempPath, string targetPath) = pendingRenames[i];
             try
             {
                 _fileSystem.RenameTempToTarget(tempPath, targetPath);
@@ -329,6 +368,8 @@ internal sealed class ReportCoordinator
                 DeleteTempFileBestEffort(tempPath);
             }
         }
+
+        return false;
     }
 
     private void DeleteTempFileBestEffort(string tempPath)
@@ -360,9 +401,10 @@ internal sealed class ReportCoordinator
         List<string> committedPaths,
         List<string> stagedPaths,
         List<string> errorDetails,
-        List<string> deliveredStreamPaths)
+        List<string> deliveredStreamPaths,
+        bool cancelled = false)
     {
-        if (failedPaths.Count == 0)
+        if (failedPaths.Count == 0 && !cancelled)
         {
             return new RouteResult(
                 ReportRouteStatus.AllSucceeded, Array.Empty<string>(), committedPaths, stagedPaths,
@@ -380,7 +422,10 @@ internal sealed class ReportCoordinator
             : ReportRouteStatus.OutputFailed;
 
         return new RouteResult(
-            status, failedPaths, committedPaths, stagedPaths, uncommittedPaths, errorDetails, deliveredStreamPaths);
+            status, failedPaths, committedPaths, stagedPaths, uncommittedPaths, errorDetails, deliveredStreamPaths)
+        {
+            Cancelled = cancelled
+        };
     }
 
     // Re-validates the bytes actually landed on disk rather than trusting the in-memory string that

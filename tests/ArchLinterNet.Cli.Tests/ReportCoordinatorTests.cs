@@ -11,7 +11,7 @@ using NUnit.Framework;
 namespace ArchLinterNet.Cli.Tests;
 
 [TestFixture]
-public sealed class ReportCoordinatorTests
+public sealed partial class ReportCoordinatorTests
 {
     [Test]
     public void StripAnsi_RemovesCsiAndOscSequencesFromHumanReports()
@@ -288,6 +288,7 @@ public sealed class ReportCoordinatorTests
         Assert.That(result.FailedPaths, Is.EquivalentTo(new[] { "bad.json" }));
     }
 
+
     [Test]
     public void ReportMode_StdoutSink_WritesFormatToStdout()
     {
@@ -536,6 +537,11 @@ public sealed class ReportCoordinatorTests
         public List<string> TempPaths { get; } = new();
         public List<string> TargetPaths { get; } = new();
 
+        // Issue #375: lets a test observe mid-commit cancellation by cancelling the token right
+        // after a specific target has been renamed, so the next pending rename in the loop sees
+        // IsCancellationRequested at its own top-of-loop check.
+        public Action<string>? OnRenamed { get; set; }
+
         public void MakeUnwritable(string path, FailPhase phase = FailPhase.Write) =>
             _failOn.Add(new FailEntry(path, phase));
 
@@ -579,6 +585,7 @@ public sealed class ReportCoordinatorTests
             }
 
             TargetPaths.Add(targetPath);
+            OnRenamed?.Invoke(targetPath);
         }
 
         public void DeleteFile(string path)

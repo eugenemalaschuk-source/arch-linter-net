@@ -15,7 +15,8 @@ public interface IArchitectureAssemblyResolutionService
         ProjectDiscoveryResult discovery,
         bool resolveAssemblyOutputs,
         string? mode,
-        HashSet<string>? selectedContractIds);
+        HashSet<string>? selectedContractIds,
+        CancellationToken cancellationToken = default);
 
     // The post-ensure-built pass must not reuse a same-simple-name assembly from the process.
     ResolutionResult ResolvePostBuild(
@@ -24,7 +25,8 @@ public interface IArchitectureAssemblyResolutionService
         ProjectDiscoveryResult discovery,
         bool resolveAssemblyOutputs,
         string? mode,
-        HashSet<string>? selectedContractIds);
+        HashSet<string>? selectedContractIds,
+        CancellationToken cancellationToken = default);
 }
 
 public sealed class ArchitectureAssemblyResolutionService : IArchitectureAssemblyResolutionService
@@ -56,10 +58,11 @@ public sealed class ArchitectureAssemblyResolutionService : IArchitectureAssembl
         ProjectDiscoveryResult discovery,
         bool resolveAssemblyOutputs,
         string? mode,
-        HashSet<string>? selectedContractIds)
+        HashSet<string>? selectedContractIds,
+        CancellationToken cancellationToken = default)
     {
         return Resolve(document, repositoryRoot, discovery, resolveAssemblyOutputs, mode, selectedContractIds,
-            forceIsolatedLoading: false, exactPostBuildAssemblyPaths: null);
+            forceIsolatedLoading: false, exactPostBuildAssemblyPaths: null, cancellationToken);
     }
 
     public ResolutionResult ResolvePostBuild(
@@ -68,10 +71,11 @@ public sealed class ArchitectureAssemblyResolutionService : IArchitectureAssembl
         ProjectDiscoveryResult discovery,
         bool resolveAssemblyOutputs,
         string? mode,
-        HashSet<string>? selectedContractIds)
+        HashSet<string>? selectedContractIds,
+        CancellationToken cancellationToken = default)
     {
         return Resolve(document, repositoryRoot, discovery, resolveAssemblyOutputs, mode, selectedContractIds,
-            forceIsolatedLoading: true, exactPostBuildAssemblyPaths: discovery.ResolvedAssemblyPaths);
+            forceIsolatedLoading: true, exactPostBuildAssemblyPaths: discovery.ResolvedAssemblyPaths, cancellationToken);
     }
 
     private ResolutionResult Resolve(
@@ -82,7 +86,8 @@ public sealed class ArchitectureAssemblyResolutionService : IArchitectureAssembl
         string? mode,
         HashSet<string>? selectedContractIds,
         bool forceIsolatedLoading,
-        IReadOnlyDictionary<string, string>? exactPostBuildAssemblyPaths)
+        IReadOnlyDictionary<string, string>? exactPostBuildAssemblyPaths,
+        CancellationToken cancellationToken)
     {
         // A scope: project coverage contract needs every discovered project to reach
         // CheckProjectCoverageContract — including ones whose build output is missing, stale,
@@ -126,15 +131,17 @@ public sealed class ArchitectureAssemblyResolutionService : IArchitectureAssembl
         return document.Analysis.TargetAssemblies.Count == 0 && projectCoverageCanReportUnresolvedProjects
             ? new ResolutionResult(Array.Empty<Assembly>(), Array.Empty<string>(), Array.Empty<string>())
             : ResolveFromDocument(document, repositoryRoot, _fileSystem, _environment, _assemblyLoader,
-                forceIsolatedLoading, exactPostBuildAssemblyPaths, discovery.AssemblySearchPaths);
+                forceIsolatedLoading, exactPostBuildAssemblyPaths, discovery.AssemblySearchPaths, cancellationToken);
     }
 
     public ResolutionResult ResolveFromDocument(
         ArchitectureContractDocument document,
-        string? repositoryRoot = null)
+        string? repositoryRoot = null,
+        CancellationToken cancellationToken = default)
     {
         return ResolveFromDocument(document, repositoryRoot, _fileSystem, _environment, _assemblyLoader,
-            forceIsolatedLoading: false, exactPostBuildAssemblyPaths: null, additionalProbingPaths: null);
+            forceIsolatedLoading: false, exactPostBuildAssemblyPaths: null, additionalProbingPaths: null,
+            cancellationToken);
     }
 
     private static ResolutionResult ResolveFromDocument(
@@ -145,7 +152,8 @@ public sealed class ArchitectureAssemblyResolutionService : IArchitectureAssembl
         IArchitectureAssemblyLoader assemblyLoader,
         bool forceIsolatedLoading,
         IReadOnlyDictionary<string, string>? exactPostBuildAssemblyPaths,
-        IReadOnlyCollection<string>? additionalProbingPaths)
+        IReadOnlyCollection<string>? additionalProbingPaths,
+        CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(document);
 
@@ -172,6 +180,7 @@ public sealed class ArchitectureAssemblyResolutionService : IArchitectureAssembl
         foreach (string name in names.Where(value => !string.IsNullOrWhiteSpace(value))
                      .Distinct(StringComparer.Ordinal))
         {
+            cancellationToken.ThrowIfCancellationRequested();
             try
             {
                 ResolvedAssembly resolved = ResolveByName(

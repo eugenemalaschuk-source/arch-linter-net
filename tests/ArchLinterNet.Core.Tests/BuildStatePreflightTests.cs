@@ -420,6 +420,40 @@ public sealed class BuildStatePreflightTests
         Assert.That(File.Exists(BuildReceiptStore.ReceiptPathFor(assemblyPath)), Is.True);
     }
 
+    // Issue #375: cancellation during EnsureBuilt must terminate the in-flight child
+    // dotnet restore/build process (without a shell — see BuildStatePreparationService's
+    // ProcessStartInfo, which never sets UseShellExecute=true) and still remove the temporary
+    // .slnx solution the existing `finally` block in InvokeGraphBuild already cleans up.
+    [Test]
+    [Category("Integration")]
+    [CancelAfter(120_000)]
+    public async Task Prepare_EnsureBuilt_CancelledMidBuild_TerminatesProcessAndCleansUpTempSolution()
+    {
+        string projectPath = CreateRealBuildableProjectFixture("CancelledBuildFixture");
+        ProjectDiscoveryResult discovery = SingleProjectDiscovery(projectPath, "CancelledBuildFixture");
+        var service = new BuildStatePreparationService();
+
+        const string TempSolutionPattern = "archlinternet-ensure-built-*.slnx";
+        int tempSolutionCountBefore = Directory.GetFiles(Path.GetTempPath(), TempSolutionPattern).Length;
+
+        using CancellationTokenSource cts = new();
+        Task prepareTask = Task.Run(() => service.Prepare(new BuildStatePreflightRequest(
+            _repoRoot, discovery, new BuildStateResolvedAssemblies(Array.Empty<Assembly>(), Array.Empty<string>()),
+            BuildPreparationMode.EnsureBuilt, RequestedConfiguration: "Debug", CancellationToken: cts.Token)));
+
+        // Give the child dotnet restore/build process a moment to actually start before
+        // cancelling — cancelling instantly risks interrupting before Process.Start even runs,
+        // which would still throw OperationCanceledException but wouldn't exercise the
+        // process-kill path this test is for.
+        await Task.Delay(300);
+        cts.Cancel();
+
+        Assert.ThrowsAsync<OperationCanceledException>(async () => await prepareTask);
+
+        int tempSolutionCountAfter = Directory.GetFiles(Path.GetTempPath(), TempSolutionPattern).Length;
+        Assert.That(tempSolutionCountAfter, Is.EqualTo(tempSolutionCountBefore));
+    }
+
     private string CreateRealBuildableProjectFixture(string assemblyName)
     {
         string projectDirectory = Path.Combine(_repoRoot, "src", assemblyName);

@@ -44,10 +44,11 @@ public sealed class ArchitectureRunnerSetupService(
         HashSet<string>? selectedContractIds = null,
         bool enableUnmatchedIgnoreTracking = true,
         ValidationTiming? timing = null,
-        string? mode = null)
+        string? mode = null,
+        CancellationToken cancellationToken = default)
     {
         return BuildRunnerCore(document, policyPath, conditionSetName, preprocessorSymbols, selectedContractIds,
-            enableUnmatchedIgnoreTracking, timing, mode, loadPostBuildArtifacts: false);
+            enableUnmatchedIgnoreTracking, timing, mode, loadPostBuildArtifacts: false, cancellationToken);
     }
 
     public ArchitectureRunnerSetup BuildRunnerForPostBuild(
@@ -58,10 +59,11 @@ public sealed class ArchitectureRunnerSetupService(
         HashSet<string>? selectedContractIds = null,
         bool enableUnmatchedIgnoreTracking = true,
         ValidationTiming? timing = null,
-        string? mode = null)
+        string? mode = null,
+        CancellationToken cancellationToken = default)
     {
         return BuildRunnerCore(document, policyPath, conditionSetName, preprocessorSymbols, selectedContractIds,
-            enableUnmatchedIgnoreTracking, timing, mode, loadPostBuildArtifacts: true);
+            enableUnmatchedIgnoreTracking, timing, mode, loadPostBuildArtifacts: true, cancellationToken);
     }
 
     private ArchitectureRunnerSetup BuildRunnerCore(
@@ -73,8 +75,11 @@ public sealed class ArchitectureRunnerSetupService(
         bool enableUnmatchedIgnoreTracking,
         ValidationTiming? timing,
         string? mode,
-        bool loadPostBuildArtifacts)
+        bool loadPostBuildArtifacts,
+        CancellationToken cancellationToken)
     {
+        cancellationToken.ThrowIfCancellationRequested();
+
         string repositoryRoot;
         using (timing?.Measure("root_resolution", indent: 1))
             repositoryRoot = repositoryRootResolver.ResolveFrom(policyPath);
@@ -89,6 +94,8 @@ public sealed class ArchitectureRunnerSetupService(
             }
         }
 
+        cancellationToken.ThrowIfCancellationRequested();
+
         ArchitectureContractRunner runner;
         using (timing?.Measure("assembly_resolution", indent: 1))
         {
@@ -101,19 +108,22 @@ public sealed class ArchitectureRunnerSetupService(
                 resolveAssemblyOutputs = true;
             }
             ProjectDiscoveryResult discovery = projectDiscoveryService.ResolveAndApply(
-                document, repositoryRoot, resolveAssemblyOutputs);
+                document, repositoryRoot, resolveAssemblyOutputs, cancellationToken);
 
             ResolutionResult resolution = loadPostBuildArtifacts
                 ? assemblyResolutionService.ResolvePostBuild(
-                    document, repositoryRoot, discovery, resolveAssemblyOutputs, mode, selectedContractIds)
+                    document, repositoryRoot, discovery, resolveAssemblyOutputs, mode, selectedContractIds,
+                    cancellationToken)
                 : assemblyResolutionService.Resolve(
-                    document, repositoryRoot, discovery, resolveAssemblyOutputs, mode, selectedContractIds);
+                    document, repositoryRoot, discovery, resolveAssemblyOutputs, mode, selectedContractIds,
+                    cancellationToken);
 
             ProjectDiscoveryResult? attemptedDiscovery = ReferenceEquals(discovery, ProjectDiscoveryResult.Empty)
                 ? null
                 : discovery;
 
-            ArchitectureAnalysisContext context = CreateAnalysisContext(repositoryRoot, resolution, discovery, attemptedDiscovery);
+            ArchitectureAnalysisContext context = CreateAnalysisContext(
+                repositoryRoot, resolution, discovery, attemptedDiscovery, cancellationToken);
             runner = CreateRunner(context, document, selectedContractIds, enableUnmatchedIgnoreTracking, symbols);
 
             return new ArchitectureRunnerSetup(repositoryRoot, runner) { AssemblyLoads = resolution.AssemblyLoads };
@@ -156,11 +166,15 @@ public sealed class ArchitectureRunnerSetupService(
         string repositoryRoot,
         ResolutionResult resolution,
         ProjectDiscoveryResult discovery,
-        ProjectDiscoveryResult? attemptedDiscovery)
+        ProjectDiscoveryResult? attemptedDiscovery,
+        CancellationToken cancellationToken)
     {
         return new ArchitectureAnalysisContext(repositoryRoot, resolution.ResolvedAssemblies,
             resolution.MissingAssemblyNames, resolution.AssemblyProbingPaths, discovery.Diagnostics, attemptedDiscovery,
-            resolution.IsolatedLoadScope);
+            resolution.IsolatedLoadScope)
+        {
+            CancellationToken = cancellationToken
+        };
     }
 
     private static ArchitectureContractRunner CreateRunner(

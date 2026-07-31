@@ -35,7 +35,8 @@ public sealed class ArchitectureRunnerSetupServiceFakeDependencyTests
         public bool WasCalled { get; private set; }
 
         public ProjectDiscoveryResult ResolveAndApply(
-            ArchitectureContractDocument document, string repositoryRoot, bool resolveAssemblyOutputs)
+            ArchitectureContractDocument document, string repositoryRoot, bool resolveAssemblyOutputs,
+            CancellationToken cancellationToken = default)
         {
             WasCalled = true;
             return ProjectDiscoveryResult.Empty;
@@ -52,7 +53,8 @@ public sealed class ArchitectureRunnerSetupServiceFakeDependencyTests
             ProjectDiscoveryResult discovery,
             bool resolveAssemblyOutputs,
             string? mode,
-            HashSet<string>? selectedContractIds)
+            HashSet<string>? selectedContractIds,
+            CancellationToken cancellationToken = default)
         {
             WasCalled = true;
             return new ResolutionResult(
@@ -67,9 +69,11 @@ public sealed class ArchitectureRunnerSetupServiceFakeDependencyTests
             ProjectDiscoveryResult discovery,
             bool resolveAssemblyOutputs,
             string? mode,
-            HashSet<string>? selectedContractIds)
+            HashSet<string>? selectedContractIds,
+            CancellationToken cancellationToken = default)
         {
-            return Resolve(document, repositoryRoot, discovery, resolveAssemblyOutputs, mode, selectedContractIds);
+            return Resolve(document, repositoryRoot, discovery, resolveAssemblyOutputs, mode, selectedContractIds,
+                cancellationToken);
         }
     }
 

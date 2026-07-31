@@ -8,7 +8,7 @@ using ArchLinterNet.Core.Validation;
 
 namespace ArchLinterNet.Cli.Commands.Validate;
 
-internal sealed class ValidateCommandHandler
+internal sealed partial class ValidateCommandHandler
 {
     private const string FormatHuman = "human";
     private const string FormatJson = "json";
@@ -18,13 +18,16 @@ internal sealed class ValidateCommandHandler
     private readonly ICliConsole _console;
     private readonly IFileSystem _fileSystem;
     private readonly ReportCoordinator _coordinator;
+    private readonly CancellationToken _cancellationToken;
 
-    public ValidateCommandHandler(ICliRuntime runtime, ICliConsole console, IFileSystem fileSystem)
+    public ValidateCommandHandler(
+        ICliRuntime runtime, ICliConsole console, IFileSystem fileSystem, CancellationToken cancellationToken = default)
     {
         _runtime = runtime;
         _console = console;
         _fileSystem = fileSystem;
         _coordinator = new ReportCoordinator(runtime, console, fileSystem);
+        _cancellationToken = cancellationToken;
     }
     public int Execute(ValidateCommandOptions options)
     {
@@ -39,6 +42,11 @@ internal sealed class ValidateCommandHandler
         try
         {
             return ExecuteValidation(options, errorFormat);
+        }
+        catch (OperationCanceledException)
+        {
+            WriteCancellation(options, errorFormat);
+            return CliExitCodes.InvalidArgumentsOrRuntimeError;
         }
         catch (Exception ex) when (TryGetPolicyDiagnostic(ex, out ArchitecturePolicyDiagnostic? diagnostic))
         {
@@ -545,7 +553,8 @@ internal sealed class ValidateCommandHandler
             return CliExitCodes.InvalidArgumentsOrRuntimeError;
         }
 
-        RouteResult result = _coordinator.RouteSingleOutcome(options.Format, mode, outcome, options.AdditionalSinks);
+        RouteResult result = _coordinator.RouteSingleOutcome(
+            options.Format, mode, outcome, options.AdditionalSinks, _cancellationToken);
         timing?.WriteReport(_console.Error);
         if (result.Status != ReportRouteStatus.AllSucceeded)
         {
@@ -574,6 +583,7 @@ internal sealed class ValidateCommandHandler
             NoRestore = options.NoRestore,
             RequestedConfiguration = options.Configuration,
             RequestedTargetFramework = options.TargetFramework,
+            CancellationToken = _cancellationToken,
         };
 
         using ArchitectureAnalysisSnapshot snapshot = _runtime.CreateSnapshot(snapshotRequest, timing);
@@ -611,7 +621,8 @@ internal sealed class ValidateCommandHandler
             return CliExitCodes.InvalidArgumentsOrRuntimeError;
         }
 
-        RouteResult result = _coordinator.RouteCombinedOutcomes(options.Format, outcomesByMode, options.AdditionalSinks);
+        RouteResult result = _coordinator.RouteCombinedOutcomes(
+            options.Format, outcomesByMode, options.AdditionalSinks, _cancellationToken);
 
         timing?.WriteReport(_console.Error);
         if (result.Status != ReportRouteStatus.AllSucceeded)
@@ -623,7 +634,7 @@ internal sealed class ValidateCommandHandler
         return allPassed ? CliExitCodes.Success : CliExitCodes.ValidationFailure;
     }
 
-    private static ValidationRequest BuildValidationRequest(ValidateCommandOptions options, string mode)
+    private ValidationRequest BuildValidationRequest(ValidateCommandOptions options, string mode)
     {
         return new ValidationRequest
         {
@@ -637,6 +648,7 @@ internal sealed class ValidateCommandHandler
             NoRestore = options.NoRestore,
             RequestedConfiguration = options.Configuration,
             RequestedTargetFramework = options.TargetFramework,
+            CancellationToken = _cancellationToken,
         };
     }
 
