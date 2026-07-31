@@ -49,20 +49,23 @@ internal static class ArchitectureSourceSetExpander
         ExpandGroup(document, resolver, expansions, "audit_external_allow_only",
             groups.AuditExternalAllowOnly, list => groups.AuditExternalAllowOnly = list);
 
-        ExpandInlineGroup(document, resolver, expansions, "strict_project_metadata",
+        ExpansionContext inlineContext = new(document, resolver, expansions);
+        ExpandInlineGroup(inlineContext, "strict_project_metadata",
             groups.StrictProjectMetadata, contract => contract.Projects, (contract, values) => contract.Projects = values,
-            contract => contract.ProjectSets, "project_sets", ArchitectureSourceSetKind.Project);
-        ExpandInlineGroup(document, resolver, expansions, "audit_project_metadata",
+            contract => contract.ProjectSets, new SourceSetField("project_sets", ArchitectureSourceSetKind.Project));
+        ExpandInlineGroup(inlineContext, "audit_project_metadata",
             groups.AuditProjectMetadata, contract => contract.Projects, (contract, values) => contract.Projects = values,
-            contract => contract.ProjectSets, "project_sets", ArchitectureSourceSetKind.Project);
-        ExpandInlineGroup(document, resolver, expansions, "strict_composition",
+            contract => contract.ProjectSets, new SourceSetField("project_sets", ArchitectureSourceSetKind.Project));
+        ExpandInlineGroup(inlineContext, "strict_composition",
             groups.StrictComposition, contract => contract.AllowedOnlyInAssemblies,
             (contract, values) => contract.AllowedOnlyInAssemblies = values,
-            contract => contract.AllowedOnlyInAssemblySets, "allowed_only_in_assembly_sets", ArchitectureSourceSetKind.Assembly);
-        ExpandInlineGroup(document, resolver, expansions, "audit_composition",
+            contract => contract.AllowedOnlyInAssemblySets,
+            new SourceSetField("allowed_only_in_assembly_sets", ArchitectureSourceSetKind.Assembly));
+        ExpandInlineGroup(inlineContext, "audit_composition",
             groups.AuditComposition, contract => contract.AllowedOnlyInAssemblies,
             (contract, values) => contract.AllowedOnlyInAssemblies = values,
-            contract => contract.AllowedOnlyInAssemblySets, "allowed_only_in_assembly_sets", ArchitectureSourceSetKind.Assembly);
+            contract => contract.AllowedOnlyInAssemblySets,
+            new SourceSetField("allowed_only_in_assembly_sets", ArchitectureSourceSetKind.Assembly));
 
         RecordLayerTemplateContainerExclusions(document, expansions, "strict_layer_templates", groups.StrictLayerTemplates);
         RecordLayerTemplateContainerExclusions(document, expansions, "audit_layer_templates", groups.AuditLayerTemplates);
@@ -140,39 +143,44 @@ internal static class ArchitectureSourceSetExpander
             "unique within its contract type and mode group.");
     }
 
-    private static IEnumerable<TContract> ExpandContract<TContract>(
-        ArchitectureContractDocument document,
-        SourceSetResolver resolver,
-        List<ArchitectureContractExpansion> expansions,
-        string group,
-        TContract contract)
-        where TContract : class, IArchitectureSourceExpandableContract
+    // Selector per resolved source (first writer wins, so overlapping sets and repeated members
+    // collapse to exactly one instance and the reported selector is deterministic), plus the
+    // per-source item-level provenance ExpandContract needs to build inclusion/exclusion evidence.
+    private sealed class SourceSelectionState
     {
-        if (!string.IsNullOrWhiteSpace(contract.Source))
+        public Dictionary<string, (string? SetName, string Selector)> Selectors { get; } = new(StringComparer.Ordinal);
+        public Dictionary<string, ArchitecturePolicySourceLocation?> InstanceLocations { get; } = new(StringComparer.Ordinal);
+        public Dictionary<string, ArchitecturePolicySourceLocation?> SourceSetReferenceLocations { get; } = new(StringComparer.Ordinal);
+        public List<string> OptionalReasons { get; } = new();
+    }
+
+    private static void ValidateNotBothExactAndMultiSource<TContract>(TContract contract, string group)
+        where TContract : IArchitectureSourceExpandableContract
+    {
+        if (string.IsNullOrWhiteSpace(contract.Source))
         {
-            bool declaresMultiSource = contract.Sources.Count > 0 || contract.SourceSets.Count > 0;
-            throw new InvalidOperationException(declaresMultiSource
-                ? $"Contract '{contract.Name}' in '{group}' declares both 'source' and " +
-                  "'sources'/'source_sets'. Declare exactly one source selector: an exact 'source', " +
-                  "or the multi-source 'sources'/'source_sets' form."
-                : $"Contract '{contract.Name}' in '{group}' declares an exact 'source' together with " +
-                  "'exclude_sources'/'exclude_source_sets'. Subtraction only applies to the multi-source " +
-                  "'sources'/'source_sets' form; remove the exclusion, or switch 'source' to 'sources'.");
+            return;
         }
 
-        // Every throw below is enriched by ArchitecturePolicyDocumentLoader with the current
-        // validation subject's location, so point it at the authored contract before resolving.
-        document.Provenance.SetValidationSubject(contract);
+        bool declaresMultiSource = contract.Sources.Count > 0 || contract.SourceSets.Count > 0;
+        throw new InvalidOperationException(declaresMultiSource
+            ? $"Contract '{contract.Name}' in '{group}' declares both 'source' and " +
+              "'sources'/'source_sets'. Declare exactly one source selector: an exact 'source', " +
+              "or the multi-source 'sources'/'source_sets' form."
+            : $"Contract '{contract.Name}' in '{group}' declares an exact 'source' together with " +
+              "'exclude_sources'/'exclude_source_sets'. Subtraction only applies to the multi-source " +
+              "'sources'/'source_sets' form; remove the exclusion, or switch 'source' to 'sources'.");
+    }
 
-        string authoredId = contract.Id ?? ArchitecturePolicyDocumentLoader.NormalizeToContractId(contract.Name);
-        ArchitecturePolicySourceLocation? contractLocation = document.Provenance.LocationFor(contract);
-
-        // Selector per resolved source, first writer wins, so overlapping sets and repeated members
-        // collapse to exactly one instance and the reported selector is deterministic.
-        Dictionary<string, (string? SetName, string Selector)> selectors = new(StringComparer.Ordinal);
-        Dictionary<string, ArchitecturePolicySourceLocation?> instanceLocations = new(StringComparer.Ordinal);
-        Dictionary<string, ArchitecturePolicySourceLocation?> sourceSetReferenceLocations = new(StringComparer.Ordinal);
-        List<string> optionalReasons = new();
+    private static SourceSelectionState ResolveIncludedSources<TContract>(
+        ArchitectureContractDocument document,
+        SourceSetResolver resolver,
+        string group,
+        TContract contract,
+        ArchitecturePolicySourceLocation? contractLocation)
+        where TContract : IArchitectureSourceExpandableContract
+    {
+        SourceSelectionState state = new();
 
         for (int index = 0; index < contract.Sources.Count; index++)
         {
@@ -183,9 +191,9 @@ internal static class ArchitectureSourceSetExpander
             }
 
             resolver.ValidateExplicitSource(contract.Name, group, contract.SourceKind, source);
-            if (selectors.TryAdd(source, (null, source)))
+            if (state.Selectors.TryAdd(source, (null, source)))
             {
-                instanceLocations[source] = ExclusionLocation(document, contractLocation, "sources", index);
+                state.InstanceLocations[source] = ExclusionLocation(document, contractLocation, "sources", index);
             }
         }
 
@@ -197,30 +205,35 @@ internal static class ArchitectureSourceSetExpander
 
             if (resolution.ResolvedSources.Count == 0)
             {
-                optionalReasons.Add(resolution.Reason);
+                state.OptionalReasons.Add(resolution.Reason);
                 continue;
             }
 
-            foreach (string source in resolution.ResolvedSources)
+            foreach (string source in resolution.ResolvedSources.Where(source =>
+                state.Selectors.TryAdd(source, (resolution.Name, resolver.SelectorFor(resolution.Name, source)))))
             {
-                if (selectors.TryAdd(source, (resolution.Name, resolver.SelectorFor(resolution.Name, source))))
-                {
-                    instanceLocations[source] = resolver.LocationFor(resolution.Name, source);
-                    sourceSetReferenceLocations[source] = ExclusionLocation(
-                        document, contractLocation, "source_sets", index);
-                }
+                state.InstanceLocations[source] = resolver.LocationFor(resolution.Name, source);
+                state.SourceSetReferenceLocations[source] = ExclusionLocation(
+                    document, contractLocation, "source_sets", index);
             }
         }
 
-        int includedCountBeforeExclusions = selectors.Count;
+        return state;
+    }
 
-        // A stable snapshot of what was actually included, taken before any exclusion mutates
-        // `selectors`. Matched/stale status for each authored exclusion item is judged against this
-        // snapshot rather than the live dictionary, so a source excluded by an earlier item does not
-        // make a later, equally-valid exclusion of the same source misreport as stale.
-        Dictionary<string, (string? SetName, string Selector)> includedSelectors =
-            new(selectors, StringComparer.Ordinal);
-        HashSet<string> includedSnapshot = new(includedSelectors.Keys, StringComparer.Ordinal);
+    // Judges every exclusion against `includedSnapshot` (captured before any exclusion mutates
+    // `state.Selectors`) rather than the live dictionary, so a source excluded by an earlier item
+    // does not make a later, equally-valid exclusion of the same source misreport as stale.
+    private static List<ArchitectureExpandedContractExclusion> ApplyExclusions<TContract>(
+        ArchitectureContractDocument document,
+        SourceSetResolver resolver,
+        string group,
+        TContract contract,
+        ArchitecturePolicySourceLocation? contractLocation,
+        SourceSelectionState state,
+        HashSet<string> includedSnapshot)
+        where TContract : IArchitectureSourceExpandableContract
+    {
         List<ArchitectureExpandedContractExclusion> exclusions = new();
 
         for (int index = 0; index < contract.ExcludedSources.Count; index++)
@@ -233,7 +246,7 @@ internal static class ArchitectureSourceSetExpander
 
             resolver.ValidateExplicitSource(contract.Name, group, contract.SourceKind, source);
             bool matched = includedSnapshot.Contains(source);
-            selectors.Remove(source);
+            state.Selectors.Remove(source);
             exclusions.Add(new ArchitectureExpandedContractExclusion(source, null, source, matched)
             {
                 PolicyLocation = ExclusionLocation(document, contractLocation, "exclude_sources", index)
@@ -263,7 +276,7 @@ internal static class ArchitectureSourceSetExpander
             foreach (string source in resolution.ResolvedSources)
             {
                 bool matched = includedSnapshot.Contains(source);
-                selectors.Remove(source);
+                state.Selectors.Remove(source);
                 exclusions.Add(new ArchitectureExpandedContractExclusion(
                     source,
                     resolution.Name,
@@ -275,7 +288,14 @@ internal static class ArchitectureSourceSetExpander
             }
         }
 
-        if (selectors.Count == 0 && includedCountBeforeExclusions == 0 && optionalReasons.Count == 0)
+        return exclusions;
+    }
+
+    private static void ValidateSelectorCounts<TContract>(
+        TContract contract, string group, SourceSelectionState state, int includedCountBeforeExclusions)
+        where TContract : IArchitectureSourceExpandableContract
+    {
+        if (state.Selectors.Count == 0 && includedCountBeforeExclusions == 0 && state.OptionalReasons.Count == 0)
         {
             throw new InvalidOperationException(
                 $"Contract '{contract.Name}' in '{group}' resolved no sources from its " +
@@ -283,27 +303,59 @@ internal static class ArchitectureSourceSetExpander
                 "the referenced set 'optional: true' with a reason if the absence is intentional.");
         }
 
-        if (selectors.Count > MaxInstancesPerContract)
+        if (state.Selectors.Count > MaxInstancesPerContract)
         {
             throw new InvalidOperationException(
-                $"Contract '{contract.Name}' in '{group}' expands to {selectors.Count} sources, " +
+                $"Contract '{contract.Name}' in '{group}' expands to {state.Selectors.Count} sources, " +
                 $"which exceeds the supported limit of {MaxInstancesPerContract}. Narrow the " +
                 "declared globs or split the contract.");
         }
+    }
+
+    private static List<TContract> ExpandContract<TContract>(
+        ArchitectureContractDocument document,
+        SourceSetResolver resolver,
+        List<ArchitectureContractExpansion> expansions,
+        string group,
+        TContract contract)
+        where TContract : class, IArchitectureSourceExpandableContract
+    {
+        ValidateNotBothExactAndMultiSource(contract, group);
+
+        // Every throw below is enriched by ArchitecturePolicyDocumentLoader with the current
+        // validation subject's location, so point it at the authored contract before resolving.
+        document.Provenance.SetValidationSubject(contract);
+
+        string authoredId = contract.Id ?? ArchitecturePolicyDocumentLoader.NormalizeToContractId(contract.Name);
+        ArchitecturePolicySourceLocation? contractLocation = document.Provenance.LocationFor(contract);
+
+        SourceSelectionState state = ResolveIncludedSources(document, resolver, group, contract, contractLocation);
+        int includedCountBeforeExclusions = state.Selectors.Count;
+
+        // A stable snapshot of what was actually included, taken before any exclusion mutates
+        // `state.Selectors`.
+        Dictionary<string, (string? SetName, string Selector)> includedSelectors =
+            new(state.Selectors, StringComparer.Ordinal);
+        HashSet<string> includedSnapshot = new(includedSelectors.Keys, StringComparer.Ordinal);
+
+        List<ArchitectureExpandedContractExclusion> exclusions =
+            ApplyExclusions(document, resolver, group, contract, contractLocation, state, includedSnapshot);
+
+        ValidateSelectorCounts(contract, group, state, includedCountBeforeExclusions);
 
         List<ArchitectureExpandedContractInstance> inclusions = includedSelectors
             .OrderBy(entry => entry.Key, StringComparer.Ordinal)
             .Select(entry => CreateExpandedInstance(
                 authoredId, entry.Key, entry.Value.SetName, entry.Value.Selector,
-                instanceLocations.GetValueOrDefault(entry.Key), contractLocation,
-                sourceSetReferenceLocations.GetValueOrDefault(entry.Key)))
+                state.InstanceLocations.GetValueOrDefault(entry.Key), contractLocation,
+                state.SourceSetReferenceLocations.GetValueOrDefault(entry.Key)))
             .ToList();
         List<ArchitectureExpandedContractInstance> instances = new();
         List<TContract> expandedContracts = new();
 
-        foreach (string source in selectors.Keys.OrderBy(value => value, StringComparer.Ordinal))
+        foreach (string source in state.Selectors.Keys.OrderBy(value => value, StringComparer.Ordinal))
         {
-            (string? setName, string selector) = selectors[source];
+            (string? setName, string selector) = state.Selectors[source];
             string instanceId = $"{authoredId}/{ArchitecturePolicyDocumentLoader.NormalizeToContractId(source)}";
 
             var instance = (TContract)contract.CloneForSource(source);
@@ -314,8 +366,8 @@ internal static class ArchitectureSourceSetExpander
             document.Provenance.BindExpandedContract(contract, instance, group);
             instances.Add(CreateExpandedInstance(
                 instanceId, source, setName, selector,
-                instanceLocations.GetValueOrDefault(source), contractLocation,
-                sourceSetReferenceLocations.GetValueOrDefault(source)));
+                state.InstanceLocations.GetValueOrDefault(source), contractLocation,
+                state.SourceSetReferenceLocations.GetValueOrDefault(source)));
             expandedContracts.Add(instance);
         }
 
@@ -326,8 +378,8 @@ internal static class ArchitectureSourceSetExpander
             contract.SourceSets.ToArray(),
             instances)
         {
-            OptionalEmpty = includedCountBeforeExclusions == 0 && optionalReasons.Count > 0,
-            OptionalReason = string.Join("; ", optionalReasons.Where(reason => !string.IsNullOrWhiteSpace(reason))),
+            OptionalEmpty = includedCountBeforeExclusions == 0 && state.OptionalReasons.Count > 0,
+            OptionalReason = string.Join("; ", state.OptionalReasons.Where(reason => !string.IsNullOrWhiteSpace(reason))),
             PolicyLocation = contractLocation,
             Exclusions = exclusions,
             Inclusions = inclusions
@@ -411,15 +463,22 @@ internal static class ArchitectureSourceSetExpander
         }
     }
 
+    // Bundles the three values every expansion step threads through unchanged, so a step's own
+    // signature only has to name what makes it different from its neighbors (kept the S107
+    // parameter-count gate under its authored-contract, not just resolved-source, threshold).
+    private sealed record ExpansionContext(
+        ArchitectureContractDocument Document,
+        SourceSetResolver Resolver,
+        List<ArchitectureContractExpansion> Expansions);
+
+    private readonly record struct SourceSetField(string Name, ArchitectureSourceSetKind Kind);
+
     private static List<string> InlineSets(
-        ArchitectureContractDocument document,
-        SourceSetResolver resolver,
-        List<ArchitectureContractExpansion> expansions,
+        ExpansionContext context,
         string group,
         IArchitectureContract contract,
         string contractName,
-        string field,
-        ArchitectureSourceSetKind kind,
+        SourceSetField field,
         List<string> declared,
         List<string> setNames)
     {
@@ -431,12 +490,12 @@ internal static class ArchitectureSourceSetExpander
         List<string> resolved = new(declared);
         Dictionary<string, (string SetName, string Selector, int ReferenceIndex)> setValues = new(StringComparer.Ordinal);
         List<string> optionalReasons = new();
-        ArchitecturePolicySourceLocation? contractLocation = document.Provenance.LocationFor(contract);
+        ArchitecturePolicySourceLocation? contractLocation = context.Document.Provenance.LocationFor(contract);
 
         for (int index = 0; index < setNames.Count; index++)
         {
             string setName = setNames[index];
-            ArchitectureSourceSetResolution resolution = resolver.Resolve(contractName, field, kind, setName);
+            ArchitectureSourceSetResolution resolution = context.Resolver.Resolve(contractName, field.Name, field.Kind, setName);
             if (resolution.ResolvedSources.Count == 0)
             {
                 optionalReasons.Add(resolution.Reason);
@@ -451,34 +510,34 @@ internal static class ArchitectureSourceSetExpander
                 }
 
                 resolved.Add(value);
-                setValues.TryAdd(value, (resolution.Name, resolver.SelectorFor(resolution.Name, value), index));
+                setValues.TryAdd(value, (resolution.Name, context.Resolver.SelectorFor(resolution.Name, value), index));
             }
         }
 
         string authoredId = contract.Id ?? ArchitecturePolicyDocumentLoader.NormalizeToContractId(contract.Name);
-        expansions.Add(new ArchitectureContractExpansion(
+        context.Expansions.Add(new ArchitectureContractExpansion(
             group, authoredId, contract.Name, setNames.ToArray(),
             setValues.OrderBy(pair => pair.Key, StringComparer.Ordinal)
                 .Select(pair => new ArchitectureExpandedContractInstance(
                     authoredId, pair.Key, pair.Value.SetName, pair.Value.Selector)
                 {
-                    PolicyLocation = resolver.LocationFor(pair.Value.SetName, pair.Key),
+                    PolicyLocation = context.Resolver.LocationFor(pair.Value.SetName, pair.Key),
                     AuthoredContractPolicyLocation = contractLocation,
                     SourceSetReferencePolicyLocation = ExclusionLocation(
-                        document, contractLocation, field, pair.Value.ReferenceIndex)
+                        context.Document, contractLocation, field.Name, pair.Value.ReferenceIndex)
                 })
                 .ToArray())
         {
             Kind = ArchitectureContractExpansionKind.InlineUnion,
-            SelectorField = field,
+            SelectorField = field.Name,
             OptionalEmpty = resolved.Count == 0 && optionalReasons.Count > 0,
             OptionalReason = string.Join("; ", optionalReasons.Where(reason => !string.IsNullOrWhiteSpace(reason))),
             PolicyLocation = contractLocation,
             Inclusions = setValues.OrderBy(pair => pair.Key, StringComparer.Ordinal)
                 .Select(pair => CreateExpandedInstance(
                     authoredId, pair.Key, pair.Value.SetName, pair.Value.Selector,
-                    resolver.LocationFor(pair.Value.SetName, pair.Key), contractLocation,
-                    ExclusionLocation(document, contractLocation, field, pair.Value.ReferenceIndex)))
+                    context.Resolver.LocationFor(pair.Value.SetName, pair.Key), contractLocation,
+                    ExclusionLocation(context.Document, contractLocation, field.Name, pair.Value.ReferenceIndex)))
                 .ToArray()
         });
 
@@ -490,23 +549,20 @@ internal static class ArchitectureSourceSetExpander
     }
 
     private static void ExpandInlineGroup<TContract>(
-        ArchitectureContractDocument document,
-        SourceSetResolver resolver,
-        List<ArchitectureContractExpansion> expansions,
+        ExpansionContext context,
         string group,
         IEnumerable<TContract> contracts,
         Func<TContract, List<string>> declared,
         Action<TContract, List<string>> assign,
         Func<TContract, List<string>> setNames,
-        string field,
-        ArchitectureSourceSetKind kind)
+        SourceSetField field)
         where TContract : class, IArchitectureContract
     {
         foreach (TContract contract in contracts)
         {
-            document.Provenance.SetValidationSubject(contract);
-            assign(contract, InlineSets(document, resolver, expansions, group, contract, contract.Name,
-                field, kind, declared(contract), setNames(contract)));
+            context.Document.Provenance.SetValidationSubject(contract);
+            assign(contract, InlineSets(context, group, contract, contract.Name,
+                field, declared(contract), setNames(contract)));
         }
     }
 
@@ -580,12 +636,17 @@ internal static class ArchitectureSourceSetExpander
         // The specific `members[i]`/`globs[i]` entry that resolved this source, falling back to the
         // set's own root location when the item-level path couldn't be resolved (e.g. a set with no
         // provenance, such as one built directly in a test rather than loaded from YAML).
-        public ArchitecturePolicySourceLocation? LocationFor(string setName, string source) =>
-            _itemLocations.TryGetValue((setName, source), out ArchitecturePolicySourceLocation? location)
-                ? location
-                : _resolutions.TryGetValue(setName, out ArchitectureSourceSetResolution? resolution)
-                    ? resolution.PolicyLocation
-                    : null;
+        public ArchitecturePolicySourceLocation? LocationFor(string setName, string source)
+        {
+            if (_itemLocations.TryGetValue((setName, source), out ArchitecturePolicySourceLocation? location))
+            {
+                return location;
+            }
+
+            return _resolutions.TryGetValue(setName, out ArchitectureSourceSetResolution? resolution)
+                ? resolution.PolicyLocation
+                : null;
+        }
 
         public ArchitectureSourceSetResolution Resolve(
             string contractName,

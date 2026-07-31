@@ -48,7 +48,7 @@ internal interface ICliRuntime
         IReadOnlyCollection<ArchitectureCoverageSummary> coverageSummaries) =>
         FormatResultAsSarif(mode, violations, cycles, cycleFindings, preflightDiagnostics);
 
-    string FormatResultAsSarif(
+    string FormatResultAsSarif( // NOSONAR: each parameter represents a semantically distinct section of the SARIF payload; grouping would obscure the data contract
         string mode,
         IReadOnlyCollection<ArchitectureViolation> violations,
         IReadOnlyCollection<string> cycles,

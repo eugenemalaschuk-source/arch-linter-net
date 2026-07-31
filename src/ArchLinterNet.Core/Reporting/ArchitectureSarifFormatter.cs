@@ -23,6 +23,7 @@ public sealed partial class ArchitectureSarifFormatter : IArchitectureSarifForma
     private const string SarifVersion = "2.1.0";
     private const string VersionPropertyName = "version";
     private const string MessagePropertyName = "message";
+    private const string PropertiesKey = "properties";
     private const string MethodBodyCategory = "method-body";
     private const string MethodBodyIlCategory = "method-body-il";
     private const string CycleRuleFallback = "dependency-cycle";
@@ -61,7 +62,7 @@ public sealed partial class ArchitectureSarifFormatter : IArchitectureSarifForma
             Array.Empty<BuildStatePreflightDiagnostic>());
     }
 
-    private static string FormatResultAsSarifCore(
+    private static string FormatResultAsSarifCore( // NOSONAR: each parameter represents a semantically distinct section of the SARIF payload; grouping would obscure the data contract
         string mode,
         IReadOnlyCollection<ArchitectureViolation> violations,
         IEnumerable<Func<string, ResultEntry>> cycleEntryFactories,
@@ -112,7 +113,7 @@ public sealed partial class ArchitectureSarifFormatter : IArchitectureSarifForma
                         },
                     },
                     ["results"] = results,
-                    ["properties"] = new Dictionary<string, object?>
+                    [PropertiesKey] = new Dictionary<string, object?>
                     {
                         ["coverage_summary"] = FormatCoverageSummaries(coverageSummaries ?? Array.Empty<ArchitectureCoverageSummary>()),
                         ["source_set_expansion"] = FormatSourceExpansion(
@@ -212,7 +213,7 @@ public sealed partial class ArchitectureSarifFormatter : IArchitectureSarifForma
         // versioned JSON finding used by the CI formatter is retained under a
         // namespaced property so no evidence has to be reconstructed from prose.
         properties["arch_linter_net"] = ArchitectureDiagnosticFormatter.FormatNormalizedFindingForSarif(finding);
-        json["properties"] = properties;
+        json[PropertiesKey] = properties;
 
         return new ResultEntry(ruleId, diagnostic.ContractName, sourceType, forbiddenNamespace, json);
     }
@@ -433,7 +434,7 @@ public sealed partial class ArchitectureSarifFormatter : IArchitectureSarifForma
             ["level"] = level,
             [MessagePropertyName] = new Dictionary<string, object?> { ["text"] = $"Dependency cycle detected: {path}" },
             ["logicalLocations"] = BuildLogicalLocations(path, "namespace"),
-            ["properties"] = new Dictionary<string, object?>
+            [PropertiesKey] = new Dictionary<string, object?>
             {
                 ["arch_linter_net"] = ArchitectureDiagnosticFormatter.FormatNormalizedFindingForSarif(finding),
             },
@@ -455,7 +456,7 @@ public sealed partial class ArchitectureSarifFormatter : IArchitectureSarifForma
             ["level"] = level,
             [MessagePropertyName] = new Dictionary<string, object?> { ["text"] = $"Dependency cycle detected: {diagnostic.Path}" },
             ["logicalLocations"] = BuildLogicalLocations(diagnostic.Path, "namespace"),
-            ["properties"] = new Dictionary<string, object?>
+            [PropertiesKey] = new Dictionary<string, object?>
             {
                 ["arch_linter_net"] = ArchitectureDiagnosticFormatter.FormatNormalizedFindingForSarif(finding),
             },

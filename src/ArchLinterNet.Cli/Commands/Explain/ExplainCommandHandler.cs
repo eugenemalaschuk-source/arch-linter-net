@@ -8,6 +8,11 @@ namespace ArchLinterNet.Cli.Commands.Explain;
 
 internal sealed class ExplainCommandHandler(ICliRuntime runtime, ICliConsole console)
 {
+    private const string PolicyLocationKey = "policyLocation";
+    private const string MatchedKey = "matched";
+    private const string SourceKey = "source";
+    private const string ContractIdKey = "contractId";
+
     public int Execute(ExplainCommandOptions options)
     {
         if (options.ShowHelp)
@@ -57,22 +62,22 @@ internal sealed class ExplainCommandHandler(ICliRuntime runtime, ICliConsole con
             {
                 var jsonObj = new Dictionary<string, object?>
                 {
-                    ["source"] = outcome.Source,
+                    [SourceKey] = outcome.Source,
                     ["target"] = outcome.Target,
                     ["path"] = outcome.Path,
                     ["contractIds"] = outcome.ContractIds,
                     ["coverageSummary"] = outcome.CoverageSummaries.Select(summary => new Dictionary<string, object?>
                     {
-                        ["contractId"] = summary.ContractId,
+                        [ContractIdKey] = summary.ContractId,
                         ["optionalEmptyItems"] = summary.OptionalEmptyItems.Select(item => new Dictionary<string, object?>
                         {
                             ["item"] = item.Item,
-                            ["contractId"] = item.ContractId,
+                            [ContractIdKey] = item.ContractId,
                             ["input"] = item.Input,
                             ["layer"] = item.Layer,
                             ["reason"] = item.Reason,
                             ["evidence"] = item.Evidence,
-                            ["policyLocation"] = item.PolicyLocation is null ? null : new Dictionary<string, object?>
+                            [PolicyLocationKey] = item.PolicyLocation is null ? null : new Dictionary<string, object?>
                             {
                                 ["sourcePath"] = item.PolicyLocation.SourcePath,
                                 ["yamlPath"] = item.PolicyLocation.YamlPath
@@ -88,7 +93,7 @@ internal sealed class ExplainCommandHandler(ICliRuntime runtime, ICliConsole con
                             ["resolvedSources"] = set.ResolvedSources,
                             ["optional"] = set.Optional,
                             ["reason"] = set.Reason,
-                            ["policyLocation"] = FormatPolicyLocation(set.PolicyLocation)
+                            [PolicyLocationKey] = FormatPolicyLocation(set.PolicyLocation)
                         }).ToArray(),
                         ["contracts"] = outcome.SourceExpansion.Contracts.Select(expansion => new Dictionary<string, object?>
                         {
@@ -105,34 +110,34 @@ internal sealed class ExplainCommandHandler(ICliRuntime runtime, ICliConsole con
                             ["sourceSets"] = expansion.SetNames,
                             ["optionalEmpty"] = expansion.OptionalEmpty,
                             ["optionalReason"] = expansion.OptionalReason,
-                            ["policyLocation"] = FormatPolicyLocation(expansion.PolicyLocation),
+                            [PolicyLocationKey] = FormatPolicyLocation(expansion.PolicyLocation),
                             ["exclusions"] = expansion.Exclusions.Select(exclusion => new Dictionary<string, object?>
                             {
-                                ["source"] = exclusion.Source,
+                                [SourceKey] = exclusion.Source,
                                 ["sourceSet"] = exclusion.SetName,
                                 ["selector"] = exclusion.Selector,
-                                ["matched"] = exclusion.Matched,
+                                [MatchedKey] = exclusion.Matched,
                                 ["optionalEmpty"] = exclusion.OptionalEmpty,
                                 ["optionalReason"] = exclusion.OptionalReason,
-                                ["policyLocation"] = FormatPolicyLocation(exclusion.PolicyLocation)
+                                [PolicyLocationKey] = FormatPolicyLocation(exclusion.PolicyLocation)
                             }).ToArray(),
                             ["inclusions"] = expansion.Inclusions.Select(instance => new Dictionary<string, object?>
                             {
-                                ["contractId"] = instance.ContractId,
-                                ["source"] = instance.Source,
+                                [ContractIdKey] = instance.ContractId,
+                                [SourceKey] = instance.Source,
                                 ["sourceSet"] = instance.SetName,
                                 ["selector"] = instance.Selector,
-                                ["policyLocation"] = FormatPolicyLocation(instance.PolicyLocation),
+                                [PolicyLocationKey] = FormatPolicyLocation(instance.PolicyLocation),
                                 ["authoredContractPolicyLocation"] = FormatPolicyLocation(instance.AuthoredContractPolicyLocation),
                                 ["sourceSetReferencePolicyLocation"] = FormatPolicyLocation(instance.SourceSetReferencePolicyLocation)
                             }).ToArray(),
                             ["instances"] = expansion.Instances.Select(instance => new Dictionary<string, object?>
                             {
-                                ["contractId"] = instance.ContractId,
-                                ["source"] = instance.Source,
+                                [ContractIdKey] = instance.ContractId,
+                                [SourceKey] = instance.Source,
                                 ["sourceSet"] = instance.SetName,
                                 ["selector"] = instance.Selector,
-                                ["policyLocation"] = FormatPolicyLocation(instance.PolicyLocation),
+                                [PolicyLocationKey] = FormatPolicyLocation(instance.PolicyLocation),
                                 ["authoredContractPolicyLocation"] = FormatPolicyLocation(instance.AuthoredContractPolicyLocation),
                                 ["sourceSetReferencePolicyLocation"] = FormatPolicyLocation(instance.SourceSetReferencePolicyLocation)
                             }).ToArray()
@@ -140,7 +145,7 @@ internal sealed class ExplainCommandHandler(ICliRuntime runtime, ICliConsole con
                     },
                     ["selectorParticipation"] = outcome.SelectorParticipation.Select(participation => new Dictionary<string, object?>
                     {
-                        ["contractId"] = participation.ContractId,
+                        [ContractIdKey] = participation.ContractId,
                         ["contractName"] = participation.ContractName,
                         ["mode"] = participation.Mode.ToString().ToLowerInvariant(),
                         ["kind"] = participation.Kind == ArchitectureSelectorParticipationKind.Inclusion
@@ -148,10 +153,10 @@ internal sealed class ExplainCommandHandler(ICliRuntime runtime, ICliConsole con
                             : "exclusion",
                         ["field"] = participation.Field,
                         ["index"] = participation.Index,
-                        ["matched"] = participation.Matched,
+                        [MatchedKey] = participation.Matched,
                         ["staleExclusion"] = participation.IsStaleExclusion,
                         ["evaluationFailed"] = participation.EvaluationFailed,
-                        ["policyLocation"] = FormatPolicyLocation(participation.PolicyLocation)
+                        [PolicyLocationKey] = FormatPolicyLocation(participation.PolicyLocation)
                     }).ToArray()
                 };
 
@@ -159,10 +164,10 @@ internal sealed class ExplainCommandHandler(ICliRuntime runtime, ICliConsole con
                 {
                     jsonObj["expressionParticipation"] = outcome.ExpressionParticipation.Select(p => new Dictionary<string, object?>
                     {
-                        ["contractId"] = p.ContractId,
+                        [ContractIdKey] = p.ContractId,
                         ["hopSource"] = p.HopSource,
                         ["hopTarget"] = p.HopTarget,
-                        ["source"] = p.Source,
+                        [SourceKey] = p.Source,
                         ["yamlPath"] = p.YamlPath,
                         ["result"] = p.Result switch
                         {
@@ -272,15 +277,7 @@ internal sealed class ExplainCommandHandler(ICliRuntime runtime, ICliConsole con
 
                 foreach (ArchitectureSubtractiveMatcherParticipation participation in outcome.SelectorParticipation)
                 {
-                    string state = participation.Matched && participation.EvaluationFailed
-                        ? "matched; evaluation failed"
-                        : participation.EvaluationFailed
-                            ? "evaluation failed"
-                            : participation.Matched
-                            ? "matched"
-                            : participation.IsStaleExclusion
-                                ? "stale"
-                                : "not matched";
+                    string state = DescribeParticipationState(participation);
                     string kind = participation.Kind == ArchitectureSelectorParticipationKind.Inclusion
                         ? "inclusion"
                         : "exclusion";
@@ -323,6 +320,26 @@ internal sealed class ExplainCommandHandler(ICliRuntime runtime, ICliConsole con
         location is null ? string.Empty : $" (policy: {location.SourcePath}:{location.YamlPath})";
 
     private static string FormatSelectorIndex(int? index) => index is int value ? $"[{value}]" : string.Empty;
+
+    private static string DescribeParticipationState(ArchitectureSubtractiveMatcherParticipation participation)
+    {
+        if (participation.Matched && participation.EvaluationFailed)
+        {
+            return "matched; evaluation failed";
+        }
+
+        if (participation.EvaluationFailed)
+        {
+            return "evaluation failed";
+        }
+
+        if (participation.Matched)
+        {
+            return "matched";
+        }
+
+        return participation.IsStaleExclusion ? "stale" : "not matched";
+    }
 
     private static string FormatInstancePolicySuffix(ArchitectureExpandedContractInstance instance)
     {

@@ -54,22 +54,16 @@ public sealed partial class ArchitectureAnalysisSession
         ArchitectureLayoutConventionContract contract,
         ArchitectureContractExecutionContext executionContext,
         List<ArchitectureViolation> violations,
-        bool[] exclusionMatched,
-        bool[] exclusionEvaluationFailed,
-        out bool inclusionMatched,
-        out bool inclusionEvaluationFailed)
+        LayoutExclusionTracker tracker)
     {
         ArchitectureLayoutFileMatcher matcher = contract.FilesMatching;
         (Dictionary<string, List<(Type Type, ArchitectureDeclaredTypeFact Fact)>> byFile,
             List<(Type Type, ArchitectureDeclaredTypeFact Fact)> unfiled) = BuildCandidateIndex();
 
-        List<LayoutFileGroup> groups = CollectFiledGroups(contract, byFile, exclusionMatched, out bool filedInclusionMatched);
-        List<LayoutFileGroup> unfiledGroups = CollectUnfiledGroups(
-            contract, matcher, unfiled, executionContext, violations, exclusionMatched, exclusionEvaluationFailed,
-            out bool unfiledInclusionMatched, out bool unfiledInclusionEvaluationFailed);
+        List<LayoutFileGroup> groups = CollectFiledGroups(contract, byFile, tracker, out bool filedInclusionMatched);
+        List<LayoutFileGroup> unfiledGroups = CollectUnfiledGroups(contract, matcher, unfiled, executionContext, violations, tracker);
         groups.AddRange(unfiledGroups);
-        inclusionMatched = filedInclusionMatched || unfiledInclusionMatched;
-        inclusionEvaluationFailed = unfiledInclusionEvaluationFailed;
+        tracker.InclusionMatched = filedInclusionMatched || tracker.InclusionMatched;
         return groups;
     }
 
@@ -110,7 +104,7 @@ public sealed partial class ArchitectureAnalysisSession
     private List<LayoutFileGroup> CollectFiledGroups(
         ArchitectureLayoutConventionContract contract,
         Dictionary<string, List<(Type Type, ArchitectureDeclaredTypeFact Fact)>> byFile,
-        bool[] exclusionMatched,
+        LayoutExclusionTracker tracker,
         out bool inclusionMatched)
     {
         List<LayoutFileGroup> groups = new();
@@ -132,7 +126,7 @@ public sealed partial class ArchitectureAnalysisSession
 
             inclusionMatched = true;
 
-            eligibleFacts = ApplyFiledExclusions(entries, eligibleFacts, contract.ExcludeFilesMatching, exclusionMatched);
+            eligibleFacts = ApplyFiledExclusions(entries, eligibleFacts, contract.ExcludeFilesMatching, tracker.Matched);
             if (eligibleFacts.Count == 0)
             {
                 continue;
@@ -147,7 +141,7 @@ public sealed partial class ArchitectureAnalysisSession
     private List<ArchitectureDeclaredTypeFact> ApplyFiledExclusions(
         List<(Type Type, ArchitectureDeclaredTypeFact Fact)> entries,
         List<ArchitectureDeclaredTypeFact> eligibleFacts,
-        IReadOnlyList<ArchitectureLayoutFileMatcher> exclusions,
+        List<ArchitectureLayoutFileMatcher> exclusions,
         bool[] exclusionMatched)
     {
         if (exclusions.Count == 0)
@@ -205,14 +199,9 @@ public sealed partial class ArchitectureAnalysisSession
         List<(Type Type, ArchitectureDeclaredTypeFact Fact)> unfiled,
         ArchitectureContractExecutionContext executionContext,
         List<ArchitectureViolation> violations,
-        bool[] exclusionMatched,
-        bool[] exclusionEvaluationFailed,
-        out bool inclusionMatched,
-        out bool inclusionEvaluationFailed)
+        LayoutExclusionTracker tracker)
     {
         List<LayoutFileGroup> groups = new();
-        inclusionMatched = false;
-        inclusionEvaluationFailed = false;
 
         foreach ((Type Type, ArchitectureDeclaredTypeFact Fact) entry in
                  unfiled.OrderBy(entry => entry.Fact.FullTypeName, StringComparer.Ordinal))
@@ -222,10 +211,11 @@ public sealed partial class ArchitectureAnalysisSession
                 continue;
             }
 
-            if (!TryEvaluateUnfiledMatcher(contract, matcher, entry, executionContext, violations, "files_matching",
-                    BuildUnevaluatedLayoutWhenExpressions(contract), out bool included))
+            MatcherDiagnosticContext filesMatchingContext = new(
+                "files_matching", BuildUnevaluatedLayoutWhenExpressions(contract));
+            if (!TryEvaluateUnfiledMatcher(contract, matcher, entry, executionContext, violations, filesMatchingContext, out bool included))
             {
-                inclusionEvaluationFailed = true;
+                tracker.InclusionEvaluationFailed = true;
                 continue;
             }
 
@@ -234,9 +224,9 @@ public sealed partial class ArchitectureAnalysisSession
                 continue;
             }
 
-            inclusionMatched = true;
+            tracker.InclusionMatched = true;
 
-            if (IsExcludedUnfiledEntry(contract, entry, executionContext, violations, exclusionMatched, exclusionEvaluationFailed))
+            if (IsExcludedUnfiledEntry(contract, entry, executionContext, violations, tracker))
             {
                 continue;
             }
@@ -252,8 +242,7 @@ public sealed partial class ArchitectureAnalysisSession
         (Type Type, ArchitectureDeclaredTypeFact Fact) entry,
         ArchitectureContractExecutionContext executionContext,
         List<ArchitectureViolation> violations,
-        bool[] exclusionMatched,
-        bool[] exclusionEvaluationFailed)
+        LayoutExclusionTracker tracker)
     {
         // Every authored exclusion is evaluated against this candidate independently - not just
         // until the first one excludes it - so two overlapping exclusion items both get their own
@@ -274,28 +263,21 @@ public sealed partial class ArchitectureAnalysisSession
                 contract.Name,
                 fieldName,
                 ExpressionParticipationResult.EvaluationFailed);
-            if (!TryEvaluateUnfiledMatcher(
-                    contract,
-                    exclusion,
-                    entry,
-                    executionContext,
-                    violations,
-                    fieldName,
-                    whenExpressions,
-                    out bool excluded))
+            MatcherDiagnosticContext exclusionContext = new(fieldName, whenExpressions);
+            if (!TryEvaluateUnfiledMatcher(contract, exclusion, entry, executionContext, violations, exclusionContext, out bool excluded))
             {
                 // The exclusion structurally matched this candidate but its `when` couldn't be
                 // evaluated (no resolved source file) - this is neither "matched" nor "stale"; the
                 // candidate is suppressed defensively (fail-closed, matching TryEvaluateUnfiledMatcher's
                 // own DataUnavailable violation) but the matcher's participation status is unknown.
-                exclusionEvaluationFailed[index] = true;
+                tracker.EvaluationFailed[index] = true;
                 excludedAny = true;
                 continue;
             }
 
             if (excluded)
             {
-                exclusionMatched[index] = true;
+                tracker.Matched[index] = true;
                 excludedAny = true;
             }
         }
@@ -303,16 +285,23 @@ public sealed partial class ArchitectureAnalysisSession
         return excludedAny;
     }
 
+    // Bundles the diagnostic identity of the matcher being evaluated (which field it came from, and
+    // the pre-built expression-participation payload for its `when`) so TryEvaluateUnfiledMatcher's
+    // signature doesn't have to name each separately.
+    private readonly record struct MatcherDiagnosticContext(
+        string FieldName, IReadOnlyList<ExpressionParticipation>? WhenExpressions);
+
     private bool TryEvaluateUnfiledMatcher(
         ArchitectureLayoutConventionContract contract,
         ArchitectureLayoutFileMatcher matcher,
         (Type Type, ArchitectureDeclaredTypeFact Fact) entry,
         ArchitectureContractExecutionContext executionContext,
         List<ArchitectureViolation> violations,
-        string fieldName,
-        IReadOnlyList<ExpressionParticipation>? whenExpressions,
+        MatcherDiagnosticContext diagnosticContext,
         out bool matched)
     {
+        string fieldName = diagnosticContext.FieldName;
+        IReadOnlyList<ExpressionParticipation>? whenExpressions = diagnosticContext.WhenExpressions;
         matched = false;
         if (matcher.CompiledWhen == null)
         {

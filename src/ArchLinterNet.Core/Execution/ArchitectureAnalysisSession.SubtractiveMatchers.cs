@@ -11,6 +11,27 @@ namespace ArchLinterNet.Core.Execution;
 // / .LayoutMatching.cs as each contract that declares these matchers executes.
 public sealed partial class ArchitectureAnalysisSession
 {
+    // Bundles per-contract layout participation state (one array slot per authored exclusion, plus
+    // the single inclusion selector's own status) so the file/candidate collection methods in
+    // ArchitectureAnalysisSession.LayoutMatching.cs/.LayoutConventions.cs can thread one object
+    // instead of two bool[] arrays and two `out bool` parameters each.
+    private sealed class LayoutExclusionTracker
+    {
+        public LayoutExclusionTracker(int exclusionCount)
+        {
+            Matched = new bool[exclusionCount];
+            EvaluationFailed = new bool[exclusionCount];
+        }
+
+        public bool[] Matched { get; }
+
+        public bool[] EvaluationFailed { get; }
+
+        public bool InclusionMatched { get; set; }
+
+        public bool InclusionEvaluationFailed { get; set; }
+    }
+
     private readonly List<ArchitectureSubtractiveMatcherParticipation> _subtractiveMatcherParticipation = new();
 
     public IReadOnlyList<ArchitectureSubtractiveMatcherParticipation> SubtractiveMatcherParticipation

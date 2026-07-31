@@ -48,22 +48,29 @@ public sealed partial class ArchitecturePolicyDocumentLoader
             }
 
             provenance.SetValidationSubject(ContractPath(groupKey, index));
-            string contractName = TryGetChild(contractNode, "name", out YamlNode? nameNode)
-                && nameNode is YamlScalarNode nameScalar
-                    ? nameScalar.Value ?? UnnamedContractName
-                    : UnnamedContractName;
+            ValidateLayerTemplateContract(contractNode);
+        }
+    }
 
-            ValidateKnownKeys(contractNode, contractName, "layer template contract", _layerTemplateContractAllowedKeys);
+    private static void ValidateLayerTemplateContract(YamlMappingNode contractNode)
+    {
+        string contractName = TryGetChild(contractNode, "name", out YamlNode? nameNode)
+            && nameNode is YamlScalarNode nameScalar
+                ? nameScalar.Value ?? UnnamedContractName
+                : UnnamedContractName;
 
-            if (TryGetChild(contractNode, "layers", out YamlNode? layersNode) && layersNode is YamlSequenceNode layersSequence)
+        ValidateKnownKeys(contractNode, contractName, "layer template contract", _layerTemplateContractAllowedKeys);
+
+        if (!TryGetChild(contractNode, "layers", out YamlNode? layersNode) || layersNode is not YamlSequenceNode layersSequence)
+        {
+            return;
+        }
+
+        foreach (YamlNode layerNode in layersSequence.Children)
+        {
+            if (layerNode is YamlMappingNode layerMapping)
             {
-                foreach (YamlNode layerNode in layersSequence.Children)
-                {
-                    if (layerNode is YamlMappingNode layerMapping)
-                    {
-                        ValidateKnownKeys(layerMapping, contractName, "layers", _templateLayerAllowedKeys);
-                    }
-                }
+                ValidateKnownKeys(layerMapping, contractName, "layers", _templateLayerAllowedKeys);
             }
         }
     }

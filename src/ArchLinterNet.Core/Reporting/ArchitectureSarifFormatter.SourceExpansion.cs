@@ -5,13 +5,15 @@ namespace ArchLinterNet.Core.Reporting;
 
 public sealed partial class ArchitectureSarifFormatter
 {
+    private const string PolicyLocationKey = "policy_location";
+
     /// <summary>
     /// Additive overload carrying the resolved source-set expansion, so a SARIF consumer can prove
     /// which sources an authored contract expanded to without parsing display text. Exists
     /// alongside the prior overloads rather than extending them, matching the pattern used for
     /// build-state preflight and coverage summaries.
     /// </summary>
-    public string FormatResultAsSarif(
+    public string FormatResultAsSarif( // NOSONAR: each parameter represents a semantically distinct section of the SARIF payload; grouping would obscure the data contract
         string mode,
         IReadOnlyCollection<ArchitectureViolation> violations,
         IReadOnlyCollection<string> cycles,
@@ -32,7 +34,7 @@ public sealed partial class ArchitectureSarifFormatter
             subtractiveMatcherParticipation);
     }
 
-    public static string FormatResultAsSarif(
+    public static string FormatResultAsSarif( // NOSONAR: each parameter represents a semantically distinct section of the SARIF payload; grouping would obscure the data contract
         string mode,
         IReadOnlyCollection<ArchitectureViolation> violations,
         IReadOnlyCollection<ArchitectureCycleFinding> cycles,
@@ -65,7 +67,7 @@ public sealed partial class ArchitectureSarifFormatter
                 ["resolved_sources"] = set.ResolvedSources,
                 ["optional"] = set.Optional,
                 ["reason"] = set.Reason,
-                ["policy_location"] = FormatSourceExpansionLocation(set.PolicyLocation)
+                [PolicyLocationKey] = FormatSourceExpansionLocation(set.PolicyLocation)
             }).ToArray(),
             ["contracts"] = inventory.Contracts.Select(expansion => (object)new Dictionary<string, object?>
             {
@@ -77,7 +79,7 @@ public sealed partial class ArchitectureSarifFormatter
                 ["source_sets"] = expansion.SetNames,
                 ["optional_empty"] = expansion.OptionalEmpty,
                 ["optional_reason"] = expansion.OptionalReason,
-                ["policy_location"] = FormatSourceExpansionLocation(expansion.PolicyLocation),
+                [PolicyLocationKey] = FormatSourceExpansionLocation(expansion.PolicyLocation),
                 ["exclusions"] = expansion.Exclusions.Select(exclusion => (object)new Dictionary<string, object?>
                 {
                     ["source"] = exclusion.Source,
@@ -86,7 +88,7 @@ public sealed partial class ArchitectureSarifFormatter
                     ["matched"] = exclusion.Matched,
                     ["optional_empty"] = exclusion.OptionalEmpty,
                     ["optional_reason"] = exclusion.OptionalReason,
-                    ["policy_location"] = FormatSourceExpansionLocation(exclusion.PolicyLocation)
+                    [PolicyLocationKey] = FormatSourceExpansionLocation(exclusion.PolicyLocation)
                 }).ToArray(),
                 ["inclusions"] = expansion.Inclusions.Select(instance => (object)new Dictionary<string, object?>
                 {
@@ -94,7 +96,7 @@ public sealed partial class ArchitectureSarifFormatter
                     ["source"] = instance.Source,
                     ["source_set"] = instance.SetName,
                     ["selector"] = instance.Selector,
-                    ["policy_location"] = FormatSourceExpansionLocation(instance.PolicyLocation),
+                    [PolicyLocationKey] = FormatSourceExpansionLocation(instance.PolicyLocation),
                     ["authored_contract_policy_location"] = FormatSourceExpansionLocation(instance.AuthoredContractPolicyLocation),
                     ["source_set_reference_policy_location"] = FormatSourceExpansionLocation(instance.SourceSetReferencePolicyLocation)
                 }).ToArray(),
@@ -104,7 +106,7 @@ public sealed partial class ArchitectureSarifFormatter
                     ["source"] = instance.Source,
                     ["source_set"] = instance.SetName,
                     ["selector"] = instance.Selector,
-                    ["policy_location"] = FormatSourceExpansionLocation(instance.PolicyLocation),
+                    [PolicyLocationKey] = FormatSourceExpansionLocation(instance.PolicyLocation),
                     ["authored_contract_policy_location"] = FormatSourceExpansionLocation(instance.AuthoredContractPolicyLocation),
                     ["source_set_reference_policy_location"] = FormatSourceExpansionLocation(instance.SourceSetReferencePolicyLocation)
                 }).ToArray()
@@ -126,7 +128,7 @@ public sealed partial class ArchitectureSarifFormatter
             ["evaluation_failed"] = p.EvaluationFailed,
             ["kind"] = p.Kind == ArchitectureSelectorParticipationKind.Inclusion ? "inclusion" : "exclusion",
             ["stale_exclusion"] = p.IsStaleExclusion,
-            ["policy_location"] = FormatSourceExpansionLocation(p.PolicyLocation)
+            [PolicyLocationKey] = FormatSourceExpansionLocation(p.PolicyLocation)
         }).ToArray();
     }
 

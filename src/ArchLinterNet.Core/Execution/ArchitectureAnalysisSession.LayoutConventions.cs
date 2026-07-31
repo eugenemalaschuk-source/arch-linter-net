@@ -89,14 +89,11 @@ public sealed partial class ArchitectureAnalysisSession
                 ? BuildTypeIdentityLookup()
                 : null;
 
-        bool[] exclusionMatched = new bool[contract.ExcludeFilesMatching.Count];
-        bool[] exclusionEvaluationFailed = new bool[contract.ExcludeFilesMatching.Count];
-        List<LayoutFileGroup> matchedGroups = CollectMatchedFileGroups(
-            contract, executionContext, violations, exclusionMatched, exclusionEvaluationFailed,
-            out bool inclusionMatched, out bool inclusionEvaluationFailed);
+        LayoutExclusionTracker tracker = new(contract.ExcludeFilesMatching.Count);
+        List<LayoutFileGroup> matchedGroups = CollectMatchedFileGroups(contract, executionContext, violations, tracker);
 
         RecordSubtractiveMatcherParticipation(
-            contract, "files_matching", null, inclusionMatched, evaluationFailed: inclusionEvaluationFailed,
+            contract, "files_matching", null, tracker.InclusionMatched, evaluationFailed: tracker.InclusionEvaluationFailed,
             kind: ArchitectureSelectorParticipationKind.Inclusion);
 
         foreach (LayoutFileGroup group in matchedGroups)
@@ -104,13 +101,13 @@ public sealed partial class ArchitectureAnalysisSession
             EvaluateFileGroupExpectations(contract, group, executionContext, violations, typesByIdentity);
         }
 
-        AddAmbiguousSourceDeclarationViolations(contract, executionContext, violations, typesByIdentity, exclusionMatched);
+        AddAmbiguousSourceDeclarationViolations(contract, executionContext, violations, typesByIdentity, tracker);
 
         for (int index = 0; index < contract.ExcludeFilesMatching.Count; index++)
         {
             RecordSubtractiveMatcherParticipation(
-                contract, "exclude_files_matching", index, exclusionMatched[index],
-                evaluationFailed: exclusionEvaluationFailed[index]);
+                contract, "exclude_files_matching", index, tracker.Matched[index],
+                evaluationFailed: tracker.EvaluationFailed[index]);
         }
 
         executionContext.CollectUnmatchedIgnores(_unmatchedIgnoredViolations);
@@ -132,6 +129,28 @@ public sealed partial class ArchitectureAnalysisSession
             "files_matching",
             ExpressionParticipationResult.Matched);
 
+    private static IReadOnlyList<ExpressionParticipation>? BuildLayoutWhenExpressions(
+        ArchitectureLayoutFileMatcher matcher,
+        string contractName,
+        string fieldName,
+        ExpressionParticipationResult result) =>
+        matcher.CompiledWhen == null
+            ? null
+            : new[]
+            {
+                new ExpressionParticipation(
+                    matcher.WhenContractName ?? contractName,
+                    fieldName,
+                    matcher.When!,
+                    matcher.WhenLocation?.YamlPath,
+                    result)
+                {
+                    PolicySourcePath = matcher.WhenLocation?.SourcePath,
+                    PolicySourceLine = matcher.WhenLocation?.Line,
+                    PolicySourceColumn = matcher.WhenLocation?.Column,
+                },
+            };
+
     private static IReadOnlyList<ExpressionParticipation>? BuildUnevaluatedLayoutWhenExpressions(
         ArchitectureLayoutConventionContract contract) =>
         BuildLayoutWhenExpressions(
@@ -140,7 +159,7 @@ public sealed partial class ArchitectureAnalysisSession
             "files_matching",
             ExpressionParticipationResult.EvaluationFailed);
 
-    private static IReadOnlyList<ExpressionParticipation>? BuildUnavailableLayoutWhenExpressions(
+    private static List<ExpressionParticipation>? BuildUnavailableLayoutWhenExpressions(
         ArchitectureLayoutConventionContract contract)
     {
         List<ExpressionParticipation> expressions = new();
@@ -172,28 +191,6 @@ public sealed partial class ArchitectureAnalysisSession
         return expressions.Count == 0 ? null : expressions;
     }
 
-    private static IReadOnlyList<ExpressionParticipation>? BuildLayoutWhenExpressions(
-        ArchitectureLayoutFileMatcher matcher,
-        string contractName,
-        string fieldName,
-        ExpressionParticipationResult result) =>
-        matcher.CompiledWhen == null
-            ? null
-            : new[]
-            {
-                new ExpressionParticipation(
-                    matcher.WhenContractName ?? contractName,
-                    fieldName,
-                    matcher.When!,
-                    matcher.WhenLocation?.YamlPath,
-                    result)
-                {
-                    PolicySourcePath = matcher.WhenLocation?.SourcePath,
-                    PolicySourceLine = matcher.WhenLocation?.Line,
-                    PolicySourceColumn = matcher.WhenLocation?.Column,
-                },
-            };
-
     private static bool MatcherNeedsSourcePath(ArchitectureLayoutFileMatcher matcher) =>
         !string.IsNullOrEmpty(matcher.FolderSegment)
         || !string.IsNullOrEmpty(matcher.FileNameSuffix)
@@ -221,7 +218,7 @@ public sealed partial class ArchitectureAnalysisSession
         ArchitectureContractExecutionContext executionContext,
         List<ArchitectureViolation> violations,
         Dictionary<(string AssemblyName, string FullTypeName), Type>? typesByIdentity,
-        bool[] exclusionMatched)
+        LayoutExclusionTracker tracker)
     {
         ArchitectureLayoutFileMatcher matcher = contract.FilesMatching;
         bool selectorNeedsSourcePath = !string.IsNullOrEmpty(matcher.FolderSegment)
@@ -240,7 +237,7 @@ public sealed partial class ArchitectureAnalysisSession
                 continue;
             }
 
-            if (MatchesAnyExclusionForAmbiguity(contract, ambiguity, typesByIdentity, exclusionMatched))
+            if (MatchesAnyExclusionForAmbiguity(contract, ambiguity, typesByIdentity, tracker))
             {
                 continue;
             }
@@ -300,7 +297,7 @@ public sealed partial class ArchitectureAnalysisSession
         ArchitectureLayoutConventionContract contract,
         ArchitectureDeclaredTypeSourceAmbiguity ambiguity,
         Dictionary<(string AssemblyName, string FullTypeName), Type>? typesByIdentity,
-        bool[] exclusionMatched)
+        LayoutExclusionTracker tracker)
     {
         // Same rationale as IsExcludedUnfiledEntry: evaluate every authored exclusion against this
         // ambiguity independently, not just until the first one matches, so overlapping exclusions
@@ -327,7 +324,7 @@ public sealed partial class ArchitectureAnalysisSession
 
             if (MatchesWhenForAmbiguity(exclusion, ambiguity, typesByIdentity))
             {
-                exclusionMatched[index] = true;
+                tracker.Matched[index] = true;
                 excludedAny = true;
             }
         }
