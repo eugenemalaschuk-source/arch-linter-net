@@ -234,6 +234,7 @@ public sealed partial class ArchitectureAnalysisSession
             .Select(type =>
             {
                 string sourceFullName = ArchitectureTypeNames.SafeFullName(type);
+                string sourceAssembly = ArchitectureTypeNames.SafeAssemblyName(type) ?? string.Empty;
                 string[] forbiddenRefs = ArchitectureReferenceScanner.GetReferencedTypes(type)
                     .Select(refType => new
                     {
@@ -246,7 +247,13 @@ public sealed partial class ArchitectureAnalysisSession
                     .Where(r => r.Type != null && IsInAnyDeclaredLayer(r.Type))
                     .Where(r => !ArchitectureNamespaceViolationFinder.IsInAnyAllowedLayer(
                         r.Type!, allowedLayers, RoleIndex, ExpressionFacts))
-                    .Where(r => !executionContext.IsIgnored(sourceFullName, r.FullName))
+                    .Where(r => !executionContext.IsIgnored(
+                        sourceFullName,
+                        r.FullName,
+                        sourceAssembly: sourceAssembly,
+                        targetAssembly: ArchitectureTypeNames.SafeAssemblyName(r.Type),
+                        targetType: r.FullName,
+                        targetMember: r.FullName))
                     .Select(r => r.FullName)
                     .Distinct()
                     .OrderBy(name => name)
@@ -299,6 +306,7 @@ public sealed partial class ArchitectureAnalysisSession
         foreach (Type sourceType in sourceTypes)
         {
             string sourceTypeName = ArchitectureTypeNames.SafeFullName(sourceType);
+            string sourceAssembly = ArchitectureTypeNames.SafeAssemblyName(sourceType) ?? string.Empty;
 
             foreach (Type referencedType in ReferenceGraph.GetReferencedTypes(sourceType))
             {
@@ -310,7 +318,13 @@ public sealed partial class ArchitectureAnalysisSession
                     continue;
                 }
 
-                if (executionContext.IsIgnored(sourceTypeName, referencedTypeName))
+                if (executionContext.IsIgnored(
+                        sourceTypeName,
+                        referencedTypeName,
+                        sourceAssembly: sourceAssembly,
+                        targetAssembly: ArchitectureTypeNames.SafeAssemblyName(referencedType),
+                        targetType: referencedTypeName,
+                        targetMember: referencedTypeName))
                 {
                     continue;
                 }
@@ -386,6 +400,7 @@ public sealed partial class ArchitectureAnalysisSession
         Dictionary<string, HashSet<string>> graph)
     {
         string sourceTypeName = ArchitectureTypeNames.SafeFullName(sourceType);
+        string sourceAssembly = ArchitectureTypeNames.SafeAssemblyName(sourceType) ?? string.Empty;
 
         foreach (Type referencedType in ArchitectureReferenceScanner.GetReferencedTypes(sourceType))
         {
@@ -397,7 +412,13 @@ public sealed partial class ArchitectureAnalysisSession
                 continue;
             }
 
-            if (executionContext.IsIgnored(sourceTypeName, referencedTypeName))
+            if (executionContext.IsIgnored(
+                    sourceTypeName,
+                    referencedTypeName,
+                    sourceAssembly: sourceAssembly,
+                    targetAssembly: ArchitectureTypeNames.SafeAssemblyName(referencedType),
+                    targetType: referencedTypeName,
+                    targetMember: referencedTypeName))
             {
                 continue;
             }

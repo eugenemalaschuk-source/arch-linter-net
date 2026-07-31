@@ -44,6 +44,7 @@ public sealed partial class ArchitectureAnalysisSession
         }
 
         string sourceFullName = ArchitectureTypeNames.SafeFullName(sourceType);
+        string sourceAssembly = ArchitectureTypeNames.SafeAssemblyName(sourceType) ?? string.Empty;
 
         // Scan references once per source type, not once per forbidden selector: GetReferencedTypes
         // does not itself deduplicate (it walks interfaces/base type/fields/properties/methods/
@@ -83,7 +84,13 @@ public sealed partial class ArchitectureAnalysisSession
 
             string targetFullName = ArchitectureTypeNames.SafeFullName(referencedType);
             if (string.IsNullOrEmpty(targetFullName)
-                || executionContext.IsIgnored(sourceFullName, targetFullName))
+                || executionContext.IsIgnored(
+                    sourceFullName,
+                    targetFullName,
+                    sourceAssembly: sourceAssembly,
+                    targetAssembly: ArchitectureTypeNames.SafeAssemblyName(referencedType),
+                    targetType: targetFullName,
+                    targetMember: targetFullName))
             {
                 continue;
             }
@@ -157,6 +164,7 @@ public sealed partial class ArchitectureAnalysisSession
         }
 
         string sourceFullName = ArchitectureTypeNames.SafeFullName(sourceType);
+        string sourceAssembly = ArchitectureTypeNames.SafeAssemblyName(sourceType) ?? string.Empty;
 
         // GetReferencedTypes does not itself deduplicate, so a target referenced via more than one
         // member (field, property, method signature, etc.) must be collapsed before evaluation —
@@ -172,7 +180,13 @@ public sealed partial class ArchitectureAnalysisSession
 
             string targetFullName = ArchitectureTypeNames.SafeFullName(referencedType);
             if (string.IsNullOrEmpty(targetFullName)
-                || executionContext.IsIgnored(sourceFullName, targetFullName))
+                || executionContext.IsIgnored(
+                    sourceFullName,
+                    targetFullName,
+                    sourceAssembly: sourceAssembly,
+                    targetAssembly: ArchitectureTypeNames.SafeAssemblyName(referencedType),
+                    targetType: targetFullName,
+                    targetMember: targetFullName))
             {
                 continue;
             }

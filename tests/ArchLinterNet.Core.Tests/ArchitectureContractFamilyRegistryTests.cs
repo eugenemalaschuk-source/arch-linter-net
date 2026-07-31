@@ -60,6 +60,35 @@ public sealed class ArchitectureContractFamilyRegistryTests
     }
 
     [Test]
+    public void All_HasAnExplicitBaselineIdentityClassificationForEveryFamily()
+    {
+        foreach (ArchitectureContractFamilyDescriptor descriptor in ArchitectureContractFamilyRegistry.All)
+        {
+            ArchitectureBaselineIdentityDescriptor identity = descriptor.BaselineIdentity;
+
+            Assert.That(identity.IsBaselineCapable, Is.EqualTo(descriptor.IsBaselineCapable),
+                $"Family '{descriptor.FamilyId}' baseline capability and identity inventory disagree.");
+
+            if (!descriptor.IsBaselineCapable)
+            {
+                Assert.That(identity.NonBaselineReason, Is.Not.Null.And.Not.Empty,
+                    $"Family '{descriptor.FamilyId}' must record why it cannot produce a baseline entry.");
+                continue;
+            }
+
+            Assert.That(identity.NonBaselineReason, Is.Null,
+                $"Baseline-capable family '{descriptor.FamilyId}' must not be classified as excluded.");
+            Assert.That(identity.SemanticDimensions, Does.Contain("contract-family"));
+            Assert.That(identity.SemanticDimensions, Does.Contain("contract-id"));
+            Assert.That(identity.SemanticDimensions, Does.Contain("occurrence"));
+            Assert.That(identity.SemanticDimensions, Is.Not.Contains("source_type"),
+                "Display-field names must not be used as canonical identity dimensions.");
+            Assert.That(identity.SemanticDimensions, Is.Not.Contains("forbidden_reference"),
+                "Display-field names must not be used as canonical identity dimensions.");
+        }
+    }
+
+    [Test]
     public void All_NoDescriptorInvokesAdditionalValidationInThisChange()
     {
         foreach (ArchitectureContractFamilyDescriptor descriptor in ArchitectureContractFamilyRegistry.All)

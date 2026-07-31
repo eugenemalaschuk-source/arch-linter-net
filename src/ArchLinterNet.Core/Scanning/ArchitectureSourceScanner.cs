@@ -93,6 +93,7 @@ internal sealed class ArchitectureSourceScanner : IArchitectureSourceScanner
                     relativePath, match.Display,
                     sourceAssembly: sourceAssemblyHint,
                     targetAssembly: match.TargetAssembly,
+                    targetType: match.TargetType,
                     sourceMember: match.SourceMember,
                     targetMember: match.TargetMember))
                 .Select(match => match.Display)
@@ -133,7 +134,12 @@ internal sealed class ArchitectureSourceScanner : IArchitectureSourceScanner
     /// <see cref="TargetMember"/>, and <see cref="SourceMember"/> are the structured identity fields
     /// derived from the resolved symbol and its enclosing member.
     /// </summary>
-    private sealed record ForbiddenCallMatch(string Display, string? TargetAssembly, string TargetMember, string? SourceMember);
+    private sealed record ForbiddenCallMatch(
+        string Display,
+        string? TargetAssembly,
+        string? TargetType,
+        string TargetMember,
+        string? SourceMember);
 
     private static List<ForbiddenCallMatch> FindForbiddenUsagesInBodies(
         SemanticModel semanticModel,
@@ -166,7 +172,12 @@ internal sealed class ArchitectureSourceScanner : IArchitectureSourceScanner
                 string display = $"line {line}: {matchedPattern} -> {symbolName}{fallbackMarker}";
                 string? sourceMember = semanticModel.GetEnclosingSymbol(node.SpanStart)
                     ?.ToDisplayString(SymbolDisplayFormat.CSharpErrorMessageFormat);
-                matches.Add(new ForbiddenCallMatch(display, symbol.ContainingAssembly?.Name, symbolName, sourceMember));
+                matches.Add(new ForbiddenCallMatch(
+                    display,
+                    symbol.ContainingAssembly?.Name,
+                    symbol.ContainingType?.ToDisplayString(),
+                    symbolName,
+                    sourceMember));
             }
         }
 

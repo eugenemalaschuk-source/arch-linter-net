@@ -124,7 +124,11 @@ public sealed partial class ArchitectureAnalysisSession
 
         string forbiddenReference = actualTypeLocation ?? actualTypeName ?? sourceType;
 
-        if (context.ExecutionContext.IsIgnored(sourceType, forbiddenReference))
+        if (context.ExecutionContext.IsIgnored(
+                sourceType,
+                forbiddenReference,
+                sourceAssembly: actualAssemblyName,
+                targetMember: forbiddenReference))
         {
             return;
         }

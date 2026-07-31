@@ -17,9 +17,12 @@ internal interface IArchitectureIlMethodBodyScanner
 }
 
 internal readonly record struct ArchitectureIlForbiddenCallMatch(
+    int InstructionOffset,
     string SourceMember,
     string MatchedPattern,
-    string MatchedMember);
+    string MatchedMember,
+    string? TargetType = null,
+    string? TargetAssembly = null);
 
 internal sealed class ArchitectureIlMethodBodyScanner : IArchitectureIlMethodBodyScanner
 {
@@ -48,8 +51,17 @@ internal sealed class ArchitectureIlMethodBodyScanner : IArchitectureIlMethodBod
         foreach (Type sourceType in sourceTypes)
         {
             string sourceTypeName = ArchitectureTypeNames.SafeFullName(sourceType);
-            var matches = FindTypeMatches(sourceType, patterns, matchCache)
-                .Where(match => !executionContext.IsIgnored(sourceTypeName, match))
+            string sourceAssembly = sourceType.Assembly.GetName().Name ?? string.Empty;
+            var matches = FindMatchDetailsForType(sourceType, patterns, matchCache)
+                .Where(match => !executionContext.IsIgnored(
+                    sourceTypeName,
+                    FormatMatch(match),
+                    sourceAssembly: sourceAssembly,
+                    targetAssembly: match.TargetAssembly,
+                    targetType: match.TargetType,
+                    sourceMember: match.SourceMember,
+                    targetMember: match.MatchedMember))
+                .Select(FormatMatch)
                 .Distinct(StringComparer.Ordinal)
                 .OrderBy(match => match, StringComparer.Ordinal)
                 .ToList();
@@ -70,19 +82,8 @@ internal sealed class ArchitectureIlMethodBodyScanner : IArchitectureIlMethodBod
         return violations;
     }
 
-    private static IEnumerable<string> FindTypeMatches(
-        Type sourceType,
-        IReadOnlyList<ForbiddenCallPattern> patterns,
-        Dictionary<string, bool> matchCache)
-    {
-        foreach (MethodBase method in EnumerateMethods(sourceType))
-        {
-            foreach (string match in FindMethodMatches(method, patterns, matchCache))
-            {
-                yield return match;
-            }
-        }
-    }
+    private static string FormatMatch(ArchitectureIlForbiddenCallMatch match)
+        => $"il {match.InstructionOffset:X4} ({match.SourceMember}): {match.MatchedPattern} -> {match.MatchedMember}";
 
     // Shared per-type IL scan loop, extracted so callers outside the namespace/layer-scoped public
     // entry point (e.g. composition contracts, which scan an already-filtered arbitrary type set
@@ -109,9 +110,12 @@ internal sealed class ArchitectureIlMethodBodyScanner : IArchitectureIlMethodBod
             foreach (IlForbiddenCallMatch match in FindMethodMatchDetails(method, patterns, matchCache))
             {
                 yield return new ArchitectureIlForbiddenCallMatch(
+                    match.InstructionOffset,
                     match.MethodName,
                     match.MatchedPattern,
-                    match.MatchedMember);
+                    match.MatchedMember,
+                    match.TargetType,
+                    match.TargetAssembly);
             }
         }
     }
@@ -149,7 +153,9 @@ internal sealed class ArchitectureIlMethodBodyScanner : IArchitectureIlMethodBod
         int InstructionOffset,
         string MethodName,
         string MatchedPattern,
-        string MatchedMember);
+        string MatchedMember,
+        string? TargetType,
+        string? TargetAssembly);
 
     private static IEnumerable<IlForbiddenCallMatch> FindMethodMatchDetails(
         MethodBase method,
@@ -209,7 +215,13 @@ internal sealed class ArchitectureIlMethodBodyScanner : IArchitectureIlMethodBod
             }
 
             string methodName = $"{method.DeclaringType?.FullName}.{method.Name}";
-            yield return new IlForbiddenCallMatch(instructionOffset, methodName, matchedPattern, descriptor.FullyQualifiedMember);
+            yield return new IlForbiddenCallMatch(
+                instructionOffset,
+                methodName,
+                matchedPattern,
+                descriptor.FullyQualifiedMember,
+                referencedMember.DeclaringType?.FullName,
+                referencedMember.DeclaringType?.Assembly.GetName().Name);
         }
     }
 

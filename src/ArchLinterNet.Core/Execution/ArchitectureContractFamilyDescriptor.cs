@@ -21,6 +21,13 @@ internal sealed record ArchitectureContractFamilyDescriptor(
     Func<ArchitectureContractGroups, IEnumerable<IArchitectureContract>> AuditContracts,
     ArchitectureContractChecker Checker)
 {
+    /// <summary>
+    /// The exhaustive baseline-identity inventory entry for this family. It is derived from the
+    /// descriptor's baseline capability so a future family cannot remain unclassified.
+    /// </summary>
+    public ArchitectureBaselineIdentityDescriptor BaselineIdentity { get; init; } =
+        ArchitectureBaselineIdentityDescriptor.For(FamilyId, IsBaselineCapable);
+
     public IReadOnlyList<Type> OwnedContractTypes { get; init; } = Array.Empty<Type>();
 
     public Action<ArchitectureContractDocument>? AdditionalValidation { get; init; }
