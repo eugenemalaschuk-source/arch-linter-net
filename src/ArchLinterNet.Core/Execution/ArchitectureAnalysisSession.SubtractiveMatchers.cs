@@ -19,7 +19,7 @@ public sealed partial class ArchitectureAnalysisSession
     private void RecordSubtractiveMatcherParticipation(
         IArchitectureContract contract,
         string field,
-        int index,
+        int? index,
         bool matched,
         bool evaluationFailed = false,
         ArchitectureSelectorParticipationKind kind = ArchitectureSelectorParticipationKind.Exclusion)
@@ -29,11 +29,12 @@ public sealed partial class ArchitectureAnalysisSession
         {
             PolicyLocation = ItemLocation(contract, field, index),
             EvaluationFailed = evaluationFailed,
-            Kind = kind
+            Kind = kind,
+            Mode = ResolveSelectorParticipationMode(contract)
         });
     }
 
-    private ArchitecturePolicySourceLocation? ItemLocation(IArchitectureContract contract, string field, int index)
+    private ArchitecturePolicySourceLocation? ItemLocation(IArchitectureContract contract, string field, int? index)
     {
         ArchitecturePolicySourceLocation? contractLocation = Document.Provenance.LocationFor(contract);
         if (contractLocation is null)
@@ -41,10 +42,26 @@ public sealed partial class ArchitectureAnalysisSession
             return null;
         }
 
-        string path = ArchitecturePolicyProvenancePath.AppendIndex(
-            ArchitecturePolicyProvenancePath.AppendProperty(contractLocation.YamlPath, field), index);
+        string path = ArchitecturePolicyProvenancePath.AppendProperty(contractLocation.YamlPath, field);
+        if (index is int itemIndex)
+        {
+            path = ArchitecturePolicyProvenancePath.AppendIndex(path, itemIndex);
+        }
         return Document.Provenance.TryGetLocation(path, out ArchitecturePolicySourceLocation? location)
             ? location
             : contractLocation with { YamlPath = path };
+    }
+
+    private ArchitectureSelectorParticipationMode ResolveSelectorParticipationMode(IArchitectureContract contract)
+    {
+        string? group = ResolveContractGroup(contract);
+        if (group is null)
+        {
+            return ArchitectureSelectorParticipationMode.Unknown;
+        }
+
+        return group.StartsWith("audit_", StringComparison.Ordinal)
+            ? ArchitectureSelectorParticipationMode.Audit
+            : ArchitectureSelectorParticipationMode.Strict;
     }
 }

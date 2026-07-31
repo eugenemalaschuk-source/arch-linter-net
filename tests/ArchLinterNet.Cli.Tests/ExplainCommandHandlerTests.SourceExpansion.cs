@@ -32,6 +32,8 @@ public sealed partial class ExplainCommandHandlerTests
             Assert.That(expansion.GetProperty("sets")[0].GetProperty("name").GetString(), Is.EqualTo("modules"));
             Assert.That(contract.GetProperty("authoredContractId").GetString(), Is.EqualTo("modules-no-infrastructure"));
             Assert.That(contract.GetProperty("exclusions")[0].GetProperty("matched").GetBoolean(), Is.False);
+            Assert.That(contract.GetProperty("inclusions")[0].GetProperty("source").GetString(),
+                Is.EqualTo("Acme.Modules.Orders"));
             Assert.That(instance.GetProperty("source").GetString(), Is.EqualTo("Acme.Modules.Orders"));
             Assert.That(instance.GetProperty("sourceSet").GetString(), Is.EqualTo("modules"));
             Assert.That(instance.GetProperty("selector").GetString(), Is.EqualTo("Acme.Modules.*"));
@@ -77,12 +79,17 @@ public sealed partial class ExplainCommandHandlerTests
                 SelectorParticipation =
                 [
                     new ArchitectureSubtractiveMatcherParticipation(
-                        "controllers", "controllers", "types_matching", 0, true)
+                        "controllers", "controllers", "types_matching", null, true)
                     {
-                        Kind = ArchitectureSelectorParticipationKind.Inclusion
+                        Kind = ArchitectureSelectorParticipationKind.Inclusion,
+                        Mode = ArchitectureSelectorParticipationMode.Strict
                     },
                     new ArchitectureSubtractiveMatcherParticipation(
-                        "controllers", "controllers", "exclude_types_matching", 0, false)
+                        "controllers", "controllers", "exclude_types_matching", 0, true)
+                    {
+                        Mode = ArchitectureSelectorParticipationMode.Audit,
+                        EvaluationFailed = true
+                    }
                 ]
             }
         };
@@ -95,14 +102,18 @@ public sealed partial class ExplainCommandHandlerTests
         Assert.Multiple(() =>
         {
             Assert.That(participation[0].GetProperty("kind").GetString(), Is.EqualTo("inclusion"));
+            Assert.That(participation[0].GetProperty("index").ValueKind, Is.EqualTo(JsonValueKind.Null));
+            Assert.That(participation[0].GetProperty("mode").GetString(), Is.EqualTo("strict"));
             Assert.That(participation[0].GetProperty("matched").GetBoolean(), Is.True);
             Assert.That(participation[1].GetProperty("kind").GetString(), Is.EqualTo("exclusion"));
-            Assert.That(participation[1].GetProperty("staleExclusion").GetBoolean(), Is.True);
+            Assert.That(participation[1].GetProperty("mode").GetString(), Is.EqualTo("audit"));
+            Assert.That(participation[1].GetProperty("matched").GetBoolean(), Is.True);
+            Assert.That(participation[1].GetProperty("evaluationFailed").GetBoolean(), Is.True);
         });
 
         Handler(runtime, console).Execute(Options(format: "human"));
         Assert.That(console.OutputText,
-            Does.Contain("Selector participation: [controllers] exclusion exclude_types_matching[0] stale"));
+            Does.Contain("Selector participation: [controllers] audit exclusion exclude_types_matching[0] matched; evaluation failed"));
     }
 
     [Test]

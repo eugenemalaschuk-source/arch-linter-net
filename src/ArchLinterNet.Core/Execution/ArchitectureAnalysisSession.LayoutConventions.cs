@@ -72,24 +72,7 @@ public sealed partial class ArchitectureAnalysisSession
                 }
             });
 
-            // The whole run aborted before any exclusion got a chance to evaluate - every exclusion
-            // that itself needs source-path facts must still surface as evaluation-failed rather than
-            // silently vanish from the structured participation result.
-            for (int index = 0; index < contract.ExcludeFilesMatching.Count; index++)
-            {
-                if (MatcherNeedsSourcePath(contract.ExcludeFilesMatching[index]))
-                {
-                    RecordSubtractiveMatcherParticipation(
-                        contract, "exclude_files_matching", index, matched: false, evaluationFailed: true);
-                }
-            }
-
-            if (MatcherNeedsSourcePath(contract.FilesMatching))
-            {
-                RecordSubtractiveMatcherParticipation(
-                    contract, "files_matching", 0, matched: false, evaluationFailed: true,
-                    kind: ArchitectureSelectorParticipationKind.Inclusion);
-            }
+            RecordUnavailableLayoutSelectorParticipation(contract);
 
             return violations;
         }
@@ -110,10 +93,10 @@ public sealed partial class ArchitectureAnalysisSession
         bool[] exclusionEvaluationFailed = new bool[contract.ExcludeFilesMatching.Count];
         List<LayoutFileGroup> matchedGroups = CollectMatchedFileGroups(
             contract, executionContext, violations, exclusionMatched, exclusionEvaluationFailed,
-            out bool inclusionMatched);
+            out bool inclusionMatched, out bool inclusionEvaluationFailed);
 
         RecordSubtractiveMatcherParticipation(
-            contract, "files_matching", 0, inclusionMatched,
+            contract, "files_matching", null, inclusionMatched, evaluationFailed: inclusionEvaluationFailed,
             kind: ArchitectureSelectorParticipationKind.Inclusion);
 
         foreach (LayoutFileGroup group in matchedGroups)

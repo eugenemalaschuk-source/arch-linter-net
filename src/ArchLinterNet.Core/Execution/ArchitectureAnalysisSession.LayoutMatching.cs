@@ -8,6 +8,40 @@ namespace ArchLinterNet.Core.Execution;
 
 public sealed partial class ArchitectureAnalysisSession
 {
+    // A whole-run data-unavailable diagnostic may be caused by an expectation (for example,
+    // require_type_name_matches_file_name), while some authored selectors remain evaluable from
+    // reflection-only namespace facts. Record every selector in that case: a missing path is
+    // explicit EvaluationFailed evidence, and an independent namespace-only result stays useful
+    // rather than silently disappearing from coverage/explain.
+    private void RecordUnavailableLayoutSelectorParticipation(ArchitectureLayoutConventionContract contract)
+    {
+        (_, List<(Type Type, ArchitectureDeclaredTypeFact Fact)> unfiled) = BuildCandidateIndex();
+        bool inclusionEvaluationFailed = MatcherNeedsSourcePath(contract.FilesMatching);
+        List<(Type Type, ArchitectureDeclaredTypeFact Fact)> included = inclusionEvaluationFailed
+            ? new List<(Type, ArchitectureDeclaredTypeFact)>()
+            : unfiled.Where(entry => MatchesUnfiledFact(contract.FilesMatching, entry.Fact)
+                && (contract.FilesMatching.CompiledWhen == null || EvaluateLayoutWhen(contract.FilesMatching, entry.Type)))
+                .ToList();
+
+        RecordSubtractiveMatcherParticipation(
+            contract, "files_matching", null, included.Count > 0,
+            evaluationFailed: inclusionEvaluationFailed,
+            kind: ArchitectureSelectorParticipationKind.Inclusion);
+
+        for (int index = 0; index < contract.ExcludeFilesMatching.Count; index++)
+        {
+            ArchitectureLayoutFileMatcher exclusion = contract.ExcludeFilesMatching[index];
+            // An exclusion cannot establish an effective subtraction while its positive universe
+            // is unknown, even if the exclusion itself is namespace-only and otherwise evaluable.
+            bool evaluationFailed = inclusionEvaluationFailed || MatcherNeedsSourcePath(exclusion);
+            bool matched = !evaluationFailed && included.Any(entry =>
+                MatchesUnfiledFact(exclusion, entry.Fact)
+                && (exclusion.CompiledWhen == null || EvaluateLayoutWhen(exclusion, entry.Type)));
+            RecordSubtractiveMatcherParticipation(
+                contract, "exclude_files_matching", index, matched, evaluationFailed);
+        }
+    }
+
     // File selection is file-granular, not fact-granular: a file matches folder_segment/file_name_*
     // (shared by every type declared in it) or namespace_segment (true if ANY declared type in the
     // file has that namespace segment) as a whole, and once a file matches, every declared type in
@@ -22,7 +56,8 @@ public sealed partial class ArchitectureAnalysisSession
         List<ArchitectureViolation> violations,
         bool[] exclusionMatched,
         bool[] exclusionEvaluationFailed,
-        out bool inclusionMatched)
+        out bool inclusionMatched,
+        out bool inclusionEvaluationFailed)
     {
         ArchitectureLayoutFileMatcher matcher = contract.FilesMatching;
         (Dictionary<string, List<(Type Type, ArchitectureDeclaredTypeFact Fact)>> byFile,
@@ -31,9 +66,10 @@ public sealed partial class ArchitectureAnalysisSession
         List<LayoutFileGroup> groups = CollectFiledGroups(contract, byFile, exclusionMatched, out bool filedInclusionMatched);
         List<LayoutFileGroup> unfiledGroups = CollectUnfiledGroups(
             contract, matcher, unfiled, executionContext, violations, exclusionMatched, exclusionEvaluationFailed,
-            out bool unfiledInclusionMatched);
+            out bool unfiledInclusionMatched, out bool unfiledInclusionEvaluationFailed);
         groups.AddRange(unfiledGroups);
         inclusionMatched = filedInclusionMatched || unfiledInclusionMatched;
+        inclusionEvaluationFailed = unfiledInclusionEvaluationFailed;
         return groups;
     }
 
@@ -171,10 +207,12 @@ public sealed partial class ArchitectureAnalysisSession
         List<ArchitectureViolation> violations,
         bool[] exclusionMatched,
         bool[] exclusionEvaluationFailed,
-        out bool inclusionMatched)
+        out bool inclusionMatched,
+        out bool inclusionEvaluationFailed)
     {
         List<LayoutFileGroup> groups = new();
         inclusionMatched = false;
+        inclusionEvaluationFailed = false;
 
         foreach ((Type Type, ArchitectureDeclaredTypeFact Fact) entry in
                  unfiled.OrderBy(entry => entry.Fact.FullTypeName, StringComparer.Ordinal))
@@ -187,6 +225,7 @@ public sealed partial class ArchitectureAnalysisSession
             if (!TryEvaluateUnfiledMatcher(contract, matcher, entry, executionContext, violations, "files_matching",
                     BuildUnevaluatedLayoutWhenExpressions(contract), out bool included))
             {
+                inclusionEvaluationFailed = true;
                 continue;
             }
 
@@ -364,7 +403,8 @@ public sealed partial class ArchitectureAnalysisSession
             return false;
         }
 
-        return fact.NamespaceSegments.Contains(matcher.NamespaceSegment, StringComparer.Ordinal);
+        return string.IsNullOrEmpty(matcher.NamespaceSegment)
+            || fact.NamespaceSegments.Contains(matcher.NamespaceSegment, StringComparer.Ordinal);
     }
 
     private bool EvaluateLayoutWhen(ArchitectureLayoutFileMatcher matcher, Type type)

@@ -400,6 +400,9 @@ contracts:
             {
                 Assert.That(expansion.Kind, Is.EqualTo(ArchitectureContractExpansionKind.ContainerSet));
                 Assert.That(expansion.Instances.Select(i => i.Source), Is.EqualTo(new[] { "Feature.Orders" }));
+                Assert.That(expansion.Inclusions.Select(i => i.Source), Is.EqualTo(new[] { "Feature.Billing", "Feature.Orders" }));
+                Assert.That(expansion.Inclusions.First(i => i.Source == "Feature.Billing").PolicyLocation?.YamlPath,
+                    Does.EndWith("/containers/0"));
                 Assert.That(
                     expansion.Exclusions.Select(e => (e.Source, e.Matched)),
                     Is.EqualTo(new[] { ("Feature.Billing", true), ("Feature.NoSuchFeature", false) }));

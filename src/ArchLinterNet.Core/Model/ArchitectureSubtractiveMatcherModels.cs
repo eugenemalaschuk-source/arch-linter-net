@@ -9,6 +9,15 @@ public enum ArchitectureSelectorParticipationKind
     Exclusion
 }
 
+// A contract id is only unique within its contract family and execution mode.  Keep the mode on
+// every runtime record so consumers never conflate otherwise-identical strict and audit rules.
+public enum ArchitectureSelectorParticipationMode
+{
+    Unknown,
+    Strict,
+    Audit
+}
+
 // Typed evidence for the candidate matchers (`types_matching`, `files_matching`, and their
 // subtractive counterparts) that type-placement and layout-convention contracts evaluate at run
 // time. Unlike source-set selection (resolved once at load time), these matchers run per candidate
@@ -17,10 +26,12 @@ public sealed record ArchitectureSubtractiveMatcherParticipation(
     string ContractId,
     string ContractName,
     string Field,
-    int Index,
+    int? Index,
     bool Matched)
 {
     public ArchitectureSelectorParticipationKind Kind { get; init; } = ArchitectureSelectorParticipationKind.Exclusion;
+
+    public ArchitectureSelectorParticipationMode Mode { get; init; }
 
     public ArchitecturePolicySourceLocation? PolicyLocation { get; init; }
 

@@ -73,7 +73,7 @@ public sealed partial class LayoutConventionContractTests
             runner.SubtractiveMatcherParticipation.Select(p => (p.Kind, p.Field, p.Index, p.Matched)),
             Is.EqualTo(new[]
             {
-                (ArchitectureSelectorParticipationKind.Inclusion, "files_matching", 0, true),
+                (ArchitectureSelectorParticipationKind.Inclusion, "files_matching", (int?)null, true),
                 (ArchitectureSelectorParticipationKind.Exclusion, "exclude_files_matching", 0, true),
                 (ArchitectureSelectorParticipationKind.Exclusion, "exclude_files_matching", 1, false)
             }),
@@ -121,7 +121,7 @@ public sealed partial class LayoutConventionContractTests
                 runner.SubtractiveMatcherParticipation.Select(p => (p.Kind, p.Field, p.Index, p.Matched)),
                 Is.EqualTo(new[]
                 {
-                    (ArchitectureSelectorParticipationKind.Inclusion, "files_matching", 0, true),
+                    (ArchitectureSelectorParticipationKind.Inclusion, "files_matching", (int?)null, true),
                     (ArchitectureSelectorParticipationKind.Exclusion, "exclude_files_matching", 0, false)
                 }));
         });

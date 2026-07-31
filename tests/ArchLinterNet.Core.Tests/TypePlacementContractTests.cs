@@ -146,7 +146,7 @@ public sealed class TypePlacementContractTests
             runner.SubtractiveMatcherParticipation.Select(p => (p.Kind, p.Field, p.Index, p.Matched)),
             Is.EqualTo(new[]
             {
-                (ArchitectureSelectorParticipationKind.Inclusion, "types_matching", 0, true),
+                (ArchitectureSelectorParticipationKind.Inclusion, "types_matching", (int?)null, true),
                 (ArchitectureSelectorParticipationKind.Exclusion, "exclude_types_matching", 0, true),
                 (ArchitectureSelectorParticipationKind.Exclusion, "exclude_types_matching", 1, false)
             }),

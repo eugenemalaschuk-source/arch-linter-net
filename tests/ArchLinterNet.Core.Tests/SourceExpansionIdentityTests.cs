@@ -344,6 +344,8 @@ public sealed class SourceExpansionIdentityTests
             {
                 Assert.That(document.Contracts.StrictExternal, Is.Empty);
                 Assert.That(expansion.Instances, Is.Empty);
+                Assert.That(expansion.Inclusions.Select(instance => instance.Source),
+                    Is.EqualTo(new[] { "application", "domain" }));
                 Assert.That(expansion.OptionalEmpty, Is.False);
                 Assert.That(expansion.Exclusions.All(exclusion => exclusion.Matched), Is.True);
             });

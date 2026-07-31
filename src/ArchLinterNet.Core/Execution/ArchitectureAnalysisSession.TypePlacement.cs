@@ -49,7 +49,7 @@ public sealed partial class ArchitectureAnalysisSession
         // Inclusion is captured before subtraction: an excluded type still proves the positive
         // selector had a candidate, making effective scope observable without rerunning matching.
         RecordSubtractiveMatcherParticipation(
-            contract, "types_matching", 0, includedTypes.Length > 0,
+            contract, "types_matching", null, includedTypes.Length > 0,
             kind: ArchitectureSelectorParticipationKind.Inclusion);
 
         Type[] candidateTypes = includedTypes

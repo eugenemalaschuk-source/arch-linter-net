@@ -218,7 +218,9 @@ internal static class ArchitectureSourceSetExpander
         // `selectors`. Matched/stale status for each authored exclusion item is judged against this
         // snapshot rather than the live dictionary, so a source excluded by an earlier item does not
         // make a later, equally-valid exclusion of the same source misreport as stale.
-        HashSet<string> includedSnapshot = new(selectors.Keys, StringComparer.Ordinal);
+        Dictionary<string, (string? SetName, string Selector)> includedSelectors =
+            new(selectors, StringComparer.Ordinal);
+        HashSet<string> includedSnapshot = new(includedSelectors.Keys, StringComparer.Ordinal);
         List<ArchitectureExpandedContractExclusion> exclusions = new();
 
         for (int index = 0; index < contract.ExcludedSources.Count; index++)
@@ -289,6 +291,13 @@ internal static class ArchitectureSourceSetExpander
                 "declared globs or split the contract.");
         }
 
+        List<ArchitectureExpandedContractInstance> inclusions = includedSelectors
+            .OrderBy(entry => entry.Key, StringComparer.Ordinal)
+            .Select(entry => CreateExpandedInstance(
+                authoredId, entry.Key, entry.Value.SetName, entry.Value.Selector,
+                instanceLocations.GetValueOrDefault(entry.Key), contractLocation,
+                sourceSetReferenceLocations.GetValueOrDefault(entry.Key)))
+            .ToList();
         List<ArchitectureExpandedContractInstance> instances = new();
         List<TContract> expandedContracts = new();
 
@@ -303,14 +312,10 @@ internal static class ArchitectureSourceSetExpander
                 authoredId, contract.Name, source, setName, selector);
 
             document.Provenance.BindExpandedContract(contract, instance, group);
-            instances.Add(new ArchitectureExpandedContractInstance(instanceId, source, setName, selector)
-            {
-                PolicyLocation = instanceLocations.TryGetValue(source, out ArchitecturePolicySourceLocation? location)
-                    ? location
-                    : null,
-                AuthoredContractPolicyLocation = contractLocation,
-                SourceSetReferencePolicyLocation = sourceSetReferenceLocations.GetValueOrDefault(source)
-            });
+            instances.Add(CreateExpandedInstance(
+                instanceId, source, setName, selector,
+                instanceLocations.GetValueOrDefault(source), contractLocation,
+                sourceSetReferenceLocations.GetValueOrDefault(source)));
             expandedContracts.Add(instance);
         }
 
@@ -324,19 +329,14 @@ internal static class ArchitectureSourceSetExpander
             OptionalEmpty = includedCountBeforeExclusions == 0 && optionalReasons.Count > 0,
             OptionalReason = string.Join("; ", optionalReasons.Where(reason => !string.IsNullOrWhiteSpace(reason))),
             PolicyLocation = contractLocation,
-            Exclusions = exclusions
+            Exclusions = exclusions,
+            Inclusions = inclusions
         });
 
         return expandedContracts;
     }
 
-    // Layer templates aren't source-expandable (no `source`/`sources`/`source_sets`), but
-    // `exclude_containers` is the same "subtract from an explicit list" shape as `exclude_sources`,
-    // so it gets the same typed matched/stale participation evidence here rather than a bespoke
-    // model - and for free, the same coverage/explain/JSON/SARIF wiring that already projects
-    // document.SourceExpansion.Contracts. The actual container -> layer-contract fan-out this
-    // evidence describes still happens separately in LayerTemplateExpander.Expand, called wherever
-    // the executable ArchitectureLayerContract instances are needed.
+    // Layer templates use the same typed expansion evidence for containers as source-scoped contracts.
     private static void RecordLayerTemplateContainerExclusions(
         ArchitectureContractDocument document,
         List<ArchitectureContractExpansion> expansions,
@@ -345,11 +345,6 @@ internal static class ArchitectureSourceSetExpander
     {
         foreach (ArchitectureLayerTemplateContract contract in contracts)
         {
-            if (contract.ExcludeContainers.Count == 0)
-            {
-                continue;
-            }
-
             document.Provenance.SetValidationSubject(contract);
             string authoredId = contract.Id ?? ArchitecturePolicyDocumentLoader.NormalizeToContractId(contract.Name);
             ArchitecturePolicySourceLocation? contractLocation = document.Provenance.LocationFor(contract);
@@ -392,14 +387,17 @@ internal static class ArchitectureSourceSetExpander
                 containerLocations.TryAdd(container, ExclusionLocation(document, contractLocation, "containers", index));
             }
 
+            List<ArchitectureExpandedContractInstance> inclusions = includedSnapshot
+                .OrderBy(container => container, StringComparer.Ordinal)
+                .Select(container => CreateExpandedInstance(
+                    $"{authoredId}/{ArchitecturePolicyDocumentLoader.NormalizeToContractId(container)}",
+                    container, null, container, containerLocations.GetValueOrDefault(container), contractLocation, null))
+                .ToList();
             List<ArchitectureExpandedContractInstance> instances = remaining
                 .OrderBy(container => container, StringComparer.Ordinal)
-                .Select(container => new ArchitectureExpandedContractInstance(
-                    $"{authoredId}/{ArchitecturePolicyDocumentLoader.NormalizeToContractId(container)}", container, null, container)
-                {
-                    PolicyLocation = containerLocations.GetValueOrDefault(container),
-                    AuthoredContractPolicyLocation = contractLocation
-                })
+                .Select(container => CreateExpandedInstance(
+                    $"{authoredId}/{ArchitecturePolicyDocumentLoader.NormalizeToContractId(container)}",
+                    container, null, container, containerLocations.GetValueOrDefault(container), contractLocation, null))
                 .ToList();
 
             expansions.Add(new ArchitectureContractExpansion(
@@ -407,7 +405,8 @@ internal static class ArchitectureSourceSetExpander
             {
                 Kind = ArchitectureContractExpansionKind.ContainerSet,
                 PolicyLocation = contractLocation,
-                Exclusions = exclusions
+                Exclusions = exclusions,
+                Inclusions = inclusions
             });
         }
     }
@@ -474,7 +473,13 @@ internal static class ArchitectureSourceSetExpander
             SelectorField = field,
             OptionalEmpty = resolved.Count == 0 && optionalReasons.Count > 0,
             OptionalReason = string.Join("; ", optionalReasons.Where(reason => !string.IsNullOrWhiteSpace(reason))),
-            PolicyLocation = contractLocation
+            PolicyLocation = contractLocation,
+            Inclusions = setValues.OrderBy(pair => pair.Key, StringComparer.Ordinal)
+                .Select(pair => CreateExpandedInstance(
+                    authoredId, pair.Key, pair.Value.SetName, pair.Value.Selector,
+                    resolver.LocationFor(pair.Value.SetName, pair.Key), contractLocation,
+                    ExclusionLocation(document, contractLocation, field, pair.Value.ReferenceIndex)))
+                .ToArray()
         });
 
         return resolved
@@ -523,6 +528,21 @@ internal static class ArchitectureSourceSetExpander
             ? location
             : contractLocation with { YamlPath = path };
     }
+
+    private static ArchitectureExpandedContractInstance CreateExpandedInstance(
+        string contractId,
+        string source,
+        string? setName,
+        string selector,
+        ArchitecturePolicySourceLocation? policyLocation,
+        ArchitecturePolicySourceLocation? contractLocation,
+        ArchitecturePolicySourceLocation? sourceSetReferenceLocation) =>
+        new(contractId, source, setName, selector)
+        {
+            PolicyLocation = policyLocation,
+            AuthoredContractPolicyLocation = contractLocation,
+            SourceSetReferencePolicyLocation = sourceSetReferenceLocation
+        };
 
     private sealed class SourceSetResolver
     {

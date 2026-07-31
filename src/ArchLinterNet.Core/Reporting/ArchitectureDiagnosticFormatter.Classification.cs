@@ -274,6 +274,7 @@ public sealed partial class ArchitectureDiagnosticFormatter
                 {
                     contract_id = p.ContractId,
                     contract_name = p.ContractName,
+                    mode = p.Mode.ToString().ToLowerInvariant(),
                     field = p.Field,
                     index = p.Index,
                     matched = p.Matched,

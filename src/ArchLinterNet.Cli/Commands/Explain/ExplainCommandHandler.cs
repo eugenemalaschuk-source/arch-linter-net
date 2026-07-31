@@ -116,6 +116,16 @@ internal sealed class ExplainCommandHandler(ICliRuntime runtime, ICliConsole con
                                 ["optionalReason"] = exclusion.OptionalReason,
                                 ["policyLocation"] = FormatPolicyLocation(exclusion.PolicyLocation)
                             }).ToArray(),
+                            ["inclusions"] = expansion.Inclusions.Select(instance => new Dictionary<string, object?>
+                            {
+                                ["contractId"] = instance.ContractId,
+                                ["source"] = instance.Source,
+                                ["sourceSet"] = instance.SetName,
+                                ["selector"] = instance.Selector,
+                                ["policyLocation"] = FormatPolicyLocation(instance.PolicyLocation),
+                                ["authoredContractPolicyLocation"] = FormatPolicyLocation(instance.AuthoredContractPolicyLocation),
+                                ["sourceSetReferencePolicyLocation"] = FormatPolicyLocation(instance.SourceSetReferencePolicyLocation)
+                            }).ToArray(),
                             ["instances"] = expansion.Instances.Select(instance => new Dictionary<string, object?>
                             {
                                 ["contractId"] = instance.ContractId,
@@ -132,6 +142,7 @@ internal sealed class ExplainCommandHandler(ICliRuntime runtime, ICliConsole con
                     {
                         ["contractId"] = participation.ContractId,
                         ["contractName"] = participation.ContractName,
+                        ["mode"] = participation.Mode.ToString().ToLowerInvariant(),
                         ["kind"] = participation.Kind == ArchitectureSelectorParticipationKind.Inclusion
                             ? "inclusion"
                             : "exclusion",
@@ -231,6 +242,14 @@ internal sealed class ExplainCommandHandler(ICliRuntime runtime, ICliConsole con
                         }
                     }
 
+                    foreach (ArchitectureExpandedContractInstance inclusion in expansion.Inclusions)
+                    {
+                        string set = inclusion.SetName is null ? "sources" : $"set '{inclusion.SetName}'";
+                        console.Out.WriteLine(
+                            $"Source expansion inclusion: [{expansion.AuthoredContractId}] {set} -> {inclusion.Source} " +
+                            $"(selector: {inclusion.Selector}; id: {inclusion.ContractId}){FormatInstancePolicySuffix(inclusion)}");
+                    }
+
                     foreach (ArchitectureExpandedContractExclusion exclusion in expansion.Exclusions)
                     {
                         string set = exclusion.SetName is null ? "sources" : $"set '{exclusion.SetName}'";
@@ -253,9 +272,11 @@ internal sealed class ExplainCommandHandler(ICliRuntime runtime, ICliConsole con
 
                 foreach (ArchitectureSubtractiveMatcherParticipation participation in outcome.SelectorParticipation)
                 {
-                    string state = participation.EvaluationFailed
-                        ? "evaluation failed"
-                        : participation.Matched
+                    string state = participation.Matched && participation.EvaluationFailed
+                        ? "matched; evaluation failed"
+                        : participation.EvaluationFailed
+                            ? "evaluation failed"
+                            : participation.Matched
                             ? "matched"
                             : participation.IsStaleExclusion
                                 ? "stale"
@@ -264,7 +285,8 @@ internal sealed class ExplainCommandHandler(ICliRuntime runtime, ICliConsole con
                         ? "inclusion"
                         : "exclusion";
                     console.Out.WriteLine(
-                        $"Selector participation: [{participation.ContractId}] {kind} {participation.Field}[{participation.Index}] " +
+                        $"Selector participation: [{participation.ContractId}] {participation.Mode.ToString().ToLowerInvariant()} " +
+                        $"{kind} {participation.Field}{FormatSelectorIndex(participation.Index)} " +
                         $"{state}{FormatPolicySuffix(participation.PolicyLocation)}");
                 }
             }
@@ -299,6 +321,8 @@ internal sealed class ExplainCommandHandler(ICliRuntime runtime, ICliConsole con
 
     private static string FormatPolicySuffix(ArchitecturePolicySourceLocation? location) =>
         location is null ? string.Empty : $" (policy: {location.SourcePath}:{location.YamlPath})";
+
+    private static string FormatSelectorIndex(int? index) => index is int value ? $"[{value}]" : string.Empty;
 
     private static string FormatInstancePolicySuffix(ArchitectureExpandedContractInstance instance)
     {

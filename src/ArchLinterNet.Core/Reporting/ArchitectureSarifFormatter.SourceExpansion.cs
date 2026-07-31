@@ -88,6 +88,16 @@ public sealed partial class ArchitectureSarifFormatter
                     ["optional_reason"] = exclusion.OptionalReason,
                     ["policy_location"] = FormatSourceExpansionLocation(exclusion.PolicyLocation)
                 }).ToArray(),
+                ["inclusions"] = expansion.Inclusions.Select(instance => (object)new Dictionary<string, object?>
+                {
+                    ["contract_id"] = instance.ContractId,
+                    ["source"] = instance.Source,
+                    ["source_set"] = instance.SetName,
+                    ["selector"] = instance.Selector,
+                    ["policy_location"] = FormatSourceExpansionLocation(instance.PolicyLocation),
+                    ["authored_contract_policy_location"] = FormatSourceExpansionLocation(instance.AuthoredContractPolicyLocation),
+                    ["source_set_reference_policy_location"] = FormatSourceExpansionLocation(instance.SourceSetReferencePolicyLocation)
+                }).ToArray(),
                 ["instances"] = expansion.Instances.Select(instance => (object)new Dictionary<string, object?>
                 {
                     ["contract_id"] = instance.ContractId,
@@ -109,6 +119,7 @@ public sealed partial class ArchitectureSarifFormatter
         {
             ["contract_id"] = p.ContractId,
             ["contract_name"] = p.ContractName,
+            ["mode"] = p.Mode.ToString().ToLowerInvariant(),
             ["field"] = p.Field,
             ["index"] = p.Index,
             ["matched"] = p.Matched,

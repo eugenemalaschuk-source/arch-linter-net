@@ -108,6 +108,12 @@ public sealed record ArchitectureContractExpansion(
 
     public IReadOnlyList<ArchitectureExpandedContractExclusion> Exclusions { get; init; } =
         Array.Empty<ArchitectureExpandedContractExclusion>();
+
+    // Authored positive selector evidence before exclusions are applied.  `Instances` deliberately
+    // remains the executable, effective scope; keeping this separate preserves proof that a fully
+    // subtracted source/container was admitted by the positive selector in the first place.
+    public IReadOnlyList<ArchitectureExpandedContractInstance> Inclusions { get; init; } =
+        Array.Empty<ArchitectureExpandedContractInstance>();
 }
 
 public sealed class ArchitectureSourceExpansionInventory
