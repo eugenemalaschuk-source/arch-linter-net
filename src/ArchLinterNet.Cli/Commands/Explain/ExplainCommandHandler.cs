@@ -127,6 +127,8 @@ internal sealed class ExplainCommandHandler(ICliRuntime runtime, ICliConsole con
                                 [SourceKey] = instance.Source,
                                 ["sourceSet"] = instance.SetName,
                                 ["selector"] = instance.Selector,
+                                ["optionalEmpty"] = instance.OptionalEmpty,
+                                ["optionalReason"] = instance.OptionalReason,
                                 [PolicyLocationKey] = FormatPolicyLocation(instance.PolicyLocation),
                                 ["authoredContractPolicyLocation"] = FormatPolicyLocation(instance.AuthoredContractPolicyLocation),
                                 ["sourceSetReferencePolicyLocation"] = FormatPolicyLocation(instance.SourceSetReferencePolicyLocation)
@@ -250,6 +252,14 @@ internal sealed class ExplainCommandHandler(ICliRuntime runtime, ICliConsole con
                     foreach (ArchitectureExpandedContractInstance inclusion in expansion.Inclusions)
                     {
                         string set = inclusion.SetName is null ? "sources" : $"set '{inclusion.SetName}'";
+                        if (inclusion.OptionalEmpty)
+                        {
+                            console.Out.WriteLine(
+                                $"Source expansion inclusion: [{expansion.AuthoredContractId}] optional-empty {set} " +
+                                $"({inclusion.OptionalReason}){FormatInstancePolicySuffix(inclusion)}");
+                            continue;
+                        }
+
                         console.Out.WriteLine(
                             $"Source expansion inclusion: [{expansion.AuthoredContractId}] {set} -> {inclusion.Source} " +
                             $"(selector: {inclusion.Selector}; id: {inclusion.ContractId}){FormatInstancePolicySuffix(inclusion)}");

@@ -279,6 +279,8 @@ public sealed partial class ArchitectureDiagnosticFormatter
                     index = p.Index,
                     matched = p.Matched,
                     evaluation_failed = p.EvaluationFailed,
+                    kind = p.Kind == Model.ArchitectureSelectorParticipationKind.Inclusion ? "inclusion" : "exclusion",
+                    stale_exclusion = p.IsStaleExclusion,
                     policy_location = p.PolicyLocation is null ? null : FormatPolicyLocationForJson(p.PolicyLocation)
                 })
                 .ToArray()

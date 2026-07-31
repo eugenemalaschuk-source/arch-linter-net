@@ -237,6 +237,11 @@ public sealed partial class ArchitectureAnalysisSession
                 continue;
             }
 
+            // The positive selector admitted this declaration before source-file ambiguity made
+            // the expectation unavailable (or an exclusion later suppressed it). Participation
+            // must preserve that fact independently of the diagnostic/exclusion outcome.
+            tracker.InclusionMatched = true;
+
             if (MatchesAnyExclusionForAmbiguity(contract, ambiguity, typesByIdentity, tracker))
             {
                 continue;

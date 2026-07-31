@@ -183,6 +183,9 @@ public sealed partial class LayoutConventionContractTests
         var violations = runner.Session.CheckLayoutConventionsContract(contract);
 
         Assert.That(violations.Any(v => v.SourceType.Contains("PartialOffender", StringComparison.Ordinal)), Is.False);
+        Assert.That(runner.SubtractiveMatcherParticipation.Single(item =>
+            item.Kind == ArchitectureSelectorParticipationKind.Inclusion).Matched, Is.True,
+            "The ambiguous declaration entered files_matching before the exclusion suppressed it.");
     }
 
     [Test]

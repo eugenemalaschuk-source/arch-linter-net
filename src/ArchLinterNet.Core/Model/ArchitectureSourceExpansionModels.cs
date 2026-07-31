@@ -37,9 +37,9 @@ public sealed record ArchitectureSourceSetResolution(
 
 public sealed record ArchitectureExpandedContractInstance(
     string ContractId,
-    string Source,
+    string? Source,
     string? SetName,
-    string Selector)
+    string? Selector)
 {
     // The authored location this instance's source came from: the matching `sources[i]` entry for
     // an explicit source, or the referenced source set's own declaration for a resolved member/glob.
@@ -53,6 +53,13 @@ public sealed record ArchitectureExpandedContractInstance(
     // The precise `source_sets[i]` reference on the authored contract. Null for explicit sources
     // and container-template expansion, whose source has no named-set reference.
     public ArchitecturePolicySourceLocation? SourceSetReferencePolicyLocation { get; init; }
+
+    // An optional source-set reference is a positive authored selector even when it resolves no
+    // concrete source. It therefore belongs in Inclusions, with its own source_sets[i] provenance,
+    // rather than being collapsed into the expansion-level optional-empty summary.
+    public bool OptionalEmpty { get; init; }
+
+    public string OptionalReason { get; init; } = string.Empty;
 }
 
 public sealed record ArchitectureExpandedContractExclusion(

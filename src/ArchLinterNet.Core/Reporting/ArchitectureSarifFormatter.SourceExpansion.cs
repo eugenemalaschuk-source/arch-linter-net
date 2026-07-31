@@ -96,6 +96,8 @@ public sealed partial class ArchitectureSarifFormatter
                     ["source"] = instance.Source,
                     ["source_set"] = instance.SetName,
                     ["selector"] = instance.Selector,
+                    ["optional_empty"] = instance.OptionalEmpty,
+                    ["optional_reason"] = instance.OptionalReason,
                     [PolicyLocationKey] = FormatSourceExpansionLocation(instance.PolicyLocation),
                     ["authored_contract_policy_location"] = FormatSourceExpansionLocation(instance.AuthoredContractPolicyLocation),
                     ["source_set_reference_policy_location"] = FormatSourceExpansionLocation(instance.SourceSetReferencePolicyLocation)

@@ -216,6 +216,29 @@ public sealed class SourceExpansionProjectionTests
     }
 
     [Test]
+    public void CiArtifactsJson_CarriesSelectorKindAndStaleExclusion()
+    {
+        string json = ArchitectureDiagnosticFormatter.FormatResultForCiArtifacts(
+            "strict", true, Array.Empty<ArchitectureViolation>(), Array.Empty<string>(),
+            Array.Empty<ArchitectureCycleFinding>(), Array.Empty<ArchitectureClassificationRoleFact>(), null,
+            Array.Empty<BuildStatePreflightDiagnostic>(), Inventory(),
+            subtractiveMatcherParticipation:
+            [
+                new ArchitectureSubtractiveMatcherParticipation(
+                    "modules-no-infrastructure", "modules avoid infrastructure", "exclude_files_matching", 0, false)
+            ]);
+
+        JsonElement participation = JsonDocument.Parse(json).RootElement
+            .GetProperty("subtractive_matcher_participation")[0];
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(participation.GetProperty("kind").GetString(), Is.EqualTo("exclusion"));
+            Assert.That(participation.GetProperty("stale_exclusion").GetBoolean(), Is.True);
+        });
+    }
+
+    [Test]
     public void Sarif_CarriesInlineUnionSelectorFieldAndValueProvenance()
     {
         ArchitectureSourceExpansionInventory inventory = new(
