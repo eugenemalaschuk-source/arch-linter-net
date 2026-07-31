@@ -282,6 +282,19 @@ public sealed partial class ExplainCommandHandlerTests
                     ])
                 {
                     PolicyLocation = location,
+                    Inclusions =
+                    [
+                        new ArchitectureExpandedContractInstance(
+                            "modules-no-infrastructure/acme-modules-orders",
+                            "Acme.Modules.Orders",
+                            "modules",
+                            "Acme.Modules.*")
+                        {
+                            PolicyLocation = location,
+                            AuthoredContractPolicyLocation = location,
+                            SourceSetReferencePolicyLocation = location
+                        }
+                    ],
                     Exclusions =
                     [
                         new ArchitectureExpandedContractExclusion(
